@@ -18,6 +18,7 @@
       "dependencies": {
         "@effect/platform-node": "catalog:",
         "@effect/sql-sqlite-do": "catalog:",
+        "@t3flare/models": "workspace:*",
         "@t3tools/contracts": "workspace:*",
         "@t3tools/provider-acp-registry": "workspace:*",
         "@t3tools/provider-core": "workspace:*",
@@ -66,6 +67,12 @@
       "devDependencies": {
         "@types/node": "catalog:",
         "vitest": "5.0.5",
+      },
+    },
+    "packages/models": {
+      "name": "@t3flare/models",
+      "devDependencies": {
+        "@types/node": "catalog:",
       },
     },
     "t3code/apps/server": {
@@ -3180,6 +3187,8 @@
     "@t3flare/github-app": ["@t3flare/github-app@workspace:packages/github-app"],
 
     "@t3flare/infra": ["@t3flare/infra@workspace:infra"],
+
+    "@t3flare/models": ["@t3flare/models@workspace:packages/models"],
 
     "@t3tools/client-runtime": ["@t3tools/client-runtime@workspace:t3code/packages/client-runtime"],
 

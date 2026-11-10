@@ -25,7 +25,8 @@
     "@t3tools/shared": "workspace:*",
     "@t3tools/source-control-core": "workspace:*",
     "effect": "catalog:",
-    "t3": "workspace:*"
+    "t3": "workspace:*",
+    "@t3flare/models": "workspace:*"
   },
   "devDependencies": {
     "@alchemy.run/cloudflare": "catalog:",

@@ -1,0 +1,15 @@
+{
+  "check": "M0 step 0 (risk R1): how the stock web client treats the unknown driver kind `piDurable`",
+  "where": "local workerd (bun run dev equivalent, wrangler dev -c wrangler.local.jsonc), stock apps/web build of v0.1.9-nightly.20261110.4478",
+  "driver": "stub `piDurable` driver through the builtInDrivers.ts Shadow; adapter answers a fixed text",
+  "results": {
+    "onboarding": "lists 'Pi (cloud)' with 'Turn on'; after it, 'Ready' (m0-r1-onboarding.png)",
+    "composerPicker": "offers the four static models, labelled 'Claude Sonnet 5.5 , Pi (cloud)', with the thinking option (default Medium) (m0-r1-model-picker.png)",
+    "permissions": "the runtime-mode picker shows 'Full access' (our supportedRuntimeModes)",
+    "turn": "a message ran a turn and the stub's answer showed (m0-r1-turn.png)",
+    "icon": "no package icon for an unknown kind: the client draws initials 'PC'/'PI'",
+    "settingsCard": "listed under its driver kind 'piDurable', status 'Authenticated'; the client also lists Codex and Claude as its own built-in entries, 'Checking provider status' forever, since the server has no such instances (cosmetic)",
+    "usagePage": "renders, no error"
+  },
+  "decision": "keep the kind `piDurable` (R1's fallback `pi` not needed)"
+}

@@ -47,6 +47,15 @@ const FS_ALIASES: Record<string, string> = {
   module: shim("node-module.ts"),
 };
 
+/**
+ * Shadows (ADR-0001): whole t3 modules replaced by ours. Keyed by the t3 module's path from the submodule's root; any
+ * import that resolves to it gets ours instead. A Shadow may import other t3 modules, never the one it replaces.
+ */
+export const SHADOWS: Record<string, string> = {
+  // Step 2a: the Cloud Environment's provider drivers are the Durable agent driver alone.
+  "apps/server/src/provider/builtInDrivers.ts": path.join(here, "src/shadows/builtInDrivers.ts"),
+};
+
 /** Node builtins workerd lacks, replaced for every importer. */
 const BUILTIN_STUBS: Record<string, string> = {
   "node:sea": shim("node-sea.ts"),
@@ -170,6 +179,29 @@ const t3NodeFsAlias = (report: { rewritten: number; importers: Set<string>; skip
   },
 });
 
+/** Redirects every import that resolves to a shadowed t3 module to its Shadow. */
+const shadows = (applied: Set<string>): Plugin => {
+  const byRealPath = new Map(
+    Object.entries(SHADOWS).map(([relative, ours]) => [fs.realpathSync(path.join(T3_ROOT, relative)), { relative, ours }]),
+  );
+  return {
+    name: "t3flare:shadows",
+    buildStart() {
+      applied.clear();
+    },
+    async resolveId(source, importer, extra) {
+      if (importer === undefined || !T3_MODULE.test(importer)) return null;
+      if (!source.startsWith(".") && !source.startsWith("/")) return null;
+      const resolved = await this.resolve(source, importer, { ...extra, skipSelf: true });
+      if (resolved === null) return null;
+      const shadow = byRealPath.get(resolved.id);
+      if (shadow === undefined) return null;
+      applied.add(shadow.relative);
+      return shadow.ours;
+    },
+  };
+};
+
 const STUB_PREFIX = "\0t3flare-stub:";
 const T3_SERVER_PACKAGE = path.join(T3_ROOT, "apps/server/package.json");
 
@@ -268,6 +300,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
   const fsAlias = { rewritten: 0, importers: new Set<string>(), skippedDependencyImports: 0 };
   const probe = { modules: 0, bindings: 0 };
   const applied: Array<string> = [];
+  const shadowed = new Set<string>();
   const identity = { t3: t3Version(), commit: ourCommit(), builtAt: new Date().toISOString() };
   const bundle = await rolldown({
     input: path.join(here, "src/worker.ts"),
@@ -275,6 +308,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
     external: ["lightningcss", "fsevents", "cloudflare:workers"],
     plugins: [
       patchedT3Modules(applied),
+      shadows(shadowed),
       t3NodeFsAlias(fsAlias),
       dependencyStubs(),
       moduleStateProbe(probe),
@@ -304,7 +338,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
   const report: BuildReport = {
     ...identity,
     patches: applied,
-    shadows: [],
+    shadows: [...shadowed].sort(),
     buildShims: {
       fsAlias: { rewritten: fsAlias.rewritten, importers: fsAlias.importers.size, skippedDependencyImports: fsAlias.skippedDependencyImports },
       builtinStubs: Object.keys(BUILTIN_STUBS),
@@ -317,7 +351,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
   fs.writeFileSync(path.join(here, "dist/build-report.json"), `${JSON.stringify(report, null, 2)}\n`);
   if (!options.quiet) {
     console.log(
-      `t3flare: built ${(bytes / 1024 / 1024).toFixed(2)} MiB for t3 ${report.t3}; ${applied.length} patches, ` +
+      `t3flare: built ${(bytes / 1024 / 1024).toFixed(2)} MiB for t3 ${report.t3}; ${applied.length} patches, ${shadowed.size} shadows, ` +
         `${fsAlias.rewritten} node:fs imports aliased in ${fsAlias.importers.size} t3 modules, ` +
         `module-state probe in ${probe.modules} modules (${probe.bindings} bindings)`,
     );
