@@ -209,6 +209,8 @@ export const make = (options: CompositionOptions) => {
       // t3's file secret store creates this; ours keeps secrets in DO KV, but replay
       // markers still live here.
       yield* (yield* FileSystem.FileSystem).makeDirectory(derived.secretsDir, { recursive: true });
+      // The home directory t3 offers when browsing for a project folder (HostProcess.HomeDirectory).
+      yield* (yield* FileSystem.FileSystem).makeDirectory(`${BASE_DIR}/home`, { recursive: true });
       return ServerConfig.ServerConfig.of({
         logLevel: "Info",
         traceMinLevel: "Info",
