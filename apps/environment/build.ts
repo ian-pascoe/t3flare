@@ -31,21 +31,38 @@ const FS_ALIASES: Record<string, string> = {
 
 export const fsAliasReport = { rewritten: 0, importers: new Set<string>(), skippedDependencyImports: 0 };
 
+// Static imports and re-exports (`import … from`, `} from` closing a multi-line import,
+// `export … from`) and dynamic `import()`; anchored to line starts so that module source
+// t3 embeds in strings (scripts it runs over SSH or in workers) is left alone.
+const IMPORT_SPECIFIER = /(^\s*(?:import|export|\})[^\n]*?\bfrom\s*|\bawait import\s*\(\s*)(["'])([^"']+)\2/gm;
+
 export const t3NodeFsAlias = (): Plugin => ({
   name: "t3flare:t3-node-fs",
-  resolveId: {
-    order: "pre",
-    handler(source, importer) {
-      const target = FS_ALIASES[source];
-      if (target === undefined || importer === undefined) return null;
-      if (!T3_MODULE.test(importer)) {
-        fsAliasReport.skippedDependencyImports++;
-        return null;
-      }
-      fsAliasReport.rewritten++;
-      fsAliasReport.importers.add(importer.slice(importer.indexOf("/t3code/") + 1));
-      return { id: target };
-    },
+  // The alias is a transform of t3's own modules, not a resolveId hook: Cloudflare's
+  // plugin claims `node:*` builtins in a "pre" resolveId hook, and alchemy's plan copies
+  // plugin objects so that a nested `{ order, handler }` hook loses its handler (the
+  // second build of a deploy failed with "handler.call"). Top-level hook functions survive.
+  transform(code, id) {
+    if (!T3_MODULE.test(id)) {
+      if (/["']node:fs["']/.test(code)) fsAliasReport.skippedDependencyImports++;
+      return null;
+    }
+    let count = 0;
+    const next = code.replace(IMPORT_SPECIFIER, (match, lead: string, quote: string, specifier: string) => {
+      const target = FS_ALIASES[specifier];
+      if (target === undefined) return match;
+      count++;
+      return `${lead}${quote}${target}${quote}`;
+    });
+    if (count === 0) return null;
+    fsAliasReport.rewritten += count;
+    fsAliasReport.importers.add(id.slice(id.indexOf("/t3code/") + 1));
+    return { code: next, map: null };
+  },
+  buildStart() {
+    fsAliasReport.rewritten = 0;
+    fsAliasReport.skippedDependencyImports = 0;
+    fsAliasReport.importers.clear();
   },
   buildEnd() {
     const report = {
@@ -74,12 +91,9 @@ const T3_SERVER = path.join(here, "../../t3code/apps/server/package.json");
 
 export const dependencyStubs = (): Plugin => ({
   name: "t3flare:dependency-stubs",
-  resolveId: {
-    order: "pre",
-    handler(source) {
-      const name = Object.keys(DEPENDENCY_STUBS).find((pkg) => source === pkg || source.startsWith(`${pkg}/`));
-      return name === undefined ? null : { id: `${STUB_PREFIX}${source}`, moduleSideEffects: false };
-    },
+  resolveId(source) {
+    const name = Object.keys(DEPENDENCY_STUBS).find((pkg) => source === pkg || source.startsWith(`${pkg}/`));
+    return name === undefined ? null : { id: `${STUB_PREFIX}${source}`, moduleSideEffects: false };
   },
   async load(id) {
     if (!id.startsWith(STUB_PREFIX)) return null;

@@ -199,16 +199,29 @@ export const rewriteCompoundSelects = (query: string): string => {
   return count < MAX_COMPOUND_TERMS ? query : rewriteLevel(query);
 };
 
+/** The last statements DO SQLite rejected, for the spike's admin route. */
+export const sqlErrors: Array<{ readonly message: string; readonly sql: string; readonly rewritten: boolean }> = [];
+
+const exec = (target: SqlStorage, raw: string, query: string, params: Array<unknown>) => {
+  try {
+    return params.length === 0 ? target.exec(query) : target.exec(query, ...params);
+  } catch (error) {
+    sqlErrors.push({ message: String(error), sql: query.slice(0, 4000), rewritten: raw !== query });
+    if (sqlErrors.length > 20) sqlErrors.shift();
+    throw error;
+  }
+};
+
 export const withParameterInlining = (sql: SqlStorage): SqlStorage =>
   new Proxy(sql, {
     get(target, property) {
       if (property === "exec") {
         return (raw: string, ...params: Array<unknown>) => {
           const query = rewriteCompoundSelects(raw);
-          if (params.length <= MAX_BOUND_PARAMETERS) return target.exec(query, ...params);
+          if (params.length <= MAX_BOUND_PARAMETERS) return exec(target, raw, query, params);
           inlinedStatements.count++;
           inlinedStatements.maxParams = Math.max(inlinedStatements.maxParams, params.length);
-          return target.exec(inlineParameters(query, params));
+          return exec(target, raw, inlineParameters(query, params), []);
         };
       }
       const value = Reflect.get(target, property, target);

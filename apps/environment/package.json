@@ -6,7 +6,9 @@
     "typecheck": "effect-tsgo tsrs --noEmit",
     "deploy": "alchemy deploy",
     "destroy": "alchemy destroy",
-    "bundle": "bun build.ts"
+    "bundle": "bun build.ts",
+    "prepare:web": "bun run --cwd ../../t3code/apps/web build && git -C ../../t3code checkout -- apps/web/src/routeTree.gen.ts && rsync -a --delete --exclude \"*.map\" ../../t3code/apps/web/dist/ dist/web/",
+    "acceptance": "bun scripts/acceptance.ts"
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",

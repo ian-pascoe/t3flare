@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalRandom:off globalFetch:off
+// @effect-diagnostics globalDate:off globalConsole:off globalRandom:off globalFetch:off cryptoRandomUUID:off globalDateInEffect:off preferSchemaOverJson:off
 // The step 0 acceptance test, headless: pair with the bootstrap token, open t3's RPC
 // socket, create a scratch project and a thread, list threads, and open the thread's
 // live stream. Talks to the Environment exactly as a stock client does (t3's contracts

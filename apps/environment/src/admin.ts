@@ -147,6 +147,7 @@ export const handleAdmin = async (request: Request, admin: AdminContext): Promis
         stats: admin.stats,
         inlinedStatements: DoSql.inlinedStatements,
         rewrittenCompounds: DoSql.rewrittenCompounds,
+        sqlErrors: DoSql.sqlErrors,
         spawnAttempts: Object.fromEntries(spawnAttempts),
         sockets: RpcTap.sockets,
         rpcCalls: RpcTap.rpcCalls,
