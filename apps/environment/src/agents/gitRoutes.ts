@@ -48,6 +48,7 @@ const PASSIVE = new Set([
   "diff-tree",
   "diff-index",
   "diff-files",
+  "grep",
 ]);
 
 /** Subcommands in PASSIVE that also have writing forms; those forms may start the Container. */
@@ -57,9 +58,15 @@ const writes = (name: string, rest: ReadonlyArray<string>): boolean => {
       return rest.length > 0 && !["-v", "--verbose", "show", "get-url"].includes(rest[0]!);
     case "config":
       return !rest.some((arg) => arg.startsWith("--get") || arg === "--list" || arg === "-l" || arg === "get");
-    case "branch":
-      return rest.some((arg) => ["-d", "-D", "-m", "-M", "-c", "-C", "--delete", "--move", "--copy", "--set-upstream-to", "-u", "--unset-upstream"].includes(arg)) ||
-        (rest.length > 0 && !rest[0]!.startsWith("-"));
+    case "branch": {
+      const writing = ["-d", "-D", "-m", "-M", "-c", "-C", "-f", "--force", "--delete", "--move", "--copy", "--set-upstream-to", "-u", "--unset-upstream", "--track", "--no-track", "--edit-description"];
+      if (rest.some((arg) => writing.includes(arg) || arg.startsWith("--set-upstream-to="))) return true;
+      const listing = ["--list", "-l", "--show-current"];
+      if (rest.some((arg) => listing.includes(arg) || /^--(no-)?(contains|merged|points-at)/.test(arg))) return false;
+      // A branch name (before or after `--`) creates one: `git branch -- <name>`, as t3 sends it.
+      const dashdash = rest.indexOf("--");
+      return rest.some((arg, at) => (dashdash >= 0 && at > dashdash) || (!arg.startsWith("-") && (dashdash < 0 || at < dashdash)));
+    }
     case "worktree":
       return rest[0] !== "list";
     case "stash":
@@ -69,6 +76,17 @@ const writes = (name: string, rest: ReadonlyArray<string>): boolean => {
     default:
       return false;
   }
+};
+
+/** git subcommands that reach the remote: the router gives them the Workspace's Container token (step 2a M4). */
+const NETWORK = new Set(["push", "fetch", "pull", "ls-remote"]);
+
+/** Whether this git argv talks to the remote, so it needs the repo's token in `T3FLARE_GIT_TOKEN` (the credential helper reads it). */
+export const needsRemoteToken = (args: ReadonlyArray<string>): boolean => {
+  const { name, rest } = subcommandOf(args);
+  if (name === null) return false;
+  if (NETWORK.has(name)) return true;
+  return (name === "remote" && rest[0] === "update") || (name === "submodule" && rest.includes("update"));
 };
 
 /** Whether this git argv may start a stopped Container (the router's allow-list). */

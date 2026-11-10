@@ -1,9 +1,9 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off
+// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off globalConsole:off
 // The Environment's process spawner (step 2a plan, section 2): the Environment DO runs no processes, so every command
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is
 // a missing binary, as in step 1. Every routed command is kept in a short trace (admin `GET /_t3flare/agents/router-trace`).
-import { fromWorkspaceText, normalize, toWorkspace } from "@t3flare/workspace-client";
+import { fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, toWorkspace } from "@t3flare/workspace-client";
 import {
   CONTAINER_GITHUB_PERMISSIONS,
   CONTAINER_WORKFLOWS_PERMISSIONS,
@@ -19,8 +19,9 @@ import * as Stream from "effect/Stream";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type * as ChildProcess from "effect/process/ChildProcess";
 
+import * as StateStore from "../platform/stateStore.ts";
 import { environmentServices } from "./bindings.ts";
-import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, readScopeOf, remoteRepoOf, subcommandOf } from "./gitRoutes.ts";
+import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, needsRemoteToken, readScopeOf, remoteRepoOf, subcommandOf } from "./gitRoutes.ts";
 import { workspaceRpc } from "./workspaceClient.ts";
 
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
@@ -129,16 +130,67 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
   return { exitCode: 0, stdout: "", stderr: answer.stderr, route: "clone", detail };
 };
 
+/**
+ * The Workspace's Container token for its repo (ADR-0013): one repo, `contents` and `pull_requests` write, and
+ * `workflows` only when the Workspace is opted in. Null for a Workspace without a GitHub remote or outside the App.
+ */
+const containerToken = async (id: string): Promise<string | null> => {
+  const record = environmentServices().workspaces.get(id);
+  if (record === undefined || record.host !== "github.com" || record.owner === null || record.name === null) return null;
+  try {
+    return (
+      await environmentServices().github().mint({
+        owner: record.owner.toLowerCase(),
+        repositories: [record.name],
+        permissions: record.workflows ? CONTAINER_WORKFLOWS_PERMISSIONS : CONTAINER_GITHUB_PERMISSIONS,
+      })
+    ).token;
+  } catch (error) {
+    console.warn(JSON.stringify({ t3flare: "container-token-failed", id, error: String(error).slice(0, 300) }));
+    return null;
+  }
+};
+
+/** Temporary index files t3 made on the Environment's side (State directory) and seeded into a Workspace, by path. */
+const seededIndexes = new Map<string, { readonly bridged: string; readonly at: number }>();
+
+/**
+ * t3 builds temporary indexes (`GIT_INDEX_FILE`) in its own temp directory, which the Container cannot see: it copies
+ * the repo's index there, then runs git with the variable set (the commit message's context, the review totals). The
+ * router copies such a file into the Workspace's harness directory the first time a git command names it, and points
+ * the variable there; from then on the Container's git owns it (t3 only hands it back to git, never reads it).
+ */
+const bridgeIndex = async (id: string, env: Record<string, string>): Promise<Record<string, string>> => {
+  const value = env.GIT_INDEX_FILE;
+  if (value === undefined || !value.startsWith("/") || isUnderW(value)) return env;
+  let seeded = seededIndexes.get(value);
+  if (seeded === undefined) {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${id}\0${value}`));
+    const name = [...new Uint8Array(digest)].slice(0, 12).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    const bridged = `${HARNESS_ROOT}/tmp/index-${name}/index`;
+    const rpc = workspaceRpc(id);
+    const entry = StateStore.get(value);
+    await rpc.fs({ op: "remove", path: bridged.slice(0, bridged.lastIndexOf("/")), options: { recursive: true, force: true } });
+    await rpc.fs({ op: "mkdir", path: bridged.slice(0, bridged.lastIndexOf("/")), recursive: true });
+    if (entry !== undefined && entry.kind === "file") await rpc.fs({ op: "write", path: bridged, data: StateStore.readFile(value) });
+    seeded = { bridged, at: Date.now() };
+    seededIndexes.set(value, seeded);
+    for (const [key, old] of seededIndexes) if (Date.now() - old.at > 30 * 60_000) seededIndexes.delete(key);
+  }
+  return { ...env, GIT_INDEX_FILE: seeded.bridged };
+};
+
 const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Record<string, unknown>> | undefined, stdin: string | undefined): Promise<Answer> => {
   const at = toWorkspace(cwd);
   if (at === null || environmentServices().workspaces.get(at.id) === undefined) {
     return { exitCode: 128, stdout: "", stderr: `fatal: cannot change to '${cwd}': No such file or directory\n`, route: "no-workspace" };
   }
   const startContainer = mayStartContainer(args);
+  const token = needsRemoteToken(args) ? await containerToken(at.id) : null;
   const answer = await workspaceRpc(at.id).git({
     argv: args.map((arg) => intoWorkspace(at.id, arg)),
     cwd: at.inner,
-    env: gitEnvOf(at.id, env),
+    env: { ...(await bridgeIndex(at.id, gitEnvOf(at.id, env))), ...(token === null ? {} : { T3FLARE_GIT_TOKEN: token }) },
     ...(stdin === undefined ? {} : { stdin }),
     startContainer,
     readScope: readScopeOf(args),
@@ -155,10 +207,13 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
   }
   return {
     exitCode: answer.exitCode,
-    stdout: fromWorkspaceText(at.id, answer.stdout),
-    stderr: fromWorkspaceText(at.id, answer.stderr),
+    stdout: redactTokens(fromWorkspaceText(at.id, answer.stdout)),
+    stderr: redactTokens(fromWorkspaceText(at.id, answer.stderr)),
     route: answer.stale !== undefined ? `stale-${answer.stale}` : answer.cached === true ? "cache" : "container",
-    detail: `${startContainer ? "action" : "passive"} ${answer.ms}ms`,
+    // An action's failure keeps git's own words in the trace (tokens taken out), as the evidence of what the remote said.
+    detail: `${startContainer ? "action" : "passive"} ${answer.ms}ms${
+      startContainer && answer.exitCode !== 0 ? `: ${redactTokens(answer.stderr).trim().slice(0, 400)}` : ""
+    }`,
   };
 };
 

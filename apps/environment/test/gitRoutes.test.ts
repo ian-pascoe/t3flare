@@ -1,7 +1,7 @@
 // The process router's rules (step 2a plan, section 2): what may start a Container, t3's clone, URLs, paths.
 import { describe, expect, it } from "vitest";
 
-import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, readScopeOf, remoteRepoOf, subcommandOf } from "../src/agents/gitRoutes.ts";
+import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, needsRemoteToken, readScopeOf, remoteRepoOf, subcommandOf } from "../src/agents/gitRoutes.ts";
 
 describe("subcommandOf", () => {
   it("skips git's global options", () => {
@@ -110,5 +110,26 @@ describe("readScopeOf", () => {
     expect(readScopeOf(["diff-index", "-M", "--numstat", "-z", "HEAD", "--"])).toBe("repo");
     expect(readScopeOf(["ls-files", "--others", "--exclude-standard", "-z", "--"])).toBe("repo");
     expect(readScopeOf(["check-ignore", "-z", "--stdin"])).toBe("repo");
+  });
+});
+
+
+describe("needsRemoteToken (step 2a M4)", () => {
+  it("push, fetch, pull and ls-remote get the token; local commands do not", () => {
+    expect(needsRemoteToken(["push", "-u", "origin", "HEAD:refs/heads/feature"])).toBe(true);
+    expect(needsRemoteToken(["-c", "x=y", "fetch", "--quiet", "origin"])).toBe(true);
+    expect(needsRemoteToken(["pull", "--ff-only"])).toBe(true);
+    expect(needsRemoteToken(["ls-remote", "origin"])).toBe(true);
+    expect(needsRemoteToken(["remote", "update"])).toBe(true);
+    expect(needsRemoteToken(["commit", "-m", "x"])).toBe(false);
+    expect(needsRemoteToken(["status"])).toBe(false);
+  });
+
+  it("t3's branch creation (`branch -- <name>`) may start the Container; listings do not", () => {
+    expect(mayStartContainer(["branch", "--", "t3flare/m4-pr-check"])).toBe(true);
+    expect(mayStartContainer(["branch", "feature"])).toBe(true);
+    expect(mayStartContainer(["branch", "--list", "--format=%(refname)"])).toBe(false);
+    expect(mayStartContainer(["branch", "--show-current"])).toBe(false);
+    expect(mayStartContainer(["branch", "-a"])).toBe(false);
   });
 });

@@ -1,0 +1,151 @@
+{
+  "milestone": "M4",
+  "stage": "step2a",
+  "exit": {
+    "commitPushAndPr": {
+      "pass": true,
+      "pr": {
+        "commits": [
+          {
+            "messageHeadline": "Update fixture greeting and README for M3 edit check",
+            "oid": "f9c4637f9884"
+          },
+          {
+            "messageHeadline": "Add manual m4-check GitHub Actions workflow",
+            "oid": "21a25acf5c30"
+          }
+        ],
+        "headRefName": "t3flare/m4-pr-check",
+        "state": "OPEN when created; closed with its branch deleted afterwards",
+        "title": "Update fixture greeting and README for M3 edit check",
+        "url": "https://github.com/ian-pascoe/t3flare-fixture/pull/1"
+      },
+      "flow": "web client, thread 'm3 approve' in /w/t3flare-fixture: branch picker \u2192 new ref t3flare/m4-pr-check (git branch/checkout in the Container), then 'Commit, push & PR': the commit message and the PR title/body came from our text generation (pi-ai through the proxy), git push ran in the Container with the Workspace's Container token in T3FLARE_GIT_TOKEN (the clone's credential helper reads it), and t3 created the PR through GitHub's REST API with the Environment token it read from `gh auth token` (the router's answer).",
+      "screenshot": "m4-pr.png",
+      "routerActions": [
+        {
+          "command": "gh",
+          "argv": "--version",
+          "route": "emulated",
+          "exitCode": 0,
+          "detail": null
+        },
+        {
+          "command": "gh",
+          "argv": "auth status --json hosts",
+          "route": "emulated",
+          "exitCode": 0,
+          "detail": null
+        },
+        {
+          "command": "gh",
+          "argv": "auth token --hostname github.com",
+          "route": "gh-token",
+          "exitCode": 0,
+          "detail": "ian-pascoe: t3flare-fixture"
+        },
+        {
+          "command": "git",
+          "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never update-index --no-split-index",
+          "route": "container",
+          "exitCode": 0,
+          "detail": "action 2265ms"
+        },
+        {
+          "command": "git",
+          "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never add -A",
+          "route": "container",
+          "exitCode": 0,
+          "detail": "action 162ms"
+        },
+        {
+          "command": "git",
+          "argv": "add -A",
+          "route": "container",
+          "exitCode": 0,
+          "detail": "action 135ms"
+        },
+        {
+          "command": "git",
+          "argv": "commit -m Update fixture greeting and README for M3 edit check -m - Add two lines to src/greeting.txt from the web client and M3\n- Note the M3 edit-only check in README.md",
+          "route": "container",
+          "exitCode": 0,
+          "detail": "action 289ms"
+        },
+        {
+          "command": "git",
+          "argv": "push -- origin HEAD:refs/heads/t3flare/m4-pr-check",
+          "route": "container",
+          "exitCode": 0,
+          "detail": "action 1391ms"
+        },
+        {
+          "command": "git",
+          "argv": "config branch.t3flare/m4-pr-check.merge refs/heads/t3flare/m4-pr-check",
+          "route": "container",
+          "exitCode": 0,
+          "detail": "action 98ms"
+        },
+        {
+          "command": "git",
+          "argv": "config branch.t3flare/m4-pr-check.remote origin",
+          "route": "container",
+          "exitCode": 0,
+          "detail": "action 103ms"
+        },
+        {
+          "command": "git",
+          "argv": "--git-dir /w/t3flare-fixture/.git fetch --quiet --no-tags --no-auto-gc -- origin",
+          "route": "container",
+          "exitCode": 0,
+          "detail": "action 493ms"
+        },
+        {
+          "command": "git",
+          "argv": "grep -G --no-color -l -z --full-name --no-recurse-submodules -e ^ dd72898c7c0fea39a34492c8d60204bfc7506a7a -- :(top,icase,literal).github/pull_request_template.md :(top,icase,literal).github/PULL_REQUEST_TEMPLATE.md :(to",
+          "route": "container",
+          "exitCode": 1,
+          "detail": "action 78ms"
+        }
+      ]
+    },
+    "workflowsOptIn": {
+      "pass": true,
+      "withoutOptIn": {
+        "screenshot": "m4-workflows-denied.png",
+        "push": [
+          {
+            "command": "git",
+            "argv": "push -- origin HEAD:refs/heads/t3flare/m4-pr-check",
+            "route": "container",
+            "exitCode": 1,
+            "detail": "action 1229ms: To https://github.com/ian-pascoe/t3flare-fixture.git\n ! [remote rejected] HEAD -> t3flare/m4-pr-check (refusing to allow a GitHub App to create or update workflow `.github/workflows/m4-check.yml` without `workflows` permission)\nerror: failed to push some refs to 'https://github.com/ian-pascoe/t3flare-fixture.git'"
+          }
+        ]
+      },
+      "withOptIn": {
+        "admin": "POST /_t3flare/agents/workspace-workflows?id=t3flare-fixture&on=1",
+        "screenshot": "m4-workflows-allowed.png",
+        "push": [
+          {
+            "command": "git",
+            "argv": "push -- origin HEAD:refs/heads/t3flare/m4-pr-check",
+            "route": "container",
+            "exitCode": 0,
+            "detail": "action 1150ms"
+          }
+        ],
+        "fileOnBranch": ".github/workflows/m4-check.yml"
+      },
+      "after": "opt-in turned off again; PR #1 closed, branch deleted; the Workspace switched back to main"
+    }
+  },
+  "ghNeeds": {
+    "R6": "settled: t3 needs no `gh` beyond `gh --version`, `gh auth status --json hosts` and `gh auth token --hostname github.com` (all answered by the router); the PR is made over REST with that token. Environment variable names t3 set on git: GIT_INDEX_FILE (temporary indexes for the commit-message context and review totals), bridged into the Workspace's harness directory by the router."
+  },
+  "fixesFoundByTheTrace": [
+    "`git branch -- <name>` (t3's branch creation) was classified passive and refused with the Container stopped: now an action",
+    "t3's temporary indexes (GIT_INDEX_FILE in t3's temp directory, on the Environment's side) did not exist in the Container (`add -A` exited 128): the router seeds each into /workspace/.t3flare/tmp/index-<hash>/index on first use",
+    "push/fetch/pull/ls-remote had no credentials: the router mints the Workspace's Container token (one repo; workflows only when opted in) into T3FLARE_GIT_TOKEN"
+  ]
+}
