@@ -3,7 +3,8 @@
 // revised in M2): every passive read the Container answers is kept with the repo's revision in computer's change log
 // (`vfs_changes`) at the time it ran; the same argv, cwd, env and stdin at the same revision gets the same bytes back.
 // Anything that changes the repo (an edit through the Workspace's files, a sync from the Container) moves the
-// revision, and the next read runs for real.
+// revision: the next read runs for real if the Container is running, and otherwise gets the last answer (`last`, any
+// revision) patched with the write journal (`./staleReads.ts`, M3), never starting the Container.
 import { REPO_ROOT } from "@t3flare/workspace-client";
 
 export interface CachedAnswer {

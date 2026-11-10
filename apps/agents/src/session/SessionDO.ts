@@ -68,6 +68,7 @@ const SEQ_KEY = "t3flare:seq";
 const PUSHED_KEY = "t3flare:pushed-entry";
 const RETRY_KEY = "t3flare:push-retry";
 const LAST_PUSH_KEY = "t3flare:last-push";
+const DIAG_KEY = "t3flare:diagnostics";
 
 interface Meta {
   readonly threadId: string;
@@ -133,6 +134,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
             if (end.kind === "failed") ctx.abort(`Harness failed: ${String(end.error)}`);
           });
           await this.#arm();
+          this.#noteDiagnostic("constructed");
           harness.resume();
           if (Object.values(this.#turns()).some(isLive)) void this.#watch();
           resolve(harness);
@@ -213,6 +215,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   override async alarm(): Promise<void> {
     const harness = await this.#opening;
+    this.#noteDiagnostic("alarms");
     harness.resume();
     const now = Date.now();
     const turns = this.#turns();
@@ -342,6 +345,22 @@ export class SessionDO extends DurableObject<SessionEnv> {
     await (await this.#root()).abort(context);
     await this.#arm();
     return { dropped };
+  }
+
+  /** Counts of this object's starts and alarms (the approval-survives-restarts check, step 2a M3). */
+  #noteDiagnostic(what: "constructed" | "alarms"): void {
+    const diag = this.ctx.storage.kv.get<Record<string, number>>(DIAG_KEY) ?? {};
+    this.ctx.storage.kv.put(DIAG_KEY, { ...diag, [what]: (diag[what] ?? 0) + 1, [`${what}At`]: Date.now() });
+  }
+
+  diagnostics(): Promise<Readonly<Record<string, number>>> {
+    return Promise.resolve(this.ctx.storage.kv.get<Record<string, number>>(DIAG_KEY) ?? {});
+  }
+
+  /** A test's fault: the object restarts (as an eviction does), with whatever work it had in memory cut off. */
+  restart(): Promise<{ readonly restarting: true }> {
+    setTimeout(() => this.ctx.abort("t3flare: session restart requested"), 0);
+    return Promise.resolve({ restarting: true });
   }
 
   /** M0's check: the Environment calls this, and it calls the Environment back over its own binding. */

@@ -14,3 +14,7 @@ Most of the Node-only code (`server.ts`, the platform Layers) is never imported,
 
 - **A straight fork with our app in-tree**: no workspace mechanics, but edits in place cost nothing, so the fork drifts silently.
 - **A vendored subtree**: easier to hack on, harder to rebase.
+
+## Refinement (step 2a, M2)
+
+The order is a preference by default, not a rule over size: **a Patch beats a large Shadow when the change is tiny**, because `git apply --check` flags drift in the lines the Patch touches on every bump, while a Shadow of a large module silently freezes all of it. Step 2a's `0002-new-project-root-is-w.patch` changes one line of `ManagedProjectFolders` (the named-projects root becomes `/w`); the Shadow it replaces would have copied 472 lines. Evidence: `docs/steps/step-2a/m2-new-project.png` (New project creates `/w/<name>` with an initial commit), the bump's `git apply --check`. Counts after step 2a part 1: Shadows 1 (`builtInDrivers`), Patches 2.

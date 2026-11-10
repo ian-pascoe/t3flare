@@ -61,6 +61,9 @@ export interface DifferState {
   readonly startedAt: Map<string, DateTime.Utc>;
   /** Each item's last emitted shape, to close it when its turn settles. */
   readonly items: Map<string, { readonly turn: string; readonly kind: OrchestrationV2ExecutionNode["kind"]; readonly status: ItemStatus; readonly title: string | null; readonly body: ItemBody }>;
+  /** Tool calls seen in committed responses of turns still open, and their results once seen (pushes split them). */
+  readonly toolCalls: Map<string, { readonly call: ToolCallInfo; readonly turn: string }>;
+  readonly toolResults: Map<string, PushedEntry>;
   /** Approvals emitted as pending and not yet closed, by the Session's request id. */
   readonly approvals: Map<string, OpenApproval>;
   /** The owner's answers, by t3's runtime request id (`respondToRuntimeRequest`), to close a request as resolved. */
@@ -83,6 +86,8 @@ export const makeDifferState = (sessionName: string): DifferState => ({
   terminated: new Set(),
   startedAt: new Map(),
   items: new Map(),
+  toolCalls: new Map(),
+  toolResults: new Map(),
   approvals: new Map(),
   decisions: new Map(),
 });
@@ -279,6 +284,7 @@ const emitTool = (
   status: ItemStatus,
   result: PushedEntry | undefined,
   pathOut: PathOut,
+  textOut: (text: string) => string,
   now: DateTime.Utc,
 ) => {
   const key = `call:${call.id}`;
@@ -288,7 +294,7 @@ const emitTool = (
     const exitCode = typeof details.exitCode === "number" ? details.exitCode : undefined;
     emitItem(state, out, turn, key, "tool_call", status, "bash", {
       type: "command_execution",
-      input: str(call.arguments.command) ?? "",
+      input: textOut(str(call.arguments.command) ?? ""),
       ...(output.length > 0 ? { output } : {}),
       ...(exitCode === undefined ? {} : { exitCode }),
     }, now);
@@ -297,7 +303,8 @@ const emitTool = (
   if (call.name === "edit" || call.name === "write") {
     const fileName = str(call.arguments.path) ?? str(call.arguments.file_path);
     if (fileName !== undefined) {
-      const diffStr = str(details.patch) ?? (result?.isError === true && output.trim().length > 0 ? output : undefined);
+      const patch = str(details.patch);
+      const diffStr = patch !== undefined ? textOut(patch) : result?.isError === true && output.trim().length > 0 ? output : undefined;
       const newStr = call.name === "write" ? str(call.arguments.content) : undefined;
       emitItem(state, out, turn, key, "tool_call", status, call.name, {
         type: "file_change",
@@ -461,8 +468,8 @@ export const diff = (
   textOut: (text: string) => string = (text) => text,
 ): Array<ProviderAdapterV2Event> => {
   const out: Array<ProviderAdapterV2Event> = [];
-  const calls = new Map<string, { readonly call: ToolCallInfo; readonly turn: TurnContext }>();
-  const results = new Map<string, PushedEntry>();
+  const calls = state.toolCalls;
+  const results = state.toolResults;
   const slots = new Map(pushed.live.tools.map((slot) => [slot.callId, slot]));
 
   for (const entry of pushed.entries) {
@@ -472,7 +479,7 @@ export const diff = (
       emitResponse(state, out, turn, entry.byTaskId ?? `entry-${entry.id}`, entry.content, false, now);
       for (const block of entry.content) {
         if (block.type === "toolCall" && typeof block.id === "string") {
-          calls.set(block.id, { call: block as unknown as ToolCallInfo, turn });
+          calls.set(block.id, { call: block as unknown as ToolCallInfo, turn: turn.providerTurnId });
         }
       }
     } else if (entry.role === "toolResult" && entry.toolCallId !== undefined) {
@@ -487,12 +494,14 @@ export const diff = (
     emitResponse(state, out, liveTurn, live.generation.taskId, live.generation.content, true, now);
   }
 
-  for (const [id, { call, turn }] of calls) {
+  for (const [id, { call, turn: turnId }] of calls) {
+    const turn = state.turns.get(turnId);
+    if (turn === undefined || state.terminated.has(turnId)) continue;
     const result = results.get(id);
     const slot = slots.get(id);
     const status: ItemStatus =
       result !== undefined ? (result.isError === true ? "failed" : "completed") : slot?.status === "done" ? "completed" : "running";
-    emitTool(state, out, turn, call, status, result, pathOut, now);
+    emitTool(state, out, turn, call, status, result, pathOut, textOut, now);
   }
 
   emitApprovals(state, out, pushed.approvals, textOut, now);
@@ -538,6 +547,11 @@ export const diff = (
       emitItem(state, out, turn, key, item.kind, closed, item.title, body, now);
     }
     state.terminated.add(providerTurnId);
+    for (const [id, { turn: callTurn }] of state.toolCalls) {
+      if (callTurn !== providerTurnId) continue;
+      state.toolCalls.delete(id);
+      state.toolResults.delete(id);
+    }
     const failure = turnState.status === "failed" ? failureOf(turnState) : null;
     out.push({
       type: "provider_turn.updated",

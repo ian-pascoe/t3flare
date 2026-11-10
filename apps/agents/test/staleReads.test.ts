@@ -47,13 +47,16 @@ const setup = (name: string) => {
 
 /** Answers before, `change` (which returns the paths it wrote), then each shape's patched answer against real git's. */
 const compare = async (dir: string, change: () => ReadonlyArray<string>) => {
-  const before = SHAPES.map((argv) => git(dir, argv));
+  // The review numstat against a merge base (a commit id), as t3's branch totals read it.
+  const base = git(dir, ["rev-list", "--max-parents=0", "HEAD"]).trim();
+  const shapes = [...SHAPES, [...SHAPES[4]!.slice(0, -2), base, "--"]];
+  const before = shapes.map((argv) => git(dir, argv));
   const journal = change();
-  const facts = await repoFacts({ fs, dir, cache: {} });
-  for (const [at, argv] of SHAPES.entries()) {
-    const kind = kindOf(argv, undefined);
-    expect(kind).toBeDefined();
-    expect(await patchAnswer(kind!, before[at]!, journal, facts), argv.join(" ")).toBe(git(dir, argv));
+  for (const [at, argv] of shapes.entries()) {
+    const shape = kindOf(argv, undefined);
+    expect(shape).toBeDefined();
+    const facts = await repoFacts({ fs, dir, cache: {} }, shape!.base);
+    expect(await patchAnswer(shape!.kind, before[at]!, journal, facts), argv.join(" ")).toBe(git(dir, argv));
   }
 };
 
@@ -66,6 +69,8 @@ describe("stale reads: last answer plus the journal match git", () => {
     r.put(".gitignore", "ignored/\n*.log\n");
     git(r.dir, ["add", "-A"]);
     git(r.dir, ["commit", "-q", "-m", "one"]);
+    r.put("src/b.txt", "b2\n");
+    git(r.dir, ["commit", "-q", "-am", "two"]);
     r.put("src/a.txt", "a\nB\nc\n");
     await compare(r.dir, () => {
       r.put("src/a.txt", "a\nB\nc\nd\n");

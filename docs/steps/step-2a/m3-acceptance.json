@@ -1,0 +1,827 @@
+{
+  "milestone": "M3",
+  "stage": "step2a",
+  "at": "2026-11-10T22:57:18.227Z",
+  "exit": {
+    "editAndBashApproved": {
+      "pass": true,
+      "note": "approval-required: the edit (file-change) and `bash test.sh` (command) each waited for an Approve; bash ran in the Container (it started); the turn's diff was made by the Container's git while it ran, and later by the DO once it stopped (m3-diff.png).",
+      "threadId": "8105f225-7b27-4400-be09-e6f49fad7057",
+      "runs": [
+        {
+          "id": "run:thread:8105f225-7b27-4400-be09-e6f49fad7057:ordinal:1",
+          "status": "completed"
+        }
+      ],
+      "answered": {
+        "runtime-request:piDurable:thread:8105f225-7b27-4400-be09-e6f49fad7057:approval:16": {
+          "decision": "accept",
+          "at": 8221,
+          "prompt": "Edit /w/t3flare-fixture/src/greeting.txt (1 change)\n\n- Edited from the web client.\n+ Edited from the web client.\nHello from M3."
+        },
+        "runtime-request:piDurable:thread:8105f225-7b27-4400-be09-e6f49fad7057:approval:17": {
+          "decision": "accept",
+          "at": 8768,
+          "prompt": "cd /w/t3flare-fixture && bash test.sh"
+        }
+      },
+      "runtimeRequests": [
+        {
+          "id": "runtime-request:piDurable:thread:8105f225-7b27-4400-be09-e6f49fad7057:approval:16",
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:piDurable:thread:8105f225-7b27-4400-be09-e6f49fad7057:approval:17",
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "tools": [
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "title": "read",
+          "toolName": "read",
+          "input": {
+            "path": "/w/t3flare-fixture/src/greeting.txt"
+          }
+        },
+        {
+          "type": "file_change",
+          "status": "completed",
+          "title": "edit",
+          "fileName": "/w/t3flare-fixture/src/greeting.txt",
+          "diffStr": ""
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "bash",
+          "input": "cd /workspace/repo && bash test.sh",
+          "output": ""
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "title": "Allow edit?",
+          "requestKind": "file-change",
+          "prompt": "Edit /w/t3flare-fixture/src/greeting.txt (1 change)\n\n- Edited from the web client.\n+ Edited from the web client.\nHello from M3."
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "title": "Allow bash?",
+          "requestKind": "command",
+          "prompt": "cd /w/t3flare-fixture && bash test.sh"
+        }
+      ],
+      "answer": "I added `Hello from M3.` as the new last line of `src/greeting.txt`, and `bash test.sh` passed, printing \"all checks passed.\" I ran the edit and the test in the same batch, so the test may not have seen the edited file, though the edit reported success.",
+      "checkpoints": [
+        {
+          "at": 1794351419017,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 34
+        },
+        {
+          "at": 1794351419169,
+          "op": "capture",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 138
+        },
+        {
+          "at": 1794351434997,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 25
+        },
+        {
+          "at": 1794351435203,
+          "op": "capture",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 150
+        },
+        {
+          "at": 1794351435448,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 28
+        },
+        {
+          "at": 1794351435583,
+          "op": "diff",
+          "cwd": "/w/t3flare-fixture",
+          "by": "container",
+          "ms": 723
+        },
+        {
+          "at": 1794351436409,
+          "op": "authored",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 28
+        }
+      ],
+      "container": {
+        "running": true,
+        "leased": true,
+        "lastUse": 1794351428340
+      },
+      "ms": 19466
+    },
+    "decline": {
+      "pass": true,
+      "threadId": "2449da2a-d5b4-479d-9538-d2b9457021db",
+      "runs": [
+        {
+          "id": "run:thread:2449da2a-d5b4-479d-9538-d2b9457021db:ordinal:1",
+          "status": "completed"
+        }
+      ],
+      "answered": {
+        "runtime-request:piDurable:thread:2449da2a-d5b4-479d-9538-d2b9457021db:approval:12": {
+          "decision": "decline",
+          "at": 6573,
+          "prompt": "echo m3-decline-check"
+        }
+      },
+      "runtimeRequests": [
+        {
+          "id": "runtime-request:piDurable:thread:2449da2a-d5b4-479d-9538-d2b9457021db:approval:12",
+          "kind": "command",
+          "status": "resolved",
+          "decision": "decline",
+          "feedback": "Not now, M3 decline check."
+        }
+      ],
+      "tools": [
+        {
+          "type": "command_execution",
+          "status": "failed",
+          "title": "bash",
+          "input": "echo m3-decline-check",
+          "output": ""
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "title": "Allow bash?",
+          "requestKind": "command",
+          "prompt": "echo m3-decline-check"
+        }
+      ],
+      "answer": "The bash command `echo m3-decline-check` was declined by you (\"Not now, M3 decline check\"), so it did not run.",
+      "ms": 11890
+    },
+    "questionOnlyTurnStartsNoContainer": {
+      "pass": true,
+      "routerRoutes": {
+        "stale-last-answer": 11,
+        "stale-patched": 3
+      },
+      "threadId": "5b8430cc-9738-43db-b07f-0c89ebe4c40a",
+      "runs": [
+        {
+          "id": "run:thread:5b8430cc-9738-43db-b07f-0c89ebe4c40a:ordinal:1",
+          "status": "completed"
+        }
+      ],
+      "tools": [
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "title": "read",
+          "toolName": "read",
+          "input": {
+            "path": "/w/t3flare-fixture/src/add.sh"
+          }
+        }
+      ],
+      "answer": "It is a Bash script that prints the sum of two integers passed as its arguments, using `echo $(( $1 + $2 ))`.",
+      "containerBefore": {
+        "running": false,
+        "leased": false,
+        "lastUse": 1794351428340
+      },
+      "containerAfter": {
+        "running": false,
+        "leased": false,
+        "lastUse": 1794351428340
+      },
+      "statusReads": [
+        {
+          "running": false,
+          "leased": false,
+          "lastUse": 1794351428340
+        },
+        {
+          "running": false,
+          "leased": false,
+          "lastUse": 1794351428340
+        },
+        {
+          "running": false,
+          "leased": false,
+          "lastUse": 1794351428340
+        }
+      ],
+      "checkpoints": [
+        {
+          "at": 1794351560371,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 28
+        },
+        {
+          "at": 1794351560517,
+          "op": "capture",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 91
+        },
+        {
+          "at": 1794351565504,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 32
+        },
+        {
+          "at": 1794351565717,
+          "op": "capture",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 67
+        },
+        {
+          "at": 1794351565900,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 23
+        },
+        {
+          "at": 1794351566008,
+          "op": "diff",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 29
+        },
+        {
+          "at": 1794351566164,
+          "op": "authored",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 25
+        }
+      ]
+    },
+    "editOnlyTurnThenStatusLeavesContainerStopped": {
+      "pass": true,
+      "routerRoutes": {
+        "stale-last-answer": 18,
+        "stale-patched": 3
+      },
+      "router": [
+        {
+          "argv": "-C /w/t3flare-fixture rev-parse --is-inside-work-tree --show-toplevel --git-common-dir",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "-C /w/t3flare-fixture rev-parse --is-inside-work-tree --show-toplevel --git-common-dir",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "rev-parse --git-path index",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "rev-parse --git-common-dir",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "symbolic-ref --quiet HEAD",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "rev-parse --show-toplevel",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "--git-dir /w/t3flare-fixture/.git symbolic-ref refs/remotes/origin/HEAD",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "--git-dir /w/t3flare-fixture/.git remote",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "diff-index -M --numstat -z HEAD --",
+          "route": "stale-patched",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "status --porcelain=2 --branch -z --no-ahead-behind",
+          "route": "stale-patched",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "config --get branch.main.t3-merge-base-ref",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "config --get branch.main.t3-merge-base",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "config --get branch.main.gh-merge-base",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "remote get-url -- origin",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "rev-parse --symbolic-full-name main@{upstream}",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "merge-base --end-of-options refs/remotes/origin/main HEAD",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "show-ref --verify --quiet refs/heads/main",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "ls-files --others --exclude-standard -z --",
+          "route": "stale-patched",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "-c diff.suppressBlankEmpty=false diff --find-renames --no-color --no-ext-diff --no-textconv --submodule=short --src-prefix=a/ --dst-prefix=b/ --numstat -z dd728",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "config --get branch.main.remote",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        },
+        {
+          "argv": "config --get remote.origin.url",
+          "route": "stale-last-answer",
+          "detail": "passive 0ms"
+        }
+      ],
+      "threadId": "dd4b7d1f-9a5e-4ef1-8e49-53d97a5cb5b7",
+      "runs": [
+        {
+          "id": "run:thread:dd4b7d1f-9a5e-4ef1-8e49-53d97a5cb5b7:ordinal:1",
+          "status": "completed"
+        }
+      ],
+      "tools": [
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "title": "read",
+          "toolName": "read",
+          "input": {
+            "path": "/w/t3flare-fixture/README.md"
+          }
+        },
+        {
+          "type": "file_change",
+          "status": "completed",
+          "title": "edit",
+          "fileName": "/w/t3flare-fixture/README.md",
+          "diffStr": ""
+        }
+      ],
+      "answer": "I appended `Edited by the M3 edit-only check.` as the new last line of `/workspace/repo/README.md`, using only the edit tool. I didn't run any commands, including `bash test.sh`, which `AGENTS.md` asks for after a change. You'll need to run it yourself if you want that check.",
+      "containerBefore": {
+        "running": false,
+        "leased": false,
+        "lastUse": 1794351428340
+      },
+      "containerAfter": {
+        "running": false,
+        "leased": false,
+        "lastUse": 1794351428340
+      },
+      "statusReads": [
+        {
+          "running": false,
+          "leased": false,
+          "lastUse": 1794351428340
+        },
+        {
+          "running": false,
+          "leased": false,
+          "lastUse": 1794351428340
+        },
+        {
+          "running": false,
+          "leased": false,
+          "lastUse": 1794351428340
+        }
+      ],
+      "checkpoints": [
+        {
+          "at": 1794351655343,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 57
+        },
+        {
+          "at": 1794351655510,
+          "op": "capture",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 118
+        },
+        {
+          "at": 1794351667044,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 45
+        },
+        {
+          "at": 1794351667270,
+          "op": "capture",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 115
+        },
+        {
+          "at": 1794351667475,
+          "op": "has",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 23
+        },
+        {
+          "at": 1794351667615,
+          "op": "diff",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 58
+        },
+        {
+          "at": 1794351667753,
+          "op": "authored",
+          "cwd": "/w/t3flare-fixture",
+          "by": "do",
+          "ms": 37
+        }
+      ]
+    },
+    "approvalSurvivesRestartAndHeartbeats": {
+      "pass": true,
+      "note": "A forced Session DO restart (admin session-restart) right after the request, then 7 minutes untouched: 7 heartbeat alarms, each waking an evicted Session (8 constructions), so the waiting call reran 7 times (restartLimit is 5); the request stayed pending in t3 throughout, and the Approve after 435 s ran the command. The polled variant (the Session's snapshot read every 30 s) had 16 constructions.",
+      "quiet": {
+        "threadId": "a8cb88f5-1955-4db8-94b7-47c1d5b6bbcd",
+        "requestId": "runtime-request:piDurable:thread:a8cb88f5-1955-4db8-94b7-47c1d5b6bbcd:approval:12",
+        "waitedSeconds": 435,
+        "stillPendingBeforeAnswer": true,
+        "diagnostics": {
+          "before": {
+            "constructed": 1,
+            "constructedAt": 1794352228149
+          },
+          "after": {
+            "constructed": 8,
+            "constructedAt": 1794352652280,
+            "alarms": 7,
+            "alarmsAt": 1794352652280
+          }
+        },
+        "answered": {
+          "runtime-request:piDurable:thread:a8cb88f5-1955-4db8-94b7-47c1d5b6bbcd:approval:12": {
+            "decision": "accept",
+            "at": 131,
+            "prompt": "echo m3-wait-check"
+          }
+        },
+        "runs": [
+          {
+            "id": "run:thread:a8cb88f5-1955-4db8-94b7-47c1d5b6bbcd:ordinal:1",
+            "status": "completed"
+          }
+        ],
+        "tools": [
+          {
+            "type": "command_execution",
+            "status": "completed",
+            "title": "bash",
+            "input": "echo m3-wait-check",
+            "exitCode": 0,
+            "output": ""
+          },
+          {
+            "type": "approval_request",
+            "status": "completed",
+            "title": "Allow bash?",
+            "requestKind": "command",
+            "prompt": "echo m3-wait-check"
+          }
+        ],
+        "answer": "The output of `echo m3-wait-check` is:\n\n```\nm3-wait-check\n```",
+        "samples": [
+          {
+            "t": 35,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 67,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 97,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 127,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 158,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 188,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 218,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 248,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 278,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 308,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 338,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 368,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 399,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 429,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          }
+        ]
+      },
+      "polled": {
+        "threadId": "e1c1decb-0631-4939-bd42-ccd35947a290",
+        "requestId": "runtime-request:piDurable:thread:e1c1decb-0631-4939-bd42-ccd35947a290:approval:12",
+        "waitedSeconds": 438,
+        "stillPendingBeforeAnswer": true,
+        "diagnostics": {
+          "before": {
+            "constructed": 1,
+            "constructedAt": 1794351744315
+          },
+          "after": {
+            "constructed": 16,
+            "constructedAt": 1794352175132
+          }
+        },
+        "answered": {
+          "runtime-request:piDurable:thread:e1c1decb-0631-4939-bd42-ccd35947a290:approval:12": {
+            "decision": "accept",
+            "at": 78,
+            "prompt": "echo m3-wait-check"
+          }
+        },
+        "runs": [
+          {
+            "id": "run:thread:e1c1decb-0631-4939-bd42-ccd35947a290:ordinal:1",
+            "status": "completed"
+          }
+        ],
+        "tools": [
+          {
+            "type": "command_execution",
+            "status": "completed",
+            "title": "bash",
+            "input": "echo m3-wait-check",
+            "exitCode": 0,
+            "output": ""
+          },
+          {
+            "type": "approval_request",
+            "status": "completed",
+            "title": "Allow bash?",
+            "requestKind": "command",
+            "prompt": "echo m3-wait-check"
+          }
+        ],
+        "answer": "The output of `echo m3-wait-check` is:\n\n```\nm3-wait-check\n```",
+        "samples": [
+          {
+            "t": 35,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 66,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 96,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 127,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 157,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 187,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 218,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 248,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 279,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 309,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 340,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 370,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 401,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          },
+          {
+            "t": 431,
+            "pendingRequests": 1,
+            "runs": [
+              "running"
+            ]
+          }
+        ]
+      }
+    },
+    "checkpointDiffFidelity": {
+      "pass": true,
+      "pairs": 55,
+      "comparisons": 110,
+      "identical": 110,
+      "nonEmpty": 76,
+      "allByDo": true,
+      "detail": "docs/steps/step-2a/m3-fidelity.json: the Workspace DO's diff (Container stopped) against the Container's git, same refs, same argv as t3's diffCheckpoints, for every pair of the fixture's 11 checkpoint refs and HEAD."
+    }
+  },
+  "screenshots": [
+    "m3-turn.png",
+    "m3-approval.png",
+    "m3-diff.png"
+  ],
+  "tests": {
+    "apps/agents/test/gitPatch.test.ts": "10 cases, the DO's patch and numstat vs real git byte for byte (edits with function lines, adds, deletes, empty files, exact renames, modes, binary, missing newlines, merged hunks, quoted paths, symlinks, rewrites, git's indent heuristic case)",
+    "apps/agents/test/staleReads.test.ts": "4 cases x 6 argv shapes, last answer + journal vs real git byte for byte",
+    "apps/agents/test/permissions.test.ts": "faux-provider Harness restarted 8 times (restartLimit 5) while bash waits; decline; an unsafe tool cut off after it started is not rerun; modes and acceptForSession; fails without api.progressed (checked by hand)",
+    "apps/environment/test/differ.test.ts": "approvals open/resolve/cancel; a recorded tool turn (session-tools.json) with results in a later push than their calls"
+  }
+}

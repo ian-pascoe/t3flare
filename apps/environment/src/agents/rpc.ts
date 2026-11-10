@@ -64,6 +64,8 @@ export interface SessionRpc {
   answer(input: AnswerInput): Promise<{ readonly applied: boolean }>;
   snapshot(input?: SnapshotInput): Promise<SessionState>;
   dropTurns(): Promise<{ readonly dropped: number }>;
+  diagnostics(): Promise<Readonly<Record<string, number>>>;
+  restart(): Promise<{ readonly restarting: true }>;
 }
 
 export type LeaseAnswer =

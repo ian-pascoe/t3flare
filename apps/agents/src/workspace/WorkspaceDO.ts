@@ -347,8 +347,8 @@ export class WorkspaceDO extends ContainerHost {
     if (last === undefined) {
       return { ran: false, reason: "container_stopped", detail: "needs the Workspace's Container, which is stopped, and has no earlier answer" };
     }
-    const kind = (run.readScope ?? "repo") === "repo" && last.answer.exitCode === 0 ? kindOf(run.argv, run.env) : undefined;
-    if (kind === undefined) return { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
+    const shape = (run.readScope ?? "repo") === "repo" && last.answer.exitCode === 0 ? kindOf(run.argv, run.env) : undefined;
+    if (shape === undefined) return { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
     const global = currentRevision(this.ctx.storage.sql);
     const memo = this.#staleMemo.get(key);
     if (memo !== undefined && memo.global === global) return memo.answer;
@@ -360,11 +360,11 @@ export class WorkspaceDO extends ContainerHost {
       if (journal.length > 0 && !(await withinGuard(repo))) {
         answer = { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
       } else {
-        const stdout = await patchAnswer(kind, last.answer.stdout, journal, await repoFacts(repo));
+        const stdout = await patchAnswer(shape.kind, last.answer.stdout, journal, await repoFacts(repo, shape.base));
         answer = { ran: true, ...last.answer, stdout, ms: Date.now() - started, cached: true, stale: "patched" };
       }
     } catch (error) {
-      console.warn(JSON.stringify({ t3flare: "stale-read-patch-failed", kind, error: String(error).slice(0, 500) }));
+      console.warn(JSON.stringify({ t3flare: "stale-read-patch-failed", kind: shape.kind, error: String(error).slice(0, 500) }));
       answer = { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
     }
     this.#staleMemo.set(key, { global, answer });

@@ -17,11 +17,15 @@
 //   POST /_t3flare/check/agents?budget=0|1      step 2a M0: the agents Worker both ways, Containers, paths, budget, token scope
 //   GET  /_t3flare/agents/session?thread=<id>   a Session's state as it would push it (differ fixtures, diagnosis)
 //   POST /_t3flare/agents/drop-turns?thread=<id> a test's fault: the Session forgets its turns (the inverse guard)
+//   GET  /_t3flare/agents/session-diagnostics?thread=<id>  a Session's start and alarm counts
+//   POST /_t3flare/agents/session-restart?thread=<id>  a test's fault: the Session DO restarts (as an eviction does)
 //   GET  /_t3flare/agents/router-trace?clear=1   the process router's recent commands (git, gh, missing binaries)
 //   GET  /_t3flare/agents/workspaces            the Workspace registry, each with its Container's state
 //   POST /_t3flare/agents/workspace-stop?id=<id>  stop a Workspace's Container now
 //   POST /_t3flare/agents/workspace-remove?id=<id> forget a Workspace (its DO's files stay; tests and cleanup)
 //   POST /_t3flare/agents/workspace-probe?id=<id>  the repo revision moves on a write and a delete (read cache check)
+//   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec": input} on the Workspace DO
+//   GET  /_t3flare/agents/checkpoint-trace?clear=1 the checkpoint operations the Workspace DOs answered, and by which side
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -194,6 +198,16 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const thread = url.searchParams.get("thread") ?? "";
         return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").dropTurns());
       }
+      case "GET /_t3flare/agents/session-diagnostics": {
+        const { byName } = await import("../agents/rpc.ts");
+        const thread = url.searchParams.get("thread") ?? "";
+        return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").diagnostics());
+      }
+      case "POST /_t3flare/agents/session-restart": {
+        const { byName } = await import("../agents/rpc.ts");
+        const thread = url.searchParams.get("thread") ?? "";
+        return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").restart());
+      }
       case "GET /_t3flare/agents/router-trace": {
         const { routerTrace, clearRouterTrace } = await import("../agents/processRouter.ts");
         const entries = routerTrace();
@@ -246,6 +260,29 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
           gitRevision: { before: first.gitRevision, afterWrite: afterWrite.gitRevision },
           ok: before! < written! && written! < rewritten! && rewritten! < removed! && outsideWrite === removed && gitDirUnmoved,
         });
+      }
+      case "POST /_t3flare/agents/workspace-call": {
+        const { workspaceRpc } = await import("../agents/workspaceClient.ts");
+        const rpc = workspaceRpc(url.searchParams.get("id") ?? "");
+        const body = (await request.json()) as Record<string, unknown>;
+        const started = Date.now();
+        const result =
+          "fs" in body
+            ? await rpc.fs(body.fs as never)
+            : "git" in body
+              ? await rpc.git(body.git as never)
+              : "checkpoint" in body
+                ? await rpc.checkpoint(body.checkpoint as never)
+                : "exec" in body
+                  ? await rpc.exec(body.exec as never)
+                  : { error: "one of fs, git, checkpoint, exec" };
+        return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
+      }
+      case "GET /_t3flare/agents/checkpoint-trace": {
+        const { checkpointTrace } = await import("../workspace/checkpoints.ts");
+        const entries = [...checkpointTrace];
+        if (url.searchParams.get("clear") === "1") checkpointTrace.length = 0;
+        return json({ entries });
       }
       case "POST /_t3flare/agents/workspace-remove": {
         const { environmentServices } = await import("../agents/bindings.ts");

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { approvalIdOf, diff, failureOf, makeDifferState, runtimeRequestIdOf, type DifferState, type TurnContext } from "../src/provider/differ.ts";
 import recorded from "./fixtures/session-chat.json" with { type: "json" };
+import recordedTools from "./fixtures/session-tools.json" with { type: "json" };
 
 const state = recorded as unknown as SessionState;
 const now = DateTime.makeUnsafe("2026-11-10T21:20:00.000Z");
@@ -137,5 +138,42 @@ describe("differ", () => {
     diff(differ, { ...running, approvals: [{ ...approval, requestId: "43" }] }, now);
     const withdrawn = diff(differ, { ...running, approvals: [] }, now);
     expect((withdrawn[0] as { runtimeRequest: { status: string } }).runtimeRequest.status).toBe("cancelled");
+  });
+
+  it("maps a recorded tool turn (step 2a M3) with each call's result arriving in a later push than the call", () => {
+    const tools = recordedTools as unknown as SessionState;
+    const differ = makeDifferState("thread:test");
+    Object.entries(tools.turns).forEach(([providerTurnId, turn], index) => {
+      differ.turns.set(providerTurnId, {
+        providerTurnId,
+        threadId: "thread-1",
+        runId: turn.runId,
+        rootNodeId: `node:${index}`,
+        providerThreadId: "provider-thread-1",
+        runOrdinal: index + 1,
+        providerTurnOrdinal: index + 1,
+        startedAt: now,
+        providerTurn: { id: providerTurnId, providerThreadId: "provider-thread-1", nodeId: `node:${index}`, runAttemptId: turn.attemptId, nativeTurnRef: null, ordinal: index + 1, status: "running", startedAt: now, completedAt: null },
+        contextWindow: 400_000,
+        providerSessionId: "provider-session-1",
+      } as unknown as TurnContext);
+    });
+    const firstResult = tools.entries.findIndex((entry) => entry.role === "toolResult");
+    const live = Object.fromEntries(Object.entries(tools.turns).map(([id, turn]) => [id, { ...turn, status: "running" as const }]));
+    const pathOut = (path: string) => path.replace(/^\/workspace\/repo(?=\/|$)/, "/w/fixture");
+    const textOut = (text: string) => text.replaceAll("/workspace/repo", "/w/fixture");
+    const events = [
+      ...diff(differ, { ...tools, entries: tools.entries.slice(0, firstResult), turns: live }, now, pathOut, textOut),
+      ...diff(differ, { ...tools, entries: tools.entries.slice(firstResult) }, now, pathOut, textOut),
+    ];
+    const items = new Map(events.flatMap((event) => (event.type === "turn_item.updated" ? [[event.turnItem.id, event.turnItem] as const] : [])));
+    const finals = [...items.values()];
+    const edit = finals.find((item) => item.type === "file_change") as { fileName: string; diffStr?: string; status: string } | undefined;
+    expect(edit?.fileName).toBe("/w/fixture/src/greeting.txt");
+    expect(edit?.diffStr).toContain("+Hello from M3.");
+    expect(edit?.status).toBe("completed");
+    const bash = finals.find((item) => item.type === "command_execution") as { input: string; output?: string; exitCode?: number } | undefined;
+    expect(bash).toMatchObject({ input: "cd /w/fixture && bash test.sh", output: "all checks passed\n", exitCode: 0 });
+    expect(events.filter((event) => event.type === "turn.terminal").length).toBe(1);
   });
 });

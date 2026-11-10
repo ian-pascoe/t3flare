@@ -9,7 +9,7 @@
 // - `diff-index -M --numstat -z HEAD --`: each journal path's record recomputed (HEAD against the working tree).
 // - `ls-files --others --exclude-standard -z --`: journal paths added or removed.
 // - `-c diff.suppressBlankEmpty=false diff --find-renames … --src-prefix=a/ --dst-prefix=b/ [--minimal] [--numstat -z]
-//   HEAD --` with no environment: each journal path's section or record recomputed.
+//   <HEAD or a merge base> --` without a temporary index: each journal path's section or record recomputed.
 // Every other argv gets the last answer alone (git-dir-scoped reads are not moved by working-tree writes; the review
 // diffs that stage untracked files in a temporary index, `GIT_INDEX_FILE`, are listed in the step's report).
 // Renames in the last answer that touch a journal path are shown as their two sides. Pure but for `RepoFacts`.
@@ -52,17 +52,24 @@ const REVIEW_PREFIX = [
 const same = (left: ReadonlyArray<string>, right: ReadonlyArray<string>) =>
   left.length === right.length && left.every((value, at) => value === right[at]);
 
-/** Which patched shape `argv` is (with `env`), or undefined for last-answer-only. */
-export const kindOf = (argv: ReadonlyArray<string>, env: Readonly<Record<string, string>> | undefined): StaleKind | undefined => {
+/** Which patched shape `argv` is (with `env`), and the commit its base side is; undefined for last-answer-only. */
+export const kindOf = (
+  argv: ReadonlyArray<string>,
+  env: Readonly<Record<string, string>> | undefined,
+): { readonly kind: StaleKind; readonly base: string } | undefined => {
   if (same(argv, ["status", "--porcelain=2", "--branch", "-z", "--no-ahead-behind"]) || same(argv, ["status", "--porcelain=2", "--branch", "-z"])) {
-    return "status";
+    return { kind: "status", base: "HEAD" };
   }
-  if (same(argv, ["diff-index", "-M", "--numstat", "-z", "HEAD", "--"])) return "diff-index-numstat";
-  if (same(argv, ["ls-files", "--others", "--exclude-standard", "-z", "--"])) return "ls-files-others";
-  if (Object.keys(env ?? {}).length > 0 || !same(argv.slice(0, REVIEW_PREFIX.length), REVIEW_PREFIX)) return undefined;
+  if (same(argv, ["diff-index", "-M", "--numstat", "-z", "HEAD", "--"])) return { kind: "diff-index-numstat", base: "HEAD" };
+  if (same(argv, ["ls-files", "--others", "--exclude-standard", "-z", "--"])) return { kind: "ls-files-others", base: "HEAD" };
+  // The review diffs: HEAD or a merge base against the working tree; with untracked files staged in a temporary index
+  // (`GIT_INDEX_FILE`) they are last-answer-only.
+  if (env?.GIT_INDEX_FILE !== undefined || !same(argv.slice(0, REVIEW_PREFIX.length), REVIEW_PREFIX)) return undefined;
   const rest = argv.slice(REVIEW_PREFIX.length).filter((arg) => arg !== "--minimal");
-  if (same(rest, ["HEAD", "--"])) return "review-diff";
-  if (same(rest, ["--numstat", "-z", "HEAD", "--"])) return "review-numstat";
+  const base = rest.at(-2);
+  if (base === undefined || rest.at(-1) !== "--" || !(base === "HEAD" || /^[0-9a-f]{40}$/.test(base))) return undefined;
+  if (rest.length === 2) return { kind: "review-diff", base };
+  if (same(rest.slice(0, -2), ["--numstat", "-z"])) return { kind: "review-numstat", base };
   return undefined;
 };
 

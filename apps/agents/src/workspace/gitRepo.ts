@@ -227,9 +227,9 @@ export const diffCommits = async (
 
 export { byPath };
 
-/** The facts the stale reads are patched with (`./staleReads.ts`), read once per patch. */
-export const repoFacts = async (repo: Repo): Promise<RepoFacts> => {
-  const head = await resolveCommit(repo, "HEAD");
+/** The facts the stale reads are patched with (`./staleReads.ts`), read once per patch; `base` is the diff's base commit. */
+export const repoFacts = async (repo: Repo, base = "HEAD"): Promise<RepoFacts> => {
+  const head = await resolveCommit(repo, base);
   const headTree = await flatTree(repo, head);
   const index = await indexEntries(repo);
   const trackedDirs = new Set<string>();

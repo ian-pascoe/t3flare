@@ -1,0 +1,83 @@
+{
+  "milestone": "M3 (moved from M2)",
+  "risk": "R5: Sessions and Workspaces share an agents isolate's 128 MB",
+  "measured": true,
+  "node": {
+    "measured": true,
+    "where": "Node (V8) with --expose-gc; workerd has no heap API",
+    "repo": {
+      "trackedFiles": 2000,
+      "head": "463095ab9abd6473e561529c4489636aefb531b5"
+    },
+    "patchBytes": 248,
+    "steps": [
+      {
+        "step": "capture (from)",
+        "ms": 412,
+        "heapBeforeMb": 11.5,
+        "heapPeakMb": 55.3,
+        "retainedMb": 4.6
+      },
+      {
+        "step": "capture (to)",
+        "ms": 342,
+        "heapBeforeMb": 16.1,
+        "heapPeakMb": 68.2,
+        "retainedMb": 0.2
+      },
+      {
+        "step": "diff (patch)",
+        "ms": 78,
+        "heapBeforeMb": 16.3,
+        "heapPeakMb": 30.6,
+        "retainedMb": -4.6
+      },
+      {
+        "step": "stale status patch (25 journal paths)",
+        "ms": 68,
+        "heapBeforeMb": 11.7,
+        "heapPeakMb": 26.5,
+        "retainedMb": 0.1
+      }
+    ],
+    "isolateLimitMb": 128
+  },
+  "deployed": {
+    "workspace": "r5-memory (2,000 tracked files of 40 lines each, 40x7 directories, loose objects; made by the Container's git)",
+    "steps": [
+      {
+        "step": "status (Container running, real git, cached)",
+        "ms": 602
+      },
+      {
+        "step": "checkpoint capture (DO, Container stopped)",
+        "ms": 2346,
+        "by": "do"
+      },
+      {
+        "step": "20 files appended through the Workspace's files",
+        "ms": null
+      },
+      {
+        "step": "checkpoint capture (DO)",
+        "ms": 2934,
+        "by": "do"
+      },
+      {
+        "step": "checkpoint diff, numstat (DO)",
+        "ms": 284,
+        "by": "do",
+        "files": 20
+      },
+      {
+        "step": "status, stale-patched (20 journal paths)",
+        "ms": 259,
+        "stale": "patched"
+      }
+    ],
+    "memoryErrors": "none (no 'exceeded memory' resets; every call answered)",
+    "containerRunningAfter": false
+  },
+  "verdict": "Within the guard (2,000 tracked files, 16 MB of packs). A capture of the whole 2,000-file working tree peaks at 40\u201352 MB of heap above the baseline in V8 (68 MB total at worst over two runs) and releases it; diffs and stale status patches peak under 20 MB. Two live Sessions (a pi-durable Harness each, a few MB) and one capture fit in 128 MB with room; two captures at once in one isolate would be near the limit. The guard stays at 2,000; no third Worker (ADR-0014 unchanged).",
+  "workerdHasNoHeapApi": true
+}
