@@ -207,6 +207,7 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
             records.map(async (record) => ({
               ...record,
               container: await workspaceRpc(record.id).containerState().catch((error: unknown) => ({ error: String(error) })),
+              info: await workspaceRpc(record.id).info().catch((error: unknown) => ({ error: String(error) })),
             })),
           ),
         });

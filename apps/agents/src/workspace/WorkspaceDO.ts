@@ -28,6 +28,7 @@ import { HARNESS_ROOT, REPO_ROOT } from "@t3flare/workspace-client";
 
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
 import { fileOps } from "./files.ts";
+import { readCache, readKey } from "./readCache.ts";
 import {
   CONTAINER_BACKEND,
   CONTAINER_IDLE_MS,
@@ -58,6 +59,8 @@ export interface ExecInput {
   readonly env?: Readonly<Record<string, string>>;
   readonly stdin?: string;
   readonly timeoutMs?: number;
+  /** A read t3 makes on its own: it does not keep the Container up (no last-use update). */
+  readonly passive?: boolean;
 }
 
 export interface ExecResult {
@@ -91,6 +94,7 @@ const ContainerHost = withWorkspaceContainer(class extends DurableObject<Workspa
 
 export class WorkspaceDO extends ContainerHost {
   readonly #workspace: ComputerWorkspace;
+  readonly #reads: ReturnType<typeof readCache>;
   readonly #container: ContainerBackend;
   /** Commands running now: the Container is not stopped under them. */
   #running = 0;
@@ -108,6 +112,7 @@ export class WorkspaceDO extends ContainerHost {
       ignore: CONTAINER_IGNORE,
       connectTimeoutMs: 60_000,
     });
+    this.#reads = readCache(ctx.storage.sql);
     this.#workspace = new ComputerWorkspace({
       storage: ctx.storage,
       backends: [new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx }), this.#container],
@@ -191,7 +196,7 @@ export class WorkspaceDO extends ContainerHost {
       };
     } finally {
       this.#running--;
-      if (backend === CONTAINER_BACKEND) {
+      if (backend === CONTAINER_BACKEND && input.passive !== true) {
         await this.#noteUse();
         await this.#scheduleAlarm();
       }
@@ -245,10 +250,19 @@ export class WorkspaceDO extends ContainerHost {
     }
   }
 
-  /** Real git in the Container (ADR-0009 item 3), unless it is stopped and `startContainer` is false. */
+  /**
+   * Real git in the Container (ADR-0009 item 3). A passive read (`startContainer: false`, t3's own status polls) is
+   * answered from the read cache while the repo is unchanged, and does not count as use: a client watching an idle
+   * Workspace never keeps its Container up. A read the cache cannot answer runs in the Container, starting it if it is
+   * stopped (the repo changed, which is someone working).
+   */
   async git(run: GitRun): Promise<GitAnswer> {
-    if (!run.startContainer && !this.containerRunning()) {
-      return { ran: false, reason: "container_stopped", detail: "The Workspace's Container is stopped." };
+    const passive = !run.startContainer;
+    const key = passive ? await readKey(run) : null;
+    const rev = passive ? this.#reads.revision() : -1;
+    if (key !== null) {
+      const hit = this.#reads.get(key, rev);
+      if (hit !== undefined) return { ran: true, ...hit, ms: 0, cached: true };
     }
     const script = `exec git ${run.argv.map(shellWord).join(" ")}`;
     try {
@@ -258,8 +272,12 @@ export class WorkspaceDO extends ContainerHost {
         ...(run.env === undefined ? {} : { env: run.env }),
         ...(run.stdin === undefined ? {} : { stdin: run.stdin }),
         timeoutMs: run.timeoutMs ?? 120_000,
+        passive,
       });
-      return { ran: true, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, ms: result.ms };
+      const answer = { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr };
+      // Kept at the revision from before it ran: a change while it ran makes the next read run again.
+      if (key !== null && result.status !== "timeout") this.#reads.put(key, rev, answer);
+      return { ran: true, ...answer, ms: result.ms };
     } catch (error) {
       return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
     }
@@ -300,7 +318,7 @@ export class WorkspaceDO extends ContainerHost {
     const ops = fileOps(this.#workspace);
     const repo = "ok" in (await ops.stat(REPO_ROOT));
     const git = "ok" in (await ops.stat(`${REPO_ROOT}/.git`));
-    return { provisioned: repo, repo: git, containerRunning: this.containerRunning() };
+    return { provisioned: repo, repo: git, containerRunning: this.containerRunning(), revision: this.#reads.revision(), cachedReads: this.#reads.stats().rows };
   }
 
   /** Whether the Container runs, and the budget's view. */

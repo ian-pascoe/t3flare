@@ -92,7 +92,7 @@ export interface GitRun {
 }
 
 export type GitAnswer =
-  | { readonly ran: true; readonly exitCode: number; readonly stdout: string; readonly stderr: string; readonly ms: number }
+  | { readonly ran: true; readonly exitCode: number; readonly stdout: string; readonly stderr: string; readonly ms: number; readonly cached?: boolean }
   | { readonly ran: false; readonly reason: "container_stopped" | "container_refused"; readonly detail: string };
 
 export interface CloneInput {
@@ -106,4 +106,7 @@ export interface ProvisionInfo {
   readonly provisioned: boolean;
   readonly repo: boolean;
   readonly containerRunning: boolean;
+  /** The repo's revision in the Workspace's change log, and how many passive reads are kept (diagnosis). */
+  readonly revision?: number;
+  readonly cachedReads?: number;
 }

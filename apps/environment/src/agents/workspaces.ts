@@ -82,6 +82,18 @@ export const workspaceRegistry = (sql: SqlStorage) => {
       );
       return this.get(input.id)!;
     },
+    /** Names the repo a Workspace made empty (a project folder t3 created first) is cloned from. */
+    setRemote(id: string, remote: { readonly host: string | null; readonly owner: string | null; readonly name: string | null; readonly cloneUrl: string | null }): void {
+      ensure();
+      sql.exec(
+        "UPDATE t3flare_workspaces SET host = ?, owner = ?, name = ?, clone_url = ? WHERE id = ?",
+        remote.host,
+        remote.owner?.toLowerCase() ?? null,
+        remote.name,
+        remote.cloneUrl,
+        id,
+      );
+    },
     setState(id: string, state: WorkspaceRecord["state"]): void {
       ensure();
       sql.exec("UPDATE t3flare_workspaces SET state = ? WHERE id = ?", state, id);

@@ -2,7 +2,7 @@
 // The Environment's file system with Workspaces in it (ADR-0008; step 2a plan, section 2): `/w` lists the registry's
 // Workspaces and `/w/<id>/…` is that Workspace DO's files over RPC; every other path is the State directory
 // (fileSystem.ts). An id the registry does not list is NotFound and never reaches a Durable Object.
-import { W_ROOT, isUnderW, normalize, toWorkspace, type DirEntry, type FileStat, type FsAnswer } from "@t3flare/workspace-client";
+import { REPO_ROOT, W_ROOT, isUnderW, normalize, toWorkspace, type DirEntry, type FileStat, type FsAnswer } from "@t3flare/workspace-client";
 import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -63,6 +63,19 @@ const info = (stat: { readonly kind: FileStat["kind"]; readonly size: number; re
   blksize: Option.none(),
   blocks: Option.none(),
 });
+
+/** Registers Workspace `id` and makes its repo folder in its Durable Object. */
+const createWorkspace = (path: string, id: string): Effect.Effect<void, PlatformError.PlatformError> =>
+  Effect.gen(function* () {
+    yield* Effect.try({
+      try: () => environmentServices().workspaces.create({ id }),
+      catch: (cause) => failure("makeDirectory", path, "BadResource", String(cause).slice(0, 300)),
+    });
+    const at = yield* workspace("makeDirectory", path);
+    yield* call("makeDirectory", path, at, { op: "mkdir", path: REPO_ROOT, recursive: true }).pipe(
+      Effect.tapError(() => Effect.sync(() => environmentServices().workspaces.remove(id))),
+    );
+  });
 
 const ROOT_INFO = info({ kind: "directory", size: 0, mtimeMs: 0, mode: 0o755 });
 
@@ -142,6 +155,9 @@ export const routing = (local: Impl): Impl => ({
   makeDirectory: (path, options) => {
     if (!isUnderW(path)) return local.makeDirectory(path, options);
     if (isRoot(path)) return options?.recursive === true ? Effect.void : Effect.fail(failure("makeDirectory", path, "AlreadyExists", "/w exists"));
+    const target = toWorkspace(path);
+    // A new folder directly in `/w` is a new, empty Workspace (t3's project folder, before a clone or `git init`).
+    if (target !== null && target.inner === REPO_ROOT && locate(path) === undefined) return createWorkspace(path, target.id);
     return Effect.flatMap(workspace("makeDirectory", path), (at) =>
       Effect.asVoid(call("makeDirectory", path, at, { op: "mkdir", path: at.inner, recursive: options?.recursive === true })),
     );
@@ -193,7 +209,7 @@ export const routing = (local: Impl): Impl => ({
     if (isRoot(path)) return Effect.succeed(W_ROOT);
     return Effect.flatMap(workspace("realPath", path), (at) =>
       Effect.map(call<string>("realPath", path, at, { op: "realPath", path: at.inner }), (inner) => {
-        const back = inner === "/workspace/repo" || inner.startsWith("/workspace/repo/") ? `${W_ROOT}/${at.id}${inner.slice("/workspace/repo".length)}` : null;
+        const back = inner === REPO_ROOT || inner.startsWith(`${REPO_ROOT}/`) ? `${W_ROOT}/${at.id}${inner.slice(REPO_ROOT.length)}` : null;
         return back ?? normalize(path);
       }),
     );
@@ -201,8 +217,15 @@ export const routing = (local: Impl): Impl => ({
   remove: (path, options) => {
     if (!isUnderW(path)) return local.remove(path, options);
     const at = toWorkspace(path);
-    // A Workspace's root goes with the Workspace, not a file operation.
-    if (isRoot(path) || (at !== null && at.inner === "/workspace/repo")) return readOnly("remove", path);
+    if (isRoot(path)) return readOnly("remove", path);
+    // A Workspace's root goes with the Workspace: its files, then its registry entry.
+    if (at !== null && at.inner === REPO_ROOT) {
+      return Effect.flatMap(workspace("remove", path), (located) =>
+        call("remove", path, located, { op: "remove", path: REPO_ROOT, options: { recursive: true, force: true } }).pipe(
+          Effect.andThen(Effect.sync(() => environmentServices().workspaces.remove(located.id))),
+        ),
+      );
+    }
     return Effect.flatMap(workspace("remove", path), (located) =>
       Effect.asVoid(call("remove", path, located, { op: "remove", path: located.inner, options: { recursive: options?.recursive === true, force: options?.force === true } })),
     );

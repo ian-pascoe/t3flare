@@ -26,7 +26,7 @@ import { workspaceRpc } from "./workspaceClient.ts";
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
 
-export type Route = "container" | "container-stopped" | "clone" | "gh-token" | "no-workspace" | "not-found" | "error";
+export type Route = "container" | "cache" | "container-stopped" | "clone" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
 
 export interface TraceEntry {
   readonly at: number;
@@ -85,15 +85,19 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
   const services = environmentServices();
   const remote = remoteRepoOf(request.url);
   const url = remote?.https ?? request.url;
+  const fields = { host: remote?.host ?? null, owner: remote?.owner ?? null, name: remote?.name ?? null, cloneUrl: url };
+  // t3 creates the project, and with it the folder (an empty Workspace), before it clones into it.
+  const existing = services.workspaces.get(request.id);
+  if (existing !== undefined && existing.cloneUrl !== null) {
+    return { exitCode: 128, stdout: "", stderr: `fatal: destination path '${request.id}' already exists and is not an empty directory.\n`, route: "clone" };
+  }
   let created;
   try {
-    created = services.workspaces.create({
-      id: request.id,
-      host: remote?.host ?? null,
-      owner: remote?.owner ?? null,
-      name: remote?.name ?? null,
-      cloneUrl: url,
-    });
+    if (existing === undefined) created = services.workspaces.create({ id: request.id, ...fields });
+    else {
+      services.workspaces.setRemote(request.id, fields);
+      created = services.workspaces.get(request.id)!;
+    }
   } catch (error) {
     return { exitCode: 128, stdout: "", stderr: `fatal: ${(error as Error).message}\n`, route: "clone" };
   }
@@ -116,7 +120,8 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
   }
   const answer = await workspaceRpc(request.id).clone({ url, token });
   if (!answer.ran || answer.exitCode !== 0) {
-    services.workspaces.remove(request.id);
+    if (existing === undefined) services.workspaces.remove(request.id);
+    else services.workspaces.setRemote(request.id, { host: null, owner: null, name: null, cloneUrl: null });
     const stderr = answer.ran ? answer.stderr : `fatal: ${answer.detail}\n`;
     return { exitCode: answer.ran ? answer.exitCode || 128 : 128, stdout: "", stderr, route: "clone", detail };
   }
@@ -151,23 +156,77 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
     exitCode: answer.exitCode,
     stdout: fromWorkspaceText(at.id, answer.stdout),
     stderr: fromWorkspaceText(at.id, answer.stderr),
-    route: "container",
-    detail: `${startContainer ? "may-start" : "running-only"} ${answer.ms}ms`,
+    route: answer.cached === true ? "cache" : "container",
+    detail: `${startContainer ? "action" : "passive"} ${answer.ms}ms`,
   };
+};
+
+/** What `git --version` says: the Workspace image's git (apps/sandbox-image). */
+const GIT_VERSION = "git version 2.51.0";
+
+/** `-C <dir>` options folded into the cwd, as git applies them (each relative to the last). */
+const withoutDashC = (argv: ReadonlyArray<string>, cwd: string | undefined): { readonly args: ReadonlyArray<string>; readonly cwd: string | undefined } => {
+  const args: Array<string> = [];
+  let at = cwd;
+  let i = 0;
+  for (; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "-C" && i + 1 < argv.length) {
+      const dir = argv[++i]!;
+      at = dir.startsWith("/") ? dir : at === undefined ? undefined : `${at}/${dir}`;
+    } else if (arg === "-c" && i + 1 < argv.length) {
+      args.push(arg, argv[++i]!);
+    } else if (arg.startsWith("-")) {
+      args.push(arg);
+    } else break;
+  }
+  return { args: [...args, ...argv.slice(i)], cwd: at === undefined ? undefined : normalize(at) };
+};
+
+/** gh as t3's GitHub provider uses it: its version, its sign-in, and its token, from the GitHub App. */
+const ghRouteOf = (args: ReadonlyArray<string>): (() => Promise<Answer>) | null => {
+  if (args[0] === "--version") return async () => ({ exitCode: 0, stdout: "gh version 2.83.0 (t3flare)\n", stderr: "", route: "emulated" });
+  if (args[0] === "config" && args[1] === "get") return async () => ({ exitCode: 0, stdout: "\n", stderr: "", route: "emulated" });
+  if (args[0] === "auth" && args[1] === "token") return () => ghToken();
+  if (args[0] === "auth" && args[1] === "status") {
+    return async () => {
+      const owner = environmentServices()
+        .workspaces.list()
+        .find((ws) => ws.host === "github.com" && ws.owner !== null)?.owner;
+      if (owner === undefined || owner === null) {
+        return { exitCode: 1, stdout: JSON.stringify({ hosts: {} }), stderr: "You are not logged into any GitHub hosts.\n", route: "emulated" };
+      }
+      const hosts = { "github.com": [{ state: "success", active: true, host: "github.com", login: owner, tokenSource: "t3flare-github-app" }] };
+      return { exitCode: 0, stdout: `${JSON.stringify({ hosts })}\n`, stderr: "", route: "emulated" };
+    };
+  }
+  return null;
 };
 
 /** What answers `command`, or null when nothing does (a missing binary). */
 const routeOf = (
   name: string,
-  args: ReadonlyArray<string>,
-  cwd: string | undefined,
+  argv: ReadonlyArray<string>,
+  spawnCwd: string | undefined,
 ): ((env: Readonly<Record<string, unknown>> | undefined, stdin: string | undefined) => Promise<Answer>) | null => {
-  if (name === "gh" && args[0] === "auth" && args[1] === "token") return () => ghToken();
-  if (name !== "git" || cwd === undefined) return null;
+  if (name === "gh") return ghRouteOf(argv);
+  if (name !== "git") return null;
+  if (argv.length === 1 && argv[0] === "--version") return async () => ({ exitCode: 0, stdout: `${GIT_VERSION}\n`, stderr: "", route: "emulated" });
+  // `git -C <dir> …`: the directory is the command's cwd.
+  const { args, cwd } = withoutDashC(argv, spawnCwd);
+  if (cwd === undefined) return null;
   const cloneRequest = cloneRequestOf(args, cwd);
   if (cloneRequest !== null) return () => clone(cloneRequest);
   const normal = normalize(cwd);
-  if (!normal.startsWith("/w/")) return null;
+  // Outside the Workspaces there is no repository: git says so, as it would on a laptop.
+  if (!normal.startsWith("/w/")) {
+    return async () => ({
+      exitCode: 128,
+      stdout: "",
+      stderr: "fatal: not a git repository (or any of the parent directories): .git\n",
+      route: "no-workspace",
+    });
+  }
   return (env, stdin) => git(args, normal, env, stdin);
 };
 
