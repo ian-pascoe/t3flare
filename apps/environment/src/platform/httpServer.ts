@@ -17,6 +17,8 @@ import * as NetAddress from "effect/net/NetAddress";
 import * as Socket from "effect/socket/Socket";
 import type { WebSocketPair as WebSocketPairType } from "@cloudflare/workers-types/index.ts";
 
+import * as RpcTap from "./rpcTap.ts";
+
 declare const WebSocketPair: typeof WebSocketPairType;
 
 type Handler = {
@@ -82,7 +84,7 @@ export const make = () => {
           socket.accept();
           // The 101 must reach the client before t3 starts writing frames.
           settle(new Response(null, { status: 101, webSocket: client } as ResponseInit));
-          return Socket.fromWebSocket(Effect.succeed(socket as unknown as globalThis.WebSocket));
+          return Socket.fromWebSocket(Effect.succeed(RpcTap.tap(socket) as unknown as globalThis.WebSocket));
         });
         serverRequest = Object.create(serverRequest, {
           upgrade: { value: upgrade },

@@ -8,6 +8,8 @@
 // - Dependency stubs: native or host-only packages t3 imports but the DO never calls.
 import * as fs from "node:fs";
 import * as os from "node:os";
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import * as path from "node:path";
 import type { Plugin } from "rolldown";
 
@@ -84,7 +86,7 @@ export const dependencyStubs = (): Plugin => ({
     const source = id.slice(STUB_PREFIX.length);
     let names: Array<string> = [];
     try {
-      const resolved = Bun.resolveSync(source, path.dirname(T3_SERVER));
+      const resolved = createRequire(T3_SERVER).resolve(source);
       names = Object.keys(await import(resolved)).filter((name) => name !== "default" && /^[A-Za-z_$][\w$]*$/.test(name));
     } catch {
       names = [];
@@ -132,8 +134,8 @@ export const patchedT3Modules = (): Plugin => {
         fs.copyFileSync(path.join(T3_ROOT, relative), path.join(work, relative));
       }
       for (const file of files) {
-        const result = Bun.spawnSync(["git", "apply", "--whitespace=nowarn", path.join(PATCHES_DIR, file)], { cwd: work });
-        if (result.exitCode !== 0) throw new Error(`t3flare: patch ${file} does not apply: ${result.stderr.toString()}`);
+        const result = spawnSync("git", ["apply", "--whitespace=nowarn", path.join(PATCHES_DIR, file)], { cwd: work });
+        if (result.status !== 0) throw new Error(`t3flare: patch ${file} does not apply: ${result.stderr.toString()}`);
       }
       for (const relative of touched) {
         patched.set(fs.realpathSync(path.join(T3_ROOT, relative)), fs.readFileSync(path.join(work, relative), "utf8"));

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off
+// @effect-diagnostics globalDate:off globalConsole:off globalDateInEffect:off anyUnknownInErrorContext:off
 // The spike's admin routes (`/_t3flare/*`, ADR-0010: behind a token here, Access too from
 // step 1): boot timings, the SQL probes for the step 0 checks, and a forced restart.
 import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
@@ -6,6 +6,7 @@ import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as DoSql from "./platform/sql.ts";
+import * as RpcTap from "./platform/rpcTap.ts";
 import { spawnAttempts } from "./platform/services.ts";
 import type { Runtime } from "./runtime.ts";
 
@@ -147,6 +148,8 @@ export const handleAdmin = async (request: Request, admin: AdminContext): Promis
         inlinedStatements: DoSql.inlinedStatements,
         rewrittenCompounds: DoSql.rewrittenCompounds,
         spawnAttempts: Object.fromEntries(spawnAttempts),
+        sockets: RpcTap.sockets,
+        rpcCalls: RpcTap.rpcCalls,
       });
     case "/_t3flare/boot": {
       const started = performance.now();

@@ -4,7 +4,19 @@
 // in the DO those packages resolve to stubs that throw when used.
 import * as real from "node:module";
 
-export * from "node:module";
+export const builtinModules = real.builtinModules;
+export const isBuiltin = real.isBuiltin;
+export const Module = real.Module;
+export const register = real.register;
+export const syncBuiltinESMExports = real.syncBuiltinESMExports;
+export const findSourceMap = real.findSourceMap;
+export const registerHooks = (real as { registerHooks?: unknown }).registerHooks ?? (() => ({ deregister: () => {} }));
+export const stripTypeScriptTypes = (real as { stripTypeScriptTypes?: unknown }).stripTypeScriptTypes;
+// Compile caches are a Node startup optimisation; workerd has none.
+export const enableCompileCache = () => ({ status: 0 });
+export const flushCompileCache = () => {};
+export const getCompileCacheDir = () => undefined;
+export const constants = { compileCacheStatus: { FAILED: 0, ENABLED: 1, ALREADY_ENABLED: 2, DISABLED: 3 } };
 
 const unavailable = (name: string) =>
   new Proxy(

@@ -698,7 +698,8 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
     Layer.provide(layerCommandReadiness),
     Layer.provide(ServerHttp.layerBrowserApiCors),
-    Layer.provide(ServerHttp.layerHttpCompression),
+    // t3flare: no response compression in t3; Cloudflare's edge compresses, and workerd
+    // would compress a body t3 already gzipped a second time.
   );
 
   const layerMakeServer = Layer.unwrap(
