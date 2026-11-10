@@ -1,8 +1,8 @@
 // @effect-diagnostics effectFnOpportunity:off
 // The platform services t3 gets from `@effect/platform-node` on a laptop, for a Durable
-// Object: the State directory file system, POSIX paths, Node's crypto (real in workerd),
-// and a process spawner and PTY that report every binary as missing, because the
-// Environment DO runs no processes (they belong to a Container, from step 2a).
+// Object: the State directory file system with the Workspaces at `/w`, POSIX paths, Node's crypto (real in
+// workerd), a process spawner that routes git to Workspaces' Containers, and a PTY that reports every shell as
+// missing (the Environment DO runs no processes).
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
@@ -12,30 +12,17 @@ import * as HttpPlatform from "effect/http/HttpPlatform";
 import * as Terminal from "effect/Terminal";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
-import * as PlatformError from "effect/PlatformError";
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
+import * as ProcessRouter from "../agents/processRouter.ts";
 import * as DoFileSystem from "./fileSystem.ts";
+import * as RoutingFileSystem from "./routingFileSystem.ts";
 
-/** Commands t3 tried to spawn, for the spike's report. */
-export const spawnAttempts = new Map<string, number>();
+/** Commands t3 tried to spawn that nothing answers, for the spike's report. */
+export { spawnAttempts } from "../agents/processRouter.ts";
 
-export const layerChildProcessSpawner = Layer.succeed(
-  ChildProcessSpawner.ChildProcessSpawner,
-  ChildProcessSpawner.make((command) => {
-    const name = "command" in command ? String(command.command) : "pipeline";
-    spawnAttempts.set(name, (spawnAttempts.get(name) ?? 0) + 1);
-    return Effect.fail(
-      PlatformError.systemError({
-        _tag: "NotFound",
-        module: "ChildProcess",
-        method: "spawn",
-        description: `t3flare: the Environment DO cannot run '${name}'`,
-        pathOrDescriptor: name,
-      }),
-    );
-  }),
-);
+// Every process t3 spawns is answered by the process router: git in a Workspace's Container, `gh auth token`, and
+// missing binaries for the rest (step 2a plan, section 2).
+export const layerChildProcessSpawner = ProcessRouter.layer;
 
 export const layerPty = Layer.succeed(PtyAdapter.PtyAdapter, {
   spawn: (input) =>
@@ -62,14 +49,14 @@ export const layerHttpPlatform = HttpPlatform.layer.pipe(
 );
 
 // The host t3 thinks it runs on: a Linux machine with no executable, no network
-// interfaces and the State directory as home (process.* is mostly empty in workerd).
+// interfaces and `/w`, the Workspaces, as home (step 2a: the web client's clone and add-project dialogs start there).
 export const layerHostProcess = Layer.mergeAll(
   Layer.succeed(HostProcess.Platform, "linux"),
   Layer.succeed(HostProcess.Architecture, "x64"),
   Layer.succeed(HostProcess.LinuxLibc, "gnu"),
   Layer.succeed(HostProcess.Hostname, "t3flare"),
   Layer.succeed(HostProcess.Username, "t3"),
-  Layer.succeed(HostProcess.HomeDirectory, "/t3/home"),
+  Layer.succeed(HostProcess.HomeDirectory, "/w"),
   Layer.succeed(HostProcess.Environment, { HOME: "/t3/home", PATH: "/usr/bin:/bin" }),
   Layer.succeed(HostProcess.WorkingDirectory, "/t3"),
   Layer.succeed(HostProcess.ExecutablePath, "/bundle/t3"),
@@ -82,7 +69,7 @@ export const layerHostProcess = Layer.mergeAll(
 
 export const layer = Layer.mergeAll(
   layerHostProcess,
-  DoFileSystem.layer,
+  RoutingFileSystem.layer,
   layerTerminal,
   layerHttpPlatform,
   Path.layer,

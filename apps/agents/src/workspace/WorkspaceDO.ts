@@ -19,13 +19,9 @@ import { DurableObject } from "cloudflare:workers";
 
 import type {
   CloneInput,
-  DirEntry,
-  FileStat,
-  FoundEntry,
   FsAnswer,
   GitAnswer,
   GitRun,
-  GrepMatch,
   ProvisionInfo,
 } from "@t3flare/workspace-client";
 import { HARNESS_ROOT, REPO_ROOT } from "@t3flare/workspace-client";

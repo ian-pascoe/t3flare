@@ -21,6 +21,7 @@ import { MuseUsageHome } from "@t3tools/provider-muse/server";
 import * as CursorAccountReader from "@t3tools/provider-cursor/server/CursorAccountReader";
 import * as CursorUsageAccounts from "@t3tools/provider-cursor/server/CursorUsageAccounts";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -177,6 +178,7 @@ import { runMigrations } from "t3/src/persistence/Migrations.ts";
 
 import * as DoHttpServer from "../platform/httpServer.ts";
 import * as DoServices from "../platform/services.ts";
+import * as WorkspaceLayers from "../workspace/layers.ts";
 import * as DoSql from "../platform/sql.ts";
 import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
@@ -401,7 +403,8 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(
       VcsStatusBroadcaster.layer.pipe(
         Layer.provide(layerGitWorkflow),
-        Layer.provide(VcsStatusBroadcaster.layerAutomaticFetchInterval),
+        // t3flare: no automatic fetches: each would start the Workspace's Container (step 2a plan, section 2).
+        Layer.provide(Layer.succeed(VcsStatusBroadcaster.VcsAutomaticFetchInterval, Effect.succeed(Duration.zero))),
         Layer.provide(VcsStatusBroadcaster.layerAutoPullPolicy.pipe(Layer.provide(ProjectStore.layer))),
       ),
     ),
@@ -422,11 +425,16 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(NetService.layer),
   );
 
-  const layerWorkspaceEntries = WorkspaceEntries.layer.pipe(Layer.provide(WorkspacePaths.layer));
-  const layerWorkspaceFileSystem = WorkspaceFileSystem.layer.pipe(
-    Layer.provide(WorkspacePaths.layer),
-    Layer.provide(layerWorkspaceEntries),
-    Layer.provide(layerKnownWorkspaces),
+  // t3flare: paths in a Workspace (`/w/…`) are its Durable Object's files, over RPC; the stock services keep the rest.
+  const layerWorkspaceEntries = WorkspaceLayers.layerWorkspaceEntries(
+    WorkspaceEntries.layer.pipe(Layer.provide(WorkspacePaths.layer)),
+  );
+  const layerWorkspaceFileSystem = WorkspaceLayers.layerWorkspaceFileSystem(
+    WorkspaceFileSystem.layer.pipe(
+      Layer.provide(WorkspacePaths.layer),
+      Layer.provide(layerWorkspaceEntries),
+      Layer.provide(layerKnownWorkspaces),
+    ),
   );
   const layerWorkspace = Layer.mergeAll(WorkspacePaths.layer, layerWorkspaceEntries, layerWorkspaceFileSystem);
   const layerProjectFaviconResolver = ProjectFaviconResolver.layer.pipe(

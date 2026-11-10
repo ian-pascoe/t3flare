@@ -107,7 +107,7 @@ const open: FileSystem.FileSystem["open"] = (path, options) =>
     return file;
   });
 
-const impl: Parameters<typeof FileSystem.make>[0] = {
+export const impl: Parameters<typeof FileSystem.make>[0] = {
     access: (path) => Effect.asVoid(entryOf("access", path, true)),
     chmod: (path, mode) => attempt("chmod", path, () => store.chmod(path, mode)),
     chown: () => Effect.void,

@@ -16,6 +16,10 @@
 //   POST /_t3flare/check/agents?budget=0|1      step 2a M0: the agents Worker both ways, Containers, paths, budget, token scope
 //   GET  /_t3flare/agents/session?thread=<id>   a Session's state as it would push it (differ fixtures, diagnosis)
 //   POST /_t3flare/agents/drop-turns?thread=<id> a test's fault: the Session forgets its turns (the inverse guard)
+//   GET  /_t3flare/agents/router-trace?clear=1   the process router's recent commands (git, gh, missing binaries)
+//   GET  /_t3flare/agents/workspaces            the Workspace registry, each with its Container's state
+//   POST /_t3flare/agents/workspace-stop?id=<id>  stop a Workspace's Container now
+//   POST /_t3flare/agents/workspace-remove?id=<id> forget a Workspace (its DO's files stay; tests and cleanup)
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -187,6 +191,35 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const { byName } = await import("../agents/rpc.ts");
         const thread = url.searchParams.get("thread") ?? "";
         return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").dropTurns());
+      }
+      case "GET /_t3flare/agents/router-trace": {
+        const { routerTrace, clearRouterTrace } = await import("../agents/processRouter.ts");
+        const entries = routerTrace();
+        if (url.searchParams.get("clear") === "1") clearRouterTrace();
+        return json({ entries });
+      }
+      case "GET /_t3flare/agents/workspaces": {
+        const { environmentServices } = await import("../agents/bindings.ts");
+        const { workspaceRpc } = await import("../agents/workspaceClient.ts");
+        const records = environmentServices().workspaces.list();
+        return json({
+          workspaces: await Promise.all(
+            records.map(async (record) => ({
+              ...record,
+              container: await workspaceRpc(record.id).containerState().catch((error: unknown) => ({ error: String(error) })),
+            })),
+          ),
+        });
+      }
+      case "POST /_t3flare/agents/workspace-stop": {
+        const { workspaceRpc } = await import("../agents/workspaceClient.ts");
+        await workspaceRpc(url.searchParams.get("id") ?? "").stopContainer();
+        return json({ stopped: true });
+      }
+      case "POST /_t3flare/agents/workspace-remove": {
+        const { environmentServices } = await import("../agents/bindings.ts");
+        environmentServices().workspaces.remove(url.searchParams.get("id") ?? "");
+        return json({ removed: true });
       }
       case "POST /_t3flare/check/agents": {
         const { agentsCheck } = await import("./agentsCheck.ts");
