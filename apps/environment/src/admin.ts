@@ -148,6 +148,7 @@ export const handleAdmin = async (request: Request, admin: AdminContext): Promis
         inlinedStatements: DoSql.inlinedStatements,
         rewrittenCompounds: DoSql.rewrittenCompounds,
         sqlErrors: DoSql.sqlErrors,
+        materializedCtes: DoSql.materializedCtes,
         spawnAttempts: Object.fromEntries(spawnAttempts),
         sockets: RpcTap.sockets,
         rpcCalls: RpcTap.rpcCalls,
@@ -184,6 +185,61 @@ export const handleAdmin = async (request: Request, admin: AdminContext): Promis
         }
       }
       return json({ maxCompoundTerms: max });
+    }
+    case "/_t3flare/probe/nesting": {
+      // DO SQLite's nesting limits, which differ between local workerd and production.
+      const sql = admin.ctx.storage.sql;
+      const limit = (make: (n: number) => string) => {
+        let ok = 0;
+        let error = "";
+        for (let n = 1; n <= 128; n++) {
+          try {
+            sql.exec(make(n)).toArray();
+            ok = n;
+          } catch (e) {
+            error = String(e);
+            break;
+          }
+        }
+        return { maxOk: ok, error };
+      };
+      const fromSubqueries = limit((n) => "SELECT * FROM (".repeat(n) + "SELECT 1 AS v" + ")".repeat(n));
+      const scalarSubqueries = limit((n) => "SELECT " + "(SELECT ".repeat(n) + "1" + ")".repeat(n));
+      const cteChain = limit(
+        (n) =>
+          "WITH c0 AS (SELECT 1 AS v)" +
+          Array.from({ length: n }, (_, i) => `, c${i + 1} AS (SELECT v FROM c${i})`).join("") +
+          ` SELECT * FROM c${n}`,
+      );
+      const cteChainNotMaterialized = limit(
+        (n) =>
+          "WITH c0 AS NOT MATERIALIZED (SELECT 1 AS v)" +
+          Array.from({ length: n }, (_, i) => `, c${i + 1} AS NOT MATERIALIZED (SELECT v FROM c${i})`).join("") +
+          ` SELECT * FROM c${n}`,
+      );
+      const failing = DoSql.sqlErrors.filter((e) => e.message.includes("nested too deep")).at(-1)?.sql;
+      const variants: Record<string, string> = {};
+      if (failing !== undefined) {
+        const params = (failing.match(/\?/g) ?? []).length;
+        const tryExplain = (text: string) => {
+          try {
+            sql.exec(`EXPLAIN ${text}`, ...Array.from({ length: params }, () => null)).toArray();
+            return "ok";
+          } catch (e) {
+            return String(e);
+          }
+        };
+        variants.original = tryExplain(failing);
+        variants.materialized = tryExplain(failing.replaceAll("NOT MATERIALIZED", "MATERIALIZED"));
+        variants.noHint = tryExplain(failing.replaceAll("NOT MATERIALIZED", ""));
+        const split = DoSql.splitWith(failing);
+        variants.ctes = split === null ? "unparsed" : split.ctes.map((c) => c.name).join(",");
+      }
+      return json({ fromSubqueries, scalarSubqueries, cteChain, cteChainNotMaterialized, failingQueryLength: failing?.length, variants });
+    }
+    case "/_t3flare/probe/force-materialize": {
+      DoSql.materializedCtes.force = url.searchParams.get("on") === "1";
+      return json(DoSql.materializedCtes);
     }
     case "/_t3flare/restart": {
       // Resets the object as an eviction or deploy would: memory and sockets go, storage stays.

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "deploy": "alchemy deploy",
+    "deploy": "bun build.ts && alchemy deploy",
     "destroy": "alchemy destroy",
     "bundle": "bun build.ts",
     "prepare:web": "bun run --cwd ../../t3code/apps/web build && git -C ../../t3code checkout -- apps/web/src/routeTree.gen.ts && rsync -a --delete --exclude \"*.map\" ../../t3code/apps/web/dist/ dist/web/",
@@ -28,6 +28,7 @@
     "@alchemy.run/cloudflare": "catalog:",
     "@alchemy.run/cloudflare-runtime": "2.0.0-beta.85",
     "@cloudflare/workers-types": "^5.20261104.1",
+    "@distilled.cloud/cloudflare": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@types/node": "catalog:",
     "alchemy": "catalog:",

@@ -202,11 +202,171 @@ export const rewriteCompoundSelects = (query: string): string => {
 /** The last statements DO SQLite rejected, for the spike's admin route. */
 export const sqlErrors: Array<{ readonly message: string; readonly sql: string; readonly rewritten: boolean }> = [];
 
+// Production DO SQLite caps how many views and subqueries one statement may expand
+// ("VIEWs and/or subqueries nested too deep" past ~100; a chain of 98 CTEs passes, and
+// local workerd has no such cap). t3's thread-window query inlines one CTE into many
+// references (NOT MATERIALIZED) and trips it. Such a statement is retried with each CTE
+// materialized into a scratch table, in order, inside the same synchronous call.
+export const materializedCtes = { count: 0, failures: 0, compared: 0, force: false };
+
+interface Cte {
+  readonly name: string;
+  readonly columns: string | null;
+  readonly body: string;
+}
+
+const skipSpace = (text: string, i: number) => {
+  for (;;) {
+    while (i < text.length && /\s/.test(text[i]!)) i++;
+    if (text.startsWith("--", i)) {
+      const end = text.indexOf("\n", i);
+      i = end === -1 ? text.length : end;
+      continue;
+    }
+    return i;
+  }
+};
+
+/** Index just past the parenthesis group opening at `open`. */
+const closeParen = (text: string, open: number) => {
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    const char = text[i]!;
+    if (char === "'" || char === '"' || char === "`") {
+      const end = text.indexOf(char, i + 1);
+      i = end === -1 ? text.length : end;
+      continue;
+    }
+    if (char === "-" && text[i + 1] === "-") {
+      const end = text.indexOf("\n", i);
+      i = end === -1 ? text.length : end;
+      continue;
+    }
+    if (char === "(") depth++;
+    else if (char === ")" && --depth === 0) return i + 1;
+  }
+  throw new Error("Unbalanced parentheses");
+};
+
+export const splitWith = (query: string): { ctes: Array<Cte>; main: string } | null => {
+  let i = skipSpace(query, 0);
+  if (!/^WITH\b/i.test(query.slice(i))) return null;
+  i = skipSpace(query, i + 4);
+  if (/^RECURSIVE\b/i.test(query.slice(i))) return null;
+  const ctes: Array<Cte> = [];
+  for (;;) {
+    const name = /^[A-Za-z_][\w$]*/.exec(query.slice(i))?.[0];
+    if (name === undefined) return null;
+    i = skipSpace(query, i + name.length);
+    let columns: string | null = null;
+    if (query[i] === "(") {
+      const end = closeParen(query, i);
+      columns = query.slice(i, end);
+      i = skipSpace(query, end);
+    }
+    const as = /^AS\s+(?:NOT\s+)?(?:MATERIALIZED\s+)?/i.exec(query.slice(i));
+    if (as === null) return null;
+    i += as[0].length;
+    if (query[i] !== "(") return null;
+    const end = closeParen(query, i);
+    ctes.push({ name, columns, body: query.slice(i + 1, end - 1) });
+    i = skipSpace(query, end);
+    if (query[i] === ",") {
+      i = skipSpace(query, i + 1);
+      continue;
+    }
+    return { ctes, main: query.slice(i) };
+  }
+};
+
+const NOT_ALIAS = new Set([
+  "WHERE", "JOIN", "LEFT", "RIGHT", "INNER", "CROSS", "FULL", "OUTER", "NATURAL", "ON", "USING",
+  "GROUP", "ORDER", "LIMIT", "UNION", "INTERSECT", "EXCEPT", "WINDOW", "HAVING", "AS",
+]);
+
+/**
+ * Runs each CTE as its own statement, then hands its rows to the statements that read it
+ * as a `json_each` parameter instead of a nested query. No DDL: creating scratch tables
+ * invalidated cursors t3 still had open.
+ */
+const materializeCtes = (target: SqlStorage, query: string) => {
+  const split = splitWith(query);
+  if (split === null) return null;
+  const data: Array<{ name: string; columns: ReadonlyArray<string>; json: string }> = [];
+  const substitute = (text: string) => {
+    const params: Array<string> = [];
+    let out = text;
+    for (const cte of data) {
+      out = out.replace(new RegExp(`\\b(FROM|JOIN)(\\s+)${cte.name}\\b(\\s*)([A-Za-z_]*)`, "gi"), (_m, kw: string, ws: string, ws2: string, next: string) => {
+        params.push(cte.json);
+        const columns = cte.columns.map((c) => `json_extract(value, '$[${cte.columns.indexOf(c)}]') AS "${c}"`).join(", ");
+        const aliased = next !== "" && !NOT_ALIAS.has(next.toUpperCase());
+        const explicit = next.toUpperCase() === "AS";
+        const alias = aliased || explicit ? "" : ` AS ${cte.name}`;
+        return `${kw}${ws}(SELECT ${columns} FROM json_each(?${params.length}))${alias}${ws2}${next}`;
+      });
+    }
+    return { sql: out, params };
+  };
+  const run = (text: string) => {
+    const { sql, params } = substitute(text);
+    const cursor = target.exec(sql, ...params);
+    const columns = cursor.columnNames;
+    const rows = Array.from(cursor.raw());
+    for (const row of rows) {
+      for (const value of row) {
+        if (value instanceof ArrayBuffer) throw new Error("A CTE row holds a blob");
+      }
+    }
+    return { columns, rows };
+  };
+  for (const cte of split.ctes) {
+    if (cte.columns !== null) return null;
+    const { columns, rows } = run(cte.body);
+    data.push({ name: cte.name, columns, json: JSON.stringify(rows) });
+  }
+  const { columns, rows } = run(split.main);
+  materializedCtes.count++;
+  return {
+    columnNames: columns,
+    raw: () => rows[Symbol.iterator](),
+    toArray: () => rows.map((row) => Object.fromEntries(columns.map((c, k) => [c, row[k]]))),
+    rowsRead: 0,
+    rowsWritten: 0,
+  } as unknown as ReturnType<SqlStorage["exec"]>;
+};
+
 const exec = (target: SqlStorage, raw: string, query: string, params: Array<unknown>) => {
+  // Test switch (admin route): take the fallback for every WITH statement, to compare results.
+  if (materializedCtes.force && /^\s*WITH\b/i.test(query) && !/^\s*WITH\s+RECURSIVE/i.test(query)) {
+    // Compare: the direct result is returned, the fallback's is checked against it.
+    const direct = params.length === 0 ? target.exec(query) : target.exec(query, ...params);
+    const columns = direct.columnNames;
+    const rows = Array.from(direct.raw());
+    const forced = materializeCtes(target, params.length === 0 ? query : inlineParameters(query, params));
+    if (forced !== null) {
+      const a = JSON.stringify(rows);
+      const b = JSON.stringify(Array.from(forced.raw()));
+      materializedCtes.compared++;
+      if (a !== b || JSON.stringify(columns) !== JSON.stringify(forced.columnNames)) {
+        sqlErrors.push({ message: `materialize mismatch: ${a.slice(0, 300)} vs ${b.slice(0, 300)} cols ${columns} vs ${forced.columnNames}`, sql: query.slice(0, 3000), rewritten: true });
+      }
+    }
+    return { columnNames: columns, raw: () => rows[Symbol.iterator](), toArray: () => [], rowsRead: 0, rowsWritten: 0 } as unknown as ReturnType<SqlStorage["exec"]>;
+  }
   try {
     return params.length === 0 ? target.exec(query) : target.exec(query, ...params);
   } catch (error) {
-    sqlErrors.push({ message: String(error), sql: query.slice(0, 4000), rewritten: raw !== query });
+    if (String(error).includes("nested too deep")) {
+      try {
+        const fallback = materializeCtes(target, params.length === 0 ? query : inlineParameters(query, params));
+        if (fallback !== null) return fallback;
+      } catch (fallbackError) {
+        materializedCtes.failures++;
+        sqlErrors.push({ message: `materialize: ${String(fallbackError)}`, sql: query.slice(0, 2000), rewritten: true });
+      }
+    }
+    sqlErrors.push({ message: String(error), sql: query.slice(0, 20000), rewritten: raw !== query });
     if (sqlErrors.length > 20) sqlErrors.shift();
     throw error;
   }
