@@ -1,0 +1,27 @@
+{
+  "name": "@t3flare/computer-env",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./shell": "./src/shell.ts"
+  },
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "lint": "oxlint --type-aware src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cloudflare/computer": "0.9.0",
+    "@earendil-works/chord": "1.5.0",
+    "@earendil-works/pi-durable": "1.5.0",
+    "@platformatic/vfs": "0.5.0",
+    "ignore": "7.0.14",
+    "just-bash": "3.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261104.1",
+    "@types/node": "catalog:",
+    "vitest": "5.0.5"
+  }
+}

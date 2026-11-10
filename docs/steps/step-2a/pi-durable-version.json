@@ -1,0 +1,58 @@
+{
+  "rule": "plan.md step 2a: run cloudpid's effect-durable tests against upstream unpatched; use upstream if they pass, otherwise pin exactly what cloudpid runs",
+  "date": "2026-11-10",
+  "source": "cloudpid@ae5a7b73 packages/effect-durable/src (copied whole to /tmp/pid-check), effect 4.1.2, vitest 5.0.5, effect-tsgo 0.67.1 with cloudpid's base tsconfig",
+  "upstream": {
+    "versions": {
+      "pi-durable": "1.5.2 (newest on npm; /tmp/ref/pi main 058496b is 1.5.2)",
+      "pi-ai": "1.5.2",
+      "chord": "1.5.2",
+      "pi-schema": "1.5.2"
+    },
+    "typecheck": {
+      "errors": 7,
+      "lines": [
+        "src/task.test.ts(3,15): error TS2305: Module '\"@earendil-works/chord\"' has no exported member 'JsonValue'.",
+        "src/tool.test.ts(328,34): error TS2741: Property 'progressed' is missing in type 'ToolExecutionApi<JsonValue>' but required in type 'Pick<ToolExecutionApi<JsonValue>, \"progressed\">'.",
+        "src/tool.test.ts(329,30): error TS2741: Property 'progressed' is missing in type 'ToolExecutionApi<JsonValue>' but required in type 'Pick<ToolExecutionApi<JsonValue>, \"progressed\">'.",
+        "src/tool.test.ts(375,64): error TS2741: Property 'progressed' is missing in type 'ToolExecutionApi<JsonValue>' but required in type 'Pick<ToolExecutionApi<JsonValue>, \"progressed\">'.",
+        "src/tool.ts(3,15): error TS2305: Module '\"@earendil-works/chord\"' has no exported member 'JsonValue'.",
+        "src/tool.ts(55,57): error TS2344: Type '\"progressed\"' does not satisfy the constraint 'keyof ToolExecutionApi<JsonValue>'.",
+        "src/tool.ts(56,42): error TS18046: 'api.progressed' is of type 'unknown'."
+      ]
+    },
+    "vitest": {
+      "result": "Test Files 2 failed | 5 passed (7); Tests 7 failed | 48 passed (55)",
+      "failing": [
+        "\u00d7 passes an appended digest, and a change that leaves the manifest alone 281ms",
+        "     \u00d7 fails a plain git revert of the change that added a migration 155ms",
+        "     \u00d7 fails a digest that changed, was inserted before one that shipped, or moved 130ms",
+        "     \u00d7 fails a manifest that was deleted, and ignores edits to its header 129ms",
+        "     \u00d7 reads digests however the manifest indents them 128ms",
+        "     \u00d7 passes when the base has no manifest yet 129ms",
+        "     \u00d7 starts the restart count over for the call and for the call that waits on it, past the restart limit 5005ms",
+        " FAIL  src/check-migration-manifests.test.ts > scripts/check-migration-manifests.sh > passes an appended digest, and a change that leaves the manifest alone"
+      ]
+    }
+  },
+  "cloudpidPin": {
+    "versions": {
+      "pi-durable": "1.5.0 + patches/@earendil-works__pi-durable@1.5.0.patch (#97 codemode details cap, #647 ToolExecutionApi.progressed)",
+      "pi-ai": "1.5.0",
+      "chord": "1.5.0",
+      "pi-schema": "1.5.0"
+    },
+    "typecheck": {
+      "errors": 0
+    },
+    "vitest": {
+      "result": [
+        "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 6 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+        "Test Files  1 failed | 6 passed (7)",
+        "Tests  6 failed | 49 passed (55)"
+      ],
+      "note": "the 6 remaining failures are scripts/check-migration-manifests.sh tests, which need cloudpid's repo scripts and do not touch pi-durable; they fail identically on both versions"
+    }
+  },
+  "decision": "upstream 1.5.2 fails (7 type errors: ToolExecutionApi has no `progressed`, which reachedWait needs, and chord no longer exports JsonValue at its root; the reachedWait restart-limit test fails). Pin exactly cloudpid's: pi-durable 1.5.0 with cloudpid's patch, pi-ai/chord/pi-schema 1.5.0."
+}

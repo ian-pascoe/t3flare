@@ -136,6 +136,16 @@ const patchedDependencies: Record<string, string> = {};
 for (const [key, file] of Object.entries(ws.patchedDependencies)) {
   patchedDependencies[key] = `${PREFIX}${file}`;
 }
+// Our own dependency patches (`patches/deps/<scope>__<name>@<version>.patch`, step 2a): bun patchedDependencies, not
+// t3 Patches (ADR-0001 counts those apart).
+const depPatches = path.join(root, "patches/deps");
+if (fs.existsSync(depPatches)) {
+  for (const file of fs.readdirSync(depPatches).filter((name) => name.endsWith(".patch")).sort()) {
+    const key = file.slice(0, -".patch".length).replace(/^@([^_]+)__/, "@$1/");
+    if (patchedDependencies[key] !== undefined) throw new Error(`patches/deps/${file}: t3 already patches ${key}`);
+    patchedDependencies[key] = `patches/deps/${file}`;
+  }
+}
 
 const pkgPath = path.join(root, "package.json");
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));

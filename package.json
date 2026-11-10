@@ -1799,6 +1799,8 @@
     "alchemy@2.0.0-beta.85": "t3code/patches/alchemy@2.0.0-beta.85.patch",
     "react-native-svg@15.16.1": "t3code/patches/react-native-svg@15.16.1.patch",
     "@legendapp/list@3.7.2": "t3code/patches/@legendapp__list@3.7.2.patch",
-    "react-native-pdf-jsi@6.1.0": "t3code/patches/react-native-pdf-jsi@6.1.0.patch"
+    "react-native-pdf-jsi@6.1.0": "t3code/patches/react-native-pdf-jsi@6.1.0.patch",
+    "@alchemy.run/cloudflare@2.0.0-beta.85": "patches/deps/@alchemy.run__cloudflare@2.0.0-beta.85.patch",
+    "@earendil-works/pi-durable@1.5.0": "patches/deps/@earendil-works__pi-durable@1.5.0.patch"
   }
 }
