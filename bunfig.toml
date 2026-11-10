@@ -1,0 +1,10 @@
+# Bun's settings (docs/adr/0019-*.md, after cloudpid's ADR-0028).
+
+[install]
+# pnpm-style layout: packages see only what they declare. The global store keeps one copy of
+# each package in Bun's cache and links every checkout to it.
+linker = "isolated"
+globalStore = true
+# Leave a release a day before installing it; t3code's own exemptions are carried over.
+minimumReleaseAge = 86400
+minimumReleaseAgeExcludes = ["@legendapp/list@3.7.2","@effect/tsgo-darwin-arm64@0.67.1","@effect/tsgo-darwin-x64@0.67.1","@effect/tsgo-linux-arm64@0.67.1","@effect/tsgo-linux-arm@0.67.1","@effect/tsgo-linux-x64@0.67.1","@effect/tsgo-win32-arm64@0.67.1","@effect/tsgo-win32-x64@0.67.1","@effect/tsgo@0.67.1","@anthropic-ai/claude-agent-sdk@0.3.321","@pierre/diffs@1.7.0-beta.3","@pierre/highlights@0.5.0"]

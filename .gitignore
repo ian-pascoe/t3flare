@@ -3,3 +3,4 @@ dist/
 .alchemy/
 .wrangler/
 *.log
+.bun/
