@@ -1,0 +1,3 @@
+# Upstream is tracked by release tag, with an automated bump
+
+Stock clients and the laptop server update themselves while the cloud is pinned, so version skew is ongoing. We track t3code release tags, not `main`. A scheduled job bumps the submodule, re-applies Shadows and Patches, typechecks, and runs the acceptance test (a headless client pairs, creates a project and opens a thread) against a deployed stage. A DO SQLite point-in-time bookmark is taken before t3's migrations run, because they only go forward. Version-coupled extras (the Claude ACP adapter that t3's registry expects) move in the same job.

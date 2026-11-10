@@ -1,0 +1,3 @@
+# The endpoint is public, behind t3's own auth
+
+Stock t3 desktop and mobile clients, and Peer links, cannot pass Cloudflare Access, so `/ws` and `/mcp` are public and protected only by t3's pairing, sessions, DPoP and MCP OAuth. Upstream already exposes servers publicly through T3 Connect tunnels. To narrow the surface, our composition mounts only the routes we need (no guest links, webhook route, OTLP proxy, device hub or relay routes), and a WAF rule rate-limits the auth paths. The first pairing uses t3's bootstrap token, supplied from a Worker secret. t3's server secrets (signing keys created at runtime) live in DO key-value storage, kept apart from SQL. Our own admin routes (`/_t3flare/*`) sit behind Access plus a token.
