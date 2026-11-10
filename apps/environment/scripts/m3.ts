@@ -7,6 +7,7 @@
 //   bun scripts/stage.ts run step2a m3 question     a question-only turn with the Container stopped: it stays stopped
 //   bun scripts/stage.ts run step2a m3 edit-only    an edit-only turn (full-access), then status reads: Container stays stopped
 //   bun scripts/stage.ts run step2a m3 wait [--minutes 7]  an approval waits through a Session restart and >5 heartbeats
+//   bun scripts/stage.ts run step2a m3 agent-push   (M5) the agent commits on a branch and pushes from its bash; a push to another repo fails
 //
 // Each prints a JSON report (also written to /tmp/m3-<check>.json).
 import * as fs from "node:fs";
@@ -230,6 +231,41 @@ switch (check) {
       runs: runsOf(final).map((run) => ({ id: run.id, status: run.status })),
       tools: toolItems(final),
       answer: assistantText(final),
+    });
+    break;
+  }
+  case "agent-push": {
+    await routerTrace();
+    const branch = `t3flare/m5-agent-push-${Date.now().toString(36)}`;
+    const threadId = await newThread("m5 agent push", "full-access");
+    const turn = await runTurn(
+      threadId,
+      [
+        "Use the bash tool for each step, in the repository, and show me each command's output:",
+        `1. \`git switch -c ${branch}\``,
+        "2. Append the line `pushed by the agent (M5)` to README.md with the edit tool, then `git commit -am 'M5: agent push check'`.",
+        `3. \`git push -u origin ${branch}\``,
+        "4. `git push https://github.com/ian-pascoe/mac-bridge.git HEAD:refs/heads/t3flare-m5-should-fail` (expected to fail; do not retry or work around it).",
+        "5. `git switch main`",
+        "Then tell me in two sentences which pushes succeeded.",
+      ].join("\n"),
+      () => ({ decision: "accept" }),
+      600_000,
+    );
+    const session = (await admin("GET", `/_t3flare/agents/session?thread=${threadId}`)).json;
+    const bashResults = (session.entries ?? [])
+      .filter((entry: any) => entry.role === "toolResult" && entry.toolName === "bash")
+      .map((entry: any) => ({ exitCode: entry.details?.exitCode ?? null, isError: entry.isError, output: entry.content.map((block: any) => block.text ?? "").join("").slice(0, 600) }));
+    const bashCalls = (session.entries ?? []).flatMap((entry: any) =>
+      entry.role === "assistant" ? entry.content.filter((block: any) => block.type === "toolCall" && block.name === "bash").map((block: any) => block.arguments.command) : [],
+    );
+    await report("agent-push", {
+      threadId,
+      branch,
+      runs: runsOf(turn.projection).map((run) => ({ id: run.id, status: run.status })),
+      bash: bashCalls.map((command: string, at: number) => ({ command, ...bashResults[at] })),
+      answer: assistantText(turn.projection),
+      container: await container(),
     });
     break;
   }

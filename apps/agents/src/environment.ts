@@ -9,6 +9,8 @@ export interface EnvironmentRpc {
   agentsPing(message: string): Promise<{ readonly environment: string; readonly message: string }>;
   /** The Session's committed state (ADR-0005). */
   sessionPush(push: SessionPush): Promise<SessionPushAnswer>;
+  /** A Workspace's Container token for its one repo, for the git credential helper (ADR-0013). */
+  workspaceToken(id: string): Promise<{ readonly token: string | null }>;
 }
 
 export const environmentStub = (namespace: DurableObjectNamespace): EnvironmentRpc =>

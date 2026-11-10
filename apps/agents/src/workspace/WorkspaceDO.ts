@@ -32,6 +32,7 @@ import { HARNESS_ROOT, REPO_ROOT } from "@t3flare/workspace-client";
 import * as git from "isomorphic-git";
 
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
+import { environmentStub } from "../environment.ts";
 import { changedBetween, currentRevision } from "./changeLog.ts";
 import { authoredScript, captureScript, restoreScript, shellWord } from "./checkpointScripts.ts";
 import { fileOps } from "./files.ts";
@@ -62,6 +63,8 @@ import {
 
 export interface WorkspaceEnv {
   readonly LOADER: WorkerLoader;
+  /** The Environment DO, the token broker (ADR-0018): the credential helper's tokens come from it. */
+  readonly ENVIRONMENT: DurableObjectNamespace;
   /** The identity of commits the agent makes (step 2a; defaults below). */
   readonly T3FLARE_GIT_NAME?: string;
   readonly T3FLARE_GIT_EMAIL?: string;
@@ -107,6 +110,20 @@ export type FsOp =
 
 const LAST_USE_KEY = "t3flare:container-last-use";
 const LEASED_KEY = "t3flare:container-leased";
+/** Where the Container's git credential helper asks this object for the repo's token (through computer's egress host). */
+export const CREDENTIAL_PATH = "/t3flare/git-credential";
+const WORKSPACE_ID_KEY = "t3flare:workspace-id";
+
+/**
+ * git's credential helper in the Container (ADR-0013): the command's own `T3FLARE_GIT_TOKEN` when the router gave one
+ * (t3's push, fetch and pull), else a token asked of this Workspace DO at that moment (the agent's own git), which asks
+ * the Environment DO: the Workspace's one repo, `workflows` only when opted in. Nothing is kept in a file or the shell.
+ */
+export const CREDENTIAL_HELPER =
+  '!f() { test "$1" = get || exit 0; t="${T3FLARE_GIT_TOKEN:-}"; ' +
+  '[ -n "$t" ] || t="$(curl -fsS --max-time 30 http://computer.internal' + CREDENTIAL_PATH + ' 2>/dev/null)"; ' +
+  '[ -n "$t" ] || exit 0; echo username=x-access-token; echo "password=$t"; }; f';
+
 /** The last checkpoint captured: its commit, the files' revision then, and HEAD then (the alias above the guard). */
 const LAST_CAPTURE_KEY = "t3flare:last-capture";
 
@@ -499,9 +516,10 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Clones `input.url` into the Workspace's repo, in the Container, and sets the repo's identity and credentials. */
   async clone(input: CloneInput): Promise<GitAnswer> {
+    this.#rememberId(input.id);
     const name = this.env.T3FLARE_GIT_NAME ?? "t3flare";
     const email = this.env.T3FLARE_GIT_EMAIL ?? "t3flare@users.noreply.github.com";
-    const helper = `!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=\${T3FLARE_GIT_TOKEN}"; }; f`;
+    const helper = CREDENTIAL_HELPER;
     const script = [
       "set -eu",
       `mkdir -p ${HARNESS_ROOT}/tmp`,
@@ -532,7 +550,7 @@ export class WorkspaceDO extends ContainerHost {
     const ops = fileOps(this.#workspace);
     const repo = "ok" in (await ops.stat(REPO_ROOT));
     const git = "ok" in (await ops.stat(`${REPO_ROOT}/.git`));
-    return { provisioned: repo, repo: git, containerRunning: this.containerRunning(), revision: this.#reads.revision(), gitRevision: this.#reads.revision("git-dir"), cachedReads: this.#reads.stats().rows };
+    return { provisioned: repo, repo: git, containerRunning: this.containerRunning(), revision: this.#reads.revision(), gitRevision: this.#reads.revision("git-dir"), cachedReads: this.#reads.stats().rows, id: this.#workspaceId() ?? null };
   }
 
   /** Whether the Container runs, and the budget's view. */
@@ -578,8 +596,40 @@ export class WorkspaceDO extends ContainerHost {
     return this.#workspace.stub();
   }
 
-  /** The Container's egress and computerd's callbacks reach the backend through the object's fetch. */
-  override fetch(request: Request): Promise<Response> {
+  /**
+   * The Container's egress and computerd's callbacks reach the backend through the object's fetch; the credential
+   * helper's token request (`CREDENTIAL_PATH`) is answered here.
+   */
+  override async fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname === CREDENTIAL_PATH) return this.#credential();
     return this.#container.handleFetch(request);
+  }
+
+  /** This Workspace's id: the object's name, or the one the Environment told it (`clone`, `ensureCredentialHelper`). */
+  #workspaceId(): string | undefined {
+    return this.ctx.id.name ?? this.ctx.storage.kv.get<string>(WORKSPACE_ID_KEY);
+  }
+
+  #rememberId(id: string | undefined): void {
+    if (id !== undefined && id !== "") this.ctx.storage.kv.put(WORKSPACE_ID_KEY, id);
+  }
+
+  async #credential(): Promise<Response> {
+    const id = this.#workspaceId();
+    if (id === undefined) return new Response("", { status: 404 });
+    try {
+      const { token } = await environmentStub(this.env.ENVIRONMENT).workspaceToken(id);
+      console.log(JSON.stringify({ t3flare: "git-credential", workspace: id, granted: token !== null }));
+      return new Response(token ?? "", { status: token === null ? 404 : 200, headers: { "cache-control": "no-store" } });
+    } catch (error) {
+      console.warn(JSON.stringify({ t3flare: "git-credential-failed", workspace: id, error: String(error).slice(0, 300) }));
+      return new Response("", { status: 503 });
+    }
+  }
+
+  /** Points the repo's git credentials at `CREDENTIAL_HELPER` (repos cloned before it existed). */
+  async ensureCredentialHelper(id?: string): Promise<ExecResult> {
+    this.#rememberId(id);
+    return this.exec({ script: `git config credential.helper ${shellWord(CREDENTIAL_HELPER)} && git config --get credential.helper`, cwd: REPO_ROOT });
   }
 }

@@ -119,7 +119,7 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
       detail = `no token: ${String(error).slice(0, 200)}`;
     }
   }
-  const answer = await workspaceRpc(request.id).clone({ url, token });
+  const answer = await workspaceRpc(request.id).clone({ id: request.id, url, token });
   if (!answer.ran || answer.exitCode !== 0) {
     if (existing === undefined) services.workspaces.remove(request.id);
     else services.workspaces.setRemote(request.id, { host: null, owner: null, name: null, cloneUrl: null });
@@ -134,7 +134,7 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
  * The Workspace's Container token for its repo (ADR-0013): one repo, `contents` and `pull_requests` write, and
  * `workflows` only when the Workspace is opted in. Null for a Workspace without a GitHub remote or outside the App.
  */
-const containerToken = async (id: string): Promise<string | null> => {
+export const containerToken = async (id: string): Promise<string | null> => {
   const record = environmentServices().workspaces.get(id);
   if (record === undefined || record.host !== "github.com" || record.owner === null || record.name === null) return null;
   try {

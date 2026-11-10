@@ -146,6 +146,21 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     }
   }
 
+  /**
+   * RPC from a Workspace DO: its repo's Container token, for the git credential helper in its Container (ADR-0013;
+   * the agent's own `git push`/`fetch`). One repo; `workflows` only when the Workspace is opted in. Null for a
+   * Workspace the registry does not list or without a GitHub remote. Counted as a request for the idle check.
+   */
+  async workspaceToken(id: string): Promise<{ readonly token: string | null }> {
+    Idle.requestStarted();
+    try {
+      const { containerToken } = await import("./agents/processRouter.ts");
+      return { token: await containerToken(id) };
+    } finally {
+      Idle.requestEnded();
+    }
+  }
+
   /** Resets the object, as an eviction or deploy does: memory and sockets go, storage stays. */
   abort(reason: string): void {
     this.ctx.abort(reason);

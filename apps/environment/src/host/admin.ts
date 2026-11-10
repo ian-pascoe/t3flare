@@ -25,7 +25,7 @@
 //   POST /_t3flare/agents/workspace-remove?id=<id> forget a Workspace (its DO's files stay; tests and cleanup)
 //   POST /_t3flare/agents/workspace-probe?id=<id>  the repo revision moves on a write and a delete (read cache check)
 //   POST /_t3flare/agents/workspace-workflows?id=<id>&on=1|0  the owner's opt-in to `workflows: write` on the Workspace's Container tokens
-//   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec": input} on the Workspace DO
+//   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec"|"credentialHelper": input} on the Workspace DO
 //   GET  /_t3flare/agents/checkpoint-trace?clear=1 the checkpoint operations the Workspace DOs answered, and by which side
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
@@ -282,7 +282,9 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                 ? await rpc.checkpoint(body.checkpoint as never)
                 : "exec" in body
                   ? await rpc.exec(body.exec as never)
-                  : { error: "one of fs, git, checkpoint, exec" };
+                  : "credentialHelper" in body
+                    ? await rpc.ensureCredentialHelper(url.searchParams.get("id") ?? "")
+                    : { error: "one of fs, git, checkpoint, exec, credentialHelper" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
       }
       case "GET /_t3flare/agents/checkpoint-trace": {

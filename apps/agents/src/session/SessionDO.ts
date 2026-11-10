@@ -39,6 +39,7 @@ import {
   type TurnState,
 } from "@t3flare/session-protocol";
 import { ComputerExecutionEnv, ComputerFiles, type ComputerWorkspaceStub } from "@t3flare/computer-env";
+import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
 
@@ -179,7 +180,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const workspace = this.#workspaceStub();
     const id = this.#meta()?.workspaceId;
     if (workspace === undefined || id === undefined || id === null) return undefined;
-    return new ComputerExecutionEnv({ workspace, id: `computer:${id}`, cwd: cwd ?? REPO_ROOT, reachContainer: true });
+    return new ComputerExecutionEnv({ workspace, id: `computer:${id}`, cwd: cwd ?? REPO_ROOT, reachContainer: true, containerEnv: COMMAND_ENV });
   }
 
   #files(): ComputerFiles | undefined {

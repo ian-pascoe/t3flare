@@ -1,4 +1,4 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/env.ts.
+// Copied from cloudpid@ae5a7b73:packages/computer-env/src/env.ts; t3flare adds `containerEnv` (step 2a M5).
 // `ComputerExecutionEnv`: pi-durable's `ExecutionEnv` over a Workspace DO stub (docs/architecture/workspace.md → Filesystem and tools).
 // File operations run in the Workspace DO and answer plain data (`host.ts`); commands run on the Workspace's runtime
 // through `@cloudflare/computer`'s RPC client (`exec.ts`).
@@ -59,6 +59,11 @@ export type ComputerExecutionEnvOptions = {
    * tools only (ADR-0018). Without it they see the Workspace's files alone, and never start the Container.
    */
   readonly reachContainer?: boolean;
+  /**
+   * t3flare: what every command on the Container carries in its environment (computerd passes only PATH and HOME): the
+   * image's mise config, so git, gh and node resolve. The command's own `env` wins.
+   */
+  readonly containerEnv?: Readonly<Record<string, string>>;
 };
 
 /** A backend a command is sent to: its id in the Workspace, and how a command is made to run in bash on it. */
@@ -364,9 +369,14 @@ export class ComputerExecutionEnv implements ExecutionEnv {
 
   exec(
     command: string | readonly string[],
-    options: ShellExecOptions | undefined,
+    given: ShellExecOptions | undefined,
     context: Context,
   ): Promise<Result<ShellExecResult, ExecutionError>> {
+    const containerEnv = this.#options.containerEnv;
+    const options =
+      containerEnv !== undefined && this.#backend?.id === BACKENDS.container.id
+        ? { ...given, env: { ...containerEnv, ...given?.env } }
+        : given;
     return exec(
       {
         workspace: workspaceHandle(this.#workspace),

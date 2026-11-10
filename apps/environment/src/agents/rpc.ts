@@ -46,6 +46,7 @@ export interface WorkspaceRpc {
   fs(op: FsOp): Promise<FsAnswer<unknown>>;
   git(run: GitRun): Promise<GitAnswer>;
   checkpoint(op: CheckpointOp): Promise<CheckpointAnswer>;
+  ensureCredentialHelper(id?: string): Promise<ExecResult>;
   clone(input: CloneInput): Promise<GitAnswer>;
   info(): Promise<ProvisionInfo>;
   exec(input: ExecInput): Promise<ExecResult>;

@@ -2,7 +2,8 @@
 // has no public URL: the environment Worker reaches it through Durable Object bindings only. Its entry also exports
 // computer's proxies: `WorkspaceServiceProxy`, through which the Worker Shell's loaded Worker reaches its Workspace DO,
 // and `WorkspaceProxy`, which carries the Container's egress back (`ctx.exports`).
-export { WorkspaceProxy, WorkspaceServiceProxy } from "@cloudflare/computer";
+export { WorkspaceServiceProxy } from "@cloudflare/computer";
+export { WorkspaceProxy } from "./workspaceProxy.ts";
 
 export { ContainerBudget } from "./budget.ts";
 export { SessionDO } from "./session/SessionDO.ts";

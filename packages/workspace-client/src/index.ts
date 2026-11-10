@@ -107,6 +107,8 @@ export type GitAnswer =
   | { readonly ran: false; readonly reason: "container_stopped" | "container_refused"; readonly detail: string };
 
 export interface CloneInput {
+  /** The Workspace's id, which the object keeps (the credential helper asks for its repo's token by it). */
+  readonly id?: string;
   /** An https URL with no credentials; the token goes in the command's environment. */
   readonly url: string;
   readonly token: string | null;
@@ -121,6 +123,8 @@ export interface ProvisionInfo {
   readonly revision?: number;
   readonly gitRevision?: number;
   readonly cachedReads?: number;
+  /** The Workspace id the object knows itself by (the credential helper's token is for its repo). */
+  readonly id?: string | null;
 }
 
 /** t3's checkpoint operations (`VcsCheckpointOps`), answered by the Workspace DO (ADR-0009; step 2a M3). Refs are git refs. */
