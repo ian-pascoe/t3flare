@@ -53,7 +53,7 @@ export class Stats {
     this.#kind = entry.kind;
     const typeBits = entry.kind === "dir" ? 0o040000 : entry.kind === "symlink" ? 0o120000 : 0o100000;
     this.mode = typeBits | entry.mode;
-    this.size = entry.data?.byteLength ?? 0;
+    this.size = entry.size;
     this.blocks = Math.ceil(this.size / 512);
     let hash = 0;
     for (const char of entry.path) hash = (hash * 31 + char.charCodeAt(0)) | 0;
@@ -215,16 +215,15 @@ export function utimesSync(input: unknown, _atime: unknown, mtime: number | Date
 }
 
 export function truncateSync(input: unknown, length = 0): void {
-  const path = pathOf(input);
-  store.writeFile(path, store.readFile(path).slice(0, length));
+  store.truncate(pathOf(input), length);
 }
 
 export function accessSync(input: unknown): void {
   if (!existsSync(input)) throw new store.FsError("ENOENT", "access", String(input));
 }
 
-// File descriptors: t3 opens files for exclusive creation and lock files. The spike keeps
-// a tiny table that buffers writes and commits them on close.
+// File descriptors: t3 opens files for exclusive creation and lock files. A tiny table buffers
+// writes and commits them on close, in one write.
 const fds = new Map<number, { path: string; chunks: Array<Uint8Array>; append: boolean }>();
 let nextFd = 1000;
 
@@ -254,7 +253,15 @@ export function closeSync(fd: number): void {
   const file = fds.get(fd);
   if (file === undefined) return;
   fds.delete(fd);
-  for (const chunk of file.chunks) store.writeFile(file.path, chunk, { append: true });
+  if (file.chunks.length === 0) return;
+  const total = file.chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of file.chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  store.writeFile(file.path, joined, { append: true });
 }
 
 export function fsyncSync(_fd: number): void {}

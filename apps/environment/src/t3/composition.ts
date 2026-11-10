@@ -24,7 +24,6 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/http";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
@@ -179,12 +178,21 @@ import { runMigrations } from "t3/src/persistence/Migrations.ts";
 import * as DoHttpServer from "../platform/httpServer.ts";
 import * as DoServices from "../platform/services.ts";
 import * as DoSql from "../platform/sql.ts";
-import * as SecretStore from "./secretStore.ts";
+import * as SecretStore from "../platform/secretStore.ts";
+import * as RedactingConsole from "../host/redactingConsole.ts";
 
 export interface CompositionOptions {
   readonly storage: DurableObjectStorage;
-  /** t3's bootstrap token for the first pairing, from a Worker secret (ADR-0010). */
+  /**
+   * t3's bootstrap token for the first pairing, from a Worker secret (ADR-0010). Set only while an admin
+   * route has armed pairing; otherwise t3 seeds no bootstrap grant.
+   */
   readonly bootstrapToken: string | undefined;
+  /**
+   * The public host the Environment is reached on. Setting it makes t3's auth policy `remote-reachable`
+   * (a host that is not loopback); without it t3 assumes `loopback-browser`.
+   */
+  readonly host: string;
 }
 
 /** The State directory's root in DO SQLite (ADR-0007). */
@@ -234,7 +242,8 @@ export const make = (options: CompositionOptions) => {
         tailscaleServeEnabled: false,
         tailscaleServePort: 443,
         port: 443,
-        host: undefined,
+        // t3flare: the Worker's public host, so t3's auth descriptor reports `remote-reachable`.
+        host: options.host,
         desktopBootstrapToken: options.bootstrapToken,
         desktopTelemetryFd: undefined,
         desktopTelemetryControlFd: undefined,
@@ -752,9 +761,14 @@ export const make = (options: CompositionOptions) => {
     }),
   ).pipe(Layer.provide(ProcessRunner.layer));
 
-  const layer = layerMakeServer.pipe(Layer.provide(layerConfig), Layer.provide(layerPlatformServices));
+  // t3flare: t3's Console (and the loggers writing through it) drops the boot pairing URL and redacts
+  // credentials, so no token reaches Workers Logs (ADR-0010).
+  const layer = layerMakeServer.pipe(
+    Layer.provide(layerConfig),
+    Layer.provide(layerPlatformServices),
+    Layer.provide(RedactingConsole.layer),
+  );
 
   return { layer, http: httpServer.http };
 };
 
-void Option;

@@ -17,7 +17,7 @@ import * as NetAddress from "effect/net/NetAddress";
 import * as Socket from "effect/socket/Socket";
 import type { WebSocketPair as WebSocketPairType } from "@cloudflare/workers-types/index.ts";
 
-import * as RpcTap from "./rpcTap.ts";
+import * as Idle from "../host/idle.ts";
 
 declare const WebSocketPair: typeof WebSocketPairType;
 
@@ -82,9 +82,19 @@ export const make = () => {
         const [client, socket] = [pair[0], pair[1]];
         const upgrade = Effect.suspend(() => {
           socket.accept();
+          // A client socket keeps the Environment awake (ADR-0003).
+          Idle.socketOpened();
+          let closed = false;
+          const onClose = () => {
+            if (closed) return;
+            closed = true;
+            Idle.socketClosed();
+          };
+          socket.addEventListener("close", onClose);
+          socket.addEventListener("error", onClose);
           // The 101 must reach the client before t3 starts writing frames.
           settle(new Response(null, { status: 101, webSocket: client } as ResponseInit));
-          return Socket.fromWebSocket(Effect.succeed(RpcTap.tap(socket) as unknown as globalThis.WebSocket));
+          return Socket.fromWebSocket(Effect.succeed(socket as unknown as globalThis.WebSocket));
         });
         serverRequest = Object.create(serverRequest, {
           upgrade: { value: upgrade },

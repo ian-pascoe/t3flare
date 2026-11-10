@@ -1,0 +1,25 @@
+// Local workerd only (`bun run dev`, iteration and local checks); every deploy is alchemy.run.ts.
+// There is no Access in front of localhost: T3FLARE_LOCAL_MODE lets the admin routes through on a loopback
+// host with the admin token alone. alchemy.run.ts never sets it.
+{
+  "name": "t3flare-environment-local",
+  "main": "dist/worker/worker.js",
+  "no_bundle": true,
+  "rules": [{ "type": "ESModule", "globs": ["**/*.js"] }],
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist/web",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws", "/oauth/*", "/.well-known/*", "/mcp", "/mcp/*", "/_t3flare/*"]
+  },
+  "durable_objects": { "bindings": [{ "name": "ENVIRONMENT", "class_name": "EnvironmentDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["EnvironmentDO"] }],
+  "vars": {
+    "T3_BOOTSTRAP_TOKEN": "local-bootstrap-token-0123456789",
+    "T3FLARE_ADMIN_TOKEN": "local-admin-token",
+    "T3FLARE_IDLE_AFTER_MS": "20000",
+    "T3FLARE_LOCAL_MODE": "true"
+  }
+}

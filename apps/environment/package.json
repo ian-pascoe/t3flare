@@ -4,10 +4,13 @@
   "type": "module",
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
+    "lint": "oxlint --type-aware --deny-warnings src test scripts build.ts alchemy.run.ts",
+    "test": "vitest run",
+    "build": "bun build.ts",
+    "prepare:web": "bun run --cwd ../../t3code/apps/web build && git -C ../../t3code checkout -- apps/web/src/routeTree.gen.ts && rsync -a --delete --exclude \"*.map\" ../../t3code/apps/web/dist/ dist/web/",
     "deploy": "bun build.ts && alchemy deploy",
     "destroy": "alchemy destroy",
-    "bundle": "bun build.ts",
-    "prepare:web": "bun run --cwd ../../t3code/apps/web build && git -C ../../t3code checkout -- apps/web/src/routeTree.gen.ts && rsync -a --delete --exclude \"*.map\" ../../t3code/apps/web/dist/ dist/web/",
+    "dev": "bun build.ts && wrangler dev -c wrangler.local.jsonc",
     "acceptance": "bun scripts/acceptance.ts"
   },
   "dependencies": {
@@ -27,11 +30,14 @@
   "devDependencies": {
     "@alchemy.run/cloudflare": "catalog:",
     "@alchemy.run/cloudflare-runtime": "2.0.0-beta.85",
+    "@cloudflare/vitest-plugin": "1.5.1",
     "@cloudflare/workers-types": "^5.20261104.1",
     "@distilled.cloud/cloudflare": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@types/node": "catalog:",
     "alchemy": "catalog:",
-    "rolldown": "1.2.13"
+    "rolldown": "1.2.13",
+    "vitest": "5.0.5",
+    "wrangler": "4.157.0"
   }
 }

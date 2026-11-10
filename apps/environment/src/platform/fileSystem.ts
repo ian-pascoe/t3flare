@@ -45,7 +45,7 @@ const info = (entry: store.Entry): FileSystem.File.Info => ({
   uid: Option.some(0),
   gid: Option.some(0),
   rdev: Option.none(),
-  size: ByteSize.bytes(entry.data?.byteLength ?? 0),
+  size: ByteSize.bytes(entry.size),
   blksize: Option.none(),
   blocks: Option.none(),
 });
@@ -73,7 +73,6 @@ const open: FileSystem.FileSystem["open"] = (path, options) =>
     if (flag.startsWith("r")) yield* entryOf("open", path, true);
     else yield* attempt("open", path, () => store.writeFile(path, new Uint8Array(0), { append: flag.startsWith("a"), exclusive: flag.includes("x") }));
     let position = 0n;
-    const read = () => store.readFile(path);
     const file: FileSystem.File = {
       [FileSystem.FileTypeId]: FileSystem.FileTypeId,
       stat: Effect.map(entryOf("stat", path, true), info),
@@ -85,18 +84,18 @@ const open: FileSystem.FileSystem["open"] = (path, options) =>
       sync: Effect.void,
       read: (buffer) =>
         attempt("read", path, () => {
-          const bytes = read().subarray(Number(position), Number(position) + buffer.byteLength);
+          const bytes = store.readRange(path, Number(position), buffer.byteLength);
           buffer.set(bytes);
           position += BigInt(bytes.byteLength);
           return bytes.byteLength;
         }) as never,
       readAlloc: (size) =>
         attempt("read", path, () => {
-          const bytes = read().slice(Number(position), Number(position) + Number(size));
+          const bytes = store.readRange(path, Number(position), Number(size));
           position += BigInt(bytes.byteLength);
           return bytes.byteLength === 0 ? Option.none() : Option.some(bytes);
         }),
-      truncate: (length) => attempt("truncate", path, () => store.writeFile(path, read().slice(0, length ?? 0))),
+      truncate: (length) => attempt("truncate", path, () => store.truncate(path, Number(length ?? 0))),
       write: (buffer) =>
         attempt("write", path, () => {
           store.writeFile(path, buffer, { append: true });
@@ -120,7 +119,7 @@ const impl: Parameters<typeof FileSystem.make>[0] = {
           if (entry.kind === "dir") {
             store.mkdir(target, { recursive: true });
             for (const name of store.readdir(source)) walk(`${source}/${name}`, `${target}/${name}`);
-          } else store.writeFile(target, entry.data ?? new Uint8Array(0));
+          } else store.writeFile(target, store.readFile(entry.path));
         };
         walk(from, to);
       }),
@@ -170,7 +169,7 @@ const impl: Parameters<typeof FileSystem.make>[0] = {
     remove: (path, options) => attempt("remove", path, () => store.remove(path, options ?? {})),
     rename: (from, to) => attempt("rename", from, () => store.rename(from, to)),
     symlink: (target, path) => attempt("symlink", path, () => store.symlink(target, path)),
-    truncate: (path, length) => attempt("truncate", path, () => store.writeFile(path, store.readFile(path).slice(0, Number(length ?? 0)))),
+    truncate: (path, length) => attempt("truncate", path, () => store.truncate(path, Number(length ?? 0))),
     utimes: (path, _atime, mtime) =>
       attempt("utimes", path, () => store.utimes(path, typeof mtime === "number" ? mtime : mtime.getTime())),
     watch: () => Stream.empty,

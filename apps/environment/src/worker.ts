@@ -1,18 +1,25 @@
-// @effect-diagnostics globalDate:off globalConsole:off
-// The environment Worker (ADR-0014): the front door, the Environment DO, and the t3 web
-// client as static assets. Kept tiny: t3 itself loads inside the DO, on first use.
-import { DurableObject } from "cloudflare:workers";
-import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
+// @effect-diagnostics globalConsole:off
+// The environment Worker (ADR-0014): the front door, the Environment DO, and the stock t3 web client as
+// static assets. Kept tiny: t3 itself loads inside the DO, on first use.
+import * as Access from "./access.ts";
+import type { EnvironmentEnv } from "./environmentDO.ts";
 
-import { bindStateStorage } from "./platform/stateStore.ts";
-import type { Runtime } from "./runtime.ts";
+export { EnvironmentDO } from "./environmentDO.ts";
 
-export interface Env {
+export interface Env extends EnvironmentEnv {
   readonly ENVIRONMENT: { getByName(name: string): { fetch(request: Request): Promise<Response> } };
   readonly ASSETS: { fetch(request: Request): Promise<Response> };
-  readonly T3_BOOTSTRAP_TOKEN?: string;
   readonly T3FLARE_ADMIN_TOKEN?: string;
+  readonly T3FLARE_ACCESS_TEAM_DOMAIN?: string;
+  readonly T3FLARE_ACCESS_AUD?: string;
+  readonly T3FLARE_OWNER_EMAIL?: string;
+  readonly T3FLARE_ACCESS_SERVICE_CLIENT_ID?: string;
+  /** Set only by wrangler.local.jsonc: there is no Access in front of localhost. */
+  readonly T3FLARE_LOCAL_MODE?: string;
 }
+
+/** The hosts local workerd serves on, with an optional port and nothing else. */
+const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
 
 /** Paths t3's server answers; everything else is the web client (t3's DEV_PROXIED_PATH_PREFIXES). */
 const SERVER_PREFIXES = ["/api", "/oauth", "/.well-known", "/ws", "/mcp", "/_t3flare"];
@@ -22,62 +29,38 @@ const isServerPath = (pathname: string) =>
 /** One Environment DO per deploy (ADR-0002). */
 const ENVIRONMENT_NAME = "environment";
 
+const guardConfig = (env: Env): Access.GuardConfig => ({
+  teamDomain: env.T3FLARE_ACCESS_TEAM_DOMAIN,
+  audience: env.T3FLARE_ACCESS_AUD,
+  ownerEmail: env.T3FLARE_OWNER_EMAIL,
+  serviceTokenClientId: env.T3FLARE_ACCESS_SERVICE_CLIENT_ID,
+  adminToken: env.T3FLARE_ADMIN_TOKEN,
+});
+
+// Per isolate: the team's signing keys, kept an hour.
+let keys: { readonly team: string; readonly lookup: Access.TeamKeyLookup } | undefined;
+const keysFor = (team: string) => {
+  if (keys?.team !== team) keys = { team, lookup: Access.teamKeys(Access.loadTeamKeysFrom(team)) };
+  return keys.lookup;
+};
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (isServerPath(url.pathname)) {
-      return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).fetch(request);
+    if (url.pathname === "/_t3flare" || url.pathname.startsWith("/_t3flare/")) {
+      const config = guardConfig(env);
+      // Local mode (local workerd only): no Access assertion, but still the admin token, and only on loopback.
+      const local = env.T3FLARE_LOCAL_MODE === "true" && LOOPBACK_HOST.test(url.host);
+      const verdict = local
+        ? Access.verifyAdminToken(request, config)
+        : await Access.verifyAdminRequest(request, config, keysFor(config.teamDomain ?? ""));
+      if (!verdict.admitted) {
+        // The caller learns nothing; the log says why.
+        console.log(JSON.stringify({ t3flare: "admin-refused", reason: verdict.reason, path: url.pathname }));
+        return new Response("Not found\n", { status: 404 });
+      }
     }
+    if (isServerPath(url.pathname)) return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).fetch(request);
     return env.ASSETS.fetch(request);
   },
 };
-
-export class EnvironmentDO extends DurableObject<Env> {
-  #runtime: Promise<Runtime> | undefined;
-  #stats = { constructedAt: Date.now(), importMs: 0, bootMs: 0, firstRequestAt: 0 };
-
-  constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env);
-    // Before any t3 code runs: the `node:fs` shim and FileSystem Layer read this.
-    bindStateStorage(ctx.storage.sql);
-  }
-
-  #boot(): Promise<Runtime> {
-    this.#runtime ??= (async () => {
-      this.#stats.firstRequestAt = Date.now();
-      const importStarted = performance.now();
-      const { boot } = await import("./runtime.ts");
-      this.#stats.importMs = performance.now() - importStarted;
-      const runtime = await boot({ storage: this.ctx.storage, bootstrapToken: this.env.T3_BOOTSTRAP_TOKEN });
-      this.#stats.bootMs = runtime.bootMs;
-      console.log(JSON.stringify({ t3flare: "booted", ...this.#stats }));
-      return runtime;
-    })().catch((error) => {
-      this.#runtime = undefined;
-      throw error;
-    });
-    return this.#runtime;
-  }
-
-  override async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname.startsWith("/_t3flare/")) {
-      const { handleAdmin } = await import("./admin.ts");
-      return handleAdmin(request, {
-        ctx: this.ctx,
-        env: this.env,
-        stats: this.#stats,
-        runtime: () => this.#boot(),
-      });
-    }
-    try {
-      const runtime = await this.#boot();
-      return await runtime.fetch(request);
-    } catch (error) {
-      console.error("t3flare: request failed", error, (error as { cause?: unknown })?.cause);
-      return new Response(`t3flare: ${String(error)}\n${String((error as { cause?: unknown })?.cause ?? "")}`, {
-        status: 500,
-      });
-    }
-  }
-}
