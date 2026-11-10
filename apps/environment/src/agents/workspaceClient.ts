@@ -14,7 +14,13 @@ export interface Located {
   readonly rpc: WorkspaceRpc;
 }
 
-export const workspaceRpc = (id: string): WorkspaceRpc => byName(environmentServices().agents.WORKSPACES, id, "WORKSPACES");
+/** Workspace DO stubs handed out, by id (the unlisted-id check proves none is made for an unlisted id). */
+export const workspaceStubs = new Map<string, number>();
+
+export const workspaceRpc = (id: string): WorkspaceRpc => {
+  workspaceStubs.set(id, (workspaceStubs.get(id) ?? 0) + 1);
+  return byName(environmentServices().agents.WORKSPACES, id, "WORKSPACES");
+};
 
 /** The Workspace a t3 path is in, or undefined when the path is not in a listed Workspace. */
 export const locate = (path: string): Located | undefined => {

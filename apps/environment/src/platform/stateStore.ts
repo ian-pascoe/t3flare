@@ -132,8 +132,28 @@ type Row = {
   birthtime_ms: number;
 };
 
+/**
+ * Paths under `/w` that reached the State directory: t3 code calling `node:fs` on a Workspace path (step 2a plan,
+ * section 1: the `node:fs` audit). The routing FileSystem never sends `/w` here, so each one is a Shadow candidate;
+ * they read as missing and are never created.
+ */
+const wAccesses = new Map<string, { count: number; sample: string }>();
+export const workspacePathAccesses = () => Object.fromEntries(wAccesses);
+const isUnderW = (path: string) => path === "/w" || path.startsWith("/w/");
+const noteW = (method: string, path: string) => {
+  const stack = new Error("t3flare: node:fs on a Workspace path").stack?.split("\n").slice(2, 7).join(" | ") ?? "";
+  const key = `${method} ${stack}`.slice(0, 400);
+  const seen = wAccesses.get(key);
+  if (seen === undefined) wAccesses.set(key, { count: 1, sample: path });
+  else seen.count++;
+};
+
 export const get = (input: string): Entry | undefined => {
   const path = normalize(input);
+  if (isUnderW(path)) {
+    noteW("get", path);
+    return undefined;
+  }
   const row = db()
     .exec<Row>(`SELECT path, kind, size, target, mode, mtime_ms, birthtime_ms FROM t3flare_files WHERE path = ?`, path)
     .toArray()[0];
@@ -161,6 +181,10 @@ export const resolve = (input: string, depth = 0): Entry | undefined => {
 
 /** Creates or replaces an entry's metadata row; a file's bytes are written by `storeBytes`. */
 const insertMeta = (path: string, kind: Entry["kind"], target: string | null, mode: number) => {
+  if (isUnderW(path)) {
+    noteW("create", path);
+    throw new FsError("ENOENT", "create", path);
+  }
   const now = Date.now();
   db().exec(
     `INSERT INTO t3flare_files (path, parent, kind, data, target, mode, mtime_ms, birthtime_ms, size, chunks)

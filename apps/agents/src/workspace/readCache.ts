@@ -12,6 +12,9 @@ export interface CachedAnswer {
   readonly stderr: string;
 }
 
+/** REPO_ROOT's two segments, as computer's VFS keeps them (`vfs_dirents` under the root inode, 1). */
+const [ROOT_NAME, REPO_NAME] = REPO_ROOT.split("/").filter(Boolean) as [string, string];
+
 const SCHEMA = `CREATE TABLE IF NOT EXISTS t3flare_git_reads (
   key TEXT PRIMARY KEY,
   rev INTEGER NOT NULL,
@@ -36,23 +39,45 @@ export const readKey = async (input: {
 
 export const readCache = (sql: SqlStorage) => {
   let ready = false;
+  let memo: { readonly global: number; readonly repo: number } | undefined;
   const ensure = () => {
     if (!ready) sql.exec(SCHEMA);
     ready = true;
   };
   return {
-    /** The repo's revision: the newest change under REPO_ROOT in computer's change log (0 before any). */
+    /**
+     * The repo's revision: the newest revision of any file, folder or deletion under REPO_ROOT in computer's VFS
+     * (`vfs_nodes.rev`, and `vfs_changes` for deletions). Recomputed only when the Workspace's global revision
+     * (`vfs_meta.rev`, bumped by every write anywhere) moved, so a status poll between changes costs one row.
+     */
     revision(): number {
       try {
-        const row = sql
+        const global = sql.exec<{ v: number }>("SELECT v FROM vfs_meta WHERE k = 'rev'").toArray()[0]?.v ?? 0;
+        if (memo !== undefined && memo.global === global) return memo.repo;
+        const nodes = sql
           .exec<{ rev: number | null }>(
-            "SELECT MAX(rev) AS rev FROM vfs_changes WHERE path = ? OR (path >= ? AND path < ?)",
-            REPO_ROOT,
-            `${REPO_ROOT}/`,
-            `${REPO_ROOT}0`,
+            `WITH RECURSIVE
+               repo(inode) AS (
+                 SELECT d2.child_inode FROM vfs_dirents d1
+                   JOIN vfs_dirents d2 ON d2.parent_inode = d1.child_inode AND d2.name = ?
+                  WHERE d1.parent_inode = 1 AND d1.name = ?
+               ),
+               sub(inode) AS (
+                 SELECT inode FROM repo
+                 UNION ALL
+                 SELECT d.child_inode FROM sub JOIN vfs_dirents d ON d.parent_inode = sub.inode
+               )
+             SELECT MAX(n.rev) AS rev FROM sub JOIN vfs_nodes n ON n.inode = sub.inode`,
+            REPO_NAME,
+            ROOT_NAME,
           )
-          .toArray()[0];
-        return row?.rev ?? 0;
+          .toArray()[0]?.rev ?? 0;
+        const deletions = sql
+          .exec<{ rev: number | null }>("SELECT MAX(rev) AS rev FROM vfs_changes WHERE path >= ? AND path < ?", `${REPO_ROOT}/`, `${REPO_ROOT}0`)
+          .toArray()[0]?.rev ?? 0;
+        const repo = Math.max(nodes, deletions);
+        memo = { global, repo };
+        return repo;
       } catch {
         return -1;
       }

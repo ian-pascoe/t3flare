@@ -1,0 +1,14 @@
+diff --git a/apps/server/src/project/ManagedProjectFolders.ts b/apps/server/src/project/ManagedProjectFolders.ts
+index 4b0991e1a6..6d31019511 100644
+--- a/apps/server/src/project/ManagedProjectFolders.ts
++++ b/apps/server/src/project/ManagedProjectFolders.ts
+@@ -341,7 +341,8 @@ const make = Effect.gen(function* () {
+     );
+   });
+ 
+-  const namedProjectsRoot = path.resolve(config.baseDir, "projects");
++  // t3flare: New project creates a Workspace (`/w/<name>`, step 2a), not a folder in the State directory.
++  const namedProjectsRoot = "/w";
+ 
+   const claimNamedFolder = Effect.fn("ManagedProjectFolders.claimNamedFolder")(function* (
+     name: string,

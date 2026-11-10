@@ -13,6 +13,7 @@
 //   POST /_t3flare/check/reboot                 boot t3 twice in this isolate, report module state that survived
 //   POST /_t3flare/check/sql                    withTransaction rollback and >100 parameters through t3's client
 //   POST /_t3flare/fixtures/turn-items          {"threadIds": [...], "runs": 3, "marker": "..."}
+//   POST /_t3flare/check/workspaces             step 2a M2: unlisted `/w` ids fail without touching a DO; `/w` lists the registry
 //   POST /_t3flare/check/agents?budget=0|1      step 2a M0: the agents Worker both ways, Containers, paths, budget, token scope
 //   GET  /_t3flare/agents/session?thread=<id>   a Session's state as it would push it (differ fixtures, diagnosis)
 //   POST /_t3flare/agents/drop-turns?thread=<id> a test's fault: the Session forgets its turns (the inverse guard)
@@ -20,6 +21,7 @@
 //   GET  /_t3flare/agents/workspaces            the Workspace registry, each with its Container's state
 //   POST /_t3flare/agents/workspace-stop?id=<id>  stop a Workspace's Container now
 //   POST /_t3flare/agents/workspace-remove?id=<id> forget a Workspace (its DO's files stay; tests and cleanup)
+//   POST /_t3flare/agents/workspace-probe?id=<id>  the repo revision moves on a write and a delete (read cache check)
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -195,8 +197,9 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
       case "GET /_t3flare/agents/router-trace": {
         const { routerTrace, clearRouterTrace } = await import("../agents/processRouter.ts");
         const entries = routerTrace();
+        const { workspacePathAccesses } = await import("../platform/stateStore.ts");
         if (url.searchParams.get("clear") === "1") clearRouterTrace();
-        return json({ entries });
+        return json({ entries, nodeFsWorkspacePaths: workspacePathAccesses() });
       }
       case "GET /_t3flare/agents/workspaces": {
         const { environmentServices } = await import("../agents/bindings.ts");
@@ -217,10 +220,30 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         await workspaceRpc(url.searchParams.get("id") ?? "").stopContainer();
         return json({ stopped: true });
       }
+      case "POST /_t3flare/agents/workspace-probe": {
+        const { workspaceRpc } = await import("../agents/workspaceClient.ts");
+        const rpc = workspaceRpc(url.searchParams.get("id") ?? "");
+        const path = "/workspace/repo/.t3flare-probe";
+        const before = (await rpc.info()).revision;
+        await rpc.writeText(path, `probe ${Date.now()}\n`);
+        const written = (await rpc.info()).revision;
+        await rpc.writeText(path, `probe again ${Date.now()}\n`);
+        const rewritten = (await rpc.info()).revision;
+        await rpc.fs({ op: "remove", path, options: { force: true } });
+        const removed = (await rpc.info()).revision;
+        const outside = "/workspace/.t3flare/probe";
+        await rpc.writeText(outside, "x");
+        const outsideWrite = (await rpc.info()).revision;
+        return json({ debug: await rpc.debugRevision(), before, written, rewritten, removed, outsideWrite, ok: before! < written! && written! < rewritten! && rewritten! < removed! && outsideWrite === removed });
+      }
       case "POST /_t3flare/agents/workspace-remove": {
         const { environmentServices } = await import("../agents/bindings.ts");
         environmentServices().workspaces.remove(url.searchParams.get("id") ?? "");
         return json({ removed: true });
+      }
+      case "POST /_t3flare/check/workspaces": {
+        const { workspacesCheck } = await import("./workspacesCheck.ts");
+        return json(await workspacesCheck());
       }
       case "POST /_t3flare/check/agents": {
         const { agentsCheck } = await import("./agentsCheck.ts");

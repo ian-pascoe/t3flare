@@ -269,7 +269,7 @@ export class WorkspaceDO extends ContainerHost {
       const result = await this.exec({
         script,
         cwd: run.cwd,
-        ...(run.env === undefined ? {} : { env: run.env }),
+        env: { ...this.#identityEnv(), ...run.env },
         ...(run.stdin === undefined ? {} : { stdin: run.stdin }),
         timeoutMs: run.timeoutMs ?? 120_000,
         passive,
@@ -281,6 +281,13 @@ export class WorkspaceDO extends ContainerHost {
     } catch (error) {
       return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
     }
+  }
+
+  /** The agent's commit identity, for repos t3 made itself (`git init`, New project) that have none in their config. */
+  #identityEnv(): Record<string, string> {
+    const name = this.env.T3FLARE_GIT_NAME ?? "t3flare";
+    const email = this.env.T3FLARE_GIT_EMAIL ?? "t3flare@users.noreply.github.com";
+    return { GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: email, GIT_COMMITTER_NAME: name, GIT_COMMITTER_EMAIL: email };
   }
 
   /** Clones `input.url` into the Workspace's repo, in the Container, and sets the repo's identity and credentials. */
@@ -311,6 +318,25 @@ export class WorkspaceDO extends ContainerHost {
     } catch (error) {
       return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
     }
+  }
+
+  /** Diagnosis (admin workspace-probe): the VFS rows the read cache's revision is computed from. */
+  debugRevision(): unknown {
+    const q = (query: string, ...args: Array<unknown>) => {
+      try {
+        return this.ctx.storage.sql.exec(query, ...args).toArray();
+      } catch (error) {
+        return String(error);
+      }
+    };
+    return {
+      meta: q("SELECT k, v FROM vfs_meta"),
+      rootChildren: q("SELECT parent_inode, name, child_inode FROM vfs_dirents WHERE parent_inode = 1"),
+      workspaceChildren: q("SELECT d.parent_inode, d.name, d.child_inode FROM vfs_dirents d WHERE d.parent_inode IN (SELECT child_inode FROM vfs_dirents WHERE parent_inode = 1)"),
+      firstNodes: q("SELECT inode, type, rev, mount_root FROM vfs_nodes ORDER BY inode LIMIT 5"),
+      maxRev: q("SELECT MAX(rev) AS rev, COUNT(*) AS n FROM vfs_nodes"),
+      lastChanges: q("SELECT rev, path FROM vfs_changes ORDER BY id DESC LIMIT 3"),
+    };
   }
 
   async info(): Promise<ProvisionInfo> {

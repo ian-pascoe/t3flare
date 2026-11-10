@@ -161,8 +161,8 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
   };
 };
 
-/** What `git --version` says: the Workspace image's git (apps/sandbox-image). */
-const GIT_VERSION = "git version 2.51.0";
+/** What `git --version` says: the Workspace image's git (apps/sandbox-image; M0's check printed 2.56.0). */
+const GIT_VERSION = "git version 2.56.0";
 
 /** `-C <dir>` options folded into the cwd, as git applies them (each relative to the last). */
 const withoutDashC = (argv: ReadonlyArray<string>, cwd: string | undefined): { readonly args: ReadonlyArray<string>; readonly cwd: string | undefined } => {
@@ -244,7 +244,7 @@ const notFound = (name: string) =>
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-const spawn = (command: ChildProcess.Command) =>
+export const spawn = (command: ChildProcess.Command) =>
   Effect.gen(function* () {
     if (command._tag !== "StandardCommand") {
       spawnAttempts.set("pipeline", (spawnAttempts.get("pipeline") ?? 0) + 1);
