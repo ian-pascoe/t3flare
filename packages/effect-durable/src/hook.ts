@@ -52,7 +52,6 @@ type Handler<E, R> = (
  * pi-durable hooks of `task` from Effect handlers, run with the services of the Effect that builds them. A handler's
  * failure or defect is thrown, which pi-durable treats as each hook documents: a throwing `beforeTool` blocks the call.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off -- as pi-durable's `hook()`: the task types the handlers.
 export const effectHook = <K extends AnyTask, Handlers extends EffectHooks<HooksOf<K>>>(
   task: K,
   handlers: Handlers,

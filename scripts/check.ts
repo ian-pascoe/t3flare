@@ -11,6 +11,8 @@ import * as path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const environment = path.join(root, "apps/environment");
 const infra = path.join(root, "infra");
+const agents = path.join(root, "apps/agents");
+const pkg = (name: string) => path.join(root, "packages", name);
 
 interface Task {
   readonly name: string;
@@ -28,6 +30,14 @@ const tasks: Array<Task> = [
   { name: "lint (infra)", cwd: infra, command: "bun", args: ["run", "lint"] },
   { name: "lint (root scripts)", cwd: root, command: path.join(root, "node_modules/.bin/oxlint"), args: ["scripts"] },
   { name: "test", cwd: environment, command: "bun", args: ["run", "test"] },
+  { name: "typecheck (agents)", cwd: agents, command: "bun", args: ["run", "typecheck"] },
+  { name: "lint (agents)", cwd: agents, command: "bun", args: ["run", "lint"] },
+  { name: "test (agents)", cwd: agents, command: "bun", args: ["run", "test"] },
+  { name: "test (infra)", cwd: infra, command: "bun", args: ["run", "test"] },
+  ...["effect-durable", "computer-env", "github-app"].flatMap((name): Array<Task> => [
+    { name: `typecheck (${name})`, cwd: pkg(name), command: "bun", args: ["run", "typecheck"] },
+    { name: `test (${name})`, cwd: pkg(name), command: "bun", args: ["run", "test"] },
+  ]),
 ];
 
 const run = (task: Task) =>

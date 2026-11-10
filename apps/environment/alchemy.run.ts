@@ -73,7 +73,7 @@ export default Alchemy.Stack(
     const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL");
     const modelProxyKey = Config.Redacted("MODEL_PROXY_API_KEY");
 
-    const workspaceContainer = yield* Cloudflare.Container("WorkspaceContainer", {
+    const workspaceContainer = Cloudflare.Container("WorkspaceContainer", {
       schedulingPolicy: "durable_object",
       context: sandboxImageContext,
     } as never);

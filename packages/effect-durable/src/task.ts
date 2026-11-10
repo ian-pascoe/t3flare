@@ -84,7 +84,6 @@ export const effectTask = <
     const { phases, abort, ...rest } = definition;
 
     /** Runs `effect` as the body of an invocation: its typed failure settles the task `failed`. */
-    // @effect-diagnostics-next-line asyncFunction:off -- the body of a native phase, which pi-durable awaits.
     const run = async (
       effect: Effect.Effect<void, E, Services>,
       runtime: TaskRuntime<I, S, R, H>,

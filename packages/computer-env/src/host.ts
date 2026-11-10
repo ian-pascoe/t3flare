@@ -110,7 +110,6 @@ export type ReadEnv = Pick<ExecutionEnv, "cwd" | "fileInfo" | "listFiles" | "rea
  * the call on any path above a read-only mount (`/workspace`, with the Skill set mounted below it), though it would
  * change nothing, and every write into the Workspace root makes its parents this way.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off -- a plain async helper, not an Effect combinator.
 export const ensureDirectory = async (
   fs: Pick<Workspace["fs"], "stat" | "mkdir">,
   path: string,

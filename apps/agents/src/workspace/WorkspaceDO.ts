@@ -14,7 +14,7 @@ import {
   withWorkspaceContainer,
 } from "@cloudflare/computer/backends/container";
 import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
-import { COMMAND_ENV } from "@t3flare/sandbox-image";
+import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { DurableObject } from "cloudflare:workers";
 
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";

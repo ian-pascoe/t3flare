@@ -30,7 +30,6 @@ export class HarnessError extends Schema.TaggedError<
  * Call pi-durable Promise code `run` from a fiber, as `operation`. `run` gets the fiber's `ChordContext`, cancelled
  * when the fiber is interrupted; a rejection fails with a `HarnessError`.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off -- the operation names the call, as `Effect.fn` does.
 export const callDurable = <A>(
   operation: string,
   run: (context: Chord.Context) => Promise<A>,
@@ -69,7 +68,6 @@ export class Harness extends Context.Service<Harness, HarnessService>()(
  * Open a Harness on `storage` with an empty registry of its own; install extensions with `install` before `resume`, so
  * resumed work finds its tools.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off -- as pi-durable's `Harness.open()`.
 export const openHarness = (
   storage: Storage,
   options: Omit<HarnessOptions, "registry">,

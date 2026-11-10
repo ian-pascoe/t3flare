@@ -2,7 +2,14 @@
   "name": "@t3flare/sandbox-image",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "effect-tsgo tsrs --noEmit" },
-  "devDependencies": { "@types/node": "catalog:" }
+  "exports": {
+    ".": "./src/index.ts",
+    "./env": "./src/env.ts"
+  },
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
 }

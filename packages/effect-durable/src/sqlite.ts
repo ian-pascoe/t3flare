@@ -21,7 +21,6 @@ export type MigrationStorage = {
  * released: add the next one (the manifest check in `@cloudpid/effect-durable/sqlite/testing` guards this). Each step
  * and its version record run in one transaction, so a step that fails partway leaves no trace and is retried whole.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off
 export const migrate = (storage: MigrationStorage, migrations: ReadonlyArray<Migration>): void => {
   const { sql } = storage;
 

@@ -53,7 +53,6 @@ export const settle = <A, E>(exit: Exit.Exit<A, E>): A => {
  * An invocation's value, or its typed failure. A defect, even beside a failure, and any failure of an invocation whose
  * Context was cancelled are thrown, so pi-durable records them itself, as a throw or as a cancellation.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off -- as `settle`: it runs in Promise code.
 export const settleTyped = <A, E>(
   exit: Exit.Exit<A, E>,
   context: Chord.Context,

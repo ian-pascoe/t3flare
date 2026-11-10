@@ -171,7 +171,6 @@ export const migrationDigests = async (
  * `scripts/check-migration-manifests.sh` enforces that in CI. Two branches that add a migration conflict on the same
  * line of the manifest, the signal that they both took the next number.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off
 export const shippedMigrationProblems = async (
   migrations: ReadonlyArray<Migration>,
   shipped: ReadonlyArray<string>,

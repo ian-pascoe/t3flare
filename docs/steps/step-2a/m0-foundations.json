@@ -1,0 +1,116 @@
+{
+  "milestone": "M0 foundations (step 2a plan, section 7)",
+  "stage": "step2a",
+  "workers": {
+    "environment": "t3flare-environment-step2a.ian-g-pascoe.workers.dev",
+    "agents": "t3flare-agents-step2a (workersDev and previews off: its would-be workers.dev host answers 404 / error 1042)"
+  },
+  "image": {
+    "build": "first build 388.9 s on this Mac (Docker 29.5.2, linux/amd64 emulated), pushed to Cloudflare's registry by alchemy; a redeploy with an unchanged context: noop",
+    "instance": "custom 1 vCPU / 3072 MiB / 12000 MB (cloudpid cpu-1)"
+  },
+  "checkAgents": {
+    "at": "2026-11-10T20:52:30.532Z",
+    "sessionRoundTrip": {
+      "session": "fdc5d838e25acaf02048b1837640125029fd8a5472f8b8d6e430277f082285a4",
+      "echo": "m0",
+      "environment": {
+        "environment": "21ac647a99374f9566c56ba946550f14495b5317602afe7f505c99ba612c19c5",
+        "message": "from session m0"
+      }
+    },
+    "containers": {
+      "m0-a": {
+        "exitCode": 0,
+        "wallMs": 18365,
+        "execMs": 18255,
+        "stdout": [
+          "git: git version 2.56.0",
+          "mise: bun 1.4.4 (system) /usr/local/share/cloudpid/mise.toml 1.4.4;conda:git 2.56.0 (system) /usr/local/share/cloudpid/mise.toml 2.56.0;gh 2.103.3 (system) /usr/local/share/cloudpid/mise.toml 2.103.3;node 26.13.0 (system) /usr/local/share/cloudpid/mise.toml 26.13.0;pnpm 12.17.0 (system) /usr/local/share/cloudpid/mise.toml 12.17.0;python 3.14.10 (system) /usr/local/share/cloudpid/mise.toml 3.14.10;uv 0.13.7 (system) /usr/local/share/cloudpid/mise.toml 0.13.7;",
+          "link: bind",
+          "pwd -P: /w/m0-a",
+          "toplevel: /w/m0-a",
+          "agent file: written by the agent in m0-a"
+        ],
+        "stderr": "",
+        "readFromDo": "from the container\n",
+        "state": {
+          "running": true,
+          "leased": true,
+          "lastUse": 1794343969387
+        }
+      },
+      "m0-b": {
+        "exitCode": 0,
+        "wallMs": 17057,
+        "execMs": 16954,
+        "stdout": [
+          "git: git version 2.56.0",
+          "mise: bun 1.4.4 (system) /usr/local/share/cloudpid/mise.toml 1.4.4;conda:git 2.56.0 (system) /usr/local/share/cloudpid/mise.toml 2.56.0;gh 2.103.3 (system) /usr/local/share/cloudpid/mise.toml 2.103.3;node 26.13.0 (system) /usr/local/share/cloudpid/mise.toml 26.13.0;pnpm 12.17.0 (system) /usr/local/share/cloudpid/mise.toml 12.17.0;python 3.14.10 (system) /usr/local/share/cloudpid/mise.toml 3.14.10;uv 0.13.7 (system) /usr/local/share/cloudpid/mise.toml 0.13.7;",
+          "link: bind",
+          "pwd -P: /w/m0-b",
+          "toplevel: /w/m0-b",
+          "agent file: written by the agent in m0-b"
+        ],
+        "stderr": "",
+        "readFromDo": "from the container\n",
+        "state": {
+          "running": true,
+          "leased": true,
+          "lastUse": 1794343986928
+        }
+      }
+    },
+    "budget": {
+      "acquired": [
+        true,
+        true,
+        true
+      ],
+      "fourthStart": {
+        "refused": true,
+        "error": "WorkspaceTransportError: Workspace backend \"container-shell\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: 3 Containers are running, the most this deploy allows; try "
+      },
+      "stateWhileFull": {
+        "max": 3,
+        "leases": [
+          {
+            "holder": "m0-fake-1",
+            "until": 1794344587442
+          },
+          {
+            "holder": "m0-fake-2",
+            "until": 1794344587475
+          },
+          {
+            "holder": "m0-fake-3",
+            "until": 1794344587507
+          }
+        ]
+      },
+      "after": {
+        "max": 3,
+        "leases": []
+      }
+    },
+    "githubToken": {
+      "repo": "ian-pascoe/t3flare-fixture",
+      "other": "ian-pascoe/mac-bridge",
+      "expiresInMinutes": 60,
+      "stdout": [
+        "own: ok",
+        "other: refused"
+      ],
+      "exitCode": 0
+    },
+    "stopped": true
+  },
+  "budgetUnitTest": "apps/agents/test/budget.workerd.test.ts: a renewed lease survives past its first expiry; an unrenewed one frees its slot (300 ms leases in workerd)",
+  "workerLoaderBindings": "code check: @cloudflare/computer 0.9.0 backends/worker-shell/index.js:655-664 builds the loaded Worker with env { HOST: ctx.exports.WorkspaceServiceProxy(...) } only",
+  "paths": "bind mount of /workspace/repo at /w/<ws> works on a deployed Container (pwd -P and git's toplevel print /w/<ws>); files cross both ways between the DO and the Container",
+  "coldStart": "first command in a stopped Workspace: about 17-18 s (Container start, computerd connect, first push)",
+  "notes": [
+    "cross-Worker Durable Object bindings in both directions deployed in one stack; the first deploy failed on an agents startup error (fixed: a module-level fileURLToPath in @t3flare/sandbox-image), the second deployed both Workers",
+    "deploy needed no two-pass: alchemy precreates Workers that bind each other (R2 settled)"
+  ]
+}

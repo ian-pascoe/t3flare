@@ -8,7 +8,6 @@ import { invoker, settle } from "./chord.ts";
  * A pi-durable prompt section `key` rendered by an Effect, run with the services of the Effect that builds it.
  * `undefined` omits the section; a failure or defect is thrown, which fails the request's preparation.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off -- as pi-durable's `section()`.
 export const effectSection = <E, R>(
   key: string,
   render: (input: PromptInput) => Effect.Effect<string | undefined, E, R>,
@@ -32,7 +31,6 @@ export const effectSection = <E, R>(
  * of every request after its first (the `mcp_servers` section tells a conversation what changed since). It never
  * changes the text, and its failure is thrown as `read`'s is.
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off -- as `effectSection`.
 export const frozenSection = <E, R>(
   key: string,
   read: (input: PromptInput) => Effect.Effect<string | undefined, E, R>,
