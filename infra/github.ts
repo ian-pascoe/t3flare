@@ -13,6 +13,7 @@
  * Optional, read from the environment (never committed):
  *
  *   GITHUB_REPOSITORY  owner/name (default: ian-pascoe/t3flare)
+ *   MODEL_PROXY_URL    the model proxy's base URL (required; `ci:setup` reads it from ~/.config/t3flare/dev.env)
  *
  * Rotate the token: `bun run --cwd infra ci:destroy`, then `ci:setup` again. The `bump` environment is retained on
  * destroy, so anything set on it by hand survives.
@@ -52,7 +53,8 @@ export default Alchemy.Stack(
     // Everything `bun run bump` deploys and destroys on the `bump` stage (apps/environment/alchemy.run.ts): the
     // Worker and its workers.dev subdomain, alchemy's state store (Secrets Store Write: it binds its token secret to a
     // short-lived Worker on every run), and the admin path's Access application, policies and service token.
-    // Containers join this list when a stage first declares one (step 2a).
+    // Workers Containers Write (step 2a): the Workspace DO's Container application and the push of its image to
+    // Cloudflare's registry.
     const token = yield* Cloudflare.ApiToken.AccountApiToken("BumpToken", {
       name: "t3flare-ci-bump",
       accountId,
@@ -61,6 +63,7 @@ export default Alchemy.Stack(
           effect: "allow",
           permissionGroups: [
             "Workers Scripts Write",
+            "Workers Containers Write",
             "Secrets Store Write",
             "Account Settings Read",
             ACCESS_APPS_AND_POLICIES_WRITE,
@@ -83,6 +86,15 @@ export default Alchemy.Stack(
       environment: bump,
       name: "CLOUDFLARE_ACCOUNT_ID",
       value: accountId,
+    });
+
+    // The model proxy's base URL for the bump stage's real turn (step 2a); its key, MODEL_PROXY_API_KEY, is a secret
+    // set on the environment by hand. Read from ~/.config/t3flare/dev.env when ci:setup runs.
+    yield* GitHub.Variable("ModelProxyUrl", {
+      ...repo,
+      environment: bump,
+      name: "MODEL_PROXY_URL",
+      value: yield* Config.String("MODEL_PROXY_URL"),
     });
 
     return { environments: ["bump"], token: "t3flare-ci-bump" };
