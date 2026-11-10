@@ -149,15 +149,14 @@ constructed twice and t3 booted three times in one isolate.
 
 ## Owner actions
 
-1. **GitHub secrets for the bump workflow** (repository `ian-pascoe/t3flare`, environment `bump`, created on
-   the workflow's first run or by hand):
-   - secret `CLOUDFLARE_API_TOKEN`: an account API token for account `4a76f86b5f2f8ed38206c6813459df1d` with
-     *Workers Scripts Write*, *Secrets Store Write* (alchemy's state store), *Account Settings Read*,
-     *Access: Apps and Policies Write* and *Access: Service Tokens Write*. (cloudpid's `infra/github.ts`
-     shows how to mint one with alchemy's `admin` profile.)
-   - variable `CLOUDFLARE_ACCOUNT_ID` = `4a76f86b5f2f8ed38206c6813459df1d`.
-   - repository setting *Actions → General → Allow GitHub Actions to create and approve pull requests*, so
-     the job can open the bump pull request with `GITHUB_TOKEN`.
+1. **CI credentials for the bump workflow**: done as code, after this report, by `bun run --cwd infra ci:setup`
+   (`infra/github.ts`, stack `t3flare-github`, stage `ci`, alchemy's `admin` profile, as cloudpid's). It creates
+   the GitHub environment `bump` (retained on destroy), the account API token `t3flare-ci-bump` (*Workers Scripts
+   Write*, *Secrets Store Write*, *Account Settings Read*, *Access: Apps and Policies Write*, *Access: Service
+   Tokens Write*), the secret `CLOUDFLARE_API_TOKEN` and the variable `CLOUDFLARE_ACCOUNT_ID`, then
+   (`infra/allow-actions-prs.ts`, through `gh`) allows GitHub Actions to create pull requests while keeping the
+   default workflow token read-only. Run on 2026-11-10. Rerun it to change the token's permissions; rotate
+   with `ci:destroy` then `ci:setup`.
 2. **File the upstream drafts**: `docs/upstream/t3code-asks.md` and
    `docs/upstream/alchemy-plugins-dropped-on-update.md`.
 3. **Access**: nothing to do. Each stage's Access application and service token are created by its deploy

@@ -25,6 +25,7 @@
     "packages": [
       "apps/*",
       "packages/*",
+      "infra",
       "t3code/apps/server",
       "t3code/apps/web",
       "t3code/packages/client-runtime",

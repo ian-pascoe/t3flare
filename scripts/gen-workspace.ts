@@ -16,7 +16,7 @@ const PREFIX = "t3code/";
 // The t3 packages we import; their workspace dependencies are added transitively.
 const T3_ROOTS = ["t3", "@t3tools/web"];
 // Our own workspace globs.
-const OUR_WORKSPACES = ["apps/*", "packages/*"];
+const OUR_WORKSPACES = ["apps/*", "packages/*", "infra"];
 
 type Pkg = { dir: string; json: Record<string, any> };
 const t3Packages = new Map<string, Pkg>();
@@ -96,7 +96,8 @@ for (const key of Object.keys(lock.packages)) {
 }
 const ourDirect = new Set<string>();
 for (const file of [path.join(root, "package.json"), ...OUR_WORKSPACES.flatMap((glob) => {
-  const dir = path.join(root, glob.replace("/*", ""));
+  if (!glob.endsWith("/*")) return [path.join(root, glob, "package.json")];
+  const dir = path.join(root, glob.slice(0, -2));
   return fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => path.join(dir, name, "package.json")) : [];
 })]) {
   if (!fs.existsSync(file)) continue;

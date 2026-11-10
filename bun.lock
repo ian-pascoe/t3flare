@@ -43,6 +43,19 @@
         "wrangler": "4.157.0",
       },
     },
+    "infra": {
+      "name": "@t3flare/infra",
+      "dependencies": {
+        "@alchemy.run/cloudflare": "catalog:",
+        "@alchemy.run/github": "2.0.0-beta.85",
+        "@effect/platform-bun": "catalog:",
+        "alchemy": "catalog:",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+      },
+    },
     "t3code/apps/server": {
       "name": "t3",
       "version": "0.1.8",
@@ -2460,6 +2473,8 @@
 
     "@alchemy.run/docker": ["@alchemy.run/docker@2.0.0-beta.85", "", { "dependencies": { "rolldown": "1.2.13" }, "peerDependencies": { "@effect/platform-bun": "^4.1.0", "alchemy": "2.0.0-beta.85", "effect": "^4.1.0" }, "optionalPeers": ["@effect/platform-bun"] }, "sha512-AhVdcCTu/paBdDUtGc2U4WEa8+gczkkf7oH7XEeIVjlQ+xX3hmYWlspdfejoJ9pb2JT4myfvp5EeXi/Jcp+W2g=="],
 
+    "@alchemy.run/github": ["@alchemy.run/github@2.0.0-beta.85", "", { "dependencies": { "@distilled.cloud/core": "1.0.0-rc.18", "@distilled.cloud/github": "1.0.0-rc.18", "libsodium-wrappers": "^0.8.3" }, "peerDependencies": { "alchemy": "2.0.0-beta.85", "effect": "^4.1.0" } }, "sha512-lKQZTlqYo/iOK4Zbskd7riff9nqkMNgtStdlmgAUD/IvR+FweXftfcjZD9u9k/Z3h4RguJi4IduwFudSpLl6QQ=="],
+
     "@alchemy.run/node-utils": ["@alchemy.run/node-utils@2.0.0-beta.85", "", { "dependencies": { "chokidar": "^5.0.0", "rolldown": "1.2.13" } }, "sha512-2gxqMNMoJdx13w7wlDJw+gaXQ8e1VxQFsKldOvweqpd7JEgB5TGn3oO8r1sb/GB9+UzqXdh8tKp2MOVgFOrmbg=="],
 
     "@alchemy.run/sigil": ["@alchemy.run/sigil@0.1.0-alpha.1", "", { "peerDependencies": { "@types/react": ">=19.2.0", "react-devtools-core": ">=6.1.2" }, "optionalPeers": ["@types/react", "react-devtools-core"] }, "sha512-RtHELG2w+GluVewRsuKm66idtPzC+4STptMr/61X1Vy5uBkDzcCzjzV8G6jUa4iBv6Il0hHV7UL6wvv//9nD/Q=="],
@@ -2589,6 +2604,8 @@
     "@distilled.cloud/cloudflare": ["@distilled.cloud/cloudflare@1.0.0-rc.18", "", { "dependencies": { "@distilled.cloud/core": "1.0.0-rc.18" }, "peerDependencies": { "effect": "^4.0.5" } }, "sha512-UJB7pitkg7msm7BGTuAE8yYx4GzKdPLRtiOm3G3XHw07xLUlqEiEr4xpSf0CeziWzDygjI53FSkpC2qyVZr49g=="],
 
     "@distilled.cloud/core": ["@distilled.cloud/core@1.0.0-rc.18", "", { "peerDependencies": { "effect": "^4.0.5" } }, "sha512-Iui60+sNl1CwUu7NKGLuFf3VC4H9xYzfm0Fc8ZQvd87qwf1sDMB3EAWZrq/QFgrwzSY16z2mJ0PNHaBUnGet8A=="],
+
+    "@distilled.cloud/github": ["@distilled.cloud/github@1.0.0-rc.18", "", { "dependencies": { "@distilled.cloud/core": "1.0.0-rc.18" }, "peerDependencies": { "effect": "^4.0.5" } }, "sha512-SX5EofqqjaHRnTw0RC83qvEQZr11/RcNxqjdsn7kteHvni+1DIgnlRfeHoUD2rVyQEyEPWCYnIOFWysgXUOvSg=="],
 
     "@distilled.cloud/iceberg": ["@distilled.cloud/iceberg@1.0.0-rc.18", "", { "dependencies": { "@distilled.cloud/core": "1.0.0-rc.18" }, "peerDependencies": { "effect": "^4.0.5" } }, "sha512-XjUJ/vEOylhIZbAm85O9H6YqXKWGfVROT5BE9BGA/RXvo0bLK2+sUcjC6BoN77a99lImJkrXJuvbHBhNebObEA=="],
 
@@ -3147,6 +3164,8 @@
     "@swc/helpers": ["@swc/helpers@0.5.21", "", { "dependencies": { "tslib": "^2.8.0" } }, "sha512-jI/VAmtdjB/RnI8GTnokyX7Ug8c+g+ffD6QRLa6XQewtnGyukKkKSk3wLTM3b5cjt1jNh9x0jfVlagdN2gDKQg=="],
 
     "@t3flare/environment": ["@t3flare/environment@workspace:apps/environment"],
+
+    "@t3flare/infra": ["@t3flare/infra@workspace:infra"],
 
     "@t3tools/client-runtime": ["@t3tools/client-runtime@workspace:t3code/packages/client-runtime"],
 
@@ -3917,6 +3936,10 @@
     "kleur": ["kleur@4.1.5", "", {}, "sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ=="],
 
     "koffi": ["koffi@3.3.6", "", { "optionalDependencies": { "@koromix/koffi-android-arm64": "3.3.6", "@koromix/koffi-android-x64": "3.3.6", "@koromix/koffi-darwin-arm64": "3.3.6", "@koromix/koffi-darwin-x64": "3.3.6", "@koromix/koffi-freebsd-arm64": "3.3.6", "@koromix/koffi-freebsd-ia32": "3.3.6", "@koromix/koffi-freebsd-x64": "3.3.6", "@koromix/koffi-linux-arm": "3.3.6", "@koromix/koffi-linux-arm64": "3.3.6", "@koromix/koffi-linux-ia32": "3.3.6", "@koromix/koffi-linux-loong64": "3.3.6", "@koromix/koffi-linux-ppc64": "3.3.6", "@koromix/koffi-linux-riscv64": "3.3.6", "@koromix/koffi-linux-x64": "3.3.6", "@koromix/koffi-openbsd-arm64": "3.3.6", "@koromix/koffi-openbsd-ia32": "3.3.6", "@koromix/koffi-openbsd-x64": "3.3.6", "@koromix/koffi-win32-arm64": "3.3.6", "@koromix/koffi-win32-ia32": "3.3.6", "@koromix/koffi-win32-x64": "3.3.6" }, "hasInstallScript": true }, "sha512-pPqCZg8o4laLvzxySGEju/T1Fd+eCJTVnJmcH6h1u98HFRoBQ9EokNuBSj3NxIQdzkEPRxPnHKjhBVkLeB+X0g=="],
+
+    "libsodium": ["libsodium@0.8.4", "", {}, "sha512-lMcYaRi0zcs7tarATsQUYC7rstliIXZuoq0c6zXSgNtSNtdvBgkSegjWhpMJAXzKX3SUSwIp7+zEsob+j3LuRw=="],
+
+    "libsodium-wrappers": ["libsodium-wrappers@0.8.4", "", { "dependencies": { "libsodium": "^0.8.0" } }, "sha512-mu8aAWucZjTB5O/BtGXtW4e1agy7uHxNYG7zPthmmD1jU43LCDmSWZLN4JhflbdPXj3yDO4lxM1O9hLDgIOXDw=="],
 
     "lie": ["lie@3.3.0", "", { "dependencies": { "immediate": "~3.0.5" } }, "sha512-UaiMJzeWRlEujzAuw5LokY1L5ecNQYZKfmyZ9L7wDHb/p5etKaxXhohBcrw0EYby+G/NA52vRSN4N39dxHAIwQ=="],
 

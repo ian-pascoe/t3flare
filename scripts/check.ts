@@ -10,6 +10,7 @@ import * as path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 const environment = path.join(root, "apps/environment");
+const infra = path.join(root, "infra");
 
 interface Task {
   readonly name: string;
@@ -23,6 +24,8 @@ const tasks: Array<Task> = [
   { name: "lock", cwd: root, command: "bun", args: ["scripts/verify-lock.ts"] },
   { name: "typecheck", cwd: environment, command: "bun", args: ["run", "typecheck"] },
   { name: "lint", cwd: environment, command: "bun", args: ["run", "lint"] },
+  { name: "typecheck (infra)", cwd: infra, command: "bun", args: ["run", "typecheck"] },
+  { name: "lint (infra)", cwd: infra, command: "bun", args: ["run", "lint"] },
   { name: "lint (root scripts)", cwd: root, command: path.join(root, "node_modules/.bin/oxlint"), args: ["scripts"] },
   { name: "test", cwd: environment, command: "bun", args: ["run", "test"] },
 ];

@@ -3,10 +3,10 @@ name: Nightly bump
 # ADR-0017: pin t3code's newest nightly tag, prove it on the `bump` stage, and propose it as a pull request.
 # `bun run bump` (scripts/bump.ts) does the work and leaves the pin unchanged when any step fails.
 #
-# Needs, set by the owner (docs/steps/step-1.md → Owner actions):
-#   secrets.CLOUDFLARE_API_TOKEN   account token: Workers Scripts Write, Secrets Store Write (alchemy's state store),
-#                                  Account Settings Read, Access: Apps and Policies Write, Access: Service Tokens Write
+# Needs, made by `bun run --cwd infra ci:setup` (infra/github.ts):
+#   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-bump`
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
+# and the repository setting that lets Actions create pull requests (infra/allow-actions-prs.ts).
 # The stage's own bootstrap and admin tokens are made fresh by the job; nothing else is stored.
 
 on:
