@@ -8,9 +8,16 @@
     "destroy": "alchemy destroy"
   },
   "dependencies": {
+    "@effect/platform-node": "catalog:",
     "@effect/sql-sqlite-do": "catalog:",
     "@t3tools/contracts": "workspace:*",
+    "@t3tools/provider-acp-registry": "workspace:*",
+    "@t3tools/provider-core": "workspace:*",
+    "@t3tools/provider-cursor": "workspace:*",
+    "@t3tools/provider-muse": "workspace:*",
+    "@t3tools/provider-opencode": "workspace:*",
     "@t3tools/shared": "workspace:*",
+    "@t3tools/source-control-core": "workspace:*",
     "effect": "catalog:",
     "t3": "workspace:*"
   },

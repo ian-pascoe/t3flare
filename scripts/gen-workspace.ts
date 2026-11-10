@@ -76,6 +76,15 @@ for (const [key, raw] of Object.entries(ws.overrides)) {
   }
   overrides[name] = version;
 }
+// Bun resolves afresh instead of reading t3's pnpm lock, so some packages land on newer
+// releases than t3 tested. Pin the ones that break a build back to t3's lock.
+const LOCK_PINS: Record<string, string> = {
+  // 2.2.0 ships no license file, which fails the web build's third-party notice check.
+  "@nodable/entities": "2.1.1",
+  // claude-agent-sdk asks for ">=0.93.0"; 1.x changes the content block types t3 compiles against.
+  "@anthropic-ai/sdk": "0.93.0",
+};
+Object.assign(overrides, LOCK_PINS);
 // Held at the effect version, as in cloudpid (ADR-0028): @effect/platform-bun pulls it in.
 overrides["@effect/platform-node-shared"] = catalog["effect"]!;
 

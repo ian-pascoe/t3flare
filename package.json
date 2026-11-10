@@ -188,7 +188,9 @@
     "ws": "8.22.0",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
     "vite-plus": "1.4.0",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "@nodable/entities": "2.1.1",
+    "@anthropic-ai/sdk": "0.93.0"
   },
   "patchedDependencies": {
     "react-native-image-viewing@0.2.2": "t3code/patches/react-native-image-viewing@0.2.2.patch",
