@@ -6,7 +6,7 @@ cloudpid read at `ae5a7b73`. pi-durable read at `/tmp/ref/pi` (`packages/durable
 This is a plan to review, not a report. It works inside the settled ADRs (0003, 0004, 0005, 0008, 0009, 0012,
 0013, 0014, 0015, 0016, 0018) and the plan's row for 2a part 1. Where it refines an ADR, it says so in
 [Refinements to the ADRs](#refinements-to-the-adrs). Owner decisions and actions are collected at the end.
-Revision 2 answers the plan review; its changes are listed in [Review changes](#review-changes-revision-2).
+Revisions 2 and 3 answer the plan reviews; their changes are listed in [Review changes](#review-changes-revision-2).
 
 **Exit criteria (from `docs/plan.md`).** From the stock desktop client: clone a repo, run a turn that edits files
 and runs `bash`, approve a tool call, see the diff, push and open a PR. An Environment restart mid-turn recovers
@@ -79,10 +79,15 @@ otherwise. Budget for the step: **0 new Patches, at most 2 new Shadows**; the bu
 
 1. `gh auth token [--hostname H] [--user U]` → stdout the Environment-side GitHub token (section 6), exit 0.
 2. A cwd under `/w/<ws>` whose `<ws>` the registry does not list → `NotFound`, before any DO is touched.
-3. `git` reads the Workspace DO answers itself (`rev-parse --show-toplevel`/`--git-common-dir`/`--abbrev-ref`,
-   `status --porcelain=v2`, `ls-files`, `check-ignore`, `remote -v`, `config --get`, `symbolic-ref`, …; the exact
-   table comes from the M2 trace) → answered from the DO (isomorphic-git), in git's output format, with paths
-   translated to `/w/<ws>`.
+3. `git` reads the Workspace DO answers itself → answered from the DO (isomorphic-git), in git's output format,
+   with paths translated to `/w/<ws>`. The table is **bounded**: at most about 10 argv shapes, chosen from the M2
+   trace by how often t3 sends them while the Container is stopped (candidates: `rev-parse --show-toplevel`/
+   `--git-common-dir`/`--abbrev-ref HEAD`, `status --porcelain=v2`, `ls-files`, `check-ignore`, `remote -v`,
+   `config --get`, `symbolic-ref`). Each one has a byte-for-byte test against real git on fixture repos, as the
+   checkpoint diffs do; a shape without that test is not emulated. Any other read argv gets **the last real
+   answer** for that exact argv (recorded when it last ran in the Container), invalidated when the write journal
+   shows a write since, or by any git command that ran in the Container; with no valid recorded answer it falls
+   to step 5.
 4. `git` subcommands on the **Container allow-list** (built from the M2 trace of what t3 runs for clone, fetch,
    pull, commit, push, checkout/switch, branch, merge-base, diff of refs above the isomorphic guard) → the
    Workspace DO's real git in its Container, starting it, with the repo's token in the command's environment for
@@ -140,26 +145,38 @@ Container-only path rules on the same constant (`container-paths.ts:13–74`). S
 Workspace on the DO's side, and the design is an explicit translation:
 
 - **Inside a Workspace** (the DO's file system, the Worker Shell, the Container, and so the agent's tools and
-  shell), the repo root is `/workspace`. Each Workspace DO holds one repo, so `/workspace` is unambiguous there.
-  `computer-env` keeps its constants.
-- **Outside** (t3, its clients, the Environment DO), the repo root is `/w/<ws>` (ADR-0008).
-- **The translation** happens in exactly three places: `workspace-client` (every path argument in, every path in
-  an answer out), the `VcsProcess` router (the cwd in; absolute paths in the output of the git commands that print
-  them, `rev-parse --show-toplevel`/`--git-dir`/`--git-common-dir`/`--absolute-git-dir` and `worktree list`, out),
-  and the differ (paths in tool calls, `file_change` items and command output out).
-- **In the Container**, the bootstrap also bind-mounts `/workspace` at `/w/<ws>` (cloudpid's bootstrap already
-  bind-mounts when the Container can mount), so a stray absolute `/w/<ws>` path in a script or in git config
-  resolves there too. If the Container cannot mount, a symlink is used, which only `pwd -P` and git's toplevel can
-  tell apart, and those are translated anyway.
-- **The harness's own files** (temp files, `bash` spills) live in `/workspace/.t3flare/`, which `provision`
-  adds to the clone's `.git/info/exclude`, `WorkspaceEntries` hides, and the differ never reports. (ADR-0008 does
-  not name a place for them; cloudpid uses `/workspace/.cloudpid/`, beside its repos, which here would be inside
-  the repo.)
+  shell), the repo is at **`/workspace/repo`**, not at the mount root, as in cloudpid's layout (one directory per
+  repo under `/workspace`). The agent's `cwd` is `/workspace/repo`. `computer-env` keeps its constants, and its
+  Container-only rule (anything outside `/workspace` is the Container's, `container-paths.ts:70`) is unchanged.
+- **Siblings of the repo** hold what is not the repo: the harness's files (temp files, `bash` spills) in
+  `/workspace/.t3flare/` (cloudpid's `HARNESS_ROOT` rules, `container-paths.ts:16–19`, always synced), out of
+  reach of an agent's `git clean -fdx`, its `grep` and its linters, with no `.git/info/exclude` entry needed; and
+  room for step 4a's synced CLI session-state directory (ADR-0016) as another sibling.
+- **Outside** (t3, its clients, the Environment DO), the repo root is `/w/<ws>` (ADR-0008); `/w/<ws>` ↔
+  `/workspace/repo`.
+- **The translation** happens in exactly four places:
+  1. `workspace-client`: every path argument in, every path in an answer out.
+  2. The `VcsProcess` router: the cwd in; out, absolute paths in the output of the git commands that print them
+     (`rev-parse --show-toplevel`/`--git-dir`/`--git-common-dir`/`--absolute-git-dir`, `worktree list`), since t3
+     parses those.
+  3. **The Session's tools, on the way in.** t3 sends the agent text with `/w/<ws>/…` paths (`@` mentions, the
+     restart continuation, handoff context), and the model may pass them to a tool; `computer-env` would treat such
+     a path as Container-only and a `read` would start the Container. So the tools' path resolver (one function in
+     `computer-env`, used by every file tool, `bash`'s `cwd` and `bash-routing`'s path words) normalises a leading
+     `/w/<this ws>` to `/workspace/repo`. The prose of a message is never rewritten.
+  4. The differ, on the way out, **structured fields only**: `file_change` paths, tool path arguments, `cwd`.
+     Command output and assistant text are shown as the agent saw them (`/workspace/repo/…`).
+- **In the Container**, the bootstrap tries to bind-mount `/workspace/repo` at `/w/<ws>`, so a stray absolute
+  `/w/<ws>` path in a script or git config resolves there too. This is unproven: cloudpid's bootstrap only
+  bind-mounts a directory over itself, best effort (`apps/sandbox-image/src/toolchains.ts:333–338`). If the mount
+  fails, a symlink `/w/<ws>` → `/workspace/repo` is used, which only `pwd -P` and git's toplevel can tell apart,
+  and the router translates those anyway.
 - **M0 checks**, in two Workspaces: through the router, `git rev-parse --show-toplevel` with cwd `/w/<ws>` prints
-  `/w/<ws>`; in the Container, `cd /w/<ws> && pwd -P && git rev-parse --show-toplevel` print `/w/<ws>` with the
-  bind mount (or `/workspace`, and the router's output translation is then the only guard); a file the agent
-  writes at `/workspace/a.txt` is read by t3 at `/w/<ws>/a.txt`. Also tried: `containerEnv.MOUNT_POINT` set to
-  `/w/<ws>`, recorded but not adopted, since the DO and the Worker Shell would still see `/workspace`.
+  `/w/<ws>`; in the Container, `cd /w/<ws> && pwd -P && git rev-parse --show-toplevel` (recording whether the bind
+  mount or the symlink is in place); a file the agent writes at `/workspace/repo/a.txt` is read by t3 at
+  `/w/<ws>/a.txt`; a `read` of `/w/<ws>/a.txt` by the agent is served by the DO with the Container stopped. Also
+  tried: `containerEnv.MOUNT_POINT` set to `/w/<ws>`, recorded but not adopted, since the DO and the Worker Shell
+  would still see `/workspace`.
 
 ### Session ↔ Environment (DO RPC, ADR-0005)
 
@@ -208,8 +225,11 @@ does `githubToken` (section 2, Workspace). It boots t3 if it is not running and 
 (so startup recovery has run), then hands the push to `SessionSink`:
 
 - With an open provider session for the thread, the adapter applies it.
-- **Orphans.** For each turn the push names as `queued` or `running` whose `providerTurnId` t3 does not have open
-  (its run is terminal in t3's projection, or unknown), the answer lists it in `orphans`, and the Session aborts
+- **Orphans.** The adapter registers a turn in its open-turn map (`providerTurnId` → run) **before** it calls
+  `submitTurn`, and removes it only after the turn's terminal is emitted. The orphan check consults that map first:
+  a turn in it is never an orphan, so a push that arrives before `submitTurn` answers cannot abort a turn just
+  starting. Only then, for each turn the push names as `queued` or `running` whose `providerTurnId` is not in the
+  map and whose run t3 does not have open (terminal in t3's projection, or unknown), the answer lists it in `orphans`, and the Session aborts
   that turn and withdraws its approvals. This is what ends a Session turn after an Environment restart when t3
   does not continue the run: a pending runtime request blocks continuation (`RestartContinuation.ts:63–68`), the
   project's *continue after restart* setting is off, or the crash-loop guard stops it. When t3 does continue, the
@@ -394,7 +414,7 @@ them and must pass in our tree.
 | `packages/computer-env/src/**` | `packages/computer-env` | whole |
 | `packages/extensions/src/{coding-tools,bash-routing,files,agents-md,agents-md-discovery,instructions,call-diff,images,result-bounds,stored-bytes,conversation-target,harness}.ts`, the parts of `outputs.ts` they use | `apps/agents/src/extensions/` | trimmed; anything reaching Registry, Environments, Secrets, MCP or Skills is cut |
 | `packages/extensions/src/approvals.ts` (`withApproval`, the store, `settle`) | `apps/agents/src/extensions/permissions.ts` | the durable wait and answer only, behind `wrapTool`; `approval-cores.ts` and `approval-tools.ts` (Agent changes) are not taken |
-| `apps/server/src/workspace/{Workspace,launch,idle,snapshots,toolchains,per-launch-backend,redact,alarm,binding,resource,git,prepare,changes,changes.collect,changes.repos,changes.setup}.ts` | `apps/agents/src/workspace/` | adapted: one repo at `/workspace`, no Environment settings (fixed defaults), tokens from the Environment DO, the budget lease |
+| `apps/server/src/workspace/{Workspace,launch,idle,snapshots,toolchains,per-launch-backend,redact,alarm,binding,resource,git,prepare,changes,changes.collect,changes.repos,changes.setup}.ts` | `apps/agents/src/workspace/` | adapted: one repo at `/workspace/repo`, no Environment settings (fixed defaults), tokens from the Environment DO, the budget lease |
 | `apps/server/src/github/{app,request,config}.ts`, `packages/config/src/github-permissions.ts` | `packages/github-app` | permissions tightened (section 6) |
 | `apps/sandbox-image/image/{Dockerfile,supervise,cloudpid-memory-guard,command.bash,mise.toml}`, `src/{toolchains,workspaces,changes,supervisor,memory-guard,index}.ts` | `apps/sandbox-image` | trimmed (section 5) |
 | `infra/github-app-setup.ts`, `infra/src/github-app.ts` | `infra/` | renamed, one GitHub environment (`bump`) |
@@ -426,7 +446,7 @@ mark.
   earlyoom under the supervisor.
 - **Dropped for part 1:** Docker, the MCP bridge, `cloudpid-notify`, Builds, the Run and Comparison scripts.
   **Kept:** the bootstrap (toolchains, git identity, the credential helper reading the command's token, the
-  `/w/<ws>` bind mount), the clone script (`prepareWorkspaceScript`, one repo, into `/workspace`), the
+  `/w/<ws>` bind mount), the clone script (`prepareWorkspaceScript`, one repo, into `/workspace/repo`), the
   Container-git status script. CLI agents (4a/4b) add their binaries to this image later (ADR-0015).
 - **Instance size:** cloudpid's `cpu-1` custom size (1 vCPU, 3 GiB, 12 GB disk), chosen at each
   `ctx.container.start({ instance })` under `schedulingPolicy: "durable_object"`. Idle stop after 2 minutes, with a
@@ -551,7 +571,8 @@ passing and a commit.
   its trace, our `VcsDriverRegistry`, the Environment DO's Workspace registry and token minting; New project by
   routing or the second Shadow; the `node:fs` audit for `/w` paths.
 - **The router trace:** every argv t3 sends while cloning, browsing, opening the diff panel and showing status,
-  with the router's decision; from it, the step-3 table and the Container allow-list.
+  with the router's decision; from it, the step-3 table (at most about 10 shapes, each with its byte-for-byte
+  test) and the Container allow-list.
 - **Memory (R5, moved here):** the agents isolate's heap after an isomorphic-git status of a 2,000-file repo, with
   two Sessions live in the same isolate.
 - **Exit evidence:** from the stock web client, *Add project → Clone* of the private fixture repo lands at
@@ -601,9 +622,14 @@ passing and a commit.
   ways; Environment and Container token scoping.
 - **Checkpoint fidelity (Node, real git):** the DO's `checkpoint.diff` output compared with `git diff` of the same
   refs, byte for byte, after edits, adds, deletes, renames, mode changes and binary files.
+- **Emulated git reads (Node, real git):** each argv shape in the router's step-3 table (at most about 10)
+  compared with real git's stdout, stderr and exit code on the same fixture repos, byte for byte, in clean, dirty,
+  detached, unborn and no-upstream states; plus the recorded-answer cache's invalidation by a journal write and by
+  a Container git command.
 - **workerd (`@cloudflare/vitest-plugin`):** Session DO with pi-durable's faux provider (submit, abort, steer,
   answer, a restart mid-approval, more than `restartLimit` reruns while waiting, the push loop against a fake sink
-  with dropped, reordered and orphaned pushes, the liveness push, the 2 h deadline via a short override); Workspace
+  with dropped, reordered and orphaned pushes, a push that arrives before `submitTurn` answers (the turn must not
+  be aborted), the liveness push, the 2 h deadline via a short override); Workspace
   DO file ops and isomorphic-git ops on real DO storage (no Container in workerd); `ContainerBudget` leases; the
   copied packages' own tests.
 - **Deployed:** `scripts/acceptance.ts` gains `--real-turn`: clone the fixture, run a turn with a small model under
@@ -640,7 +666,7 @@ passing and a commit.
 | R10 | Restart ordering: pushes while t3 boots, the old turn's terminal racing the continuation | End of M1 (text), M5 (tools, five runs), the workerd fake-sink test | Tighten the orphan and open-turn filters |
 | R11 | Image build time under amd64 emulation and in CI | M0 measures a first and a cached build | Build in CI only; cache layers |
 | R12 | t3's text-generation model setting defaults to a driver we removed | M1: t3 falls back to a capable instance; check the title and commit-message paths | Seed the setting once from our composition |
-| R13 | Path translation misses an absolute path t3 reads from git or from a tool result | M0's *Paths* checks, M2's trace, the differ's tests | Add the command to the router's translated set; the bind mount covers the Container |
+| R13 | Path translation misses an absolute path t3 reads from git or from a tool result | M0's *Paths* checks, M2's trace, the differ's tests | Add the command to the router's translated set; the bind mount or symlink covers the Container; the tools' resolver covers `/w/<ws>` inputs |
 | R14 | The run's status while an approval is pending, and whether t3 treats it as settled anywhere that matters | M0 desk check, M1 synthetic approval | Adjust the adapter's status reporting |
 
 No risk needs the owner now. R5's fallback would.
@@ -656,11 +682,12 @@ To be written into the ADRs with the step's report, not before:
   name the Projects' repos of one installation, never reach an agent, and carry the App's read permissions plus
   `pull_requests: write`; PR features for a second installation are out of scope for now. The private key lives
   only in the environment Worker, and the Environment DO mints for the Workspace DOs (ADR-0018's broker).
-- **ADR-0008:** the path a Workspace's own tools see is `/workspace` (computer fixes it); t3's `/w/<ws>` is
-  translated at three named places, and the Container also mounts the files at `/w/<ws>`. Workspace ids are the
-  single path segment under `/w` that t3's client chooses as the clone directory. The harness's files live in
-  `/workspace/.t3flare/`, excluded from git.
-- **ADR-0009:** as built: our `VcsDriverRegistry`, the router's DO-answered git table, the Container allow-list,
+- **ADR-0008:** inside a Workspace the repo is `/workspace/repo` (computer fixes the `/workspace` root); t3's
+  `/w/<ws>` is translated at four named places (`workspace-client`, the router, the Session's tool path resolver,
+  the differ's structured fields), and the Container also mounts or links `/w/<ws>`. Workspace ids are the single
+  path segment under `/w` that t3's client chooses as the clone directory. The harness's files live beside the
+  repo in `/workspace/.t3flare/`.
+- **ADR-0009:** as built: our `VcsDriverRegistry`, the router's bounded DO-answered git table and its recorded-answer cache, the Container allow-list,
   checkpoint aliasing above the guard.
 - **ADR-0005:** the push payload, epoch and sequence, the liveness push, orphans, the inverse guard and the
   snapshot call, as built.
@@ -712,3 +739,12 @@ Each finding of the review, checked against the source before changing anything:
 | 12c | `github-app`, `provider-pi-durable`, `agent-extensions` as folders | Accepted for the provider and the extensions (one Worker each); not for `github-app`, which `infra/github-app-setup.ts` also imports to check an installation | Changed as stated |
 | 12d | R1 before M0's copying | Accepted | M0 step 0 |
 | — | Unverified: run status while an approval is pending; computer's mount point; Loader bindings | Mount point settled above; the other two scheduled | M0 desk check and M1 test (R14); M0 bindings check (R9) |
+
+## Review changes (revision 3)
+
+| # | Finding | Checked | Outcome |
+|---|---|---|---|
+| 1 | Repo at the mount root; harness files inside the repo; the bind mount unproven | Confirmed: cloudpid keeps `HARNESS_ROOT` beside its repos (`container-paths.ts:16–19`); its bootstrap only bind-mounts a directory over itself, best effort (`toolchains.ts:333–338`) | Changed: `/w/<ws>` ↔ `/workspace/repo`, harness in the sibling `/workspace/.t3flare/` (room for 4a's session-state sibling); the `/w/<ws>` bind mount is tried with a symlink fallback, and M0 records which |
+| 2 | `/w/<ws>` paths reach the agent's tools and would start the Container | Confirmed: `isContainerOnly` treats any path outside `/workspace` as the Container's (`container-paths.ts:70`) | Changed: a fourth translation point, the tools' path resolver, normalises a leading `/w/<this ws>`; prose untouched; the differ translates only structured fields, not command output; M0 checks a `read` of `/w/<ws>/…` with the Container stopped |
+| 3 | Orphan race at turn start | Accepted | Changed: the turn enters the adapter's open-turn map before `submitTurn`, and the orphan check consults the map first; a fake-sink test for a push before `submitTurn` answers |
+| 4 | Emulated git reads unbounded and untested | Accepted | Changed: at most about 10 emulated argv shapes, each with a byte-for-byte test against real git; other reads get the last real answer per argv, invalidated by the write journal or a Container git command |
