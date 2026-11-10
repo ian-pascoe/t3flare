@@ -152,6 +152,11 @@ export interface TurnState {
   readonly inputEntry?: string;
   readonly startedAt: number;
   readonly settledAt?: number;
+  /**
+   * Steers sent into the turn (their submissions). A steer that reaches the run as it gives its final answer starts the
+   * next pi-durable run; it is still this turn's work, so the turn settles only when they have.
+   */
+  readonly steers?: ReadonlyArray<string>;
 }
 
 export interface PendingApproval {

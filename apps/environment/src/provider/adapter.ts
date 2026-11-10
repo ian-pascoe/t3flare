@@ -165,7 +165,8 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
             Effect.gen(function* () {
               if (closed) return { ok: true } as SessionPushAnswer;
               const nowMs = Date.now();
-              for (const id of differ.turns.keys()) lastPushAt.set(id, nowMs);
+              // Only a push that still names a turn counts as a sign of it (the inverse guard).
+              for (const id of differ.turns.keys()) if (push.turns[id] !== undefined) lastPushAt.set(id, nowMs);
               // Live turns of the Session that this provider session did not start: orphans (step 2a plan, section 2).
               const orphans = Object.entries(push.turns)
                 .filter(([id, turn]) => (turn.status === "queued" || turn.status === "running") && !differ.turns.has(id))

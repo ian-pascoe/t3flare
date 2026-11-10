@@ -15,6 +15,7 @@
 //   POST /_t3flare/fixtures/turn-items          {"threadIds": [...], "runs": 3, "marker": "..."}
 //   POST /_t3flare/check/agents?budget=0|1      step 2a M0: the agents Worker both ways, Containers, paths, budget, token scope
 //   GET  /_t3flare/agents/session?thread=<id>   a Session's state as it would push it (differ fixtures, diagnosis)
+//   POST /_t3flare/agents/drop-turns?thread=<id> a test's fault: the Session forgets its turns (the inverse guard)
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -181,6 +182,11 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const { byName } = await import("../agents/rpc.ts");
         const thread = url.searchParams.get("thread") ?? "";
         return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").snapshot({}));
+      }
+      case "POST /_t3flare/agents/drop-turns": {
+        const { byName } = await import("../agents/rpc.ts");
+        const thread = url.searchParams.get("thread") ?? "";
+        return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").dropTurns());
       }
       case "POST /_t3flare/check/agents": {
         const { agentsCheck } = await import("./agentsCheck.ts");

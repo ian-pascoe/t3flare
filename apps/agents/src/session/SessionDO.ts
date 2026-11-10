@@ -229,11 +229,20 @@ export class SessionDO extends DurableObject<SessionEnv> {
   }
 
   async steer(input: SteerInput): Promise<{ readonly submissionId: string }> {
+    const turn = this.#turns()[input.providerTurnId];
+    if (turn === undefined || !isLive(turn)) throw new Error(`t3flare: turn ${input.providerTurnId} is not live`);
     const root = await this.#root();
     const submission = await root.submit(
-      { type: "input", content: userContent(input.text, input.images), requestId: input.key, whenBusy: "steer" },
+      // Only into a run in progress: a steer that finds the Session idle is refused, never a run t3 did not start.
+      { type: "input", content: userContent(input.text, input.images), requestId: input.key, whenBusy: "steer", whenIdle: "reject" },
       context,
     );
+    const turns = this.#turns();
+    const current = turns[input.providerTurnId];
+    if (current !== undefined) {
+      turns[input.providerTurnId] = { ...current, steers: [...(current.steers ?? []), String(submission.id)] };
+      this.#saveTurns(turns);
+    }
     this.#schedulePush(0);
     return { submissionId: String(submission.id) };
   }
@@ -276,6 +285,15 @@ export class SessionDO extends DurableObject<SessionEnv> {
     return this.#state(fromEntry, Number.POSITIVE_INFINITY);
   }
 
+  /** A test's fault (the inverse guard's check): forgets every turn, as a Session that lost its state would. */
+  async dropTurns(): Promise<{ readonly dropped: number }> {
+    const dropped = Object.keys(this.#turns()).length;
+    this.#saveTurns({});
+    await (await this.#root()).abort(context);
+    await this.#arm();
+    return { dropped };
+  }
+
   /** M0's check: the Environment calls this, and it calls the Environment back over its own binding. */
   async ping(echo: string): Promise<{ readonly session: string; readonly echo: string; readonly environment: unknown }> {
     return {
@@ -288,7 +306,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // -------------------------------------------------------------------------------------------------------------------
   // Turn states
 
-  /** Reads each live turn's submission and settles the turns whose submission settled. */
+  /** Reads each live turn's submissions (its own and its steers') and settles the turns whose submissions settled. */
   async #refreshTurns(): Promise<void> {
     const harness = await this.#opening;
     const turns = this.#turns();
@@ -298,9 +316,17 @@ export class SessionDO extends DurableObject<SessionEnv> {
       const submission = await harness.submission(turn.submissionId as never, context);
       if (submission === undefined) continue;
       const status = await submission.status(context);
+      // A steer still queued or placed keeps the turn running, whatever its own submission says.
+      let steering = false;
+      for (const steer of turn.steers ?? []) {
+        const record = await harness.submission(steer as never, context);
+        const steerStatus = record === undefined ? undefined : (await record.status(context)).status;
+        if (steerStatus === "queued" || steerStatus === "placed") steering = true;
+      }
       let next: TurnState = turn;
-      if (status.status === "placed") next = { ...turn, status: "running", inputEntry: String(status.entry) };
-      else if (status.status === "done") {
+      if (status.status === "placed" || (status.status === "done" && steering)) {
+        next = { ...turn, status: "running", inputEntry: String(status.entry) };
+      } else if (status.status === "done") {
         next = { ...turn, status: "answered", inputEntry: String(status.entry), settledAt: Date.now() };
       } else if (status.status === "unanswered") {
         const reason = String(status.reason);
@@ -314,7 +340,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
           settledAt: Date.now(),
         };
       }
-      if (next !== turn) {
+      if (JSON.stringify(next) !== JSON.stringify(turn)) {
         turns[id] = next;
         changed = true;
       }
