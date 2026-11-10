@@ -1,0 +1,88 @@
+{
+  "url": "https://t3flare-environment-spike-juxn3xepy62clmbe.ian-g-pascoe.workers.dev",
+  "descriptor": {
+    "status": 200,
+    "machine": "cloud",
+    "label": "t3flare"
+  },
+  "pairing": {
+    "status": 200,
+    "ms": 271,
+    "scopes": [
+      "orchestration:read",
+      "orchestration:operate",
+      "terminal:operate",
+      "relay:read",
+      "access:read",
+      "access:write",
+      "relay:write"
+    ],
+    "permissions": [
+      "orchestration:read",
+      "orchestration:operate",
+      "settings:write",
+      "providers:manage",
+      "environment:maintain",
+      "preview:operate",
+      "diagnostics:read",
+      "terminal:read",
+      "terminal:operate",
+      "source-control:write",
+      "filesystem:read",
+      "filesystem:write",
+      "relay:read",
+      "access:read",
+      "access:write",
+      "relay:write"
+    ],
+    "sessionMethod": "browser-session-cookie",
+    "expiresAt": "2026-12-10T17:39:37.718Z"
+  },
+  "connect": {
+    "serverConfig": {
+      "ok": true,
+      "ms": 774
+    },
+    "shell": {
+      "ok": true,
+      "ms": 887
+    }
+  },
+  "project": {
+    "projectId": "cb31ff34-91e1-45c3-8031-e62206a5f842",
+    "ms": 952,
+    "result": {
+      "id": "cb31ff34-91e1-45c3-8031-e62206a5f842",
+      "title": "scratch-mwaz641i",
+      "workspaceRoot": "/t3/home/scratch-mwaz641i",
+      "repositoryIdentity": null,
+      "faviconPath": null,
+      "projectIcon": null,
+      "defaultModelSelection": null,
+      "defaultThreadEnvMode": null,
+      "autoPull": false,
+      "scripts": [],
+      "pinnedAt": null,
+      "archivedAt": null,
+      "createdAt": "2026-11-10T17:39:38.264Z",
+      "updatedAt": "2026-11-10T17:39:38.264Z",
+      "deletedAt": null
+    }
+  },
+  "thread": {
+    "threadId": "4c365ca7-e113-4271-930f-0525600ab2d8",
+    "ms": 1044
+  },
+  "listThreads": {
+    "ms": 1148,
+    "threadCount": 122,
+    "containsNewThread": true
+  },
+  "openThread": {
+    "ok": true,
+    "ms": 1194,
+    "containsTitle": true
+  },
+  "ok": true,
+  "totalMs": 1195
+}
