@@ -4,7 +4,7 @@ The owner wants the fastest possible devtools, so the repo follows cloudpid's AD
 
 t3code is a pnpm workspace, so a Bun script generates the root `package.json`'s `catalog`, `overrides` and `patchedDependencies` from its `pnpm-workspace.yaml`. Only the t3code packages we import are workspace members. A single copy of `effect` remains mandatory, because duplicate copies break schema decoding.
 
-Bun does not read t3's `pnpm-lock.yaml`. Resolving fresh, 209 of the 993 packages shared with t3's lock came out at other versions at the spike, and two of them broke the build until pinned. So the generator also pins every package that t3's lock resolves to a single version to that version, and lists what it cannot express (pnpm's `"-"` removals and `parent>child` overrides).
+Bun does not read t3's `pnpm-lock.yaml`. Resolving fresh, 209 of the 993 packages shared with t3's lock came out at other versions at the spike, and two of them broke the build until pinned. So the generator also pins every package that t3's lock resolves to a single version to that version, and lists what it cannot express (pnpm's `"-"` removals and `parent>child` overrides) in `scripts/lock-pins.report.md`. At step 1: 1,572 packages pinned from 1,811 in t3's lock; 167 are at several versions there and cannot be pinned (Bun's overrides are per name); our own direct dependencies are left to us. `scripts/verify-lock.ts` then compares Bun's resolution with t3's lock: 20 of 950 shared packages differ, all multi-version ones or our own (`typescript` 7, `@cloudflare/workers-types`), and there is one `effect` (4.1.2). The bump job runs both.
 
 ## Considered Options
 

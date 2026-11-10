@@ -70,6 +70,14 @@ _Avoid_: vault, keychain
 An opaque stand-in for a credential, given to one CLI agent process and redeemed only by the broker's intercept.
 _Avoid_: placeholder, fake token
 
+**Safe mode**:
+The Environment DO's state where it does not start t3, and only the admin routes answer; entered by hand or after three boots in a row fail.
+_Avoid_: maintenance mode, recovery mode
+
+**Pairing window**:
+The minutes, opened by an admin route, during which t3's bootstrap grant exists and the bootstrap token pairs a client.
+_Avoid_: bootstrap mode
+
 ## Upstream
 
 **State directory**:

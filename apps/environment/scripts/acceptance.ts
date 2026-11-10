@@ -136,13 +136,16 @@ const uuid = () => crypto.randomUUID();
 const stamp = Date.now().toString(36);
 const marker = `fixture${stamp}`;
 
+/** Distinct fixture turn items named in a response. */
+const fixtureItems = (text: string) => new Set(text.match(/item:fixture:[^"]+/g) ?? []).size;
+
 const threadWindow = async (threadId: string) => {
   const started = performance.now();
   const response = await fetch(new URL(`/api/orchestration/threads/${threadId}/bounded`, base), {
     headers: { cookie, "x-t3-orchestration-protocol": "2" },
   });
   const text = await response.text();
-  return { status: response.status, ms: Math.round(performance.now() - started), bytes: text.length, items: (text.match(/"item:fixture:/g) ?? []).length };
+  return { status: response.status, ms: Math.round(performance.now() - started), bytes: text.length, items: fixtureItems(text) };
 };
 
 const program = Effect.gen(function* () {
@@ -222,7 +225,7 @@ const heavy = Effect.gen(function* () {
   const startedThread = performance.now();
   const detail = yield* first(client[ORCHESTRATION_V2_WS_METHODS.subscribeThread]({ threadId: target } as never));
   const detailText = JSON.stringify(detail ?? {});
-  report.subscribeThread = { ms: Math.round(performance.now() - startedThread), bytes: detailText.length, items: (detailText.match(/"item:fixture:/g) ?? []).length };
+  report.subscribeThread = { ms: Math.round(performance.now() - startedThread), bytes: detailText.length, items: fixtureItems(detailText) };
   check("subscribeThread emits with turn items", detail !== undefined && detailText.includes("item:fixture:"), report.subscribeThread);
 
   const startedSearch = performance.now();

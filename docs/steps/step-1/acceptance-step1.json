@@ -1,13 +1,13 @@
 {
   "url": "https://t3flare-environment-step1.ian-g-pascoe.workers.dev",
-  "startedAt": "2026-11-10T19:15:44.657Z",
+  "startedAt": "2026-11-10T19:22:36.280Z",
   "adminGuard": {
     "wrongToken": 404,
     "withAccessAndToken": 200,
     "build": {
       "t3": "v0.1.9-nightly.20261110.4478",
-      "commit": "cb99a18a44a1",
-      "builtAt": "2026-11-10T19:10:33.975Z"
+      "commit": "d4511ed7d093",
+      "builtAt": "2026-11-10T19:21:09.850Z"
     }
   },
   "auth": {
@@ -17,15 +17,15 @@
   },
   "pairing": {
     "refusedBeforeArming": 401,
-    "armedUntil": "2026-11-10T19:25:45.401Z",
+    "armedUntil": "2026-11-10T19:32:36.860Z",
     "paired": 200,
-    "ms": 2323,
+    "ms": 1057,
     "refusedAfterDisarming": 401
   },
   "project": {
-    "projectId": "841f557a-6f07-4e5a-aa2d-16291d5dc25e",
+    "projectId": "c17af665-c34b-4593-ae1d-0ba0ac483538",
     "threads": 12,
-    "ms": 3085
+    "ms": 2280
   },
   "fixtures": {
     "threads": 12,
@@ -36,44 +36,44 @@
     "eventSink": "fresh"
   },
   "shellSnapshot": {
-    "ms": 727,
-    "bytes": 45990,
+    "ms": 556,
+    "bytes": 76860,
     "listedFixtureThreads": 12
   },
   "threadWindow": {
     "threads": 12,
     "allOk": true,
-    "minItems": 60,
-    "maxMs": 136,
+    "minItems": 20,
+    "maxMs": 202,
     "maxBytes": 46535
   },
   "subscribeThread": {
     "ms": 55,
-    "bytes": 46474,
-    "items": 60
+    "bytes": 46475,
+    "items": 20
   },
   "search": {
-    "ms": 51,
+    "ms": 42,
     "matches": 12,
     "threads": 12
   },
   "searchThread": {
     "ok": true,
-    "bytes": 1536
+    "bytes": 1537
   },
   "sqlChecks": {
     "transactionRollback": true,
     "overHundredParameters": true
   },
   "sqlAdapter": {
-    "statementsInlined": 2,
+    "statementsInlined": 4,
     "maxParameters": 300,
-    "compoundsRewritten": 42,
+    "compoundsRewritten": 31,
     "maxCompoundTerms": 12,
-    "ctesMaterialized": 26,
+    "ctesMaterialized": 36,
     "materializeFailures": 0,
     "refusedStatements": 0,
-    "pragmaRefusals": 13
+    "pragmaRefusals": 7
   },
   "rebootCheck": {
     "registered": {
@@ -82,13 +82,13 @@
     },
     "bothBootsServed": true,
     "sameEnvironmentId": true,
-    "isolateBoots": 10,
+    "isolateBoots": 8,
     "survivedIntoSecondBoot": [
       {
         "module": "packages/shared/src/observability.ts",
         "name": "generatedServiceInstanceId",
         "initial": "undefined",
-        "now": "string:76038927-585a-4e06-8f9c-b05ac52c7760"
+        "now": "string:18c89246-1e72-4960-8589-8db031035feb"
       },
       {
         "module": "apps/server/src/mcp/McpSessionRegistry.ts",
@@ -100,7 +100,7 @@
     "changedAfterFirstBoot": 2,
     "globalsAddedDuringCheck": []
   },
-  "totalMs": 9371,
+  "totalMs": 9017,
   "failures": [],
   "ok": true
 }

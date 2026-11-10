@@ -15,7 +15,7 @@ DO SQLite refuses some of what t3's queries do, so the client goes through an ad
 ## Consequences
 
 - An open `storage.transaction()` closes the DO's input gate, so **nothing else runs** until it commits, not just reads. t3's transactions are short and SQL-only; a transaction that awaited I/O would stall the whole Environment.
-- Local workerd does not have the production-only expansion cap, so the SQL acceptance tests run against a deployed stage, with fixtures that have turn items.
+- Local workerd does not have the production-only expansion cap, so the SQL acceptance tests run against a deployed stage, with fixtures that have turn items. Step 1's fixtures (12 threads × 4 runs, 240 turn items, written through t3's own `EventSinkV2`) took the CTE fallback 24–26 times per acceptance run on production with no failure, and no statement other than t3's PRAGMAs was refused. The adapter's rewrites are also tested for equal results on Node's SQLite and against DO SQLite's limits in local workerd (`apps/environment/test/`).
 
 ## Considered Options
 
