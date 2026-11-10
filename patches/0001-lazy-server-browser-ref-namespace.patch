@@ -1,0 +1,17 @@
+diff --git a/apps/server/src/preview/ServerBrowserPage.ts b/apps/server/src/preview/ServerBrowserPage.ts
+index 31cff82..9f886b4 100644
+--- a/apps/server/src/preview/ServerBrowserPage.ts
++++ b/apps/server/src/preview/ServerBrowserPage.ts
+@@ -90,9 +90,10 @@ const MAX_TARGET_CHARS = 200;
+ 
+ const pageRefs = new WeakMap<Page, { generation: string; refs: Map<string, string> }>();
+ // A compact runtime namespace prevents old refs from aliasing after a server restart.
+-const refNamespace = NodeCrypto.randomUUID().slice(0, 8);
++let refNamespace: string | undefined;
+ let snapshotSequence = 0;
+-const nextRefGeneration = () => `${refNamespace}-${(++snapshotSequence).toString(36)}`;
++const nextRefGeneration = () =>
++  `${(refNamespace ??= NodeCrypto.randomUUID().slice(0, 8))}-${(++snapshotSequence).toString(36)}`;
+ 
+ /** A takeover revokes previously issued refs even when the document stays unchanged. */
+ export const invalidateRefs = (page: Page) => {

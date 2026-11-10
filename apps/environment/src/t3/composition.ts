@@ -22,6 +22,7 @@ import * as CursorAccountReader from "@t3tools/provider-cursor/server/CursorAcco
 import * as CursorUsageAccounts from "@t3tools/provider-cursor/server/CursorUsageAccounts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
@@ -125,7 +126,6 @@ import * as PullRequestReadCache from "t3/src/pullRequest/PullRequestReadCache.t
 import * as SourceControlRepositoryService from "t3/src/sourceControl/SourceControlRepositoryService.ts";
 import * as WorktreeSetupTracker from "t3/src/project/WorktreeSetupTracker.ts";
 import * as Observability from "t3/src/observability/Observability.ts";
-import * as EventLoopMonitor from "t3/src/observability/EventLoopMonitor.ts";
 import * as ServerEnvironment from "t3/src/environment/ServerEnvironment.ts";
 import * as DirectEndpoints from "t3/src/environment/DirectEndpoints.ts";
 import * as RemoteOpenTargets from "t3/src/environment/RemoteOpenTargets.ts";
@@ -206,6 +206,9 @@ export const make = (options: CompositionOptions) => {
     Effect.gen(function* () {
       const derived = yield* ServerConfig.deriveServerPaths(BASE_DIR, undefined);
       yield* ServerConfig.ensureServerDirectories(derived);
+      // t3's file secret store creates this; ours keeps secrets in DO KV, but replay
+      // markers still live here.
+      yield* (yield* FileSystem.FileSystem).makeDirectory(derived.secretsDir, { recursive: true });
       return ServerConfig.ServerConfig.of({
         logLevel: "Info",
         traceMinLevel: "Info",
@@ -254,8 +257,9 @@ export const make = (options: CompositionOptions) => {
   const layerSecretStore = SecretStore.layer(options.storage).pipe(Layer.provide(layerPlatformServices));
 
   const layerResourceAttribution = ResourceAttribution.layer;
-  const layerApplicationObservability = EventLoopMonitor.layer.pipe(
-    Layer.provideMerge(Observability.layer),
+  // t3flare: no event-loop monitor (perf_hooks.monitorEventLoopDelay is not in workerd);
+  // EventLoopMonitor is a Reference whose default reports no stalls.
+  const layerApplicationObservability = Observability.layer.pipe(
     Layer.provideMerge(layerResourceAttribution),
   );
 

@@ -74,6 +74,9 @@ const sqlProbe = Effect.gen(function* () {
   // 3. Read latency behind an open transaction: a read issued while a 50 ms transaction
   // is open waits for it (no separate reader, unlike t3's Node client).
   const reads: Array<number> = [];
+  const seen: Array<string> = [];
+  const order: Array<string> = [];
+  const wall0 = Date.now();
   const t0 = performance.now();
   yield* Effect.all(
     [
@@ -81,21 +84,49 @@ const sqlProbe = Effect.gen(function* () {
         Effect.gen(function* () {
           yield* sql`UPDATE t3flare_probe SET label = 'locked' WHERE id = 2`;
           yield* Effect.sleep("50 millis");
+          order.push(`tx-body-end@${Date.now() - wall0}`);
         }),
-      ),
+      ).pipe(Effect.tap(() => Effect.sync(() => order.push(`tx-committed@${Date.now() - wall0}`)))),
       Effect.gen(function* () {
         yield* Effect.sleep("5 millis");
         const start = performance.now();
-        yield* sql`SELECT label FROM t3flare_probe WHERE id = 2`;
+        order.push(`read-issued@${Date.now() - wall0}`);
+        const row = yield* sql<{ label: string }>`SELECT label FROM t3flare_probe WHERE id = 2`;
+        order.push(`read-done@${Date.now() - wall0}`);
         reads.push(performance.now() - start);
+        seen.push(row[0]?.label ?? "");
       }),
     ],
     { concurrency: "unbounded" },
   );
+  const dirty: Array<string> = [];
+  yield* Effect.all(
+    [
+      sql
+        .withTransaction(
+          Effect.gen(function* () {
+            yield* sql`UPDATE t3flare_probe SET label = 'uncommitted' WHERE id = 2`;
+            yield* Effect.sleep("30 millis");
+            return yield* Effect.fail(new Rollback());
+          }),
+        )
+        .pipe(Effect.catchTag("Rollback", () => Effect.void)),
+      Effect.gen(function* () {
+        yield* Effect.sleep("5 millis");
+        const row = yield* sql<{ label: string }>`SELECT label FROM t3flare_probe WHERE id = 2`;
+        dirty.push(row[0]?.label ?? "");
+      }),
+    ],
+    { concurrency: "unbounded" },
+  );
+  const final = yield* sql<{ label: string }>`SELECT label FROM t3flare_probe WHERE id = 2`;
+  results.isolation = { concurrentReadSaw: dirty[0], afterRollback: final[0]?.label };
   const baseline = performance.now();
   for (let i = 0; i < 20; i++) yield* sql`SELECT label FROM t3flare_probe WHERE id = 2`;
   results.readBehindTransaction = {
     readWaitMs: reads[0],
+    labelSeenByConcurrentRead: seen[0],
+    order,
     totalMs: performance.now() - t0,
     uncontendedReadMs: (performance.now() - baseline) / 20,
   };
@@ -114,6 +145,7 @@ export const handleAdmin = async (request: Request, admin: AdminContext): Promis
       return json({
         stats: admin.stats,
         inlinedStatements: DoSql.inlinedStatements,
+        rewrittenCompounds: DoSql.rewrittenCompounds,
         spawnAttempts: Object.fromEntries(spawnAttempts),
       });
     case "/_t3flare/boot": {
@@ -126,6 +158,28 @@ export const handleAdmin = async (request: Request, admin: AdminContext): Promis
         sqlProbe.pipe(Effect.provide(DoSql.layer(admin.ctx.storage)), Effect.scoped),
       );
       return json(result);
+    }
+    case "/_t3flare/probe/compound": {
+      // DO SQLite's limits on terms in one compound SELECT (UNION chains), and on LIKE patterns.
+      let likeMax = 0;
+      for (const n of [10, 20, 30, 40, 50, 60, 64, 100, 1000, 50000]) {
+        try {
+          admin.ctx.storage.sql.exec(`SELECT 'x' LIKE ?`, "a".repeat(n - 1) + "%").toArray();
+          likeMax = n;
+        } catch {
+          break;
+        }
+      }
+      let max = 0;
+      for (const n of [2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 32, 64, 128, 256, 500, 501]) {
+        try {
+          admin.ctx.storage.sql.exec(Array.from({ length: n }, (_, i) => `SELECT ${i}`).join(" UNION ALL ")).toArray();
+          max = n;
+        } catch (error) {
+          return json({ maxCompoundTerms: max, failedAt: n, error: String(error), maxLikePatternBytes: likeMax });
+        }
+      }
+      return json({ maxCompoundTerms: max });
     }
     case "/_t3flare/restart": {
       // Resets the object as an eviction or deploy would: memory and sockets go, storage stays.

@@ -4,6 +4,7 @@
 // and a process spawner and PTY that report every binary as missing, because the
 // Environment DO runs no processes (they belong to a Container, from step 2a).
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
 import * as Effect from "effect/Effect";
 import * as Etag from "effect/http/Etag";
@@ -60,7 +61,27 @@ export const layerHttpPlatform = HttpPlatform.layer.pipe(
   Layer.provide(DoFileSystem.layer),
 );
 
+// The host t3 thinks it runs on: a Linux machine with no executable, no network
+// interfaces and the State directory as home (process.* is mostly empty in workerd).
+export const layerHostProcess = Layer.mergeAll(
+  Layer.succeed(HostProcess.Platform, "linux"),
+  Layer.succeed(HostProcess.Architecture, "x64"),
+  Layer.succeed(HostProcess.LinuxLibc, "gnu"),
+  Layer.succeed(HostProcess.Hostname, "t3flare"),
+  Layer.succeed(HostProcess.Username, "t3"),
+  Layer.succeed(HostProcess.HomeDirectory, "/t3/home"),
+  Layer.succeed(HostProcess.Environment, { HOME: "/t3/home", PATH: "/usr/bin:/bin" }),
+  Layer.succeed(HostProcess.WorkingDirectory, "/t3"),
+  Layer.succeed(HostProcess.ExecutablePath, "/bundle/t3"),
+  Layer.succeed(HostProcess.Arguments, ["/bundle/t3", "serve"]),
+  Layer.succeed(HostProcess.InvokedAs, "t3"),
+  Layer.succeed(HostProcess.IsExecutable, false),
+  Layer.succeed(HostProcess.Addresses, Effect.succeed(new Set<string>())),
+  Layer.succeed(HostProcess.UserId, 1000),
+);
+
 export const layer = Layer.mergeAll(
+  layerHostProcess,
   DoFileSystem.layer,
   layerTerminal,
   layerHttpPlatform,

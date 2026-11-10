@@ -207,13 +207,15 @@ export const remove = (input: string, options: { readonly recursive?: boolean | 
   if (entry.kind === "dir") {
     const children = db().exec(`SELECT 1 FROM t3flare_files WHERE parent = ? LIMIT 1`, path).toArray();
     if (children.length > 0 && !options.recursive) throw new FsError("ENOTEMPTY", "rmdir", path);
-    db().exec(`DELETE FROM t3flare_files WHERE path = ? OR path LIKE ? ESCAPE '\\'`, path, `${escapeLike(path)}/%`);
+    db().exec(`DELETE FROM t3flare_files WHERE path = ? OR (path > ? AND path < ?)`, path, ...descendants(path));
     return;
   }
   db().exec(`DELETE FROM t3flare_files WHERE path = ?`, path);
 };
 
-const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
+// DO SQLite rejects LIKE patterns longer than a few dozen bytes ("LIKE or GLOB pattern too
+// complex"), so a subtree is the key range between `dir/` and `dir0` ('0' follows '/').
+const descendants = (dir: string): [string, string] => (dir === "/" ? ["/", "0"] : [`${dir}/`, `${dir}0`]);
 
 export const rename = (fromInput: string, toInput: string) => {
   const from = normalize(fromInput);
@@ -225,7 +227,7 @@ export const rename = (fromInput: string, toInput: string) => {
   if (existing?.kind === "dir" && entry.kind !== "dir") throw new FsError("EISDIR", "rename", to);
   remove(to, { recursive: true, force: true });
   const rows = db()
-    .exec<{ path: string }>(`SELECT path FROM t3flare_files WHERE path = ? OR path LIKE ? ESCAPE '\\'`, from, `${escapeLike(from)}/%`)
+    .exec<{ path: string }>(`SELECT path FROM t3flare_files WHERE path = ? OR (path > ? AND path < ?)`, from, ...descendants(from))
     .toArray();
   for (const row of rows) {
     const next = to + row.path.slice(from.length);

@@ -5,7 +5,8 @@
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
     "deploy": "alchemy deploy",
-    "destroy": "alchemy destroy"
+    "destroy": "alchemy destroy",
+    "bundle": "bun build.ts"
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
@@ -23,9 +24,11 @@
   },
   "devDependencies": {
     "@alchemy.run/cloudflare": "catalog:",
+    "@alchemy.run/cloudflare-runtime": "2.0.0-beta.85",
     "@cloudflare/workers-types": "^5.20261104.1",
+    "@effect/platform-bun": "catalog:",
     "@types/node": "catalog:",
     "alchemy": "catalog:",
-    "@effect/platform-bun": "catalog:"
+    "rolldown": "1.2.13"
   }
 }
