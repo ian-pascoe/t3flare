@@ -5,4 +5,4 @@ dist/
 *.log
 .bun/
 .env.spike
-bump-report.json
+/bump-report.json

@@ -1,0 +1,165 @@
+{
+  "ok": true,
+  "from": "v0.1.9-nightly.20261110.4478",
+  "to": "v0.1.9-nightly.20261110.4478",
+  "changed": false,
+  "note": "already at the newest nightly; re-proved on the bump stage",
+  "at": "2026-11-10T19:19:11.733Z",
+  "steps": [
+    {
+      "name": "find the newest nightly tag",
+      "ok": true,
+      "seconds": 0.7,
+      "detail": "v0.1.9-nightly.20261110.4478 → v0.1.9-nightly.20261110.4478"
+    },
+    {
+      "name": "move t3code to v0.1.9-nightly.20261110.4478",
+      "ok": true,
+      "seconds": 0.1,
+      "detail": ""
+    },
+    {
+      "name": "regenerate the workspace and install",
+      "ok": true,
+      "seconds": 0.6,
+      "detail": "bun install v1.4.4 (38afee6c8)\n\nChecked 852 installs across 1077 packages (no changes) [509.00ms]\nResolving dependencies\nResolved, downloaded and extracted [32]\n\n$ effect-tsgo patch --typescript && ./scripts/link-tsrslint.sh\ntypescript skipped because its hash matches the replacement.\n"
+    },
+    {
+      "name": "lock matches t3's, one effect",
+      "ok": true,
+      "seconds": 0,
+      "detail": "{\"shared\":950,\"differing\":20,\"effectCopies\":[\"4.1.2\"]}\n"
+    },
+    {
+      "name": "patches apply (git apply --check)",
+      "ok": true,
+      "seconds": 0,
+      "detail": "ok   0001-lazy-server-browser-ref-namespace.patch\n"
+    },
+    {
+      "name": "typecheck, lint, test",
+      "ok": true,
+      "seconds": 8.7,
+      "detail": ""
+    },
+    {
+      "name": "deploy the bump stage (build, web client)",
+      "ok": true,
+      "seconds": 57.2,
+      "detail": "ets/utils-BcYzZSYZ.js                                  1,307.06 kB │ gzip:   411.50 kB │ map: 9,716.26 kB\ndist/assets/heic-to-DeD09f__.js                                2,995.22 kB │ gzip:   750.97 kB │ map: 2,998.76 kB\n\n\u001b[32m✓ built in 20.20s\u001b[39m\nt3flare: built 9.19 MiB for t3 v0.1.9-nightly.20261110.4478; 1 patches, 46 node:fs imports aliased in 40 t3 modules, module-state probe in 109 modules (191 bindings)\n[14:18:32.531] INFO: Deploy · bump\n[14:18:32.542] INFO: Importing stack module\n[14:18:32.962] INFO: Resolving stack services\n[14:18:32.962] INFO: Loading stack state\n[14:18:34.542] INFO: Computing plan\n[14:18:35.336] INFO: Plan ready (2.8s)\n[14:18:35.339] INFO: Plan: 3 to create, 7 binding changes\n[14:18:35.339] INFO: [AdminAccess] create\n[14:18:35.339] INFO: [AdminServiceToken] create\n[14:18:35.339] INFO: [Environment] create\n[14:18:35.340] INFO: [Environment/ENVIRONMENT] create\n[14:18:35.340] INFO: [Environment/T3_BOOTSTRAP_TOKEN] create\n[14:18:35.340] INFO: [Environment/T3FLARE_ACCESS_AUD] create\n[14:18:35.340] INFO: [Environment/T3FLARE_ACCESS_SERVICE_CLIENT_ID] create\n[14:18:35.340] INFO: [Environment/T3FLARE_ACCESS_TEAM_DOMAIN] create\n[14:18:35.340] INFO: [Environment/T3FLARE_ADMIN_TOKEN] create\n[14:18:35.340] INFO: [Environment/T3FLARE_OWNER_EMAIL] create\n[14:18:35.340] INFO: \n[14:18:35.644] INFO: [AdminServiceToken] creating\n[14:18:36.874] INFO: [AdminAccess] creating\n[14:18:36.875] INFO: [AdminServiceToken] created (1.2s)\n[14:18:38.203] INFO: [Environment] creating\n[14:18:38.204] INFO: [AdminAccess] created (1.3s)\n[14:18:38.329] INFO: [Environment] Cloudflare Worker read: checking t3flare-environment-bump\n[14:18:38.625] INFO: [Environment] Cloudflare Worker reconcile: starting t3flare-environment-bump\n[14:18:38.625] INFO: [Environment] Cloudflare Worker reconcile: durable objects [{\"logicalId\":\"ENVIRONMENT\",\"className\":\"EnvironmentDO\"}]\n[14:18:39.073] INFO: [Environment] Cloudflare Worker reconcile: existing durable object tags []\n[14:18:39.073] INFO: [Environment] Cloudflare Worker reconcile: previous durable object tags []\n[14:18:39.078] INFO: [Environment] Cloudflare Worker create: preparing bundle for t3flare-environment-bump\n[14:18:39.768] INFO: [Environment] Cloudflare Worker create: uploading assets for t3flare-environment-bump\n[14:18:41.692] INFO: [Environment] Uploaded 0 of 1183 assets...\n[14:18:46.617] INFO: [Environment] Uploaded 394 of 1183 assets...\n[14:18:51.697] INFO: [Environment] Uploaded 788 of 1183 assets...\n[14:18:52.188] INFO: [Environment] Uploaded 789 of 1183 assets...\n[14:18:53.209] INFO: [Environment] Cloudflare Worker create: uploading script for t3flare-environment-bump\n[14:18:53.211] INFO: [Environment] Uploaded 1183 of 1183 assets...\n[14:18:54.257] INFO: [Environment] Cloudflare Worker put: durable object reconciliation {\"oldDoClassNameByLogicalId\":{},\"currentDoClassNameByLogicalId\":{\"ENVIRONMENT\":\"EnvironmentDO\"},\"deletedClasses\":[],\"renamedClasses\":[],\"transferredClasses\":[],\"newSqliteClasses\":[\"EnvironmentDO\"]}\n[14:18:59.073] INFO: [Environment] created — Enabling workers.dev subdomain... (20.9s)\n[14:18:59.332] INFO: \n[14:18:59.333] INFO: Done: 3 succeeded (24.0s)\n{\n  url: 'https://t3flare-environment-bump.ian-g-pascoe.workers.dev',\n  host: 't3flare-environment-bump.ian-g-pascoe.workers.dev',\n  accessAud: 'd8f58ac71a4a66e048857cc177c283d491481ff6947b5357315a3e96f0916dc3',\n  credentials: '.alchemy/stages/bump.access.json'\n}\n$ bun run --cwd ../../t3code/apps/web build && git -C ../../t3code checkout -- apps/web/src/routeTree.gen.ts && rsync -a --delete --exclude \"*.map\" ../../t3code/apps/web/dist/ dist/web/\n$ vp build\n\u001b[33m[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m\n"
+    },
+    {
+      "name": "acceptance test against the bump stage",
+      "ok": true,
+      "seconds": 12.2,
+      "detail": "{\n  \"url\": \"https://t3flare-environment-bump.ian-g-pascoe.workers.dev\",\n  \"startedAt\": \"2026-11-10T19:18:59.652Z\",\n  \"adminGuard\": {\n    \"wrongToken\": 404,\n    \"withAccessAndToken\": 200,\n    \"build\": {\n      \"t3\": \"v0.1.9-nightly.20261110.4478\",\n      \"commit\": \"5c1f87c4403b\",\n      \"builtAt\": \"2026-11-10T19:18:27.556Z\"\n    }\n  },\n  \"auth\": {\n    \"machine\": \"cloud\",\n    \"label\": \"t3flare\",\n    \"policy\": \"remote-reachable\"\n  },\n  \"pairing\": {\n    \"refusedBeforeArming\": 401,\n    \"armedUntil\": \"2026-11-10T19:29:03.158Z\",\n    \"paired\": 200,\n    \"ms\": 5199,\n    \"refusedAfterDisarming\": 401\n  },\n  \"project\": {\n    \"projectId\": \"55380b8b-79e1-4fd2-8f90-fc047488e94b\",\n    \"threads\": 12,\n    \"ms\": 6106\n  },\n  \"fixtures\": {\n    \"threads\": 12,\n    \"runs\": 48,\n    \"messages\": 96,\n    \"turnItems\": 240,\n    \"events\": 480,\n    \"eventSink\": \"fresh\"\n  },\n  \"shellSnapshot\": {\n    \"ms\": 437,\n    \"bytes\": 20571,\n    \"listedFixtureThreads\": 12\n  },\n  \"threadWindow\": {\n    \"threads\": 12,\n    \"allOk\": true,\n    \"minItems\": 60,\n    \"maxMs\": 203,\n    \"maxBytes\": 46534\n  },\n  \"subscribeThread\": {\n    \"ms\": 52,\n    \"bytes\": 46473,\n    \"items\": 60\n  },\n  \"search\": {\n    \"ms\": 51,\n    \"matches\": 12,\n    \"threads\": 12\n  },\n  \"searchThread\": {\n    \"ok\": true,\n    \"bytes\": 1535\n  },\n  \"sqlChecks\": {\n    \"transactionRollback\": true,\n    \"overHundredParameters\": true\n  },\n  \"sqlAdapter\": {\n    \"statementsInlined\": 3,\n    \"maxParameters\": 300,\n    \"compoundsRewritten\": 17,\n    \"maxCompoundTerms\": 12,\n    \"ctesMaterialized\": 24,\n    \"materializeFailures\": 0,\n    \"refusedStatements\": 0,\n    \"pragmaRefusals\": 3\n  },\n  \"rebootCheck\": {\n    \"registered\": {\n      \"bindings\": 191,\n      \"modules\": 109\n    },\n    \"bothBootsServed\": true,\n    \"sameEnvironmentId\": true,\n    \"isolateBoots\": 4,\n    \"survivedIntoSecondBoot\": [\n      {\n        \"module\": \"packages/shared/src/observability.ts\",\n        \"name\": \"generatedServiceInstanceId\",\n        \"initial\": \"undefined\",\n        \"now\": \"string:c8608e0f-8792-4250-90be-9f2ca477deb4\"\n      },\n      {\n        \"module\": \"apps/server/src/mcp/McpSessionRegistry.ts\",\n        \"name\": \"activeMcpSessionRegistry\",\n        \"initial\": \"undefined\",\n        \"now\": \"Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}\"\n      }\n    ],\n    \"changedAfterFirstBoot\": 2,\n    \"globalsAddedDuringCheck\": []\n  },\n  \"totalMs\": 12058,\n  \"failures\": [],\n  \"ok\": true\n}\n"
+    }
+  ],
+  "acceptance": {
+    "url": "https://t3flare-environment-bump.ian-g-pascoe.workers.dev",
+    "startedAt": "2026-11-10T19:18:59.652Z",
+    "adminGuard": {
+      "wrongToken": 404,
+      "withAccessAndToken": 200,
+      "build": {
+        "t3": "v0.1.9-nightly.20261110.4478",
+        "commit": "5c1f87c4403b",
+        "builtAt": "2026-11-10T19:18:27.556Z"
+      }
+    },
+    "auth": {
+      "machine": "cloud",
+      "label": "t3flare",
+      "policy": "remote-reachable"
+    },
+    "pairing": {
+      "refusedBeforeArming": 401,
+      "armedUntil": "2026-11-10T19:29:03.158Z",
+      "paired": 200,
+      "ms": 5199,
+      "refusedAfterDisarming": 401
+    },
+    "project": {
+      "projectId": "55380b8b-79e1-4fd2-8f90-fc047488e94b",
+      "threads": 12,
+      "ms": 6106
+    },
+    "fixtures": {
+      "threads": 12,
+      "runs": 48,
+      "messages": 96,
+      "turnItems": 240,
+      "events": 480,
+      "eventSink": "fresh"
+    },
+    "shellSnapshot": {
+      "ms": 437,
+      "bytes": 20571,
+      "listedFixtureThreads": 12
+    },
+    "threadWindow": {
+      "threads": 12,
+      "allOk": true,
+      "minItems": 60,
+      "maxMs": 203,
+      "maxBytes": 46534
+    },
+    "subscribeThread": {
+      "ms": 52,
+      "bytes": 46473,
+      "items": 60
+    },
+    "search": {
+      "ms": 51,
+      "matches": 12,
+      "threads": 12
+    },
+    "searchThread": {
+      "ok": true,
+      "bytes": 1535
+    },
+    "sqlChecks": {
+      "transactionRollback": true,
+      "overHundredParameters": true
+    },
+    "sqlAdapter": {
+      "statementsInlined": 3,
+      "maxParameters": 300,
+      "compoundsRewritten": 17,
+      "maxCompoundTerms": 12,
+      "ctesMaterialized": 24,
+      "materializeFailures": 0,
+      "refusedStatements": 0,
+      "pragmaRefusals": 3
+    },
+    "rebootCheck": {
+      "registered": {
+        "bindings": 191,
+        "modules": 109
+      },
+      "bothBootsServed": true,
+      "sameEnvironmentId": true,
+      "isolateBoots": 4,
+      "survivedIntoSecondBoot": [
+        {
+          "module": "packages/shared/src/observability.ts",
+          "name": "generatedServiceInstanceId",
+          "initial": "undefined",
+          "now": "string:c8608e0f-8792-4250-90be-9f2ca477deb4"
+        },
+        {
+          "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+          "name": "activeMcpSessionRegistry",
+          "initial": "undefined",
+          "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+        }
+      ],
+      "changedAfterFirstBoot": 2,
+      "globalsAddedDuringCheck": []
+    },
+    "totalMs": 12058,
+    "failures": [],
+    "ok": true
+  },
+  "lockPins": "lock packages: 1811; pinned: 1572; at several versions (not pinnable): 167; not pinned otherwise: 11"
+}
