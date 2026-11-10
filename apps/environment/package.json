@@ -1,0 +1,22 @@
+{
+  "name": "@t3flare/environment",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "alchemy deploy",
+    "destroy": "alchemy destroy"
+  },
+  "dependencies": {
+    "@effect/sql-sqlite-do": "catalog:",
+    "@t3tools/contracts": "workspace:*",
+    "@t3tools/shared": "workspace:*",
+    "effect": "catalog:",
+    "t3": "workspace:*"
+  },
+  "devDependencies": {
+    "@alchemy.run/cloudflare": "catalog:",
+    "@cloudflare/workers-types": "^5.20261101.0",
+    "@types/node": "catalog:",
+    "alchemy": "catalog:"
+  }
+}
