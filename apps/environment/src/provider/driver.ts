@@ -1,7 +1,6 @@
 // The Durable agent provider (step 2a): a t3 ProviderDriver whose agents run on pi-durable in Session DOs of the agents
 // Worker, with models through the deployment's model proxy (ADR-0012). Registered through the `builtInDrivers.ts` Shadow.
 import type { ServerProvider, ServerProviderModel } from "@t3tools/contracts";
-import { TextGenerationError } from "@t3tools/contracts";
 import {
   defaultProviderContinuationIdentity,
   type ProviderDriver,
@@ -15,7 +14,6 @@ import {
   makeProviderSnapshotSettingsSource,
 } from "@t3tools/provider-core/server/snapshotSettings";
 import type * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
-import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -24,6 +22,7 @@ import { makePiDurableAdapter } from "./adapter.ts";
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
 import { snapshotModels } from "./models.ts";
 import { PiDurableSettings } from "./settings.ts";
+import { makePiDurableTextGeneration } from "./textGeneration.ts";
 
 const PRESENTATION = {
   displayName: "Pi (cloud)",
@@ -77,12 +76,7 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       initialSnapshot: (settings) => snapshotOf({ enabled: settings.provider.enabled, models }).pipe(Effect.map(stamp)),
       checkProvider: snapshotOf({ enabled: effective.enabled, models }).pipe(Effect.map(stamp)),
     }).pipe(Effect.orDie);
-    const textGeneration = TextGenerationOperations.fromRunner(
-      "PiDurableTextGeneration",
-      TextGenerationOperations.withoutInvestigation("Pi (cloud)", (request) =>
-        Effect.fail(new TextGenerationError({ operation: request.operation, detail: "Text generation arrives in M1." })),
-      ),
-    );
+    const textGeneration = makePiDurableTextGeneration();
     return {
       instanceId,
       driverKind: PI_DURABLE_DRIVER,

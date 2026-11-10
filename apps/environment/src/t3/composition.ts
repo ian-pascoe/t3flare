@@ -180,6 +180,7 @@ import * as DoServices from "../platform/services.ts";
 import * as DoSql from "../platform/sql.ts";
 import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
+import { layerSeedTextGenerationModel } from "../agents/seedSettings.ts";
 
 export interface CompositionOptions {
   readonly storage: DurableObjectStorage;
@@ -583,6 +584,8 @@ export const make = (options: CompositionOptions) => {
     ProviderInstallation.layer,
     ReplayMarkers.layer,
     Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),
+    // t3flare: text generation's model points at the Durable agent provider (step 2a, R12).
+    layerSeedTextGenerationModel,
   ).pipe(
     Layer.provideMerge(layerOrchestrationApplication),
     Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),

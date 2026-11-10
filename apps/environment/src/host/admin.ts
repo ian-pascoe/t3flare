@@ -14,6 +14,7 @@
 //   POST /_t3flare/check/sql                    withTransaction rollback and >100 parameters through t3's client
 //   POST /_t3flare/fixtures/turn-items          {"threadIds": [...], "runs": 3, "marker": "..."}
 //   POST /_t3flare/check/agents?budget=0|1      step 2a M0: the agents Worker both ways, Containers, paths, budget, token scope
+//   GET  /_t3flare/agents/session?thread=<id>   a Session's state as it would push it (differ fixtures, diagnosis)
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -176,6 +177,11 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         return json(await rebootCheck(environment, request));
       case "POST /_t3flare/check/sql":
         return json(await sqlCheck(environment, request));
+      case "GET /_t3flare/agents/session": {
+        const { byName } = await import("../agents/rpc.ts");
+        const thread = url.searchParams.get("thread") ?? "";
+        return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").snapshot({}));
+      }
       case "POST /_t3flare/check/agents": {
         const { agentsCheck } = await import("./agentsCheck.ts");
         return json(await agentsCheck(environment, request));

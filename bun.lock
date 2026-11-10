@@ -25,6 +25,7 @@
         "@t3flare/effect-durable": "workspace:*",
         "@t3flare/models": "workspace:*",
         "@t3flare/sandbox-image": "workspace:*",
+        "@t3flare/session-protocol": "workspace:*",
         "effect": "catalog:",
         "just-bash": "3.6.0",
       },
@@ -44,6 +45,7 @@
         "@effect/sql-sqlite-do": "catalog:",
         "@t3flare/github-app": "workspace:*",
         "@t3flare/models": "workspace:*",
+        "@t3flare/session-protocol": "workspace:*",
         "@t3tools/contracts": "workspace:*",
         "@t3tools/provider-acp-registry": "workspace:*",
         "@t3tools/provider-core": "workspace:*",
@@ -133,6 +135,12 @@
     },
     "packages/models": {
       "name": "@t3flare/models",
+      "devDependencies": {
+        "@types/node": "catalog:",
+      },
+    },
+    "packages/session-protocol": {
+      "name": "@t3flare/session-protocol",
       "devDependencies": {
         "@types/node": "catalog:",
       },
@@ -3355,6 +3363,8 @@
     "@t3flare/models": ["@t3flare/models@workspace:packages/models"],
 
     "@t3flare/sandbox-image": ["@t3flare/sandbox-image@workspace:apps/sandbox-image"],
+
+    "@t3flare/session-protocol": ["@t3flare/session-protocol@workspace:packages/session-protocol"],
 
     "@t3tools/client-runtime": ["@t3tools/client-runtime@workspace:t3code/packages/client-runtime"],
 

@@ -1,5 +1,15 @@
 // The environment Worker's view of the agents Worker's Durable Objects (ADR-0014): their RPC methods, typed here so
 // this Worker never imports the agents Worker's code (which is typed against the Workers globals, not Node's).
+import type {
+  AbortInput,
+  AnswerInput,
+  OpenAnswer,
+  OpenInput,
+  SessionState,
+  SnapshotInput,
+  SteerInput,
+  SubmitTurnInput,
+} from "@t3flare/session-protocol";
 
 export interface ExecInput {
   readonly script: string;
@@ -28,6 +38,12 @@ export interface WorkspaceRpc {
 
 export interface SessionRpc {
   ping(echo: string): Promise<{ readonly session: string; readonly echo: string; readonly environment: unknown }>;
+  open(input: OpenInput): Promise<OpenAnswer>;
+  submitTurn(input: SubmitTurnInput): Promise<{ readonly submissionId: string }>;
+  steer(input: SteerInput): Promise<{ readonly submissionId: string }>;
+  abort(input: AbortInput): Promise<{ readonly aborted: boolean }>;
+  answer(input: AnswerInput): Promise<{ readonly applied: boolean }>;
+  snapshot(input?: SnapshotInput): Promise<SessionState>;
 }
 
 export type LeaseAnswer =

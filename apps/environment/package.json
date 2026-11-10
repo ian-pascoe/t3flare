@@ -27,7 +27,8 @@
     "effect": "catalog:",
     "t3": "workspace:*",
     "@t3flare/models": "workspace:*",
-    "@t3flare/github-app": "workspace:*"
+    "@t3flare/github-app": "workspace:*",
+    "@t3flare/session-protocol": "workspace:*"
   },
   "devDependencies": {
     "@alchemy.run/cloudflare": "catalog:",

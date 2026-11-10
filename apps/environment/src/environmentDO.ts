@@ -7,7 +7,11 @@
 import { DurableObject } from "cloudflare:workers";
 import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
+import type { SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
+
+import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
+import { deliverPush } from "./agents/sessionSink.ts";
 import type { AgentsBindings } from "./agents/rpc.ts";
 import * as BootState from "./host/bootState.ts";
 import * as Idle from "./host/idle.ts";
@@ -84,6 +88,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     Idle.activity.idleSince = Date.now();
     // Before any t3 code runs: the `node:fs` shim and FileSystem Layer read this.
     bindStateStorage({ sql: ctx.storage.sql, transactionSync: (closure) => ctx.storage.transactionSync(closure) });
+    bindEnvironmentServices({
+      agents: env,
+      modelProxy:
+        env.MODEL_PROXY_URL && env.MODEL_PROXY_API_KEY ? { url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY } : undefined,
+      github: () => this.github,
+    });
   }
 
   get ctxStorage(): DurableObjectState["storage"] {
@@ -102,6 +112,23 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       privateKey: this.env.T3FLARE_GITHUB_APP_PRIVATE_KEY,
     });
     return this.#github;
+  }
+
+  /**
+   * A Session's committed state (ADR-0005), RPC from the agents Worker: boots t3 if it is not running (the Session is
+   * the durable party, so its push wakes the Environment), waits until t3's startup recovery has run, then hands the
+   * push to the adapter's open provider session for that thread (`sessionSink.ts`). Counted as a request for the idle
+   * check (step 2a plan, section 3).
+   */
+  async sessionPush(push: SessionPush): Promise<SessionPushAnswer> {
+    Idle.requestStarted();
+    try {
+      const runtime = await this.boot("session-push");
+      await runtime.commandReady();
+      return await deliverPush(push.sessionId, push);
+    } finally {
+      Idle.requestEnded();
+    }
   }
 
   /**

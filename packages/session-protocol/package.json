@@ -1,0 +1,8 @@
+{
+  "name": "@t3flare/session-protocol",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "effect-tsgo tsrs --noEmit" },
+  "devDependencies": { "@types/node": "catalog:" }
+}

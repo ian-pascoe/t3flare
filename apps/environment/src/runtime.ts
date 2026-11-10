@@ -9,6 +9,9 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Scope from "effect/Scope";
 
+import * as ServerRuntimeStartup from "t3/src/serverRuntimeStartup.ts";
+
+import { resetSessions } from "./agents/sessionSink.ts";
 import * as Composition from "./t3/composition.ts";
 
 export interface Runtime {
@@ -19,9 +22,13 @@ export interface Runtime {
   readonly dispose: () => Promise<void>;
   /** Whether this boot seeded t3's bootstrap grant (pairing was armed). */
   readonly bootstrapSeeded: boolean;
+  /** Resolves once t3 takes commands: its startup recovery has run (ADR-0004). */
+  readonly commandReady: () => Promise<void>;
 }
 
 export const boot = async (options: Composition.CompositionOptions): Promise<Runtime> => {
+  // Session registrations belong to one runtime (a warm isolate keeps module state across a reset, ADR-0003).
+  resetSessions();
   const { layer, http } = Composition.make(options);
   const scope = Scope.makeUnsafe();
   // Build the whole layer graph; HttpRouter.serve registers t3's routes on our server.
@@ -39,5 +46,12 @@ export const boot = async (options: Composition.CompositionOptions): Promise<Run
     context,
     dispose: () => Effect.runPromise(Scope.close(scope, Exit.void)),
     bootstrapSeeded: options.bootstrapToken !== undefined,
+    commandReady: () =>
+      Effect.runPromise(
+        Effect.provideContext(
+          Effect.flatMap(ServerRuntimeStartup.ServerRuntimeStartup, (startup) => Effect.orDie(startup.awaitCommandReady)),
+          context as Context.Context<never>,
+        ) as Effect.Effect<void>,
+      ),
   };
 };
