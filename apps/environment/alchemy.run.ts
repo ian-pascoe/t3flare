@@ -13,6 +13,10 @@
 // `<host>/_t3flare` (and below) has an Access application, admitting the owner by email and the stage's own
 // service token (for the acceptance test and the bump job). The Worker verifies the assertion itself against
 // the application's `aud` (src/access.ts), and also requires the admin token.
+//
+// The agents Worker (ADR-0014, step 2a) deploys in the same stack: its Session DOs, Workspace DOs with their Container
+// (the image in apps/sandbox-image, built here with Docker), and the Container budget. It has no public URL. The two
+// Workers bind each other's Durable Objects by script name, so their names are fixed per stage.
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "@alchemy.run/cloudflare";
 import * as Output from "alchemy/Output";
@@ -21,6 +25,8 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as fs from "node:fs";
 import * as path from "node:path";
+
+import { sandboxImageContext } from "@t3flare/sandbox-image";
 
 import { COMPATIBILITY } from "./build.ts";
 import { credentialsFile } from "./stage-files.ts";
@@ -40,6 +46,7 @@ export default Alchemy.Stack(
   Effect.gen(function* () {
     const stage = yield* Alchemy.Stage;
     const name = `t3flare-environment-${stage}`;
+    const agentsName = `t3flare-agents-${stage}`;
     const host = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
     const teamDomain = yield* Config.String("T3FLARE_ACCESS_TEAM_DOMAIN").pipe(Config.withDefault(ACCESS_TEAM_DOMAIN));
     const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
@@ -62,6 +69,33 @@ export default Alchemy.Stack(
       ],
     } as never);
 
+    // The model proxy (ADR-0012) and the GitHub App (ADR-0013), from ~/.config/t3flare/dev.env or CI's environment.
+    const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL");
+    const modelProxyKey = Config.Redacted("MODEL_PROXY_API_KEY");
+
+    const workspaceContainer = yield* Cloudflare.Container("WorkspaceContainer", {
+      schedulingPolicy: "durable_object",
+      context: sandboxImageContext,
+    } as never);
+
+    const agents = yield* Cloudflare.Worker("Agents", {
+      name: agentsName,
+      main: path.join(here, "../agents/dist/worker/worker.js"),
+      bundle: false,
+      compatibility: COMPATIBILITY,
+      workersDev: { enabled: false, previewsEnabled: false },
+      env: {
+        SESSIONS: Cloudflare.DurableObject("SessionDO", { className: "SessionDO" }),
+        WORKSPACES: Cloudflare.DurableObject("WorkspaceDO", { className: "WorkspaceDO", containers: [workspaceContainer] } as never),
+        CONTAINER_BUDGET: Cloudflare.DurableObject("ContainerBudget", { className: "ContainerBudget" }),
+        ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO", scriptName: name }),
+        LOADER: Cloudflare.WorkerLoader(),
+        MODEL_PROXY_URL: modelProxyUrl,
+        MODEL_PROXY_API_KEY: modelProxyKey,
+      },
+      observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
+    } as never);
+
     const environment = yield* Cloudflare.Worker("Environment", {
       name,
       main: path.join(here, "dist/worker/worker.js"),
@@ -75,6 +109,13 @@ export default Alchemy.Stack(
         T3FLARE_ACCESS_AUD: admin.aud,
         T3FLARE_OWNER_EMAIL: ownerEmail,
         T3FLARE_ACCESS_SERVICE_CLIENT_ID: serviceToken.clientId,
+        SESSIONS: Cloudflare.DurableObject("SessionDO", { className: "SessionDO", scriptName: agentsName }),
+        WORKSPACES: Cloudflare.DurableObject("WorkspaceDO", { className: "WorkspaceDO", scriptName: agentsName }),
+        CONTAINER_BUDGET: Cloudflare.DurableObject("ContainerBudget", { className: "ContainerBudget", scriptName: agentsName }),
+        T3FLARE_GITHUB_APP_ID: Config.String("T3FLARE_GITHUB_APP_ID"),
+        T3FLARE_GITHUB_APP_PRIVATE_KEY: Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),
+        MODEL_PROXY_URL: modelProxyUrl,
+        MODEL_PROXY_API_KEY: modelProxyKey,
         ...(idleAfterMs === "" ? {} : { T3FLARE_IDLE_AFTER_MS: idleAfterMs }),
       },
       assets: {
@@ -98,6 +139,6 @@ export default Alchemy.Stack(
         return path.relative(here, file);
       },
     );
-    return { url: environment.url, host, accessAud: admin.aud, credentials };
+    return { url: environment.url, host, accessAud: admin.aud, credentials, agents: agents.workerName };
   }),
 );

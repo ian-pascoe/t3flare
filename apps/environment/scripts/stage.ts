@@ -15,12 +15,13 @@ import * as path from "node:path";
 
 import { credentialsFile, secretsFile as secretsFileOf } from "../stage-files.ts";
 import { buildWorker } from "../build.ts";
+import { buildAgentsWorker } from "../../agents/build.ts";
 
 const here = path.resolve(import.meta.dirname, "..");
 const [command, stage, ...rest] = process.argv.slice(2);
 
 /** The stages this repo deploys to; anything else is refused, so a typo cannot create a stray stage. */
-const STAGES = new Set(["step1", "bump"]);
+const STAGES = new Set(["step1", "bump", "step2a"]);
 
 if (command === undefined || stage === undefined || !STAGES.has(stage)) {
   console.error(`usage: bun scripts/stage.ts deploy|run|destroy <${[...STAGES].join("|")}> …`);
@@ -36,6 +37,24 @@ const stageSecrets = (): Record<string, string> => {
   fs.mkdirSync(path.dirname(secretsFile), { recursive: true });
   fs.writeFileSync(secretsFile, JSON.stringify(secrets), { mode: 0o600 });
   return secrets;
+};
+
+/**
+ * The deploy-wide secrets (step 2a): the model proxy and the GitHub App, from the environment (CI) or else from
+ * ~/.config/t3flare/dev.env (0600, outside the repo), which bash reads as it is written (multi-line values included).
+ * Never printed.
+ */
+const DEPLOY_SECRETS = ["MODEL_PROXY_URL", "MODEL_PROXY_API_KEY", "T3FLARE_GITHUB_APP_ID", "T3FLARE_GITHUB_APP_PRIVATE_KEY"];
+const deploySecrets = (): Record<string, string> => {
+  const fromEnv = Object.fromEntries(DEPLOY_SECRETS.flatMap((name) => (process.env[name] ? [[name, process.env[name]!]] : [])));
+  if (Object.keys(fromEnv).length === DEPLOY_SECRETS.length) return fromEnv;
+  const file = path.join(process.env.HOME ?? "", ".config/t3flare/dev.env");
+  if (!fs.existsSync(file)) return fromEnv;
+  const script = `set -a; . "$1"; set +a; node -e 'process.stdout.write(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((n) => [n, process.env[n] ?? ""]))))' ${DEPLOY_SECRETS.join(" ")}`;
+  const result = spawnSync("bash", ["-c", script, "-", file], { encoding: "utf8" });
+  if (result.status !== 0) throw new Error("t3flare: could not read ~/.config/t3flare/dev.env");
+  const fromFile = JSON.parse(result.stdout) as Record<string, string>;
+  return { ...Object.fromEntries(Object.entries(fromFile).filter(([, value]) => value !== "")), ...fromEnv };
 };
 
 const alchemy = (args: Array<string>, env: Record<string, string>) => {
@@ -54,7 +73,14 @@ switch (command) {
       if (web.status !== 0) process.exit(web.status ?? 1);
     }
     await buildWorker();
-    const status = alchemy(["deploy"], stageSecrets());
+    await buildAgentsWorker();
+    const secrets = deploySecrets();
+    const missing = DEPLOY_SECRETS.filter((name) => secrets[name] === undefined);
+    if (missing.length > 0) {
+      console.error(`t3flare: missing ${missing.join(", ")} (set them, or put them in ~/.config/t3flare/dev.env)`);
+      process.exit(1);
+    }
+    const status = alchemy(["deploy"], { ...stageSecrets(), ...secrets });
     if (status === 0 && !fs.existsSync(credentialsFile(stage))) {
       console.error(`t3flare: deployed, but ${path.relative(here, credentialsFile(stage))} was not written`);
       process.exit(1);
@@ -74,6 +100,7 @@ switch (command) {
       env: {
         ...process.env,
         ...stageSecrets(),
+        ...deploySecrets(),
         T3_URL: access.url,
         T3FLARE_ACCESS_CLIENT_ID: access.clientId,
         T3FLARE_ACCESS_CLIENT_SECRET: access.clientSecret,
@@ -82,7 +109,7 @@ switch (command) {
     process.exit(result.status ?? 1);
   }
   case "destroy": {
-    const status = alchemy(["destroy"], stageSecrets());
+    const status = alchemy(["destroy"], { ...stageSecrets(), ...deploySecrets() });
     if (status === 0) {
       fs.rmSync(secretsFile, { force: true });
       fs.rmSync(credentialsFile(stage), { force: true });

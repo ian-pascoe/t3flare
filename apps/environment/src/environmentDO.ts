@@ -7,14 +7,22 @@
 import { DurableObject } from "cloudflare:workers";
 import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
+import { GitHubTokens } from "./agents/github.ts";
+import type { AgentsBindings } from "./agents/rpc.ts";
 import * as BootState from "./host/bootState.ts";
 import * as Idle from "./host/idle.ts";
 import * as ModuleState from "./host/moduleState.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
 import type { Runtime } from "./runtime.ts";
 
-export interface EnvironmentEnv {
+export interface EnvironmentEnv extends AgentsBindings {
   readonly T3_BOOTSTRAP_TOKEN?: string;
+  /** The GitHub App (ADR-0013): only this Worker holds its key; the Environment DO mints every token. */
+  readonly T3FLARE_GITHUB_APP_ID?: string;
+  readonly T3FLARE_GITHUB_APP_PRIVATE_KEY?: string;
+  /** The model proxy (ADR-0012), for text generation. */
+  readonly MODEL_PROXY_URL?: string;
+  readonly MODEL_PROXY_API_KEY?: string;
   /** Overrides IDLE_AFTER_MS (tests and the acceptance stage). */
   readonly T3FLARE_IDLE_AFTER_MS?: string;
 }
@@ -64,6 +72,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   #idleTimer: ReturnType<typeof setInterval> | undefined;
   #lastBoot: BootReport | undefined;
   #constructedAt = Date.now();
+  #github: GitHubTokens | undefined;
 
   constructor(ctx: DurableObjectState, env: EnvironmentEnv) {
     super(ctx, env);
@@ -79,6 +88,33 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   get ctxStorage(): DurableObjectState["storage"] {
     return this.ctx.storage;
+  }
+
+  /** The agents Worker's Durable Objects (ADR-0014). */
+  get agents(): AgentsBindings {
+    return this.env;
+  }
+
+  /** The GitHub App's minter (ADR-0013, ADR-0018). */
+  get github(): GitHubTokens {
+    this.#github ??= new GitHubTokens({
+      appId: this.env.T3FLARE_GITHUB_APP_ID,
+      privateKey: this.env.T3FLARE_GITHUB_APP_PRIVATE_KEY,
+    });
+    return this.#github;
+  }
+
+  /**
+   * RPC from the agents Worker, M0's check of the binding back. Counted as a request for the idle check, as every call
+   * from the agents Worker is (step 2a plan, section 3).
+   */
+  async agentsPing(message: string): Promise<{ readonly environment: string; readonly message: string }> {
+    Idle.requestStarted();
+    try {
+      return { environment: this.ctx.id.toString(), message };
+    } finally {
+      Idle.requestEnded();
+    }
   }
 
   /** Resets the object, as an eviction or deploy does: memory and sockets go, storage stays. */

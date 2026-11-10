@@ -1,0 +1,32 @@
+{
+  "name": "@t3flare/agents",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "lint": "oxlint --type-aware --deny-warnings src test build.ts",
+    "test": "vitest run",
+    "build": "bun build.ts"
+  },
+  "dependencies": {
+    "@cloudflare/computer": "0.9.0",
+    "@earendil-works/chord": "1.5.0",
+    "@earendil-works/pi-ai": "1.5.0",
+    "@earendil-works/pi-durable": "1.5.0",
+    "@platformatic/vfs": "0.5.0",
+    "@t3flare/computer-env": "workspace:*",
+    "@t3flare/effect-durable": "workspace:*",
+    "@t3flare/models": "workspace:*",
+    "@t3flare/sandbox-image": "workspace:*",
+    "effect": "catalog:",
+    "just-bash": "3.6.0"
+  },
+  "devDependencies": {
+    "@alchemy.run/cloudflare-runtime": "2.0.0-beta.85",
+    "@cloudflare/vitest-plugin": "1.5.1",
+    "@cloudflare/workers-types": "^5.20261104.1",
+    "@types/node": "catalog:",
+    "rolldown": "1.2.13",
+    "vitest": "5.0.5"
+  }
+}
