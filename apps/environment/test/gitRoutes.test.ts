@@ -1,7 +1,7 @@
 // The process router's rules (step 2a plan, section 2): what may start a Container, t3's clone, URLs, paths.
 import { describe, expect, it } from "vitest";
 
-import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, remoteRepoOf, subcommandOf } from "../src/agents/gitRoutes.ts";
+import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, readScopeOf, remoteRepoOf, subcommandOf } from "../src/agents/gitRoutes.ts";
 
 describe("subcommandOf", () => {
   it("skips git's global options", () => {
@@ -95,5 +95,20 @@ describe("paths into a Workspace", () => {
     expect(
       gitEnvOf("a", { HOME: "/t3/home", PATH: "/bin", GIT_OPTIONAL_LOCKS: "0", GIT_DIR: "/w/a/.git", GIT_TRACE2_EVENT: "/tmp/x", LANGUAGE: "C" }),
     ).toEqual({ GIT_OPTIONAL_LOCKS: "0", GIT_DIR: "/workspace/repo/.git", LANGUAGE: "C" });
+  });
+});
+
+describe("readScopeOf", () => {
+  it("keys ref and config reads on .git alone", () => {
+    expect(readScopeOf(["--git-dir", "/w/a/.git", "for-each-ref", "--format=%(refname)", "refs/heads"])).toBe("git-dir");
+    expect(readScopeOf(["rev-parse", "--show-toplevel"])).toBe("git-dir");
+    expect(readScopeOf(["config", "--get", "remote.origin.url"])).toBe("git-dir");
+  });
+
+  it("keys working-tree reads on the whole repo", () => {
+    expect(readScopeOf(["status", "--porcelain=2", "--branch", "-z"])).toBe("repo");
+    expect(readScopeOf(["diff-index", "-M", "--numstat", "-z", "HEAD", "--"])).toBe("repo");
+    expect(readScopeOf(["ls-files", "--others", "--exclude-standard", "-z", "--"])).toBe("repo");
+    expect(readScopeOf(["check-ignore", "-z", "--stdin"])).toBe("repo");
   });
 });

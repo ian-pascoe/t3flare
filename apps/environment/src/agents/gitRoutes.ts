@@ -78,6 +78,35 @@ export const mayStartContainer = (args: ReadonlyArray<string>): boolean => {
   return !PASSIVE.has(name) || writes(name, rest);
 };
 
+/** Passive reads whose answer depends only on `.git` (refs, config, objects), not on the working tree's files. */
+const GIT_DIR_ONLY = new Set([
+  "rev-parse",
+  "symbolic-ref",
+  "for-each-ref",
+  "remote",
+  "worktree",
+  "config",
+  "show-ref",
+  "merge-base",
+  "rev-list",
+  "branch",
+  "log",
+  "cat-file",
+  "ls-tree",
+  "describe",
+  "name-rev",
+  "diff-tree",
+]);
+
+/**
+ * What a passive read's cached answer depends on (the Workspace DO's read cache): `git-dir` when only `.git`, so an
+ * edit to a file does not make t3's branch and ref reads run again; `repo` otherwise (status, diffs, ls-files).
+ */
+export const readScopeOf = (args: ReadonlyArray<string>): "git-dir" | "repo" => {
+  const { name } = subcommandOf(args);
+  return name !== null && GIT_DIR_ONLY.has(name) ? "git-dir" : "repo";
+};
+
 export interface CloneRequest {
   /** The Workspace id: the directory name t3 asked for. */
   readonly id: string;

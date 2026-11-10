@@ -87,8 +87,10 @@ export interface GitRun {
   readonly env?: Readonly<Record<string, string>>;
   readonly stdin?: string;
   readonly timeoutMs?: number;
-  /** May start a stopped Container (the router's allow-list); else only runs when it is running. */
+  /** May start a stopped Container (the router's allow-list); else a passive read, answered from the read cache when it can. */
   readonly startContainer: boolean;
+  /** What a passive read's answer depends on: `.git` alone, or the whole repo (working tree included). */
+  readonly readScope?: "git-dir" | "repo";
 }
 
 export type GitAnswer =
@@ -108,5 +110,6 @@ export interface ProvisionInfo {
   readonly containerRunning: boolean;
   /** The repo's revision in the Workspace's change log, and how many passive reads are kept (diagnosis). */
   readonly revision?: number;
+  readonly gitRevision?: number;
   readonly cachedReads?: number;
 }

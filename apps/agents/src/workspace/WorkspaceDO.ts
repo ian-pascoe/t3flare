@@ -259,7 +259,7 @@ export class WorkspaceDO extends ContainerHost {
   async git(run: GitRun): Promise<GitAnswer> {
     const passive = !run.startContainer;
     const key = passive ? await readKey(run) : null;
-    const rev = passive ? this.#reads.revision() : -1;
+    const rev = passive ? this.#reads.revision(run.readScope ?? "repo") : -1;
     if (key !== null) {
       const hit = this.#reads.get(key, rev);
       if (hit !== undefined) return { ran: true, ...hit, ms: 0, cached: true };
@@ -320,31 +320,12 @@ export class WorkspaceDO extends ContainerHost {
     }
   }
 
-  /** Diagnosis (admin workspace-probe): the VFS rows the read cache's revision is computed from. */
-  debugRevision(): unknown {
-    const q = (query: string, ...args: Array<unknown>) => {
-      try {
-        return this.ctx.storage.sql.exec(query, ...args).toArray();
-      } catch (error) {
-        return String(error);
-      }
-    };
-    return {
-      meta: q("SELECT k, v FROM vfs_meta"),
-      rootChildren: q("SELECT parent_inode, name, child_inode FROM vfs_dirents WHERE parent_inode = 1"),
-      workspaceChildren: q("SELECT d.parent_inode, d.name, d.child_inode FROM vfs_dirents d WHERE d.parent_inode IN (SELECT child_inode FROM vfs_dirents WHERE parent_inode = 1)"),
-      firstNodes: q("SELECT inode, type, rev, mount_root FROM vfs_nodes ORDER BY inode LIMIT 5"),
-      maxRev: q("SELECT MAX(rev) AS rev, COUNT(*) AS n FROM vfs_nodes"),
-      lastChanges: q("SELECT rev, path FROM vfs_changes ORDER BY id DESC LIMIT 3"),
-    };
-  }
-
   async info(): Promise<ProvisionInfo> {
     await this.#workspace.ready();
     const ops = fileOps(this.#workspace);
     const repo = "ok" in (await ops.stat(REPO_ROOT));
     const git = "ok" in (await ops.stat(`${REPO_ROOT}/.git`));
-    return { provisioned: repo, repo: git, containerRunning: this.containerRunning(), revision: this.#reads.revision(), cachedReads: this.#reads.stats().rows };
+    return { provisioned: repo, repo: git, containerRunning: this.containerRunning(), revision: this.#reads.revision(), gitRevision: this.#reads.revision("git-dir"), cachedReads: this.#reads.stats().rows };
   }
 
   /** Whether the Container runs, and the budget's view. */

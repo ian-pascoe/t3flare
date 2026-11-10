@@ -47,7 +47,6 @@ export interface WorkspaceRpc {
   git(run: GitRun): Promise<GitAnswer>;
   clone(input: CloneInput): Promise<GitAnswer>;
   info(): Promise<ProvisionInfo>;
-  debugRevision(): Promise<unknown>;
   exec(input: ExecInput): Promise<ExecResult>;
   containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }>;
   stopContainer(): Promise<void>;

@@ -1,0 +1,7 @@
+{
+  "milestone": "M2",
+  "risk": "R5: Sessions and Workspaces share an agents isolate's 128 MB",
+  "measured": false,
+  "why": "M2 ships no isomorphic-git status. t3's status and branch reads run as real git in the Workspace's Container and are then answered from the Workspace DO's read cache (a SQL table keyed by argv, cwd, env, stdin and the repo's revision in computer's VFS change log). A cache lookup is two SQL queries (a recursive CTE over vfs_dirents under /workspace/repo, memoised on vfs_meta.rev) and holds no repo in memory. The memory R5 is about arrives with M3's isomorphic-git checkpoints and diffs, so the measurement moves to M3, on the same terms (a 2,000-file repo, two Sessions live in the isolate).",
+  "movedTo": "M3"
+}

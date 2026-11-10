@@ -224,9 +224,12 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");
         const rpc = workspaceRpc(url.searchParams.get("id") ?? "");
         const path = "/workspace/repo/.t3flare-probe";
-        const before = (await rpc.info()).revision;
+        const first = await rpc.info();
+        const before = first.revision;
         await rpc.writeText(path, `probe ${Date.now()}\n`);
-        const written = (await rpc.info()).revision;
+        const afterWrite = await rpc.info();
+        const written = afterWrite.revision;
+        const gitDirUnmoved = first.gitRevision === afterWrite.gitRevision;
         await rpc.writeText(path, `probe again ${Date.now()}\n`);
         const rewritten = (await rpc.info()).revision;
         await rpc.fs({ op: "remove", path, options: { force: true } });
@@ -234,7 +237,15 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const outside = "/workspace/.t3flare/probe";
         await rpc.writeText(outside, "x");
         const outsideWrite = (await rpc.info()).revision;
-        return json({ debug: await rpc.debugRevision(), before, written, rewritten, removed, outsideWrite, ok: before! < written! && written! < rewritten! && rewritten! < removed! && outsideWrite === removed });
+        return json({
+          before,
+          written,
+          rewritten,
+          removed,
+          outsideWrite,
+          gitRevision: { before: first.gitRevision, afterWrite: afterWrite.gitRevision },
+          ok: before! < written! && written! < rewritten! && rewritten! < removed! && outsideWrite === removed && gitDirUnmoved,
+        });
       }
       case "POST /_t3flare/agents/workspace-remove": {
         const { environmentServices } = await import("../agents/bindings.ts");

@@ -39,45 +39,52 @@ export const readKey = async (input: {
 
 export const readCache = (sql: SqlStorage) => {
   let ready = false;
-  let memo: { readonly global: number; readonly repo: number } | undefined;
+  const memo = new Map<"git-dir" | "repo", { readonly global: number; readonly rev: number }>();
   const ensure = () => {
     if (!ready) sql.exec(SCHEMA);
     ready = true;
   };
   return {
     /**
-     * The repo's revision: the newest revision of any file, folder or deletion under REPO_ROOT in computer's VFS
+     * The repo's revision (or its `.git`'s, for `git-dir`): the newest revision of any file, folder or deletion under it in computer's VFS
      * (`vfs_nodes.rev`, and `vfs_changes` for deletions). Recomputed only when the Workspace's global revision
      * (`vfs_meta.rev`, bumped by every write anywhere) moved, so a status poll between changes costs one row.
      */
-    revision(): number {
+    revision(scope: "git-dir" | "repo" = "repo"): number {
       try {
         const global = sql.exec<{ v: number }>("SELECT v FROM vfs_meta WHERE k = 'rev'").toArray()[0]?.v ?? 0;
-        if (memo !== undefined && memo.global === global) return memo.repo;
-        const nodes = sql
-          .exec<{ rev: number | null }>(
-            `WITH RECURSIVE
-               repo(inode) AS (
-                 SELECT d2.child_inode FROM vfs_dirents d1
-                   JOIN vfs_dirents d2 ON d2.parent_inode = d1.child_inode AND d2.name = ?
-                  WHERE d1.parent_inode = 1 AND d1.name = ?
-               ),
-               sub(inode) AS (
-                 SELECT inode FROM repo
-                 UNION ALL
-                 SELECT d.child_inode FROM sub JOIN vfs_dirents d ON d.parent_inode = sub.inode
-               )
-             SELECT MAX(n.rev) AS rev FROM sub JOIN vfs_nodes n ON n.inode = sub.inode`,
-            REPO_NAME,
-            ROOT_NAME,
-          )
-          .toArray()[0]?.rev ?? 0;
-        const deletions = sql
-          .exec<{ rev: number | null }>("SELECT MAX(rev) AS rev FROM vfs_changes WHERE path >= ? AND path < ?", `${REPO_ROOT}/`, `${REPO_ROOT}0`)
-          .toArray()[0]?.rev ?? 0;
-        const repo = Math.max(nodes, deletions);
-        memo = { global, repo };
-        return repo;
+        const known = memo.get(scope);
+        if (known !== undefined && known.global === global) return known.rev;
+        const segments = scope === "git-dir" ? [ROOT_NAME, REPO_NAME, ".git"] : [ROOT_NAME, REPO_NAME];
+        const prefix = `/${segments.join("/")}`;
+        // The subtree's root inode: one dirent hop per segment from the VFS root (inode 1).
+        let inode: number | undefined = 1;
+        for (const name of segments) {
+          inode = sql
+            .exec<{ child_inode: number }>("SELECT child_inode FROM vfs_dirents WHERE parent_inode = ? AND name = ?", inode, name)
+            .toArray()[0]?.child_inode;
+          if (inode === undefined) break;
+        }
+        const nodes =
+          inode === undefined
+            ? 0
+            : (sql
+                .exec<{ rev: number | null }>(
+                  `WITH RECURSIVE sub(inode) AS (
+                     SELECT ?
+                     UNION ALL
+                     SELECT d.child_inode FROM sub JOIN vfs_dirents d ON d.parent_inode = sub.inode
+                   )
+                   SELECT MAX(n.rev) AS rev FROM sub JOIN vfs_nodes n ON n.inode = sub.inode`,
+                  inode,
+                )
+                .toArray()[0]?.rev ?? 0);
+        const deletions =
+          sql.exec<{ rev: number | null }>("SELECT MAX(rev) AS rev FROM vfs_changes WHERE path >= ? AND path < ?", `${prefix}/`, `${prefix}0`).toArray()[0]
+            ?.rev ?? 0;
+        const rev = Math.max(nodes, deletions);
+        memo.set(scope, { global, rev });
+        return rev;
       } catch {
         return -1;
       }

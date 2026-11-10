@@ -1,0 +1,2573 @@
+{
+  "milestone": "M2",
+  "stage": "step2a",
+  "summary": {
+    "clone": "Add project \u2192 Git URL \u2192 https://github.com/ian-pascoe/t3flare-fixture.git (private) \u2192 ~/t3flare-fixture = /w/t3flare-fixture; cloned in the Workspace's Container with a one-repo GitHub App token (14.2 s)",
+    "containerAfterClone": "stopped by the idle stop; t3's status polls since are answered from the read cache (0 Container starts while the repo is unchanged)",
+    "unlistedWorkspace": "stat/readDirectory/readFile/writeFile/mkdir under /w/<unlisted> fail NotFound with 0 Workspace DO stubs made; git there exits 128",
+    "newProject": "New project 'scratch-m2' \u2192 /w/scratch-m2, git init --initial-branch=main + Initial commit in the Container"
+  },
+  "cloneTrace": {
+    "routes": {
+      "not-found": 28,
+      "emulated": 7,
+      "no-workspace": 4,
+      "container-stopped": 5,
+      "clone": 1,
+      "container": 58,
+      "gh-token": 1
+    },
+    "entries": [
+      {
+        "at": 1794348209111,
+        "command": "hostnamectl",
+        "argv": [
+          "--pretty"
+        ],
+        "cwd": null,
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348209111,
+        "command": "gh",
+        "argv": [
+          "config",
+          "get",
+          "http_unix_socket"
+        ],
+        "cwd": "/t3",
+        "route": "emulated",
+        "exitCode": 0,
+        "ms": 5
+      },
+      {
+        "at": 1794348210342,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/t3/scratch",
+          "rev-parse",
+          "--show-toplevel"
+        ],
+        "cwd": null,
+        "route": "no-workspace",
+        "exitCode": 128,
+        "ms": 5
+      },
+      {
+        "at": 1794348210863,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/t3",
+          "rev-parse",
+          "--is-inside-work-tree",
+          "--show-toplevel",
+          "--git-common-dir"
+        ],
+        "cwd": "/bundle",
+        "route": "no-workspace",
+        "exitCode": 128,
+        "ms": 5
+      },
+      {
+        "at": 1794348210868,
+        "command": "tailscale",
+        "argv": [
+          "status",
+          "--json"
+        ],
+        "cwd": null,
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210965,
+        "command": "jj",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210965,
+        "command": "git",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "emulated",
+        "exitCode": 0,
+        "ms": 5
+      },
+      {
+        "at": 1794348210970,
+        "command": "origin",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210970,
+        "command": "origin",
+        "argv": [
+          "auth",
+          "status",
+          "--json"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210970,
+        "command": "glab",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210970,
+        "command": "glab",
+        "argv": [
+          "auth",
+          "status"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210970,
+        "command": "cafe",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210970,
+        "command": "cafe",
+        "argv": [
+          "--host",
+          "https://git.cafe/api",
+          "--no-input",
+          "--no-update-check",
+          "auth",
+          "status",
+          "--json"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210970,
+        "command": "az",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210970,
+        "command": "az",
+        "argv": [
+          "account",
+          "show",
+          "--query",
+          "user.name",
+          "-o",
+          "tsv"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210970,
+        "command": "gh",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "emulated",
+        "exitCode": 0,
+        "ms": 5
+      },
+      {
+        "at": 1794348210970,
+        "command": "gh",
+        "argv": [
+          "auth",
+          "status",
+          "--json",
+          "hosts"
+        ],
+        "cwd": "/t3",
+        "route": "emulated",
+        "exitCode": 1,
+        "ms": 5
+      },
+      {
+        "at": 1794348210970,
+        "command": "git",
+        "argv": [
+          "remote",
+          "get-url",
+          "origin"
+        ],
+        "cwd": "/t3",
+        "route": "no-workspace",
+        "exitCode": 128,
+        "ms": 5
+      },
+      {
+        "at": 1794348210975,
+        "command": "fj",
+        "argv": [
+          "version"
+        ],
+        "cwd": "/w",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210975,
+        "command": "fj",
+        "argv": [
+          "auth",
+          "list"
+        ],
+        "cwd": "/w",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210975,
+        "command": "tea",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348210975,
+        "command": "tea",
+        "argv": [
+          "login",
+          "status",
+          "--output",
+          "json"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215858,
+        "command": "jj",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215858,
+        "command": "git",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "emulated",
+        "exitCode": 0,
+        "ms": 5
+      },
+      {
+        "at": 1794348215863,
+        "command": "origin",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215863,
+        "command": "origin",
+        "argv": [
+          "auth",
+          "status",
+          "--json"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215863,
+        "command": "glab",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215863,
+        "command": "glab",
+        "argv": [
+          "auth",
+          "status"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215863,
+        "command": "cafe",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215863,
+        "command": "cafe",
+        "argv": [
+          "--host",
+          "https://git.cafe/api",
+          "--no-input",
+          "--no-update-check",
+          "auth",
+          "status",
+          "--json"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215863,
+        "command": "az",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215863,
+        "command": "az",
+        "argv": [
+          "account",
+          "show",
+          "--query",
+          "user.name",
+          "-o",
+          "tsv"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215863,
+        "command": "gh",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "emulated",
+        "exitCode": 0,
+        "ms": 5
+      },
+      {
+        "at": 1794348215863,
+        "command": "gh",
+        "argv": [
+          "auth",
+          "status",
+          "--json",
+          "hosts"
+        ],
+        "cwd": "/t3",
+        "route": "emulated",
+        "exitCode": 1,
+        "ms": 5
+      },
+      {
+        "at": 1794348215863,
+        "command": "git",
+        "argv": [
+          "remote",
+          "get-url",
+          "origin"
+        ],
+        "cwd": "/t3",
+        "route": "no-workspace",
+        "exitCode": 128,
+        "ms": 5
+      },
+      {
+        "at": 1794348215868,
+        "command": "fj",
+        "argv": [
+          "version"
+        ],
+        "cwd": "/w",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215868,
+        "command": "fj",
+        "argv": [
+          "auth",
+          "list"
+        ],
+        "cwd": "/w",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215868,
+        "command": "tea",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348215868,
+        "command": "tea",
+        "argv": [
+          "login",
+          "status",
+          "--output",
+          "json"
+        ],
+        "cwd": "/t3",
+        "route": "not-found",
+        "exitCode": null,
+        "ms": 0
+      },
+      {
+        "at": 1794348229520,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "rev-parse",
+          "--show-toplevel"
+        ],
+        "cwd": null,
+        "route": "container-stopped",
+        "exitCode": 128,
+        "ms": 18,
+        "detail": "The Workspace's Container is stopped."
+      },
+      {
+        "at": 1794348229873,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "rev-parse",
+          "--is-inside-work-tree",
+          "--show-toplevel",
+          "--git-common-dir"
+        ],
+        "cwd": "/bundle",
+        "route": "container-stopped",
+        "exitCode": 128,
+        "ms": 28,
+        "detail": "The Workspace's Container is stopped."
+      },
+      {
+        "at": 1794348229930,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "rev-parse",
+          "--is-inside-work-tree",
+          "--show-toplevel",
+          "--git-common-dir"
+        ],
+        "cwd": "/bundle",
+        "route": "container-stopped",
+        "exitCode": 128,
+        "ms": 32,
+        "detail": "The Workspace's Container is stopped."
+      },
+      {
+        "at": 1794348230025,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "rev-parse",
+          "--is-inside-work-tree",
+          "--show-toplevel",
+          "--git-common-dir"
+        ],
+        "cwd": "/bundle",
+        "route": "container-stopped",
+        "exitCode": 128,
+        "ms": 30,
+        "detail": "The Workspace's Container is stopped."
+      },
+      {
+        "at": 1794348230077,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "rev-parse",
+          "--is-inside-work-tree",
+          "--show-toplevel",
+          "--git-common-dir"
+        ],
+        "cwd": "/bundle",
+        "route": "container-stopped",
+        "exitCode": 128,
+        "ms": 32,
+        "detail": "The Workspace's Container is stopped."
+      },
+      {
+        "at": 1794348229538,
+        "command": "git",
+        "argv": [
+          "clone",
+          "--progress",
+          "--",
+          "https://github.com/ian-pascoe/t3flare-fixture.git",
+          "t3flare-fixture"
+        ],
+        "cwd": "/w",
+        "route": "clone",
+        "exitCode": 0,
+        "ms": 14172,
+        "detail": "github-app"
+      },
+      {
+        "at": 1794348243754,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "rev-parse",
+          "--show-toplevel"
+        ],
+        "cwd": null,
+        "route": "container",
+        "exitCode": 0,
+        "ms": 190,
+        "detail": "running-only 90ms"
+      },
+      {
+        "at": 1794348243944,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "remote",
+          "-v"
+        ],
+        "cwd": null,
+        "route": "container",
+        "exitCode": 0,
+        "ms": 179,
+        "detail": "running-only 104ms"
+      },
+      {
+        "at": 1794348244192,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "rev-parse",
+          "--is-inside-work-tree",
+          "--show-toplevel",
+          "--git-common-dir"
+        ],
+        "cwd": "/bundle",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 245,
+        "detail": "running-only 75ms"
+      },
+      {
+        "at": 1794348244629,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--git-path",
+          "index"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 128,
+        "detail": "running-only 77ms"
+      },
+      {
+        "at": 1794348244791,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--git-common-dir"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 132,
+        "detail": "running-only 75ms"
+      },
+      {
+        "at": 1794348244978,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--show-toplevel"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 188,
+        "detail": "running-only 116ms"
+      },
+      {
+        "at": 1794348244978,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 193,
+        "detail": "running-only 120ms"
+      },
+      {
+        "at": 1794348245193,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/t3flare-fixture/.git",
+          "remote"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 330,
+        "detail": "running-only 279ms"
+      },
+      {
+        "at": 1794348245193,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/t3flare-fixture/.git",
+          "symbolic-ref",
+          "refs/remotes/origin/HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 337,
+        "detail": "running-only 287ms"
+      },
+      {
+        "at": 1794348245193,
+        "command": "git",
+        "argv": [
+          "diff-index",
+          "-M",
+          "--numstat",
+          "-z",
+          "HEAD",
+          "--"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 357,
+        "detail": "running-only 310ms"
+      },
+      {
+        "at": 1794348245193,
+        "command": "git",
+        "argv": [
+          "status",
+          "--porcelain=2",
+          "--branch",
+          "-z",
+          "--no-ahead-behind"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 363,
+        "detail": "running-only 317ms"
+      },
+      {
+        "at": 1794348245556,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base-ref"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 1,
+        "ms": 125,
+        "detail": "running-only 81ms"
+      },
+      {
+        "at": 1794348245681,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 1,
+        "ms": 111,
+        "detail": "running-only 68ms"
+      },
+      {
+        "at": 1794348245792,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.gh-merge-base"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 1,
+        "ms": 132,
+        "detail": "running-only 75ms"
+      },
+      {
+        "at": 1794348245924,
+        "command": "git",
+        "argv": [
+          "remote",
+          "get-url",
+          "--",
+          "origin"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 131,
+        "detail": "running-only 70ms"
+      },
+      {
+        "at": 1794348246055,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "main@{upstream}"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 124,
+        "detail": "running-only 79ms"
+      },
+      {
+        "at": 1794348246179,
+        "command": "git",
+        "argv": [
+          "merge-base",
+          "--end-of-options",
+          "refs/remotes/origin/main",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 172,
+        "detail": "running-only 91ms"
+      },
+      {
+        "at": 1794348246351,
+        "command": "git",
+        "argv": [
+          "show-ref",
+          "--verify",
+          "--quiet",
+          "refs/heads/main"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 112,
+        "detail": "running-only 70ms"
+      },
+      {
+        "at": 1794348246463,
+        "command": "git",
+        "argv": [
+          "ls-files",
+          "--others",
+          "--exclude-standard",
+          "-z",
+          "--"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 119,
+        "detail": "running-only 76ms"
+      },
+      {
+        "at": 1794348246582,
+        "command": "git",
+        "argv": [
+          "-c",
+          "diff.suppressBlankEmpty=false",
+          "diff",
+          "--find-renames",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--submodule=short",
+          "--src-prefix=a/",
+          "--dst-prefix=b/",
+          "--numstat",
+          "-z",
+          "dd72898c7c0fea39a34492c8d60204bfc7506a7a",
+          "--"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 175,
+        "detail": "running-only 117ms"
+      },
+      {
+        "at": 1794348246757,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.remote"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 138,
+        "detail": "running-only 71ms"
+      },
+      {
+        "at": 1794348246895,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "remote.origin.url"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 124,
+        "detail": "running-only 71ms"
+      },
+      {
+        "at": 1794348247165,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/t3flare-fixture/.git",
+          "symbolic-ref",
+          "refs/remotes/origin/HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 194,
+        "detail": "running-only 136ms"
+      },
+      {
+        "at": 1794348247209,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 181,
+        "detail": "running-only 123ms"
+      },
+      {
+        "at": 1794348247165,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/t3flare-fixture/.git",
+          "for-each-ref",
+          "--format=%(refname)%09%(committerdate:unix)%09%(symref)%09%(upstream)",
+          "refs/heads",
+          "refs/remotes"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 230,
+        "detail": "running-only 158ms"
+      },
+      {
+        "at": 1794348247359,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/t3flare-fixture/.git",
+          "worktree",
+          "list",
+          "--porcelain",
+          "-z"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 136,
+        "detail": "running-only 80ms"
+      },
+      {
+        "at": 1794348247395,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/t3flare-fixture/.git",
+          "remote"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 119,
+        "detail": "running-only 66ms"
+      },
+      {
+        "at": 1794348247558,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 121,
+        "detail": "running-only 70ms"
+      },
+      {
+        "at": 1794348247679,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "@{upstream}"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 120,
+        "detail": "running-only 72ms"
+      },
+      {
+        "at": 1794348247799,
+        "command": "git",
+        "argv": [
+          "rev-list",
+          "--left-right",
+          "--count",
+          "HEAD...@{upstream}"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 139,
+        "detail": "running-only 74ms"
+      },
+      {
+        "at": 1794348247938,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "refs/remotes/origin/HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 116,
+        "detail": "running-only 68ms"
+      },
+      {
+        "at": 1794348248054,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.remote"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 125,
+        "detail": "running-only 70ms"
+      },
+      {
+        "at": 1794348248179,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "remote.origin.url"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 128,
+        "detail": "running-only 64ms"
+      },
+      {
+        "at": 1794348248391,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/t3flare-fixture",
+          "remote",
+          "-v"
+        ],
+        "cwd": "/bundle",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 113,
+        "detail": "running-only 61ms"
+      },
+      {
+        "at": 1794348248504,
+        "command": "git",
+        "argv": [
+          "remote",
+          "-v"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 107,
+        "detail": "running-only 66ms"
+      },
+      {
+        "at": 1794348248611,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get-regexp",
+          "^remote\\..*\\.gh-resolved$"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 1,
+        "ms": 125,
+        "detail": "running-only 77ms"
+      },
+      {
+        "at": 1794348249236,
+        "command": "gh",
+        "argv": [
+          "auth",
+          "token",
+          "--hostname",
+          "github.com"
+        ],
+        "cwd": "/t3",
+        "route": "gh-token",
+        "exitCode": 0,
+        "ms": 456,
+        "detail": "ian-pascoe: t3flare-fixture"
+      },
+      {
+        "at": 1794348250086,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 124,
+        "detail": "running-only 78ms"
+      },
+      {
+        "at": 1794348250354,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--git-path",
+          "index"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 115,
+        "detail": "running-only 72ms"
+      },
+      {
+        "at": 1794348250493,
+        "command": "git",
+        "argv": [
+          "diff-index",
+          "-M",
+          "--numstat",
+          "-z",
+          "HEAD",
+          "--"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 169,
+        "detail": "running-only 123ms"
+      },
+      {
+        "at": 1794348250493,
+        "command": "git",
+        "argv": [
+          "status",
+          "--porcelain=2",
+          "--branch",
+          "-z",
+          "--no-ahead-behind"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 187,
+        "detail": "running-only 145ms"
+      },
+      {
+        "at": 1794348250680,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base-ref"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 1,
+        "ms": 105,
+        "detail": "running-only 63ms"
+      },
+      {
+        "at": 1794348250785,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 1,
+        "ms": 145,
+        "detail": "running-only 84ms"
+      },
+      {
+        "at": 1794348250930,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.gh-merge-base"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 1,
+        "ms": 107,
+        "detail": "running-only 63ms"
+      },
+      {
+        "at": 1794348251037,
+        "command": "git",
+        "argv": [
+          "remote",
+          "get-url",
+          "--",
+          "origin"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 114,
+        "detail": "running-only 70ms"
+      },
+      {
+        "at": 1794348251151,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "main@{upstream}"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 114,
+        "detail": "running-only 72ms"
+      },
+      {
+        "at": 1794348251265,
+        "command": "git",
+        "argv": [
+          "merge-base",
+          "--end-of-options",
+          "refs/remotes/origin/main",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 126,
+        "detail": "running-only 72ms"
+      },
+      {
+        "at": 1794348251391,
+        "command": "git",
+        "argv": [
+          "show-ref",
+          "--verify",
+          "--quiet",
+          "refs/heads/main"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 131,
+        "detail": "running-only 75ms"
+      },
+      {
+        "at": 1794348251522,
+        "command": "git",
+        "argv": [
+          "ls-files",
+          "--others",
+          "--exclude-standard",
+          "-z",
+          "--"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 109,
+        "detail": "running-only 66ms"
+      },
+      {
+        "at": 1794348251631,
+        "command": "git",
+        "argv": [
+          "-c",
+          "diff.suppressBlankEmpty=false",
+          "diff",
+          "--find-renames",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--submodule=short",
+          "--src-prefix=a/",
+          "--dst-prefix=b/",
+          "--numstat",
+          "-z",
+          "dd72898c7c0fea39a34492c8d60204bfc7506a7a",
+          "--"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 122,
+        "detail": "running-only 77ms"
+      },
+      {
+        "at": 1794348251753,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.remote"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 105,
+        "detail": "running-only 64ms"
+      },
+      {
+        "at": 1794348251858,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "remote.origin.url"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 121,
+        "detail": "running-only 72ms"
+      },
+      {
+        "at": 1794348265253,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 125,
+        "detail": "running-only 71ms"
+      },
+      {
+        "at": 1794348265529,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 122,
+        "detail": "running-only 67ms"
+      },
+      {
+        "at": 1794348265651,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "@{upstream}"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 121,
+        "detail": "running-only 73ms"
+      },
+      {
+        "at": 1794348265772,
+        "command": "git",
+        "argv": [
+          "rev-list",
+          "--left-right",
+          "--count",
+          "HEAD...@{upstream}"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 154,
+        "detail": "running-only 79ms"
+      },
+      {
+        "at": 1794348265926,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "refs/remotes/origin/HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 107,
+        "detail": "running-only 68ms"
+      },
+      {
+        "at": 1794348266125,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 112,
+        "detail": "running-only 67ms"
+      },
+      {
+        "at": 1794348266379,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--git-path",
+          "index"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "container",
+        "exitCode": 0,
+        "ms": 146,
+        "detail": "running-only 78ms"
+      }
+    ]
+  },
+  "idleTrace": {
+    "note": "after both Containers were stopped: reload, open files, @ search, switch projects back and forth; 60+ s",
+    "routes": {
+      "cache git": 63,
+      "not-found jj": 1,
+      "emulated git": 1,
+      "not-found origin": 2,
+      "not-found glab": 2,
+      "not-found cafe": 2,
+      "not-found az": 2,
+      "emulated gh": 2,
+      "no-workspace git": 1,
+      "not-found fj": 2,
+      "not-found tea": 2
+    },
+    "gitEntries": [
+      {
+        "at": 1794349549022,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 51,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644168,
+        "command": "git",
+        "argv": [
+          "--version"
+        ],
+        "cwd": "/t3",
+        "route": "emulated",
+        "exitCode": 0,
+        "ms": 5
+      },
+      {
+        "at": 1794349644173,
+        "command": "git",
+        "argv": [
+          "remote",
+          "get-url",
+          "origin"
+        ],
+        "cwd": "/t3",
+        "route": "no-workspace",
+        "exitCode": 128,
+        "ms": 5
+      },
+      {
+        "at": 1794349644178,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/scratch-m2",
+          "rev-parse",
+          "--is-inside-work-tree",
+          "--show-toplevel",
+          "--git-common-dir"
+        ],
+        "cwd": "/bundle",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644250,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--git-common-dir"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 28,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644256,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--git-path",
+          "index"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 27,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644312,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--show-toplevel"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644312,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644441,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/scratch-m2/.git",
+          "for-each-ref",
+          "--format=%(refname)%09%(committerdate:unix)%09%(symref)%09%(upstream)",
+          "refs/heads",
+          "refs/remotes"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644441,
+        "command": "git",
+        "argv": [
+          "diff-index",
+          "-M",
+          "--numstat",
+          "-z",
+          "HEAD",
+          "--"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644441,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/scratch-m2/.git",
+          "symbolic-ref",
+          "refs/remotes/origin/HEAD"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 128,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644441,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/scratch-m2/.git",
+          "symbolic-ref",
+          "refs/remotes/origin/HEAD"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 128,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644441,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/scratch-m2/.git",
+          "remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644441,
+        "command": "git",
+        "argv": [
+          "status",
+          "--porcelain=2",
+          "--branch",
+          "-z",
+          "--no-ahead-behind"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644475,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/scratch-m2/.git",
+          "worktree",
+          "list",
+          "--porcelain",
+          "-z"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644475,
+        "command": "git",
+        "argv": [
+          "--git-dir",
+          "/w/scratch-m2/.git",
+          "remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 53,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644475,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base-ref"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 53,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644528,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644558,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.gh-merge-base"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644592,
+        "command": "git",
+        "argv": [
+          "remote",
+          "get-url",
+          "--",
+          "origin"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 2,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644622,
+        "command": "git",
+        "argv": [
+          "remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644651,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "main@{upstream}"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 128,
+        "ms": 32,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644683,
+        "command": "git",
+        "argv": [
+          "show-ref",
+          "--verify",
+          "--quiet",
+          "refs/heads/master"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 44,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644727,
+        "command": "git",
+        "argv": [
+          "show-ref",
+          "--verify",
+          "--quiet",
+          "refs/heads/main"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 31,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644758,
+        "command": "git",
+        "argv": [
+          "ls-files",
+          "--others",
+          "--exclude-standard",
+          "-z",
+          "--"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644788,
+        "command": "git",
+        "argv": [
+          "-c",
+          "diff.suppressBlankEmpty=false",
+          "diff",
+          "--find-renames",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--submodule=short",
+          "--src-prefix=a/",
+          "--dst-prefix=b/",
+          "--numstat",
+          "-z",
+          "HEAD",
+          "--"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644822,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644851,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "remote.origin.url"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 32,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644883,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "remote.origin.url"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 46,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349644962,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645036,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "HEAD"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645066,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "@{upstream}"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 128,
+        "ms": 26,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645092,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base-ref"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 38,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645130,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 32,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645162,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.gh-merge-base"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645192,
+        "command": "git",
+        "argv": [
+          "remote",
+          "get-url",
+          "--",
+          "origin"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 2,
+        "ms": 37,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645229,
+        "command": "git",
+        "argv": [
+          "remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 32,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645261,
+        "command": "git",
+        "argv": [
+          "show-ref",
+          "--verify",
+          "--quiet",
+          "refs/heads/master"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645291,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "refs/remotes/origin/HEAD"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 128,
+        "ms": 39,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645330,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 31,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645361,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "remote.origin.url"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645391,
+        "command": "git",
+        "argv": [
+          "remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645420,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645420,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.merge"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645449,
+        "command": "git",
+        "argv": [
+          "remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645449,
+        "command": "git",
+        "argv": [
+          "for-each-ref",
+          "--count=1",
+          "--format=%(refname)",
+          "refs/remotes"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645528,
+        "command": "git",
+        "argv": [
+          "-C",
+          "/w/scratch-m2",
+          "remote",
+          "-v"
+        ],
+        "cwd": "/bundle",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 31,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645584,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645659,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--git-path",
+          "index"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 25,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645717,
+        "command": "git",
+        "argv": [
+          "diff-index",
+          "-M",
+          "--numstat",
+          "-z",
+          "HEAD",
+          "--"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 31,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645717,
+        "command": "git",
+        "argv": [
+          "status",
+          "--porcelain=2",
+          "--branch",
+          "-z",
+          "--no-ahead-behind"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 31,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645748,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base-ref"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 32,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645780,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.t3-merge-base"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 34,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645814,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.gh-merge-base"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645844,
+        "command": "git",
+        "argv": [
+          "remote",
+          "get-url",
+          "--",
+          "origin"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 2,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645874,
+        "command": "git",
+        "argv": [
+          "remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 28,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645902,
+        "command": "git",
+        "argv": [
+          "rev-parse",
+          "--symbolic-full-name",
+          "main@{upstream}"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 128,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645932,
+        "command": "git",
+        "argv": [
+          "show-ref",
+          "--verify",
+          "--quiet",
+          "refs/heads/master"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 32,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645964,
+        "command": "git",
+        "argv": [
+          "show-ref",
+          "--verify",
+          "--quiet",
+          "refs/heads/main"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 30,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349645994,
+        "command": "git",
+        "argv": [
+          "ls-files",
+          "--others",
+          "--exclude-standard",
+          "-z",
+          "--"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349646023,
+        "command": "git",
+        "argv": [
+          "-c",
+          "diff.suppressBlankEmpty=false",
+          "diff",
+          "--find-renames",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--submodule=short",
+          "--src-prefix=a/",
+          "--dst-prefix=b/",
+          "--numstat",
+          "-z",
+          "HEAD",
+          "--"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 29,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349646052,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "branch.main.remote"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 31,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349646083,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "remote.origin.url"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 48,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349646131,
+        "command": "git",
+        "argv": [
+          "config",
+          "--get",
+          "remote.origin.url"
+        ],
+        "cwd": "/w/scratch-m2",
+        "route": "cache",
+        "exitCode": 1,
+        "ms": 31,
+        "detail": "passive 0ms"
+      },
+      {
+        "at": 1794349658083,
+        "command": "git",
+        "argv": [
+          "symbolic-ref",
+          "--quiet",
+          "HEAD"
+        ],
+        "cwd": "/w/t3flare-fixture",
+        "route": "cache",
+        "exitCode": 0,
+        "ms": 46,
+        "detail": "passive 0ms"
+      }
+    ],
+    "nodeFsWorkspacePaths": {
+      "get     at get (stateStore-B6QdxupM.js:16:150) |     at resolve (stateStore-B6QdxupM.js:16:459) |     at realpathSync (runtimeLayer-HYLnmWM4.js:632:14341) |     at runtimeLayer-HYLnmWM4.js:632:10722 |     at runtimeLayer-HYLnmWM4.js:3728:1058": {
+        "count": 6,
+        "sample": "/w/scratch-m2/assets/icon.svg"
+      },
+      "get     at get (stateStore-B6QdxupM.js:16:150) |     at resolve (stateStore-B6QdxupM.js:16:459) |     at routingFileSystem-CH1udjxP.js:1:1549 |     at Effect-CA_y1Wmf.js:15:7064 |     at ~effect/Effect/evaluate (Effect-CA_y1Wmf.js:15:6247)": {
+        "count": 4,
+        "sample": "/w/scratch-m2/assets/icon.svg"
+      }
+    }
+  },
+  "workspaces": [
+    {
+      "id": "scratch-m2",
+      "host": null,
+      "owner": null,
+      "name": null,
+      "cloneUrl": null,
+      "createdAt": 1794349087350,
+      "state": "provisioning",
+      "workflows": false,
+      "container": {
+        "running": false,
+        "leased": false,
+        "lastUse": 1794349098470
+      },
+      "info": {
+        "provisioned": true,
+        "repo": true,
+        "containerRunning": false,
+        "revision": 53,
+        "gitRevision": 53,
+        "cachedReads": 32
+      }
+    },
+    {
+      "id": "t3flare-fixture",
+      "host": "github.com",
+      "owner": "ian-pascoe",
+      "name": "t3flare-fixture",
+      "cloneUrl": "https://github.com/ian-pascoe/t3flare-fixture.git",
+      "createdAt": 1794348229114,
+      "state": "ready",
+      "workflows": false,
+      "container": {
+        "running": false,
+        "leased": false,
+        "lastUse": 1794349516857
+      },
+      "info": {
+        "provisioned": true,
+        "repo": true,
+        "containerRunning": false,
+        "revision": 78,
+        "gitRevision": 73,
+        "cachedReads": 30
+      }
+    }
+  ],
+  "unlistedCheck": {
+    "at": "2026-11-10T22:20:59.077Z",
+    "unlisted": "/w/not-listed-mwb97xa8",
+    "fileOps": {
+      "stat": {
+        "ok": false,
+        "error": "NotFound"
+      },
+      "exists": {
+        "ok": true,
+        "value": false
+      },
+      "readDirectory": {
+        "ok": false,
+        "error": "NotFound"
+      },
+      "readFile": {
+        "ok": false,
+        "error": "NotFound"
+      },
+      "writeFile": {
+        "ok": false,
+        "error": "NotFound"
+      },
+      "nestedMkdir": {
+        "ok": false,
+        "error": "NotFound"
+      }
+    },
+    "git": {
+      "exitCode": 128,
+      "stderr": "fatal: cannot change to '/w/not-listed-mwb97xa8': No such file or directory"
+    },
+    "workspaceStubsMade": 0,
+    "listing": {
+      "ok": true,
+      "value": [
+        "scratch-m2",
+        "t3flare-fixture"
+      ]
+    },
+    "registry": [
+      "scratch-m2",
+      "t3flare-fixture"
+    ],
+    "ok": true
+  },
+  "readCacheRevisionProbe": {
+    "before": 73,
+    "written": 75,
+    "rewritten": 77,
+    "removed": 78,
+    "outsideWrite": 78,
+    "gitRevision": {
+      "before": 73,
+      "afterWrite": 73
+    },
+    "ok": true
+  }
+}

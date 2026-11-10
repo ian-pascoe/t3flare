@@ -20,7 +20,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type * as ChildProcess from "effect/process/ChildProcess";
 
 import { environmentServices } from "./bindings.ts";
-import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, remoteRepoOf, subcommandOf } from "./gitRoutes.ts";
+import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, readScopeOf, remoteRepoOf, subcommandOf } from "./gitRoutes.ts";
 import { workspaceRpc } from "./workspaceClient.ts";
 
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
@@ -141,6 +141,7 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
     env: gitEnvOf(at.id, env),
     ...(stdin === undefined ? {} : { stdin }),
     startContainer,
+    readScope: readScopeOf(args),
   });
   if (!answer.ran) {
     const stopped = answer.reason === "container_stopped";
