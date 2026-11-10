@@ -42,4 +42,6 @@ export const createRequire = (from: string | URL) => {
   return Object.assign(wrapped, { resolve: require.resolve, cache: require.cache, main: require.main, extensions: require.extensions });
 };
 
+// `real` is the module namespace, not a class: its own exports are what is spread.
+// oxlint-disable-next-line typescript/no-misused-spread
 export default { ...real, createRequire };

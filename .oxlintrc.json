@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "ignorePatterns": ["t3code/**", "**/dist/**", "**/.alchemy/**", "**/.wrangler/**"],
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "options": {
+    "typeAware": true
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "oxc/no-accumulating-spread": "error"
+  },
+  "env": {
+    "builtin": true
+  }
+}

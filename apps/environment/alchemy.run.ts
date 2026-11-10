@@ -1,50 +1,103 @@
 // @effect-diagnostics anyUnknownInErrorContext:off layerMergeAllWithDependencies:off nodeBuiltinImport:off
-// The environment Worker (ADR-0014) for the step 0 spike: the front door, the
-// Environment DO and the stock t3 web client as static assets.
+// The environment Worker (ADR-0014): the front door, the Environment DO and the stock t3 web client as static
+// assets, plus the Access application that guards the admin routes. Deployed by scripts/stage.ts, which
+// builds first and supplies the stage's secrets:
 //
-//   T3_BOOTSTRAP_TOKEN=… T3FLARE_ADMIN_TOKEN=… bun alchemy deploy --stage spike
+//   bun scripts/stage.ts deploy <stage>      (build, web client, alchemy deploy)
+//   bun scripts/stage.ts destroy <stage>
 //
-// The web client must be built first (`bun run prepare:web` copies t3's apps/web build to
-// dist/web), and the Worker too (`bun build.ts`, which `bun run deploy` runs).
+// The Worker is prebuilt by build.ts and uploaded with `bundle: false` (ADR-0020): alchemy 2.0.0-beta.85 drops
+// `build.input.plugins` on every update after the first deploy.
 //
-// The Worker is prebuilt and uploaded with `bundle: false`. Bundling through alchemy's
-// `build.input` worked on the first deploy, but alchemy 2.0.0-beta.85 drops functions from
-// the stored props on an update, so every later deploy bundled without our plugins (no
-// `node:fs` alias, no stubs, no patches) and the Worker failed at boot. See
-// docs/spike/step-0.md.
+// Access (ADR-0010): `/ws`, `/mcp` and t3's auth routes are public (stock clients cannot pass Access); only
+// `<host>/_t3flare` (and below) has an Access application, admitting the owner by email and the stage's own
+// service token (for the acceptance test and the bump job). The Worker verifies the assertion itself against
+// the application's `aud` (src/access.ts), and also requires the admin token.
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "@alchemy.run/cloudflare";
+import * as Output from "alchemy/Output";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import * as Redacted from "effect/Redacted";
+import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { COMPATIBILITY } from "./build.ts";
+import { credentialsFile } from "./stage-files.ts";
 
 const here = import.meta.dirname;
+
+/** The Access team (`<team>.cloudflareaccess.com`) of the owner's account, and the one person it admits. */
+const ACCESS_TEAM_DOMAIN = "spirit-led-software.cloudflareaccess.com";
+const OWNER_EMAIL = "ian.g.pascoe@gmail.com";
+/** The account's workers.dev subdomain: the Worker's host has to be known to name the Access destination. */
+const WORKERS_DEV_SUBDOMAIN = "ian-g-pascoe";
+
 
 export default Alchemy.Stack(
   "t3flare",
   { providers: Cloudflare.providers(), state: Cloudflare.state() },
   Effect.gen(function* () {
+    const stage = yield* Alchemy.Stage;
+    const name = `t3flare-environment-${stage}`;
+    const host = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
+    const teamDomain = yield* Config.String("T3FLARE_ACCESS_TEAM_DOMAIN").pipe(Config.withDefault(ACCESS_TEAM_DOMAIN));
+    const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
+    // A shorter idle delay for test stages (ADR-0003's default is 60 s).
+    const idleAfterMs = yield* Config.String("T3FLARE_IDLE_AFTER_MS").pipe(Config.withDefault(""));
+
+    const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {
+      name: `${name}-admin`,
+      duration: "8760h",
+    });
+    const admin = yield* Cloudflare.Access.Application("AdminAccess", {
+      name: `${name} admin`,
+      type: "self_hosted",
+      destinations: [{ type: "public", uri: `${host}/_t3flare` }],
+      sessionDuration: "24h",
+      appLauncherVisible: false,
+      policies: [
+        { name: "owner", decision: "allow", include: [{ email: ownerEmail }] },
+        { name: "stage service token", decision: "non_identity", include: [{ serviceToken: serviceToken.serviceTokenId }] },
+      ],
+    } as never);
+
     const environment = yield* Cloudflare.Worker("Environment", {
+      name,
       main: path.join(here, "dist/worker/worker.js"),
       bundle: false,
       compatibility: COMPATIBILITY,
-      // One Environment DO; a deploy resets it when idle or after 5 minutes (ADR-0004 later
-      // raises this to ~30 minutes).
       env: {
         ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO" }),
         T3_BOOTSTRAP_TOKEN: Config.Redacted("T3_BOOTSTRAP_TOKEN"),
         T3FLARE_ADMIN_TOKEN: Config.Redacted("T3FLARE_ADMIN_TOKEN"),
+        T3FLARE_ACCESS_TEAM_DOMAIN: teamDomain,
+        T3FLARE_ACCESS_AUD: admin.aud,
+        T3FLARE_OWNER_EMAIL: ownerEmail,
+        T3FLARE_ACCESS_SERVICE_CLIENT_ID: serviceToken.clientId,
+        ...(idleAfterMs === "" ? {} : { T3FLARE_IDLE_AFTER_MS: idleAfterMs }),
       },
       assets: {
         directory: path.join(here, "dist/web"),
         notFoundHandling: "single-page-application",
         // t3's server paths (DEV_PROXIED_PATH_PREFIXES) reach the Worker before the assets.
-        runWorkerFirst: ["/api/*", "/ws", "/oauth/*", "/.well-known/*", "/mcp", "/mcp/*", "/_t3flare/*"],
+        runWorkerFirst: ["/api/*", "/ws", "/oauth/*", "/.well-known/*", "/mcp", "/mcp/*", "/_t3flare", "/_t3flare/*"],
       },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     });
-    return { url: environment.url };
+
+    // The stage's service-token credentials, for scripts/acceptance.ts; never printed.
+    const credentials = Output.map(
+      Output.all(serviceToken.clientId, serviceToken.clientSecret, environment.url),
+      ([clientId, clientSecret, url]) => {
+        const file = credentialsFile(stage);
+        if (clientSecret !== undefined) {
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.writeFileSync(file, JSON.stringify({ url, clientId, clientSecret: Redacted.value(clientSecret as Redacted.Redacted<string>) }), { mode: 0o600 });
+        }
+        return path.relative(here, file);
+      },
+    );
+    return { url: environment.url, host, accessAud: admin.aud, credentials };
   }),
 );

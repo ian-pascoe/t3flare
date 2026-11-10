@@ -112,7 +112,14 @@ const causesOf = (error: unknown): Array<string> => {
   const out: Array<string> = [];
   let current = (error as { cause?: unknown })?.cause;
   for (let depth = 0; current !== undefined && current !== null && depth < 6; depth++) {
-    out.push(String((current as { message?: unknown }).message ?? current).slice(0, 2000));
+    const message = (current as { message?: unknown }).message;
+    let text: string;
+    try {
+      text = typeof message === "string" ? message : (JSON.stringify(current) ?? "");
+    } catch {
+      text = "unprintable cause";
+    }
+    out.push(text.slice(0, 2000));
     current = (current as { cause?: unknown }).cause;
   }
   return out;

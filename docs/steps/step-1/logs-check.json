@@ -1,0 +1,39 @@
+{
+  "worker": "t3flare-environment-step1",
+  "steps": [
+    "restart (abort)",
+    "request boots t3",
+    "arm (boot with grant)",
+    "pair 200",
+    "disarm (boot without grant)"
+  ],
+  "tailEvents": 8,
+  "logLines": 21,
+  "boots": [
+    {
+      "t3flare": "booted",
+      "at": "2026-11-10T19:03:52.796Z",
+      "trigger": "request",
+      "wallMs": 0,
+      "bootstrapSeeded": false,
+      "isolateBoot": 1,
+      "constructions": 1
+    },
+    {
+      "t3flare": "booted",
+      "at": "2026-11-10T19:03:59.231Z",
+      "trigger": "arm-bootstrap",
+      "wallMs": 0,
+      "bootstrapSeeded": true,
+      "isolateBoot": 2,
+      "constructions": 1
+    }
+  ],
+  "forbidden": {
+    "bootstrapToken": 0,
+    "adminToken": 0,
+    "pairingUrlLine": 0,
+    "unredactedTokenParam": 0
+  },
+  "ok": true
+}

@@ -1,0 +1,123 @@
+{
+  "url": "https://t3flare-environment-step1.ian-g-pascoe.workers.dev",
+  "steps": [
+    {
+      "step": "inject 3 boot failures",
+      "at": "2026-11-10T19:14:36.929Z",
+      "value": {
+        "injected": 3
+      }
+    },
+    {
+      "step": "client requests",
+      "at": "2026-11-10T19:14:37.288Z",
+      "value": [
+        {
+          "status": 500,
+          "body": "t3flare: the Environment failed to start; see the admin health route.\n"
+        },
+        {
+          "status": 500,
+          "body": "t3flare: the Environment failed to start; see the admin health route.\n"
+        },
+        {
+          "status": 500,
+          "body": "t3flare: the Environment failed to start; see the admin health route.\n"
+        },
+        {
+          "status": 503,
+          "body": "{\"t3flare\":\"safe-mode\",\"on\":true,\"reason\":\"boot-failures\",\"since\":\"2026-11-10T19:14:37.245Z\"}"
+        }
+      ]
+    },
+    {
+      "step": "health",
+      "at": "2026-11-10T19:14:37.423Z",
+      "value": {
+        "safeMode": {
+          "on": true,
+          "reason": "boot-failures",
+          "since": "2026-11-10T19:14:37.245Z"
+        },
+        "bootRecord": {
+          "boots": 19,
+          "consecutiveFailures": 3,
+          "lastStartedAt": "2026-11-10T19:14:37.169Z",
+          "lastSucceededAt": "2026-11-10T19:13:45.665Z",
+          "lastError": "Error: t3flare: injected boot failure (admin fault route)"
+        },
+        "runtime": "stopped"
+      }
+    },
+    {
+      "step": "safe mode off",
+      "at": "2026-11-10T19:14:37.518Z",
+      "value": {
+        "safeMode": {
+          "on": false,
+          "reason": null,
+          "since": null
+        }
+      }
+    },
+    {
+      "step": "client request",
+      "at": "2026-11-10T19:14:37.965Z",
+      "value": {
+        "status": 200,
+        "body": "{\"authenticated\":false,\"auth\":{\"policy\":\"remote-reachable\",\"bootstrapMethods\":[\"one-time-token\"],\"sessionMethods\":[\"browser-session-cookie\",\"bearer-access-token"
+      }
+    },
+    {
+      "step": "safe mode on (manual)",
+      "at": "2026-11-10T19:14:38.969Z",
+      "value": {
+        "safeMode": {
+          "on": true,
+          "reason": "manual",
+          "since": "2026-11-10T19:14:37.654Z"
+        }
+      }
+    },
+    {
+      "step": "client request",
+      "at": "2026-11-10T19:14:39.060Z",
+      "value": {
+        "status": 503,
+        "body": "{\"t3flare\":\"safe-mode\",\"on\":true,\"reason\":\"manual\",\"since\":\"2026-11-10T19:14:37.654Z\"}"
+      }
+    },
+    {
+      "step": "health",
+      "at": "2026-11-10T19:14:39.121Z",
+      "value": {
+        "safeMode": {
+          "on": true,
+          "reason": "manual",
+          "since": "2026-11-10T19:14:37.654Z"
+        },
+        "runtime": "stopped"
+      }
+    },
+    {
+      "step": "safe mode off",
+      "at": "2026-11-10T19:14:39.228Z",
+      "value": {
+        "safeMode": {
+          "on": false,
+          "reason": null,
+          "since": null
+        }
+      }
+    },
+    {
+      "step": "client request",
+      "at": "2026-11-10T19:14:39.603Z",
+      "value": {
+        "status": 200,
+        "body": "{\"authenticated\":false,\"auth\":{\"policy\":\"remote-reachable\",\"bootstrapMethods\":[\"one-time-token\"],\"sessionMethods\":[\"browser-session-cookie\",\"bearer-access-token"
+      }
+    }
+  ],
+  "ok": true
+}

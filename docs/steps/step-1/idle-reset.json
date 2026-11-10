@@ -1,0 +1,79 @@
+{
+  "url": "https://t3flare-environment-step1.ian-g-pascoe.workers.dev",
+  "task": {
+    "task": {
+      "id": "scheduled-task:73a208df-d512-4a1b-801b-b53444da6791",
+      "title": "Wake the Environment",
+      "prompt": "A scheduled task that makes the idle reset set its alarm.",
+      "enabled": true,
+      "schedule": {
+        "type": "once",
+        "runAt": "2026-11-10T19:13:45.665Z"
+      },
+      "projectId": "41a72c7a-c8fa-4482-8dba-9fe1ef497685",
+      "threadId": null,
+      "threadMode": "new_thread",
+      "workspaceStrategy": {
+        "type": "root"
+      },
+      "modelSelection": {
+        "instanceId": "codex",
+        "model": "gpt-5.5"
+      },
+      "runtimeMode": "approval-required",
+      "interactionMode": "default",
+      "createdBy": "user",
+      "creationSource": "web",
+      "createdAt": "2026-11-10T19:11:15.523Z",
+      "updatedAt": "2026-11-10T19:11:15.523Z",
+      "nextRunAt": "2026-11-10T19:13:45.665Z",
+      "lastRunAt": null,
+      "lastRunStatus": "never",
+      "lastRunError": null,
+      "runCount": 0
+    }
+  },
+  "runAt": "2026-11-10T19:13:45.665Z",
+  "timeline": [
+    {
+      "event": "socket closed; scheduled task due",
+      "runAt": "2026-11-10T19:13:45.665Z",
+      "at": "2026-11-10T19:11:16.411Z",
+      "runtime": "running",
+      "constructions": 1,
+      "isolateBoots": 2,
+      "objectConstructedAt": "2026-11-10T19:11:12.301Z",
+      "alarm": "2026-11-10T19:13:12.301Z",
+      "lastBootTrigger": "disarm-bootstrap",
+      "sockets": 0,
+      "nextDue": "2026-11-10T19:13:45.665Z"
+    },
+    {
+      "event": "reset (new object, t3 stopped, alarm set)",
+      "secondsAfterClose": 71,
+      "at": "2026-11-10T19:12:27.685Z",
+      "runtime": "stopped",
+      "constructions": 2,
+      "isolateBoots": 2,
+      "objectConstructedAt": "2026-11-10T19:12:27.681Z",
+      "alarm": "2026-11-10T19:13:45.665Z",
+      "lastBootTrigger": null,
+      "sockets": 0,
+      "nextDue": "2026-11-10T19:13:45.665Z"
+    },
+    {
+      "event": "woke on alarm",
+      "secondsAfterClose": 153,
+      "at": "2026-11-10T19:13:48.955Z",
+      "runtime": "running",
+      "constructions": 2,
+      "isolateBoots": 3,
+      "objectConstructedAt": "2026-11-10T19:12:27.681Z",
+      "alarm": null,
+      "lastBootTrigger": "alarm",
+      "sockets": 0,
+      "nextDue": null
+    }
+  ],
+  "ok": true
+}

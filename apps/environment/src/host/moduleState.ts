@@ -30,7 +30,7 @@ export const summarize = (value: unknown): string => {
       if (value instanceof Promise) return "Promise";
       return `Object{${Object.keys(value).sort().join(",").slice(0, 200)}}`;
     }
-    return `${typeof value}:${String(value).slice(0, 120)}`;
+    return `${typeof value}:${String(value as string | number | boolean | bigint | symbol).slice(0, 120)}`;
   } catch {
     return "unreadable";
   }

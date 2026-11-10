@@ -241,7 +241,10 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     const due = verdict.due.at;
     if (due === null) await this.ctx.storage.deleteAlarm();
     else await this.ctx.storage.setAlarm(Math.max(due.getTime(), now.getTime() + 1000));
-    const alarm = due === null ? null : new Date(Math.max(due.getTime(), now.getTime() + 1000)).toISOString();
+    // `ctx.abort()` discards writes not yet durable: on production the alarm was lost without this.
+    await this.ctx.storage.sync();
+    const stored = await this.ctx.storage.getAlarm();
+    const alarm = stored === null ? null : new Date(stored).toISOString();
     console.log(JSON.stringify({ t3flare: "idle-reset", alarm, work: verdict.work, sources: verdict.due.sources }));
     this.#stopIdleChecks();
     // Reset outside this call, so the caller's I/O completes first.
