@@ -1,0 +1,106 @@
+{
+  "url": "https://t3flare-environment-step1.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-10T19:15:44.657Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.9-nightly.20261110.4478",
+      "commit": "cb99a18a44a1",
+      "builtAt": "2026-11-10T19:10:33.975Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-10T19:25:45.401Z",
+    "paired": 200,
+    "ms": 2323,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "841f557a-6f07-4e5a-aa2d-16291d5dc25e",
+    "threads": 12,
+    "ms": 3085
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 727,
+    "bytes": 45990,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 60,
+    "maxMs": 136,
+    "maxBytes": 46535
+  },
+  "subscribeThread": {
+    "ms": 55,
+    "bytes": 46474,
+    "items": 60
+  },
+  "search": {
+    "ms": 51,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1536
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 2,
+    "maxParameters": 300,
+    "compoundsRewritten": 42,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 26,
+    "materializeFailures": 0,
+    "refusedStatements": 0,
+    "pragmaRefusals": 13
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 191,
+      "modules": 109
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 10,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:76038927-585a-4e06-8f9c-b05ac52c7760"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": []
+  },
+  "totalMs": 9371,
+  "failures": [],
+  "ok": true
+}

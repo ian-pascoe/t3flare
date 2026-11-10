@@ -1,0 +1,103 @@
+name: Nightly bump
+
+# ADR-0017: pin t3code's newest nightly tag, prove it on the `bump` stage, and propose it as a pull request.
+# `bun run bump` (scripts/bump.ts) does the work and leaves the pin unchanged when any step fails.
+#
+# Needs, set by the owner (docs/steps/step-1.md → Owner actions):
+#   secrets.CLOUDFLARE_API_TOKEN   account token: Workers Scripts Write, Secrets Store Write (alchemy's state store),
+#                                  Account Settings Read, Access: Apps and Policies Write, Access: Service Tokens Write
+#   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
+# The stage's own bootstrap and admin tokens are made fresh by the job; nothing else is stored.
+
+on:
+  schedule:
+    # Daily, after t3code's nightly runs have usually landed.
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "A t3code tag to pin instead of the newest nightly"
+        required: false
+      force:
+        description: "Deploy and test even when the pin is already the newest nightly"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: bump
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # Vitest stays on Node (ADR-0019).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: bun install --frozen-lockfile
+
+      - name: Bump
+        id: bump
+        run: |
+          args=(--commit --report bump-report.json)
+          if [ -n "$TAG" ]; then args+=(--tag "$TAG"); fi
+          if [ "$FORCE" != "true" ]; then args+=(--skip-if-current); fi
+          git config user.name "t3flare-bump"
+          git config user.email "t3flare-bump@users.noreply.github.com"
+          bun run bump "${args[@]}"
+        env:
+          TAG: ${{ inputs.tag }}
+          FORCE: ${{ inputs.force }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Report
+        if: always()
+        run: |
+          if [ -f bump-report.json ]; then
+            {
+              echo "## t3code bump"
+              echo '```json'
+              jq '{ok, from, to, changed, note, steps: [.steps[] | {name, ok, seconds}], acceptance: (.acceptance | if . then {ok, failures, sqlAdapter, threadWindow, search} else null end), lockPins}' bump-report.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bump-report
+          path: bump-report.json
+          if-no-files-found: ignore
+
+      # A new pin that passed: push it on its own branch and propose it. The owner merges.
+      - name: Propose the new pin
+        if: success()
+        run: |
+          to=$(jq -r .to bump-report.json)
+          changed=$(jq -r .changed bump-report.json)
+          if [ "$changed" != "true" ]; then echo "No new pin."; exit 0; fi
+          branch="bump/$to"
+          git push --force origin "HEAD:refs/heads/$branch"
+          gh pr create --head "$branch" --base main --title "chore: bump t3code to $to" \
+            --body "Pinned by the nightly bump job; the acceptance test passed on the \`bump\` stage. See the run's report: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            || echo "A pull request for $branch already exists."
+        env:
+          GH_TOKEN: ${{ github.token }}

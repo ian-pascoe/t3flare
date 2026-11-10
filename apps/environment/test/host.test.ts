@@ -85,6 +85,7 @@ describe("idle queries", () => {
     sql.exec("CREATE TABLE orchestration_v2_projection_provider_sessions (session_id TEXT, status TEXT)");
     sql.exec("CREATE TABLE orchestration_v2_effect_outbox (effect_id TEXT, status TEXT, available_at TEXT)");
     sql.exec("CREATE TABLE scheduled_tasks (task_id TEXT, enabled INTEGER, next_run_at TEXT)");
+    sql.exec("CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT, payload_json TEXT, deleted_at TEXT)");
     return sql;
   };
   const now = new Date("2026-11-10T12:00:00.000Z");
@@ -104,6 +105,16 @@ describe("idle queries", () => {
     expect(Idle.nextDue(sql).at?.toISOString()).toBe("2026-11-10T15:00:00.000Z");
     sql.exec("INSERT INTO orchestration_v2_effect_outbox VALUES ('e2', 'pending', '2026-11-10T14:00:00.000Z')");
     expect(Idle.nextDue(sql).at?.toISOString()).toBe("2026-11-10T14:00:00.000Z");
+  });
+
+  it("wakes for a usage-limit recovery, as t3's getLimitRecoveryWakeAt reads it", () => {
+    const sql = t3Tables();
+    const payload = (resetAt: string, autoResume: boolean) => JSON.stringify({ limitRecovery: { resetAt, autoResume } });
+    sql.exec("INSERT INTO orchestration_v2_projection_threads VALUES ('a', ?, NULL), ('b', ?, NULL), ('c', ?, NULL)",
+      payload("2026-11-10T12:30:00.000Z", true), payload("2026-11-10T12:10:00.000Z", false), payload("2026-11-10T11:00:00.000Z", true));
+    const due = Idle.nextDue(sql, now);
+    expect(due.at?.toISOString()).toBe("2026-11-10T12:30:00.000Z");
+    expect(due.sources.usageLimitResets).toBe("2026-11-10T12:30:00.000Z");
   });
 
   it("treats tables t3 has not created as empty", () => {

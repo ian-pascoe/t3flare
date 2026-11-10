@@ -85,11 +85,12 @@ const parseTime = (value: string | number | null | undefined): Date | null => {
 };
 
 /**
- * The next time t3 has work due: the earliest pending outbox effect (`nextClaimableAt`), the earliest
- * enabled scheduled task. Usage-limit resets are not persisted by t3 at this pin (UsageService keeps them
- * in memory and re-reads them at boot), so there is nothing to read for them; see docs/steps/step-1.md.
+ * The next time t3 has work due: the earliest pending outbox effect (`nextClaimableAt`), the earliest enabled
+ * scheduled task, and the earliest usage-limit recovery (the query of t3's
+ * `ProjectionStoreV2.getLimitRecoveryWakeAt`: a usage-limited thread set to resume when its limit resets, or
+ * when its snooze ends).
  */
-export const nextDue = (sql: SqlStorage): NextDue => {
+export const nextDue = (sql: SqlStorage, now: Date = new Date()): NextDue => {
   const outbox = tryRows<{ at: string | null }>(
     sql,
     `SELECT MIN(available_at) AS at FROM orchestration_v2_effect_outbox WHERE status = 'pending'`,
@@ -98,9 +99,29 @@ export const nextDue = (sql: SqlStorage): NextDue => {
     sql,
     `SELECT MIN(next_run_at) AS at FROM scheduled_tasks WHERE enabled = 1 AND next_run_at IS NOT NULL`,
   )[0]?.at;
-  const candidates = [parseTime(outbox), parseTime(scheduled)].filter((d): d is Date => d !== null);
+  const nowIso = now.toISOString();
+  const limits = tryRows<{ reset_ms: number | null; snooze_ms: number | null }>(
+    sql,
+    `SELECT
+       MIN(CASE WHEN julianday(reset_at) > julianday(?) THEN (julianday(reset_at) - 2440587.5) * 86400000 END) AS reset_ms,
+       MIN(CASE WHEN julianday(snoozed_until) > julianday(?) THEN (julianday(snoozed_until) - 2440587.5) * 86400000 END) AS snooze_ms
+     FROM (
+       SELECT json_extract(payload_json, '$.limitRecovery.resetAt') AS reset_at,
+         json_extract(payload_json, '$.snoozedUntil') AS snoozed_until
+       FROM orchestration_v2_projection_threads
+       WHERE deleted_at IS NULL AND json_extract(payload_json, '$.limitRecovery.autoResume') = 1
+     )`,
+    nowIso,
+    nowIso,
+  )[0];
+  const limitWakes = [limits?.reset_ms, limits?.snooze_ms].filter((v): v is number => v !== null && v !== undefined);
+  const usageLimit = limitWakes.length === 0 ? null : new Date(Math.round(Math.min(...limitWakes)));
+  const candidates = [parseTime(outbox), parseTime(scheduled), usageLimit].filter((d): d is Date => d !== null);
   const at = candidates.length === 0 ? null : new Date(Math.min(...candidates.map((d) => d.getTime())));
-  return { at, sources: { outbox: outbox ?? null, scheduledTasks: scheduled ?? null, usageLimitResets: null } };
+  return {
+    at,
+    sources: { outbox: outbox ?? null, scheduledTasks: scheduled ?? null, usageLimitResets: usageLimit?.toISOString() ?? null },
+  };
 };
 
 export type IdleVerdict =
@@ -114,5 +135,5 @@ export const idleVerdict = (sql: SqlStorage, now: Date, idleAfterMs = IDLE_AFTER
   if (now.getTime() - activity.idleSince < idleAfterMs) return { reset: false, why: "not idle long enough" };
   const work = openWork(sql, now);
   if (hasOpenWork(work)) return { reset: false, why: `open work ${JSON.stringify(work)}` };
-  return { reset: true, work, due: nextDue(sql) };
+  return { reset: true, work, due: nextDue(sql, now) };
 };

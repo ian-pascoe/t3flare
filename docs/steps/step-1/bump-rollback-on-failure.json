@@ -1,0 +1,48 @@
+{
+  "ok": false,
+  "from": "v0.1.9-nightly.20261110.4478",
+  "to": "v0.1.9-nightly.20261110.4478",
+  "changed": false,
+  "note": "pin unchanged",
+  "at": "2026-11-10T19:17:08.723Z",
+  "steps": [
+    {
+      "name": "find the newest nightly tag",
+      "ok": true,
+      "seconds": 1,
+      "detail": "v0.1.9-nightly.20261110.4478 → v0.1.9-nightly.20261110.4478"
+    },
+    {
+      "name": "move t3code to v0.1.9-nightly.20261110.4478",
+      "ok": true,
+      "seconds": 0.1,
+      "detail": ""
+    },
+    {
+      "name": "regenerate the workspace and install",
+      "ok": true,
+      "seconds": 1.5,
+      "detail": "bun install v1.4.4 (38afee6c8)\n\nChecked 852 installs across 1077 packages (no changes) [1441.00ms]\nResolving dependencies\nResolved, downloaded and extracted [32]\n\n$ effect-tsgo patch --typescript && ./scripts/link-tsrslint.sh\ntypescript skipped because its hash matches the replacement.\n"
+    },
+    {
+      "name": "lock matches t3's, one effect",
+      "ok": true,
+      "seconds": 0.1,
+      "detail": "{\"shared\":950,\"differing\":20,\"effectCopies\":[\"4.1.2\"]}\n"
+    },
+    {
+      "name": "patches apply (git apply --check)",
+      "ok": true,
+      "seconds": 0.1,
+      "detail": "ok   0001-lazy-server-browser-ref-namespace.patch\n"
+    },
+    {
+      "name": "typecheck, lint, test",
+      "ok": false,
+      "seconds": 8,
+      "detail": "scripts/arm.ts(1,17): error TS377061: This code uses the global `fetch` function, HTTP requests are represented through `HttpClient` from `effect/http`. effect(globalFetch)\nscripts/arm.ts(2,1): error TS377064: This code uses `console.log`, the corresponding Effect logging API is `Effect.log or Logger`. effect(globalConsole)\n$ effect-tsgo tsrs --noEmit\n"
+    }
+  ],
+  "acceptance": null,
+  "lockPins": "lock packages: 1811; pinned: 1572; at several versions (not pinnable): 167; not pinned otherwise: 11"
+}
