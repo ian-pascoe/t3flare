@@ -1,0 +1,38 @@
+{
+  "scenario": "restart",
+  "at": "2026-11-10T21:38:13.283Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "restart": {
+    "noContinue": false,
+    "objectReset": true,
+    "secondsToRecover": 53,
+    "runs": [
+      {
+        "id": "bb:ordinal:1",
+        "status": "cancelled",
+        "continuationOf": null
+      },
+      {
+        "id": "bb:ordinal:2",
+        "status": "completed",
+        "continuationOf": "bb:ordinal:1"
+      }
+    ],
+    "sessionTurns": [
+      {
+        "status": "aborted",
+        "reason": "orphaned_by_environment"
+      },
+      {
+        "status": "answered",
+        "reason": null
+      }
+    ],
+    "continuationAnswer": [
+      "\n5985\n5986\n5987\n5988\n5989\n5990\n5991\n5992\n5993\n5994\n5995\n5996\n5997\n5998\n5999\n6000"
+    ],
+    "liveSessionTurns": 0
+  },
+  "failures": [],
+  "ok": true
+}

@@ -45,7 +45,7 @@ const finish = () => {
   process.exit(report.ok ? 0 : 1);
 };
 
-const LONG = "Count from 1 to 4000, one number per line, nothing else.";
+const LONG = `Count from 1 to ${option("count", "4000")}, one number per line, nothing else.`;
 const cookie = await pair();
 await admin("POST", "/_t3flare/disarm-bootstrap");
 const stamp = Date.now().toString(36);
@@ -62,11 +62,13 @@ if (scenario === "liveness") {
   let settledAt: number | null = null;
   let resetAt: number | null = null;
   while (Date.now() - started < 8 * 60_000) {
-    const h = await health();
-    const verdict = await admin("POST", "/_t3flare/idle-check");
     const projection = settledAt === null ? await waitFor(cookie, threadId, () => true, 5000).then((r) => r.projection) : undefined;
     const run = projection === undefined ? undefined : runsOf(projection)[0];
     if (settledAt === null && run !== undefined && SETTLED.has(run.status)) settledAt = Date.now();
+    const h = await health();
+    // While the turn runs, the check ignores the idle delay (`force`), so the verdict is what open work says alone; the
+    // Session's pushes also count as requests, which keep the delay from running out. After the turn, the plain check.
+    const verdict = await admin("POST", settledAt === null ? "/_t3flare/idle-check?force=1" : "/_t3flare/idle-check");
     verdicts.push({
       at: Math.round((Date.now() - started) / 1000),
       why: verdict.json?.why ?? JSON.stringify(verdict.json).slice(0, 120),
@@ -90,7 +92,7 @@ if (scenario === "liveness") {
     verdicts,
   };
   check("the turn completed with no client", runsOf(after.projection)[0]?.status === "completed", report.liveness);
-  check("open work for the whole turn", verdicts.filter((v) => settledAt === null || v.at * 1000 < settledAt - started).every((v) => !v.reset && /open work|requests in flight|client sockets/.test(v.why)), verdicts);
+  check("open work for the whole turn", verdicts.filter((v) => settledAt === null || v.at * 1000 < settledAt - started).every((v) => !v.reset && /open work/.test(v.why)), verdicts);
   check("the Environment reset after the turn, not at once", resetAt !== null && settledAt !== null && resetAt - settledAt >= 30_000, report.liveness);
   check("a title was generated", typeof after.projection?.thread?.title === "string" && after.projection.thread.title !== "Counting", after.projection?.thread?.title);
   finish();

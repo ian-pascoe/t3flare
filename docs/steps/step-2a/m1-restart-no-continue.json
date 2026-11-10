@@ -1,0 +1,27 @@
+{
+  "scenario": "restart",
+  "at": "2026-11-10T21:39:23.926Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "restart": {
+    "noContinue": true,
+    "objectReset": true,
+    "secondsToRecover": 6,
+    "runs": [
+      {
+        "id": "a5:ordinal:1",
+        "status": "cancelled",
+        "continuationOf": null
+      }
+    ],
+    "sessionTurns": [
+      {
+        "status": "aborted",
+        "reason": "orphaned_by_environment"
+      }
+    ],
+    "continuationAnswer": [],
+    "liveSessionTurns": 0
+  },
+  "failures": [],
+  "ok": true
+}

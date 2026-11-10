@@ -1,0 +1,122 @@
+{
+  "scenario": "liveness",
+  "at": "2026-11-10T21:35:37.168Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "liveness": {
+    "turnSeconds": 72,
+    "resetSecondsAfterTurn": 71,
+    "run": [
+      "completed"
+    ],
+    "title": "Counting Sequence from 1 to 9000",
+    "verdicts": [
+      {
+        "at": 0,
+        "why": "open work {\"openRuns\":1,\"openProviderSessions\":0,\"claimableEffects\":2}",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 10,
+        "why": "open work {\"openRuns\":1,\"openProviderSessions\":1,\"claimableEffects\":0}",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 21,
+        "why": "open work {\"openRuns\":1,\"openProviderSessions\":1,\"claimableEffects\":0}",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 31,
+        "why": "open work {\"openRuns\":1,\"openProviderSessions\":1,\"claimableEffects\":0}",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 41,
+        "why": "open work {\"openRuns\":1,\"openProviderSessions\":1,\"claimableEffects\":0}",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 51,
+        "why": "open work {\"openRuns\":1,\"openProviderSessions\":1,\"claimableEffects\":0}",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 61,
+        "why": "open work {\"openRuns\":1,\"openProviderSessions\":1,\"claimableEffects\":0}",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 72,
+        "why": "not idle long enough",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 82,
+        "why": "not idle long enough",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 92,
+        "why": "not idle long enough",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 102,
+        "why": "not idle long enough",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 112,
+        "why": "not idle long enough",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 122,
+        "why": "not idle long enough",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 132,
+        "why": "{\"reset\":true,\"work\":{\"openRuns\":0,\"openProviderSessions\":0,\"claimableEffects\":0},\"due\":{\"at\":null,\"sources\":{\"outbox\":n",
+        "reset": true,
+        "constructedAt": "2026-11-10T21:35:12.197Z",
+        "runtime": "running"
+      },
+      {
+        "at": 143,
+        "why": "t3 is not running",
+        "reset": false,
+        "constructedAt": "2026-11-10T21:38:03.894Z",
+        "runtime": "stopped"
+      }
+    ]
+  },
+  "failures": [],
+  "ok": true
+}

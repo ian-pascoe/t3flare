@@ -1,0 +1,15 @@
+{
+  "scenario": "lost",
+  "at": "2026-11-10T21:39:43.906Z",
+  "model": "anthropic/claude-sonnet-5-5",
+  "lost": {
+    "dropped": {
+      "dropped": 1
+    },
+    "secondsToEnd": 150,
+    "status": "failed",
+    "error": "The agent's session lost this turn."
+  },
+  "failures": [],
+  "ok": true
+}
