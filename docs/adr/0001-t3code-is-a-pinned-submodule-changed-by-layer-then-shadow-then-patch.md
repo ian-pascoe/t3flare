@@ -1,6 +1,6 @@
 # t3code is a pinned submodule, changed by Layer, then Shadow, then Patch
 
-t3flare runs t3code's own server code so that stock t3 clients and Peer links work unchanged. We take t3code as a git submodule pinned to a release tag, and our packages import its modules. A change to t3's behaviour is made, in order of preference:
+t3flare runs t3code's own server code so that stock t3 clients and Peer links work unchanged. We take t3code as a git submodule pinned to a nightly tag (ADR-0017), and our packages import its modules. A change to t3's behaviour is made, in order of preference:
 
 1. our own Layer for one of t3's Effect services;
 2. a **Shadow**: a bundler alias that replaces a whole module;
