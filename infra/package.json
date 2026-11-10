@@ -6,16 +6,20 @@
     "ci:setup": "alchemy deploy --config github.ts --stage ci --profile admin && bun allow-actions-prs.ts",
     "ci:destroy": "alchemy destroy --config github.ts --stage ci --profile admin",
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "lint": "oxlint --type-aware --deny-warnings github.ts allow-actions-prs.ts"
+    "lint": "oxlint --type-aware --deny-warnings github.ts allow-actions-prs.ts github-app-setup.ts src",
+    "github-app:setup": "bun github-app-setup.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@alchemy.run/cloudflare": "catalog:",
     "@alchemy.run/github": "2.0.0-beta.85",
     "@effect/platform-bun": "catalog:",
     "alchemy": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@t3flare/github-app": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "vitest": "5.0.5"
   }
 }

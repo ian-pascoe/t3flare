@@ -2,7 +2,7 @@
   "extends": "../t3code/tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"],
-    "lib": ["ESNext", "esnext.disposable"]
+    "lib": ["ESNext", "esnext.disposable", "DOM"]
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "src"]
 }
