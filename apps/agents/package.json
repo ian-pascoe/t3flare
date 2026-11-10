@@ -20,7 +20,8 @@
     "@t3flare/sandbox-image": "workspace:*",
     "effect": "catalog:",
     "just-bash": "3.6.0",
-    "@t3flare/session-protocol": "workspace:*"
+    "@t3flare/session-protocol": "workspace:*",
+    "@t3flare/workspace-client": "workspace:*"
   },
   "devDependencies": {
     "@alchemy.run/cloudflare-runtime": "2.0.0-beta.85",

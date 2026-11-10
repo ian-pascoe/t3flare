@@ -12,6 +12,7 @@ import type { SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
 import { deliverPush } from "./agents/sessionSink.ts";
+import { workspaceRegistry } from "./agents/workspaces.ts";
 import type { AgentsBindings } from "./agents/rpc.ts";
 import * as BootState from "./host/bootState.ts";
 import * as Idle from "./host/idle.ts";
@@ -93,6 +94,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       modelProxy:
         env.MODEL_PROXY_URL && env.MODEL_PROXY_API_KEY ? { url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY } : undefined,
       github: () => this.github,
+      workspaces: workspaceRegistry(ctx.storage.sql),
     });
   }
 

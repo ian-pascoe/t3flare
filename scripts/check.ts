@@ -34,7 +34,7 @@ const tasks: Array<Task> = [
   { name: "lint (agents)", cwd: agents, command: "bun", args: ["run", "lint"] },
   { name: "test (agents)", cwd: agents, command: "bun", args: ["run", "test"] },
   { name: "test (infra)", cwd: infra, command: "bun", args: ["run", "test"] },
-  ...["effect-durable", "computer-env", "github-app"].flatMap((name): Array<Task> => [
+  ...["effect-durable", "computer-env", "github-app", "workspace-client"].flatMap((name): Array<Task> => [
     { name: `typecheck (${name})`, cwd: pkg(name), command: "bun", args: ["run", "typecheck"] },
     { name: `test (${name})`, cwd: pkg(name), command: "bun", args: ["run", "test"] },
   ]),

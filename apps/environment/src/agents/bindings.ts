@@ -3,11 +3,13 @@
 // t3 boots; module state, as the DO is the only one in its isolate.
 import type { GitHubTokens } from "./github.ts";
 import type { AgentsBindings } from "./rpc.ts";
+import type { WorkspaceRegistry } from "./workspaces.ts";
 
 export interface EnvironmentServices {
   readonly agents: AgentsBindings;
   readonly modelProxy: { readonly url: string; readonly apiKey: string } | undefined;
   readonly github: () => GitHubTokens;
+  readonly workspaces: WorkspaceRegistry;
 }
 
 let current: EnvironmentServices | undefined;

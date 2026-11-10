@@ -10,6 +10,20 @@ import type {
   SteerInput,
   SubmitTurnInput,
 } from "@t3flare/session-protocol";
+import type { CloneInput, FsAnswer, GitAnswer, GitRun, ProvisionInfo } from "@t3flare/workspace-client";
+
+/** One file operation of the Workspace DO's (`fs`); paths inside the Workspace. */
+export type FsOp =
+  | { readonly op: "stat"; readonly path: string; readonly follow?: boolean }
+  | { readonly op: "read"; readonly path: string; readonly range?: { readonly offset: number; readonly length: number } }
+  | { readonly op: "write"; readonly path: string; readonly data: Uint8Array | string; readonly options?: { readonly append?: boolean; readonly exclusive?: boolean } }
+  | { readonly op: "readdir"; readonly path: string }
+  | { readonly op: "mkdir"; readonly path: string; readonly recursive?: boolean }
+  | { readonly op: "remove"; readonly path: string; readonly options?: { readonly recursive?: boolean; readonly force?: boolean } }
+  | { readonly op: "rename"; readonly path: string; readonly to: string }
+  | { readonly op: "realPath"; readonly path: string }
+  | { readonly op: "find"; readonly path: string; readonly pattern?: string; readonly limit?: number }
+  | { readonly op: "grep"; readonly path: string; readonly pattern: string; readonly options?: { readonly ignoreCase?: boolean; readonly regex?: boolean; readonly limit?: number; readonly include?: string } };
 
 export interface ExecInput {
   readonly script: string;
@@ -29,6 +43,10 @@ export interface ExecResult {
 }
 
 export interface WorkspaceRpc {
+  fs(op: FsOp): Promise<FsAnswer<unknown>>;
+  git(run: GitRun): Promise<GitAnswer>;
+  clone(input: CloneInput): Promise<GitAnswer>;
+  info(): Promise<ProvisionInfo>;
   exec(input: ExecInput): Promise<ExecResult>;
   containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }>;
   stopContainer(): Promise<void>;

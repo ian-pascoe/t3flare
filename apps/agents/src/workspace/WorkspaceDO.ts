@@ -17,7 +17,21 @@ import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { DurableObject } from "cloudflare:workers";
 
+import type {
+  CloneInput,
+  DirEntry,
+  FileStat,
+  FoundEntry,
+  FsAnswer,
+  GitAnswer,
+  GitRun,
+  GrepMatch,
+  ProvisionInfo,
+} from "@t3flare/workspace-client";
+import { HARNESS_ROOT, REPO_ROOT } from "@t3flare/workspace-client";
+
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
+import { fileOps } from "./files.ts";
 import {
   CONTAINER_BACKEND,
   CONTAINER_IDLE_MS,
@@ -31,6 +45,9 @@ import {
 
 export interface WorkspaceEnv {
   readonly LOADER: WorkerLoader;
+  /** The identity of commits the agent makes (step 2a; defaults below). */
+  readonly T3FLARE_GIT_NAME?: string;
+  readonly T3FLARE_GIT_EMAIL?: string;
   readonly CONTAINER_BUDGET: DurableObjectNamespace<ContainerBudget>;
   /** Overrides CONTAINER_IDLE_MS (tests). */
   readonly T3FLARE_CONTAINER_IDLE_MS?: string;
@@ -54,6 +71,22 @@ export interface ExecResult {
   readonly stderr: string;
   readonly ms: number;
 }
+
+/** One file operation of the Environment's (`fs`). */
+export type FsOp =
+  | { readonly op: "stat"; readonly path: string; readonly follow?: boolean }
+  | { readonly op: "read"; readonly path: string; readonly range?: { readonly offset: number; readonly length: number } }
+  | { readonly op: "write"; readonly path: string; readonly data: Uint8Array | string; readonly options?: { readonly append?: boolean; readonly exclusive?: boolean } }
+  | { readonly op: "readdir"; readonly path: string }
+  | { readonly op: "mkdir"; readonly path: string; readonly recursive?: boolean }
+  | { readonly op: "remove"; readonly path: string; readonly options?: { readonly recursive?: boolean; readonly force?: boolean } }
+  | { readonly op: "rename"; readonly path: string; readonly to: string }
+  | { readonly op: "realPath"; readonly path: string }
+  | { readonly op: "find"; readonly path: string; readonly pattern?: string; readonly limit?: number }
+  | { readonly op: "grep"; readonly path: string; readonly pattern: string; readonly options?: { readonly ignoreCase?: boolean; readonly regex?: boolean; readonly limit?: number; readonly include?: string } };
+
+/** `value` as one single-quoted shell word. */
+const shellWord = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
 
 const LAST_USE_KEY = "t3flare:container-last-use";
 const LEASED_KEY = "t3flare:container-leased";
@@ -184,6 +217,94 @@ export class WorkspaceDO extends ContainerHost {
     await this.#workspace.ready();
     await this.#workspace.fs.mkdir(path.slice(0, path.lastIndexOf("/")) || "/", { recursive: true });
     await this.#workspace.fs.writeFile(path, text);
+  }
+
+  // -------------------------------------------------------------------------------------------------------------------
+  // The Environment's file operations (its own files, never the Container) and git (step 2a plan, section 2)
+
+  async fs(op: FsOp): Promise<FsAnswer<unknown>> {
+    await this.#workspace.ready();
+    const ops = fileOps(this.#workspace);
+    switch (op.op) {
+      case "stat":
+        return ops.stat(op.path, op.follow ?? true);
+      case "read":
+        return ops.read(op.path, op.range);
+      case "write":
+        return ops.write(op.path, op.data, op.options);
+      case "readdir":
+        return ops.readdir(op.path);
+      case "mkdir":
+        return ops.mkdir(op.path, op.recursive ?? false);
+      case "remove":
+        return ops.remove(op.path, op.options ?? {});
+      case "rename":
+        return ops.rename(op.path, op.to);
+      case "realPath":
+        return ops.realPath(op.path);
+      case "find":
+        return ops.find(op.path, op.pattern, op.limit ?? 5000);
+      case "grep":
+        return ops.grep(op.pattern, op.path, op.options ?? {});
+    }
+  }
+
+  /** Real git in the Container (ADR-0009 item 3), unless it is stopped and `startContainer` is false. */
+  async git(run: GitRun): Promise<GitAnswer> {
+    if (!run.startContainer && !this.containerRunning()) {
+      return { ran: false, reason: "container_stopped", detail: "The Workspace's Container is stopped." };
+    }
+    const script = `exec git ${run.argv.map(shellWord).join(" ")}`;
+    try {
+      const result = await this.exec({
+        script,
+        cwd: run.cwd,
+        ...(run.env === undefined ? {} : { env: run.env }),
+        ...(run.stdin === undefined ? {} : { stdin: run.stdin }),
+        timeoutMs: run.timeoutMs ?? 120_000,
+      });
+      return { ran: true, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, ms: result.ms };
+    } catch (error) {
+      return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
+    }
+  }
+
+  /** Clones `input.url` into the Workspace's repo, in the Container, and sets the repo's identity and credentials. */
+  async clone(input: CloneInput): Promise<GitAnswer> {
+    const name = this.env.T3FLARE_GIT_NAME ?? "t3flare";
+    const email = this.env.T3FLARE_GIT_EMAIL ?? "t3flare@users.noreply.github.com";
+    const helper = `!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=\${T3FLARE_GIT_TOKEN}"; }; f`;
+    const script = [
+      "set -eu",
+      `mkdir -p ${HARNESS_ROOT}/tmp`,
+      `if [ -e ${REPO_ROOT}/.git ]; then echo "already cloned" >&2; exit 3; fi`,
+      `rm -rf ${REPO_ROOT}`,
+      `git -c credential.helper= -c ${shellWord(`credential.helper=${helper}`)} clone --progress -- ${shellWord(input.url)} ${REPO_ROOT}`,
+      `cd ${REPO_ROOT}`,
+      `git config credential.helper ${shellWord(helper)}`,
+      `git config user.name ${shellWord(name)}`,
+      `git config user.email ${shellWord(email)}`,
+      `git rev-parse --abbrev-ref HEAD`,
+    ].join("\n");
+    try {
+      const result = await this.exec({
+        script,
+        cwd: "/workspace",
+        env: input.token === null ? {} : { T3FLARE_GIT_TOKEN: input.token },
+        timeoutMs: input.timeoutMs ?? 15 * 60_000,
+      });
+      return { ran: true, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, ms: result.ms };
+    } catch (error) {
+      return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
+    }
+  }
+
+  async info(): Promise<ProvisionInfo> {
+    await this.#workspace.ready();
+    const ops = fileOps(this.#workspace);
+    const repo = "ok" in (await ops.stat(REPO_ROOT));
+    const git = "ok" in (await ops.stat(`${REPO_ROOT}/.git`));
+    return { provisioned: repo, repo: git, containerRunning: this.containerRunning() };
   }
 
   /** Whether the Container runs, and the budget's view. */

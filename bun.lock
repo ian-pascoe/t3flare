@@ -26,6 +26,7 @@
         "@t3flare/models": "workspace:*",
         "@t3flare/sandbox-image": "workspace:*",
         "@t3flare/session-protocol": "workspace:*",
+        "@t3flare/workspace-client": "workspace:*",
         "effect": "catalog:",
         "just-bash": "3.6.0",
       },
@@ -46,6 +47,7 @@
         "@t3flare/github-app": "workspace:*",
         "@t3flare/models": "workspace:*",
         "@t3flare/session-protocol": "workspace:*",
+        "@t3flare/workspace-client": "workspace:*",
         "@t3tools/contracts": "workspace:*",
         "@t3tools/provider-acp-registry": "workspace:*",
         "@t3tools/provider-core": "workspace:*",
@@ -143,6 +145,13 @@
       "name": "@t3flare/session-protocol",
       "devDependencies": {
         "@types/node": "catalog:",
+      },
+    },
+    "packages/workspace-client": {
+      "name": "@t3flare/workspace-client",
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "vitest": "5.0.5",
       },
     },
     "t3code/apps/server": {
@@ -3365,6 +3374,8 @@
     "@t3flare/sandbox-image": ["@t3flare/sandbox-image@workspace:apps/sandbox-image"],
 
     "@t3flare/session-protocol": ["@t3flare/session-protocol@workspace:packages/session-protocol"],
+
+    "@t3flare/workspace-client": ["@t3flare/workspace-client@workspace:packages/workspace-client"],
 
     "@t3tools/client-runtime": ["@t3tools/client-runtime@workspace:t3code/packages/client-runtime"],
 
