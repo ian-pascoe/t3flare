@@ -10,7 +10,7 @@ import type {
   SteerInput,
   SubmitTurnInput,
 } from "@t3flare/session-protocol";
-import type { CloneInput, FsAnswer, GitAnswer, GitRun, ProvisionInfo } from "@t3flare/workspace-client";
+import type { CheckpointAnswer, CheckpointOp, CloneInput, FsAnswer, GitAnswer, GitRun, ProvisionInfo } from "@t3flare/workspace-client";
 
 /** One file operation of the Workspace DO's (`fs`); paths inside the Workspace. */
 export type FsOp =
@@ -45,6 +45,7 @@ export interface ExecResult {
 export interface WorkspaceRpc {
   fs(op: FsOp): Promise<FsAnswer<unknown>>;
   git(run: GitRun): Promise<GitAnswer>;
+  checkpoint(op: CheckpointOp): Promise<CheckpointAnswer>;
   clone(input: CloneInput): Promise<GitAnswer>;
   info(): Promise<ProvisionInfo>;
   exec(input: ExecInput): Promise<ExecResult>;

@@ -1,4 +1,4 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/container-paths.ts.
+// Copied from cloudpid@ae5a7b73:packages/computer-env/src/container-paths.ts; the harness directory is `.t3flare`.
 // Container-only paths (GLOSSARY.md): the paths whose files only the Workspace's Container has. Outside the Workspace
 // that is every path; inside it, those a launch's patterns name (computer's `ignore`, which computerd applies as
 // `MOUNT_IGNORE`). The Workspace DO decides with these when a model tool's file operation, or a `bash` command, has to
@@ -14,10 +14,10 @@
 export const WORKSPACE_ROOT = "/workspace";
 
 /** The harness's own files in the Workspace (temp files, spills, Attachments), always synced. */
-export const HARNESS_ROOT = `${WORKSPACE_ROOT}/.cloudpid`;
+export const HARNESS_ROOT = `${WORKSPACE_ROOT}/.t3flare`;
 
 /** What the harness appends to a launch's patterns so its own directory is never Container-only. */
-const HARNESS_KEPT = ["!/.cloudpid", "!/.cloudpid/**"];
+const HARNESS_KEPT = ["!/.t3flare", "!/.t3flare/**"];
 
 /** `patterns` with the harness's own directory taken back last, so nothing an Environment adds can make it local. */
 export const withHarnessKept = (patterns: readonly string[]): readonly string[] => [

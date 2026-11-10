@@ -38,14 +38,22 @@ import {
   TURN_DEADLINE_MS,
   type TurnState,
 } from "@t3flare/session-protocol";
+import { ComputerExecutionEnv, ComputerFiles, type ComputerWorkspaceStub } from "@t3flare/computer-env";
+import { REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
 
 import { environmentStub } from "../environment.ts";
+import { codingTools } from "../extensions/coding-tools.ts";
+import { fileTools } from "../extensions/files.ts";
+import { ApprovalStore, permissions } from "../extensions/permissions.ts";
+import { projectContext } from "../extensions/project-context.ts";
 import { proxyModels } from "./models.ts";
 import { liveOf, pushedEntry, turnOfEntry, usageOf } from "./state.ts";
 
 export interface SessionEnv {
   readonly ENVIRONMENT: DurableObjectNamespace;
+  /** The Workspace DOs (this Worker's own): the agent's tools work on the thread's Workspace. */
+  readonly WORKSPACES: DurableObjectNamespace;
   readonly MODEL_PROXY_URL: string;
   readonly MODEL_PROXY_API_KEY: string;
   /** Overrides TURN_DEADLINE_MS (tests and the stage's deadline check). */
@@ -82,11 +90,26 @@ export class SessionDO extends DurableObject<SessionEnv> {
   #pushTimer: ReturnType<typeof setTimeout> | undefined;
   #pushing: Promise<void> = Promise.resolve();
   #dirty = false;
-  /** Registry the tool extensions install into (M3). */
-  readonly #registry: RegistryReader = createRegistry();
+  /** Registry the tool extensions install into, before the Harness resumes work that needs them. */
+  readonly #registry: RegistryReader;
+  readonly #approvals: ApprovalStore;
 
   constructor(ctx: DurableObjectState, env: SessionEnv) {
     super(ctx, env);
+    this.#approvals = new ApprovalStore(ctx.storage.kv, () => this.#schedulePush(0));
+    const registry = createRegistry();
+    registry.install(codingTools());
+    registry.install(fileTools(() => this.#files()));
+    registry.install(projectContext(REPO_ROOT));
+    registry.install(
+      permissions({
+        store: this.#approvals,
+        mode: () => this.#meta()?.runtimeMode ?? "full-access",
+        turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null,
+        workspaceId: () => this.#meta()?.workspaceId ?? null,
+      }),
+    );
+    this.#registry = registry;
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {
         try {
@@ -101,6 +124,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
               models: proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }),
               registry: this.#registry,
               settings: { retry: { enabled: true, maxRetries: 3 } },
+              env: (target) => this.#envAt(target.cwd),
               onReport: (report) => console.warn(JSON.stringify({ t3flare: "pi-durable-report", kind: report.kind })),
             },
             context,
@@ -138,6 +162,27 @@ export class SessionDO extends DurableObject<SessionEnv> {
   #deadlineMs(): number {
     const value = Number(this.env.T3FLARE_TURN_DEADLINE_MS);
     return Number.isFinite(value) && value > 0 ? value : TURN_DEADLINE_MS;
+  }
+
+  /** The Workspace DO of the thread's Workspace, as computer's stub; undefined without one. */
+  #workspaceStub(): ComputerWorkspaceStub | undefined {
+    const id = this.#meta()?.workspaceId;
+    if (id === undefined || id === null) return undefined;
+    // SAFETY: the Workspace DO answers `fileOperation`, `skills`, `prompts`, `instructions` and `__getWorkspaceStub`.
+    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as ComputerWorkspaceStub;
+  }
+
+  /** The agent's environment: its Workspace's files and commands, in `cwd` (the repo by default). */
+  #envAt(cwd: string | undefined): ComputerExecutionEnv | undefined {
+    const workspace = this.#workspaceStub();
+    const id = this.#meta()?.workspaceId;
+    if (workspace === undefined || id === undefined || id === null) return undefined;
+    return new ComputerExecutionEnv({ workspace, id: `computer:${id}`, cwd: cwd ?? REPO_ROOT, reachContainer: true });
+  }
+
+  #files(): ComputerFiles | undefined {
+    const workspace = this.#workspaceStub();
+    return workspace === undefined ? undefined : new ComputerFiles(workspace, { reachContainer: true });
   }
 
   async #root(model?: ModelRef, thinking?: ThinkingLevel | null): Promise<Conversation> {
@@ -198,7 +243,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
       runtimeMode: input.runtimeMode,
       epoch,
     } satisfies Meta);
-    await this.#root(input.model, input.thinking);
+    const root = await this.#root(input.model, input.thinking);
+    // The agent works in its Workspace's repo (t3's `/w/<id>`), or nowhere without one.
+    if (input.workspaceId !== null) await root.configure({ cwd: REPO_ROOT }, context);
     const turns = this.#turns();
     return { epoch, busy: Object.values(turns).some(isLive), turns };
   }
@@ -272,11 +319,14 @@ export class SessionDO extends DurableObject<SessionEnv> {
       turns[providerTurnId] = { ...turns[providerTurnId]!, status: "aborted", reason, settledAt: Date.now() };
       this.#saveTurns(turns);
     }
+    this.#dropAbandonedApprovals();
   }
 
-  /** Answers a pending approval (step 2a M3); none exist before the permissions extension. */
-  async answer(_input: AnswerInput): Promise<{ readonly applied: boolean }> {
-    return { applied: false };
+  /** Answers a pending approval: the waiting call runs or returns the decline. */
+  answer(input: AnswerInput): Promise<{ readonly applied: boolean }> {
+    const applied = this.#approvals.answer(input.requestId, input.decision, input.feedback);
+    console.log(JSON.stringify({ t3flare: "approval-answer", requestId: input.requestId, decision: input.decision, applied }));
+    return Promise.resolve({ applied });
   }
 
   async snapshot(input: SnapshotInput = {}): Promise<SessionState> {
@@ -346,6 +396,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
       }
     }
     if (changed) this.#saveTurns(turns);
+    this.#dropAbandonedApprovals();
+  }
+
+  /** Requests of turns no longer live are withdrawn (their calls were aborted or ended). */
+  #dropAbandonedApprovals(): void {
+    const live = new Set(Object.entries(this.#turns()).filter(([, turn]) => isLive(turn)).map(([id]) => id));
+    this.#approvals.dropAbandoned(live);
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -393,7 +450,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       agent: { model: agentDoc.model ?? null, thinking: agentDoc.thinkingLevel ?? null },
       usage: usageOf((view?.docs["pi.usage"] as { total?: unknown } | undefined)?.total ?? view?.docs["pi.usage"]) ?? null,
       inbox: { pending: inbox.items?.length ?? 0 },
-      approvals: [],
+      approvals: this.#approvals.pending(),
       turns,
       lastEntry,
     };

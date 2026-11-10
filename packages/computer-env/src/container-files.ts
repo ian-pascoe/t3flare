@@ -1,7 +1,7 @@
 // Copied from cloudpid@ae5a7b73:packages/computer-env/src/container-files.ts.
 // The model tools' file operations on Container-only paths (GLOSSARY.md), run on the Container (ADR-0018).
 // `@cloudflare/computer` reaches a Container only through commands, so each operation is a bash script there. Bytes cross
-// through the Workspace's own files: a script copies a file to a stage under `/workspace/.cloudpid/tmp`, which computer
+// through the Workspace's own files: a script copies a file to a stage under `/workspace/.t3flare/tmp`, which computer
 // pulls into the Workspace DO after the command, and a write stages its bytes there first, which computer pushes to the
 // Container before the command. Metadata, listings and matches come back on standard output.
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
@@ -136,7 +136,7 @@ fi
 if [ "$APPEND" = 1 ]; then
   out=$(cat -- "$S" 2>&1 >> "$P") || failed "$out"
 else
-  t="$P.cloudpid-$$"
+  t="$P.t3flare-$$"
   out=$(cat -- "$S" 2>&1 > "$t") || { rm -f -- "$t"; failed "$out"; }
   [ -e "$P" ] && chmod --reference="$P" -- "$t" 2>/dev/null
   out=$(mv -f -- "$t" "$P" 2>&1) || { rm -f -- "$t"; failed "$out"; }

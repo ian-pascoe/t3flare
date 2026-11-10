@@ -2,12 +2,15 @@
 // provider events. Pure: `diff(state, pushed, now)` returns the events for what changed since the last call on `state`.
 // Every id is derived from pi-durable's own ids (the generation task for text and reasoning, the tool call's id for a
 // tool), so re-applying a range after a gap or a restart emits the same upserts. Shapes follow t3's Pi adapter.
-import type {
-  NodeId,
+import {
+  RuntimeRequestId,
+  type NodeId,
   OrchestrationV2ExecutionNode,
   OrchestrationV2ProviderFailure,
   OrchestrationV2ProviderRef,
+  OrchestrationV2RuntimeRequest,
   OrchestrationV2TurnItem,
+  ProviderSessionId,
   ProviderThreadId,
   ProviderTurnId,
   RunId,
@@ -16,7 +19,7 @@ import type {
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import type { ProviderAdapterV2Event } from "@t3tools/provider-core/server/ProviderAdapter";
-import type { ContentBlock, PushedEntry, SessionState, TurnState } from "@t3flare/session-protocol";
+import type { ApprovalDecision, ContentBlock, PendingApproval, PushedEntry, SessionState, TurnState } from "@t3flare/session-protocol";
 import * as DateTime from "effect/DateTime";
 
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
@@ -37,6 +40,8 @@ export interface TurnContext {
   /** The provider turn as last emitted, to emit its terminal update. */
   readonly providerTurn: Extract<ProviderAdapterV2Event, { type: "provider_turn.updated" }>["providerTurn"];
   readonly contextWindow: number | null;
+  /** The provider session the turn runs in (an approval's live response capability). */
+  readonly providerSessionId: ProviderSessionId;
   /** Stop asked by t3 (`interruptTurn`): an abort settles as `interrupted`, else as `cancelled`. */
   interruptRequested?: boolean;
 }
@@ -56,6 +61,17 @@ export interface DifferState {
   readonly startedAt: Map<string, DateTime.Utc>;
   /** Each item's last emitted shape, to close it when its turn settles. */
   readonly items: Map<string, { readonly turn: string; readonly kind: OrchestrationV2ExecutionNode["kind"]; readonly status: ItemStatus; readonly title: string | null; readonly body: ItemBody }>;
+  /** Approvals emitted as pending and not yet closed, by the Session's request id. */
+  readonly approvals: Map<string, OpenApproval>;
+  /** The owner's answers, by t3's runtime request id (`respondToRuntimeRequest`), to close a request as resolved. */
+  readonly decisions: Map<string, { readonly decision: ApprovalDecision; readonly feedback?: string }>;
+}
+
+interface OpenApproval {
+  readonly turn: string;
+  readonly runtimeRequest: OrchestrationV2RuntimeRequest;
+  readonly node: OrchestrationV2ExecutionNode;
+  readonly turnItem: OrchestrationV2TurnItem;
 }
 
 export const makeDifferState = (sessionName: string): DifferState => ({
@@ -67,7 +83,19 @@ export const makeDifferState = (sessionName: string): DifferState => ({
   terminated: new Set(),
   startedAt: new Map(),
   items: new Map(),
+  approvals: new Map(),
+  decisions: new Map(),
 });
+
+/** t3's runtime request id for the Session's approval request `requestId` (stable across re-diffs and restarts). */
+export const runtimeRequestIdOf = (sessionName: string, requestId: string): RuntimeRequestId =>
+  RuntimeRequestId.make(`runtime-request:${driver}:${sessionName}:approval:${requestId}`);
+
+/** The Session's approval request id of t3's runtime request id, or undefined when it is not one of ours. */
+export const approvalIdOf = (sessionName: string, runtimeRequestId: string): string | undefined => {
+  const prefix = `runtime-request:${driver}:${sessionName}:approval:`;
+  return runtimeRequestId.startsWith(prefix) ? runtimeRequestId.slice(prefix.length) : undefined;
+};
 
 const ref = (nativeId: string): OrchestrationV2ProviderRef => ({ driver, nativeId, strength: "strong" });
 
@@ -291,6 +319,104 @@ const emitTool = (
   }, now);
 };
 
+/** Opens each new pending approval of a turn this provider session started, and closes those the Session no longer has. */
+const emitApprovals = (
+  state: DifferState,
+  out: Array<ProviderAdapterV2Event>,
+  pending: ReadonlyArray<PendingApproval>,
+  textOut: (text: string) => string,
+  now: DateTime.Utc,
+) => {
+  const current = new Set(pending.map((approval) => approval.requestId));
+  for (const approval of pending) {
+    if (state.approvals.has(approval.requestId) || approval.turn === null) continue;
+    const turn = state.turns.get(approval.turn);
+    if (turn === undefined || state.terminated.has(turn.providerTurnId)) continue;
+    const id = runtimeRequestIdOf(state.sessionName, approval.requestId);
+    const nativeId = `${state.sessionName}:approval:${approval.requestId}`;
+    const nodeId = derive.approvalNode({ requestId: id });
+    const createdAt = DateTime.makeUnsafe(approval.createdAt);
+    const runtimeRequest: OrchestrationV2RuntimeRequest = {
+      id,
+      nodeId,
+      providerTurnId: turn.providerTurnId,
+      nativeRequestRef: ref(nativeId),
+      kind: approval.kind,
+      status: "pending",
+      responseCapability: { type: "live", providerSessionId: turn.providerSessionId, supportsFeedback: true },
+      createdAt,
+      resolvedAt: null,
+    };
+    const node: OrchestrationV2ExecutionNode = {
+      id: nodeId,
+      threadId: turn.threadId,
+      runId: turn.runId,
+      parentNodeId: turn.rootNodeId,
+      rootNodeId: turn.rootNodeId,
+      kind: "approval_request",
+      status: "waiting",
+      countsForRun: false,
+      providerThreadId: turn.providerThreadId,
+      providerTurnId: turn.providerTurnId,
+      nativeItemRef: ref(nativeId),
+      runtimeRequestId: id,
+      checkpointScopeId: null,
+      startedAt: createdAt,
+      completedAt: null,
+    };
+    const prompt = textOut(approval.detail === undefined ? approval.summary : `${approval.summary}\n\n${approval.detail}`);
+    const turnItem = {
+      id: derive.approvalTurnItem({ requestId: id }),
+      threadId: turn.threadId,
+      runId: turn.runId,
+      nodeId,
+      providerThreadId: turn.providerThreadId,
+      providerTurnId: turn.providerTurnId,
+      nativeItemRef: ref(nativeId),
+      parentItemId: null,
+      ordinal: ordinalOf(state, turn, `approval:${approval.requestId}`),
+      status: "waiting",
+      title: `Allow ${approval.tool}?`,
+      startedAt: createdAt,
+      completedAt: null,
+      updatedAt: createdAt,
+      type: "approval_request",
+      requestId: id,
+      requestKind: approval.kind,
+      prompt,
+    } as OrchestrationV2TurnItem;
+    state.approvals.set(approval.requestId, { turn: turn.providerTurnId, runtimeRequest, node, turnItem });
+    out.push({ type: "runtime_request.updated", driver, threadId: turn.threadId, runtimeRequest });
+    out.push({ type: "node.updated", driver, node });
+    out.push({ type: "turn_item.updated", driver, turnItem });
+  }
+  for (const [requestId, open] of state.approvals) {
+    if (current.has(requestId)) continue;
+    state.approvals.delete(requestId);
+    const answered = state.decisions.get(open.runtimeRequest.id);
+    state.decisions.delete(open.runtimeRequest.id);
+    const resolved = answered !== undefined;
+    out.push({
+      type: "runtime_request.updated",
+      driver,
+      threadId: open.node.threadId,
+      runtimeRequest: {
+        ...open.runtimeRequest,
+        status: resolved ? "resolved" : "cancelled",
+        resolvedAt: now,
+        ...(answered === undefined ? {} : { decision: answered.decision }),
+        ...(answered?.feedback === undefined ? {} : { feedback: answered.feedback }),
+      },
+    });
+    out.push({ type: "node.updated", driver, node: { ...open.node, status: resolved ? "completed" : "cancelled", completedAt: now } });
+    out.push({
+      type: "turn_item.updated",
+      driver,
+      turnItem: { ...open.turnItem, status: resolved ? "completed" : "cancelled", completedAt: now, updatedAt: now } as OrchestrationV2TurnItem,
+    });
+  }
+};
+
 /** A model error, classified: an HTTP 429 or a quota body is a usage limit (step 2a plan, section 3). */
 export const failureOf = (turn: TurnState): OrchestrationV2ProviderFailure => {
   const reason = turn.reason ?? "unknown";
@@ -332,6 +458,7 @@ export const diff = (
   pushed: SessionState,
   now: DateTime.Utc,
   pathOut: PathOut = (path) => path,
+  textOut: (text: string) => string = (text) => text,
 ): Array<ProviderAdapterV2Event> => {
   const out: Array<ProviderAdapterV2Event> = [];
   const calls = new Map<string, { readonly call: ToolCallInfo; readonly turn: TurnContext }>();
@@ -367,6 +494,8 @@ export const diff = (
       result !== undefined ? (result.isError === true ? "failed" : "completed") : slot?.status === "done" ? "completed" : "running";
     emitTool(state, out, turn, call, status, result, pathOut, now);
   }
+
+  emitApprovals(state, out, pushed.approvals, textOut, now);
 
   // Usage of the newest response in each turn, as the provider turn's token usage.
   const usageByTurn = new Map<string, NonNullable<PushedEntry["usage"]>>();

@@ -26,7 +26,7 @@ import { workspaceRpc } from "./workspaceClient.ts";
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
 
-export type Route = "container" | "cache" | "container-stopped" | "clone" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
+export type Route = "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
 
 export interface TraceEntry {
   readonly at: number;
@@ -157,7 +157,7 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
     exitCode: answer.exitCode,
     stdout: fromWorkspaceText(at.id, answer.stdout),
     stderr: fromWorkspaceText(at.id, answer.stderr),
-    route: answer.cached === true ? "cache" : "container",
+    route: answer.stale !== undefined ? `stale-${answer.stale}` : answer.cached === true ? "cache" : "container",
     detail: `${startContainer ? "action" : "passive"} ${answer.ms}ms`,
   };
 };

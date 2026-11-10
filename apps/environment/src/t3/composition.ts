@@ -179,6 +179,7 @@ import { runMigrations } from "t3/src/persistence/Migrations.ts";
 import * as DoHttpServer from "../platform/httpServer.ts";
 import * as DoServices from "../platform/services.ts";
 import * as WorkspaceLayers from "../workspace/layers.ts";
+import * as WorkspaceCheckpoints from "../workspace/checkpoints.ts";
 import * as DoSql from "../platform/sql.ts";
 import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
@@ -327,7 +328,10 @@ export const make = (options: CompositionOptions) => {
   // t3flare: no T3 Connect tunnel (ADR-0010, ADR-0011); cloudflared is never installed.
   const layerRelayClient = RelayClient.layerCloudflared({ baseDir: BASE_DIR });
 
-  const layerVcsDriverRegistry = VcsDriverRegistry.layer.pipe(Layer.provide(VcsProjectConfig.layer));
+  // t3flare: checkpoints of a Workspace's repo are its Durable Object's (isomorphic-git), not a Container per turn.
+  const layerVcsDriverRegistry = WorkspaceCheckpoints.layerVcsDriverRegistry(
+    VcsDriverRegistry.layer.pipe(Layer.provide(VcsProjectConfig.layer)),
+  );
   const layerSourceControlProviderRegistry = SourceControlProviderRegistry.layer.pipe(
     Layer.provideMerge(SourceControlBuiltInDrivers.layer),
     Layer.provideMerge(GitVcsDriver.layer),

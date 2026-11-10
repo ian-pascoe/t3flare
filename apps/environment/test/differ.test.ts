@@ -4,7 +4,7 @@ import type { SessionState } from "@t3flare/session-protocol";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vitest";
 
-import { diff, failureOf, makeDifferState, type DifferState, type TurnContext } from "../src/provider/differ.ts";
+import { approvalIdOf, diff, failureOf, makeDifferState, runtimeRequestIdOf, type DifferState, type TurnContext } from "../src/provider/differ.ts";
 import recorded from "./fixtures/session-chat.json" with { type: "json" };
 
 const state = recorded as unknown as SessionState;
@@ -34,6 +34,7 @@ const withTurns = (): DifferState => {
         completedAt: null,
       },
       contextWindow: 400_000,
+      providerSessionId: "provider-session-1",
     } as unknown as TurnContext);
   });
   return differ;
@@ -103,5 +104,38 @@ describe("differ", () => {
     const other = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail: "500 upstream", startedAt: 0 });
     expect(other.class).toBe("provider_error");
     expect(other.message).toBe("The model provider returned HTTP 500.");
+  });
+
+  it("opens a pending approval as a runtime request, and closes it as resolved or cancelled", () => {
+    const turnId = Object.keys(state.turns)[0]!;
+    const differ = withTurns();
+    const running = { ...state, entries: [], turns: { [turnId]: { ...state.turns[turnId]!, status: "running" as const } } };
+    const approval = {
+      requestId: "42",
+      turn: turnId,
+      callId: "call-1",
+      tool: "bash",
+      kind: "command" as const,
+      summary: "cd /workspace/repo && bash test.sh",
+      createdAt: Date.parse("2026-11-10T21:19:00.000Z"),
+    };
+    const textOut = (text: string) => text.replaceAll("/workspace/repo", "/w/fixture");
+    const opened = diff(differ, { ...running, approvals: [approval] }, now, undefined, textOut);
+    expect(types(opened)).toEqual(["runtime_request.updated", "node.updated", "turn_item.updated"]);
+    const request = (opened[0] as { runtimeRequest: { id: string; status: string; kind: string } }).runtimeRequest;
+    expect(request).toMatchObject({ status: "pending", kind: "command" });
+    expect(approvalIdOf("thread:test", request.id)).toBe("42");
+    expect(request.id).toBe(runtimeRequestIdOf("thread:test", "42"));
+    expect((opened[2] as { turnItem: { prompt: string } }).turnItem.prompt).toBe("cd /w/fixture && bash test.sh");
+    // Applied again: nothing new.
+    expect(types(diff(differ, { ...running, approvals: [approval] }, now, undefined, textOut))).toEqual([]);
+    // Answered (the adapter keeps the decision), then gone from the Session: resolved.
+    differ.decisions.set(request.id, { decision: "accept" });
+    const closed = diff(differ, { ...running, approvals: [] }, now);
+    expect((closed[0] as { runtimeRequest: { status: string; decision: string } }).runtimeRequest).toMatchObject({ status: "resolved", decision: "accept" });
+    // Another one withdrawn without an answer (Stop): cancelled.
+    diff(differ, { ...running, approvals: [{ ...approval, requestId: "43" }] }, now);
+    const withdrawn = diff(differ, { ...running, approvals: [] }, now);
+    expect((withdrawn[0] as { runtimeRequest: { status: string } }).runtimeRequest.status).toBe("cancelled");
   });
 });

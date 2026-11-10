@@ -38,20 +38,20 @@ describe("Container-only paths", () => {
   });
 
   it("keep the harness's own directory synced whatever the Environment adds", () => {
-    const launch = withHarnessKept(["**/node_modules", "/.cloudpid", "**/tmp"]);
+    const launch = withHarnessKept(["**/node_modules", "/.t3flare", "**/tmp"]);
 
-    expect(isContainerOnly("/workspace/.cloudpid", launch)).toBe(false);
-    expect(isContainerOnly("/workspace/.cloudpid/tmp/tmp-1/out.log", launch)).toBe(false);
-    expect(isContainerOnly("/workspace/.cloudpid/uploads/s1/a.png", launch)).toBe(false);
+    expect(isContainerOnly("/workspace/.t3flare", launch)).toBe(false);
+    expect(isContainerOnly("/workspace/.t3flare/tmp/tmp-1/out.log", launch)).toBe(false);
+    expect(isContainerOnly("/workspace/.t3flare/uploads/s1/a.png", launch)).toBe(false);
     expect(isContainerOnly("/workspace/repo/tmp/x", launch)).toBe(true);
     expect(isContainerOnly("/workspace/repo/node_modules", launch)).toBe(true);
   });
 
   it("append the harness's patterns once, after the launch's", () => {
-    expect(withHarnessKept(["!/.cloudpid", "**/node_modules", "!/.cloudpid/**"])).toEqual([
+    expect(withHarnessKept(["!/.t3flare", "**/node_modules", "!/.t3flare/**"])).toEqual([
       "**/node_modules",
-      "!/.cloudpid",
-      "!/.cloudpid/**",
+      "!/.t3flare",
+      "!/.t3flare/**",
     ]);
   });
 });

@@ -13,15 +13,18 @@
     "@earendil-works/chord": "1.5.0",
     "@earendil-works/pi-ai": "1.5.0",
     "@earendil-works/pi-durable": "1.5.0",
+    "@earendil-works/pi-schema": "1.5.0",
     "@platformatic/vfs": "0.5.0",
     "@t3flare/computer-env": "workspace:*",
     "@t3flare/effect-durable": "workspace:*",
     "@t3flare/models": "workspace:*",
     "@t3flare/sandbox-image": "workspace:*",
-    "effect": "catalog:",
-    "just-bash": "3.6.0",
     "@t3flare/session-protocol": "workspace:*",
-    "@t3flare/workspace-client": "workspace:*"
+    "@t3flare/workspace-client": "workspace:*",
+    "diff": "9.0.0",
+    "effect": "catalog:",
+    "isomorphic-git": "1.44.10",
+    "just-bash": "3.6.0"
   },
   "devDependencies": {
     "@alchemy.run/cloudflare-runtime": "2.0.0-beta.85",

@@ -97,6 +97,12 @@ export const readCache = (sql: SqlStorage) => {
       sql.exec("UPDATE t3flare_git_reads SET used_at = ? WHERE key = ?", Date.now(), key);
       return JSON.parse(row.answer) as CachedAnswer;
     },
+    /** The last real answer for `key` at any revision, and the revision it was made at (the stale reads' base). */
+    last(key: string): { readonly rev: number; readonly answer: CachedAnswer } | undefined {
+      ensure();
+      const row = sql.exec<{ rev: number; answer: string }>("SELECT rev, answer FROM t3flare_git_reads WHERE key = ?", key).toArray()[0];
+      return row === undefined ? undefined : { rev: row.rev, answer: JSON.parse(row.answer) as CachedAnswer };
+    },
     put(key: string, rev: number, answer: CachedAnswer): void {
       ensure();
       if (rev < 0) return;

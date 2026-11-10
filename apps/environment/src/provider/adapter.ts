@@ -39,7 +39,7 @@ import { environmentServices } from "../agents/bindings.ts";
 import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "./capabilities.ts";
-import { diff, makeDifferState, type DifferState, type TurnContext } from "./differ.ts";
+import { approvalIdOf, diff, makeDifferState, type DifferState, type TurnContext } from "./differ.ts";
 
 const driver = PI_DURABLE_DRIVER;
 const derive = IdAllocator.derive;
@@ -131,7 +131,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
       const apply = Effect.fn("PiDurableAdapter.apply")(function* (state: SessionState) {
           const at = yield* DateTime.now;
           const before = new Set(differ.terminated);
-          for (const event of diff(differ, state, at, pathOut)) offer(event);
+          for (const event of diff(differ, state, at, pathOut, textOut)) offer(event);
           let settled = false;
           for (const id of differ.terminated) {
             if (before.has(id)) continue;
@@ -147,6 +147,9 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
 
       const pathOut = (path: string) =>
         workspaceId === null ? path : path.replace(/^\/workspace\/repo(?=\/|$)/, `/w/${workspaceId}`);
+      /** Every `/workspace/repo` in a text shown to the owner (an approval's command) as t3's `/w/<id>`. */
+      const textOut = (text: string) =>
+        workspaceId === null ? text : text.replace(/\/workspace\/repo(?=\/|\b|$)/g, `/w/${workspaceId}`);
 
       const pullSnapshot = (why: string) =>
         call("a snapshot", () => client().snapshot({})).pipe(
@@ -338,6 +341,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
               startedAt,
               providerTurn,
               contextWindow: findModel(`${model.provider}/${model.modelId}`)?.contextWindow ?? null,
+              providerSessionId: input.providerSessionId,
             };
             // Registered before the submit, so a push that arrives first is not taken for an orphan (plan revision 3).
             differ.turns.set(providerTurn.id, context);
@@ -420,10 +424,20 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
         }),
         respondToRuntimeRequest: Effect.fn("PiDurableAdapter.respondToRuntimeRequest")(function* (requestInput) {
           const decision = requestInput.decision ?? "cancel";
+          const approvalId = approvalIdOf(sessionName, requestInput.requestId);
+          if (approvalId === undefined) {
+            return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({ driver, requestId: requestInput.requestId });
+          }
+          const answerDecision = decision === "accept" || decision === "acceptForSession" || decision === "decline" ? decision : "cancel";
+          // Kept before the call, so the push that drops the request closes it as resolved, not cancelled.
+          differ.decisions.set(requestInput.requestId, {
+            decision: answerDecision,
+            ...(requestInput.feedback === undefined ? {} : { feedback: requestInput.feedback }),
+          });
           const answered = yield* call("answer", () =>
             client().answer({
-              requestId: requestInput.requestId,
-              decision: decision === "accept" || decision === "acceptForSession" || decision === "decline" ? decision : "cancel",
+              requestId: approvalId,
+              decision: answerDecision,
               ...(requestInput.feedback === undefined ? {} : { feedback: requestInput.feedback }),
             }),
           ).pipe(
@@ -432,6 +446,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
             ),
           );
           if (!answered.applied) {
+            differ.decisions.delete(requestInput.requestId);
             return yield* new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({ driver, requestId: requestInput.requestId });
           }
         }),

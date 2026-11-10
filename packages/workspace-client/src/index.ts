@@ -94,7 +94,16 @@ export interface GitRun {
 }
 
 export type GitAnswer =
-  | { readonly ran: true; readonly exitCode: number; readonly stdout: string; readonly stderr: string; readonly ms: number; readonly cached?: boolean }
+  | {
+      readonly ran: true;
+      readonly exitCode: number;
+      readonly stdout: string;
+      readonly stderr: string;
+      readonly ms: number;
+      readonly cached?: boolean;
+      /** A passive read answered while the Container was stopped: the last real answer, patched with the write journal where its shape allows. */
+      readonly stale?: "patched" | "last-answer";
+    }
   | { readonly ran: false; readonly reason: "container_stopped" | "container_refused"; readonly detail: string };
 
 export interface CloneInput {
@@ -113,3 +122,26 @@ export interface ProvisionInfo {
   readonly gitRevision?: number;
   readonly cachedReads?: number;
 }
+
+/** t3's checkpoint operations (`VcsCheckpointOps`), answered by the Workspace DO (ADR-0009; step 2a M3). Refs are git refs. */
+export type CheckpointOp =
+  | { readonly op: "capture"; readonly ref: string }
+  | { readonly op: "has"; readonly ref: string }
+  | {
+      readonly op: "diff";
+      readonly from: string;
+      readonly to: string;
+      readonly fallbackFromToHead: boolean;
+      readonly ignoreWhitespace: boolean;
+      readonly format: "patch" | "numstat";
+      readonly filePaths?: ReadonlyArray<string>;
+      readonly maxOutputBytes?: number;
+    }
+  | { readonly op: "authored"; readonly from: string; readonly to: string }
+  | { readonly op: "delete"; readonly refs: ReadonlyArray<string> }
+  | { readonly op: "restore"; readonly ref: string; readonly fallbackToHead: boolean };
+
+/** A checkpoint operation's answer, and which side made it (the DO's isomorphic-git, or the Container's git). */
+export type CheckpointAnswer =
+  | { readonly ok: true; readonly value: unknown; readonly by: "do" | "container" | "alias" }
+  | { readonly ok: false; readonly error: string };

@@ -14,10 +14,13 @@ import {
   withWorkspaceContainer,
 } from "@cloudflare/computer/backends/container";
 import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
+import { type EnvRequest, type EnvResponse, type HostOperation, withHarnessKept, WorkspaceEnvHost } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { DurableObject } from "cloudflare:workers";
 
 import type {
+  CheckpointAnswer,
+  CheckpointOp,
   CloneInput,
   FsAnswer,
   GitAnswer,
@@ -26,8 +29,25 @@ import type {
 } from "@t3flare/workspace-client";
 import { HARNESS_ROOT, REPO_ROOT } from "@t3flare/workspace-client";
 
+import * as git from "isomorphic-git";
+
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
+import { changedBetween, currentRevision } from "./changeLog.ts";
+import { authoredScript, captureScript, restoreScript, shellWord } from "./checkpointScripts.ts";
 import { fileOps } from "./files.ts";
+import {
+  captureCheckpoint,
+  deleteRef,
+  diffCommits,
+  type GitFs,
+  parentsOf,
+  type Repo,
+  repoFacts,
+  resolveCommit,
+  withinGuard,
+} from "./gitRepo.ts";
+import { isomorphicFs } from "./isoFs.ts";
+import { kindOf, patchAnswer } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import {
   CONTAINER_BACKEND,
@@ -84,11 +104,11 @@ export type FsOp =
   | { readonly op: "find"; readonly path: string; readonly pattern?: string; readonly limit?: number }
   | { readonly op: "grep"; readonly path: string; readonly pattern: string; readonly options?: { readonly ignoreCase?: boolean; readonly regex?: boolean; readonly limit?: number; readonly include?: string } };
 
-/** `value` as one single-quoted shell word. */
-const shellWord = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
 
 const LAST_USE_KEY = "t3flare:container-last-use";
 const LEASED_KEY = "t3flare:container-leased";
+/** The last checkpoint captured: its commit, the files' revision then, and HEAD then (the alias above the guard). */
+const LAST_CAPTURE_KEY = "t3flare:last-capture";
 
 const ContainerHost = withWorkspaceContainer(class extends DurableObject<WorkspaceEnv> {});
 
@@ -96,6 +116,9 @@ export class WorkspaceDO extends ContainerHost {
   readonly #workspace: ComputerWorkspace;
   readonly #reads: ReturnType<typeof readCache>;
   readonly #container: ContainerBackend;
+  /** The Session's `ComputerExecutionEnv` file operations (the agent's tools), answered here. */
+  readonly #host: WorkspaceEnvHost;
+  #hostReady: Promise<void> | undefined;
   /** Commands running now: the Container is not stopped under them. */
   #running = 0;
 
@@ -117,6 +140,36 @@ export class WorkspaceDO extends ContainerHost {
       storage: ctx.storage,
       backends: [new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx }), this.#container],
     });
+    // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
+    this.#host = new WorkspaceEnvHost(this.#workspace, {
+      patterns: () => Promise.resolve(withHarnessKept(CONTAINER_IGNORE)),
+      running: () => this.containerRunning(),
+      run: async (script, scriptEnv) => {
+        const result = await this.exec({ script, env: { ...scriptEnv }, cwd: WORKSPACE_ROOT });
+        return { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr };
+      },
+    });
+  }
+
+  /** One of `ComputerExecutionEnv`'s file operations (the Session's tools), answered as plain data. */
+  async fileOperation(request: EnvRequest): Promise<EnvResponse<HostOperation>> {
+    await this.#workspace.ready();
+    this.#hostReady ??= this.#host.prepare(WORKSPACE_ROOT, Date.now());
+    await this.#hostReady;
+    return this.#host.handle(request);
+  }
+
+  /** No skills, prompt templates or nested instruction files in part 1 (the Session reads AGENTS.md itself). */
+  skills(_cwd: string): Promise<ReadonlyArray<never>> {
+    return Promise.resolve([]);
+  }
+
+  prompts(_cwd: string): Promise<ReadonlyArray<never>> {
+    return Promise.resolve([]);
+  }
+
+  instructions(_directory: string): Promise<ReadonlyArray<never>> {
+    return Promise.resolve([]);
   }
 
   /** The platform's Container API with the budget's lease taken before every start (step 2a cost guardrails). */
@@ -253,8 +306,9 @@ export class WorkspaceDO extends ContainerHost {
   /**
    * Real git in the Container (ADR-0009 item 3). A passive read (`startContainer: false`, t3's own status polls) is
    * answered from the read cache while the repo is unchanged, and does not count as use: a client watching an idle
-   * Workspace never keeps its Container up. A read the cache cannot answer runs in the Container, starting it if it is
-   * stopped (the repo changed, which is someone working).
+   * Workspace never keeps its Container up. A passive read the cache cannot answer runs in the Container only if it is
+   * running; while it is stopped the read gets its last real answer patched with the write journal (`#stale`), and the
+   * Container stays stopped (the parent's ruling on M2's deviation 2; ADR-0009 refinement).
    */
   async git(run: GitRun): Promise<GitAnswer> {
     const passive = !run.startContainer;
@@ -263,6 +317,7 @@ export class WorkspaceDO extends ContainerHost {
     if (key !== null) {
       const hit = this.#reads.get(key, rev);
       if (hit !== undefined) return { ran: true, ...hit, ms: 0, cached: true };
+      if (!this.containerRunning()) return this.#stale(run, key);
     }
     const script = `exec git ${run.argv.map(shellWord).join(" ")}`;
     try {
@@ -281,6 +336,158 @@ export class WorkspaceDO extends ContainerHost {
     } catch (error) {
       return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
     }
+  }
+
+  /** Stale answers made since the files last changed, by read key: a client polling status patches once per change. */
+  readonly #staleMemo = new Map<string, { readonly global: number; readonly answer: GitAnswer }>();
+
+  /** A passive read while the Container is stopped: its last real answer, patched with the paths written since. */
+  async #stale(run: GitRun, key: string): Promise<GitAnswer> {
+    const last = this.#reads.last(key);
+    if (last === undefined) {
+      return { ran: false, reason: "container_stopped", detail: "needs the Workspace's Container, which is stopped, and has no earlier answer" };
+    }
+    const kind = (run.readScope ?? "repo") === "repo" && last.answer.exitCode === 0 ? kindOf(run.argv, run.env) : undefined;
+    if (kind === undefined) return { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
+    const global = currentRevision(this.ctx.storage.sql);
+    const memo = this.#staleMemo.get(key);
+    if (memo !== undefined && memo.global === global) return memo.answer;
+    const started = Date.now();
+    const journal = this.#journalSince(last.rev, global);
+    let answer: GitAnswer;
+    try {
+      const repo = await this.#repo();
+      if (journal.length > 0 && !(await withinGuard(repo))) {
+        answer = { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
+      } else {
+        const stdout = await patchAnswer(kind, last.answer.stdout, journal, await repoFacts(repo));
+        answer = { ran: true, ...last.answer, stdout, ms: Date.now() - started, cached: true, stale: "patched" };
+      }
+    } catch (error) {
+      console.warn(JSON.stringify({ t3flare: "stale-read-patch-failed", kind, error: String(error).slice(0, 500) }));
+      answer = { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
+    }
+    this.#staleMemo.set(key, { global, answer });
+    if (this.#staleMemo.size > 200) this.#staleMemo.delete(this.#staleMemo.keys().next().value!);
+    return answer;
+  }
+
+  /** The repo's paths (relative, outside `.git`) written after revision `after` (computer's change log). */
+  #journalSince(after: number, through: number): ReadonlyArray<string> {
+    const prefix = `${REPO_ROOT}/`;
+    return changedBetween(this.ctx.storage.sql, after, through)
+      .map((changed) => changed.path)
+      .filter((path) => path.startsWith(prefix) && path !== `${REPO_ROOT}/.git` && !path.startsWith(`${REPO_ROOT}/.git/`))
+      .map((path) => path.slice(prefix.length));
+  }
+
+  #gitFs: GitFs | undefined;
+
+  /** The repo, for isomorphic-git (a fresh parse cache per operation). */
+  async #repo(): Promise<Repo> {
+    await this.#workspace.ready();
+    this.#gitFs ??= isomorphicFs(this.#workspace);
+    return { fs: this.#gitFs, dir: REPO_ROOT, cache: {} };
+  }
+
+  // -------------------------------------------------------------------------------------------------------------------
+  // Checkpoints (t3's `VcsCheckpointOps`, ADR-0009 items 1–2)
+
+  /**
+   * One of t3's checkpoint operations. Captures, diffs, ref checks and deletes run here with isomorphic-git and never
+   * start the Container; a diff runs on the Container's git while it is running anyway (git's own text). A capture of a
+   * repo above the guard makes the new ref an alias of the previous capture when nothing was written since, and runs
+   * the Container's git otherwise. A restore, and the authored paths of a range where HEAD moved, run the Container's git.
+   */
+  async checkpoint(op: CheckpointOp): Promise<CheckpointAnswer> {
+    try {
+      const repo = await this.#repo();
+      switch (op.op) {
+        case "has":
+          return { ok: true, value: (await resolveCommit(repo, op.ref)) !== null, by: "do" };
+        case "delete":
+          for (const ref of op.refs) await deleteRef(repo, ref);
+          return { ok: true, value: null, by: "do" };
+        case "capture":
+          return await this.#capture(repo, op.ref);
+        case "diff":
+          return await this.#diff(repo, op);
+        case "authored":
+          return await this.#authored(repo, op.from, op.to);
+        case "restore":
+          return await this.#restore(repo, op.ref, op.fallbackToHead);
+      }
+    } catch (error) {
+      console.warn(JSON.stringify({ t3flare: "checkpoint-failed", op: op.op, error: String(error).slice(0, 500) }));
+      return { ok: false, error: String(error).slice(0, 1000) };
+    }
+  }
+
+  async #capture(repo: Repo, ref: string): Promise<CheckpointAnswer> {
+    const global = currentRevision(this.ctx.storage.sql);
+    const head = await resolveCommit(repo, "HEAD");
+    let answer: CheckpointAnswer;
+    if (await withinGuard(repo)) {
+      await captureCheckpoint(repo, ref, Math.floor(Date.now() / 1000));
+      answer = { ok: true, value: null, by: "do" };
+    } else {
+      const previous = this.ctx.storage.kv.get<{ readonly commit: string; readonly rev: number; readonly head: string | null }>(LAST_CAPTURE_KEY);
+      if (previous !== undefined && previous.head === head && this.#journalSince(previous.rev, global).length === 0) {
+        await git.writeRef({ fs: repo.fs, dir: repo.dir, ref, value: previous.commit, force: true });
+        answer = { ok: true, value: null, by: "alias" };
+      } else {
+        const result = await this.exec({ script: captureScript(ref), cwd: REPO_ROOT, env: this.#identityEnv(), timeoutMs: 10 * 60_000 });
+        if (result.exitCode !== 0) return { ok: false, error: `git capture failed: ${result.stderr.slice(0, 1000)}` };
+        answer = { ok: true, value: null, by: "container" };
+      }
+    }
+    const commit = await resolveCommit(repo, ref);
+    if (commit !== null) this.ctx.storage.kv.put(LAST_CAPTURE_KEY, { commit, rev: global, head });
+    return answer;
+  }
+
+  async #diff(repo: Repo, op: Extract<CheckpointOp, { op: "diff" }>): Promise<CheckpointAnswer> {
+    if (op.filePaths?.length === 0) return { ok: true, value: "", by: "do" };
+    let from = await resolveCommit(repo, op.from);
+    if (from === null && op.fallbackFromToHead) from = await resolveCommit(repo, "HEAD");
+    const to = await resolveCommit(repo, op.to);
+    if (from === null || to === null) return { ok: false, error: "Checkpoint ref is unavailable for diff operation." };
+    if (this.containerRunning()) {
+      const argv = [
+        "-c", "diff.relative=false", "-c", "diff.suppressBlankEmpty=false", "diff",
+        ...(op.format === "numstat" ? ["--numstat", "-z"] : ["--patch"]),
+        "--no-color", "--no-ext-diff", "--no-textconv", "--submodule=short", "--src-prefix=a/", "--dst-prefix=b/",
+        ...(op.ignoreWhitespace ? ["--ignore-all-space"] : []),
+        `${from}^{commit}`, `${to}^{commit}`,
+        ...(op.filePaths === undefined ? [] : ["--", ...op.filePaths.map((path) => `:(top,literal)${path}`)]),
+      ];
+      const result = await this.exec({ script: `exec git ${argv.map(shellWord).join(" ")}`, cwd: REPO_ROOT, passive: true });
+      if (result.exitCode === 0) return { ok: true, value: result.stdout, by: "container" };
+    }
+    const value = await diffCommits(repo, from, to, { format: op.format, filePaths: op.filePaths, maxOutputBytes: op.maxOutputBytes });
+    return { ok: true, value, by: "do" };
+  }
+
+  async #authored(repo: Repo, fromRef: string, toRef: string): Promise<CheckpointAnswer> {
+    const from = await resolveCommit(repo, fromRef);
+    const to = await resolveCommit(repo, toRef);
+    if (from === null || to === null) return { ok: false, error: "Checkpoint ref is unavailable." };
+    const [startHead] = await parentsOf(repo, from);
+    const [endHead] = await parentsOf(repo, to);
+    if (startHead === undefined || endHead === undefined || startHead === endHead) return { ok: true, value: null, by: "do" };
+    // HEAD moved between the checkpoints (a commit, in the Container): its git lists the paths, as t3's driver does.
+    const result = await this.exec({ script: authoredScript(from, to, startHead, endHead), cwd: REPO_ROOT, timeoutMs: 120_000 });
+    if (result.exitCode !== 0) return { ok: false, error: result.stderr.slice(0, 1000) };
+    return { ok: true, value: [...new Set(result.stdout.split("\0").filter((path) => path.length > 0))], by: "container" };
+  }
+
+  async #restore(repo: Repo, ref: string, fallbackToHead: boolean): Promise<CheckpointAnswer> {
+    let commit = await resolveCommit(repo, ref);
+    if (commit === null && fallbackToHead) commit = await resolveCommit(repo, "HEAD");
+    if (commit === null) return { ok: true, value: false, by: "do" };
+    const result = await this.exec({ script: restoreScript(commit), cwd: REPO_ROOT, timeoutMs: 10 * 60_000 });
+    if (result.exitCode !== 0) return { ok: false, error: result.stderr.slice(0, 1000) };
+    return { ok: true, value: true, by: "container" };
   }
 
   /** The agent's commit identity, for repos t3 made itself (`git init`, New project) that have none in their config. */
