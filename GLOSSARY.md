@@ -82,3 +82,7 @@ _Avoid_: override, monkeypatch
 **Patch**:
 A line-level change to t3's source, kept as a patch file.
 _Avoid_: fork change, hack
+
+**Build shim**:
+A bundle-time substitute for a Node builtin or a dependency that cannot load in workerd, applied only to the modules that need it.
+_Avoid_: polyfill, Shadow
