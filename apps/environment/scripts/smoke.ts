@@ -1,12 +1,13 @@
 // @effect-diagnostics globalConsole:off globalFetch:off globalDate:off globalTimers:off
 // A post-deploy smoke check that leaves nothing behind: the web client answers, and the admin health route (read-only;
 // it neither boots t3 nor starts a Container) answers through Access with the admin token, reports the expected build,
-// and is not in safe mode. Retries for a minute while the deploy propagates. Prints only non-secret health fields.
+// and is not in safe mode. Prints only non-secret health fields. Retries for six minutes: an active Environment DO (an
+// open client socket) keeps its old code until it hibernates or Cloudflare's default code-update delay of 5 minutes ends.
 //
 //   bun scripts/stage.ts run <stage> smoke [<commit>]
 const expected = (process.argv[2] ?? "").slice(0, 12);
 const url = process.env.T3_URL ?? "";
-const deadline = Date.now() + 60_000;
+const deadline = Date.now() + 360_000;
 
 const attempt = async (): Promise<string | undefined> => {
   const page = await fetch(new URL("/", url));
@@ -37,5 +38,5 @@ for (;;) {
     process.exit(1);
   }
   console.error(`smoke: ${failure}; retrying`);
-  await new Promise((resolve) => setTimeout(resolve, 5_000));
+  await new Promise((resolve) => setTimeout(resolve, 10_000));
 }
