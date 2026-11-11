@@ -30,6 +30,9 @@ export interface BudgetEnv {
 }
 
 export class ContainerBudget extends DurableObject<BudgetEnv> {
+  /** The clock every lease is judged by; a field, not a method, so it is not part of the RPC surface. Tests swap it. */
+  protected readonly now: () => number = () => Date.now();
+
   #max(): number {
     const value = Number(this.env.T3FLARE_MAX_CONTAINERS);
     return Number.isInteger(value) && value > 0 ? value : MAX_CONTAINERS;
@@ -49,7 +52,7 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
 
   /** Takes (or renews) `holder`'s lease if a slot is free. */
   acquire(holder: string): LeaseAnswer {
-    const now = Date.now();
+    const now = this.now();
     const live = this.#live(now);
     const others = live.filter((lease) => lease.holder !== holder);
     if (others.length >= this.#max()) {
@@ -67,7 +70,7 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
 
   /** Renews `holder`'s lease; refused when it has none (it expired and its slot went to another). */
   renew(holder: string): LeaseAnswer {
-    const now = Date.now();
+    const now = this.now();
     const live = this.#live(now);
     if (!live.some((lease) => lease.holder === holder)) {
       return { ok: false, reason: "no lease", running: live.map((lease) => lease.holder) };
@@ -76,11 +79,11 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
   }
 
   release(holder: string): void {
-    const live = this.#live(Date.now()).filter((lease) => lease.holder !== holder);
+    const live = this.#live(this.now()).filter((lease) => lease.holder !== holder);
     this.ctx.storage.kv.put("leases", live);
   }
 
   state(): { readonly max: number; readonly leases: ReadonlyArray<Lease> } {
-    return { max: this.#max(), leases: this.#live(Date.now()) };
+    return { max: this.#max(), leases: this.#live(this.now()) };
   }
 }

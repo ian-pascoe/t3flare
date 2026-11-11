@@ -60,7 +60,12 @@ const compare = async (dir: string, change: () => ReadonlyArray<string>) => {
   }
 };
 
-describe("stale reads: last answer plus the journal match git", () => {
+// Each case forks dozens of real `git` processes (before/after answers for six shapes): fast idle, but past vitest's 5 s
+// default on a CPU-saturated runner. Real git is what the answers are compared with, so the timeout is a ceiling, not a
+// wait: 60 s costs nothing when git is fast and only fails a genuine hang.
+const GIT_TEST_TIMEOUT_MS = 60_000;
+
+describe("stale reads: last answer plus the journal match git", { timeout: GIT_TEST_TIMEOUT_MS }, () => {
   it("edits, an added file, a deleted file, a new untracked directory", async () => {
     const r = setup("basic");
     r.put("README.md", "# readme\n");

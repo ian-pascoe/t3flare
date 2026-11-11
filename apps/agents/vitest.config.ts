@@ -18,7 +18,11 @@ export default defineConfig({
               compatibilityDate: "2026-11-01",
               compatibilityFlags: ["nodejs_compat"],
               bindings: { T3FLARE_LEASE_MS: "300", T3FLARE_MAX_CONTAINERS: "2" },
-              durableObjects: { CONTAINER_BUDGET: { className: "ContainerBudget", useSQLite: true } },
+              durableObjects: {
+                // The fake-clock subclass for lease timing; the real class (wall clock) for the one test of the default.
+                CONTAINER_BUDGET: { className: "FakeClockContainerBudget", useSQLite: true },
+                WALL_CLOCK_BUDGET: { className: "ContainerBudget", useSQLite: true },
+              },
             },
           }),
         ],

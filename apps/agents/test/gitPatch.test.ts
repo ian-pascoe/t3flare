@@ -92,7 +92,12 @@ const check = (dir: string, from: string, to: string) => {
   expect(ours(dir, from, to, "numstat")).toBe(realDiff(dir, from, to, "numstat"));
 };
 
-describe("checkpoint diffs match git's", () => {
+// Each case forks a dozen real `git` processes, ~0.3 s idle but 4 s+ on a CPU-saturated CI runner or a parallel
+// `bun run check`: vitest's 5 s default timed out there. Real git cannot be faked (it is what the DO is compared with),
+// so the timeout is a ceiling, not a wait: 60 s costs nothing when git is fast and only fails a genuine hang.
+const GIT_TEST_TIMEOUT_MS = 60_000;
+
+describe("checkpoint diffs match git's", { timeout: GIT_TEST_TIMEOUT_MS }, () => {
   it("edits in the middle, with a function line above", () => {
     const r = repo("edit");
     r.put("src/main.ts", `import x from "x";\n\nfunction alpha() {\n${lines(20, "  a")}}\n\nfunction beta() {\n${lines(20, "  b")}}\n`);
