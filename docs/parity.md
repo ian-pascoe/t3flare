@@ -123,7 +123,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
 | Server self-update | `ws.ts:2685`; `srv/cloud/selfUpdate.ts:161` | N/A: nightly bump and deploy | ADR-0017; `npmReleaseLookup` and the self-update flags stripped (SPI-994) | done |
-| Product analytics | `srv/telemetry/AnalyticsService.ts:67-74` (on by default, `ingest.t3.codes`) | Probably **on**, undocumented | `AnalyticsService.layer` in composition; no override; DO `process.env` empty | — D1 |
+| Product analytics | `srv/telemetry/AnalyticsService.ts:67-74` (on by default, `ingest.t3.codes`) | **Off** (D1): t3flare's managed policy sets `limits.telemetry: false` (SPI-995) | ADR-0023, README; `test/analytics.test.ts` (t3's service sends nothing under the policy); stage: `docs/steps/parity/spi-995-analytics.json` | done |
 | OTLP export | `con/settings.ts:1017`; proxy route `srv/http.ts:335` | M | URLs `undefined` in composition; route unmounted | *def* |
 | Import agent sessions | `srv/project/AgentSessionScanner.ts:217`, `:1196`; `ws.ts:3060` | N/A: no provider homes in the State directory | — | — |
 | Voice | `con/environmentHttp.ts:795-927` | R: local voice is host-bound; cloud voice refused for now (D5) | both capabilities stripped (SPI-994) | done (refusal ADR: SPI-1004) |
@@ -135,7 +135,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 |---|---|---|---|
 | G1 | ~~**Attachments and images reach Durable agents.**~~ Done (SPI-993): `apps/environment/src/provider/attachments.ts`. The user message's attachments are t3's own, so the differ has nothing to echo. Follow-ups: SPI-1027 (shrink large images), SPI-1028 (SnapShot context). | S | Bound: a DO SQLite row (2 MB) per Session message |
 | G2 | ~~**Truthful capabilities.**~~ Done (SPI-994, SPI-1012): every capability classified in `env/t3/capabilities.ts` (a new one fails typecheck and a test); settings of refused features locked by t3flare's managed policy (ADR-0023). | S | Client behaviour varies by nightly |
-| G3 | **Telemetry Layer**, per D1. | S | None |
+| G3 | ~~**Telemetry Layer**, per D1.~~ Done (SPI-995): a managed-policy limit, not a Layer of its own (ADR-0023). | S | None |
 | G4 | **Scratch threads**: the scratch root becomes a Workspace. | S–M | Root is private to t3's runtime graph; likely a third Patch |
 | G5 | **Owner-facing plan mode and live output** (after step 3): toggle on, proposed plan, todos, streamed tool output. | M | pi-durable has no plan primitive |
 | G6 | **Fork and rollback**: prove the handoff fork; add conversation rollback in the Session plus checkpoint restore. | M | t3 needs rollback to return a snapshot |
