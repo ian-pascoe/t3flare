@@ -19,6 +19,8 @@ export interface EnvironmentServices {
   /** The Environment DO's SQLite (t3's projection, read by the deletion's reference check). */
   readonly sql: SqlStorage;
   readonly sweep: SweepSettings;
+  /** One-time marks in the Environment DO's storage (step 3: a setting seeded once, L1). */
+  readonly marks: { has(key: string): boolean; set(key: string): void };
 }
 
 let current: EnvironmentServices | undefined;

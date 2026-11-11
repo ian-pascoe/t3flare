@@ -9,6 +9,7 @@ import * as ServerSettings from "t3/src/serverSettings.ts";
 import * as ProviderInstanceRegistry from "t3/src/provider/ProviderInstanceRegistry.ts";
 
 import { PI_DURABLE_DRIVER } from "../provider/capabilities.ts";
+import { environmentServices } from "./bindings.ts";
 
 export const layerSeedTextGenerationModel = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -36,4 +37,38 @@ export const layerPinFastWorktreeCheckoutOff = Layer.effectDiscard(
     yield* settings.updateSettings({ fastWorktreeCheckout: false });
     yield* Effect.logInfo("t3flare: fast worktree checkout turned off");
   }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: fast worktree checkout was not pinned off", cause))),
+);
+
+/** Marks, in the Environment DO's storage, that L1 has turned Linked environments on (once). */
+const LINKED_ENVIRONMENTS_SEEDED = "t3flare:seeded/linked-environments";
+
+/**
+ * Step 3 (L1): Linked environments (a Labs setting, off by default) is what lets the owner's laptop link to the Cloud
+ * Environment (ADR-0011), so it is turned on once per Environment. An owner who turns it off in the cloud's Labs keeps
+ * it off: the seed is recorded in the DO's storage and never runs again.
+ */
+export const layerSeedLinkedEnvironmentsOn = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const marks = environmentServices().marks;
+    if (marks.has(LINKED_ENVIRONMENTS_SEEDED)) return;
+    const settings = yield* ServerSettings.ServerSettingsService;
+    if (!(yield* settings.getSettings).linkedEnvironmentsEnabled) {
+      yield* settings.updateSettings({ linkedEnvironmentsEnabled: true });
+      yield* Effect.logInfo("t3flare: Linked environments turned on");
+    }
+    marks.set(LINKED_ENVIRONMENTS_SEEDED);
+  }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: Linked environments was not seeded", cause))),
+);
+
+/**
+ * Step 3 (L3): the Cloud Environment has no browser, so agent browser access (which adds `preview` to every agent's
+ * MCP credential and offers `preview_*`) is off at each boot, as the fast worktree checkout is.
+ */
+export const layerPinAgentBrowserAccessOff = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const settings = yield* ServerSettings.ServerSettingsService;
+    if (!(yield* settings.getSettings).enableAgentBrowserAccess) return;
+    yield* settings.updateSettings({ enableAgentBrowserAccess: false });
+    yield* Effect.logInfo("t3flare: agent browser access turned off");
+  }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: agent browser access was not pinned off", cause))),
 );

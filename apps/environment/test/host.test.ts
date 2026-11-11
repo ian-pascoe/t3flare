@@ -214,4 +214,16 @@ describe("Pairing window", () => {
     expect(presents("not a body")).toBe(false);
     expect(presents("")).toBe(false);
   });
+
+  it("finds the bootstrap token spent as an MCP pairing code (step 3, L2), and guards the decision route", () => {
+    const token = "boot-token-1";
+    const decision = (code: string) =>
+      JSON.stringify({ authorization: { client_id: "c", state: "s" }, decision: { _tag: "pairing-code", access: "full-access", code } });
+    expect(Pairing.presentsBootstrapToken(decision(token), token)).toBe(true);
+    expect(Pairing.presentsBootstrapToken(decision(` ${token} `), token)).toBe(true);
+    expect(Pairing.presentsBootstrapToken(decision("ABCD2345EFGH"), token)).toBe(false);
+    expect(Pairing.BOOTSTRAP_EXCHANGE_PATHS.has("/oauth/mcp/decision")).toBe(true);
+    expect(Pairing.BOOTSTRAP_EXCHANGE_PATHS.has("/api/auth/browser-session")).toBe(true);
+    expect(Pairing.BOOTSTRAP_EXCHANGE_PATHS.has("/oauth/token")).toBe(true);
+  });
 });

@@ -183,7 +183,12 @@ import * as WorkspaceCheckpoints from "../workspace/checkpoints.ts";
 import * as DoSql from "../platform/sql.ts";
 import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
-import { layerPinFastWorktreeCheckoutOff, layerSeedTextGenerationModel } from "../agents/seedSettings.ts";
+import {
+  layerPinAgentBrowserAccessOff,
+  layerPinFastWorktreeCheckoutOff,
+  layerSeedLinkedEnvironmentsOn,
+  layerSeedTextGenerationModel,
+} from "../agents/seedSettings.ts";
 import { WORKTREES_ROOT } from "@t3flare/workspace-client";
 
 export interface CompositionOptions {
@@ -599,6 +604,9 @@ export const make = (options: CompositionOptions) => {
     layerSeedTextGenerationModel,
     // t3flare: every worktree is a Workspace of its own (step 2b): no fast checkout cache.
     layerPinFastWorktreeCheckoutOff,
+    // t3flare: the laptop links to the cloud (step 3, L1, once), and the cloud has no browser (L3).
+    layerSeedLinkedEnvironmentsOn,
+    layerPinAgentBrowserAccessOff,
   ).pipe(
     Layer.provideMerge(layerOrchestrationApplication),
     Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),

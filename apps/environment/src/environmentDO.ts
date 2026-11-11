@@ -58,8 +58,6 @@ ModuleState.install();
 const HOST_KEY = "t3flare/host";
 export const DEFAULT_ARM_MINUTES = 15;
 
-/** The routes that exchange a bootstrap credential for a session. */
-const BOOTSTRAP_EXCHANGE_PATHS = new Set(["/api/auth/browser-session", "/oauth/token"]);
 
 export class SafeModeError extends Error {
   readonly safeMode: BootState.SafeMode;
@@ -121,6 +119,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         purge: env.T3FLARE_SWEEP_PURGE === "1",
         graceMs: Number(env.T3FLARE_SWEEP_GRACE_MS) > 0 ? Number(env.T3FLARE_SWEEP_GRACE_MS) : GRACE_MS,
       },
+      marks: { has: (key) => ctx.storage.kv.get(key) !== undefined, set: (key) => ctx.storage.kv.put(key, Date.now()) },
     });
   }
 
@@ -443,7 +442,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     }
     Idle.requestStarted();
     try {
-      if (BOOTSTRAP_EXCHANGE_PATHS.has(url.pathname) && request.method === "POST") {
+      if (Pairing.BOOTSTRAP_EXCHANGE_PATHS.has(url.pathname) && request.method === "POST") {
         const refused = await this.#refuseDisarmedBootstrap(request);
         if (refused !== undefined) return refused;
       }

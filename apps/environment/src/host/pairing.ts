@@ -59,6 +59,14 @@ export const onAlarm = async (storage: PairingStorage, runtime: { readonly seede
   return "keep";
 };
 
+/**
+ * The routes that exchange a bootstrap credential, which outside the window are refused when they present the token:
+ * a session (`/api/auth/browser-session`, `/oauth/token`) and, step 3's L2, an MCP sign-in's pairing code
+ * (`/oauth/mcp/decision`; t3 itself refuses a grant that is not one-time there, so this is defence in depth). t3's
+ * `/oauth/mcp/approval` carries no credential.
+ */
+export const BOOTSTRAP_EXCHANGE_PATHS: ReadonlySet<string> = new Set(["/api/auth/browser-session", "/oauth/token", "/oauth/mcp/decision"]);
+
 /** The credential fields of t3's bootstrap exchanges: `/api/auth/browser-session` (JSON) and `/oauth/token` (form). */
 const CREDENTIAL_FIELDS = ["credential", "subject_token"] as const;
 
@@ -66,7 +74,12 @@ const fieldsOf = (body: string): ReadonlyArray<unknown> => {
   const values: Array<unknown> = [];
   try {
     const json: unknown = JSON.parse(body);
-    if (typeof json === "object" && json !== null) for (const field of CREDENTIAL_FIELDS) values.push((json as Record<string, unknown>)[field]);
+    if (typeof json === "object" && json !== null) {
+      for (const field of CREDENTIAL_FIELDS) values.push((json as Record<string, unknown>)[field]);
+      // `/oauth/mcp/decision`: `{ decision: { _tag: "pairing-code", code } }`.
+      const decision = (json as { decision?: unknown }).decision;
+      if (typeof decision === "object" && decision !== null) values.push((decision as Record<string, unknown>).code);
+    }
   } catch {
     // Not JSON: read it as a form.
   }
