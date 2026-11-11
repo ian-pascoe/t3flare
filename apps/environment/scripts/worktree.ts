@@ -186,6 +186,31 @@ if (scenario === "work") {
   check("pushed from the worktree", /push=0/.test(outputs[0]!) && /delete=0/.test(outputs[1]!), report.push);
 }
 
+if (scenario === "watch") {
+  // Root's ruling, check 4: a passive client watching a primed Workspace with its Container stopped never starts it,
+  // also after an Environment restart.
+  const id = arg("worktree")!;
+  await admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(id)}`);
+  const rounds: Array<unknown> = [];
+  for (const restart of [false, true]) {
+    if (restart) await admin("POST", "/_t3flare/restart");
+    await admin("GET", "/_t3flare/agents/router-trace?clear=1");
+    for (let poll = 0; poll < 3; poll++) {
+      await wsCall(cookie, "vcs.refreshStatus", { cwd: `/w/${id}` }).catch(() => undefined);
+      await wsCall(cookie, "vcs.listRefs", { cwd: `/w/${id}`, limit: 50 }).catch(() => undefined);
+    }
+    const trace = (((await admin("GET", "/_t3flare/agents/router-trace")).json?.entries ?? []) as Array<{ route: string; argv: Array<string>; cwd: string | null; detail?: string }>).filter(
+      (entry) => entry.cwd === `/w/${id}` || entry.argv.some((word) => word.startsWith(`/w/${id}`)),
+    );
+    const running = (await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(id)}`, { killExecs: [] })).json?.container?.running;
+    const routes: Record<string, number> = {};
+    for (const entry of trace) routes[entry.route] = (routes[entry.route] ?? 0) + 1;
+    rounds.push({ restart, reads: trace.length, routes, running, started: trace.filter((entry) => /started the Container/.test(entry.detail ?? "")).map((entry) => entry.argv.join(" ")) });
+    check(`Container still stopped${restart ? " after the restart" : ""}`, running === false && trace.every((entry) => entry.route !== "container"), rounds.at(-1));
+  }
+  report.rounds = rounds;
+}
+
 if (scenario === "trace") {
   const trace = (await admin("GET", "/_t3flare/agents/router-trace")).json?.entries as Array<{ route: string; argv: Array<string>; cwd: string | null; exitCode: number | null }>;
   const shapes = new Map<string, number>();

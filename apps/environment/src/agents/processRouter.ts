@@ -225,7 +225,7 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
     stderr: redactTokens(fromWorkspaceText(at.id, answer.stderr)),
     route: answer.stale !== undefined ? `stale-${answer.stale}` : answer.cached === true ? "cache" : "container",
     // An action's failure keeps git's own words in the trace (tokens taken out), as the evidence of what the remote said.
-    detail: `${startContainer ? "action" : "passive"} ${answer.ms}ms${
+    detail: `${startContainer ? "action" : "passive"} ${answer.ms}ms${answer.startedContainer === undefined ? "" : ` started the Container: first ${answer.startedContainer} read`}${
       startContainer && answer.exitCode !== 0 ? `: ${redactTokens(answer.stderr).trim().slice(0, 400)}` : ""
     }`,
   };

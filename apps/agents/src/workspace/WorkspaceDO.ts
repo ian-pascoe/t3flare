@@ -51,6 +51,7 @@ import {
   withinGuard,
 } from "./gitRepo.ts";
 import { isomorphicFs } from "./isoFs.ts";
+import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, withoutOwnGitDir } from "./gitDirReads.ts";
 import { kindOf, patchAnswer } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { TerminalHost } from "./terminalHost.ts";
@@ -422,18 +423,26 @@ export class WorkspaceDO extends ContainerHost {
    */
   async git(run: GitRun): Promise<GitAnswer> {
     const passive = !run.startContainer;
-    const key = passive ? await readKey(run) : null;
+    // Step 2b (root's ruling, ADR-0009 refinement): the allow-listed `.git` reads are keyed without env and own
+    // `--git-dir`, so the answers primed while the Container was up match t3's later reads.
+    const allowed = passive ? allowedRead(run.argv, REPO_ROOT) : undefined;
+    const key = passive ? await readKey(allowed === undefined ? run : { argv: withoutOwnGitDir(run.argv, REPO_ROOT), cwd: run.cwd }) : null;
     const rev = passive ? this.#reads.revision(run.readScope ?? "repo") : -1;
+    let startedBy: string | undefined;
     if (key !== null) {
       const hit = this.#reads.get(key, rev);
+      const decision = passiveDecision({
+        cachedNow: hit !== undefined,
+        running: this.containerRunning(),
+        hasLastAnswer: this.#reads.last(key) !== undefined,
+        allowed: allowed !== undefined,
+        emulated: allowed?.name === "remotes",
+      });
       if (hit !== undefined) return { ran: true, ...hit, ms: 0, cached: true };
-      // Step 2b: a read of `.git` alone (refs, config) never answered before runs for real, starting the Container once
-      // for that shape: t3's worktree launch asks the project such reads (its base branch's upstream) before anything
-      // else starts it. Reads of the working tree (status, diffs, t3's temporary indexes, whose keys change every
-      // time) and reads answered before are served stale while the Container is stopped, as step 2a ruled.
-      const firstGitDirRead = (run.readScope ?? "repo") === "git-dir" && this.#reads.last(key) === undefined;
-      if (!this.containerRunning() && (!firstGitDirRead || (await this.#emulatedRead(run).catch(() => undefined)) !== undefined)) {
-        return this.#stale(run, key);
+      if (decision === "stale") return this.#stale(run, key);
+      if (decision === "run-starting-container") {
+        startedBy = allowed!.name;
+        console.log(JSON.stringify({ t3flare: "first-read-starts-container", read: allowed!.name, caller: allowed!.caller }));
       }
     }
     const script = `exec git ${run.argv.map(shellWord).join(" ")}`;
@@ -449,11 +458,38 @@ export class WorkspaceDO extends ContainerHost {
       const answer = { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr };
       // Kept at the revision from before it ran: a change while it ran makes the next read run again.
       if (key !== null && result.status !== "timeout") this.#reads.put(key, rev, answer);
-      return { ran: true, ...answer, ms: result.ms };
+      // The Container is up: answer the allow-listed reads now (after an action, or a start a read caused).
+      if (!passive || startedBy !== undefined) this.ctx.waitUntil(this.#prime().catch(() => undefined));
+      return { ran: true, ...answer, ms: result.ms, ...(startedBy === undefined ? {} : { startedContainer: startedBy }) };
     } catch (error) {
       return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
     }
   }
+
+  #primedRev = -2;
+
+  /**
+   * Answers the allow-listed `.git` reads while the Container runs (root's ruling on step 2b M2): for the repo's branches
+   * and remote-tracking refs, once per change of `.git`. Never starts the Container.
+   */
+  async #prime(): Promise<void> {
+    if (!this.containerRunning()) return;
+    const before = this.#reads.revision("git-dir");
+    if (before === this.#primedRev) return;
+    this.#primedRev = before;
+    const listed = await this.exec({ script: "git for-each-ref --format='%(refname)' refs/heads refs/remotes", cwd: REPO_ROOT, passive: true });
+    if (listed.exitCode !== 0 || !this.containerRunning()) return;
+    const argvs = primeArgvs(listed.stdout.split("\n").filter((line) => line !== ""));
+    const primed = await this.exec({ script: primeScript(argvs), cwd: REPO_ROOT, passive: true, timeoutMs: 60_000 });
+    const rev = this.#reads.revision("git-dir");
+    for (const answer of parsePrimed(primed.stdout)) {
+      const argv = argvs[answer.index];
+      if (argv === undefined) continue;
+      this.#reads.put(await readKey({ argv, cwd: REPO_ROOT }), rev, { exitCode: answer.exitCode, stdout: answer.stdout, stderr: "" });
+    }
+    console.log(JSON.stringify({ t3flare: "git-reads-primed", reads: argvs.length }));
+  }
+
 
   /**
    * A passive read with no earlier answer while the Container is stopped, answered from the repo's own files when its
@@ -656,6 +692,7 @@ export class WorkspaceDO extends ContainerHost {
         env: input.token === null ? {} : { T3FLARE_GIT_TOKEN: input.token },
         timeoutMs: input.timeoutMs ?? 15 * 60_000,
       });
+      if (result.exitCode === 0) await this.#prime().catch(() => undefined);
       return { ran: true, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, ms: result.ms };
     } catch (error) {
       return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
@@ -740,6 +777,7 @@ export class WorkspaceDO extends ContainerHost {
       const head = result.stdout.trim().split("\n").at(-1) ?? "";
       if (result.exitCode !== 0) return { ok: false, error: result.stderr.slice(-1000) };
       if (head !== input.commit) return { ok: false, error: `HEAD is ${head}, not ${input.commit}` };
+      await this.#prime().catch(() => undefined);
       return { ok: true, head };
     } catch (error) {
       return { ok: false, error: String(error).slice(0, 1000) };

@@ -1,0 +1,26 @@
+{
+  "scenario": "watch",
+  "at": "2026-11-11T17:36:56.065Z",
+  "rounds": [
+    {
+      "restart": false,
+      "reads": 147,
+      "routes": {
+        "cache": 147
+      },
+      "running": false,
+      "started": []
+    },
+    {
+      "restart": true,
+      "reads": 174,
+      "routes": {
+        "cache": 174
+      },
+      "running": false,
+      "started": []
+    }
+  ],
+  "failures": [],
+  "ok": true
+}

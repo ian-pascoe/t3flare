@@ -142,6 +142,8 @@ export type GitAnswer =
       readonly cached?: boolean;
       /** A passive read answered while the Container was stopped: the last real answer, patched with the write journal where its shape allows. */
       readonly stale?: "patched" | "last-answer";
+      /** Step 2b: an allow-listed `.git` read with no answer at all started the stopped Container (its name). */
+      readonly startedContainer?: string;
     }
   | { readonly ran: false; readonly reason: "container_stopped" | "container_refused"; readonly detail: string };
 
