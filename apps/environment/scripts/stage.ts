@@ -70,11 +70,12 @@ const deploySecrets = (): Record<string, string> => {
 };
 
 /**
- * Puts a deploy's code in force in the Environment DO. A deploy does not replace a Durable Object that holds a WebSocket
- * (an open client): it keeps running the code it was constructed with until the socket closes and it resets, which may
- * be never. So after a deploy the stage's Environment is asked for its build, and restarted (as an eviction is: memory
- * and sockets go, storage stays; clients reconnect and running turns continue, ADR-0004) when that is not this one.
- * A DO no one has used yet is constructed by the question itself, on the new code, and is left alone.
+ * Puts a deploy's code in force in the Environment DO now. A deploy does not replace a Durable Object that has an open
+ * WebSocket (a connected client) at once: it keeps running the code it was constructed with until Cloudflare's code-update
+ * delay (five minutes) ends, so a check made right after a deploy sees the old build. After a deploy the stage's
+ * Environment is therefore asked for its build, and restarted (as an eviction is: memory and sockets go, storage stays;
+ * clients reconnect and running turns continue, ADR-0004) when that is not this one. A DO no one has used yet is
+ * constructed by the question itself, on the new code, and is left alone.
  */
 const putBuildInForce = async (): Promise<boolean> => {
   const build = JSON.parse(fs.readFileSync(path.join(here, "dist/build-report.json"), "utf8")) as { builtAt: string };

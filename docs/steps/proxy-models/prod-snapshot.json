@@ -1,0 +1,20 @@
+{
+  "at": "2026-11-11T13:18:45.649Z",
+  "snapshot": {
+    "ms": 614,
+    "models": 76,
+    "proxyModels": 76,
+    "sample": [
+      "anthropic/beam-free | Beam Free | opencode",
+      "anthropic/big-pickle | Big Pickle | opencode",
+      "anthropic/claude-3-5-haiku-20241022 | Claude 3.5 Haiku | anthropic",
+      "anthropic/claude-3-7-sonnet-20250219 | Claude 3.7 Sonnet | anthropic",
+      "anthropic/claude-fable-5 | Claude Fable 5 | opencode",
+      "anthropic/claude-fable-5-1 | Claude Fable 5.1 | opencode"
+    ],
+    "default": "anthropic/claude-sonnet-5-5"
+  },
+  "turns": [],
+  "failures": [],
+  "ok": true
+}
