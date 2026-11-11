@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off globalFetch:off globalTimers:off
 // Deploys, tests and destroys a stage of the environment Worker, with secrets made for that stage alone.
 //
 //   bun scripts/stage.ts deploy <stage> [--web]       build (and the web client with --web or when missing), alchemy deploy
@@ -69,6 +69,39 @@ const deploySecrets = (): Record<string, string> => {
   return { ...Object.fromEntries(Object.entries(fromFile).filter(([, value]) => value !== "")), ...fromEnv };
 };
 
+/**
+ * Puts a deploy's code in force in the Environment DO. A deploy does not replace a Durable Object that holds a WebSocket
+ * (an open client): it keeps running the code it was constructed with until the socket closes and it resets, which may
+ * be never. So after a deploy the stage's Environment is asked for its build, and restarted (as an eviction is: memory
+ * and sockets go, storage stays; clients reconnect and running turns continue, ADR-0004) when that is not this one.
+ * A DO no one has used yet is constructed by the question itself, on the new code, and is left alone.
+ */
+const putBuildInForce = async (): Promise<boolean> => {
+  const build = JSON.parse(fs.readFileSync(path.join(here, "dist/build-report.json"), "utf8")) as { builtAt: string };
+  const access = JSON.parse(fs.readFileSync(credentialsFile(stage), "utf8")) as { url: string; clientId: string; clientSecret: string };
+  const headers = {
+    "cf-access-client-id": access.clientId,
+    "cf-access-client-secret": access.clientSecret,
+    authorization: `Bearer ${stageSecrets().T3FLARE_ADMIN_TOKEN}`,
+  };
+  const running = async (): Promise<string | undefined> => {
+    try {
+      const response = await fetch(new URL("/_t3flare/health", access.url), { headers });
+      return response.ok ? ((await response.json()) as { build?: { builtAt?: string } }).build?.builtAt : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  if ((await running()) === build.builtAt) return true;
+  console.error("t3flare: the Environment is still running an earlier build; restarting it");
+  await fetch(new URL("/_t3flare/restart", access.url), { method: "POST", headers }).catch(() => undefined);
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if ((await running()) === build.builtAt) return true;
+  }
+  return false;
+};
+
 const alchemy = (args: Array<string>, env: Record<string, string>) => {
   const result = spawnSync(path.join(here, "node_modules/.bin/alchemy"), [...args, "--stage", stage, "--yes", "--no-input"], {
     cwd: here,
@@ -111,6 +144,10 @@ switch (command) {
     }
     if (status === 0 && !fs.existsSync(credentialsFile(stage))) {
       console.error(`t3flare: deployed, but ${path.relative(here, credentialsFile(stage))} was not written`);
+      process.exit(1);
+    }
+    if (status === 0 && !(await putBuildInForce())) {
+      console.error("t3flare: deployed, but the Environment did not come up on the new build");
       process.exit(1);
     }
     process.exit(status);

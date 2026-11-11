@@ -3,11 +3,14 @@
 // the models the proxy serves under their real ids, and a turn runs on a model that is not Claude (the proxy translates)
 // as well as on one that is. Run against a stage:
 //
-//   bun scripts/stage.ts run <stage> models [--out file.json]
+//   bun scripts/stage.ts run <stage> models [--no-turns] [--out file.json]
+//
+// `--no-turns` only reads the snapshot: it creates no project or thread, so it is the check to run against `prod`.
 import * as fs from "node:fs";
 
 import { createProjectAndThread, itemsOf, pair, runsOf, sendMessage, SETTLED, sleep, waitFor, wsCall } from "./lib/client.ts";
 
+const noTurns = process.argv.includes("--no-turns");
 const outIndex = process.argv.indexOf("--out");
 const out = outIndex === -1 ? undefined : process.argv[outIndex + 1];
 const report: Record<string, unknown> = { at: new Date().toISOString() };
@@ -22,10 +25,15 @@ const listed = (await (await fetch(`${proxyUrl}/v1/models`, { headers: { "x-api-
 const proxyIds = listed.data.map((model) => model.id);
 
 const cookie = await pair();
-await wsCall(cookie, "server.updateSettings", {
-  patch: {},
-  providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } },
-});
+type Provider = { instanceId?: string; enabled?: boolean; models?: Array<Model> };
+const providers = async () => ((await wsCall(cookie, "server.getConfig", {})) as { providers: Array<Provider> }).providers;
+// A new Environment has the provider off (onboarding turns it on); one that has it on is left as it is.
+if (!(await providers()).some((provider) => provider.instanceId === "piDurable" && provider.enabled === true)) {
+  await wsCall(cookie, "server.updateSettings", {
+    patch: {},
+    providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } },
+  });
+}
 
 // 1. The snapshot lists the proxy's models. The Environment reads the proxy's list in the background once it boots, so
 //    wait for the snapshot to stop being the static list.
@@ -33,8 +41,7 @@ type Model = { slug: string; name: string; subProvider?: string; isDefault?: boo
 let models: Array<Model> = [];
 const started = Date.now();
 while (Date.now() - started < 90_000) {
-  const config = (await wsCall(cookie, "server.getConfig", {})) as { providers: Array<{ driver?: string; instanceId?: string; models?: Array<Model> }> };
-  models = config.providers.find((provider) => provider.instanceId === "piDurable")?.models ?? [];
+  models = (await providers()).find((provider) => provider.instanceId === "piDurable")?.models ?? [];
   if (models.length > 4) break;
   await sleep(3000);
 }
@@ -68,7 +75,7 @@ const turn = async (slug: string, options: Array<{ id: string; value: string }>)
   return { slug, ms: settled.ms, runs: runsOf(settled.projection).map((run) => run.status), answer: String(message?.text ?? "").slice(0, 160), error: (settled as any).error };
 };
 const turns = [];
-for (const [slug, options] of [
+if (!noTurns) for (const [slug, options] of [
   ["anthropic/claude-haiku-5-5", [{ id: "thinking", value: "low" }]],
   ["anthropic/gemini-3-flash", []],
   ["anthropic/deepseek-v4-pro", []],
