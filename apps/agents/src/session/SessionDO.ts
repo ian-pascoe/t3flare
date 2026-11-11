@@ -247,13 +247,16 @@ export class SessionDO extends DurableObject<SessionEnv> {
       id: `computer:${id}`,
       cwd: cwd ?? REPO_ROOT,
       reachContainer: true,
-      containerEnv: { ...COMMAND_ENV, T3FLARE_OWNER: this.ctx.id.toString() },
+      containerEnv: COMMAND_ENV,
       ledger: {
         started: (execId) => this.#execs.started(execId),
         ended: (execId) => this.#execs.ended(execId),
         stopped: (execId) => {
           // Not awaited by the command's caller; a kill that does not finish is tried again from the alarm.
-          void this.#execs.stopped(execId, KILL_BOUND_MS).then(() => this.#arm());
+          void this.#execs
+            .stopped(execId, KILL_BOUND_MS)
+            .then(() => this.#arm())
+            .catch(() => undefined);
         },
       },
     });

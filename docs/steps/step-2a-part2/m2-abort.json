@@ -1,6 +1,6 @@
 {
   "scenario": "abort",
-  "at": "2026-11-11T15:00:14.275Z",
+  "at": "2026-11-11T15:08:07.089Z",
   "model": "anthropic/claude-haiku-5-5",
   "before": {
     "call": [
@@ -17,6 +17,16 @@
         "pgid": 35,
         "sid": 35,
         "args": "sleep 600"
+      }
+    ],
+    "marked": [
+      {
+        "pid": 37,
+        "exec": "fc211e67-9b7d-4069-bdcf-57ae8d7aa9ff"
+      },
+      {
+        "pid": 38,
+        "exec": "fc211e67-9b7d-4069-bdcf-57ae8d7aa9ff"
       }
     ],
     "tree": [
@@ -54,9 +64,9 @@
     "secondsToGone": 0.9,
     "left": [],
     "run": "interrupted",
-    "msToSettle": 963
+    "msToSettle": 931
   },
-  "threadId": "db065dea-f766-4cd2-8eae-1803ea89803e",
+  "threadId": "79c8f045-a859-437d-b9c2-81ecac911d23",
   "failures": [],
   "ok": true
 }

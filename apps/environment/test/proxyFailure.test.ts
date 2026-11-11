@@ -107,6 +107,8 @@ describe("classifyProxyFailure", () => {
   it("anything else is not the proxy's failure", () => {
     expect(classifyProxyFailure({ status: 400, retryAfter: null, text: '400 {"type":"error","error":{"type":"invalid_request_error","message":"x"}}', at: AT })).toBeUndefined();
     expect(classifyProxyFailure({ status: 200, retryAfter: null, text: "Request was aborted", at: AT })).toBeUndefined();
+    // A 403 page from something in front of the proxy is neither the key nor an account.
+    expect(classifyProxyFailure({ status: 403, retryAfter: null, text: "403 <html>Forbidden</html>", at: AT })).toBeUndefined();
   });
 
   it("a usage limit's failure is the class and the code; the text is fixed, never the proxy's body", () => {

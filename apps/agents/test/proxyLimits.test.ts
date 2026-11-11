@@ -7,7 +7,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { isRetryableAssistantError } from "@earendil-works/pi-ai";
 import { createRegistry, Harness, MemoryStorage } from "@earendil-works/pi-durable";
 import { STATIC_CATALOG } from "@t3flare/models/catalog";
-import { type ProxyFailureCode, proxyFailureDetail } from "@t3flare/models/proxyFailure";
+import { classifyProxyFailure, type ProxyFailureCode, proxyFailureDetail } from "@t3flare/models/proxyFailure";
 import type { ProxyFailureRecord } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
@@ -99,6 +99,17 @@ describe("the Session's model proxy failures", () => {
     const run = await submit(() => answerOf("invalidKey"), { fixture: "cooldown", resetAt: T0 - 1 });
     expect(run.proxied).toBe(1);
     expect(run.records[0]).toMatchObject({ code: "proxy_key_rejected" });
+  });
+
+  it("every fixture, through pi-ai's real client, is recorded as the classifier reads Commissary's raw answer", async () => {
+    // A pi-ai or SDK upgrade that changes the error text fails here.
+    for (const name of Object.keys(fixtures.answers) as Array<Name>) {
+      const raw = fixtures.answers[name];
+      const headers = raw.headers as Record<string, string>;
+      const direct = classifyProxyFailure({ status: raw.status, retryAfter: headers["retry-after"] ?? null, text: raw.body, at: 0 });
+      const run = await submit(() => answerOf(name));
+      expect(run.records.at(-1) && { class: run.records.at(-1)!.class, code: run.records.at(-1)!.code }, name).toEqual({ class: direct!.class, code: direct!.code });
+    }
   });
 
   it("the text left for pi-durable matches no retry pattern of pi-ai's, for every code", () => {

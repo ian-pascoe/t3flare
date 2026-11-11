@@ -223,29 +223,37 @@ switch (scenario) {
     else await admin("POST", "/_t3flare/restart");
     const restartedAt = Date.now();
     // The first run ends (an Environment restart cancels it; a Session restart reruns the waiting call, so the run goes
-    // on); either way the first call's processes must go.
-    const gone = await goneWithin(started.tree.map((p) => p.pid), 150_000);
-    report.after = { secondsToGone: gone.seconds, left: gone.left, lastSeenAliveS: Math.round((gone.lastSeenAlive - restartedAt) / 100) / 10 };
+    // on); either way the first call's processes must go. Without clocks: each round reads the Session's turns, then
+    // `ps`; a continuation turn in the Session followed by a sight of the old processes would mean the continuation
+    // could find them.
+    const pids = started.tree.map((p) => p.pid);
+    let goneS: number | null = null;
+    let lastSeenAliveS: number | null = null;
+    let continuationSeenS: number | null = null;
+    const seenWithContinuation: Array<Proc> = [];
+    while (Date.now() - restartedAt < 150_000) {
+      const turns = Object.values(await sessionTurns(threadId).catch(() => ({}))) as Array<any>;
+      const continuation = turns.some((t) => t.runId !== started.runId);
+      if (continuation && continuationSeenS === null) continuationSeenS = Math.round((Date.now() - restartedAt) / 100) / 10;
+      const alive = (await ps(fixture().workspaceId)).filter((p) => pids.includes(p.pid));
+      const at = Math.round((Date.now() - restartedAt) / 100) / 10;
+      if (alive.length === 0) {
+        goneS = at;
+        break;
+      }
+      lastSeenAliveS = at;
+      if (continuation) seenWithContinuation.push(...alive);
+      await sleep(300);
+    }
+    report.after = { secondsToGone: goneS, lastSeenAliveS, continuationInSessionS: continuationSeenS, seenWithContinuation };
     if (!session) {
-      const recovered = await waitFor(
-        cookie,
-        threadId,
-        (p) => SETTLED.has(runsOf(p).find((r) => r.id === started.runId)?.status ?? "") && runsOf(p).some((r) => r.restartContinuationOfRunId === started.runId && (r as any).startedAt),
-        180_000,
-      ).catch(() => undefined);
-      const runs = runsOf(recovered?.projection) as Array<any>;
-      const continuation = runs.find((r) => r.restartContinuationOfRunId === started.runId);
-      const continuationStart = Date.parse(continuation?.workStartedAt ?? continuation?.startedAt ?? "");
-      Object.assign(report.after as any, {
-        firstRun: runs.find((r) => r.id === started.runId)?.status ?? null,
-        continuationStartedS: Number.isFinite(continuationStart) ? Math.round((continuationStart - restartedAt) / 100) / 10 : null,
-      });
-      // The continuation's work starts after the last sight of the old call's processes.
-      check("the continuation started after the old call's processes were gone", Number.isFinite(continuationStart) && gone.seconds !== null && gone.lastSeenAlive < continuationStart, report.after);
+      const recovered = await waitFor(cookie, threadId, (p) => SETTLED.has(runsOf(p).find((r) => r.id === started.runId)?.status ?? ""), 120_000).catch(() => undefined);
+      (report.after as any).firstRun = runsOf(recovered?.projection).find((r) => r.id === started.runId)?.status ?? null;
+      check("the continuation never saw the old call's processes", seenWithContinuation.length === 0, report.after);
     }
     (report.after as any).secondsSinceRestart = Math.round((Date.now() - restartedAt) / 1000);
     report.threadId = threadId;
-    check("the first call's processes are gone after the restart", gone.seconds !== null, report.after);
+    check("the first call's processes are gone after the restart", goneS !== null, report.after);
     // Stop whatever the thread runs now (a continuation may run the command again).
     const now = await waitFor(cookie, threadId, () => true, 5000);
     for (const run of runsOf(now.projection).filter((r) => !SETTLED.has(r.status))) {

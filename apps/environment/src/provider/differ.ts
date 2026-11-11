@@ -439,7 +439,7 @@ const proxyFailureOf = (failure: ProxyFailure, now: DateTime.Utc): Orchestration
     class: failure.class,
     message: proxyFailureMessage(failure),
     code: failure.code,
-    retryable: failure.class === "permission_error" || failure.code === "proxy_no_account" ? false : true,
+    retryable: !(failure.class === "permission_error" || failure.code === "proxy_no_account"),
     resetAt,
   });
 };

@@ -122,9 +122,10 @@ export const classifyProxyFailure = (answer: ProxyAnswer): ProxyFailure | undefi
   }
   if (status === 401 || status === 403) {
     // The proxy's own gate answers flat `{"error":"…"}`; an upstream account's refusal comes in Anthropic's shape.
-    return flat
-      ? { class: "permission_error", code: "proxy_key_rejected", row: row(5), stop: true }
-      : { class: "permission_error", code: "proxy_account_rejected", row: row(7), stop: true };
+    // Anything else (an HTML page from something in front of the proxy) is neither.
+    if (flat) return { class: "permission_error", code: "proxy_key_rejected", row: row(5), stop: true };
+    if (type !== undefined) return { class: "permission_error", code: "proxy_account_rejected", row: row(7), stop: true };
+    return undefined;
   }
   if (status === 529 || type === "overloaded_error") return { class: "provider_error", code: "proxy_overloaded", row: row(9), stop: false };
   if (status !== undefined && status >= 500) return { class: "provider_error", code: "proxy_server_error", row: row(9), stop: false };

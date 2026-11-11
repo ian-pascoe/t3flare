@@ -280,6 +280,8 @@ export class WorkspaceDO extends ContainerHost {
    * Container not started, when it is not running: a stopped Container has no processes.
    */
   async killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }> {
+    // A Container that stops between this check and the exec would be started again by it: the window is the length of
+    // one RPC, and the kill then finds nothing.
     if (!this.containerRunning() || execIds.length === 0) return { running: false, signalled: 0, survivors: 0 };
     const result = await this.exec({ script: killCommand(execIds), passive: true, timeoutMs: 15_000 });
     const answer = /\{"signalled":(\d+),"survivors":(\d+)\}/.exec(result.stdout);
