@@ -29,6 +29,8 @@
 //   POST /_t3flare/agents/workspace-workflows?id=<id>&on=1|0  the owner's opt-in to `workflows: write` on the Workspace's Container tokens
 //   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec"|"credentialHelper"|"killExecs": input} on the Workspace DO
 //   GET  /_t3flare/agents/checkpoint-trace?clear=1 the checkpoint operations the Workspace DOs answered, and by which side
+//   POST /_t3flare/check/terminal-leak           step 2b: a terminal's `env` output compared with this Worker's binding values (names only)
+//   POST /_t3flare/check/terminal-close-idle?thread=<id>  step 2b: t3's own `closeIdle` for a thread's terminals (as settling runs it)
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -296,6 +298,27 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                       ? await rpc.killExecs(body.killExecs as never)
                       : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
+      }
+      case "POST /_t3flare/check/terminal-leak": {
+        // Step 2b M1 (review F0): a terminal's `env` output, posted by the evidence script, compared here with the values
+        // of this Worker's string bindings (secrets included). Answers names only, never a value.
+        const { text } = (await request.json()) as { readonly text: string };
+        const env = (environment as unknown as { readonly env: Record<string, unknown> }).env;
+        const checked: Array<string> = [];
+        const leaked: Array<string> = [];
+        for (const [name, value] of Object.entries(env)) {
+          if (typeof value !== "string" || value.length < 8) continue;
+          checked.push(name);
+          if (text.includes(value) || value.split("\n").some((line) => line.length >= 16 && text.includes(line))) leaked.push(name);
+        }
+        const processEnv = Object.keys((globalThis as { process?: { env?: object } }).process?.env ?? {});
+        return json({ checked: checked.toSorted(), leaked, processEnvKeys: processEnv.toSorted() });
+      }
+      case "POST /_t3flare/check/terminal-close-idle": {
+        // Step 2b M1 (review F1): t3's own `closeIdle` for a thread's terminals, as settling a thread runs it.
+        const runtime = await environment.boot("admin-terminal-close-idle");
+        const { closeIdleFor } = await import("../terminal/checks.ts");
+        return json(await runtime.run(closeIdleFor(url.searchParams.get("thread") ?? "")));
       }
       case "GET /_t3flare/agents/checkpoint-trace": {
         const { checkpointTrace } = await import("../workspace/checkpoints.ts");

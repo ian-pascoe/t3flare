@@ -71,7 +71,7 @@ import * as TextGeneration from "t3/src/textGeneration/TextGeneration.ts";
 import * as SecretResolver from "t3/src/secrets/SecretResolver.ts";
 import * as ProviderInstanceRegistryHydration from "t3/src/provider/ProviderInstanceRegistryHydration.ts";
 import * as ProjectSettingsOverrideSweep from "t3/src/provider/ProjectSettingsOverrideSweep.ts";
-import * as TerminalManager from "t3/src/terminal/Manager.ts";
+import * as TerminalLayer from "../terminal/layer.ts";
 import * as McpHttpServer from "t3/src/mcp/McpHttpServer.ts";
 import * as PeerForwarding from "t3/src/peer/PeerForwarding.ts";
 import * as RemoteDelegation from "t3/src/peer/RemoteDelegation.ts";
@@ -416,12 +416,8 @@ export const make = (options: CompositionOptions) => {
 
   const layerCheckpointStore = CheckpointStore.layer.pipe(Layer.provide(layerVcsDriverRegistry));
   const layerPortScanner = PortScanner.layer.pipe(Layer.provide(ProcessRunner.layer));
-  // t3flare: the PTY adapter reports every shell as missing (terminal is step 2b).
-  const layerTerminal = TerminalManager.layer.pipe(
-    Layer.provide(DoServices.layerPty),
-    Layer.provide(layerPortScanner),
-    Layer.provide(layerNativeTelemetry),
-  );
+  // t3flare: t3's TerminalManager over our PTY adapter: shells in the Workspace's Container (step 2b, ADR-0021).
+  const layerTerminal = TerminalLayer.layer;
   const layerPreview = Layer.empty.pipe(Layer.provideMerge(PreviewManager.layer), Layer.provideMerge(layerPortScanner));
   const layerDevice = DeviceService.layer.pipe(
     Layer.provide(layerServerSettings),

@@ -1,0 +1,99 @@
+{
+  "scenario": "basic",
+  "at": "2026-11-11T16:37:27.309Z",
+  "workspace": "term-mwcc46eb",
+  "containerBefore": {
+    "running": false,
+    "leased": false,
+    "lastUse": 1794414999838
+  },
+  "statusLineMs": 617,
+  "promptMs": 4125,
+  "pwd": "/w/term-mwcc46eb",
+  "gitStatus": "git status --short --branch | head -3; echo T3D$((383596846+1))\n/w/term-mwcc46eb # git status --short --branch | head -3; echo T3D$((383596846+1))\n## main...origin/main\nT3D383596847\n",
+  "stty": {
+    "before": "30 100",
+    "after": "40 120"
+  },
+  "prompt": "Starting the Workspace's Container…\n/w/term-mwcc46eb # ",
+  "echo": {
+    "p50": 81,
+    "p95": 138,
+    "samples": [
+      76,
+      18,
+      94,
+      65,
+      86,
+      81,
+      73,
+      104,
+      73,
+      73,
+      138,
+      96,
+      75,
+      71,
+      106,
+      82,
+      74,
+      81,
+      85,
+      79
+    ]
+  },
+  "throughput": {
+    "bytes": 5242880,
+    "ms": 1753,
+    "mibPerSecond": 2.85
+  },
+  "ctrlCMs": 119,
+  "shellWriteSeenByDoMs": 951,
+  "doWriteSeenByShellMs": 589,
+  "envNames": [
+    "COLORTERM",
+    "GIT_TERMINAL_PROMPT",
+    "HOME",
+    "LANG",
+    "MISE_GLOBAL_CONFIG_FILE",
+    "MISE_SHELL",
+    "MISE_TRUSTED_CONFIG_PATHS",
+    "MISE_YES",
+    "OLDPWD",
+    "PATH",
+    "PWD",
+    "SHLVL",
+    "T3FLARE_EXEC",
+    "TERM",
+    "_",
+    "__MISE_DIFF",
+    "__MISE_EXE",
+    "__MISE_ORIG_PATH",
+    "__MISE_SESSION"
+  ],
+  "leak": {
+    "checked": [
+      "ALCHEMY_CLOUDFLARE_ACCOUNT_ID",
+      "ALCHEMY_WORKER_NAME",
+      "MODEL_PROXY_API_KEY",
+      "MODEL_PROXY_URL",
+      "T3FLARE_ACCESS_AUD",
+      "T3FLARE_ACCESS_SERVICE_CLIENT_ID",
+      "T3FLARE_ACCESS_TEAM_DOMAIN",
+      "T3FLARE_ADMIN_TOKEN",
+      "T3FLARE_GITHUB_APP_PRIVATE_KEY",
+      "T3FLARE_OWNER_EMAIL",
+      "T3_BOOTSTRAP_TOKEN"
+    ],
+    "leaked": [],
+    "processEnvKeys": []
+  },
+  "markedBeforeClose": 2,
+  "close": {
+    "ms": 2457,
+    "left": 0
+  },
+  "events": 1507,
+  "failures": [],
+  "ok": true
+}

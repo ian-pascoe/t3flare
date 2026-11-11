@@ -1,0 +1,26 @@
+{
+  "scenario": "budget",
+  "at": "2026-11-11T16:57:18.286Z",
+  "workspace": "term-mwcc46eb",
+  "budget-a": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794416243051
+  },
+  "budget-b": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794416246003
+  },
+  "budget-c": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794416247930
+  },
+  "refusal": [
+    "t3flare: the Container cannot start: 3 Containers are running, the most this deploy allo"
+  ],
+  "exitedShown": true,
+  "failures": [],
+  "ok": true
+}

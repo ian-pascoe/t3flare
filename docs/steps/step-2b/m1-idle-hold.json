@@ -1,0 +1,16 @@
+{
+  "scenario": "idle-hold",
+  "at": "2026-11-11T16:45:33.817Z",
+  "workspace": "term-mwcc46eb",
+  "containerStoppedAfterLastInputMs": 122794,
+  "lastEvents": [
+    "output",
+    "output",
+    "output",
+    "exited"
+  ],
+  "exitedShown": true,
+  "fileSurvived": true,
+  "failures": [],
+  "ok": true
+}

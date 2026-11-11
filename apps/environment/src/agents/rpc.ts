@@ -10,7 +10,7 @@ import type {
   SteerInput,
   SubmitTurnInput,
 } from "@t3flare/session-protocol";
-import type { CheckpointAnswer, CheckpointOp, CloneInput, FsAnswer, GitAnswer, GitRun, ProvisionInfo } from "@t3flare/workspace-client";
+import type { CheckpointAnswer, CheckpointOp, CloneInput, FsAnswer, GitAnswer, GitRun, ProvisionInfo, TerminalAnswer, TerminalOpenInput } from "@t3flare/workspace-client";
 
 /** One file operation of the Workspace DO's (`fs`); paths inside the Workspace. */
 export type FsOp =
@@ -55,6 +55,12 @@ export interface WorkspaceRpc {
   stopContainer(): Promise<void>;
   readText(path: string): Promise<string | null>;
   writeText(path: string, text: string): Promise<void>;
+  terminalOpen(input: TerminalOpenInput): Promise<TerminalAnswer>;
+  terminalInput(key: string, data: string): Promise<TerminalAnswer>;
+  terminalResize(key: string, cols: number, rows: number): Promise<TerminalAnswer>;
+  terminalClose(key: string): Promise<TerminalAnswer>;
+  terminalHeartbeat(keys: ReadonlyArray<string>): Promise<TerminalAnswer>;
+  terminalState(): Promise<{ readonly epoch: string; readonly keys: ReadonlyArray<string>; readonly lastInput: number; readonly sync: Readonly<Record<string, number>> }>;
 }
 
 export interface SessionRpc {

@@ -1,0 +1,21 @@
+{
+  "scenario": "settle",
+  "at": "2026-11-11T16:38:07.691Z",
+  "workspace": "term-mwcc46eb",
+  "closeIdleBusy": {
+    "closeIdle": "ran",
+    "threadId": "terminal-abdf6d85-1aa3-4a17-9e82-afe8bf24f405"
+  },
+  "aliveAfterBusyCloseIdle": true,
+  "closeIdleIdle": {
+    "closeIdle": "ran",
+    "threadId": "terminal-abdf6d85-1aa3-4a17-9e82-afe8bf24f405"
+  },
+  "lastEvents": [
+    "output",
+    "activity",
+    "closed"
+  ],
+  "failures": [],
+  "ok": true
+}

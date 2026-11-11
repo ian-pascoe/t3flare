@@ -1,0 +1,12 @@
+{
+  "scenario": "clients-gone",
+  "at": "2026-11-11T16:54:36.151Z",
+  "workspace": "term-mwcc46eb",
+  "markedBefore": 2,
+  "clientsGoneAt": "2026-11-11T16:54:44.417Z",
+  "shellsGoneMs": 153571,
+  "containerStoppedMs": 153571,
+  "environment": "stopped",
+  "failures": [],
+  "ok": true
+}

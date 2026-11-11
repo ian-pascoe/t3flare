@@ -1,0 +1,21 @@
+{
+  "scenario": "push",
+  "at": "2026-11-11T16:42:04.836Z",
+  "workspace": "term-mwcc46eb",
+  "push": [
+    "remote: ",
+    "To https://github.com/ian-pascoe/t3flare-fixture.git",
+    " * [new branch]      HEAD -> t3flare-terminal-1794415332904",
+    "exit=0",
+    "T3D374831002",
+    ""
+  ],
+  "delete": [
+    " - [deleted]         t3flare-terminal-1794415332904",
+    "exit=0",
+    "T3D478747677",
+    ""
+  ],
+  "failures": [],
+  "ok": true
+}

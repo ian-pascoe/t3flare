@@ -1,0 +1,12 @@
+{
+  "scenario": "restart",
+  "at": "2026-11-11T16:39:05.465Z",
+  "workspace": "term-mwcc46eb",
+  "markedBefore": 3,
+  "resumedMs": 1199,
+  "oldScrollbackShown": true,
+  "markedAfter": 1,
+  "oldGoneMs": 92954,
+  "failures": [],
+  "ok": true
+}

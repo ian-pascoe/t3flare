@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalDate:off globalConsole:off globalTimers:off
+// @effect-diagnostics asyncFunction:off globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off
 // The Workspace DO (ADR-0008, ADR-0009; step 2a plan): one `@cloudflare/computer` Workspace, its files in this object's
 // SQLite, its commands on the Worker Shell or, for real binaries, in the Container this object starts itself
 // (`schedulingPolicy: "durable_object"`). Adapted from cloudpid@ae5a7b73:apps/server/src/workspace/Workspace.ts, which
@@ -16,7 +16,7 @@ import {
 import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
 import { type EnvRequest, type EnvResponse, type HostOperation, withHarnessKept, WorkspaceEnvHost } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
-import { killCommand } from "@t3flare/sandbox-image/kill";
+import { KILL_SCRIPT, killCommand } from "@t3flare/sandbox-image/kill";
 import { DurableObject } from "cloudflare:workers";
 
 import type {
@@ -27,6 +27,8 @@ import type {
   GitAnswer,
   GitRun,
   ProvisionInfo,
+  TerminalAnswer,
+  TerminalOpenInput,
 } from "@t3flare/workspace-client";
 import { HARNESS_ROOT, REPO_ROOT } from "@t3flare/workspace-client";
 
@@ -51,11 +53,14 @@ import {
 import { isomorphicFs } from "./isoFs.ts";
 import { kindOf, patchAnswer } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
+import { TerminalHost } from "./terminalHost.ts";
+import { TerminalSync } from "./terminalSync.ts";
 import {
   CONTAINER_BACKEND,
   CONTAINER_IDLE_MS,
   CONTAINER_IGNORE,
   CONTAINER_INSTANCE,
+  TERMINAL_IDLE_MS,
   WORKER_SHELL_BACKEND,
   WORKSPACE_BINDING,
   WORKSPACE_CONTAINER,
@@ -72,6 +77,8 @@ export interface WorkspaceEnv {
   readonly CONTAINER_BUDGET: DurableObjectNamespace<ContainerBudget>;
   /** Overrides CONTAINER_IDLE_MS (tests). */
   readonly T3FLARE_CONTAINER_IDLE_MS?: string;
+  /** Overrides TERMINAL_IDLE_MS (the stage's idle-hold check). */
+  readonly T3FLARE_TERMINAL_IDLE_MS?: string;
 }
 
 export interface ExecInput {
@@ -114,6 +121,10 @@ const LEASED_KEY = "t3flare:container-leased";
 /** Where the Container's git credential helper asks this object for the repo's token (through computer's egress host). */
 export const CREDENTIAL_PATH = "/t3flare/git-credential";
 const WORKSPACE_ID_KEY = "t3flare:workspace-id";
+/** The markers of the shells this object started (orphans after a restart are killed by them). */
+const TERMINAL_MARKERS_KEY = "t3flare:terminal-markers";
+/** How often terminals' heartbeats are checked while any is open. */
+const TERMINAL_EXPIRE_EVERY_MS = 15_000;
 
 /**
  * git's credential helper in the Container (ADR-0013): the command's own `T3FLARE_GIT_TOKEN` when the router gave one
@@ -139,6 +150,11 @@ export class WorkspaceDO extends ContainerHost {
   #hostReady: Promise<void> | undefined;
   /** Commands running now: the Container is not stopped under them. */
   #running = 0;
+  /** This instance (review F11): the adapter learns from a new epoch that the old instance's terminals are gone. */
+  readonly #epoch = crypto.randomUUID();
+  readonly #terminals: TerminalHost;
+  readonly #terminalSync: TerminalSync;
+  #expireTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(ctx: DurableObjectState, env: WorkspaceEnv) {
     super(ctx, env);
@@ -167,6 +183,62 @@ export class WorkspaceDO extends ContainerHost {
         return { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr };
       },
     });
+    const { BASH_ENV: _bashEnv, ...terminalEnv } = COMMAND_ENV;
+    this.#terminalSync = new TerminalSync({
+      now: () => Date.now(),
+      running: () => this.containerRunning(),
+      pull: () => this.#syncEntries("pull"),
+      push: () => this.#syncEntries("push"),
+      revision: () => currentRevision(ctx.storage.sql),
+      active: () => this.#terminals.size > 0,
+    });
+    this.#terminals = new TerminalHost({
+      now: () => Date.now(),
+      epoch: this.#epoch,
+      running: () => this.containerRunning(),
+      startContainer: async () => {
+        try {
+          await this.exec({ script: "true", timeoutMs: 180_000 });
+        } catch (error) {
+          // The budget's own reason, out of computer's connect-retry wrapping.
+          const reason = /the Container cannot start: (.+?)(?:"|$)/s.exec(String(error))?.[1];
+          throw new Error(reason === undefined ? String(error).slice(0, 300) : `the Container cannot start: ${reason}`);
+        }
+      },
+      spawn: async (argv, options) => {
+        const container = this.ctx.container;
+        if (container === undefined) throw new Error("no Container binding");
+        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: options.env });
+      },
+      kill: (markers) => this.#killMarkers(markers),
+      push: async (push) => {
+        const id = this.#workspaceId();
+        if (id === undefined) return { unknown: push.frames.map((frame) => frame.key) };
+        return environmentStub(this.env.ENVIRONMENT).terminalOutput({ workspace: id, ...push });
+      },
+      baseEnv: terminalEnv,
+      filesMayHaveChanged: (why) => this.#terminalSync.changed(why),
+      remember: (markers) => ctx.storage.kv.put(TERMINAL_MARKERS_KEY, [...markers]),
+      remembered: () => ctx.storage.kv.get<ReadonlyArray<string>>(TERMINAL_MARKERS_KEY) ?? [],
+    });
+  }
+
+  /** One sync with the Container backend to completion (review F9: never the default backend). */
+  async #syncEntries(direction: "pull" | "push"): Promise<number> {
+    let entries = 0;
+    for await (const progress of direction === "pull" ? this.#workspace.pull(CONTAINER_BACKEND) : this.#workspace.push(CONTAINER_BACKEND)) {
+      entries += progress.entries;
+    }
+    return entries;
+  }
+
+  /** Part 2's kill script on terminal markers, run straight on the Container (never starting it). */
+  async #killMarkers(markers: ReadonlyArray<string>): Promise<void> {
+    const container = this.ctx.container;
+    if (container === undefined || !container.running || markers.length === 0) return;
+    const process = await container.exec(["bash", "-c", KILL_SCRIPT, "t3flare-kill", ...markers], {});
+    const output = await process.output();
+    console.log(JSON.stringify({ t3flare: "terminal-kill", markers: markers.length, answer: new TextDecoder().decode(output.stdout).trim() }));
   }
 
   /** One of `ComputerExecutionEnv`'s file operations (the Session's tools), answered as plain data. */
@@ -229,7 +301,9 @@ export class WorkspaceDO extends ContainerHost {
 
   async #scheduleAlarm(): Promise<void> {
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? Date.now();
-    const at = Math.min(lastUse + this.#idleMs(), Date.now() + RENEW_EVERY_MS);
+    let at = Math.min(lastUse + this.#idleMs(), Date.now() + RENEW_EVERY_MS);
+    // Open terminals: their heartbeats are checked and their hold measured at least every 30 s.
+    if (this.#terminals.size > 0) at = Math.min(at, Date.now() + 30_000);
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > at) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000));
   }
@@ -569,6 +643,56 @@ export class WorkspaceDO extends ContainerHost {
     return { provisioned: repo, repo: git, containerRunning: this.containerRunning(), revision: this.#reads.revision(), gitRevision: this.#reads.revision("git-dir"), cachedReads: this.#reads.stats().rows, id: this.#workspaceId() ?? null };
   }
 
+  // -------------------------------------------------------------------------------------------------------------------
+  // Terminals (step 2b, ADR-0021): the Environment's PTY adapter calls these; output goes back by push.
+
+  #terminalsChanged(): void {
+    if (this.#terminals.size > 0) {
+      this.#terminalSync.startPushing();
+      this.#expireTimer ??= setInterval(() => {
+        void this.#terminals.expire().catch(() => undefined);
+        if (this.#terminals.size === 0 && this.#expireTimer !== undefined) {
+          clearInterval(this.#expireTimer);
+          this.#expireTimer = undefined;
+        }
+      }, TERMINAL_EXPIRE_EVERY_MS);
+    }
+  }
+
+  async terminalOpen(input: TerminalOpenInput): Promise<TerminalAnswer> {
+    this.#rememberId(input.t3Path.startsWith("/w/") ? input.t3Path.slice(3) : undefined);
+    const answer = await this.#terminals.open(input);
+    this.#terminalsChanged();
+    await this.#scheduleAlarm();
+    return answer;
+  }
+
+  terminalInput(key: string, data: string): Promise<TerminalAnswer> {
+    return this.#terminals.input(key, data);
+  }
+
+  terminalResize(key: string, cols: number, rows: number): TerminalAnswer {
+    return this.#terminals.resize(key, cols, rows);
+  }
+
+  terminalClose(key: string): Promise<TerminalAnswer> {
+    return this.#terminals.close(key);
+  }
+
+  terminalHeartbeat(keys: ReadonlyArray<string>): TerminalAnswer {
+    return this.#terminals.heartbeat(keys);
+  }
+
+  /** Diagnosis: the open terminals, the sync's counts, the last input. */
+  terminalState(): { readonly epoch: string; readonly keys: ReadonlyArray<string>; readonly lastInput: number; readonly sync: Readonly<Record<string, number>> } {
+    return { epoch: this.#epoch, keys: this.#terminals.keys(), lastInput: this.#terminals.lastInput, sync: { ...this.#terminalSync.stats } };
+  }
+
+  #terminalIdleMs(): number {
+    const value = Number(this.env.T3FLARE_TERMINAL_IDLE_MS);
+    return Number.isFinite(value) && value > 0 ? value : TERMINAL_IDLE_MS;
+  }
+
   /** Whether the Container runs, and the budget's view. */
   async containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }> {
     return {
@@ -580,7 +704,12 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Stops the Container now and frees its slot. */
   async stopContainer(): Promise<void> {
-    if (this.ctx.container?.running === true) await this.ctx.container.destroy();
+    if (this.ctx.container?.running === true) {
+      // The shells' writes not yet pulled would go with the Container.
+      await this.#terminalSync.pullNow().catch(() => undefined);
+      await this.ctx.container.destroy();
+    }
+    this.#terminals.containerStopped();
     await this.#release();
   }
 
@@ -595,8 +724,11 @@ export class WorkspaceDO extends ContainerHost {
       if ((await this.ctx.storage.get<boolean>(LEASED_KEY)) === true) await this.#release();
       return;
     }
+    await this.#terminals.expire().catch(() => undefined);
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
-    if (this.#running === 0 && Date.now() - lastUse >= this.#idleMs()) {
+    // Terminals hold the Container until their last input is older than the hold (review F10: output is not use).
+    const held = this.#terminals.size > 0 && Date.now() - this.#terminals.lastInput < this.#terminalIdleMs();
+    if (this.#running === 0 && !held && Date.now() - lastUse >= this.#idleMs()) {
       console.log(JSON.stringify({ t3flare: "container-idle-stop", workspace: this.ctx.id.toString() }));
       await this.stopContainer();
       return;

@@ -149,3 +149,46 @@ export type CheckpointOp =
 export type CheckpointAnswer =
   | { readonly ok: true; readonly value: unknown; readonly by: "do" | "container" | "alias" }
   | { readonly ok: false; readonly error: string };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Terminals (step 2b, ADR-0021): the Environment's PTY adapter ⇄ the Workspace DO's terminal host. Keys are made by the
+// adapter (`term-<hex>`), and are also the shell's marker in the Container.
+
+export interface TerminalOpenInput {
+  readonly key: string;
+  /** t3's path of the Workspace's repo (`/w/<id>`) and t3's cwd at or below it. */
+  readonly t3Path: string;
+  readonly cwd: string;
+  readonly cols: number;
+  readonly rows: number;
+  /** Already allowlisted by the adapter. */
+  readonly env: Readonly<Record<string, string>>;
+}
+
+/** Every answer names the Workspace DO instance (its epoch): a new epoch means the old one's terminals are gone. */
+export interface TerminalAnswer {
+  readonly epoch: string;
+  /** Keys this instance does not hold (an exited or unknown terminal). */
+  readonly unknown: ReadonlyArray<string>;
+}
+
+/** One terminal's output, in order (`seq`); `busy` is the foreground's state after the data; `exit` ends it. */
+export interface TerminalFrame {
+  readonly key: string;
+  readonly seq: number;
+  readonly data?: string;
+  readonly busy?: boolean;
+  readonly exit?: { readonly code: number };
+}
+
+/** A batch of frames a Workspace DO pushes to the Environment DO. */
+export interface TerminalPush {
+  readonly workspace: string;
+  readonly epoch: string;
+  readonly frames: ReadonlyArray<TerminalFrame>;
+}
+
+/** The Environment's answer: keys it does not know (it restarted, or the terminal was closed): kill them. */
+export interface TerminalPushAnswer {
+  readonly unknown: ReadonlyArray<string>;
+}

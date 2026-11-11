@@ -9,6 +9,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
+import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
@@ -19,6 +20,7 @@ import * as BootState from "./host/bootState.ts";
 import * as Idle from "./host/idle.ts";
 import * as ModuleState from "./host/moduleState.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
+import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
 
 export interface EnvironmentEnv extends AgentsBindings {
@@ -91,6 +93,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     Idle.activity.sockets = 0;
     Idle.activity.inFlight = 0;
     Idle.activity.idleSince = Date.now();
+    resetTerminals();
     // Before any t3 code runs: the `node:fs` shim and FileSystem Layer read this.
     bindStateStorage({ sql: ctx.storage.sql, transactionSync: (closure) => ctx.storage.transactionSync(closure) });
     const modelProxy =
@@ -168,6 +171,18 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     } finally {
       Idle.requestEnded();
     }
+  }
+
+  /**
+   * A Workspace DO's terminal output (step 2b, ADR-0021), RPC from the agents Worker. Never boots t3 and is not counted
+   * as activity (ADR-0003's refinement): a chatty shell with no client cannot keep the Environment awake. Answers the
+   * terminals this instance does not know (t3 not running, restarted, or the terminal closed): the Workspace DO kills
+   * them.
+   */
+  async terminalOutput(push: TerminalPush): Promise<TerminalPushAnswer> {
+    const terminals = currentTerminals();
+    if (terminals === undefined) return { unknown: [...new Set(push.frames.filter((frame) => frame.exit === undefined).map((frame) => frame.key))] };
+    return terminals.deliver(push);
   }
 
   /** Resets the object, as an eviction or deploy does: memory and sockets go, storage stays. */

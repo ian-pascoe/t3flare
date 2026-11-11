@@ -99,6 +99,8 @@ export default Alchemy.Stack(
     const bootstrapPass = (yield* Config.String("T3FLARE_DEPLOY_BOOTSTRAP").pipe(Config.withDefault(""))) === "1";
     // The turn deadline (2 h) shortened on a stage for its check (step 2a M5): unset in normal deploys.
     const turnDeadlineMs = yield* Config.String("T3FLARE_TURN_DEADLINE_MS").pipe(Config.withDefault(""));
+    // The terminal hold (30 min) and the sweep's grace (7 days) shortened on a stage for their checks (step 2b).
+    const terminalIdleMs = yield* Config.String("T3FLARE_TERMINAL_IDLE_MS").pipe(Config.withDefault(""));
 
     const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {
       name: `${name}-admin`,
@@ -145,6 +147,7 @@ export default Alchemy.Stack(
         // The model proxy fault route (step 2a part 2) answers on test stages only.
         ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
         ...(turnDeadlineMs === "" ? {} : { T3FLARE_TURN_DEADLINE_MS: turnDeadlineMs }),
+        ...(terminalIdleMs === "" ? {} : { T3FLARE_TERMINAL_IDLE_MS: terminalIdleMs }),
       },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     } as never);

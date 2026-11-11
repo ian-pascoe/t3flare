@@ -46,7 +46,7 @@ export const pair = async (): Promise<string> => {
   return response.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
 };
 
-const protocol = (cookie: string) => {
+export const protocol = (cookie: string) => {
   const socketUrl = new URL("/ws?orchestrationProtocol=2", base);
   socketUrl.protocol = base.protocol === "https:" ? "wss:" : "ws:";
   return Layer.effect(RpcClient.Protocol, RpcClient.makeProtocolSocket({ retryTransientErrors: false })).pipe(
