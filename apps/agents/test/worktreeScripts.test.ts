@@ -10,7 +10,7 @@ import * as path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { parseBundleAnswer, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "../src/workspace/worktreeScripts.ts";
+import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "../src/workspace/worktreeScripts.ts";
 
 let dir: string;
 const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t", GIT_CONFIG_NOSYSTEM: "1" };
@@ -142,5 +142,71 @@ describe("worktree provisioning scripts", () => {
     const result = sh(project, worktreeBundleScript({ ref: "nope", tips: [], bundle: path.join(dir, "x.bundle") }));
     expect(result.code).toBe(128);
     expect(result.stderr).toContain("invalid reference: nope");
+  });
+});
+
+describe("carrying a removed worktree's work home (review F8)", () => {
+  /** A project and a provisioned worktree of it on branch `feature`. */
+  const projectAndWorktree = () => {
+    const { remote, project } = remoteAndProject();
+    git(project, "branch --track feature origin/main");
+    git(project, "branch other origin/main");
+    const { worktree } = provision(project, remote, "feature");
+    return { project, worktree };
+  };
+  const carry = (project: string, worktree: string) => {
+    const tips = git(project, "for-each-ref --format='%(objectname)'").split("\n");
+    const bundle = path.join(dir, "carry.bundle");
+    const out = sh(worktree, carryOutScript({ projectTips: tips, bundle }));
+    expect(out.code, out.stderr).toBe(0);
+    const answer = parseCarryOut(out.stdout);
+    if (!answer.bundled) return { answer, lines: [] as Array<string> };
+    const home = sh(project, carryInScript({ bundle, dir: "feat-0123", carried: answer.carried }));
+    expect(home.code, home.stderr).toBe(0);
+    return { answer, lines: home.stdout.trim().split("\n") };
+  };
+
+  it("carries nothing from a clean worktree the project can reach", () => {
+    const { project, worktree } = projectAndWorktree();
+    expect(carry(project, worktree)).toEqual({ answer: { dirty: false, carried: [], bundled: false }, lines: [] });
+  });
+
+  it("fast-forwards a branch, creates one the project lacks, and keeps a diverged one and the stash aside", () => {
+    const { project, worktree } = projectAndWorktree();
+    const feature = commit(worktree, "f", "f");
+    git(worktree, "checkout -q -b only-here");
+    const onlyHere = commit(worktree, "o", "o");
+    git(worktree, "checkout -q -b other origin/main");
+    const other = commit(worktree, "w", "w");
+    git(project, "checkout -q other");
+    commit(project, "p", "p"); // the project's `other` moved on: diverged
+    git(project, "checkout -q main");
+    fs.writeFileSync(path.join(worktree, "w"), "stashed change");
+    git(worktree, "stash -q");
+    const { answer, lines } = carry(project, worktree);
+    expect(answer.dirty).toBe(false);
+    expect(answer.carried.map((c) => c.ref).toSorted()).toEqual(["refs/heads/feature", "refs/heads/only-here", "refs/heads/other", "refs/stash"]);
+    expect(lines.toSorted()).toEqual([
+      "CREATED refs/heads/only-here",
+      "FASTFORWARD refs/heads/feature",
+      "KEPT refs/heads/other refs/t3flare/worktrees/feat-0123/heads/other",
+      "KEPT refs/stash refs/t3flare/worktrees/feat-0123/stash",
+    ]);
+    expect(git(project, "rev-parse feature")).toBe(feature);
+    expect(git(project, "rev-parse only-here")).toBe(onlyHere);
+    expect(git(project, "rev-parse refs/t3flare/worktrees/feat-0123/heads/other")).toBe(other);
+    expect(git(project, "for-each-ref refs/t3flare/carry")).toBe("");
+  });
+
+  it("never moves the project's checked-out branch, and sees uncommitted work", () => {
+    const { project, worktree } = projectAndWorktree();
+    git(project, "checkout -q feature");
+    const ahead = commit(worktree, "f", "f");
+    fs.writeFileSync(path.join(worktree, "untracked.txt"), "x");
+    const { answer, lines } = carry(project, worktree);
+    expect(answer.dirty).toBe(true);
+    expect(lines).toEqual([`KEPT refs/heads/feature refs/t3flare/worktrees/feat-0123/heads/feature`]);
+    expect(git(project, "rev-parse refs/t3flare/worktrees/feat-0123/heads/feature")).toBe(ahead);
+    expect(git(project, "rev-parse feature")).not.toBe(ahead);
   });
 });

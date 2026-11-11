@@ -261,9 +261,18 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
   const existing = services.workspaces.get(id);
   if (existing !== undefined) {
     if (existing.state === "ready" || existing.state === "provisioning") return fail(`fatal: '${command.path}' already exists`);
-    // A failed attempt's row: provisioning starts again from nothing (the clone script empties the repo first).
-    if (existing.state === "failed") services.workspaces.remove(id);
-    else return fail(`fatal: t3flare: '${command.path}' is being removed; try again in a minute`, existing.state);
+    // Review F5: t3 makes a worktree's path from its branch, and re-creates a missing one at the same path. A tombstone
+    // there is restored (its work kept); a removal still under way is finished first; a failed attempt starts again.
+    if (existing.state === "tombstoned") {
+      const { restoreWorkspace } = await import("./deletion.ts");
+      restoreWorkspace(id);
+      return { exitCode: 0, stdout: "", stderr: `Preparing worktree (restoring '${command.path}')\n`, route: "worktree", detail: "tombstone restored" };
+    }
+    if (existing.state === "deleting") {
+      const { purgeWorkspace, referencesFrom } = await import("./deletion.ts");
+      const purged = await purgeWorkspace(id, referencesFrom(services.sql).deletedThreads.get(id) ?? []);
+      if (!purged.destroyed) return fail(`fatal: t3flare: '${command.path}' is still being removed: ${purged.error ?? ""}`, "deleting");
+    } else services.workspaces.remove(id);
   }
   const started = Date.now();
   services.workspaces.createWorktree({ id, parent, branch: ref });
@@ -345,7 +354,12 @@ const worktreeRouteOf = (
       // The registry keeps no stale links.
       return async () => ({ exitCode: 0, stdout: "", stderr: "", route: "worktree" });
     case "remove":
-      return null;
+      return async () => {
+        const { removeWorktree } = await import("./deletion.ts");
+        const services = environmentServices();
+        const answer = await removeWorktree(cwd, command.path, command.force, services.sql, services.sweep);
+        return { exitCode: answer.exitCode, stdout: "", stderr: answer.stderr, route: "worktree", detail: answer.detail };
+      };
     case "unsupported":
       return async () => fail(`fatal: t3flare: 'git worktree ${command.name}' is not supported in the Cloud Environment`);
   }

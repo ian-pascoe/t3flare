@@ -4,6 +4,9 @@
 import type { ModelCatalog } from "@t3flare/models/catalog";
 import type { GitHubTokens } from "./github.ts";
 import type { AgentsBindings } from "./rpc.ts";
+import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
+
+import type { SweepSettings } from "./deletion.ts";
 import type { WorkspaceRegistry } from "./workspaces.ts";
 
 export interface EnvironmentServices {
@@ -13,6 +16,9 @@ export interface EnvironmentServices {
   readonly catalog: ModelCatalog;
   readonly github: () => GitHubTokens;
   readonly workspaces: WorkspaceRegistry;
+  /** The Environment DO's SQLite (t3's projection, read by the deletion's reference check). */
+  readonly sql: SqlStorage;
+  readonly sweep: SweepSettings;
 }
 
 let current: EnvironmentServices | undefined;

@@ -166,6 +166,8 @@ export interface ProvisionInfo {
   readonly cachedReads?: number;
   /** The Workspace id the object knows itself by (the credential helper's token is for its repo). */
   readonly id?: string | null;
+  /** Step 2b: purged (`destroy()`); every RPC but provisioning refuses. */
+  readonly destroyed?: boolean;
 }
 
 /** t3's checkpoint operations (`VcsCheckpointOps`), answered by the Workspace DO (ADR-0009; step 2a M3). Refs are git refs. */

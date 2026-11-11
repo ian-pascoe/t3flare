@@ -14,6 +14,7 @@ import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
 import { deliverPush } from "./agents/sessionSink.ts";
+import { GRACE_MS } from "./agents/deletionConstants.ts";
 import { workspaceRegistry } from "./agents/workspaces.ts";
 import type { AgentsBindings } from "./agents/rpc.ts";
 import * as BootState from "./host/bootState.ts";
@@ -33,6 +34,10 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly MODEL_PROXY_API_KEY?: string;
   /** Overrides IDLE_AFTER_MS (tests and the acceptance stage). */
   readonly T3FLARE_IDLE_AFTER_MS?: string;
+  /** Step 2b: the sweep purges only when this is "1" (stages); prod's sweep reports what it would do (review F3). */
+  readonly T3FLARE_SWEEP_PURGE?: string;
+  /** Overrides the sweep's 7-day grace (stages). */
+  readonly T3FLARE_SWEEP_GRACE_MS?: string;
 }
 
 /** Module state that outlives `ctx.abort()` in a warm isolate (ADR-0003); reported by the health route. */
@@ -74,6 +79,10 @@ export interface BootReport {
   readonly isolateBoot: number;
 }
 
+/** When the Workspace sweep is next due, and its last report (step 2b, plan section 5.5). */
+const NEXT_SWEEP_KEY = "t3flare:next-sweep";
+const LAST_SWEEP_KEY = "t3flare:last-sweep";
+
 /** The proxy's model list, as the last read of it left it (ADR-0012). */
 const CATALOG_KEY = "t3flare:model-catalog";
 
@@ -107,6 +116,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       }),
       github: () => this.github,
       workspaces: workspaceRegistry(ctx.storage.sql),
+      sql: ctx.storage.sql,
+      sweep: {
+        purge: env.T3FLARE_SWEEP_PURGE === "1",
+        graceMs: Number(env.T3FLARE_SWEEP_GRACE_MS) > 0 ? Number(env.T3FLARE_SWEEP_GRACE_MS) : GRACE_MS,
+      },
     });
   }
 
@@ -332,19 +346,62 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     this.#idleTimer = undefined;
   }
 
+  #sweeping: Promise<unknown> | undefined;
+
+  /** When the sweep is next due (the first is an hour after the first look). */
+  #nextSweep(now = Date.now()): number {
+    const stored = this.ctx.storage.kv.get<number>(NEXT_SWEEP_KEY);
+    if (stored !== undefined) return stored;
+    this.ctx.storage.kv.put(NEXT_SWEEP_KEY, now + 60 * 60_000);
+    return now + 60 * 60_000;
+  }
+
+  /** Runs the Workspace sweep (step 2b); `dry` only reports. Never boots t3: it reads t3's tables directly. */
+  async runSweep(options: { readonly dry: boolean }): Promise<unknown> {
+    const { sweep } = await import("./agents/deletion.ts");
+    const { environmentServices } = await import("./agents/bindings.ts");
+    const report = await sweep(this.ctx.storage.sql, { ...environmentServices().sweep, dry: options.dry });
+    if (!options.dry) {
+      this.ctx.storage.kv.put(LAST_SWEEP_KEY, report);
+      this.ctx.storage.kv.put(NEXT_SWEEP_KEY, Date.parse(report.nextDue));
+      await this.#armSweep();
+    }
+    return report;
+  }
+
+  get lastSweep(): unknown {
+    return this.ctx.storage.kv.get(LAST_SWEEP_KEY) ?? null;
+  }
+
+  async #sweepIfDue(now = Date.now()): Promise<void> {
+    if (now < this.#nextSweep(now) || this.#sweeping !== undefined) return;
+    this.#sweeping = this.runSweep({ dry: false })
+      .catch((error: unknown) => console.error(JSON.stringify({ t3flare: "sweep-failed", error: String(error).slice(0, 500) })))
+      .finally(() => (this.#sweeping = undefined));
+    await this.#sweeping;
+  }
+
+  /** The one alarm also wakes the sweep (ADR-0003's refinement). */
+  async #armSweep(): Promise<void> {
+    const at = this.#nextSweep();
+    const current = await this.ctx.storage.getAlarm();
+    if (current === null || current > at) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000));
+  }
+
   /**
    * ADR-0003: when idle, set one alarm for t3's next due work and reset the object. Returns what it found
    * (for the admin route) and resets only when `reset` is true.
    */
   async checkIdle(options: { readonly force?: boolean } = {}): Promise<Idle.IdleVerdict & { alarm?: string | null }> {
     if (this.#runtime === undefined) return { reset: false, why: "t3 is not running" };
+    void this.#sweepIfDue().catch(() => undefined);
     const now = new Date();
     const verdict = Idle.idleVerdict(this.ctx.storage.sql, now, options.force ? 0 : this.#idleAfterMs());
     if (!verdict.reset) return verdict;
     // A pending arm window needs no alarm: the next boot reads it, and seeds the grant only if still armed.
-    const due = verdict.due.at;
-    if (due === null) await this.ctx.storage.deleteAlarm();
-    else await this.ctx.storage.setAlarm(Math.max(due.getTime(), now.getTime() + 1000));
+    // The sweep's due time joins t3's (step 2b).
+    const due = Math.min(verdict.due.at?.getTime() ?? Number.POSITIVE_INFINITY, this.#nextSweep(now.getTime()));
+    await this.ctx.storage.setAlarm(Math.max(due, now.getTime() + 1000));
     // `ctx.abort()` discards writes not yet durable: on production the alarm was lost without this.
     await this.ctx.storage.sync();
     const stored = await this.ctx.storage.getAlarm();
@@ -363,7 +420,15 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       await this.restartRuntime("bootstrap-window-closed");
       return;
     }
+    await this.#sweepIfDue().catch(() => undefined);
     if (runtime === undefined) {
+      // A wake for the sweep alone does not boot t3: it is armed again for t3's own due work, if any.
+      const due = Idle.nextDue(this.ctx.storage.sql).at;
+      if (due === null || due.getTime() > Date.now() + 1000) {
+        const at = Math.min(due?.getTime() ?? Number.POSITIVE_INFINITY, this.#nextSweep());
+        await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000));
+        return;
+      }
       console.log(JSON.stringify({ t3flare: "alarm-wake" }));
       try {
         await this.boot("alarm");

@@ -473,6 +473,22 @@ export class SessionDO extends DurableObject<SessionEnv> {
     return Promise.resolve({ armed });
   }
 
+  /**
+   * Step 2b (review F4): the Session of a deleted thread goes with its Workspace's purge: its live turns are aborted
+   * (their commands' processes killed, bounded), then its alarm and storage, and the object restarts empty.
+   */
+  async destroy(): Promise<{ readonly destroyed: true }> {
+    try {
+      await this.abort({ all: true, reason: "workspace_deleted" } as AbortInput);
+    } catch (error) {
+      console.warn(JSON.stringify({ t3flare: "session-destroy-abort-failed", error: String(error).slice(0, 300) }));
+    }
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    setTimeout(() => this.ctx.abort("t3flare: session destroyed"), 0);
+    return { destroyed: true };
+  }
+
   /** A test's fault: the object restarts (as an eviction does), with whatever work it had in memory cut off. */
   restart(): Promise<{ readonly restarting: true }> {
     setTimeout(() => this.ctx.abort("t3flare: session restart requested"), 0);

@@ -101,6 +101,7 @@ export default Alchemy.Stack(
     const turnDeadlineMs = yield* Config.String("T3FLARE_TURN_DEADLINE_MS").pipe(Config.withDefault(""));
     // The terminal hold (30 min) and the sweep's grace (7 days) shortened on a stage for their checks (step 2b).
     const terminalIdleMs = yield* Config.String("T3FLARE_TERMINAL_IDLE_MS").pipe(Config.withDefault(""));
+    const sweepGraceMs = yield* Config.String("T3FLARE_SWEEP_GRACE_MS").pipe(Config.withDefault(""));
 
     const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {
       name: `${name}-admin`,
@@ -184,6 +185,10 @@ export default Alchemy.Stack(
         MODEL_PROXY_URL: modelProxyUrl,
         MODEL_PROXY_API_KEY: modelProxyKey,
         ...(idleAfterMs === "" ? {} : { T3FLARE_IDLE_AFTER_MS: idleAfterMs }),
+        // Step 2b (review F3): the Workspace sweep purges on test stages; prod's reports what it would do until the owner
+        // sets T3FLARE_SWEEP_PURGE=1 for it.
+        ...(stage === "prod" ? {} : { T3FLARE_SWEEP_PURGE: "1" }),
+        ...(sweepGraceMs === "" ? {} : { T3FLARE_SWEEP_GRACE_MS: sweepGraceMs }),
       },
       assets: {
         directory: path.join(here, "dist/web"),

@@ -92,3 +92,69 @@ export const worktreeFinishScript = (input: {
     "git rev-parse HEAD",
   ].join("\n");
 };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Removal (step 2b, plan section 3.3; review F8): carrying the worktree's work home to its project before a purge.
+
+/**
+ * In the worktree's Container: whether it has uncommitted work (`DIRTY`), and a bundle of every `refs/heads/*` and
+ * `refs/stash` the project cannot reach (`CARRY <ref> <sha>` each, then `BUNDLE`), less the project's tips it has.
+ */
+export const carryOutScript = (input: { readonly projectTips: ReadonlyArray<string>; readonly bundle: string }): string => {
+  const bundle = shellWord(input.bundle);
+  return [
+    "set -u",
+    `mkdir -p "$(dirname ${bundle})" && rm -f ${bundle}`,
+    `[ -n "$(git status --porcelain --untracked-files=normal 2>/dev/null | head -c 4096)" ] && echo DIRTY`,
+    `tips=${shellWord(input.projectTips.filter(isObjectId).join(" "))}`,
+    `have=""; for t in $tips; do git cat-file -e "$t^{commit}" 2>/dev/null && have="$have $t"; done`,
+    `refs=""`,
+    `for r in $(git for-each-ref --format='%(refname)' refs/heads refs/stash); do`,
+    `  reach=0; for t in $have; do git merge-base --is-ancestor "$r" "$t" 2>/dev/null && reach=1 && break; done`,
+    `  if [ $reach = 0 ]; then refs="$refs $r"; echo "CARRY $r $(git rev-parse "$r")"; fi`,
+    `done`,
+    `exclude=""; for t in $have; do exclude="$exclude ^$t"; done`,
+    `if [ -n "$refs" ]; then git bundle create --quiet ${bundle} $refs $exclude 2>/dev/null || git bundle create --quiet ${bundle} $refs >&2 || exit 128; echo BUNDLE; fi`,
+    "exit 0",
+  ].join("\n");
+};
+
+export const parseCarryOut = (stdout: string): { readonly dirty: boolean; readonly carried: ReadonlyArray<{ readonly ref: string; readonly sha: string }>; readonly bundled: boolean } => {
+  const lines = stdout.split("\n");
+  return {
+    dirty: lines.includes("DIRTY"),
+    carried: lines
+      .filter((line) => line.startsWith("CARRY "))
+      .map((line) => {
+        const [, ref = "", sha = ""] = line.split(" ");
+        return { ref, sha };
+      })
+      .filter((carry) => isObjectId(carry.sha)),
+    bundled: lines.includes("BUNDLE"),
+  };
+};
+
+/**
+ * In the project's Container: fetch the carried refs from the bundle and give each a home. A branch the project lacks
+ * is created; one it has fast-forwards when that is a fast-forward and it is not the project's checked-out branch;
+ * anything else (a diverged branch, the stash) is kept at `refs/t3flare/worktrees/<dir>/…`. Prints one line per ref.
+ */
+export const carryInScript = (input: { readonly bundle: string; readonly dir: string; readonly carried: ReadonlyArray<{ readonly ref: string; readonly sha: string }> }): string => {
+  const keep = (rest: string) => shellWord(`refs/t3flare/worktrees/${input.dir.replace(/[^A-Za-z0-9._-]/g, "_")}/${rest}`);
+  return [
+    "set -eu",
+    `git fetch --quiet ${shellWord(input.bundle)} '+refs/*:refs/t3flare/carry/*'`,
+    `cur=$(git symbolic-ref --quiet HEAD || true)`,
+    ...input.carried.filter((carry) => isObjectId(carry.sha)).map((carry) => {
+      if (!carry.ref.startsWith("refs/heads/")) return `git update-ref ${keep(carry.ref.replace(/^refs\//, ""))} ${carry.sha} && echo "KEPT ${carry.ref} ${keep(carry.ref.replace(/^refs\//, "")).slice(1, -1)}"`;
+      const ref = shellWord(carry.ref);
+      return [
+        `if ! git show-ref --verify --quiet ${ref}; then git update-ref ${ref} ${carry.sha} && echo "CREATED ${carry.ref}";`,
+        `elif [ ${ref} != "$cur" ] && git merge-base --is-ancestor ${ref} ${carry.sha}; then git update-ref ${ref} ${carry.sha} && echo "FASTFORWARD ${carry.ref}";`,
+        `else git update-ref ${keep(carry.ref.replace(/^refs\//, ""))} ${carry.sha} && echo "KEPT ${carry.ref} ${keep(carry.ref.replace(/^refs\//, "")).slice(1, -1)}"; fi`,
+      ].join(" ");
+    }),
+    `git for-each-ref --format='%(refname)' refs/t3flare/carry | while read -r r; do git update-ref -d "$r"; done`,
+    `rm -f ${shellWord(input.bundle)}`,
+  ].join("\n");
+};

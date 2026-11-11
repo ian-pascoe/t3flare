@@ -24,7 +24,11 @@
 //   GET  /_t3flare/agents/router-trace?clear=1   the process router's recent commands (git, gh, missing binaries)
 //   GET  /_t3flare/agents/workspaces            the Workspace registry, each with its Container's state
 //   POST /_t3flare/agents/workspace-stop?id=<id>  stop a Workspace's Container now
-//   POST /_t3flare/agents/workspace-remove?id=<id> forget a Workspace (its DO's files stay; tests and cleanup)
+//   POST /_t3flare/agents/workspace-remove?id=<id> purge a Workspace (step 2b: its DO's files with it; forced)
+//   POST /_t3flare/agents/workspace-purge?id=<id>[&force=1]  step 2b: purge, refused while referenced unless forced
+//   POST /_t3flare/agents/workspace-restore?id=<id> step 2b: a tombstone back to ready
+//   GET  /_t3flare/agents/budget                step 2b: the Container budget's leases, by Workspace
+//   GET  /_t3flare/agents/sweep[?dry=1]           step 2b: the Workspace sweep (dry: what it would do, with reasons)
 //   POST /_t3flare/agents/workspace-probe?id=<id>  the repo revision moves on a write and a delete (read cache check)
 //   POST /_t3flare/agents/workspace-workflows?id=<id>&on=1|0  the owner's opt-in to `workflows: write` on the Workspace's Container tokens
 //   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec"|"credentialHelper"|"killExecs": input} on the Workspace DO
@@ -230,10 +234,18 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const { environmentServices } = await import("../agents/bindings.ts");
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");
         const records = environmentServices().workspaces.list();
+        const { referencesFrom } = await import("../agents/deletion.ts");
+        let references: ReadonlyMap<string, ReadonlyArray<string>> = new Map();
+        try {
+          references = referencesFrom(environmentServices().sql).byWorkspace;
+        } catch {
+          // t3's tables not there yet
+        }
         return json({
           workspaces: await Promise.all(
             records.map(async (record) => ({
               ...record,
+              references: references.get(record.id) ?? [],
               container: await workspaceRpc(record.id).containerState().catch((error: unknown) => ({ error: String(error) })),
               info: await workspaceRpc(record.id).info().catch((error: unknown) => ({ error: String(error) })),
             })),
@@ -326,11 +338,38 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         if (url.searchParams.get("clear") === "1") checkpointTrace.length = 0;
         return json({ entries });
       }
-      case "POST /_t3flare/agents/workspace-remove": {
+      case "POST /_t3flare/agents/workspace-remove":
+      case "POST /_t3flare/agents/workspace-purge": {
+        // Step 2b: a purge (the DO's files with it), refused while referenced unless `force=1`; `workspace-remove`
+        // (step 2a's, which left the files) is a forced purge now.
         const { environmentServices } = await import("../agents/bindings.ts");
-        environmentServices().workspaces.remove(url.searchParams.get("id") ?? "");
-        return json({ removed: true });
+        const { purgeWorkspace, referencesFrom } = await import("../agents/deletion.ts");
+        const id = url.searchParams.get("id") ?? "";
+        if (environmentServices().workspaces.get(id) === undefined) return json({ error: "no such Workspace" }, 404);
+        const references = referencesFrom(environmentServices().sql);
+        const why = references.byWorkspace.get(id);
+        const force = url.searchParams.get("force") === "1" || url.pathname.endsWith("workspace-remove");
+        if (why !== undefined && !force) return json({ refused: true, references: why }, 409);
+        return json(await purgeWorkspace(id, references.deletedThreads.get(id) ?? []));
       }
+      case "POST /_t3flare/agents/workspace-restore": {
+        const { restoreWorkspace } = await import("../agents/deletion.ts");
+        const restored = restoreWorkspace(url.searchParams.get("id") ?? "");
+        return restored === undefined ? json({ error: "not a tombstone" }, 409) : json({ restored });
+      }
+      case "GET /_t3flare/agents/budget": {
+        // Step 2b: the Container budget's leases, and which Workspace each holder is (DO ids in hex).
+        const { environmentServices } = await import("../agents/bindings.ts");
+        const { byName } = await import("../agents/rpc.ts");
+        const services = environmentServices();
+        const state = await byName(services.agents.CONTAINER_BUDGET, "budget", "CONTAINER_BUDGET").state();
+        const names = new Map(services.workspaces.list().map((ws) => [String(services.agents.WORKSPACES?.idFromName(ws.id)), ws.id]));
+        return json({ ...state, leases: state.leases.map((lease) => ({ ...lease, workspace: names.get(lease.holder) ?? null })) });
+      }
+      case "GET /_t3flare/agents/sweep":
+      case "POST /_t3flare/agents/sweep":
+        // `dry=1` reports what it would do; a run on a stage without T3FLARE_SWEEP_PURGE=1 (prod) is a dry run anyway.
+        return json({ report: await environment.runSweep({ dry: url.searchParams.get("dry") === "1" }), last: environment.lastSweep });
       case "POST /_t3flare/check/workspaces": {
         const { workspacesCheck } = await import("./workspacesCheck.ts");
         return json(await workspacesCheck());

@@ -56,7 +56,7 @@ import { kindOf, patchAnswer } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
-import { parseBundleAnswer, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
+import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
 import {
   CONTAINER_BACKEND,
   CONTAINER_IDLE_MS,
@@ -121,6 +121,8 @@ export type FsOp =
 
 
 const LAST_USE_KEY = "t3flare:container-last-use";
+/** Set by `destroy()` (review F4): every RPC but provisioning refuses, so a purged Workspace is never recreated. */
+const DESTROYED_KEY = "t3flare:destroyed";
 /** A worktree's copy of its project's untracked files (step 2b, plan section 4.2), linked at the project's t3 path in its Container. */
 export const PROJECT_ROOT_VIEW = `${HARNESS_ROOT}/project-root`;
 const PROJECT_ROOT_MAX_FILES = 1000;
@@ -255,6 +257,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** One of `ComputerExecutionEnv`'s file operations (the Session's tools), answered as plain data. */
   async fileOperation(request: EnvRequest): Promise<EnvResponse<HostOperation>> {
+    this.#alive();
     await this.#workspace.ready();
     this.#hostReady ??= this.#host.prepare(WORKSPACE_ROOT, Date.now());
     await this.#hostReady;
@@ -330,6 +333,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Runs `input.script` and waits for it. The Container backend starts the Container if it is stopped. */
   async exec(input: ExecInput): Promise<ExecResult> {
+    this.#alive();
     const started = Date.now();
     const backend = input.backend === "worker-shell" ? WORKER_SHELL_BACKEND : CONTAINER_BACKEND;
     this.#running++;
@@ -377,6 +381,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Reads a text file from the Workspace's own files (never the Container). Paths inside the Workspace. */
   async readText(path: string): Promise<string | null> {
+    this.#alive();
     await this.#workspace.ready();
     try {
       return await this.#workspace.fs.readFile(path, "utf8");
@@ -387,6 +392,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Writes a text file into the Workspace's own files, as the agent's file tools do. */
   async writeText(path: string, text: string): Promise<void> {
+    this.#alive();
     await this.#workspace.ready();
     await this.#workspace.fs.mkdir(path.slice(0, path.lastIndexOf("/")) || "/", { recursive: true });
     await this.#workspace.fs.writeFile(path, text);
@@ -396,6 +402,7 @@ export class WorkspaceDO extends ContainerHost {
   // The Environment's file operations (its own files, never the Container) and git (step 2a plan, section 2)
 
   async fs(op: FsOp): Promise<FsAnswer<unknown>> {
+    this.#alive();
     await this.#workspace.ready();
     const ops = fileOps(this.#workspace);
     switch (op.op) {
@@ -430,6 +437,7 @@ export class WorkspaceDO extends ContainerHost {
    * Container stays stopped (the parent's ruling on M2's deviation 2; ADR-0009 refinement).
    */
   async git(run: GitRun): Promise<GitAnswer> {
+    if (this.#isDestroyed()) return { ran: false, reason: "container_refused", detail: "t3flare: this Workspace was deleted" };
     const passive = !run.startContainer;
     // Step 2b (root's ruling, ADR-0009 refinement): the allow-listed `.git` reads are keyed without env and own
     // `--git-dir`, so the answers primed while the Container was up match t3's later reads.
@@ -578,6 +586,7 @@ export class WorkspaceDO extends ContainerHost {
    * the Container's git otherwise. A restore, and the authored paths of a range where HEAD moved, run the Container's git.
    */
   async checkpoint(op: CheckpointOp): Promise<CheckpointAnswer> {
+    this.#alive();
     try {
       const repo = await this.#repo();
       switch (op.op) {
@@ -677,6 +686,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Clones `input.url` into the Workspace's repo, in the Container, and sets the repo's identity and credentials. */
   async clone(input: CloneInput): Promise<GitAnswer> {
+    this.#revive();
     this.#rememberId(input.id);
     const name = this.env.T3FLARE_GIT_NAME ?? "t3flare";
     const email = this.env.T3FLARE_GIT_EMAIL ?? "t3flare@users.noreply.github.com";
@@ -713,6 +723,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Step 1, in the worktree's object: a fresh clone without checkout (or `git init` with no remote); answers its tips. */
   async worktreeClone(input: { readonly id: string; readonly url: string | null; readonly token: string | null }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }> {
+    this.#revive();
     this.#rememberId(input.id);
     const script = worktreeCloneScript({
       repo: REPO_ROOT,
@@ -736,6 +747,7 @@ export class WorkspaceDO extends ContainerHost {
    * No bundle when the clone already has the commit. Also `ref`'s `branch.<ref>.*` config.
    */
   async worktreeBundle(input: { readonly ref: string; readonly tips: ReadonlyArray<string>; readonly name: string }): Promise<{ readonly ok: boolean; readonly commit?: string; readonly bundle?: string | null; readonly config?: ReadonlyArray<string>; readonly error?: string }> {
+    this.#alive();
     const bundle = `${HARNESS_ROOT}/tmp/wt-${input.name.replace(/[^A-Za-z0-9-]/g, "")}.bundle`;
     const script = worktreeBundleScript({ ref: input.ref, tips: input.tips, bundle });
     try {
@@ -751,6 +763,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** A slice of one of this object's own files (another Workspace DO copies a bundle with it). */
   async readChunk(path: string, offset: number, length: number): Promise<{ readonly bytes: Uint8Array; readonly done: boolean } | { readonly error: string }> {
+    this.#alive();
     await this.#workspace.ready();
     const answer = await fileOps(this.#workspace).read(path, { offset, length });
     if (!("ok" in answer)) return { error: answer.message };
@@ -798,6 +811,7 @@ export class WorkspaceDO extends ContainerHost {
    * `maxBytes`. Tracked files are not in it: a worktree has them at its own commit.
    */
   async projectRootFiles(input: { readonly maxFiles: number; readonly maxBytes: number }): Promise<{ readonly files: ReadonlyArray<{ readonly path: string; readonly size: number }>; readonly capped: boolean }> {
+    this.#alive();
     const repo = await this.#repo();
     const tracked = new Set(await git.listFiles({ fs: repo.fs, dir: repo.dir, cache: repo.cache }).catch(() => [] as Array<string>));
     const found = await fileOps(this.#workspace).find(REPO_ROOT, undefined, 50_000);
@@ -823,6 +837,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Copies the project's untracked files into this worktree's project-root view (step 2b), object to object. */
   async seedProjectRoot(input: { readonly parent: string }): Promise<{ readonly files: number; readonly bytes: number; readonly capped: boolean; readonly names: ReadonlyArray<string> }> {
+    this.#alive();
     await this.#workspace.ready();
     const ops = fileOps(this.#workspace);
     const project = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(input.parent)) as unknown as WorkspaceDO;
@@ -857,7 +872,84 @@ export class WorkspaceDO extends ContainerHost {
     }
   }
 
+  // -------------------------------------------------------------------------------------------------------------------
+  // Deletion (step 2b, plan section 5; review F4 and F8)
+
+  /** Whether `destroy()` ran and no provisioning has run since. */
+  #isDestroyed(): boolean {
+    return this.ctx.storage.kv.get<number>(DESTROYED_KEY) !== undefined;
+  }
+
+  /** Refuses an RPC on a purged Workspace (a Session reaching it by name, a stale caller), before computer touches storage. */
+  #alive(): void {
+    if (this.#isDestroyed()) throw new Error("t3flare: this Workspace was deleted");
+  }
+
+  /** Provisioning makes the Workspace again (a worktree at a reused path, review F5). */
+  #revive(): void {
+    this.ctx.storage.kv.delete(DESTROYED_KEY);
+  }
+
+  /**
+   * Purges the Workspace: its terminals and Container, the budget's lease, the alarm, then all of its storage
+   * (computer's file system, the read cache, the change log), leaving only the marker that refuses later RPCs, and
+   * restarts the object so no in-memory computer state outlives the storage.
+   */
+  async destroy(): Promise<{ readonly destroyed: true }> {
+    this.#terminals.containerStopped();
+    await this.#terminals.settled().catch(() => undefined);
+    if (this.ctx.container?.running === true) await this.ctx.container.destroy().catch(() => undefined);
+    await this.#budget().release(this.ctx.id.toString()).catch(() => undefined);
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    this.ctx.storage.kv.put(DESTROYED_KEY, Date.now());
+    await this.ctx.storage.sync();
+    console.log(JSON.stringify({ t3flare: "workspace-destroyed", workspace: this.ctx.id.name ?? this.ctx.id.toString() }));
+    setTimeout(() => this.ctx.abort("t3flare: workspace destroyed"), 0);
+    return { destroyed: true };
+  }
+
+  /** The project's ref tips (its Container), for what a removed worktree must carry home. */
+  async refTips(): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }> {
+    this.#alive();
+    const result = await this.exec({ script: "git for-each-ref --format='%(objectname)' | sort -u", cwd: REPO_ROOT, timeoutMs: 120_000 });
+    if (result.exitCode !== 0) return { ok: false, tips: [], error: result.stderr.slice(-500) };
+    return { ok: true, tips: parseTips(`TIPS\n${result.stdout}`) };
+  }
+
+  /** In a worktree being removed: whether it is dirty, and a bundle of the refs its project cannot reach (F8). */
+  async carryOut(input: { readonly projectTips: ReadonlyArray<string> }): Promise<{ readonly ok: boolean; readonly dirty: boolean; readonly carried: ReadonlyArray<{ readonly ref: string; readonly sha: string }>; readonly bundle: string | null; readonly error?: string }> {
+    this.#alive();
+    const bundle = `${HARNESS_ROOT}/tmp/carry.bundle`;
+    const result = await this.exec({ script: carryOutScript({ projectTips: input.projectTips, bundle }), cwd: REPO_ROOT, timeoutMs: 10 * 60_000 });
+    if (result.exitCode !== 0) return { ok: false, dirty: true, carried: [], bundle: null, error: result.stderr.slice(-500) };
+    const answer = parseCarryOut(result.stdout);
+    return { ok: true, dirty: answer.dirty, carried: answer.carried, bundle: answer.bundled ? bundle : null };
+  }
+
+  /** In the project: fetch a removed worktree's carried refs from its bundle (object to object) and give each a home. */
+  async carryIn(input: { readonly worktree: string; readonly bundle: string; readonly dir: string; readonly carried: ReadonlyArray<{ readonly ref: string; readonly sha: string }> }): Promise<{ readonly ok: boolean; readonly lines: ReadonlyArray<string>; readonly error?: string }> {
+    this.#alive();
+    await this.#workspace.ready();
+    const ops = fileOps(this.#workspace);
+    const local = `${HARNESS_ROOT}/tmp/carry-in.bundle`;
+    const source = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(input.worktree)) as unknown as WorkspaceDO;
+    await ops.mkdir(`${HARNESS_ROOT}/tmp`, true);
+    await ops.remove(local, { force: true });
+    for (let offset = 0; ; offset += 4 * 1024 * 1024) {
+      const chunk = await source.readChunk(input.bundle, offset, 4 * 1024 * 1024);
+      if ("error" in chunk) return { ok: false, lines: [], error: `the worktree's bundle could not be read: ${chunk.error}` };
+      await ops.write(local, chunk.bytes, { append: offset > 0 });
+      if (chunk.done) break;
+    }
+    const result = await this.exec({ script: carryInScript({ bundle: local, dir: input.dir, carried: input.carried }), cwd: REPO_ROOT, timeoutMs: 10 * 60_000 });
+    const lines = result.stdout.split("\n").filter((line) => /^(CREATED|FASTFORWARD|KEPT) /.test(line));
+    if (result.exitCode !== 0) return { ok: false, lines, error: result.stderr.slice(-500) };
+    return { ok: true, lines };
+  }
+
   async info(): Promise<ProvisionInfo> {
+    if (this.#isDestroyed()) return { provisioned: false, repo: false, containerRunning: this.containerRunning(), revision: 0, gitRevision: 0, cachedReads: 0, id: null, destroyed: true };
     await this.#workspace.ready();
     const ops = fileOps(this.#workspace);
     const repo = "ok" in (await ops.stat(REPO_ROOT));
@@ -882,6 +974,7 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   async terminalOpen(input: TerminalOpenInput): Promise<TerminalAnswer> {
+    this.#alive();
     this.#rememberId(input.t3Path.startsWith("/w/") ? input.t3Path.slice(3) : undefined);
     const answer = await this.#terminals.open(input);
     this.#terminalsChanged();
@@ -942,6 +1035,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Idle stop and the budget lease's renewal: the object's one alarm. */
   override async alarm(): Promise<void> {
+    if (this.#isDestroyed()) return;
     if (!this.containerRunning()) {
       if ((await this.ctx.storage.get<boolean>(LEASED_KEY)) === true) await this.#release();
       return;
@@ -962,6 +1056,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** computer's Workspace RPC (`getWorkspace()`, the Worker Shell's proxy): the caller disposes the stub. */
   async __getWorkspaceStub(): Promise<WorkspaceStub> {
+    this.#alive();
     await this.#workspace.ready();
     return this.#workspace.stub();
   }
@@ -971,6 +1066,7 @@ export class WorkspaceDO extends ContainerHost {
    * helper's token request (`CREDENTIAL_PATH`) is answered here.
    */
   override async fetch(request: Request): Promise<Response> {
+    if (this.#isDestroyed()) return new Response("t3flare: this Workspace was deleted", { status: 410 });
     if (new URL(request.url).pathname === CREDENTIAL_PATH) return this.#credential();
     return this.#container.handleFetch(request);
   }
@@ -999,6 +1095,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Points the repo's git credentials at `CREDENTIAL_HELPER` (repos cloned before it existed). */
   async ensureCredentialHelper(id?: string): Promise<ExecResult> {
+    this.#alive();
     this.#rememberId(id);
     return this.exec({ script: `git config credential.helper ${shellWord(CREDENTIAL_HELPER)} && git config --get credential.helper`, cwd: REPO_ROOT });
   }
