@@ -6,3 +6,4 @@ dist/
 .bun/
 .env.spike
 /bump-report.json
+.worktrees/
