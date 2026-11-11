@@ -43,6 +43,9 @@ jobs:
         with:
           submodules: true
           fetch-depth: 0
+          # Persisting credentials walks t3code's nested gitlinks, one of which has no URL (.repos/alchemy-effect/…),
+          # and fails the checkout; the push below sets its own credentials instead.
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -101,7 +104,7 @@ jobs:
           changed=$(jq -r .changed bump-report.json)
           if [ "$changed" != "true" ]; then echo "No new pin."; exit 0; fi
           branch="bump/$to"
-          git push --force origin "HEAD:refs/heads/$branch"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
           gh pr create --head "$branch" --base main --title "chore: bump t3code to $to" \
             --body "Pinned by the nightly bump job; the acceptance test passed on the \`bump\` stage. See the run's report: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             || echo "A pull request for $branch already exists."

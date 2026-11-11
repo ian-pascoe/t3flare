@@ -1,0 +1,104 @@
+{
+ "runs": [
+  {
+   "id": ":ordinal:1",
+   "status": "completed",
+   "continuationOf": null
+  },
+  {
+   "id": ":ordinal:2",
+   "status": "completed",
+   "continuationOf": null
+  },
+  {
+   "id": ":ordinal:3",
+   "status": "cancelled",
+   "continuationOf": null
+  },
+  {
+   "id": ":ordinal:4",
+   "status": "completed",
+   "continuationOf": ":ordinal:3"
+  }
+ ],
+ "items": [
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "run": ":ordinal:1",
+   "text": "Preparing workspace"
+  },
+  {
+   "type": "file_change",
+   "status": "completed",
+   "run": ":ordinal:1",
+   "text": "src/greeting.txt"
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "run": ":ordinal:1",
+   "text": ""
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "run": ":ordinal:1",
+   "text": "bash test.sh"
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "run": ":ordinal:1",
+   "text": ""
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "run": ":ordinal:1",
+   "text": "Yes, it passed: `bash test.sh` printed \"all checks passed\" after I added `Hello from the desktop client.` as the new las"
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "run": ":ordinal:2",
+   "text": "sleep 30 && echo slept; bash test.sh"
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "run": ":ordinal:2",
+   "text": "The `sleep 30 && echo slept` command printed \"slept\", and `bash test.sh` then printed \"all checks passed\"."
+  },
+  {
+   "type": "command_execution",
+   "status": "cancelled",
+   "run": ":ordinal:3",
+   "text": "sleep 60 && echo slept again; bash test.sh"
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "run": ":ordinal:4",
+   "text": "ps aux | grep -E \"sleep|test.sh\" | grep -v grep; cat test.sh; git status --short"
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "run": ":ordinal:4",
+   "text": "The earlier `sleep 60` is still running in the container. Its output went nowhere I can read. The commands are read-only"
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "run": ":ordinal:4",
+   "text": "sleep 60 && echo slept again; bash test.sh"
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "run": ":ordinal:4",
+   "text": "The `sleep 60 && echo slept again` command printed \"slept again\", and `bash test.sh` then printed \"all checks passed\". T"
+  }
+ ]
+}
