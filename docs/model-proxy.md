@@ -92,7 +92,7 @@ When the proxy cannot serve a turn because a limit is reached, the turn ends as 
 - A reset is held to at least **30 s after the turn ends**, so a `retry-after: 0` cannot start an instant resume (t3 arms no resume for a reset that is not after the run's end). There is no upper bound: a monthly spend limit resets weeks away.
 - **Resuming.** t3 offers the resume on the thread; with the client's "auto-resume limited threads" setting on (off by default, your own choice) it resumes by itself. An idle Environment's alarm wakes it at the reset. t3 resumes once per run and reset, so a limit that persists costs one request per window.
 - **Text generation** (titles, commit messages) uses the same classification for its error text.
-- **Not covered:** compaction's own model requests are retried by pi-durable as before (rare: a limited turn rarely compacts).
+- **Compaction** gets the same treatment. pi-durable's compaction summarizes with `completeSimple` and runs no `afterResponse` hook, so the Session's models classify each `completeSimple` answer the same way (`compactionLimits`). A summary refused for a limit or a key makes one request. It fails the compaction, and a turn that waited on that compaction fails with the record as above.
 
 ## Set it up
 

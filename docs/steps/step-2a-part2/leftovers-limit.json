@@ -1,0 +1,37 @@
+{
+  "scenario": "limit",
+  "at": "2026-11-11T19:36:52.495Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "fault": {
+    "armed": {
+      "fixture": "cooldown",
+      "resetAt": 1794425935441
+    }
+  },
+  "first": {
+    "run": "failed",
+    "failure": {
+      "class": "usage_limit",
+      "message": "Every account the model proxy has for this model is at its usage limit.",
+      "code": "proxy_cooldown",
+      "retryable": true,
+      "resetAt": "2026-11-11T19:38:55.859Z"
+    },
+    "proxy": {
+      "requests": 1,
+      "failure": {
+        "class": "usage_limit",
+        "code": "proxy_cooldown",
+        "row": 1,
+        "resetAt": 1794425935859,
+        "stop": true,
+        "at": 1794425817859
+      }
+    },
+    "faultResetAt": "2026-11-11T19:38:55.441Z"
+  },
+  "threadId": "2cd89ec3-dfce-42d2-8d34-742c88c0dc43",
+  "errorItems": 1,
+  "failures": [],
+  "ok": true
+}
