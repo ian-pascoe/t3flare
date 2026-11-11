@@ -1,0 +1,35 @@
+{
+ "at": "2026-11-11T21:18:00.338Z",
+ "envRestartDelegated": {
+  "followerAfterRestart": {
+   "timedOut": true,
+   "status": "running",
+   "run": "run:thread:mcp%3Alaunch%3A3d64aa4e9095c3446d8006993294559519ecfa02039436b58d0756553a77e2a5:ordinal:2"
+  },
+  "original": {
+   "status": "resolved",
+   "capability": "message"
+  },
+  "raisedAgain": {
+   "question": "Which color for d-mwcmeb1r?",
+   "capability": "live"
+  },
+  "runs": [
+   {
+    "status": "cancelled",
+    "continuationOf": null
+   },
+   {
+    "status": "running",
+    "continuationOf": "the cut run"
+   }
+  ],
+  "final": {
+   "status": "completed",
+   "resultRun": "run:thread:mcp%3Alaunch%3A3d64aa4e9095c3446d8006993294559519ecfa02039436b58d0756553a77e2a5:ordinal:2",
+   "blue": true
+  }
+ },
+ "failures": [],
+ "ok": true
+}
