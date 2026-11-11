@@ -42,7 +42,7 @@ _Avoid_: remote subagent, cloud task
 
 **T3 Connect**:
 The hosted relay at `t3.codes` that T3's mobile apps register with; it pushes an Environment's published thread
-phases to the owner's phone (ADR-0023).
+phases to the owner's phone (ADR-0025).
 _Avoid_: the cloud, the relay service, push service
 
 **Publish-only link**:

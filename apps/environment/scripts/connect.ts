@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off globalFetch:off globalDate:off globalTimers:off nodeBuiltinImport:off
-// The publish-only T3 Connect link of a stage (step 3+, ADR-0023), through its admin routes (src/connect/admin.ts):
+// The publish-only T3 Connect link of a stage (step 3+, ADR-0025), through its admin routes (src/connect/admin.ts):
 //
 //   bun scripts/stage.ts run <stage> connect sign-in [--owner]   start t3's device flow; prints the code and URL for the
 //                                                               owner to approve, then waits until the link is made

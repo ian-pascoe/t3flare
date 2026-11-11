@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off globalJsonInEffect:off
-// The Connect admin routes (step 3+, ADR-0023), under the Worker's admin check (Access plus the admin token):
+// The Connect admin routes (step 3+, ADR-0025), under the Worker's admin check (Access plus the admin token):
 //
 //   POST /_t3flare/connect/sign-in            t3's device flow; answers the code and URL for the owner to approve
 //   POST /_t3flare/connect/import-token       R1 fallback: {"accessToken","refreshToken","expiresAtEpochMs"} from a headless CLI

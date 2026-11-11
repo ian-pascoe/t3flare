@@ -41,7 +41,7 @@ export interface EnvironmentEnv extends AgentsBindings {
   /** Overrides the sweep's 7-day grace (stages). */
   readonly T3FLARE_SWEEP_GRACE_MS?: string;
   /**
-   * Step 3+ (ADR-0023): "1" keeps the T3 Connect account token after the link (stages). Unset, as on prod, it is
+   * Step 3+ (ADR-0025): "1" keeps the T3 Connect account token after the link (stages). Unset, as on prod, it is
    * discarded (owner decision D2).
    */
   readonly T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN?: string;

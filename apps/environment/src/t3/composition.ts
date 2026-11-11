@@ -207,7 +207,7 @@ export interface CompositionOptions {
    * (a host that is not loopback); without it t3 assumes `loopback-browser`.
    */
   readonly host: string;
-  /** Step 3+: the publish-only T3 Connect link's policy (ADR-0023). */
+  /** Step 3+: the publish-only T3 Connect link's policy (ADR-0025). */
   readonly connect: ConnectService.ConnectPolicy;
 }
 
@@ -747,7 +747,7 @@ export const make = (options: CompositionOptions) => {
     Effect.gen(function* () {
       // t3flare: no server ownership lock, PATH fixing, runtime-state file, Tailscale
       // Serve, and no T3 Connect link at startup: one DO is the only server, and it has no host. The
-      // publish-only link is made once, from an admin route (step 3+, ADR-0023).
+      // publish-only link is made once, from an admin route (step 3+, ADR-0025).
       const activation = yield* Deferred.make<void>();
       const layerActivation = Layer.succeed(ServerActivation.ServerActivation, Deferred.await(activation));
       const routesReady = yield* Deferred.make<void>();

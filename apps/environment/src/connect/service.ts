@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalDateInEffect:off globalFetch:off globalFetchInEffect:off effectFnOpportunity:off
-// The Connect service (step 3+, ADR-0023): a publish-only T3 Connect link, so the owner's phone hears when a cloud run
+// The Connect service (step 3+, ADR-0025): a publish-only T3 Connect link, so the owner's phone hears when a cloud run
 // ends or waits. Everything is t3's own: the device-flow sign-in (`CliTokenManager.deviceAuthorizationLogin`), the
 // link step (`CloudLink.reconcileDesiredLinkIfStillDesired`), the token store, and the publisher, which then publishes
 // on its own whenever a thread's awareness phase changes. This service only runs those steps from the admin routes,
@@ -349,7 +349,7 @@ export const layerRefusingCloudLink = Layer.effect(
       return yield* new ManagedLimits.ManagedPolicyRefusedError({
         organization: "t3flare",
         action: "T3 Connect's relay routes",
-        detail: "this Environment links outward only, from its admin routes (ADR-0010, ADR-0023)",
+        detail: "this Environment links outward only, from its admin routes (ADR-0010, ADR-0025)",
       });
     });
     return CloudLink.CloudLink.of({

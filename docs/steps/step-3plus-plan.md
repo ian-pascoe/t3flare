@@ -54,7 +54,7 @@ does: finding 5).
    sign-in (an in-place restart kills the sign-in fiber): arm refuses while a sign-in is pending.
 5. **MEDIUM: D2 and R8 understate the account token.** The relay accepts it as `clerk_oauth_bearer` on the whole
    client group: it can unlink environments, delete the laptop's tunnel and link an attacker's environment. Built:
-   prod discards it after the link (above); P6 decides by status code, not by body; ADR-0023 states the
+   prod discards it after the link (above); P6 decides by status code, not by body; ADR-0025 states the
    single-holder rule and that this is the first account credential the DO holds.
 6. **MEDIUM-LOW: admin exposure.** The stage's Access service token is admitted, and CI holds it with the admin token.
    Built: on prod, Connect mutations and the R1 token import require the owner's Access identity (an Access assertion
@@ -322,7 +322,7 @@ T3 Connect can neither reach the Environment nor mint a session on it. No tunnel
 The paragraph's 'no relay routes' line becomes "relay routes only for link state, preferences, unlink and the
 reachability answer".
 
-A new ADR-0023 records the hard-to-reverse choice: "Mobile notifications come from t3's own publisher over a
+A new ADR-0025 records the hard-to-reverse choice: "Mobile notifications come from t3's own publisher over a
 publish-only T3 Connect link, signed in once by device flow and never relinked at boot". The options it considers:
 t3's startup relink (rejected: churn, and it undoes the owner's unlink); our own push service (rejected: the mobile app
 registers only with the relay); a managed tunnel (rejected: ADR-0010).
@@ -436,7 +436,7 @@ notified when a cloud run ends and when one waits on them.
   It also runs the workerd fake-relay test (part of `bun run check`). The bump job never signs in.
 - Documents:
   - the report `docs/steps/step-3plus.md`;
-  - ADR-0023 and ADR-0010's refinement (§5);
+  - ADR-0025 and ADR-0010's refinement (§5);
   - GLOSSARY: **T3 Connect** (the hosted relay at `t3.codes` that pushes to the owner's phone) and **Publish-only
     link**;
   - `docs/parity.md` (Mobile push → W);
