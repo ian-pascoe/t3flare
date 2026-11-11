@@ -1,6 +1,7 @@
 // The differ on a recorded Session (step 2a plan, tests): a real Session's state, as `GET /_t3flare/agents/session`
 // returned it on the `step2a` stage after `scripts/chat.ts` (an answer, a Stop, a steer).
 import type { SessionState, TurnState } from "@t3flare/session-protocol";
+import { makeProviderFailureTurnItem } from "@t3tools/provider-core/server/failure";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vitest";
 
@@ -223,6 +224,31 @@ describe("differ", () => {
     const bash = finals.find((item) => item.type === "command_execution") as { input: string; output?: string; exitCode?: number } | undefined;
     expect(bash).toMatchObject({ input: "cd /w/fixture && bash test.sh", output: "all checks passed\n", exitCode: 0 });
     expect(events.filter((event) => event.type === "turn.terminal").length).toBe(1);
+  });
+
+  it("a failed turn's error item is the one t3 makes from its terminal, so the thread shows the failure once", () => {
+    // t3's ingestor turns a failed `turn.terminal` into an error item of its own (ProviderEventIngestor.ts,
+    // `makeProviderFailureTurnItem`); the item the differ emits must be that item, not a second one.
+    const turnId = Object.keys(state.turns)[0]!;
+    const detail = `429 {"type":"error","error":{"type":"rate_limit_error","message":"All credentials for model m are cooling down via provider claude (reset after 2m0s)"}}`;
+    const events = diff(withTurns(), { ...state, entries: [], turns: { [turnId]: { ...state.turns[turnId]!, status: "failed", reason: "model_error", detail } } }, now);
+    const errors = events.flatMap((event) => (event.type === "turn_item.updated" && event.turnItem.type === "error" ? [event.turnItem] : []));
+    const terminal = events.find((event) => event.type === "turn.terminal");
+    if (terminal?.type !== "turn.terminal" || terminal.status !== "failed") throw new Error("no failed terminal");
+    const ingested = makeProviderFailureTurnItem({
+      driver: terminal.driver,
+      threadId: errors[0]!.threadId,
+      runId: errors[0]!.runId,
+      nodeId: errors[0]!.nodeId,
+      providerThreadId: terminal.providerThreadId,
+      providerTurnId: terminal.providerTurnId,
+      itemOrdinal: terminal.failureItemOrdinal,
+      failure: terminal.failure,
+      occurredAt: now,
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.id).toBe(ingested.id);
+    expect(errors[0]!.ordinal).toBe(ingested.ordinal);
   });
 
   it("a turn the Session aborted at the 2 h cap ends failed, with the deadline's reason", () => {

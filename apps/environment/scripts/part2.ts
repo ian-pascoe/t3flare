@@ -325,6 +325,10 @@ switch (scenario) {
     };
     report.threadId = threadId;
     check("the first run failed", firstRun.status === "failed", firstRun);
+    // Once in the thread: the differ's error item and the one t3 makes from the failed terminal are the same item.
+    const errors = itemsOf(failed.projection).filter((i: any) => i.type === "error");
+    report.errorItems = errors.length;
+    check("one error item in the thread", errors.length === 1, errors);
     if (scenario === "overload") {
       // pi-durable retries an overload (3 retries, from 2 s): four answers, then a provider error.
       check("four proxy requests (retried)", turns[0]?.proxy?.requests === 4, turns[0]?.proxy);

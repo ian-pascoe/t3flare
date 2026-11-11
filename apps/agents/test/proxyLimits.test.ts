@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import fixtures from "../../../packages/models/test/fixtures/proxy.json" with { type: "json" };
 import { proxyModels } from "../src/session/models.ts";
-import { type Fault, faultAnswer, proxyLimits, recordingFetch } from "../src/session/proxyLimits.ts";
+import { compactionLimits, type Fault, faultAnswer, proxyLimits, recordingFetch } from "../src/session/proxyLimits.ts";
 
 const context = BACKGROUND_CONTEXT;
 const T0 = Date.parse("2026-11-12T10:00:00.000Z");
@@ -24,8 +24,30 @@ const answerOf = (name: Name) => {
   return new Response(answer.body, { status: answer.status, headers: { ...answer.headers, "content-type": "application/json" } });
 };
 
-/** A Session's model path: a fake proxy answering `answer`, the recording fetch, the hook; runs one submission. */
+/** An answer the proxy streams for a turn that succeeds: one text block, `ok`. */
+const okAnswer = () => {
+  const event = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify({ type, ...(data as object) })}\n\n`;
+  const body = [
+    event("message_start", {
+      message: { id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [], stop_reason: null, usage: { input_tokens: 5, output_tokens: 0 } },
+    }),
+    event("content_block_start", { index: 0, content_block: { type: "text", text: "" } }),
+    event("content_block_delta", { index: 0, delta: { type: "text_delta", text: "ok" } }),
+    event("content_block_stop", { index: 0 }),
+    event("message_delta", { delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } }),
+    event("message_stop", {}),
+  ].join("");
+  return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+};
+
+/** A Session's model path: a fake proxy answering `answer`, the recording fetch, the hooks; runs one submission. */
 const submit = async (answer: () => Response, fault?: Fault) => {
+  const session = await openSession(answer, fault);
+  return { ...(await session.submit()), ...session.counts() };
+};
+
+/** The Session's model path over a fake proxy: the recording fetch, the `afterResponse` hook and compaction's limits. */
+const openSession = async (answer: () => Response, fault?: Fault) => {
   let now = T0;
   let proxied = 0;
   let requests = 0;
@@ -46,18 +68,35 @@ const submit = async (answer: () => Response, fault?: Fault) => {
       requests++;
     },
   });
-  const models = proxyModels({ url: "https://proxy.example", apiKey: "k" }, () => STATIC_CATALOG, recorder.fetch);
+  const limits = { last: recorder.last, record: (failure: ProxyFailureRecord) => void records.push(failure) };
+  const models = compactionLimits(proxyModels({ url: "https://proxy.example", apiKey: "k" }, () => STATIC_CATALOG, recorder.fetch), limits);
   const registry = createRegistry();
-  registry.install(proxyLimits({ last: recorder.last, record: (failure) => void records.push(failure) }));
-  const harness = await Harness.open(new MemoryStorage(), { models, registry, settings: { retry: { enabled: true, maxRetries: 3, baseDelayMs: 1 } } }, context);
+  registry.install(proxyLimits(limits));
+  const harness = await Harness.open(
+    new MemoryStorage(),
+    // Any earlier turn is enough to compact.
+    { models, registry, settings: { retry: { enabled: true, maxRetries: 3, baseDelayMs: 1 }, compaction: { keepRecentTokens: 1 } } },
+    context,
+  );
   const root = await harness.root(context, { agent: { model: { provider: "anthropic", modelId: "claude-haiku-5-5" } } });
-  const submission = await root.submit({ type: "input", content: "hi" }, context);
   harness.resume();
-  for (;;) {
-    const status = await submission.status(context);
-    if (status.status === "done" || status.status === "unanswered") return { requests, proxied, records, status: status as { status: string; detail?: unknown } };
-    await new Promise((resolve) => setTimeout(resolve, 2));
-  }
+  return {
+    counts: () => ({ requests, proxied, records }),
+    submit: async () => {
+      const submission = await root.submit({ type: "input", content: "hi" }, context);
+      for (;;) {
+        const status = await submission.status(context);
+        if (status.status === "done" || status.status === "unanswered") return { status: status as { status: string; detail?: unknown } };
+        await new Promise((resolve) => setTimeout(resolve, 2));
+      }
+    },
+    compact: async () => {
+      const before = requests;
+      const task = await root.compact(undefined, context);
+      const settled = await harness.waitForTask(task, context);
+      return { requests: requests - before, outcome: settled.state.outcome };
+    },
+  };
 };
 
 describe("the Session's model proxy failures", () => {
@@ -86,6 +125,32 @@ describe("the Session's model proxy failures", () => {
     const run = await submit(() => (calls++ === 0 ? answerOf("upstreamLimit") : answerOf("cooldown")));
     expect(run.requests).toBe(2);
     expect(run.records.map((record) => record.code)).toEqual(["proxy_upstream_limit", "proxy_cooldown"]);
+  });
+
+  it("compaction on a usage limit or a refused key: one request, recorded, failed with the text no retry matches", async () => {
+    for (const [name, code] of [
+      ["cooldown", "proxy_cooldown"],
+      ["invalidKey", "proxy_key_rejected"],
+    ] as const) {
+      let compacting = false;
+      const session = await openSession(() => (compacting ? answerOf(name) : okAnswer()));
+      expect((await session.submit()).status.status, name).toBe("done");
+      compacting = true;
+      const compaction = await session.compact();
+      expect(compaction.requests, name).toBe(1);
+      expect(compaction.outcome, name).toMatchObject({ status: "failed", error: { message: `Summarization failed: t3flare model proxy: ${code}` } });
+      expect(session.counts().records.at(-1), name).toMatchObject({ code, stop: true });
+    }
+  });
+
+  it("compaction on an overload is still retried by pi-durable", async () => {
+    let compacting = false;
+    const session = await openSession(() => (compacting ? answerOf("overloaded") : okAnswer()));
+    await session.submit();
+    compacting = true;
+    const compaction = await session.compact();
+    expect(compaction.requests).toBe(4);
+    expect(compaction.outcome).toMatchObject({ status: "failed" });
   });
 
   it("a fault answers in the proxy's place until its reset, counted as a request, with the proxy never called", async () => {

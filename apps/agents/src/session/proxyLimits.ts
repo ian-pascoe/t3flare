@@ -13,6 +13,7 @@
 import { GenerationTask, defineExtension, type Extension, hook } from "@earendil-works/pi-durable";
 import { classifyProxyFailure, proxyFailureDetail } from "@t3flare/models/proxyFailure";
 import type { ProxyFailureRecord } from "@t3flare/session-protocol";
+import type { AssistantMessage, MutableModels } from "@earendil-works/pi-ai";
 
 /** The last answer the proxy (or a fault) gave: its status, `retry-after` and when it came. */
 export interface RecordedAnswer {
@@ -112,20 +113,35 @@ export interface ProxyLimitsOptions {
   readonly record: (failure: ProxyFailureRecord) => void;
 }
 
-/** The `afterResponse` hook: classify a failed response once, record it, and stop retries that cannot succeed. */
+/** Classify a failed response once, record it, and when no retry can succeed leave a text no retry pattern matches. */
+const classifyOnce = (message: AssistantMessage, options: ProxyLimitsOptions): void => {
+  if (message.stopReason !== "error" || message.errorMessage === undefined) return;
+  const answer = options.last() ?? { status: 200, retryAfter: null, at: Date.now() };
+  const failure = classifyProxyFailure({ ...answer, text: message.errorMessage });
+  if (failure === undefined) return;
+  options.record({ ...failure, at: answer.at });
+  if (failure.stop) message.errorMessage = proxyFailureDetail(failure);
+};
+
+/** The `afterResponse` hook: `classifyOnce` on each generation's response, before pi-durable decides to retry it. */
 export const proxyLimits = (options: ProxyLimitsOptions): Extension =>
   defineExtension({
     name: "proxy-limits",
-    hooks: [
-      hook(GenerationTask, {
-        afterResponse: (message) => {
-          if (message.stopReason !== "error" || message.errorMessage === undefined) return;
-          const answer = options.last() ?? { status: 200, retryAfter: null, at: Date.now() };
-          const failure = classifyProxyFailure({ ...answer, text: message.errorMessage });
-          if (failure === undefined) return;
-          options.record({ ...failure, at: answer.at });
-          if (failure.stop) message.errorMessage = proxyFailureDetail(failure);
-        },
-      }),
-    ],
+    hooks: [hook(GenerationTask, { afterResponse: (message) => classifyOnce(message, options) })],
   });
+
+/**
+ * `models` with `classifyOnce` on every `completeSimple` answer. pi-durable's compaction summarizes with
+ * `completeSimple` and runs no `afterResponse` hook (1.5.0 `harness/compaction.js`: the request at :133, the retry
+ * classification right after it), so this is where its answer is classified, before that retry decision. Generation
+ * streams with `streamSimple` and keeps the hook, so no answer is classified twice.
+ */
+export const compactionLimits = (models: MutableModels, options: ProxyLimitsOptions): MutableModels => {
+  const completeSimple = models.completeSimple.bind(models);
+  models.completeSimple = async (...args) => {
+    const message = await completeSimple(...args);
+    classifyOnce(message, options);
+    return message;
+  };
+  return models;
+};
