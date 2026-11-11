@@ -19,6 +19,8 @@ import {
   type AbortInput,
   type AnswerInput,
   type ImageInput,
+  type InteractionMode,
+  interactionModeOf,
   LIVENESS_PUSH_MS,
   type ModelRef,
   type OpenAnswer,
@@ -48,7 +50,7 @@ import { DurableObject } from "cloudflare:workers";
 import { environmentStub } from "../environment.ts";
 import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
-import { ApprovalStore, permissions } from "../extensions/permissions.ts";
+import { ApprovalStore, interactionModeSection, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
@@ -89,6 +91,8 @@ interface Meta {
   readonly threadId: string;
   readonly workspaceId: string | null;
   readonly runtimeMode: RuntimeMode;
+  /** Step 3 (F-plan); absent in a Session stored before it. */
+  readonly interactionMode?: InteractionMode;
   readonly epoch: string;
 }
 
@@ -144,10 +148,12 @@ export class SessionDO extends DurableObject<SessionEnv> {
       permissions({
         store: this.#approvals,
         mode: () => runtimeModeOf(this.#meta()?.runtimeMode),
+        interaction: () => interactionModeOf(this.#meta()?.interactionMode),
         turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null,
         workspaceId: () => this.#meta()?.workspaceId ?? null,
       }),
     );
+    registry.install(interactionModeSection(() => interactionModeOf(this.#meta()?.interactionMode)));
     this.#registry = registry;
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {
@@ -346,6 +352,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       threadId: input.threadId,
       workspaceId: input.workspaceId,
       runtimeMode: input.runtimeMode,
+      interactionMode: interactionModeOf(input.interactionMode),
       epoch,
     } satisfies Meta);
     const root = await this.#root(input.model, input.thinking);
@@ -359,7 +366,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const existing = this.#turns()[input.providerTurnId];
     if (existing !== undefined) return { submissionId: existing.submissionId };
     const meta = this.#meta();
-    if (meta !== undefined) this.ctx.storage.kv.put(META_KEY, { ...meta, runtimeMode: input.runtimeMode } satisfies Meta);
+    if (meta !== undefined) {
+      this.ctx.storage.kv.put(META_KEY, { ...meta, runtimeMode: input.runtimeMode, interactionMode: interactionModeOf(input.interactionMode) } satisfies Meta);
+    }
     // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
     if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
     const root = await this.#root(input.model, input.thinking);

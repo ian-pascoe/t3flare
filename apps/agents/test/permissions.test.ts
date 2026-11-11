@@ -8,10 +8,10 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type AssistantMessage, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, defineTool, type Extension, Harness, MemoryStorage, type Storage, ToolResultEntry } from "@earendil-works/pi-durable";
 import { obj, str } from "@earendil-works/pi-schema";
-import type { RuntimeMode } from "@t3flare/session-protocol";
+import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
-import { ApprovalStore, type ApprovalStorage, asks, permissions, toToolPath } from "../src/extensions/permissions.ts";
+import { ApprovalStore, type ApprovalStorage, asks, interactionModeSection, permissions, PLAN_MODE_REFUSAL, toToolPath } from "../src/extensions/permissions.ts";
 
 const context = BACKGROUND_CONTEXT;
 
@@ -49,6 +49,26 @@ const fakeBash = (runs: Array<string>, hold?: Promise<void>) =>
       }),
     ],
   });
+
+/** `write` that records the paths it wrote. */
+const fakeWrite = (writes: Array<string>) =>
+  defineExtension({
+    name: "files",
+    tools: [
+      defineTool({
+        name: "write",
+        description: "write",
+        parameters: obj({ path: str(), content: str() }),
+        async execute(args) {
+          writes.push(args.path);
+          return { output: [{ type: "text" as const, text: `wrote ${args.path}` }] };
+        },
+      }),
+    ],
+  });
+
+const callWrite = (path: string): AssistantMessage =>
+  fauxAssistantMessage([fauxToolCall("write", { path, content: "x" }, { id: "call-write" })], { stopReason: "toolUse" });
 
 const callBash = (command: string): AssistantMessage =>
   fauxAssistantMessage([fauxToolCall("bash", { command }, { id: "call-bash" })], { stopReason: "toolUse" });
@@ -100,7 +120,7 @@ const restartingHarness = async (extensions: ReadonlyArray<Extension>, responses
   };
 };
 
-const setup = (mode: RuntimeMode) => {
+const setup = (mode: RuntimeMode, interaction: InteractionMode = "default") => {
   const kv = memoryKv();
   let store = new ApprovalStore(kv, () => {});
   return {
@@ -115,6 +135,7 @@ const setup = (mode: RuntimeMode) => {
         return store;
       },
       mode: () => mode,
+      interaction: () => interaction,
       turn: () => "turn-1",
       workspaceId: () => "fixture",
     }),
@@ -172,6 +193,37 @@ describe("permissions", () => {
     await until(async () => (await harness.lastToolResult()) !== undefined, "the tool result");
     expect(textOf(await harness.lastToolResult())).toContain("cut off by a restart");
     expect(runs).toEqual(["make deploy"]);
+  });
+
+  it("in plan mode a write is refused without asking, and nothing is written", async () => {
+    const writes: Array<string> = [];
+    const host = setup("full-access", "plan");
+    const harness = await restartingHarness([fakeWrite(writes), host.extension], [callWrite("/workspace/repo/a.txt"), fauxAssistantMessage("ok")]);
+    await until(async () => (await harness.lastToolResult()) !== undefined, "the tool result");
+    const result = await harness.lastToolResult();
+    expect(result?.isError).toBe(true);
+    expect(textOf(result)).toBe(PLAN_MODE_REFUSAL);
+    expect(writes).toEqual([]);
+    expect(host.store().pending()).toEqual([]);
+  });
+
+  it("in plan mode bash asks even in full access and after the owner accepted commands for the session", async () => {
+    const runs: Array<string> = [];
+    const host = setup("full-access", "plan");
+    void host.store().ask({ requestId: "earlier", turn: "turn-1", callId: "c", tool: "bash", kind: "command", summary: "ls", createdAt: 0 }, async () => {}, context);
+    host.store().answer("earlier", "acceptForSession");
+    const harness = await restartingHarness([fakeBash(runs), host.extension], [callBash("git status"), fauxAssistantMessage("ok")]);
+    await until(() => host.store().pending().length === 1, "the request");
+    expect(runs).toEqual([]);
+    host.store().answer(host.store().pending()[0]!.requestId, "accept");
+    await until(async () => (await harness.lastToolResult()) !== undefined, "the tool result");
+    expect(runs).toEqual(["git status"]);
+  });
+
+  it("the plan-mode instruction is in the prompt only in plan mode", async () => {
+    const render = (mode: InteractionMode) => interactionModeSection(() => mode).sections![0]!.render({} as never, context);
+    expect(await render("default")).toBeUndefined();
+    expect(await render("plan")).toContain("do not edit files");
   });
 
   it("the modes, acceptForSession, and the path translation", () => {

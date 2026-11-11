@@ -23,6 +23,16 @@ export type RuntimeMode = "approval-required" | "auto-accept-edits" | "full-acce
 export const runtimeModeOf = (mode: string | null | undefined): RuntimeMode =>
   mode === "auto-accept-edits" || mode === "full-access" ? mode : "approval-required";
 
+/** t3's interaction mode as the Session enforces it (step 3, F-plan): `plan` is read-only work. */
+export type InteractionMode = "default" | "plan";
+
+/**
+ * The interaction mode the Session enforces. It fails closed: any mode t3 sends other than `default` (`plan`, or one
+ * added later) runs as plan. A missing one (a Session stored before step 3) is the default.
+ */
+export const interactionModeOf = (mode: string | null | undefined): InteractionMode =>
+  mode === undefined || mode === null || mode === "default" ? "default" : "plan";
+
 /** A model as the Session runs it: pi-ai's provider and model id. */
 export interface ModelRef {
   readonly provider: string;
@@ -41,6 +51,8 @@ export interface OpenInput {
   readonly threadId: string;
   readonly workspaceId: string | null;
   readonly runtimeMode: RuntimeMode;
+  /** Step 3: absent from an adapter before it (the default). */
+  readonly interactionMode?: InteractionMode;
   readonly model: ModelRef;
   readonly thinking: ThinkingLevel | null;
 }
@@ -61,6 +73,8 @@ export interface SubmitTurnInput {
   readonly model: ModelRef;
   readonly thinking: ThinkingLevel | null;
   readonly runtimeMode: RuntimeMode;
+  /** Step 3: absent from an adapter before it (the default). */
+  readonly interactionMode?: InteractionMode;
 }
 
 export interface SteerInput {

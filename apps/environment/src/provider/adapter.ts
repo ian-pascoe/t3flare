@@ -17,6 +17,7 @@ import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter"
 import { turnScopedSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import {
+  interactionModeOf,
   type ModelRef,
   runtimeModeOf,
   type SessionPush,
@@ -226,6 +227,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
         readonly existing?: OrchestrationV2ProviderThread | undefined;
         readonly modelSelection: ModelSelection;
         readonly runtimeMode: string;
+        readonly interactionMode: string;
         readonly resume: boolean;
       }) {
         const at = yield* DateTime.now;
@@ -235,6 +237,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
             threadId: registerInput.threadId,
             workspaceId,
             runtimeMode: runtimeModeOf(registerInput.runtimeMode),
+            interactionMode: interactionModeOf(registerInput.interactionMode),
             model,
             thinking,
           }),
@@ -287,6 +290,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
             existing: threadInput.existingProviderThread,
             modelSelection: threadInput.modelSelection,
             runtimeMode: threadInput.runtimePolicy.runtimeMode,
+            interactionMode: threadInput.runtimePolicy.interactionMode,
             resume: false,
           }).pipe(
             Effect.mapError((cause) => new ProviderAdapter.ProviderAdapterEnsureThreadError({ driver, threadId: threadInput.threadId, cause })),
@@ -297,6 +301,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
             existing: threadInput.providerThread,
             modelSelection: threadInput.modelSelection ?? input.modelSelection,
             runtimeMode: (threadInput.runtimePolicy ?? input.runtimePolicy).runtimeMode,
+            interactionMode: (threadInput.runtimePolicy ?? input.runtimePolicy).interactionMode,
             resume: true,
           }).pipe(
             Effect.mapError(
@@ -358,6 +363,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
                 model,
                 thinking,
                 runtimeMode: runtimeModeOf(turnInput.runtimePolicy.runtimeMode),
+                interactionMode: interactionModeOf(turnInput.runtimePolicy.interactionMode),
               }),
             ).pipe(
               Effect.tapError(() =>

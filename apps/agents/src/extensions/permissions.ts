@@ -16,8 +16,8 @@
 // see it) in the arguments of the file tools and in `bash`'s command (step 2a plan, R13).
 // @effect-diagnostics asyncFunction:off preferEffectArray:off globalDate:off globalConsole:off
 import type { Context } from "@earendil-works/chord";
-import { defineExtension, type Extension, type ToolExecutionApi, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
-import type { ApprovalDecision, PendingApproval, RuntimeMode } from "@t3flare/session-protocol";
+import { defineExtension, type Extension, section, type ToolExecutionApi, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
+import type { ApprovalDecision, InteractionMode, PendingApproval, RuntimeMode } from "@t3flare/session-protocol";
 
 /** The Durable Object's synchronous key-value storage. */
 export interface ApprovalStorage {
@@ -137,6 +137,8 @@ export interface PermissionsHost {
   readonly store: ApprovalStore;
   /** The Session's runtime mode now (each turn's `submitTurn` sets it). */
   readonly mode: () => RuntimeMode;
+  /** The Session's interaction mode now (step 3, F-plan; each turn's `submitTurn` sets it). */
+  readonly interaction: () => InteractionMode;
   /** The turn the Session runs now. */
   readonly turn: () => string | null;
   /** The Session's Workspace id, for path translation; null without one. */
@@ -170,6 +172,26 @@ export const summaryOf = (tool: string, args: Readonly<Record<string, unknown>>)
 
 const STARTED_MEMO = "t3flare.started";
 
+/** What a tool that changes files answers in plan mode (step 3, F-plan): fixed, and nothing runs. */
+export const PLAN_MODE_REFUSAL =
+  "Refused: this thread is in plan mode, which is read-only. Investigate with read-only tools and reply with a plan; the owner switches the thread out of plan mode to implement it.";
+
+const planRefusal = () => ({ output: [{ type: "text" as const, text: PLAN_MODE_REFUSAL }], isError: true, details: { planMode: true } });
+
+/**
+ * t3's plan-mode instruction (t3code/packages/provider-core/src/server/orchestrationInstructions.ts,
+ * `T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS`, not exported there), present in the prompt only while the thread is in plan mode.
+ */
+export const PLAN_MODE_INSTRUCTIONS = `## T3 Code interaction mode: Plan
+
+Investigate with read-only actions and do not edit files or otherwise execute the implementation. Resolve discoverable facts before asking questions. When the requirements are decision complete, return a concrete implementation plan and do not start implementing it. Treat this mode as active until T3 Code supplies a different interaction-mode instruction.`;
+
+export const interactionModeSection = (interaction: () => InteractionMode): Extension =>
+  defineExtension({
+    name: "interaction-mode",
+    sections: [section("t3_interaction_mode", () => (interaction() === "plan" ? PLAN_MODE_INSTRUCTIONS : undefined))],
+  });
+
 const declinedResult = (answer: StoredAnswer) => ({
   output: [
     {
@@ -202,8 +224,11 @@ const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T 
         };
       }
       const kind = kindOf(tool.name);
+      const plan = host.interaction() === "plan";
+      // Plan mode is read-only: no file change runs, and every command asks (a command cannot be classified as reading).
+      if (plan && kind === "file-change") return planRefusal();
       const requestId = String(api.taskId);
-      if (asks(host.mode(), kind) && !host.store.acceptedKinds().has(kind)) {
+      if (plan || (asks(host.mode(), kind) && !host.store.acceptedKinds().has(kind))) {
         try {
           const answer = await host.store.ask(
             { requestId, turn: host.turn(), callId: api.callId, tool: tool.name, kind, ...summaryOf(tool.name, args), createdAt: Date.now() },
