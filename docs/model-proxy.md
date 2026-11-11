@@ -1,8 +1,8 @@
 # The model proxy
 
-**Every model call t3flare makes goes to one HTTP endpoint you run: the model proxy.** The Durable agent provider has no other way to reach a model: no Anthropic or OpenAI key, and no sign-in of its own in a Worker. The proxy holds your provider keys and your Claude, ChatGPT and other subscriptions; t3flare holds one URL and one proxy key. Connect subscriptions and keys in the proxy, not in t3flare.
+**Every model call t3flare makes goes to one HTTP endpoint you run: the model proxy.** No agent has any other way to reach a model: no Anthropic or OpenAI key, and no sign-in of its own, in a Worker or a Container. The proxy holds your provider keys and your Claude, ChatGPT and other subscriptions; t3flare holds one URL and one proxy key. Connect subscriptions and keys in the proxy, not in t3flare.
 
-The proxy t3flare is built and tested against is **[Commissary](https://github.com/spiritledsoftware/commissary)**: a service you deploy to your own Cloudflare account (or buy as Commissary Cloud) that pools Claude, ChatGPT/Codex, Gemini, xAI and other accounts and provider keys behind one endpoint that speaks the Anthropic, OpenAI and Gemini APIs, translating between them. The code names a contract (below), not a deployment ([ADR-0012](adr/0012-model-access-is-per-provider-instance-a-proxy-key-or-a-subscription.md)), but only Commissary has been run against it.
+The proxy t3flare is built and tested against is **[Commissary](https://github.com/spiritledsoftware/commissary)**: a service you deploy to your own Cloudflare account (or buy as Commissary Cloud) that pools Claude, ChatGPT/Codex, Gemini, xAI and other accounts and provider keys behind one endpoint that speaks the Anthropic, OpenAI and Gemini APIs, translating between them. The code names a contract (below), not a deployment ([ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md)), but only Commissary has been run against it.
 
 ## What t3flare uses it for
 
@@ -13,7 +13,7 @@ The proxy t3flare is built and tested against is **[Commissary](https://github.c
 | The model list: the picker's models, each one's name, thinking levels and context window; the Session's models | Both Workers, each keeping its own copy | `GET {MODEL_PROXY_URL}/v1/models`, twice (see below) |
 | The nightly bump job's real turn ([ADR-0017](adr/0017-upstream-is-tracked-by-nightly-tag-with-an-automated-bump.md)) | The `bump` stage, deployed by CI with the same two settings | A Durable agent turn and text generation, as above |
 
-Nothing else calls a model. A Container never sees the URL or the key; they are settings of the two Workers only.
+Nothing else calls a model today. A Container never sees the URL or the key; they are settings of the two Workers only. The CLI agents of step 4 (Codex, Claude Code, OpenCode, pi) will call the proxy from their Containers, each through its own base-URL setting; whether the key itself enters a Container is still open ([ADR-0016](adr/0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)).
 
 ## What the proxy must provide
 

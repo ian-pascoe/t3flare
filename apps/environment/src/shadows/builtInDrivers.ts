@@ -13,5 +13,5 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
 
 export type BuiltInUsageReadersEnv = ProviderUsageReaderEnv<typeof PiDurableDriver>;
 
-/** No usage readers: the proxy key has no plan windows to read (part 2's Subscription logins add them). */
+/** No usage readers: the proxy key has no plan windows to read; the subscriptions' windows are the model proxy's (ADR-0012). */
 export const BUILT_IN_USAGE_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv, BuiltInUsageReadersEnv>> = [];

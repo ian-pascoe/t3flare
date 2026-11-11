@@ -1,6 +1,6 @@
 # t3flare
 
-A t3code Environment on Cloudflare. The stock t3 clients (web, desktop, mobile) attach to it like any other Environment, and the owner's laptop delegates to it over a Peer link. Its agents run on pi-durable in Durable Objects, or as CLIs (Codex, Claude Code, OpenCode) in Containers started only when needed.
+A t3code Environment on Cloudflare. The stock t3 clients (web, desktop, mobile) attach to it like any other Environment, and the owner's laptop delegates to it over a Peer link. Its agents run on pi-durable in Durable Objects (shown in t3 as "Pi Durable"), or as CLIs (Codex, Claude Code, OpenCode, and the pi CLI, shown as "Pi") in Containers started only when needed. Every model call goes through a model proxy you run.
 
 - [`docs/plan.md`](docs/plan.md): milestones and their exit criteria.
 - [`docs/adr/`](docs/adr/): the decisions that are hard to reverse.
@@ -9,7 +9,7 @@ A t3code Environment on Cloudflare. The stock t3 clients (web, desktop, mobile) 
 
 ## Status
 
-Steps 0 (spike), 1 (platform) and 2a part 1 (Durable agents on the model proxy) are done; step 2a part 2 is next ([plan](docs/plan.md)). What works today, against a deployed stage and the stock web and desktop clients: pair, create a project, clone a repo from GitHub, run a Durable agent turn that edits files and runs `bash`, approve a tool call, see the diff, push and open a PR, and an Environment restart mid-turn that continues ([step 2a report](docs/steps/step-2a.md)). CLI agents, Peer links and the terminal are not built.
+Steps 0 (spike), 1 (platform) and 2a part 1 (Durable agents on the model proxy) are done; step 2a part 2 (usage limits from the proxy, and killing an aborted command's processes) is next ([plan](docs/steps/step-2a-part2-plan.md)). What works today, against a deployed stage and the stock web and desktop clients: pair, create a project, clone a repo from GitHub, run a Durable agent turn that edits files and runs `bash`, approve a tool call, see the diff, push and open a PR, and an Environment restart mid-turn that continues ([step 2a report](docs/steps/step-2a.md)). CLI agents, Peer links and the terminal are not built.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ Deploying t3flare needs all three:
 
 1. **Cloudflare**: a Workers **Paid** account with **Containers** (the Durable agents' Workspaces run commands in one), and Cloudflare Access (Zero Trust) for the admin routes ([ADR-0010](docs/adr/0010-the-endpoint-is-public-behind-t3s-own-auth.md)). The deploy builds the Container image with local Docker.
 2. **A GitHub App** that gives each Workspace a token for its one repo ([ADR-0013](docs/adr/0013-github-access-through-a-github-app-with-per-repo-tokens.md)). `bun run --cwd infra github-app:setup` registers it under your account and stores its id and key.
-3. **A model proxy.** t3flare holds no model credentials of its own: every model call, the agents' turns, generated titles and commit text, and the model list, goes to a proxy you run, speaking the Anthropic Messages API and listing its models at `GET /v1/models`. The proxy t3flare is built and tested against is [Commissary](https://github.com/spiritledsoftware/commissary), which you deploy to your own Cloudflare account or buy as Commissary Cloud, and where you connect your Claude, ChatGPT and other subscriptions and provider keys. **[`docs/model-proxy.md`](docs/model-proxy.md)** says exactly what the proxy must provide and how to set it up.
+3. **A model proxy.** t3flare holds no model credentials and no subscription sign-ins of its own ([ADR-0012](docs/adr/0012-all-model-access-goes-through-the-model-proxy.md)): every model call, by every agent (turns, generated titles and commit text, the model list), goes to a proxy you run, speaking the Anthropic Messages API and listing its models at `GET /v1/models`. The proxy t3flare is built and tested against is [Commissary](https://github.com/spiritledsoftware/commissary), which you deploy to your own Cloudflare account or buy as Commissary Cloud, and where you connect your Claude, ChatGPT and other subscriptions and provider keys. **[`docs/model-proxy.md`](docs/model-proxy.md)** says exactly what the proxy must provide and how to set it up.
 
 ## Deploy your own
 

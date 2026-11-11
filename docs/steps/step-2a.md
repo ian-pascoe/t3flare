@@ -175,9 +175,10 @@ Bundle: environment Worker 8.9 MB, agents Worker 3.6 MB. The t3code submodule is
   Container unless nothing was written.
 - **Credentials**: the Environment DO is the only GitHub minter. Part 2's Credential broker can follow the same
   pattern: the Workspace DO asks the Environment DO at use time through the egress host, and nothing is stored
-  in the Container.
+  in the Container. (2026-11-11: there is no broker; all model access goes through the model proxy, ADR-0012.)
 - **Subscription logins** (part 2) only change `models.ts` (pi-ai `Models`) in the Session. The differ, approvals
-  and Workspaces do not depend on the provider.
+  and Workspaces do not depend on the provider. (2026-11-11: dropped; subscriptions are connected in the model
+  proxy, ADR-0012, and part 2 is [replanned](step-2a-part2-plan.md).)
 - **Worktrees (2b)**: one Workspace per `/w/<id>` today. The router refuses nested destinations, and the
   `node:fs` audit lists `removeEmptyDirectory`/`worktreeCheckoutCache` as the worktree code paths to Shadow or
   Layer.

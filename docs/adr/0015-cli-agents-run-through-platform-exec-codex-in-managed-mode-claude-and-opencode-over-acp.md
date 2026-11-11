@@ -9,6 +9,16 @@ CLI agents cannot run in a Durable Object (workerd's `child_process` is a stub, 
 
 All are pre-installed in one image shared with Durable agents. At most 3 Containers run at once, and a turn may run at most 2 hours.
 
+## Refinement (2026-11-11): every CLI on the model proxy, and the pi CLI added
+
+After [ADR-0012](0012-all-model-access-goes-through-the-model-proxy.md), no CLI uses a vendor sign-in:
+
+- **Codex** runs `app-server` with a model provider whose `base_url` is the proxy's (Commissary serves the OpenAI Responses API), not in managed mode against OpenAI. t3's managed mode shows the shape: a `model_providers` entry with `wire_api = "responses"` and an `auth` command (`CodexManagedRuntime.ts`).
+- **Claude Code** and **OpenCode** use the proxy through their own base-URL settings.
+- The **pi CLI** is no longer skipped. It runs through t3's built-in Pi provider (`packages/provider-pi`), shown as "Pi", with a pi `models.json` that names the proxy. That provider spawns `pi --mode rpc` through `ChildProcessSpawner` and speaks JSON lines over stdio, as Codex's `app-server` does, so it shares Codex's process channel (step 4a). It is a CLI agent, distinct from the Durable agent provider, which t3 shows as "Pi Durable" (driver kind `piDurable`).
+
+How the proxy key reaches each CLI is open ([ADR-0016](0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)).
+
 ## Considered Options
 
 - **Our own supervisor daemon with output replay**: add behind the same interface only if DO resets mid-turn prove common.

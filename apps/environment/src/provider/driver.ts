@@ -26,7 +26,7 @@ import { PiDurableSettings } from "./settings.ts";
 import { makePiDurableTextGeneration } from "./textGeneration.ts";
 
 const PRESENTATION = {
-  displayName: "Pi (cloud)",
+  displayName: "Pi Durable",
   showInteractionModeToggle: false,
   supportedRuntimeModes: ["approval-required", "auto-accept-edits", "full-access"],
   reportsContextWindow: true,
@@ -52,7 +52,7 @@ const snapshotOf = Effect.fn("PiDurableDriver.snapshot")(function* (input: {
 
 export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverEnv> = {
   driverKind: PI_DURABLE_DRIVER,
-  metadata: { displayName: "Pi (cloud)", supportsMultipleInstances: false, hasDefaultInstance: true },
+  metadata: { displayName: "Pi Durable", supportsMultipleInstances: false, hasDefaultInstance: true },
   configSchema: PiDurableSettings,
   defaultConfig: () => decodeSettings({}),
   create: Effect.fn("PiDurableDriver.create")(function* ({ instanceId, displayName, accentColor, enabled, config }) {

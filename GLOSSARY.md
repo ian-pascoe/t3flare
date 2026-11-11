@@ -46,8 +46,12 @@ One Durable agent's conversation, kept in its own Durable Object.
 _Avoid_: thread (that is t3's), run
 
 **Durable agent**:
-An agent running on pi-durable in a Session, mostly on Workers.
-_Avoid_: Mode 2, cloud agent
+An agent running on pi-durable in a Session, mostly on Workers. t3 shows its provider as **Pi Durable**.
+_Avoid_: Mode 2, cloud agent, Pi (cloud)
+
+**Pi Durable**:
+The Durable agent provider as t3 lists it, under the driver kind `piDurable`. Not the pi CLI.
+_Avoid_: Pi (cloud), cloud Pi, Pi (that is the CLI agent)
 
 **Approval**:
 A Durable agent's tool call waiting for the owner's Approve or Decline, kept in the Session's storage so it survives the Session restarting. The runtime mode decides which calls ask.
@@ -62,8 +66,12 @@ A passive git read answered while the Container is stopped: its last real answer
 _Avoid_: cached status, emulated git
 
 **CLI agent**:
-A coding-agent CLI (Codex, Claude Code, OpenCode) running as a process in a Container.
+A stock coding-agent CLI (Codex, Claude Code, OpenCode, pi) running as a process in a Container, through t3's own provider for it.
 _Avoid_: Mode 1, container agent
+
+**Pi**:
+The stock pi coding agent CLI as a CLI agent, through t3's built-in Pi provider, which shows it as "Pi". Not a Durable agent.
+_Avoid_: Pi Durable (that is the Durable agent provider), pi CLI agent
 
 ## Credentials
 
@@ -71,16 +79,12 @@ _Avoid_: Mode 1, container agent
 One configured way to reach an agent or model provider, with its own credentials. Used in t3's sense.
 
 **Model proxy**:
-The HTTP endpoint every model call goes to (the agents' turns, generated titles and commit text, the model list), set by `MODEL_PROXY_URL` and `MODEL_PROXY_API_KEY`. It speaks the Anthropic Messages API, lists its models at `GET /v1/models` and translates to other providers; t3flare is built against Commissary. See `docs/model-proxy.md`.
+The HTTP endpoint every model call goes to, for every agent (Durable agents' and CLI agents' turns, generated titles and commit text, the model list), set by `MODEL_PROXY_URL` and `MODEL_PROXY_API_KEY`. It holds the owner's Subscriptions and provider keys; t3flare holds only its URL and keys. It speaks the Anthropic Messages API, lists its models at `GET /v1/models` and translates to other providers; t3flare is built against Commissary. See `docs/model-proxy.md`.
 _Avoid_: gateway, LLM router
 
-**Subscription login**:
-The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key.
-_Avoid_: OAuth, account
-
-**Credential broker**:
-The single holder and refresher of Subscription logins.
-_Avoid_: vault, keychain
+**Subscription**:
+The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key. Connected in the Model proxy, never held by t3flare.
+_Avoid_: Subscription login (t3flare holds none), OAuth, account
 
 **Container token**:
 A GitHub installation token for one Workspace's one repo, handed to git in its Container per command or on the credential helper's request; never stored there.
@@ -91,7 +95,7 @@ The GitHub installation token t3's own PR features use, answered to `gh auth tok
 _Avoid_: gh token, PAT
 
 **Handle**:
-An opaque stand-in for a credential, given to one CLI agent process and redeemed only by the broker's intercept.
+An opaque stand-in for a credential, given to one CLI agent process and redeemed only by an intercept outside the Container. Whether CLI agents get one, or the proxy key itself, is open (ADR-0016).
 _Avoid_: placeholder, fake token
 
 **Safe mode**:

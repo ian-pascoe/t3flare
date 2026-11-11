@@ -51,8 +51,8 @@ export const runText: TextGenerationOperations.Runner = (request) =>
       .join("")
       .trim();
     if (text.length === 0) return yield* fail(request.operation, "The model returned no text.");
-    return yield* TextGenerationOperations.decodeJsonReply(request, "Pi (cloud)", text);
+    return yield* TextGenerationOperations.decodeJsonReply(request, "Pi Durable", text);
   });
 
 export const makePiDurableTextGeneration = () =>
-  TextGenerationOperations.fromRunner("PiDurableTextGeneration", TextGenerationOperations.withoutInvestigation("Pi (cloud)", runText));
+  TextGenerationOperations.fromRunner("PiDurableTextGeneration", TextGenerationOperations.withoutInvestigation("Pi Durable", runText));
