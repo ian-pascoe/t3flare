@@ -20,6 +20,7 @@ import type { AgentsBindings } from "./agents/rpc.ts";
 import * as BootState from "./host/bootState.ts";
 import * as Idle from "./host/idle.ts";
 import * as ModuleState from "./host/moduleState.ts";
+import * as Pairing from "./host/pairing.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
@@ -54,10 +55,7 @@ export const isolate = {
 // call this.
 ModuleState.install();
 
-const ARMED_UNTIL_KEY = "t3flare/bootstrap/armed-until";
 const HOST_KEY = "t3flare/host";
-/** The longest an admin may arm pairing for. */
-export const MAX_ARM_MINUTES = 60;
 export const DEFAULT_ARM_MINUTES = 15;
 
 /** The routes that exchange a bootstrap credential for a session. */
@@ -218,14 +216,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return this.#constructedAt;
   }
 
-  async armedUntil(): Promise<Date | null> {
-    const value = await this.ctx.storage.get<string>(ARMED_UNTIL_KEY);
-    return value === undefined ? null : new Date(value);
+  armedUntil(): Promise<Date | null> {
+    return Pairing.armedUntil(this.ctx.storage);
   }
 
-  async isArmed(now = new Date()): Promise<boolean> {
-    const until = await this.armedUntil();
-    return until !== null && until.getTime() > now.getTime();
+  isArmed(now = new Date()): Promise<boolean> {
+    return Pairing.isArmed(this.ctx.storage, now);
   }
 
   async #publicHost(request?: Request): Promise<string> {
@@ -279,7 +275,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       };
       console.log(JSON.stringify({ t3flare: "booted", ...this.#lastBoot, constructions: isolate.constructions }));
       this.#startIdleChecks();
-      if (runtime.bootstrapSeeded) await this.#scheduleArmExpiry();
+      if (runtime.bootstrapSeeded) await Pairing.keepWindowClosing(this.ctx.storage);
       return runtime;
     } catch (error) {
       await BootState.bootFailed(kv, error);
@@ -308,26 +304,17 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   async arm(minutes: number): Promise<Date> {
-    const until = new Date(Date.now() + Math.min(Math.max(minutes, 1), MAX_ARM_MINUTES) * 60_000);
-    await this.ctx.storage.put(ARMED_UNTIL_KEY, until.toISOString());
+    const until = await Pairing.arm(this.ctx.storage, minutes, new Date());
     const runtime = this.#runtime === undefined ? undefined : await this.#runtime.catch(() => undefined);
     if (runtime !== undefined && !runtime.bootstrapSeeded) await this.restartRuntime("arm-bootstrap");
-    else if (runtime !== undefined) await this.#scheduleArmExpiry();
+    else if (runtime !== undefined) await Pairing.keepWindowClosing(this.ctx.storage);
     return until;
   }
 
   async disarm(): Promise<void> {
-    await this.ctx.storage.delete(ARMED_UNTIL_KEY);
+    await Pairing.disarm(this.ctx.storage);
     const runtime = this.#runtime === undefined ? undefined : await this.#runtime.catch(() => undefined);
     if (runtime?.bootstrapSeeded) await this.restartRuntime("disarm-bootstrap");
-  }
-
-  /** While t3 holds a seeded grant, the alarm fires when pairing disarms, so t3 restarts without it. */
-  async #scheduleArmExpiry() {
-    const until = await this.armedUntil();
-    if (until === null) return;
-    const current = await this.ctx.storage.getAlarm();
-    if (current === null || current > until.getTime()) await this.ctx.storage.setAlarm(until.getTime());
   }
 
   #idleAfterMs(): number {
@@ -422,7 +409,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   override async alarm(): Promise<void> {
     const runtime = this.#runtime === undefined ? undefined : await this.#runtime.catch(() => undefined);
-    if (runtime?.bootstrapSeeded && !(await this.isArmed())) {
+    // An earlier alarm may have displaced the window's close: onAlarm sets it again while the window is open.
+    if ((await Pairing.onAlarm(this.ctx.storage, { seeded: runtime?.bootstrapSeeded ?? false }, new Date())) === "close-window") {
       console.log(JSON.stringify({ t3flare: "bootstrap-disarmed", action: "restart-in-place" }));
       await this.restartRuntime("bootstrap-window-closed");
       return;
@@ -479,8 +467,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async #refuseDisarmedBootstrap(request: Request): Promise<Response | undefined> {
     const token = this.env.T3_BOOTSTRAP_TOKEN;
     if (!token || (await this.isArmed())) return undefined;
-    const body = await request.clone().text();
-    if (!body.includes(token) && !body.includes(encodeURIComponent(token))) return undefined;
+    if (!Pairing.presentsBootstrapToken(await request.clone().text(), token)) return undefined;
     console.log(JSON.stringify({ t3flare: "bootstrap-refused", reason: "pairing is not armed" }));
     return Response.json({ error: "pairing is not armed" }, { status: 401 });
   }

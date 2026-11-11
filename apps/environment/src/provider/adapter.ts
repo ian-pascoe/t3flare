@@ -18,7 +18,7 @@ import { turnScopedSelectionTransition } from "@t3tools/provider-core/server/sel
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import {
   type ModelRef,
-  type RuntimeMode,
+  runtimeModeOf,
   type SessionPush,
   type SessionPushAnswer,
   type SessionState,
@@ -61,9 +61,6 @@ export const modelOf = (selection: ModelSelection): { readonly model: ModelRef; 
   const thinking = getModelSelectionStringOptionValue(selection, "thinking");
   return { model, thinking: thinking !== undefined && THINKING.has(thinking) ? (thinking as ThinkingLevel) : null };
 };
-
-const runtimeModeOf = (mode: string): RuntimeMode =>
-  mode === "approval-required" || mode === "auto-accept-edits" ? mode : "full-access";
 
 /** The Workspace id of a cwd under `/w/<id>` (ADR-0008), or null. */
 export const workspaceOfCwd = (cwd: string | null | undefined): string | null => (cwd ? (toWorkspace(cwd)?.id ?? null) : null);

@@ -15,6 +15,14 @@ export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhi
 /** The t3 runtime modes the Session enforces (step 2a plan, section 3). */
 export type RuntimeMode = "approval-required" | "auto-accept-edits" | "full-access";
 
+/**
+ * The mode the Session enforces for t3's runtime mode. It fails closed: an unknown or missing mode asks for approval.
+ * t3's `auto` runs as approval-required, as t3's own Pi provider runs it
+ * (t3code/packages/provider-pi/src/server/mcpInjection.ts); we have no automatic reviewer to approve for the owner.
+ */
+export const runtimeModeOf = (mode: string | null | undefined): RuntimeMode =>
+  mode === "auto-accept-edits" || mode === "full-access" ? mode : "approval-required";
+
 /** A model as the Session runs it: pi-ai's provider and model id. */
 export interface ModelRef {
   readonly provider: string;
