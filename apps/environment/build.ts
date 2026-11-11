@@ -23,6 +23,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Plugin } from "rolldown";
 
+import { T3_CONNECT_DEFINES } from "./src/t3/connectPublicConfig.ts";
+
 const here = import.meta.dirname;
 const shim = (name: string) => path.join(here, "src/shims", name);
 const T3_ROOT = path.join(here, "../../t3code");
@@ -291,6 +293,8 @@ const DEFINES = {
   "import.meta.url": JSON.stringify("file:///bundle/worker.js"),
   "import.meta.dirname": JSON.stringify("/bundle"),
   "import.meta.filename": JSON.stringify("/bundle/worker.js"),
+  // Step 3+: T3 Connect's public values, as t3's own builds define them.
+  ...T3_CONNECT_DEFINES,
 };
 
 /** Bundles the Worker to `dist/worker/`, as alchemy would, and writes `dist/build-report.json`. */

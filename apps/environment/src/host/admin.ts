@@ -37,6 +37,7 @@
 //   GET  /_t3flare/agents/session-tools?thread=<id>  step 3: the T3 tools a Session offers and those left out
 //   POST /_t3flare/check/terminal-leak           step 2b: a terminal's `env` output compared with this Worker's binding values (names only)
 //   POST /_t3flare/check/terminal-close-idle?thread=<id>  step 2b: t3's own `closeIdle` for a thread's terminals (as settling runs it)
+//   /_t3flare/connect/*, POST /_t3flare/check/connect-refusals  step 3+: the T3 Connect link (connect/admin.ts)
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -99,6 +100,7 @@ const health = async (environment: EnvironmentDO) => {
     isolate: { ...isolate, startedAt: new Date(isolate.startedAt).toISOString() },
     object: { constructedAt: new Date(environment.constructedAt).toISOString() },
     activity: { ...Idle.activity, idleSince: new Date(Idle.activity.idleSince).toISOString() },
+    holds: Object.fromEntries([...Idle.holds].map(([name, { until, capped }]) => [name, { until: new Date(until).toISOString(), capped }])),
     alarm: alarm === null ? null : new Date(alarm).toISOString(),
     openWork: unreadableAsError(() => Idle.openWork(storage.sql, new Date())),
     nextDue: unreadableAsError(() => Idle.nextDue(storage.sql)),
@@ -165,6 +167,11 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
   const storage = environment.ctxStorage;
   const route = `${request.method} ${url.pathname}`;
   try {
+    // Step 3+: the T3 Connect routes (connect/admin.ts), loaded only when called.
+    if (url.pathname.startsWith("/_t3flare/connect/") || route === "POST /_t3flare/check/connect-refusals") {
+      const { handleConnectAdmin } = await import("../connect/admin.ts");
+      return await handleConnectAdmin(request, environment);
+    }
     switch (route) {
       case "GET /_t3flare/health":
         return json(await health(environment));

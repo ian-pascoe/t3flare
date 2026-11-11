@@ -154,6 +154,28 @@ describe("idle queries", () => {
     expect(Idle.idleVerdict(sql, now)).toMatchObject({ reset: false, unreadable: expect.stringContaining("scheduled_tasks") });
   });
 
+  it("holds the Environment up while a hold lasts, until it is released or expires", () => {
+    const sql = t3Tables();
+    Object.assign(Idle.activity, { sockets: 0, inFlight: 0, idleSince: now.getTime() - 61_000, unreadableUntil: 0 });
+    Idle.hold("connect-sign-in", now.getTime() + 600_000);
+    expect(Idle.idleVerdict(sql, now)).toEqual({ reset: false, why: "held: connect-sign-in" });
+    expect(Idle.idleVerdict(sql, new Date(now.getTime() + 600_001)).reset).toBe(true);
+    Idle.hold("connect-sign-in", now.getTime() + 600_000);
+    Idle.release("connect-sign-in");
+    expect(Idle.idleVerdict(sql, now).reset).toBe(true);
+  });
+
+  it("honours a capped hold (a pending publish) for at most PUBLISH_HOLD_CAP_MS after the last activity", () => {
+    const sql = t3Tables();
+    const lastActivity = now.getTime() - 61_000;
+    Object.assign(Idle.activity, { sockets: 0, inFlight: 0, idleSince: lastActivity, unreadableUntil: 0 });
+    Idle.hold("publish:t1", now.getTime() + 3_600_000, { capped: true });
+    expect(Idle.idleVerdict(sql, now)).toEqual({ reset: false, why: "held: publish:t1" });
+    const atCap = new Date(lastActivity + Idle.PUBLISH_HOLD_CAP_MS);
+    expect(Idle.idleVerdict(sql, atCap).reset).toBe(true);
+    Idle.release("publish:t1");
+  });
+
   it("resets only with no socket, no request and the idle delay passed", () => {
     const sql = t3Tables();
     Object.assign(Idle.activity, { sockets: 1, inFlight: 0, idleSince: now.getTime() - 120_000, unreadableUntil: 0 });
@@ -255,5 +277,37 @@ describe("Pairing window", () => {
     expect(Pairing.BOOTSTRAP_EXCHANGE_PATHS.has("/oauth/mcp/decision")).toBe(true);
     expect(Pairing.BOOTSTRAP_EXCHANGE_PATHS.has("/api/auth/browser-session")).toBe(true);
     expect(Pairing.BOOTSTRAP_EXCHANGE_PATHS.has("/oauth/token")).toBe(true);
+  });
+});
+
+describe("T3 Connect relay routes refused in the DO (step 3+, review finding 1)", () => {
+  it("refuses the four relay routes in any spelling t3's router could match", async () => {
+    const { isRefusedRelayRoute } = await import("../src/host/relayRoutes.ts");
+    const refused = [
+      "/api/connect/link-proof",
+      "/api/connect/relay-config",
+      "/api/t3-connect/health",
+      "/api/t3-connect/mint-credential",
+      "/api/t3-connect/mint-credential/",
+      "/api/t3-connect/mint-credential//",
+      "/API/T3-Connect/Mint-Credential",
+      "/api/t3-connect/mint%2Dcredential",
+      "/api/t3%2Dconnect/health",
+      "/api%2Ft3-connect%2Fhealth",
+      "//api//connect//link-proof",
+      "/api/connect/./link-proof",
+      "/api/connect/x/../relay-config",
+      "/api/connect/link-proof;x",
+      "/api/connect/%6C%69%6E%6B-proof",
+    ];
+    for (const path of refused) expect(isRefusedRelayRoute(path), path).toBe(true);
+    const kept = ["/api/connect/link-state", "/api/connect/preferences", "/api/connect/unlink", "/api/connect/reachability", "/api/t3-connect", "/ws", "/api/connect/link-proofs"];
+    for (const path of kept) expect(isRefusedRelayRoute(path), path).toBe(false);
+  });
+
+  it("refuses a path it cannot decode", async () => {
+    const { isRefusedRelayRoute } = await import("../src/host/relayRoutes.ts");
+    expect(isRefusedRelayRoute("/api/t3-connect/%E0%A4%A")).toBe(true);
+    expect(isRefusedRelayRoute("/api/connect/%ZZ")).toBe(true);
   });
 });

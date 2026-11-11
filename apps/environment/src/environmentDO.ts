@@ -21,6 +21,7 @@ import * as BootState from "./host/bootState.ts";
 import * as Idle from "./host/idle.ts";
 import * as ModuleState from "./host/moduleState.ts";
 import * as Pairing from "./host/pairing.ts";
+import { isRefusedRelayRoute } from "./host/relayRoutes.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
@@ -39,6 +40,16 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_SWEEP_PURGE?: string;
   /** Overrides the sweep's 7-day grace (stages). */
   readonly T3FLARE_SWEEP_GRACE_MS?: string;
+  /**
+   * Step 3+ (ADR-0023): "1" keeps the T3 Connect account token after the link (stages). Unset, as on prod, it is
+   * discarded (owner decision D2).
+   */
+  readonly T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN?: string;
+  /**
+   * Step 3+ (review finding 6): "1" lets the stage's Access service token run the Connect mutations (stages). Unset,
+   * as on prod, only the owner's own Access identity may.
+   */
+  readonly T3FLARE_CONNECT_SERVICE_TOKEN?: string;
 }
 
 /** Module state that outlives `ctx.abort()` in a warm isolate (ADR-0003); reported by the health route. */
@@ -105,6 +116,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     Idle.activity.inFlight = 0;
     Idle.activity.idleSince = Date.now();
     Idle.activity.unreadableUntil = 0;
+    // The sign-in's poll and the publishes the holds stood for went with the reset (step 3+).
+    Idle.holds.clear();
     resetTerminals();
     // Before any t3 code runs: the `node:fs` shim and FileSystem Layer read this.
     bindStateStorage({ sql: ctx.storage.sql, transactionSync: (closure) => ctx.storage.transactionSync(closure) });
@@ -246,6 +259,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     this.ctx.abort(reason);
   }
 
+  /** Step 3+ (review finding 6): whether the stage's service token may run the Connect mutations (never on prod). */
+  get connectServiceTokenAllowed(): boolean {
+    return this.env.T3FLARE_CONNECT_SERVICE_TOKEN === "1";
+  }
+
   get runtimeIfBooted(): Promise<Runtime> | undefined {
     return this.#runtime;
   }
@@ -304,6 +322,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         storage: this.ctx.storage,
         bootstrapToken: armed ? this.env.T3_BOOTSTRAP_TOKEN : undefined,
         host,
+        connect: { keepAccountToken: this.env.T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN === "1" },
       });
       await BootState.bootSucceeded(kv, new Date());
       isolate.boots++;
@@ -354,6 +373,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   async arm(minutes: number): Promise<Date> {
+    // Arming restarts t3 in place, which would end a T3 Connect sign-in's poll (step 3+, review finding 4).
+    if (Idle.activeHolds(Date.now()).includes(Idle.CONNECT_SIGN_IN_HOLD)) throw new Error("t3flare: a T3 Connect sign-in is pending; arm after it ends");
     const until = await Pairing.arm(this.ctx.storage, minutes, new Date());
     const runtime = this.#runtime === undefined ? undefined : await this.#runtime.catch(() => undefined);
     if (runtime !== undefined && !runtime.bootstrapSeeded) await this.restartRuntime("arm-bootstrap");
@@ -509,6 +530,9 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       const { handleAdmin } = await import("./host/admin.ts");
       return handleAdmin(request, this);
     }
+    // Step 3+ (plan section 5, review finding 1): T3 Connect's relay-initiated routes are not served, for any method,
+    // before t3 boots. t3's own app refuses them too (connect/service.ts).
+    if (isRefusedRelayRoute(url.pathname)) return new Response("Not found\n", { status: 404 });
     Idle.requestStarted();
     try {
       if (Pairing.BOOTSTRAP_EXCHANGE_PATHS.has(url.pathname) && request.method === "POST") {

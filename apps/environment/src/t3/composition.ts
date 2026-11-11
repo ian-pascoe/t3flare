@@ -25,6 +25,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Stream from "effect/Stream";
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/http";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
@@ -184,6 +185,8 @@ import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
 import { cloudCapabilities } from "./capabilities.ts";
 import { layerManagedPolicy } from "./managedPolicy.ts";
+import * as ConnectService from "../connect/service.ts";
+import { makePublishRecorder } from "../connect/recorder.ts";
 import {
   layerPinAgentBrowserAccessOff,
   layerPinFastWorktreeCheckoutOff,
@@ -204,7 +207,12 @@ export interface CompositionOptions {
    * (a host that is not loopback); without it t3 assumes `loopback-browser`.
    */
   readonly host: string;
+  /** Step 3+: the publish-only T3 Connect link's policy (ADR-0023). */
+  readonly connect: ConnectService.ConnectPolicy;
 }
+
+/** Where the publish recorder keeps its last events (step 3+). */
+const PUBLISHES_KEY = "t3flare:connect-publishes";
 
 /** The State directory's root in DO SQLite (ADR-0007). */
 export const BASE_DIR = "/t3";
@@ -214,6 +222,11 @@ const HTTP_ROUTER_CONFIG = { maxParamLength: 512 } as const;
 
 export const make = (options: CompositionOptions) => {
   const httpServer = DoHttpServer.make();
+  // t3flare: the outcome of each T3 Connect publish, read from t3's own log events (step 3+, plan section 4.4).
+  const publishRecorder = makePublishRecorder({
+    read: () => options.storage.kv.get(PUBLISHES_KEY),
+    write: (entries) => options.storage.kv.put(PUBLISHES_KEY, entries),
+  });
 
   // t3flare: the Node platform (NodeServices, NodeCrypto) becomes the DO's.
   const layerPlatformServices = DocumentText.layer.pipe(Layer.provideMerge(DoServices.layer));
@@ -733,7 +746,8 @@ export const make = (options: CompositionOptions) => {
   const layerMakeServer = Layer.unwrap(
     Effect.gen(function* () {
       // t3flare: no server ownership lock, PATH fixing, runtime-state file, Tailscale
-      // Serve or T3 Connect link: one DO is the only server, and it has no host.
+      // Serve, and no T3 Connect link at startup: one DO is the only server, and it has no host. The
+      // publish-only link is made once, from an admin route (step 3+, ADR-0023).
       const activation = yield* Deferred.make<void>();
       const layerActivation = Layer.succeed(ServerActivation.ServerActivation, Deferred.await(activation));
       const routesReady = yield* Deferred.make<void>();
@@ -762,14 +776,26 @@ export const make = (options: CompositionOptions) => {
         Layer.tap(() => Deferred.succeed(routesReady, undefined).pipe(Effect.orDie)),
       );
 
-      return Layer.mergeAll(layerRoutes, layerHttpListening).pipe(
-        Layer.provide(CloudLink.layer.pipe(Layer.provideMerge(ConnectReachability.layer))),
+      // t3flare: one CloudLink (step 3+, review finding 1). The Connect service, which links outward from the admin
+      // routes, gets it whole; t3's HTTP routes get it with the four relay-initiated calls refused.
+      const layerCloudLink = CloudLink.layer.pipe(Layer.provideMerge(ConnectReachability.layer));
+      const layerConnect = ConnectService.layer(options.connect, publishRecorder).pipe(Layer.provide(layerCloudLink));
+      const layerRouteCloudLink = Layer.merge(
+        ConnectService.layerRefusingCloudLink.pipe(Layer.provide(layerCloudLink)),
+        ConnectReachability.layer,
+      );
+
+      return Layer.mergeAll(layerRoutes, layerHttpListening, layerConnect).pipe(
+        Layer.provide(layerRouteCloudLink),
         Layer.provideMerge(layerRuntimeServices),
         Layer.provideMerge(McpSessionRegistry.layer.pipe(Layer.provide(layerServerEnvironment))),
         Layer.provide(layerActivation),
         Layer.provideMerge(RelayTracing.layerServerRelayBroker.pipe(Layer.provide(layerManagedPolicy))),
         Layer.provideMerge(DoHttpServer.layer(httpServer)),
-        Layer.provide(layerApplicationObservability),
+        // t3flare: t3's loggers, and the publish recorder beside them (step 3+).
+        Layer.provide(
+          Logger.layer([publishRecorder.logger], { mergeWithExisting: true }).pipe(Layer.provideMerge(layerApplicationObservability)),
+        ),
         Layer.provideMerge(FetchHttpClient.layer),
         Layer.provide(VcsProcess.layer),
         Layer.provideMerge(AgentScopeLive.layer),

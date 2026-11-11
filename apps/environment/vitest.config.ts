@@ -4,15 +4,20 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import { configDefaults, defineConfig, defineProject } from "vitest/config";
 
+import { T3_CONNECT_DEFINES } from "./src/t3/connectPublicConfig.ts";
+
 const workerd = "test/**/*.workerd.test.ts";
 
 export default defineConfig({
   test: {
     projects: [
       defineProject({
+        // T3 Connect's public values, as build.ts defines them for the Worker.
+        define: T3_CONNECT_DEFINES,
         test: { name: "node", include: ["test/**/*.test.ts"], exclude: [...configDefaults.exclude, workerd] },
       }),
       defineProject({
+        define: T3_CONNECT_DEFINES,
         plugins: [
           cloudflareTest({
             main: "./test/workerd.fixture.ts",

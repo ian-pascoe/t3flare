@@ -23,6 +23,39 @@ export const activity = {
   unreadableUntil: 0,
 };
 
+/**
+ * How long a capped hold (a publish to T3 Connect still pending, step 3+) keeps the Environment up after its last
+ * request or socket: t3's worst case is five retries with 10 s timeouts (about 91 s), past the 60 s idle delay.
+ */
+export const PUBLISH_HOLD_CAP_MS = 120_000;
+
+/**
+ * Holds on the idle reset, by name, each until a time (ms since epoch): the T3 Connect sign-in's poll while its code
+ * is valid, and each publish still pending (capped). Module state, cleared when the object is constructed.
+ */
+export const holds = new Map<string, { readonly until: number; readonly capped: boolean }>();
+
+/** The T3 Connect sign-in's hold (connect/service.ts): while it lasts, t3 must not restart in place. */
+export const CONNECT_SIGN_IN_HOLD = "connect-sign-in";
+
+export const hold = (name: string, until: number, options: { readonly capped?: boolean } = {}) => {
+  holds.set(name, { until, capped: options.capped === true });
+};
+
+export const release = (name: string) => {
+  holds.delete(name);
+};
+
+/** The holds that keep the Environment up now; expired ones are dropped. */
+export const activeHolds = (now: number): Array<string> => {
+  const active: Array<string> = [];
+  for (const [name, { until, capped }] of holds) {
+    if (until <= now) holds.delete(name);
+    else if (!capped || now - activity.idleSince < PUBLISH_HOLD_CAP_MS) active.push(name);
+  }
+  return active;
+};
+
 export const socketOpened = () => {
   activity.sockets++;
 };
@@ -158,6 +191,8 @@ export const idleVerdict = (sql: SqlStorage, now: Date, idleAfterMs = IDLE_AFTER
   if (activity.sockets > 0) return { reset: false, why: `${activity.sockets} client sockets` };
   if (activity.inFlight > 0) return { reset: false, why: `${activity.inFlight} requests in flight` };
   if (now.getTime() - activity.idleSince < idleAfterMs) return { reset: false, why: "not idle long enough" };
+  const held = activeHolds(now.getTime());
+  if (held.length > 0) return { reset: false, why: `held: ${held.join(", ")}` };
   if (now.getTime() < activity.unreadableUntil) {
     return { reset: false, why: `t3's tables were unreadable; next read after ${new Date(activity.unreadableUntil).toISOString()}` };
   }

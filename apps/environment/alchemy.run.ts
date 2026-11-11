@@ -190,6 +190,9 @@ export default Alchemy.Stack(
         // Step 2b (review F3): the Workspace sweep purges on test stages; prod's reports what it would do until the owner
         // sets T3FLARE_SWEEP_PURGE=1 for it.
         ...(stage === "prod" ? {} : { T3FLARE_SWEEP_PURGE: "1" }),
+        // Step 3+ (ADR-0023): test stages keep the T3 Connect account token and let the service token run the Connect
+        // routes; prod discards the token after the link and admits only the owner's own identity there.
+        ...(stage === "prod" ? {} : { T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN: "1", T3FLARE_CONNECT_SERVICE_TOKEN: "1" }),
         ...(sweepGraceMs === "" ? {} : { T3FLARE_SWEEP_GRACE_MS: sweepGraceMs }),
       },
       assets: {
