@@ -184,3 +184,17 @@ M1: `m1-limit-cooldown.json`, `m1-limit-ui.json`, `m1-limit-paused.png`, `m1-lim
 `m1-key-live.json`, `m1-key-live.png`, `m1-overload.json`.
 M2: `m2-abort.json`, `m2-restart-1.json` … `m2-restart-5.json`, `m2-session-restart.json`, `m2-survivor.json`,
 `m2-stopped.json`.
+
+## Since: the leftovers (2026-11-11)
+
+Three items under "Risks and notes" and "Partial" above have been closed since this report:
+
+- **Compaction's requests.** The Session's models run the same classify-once on compaction's `completeSimple` answers (`compactionLimits`, `proxyLimits.ts`). A usage limit or a refused key now makes 1 request, not 4. Tested on a real Harness (`proxyLimits.test.ts`).
+- **The kill's window.** `killExecs` and the terminals' kill run the script straight on the platform's `ctx.container.exec` (`containerKill.ts`), never through computer's Container backend. The backend starts a stopped Container, but the platform's `exec` never does. A Container that stops between the check and the exec makes the exec fail, and that failure counts as "not running". Tested with a fake Container (`containerKill.test.ts`).
+- **The error shown twice.** This was the differ's doing. t3's ingestor makes its own error item from a failed `turn.terminal` (provider-core `makeProviderFailureTurnItem`, id from `terminal-failure:<providerTurnId>`), and stock adapters name their item the same so the two are one item. The differ had prefixed the Session's name, which gave a second item. It now uses t3's id (`differ.test.ts`; `part2 key`/`limit` check one error item).
+
+These were checked on the throwaway stage `leftovers`, which has since been destroyed:
+- `leftovers-key.json`: the key error, 1 request, 1 error item.
+- `leftovers-limit.json`: the usage limit, 1 request, 1 error item.
+- `leftovers-abort.json`: Stop's kill, now run straight on the Container, left nothing after 0.9 s.
+- `leftovers-stopped.json`: a kill with the Container stopped did not start it.

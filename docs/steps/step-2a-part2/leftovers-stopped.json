@@ -1,0 +1,60 @@
+{
+  "scenario": "stopped",
+  "at": "2026-11-11T19:36:58.987Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "kill": {
+    "ms": 20,
+    "result": {
+      "running": false,
+      "signalled": 0,
+      "survivors": 0
+    },
+    "container": {
+      "running": false,
+      "leased": false,
+      "lastUse": 1794425804134
+    }
+  },
+  "workspaces": {
+    "workspaces": [
+      {
+        "id": "part2-mwcis722",
+        "host": "github.com",
+        "owner": "ian-pascoe",
+        "name": "t3flare-fixture",
+        "cloneUrl": "https://github.com/ian-pascoe/t3flare-fixture.git",
+        "createdAt": 1794425788669,
+        "state": "ready",
+        "workflows": false,
+        "kind": "project",
+        "parent": null,
+        "branch": null,
+        "unreferencedSince": null,
+        "deletedAt": null,
+        "purgeAfter": null,
+        "lastError": null,
+        "references": [
+          "project 9485bb6d-8e6b-49f4-8e2c-953c5e0ec755",
+          "thread 61377237-0a2f-4e33-bab8-bdbaa5801347",
+          "thread 2cd89ec3-dfce-42d2-8d34-742c88c0dc43"
+        ],
+        "container": {
+          "running": false,
+          "leased": false,
+          "lastUse": 1794425804134
+        },
+        "info": {
+          "provisioned": true,
+          "repo": true,
+          "containerRunning": false,
+          "revision": 73,
+          "gitRevision": 73,
+          "cachedReads": 8,
+          "id": "part2-mwcis722"
+        }
+      }
+    ]
+  },
+  "failures": [],
+  "ok": true
+}

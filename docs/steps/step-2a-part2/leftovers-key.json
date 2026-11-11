@@ -1,0 +1,35 @@
+{
+  "scenario": "key",
+  "at": "2026-11-11T19:36:45.485Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "fault": {
+    "armed": {
+      "fixture": "invalidKey",
+      "resetAt": 1794425868530
+    }
+  },
+  "first": {
+    "run": "failed",
+    "failure": {
+      "class": "permission_error",
+      "message": "The model proxy refused this Environment's key. Check `MODEL_PROXY_API_KEY`.",
+      "code": "proxy_key_rejected",
+      "retryable": false
+    },
+    "proxy": {
+      "requests": 1,
+      "failure": {
+        "class": "permission_error",
+        "code": "proxy_key_rejected",
+        "row": 5,
+        "stop": true,
+        "at": 1794425811627
+      }
+    },
+    "faultResetAt": "2026-11-11T19:37:48.530Z"
+  },
+  "threadId": "61377237-0a2f-4e33-bab8-bdbaa5801347",
+  "errorItems": 1,
+  "failures": [],
+  "ok": true
+}
