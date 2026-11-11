@@ -1,0 +1,57 @@
+{
+  "scenario": "after",
+  "worktree": ".wt/term-mwcc46eb/t3-b990b4a6-e00e0a20358056f1",
+  "at": "2026-11-11T18:21:51.004Z",
+  "ms": 1023,
+  "state": {
+    "row": null,
+    "container": {
+      "running": false,
+      "leased": false,
+      "lastUse": null
+    },
+    "leased": false,
+    "leases": [
+      {
+        "holder": "f6fa07dfdbdc0571ab170f079b2a04d0a40271e1be4e8bedd219dbea66322706",
+        "until": 1794421869564,
+        "workspace": "term-mwcc46eb"
+      }
+    ]
+  },
+  "doFiles": {
+    "error": "Error: t3flare: this Workspace was deleted",
+    "causes": [],
+    "stack": [
+      "Error: t3flare: this Workspace was deleted",
+      "    at async handleAdmin (admin-DtQNeMga.js:1:7945)"
+    ]
+  },
+  "registryIds": [
+    ".wt/noremote-mwce52fv/t3flare-noremote-179441-5ce1b64e2a91000b failed",
+    ".wt/noremote-mwce5pmh/t3flare-noremote-179441-198c1785d99192db ready",
+    ".wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60 ready",
+    ".wt/term-mwcc46eb/t3-312af859-46bdca83e20982d0 ready",
+    ".wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a ready",
+    ".wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682 ready",
+    ".wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878 ready",
+    ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688 tombstoned",
+    ".wt/term-mwcc46eb/t3-b42edc0b-557df6f63e7056e2 ready",
+    ".wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712 ready",
+    ".wt/term-mwcc46eb/t3flare-two-a-179441752-cccd01b263667f01 ready",
+    ".wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc ready",
+    ".wt/term-mwcc46eb/t3flare-two-b-179441752-9b7aa5740a57b5f1 failed",
+    ".wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3 ready",
+    "noremote-mwcdxr5c provisioning",
+    "noremote-mwce1fug provisioning",
+    "noremote-mwce4s1a ready",
+    "noremote-mwce52fv ready",
+    "noremote-mwce5pmh ready",
+    "term-mwcc46eb ready"
+  ],
+  "branchInProject": [
+    "refs/heads/t3/reply-with-ok b0a61868f11ac44e08a371303b736b83817839b6 unpushed 1794421192388"
+  ],
+  "failures": [],
+  "ok": true
+}

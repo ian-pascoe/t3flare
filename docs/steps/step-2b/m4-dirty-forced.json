@@ -1,0 +1,111 @@
+{
+  "note": "The forced removal of a worktree with an untracked file (the setup script's .env): tombstoned for the grace, its unpushed branch carried into the project first. (Before the fix that stops a tombstone's Container, it was left running here.)",
+  "before": {
+    "scenario": "before",
+    "worktree": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688",
+    "at": "2026-11-11T18:15:54.195Z",
+    "commit": "597f9d3dccb4b776a604d3dab5cf18e14ebdc3ee",
+    "branch": "t3/show-env-file-contents",
+    "terminalOpen": true,
+    "state": {
+      "row": {
+        "state": "ready",
+        "references": [
+          "thread f9f37956-e8db-4104-8ace-10f8b2caab29"
+        ],
+        "lastError": null,
+        "purgeAfter": null
+      },
+      "container": {
+        "running": true,
+        "leased": true,
+        "lastUse": 1794420957590
+      },
+      "leased": true,
+      "leases": [
+        {
+          "holder": "f6fa07dfdbdc0571ab170f079b2a04d0a40271e1be4e8bedd219dbea66322706",
+          "until": 1794421544220,
+          "workspace": "term-mwcc46eb"
+        },
+        {
+          "holder": "09d1ca3eb970677b6587fcafa98352606860201a209a6a7fefbce60c23ca0543",
+          "until": 1794421555766,
+          "workspace": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688"
+        }
+      ]
+    },
+    "failures": [],
+    "ok": true
+  },
+  "after": {
+    "scenario": "after",
+    "worktree": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688",
+    "at": "2026-11-11T18:16:58.721Z",
+    "ms": 60082,
+    "state": {
+      "row": {
+        "state": "tombstoned",
+        "references": [],
+        "lastError": "uncommitted work (--force)",
+        "purgeAfter": 1794421200768
+      },
+      "container": {
+        "running": true,
+        "leased": true,
+        "lastUse": 1794421019625
+      },
+      "leased": true,
+      "leases": [
+        {
+          "holder": "f6fa07dfdbdc0571ab170f079b2a04d0a40271e1be4e8bedd219dbea66322706",
+          "until": 1794421664200,
+          "workspace": "term-mwcc46eb"
+        },
+        {
+          "holder": "09d1ca3eb970677b6587fcafa98352606860201a209a6a7fefbce60c23ca0543",
+          "until": 1794421676116,
+          "workspace": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688"
+        }
+      ]
+    },
+    "doFiles": {
+      "ok": {
+        "kind": "directory",
+        "size": 0,
+        "mtimeMs": 1794419778167,
+        "mode": 493
+      }
+    },
+    "registryIds": [
+      ".wt/noremote-mwce52fv/t3flare-noremote-179441-5ce1b64e2a91000b failed",
+      ".wt/noremote-mwce5pmh/t3flare-noremote-179441-198c1785d99192db ready",
+      ".wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60 ready",
+      ".wt/term-mwcc46eb/t3-312af859-46bdca83e20982d0 ready",
+      ".wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a ready",
+      ".wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682 ready",
+      ".wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878 ready",
+      ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688 tombstoned",
+      ".wt/term-mwcc46eb/t3-b42edc0b-557df6f63e7056e2 ready",
+      ".wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712 ready",
+      ".wt/term-mwcc46eb/t3flare-two-a-179441752-cccd01b263667f01 ready",
+      ".wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc ready",
+      ".wt/term-mwcc46eb/t3flare-two-b-179441752-9b7aa5740a57b5f1 failed",
+      ".wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3 ready",
+      "noremote-mwcdxr5c provisioning",
+      "noremote-mwce1fug provisioning",
+      "noremote-mwce4s1a ready",
+      "noremote-mwce52fv ready",
+      "noremote-mwce5pmh ready",
+      "term-mwcc46eb ready"
+    ],
+    "branchInProject": [
+      "refs/heads/t3/show-env-file-contents 597f9d3dccb4b776a604d3dab5cf18e14ebdc3ee unpushed 1794420958342"
+    ],
+    "failures": [
+      "Container stopped: {\"running\":true,\"leased\":true,\"lastUse\":1794421019625}",
+      "not in the budget: [{\"holder\":\"f6fa07dfdbdc0571ab170f079b2a04d0a40271e1be4e8bedd219dbea66322706\",\"until\":1794421664200,\"workspace\":\"term-mwcc46eb\"},{\"holder\":\"09d1ca3eb970677b6587fcafa98352606860201a209a6a7fefbce60c23ca0543\",\"until\":1794421676116,\"workspace\":\".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688\"}]"
+    ],
+    "ok": false
+  }
+}

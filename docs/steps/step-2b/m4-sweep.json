@@ -1,0 +1,443 @@
+{
+  "scenario": "sweep",
+  "worktree": "",
+  "at": "2026-11-11T18:24:50.022Z",
+  "steps": {
+    "archive": "archived",
+    "restore": {
+      "restored": {
+        "id": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688",
+        "host": "github.com",
+        "owner": "ian-pascoe",
+        "name": "t3flare-fixture",
+        "cloneUrl": "https://github.com/ian-pascoe/t3flare-fixture.git",
+        "createdAt": 1794419775596,
+        "state": "ready",
+        "workflows": false,
+        "kind": "worktree",
+        "parent": "term-mwcc46eb",
+        "branch": "t3/a03e15ff",
+        "unreferencedSince": null,
+        "deletedAt": null,
+        "purgeAfter": null,
+        "lastError": null
+      }
+    },
+    "reRemove": "removed",
+    "tombstone": {
+      "state": "tombstoned",
+      "purgeAfter": 1794421674809,
+      "lastError": "uncommitted work (--force)"
+    },
+    "orphan": {
+      "running": true,
+      "leased": true,
+      "lastUse": 1794421497581
+    },
+    "delete b53baa49-1805-4211-9e13-f47e256baae5": "deleted",
+    "delete a5349df0-08b0-43ca-b974-e57050ee2ef6": "deleted",
+    "readd": "/w/noremote-mwce52fv"
+  },
+  "dry": {
+    "at": "2026-11-11T18:25:03.830Z",
+    "dry": true,
+    "ok": true,
+    "actions": [
+      {
+        "id": ".wt/noremote-mwce52fv/t3flare-noremote-179441-5ce1b64e2a91000b",
+        "action": "skip",
+        "why": "failed"
+      },
+      {
+        "id": ".wt/noremote-mwce5pmh/t3flare-noremote-179441-198c1785d99192db",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60",
+        "action": "skip",
+        "why": "thread 584ed5a3-a628-4bb4-b7c5-98637fa9cda1"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-312af859-46bdca83e20982d0",
+        "action": "skip",
+        "why": "thread ceae1f6a-7786-4329-81c3-5af9eb72d663"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a",
+        "action": "skip",
+        "why": "thread cad337a9-7466-4279-9a5f-1757d0b6a798 (archived)"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682",
+        "action": "skip",
+        "why": "thread 34d51d58-16cc-4c46-b8e5-9480ad672b93"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878",
+        "action": "skip",
+        "why": "thread 3b9c3ea6-9fd1-4d64-ac7d-161ae73a2df7"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688",
+        "action": "skip",
+        "why": "tombstone in its grace"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-b42edc0b-557df6f63e7056e2",
+        "action": "skip",
+        "why": "thread cc0b7160-27c3-4037-9d55-726fdbf7d338"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-a-179441752-cccd01b263667f01",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc",
+        "action": "skip",
+        "why": "1 open terminals"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-b-179441752-9b7aa5740a57b5f1",
+        "action": "purge",
+        "why": "failed for over an hour"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": "noremote-mwcdxr5c",
+        "action": "skip",
+        "why": "provisioning"
+      },
+      {
+        "id": "noremote-mwce1fug",
+        "action": "skip",
+        "why": "provisioning"
+      },
+      {
+        "id": "noremote-mwce4s1a",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": "noremote-mwce52fv",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": "noremote-mwce5pmh",
+        "action": "skip",
+        "why": "project f9c07d2a-70b8-423f-a50f-64b2a800d12f"
+      },
+      {
+        "id": "term-mwcc46eb",
+        "action": "skip",
+        "why": "project 12148821-d460-41bc-98d4-153f6e3005e2"
+      }
+    ],
+    "purged": [],
+    "costGuard": [
+      {
+        "holder": "b4125c0a77a8df95490f196ecc8a3628641bef9a5821e3e26ff048d5d1cb8b3e",
+        "action": "would stop"
+      }
+    ],
+    "nextDue": "2026-11-12T18:25:03.830Z"
+  },
+  "first": {
+    "at": "2026-11-11T18:25:04.258Z",
+    "dry": false,
+    "ok": true,
+    "actions": [
+      {
+        "id": ".wt/noremote-mwce52fv/t3flare-noremote-179441-5ce1b64e2a91000b",
+        "action": "skip",
+        "why": "failed"
+      },
+      {
+        "id": ".wt/noremote-mwce5pmh/t3flare-noremote-179441-198c1785d99192db",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60",
+        "action": "skip",
+        "why": "thread 584ed5a3-a628-4bb4-b7c5-98637fa9cda1"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-312af859-46bdca83e20982d0",
+        "action": "skip",
+        "why": "thread ceae1f6a-7786-4329-81c3-5af9eb72d663"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a",
+        "action": "skip",
+        "why": "thread cad337a9-7466-4279-9a5f-1757d0b6a798 (archived)"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682",
+        "action": "skip",
+        "why": "thread 34d51d58-16cc-4c46-b8e5-9480ad672b93"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878",
+        "action": "skip",
+        "why": "thread 3b9c3ea6-9fd1-4d64-ac7d-161ae73a2df7"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688",
+        "action": "skip",
+        "why": "tombstone in its grace"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-b42edc0b-557df6f63e7056e2",
+        "action": "skip",
+        "why": "thread cc0b7160-27c3-4037-9d55-726fdbf7d338"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-a-179441752-cccd01b263667f01",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc",
+        "action": "skip",
+        "why": "1 open terminals"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-b-179441752-9b7aa5740a57b5f1",
+        "action": "purge",
+        "why": "failed for over an hour"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": "noremote-mwcdxr5c",
+        "action": "skip",
+        "why": "provisioning"
+      },
+      {
+        "id": "noremote-mwce1fug",
+        "action": "skip",
+        "why": "provisioning"
+      },
+      {
+        "id": "noremote-mwce4s1a",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": "noremote-mwce52fv",
+        "action": "mark-unreferenced",
+        "why": "nothing references it"
+      },
+      {
+        "id": "noremote-mwce5pmh",
+        "action": "skip",
+        "why": "project f9c07d2a-70b8-423f-a50f-64b2a800d12f"
+      },
+      {
+        "id": "term-mwcc46eb",
+        "action": "skip",
+        "why": "project 12148821-d460-41bc-98d4-153f6e3005e2"
+      }
+    ],
+    "purged": [
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-b-179441752-9b7aa5740a57b5f1",
+        "sessionsDestroyed": [],
+        "destroyed": true
+      }
+    ],
+    "costGuard": [
+      {
+        "holder": "b4125c0a77a8df95490f196ecc8a3628641bef9a5821e3e26ff048d5d1cb8b3e",
+        "action": "stopped"
+      }
+    ],
+    "nextDue": "2026-11-12T18:25:04.258Z"
+  },
+  "last": {
+    "at": "2026-11-11T18:28:20.695Z",
+    "dry": false,
+    "ok": true,
+    "actions": [
+      {
+        "id": ".wt/noremote-mwce52fv/t3flare-noremote-179441-5ce1b64e2a91000b",
+        "action": "purge",
+        "why": "failed for over an hour"
+      },
+      {
+        "id": ".wt/noremote-mwce5pmh/t3flare-noremote-179441-198c1785d99192db",
+        "action": "purge",
+        "why": "unreferenced since 2026-11-11T18:25:04.258Z"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60",
+        "action": "skip",
+        "why": "thread 584ed5a3-a628-4bb4-b7c5-98637fa9cda1"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-312af859-46bdca83e20982d0",
+        "action": "skip",
+        "why": "thread ceae1f6a-7786-4329-81c3-5af9eb72d663"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a",
+        "action": "skip",
+        "why": "thread cad337a9-7466-4279-9a5f-1757d0b6a798 (archived)"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682",
+        "action": "skip",
+        "why": "thread 34d51d58-16cc-4c46-b8e5-9480ad672b93"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878",
+        "action": "skip",
+        "why": "thread 3b9c3ea6-9fd1-4d64-ac7d-161ae73a2df7"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688",
+        "action": "purge",
+        "why": "tombstone past its grace"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-b42edc0b-557df6f63e7056e2",
+        "action": "skip",
+        "why": "thread cc0b7160-27c3-4037-9d55-726fdbf7d338"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712",
+        "action": "purge",
+        "why": "unreferenced since 2026-11-11T18:25:04.258Z"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-a-179441752-cccd01b263667f01",
+        "action": "purge",
+        "why": "unreferenced since 2026-11-11T18:25:04.258Z"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc",
+        "action": "skip",
+        "why": "1 open terminals"
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3",
+        "action": "purge",
+        "why": "unreferenced since 2026-11-11T18:25:04.258Z"
+      },
+      {
+        "id": "noremote-mwcdxr5c",
+        "action": "skip",
+        "why": "provisioning"
+      },
+      {
+        "id": "noremote-mwce1fug",
+        "action": "skip",
+        "why": "provisioning"
+      },
+      {
+        "id": "noremote-mwce4s1a",
+        "action": "purge",
+        "why": "unreferenced since 2026-11-11T18:25:04.258Z"
+      },
+      {
+        "id": "noremote-mwce52fv",
+        "action": "clear-unreferenced",
+        "why": "project 200a5c26-b7da-40f0-a726-222be3f58357"
+      },
+      {
+        "id": "noremote-mwce5pmh",
+        "action": "skip",
+        "why": "project f9c07d2a-70b8-423f-a50f-64b2a800d12f"
+      },
+      {
+        "id": "term-mwcc46eb",
+        "action": "skip",
+        "why": "project 12148821-d460-41bc-98d4-153f6e3005e2"
+      }
+    ],
+    "purged": [
+      {
+        "id": ".wt/noremote-mwce52fv/t3flare-noremote-179441-5ce1b64e2a91000b",
+        "sessionsDestroyed": [],
+        "destroyed": true
+      },
+      {
+        "id": ".wt/noremote-mwce5pmh/t3flare-noremote-179441-198c1785d99192db",
+        "sessionsDestroyed": [],
+        "destroyed": true
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3-a03e15ff-7d50706d42a9f688",
+        "sessionsDestroyed": [
+          "f9f37956-e8db-4104-8ace-10f8b2caab29"
+        ],
+        "destroyed": true
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712",
+        "sessionsDestroyed": [],
+        "destroyed": true
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-a-179441752-cccd01b263667f01",
+        "sessionsDestroyed": [],
+        "destroyed": true
+      },
+      {
+        "id": ".wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3",
+        "sessionsDestroyed": [],
+        "destroyed": true
+      },
+      {
+        "id": "noremote-mwce4s1a",
+        "sessionsDestroyed": [],
+        "destroyed": true
+      }
+    ],
+    "costGuard": [],
+    "nextDue": "2026-11-12T18:28:20.695Z"
+  },
+  "after": [
+    ".wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60 ready",
+    ".wt/term-mwcc46eb/t3-312af859-46bdca83e20982d0 ready",
+    ".wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a ready",
+    ".wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682 ready",
+    ".wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878 ready",
+    ".wt/term-mwcc46eb/t3-b42edc0b-557df6f63e7056e2 ready",
+    ".wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc ready",
+    "noremote-mwcdxr5c provisioning",
+    "noremote-mwce1fug provisioning",
+    "noremote-mwce52fv ready",
+    "noremote-mwce5pmh ready",
+    "term-mwcc46eb ready"
+  ],
+  "budget": [
+    {
+      "holder": "54bbd8d6acc7ffe0c6247b063a2aaa29c0c3ba9fee04c688d70aa0a370fd9a01",
+      "until": 1794422304766,
+      "workspace": ".wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc"
+    }
+  ],
+  "failures": [],
+  "ok": true
+}

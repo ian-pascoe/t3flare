@@ -8,7 +8,7 @@
 //       branch in the project's repo
 import * as fs from "node:fs";
 
-import { admin, pair, sleep, uuid } from "./lib/client.ts";
+import { admin, dispatch, mutateProject, pair, sleep, uuid, wsCall } from "./lib/client.ts";
 import { attachTerminal } from "./lib/terminal.ts";
 
 const [scenario = "after", ...args] = process.argv.slice(2);
@@ -16,7 +16,7 @@ const arg = (name: string) => {
   const index = args.indexOf(`--${name}`);
   return index === -1 ? undefined : args[index + 1];
 };
-const id = arg("worktree")!;
+const id = arg("worktree") ?? "";
 const enc = encodeURIComponent(id);
 const report: Record<string, unknown> = { scenario, worktree: id, at: new Date().toISOString() };
 const failures: Array<string> = [];
@@ -81,6 +81,57 @@ if (scenario === "after") {
     report.branchInProject = String(carried?.stdout ?? "").trim().split("\n");
     check("the branch is in the project's repo", String(carried?.stdout ?? "").includes("unpushed"), carried);
   }
+}
+
+if (scenario === "sweep") {
+  // The sweep on a stage with a short grace (T3FLARE_SWEEP_GRACE_MS): references hold, a tombstone and unreferenced
+  // Workspaces are purged after the grace, the cost guard stops a Container no Workspace holds.
+  //   --archived-thread <thread>  archived first (its worktree must survive)
+  //   --tombstone <worktree id> --project <project id>  restored, then removed again with --force (tombstoned)
+  //   --terminal <worktree id>     a terminal open in it through the sweeps (skipped: an open terminal)
+  //   --grace-ms <ms>              how long to wait between the first and the last sweep
+  //   --delete-project <project id> --readd-project <project id>  deleted (one re-added within the grace)
+  const cookie = await pair();
+  const graceMs = Number(arg("grace-ms") ?? 180_000);
+  const steps: Record<string, unknown> = {};
+  const archived = arg("archived-thread");
+  if (archived !== undefined) steps.archive = await dispatch(cookie, { type: "thread.archive", commandId: uuid(), threadId: archived }).then(() => "archived", (error: unknown) => String(error).slice(0, 200));
+  const tomb = arg("tombstone");
+  if (tomb !== undefined) {
+    steps.restore = (await admin("POST", `/_t3flare/agents/workspace-restore?id=${encodeURIComponent(tomb)}`)).json;
+    steps.reRemove = await wsCall(cookie, "vcs.removeWorktree", { cwd: `/w/${tomb.split("/")[1]}`, path: `/w/${tomb}`, force: true }).then(
+      () => "removed",
+      (error: unknown) => String(error).slice(0, 300),
+    );
+    const row = (((await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces ?? []) as Array<any>).find((ws) => ws.id === tomb);
+    steps.tombstone = row === undefined ? null : { state: row.state, purgeAfter: row.purgeAfter, lastError: row.lastError };
+  }
+  // The cost guard: a Container whose lease no registered Workspace holds (a scratch Workspace DO).
+  steps.orphan = (await admin("POST", "/_t3flare/agents/workspace-call?id=orphan-cost-check", { exec: { script: "echo started" } })).json?.container ?? null;
+  const terminalAt = arg("terminal");
+  const terminal = terminalAt === undefined ? undefined : await attachTerminal(cookie, { threadId: `sweep-${uuid()}`, terminalId: "default", cwd: `/w/${terminalAt}` });
+  if (terminal !== undefined) await terminal.until(/[$#] $/, 120_000);
+  const deleted = arg("delete-project");
+  const readd = arg("readd-project");
+  for (const projectId of [deleted, readd]) {
+    if (projectId !== undefined) steps[`delete ${projectId}`] = await mutateProject(cookie, { type: "project.delete", commandId: uuid(), projectId, force: true }).then(() => "deleted", (error: unknown) => String(error).slice(0, 200));
+  }
+  report.steps = steps;
+  report.dry = (await admin("GET", "/_t3flare/agents/sweep?dry=1")).json?.report;
+  report.first = (await admin("POST", "/_t3flare/agents/sweep")).json?.report;
+  if (readd !== undefined) {
+    // Re-added within the grace: a new project at the same root references the Workspace again.
+    const root = arg("readd-root")!;
+    steps.readd = await mutateProject(cookie, { type: "project.create", commandId: uuid(), projectId: uuid(), title: "re-added", workspaceRoot: root, createWorkspaceRootIfMissing: false }).then(() => root, (error: unknown) => String(error).slice(0, 200));
+  }
+  await sleep(graceMs + 15_000);
+  report.last = (await admin("POST", "/_t3flare/agents/sweep")).json?.report;
+  if (terminal !== undefined) {
+    await terminal.close();
+    await terminal.detach();
+  }
+  report.after = (((await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces ?? []) as Array<any>).map((ws) => `${ws.id} ${ws.state}`);
+  report.budget = (await admin("GET", "/_t3flare/agents/budget")).json?.leases;
 }
 
 report.failures = failures;

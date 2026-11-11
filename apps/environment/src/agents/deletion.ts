@@ -92,6 +92,15 @@ export interface PurgeReport {
   readonly error?: string;
 }
 
+/** A `destroy()` whose object restarted before its answer arrived ("… destroyed") did its work. */
+const destroyed = async (call: Promise<unknown>): Promise<void> => {
+  try {
+    await call;
+  } catch (error) {
+    if (!/destroyed/.test(String(error))) throw error;
+  }
+};
+
 /** Sessions of deleted threads first (review F4), then the Workspace DO, then the registry row. */
 export const purgeWorkspace = async (id: string, deletedThreads: ReadonlyArray<{ readonly threadId: string }>): Promise<PurgeReport> => {
   const services = environmentServices();
@@ -99,10 +108,10 @@ export const purgeWorkspace = async (id: string, deletedThreads: ReadonlyArray<{
   const sessionsDestroyed: Array<string> = [];
   try {
     for (const { threadId } of deletedThreads) {
-      await byName(services.agents.SESSIONS, `thread:${threadId}`, "SESSIONS").destroy();
+      await destroyed(byName(services.agents.SESSIONS, `thread:${threadId}`, "SESSIONS").destroy());
       sessionsDestroyed.push(threadId);
     }
-    await workspaceRpc(id).destroy();
+    await destroyed(workspaceRpc(id).destroy());
     services.workspaces.remove(id);
     console.log(JSON.stringify({ t3flare: "workspace-purged", id, sessions: sessionsDestroyed.length }));
     return { id, sessionsDestroyed, destroyed: true };
@@ -148,8 +157,10 @@ export const removeWorktree = async (projectCwd: string, path: string, force: bo
   if (record === undefined || record.kind !== "worktree" || record.parent !== project.id) return notAWorktree(path);
   const id = record.id;
   const dir = id.split("/")[2] ?? id;
-  const tombstone = (why: string, purgeAfter: number | null): RemoveAnswer => {
+  const tombstone = async (why: string, purgeAfter: number | null): Promise<RemoveAnswer> => {
     services.workspaces.setState(id, "tombstoned", { deletedAt: Date.now(), purgeAfter, lastError: why });
+    // The work is kept; the Container and its budget slot are not.
+    await workspaceRpc(id).stopContainer().catch(() => undefined);
     console.log(JSON.stringify({ t3flare: "workspace-tombstoned", id, why, purgeAfter }));
     return { exitCode: 0, stderr: "", detail: JSON.stringify({ outcome: "tombstoned", why, purgeAfter }) };
   };
@@ -160,9 +171,9 @@ export const removeWorktree = async (projectCwd: string, path: string, force: bo
     out = await workspaceRpc(id).carryOut({ projectTips: tips.ok ? tips.tips : [] });
   } catch (error) {
     // The check needs both Containers (a budget of 3): without it nothing is known, so nothing is purged.
-    return tombstone(`the removal could not check the worktree: ${String(error).slice(0, 300)}`, null);
+    return await tombstone(`the removal could not check the worktree: ${String(error).slice(0, 300)}`, null);
   }
-  if (!out.ok || !tips.ok) return tombstone(`the removal could not check the worktree: ${(out.error ?? tips.error ?? "").slice(0, 300)}`, null);
+  if (!out.ok || !tips.ok) return await tombstone(`the removal could not check the worktree: ${(out.error ?? tips.error ?? "").slice(0, 300)}`, null);
   if (out.dirty && !force) {
     return { exitCode: 128, stderr: `fatal: '${path}' contains modified or untracked files, use --force to delete it\n`, detail: "dirty, no --force" };
   }
@@ -172,10 +183,10 @@ export const removeWorktree = async (projectCwd: string, path: string, force: bo
     const home = await workspaceRpc(project.id)
       .carryIn({ worktree: id, bundle: out.bundle, dir, carried: out.carried })
       .catch((error: unknown) => ({ ok: false, lines: [] as ReadonlyArray<string>, error: String(error) }));
-    if (!home.ok) return tombstone(`the worktree's refs could not be carried home: ${(home.error ?? "").slice(0, 300)}`, null);
+    if (!home.ok) return await tombstone(`the worktree's refs could not be carried home: ${(home.error ?? "").slice(0, 300)}`, null);
     carried = home.lines;
   }
-  if (out.dirty) return { ...tombstone("uncommitted work (--force)", Date.now() + settings.graceMs), detail: JSON.stringify({ outcome: "tombstoned", carried }) };
+  if (out.dirty) return { ...(await tombstone("uncommitted work (--force)", Date.now() + settings.graceMs)), detail: JSON.stringify({ outcome: "tombstoned", carried }) };
   const references = referencesFrom(sql);
   const purged = await purgeWorkspace(id, references.deletedThreads.get(id) ?? []);
   return { exitCode: 0, stderr: "", detail: JSON.stringify({ outcome: purged.destroyed ? "purged" : "deleting", carried, sessions: purged.sessionsDestroyed.length, error: purged.error }) };
