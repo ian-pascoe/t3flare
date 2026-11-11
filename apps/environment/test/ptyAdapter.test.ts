@@ -94,10 +94,9 @@ describe("the terminal env", () => {
 });
 
 describe("TerminalProcesses", () => {
-  it("refuses other shells and paths outside every Workspace as not found, so t3 tries its next shell", () => {
+  it("refuses other shells as not found, so t3 tries its next shell", () => {
     const { processes } = setup();
     expect(() => processes.spawn({ shell: "/bin/zsh", cwd: "/w/demo", cols: 80, rows: 24, env: {} })).toThrow(SpawnRefused);
-    expect(() => processes.spawn({ shell: "bash", cwd: "/t3/home", cols: 80, rows: 24, env: {} })).toThrow(/ENOENT/);
   });
 
   it("opens with the filtered env, queues writes until the open answers, then sends them in order, one RPC at a time", async () => {

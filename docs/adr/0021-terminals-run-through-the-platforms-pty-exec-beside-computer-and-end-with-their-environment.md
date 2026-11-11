@@ -27,6 +27,11 @@ designed this and never built it.
   env is fixed (never `process.env`), and the adapter allowlists the env it passes.
 - Output is never dropped: a failed push goes back to the front of the queue, because a lost frame can be a setup
   script's sentinel.
+- **A terminal outside every Workspace says so and exits 1.** t3's "No project" folder (`/t3/scratch`) is in the state
+  directory, not a Workspace, so it has no Container to run a shell in (step 2a left scratch threads without one). The
+  adapter never fails that spawn: t3 sends a spawn error as an event before `terminal.attach` subscribes, so the
+  client got only an `error` status and showed a blank terminal (the prod hang after 2b). Every refusal is therefore
+  output in the terminal, then an exit.
 - Every deploy of `main` restarts the Environment (immediate code update), which kills running terminals and setup
   scripts; their scrollback stays.
 

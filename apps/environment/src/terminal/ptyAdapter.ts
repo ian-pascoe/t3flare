@@ -3,8 +3,10 @@
 // here a shell is a bash the Workspace DO of the cwd starts under the platform's PTY exec in its Container. Input,
 // size and close go to that DO over RPC; output comes back pushed (`EnvironmentDO.terminalOutput` → `deliver`).
 //
-// - The cwd names the Workspace (`/w/<id>/…`); a path outside every listed Workspace fails as "no such file", so t3
-//   tries its next shell and then reports the error. Only bash and sh are shells here (zsh, fish: "not found").
+// - The cwd names the Workspace (`/w/<id>/…`). A cwd in no Workspace (t3's "No project" folder, `/t3/scratch`) gets a
+//   shell that prints why and exits 1: a failed spawn would leave the client a blank terminal, because t3 sends its
+//   spawn error as an event before `terminal.attach` subscribes, and the snapshot carries only the "error" status.
+//   Only bash and sh are shells here (zsh, fish: "not found", so t3 tries its next shell).
 // - The env is filtered through an allowlist (defence in depth beside the TerminalManager's fixed base env, review F0):
 //   terminal and locale keys and t3's `T3CODE_*`; anything named like a credential is dropped and logged by name.
 // - The pid is synthetic and unique here: pids of two Containers can collide, and t3 never sees a Container pid.
@@ -48,6 +50,36 @@ export interface Exit {
 }
 
 export class SpawnRefused extends Error {}
+
+/** What a terminal in no Workspace shows. */
+export const noWorkspaceMessage = (cwd: string): string =>
+  `t3flare: terminals run in a project's Workspace, and ${cwd} is in none (a "No project" thread has no Workspace in the Cloud Environment). Open the terminal from a thread of a project.`;
+
+/** A shell that never started: it shows why, then exits 1, once t3 listens. */
+export class RefusedProcess {
+  readonly pid: number;
+  readonly #message: string;
+
+  constructor(pid: number, message: string) {
+    this.pid = pid;
+    this.#message = message;
+  }
+
+  write(_data: string): void {}
+  resize(_cols: number, _rows: number): void {}
+  kill(_signal?: string): void {}
+
+  // t3 subscribes to data, then to the exit; microtasks keep that order.
+  onData(listener: Listener<string>): () => void {
+    queueMicrotask(() => listener(`\x1b[31m${this.#message}\x1b[0m\r\n`));
+    return () => undefined;
+  }
+
+  onExit(listener: Listener<Exit>): () => void {
+    queueMicrotask(() => listener({ exitCode: 1, signal: null }));
+    return () => undefined;
+  }
+}
 
 const SHELLS = new Set(["bash", "sh", "/bin/bash", "/bin/sh", "/usr/bin/bash", "/usr/bin/sh"]);
 
@@ -245,10 +277,10 @@ export class TerminalProcesses {
   }
 
   /** Starts a shell (the open runs in the background; t3 gets the process at once). */
-  spawn(input: SpawnInput): TerminalProcess {
+  spawn(input: SpawnInput): TerminalProcess | RefusedProcess {
     if (!SHELLS.has(input.shell)) throw new SpawnRefused(`ENOENT: ${input.shell} not found in the Cloud Environment (bash only)`);
     const place = this.#deps.place(input.cwd);
-    if (place === undefined) throw new SpawnRefused(`ENOENT: no such file or directory, the cwd ${input.cwd} is in no Workspace`);
+    if (place === undefined) return new RefusedProcess(this.#nextPid++, noWorkspaceMessage(input.cwd));
     const { env, droppedCredentials } = filterTerminalEnv(input.env);
     if (droppedCredentials.length > 0) console.warn(JSON.stringify({ t3flare: "terminal-env-dropped", keys: droppedCredentials }));
     const key = this.#deps.newKey();

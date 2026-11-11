@@ -16,6 +16,7 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Stream from "effect/Stream";
 import * as ProjectionStore from "t3/src/orchestration-v2/ProjectionStore.ts";
 import * as ProcessRunner from "t3/src/processRunner.ts";
 import * as ProjectService from "t3/src/project/ProjectService.ts";
@@ -60,8 +61,10 @@ const spawnShell = (env: Record<string, string>): ShellProcess => {
 
 beforeAll(async () => {
   dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3flare-stack-")));
-  // t3 checks the cwd exists: the Workspace's path is a real folder here.
+  // t3 checks the cwd exists: the Workspace's path is a real folder here, and so is a folder in no Workspace (as t3's
+  // "No project" folder, `/t3/scratch`, is in the Cloud Environment).
   fs.mkdirSync(path.join(dir, "demo"));
+  fs.mkdirSync(path.join(dir, "scratch"));
   let processes!: TerminalProcesses;
   const host: TerminalHost = new TerminalHost({
     now: () => Date.now(),
@@ -148,6 +151,39 @@ const runSetup = (threadId: string, command: string) =>
       return { started, completion, lines };
     }),
   );
+
+/** What a client of `terminal.attach` shows within `ms`: the snapshot's history, the output, and t3's error lines. */
+const attachAndRead = (threadId: string, cwd: string, ms = 3000) =>
+  runtime.runPromise(
+    Effect.gen(function* () {
+      const terminals = yield* TerminalManager.TerminalManager;
+      let shown = "";
+      const types: Array<string> = [];
+      const stream = terminals
+        .attachOutputStream({ threadId, terminalId: "default", cwd, cols: 80, rows: 24 }, "viewer-1")
+        .pipe(Stream.takeUntil((event) => event.type === "exited" || event.type === "error"));
+      yield* Stream.runForEach(stream, (event) =>
+        Effect.sync(() => {
+          const any = event as { type: string; data?: string; message?: string; snapshot?: { history?: string; status?: string } };
+          types.push(any.type === "snapshot" ? `snapshot:${any.snapshot?.status}` : any.type);
+          if (any.type === "snapshot") shown += any.snapshot?.history ?? "";
+          if (any.type === "output") shown += any.data ?? "";
+          if (any.type === "error") shown += `[terminal] ${any.message}`;
+        }),
+      ).pipe(Effect.timeoutOption(`${ms} millis`));
+      return { shown, types };
+    }),
+  );
+
+describe("a terminal whose cwd is in no Workspace (t3's No project)", () => {
+  it("shows why in the terminal at once and ends, instead of a blank terminal", async () => {
+    const started = Date.now();
+    const { shown, types } = await attachAndRead("thread-scratch", path.join(dir, "scratch"));
+    expect(shown, `events: ${types.join(", ")}`).toMatch(/terminals run in a project's Workspace/);
+    expect(types).toContain("exited");
+    expect(Date.now() - started).toBeLessThan(2000);
+  }, 20_000);
+});
 
 describe.skipIf(BASH === undefined || PYTHON === undefined)("t3's terminal and setup runner over ours, on a real PTY", () => {
   it("runs a setup script with T3CODE_* set and reports exit code 0, ", async () => {

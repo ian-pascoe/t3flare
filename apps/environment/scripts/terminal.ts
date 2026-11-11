@@ -7,6 +7,8 @@
 //       throughput, the sync both ways, the leak check against the Worker's binding values, close and the processes
 //   bun scripts/stage.ts run <stage> terminal restart --workspace <id>   an Environment restart with a terminal open
 //   bun scripts/stage.ts run <stage> terminal settle --workspace <id>    a running command survives t3's closeIdle
+//   bun scripts/stage.ts run <stage> terminal noproject [--cwd /t3/scratch]  a terminal in no Workspace (t3's No project)
+//       shows why and exits within seconds; creates no project or thread (safe on prod)
 import * as fs from "node:fs";
 
 import { admin, pair, readDoText, sleep, uuid, wsCall } from "./lib/client.ts";
@@ -38,6 +40,28 @@ const ps = async (id: string, pattern: string) => {
 
 
 const cookie = await pair();
+
+if (scenario === "noproject") {
+  const cwd = arg("cwd") ?? "/t3/scratch";
+  const opened = Date.now();
+  const terminal = await attachTerminal(cookie, { threadId: `terminal-${uuid()}`, terminalId: "default", cwd });
+  const shown = await terminal.until(/terminals run in a project's Workspace/, 15_000).catch(() => null);
+  report.cwd = cwd;
+  report.shownMs = shown === null ? null : Date.now() - opened;
+  report.shown = stripAnsi(terminal.output()).trim().slice(-400);
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && !terminal.events.some((e) => e.event.type === "exited")) await sleep(50);
+  report.events = terminal.events.map((e) => (e.event.type === "snapshot" ? `snapshot:${e.event.snapshot?.status}` : e.event.type));
+  check("the reason shown within 5 s", shown !== null && (report.shownMs as number) < 5000, report);
+  check("terminal exited", (report.events as Array<string>).includes("exited"), report.events);
+  await terminal.close(true).catch(() => undefined);
+  await terminal.detach();
+  report.failures = failures;
+  report.ok = failures.length === 0;
+  console.log(JSON.stringify(report, null, 2));
+  process.exit(report.ok ? 0 : 1);
+}
+
 let id = arg("workspace");
 if (id === undefined) {
   id = `term-${Date.now().toString(36)}`;
