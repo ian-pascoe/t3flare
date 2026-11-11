@@ -17,7 +17,7 @@
 //   bun scripts/stage.ts run step3plus connect-m2 [--only a,b,…] [--out m2-publishes.json]
 import * as path from "node:path";
 
-import { admin, dispatch, mutateProject, pair, runsOf, sleep, uuid } from "./lib/client.ts";
+import { admin, dispatch, mutateProject, pair, runsOf, sleep, updateSettings, uuid } from "./lib/client.ts";
 import { createThread, pendingOf, projection, replyOf, say, settled, until } from "./lib/cloudThread.ts";
 import { writeEvidence } from "./lib/evidence.ts";
 
@@ -35,6 +35,8 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 };
 
 const cookie = await pair();
+// A fresh stage has no `piDurable` instance configured, and t3 enables only codex and claudeAgent unconfigured.
+await updateSettings(cookie, { providerInstances: { piDurable: { driver: "piDurable", enabled: true } } });
 const projectId = uuid();
 await mutateProject(cookie, {
   type: "project.create",
@@ -126,7 +128,7 @@ if (wants("e")) {
   const entries = await publishes(threadId);
   const alertable = phasesOf(entries).filter((phase) => ["completed", "failed", "waiting_for_approval", "waiting_for_input"].includes(phase));
   out.e = { threadId, run: runsOf(done).at(-1)?.status, phases: phasesOf(entries), entries };
-  check("e: Stop publishes no alertable phase", run !== undefined && alertable.length === 0, out.e);
+  check("e: Stop publishes no alertable phase (running was published)", run !== undefined && phasesOf(entries).includes("running") && alertable.length === 0, out.e);
 }
 
 if (wants("f")) {
