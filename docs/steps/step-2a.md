@@ -190,5 +190,7 @@ Bundle: environment Worker 8.9 MB, agents Worker 3.6 MB. The t3code submodule is
 
 ## Stages
 
-- `step2a`: about 25 deploys, destroyed at the end with `bun scripts/stage.ts destroy step2a`.
-- `bump`: deployed by the CI bump job (see below), and left in place as step 1 left it.
+- `step2a`: about 25 deploys, destroyed on 2026-11-11 with `bun scripts/stage.ts destroy step2a` (6 resources,
+  both Workers and the Container application).
+- `bump`: deployed by the CI bump job, and left in place as step 1 left it. The job's first CI runs failed on
+  the fixes listed above; `workflow_dispatch` run 43012293366 on `step-2a` passed, real turn included.
