@@ -75,6 +75,16 @@ const readOnlySql = (environment: EnvironmentDO, query: string, params: Readonly
   return result!;
 };
 
+/** The health route shows an unreadable idle query (fragility U2) as its error rather than failing. */
+const unreadableAsError = <A>(read: () => A): A | { readonly unreadable: string } => {
+  try {
+    return read();
+  } catch (error) {
+    if (!(error instanceof Idle.UnreadableTables)) throw error;
+    return { unreadable: error.message };
+  }
+};
+
 const health = async (environment: EnvironmentDO) => {
   const storage = environment.ctxStorage;
   const runtime = environment.runtimeIfBooted === undefined ? undefined : await environment.runtimeIfBooted.catch(() => null);
@@ -90,8 +100,8 @@ const health = async (environment: EnvironmentDO) => {
     object: { constructedAt: new Date(environment.constructedAt).toISOString() },
     activity: { ...Idle.activity, idleSince: new Date(Idle.activity.idleSince).toISOString() },
     alarm: alarm === null ? null : new Date(alarm).toISOString(),
-    openWork: Idle.openWork(storage.sql, new Date()),
-    nextDue: Idle.nextDue(storage.sql),
+    openWork: unreadableAsError(() => Idle.openWork(storage.sql, new Date())),
+    nextDue: unreadableAsError(() => Idle.nextDue(storage.sql)),
     // The rows are t3's statements through the adapter since `isolate.startedAt` (cost audit F2).
     sql: { ...sqlStats, databaseSize: storage.sql.databaseSize },
     stateDirectory: StateStore.usage(),

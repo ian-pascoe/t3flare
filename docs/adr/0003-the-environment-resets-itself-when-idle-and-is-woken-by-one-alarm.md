@@ -20,3 +20,12 @@ t3 runs many in-process timers (a 5 s Scheduler tick, `Schedule.spaced` reactors
   not counted as requests, so a chatty shell with no client cannot keep the Environment awake (ADR-0021).
 - **The Workspace sweep's due time joins the one alarm.** An alarm due only for the sweep runs it without booting t3,
   then arms again for t3's own due work (`docs/steps/step-2b.md`).
+
+## Refinement (SPI-1024): the reads of t3's tables fail safe
+
+The idle check reads t3's private tables, which a nightly can rename or reshape ([fragility U2](../upstream-fragility.md#u2-the-idle-reset-reads-t3s-private-tables)). A read that fails now means "don't know", never "no work":
+
+- **No reset on a failed read.** If any idle query errors (a table or column gone), the Environment does not reset; it logs `idle-check-unreadable` as an error and reads again only after 10 minutes. Staying up costs money; resetting under a turn ends the turn (ADR-0004), and a wrong alarm loses a wake.
+- **An unknown status is open.** A run or provider session counts as open unless its status is a settled one (runs: `completed`, `interrupted`, `failed`, `cancelled`, `rolled_back`; sessions: `ready`, `stopped`, `error`), so a status a nightly adds keeps the Environment up.
+- **An alarm that cannot read its due work boots t3** rather than arming for a time it cannot know (`alarm-due-unreadable`).
+- The health route shows a failed read as `{ unreadable }` under `openWork` or `nextDue`.

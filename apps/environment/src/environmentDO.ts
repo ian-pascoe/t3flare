@@ -104,6 +104,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     Idle.activity.sockets = 0;
     Idle.activity.inFlight = 0;
     Idle.activity.idleSince = Date.now();
+    Idle.activity.unreadableUntil = 0;
     resetTerminals();
     // Before any t3 code runs: the `node:fs` shim and FileSystem Layer read this.
     bindStateStorage({ sql: ctx.storage.sql, transactionSync: (closure) => ctx.storage.transactionSync(closure) });
@@ -439,8 +440,18 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     if (this.#runtime === undefined) return { reset: false, why: "t3 is not running" };
     void this.#sweepIfDue().catch(() => undefined);
     const now = new Date();
+    // A forced check (the admin route) reads t3's tables again even while backing off.
+    if (options.force) Idle.activity.unreadableUntil = 0;
     const verdict = Idle.idleVerdict(this.ctx.storage.sql, now, options.force ? 0 : this.#idleAfterMs());
-    if (!verdict.reset) return verdict;
+    if (!verdict.reset) {
+      // Fail safe (fragility U2): the Environment stays up. Logged once per back-off, as an error.
+      if (verdict.unreadable !== undefined) {
+        console.error(
+          JSON.stringify({ t3flare: "idle-check-unreadable", error: verdict.unreadable, retryAfter: new Date(Idle.activity.unreadableUntil).toISOString() }),
+        );
+      }
+      return verdict;
+    }
     // A pending arm window needs no alarm: the next boot reads it, and seeds the grant only if still armed.
     // The sweep's due time joins t3's (step 2b).
     const due = Math.min(verdict.due.at?.getTime() ?? Number.POSITIVE_INFINITY, this.#nextSweep(now.getTime()));
@@ -467,7 +478,15 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     await this.#sweepIfDue().catch(() => undefined);
     if (runtime === undefined) {
       // A wake for the sweep alone does not boot t3: it is armed again for t3's own due work, if any.
-      const due = Idle.nextDue(this.ctx.storage.sql).at;
+      // If t3's tables cannot be read, the due work is unknown: boot t3 rather than miss a wake (fragility U2).
+      let due: Date | null;
+      try {
+        due = Idle.nextDue(this.ctx.storage.sql).at;
+      } catch (error) {
+        if (!(error instanceof Idle.UnreadableTables)) throw error;
+        console.error(JSON.stringify({ t3flare: "alarm-due-unreadable", error: error.message }));
+        due = new Date(0);
+      }
       if (due === null || due.getTime() > Date.now() + 1000) {
         const at = Math.min(due?.getTime() ?? Number.POSITIVE_INFINITY, this.#nextSweep());
         await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000));
