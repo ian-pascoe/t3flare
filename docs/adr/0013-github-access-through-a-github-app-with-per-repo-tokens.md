@@ -21,3 +21,16 @@ How part 1 implements it, with evidence in `docs/steps/step-2a/` (`m4-pr.json`, 
 Work started over a Peer link may `git push` the project's repo, but **every push needs its own approval**, which "accept for the session" never covers, in any mode. The gate is where the token is handed out, since a remote task runs in the project's shared checkout and the Container token is per Workspace: a Session whose thread carries a `linkOrigin` notes, before each of its commands, that linked work is active in its Workspace (for 30 minutes). While it is, the credential helper says what git is doing (its git ancestor: push, fetch or unknown). A fetch gets a **read-only token** (`contents: read`), so claiming "fetch" for a push only makes the push fail; anything else asks the owner on the linked thread (an approval titled "Allow git push?", showing the command) and gets the write token only if approved; with no live linked turn to ask, or no answer in 10 minutes, no token. Proved on the fixture (`docs/steps/step-3/m3-push.json`): the fetch asked nothing, a declined `git push origin HEAD:main` left the remote `main` unchanged, an approved one pushed once, the next asked again although the one before was accepted "for the session".
 
 **Residual risk, accepted for step 3:** an approved push hands git a write token that a hostile agent could capture (by wrapping the helper) and reuse until it expires (at most an hour). The fix is filed as a high-priority ticket, "Link-started pushes: keep the write token out of the Container": the Workspace DO's egress adds the auth header per approved push, so the token never enters the Container. Also residual: a detached process a linked thread started more than 30 minutes before its push is not counted as linked work.
+
+## Refinement (SPI-1004): GitHub is the App's identity, and GitHub only (owner decision D2)
+
+t3's GitHub features act as the **App**, not as the owner. They call GitHub with an installation token, so GitHub attributes what they do (a pull request opened, a comment, a review) to the App's bot account, and pushes use App tokens.
+
+Some features need an owner's user token, and they are missing by this decision, not by a bug:
+- "my PRs" filters
+- starred repositories
+- publishing a new repository
+
+A token pasted into t3's settings still works as in stock t3, at the owner's choice. There is no owner token held by t3flare.
+
+Other hosts (GitLab, Bitbucket, Azure DevOps, Forgejo) are out of scope for now: cloning works for public repos only, and t3's discovery reports their CLIs "not found". A later decision may add an owner token or a host, each with its own ADR.

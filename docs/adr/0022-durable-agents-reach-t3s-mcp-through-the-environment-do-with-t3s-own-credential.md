@@ -38,3 +38,13 @@ t3 lists for that credential and installed again when its hash changes (cloudpid
 - **The credential is never in a push, a snapshot, `/_t3flare/agents/session`, a Workspace or a Container.** The step 3
   leak check reads all of them for it, and for every other secret the Environment holds.
 - `EnvironmentDO.mcp` boots t3 the way a Session push does: from the stored public host, never a made-up request's.
+
+## Refinement (SPI-1004): what the allowlist withholds are parity refusals
+
+The tools listed above as not offered are refusals by design, not omissions:
+- `request_secret`: a credential typed into t3 (owner decision D5, ADR-0012's refinement).
+- `t3_attachment_*`: an upload URL for a shell. Attachments reach a Durable agent through its prompt instead (SPI-993).
+- `preview_*`, `html_*`, `device_*`: host-bound or not built yet (ADR-0024; previews come with SPI-1002).
+- The link tools: cloud-to-elsewhere links (ADR-0011).
+
+A bump that adds a tool leaves it withheld until it is classified here and in `T3_TOOL_ALLOWLIST`.

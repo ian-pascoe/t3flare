@@ -23,3 +23,7 @@ How the proxy key reaches each CLI is open ([ADR-0016](0016-no-vendor-credential
 
 - **Our own supervisor daemon with output replay**: add behind the same interface only if DO resets mid-turn prove common.
 - **Running the Claude SDK and a slice of t3's adapter in the Container**: remoting at the adapter boundary.
+
+## Refinement (SPI-1004): vendor-login CLIs are refused (owner decision D3)
+
+Stock t3 also drives CLIs that sign in to their vendor and reach no model through a base URL of the owner's choosing: Cursor, Antigravity, Kiro, Muse, Grok and Fx. Under ADR-0012 every model call goes through the model proxy, and none of these can be pointed at it. They are **refused**: they are not in the Workspace image, and t3flare registers no driver for them (`shadows/builtInDrivers.ts`), so t3 lists no such provider. The CLI agents are Codex, Claude Code, OpenCode and pi, as above. A vendor that later supports a custom base URL is a new decision, not a gap.
