@@ -1,0 +1,58 @@
+{
+  "ok": true,
+  "failures": [],
+  "fixture": "ian-pascoe/t3flare-fixture",
+  "model": "anthropic/deepseek-v4-pro",
+  "clone": {
+    "destination": "/w/acceptance-mwc487nb",
+    "ms": 5444,
+    "cwd": "/w/acceptance-mwc487nb",
+    "error": null
+  },
+  "turn": {
+    "threadId": "3b0efc7b-dbb4-45d3-a47d-b79bf9cc7b8d",
+    "runs": [
+      "completed"
+    ],
+    "approvals": [
+      {
+        "kind": "file-change",
+        "status": "resolved",
+        "decision": "accept"
+      },
+      {
+        "kind": "command",
+        "status": "resolved",
+        "decision": "accept"
+      }
+    ],
+    "edit": {
+      "fileName": "src/greeting.txt",
+      "status": "completed"
+    },
+    "bash": {
+      "input": "bash test.sh",
+      "status": "completed",
+      "exitCode": 0
+    },
+    "checkpointFiles": [
+      {
+        "path": "src/greeting.txt",
+        "kind": "modified",
+        "additions": 1,
+        "deletions": 0
+      }
+    ],
+    "ms": 22785
+  },
+  "checkpointOps": [
+    "has:do",
+    "capture:do",
+    "has:do",
+    "capture:do",
+    "has:do",
+    "diff:container",
+    "authored:do"
+  ],
+  "ms": 23149
+}

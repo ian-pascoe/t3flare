@@ -1,0 +1,45 @@
+{
+  "at": "2026-11-11T12:47:16.766Z",
+  "snapshot": {
+    "ms": 454,
+    "models": 71,
+    "proxyModels": 71,
+    "sample": [
+      "anthropic/beam-free | Beam Free | opencode",
+      "anthropic/big-pickle | Big Pickle | opencode",
+      "anthropic/claude-fable-5 | Claude Fable 5 | opencode",
+      "anthropic/claude-fable-5-1 | Claude Fable 5.1 | opencode",
+      "anthropic/claude-fable-5-2 | Claude Fable 5.2 | opencode",
+      "anthropic/claude-haiku-4-5 | Claude Haiku 4.5 | opencode"
+    ],
+    "default": "anthropic/claude-sonnet-5-5"
+  },
+  "turns": [
+    {
+      "slug": "anthropic/claude-haiku-5-5",
+      "ms": 3281,
+      "runs": [
+        "completed"
+      ],
+      "answer": "Bananas are the yellow, curved fruit."
+    },
+    {
+      "slug": "anthropic/gemini-3-flash",
+      "ms": 3240,
+      "runs": [
+        "completed"
+      ],
+      "answer": "The banana is a yellow and curved fruit."
+    },
+    {
+      "slug": "anthropic/deepseek-v4-pro",
+      "ms": 3215,
+      "runs": [
+        "completed"
+      ],
+      "answer": "A banana."
+    }
+  ],
+  "failures": [],
+  "ok": true
+}

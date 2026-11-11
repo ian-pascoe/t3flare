@@ -1,0 +1,58 @@
+{
+  "ok": true,
+  "failures": [],
+  "fixture": "ian-pascoe/t3flare-fixture",
+  "model": "anthropic/gemini-3-flash",
+  "clone": {
+    "destination": "/w/acceptance-mwc48w8e",
+    "ms": 5611,
+    "cwd": "/w/acceptance-mwc48w8e",
+    "error": null
+  },
+  "turn": {
+    "threadId": "c7d5efdf-0b71-4702-82df-57affef2dab2",
+    "runs": [
+      "completed"
+    ],
+    "approvals": [
+      {
+        "kind": "file-change",
+        "status": "resolved",
+        "decision": "accept"
+      },
+      {
+        "kind": "command",
+        "status": "resolved",
+        "decision": "accept"
+      }
+    ],
+    "edit": {
+      "fileName": "src/greeting.txt",
+      "status": "completed"
+    },
+    "bash": {
+      "input": "bash test.sh",
+      "status": "completed",
+      "exitCode": 0
+    },
+    "checkpointFiles": [
+      {
+        "path": "src/greeting.txt",
+        "kind": "modified",
+        "additions": 1,
+        "deletions": 0
+      }
+    ],
+    "ms": 18481
+  },
+  "checkpointOps": [
+    "has:do",
+    "capture:do",
+    "has:do",
+    "capture:do",
+    "has:do",
+    "diff:container",
+    "authored:do"
+  ],
+  "ms": 18792
+}

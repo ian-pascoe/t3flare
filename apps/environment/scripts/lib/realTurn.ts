@@ -10,7 +10,9 @@ import { spawnSync } from "node:child_process";
 import { admin, dispatch, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall, wsStream } from "./client.ts";
 
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
-const MODEL = { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5", options: [{ id: "thinking", value: "low" }] };
+// T3FLARE_REAL_TURN_MODEL names another model of the proxy (a Claude model gets a thinking level, any other none).
+const SLUG = process.env.T3FLARE_REAL_TURN_MODEL ?? "anthropic/claude-haiku-5-5";
+const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
 
 export interface RealTurnReport {
   readonly ok: boolean;
@@ -91,7 +93,8 @@ export const realTurn = async (cookie: string, options: { readonly push: boolean
   };
   check("the turn completed", runsOf(projection)[0]?.status === "completed", report.turn);
   check("the edit and bash each asked and were approved", requests.length >= 2 && requests.every((r: any) => r.status === "resolved" && r.decision === "accept"), requests);
-  check("the edit item names the file under /w", edit?.fileName === `${destination}/src/greeting.txt` && edit?.status === "completed", edit);
+  // Claude passes the absolute path, other models often the one relative to the repo; both name the file.
+  check("the edit item names the file", [`${destination}/src/greeting.txt`, "src/greeting.txt"].includes(edit?.fileName) && edit?.status === "completed", edit);
   check("bash test.sh exited 0", bash?.status === "completed" && bash?.exitCode === 0, bash);
   check("the turn's checkpoint lists src/greeting.txt", JSON.stringify(checkpoint?.files ?? []).includes("src/greeting.txt"), checkpoint?.files);
   const trace = (await admin("GET", "/_t3flare/agents/checkpoint-trace?clear=1")).json?.entries ?? [];

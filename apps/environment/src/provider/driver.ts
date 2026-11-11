@@ -18,6 +18,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import { environmentServices } from "../agents/bindings.ts";
 import { makePiDurableAdapter } from "./adapter.ts";
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
 import { snapshotModels } from "./models.ts";
@@ -65,7 +66,9 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       continuation: { groupKey: continuationIdentity.continuationKey },
     });
     const effective = { ...config, enabled };
-    const models = snapshotModels();
+    const { catalog } = environmentServices();
+    // The snapshot's models are the catalog's: the copy kept from the last read, now; the proxy's list again at each check.
+    const models = () => snapshotModels(catalog.current());
     const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: PI_DURABLE_DRIVER, packageName: null });
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
     const snapshot = yield* makeManagedServerProvider({
@@ -73,9 +76,14 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       getSettings: settingsSource.getSettings,
       streamSettings: settingsSource.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,
-      initialSnapshot: (settings) => snapshotOf({ enabled: settings.provider.enabled, models }).pipe(Effect.map(stamp)),
-      checkProvider: snapshotOf({ enabled: effective.enabled, models }).pipe(Effect.map(stamp)),
+      initialSnapshot: (settings) => snapshotOf({ enabled: settings.provider.enabled, models: models() }).pipe(Effect.map(stamp)),
+      checkProvider: Effect.promise(() => catalog.refresh()).pipe(
+        Effect.flatMap(() => snapshotOf({ enabled: effective.enabled, models: models() })),
+        Effect.map(stamp),
+      ),
     }).pipe(Effect.orDie);
+    // Read the proxy's list now rather than at the first interval: a fresh Environment starts with the kept copy.
+    yield* Effect.forkScoped(snapshot.refresh);
     const textGeneration = makePiDurableTextGeneration();
     return {
       instanceId,

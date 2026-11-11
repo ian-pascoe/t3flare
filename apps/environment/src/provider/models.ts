@@ -1,8 +1,9 @@
-// The provider snapshot's models: the static list from @t3flare/models, each with its thinking picker (the option t3's
+// The provider snapshot's models: the catalog's (the proxy's list, or the static one before it is read), each with its thinking picker (the option t3's
 // Pi provider calls `thinking`).
 import type { ModelCapabilities, ProviderOptionChoice, ServerProviderModel } from "@t3tools/contracts";
 import { createModelCapabilities } from "@t3tools/shared/model";
-import { CATALOG, DEFAULT_MODEL_SLUG, DEFAULT_THINKING, THINKING_LEVELS, type CatalogModel } from "@t3flare/models";
+import type { Catalog } from "@t3flare/models/catalog";
+import { DEFAULT_MODEL_SLUG, DEFAULT_THINKING, THINKING_LEVELS, type CatalogModel } from "@t3flare/models";
 
 const LABELS: Record<(typeof THINKING_LEVELS)[number], string> = {
   off: "Off",
@@ -32,12 +33,15 @@ const capabilitiesOf = (model: CatalogModel): ModelCapabilities =>
       : [],
   });
 
-export const snapshotModels = (): ReadonlyArray<ServerProviderModel> =>
-  CATALOG.map((model) => ({
+/** The picker's default is the default model when the catalog lists it, else its first model. */
+export const snapshotModels = (catalog: Catalog): ReadonlyArray<ServerProviderModel> => {
+  const defaultSlug = catalog.models.some((model) => model.slug === DEFAULT_MODEL_SLUG) ? DEFAULT_MODEL_SLUG : catalog.models[0]?.slug;
+  return catalog.models.map((model) => ({
     slug: model.slug,
     name: model.name,
-    subProvider: model.provider,
+    subProvider: model.ownedBy,
     isCustom: false,
-    ...(model.slug === DEFAULT_MODEL_SLUG ? { isDefault: true } : {}),
+    ...(model.slug === defaultSlug ? { isDefault: true } : {}),
     capabilities: capabilitiesOf(model),
   }));
+};

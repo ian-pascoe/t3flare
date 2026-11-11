@@ -16,7 +16,6 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import { turnScopedSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
-import { findModel } from "@t3flare/models";
 import {
   type ModelRef,
   type RuntimeMode,
@@ -285,7 +284,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
         canResumeAfterRestart: true,
         events: Stream.fromQueue(events),
         getModelContextWindow: (selection) =>
-          selection.instanceId !== instanceId ? undefined : findModel(modelOf(selection).model.provider + "/" + modelOf(selection).model.modelId)?.contextWindow,
+          selection.instanceId !== instanceId ? undefined : environmentServices().catalog.find(modelOf(selection).model.provider + "/" + modelOf(selection).model.modelId)?.contextWindow,
         ensureThread: (threadInput) =>
           register({
             threadId: threadInput.threadId,
@@ -340,7 +339,7 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
               providerTurnOrdinal: turnInput.providerTurnOrdinal,
               startedAt,
               providerTurn,
-              contextWindow: findModel(`${model.provider}/${model.modelId}`)?.contextWindow ?? null,
+              contextWindow: environmentServices().catalog.find(`${model.provider}/${model.modelId}`)?.contextWindow ?? null,
               providerSessionId: input.providerSessionId,
             };
             // Registered before the submit, so a push that arrives first is not taken for an orphan (plan revision 3).

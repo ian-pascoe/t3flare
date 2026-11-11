@@ -7,6 +7,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
+import { modelCatalog } from "@t3flare/models/catalog";
 import type { SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
@@ -71,6 +72,9 @@ export interface BootReport {
   readonly isolateBoot: number;
 }
 
+/** The proxy's model list, as the last read of it left it (ADR-0012). */
+const CATALOG_KEY = "t3flare:model-catalog";
+
 export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   #runtime: Promise<Runtime> | undefined;
   #host: string | undefined;
@@ -89,10 +93,15 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     Idle.activity.idleSince = Date.now();
     // Before any t3 code runs: the `node:fs` shim and FileSystem Layer read this.
     bindStateStorage({ sql: ctx.storage.sql, transactionSync: (closure) => ctx.storage.transactionSync(closure) });
+    const modelProxy =
+      env.MODEL_PROXY_URL && env.MODEL_PROXY_API_KEY ? { url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY } : undefined;
     bindEnvironmentServices({
       agents: env,
-      modelProxy:
-        env.MODEL_PROXY_URL && env.MODEL_PROXY_API_KEY ? { url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY } : undefined,
+      modelProxy,
+      catalog: modelCatalog({
+        proxy: modelProxy,
+        store: { read: () => ctx.storage.kv.get(CATALOG_KEY), write: (catalog) => ctx.storage.kv.put(CATALOG_KEY, catalog) },
+      }),
       github: () => this.github,
       workspaces: workspaceRegistry(ctx.storage.sql),
     });

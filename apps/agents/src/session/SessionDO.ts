@@ -48,6 +48,7 @@ import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
 import { ApprovalStore, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
+import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
 import { liveOf, pushedEntry, turnOfEntry, usageOf } from "./state.ts";
 
@@ -70,6 +71,7 @@ const PUSHED_KEY = "t3flare:pushed-entry";
 const RETRY_KEY = "t3flare:push-retry";
 const LAST_PUSH_KEY = "t3flare:last-push";
 const DIAG_KEY = "t3flare:diagnostics";
+const CATALOG_KEY = "t3flare:model-catalog";
 
 interface Meta {
   readonly threadId: string;
@@ -95,9 +97,15 @@ export class SessionDO extends DurableObject<SessionEnv> {
   /** Registry the tool extensions install into, before the Harness resumes work that needs them. */
   readonly #registry: RegistryReader;
   readonly #approvals: ApprovalStore;
+  /** The proxy's model list (ADR-0012), kept in this object's storage and read again when it is old. */
+  readonly #catalog: ModelCatalog;
 
   constructor(ctx: DurableObjectState, env: SessionEnv) {
     super(ctx, env);
+    this.#catalog = modelCatalog({
+      proxy: { url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY },
+      store: { read: () => ctx.storage.kv.get(CATALOG_KEY), write: (catalog) => ctx.storage.kv.put(CATALOG_KEY, catalog) },
+    });
     this.#approvals = new ApprovalStore(ctx.storage.kv, () => this.#schedulePush(0));
     const registry = createRegistry();
     registry.install(codingTools());
@@ -119,11 +127,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
           const fallback = Date.now() + HEARTBEAT_MS;
           const current = await ctx.storage.getAlarm();
           if (current === null || current > fallback) await ctx.storage.setAlarm(fallback);
+          // The proxy's list before the Harness opens, so a model it added is there for a resumed turn; bounded, never throws.
+          await this.#catalog.refresh();
           const storage = await openDurableObjectSqliteStorage(ctx.storage, { prefix: "pi_" });
           const harness = await Harness.open(
             storage,
             {
-              models: proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }),
+              models: proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current()),
               registry: this.#registry,
               settings: { retry: { enabled: true, maxRetries: 3 } },
               env: (target) => this.#envAt(target.cwd),
@@ -259,6 +269,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (existing !== undefined) return { submissionId: existing.submissionId };
     const meta = this.#meta();
     if (meta !== undefined) this.ctx.storage.kv.put(META_KEY, { ...meta, runtimeMode: input.runtimeMode } satisfies Meta);
+    // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
+    if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
     const root = await this.#root(input.model, input.thinking);
     await root.configure({ model: input.model, thinkingLevel: input.thinking ?? null }, context);
     const startedAt = Date.now();
