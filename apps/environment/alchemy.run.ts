@@ -11,12 +11,16 @@
 //
 // A stage may also have a custom domain (`T3FLARE_DOMAIN`, a hostname in a Cloudflare zone of the account; prod's is
 // `t3.ianpascoe.dev`, from the GitHub environment `prod` in CI and the laptop's environment otherwise). When set, it is
-// attached as a Workers Custom Domain and becomes the stage's `url` and `host`; the workers.dev URL keeps working.
+// attached as a Workers Custom Domain and becomes the stage's only host: its workers.dev URL and preview URLs are
+// turned off, so the domain's rate limit (below) cannot be sidestepped. A stage without a domain is served at workers.dev.
 //
 // Access (ADR-0010): `/ws`, `/mcp` and t3's auth routes are public (stock clients cannot pass Access); only
-// `<host>/_t3flare` (and below, on every host the Worker serves) has an Access application, admitting the owner by
-// email and the stage's own service token (for the acceptance test and the bump job). The Worker verifies the
-// assertion itself against the application's `aud` (src/access.ts), and also requires the admin token.
+// `<host>/_t3flare` (and below) has an Access application, admitting the owner by email and the stage's own service
+// token (for the acceptance test and the bump job). The Worker verifies the assertion itself against the application's
+// `aud` (src/access.ts), and also requires the admin token.
+//
+// A stage with a domain also rate-limits t3's credential-presenting auth routes on that host (ADR-0010), as the
+// `http_ratelimit` phase of the domain's zone: see `AUTH_RATE_LIMIT` below.
 //
 // The agents Worker (ADR-0014, step 2a) deploys in the same stack: its Session DOs, Workspace DOs with their Container
 // (the image in apps/sandbox-image, built here with Docker), and the Container budget. It has no public URL. The two
@@ -43,6 +47,38 @@ const OWNER_EMAIL = "ian.g.pascoe@gmail.com";
 /** The account's workers.dev subdomain: the Worker's host has to be known to name the Access destination. */
 const WORKERS_DEV_SUBDOMAIN = "ian-g-pascoe";
 
+/**
+ * The routes of t3's server (t3code, pinned) that take a credential from a caller who has no session yet, and so are
+ * what a guesser or a flood would hit. All are POSTs:
+ *
+ *   /oauth/token               bootstrap token exchange: pairing a desktop/mobile client, bearer or DPoP-bound
+ *                              (packages/contracts/src/environmentHttp.ts:577, apps/server/src/auth/http.ts:355)
+ *   /api/auth/browser-session  bootstrap token -> session cookie: pairing the web client
+ *                              (environmentHttp.ts:570, auth/http.ts:300)
+ *   /oauth/mcp/register        MCP OAuth dynamic client registration (environmentHttp.ts:648, auth/mcpOAuthHttp.ts:103)
+ *   /oauth/mcp/approval        MCP OAuth consent: the owner's session approves a client (environmentHttp.ts:656,
+ *                              mcpOAuthHttp.ts:149)
+ *   /oauth/mcp/decision        MCP OAuth consent decision (environmentHttp.ts:665, mcpOAuthHttp.ts:174)
+ *   /oauth/mcp/token           MCP OAuth authorization code -> token (environmentHttp.ts:674, mcpOAuthHttp.ts:187)
+ *
+ * Not limited, because a paired client calls them on every (re)connect and they need its session anyway:
+ * GET /api/auth/session, POST /api/auth/websocket-ticket[/:use] (environmentHttp.ts:563, 585, 592), `/ws` and `/mcp`.
+ * Guest links (/api/guest/redeem) are not mounted here (src/t3/composition.ts). t3 has no refresh grant: a client's
+ * session lasts 30 days (apps/server/src/auth/SessionStore.ts:428) and an MCP client's 30 days
+ * (apps/server/src/auth/EnvironmentAuth.ts:79), so these routes see a request only when something pairs or signs in.
+ */
+const AUTH_PATHS = ["/oauth/token", "/api/auth/browser-session", "/oauth/mcp/register", "/oauth/mcp/approval", "/oauth/mcp/decision", "/oauth/mcp/token"];
+
+/**
+ * 10 such requests per 10 s from one IP (per Cloudflare data center), then 429 for 10 s. The zone (`ianpascoe.dev`) is
+ * on the Free plan, which allows one rate limiting rule, a 10 s period and a 10 s block, counted by IP. Normal use
+ * peaks well below: pairing is 1 request per client (desktop and web paired at once from one network: 2), an MCP
+ * client's sign-in 3 to 4 (register, approval, decision, token), so even all of those at once from one network (6)
+ * stays under 10, and a blocked caller waits only 10 s.
+ * A guesser is held to 1 request a second per IP against 256-bit bootstrap tokens; the limit is there to keep floods
+ * off the Environment DO, which every auth request wakes.
+ */
+const AUTH_RATE_LIMIT = { requestsPerPeriod: 10, period: 10, mitigationTimeout: 10 };
 
 export default Alchemy.Stack(
   "t3flare",
@@ -55,7 +91,6 @@ export default Alchemy.Stack(
     // The stage's custom domain, if it has one (unset or empty: workers.dev only).
     const domain = yield* Config.String("T3FLARE_DOMAIN").pipe(Config.withDefault(""));
     const host = domain === "" ? workersDevHost : domain;
-    const hosts = domain === "" ? [workersDevHost] : [domain, workersDevHost];
     const teamDomain = yield* Config.String("T3FLARE_ACCESS_TEAM_DOMAIN").pipe(Config.withDefault(ACCESS_TEAM_DOMAIN));
     const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
@@ -72,7 +107,7 @@ export default Alchemy.Stack(
     const admin = yield* Cloudflare.Access.Application("AdminAccess", {
       name: `${name} admin`,
       type: "self_hosted",
-      destinations: hosts.map((h) => ({ type: "public", uri: `${h}/_t3flare` })),
+      destinations: [{ type: "public", uri: `${host}/_t3flare` }],
       sessionDuration: "24h",
       appLauncherVisible: false,
       policies: [
@@ -121,7 +156,8 @@ export default Alchemy.Stack(
       // old build. The Environment adopts new code at once, as a restart does (ADR-0004): clients reconnect, and running
       // turns continue from their Sessions. The agents Worker keeps the default: its Sessions finish in-flight work first.
       codeUpdateStrategy: { mode: "immediate" },
-      ...(domain === "" ? {} : { domain }),
+      // A stage with a domain is served there only (no workers.dev URL, no version preview URLs).
+      ...(domain === "" ? {} : { domain, workersDev: false }),
       env: {
         ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO" }),
         T3_BOOTSTRAP_TOKEN: Config.Redacted("T3_BOOTSTRAP_TOKEN"),
@@ -152,10 +188,34 @@ export default Alchemy.Stack(
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     });
 
-    // The stage's service-token credentials, for scripts/acceptance.ts; never printed.
+    if (domain !== "") {
+      // Owns the zone's whole http_ratelimit entrypoint (one per zone; the Free plan allows one rule in it), so only one
+      // stage may have a domain in a given zone.
+      const { accountId } = yield* yield* Cloudflare.CloudflareEnvironment;
+      const zoneId = yield* Cloudflare.Zone.resolveZoneId({ accountId, zone: undefined, hostname: domain }).pipe(Effect.orDie);
+      yield* Cloudflare.Ruleset.Ruleset("AuthRateLimit", {
+        zone: { zoneId } as never,
+        phase: "http_ratelimit",
+        name: "t3flare auth rate limit",
+        description: `t3's auth routes on ${domain} (apps/environment/alchemy.run.ts)`,
+        rules: [
+          {
+            ref: `t3flare-auth-${stage}`,
+            description: `t3flare ${stage}: t3's auth routes on ${domain}`,
+            expression: `(http.host eq "${domain}" and http.request.method eq "POST" and http.request.uri.path in {${AUTH_PATHS.map((p) => `"${p}"`).join(" ")}})`,
+            action: "block",
+            ratelimit: { characteristics: ["cf.colo.id", "ip.src"], ...AUTH_RATE_LIMIT },
+          },
+        ],
+      });
+    }
+
+    // The stage's service-token credentials and URL (its custom domain when it has one), for the stage scripts; never
+    // printed.
     const credentials = Output.map(
       Output.all(serviceToken.clientId, serviceToken.clientSecret, environment.url),
-      ([clientId, clientSecret, url]) => {
+      ([clientId, clientSecret]) => {
+        const url = `https://${host}`;
         const file = credentialsFile(stage);
         if (clientSecret !== undefined) {
           fs.mkdirSync(path.dirname(file), { recursive: true });

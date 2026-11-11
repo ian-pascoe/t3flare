@@ -57,7 +57,8 @@ const STAGE_DEPLOY_PERMISSIONS = [
 /**
  * prod's custom domain (apps/environment/alchemy.run.ts reads it as T3FLARE_DOMAIN), and the zone it is in. Attaching a
  * Workers Custom Domain needs zone permissions the other stages do not: Zone Read (alchemy looks the zone up by name)
- * and Workers Routes Write ("Worker domains and routes"), on this zone only, for the prod token only.
+ * and Workers Routes Write ("Worker domains and routes"), on this zone only, for the prod token only. Zone WAF Write:
+ * the rate limit on t3's auth routes (the zone's `http_ratelimit` phase, ADR-0010).
  */
 const PROD_DOMAIN = "t3.ianpascoe.dev";
 const PROD_DOMAIN_ZONE_ID = "c36c6e2b6bda856f9d4f6175059c6df4"; // ianpascoe.dev
@@ -147,7 +148,7 @@ export default Alchemy.Stack(
         },
         {
           effect: "allow",
-          permissionGroups: ["Zone Read", "Workers Routes Write"],
+          permissionGroups: ["Zone Read", "Workers Routes Write", "Zone WAF Write"],
           resources: {
             [`com.cloudflare.api.account.${accountId}`]: { [`com.cloudflare.api.account.zone.${PROD_DOMAIN_ZONE_ID}`]: "*" },
           },
