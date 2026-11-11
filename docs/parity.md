@@ -182,3 +182,12 @@ Needs an ADR or a line in one:
 - **D3. Vendor-login CLIs.** Refuse permanently under ADR-0012?
 - **D4. Previews.** Is dev-server preview (G11, L) part of parity, or refused with the device hub?
 - **D5. Keys typed into t3.** Cloud voice, custom text generators, 1Password and `request_secret` each put a credential in t3flare. Exempt them from ADR-0012/0016, or refuse them?
+
+## 5. Owner decisions taken (2026-11-11)
+
+- **D1** Product analytics: **off** in the Cloud Environment (SPI-995).
+- **D2** GitHub stays **App-only and GitHub-only** for now: no owner token, no other hosts (SPI-1000 canceled; ADR-0013 note in SPI-1004).
+- **D3** Vendor-login CLIs (Cursor, Antigravity, Kiro, Muse, Grok, Fx): **refused** (ADR-0012/0015 via SPI-1004).
+- **D4** Dev-server previews: **part of parity, built last** (SPI-1002).
+- **D5** Keys typed into t3 (cloud voice, custom text generators, `request_secret`): **refused for now**; 1Password possibly later via the broker pattern.
+- **ADR-0016** CLI agents get the Commissary key by an on-demand helper, never in env or on disk (option A′).
