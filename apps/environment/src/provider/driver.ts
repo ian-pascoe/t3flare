@@ -14,6 +14,7 @@ import {
   makeProviderSnapshotSettingsSource,
 } from "@t3tools/provider-core/server/snapshotSettings";
 import type * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -34,7 +35,7 @@ const PRESENTATION = {
 
 const decodeSettings = Schema.decodeSync(PiDurableSettings);
 
-export type PiDurableDriverEnv = ProviderHost.ProviderHost;
+export type PiDurableDriverEnv = ProviderHost.ProviderHost | McpProviderSessions.McpProviderSessions;
 
 const snapshotOf = Effect.fn("PiDurableDriver.snapshot")(function* (input: {
   readonly enabled: boolean;
@@ -85,6 +86,8 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
     // Read the proxy's list now rather than at the first interval: a fresh Environment starts with the kept copy.
     yield* Effect.forkScoped(snapshot.refresh);
     const textGeneration = makePiDurableTextGeneration();
+    // t3's MCP credential per thread (step 3): the adapter hands it to the Session with each open and turn.
+    const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
     return {
       instanceId,
       driverKind: PI_DURABLE_DRIVER,
@@ -93,7 +96,7 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       accentColor,
       enabled,
       snapshot,
-      orchestrationAdapter: makePiDurableAdapter(instanceId),
+      orchestrationAdapter: makePiDurableAdapter(instanceId, mcpSessions),
       textGeneration,
     } satisfies ProviderInstance;
   }),

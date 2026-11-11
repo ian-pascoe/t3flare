@@ -2,6 +2,7 @@
 // provider events. Pure: `diff(state, pushed, now)` returns the events for what changed since the last call on `state`.
 // Every id is derived from pi-durable's own ids (the generation task for text and reasoning, the tool call's id for a
 // tool), so re-applying a range after a gap or a restart emits the same upserts. Shapes follow t3's Pi adapter.
+import { mcpToolPresentation } from "@t3tools/provider-core/server/mcpToolPresentation";
 import {
   RuntimeRequestId,
   type NodeId,
@@ -321,11 +322,17 @@ const emitTool = (
   );
   emitItem(state, out, turn, key, "tool_call", status, call.name, {
     type: "dynamic_tool",
+    // t3's own tools (`mcp__t3-code__…`, step 3) show as t3 shows them for its Pi provider.
+    ...mcpToolPresentation({ toolName: call.name }),
     toolName: call.name,
     input,
     ...(result === undefined ? {} : { output: { content: result.content.filter((block) => block.type === "text") } }),
   }, now);
 };
+
+/** t3's request kind for a Session approval: a T3 tool's is a permission (as t3's Pi bridge asks), a push a command. */
+const requestKindOf = (kind: PendingApproval["kind"]): "command" | "file-change" | "permission" =>
+  kind === "mcp-tool" ? "permission" : kind === "git-push" ? "command" : kind;
 
 /** Opens each new pending approval of a turn this provider session started, and closes those the Session no longer has. */
 const emitApprovals = (
@@ -349,7 +356,7 @@ const emitApprovals = (
       nodeId,
       providerTurnId: turn.providerTurnId,
       nativeRequestRef: ref(nativeId),
-      kind: approval.kind,
+      kind: requestKindOf(approval.kind),
       status: "pending",
       responseCapability: { type: "live", providerSessionId: turn.providerSessionId, supportsFeedback: true },
       createdAt,
@@ -390,7 +397,7 @@ const emitApprovals = (
       updatedAt: createdAt,
       type: "approval_request",
       requestId: id,
-      requestKind: approval.kind,
+      requestKind: requestKindOf(approval.kind),
       prompt,
     } as OrchestrationV2TurnItem;
     state.approvals.set(approval.requestId, { turn: turn.providerTurnId, runtimeRequest, node, turnItem });

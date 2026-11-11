@@ -21,6 +21,8 @@ import {
   type ImageInput,
   type InteractionMode,
   interactionModeOf,
+  type LinkedWork,
+  type T3McpCredential,
   LIVENESS_PUSH_MS,
   type ModelRef,
   type OpenAnswer,
@@ -52,6 +54,8 @@ import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
 import { ApprovalStore, interactionModeSection, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
+import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
+import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
@@ -82,6 +86,13 @@ const DIAG_KEY = "t3flare:diagnostics";
 const CATALOG_KEY = "t3flare:model-catalog";
 /** Each turn's model proxy record (requests, last failure), apart from the turns so no turn write can lose one. */
 const PROXY_KEY = "t3flare:proxy";
+/**
+ * t3's MCP credential for this thread's provider session (step 3, ADR-0022): this object's storage only, never a push,
+ * a snapshot, a Workspace or a Container (review C8).
+ */
+const T3_MCP_KEY = "t3flare:t3-mcp";
+/** The catalog the `t3-mcp` extension was built from (installed again at each start, before work resumes). */
+const T3_CATALOG_KEY = "t3flare:t3-mcp-catalog";
 /** A test's model proxy fault (stages only). */
 const FAULT_KEY = "t3flare:proxy-fault";
 /** The most a Stop (or the object's start) waits for an aborted command's processes to be killed. */
@@ -93,6 +104,8 @@ interface Meta {
   readonly runtimeMode: RuntimeMode;
   /** Step 3 (F-plan); absent in a Session stored before it. */
   readonly interactionMode?: InteractionMode;
+  /** Step 3: the thread's link origin (t3's `linkOrigin`), null or absent for the owner's own work. */
+  readonly linked?: LinkedWork | null;
   readonly epoch: string;
 }
 
@@ -121,6 +134,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #limits: ProxyLimitsOptions;
   /** The Container commands running, kept so an aborted one's processes are killed, even after a restart. */
   readonly #execs: RunningExecs;
+  /** t3's `/mcp`, through the Environment DO (step 3). */
+  readonly #t3: T3McpClient;
+  readonly #registryWriter: ReturnType<typeof createRegistry>;
 
   constructor(ctx: DurableObjectState, env: SessionEnv) {
     super(ctx, env);
@@ -154,6 +170,14 @@ export class SessionDO extends DurableObject<SessionEnv> {
       }),
     );
     registry.install(interactionModeSection(() => interactionModeOf(this.#meta()?.interactionMode)));
+    this.#t3 = new T3McpClient(
+      (request) => environmentStub(env.ENVIRONMENT).mcp(request),
+      () => ctx.storage.kv.get<T3McpCredential>(T3_MCP_KEY),
+    );
+    this.#registryWriter = registry;
+    // The tools the last turn had, before work that may call them resumes.
+    const catalog = ctx.storage.kv.get<T3Catalog>(T3_CATALOG_KEY);
+    if (catalog !== undefined) registry.install(this.#t3Extension(catalog));
     this.#registry = registry;
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {
@@ -202,6 +226,47 @@ export class SessionDO extends DurableObject<SessionEnv> {
         }
       });
     });
+  }
+
+  // -------------------------------------------------------------------------------------------------------------------
+  // t3's MCP tools (step 3)
+
+  #t3Extension(catalog: T3Catalog) {
+    return t3McpExtension(catalog, {
+      store: this.#approvals,
+      mode: () => runtimeModeOf(this.#meta()?.runtimeMode),
+      interaction: () => interactionModeOf(this.#meta()?.interactionMode),
+      turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null,
+      credential: () => this.ctx.storage.kv.get<T3McpCredential>(T3_MCP_KEY)?.providerSessionId,
+      instructions: () => this.ctx.storage.kv.get<T3McpCredential>(T3_MCP_KEY)?.instructions,
+      call: (tool, args) => this.#t3.callTool(tool, args),
+    });
+  }
+
+  /**
+   * Keeps the credential t3 issued for this provider session (none: the tools are unavailable), and when it changed
+   * lists t3's tools with it and installs the extension again if the catalog changed. Never fails the command.
+   */
+  async #takeT3Mcp(credential: T3McpCredential | undefined): Promise<void> {
+    const kv = this.ctx.storage.kv;
+    if (credential === undefined) {
+      kv.delete(T3_MCP_KEY);
+      return;
+    }
+    const before = kv.get<T3McpCredential>(T3_MCP_KEY);
+    kv.put(T3_MCP_KEY, credential);
+    if (before?.authorization === credential.authorization && kv.get(T3_CATALOG_KEY) !== undefined) return;
+    try {
+      const listed = await this.#t3.listTools();
+      if (listed === undefined) return;
+      const catalog = catalogOf(listed);
+      if (kv.get<T3Catalog>(T3_CATALOG_KEY)?.hash === catalog.hash) return;
+      kv.put(T3_CATALOG_KEY, catalog);
+      this.#registryWriter.install(this.#t3Extension(catalog));
+      console.log(JSON.stringify({ t3flare: "t3-mcp-catalog", tools: catalog.tools.length, left: catalog.left.length, hash: catalog.hash }));
+    } catch (error) {
+      console.warn(JSON.stringify({ t3flare: "t3-mcp-catalog-failed", error: String(error).slice(0, 300) }));
+    }
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -353,8 +418,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
       workspaceId: input.workspaceId,
       runtimeMode: input.runtimeMode,
       interactionMode: interactionModeOf(input.interactionMode),
+      linked: input.linked ?? null,
       epoch,
     } satisfies Meta);
+    await this.#takeT3Mcp(input.t3Mcp);
     const root = await this.#root(input.model, input.thinking);
     // The agent works in its Workspace's repo (t3's `/w/<id>`), or nowhere without one.
     if (input.workspaceId !== null) await root.configure({ cwd: REPO_ROOT }, context);
@@ -367,8 +434,14 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (existing !== undefined) return { submissionId: existing.submissionId };
     const meta = this.#meta();
     if (meta !== undefined) {
-      this.ctx.storage.kv.put(META_KEY, { ...meta, runtimeMode: input.runtimeMode, interactionMode: interactionModeOf(input.interactionMode) } satisfies Meta);
+      this.ctx.storage.kv.put(META_KEY, {
+        ...meta,
+        runtimeMode: input.runtimeMode,
+        interactionMode: interactionModeOf(input.interactionMode),
+        linked: input.linked ?? meta.linked ?? null,
+      } satisfies Meta);
     }
+    await this.#takeT3Mcp(input.t3Mcp);
     // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
     if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
     const root = await this.#root(input.model, input.thinking);

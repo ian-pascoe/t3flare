@@ -40,6 +40,14 @@ export const MAX_SUMMARY = 2_000;
 
 export type ApprovalKind = PendingApproval["kind"];
 
+/**
+ * What "accept for the session" covers (review C4): a kind for the coding tools (every command, every file change), one
+ * tool by name for t3's MCP tools (so accepting `delegate_task` never unlocks `bash` or another T3 tool, nor the
+ * reverse), and nothing for a linked thread's push (owner decision D1: every push asks).
+ */
+export const acceptanceKeyOf = (call: { readonly tool: string; readonly kind: ApprovalKind }): string | null =>
+  call.kind === "git-push" ? null : call.kind === "mcp-tool" ? `mcp-tool:${call.tool}` : call.kind;
+
 /** The Session's approval requests, over its storage. `changed` runs whenever the pending requests change. */
 export class ApprovalStore {
   readonly #storage: ApprovalStorage;
@@ -65,9 +73,15 @@ export class ApprovalStore {
     this.#changed();
   }
 
-  /** Kinds the owner accepted for the rest of the Session (`acceptForSession`). */
-  acceptedKinds(): ReadonlySet<ApprovalKind> {
-    return new Set(this.#storage.get<ApprovalKind[]>(ACCEPTED_KEY) ?? []);
+  /** What the owner accepted for the rest of the Session (`acceptForSession`), by `acceptanceKeyOf`. */
+  #accepted(): ReadonlySet<string> {
+    return new Set(this.#storage.get<string[]>(ACCEPTED_KEY) ?? []);
+  }
+
+  /** Whether the owner accepted calls like this one for the rest of the Session. */
+  acceptedFor(call: { readonly tool: string; readonly kind: ApprovalKind }): boolean {
+    const key = acceptanceKeyOf(call);
+    return key !== null && this.#accepted().has(key);
   }
 
   /**
@@ -118,7 +132,8 @@ export class ApprovalStore {
       ...this.#answers(),
       [requestId]: { decision, ...(trimmed === undefined || trimmed === "" ? {} : { feedback: trimmed }) },
     });
-    if (decision === "acceptForSession") this.#storage.put(ACCEPTED_KEY, [...new Set([...this.acceptedKinds(), request.kind])]);
+    const key = acceptanceKeyOf(request);
+    if (decision === "acceptForSession" && key !== null) this.#storage.put(ACCEPTED_KEY, [...new Set([...this.#accepted(), key])]);
     this.#putRequests(this.pending().filter((pending) => pending.requestId !== requestId));
     this.#waiters.get(requestId)?.();
     return true;
@@ -170,13 +185,13 @@ export const summaryOf = (tool: string, args: Readonly<Record<string, unknown>>)
   return { summary: `Write ${path} (${content.length} characters)`, detail: cut(content, 600) };
 };
 
-const STARTED_MEMO = "t3flare.started";
+export const STARTED_MEMO = "t3flare.started";
 
 /** What a tool that changes files answers in plan mode (step 3, F-plan): fixed, and nothing runs. */
 export const PLAN_MODE_REFUSAL =
   "Refused: this thread is in plan mode, which is read-only. Investigate with read-only tools and reply with a plan; the owner switches the thread out of plan mode to implement it.";
 
-const planRefusal = () => ({ output: [{ type: "text" as const, text: PLAN_MODE_REFUSAL }], isError: true, details: { planMode: true } });
+export const planRefusal = () => ({ output: [{ type: "text" as const, text: PLAN_MODE_REFUSAL }], isError: true, details: { planMode: true } });
 
 /**
  * t3's plan-mode instruction (t3code/packages/provider-core/src/server/orchestrationInstructions.ts,
@@ -205,6 +220,41 @@ const declinedResult = (answer: StoredAnswer) => ({
   details: { approval: { approved: false, decision: answer.decision, feedback: answer.feedback ?? null } },
 });
 
+/**
+ * Asks the owner for `request` and waits durably (a rerun after a restart waits again, or takes the answer given
+ * meanwhile), marking each wait as progress; the request is settled when the wait ends. The decline's result when
+ * declined or cancelled, else undefined.
+ */
+export const askOwner = async (
+  store: ApprovalStore,
+  request: Omit<PendingApproval, "requestId" | "callId" | "createdAt">,
+  api: ToolExecutionApi,
+  context: Context,
+): Promise<ReturnType<typeof declinedResult> | undefined> => {
+  const requestId = String(api.taskId);
+  try {
+    const answer = await store.ask(
+      { ...request, requestId, callId: api.callId, createdAt: Date.now() },
+      () => api.progressed(context).catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "progressed-failed", error: String(error) }))),
+      context,
+    );
+    return answer.decision === "decline" || answer.decision === "cancel" ? declinedResult(answer) : undefined;
+  } finally {
+    store.settle(requestId);
+  }
+};
+
+/** The result of a call cut off by a restart after it started: it is not run again. */
+export const cutOffResult = () => ({
+  output: [
+    {
+      type: "text" as const,
+      text: "This call was cut off by a restart after it started, so it may have partly run. Check the state before running it again.",
+    },
+  ],
+  isError: true,
+});
+
 /** `tool`, asking before it runs when the mode says so. */
 const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T => {
   const unsafe = tool.replay !== "safe";
@@ -212,33 +262,14 @@ const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T 
     ...tool,
     replay: "safe",
     async execute(args: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
-      if (unsafe && (await api.memo<boolean>(STARTED_MEMO, context)) === true) {
-        return {
-          output: [
-            {
-              type: "text" as const,
-              text: "This call was cut off by a restart after it started, so it may have partly run. Check the state before running it again.",
-            },
-          ],
-          isError: true,
-        };
-      }
+      if (unsafe && (await api.memo<boolean>(STARTED_MEMO, context)) === true) return cutOffResult();
       const kind = kindOf(tool.name);
       const plan = host.interaction() === "plan";
       // Plan mode is read-only: no file change runs, and every command asks (a command cannot be classified as reading).
       if (plan && kind === "file-change") return planRefusal();
-      const requestId = String(api.taskId);
-      if (plan || (asks(host.mode(), kind) && !host.store.acceptedKinds().has(kind))) {
-        try {
-          const answer = await host.store.ask(
-            { requestId, turn: host.turn(), callId: api.callId, tool: tool.name, kind, ...summaryOf(tool.name, args), createdAt: Date.now() },
-            () => api.progressed(context).catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "progressed-failed", error: String(error) }))),
-            context,
-          );
-          if (answer.decision === "decline" || answer.decision === "cancel") return declinedResult(answer);
-        } finally {
-          host.store.settle(requestId);
-        }
+      if (plan || (asks(host.mode(), kind) && !host.store.acceptedFor({ tool: tool.name, kind }))) {
+        const declined = await askOwner(host.store, { turn: host.turn(), tool: tool.name, kind, ...summaryOf(tool.name, args) }, api, context);
+        if (declined !== undefined) return declined;
       }
       if (unsafe) await api.memo(STARTED_MEMO, true, context);
       return tool.execute(args as never, api as never, context);

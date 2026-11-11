@@ -46,7 +46,8 @@ export const PiDurableCapabilities = {
     emitsToolStarted: true,
     emitsToolCompleted: true,
     emitsToolOutput: true,
-    supportsMcpTools: false,
+    // Step 3: t3's own tools, through the Session's `t3-mcp` extension (ADR-0022).
+    supportsMcpTools: true,
     supportsDynamicToolCallbacks: false,
   },
   approvals: {

@@ -33,6 +33,43 @@ export type InteractionMode = "default" | "plan";
 export const interactionModeOf = (mode: string | null | undefined): InteractionMode =>
   mode === undefined || mode === null || mode === "default" ? "default" : "plan";
 
+/**
+ * t3's MCP credential for the thread's provider session (step 3, plan section 4.1; ADR-0022): issued by t3, read by the
+ * adapter, and kept by the Session in its DO storage only. Never in a Container, a push, a snapshot or a log.
+ */
+export interface T3McpCredential {
+  /** `Bearer <token>`, as t3 issues it (`McpProviderSessionConfig.authorizationHeader`). */
+  readonly authorization: string;
+  /** t3's provider-session id the credential is scoped to; t3 namespaces `clientRequestId` by it. */
+  readonly providerSessionId: string;
+  /** t3's orchestration instructions (`T3_CODE_ORCHESTRATION_INSTRUCTIONS`), shown while the tools are installed. */
+  readonly instructions: string;
+}
+
+/**
+ * The link a thread's work came from (t3's `linkOrigin`), when it came over a Peer link (step 3). The Session asks
+ * a fresh approval for every `git push` such a thread makes (owner decision D1, option 2).
+ */
+export interface LinkedWork {
+  readonly label: string;
+  readonly access: string | null;
+}
+
+/** One `/mcp` request from a Session to the Environment DO (`EnvironmentDO.mcp`, plan section 4.2). */
+export interface McpRpcRequest {
+  readonly authorization: string;
+  readonly body: string;
+  readonly sessionId?: string;
+  readonly protocolVersion?: string;
+}
+
+export interface McpRpcAnswer {
+  readonly status: number;
+  readonly contentType: string;
+  readonly sessionId?: string;
+  readonly body: string;
+}
+
 /** A model as the Session runs it: pi-ai's provider and model id. */
 export interface ModelRef {
   readonly provider: string;
@@ -55,6 +92,10 @@ export interface OpenInput {
   readonly interactionMode?: InteractionMode;
   readonly model: ModelRef;
   readonly thinking: ThinkingLevel | null;
+  /** Step 3: t3's MCP credential for this provider session; absent when t3 issued none. */
+  readonly t3Mcp?: T3McpCredential;
+  /** Step 3: the thread's link origin, null for the owner's own work. */
+  readonly linked?: LinkedWork | null;
 }
 
 export interface OpenAnswer {
@@ -75,6 +116,9 @@ export interface SubmitTurnInput {
   readonly runtimeMode: RuntimeMode;
   /** Step 3: absent from an adapter before it (the default). */
   readonly interactionMode?: InteractionMode;
+  /** Step 3: as `OpenInput.t3Mcp`, read again at every turn. */
+  readonly t3Mcp?: T3McpCredential;
+  readonly linked?: LinkedWork | null;
 }
 
 export interface SteerInput {
@@ -205,7 +249,11 @@ export interface PendingApproval {
   readonly turn: string | null;
   readonly callId: string;
   readonly tool: string;
-  readonly kind: "command" | "file-change";
+  /**
+   * `mcp-tool` (step 3, review C4): a t3 MCP tool, accepted for the session per tool name. `git-push` (step 3, D1): a
+   * push from linked work, never accepted for the session.
+   */
+  readonly kind: "command" | "file-change" | "mcp-tool" | "git-push";
   readonly summary: string;
   readonly detail?: string;
   readonly createdAt: number;

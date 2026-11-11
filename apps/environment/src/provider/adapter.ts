@@ -13,17 +13,21 @@ import {
   type ProviderInstanceId,
 } from "@t3tools/contracts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import type * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import { T3_CODE_ORCHESTRATION_INSTRUCTIONS } from "@t3tools/provider-core/server/orchestrationInstructions";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import { turnScopedSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import {
   interactionModeOf,
+  type LinkedWork,
   type ModelRef,
   runtimeModeOf,
   type SessionPush,
   type SessionPushAnswer,
   type SessionState,
   SILENT_TURN_MS,
+  type T3McpCredential,
   sessionNameOf,
   type ThinkingLevel,
 } from "@t3flare/session-protocol";
@@ -69,10 +73,30 @@ export const workspaceOfCwd = (cwd: string | null | undefined): string | null =>
 const protocolError = (detail: string, cause?: unknown) =>
   new ProviderAdapter.ProviderAdapterProtocolError({ driver, detail, ...(cause === undefined ? {} : { cause }) });
 
+/**
+ * The thread's link origin (t3's `linkOrigin`, step 3), read from t3's projection: null for the owner's own work. The
+ * Session asks a fresh approval for every push such a thread makes (owner decision D1).
+ */
+export const linkedWorkOf = (threadId: string): LinkedWork | null => {
+  const row = environmentServices()
+    .sql.exec<{ origin: string | null }>(
+      "SELECT json_extract(payload_json, '$.linkOrigin') AS origin FROM orchestration_v2_projection_threads WHERE thread_id = ?",
+      threadId,
+    )
+    .toArray()[0];
+  if (row?.origin == null) return null;
+  try {
+    const origin = JSON.parse(row.origin) as { label?: unknown; access?: unknown };
+    return { label: typeof origin.label === "string" ? origin.label : "a linked environment", access: typeof origin.access === "string" ? origin.access : null };
+  } catch {
+    return { label: "a linked environment", access: null };
+  }
+};
+
 const call = <A>(what: string, thunk: () => Promise<A>) =>
   Effect.tryPromise({ try: thunk, catch: (cause) => protocolError(`The agent's session did not answer ${what}`, cause) });
 
-export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
+export const makePiDurableAdapter = (instanceId: ProviderInstanceId, mcpSessions: McpProviderSessions.McpProviderSessions["Service"]) =>
   ProviderAdapter.ProviderAdapterV2.of({
     instanceId,
     driver,
@@ -86,6 +110,12 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
       const scope = yield* Effect.scope;
       const sessionName = sessionNameOf(input.threadId);
       const client = (): SessionRpc => byName(environmentServices().agents.SESSIONS, sessionName, "SESSIONS");
+      /** t3's MCP credential for this thread now (step 3): t3 issues it before the session opens and on attach. */
+      const t3Mcp = Effect.map(mcpSessions.read(input.threadId), (config): T3McpCredential | undefined =>
+        config === undefined
+          ? undefined
+          : { authorization: config.authorizationHeader, providerSessionId: config.providerSessionId, instructions: T3_CODE_ORCHESTRATION_INSTRUCTIONS },
+      );
       const workspaceId = workspaceOfCwd(input.runtimePolicy.cwd);
       const now = yield* DateTime.now;
       let session: OrchestrationV2ProviderSession = {
@@ -232,6 +262,8 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
       }) {
         const at = yield* DateTime.now;
         const { model, thinking } = modelOf(registerInput.modelSelection);
+        const credential = yield* t3Mcp;
+        const linked = linkedWorkOf(registerInput.threadId);
         const opened = yield* call("open", () =>
           client().open({
             threadId: registerInput.threadId,
@@ -240,6 +272,8 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
             interactionMode: interactionModeOf(registerInput.interactionMode),
             model,
             thinking,
+            ...(credential === undefined ? {} : { t3Mcp: credential }),
+            linked,
           }),
         );
         // ADR-0004: an Environment restart ends running turns. A Session still busy when a provider session reopens it
@@ -353,6 +387,8 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
               startedAt,
             );
             emitSession("running", startedAt, turnInput.modelSelection.model);
+            const credential = yield* t3Mcp;
+            const linked = linkedWorkOf(turnInput.threadId);
             yield* call("submitTurn", () =>
               client().submitTurn({
                 providerTurnId: providerTurn.id,
@@ -364,6 +400,8 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId) =>
                 thinking,
                 runtimeMode: runtimeModeOf(turnInput.runtimePolicy.runtimeMode),
                 interactionMode: interactionModeOf(turnInput.runtimePolicy.interactionMode),
+                ...(credential === undefined ? {} : { t3Mcp: credential }),
+                linked,
               }),
             ).pipe(
               Effect.tapError(() =>

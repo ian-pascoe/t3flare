@@ -189,6 +189,44 @@ describe("differ", () => {
     expect((withdrawn[0] as { runtimeRequest: { status: string } }).runtimeRequest.status).toBe("cancelled");
   });
 
+  it("opens a T3 tool's approval as a permission request, and a linked push's as a command (step 3)", () => {
+    const turnId = Object.keys(state.turns)[0]!;
+    const differ = withTurns();
+    const running = { ...state, entries: [], turns: { [turnId]: { ...state.turns[turnId]!, status: "running" as const } } };
+    const base = { turn: turnId, callId: "call-1", summary: "delegate_task {}", createdAt: Date.parse("2026-11-10T21:19:00.000Z") };
+    const opened = diff(differ, {
+      ...running,
+      approvals: [
+        { ...base, requestId: "m", tool: "mcp__t3-code__delegate_task", kind: "mcp-tool" as const },
+        { ...base, requestId: "p", tool: "git push", kind: "git-push" as const },
+      ],
+    }, now);
+    const kinds = opened.flatMap((event) => (event.type === "runtime_request.updated" ? [event.runtimeRequest.kind] : []));
+    expect(kinds).toEqual(["permission", "command"]);
+    const titles = opened.flatMap((event) => (event.type === "turn_item.updated" ? [event.turnItem.title] : []));
+    expect(titles).toEqual(["Allow mcp__t3-code__delegate_task?", "Allow git push?"]);
+  });
+
+  it("shows a call of t3's own tool as t3 shows it for its Pi provider (step 3)", () => {
+    const turnId = Object.keys(state.turns)[0]!;
+    const differ = withTurns();
+    const running = { ...state, turns: { [turnId]: { ...state.turns[turnId]!, status: "running" as const } } };
+    const call = { type: "toolCall", id: "mcp-1", name: "mcp__t3-code__t3_thread_list", arguments: {} };
+    const entries = [
+      { id: "900", kind: "message", byTaskId: null, turn: turnId, role: "assistant" as const, content: [call], stopReason: "toolUse" },
+      { id: "901", kind: "message", byTaskId: null, turn: turnId, role: "toolResult" as const, content: [{ type: "text", text: "{\"threads\":[]}" }], toolCallId: "mcp-1", toolName: call.name, isError: false },
+    ];
+    const events = diff(differ, { ...running, entries }, now);
+    const item = events.flatMap((event) => (event.type === "turn_item.updated" && event.turnItem.type === "dynamic_tool" ? [event.turnItem] : [])).at(-1) as
+      | { toolName: string; toolSource?: unknown; title?: string; status: string }
+      | undefined;
+    // A known T3 tool gets no presentation fields: t3's clients present it from its `mcp__t3-code__` name.
+    expect(item?.toolName).toBe("mcp__t3-code__t3_thread_list");
+    expect(item?.toolSource).toBeUndefined();
+    expect(item?.title).toBe("mcp__t3-code__t3_thread_list");
+    expect(item?.status).toBe("completed");
+  });
+
   it("maps a recorded tool turn (step 2a M3) with each call's result arriving in a later push than the call", () => {
     const tools = recordedTools as unknown as SessionState;
     const differ = makeDifferState("thread:test");

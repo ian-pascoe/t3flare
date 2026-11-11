@@ -8,7 +8,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
 import { modelCatalog } from "@t3flare/models/catalog";
-import type { SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
+import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
@@ -153,6 +153,43 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       const runtime = await this.boot("session-push");
       await runtime.commandReady();
       return await deliverPush(push.sessionId, push);
+    } finally {
+      Idle.requestEnded();
+    }
+  }
+
+  /**
+   * A Session's call of t3's `/mcp` (step 3, plan section 4.2; ADR-0022), RPC from the agents Worker: t3's own HTTP app
+   * answers it as it answers the public route, so t3's auth and tool access run unchanged, but nothing crosses the public
+   * host. Boots t3 as a push does (review C7: the host is the one stored, never a made-up request's), waits for its
+   * startup recovery, and counts as a request for the idle check while it is held (a long `t3_thread_wait`).
+   */
+  async mcp(input: McpRpcRequest): Promise<McpRpcAnswer> {
+    Idle.requestStarted();
+    try {
+      const runtime = await this.boot("mcp");
+      await runtime.commandReady();
+      const host = await this.#publicHost();
+      const response = await runtime.fetch(
+        new Request(`https://${host}/mcp`, {
+          method: "POST",
+          headers: {
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+            authorization: input.authorization,
+            ...(input.sessionId === undefined ? {} : { "mcp-session-id": input.sessionId }),
+            ...(input.protocolVersion === undefined ? {} : { "mcp-protocol-version": input.protocolVersion }),
+          },
+          body: input.body,
+        }),
+      );
+      const sessionId = response.headers.get("mcp-session-id") ?? undefined;
+      return {
+        status: response.status,
+        contentType: response.headers.get("content-type") ?? "",
+        ...(sessionId === undefined ? {} : { sessionId }),
+        body: await response.text(),
+      };
     } finally {
       Idle.requestEnded();
     }

@@ -4,33 +4,15 @@
 // is, more times than `restartLimit`, while the call waits: the request survives, the call is not ended, and the answer
 // given after the restarts runs the tool once. Also: a decline, the modes, and an unsafe tool cut off after it started.
 // @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { type AssistantMessage, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
-import { createRegistry, defineExtension, defineTool, type Extension, Harness, MemoryStorage, type Storage, ToolResultEntry } from "@earendil-works/pi-durable";
+import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
+import { defineExtension, defineTool } from "@earendil-works/pi-durable";
 import { obj, str } from "@earendil-works/pi-schema";
 import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
-import { ApprovalStore, type ApprovalStorage, asks, interactionModeSection, permissions, PLAN_MODE_REFUSAL, toToolPath } from "../src/extensions/permissions.ts";
+import { ApprovalStore, asks, interactionModeSection, permissions, PLAN_MODE_REFUSAL, toToolPath } from "../src/extensions/permissions.ts";
 
-const context = BACKGROUND_CONTEXT;
-
-const memoryKv = (): ApprovalStorage => {
-  const map = new Map<string, unknown>();
-  return {
-    get: <T>(key: string) => map.get(key) as T | undefined,
-    put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)),
-    delete: (key: string) => map.delete(key),
-  };
-};
-
-const until = async (check: () => boolean | Promise<boolean>, what: string): Promise<void> => {
-  for (let tries = 0; tries < 2000; tries++) {
-    if (await check()) return;
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  throw new Error(`timed out waiting for ${what}`);
-};
+import { context, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
 /** A `bash` that records its runs (not replay-safe, as pi-durable's own). */
 const fakeBash = (runs: Array<string>, hold?: Promise<void>) =>
@@ -73,53 +55,6 @@ const callWrite = (path: string): AssistantMessage =>
 const callBash = (command: string): AssistantMessage =>
   fauxAssistantMessage([fauxToolCall("bash", { command }, { id: "call-bash" })], { stopReason: "toolUse" });
 
-/** A Harness restarted as an evicted Durable Object is: the old instance cut off from storage, a new one resumed. */
-const restartingHarness = async (extensions: ReadonlyArray<Extension>, responses: ReadonlyArray<AssistantMessage>) => {
-  const faux = fauxProvider();
-  const models = createModels();
-  models.setProvider(faux.provider);
-  faux.setResponses([...responses]);
-  const registry = createRegistry();
-  for (const extension of extensions) registry.install(extension);
-  const memory = new MemoryStorage();
-  let cut = () => {};
-  const connect = (): Storage => {
-    let live = true;
-    cut = () => {
-      live = false;
-    };
-    return new Proxy(memory, {
-      get: (target, key) => {
-        const value: unknown = Reflect.get(target, key, target);
-        if (typeof value !== "function") return value;
-        return (...args: Array<unknown>) => {
-          if (!live) throw new Error("cut off");
-          return (value as (...rest: Array<unknown>) => unknown).apply(target, args);
-        };
-      },
-    });
-  };
-  const open = () => Harness.open(connect(), { models, registry, settings: { restartLimit: 5 } }, context);
-  let current = await open();
-  const root = await current.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
-  await root.submit({ type: "input", content: "go" }, context);
-  current.resume();
-  return {
-    restart: async () => {
-      cut();
-      current = await open();
-      current.resume();
-    },
-    lastToolResult: async () => {
-      const conversation = await current.conversation(root.id, context);
-      const page = await conversation?.entries({}, 50, undefined, context);
-      const entry = page?.items.find((item) => ToolResultEntry.is(item));
-      const message = entry?.model?.[0];
-      return message?.role === "toolResult" ? message : undefined;
-    },
-  };
-};
-
 const setup = (mode: RuntimeMode, interaction: InteractionMode = "default") => {
   const kv = memoryKv();
   let store = new ApprovalStore(kv, () => {});
@@ -141,9 +76,6 @@ const setup = (mode: RuntimeMode, interaction: InteractionMode = "default") => {
     }),
   };
 };
-
-const textOf = (result: { content: ReadonlyArray<{ type: string; text?: string }> } | undefined) =>
-  (result?.content ?? []).map((block) => block.text ?? "").join("");
 
 describe("permissions", () => {
   it("an approval survives more restarts than restartLimit, and the answer runs the tool once", async () => {
@@ -226,6 +158,24 @@ describe("permissions", () => {
     expect(await render("plan")).toContain("do not edit files");
   });
 
+  it("accepting for the session covers one MCP tool by name, never bash or another tool, and never a push", () => {
+    const store = new ApprovalStore(memoryKv(), () => {});
+    const ask = (requestId: string, tool: string, kind: "command" | "mcp-tool" | "git-push") =>
+      void store.ask({ requestId, turn: "t", callId: "c", tool, kind, summary: tool, createdAt: 0 }, async () => {}, context);
+    ask("1", "mcp__t3-code__delegate_task", "mcp-tool");
+    store.answer("1", "acceptForSession");
+    expect(store.acceptedFor({ tool: "mcp__t3-code__delegate_task", kind: "mcp-tool" })).toBe(true);
+    expect(store.acceptedFor({ tool: "mcp__t3-code__t3_thread_send", kind: "mcp-tool" })).toBe(false);
+    expect(store.acceptedFor({ tool: "bash", kind: "command" })).toBe(false);
+    ask("2", "bash", "command");
+    store.answer("2", "acceptForSession");
+    expect(store.acceptedFor({ tool: "bash", kind: "command" })).toBe(true);
+    expect(store.acceptedFor({ tool: "mcp__t3-code__t3_thread_send", kind: "mcp-tool" })).toBe(false);
+    ask("3", "git push", "git-push");
+    store.answer("3", "acceptForSession");
+    expect(store.acceptedFor({ tool: "git push", kind: "git-push" })).toBe(false);
+  });
+
   it("the modes, acceptForSession, and the path translation", () => {
     expect(asks("full-access", "command")).toBe(false);
     expect(asks("auto-accept-edits", "file-change")).toBe(false);
@@ -234,7 +184,7 @@ describe("permissions", () => {
     const store = new ApprovalStore(memoryKv(), () => {});
     void store.ask({ requestId: "1", turn: "t", callId: "c", tool: "bash", kind: "command", summary: "ls", createdAt: 0 }, async () => {}, context);
     expect(store.answer("1", "acceptForSession")).toBe(true);
-    expect(store.acceptedKinds().has("command")).toBe(true);
+    expect(store.acceptedFor({ tool: "bash", kind: "command" })).toBe(true);
     expect(store.answer("1", "accept")).toBe(false);
     expect(toToolPath("cat /w/fixture/src/a.txt && ls /w/fixture", "fixture")).toBe("cat /workspace/repo/src/a.txt && ls /workspace/repo");
     expect(toToolPath("/w/fixture-2/x", "fixture")).toBe("/w/fixture-2/x");
