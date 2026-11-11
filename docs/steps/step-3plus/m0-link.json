@@ -1,0 +1,74 @@
+{
+ "flow": {
+  "state": "idle"
+ },
+ "link": {
+  "linked": true,
+  "linkRevoked": false,
+  "cloudUserId": "user_3JUtiuKj0BsIDFeiEnTNcstrNYt",
+  "relayUrl": "https://relay.t3.codes",
+  "relayIssuer": "https://relay.t3.codes",
+  "managedTunnelActive": false,
+  "publishAgentActivity": true,
+  "holdWebhooksWhileOffline": false
+ },
+ "desired": {
+  "marked": true,
+  "mode": "publish_only"
+ },
+ "secretsHeld": {
+  "environmentCredential": true,
+  "mintKey": false,
+  "tunnelConfig": false
+ },
+ "accountToken": {
+  "held": true,
+  "expiresAt": "2026-11-12T23:37:41.132Z",
+  "identity": "ian.g.pascoe@gmail.com"
+ },
+ "policy": {
+  "keepAccountToken": true
+ },
+ "publishes": {
+  "pending": [],
+  "lastSuccess": null,
+  "lastFailure": null,
+  "rejected": false,
+  "recent": []
+ },
+ "relay": {
+  "environments": {
+   "status": 200,
+   "items": [
+    {
+     "environmentId": "2bf13dc5-a59f-493d-8515-0f6b433357c1",
+     "label": "Ian's MacBook",
+     "providerKind": "cloudflare_tunnel",
+     "linkedAt": "2026-09-18T10:56:09.187Z"
+    },
+    {
+     "environmentId": "69834765-298d-4478-baba-ad1ec577aee9",
+     "label": "t3flare",
+     "providerKind": "manual",
+     "linkedAt": "2026-11-11T23:37:42.321Z"
+    }
+   ]
+  },
+  "devices": {
+   "status": 200,
+   "items": [
+    {
+     "platform": "ios",
+     "appVersion": "2.3.0",
+     "notifications": {
+      "enabled": false,
+      "notifyOnApproval": true,
+      "notifyOnInput": true,
+      "notifyOnCompletion": true,
+      "notifyOnFailure": true
+     }
+    }
+   ]
+  }
+ }
+}

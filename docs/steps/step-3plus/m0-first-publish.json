@@ -1,0 +1,104 @@
+{
+ "at": "2026-11-11T23:38:19.031Z",
+ "stamp": "mwcreqqj",
+ "projectId": "776d07e1-5689-4bd1-82aa-78378c3cb47c",
+ "failures": [],
+ "a": {
+  "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+  "run": "completed",
+  "phases": [
+   "starting",
+   "running",
+   "completed"
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:38:00.640Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:38:01.615Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:38:01.800Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:38:02.658Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:38:02.824Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:38:05.213Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "deferred",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:38:10.218Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:38:10.218Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:38:10.392Z",
+    "threadId": "0ca01451-89c7-410f-9ad1-b4a74f184488",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "completed"
+   }
+  ]
+ }
+}
