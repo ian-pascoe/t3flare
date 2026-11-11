@@ -6,6 +6,7 @@ A t3code Environment on Cloudflare. The stock t3 clients (web, desktop, mobile) 
 - [`docs/adr/`](docs/adr/): the decisions that are hard to reverse.
 - [`docs/research/`](docs/research/): platform facts the decisions rest on.
 - [`GLOSSARY.md`](GLOSSARY.md): the terms.
+- Issues: Linear (team SPI, project t3flare); GitHub Issues sync into it ([`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)).
 
 ## Status
 
