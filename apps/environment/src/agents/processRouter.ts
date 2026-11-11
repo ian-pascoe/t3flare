@@ -148,7 +148,10 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
  * The Workspace's Container token for its repo (ADR-0013): one repo, `contents` and `pull_requests` write, and
  * `workflows` only when the Workspace is opted in. Null for a Workspace without a GitHub remote or outside the App.
  */
-export const containerToken = async (id: string): Promise<string | null> => {
+/** `contents: read` alone: a linked thread's fetch while linked work is active in its Workspace (step 3, D1). */
+const CONTAINER_READ_PERMISSIONS = { contents: "read", metadata: "read" } as const;
+
+export const containerToken = async (id: string, readOnly = false): Promise<string | null> => {
   const record = environmentServices().workspaces.resolve(id);
   if (record === undefined || record.host !== "github.com" || record.owner === null || record.name === null) return null;
   try {
@@ -156,7 +159,7 @@ export const containerToken = async (id: string): Promise<string | null> => {
       await environmentServices().github().mint({
         owner: record.owner.toLowerCase(),
         repositories: [record.name],
-        permissions: record.workflows ? CONTAINER_WORKFLOWS_PERMISSIONS : CONTAINER_GITHUB_PERMISSIONS,
+        permissions: readOnly ? CONTAINER_READ_PERMISSIONS : record.workflows ? CONTAINER_WORKFLOWS_PERMISSIONS : CONTAINER_GITHUB_PERMISSIONS,
       })
     ).token;
   } catch (error) {

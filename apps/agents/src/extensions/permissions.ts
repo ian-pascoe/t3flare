@@ -48,47 +48,52 @@ export type ApprovalKind = PendingApproval["kind"];
 export const acceptanceKeyOf = (call: { readonly tool: string; readonly kind: ApprovalKind }): string | null =>
   call.kind === "git-push" ? null : call.kind === "mcp-tool" ? `mcp-tool:${call.tool}` : call.kind;
 
-/** The Session's approval requests, over its storage. `changed` runs whenever the pending requests change. */
-export class ApprovalStore {
+/** A request a tool call waits on: stored by the asking call's task, withdrawn when its turn ends. */
+export interface WaitingRequest {
+  readonly requestId: string;
+  readonly turn: string | null;
+}
+
+/**
+ * Requests tool calls wait on durably, over the Session's storage (approvals; step 3's questions). A request is stored
+ * by the asking call's task, so a rerun of the call after a restart finds it still waiting (and waits again), or finds
+ * the answer given meanwhile. `changed` runs whenever the pending requests change.
+ */
+export class WaitingRequests<Request extends WaitingRequest, Answer> {
   readonly #storage: ApprovalStorage;
   readonly #changed: () => void;
+  readonly #keys: { readonly requests: string; readonly answers: string };
   /** Calls waiting for an answer in this instance, by request. */
   readonly #waiters = new Map<string, () => void>();
 
-  constructor(storage: ApprovalStorage, changed: () => void) {
+  constructor(storage: ApprovalStorage, keys: { readonly requests: string; readonly answers: string }, changed: () => void) {
     this.#storage = storage;
+    this.#keys = keys;
     this.#changed = changed;
   }
 
-  pending(): ReadonlyArray<PendingApproval> {
-    return this.#storage.get<PendingApproval[]>(REQUESTS_KEY) ?? [];
+  protected get storage(): ApprovalStorage {
+    return this.#storage;
   }
 
-  #answers(): Readonly<Record<string, StoredAnswer>> {
-    return this.#storage.get<Record<string, StoredAnswer>>(ANSWERS_KEY) ?? {};
+  pending(): ReadonlyArray<Request> {
+    return this.#storage.get<Request[]>(this.#keys.requests) ?? [];
   }
 
-  #putRequests(next: ReadonlyArray<PendingApproval>): void {
-    this.#storage.put(REQUESTS_KEY, next);
+  #answers(): Readonly<Record<string, Answer>> {
+    return this.#storage.get<Record<string, Answer>>(this.#keys.answers) ?? {};
+  }
+
+  #putRequests(next: ReadonlyArray<Request>): void {
+    this.#storage.put(this.#keys.requests, next);
     this.#changed();
-  }
-
-  /** What the owner accepted for the rest of the Session (`acceptForSession`), by `acceptanceKeyOf`. */
-  #accepted(): ReadonlySet<string> {
-    return new Set(this.#storage.get<string[]>(ACCEPTED_KEY) ?? []);
-  }
-
-  /** Whether the owner accepted calls like this one for the rest of the Session. */
-  acceptedFor(call: { readonly tool: string; readonly kind: ApprovalKind }): boolean {
-    const key = acceptanceKeyOf(call);
-    return key !== null && this.#accepted().has(key);
   }
 
   /**
    * Ask for `request`, and wait for the answer. A rerun with the same id waits for the request already made, or takes
    * the answer given while no call waited. `waiting` runs once the request is stored, just before the wait.
    */
-  async ask(request: PendingApproval, waiting: () => Promise<void>, context: Context): Promise<StoredAnswer> {
+  async ask(request: Request, waiting: () => Promise<void>, context: Context): Promise<Answer> {
     const ready = this.#answers()[request.requestId];
     if (ready !== undefined) return ready;
     if (!this.pending().some((pending) => pending.requestId === request.requestId)) this.#putRequests([...this.pending(), request]);
@@ -108,7 +113,7 @@ export class ApprovalStore {
       });
     });
     const answer = this.#answers()[request.requestId];
-    if (answer === undefined) throw new Error(`Approval request ${request.requestId} was lost`);
+    if (answer === undefined) throw new Error(`Request ${request.requestId} was lost`);
     return answer;
   }
 
@@ -117,33 +122,55 @@ export class ApprovalStore {
     this.#waiters.delete(requestId);
     const answers = this.#answers();
     if (answers[requestId] !== undefined) {
-      this.#storage.put(ANSWERS_KEY, Object.fromEntries(Object.entries(answers).filter(([key]) => key !== requestId)));
+      this.#storage.put(this.#keys.answers, Object.fromEntries(Object.entries(answers).filter(([key]) => key !== requestId)));
     }
     const remaining = this.pending().filter((pending) => pending.requestId !== requestId);
     if (remaining.length !== this.pending().length) this.#putRequests(remaining);
   }
 
-  /** The owner's answer to `requestId`; false when no such request waits (answered already, or its call ended). */
-  answer(requestId: string, decision: ApprovalDecision, feedback?: string): boolean {
+  /** Answers `requestId`; the request answered, or undefined when none waits (answered already, or its call ended). */
+  protected give(requestId: string, answer: Answer): Request | undefined {
     const request = this.pending().find((pending) => pending.requestId === requestId);
-    if (request === undefined) return false;
-    const trimmed = feedback?.trim();
-    this.#storage.put(ANSWERS_KEY, {
-      ...this.#answers(),
-      [requestId]: { decision, ...(trimmed === undefined || trimmed === "" ? {} : { feedback: trimmed }) },
-    });
-    const key = acceptanceKeyOf(request);
-    if (decision === "acceptForSession" && key !== null) this.#storage.put(ACCEPTED_KEY, [...new Set([...this.#accepted(), key])]);
+    if (request === undefined) return undefined;
+    this.#storage.put(this.#keys.answers, { ...this.#answers(), [requestId]: answer });
     this.#putRequests(this.pending().filter((pending) => pending.requestId !== requestId));
     this.#waiters.get(requestId)?.();
-    return true;
+    return request;
   }
 
   /** Withdraws the requests of turns that are no longer live, and the answers no call took (only while idle). */
   dropAbandoned(liveTurns: ReadonlySet<string>): void {
     const kept = this.pending().filter((pending) => pending.turn !== null && liveTurns.has(pending.turn));
     if (kept.length !== this.pending().length) this.#putRequests(kept);
-    if (liveTurns.size === 0 && Object.keys(this.#answers()).length > 0) this.#storage.put(ANSWERS_KEY, {});
+    if (liveTurns.size === 0 && Object.keys(this.#answers()).length > 0) this.#storage.put(this.#keys.answers, {});
+  }
+}
+
+/** The Session's approval requests. */
+export class ApprovalStore extends WaitingRequests<PendingApproval, StoredAnswer> {
+  constructor(storage: ApprovalStorage, changed: () => void) {
+    super(storage, { requests: REQUESTS_KEY, answers: ANSWERS_KEY }, changed);
+  }
+
+  /** What the owner accepted for the rest of the Session (`acceptForSession`), by `acceptanceKeyOf`. */
+  #accepted(): ReadonlySet<string> {
+    return new Set(this.storage.get<string[]>(ACCEPTED_KEY) ?? []);
+  }
+
+  /** Whether the owner accepted calls like this one for the rest of the Session. */
+  acceptedFor(call: { readonly tool: string; readonly kind: ApprovalKind }): boolean {
+    const key = acceptanceKeyOf(call);
+    return key !== null && this.#accepted().has(key);
+  }
+
+  /** The owner's answer to `requestId`; false when no such request waits (answered already, or its call ended). */
+  answer(requestId: string, decision: ApprovalDecision, feedback?: string): boolean {
+    const trimmed = feedback?.trim();
+    const request = this.give(requestId, { decision, ...(trimmed === undefined || trimmed === "" ? {} : { feedback: trimmed }) });
+    if (request === undefined) return false;
+    const key = acceptanceKeyOf(request);
+    if (decision === "acceptForSession" && key !== null) this.storage.put(ACCEPTED_KEY, [...new Set([...this.#accepted(), key])]);
+    return true;
   }
 }
 
@@ -158,6 +185,8 @@ export interface PermissionsHost {
   readonly turn: () => string | null;
   /** The Session's Workspace id, for path translation; null without one. */
   readonly workspaceId: () => string | null;
+  /** Runs before each command is started (step 3, D1: a linked Session notes its work in the Workspace). */
+  readonly beforeCommand?: () => Promise<void>;
 }
 
 const kindOf = (tool: string): ApprovalKind => (tool === "bash" ? "command" : "file-change");
@@ -272,6 +301,7 @@ const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T 
         if (declined !== undefined) return declined;
       }
       if (unsafe) await api.memo(STARTED_MEMO, true, context);
+      if (kind === "command") await host.beforeCommand?.();
       return tool.execute(args as never, api as never, context);
     },
   } as T;

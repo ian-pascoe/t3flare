@@ -11,7 +11,7 @@ export interface EnvironmentRpc {
   /** The Session's committed state (ADR-0005). */
   sessionPush(push: SessionPush): Promise<SessionPushAnswer>;
   /** A Workspace's Container token for its one repo, for the git credential helper (ADR-0013). */
-  workspaceToken(id: string): Promise<{ readonly token: string | null }>;
+  workspaceToken(id: string, options?: { readonly readOnly?: boolean }): Promise<{ readonly token: string | null }>;
   /** A Session's call of t3's `/mcp` (step 3, ADR-0022): t3's HTTP app answers it, never over the public host. */
   mcp(input: McpRpcRequest): Promise<McpRpcAnswer>;
   /** A Workspace's terminal output (step 2b): never boots t3, and is not activity (ADR-0003). */

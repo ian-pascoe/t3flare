@@ -7,7 +7,7 @@
 // The Session pushes its committed state to the Environment DO over DO RPC (`sessionPush`), coalesced to about 100 ms
 // while streaming and at least every 60 s while a turn is live; the Environment's adapter diffs it into t3's events.
 // One alarm, computed in one place (`#arm`): the heartbeat, the turn deadline, the liveness push, a push retry.
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import {
   type Conversation,
   createRegistry,
@@ -52,10 +52,12 @@ import { DurableObject } from "cloudflare:workers";
 import { environmentStub } from "../environment.ts";
 import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
+import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
 import { ApprovalStore, interactionModeSection, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
 import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
+import { LINKED_WORK_MS, PUSH_APPROVAL_MS } from "../workspace/linkedPush.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
@@ -126,6 +128,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   /** Registry the tool extensions install into, before the Harness resumes work that needs them. */
   readonly #registry: RegistryReader;
   readonly #approvals: ApprovalStore;
+  /** The agent's questions to the owner (`ask_user`, step 3). */
+  readonly #questions: QuestionStore;
   /** The proxy's model list (ADR-0012), kept in this object's storage and read again when it is old. */
   readonly #catalog: ModelCatalog;
   /** Every model request's fetch: the proxy's answers recorded, a test fault answered (`proxyLimits.ts`). */
@@ -145,6 +149,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       store: { read: () => ctx.storage.kv.get(CATALOG_KEY), write: (catalog) => ctx.storage.kv.put(CATALOG_KEY, catalog) },
     });
     this.#approvals = new ApprovalStore(ctx.storage.kv, () => this.#schedulePush(0));
+    this.#questions = new QuestionStore(ctx.storage.kv, () => this.#schedulePush(0));
     const recorder = recordingFetch({
       fetch: (input, init) => fetch(input, init),
       fault: () => ctx.storage.kv.get<Fault>(FAULT_KEY),
@@ -167,9 +172,11 @@ export class SessionDO extends DurableObject<SessionEnv> {
         interaction: () => interactionModeOf(this.#meta()?.interactionMode),
         turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null,
         workspaceId: () => this.#meta()?.workspaceId ?? null,
+        beforeCommand: () => this.#noteLinkedWork(),
       }),
     );
     registry.install(interactionModeSection(() => interactionModeOf(this.#meta()?.interactionMode)));
+    registry.install(askUser({ store: this.#questions, turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null }));
     this.#t3 = new T3McpClient(
       (request) => environmentStub(env.ENVIRONMENT).mcp(request),
       () => ctx.storage.kv.get<T3McpCredential>(T3_MCP_KEY),
@@ -226,6 +233,58 @@ export class SessionDO extends DurableObject<SessionEnv> {
         }
       });
     });
+  }
+
+  // -------------------------------------------------------------------------------------------------------------------
+  // Pushes from linked work (step 3, owner decision D1: each push of a thread a link started asks the owner)
+
+  /** Before each command of a linked thread: its Workspace counts as holding linked work for LINKED_WORK_MS. */
+  async #noteLinkedWork(): Promise<void> {
+    const meta = this.#meta();
+    if (meta?.linked == null || meta.workspaceId === null) return;
+    // SAFETY: the Workspace DO answers `noteLinkedWork` (WorkspaceDO.ts).
+    const workspace = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(meta.workspaceId)) as unknown as {
+      noteLinkedWork(input: { readonly session: string; readonly until: number }): Promise<void>;
+    };
+    await workspace.noteLinkedWork({ session: sessionNameOf(meta.threadId), until: Date.now() + LINKED_WORK_MS });
+  }
+
+  /**
+   * RPC from the Workspace DO: a push (or a git request it cannot tell is a fetch) while this linked thread's work is
+   * active there. Asks the owner for this push alone, on this thread's live turn; never accepted for the session, in any
+   * mode. No live turn, or no answer within PUSH_APPROVAL_MS: refused.
+   */
+  async approveGitPush(input: { readonly workspace: string; readonly op: string; readonly command: string }): Promise<{ readonly approved: boolean; readonly reason?: string }> {
+    await this.#opening;
+    const meta = this.#meta();
+    const turn = Object.entries(this.#turns()).find(([, candidate]) => isLive(candidate))?.[0];
+    if (meta?.linked == null) return { approved: false, reason: "not linked work" };
+    if (turn === undefined) return { approved: false, reason: "no live turn to ask on" };
+    const requestId = `push:${crypto.randomUUID()}`;
+    const command = input.command.trim() === "" ? `git ${input.op}` : input.command.trim();
+    const context = withAbortSignal(AbortSignal.timeout(PUSH_APPROVAL_MS), BACKGROUND_CONTEXT);
+    try {
+      const answer = await this.#approvals.ask(
+        {
+          requestId,
+          turn,
+          callId: "",
+          tool: "git push",
+          kind: "git-push",
+          summary: `${command}`,
+          detail: `Work started from ${meta.linked.label} through a linked environment wants to push to this project's repository. Each push asks.`,
+          createdAt: Date.now(),
+        },
+        () => Promise.resolve(),
+        context,
+      );
+      const approved = answer.decision === "accept" || answer.decision === "acceptForSession";
+      return approved ? { approved } : { approved, reason: answer.decision };
+    } catch {
+      return { approved: false, reason: "no answer in time" };
+    } finally {
+      this.#approvals.settle(requestId);
+    }
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -516,8 +575,15 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.#dropAbandonedApprovals();
   }
 
-  /** Answers a pending approval: the waiting call runs or returns the decline. */
+  /** Answers a pending approval (the waiting call runs or returns the decline) or question (step 3: its answer is the result). */
   answer(input: AnswerInput): Promise<{ readonly applied: boolean }> {
+    if (this.#questions.pending().some((question) => question.requestId === input.requestId)) {
+      const given = Object.values(input.answers ?? {}).map(answerText).find((text) => text !== undefined && text.trim() !== "");
+      const text = given ?? (input.decision === "decline" || input.decision === "cancel" ? "(no answer: the owner dismissed the question)" : "(no answer)");
+      const applied = this.#questions.answer(input.requestId, text);
+      console.log(JSON.stringify({ t3flare: "question-answer", requestId: input.requestId, applied }));
+      return Promise.resolve({ applied });
+    }
     const applied = this.#approvals.answer(input.requestId, input.decision, input.feedback);
     console.log(JSON.stringify({ t3flare: "approval-answer", requestId: input.requestId, decision: input.decision, applied }));
     return Promise.resolve({ applied });
@@ -654,6 +720,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   #dropAbandonedApprovals(): void {
     const live = new Set(Object.entries(this.#turns()).filter(([, turn]) => isLive(turn)).map(([id]) => id));
     this.#approvals.dropAbandoned(live);
+    this.#questions.dropAbandoned(live);
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -702,6 +769,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       usage: usageOf((view?.docs["pi.usage"] as { total?: unknown } | undefined)?.total ?? view?.docs["pi.usage"]) ?? null,
       inbox: { pending: inbox.items?.length ?? 0 },
       approvals: this.#approvals.pending(),
+      questions: this.#questions.pending(),
       turns,
       lastEntry,
     };

@@ -20,7 +20,7 @@ import {
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import type { ProviderAdapterV2Event } from "@t3tools/provider-core/server/ProviderAdapter";
-import type { ApprovalDecision, ContentBlock, PendingApproval, PushedEntry, SessionState, TurnState } from "@t3flare/session-protocol";
+import type { ApprovalDecision, ContentBlock, PendingApproval, PendingQuestion, PushedEntry, SessionState, TurnState } from "@t3flare/session-protocol";
 import { classifyProxyFailure, type ProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
 import * as DateTime from "effect/DateTime";
 
@@ -69,7 +69,7 @@ export interface DifferState {
   /** Approvals emitted as pending and not yet closed, by the Session's request id. */
   readonly approvals: Map<string, OpenApproval>;
   /** The owner's answers, by t3's runtime request id (`respondToRuntimeRequest`), to close a request as resolved. */
-  readonly decisions: Map<string, { readonly decision: ApprovalDecision; readonly feedback?: string }>;
+  readonly decisions: Map<string, { readonly decision: ApprovalDecision; readonly feedback?: string; readonly answers?: Readonly<Record<string, unknown>> }>;
 }
 
 interface OpenApproval {
@@ -334,29 +334,70 @@ const emitTool = (
 const requestKindOf = (kind: PendingApproval["kind"]): "command" | "file-change" | "permission" =>
   kind === "mcp-tool" ? "permission" : kind === "git-push" ? "command" : kind;
 
-/** Opens each new pending approval of a turn this provider session started, and closes those the Session no longer has. */
-const emitApprovals = (
-  state: DifferState,
-  out: Array<ProviderAdapterV2Event>,
-  pending: ReadonlyArray<PendingApproval>,
-  textOut: (text: string) => string,
-  now: DateTime.Utc,
-) => {
-  const current = new Set(pending.map((approval) => approval.requestId));
-  for (const approval of pending) {
-    if (state.approvals.has(approval.requestId) || approval.turn === null) continue;
-    const turn = state.turns.get(approval.turn);
+/** A Session request (an approval, or step 3's question) as t3 shows it: its kinds and its turn item's own fields. */
+interface RequestView {
+  readonly requestId: string;
+  readonly turn: string | null;
+  readonly createdAt: number;
+  readonly runtimeKind: OrchestrationV2RuntimeRequest["kind"];
+  readonly nodeKind: "approval_request" | "user_input_request";
+  readonly title: string;
+  readonly item: Readonly<Record<string, unknown>>;
+}
+
+const approvalView = (approval: PendingApproval, textOut: (text: string) => string): RequestView => ({
+  requestId: approval.requestId,
+  turn: approval.turn,
+  createdAt: approval.createdAt,
+  runtimeKind: requestKindOf(approval.kind),
+  nodeKind: "approval_request",
+  title: `Allow ${approval.tool}?`,
+  item: {
+    type: "approval_request",
+    requestKind: requestKindOf(approval.kind),
+    prompt: textOut(approval.detail === undefined ? approval.summary : `${approval.summary}\n\n${approval.detail}`),
+  },
+});
+
+/** A question (`ask_user`) as t3's \`user_input\` request, in the shape t3's Pi provider gives one (\`piQuestion\`). */
+const questionView = (question: PendingQuestion): RequestView => ({
+  requestId: question.requestId,
+  turn: question.turn,
+  createdAt: question.createdAt,
+  runtimeKind: "user_input",
+  nodeKind: "user_input_request",
+  title: "Question",
+  item: {
+    type: "user_input_request",
+    questions: [
+      {
+        id: question.requestId,
+        header: "Question",
+        question: question.question,
+        options: question.options.map((option) => ({ label: option, description: option, value: option })),
+        allowCustomAnswer: question.allowFreeText || question.options.length === 0,
+      },
+    ],
+  },
+});
+
+/** Opens each new pending request of a turn this provider session started, and closes those the Session no longer has. */
+const emitRequests = (state: DifferState, out: Array<ProviderAdapterV2Event>, pending: ReadonlyArray<RequestView>, now: DateTime.Utc) => {
+  const current = new Set(pending.map((request) => request.requestId));
+  for (const view of pending) {
+    if (state.approvals.has(view.requestId) || view.turn === null) continue;
+    const turn = state.turns.get(view.turn);
     if (turn === undefined || state.terminated.has(turn.providerTurnId)) continue;
-    const id = runtimeRequestIdOf(state.sessionName, approval.requestId);
-    const nativeId = `${state.sessionName}:approval:${approval.requestId}`;
+    const id = runtimeRequestIdOf(state.sessionName, view.requestId);
+    const nativeId = `${state.sessionName}:approval:${view.requestId}`;
     const nodeId = derive.approvalNode({ requestId: id });
-    const createdAt = DateTime.makeUnsafe(approval.createdAt);
+    const createdAt = DateTime.makeUnsafe(view.createdAt);
     const runtimeRequest: OrchestrationV2RuntimeRequest = {
       id,
       nodeId,
       providerTurnId: turn.providerTurnId,
       nativeRequestRef: ref(nativeId),
-      kind: requestKindOf(approval.kind),
+      kind: view.runtimeKind,
       status: "pending",
       responseCapability: { type: "live", providerSessionId: turn.providerSessionId, supportsFeedback: true },
       createdAt,
@@ -368,7 +409,7 @@ const emitApprovals = (
       runId: turn.runId,
       parentNodeId: turn.rootNodeId,
       rootNodeId: turn.rootNodeId,
-      kind: "approval_request",
+      kind: view.nodeKind,
       status: "waiting",
       countsForRun: false,
       providerThreadId: turn.providerThreadId,
@@ -379,7 +420,6 @@ const emitApprovals = (
       startedAt: createdAt,
       completedAt: null,
     };
-    const prompt = textOut(approval.detail === undefined ? approval.summary : `${approval.summary}\n\n${approval.detail}`);
     const turnItem = {
       id: derive.approvalTurnItem({ requestId: id }),
       threadId: turn.threadId,
@@ -389,18 +429,16 @@ const emitApprovals = (
       providerTurnId: turn.providerTurnId,
       nativeItemRef: ref(nativeId),
       parentItemId: null,
-      ordinal: ordinalOf(state, turn, `approval:${approval.requestId}`),
+      ordinal: ordinalOf(state, turn, `approval:${view.requestId}`),
       status: "waiting",
-      title: `Allow ${approval.tool}?`,
+      title: view.title,
       startedAt: createdAt,
       completedAt: null,
       updatedAt: createdAt,
-      type: "approval_request",
       requestId: id,
-      requestKind: requestKindOf(approval.kind),
-      prompt,
+      ...view.item,
     } as OrchestrationV2TurnItem;
-    state.approvals.set(approval.requestId, { turn: turn.providerTurnId, runtimeRequest, node, turnItem });
+    state.approvals.set(view.requestId, { turn: turn.providerTurnId, runtimeRequest, node, turnItem });
     out.push({ type: "runtime_request.updated", driver, threadId: turn.threadId, runtimeRequest });
     out.push({ type: "node.updated", driver, node });
     out.push({ type: "turn_item.updated", driver, turnItem });
@@ -421,6 +459,7 @@ const emitApprovals = (
         resolvedAt: now,
         ...(answered === undefined ? {} : { decision: answered.decision }),
         ...(answered?.feedback === undefined ? {} : { feedback: answered.feedback }),
+        ...(answered?.answers === undefined ? {} : { answers: answered.answers }),
       },
     });
     out.push({ type: "node.updated", driver, node: { ...open.node, status: resolved ? "completed" : "cancelled", completedAt: now } });
@@ -529,7 +568,7 @@ export const diff = (
     emitTool(state, out, turn, call, status, result, pathOut, textOut, now);
   }
 
-  emitApprovals(state, out, pushed.approvals, textOut, now);
+  emitRequests(state, out, [...pushed.approvals.map((approval) => approvalView(approval, textOut)), ...(pushed.questions ?? []).map(questionView)], now);
 
   // Usage of the newest response in each turn, as the provider turn's token usage.
   const usageByTurn = new Map<string, NonNullable<PushedEntry["usage"]>>();

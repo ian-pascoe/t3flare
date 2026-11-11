@@ -63,7 +63,8 @@ export const PiDurableCapabilities = {
     emitsPlanUpdated: false,
     emitsTodoList: false,
     emitsProposedPlan: false,
-    supportsStructuredQuestions: false,
+    // Step 3: the Session's `ask_user` (one question, optional choices), answered as t3's user_input request.
+    supportsStructuredQuestions: true,
     planDeltasHaveItemIds: false,
   },
   subagents: {

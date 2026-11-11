@@ -51,6 +51,7 @@ import {
   withinGuard,
 } from "./gitRepo.ts";
 import { isomorphicFs } from "./isoFs.ts";
+import { credentialDecision, type LinkedWork, prunedLinkedWork } from "./linkedPush.ts";
 import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, withoutOwnGitDir } from "./gitDirReads.ts";
 import { kindOf, patchAnswer } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
@@ -86,6 +87,8 @@ export interface WorkspaceEnv {
   readonly T3FLARE_CONTAINER_IDLE_MS?: string;
   /** Overrides TERMINAL_IDLE_MS (the stage's idle-hold check). */
   readonly T3FLARE_TERMINAL_IDLE_MS?: string;
+  /** This Worker's Session DOs (step 3, D1): a linked thread's Session approves each push from its Workspace. */
+  readonly SESSIONS?: DurableObjectNamespace;
 }
 
 export interface ExecInput {
@@ -146,6 +149,8 @@ const LEASED_KEY = "t3flare:container-leased";
 /** Where the Container's git credential helper asks this object for the repo's token (through computer's egress host). */
 export const CREDENTIAL_PATH = "/t3flare/git-credential";
 const WORKSPACE_ID_KEY = "t3flare:workspace-id";
+/** Step 3 (D1): linked Sessions that ran commands here, and until when each counts. */
+const LINKED_WORK_KEY = "t3flare:linked-work";
 /** The markers of the shells this object started (orphans after a restart are killed by them). */
 const TERMINAL_MARKERS_KEY = "t3flare:terminal-markers";
 /** How often terminals' heartbeats are checked while any is open. */
@@ -158,7 +163,11 @@ const TERMINAL_EXPIRE_EVERY_MS = 15_000;
  */
 export const CREDENTIAL_HELPER =
   '!f() { test "$1" = get || exit 0; t="${T3FLARE_GIT_TOKEN:-}"; ' +
-  '[ -n "$t" ] || t="$(curl -fsS --max-time 30 http://computer.internal' + CREDENTIAL_PATH + ' 2>/dev/null)"; ' +
+  // Step 3 (D1): what git is doing, from the helper's git ancestors (`git push`, `git fetch`, …), and its command line.
+  'p=$PPID; op=unknown; cmd=; for i in 1 2 3 4 5; do c="$(tr "\\0" " " < /proc/$p/cmdline 2>/dev/null)"; ' +
+  'case "$c" in *"git push"*|*"git-push"*) op=push; cmd="$c"; break;; *"git fetch"*|*"git pull"*|*"git clone"*|*"git ls-remote"*|*"git-fetch"*) op=fetch; cmd="$c"; break;; esac; ' +
+  'p="$(awk \'{print $4}\' /proc/$p/stat 2>/dev/null)"; [ -n "$p" ] && [ "$p" != 0 ] || break; done; ' +
+  '[ -n "$t" ] || t="$(curl -fsS --max-time 660 -G --data-urlencode "op=$op" --data-urlencode "cmd=$(printf %s "$cmd" | head -c 300)" http://computer.internal' + CREDENTIAL_PATH + ' 2>/dev/null)"; ' +
   '[ -n "$t" ] || exit 0; echo username=x-access-token; echo "password=$t"; }; f';
 
 /** The last checkpoint captured: its commit, the files' revision then, and HEAD then (the alias above the guard). */
@@ -1091,7 +1100,7 @@ export class WorkspaceDO extends ContainerHost {
    */
   override async fetch(request: Request): Promise<Response> {
     if (this.#isDestroyed()) return new Response("t3flare: this Workspace was deleted", { status: 410 });
-    if (new URL(request.url).pathname === CREDENTIAL_PATH) return this.#credential();
+    if (new URL(request.url).pathname === CREDENTIAL_PATH) return this.#credential(new URL(request.url));
     return this.#container.handleFetch(request);
   }
 
@@ -1104,11 +1113,37 @@ export class WorkspaceDO extends ContainerHost {
     if (id !== undefined && id !== "") this.ctx.storage.kv.put(WORKSPACE_ID_KEY, id);
   }
 
-  async #credential(): Promise<Response> {
+  /**
+   * Step 3 (D1): a linked thread's Session notes, before each of its commands, that linked work is active here until
+   * `until`; while it is, the helper's pushes ask that Session's owner (`linkedPush.ts`).
+   */
+  noteLinkedWork(input: { readonly session: string; readonly until: number }): Promise<void> {
+    const linked = prunedLinkedWork(this.ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {}, Date.now());
+    this.ctx.storage.kv.put(LINKED_WORK_KEY, { ...linked, [input.session]: Math.max(linked[input.session] ?? 0, input.until) });
+    return Promise.resolve();
+  }
+
+  async #credential(url: URL): Promise<Response> {
     const id = this.#workspaceId();
     if (id === undefined) return new Response("", { status: 404 });
+    const op = url.searchParams.get("op");
+    const decision = credentialDecision(this.ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {}, Date.now(), op);
+    let readOnly = false;
+    if (decision.kind === "read-only") readOnly = true;
+    if (decision.kind === "ask") {
+      const sessions = this.env.SESSIONS;
+      // SAFETY: the Session DO answers `approveGitPush` (SessionDO.ts).
+      const session = sessions === undefined ? undefined : (sessions.get(sessions.idFromName(decision.session)) as unknown as {
+        approveGitPush(input: { readonly workspace: string; readonly op: string; readonly command: string }): Promise<{ readonly approved: boolean; readonly reason?: string }>;
+      });
+      const answer = session === undefined
+        ? { approved: false, reason: "no Session binding" }
+        : await session.approveGitPush({ workspace: id, op: op ?? "unknown", command: (url.searchParams.get("cmd") ?? "").slice(0, 300) }).catch((error: unknown) => ({ approved: false, reason: String(error).slice(0, 200) }));
+      console.log(JSON.stringify({ t3flare: "git-credential-linked", workspace: id, op, session: decision.session, approved: answer.approved, reason: answer.reason ?? null }));
+      if (!answer.approved) return new Response("", { status: 403, headers: { "cache-control": "no-store" } });
+    }
     try {
-      const { token } = await environmentStub(this.env.ENVIRONMENT).workspaceToken(id);
+      const { token } = await environmentStub(this.env.ENVIRONMENT).workspaceToken(id, readOnly ? { readOnly: true } : undefined);
       console.log(JSON.stringify({ t3flare: "git-credential", workspace: id, granted: token !== null }));
       return new Response(token ?? "", { status: token === null ? 404 : 200, headers: { "cache-control": "no-store" } });
     } catch (error) {

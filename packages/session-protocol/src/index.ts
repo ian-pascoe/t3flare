@@ -140,6 +140,8 @@ export interface AnswerInput {
   readonly requestId: string;
   readonly decision: ApprovalDecision;
   readonly feedback?: string;
+  /** Step 3: a question's answer (`ask_user`), as t3 hands it to a provider: by question id. */
+  readonly answers?: Readonly<Record<string, unknown>>;
 }
 
 export interface SnapshotInput {
@@ -259,6 +261,20 @@ export interface PendingApproval {
   readonly createdAt: number;
 }
 
+/**
+ * A question the agent asked the owner (`ask_user`, step 3): one question, optional choices, a free answer unless only
+ * the choices are allowed. It waits durably as an approval does.
+ */
+export interface PendingQuestion {
+  readonly requestId: string;
+  readonly turn: string | null;
+  readonly callId: string;
+  readonly question: string;
+  readonly options: ReadonlyArray<string>;
+  readonly allowFreeText: boolean;
+  readonly createdAt: number;
+}
+
 export interface SessionState {
   readonly sessionId: string;
   readonly epoch: string;
@@ -270,6 +286,8 @@ export interface SessionState {
   readonly usage: UsageSlim | null;
   readonly inbox: { readonly pending: number };
   readonly approvals: ReadonlyArray<PendingApproval>;
+  /** Step 3: absent in a push from a Session before it. */
+  readonly questions?: ReadonlyArray<PendingQuestion>;
   readonly turns: Readonly<Record<string, TurnState>>;
 }
 

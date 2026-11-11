@@ -207,6 +207,29 @@ describe("differ", () => {
     expect(titles).toEqual(["Allow mcp__t3-code__delegate_task?", "Allow git push?"]);
   });
 
+  it("opens an ask_user question as t3's user_input request, resolves it with the answer, cancels it when withdrawn (step 3)", () => {
+    const turnId = Object.keys(state.turns)[0]!;
+    const differ = withTurns();
+    const running = { ...state, entries: [], turns: { [turnId]: { ...state.turns[turnId]!, status: "running" as const } } };
+    const question = { requestId: "q1", turn: turnId, callId: "ask-1", question: "Which color?", options: ["red", "blue"], allowFreeText: false, createdAt: Date.parse("2026-11-10T21:19:00.000Z") };
+    const opened = diff(differ, { ...running, approvals: [], questions: [question] }, now);
+    expect(types(opened)).toEqual(["runtime_request.updated", "node.updated", "turn_item.updated"]);
+    const request = (opened[0] as { runtimeRequest: { id: string; kind: string; status: string } }).runtimeRequest;
+    expect(request).toMatchObject({ kind: "user_input", status: "pending" });
+    expect((opened[1] as { node: { kind: string } }).node.kind).toBe("user_input_request");
+    const item = (opened[2] as { turnItem: { type: string; questions: ReadonlyArray<{ id: string; question: string; options: ReadonlyArray<{ value: string }>; allowCustomAnswer: boolean }> } }).turnItem;
+    expect(item.type).toBe("user_input_request");
+    expect(item.questions[0]).toMatchObject({ id: "q1", question: "Which color?", allowCustomAnswer: false });
+    expect(item.questions[0]!.options.map((option) => option.value)).toEqual(["red", "blue"]);
+    expect(approvalIdOf("thread:test", request.id)).toBe("q1");
+    differ.decisions.set(request.id, { decision: "accept", answers: { q1: "blue" } });
+    const closed = diff(differ, { ...running, approvals: [], questions: [] }, now);
+    expect((closed[0] as { runtimeRequest: { status: string; answers: unknown } }).runtimeRequest).toMatchObject({ status: "resolved", answers: { q1: "blue" } });
+    diff(differ, { ...running, approvals: [], questions: [{ ...question, requestId: "q2" }] }, now);
+    const withdrawn = diff(differ, { ...running, approvals: [], questions: [] }, now);
+    expect((withdrawn[0] as { runtimeRequest: { status: string } }).runtimeRequest.status).toBe("cancelled");
+  });
+
   it("shows a call of t3's own tool as t3 shows it for its Pi provider (step 3)", () => {
     const turnId = Object.keys(state.turns)[0]!;
     const differ = withTurns();

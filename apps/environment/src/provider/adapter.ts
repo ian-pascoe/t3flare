@@ -469,15 +469,19 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId, mcpSessions
           }
           const answerDecision = decision === "accept" || decision === "acceptForSession" || decision === "decline" ? decision : "cancel";
           // Kept before the call, so the push that drops the request closes it as resolved, not cancelled.
+          // A question's answer (step 3, `ask_user`) comes as `answers` by question id, which is the Session's request id.
+          const answers = requestInput.answers;
           differ.decisions.set(requestInput.requestId, {
             decision: answerDecision,
             ...(requestInput.feedback === undefined ? {} : { feedback: requestInput.feedback }),
+            ...(answers === undefined ? {} : { answers }),
           });
           const answered = yield* call("answer", () =>
             client().answer({
               requestId: approvalId,
               decision: answerDecision,
               ...(requestInput.feedback === undefined ? {} : { feedback: requestInput.feedback }),
+              ...(answers === undefined ? {} : { answers }),
             }),
           ).pipe(
             Effect.mapError(
