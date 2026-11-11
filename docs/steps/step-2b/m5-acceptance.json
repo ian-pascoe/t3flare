@@ -1,0 +1,135 @@
+{
+  "url": "https://t3flare-environment-step2b.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-11T18:37:44.236Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "24e77473",
+      "commit": "7a732b023384",
+      "builtAt": "2026-11-11T18:21:34.751Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-11T18:47:45.485Z",
+    "paired": 200,
+    "ms": 1674,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "82dd46d3-daac-42aa-9e79-5456d706e99b",
+    "threads": 2,
+    "ms": 2339
+  },
+  "fixtures": {
+    "threads": 2,
+    "runs": 2,
+    "messages": 4,
+    "turnItems": 10,
+    "events": 20,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 444,
+    "bytes": 31706,
+    "listedFixtureThreads": 2
+  },
+  "threadWindow": {
+    "threads": 2,
+    "allOk": true,
+    "minItems": 5,
+    "maxMs": 70,
+    "maxBytes": 12518
+  },
+  "subscribeThread": {
+    "ms": 33,
+    "bytes": 12459,
+    "items": 5
+  },
+  "search": {
+    "ms": 26,
+    "matches": 2,
+    "threads": 2
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 555
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 4,
+    "maxParameters": 300,
+    "compoundsRewritten": 24,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "refusedStatements": 0,
+    "pragmaRefusals": 20
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 192,
+      "modules": 108
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 9,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:259ef48a-9d8c-483e-b38b-6ac290e53f37"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": []
+  },
+  "step2b": {
+    "ok": true,
+    "failures": [],
+    "terminal": {
+      "ms": 865,
+      "echoed": true
+    },
+    "worktree": {
+      "ms": 11033,
+      "path": "/w/.wt/acc2b-mwcgospa/t3-7ed03c42-6f6000a14676485e",
+      "stages": [
+        "fetch:skipped",
+        "checkout:done",
+        "setup-script:done",
+        "agent:done"
+      ],
+      "error": null
+    },
+    "removal": {
+      "removed": "removed",
+      "inRegistry": true,
+      "leased": false
+    },
+    "sweepDry": {
+      "ok": true,
+      "error": null,
+      "actions": 14
+    }
+  },
+  "totalMs": 29938,
+  "failures": [],
+  "ok": true
+}

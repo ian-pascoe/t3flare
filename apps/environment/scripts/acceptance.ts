@@ -13,6 +13,8 @@
 // 5. t3's SQL client on DO SQLite (transaction rollback, >100 parameters), the SQL adapter's record (no
 //    statement refused except t3's PRAGMAs), and the twice-in-one-isolate boot check.
 // 6. With `--real-turn [--push]` (step 2a): a Durable agent turn on a fresh clone of the fixture (`lib/realTurn.ts`).
+// 7. With `--terminal` and/or `--worktree` (step 2b): a terminal's echo, a worktree thread's setup script, its removal,
+//    and the sweep's dry run (`lib/terminalWorktree.ts`).
 import { WsRpcGroup, WS_METHODS, ORCHESTRATION_V2_WS_METHODS } from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -260,6 +262,14 @@ if (process.argv.includes("--real-turn")) {
   const real = await realTurn(cookie, { push: process.argv.includes("--push") });
   report.realTurn = real;
   for (const failure of real.failures) failures.push(`real turn: ${failure}`);
+}
+
+// 7. Terminals, worktree Workspaces and setup scripts (step 2b).
+if (process.argv.includes("--terminal") || process.argv.includes("--worktree")) {
+  const { terminalWorktree } = await import("./lib/terminalWorktree.ts");
+  const result = await terminalWorktree(cookie, { terminal: process.argv.includes("--terminal"), worktree: process.argv.includes("--worktree") });
+  report.step2b = result;
+  for (const failure of result.failures) failures.push(`step 2b: ${failure}`);
 }
 
 // Disarm, and the bootstrap token is refused again.
