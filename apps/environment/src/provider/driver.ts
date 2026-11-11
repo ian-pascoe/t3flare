@@ -13,14 +13,16 @@ import {
   haveProviderSnapshotSettingsChanged,
   makeProviderSnapshotSettingsSource,
 } from "@t3tools/provider-core/server/snapshotSettings";
-import type * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
 
 import { environmentServices } from "../agents/bindings.ts";
 import { makePiDurableAdapter } from "./adapter.ts";
+import { attachmentReader } from "./attachments.ts";
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
 import { snapshotModels } from "./models.ts";
 import { PiDurableSettings } from "./settings.ts";
@@ -35,7 +37,7 @@ const PRESENTATION = {
 
 const decodeSettings = Schema.decodeSync(PiDurableSettings);
 
-export type PiDurableDriverEnv = ProviderHost.ProviderHost | McpProviderSessions.McpProviderSessions;
+export type PiDurableDriverEnv = ProviderHost.ProviderHost | McpProviderSessions.McpProviderSessions | FileSystem.FileSystem;
 
 const snapshotOf = Effect.fn("PiDurableDriver.snapshot")(function* (input: {
   readonly enabled: boolean;
@@ -88,6 +90,8 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
     const textGeneration = makePiDurableTextGeneration();
     // t3's MCP credential per thread (step 3): the adapter hands it to the Session with each open and turn.
     const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+    // t3's attachment store (SPI-993): the adapter turns a message's attachments into the Session's images and text.
+    const attachments = attachmentReader(yield* ProviderHost.ProviderHost, yield* FileSystem.FileSystem);
     return {
       instanceId,
       driverKind: PI_DURABLE_DRIVER,
@@ -96,7 +100,7 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       accentColor,
       enabled,
       snapshot,
-      orchestrationAdapter: makePiDurableAdapter(instanceId, mcpSessions),
+      orchestrationAdapter: makePiDurableAdapter(instanceId, mcpSessions, attachments),
       textGeneration,
     } satisfies ProviderInstance;
   }),

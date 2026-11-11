@@ -1,0 +1,31 @@
+{
+  "at": "2026-11-11T22:42:15.791Z",
+  "colour": {
+    "ms": 3386,
+    "imageBytes": 190,
+    "run": [
+      "completed"
+    ],
+    "answer": "green",
+    "userMessageAttachments": [
+      {
+        "type": "image",
+        "id": "9bf7a008-160f-418b-97af-beb65838f376-29de3e43-2426-bae4-eba4-dc4812e3b773",
+        "name": "square.png",
+        "mimeType": "image/png",
+        "sizeBytes": 190
+      }
+    ]
+  },
+  "overBudget": {
+    "ms": 2417,
+    "imageBytes": 1229883,
+    "run": [
+      "completed",
+      "completed"
+    ],
+    "answer": "not shown"
+  },
+  "ok": true,
+  "failures": []
+}

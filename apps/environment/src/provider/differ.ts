@@ -42,6 +42,8 @@ export interface TurnContext {
   /** The provider turn as last emitted, to emit its terminal update. */
   readonly providerTurn: Extract<ProviderAdapterV2Event, { type: "provider_turn.updated" }>["providerTurn"];
   readonly contextWindow: number | null;
+  /** Whether the turn's model takes images (a steer's attachments follow it). Absent: it does. */
+  readonly acceptsImages?: boolean;
   /** The provider session the turn runs in (an approval's live response capability). */
   readonly providerSessionId: ProviderSessionId;
   /** Stop asked by t3 (`interruptTurn`): an abort settles as `interrupted`, else as `cancelled`. */

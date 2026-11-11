@@ -20,7 +20,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Open folder | `filesystem.browse` `ws.ts:3047` | R: only `/w` Workspaces exist | `env/workspace/layers.ts` `browse`; ADR-0008 | — |
 | Scratch threads | `projects.ensureScratch` `ws.ts:2924`; `srv/project/ManagedProjectFolders.ts:247` | M, yet `threadProjectFromScratch` is still advertised (`srv/environment/ServerEnvironment.ts:259`) | "Scratch threads stay unavailable" (`docs/steps/step-2a-plan.md:74`) | — G4 |
 | File tree, read, edit, `@` and content search | `ws.ts:2960-3019` | W | `layers.ts`; step-2a M2. Ignored-file list is always empty; reads cap at 1 MiB | done |
-| Attachments, images | upload route `srv/http.ts:464`; Pi inlines images `t3code/packages/provider-pi/src/server/adapter.ts:2671` | P: upload is mounted, but the model never receives them | `images: []` (`env/provider/adapter.ts:357`, `:391`); `attachments: []` (`env/provider/differ.ts:223`); same on `step-3` | — G1 |
+| Attachments, images | upload route `srv/http.ts:464`; Pi inlines images `t3code/packages/provider-pi/src/server/adapter.ts:2671` | W (images); P (files: as text, unit-tested only); images past 0.9 MB per message are named, not shown (SPI-1027); no SnapShot window context (SPI-1028) | `env/provider/attachments.ts` (SPI-993): images inline within the Session's row budget, readable files as text, the rest named; stage `attach`: a green square named "green" on claude-haiku-5-5, a 1.2 MB image named "not shown" (`docs/steps/parity/spi-993-attachments.json`) | done |
 | Open in editor | `shell.openInEditor` `ws.ts:3045` | N/A (host launcher) | router answers "not found" | — |
 
 ### Threads
@@ -133,7 +133,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 
 | # | Ticket | Size | Key risk |
 |---|---|---|---|
-| G1 | **Attachments and images reach Durable agents.** The adapter resolves attachments to the `images` the Session already accepts (`apps/agents/src/session/SessionDO.ts:98`); the differ echoes them. | S | RPC size bounds; non-Claude models are text-only |
+| G1 | ~~**Attachments and images reach Durable agents.**~~ Done (SPI-993): `apps/environment/src/provider/attachments.ts`. The user message's attachments are t3's own, so the differ has nothing to echo. Follow-ups: SPI-1027 (shrink large images), SPI-1028 (SnapShot context). | S | Bound: a DO SQLite row (2 MB) per Session message |
 | G2 | **Truthful capabilities.** Strip or hide scratch, npm release lookup, guest share and the device/browser/voice settings. | S | Client behaviour varies by nightly |
 | G3 | **Telemetry Layer**, per D1. | S | None |
 | G4 | **Scratch threads**: the scratch root becomes a Workspace. | S–M | Root is private to t3's runtime graph; likely a third Patch |
