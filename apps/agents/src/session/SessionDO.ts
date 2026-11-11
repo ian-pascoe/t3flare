@@ -545,6 +545,17 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.ctx.storage.kv.put(DIAG_KEY, { ...diag, [what]: (diag[what] ?? 0) + 1, [`${what}At`]: Date.now() });
   }
 
+  /** Step 3: the T3 tools offered and those left out (names only, never the credential). */
+  t3Tools(): Promise<{ readonly tools: ReadonlyArray<string>; readonly left: ReadonlyArray<string>; readonly hash: string | null; readonly credential: boolean }> {
+    const catalog = this.ctx.storage.kv.get<T3Catalog>(T3_CATALOG_KEY);
+    return Promise.resolve({
+      tools: (catalog?.tools ?? []).map((tool) => tool.name),
+      left: catalog?.left ?? [],
+      hash: catalog?.hash ?? null,
+      credential: this.ctx.storage.kv.get(T3_MCP_KEY) !== undefined,
+    });
+  }
+
   diagnostics(): Promise<Readonly<Record<string, number>>> {
     return Promise.resolve(this.ctx.storage.kv.get<Record<string, number>>(DIAG_KEY) ?? {});
   }

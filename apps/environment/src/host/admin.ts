@@ -33,6 +33,8 @@
 //   POST /_t3flare/agents/workspace-workflows?id=<id>&on=1|0  the owner's opt-in to `workflows: write` on the Workspace's Container tokens
 //   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec"|"credentialHelper"|"killExecs": input} on the Workspace DO
 //   GET  /_t3flare/agents/checkpoint-trace?clear=1 the checkpoint operations the Workspace DOs answered, and by which side
+//   POST /_t3flare/check/peer-leak               step 3: secrets (names only) in a Workspace's Container and Sessions' state
+//   GET  /_t3flare/agents/session-tools?thread=<id>  step 3: the T3 tools a Session offers and those left out
 //   POST /_t3flare/check/terminal-leak           step 2b: a terminal's `env` output compared with this Worker's binding values (names only)
 //   POST /_t3flare/check/terminal-close-idle?thread=<id>  step 2b: t3's own `closeIdle` for a thread's terminals (as settling runs it)
 import * as BootState from "./bootState.ts";
@@ -312,6 +314,26 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                       ? await rpc.killExecs(body.killExecs as never)
                       : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
+      }
+      case "POST /_t3flare/check/peer-leak": {
+        // Step 3 (plan section 4.6, review C8): after turns that called t3's tools and answered linked work, look for
+        // every secret this Environment knows (its string bindings, its live GitHub tokens, t3's MCP credential of each
+        // named thread, and values the harness adds, such as the link's token) in the Workspace's Container (`env`,
+        // every `/proc/*/environ`, the files of /workspace, /tmp and home) and in each Session's snapshot (the state
+        // its pushes carry, and `/_t3flare/agents/session`). Answers names and sizes only, never a value.
+        const body = (await request.json()) as {
+          readonly workspace: string;
+          readonly threads: ReadonlyArray<string>;
+          readonly extra?: ReadonlyArray<{ readonly name: string; readonly value: string }>;
+        };
+        const { peerLeakCheck } = await import("./peerLeak.ts");
+        return json(await peerLeakCheck(environment, body));
+      }
+      case "GET /_t3flare/agents/session-tools": {
+        // Step 3: the T3 tools a Session offers (names only), and those its catalog left out.
+        const { byName } = await import("../agents/rpc.ts");
+        const thread = url.searchParams.get("thread") ?? "";
+        return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").t3Tools());
       }
       case "POST /_t3flare/check/terminal-leak": {
         // Step 2b M1 (review F0): a terminal's `env` output, posted by the evidence script, compared here with the values
