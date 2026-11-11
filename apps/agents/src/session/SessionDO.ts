@@ -38,7 +38,7 @@ import {
   TURN_DEADLINE_MS,
   type TurnState,
 } from "@t3flare/session-protocol";
-import { ComputerExecutionEnv, ComputerFiles, type ComputerWorkspaceStub } from "@t3flare/computer-env";
+import { ComputerExecutionEnv, ComputerFiles, type ComputerWorkspaceStub, execTrace, type ExecTraceEntry } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
@@ -368,6 +368,11 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   diagnostics(): Promise<Readonly<Record<string, number>>> {
     return Promise.resolve(this.ctx.storage.kv.get<Record<string, number>>(DIAG_KEY) ?? {});
+  }
+
+  /** The commands this isolate started, killed and saw end, newest last (step 2a part 2: aborted commands). */
+  execTrace(): Promise<ReadonlyArray<ExecTraceEntry>> {
+    return Promise.resolve([...execTrace]);
   }
 
   /** A test's fault: the object restarts (as an eviction does), with whatever work it had in memory cut off. */

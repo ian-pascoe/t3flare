@@ -34,6 +34,24 @@ const KILL_GRACE_MS = 500;
 /** How often a kill is repeated while the command has not stopped: the first can arrive before the command starts. */
 const KILL_RETRY_MS = 100;
 
+/** One step of a command's life, kept in this isolate's trace (step 2a part 2's diagnosis of aborted commands). */
+export type ExecTraceEntry = {
+  readonly id: string;
+  readonly at: number;
+  readonly event: "start" | "kill" | "end";
+  readonly detail?: Readonly<Record<string, unknown>>;
+};
+
+const TRACE_LIMIT = 200;
+
+/** The last commands' starts, kills and ends in this isolate, oldest first. */
+export const execTrace: ExecTraceEntry[] = [];
+
+const traced = (entry: ExecTraceEntry): void => {
+  execTrace.push(entry);
+  if (execTrace.length > TRACE_LIMIT) execTrace.splice(0, execTrace.length - TRACE_LIMIT);
+};
+
 /** Writes a command's complete output to a file, for output past the spill thresholds. */
 export type SpillWriter = (output: string) => Promise<string | undefined>;
 
@@ -210,11 +228,15 @@ export const exec = async (
       ? undefined
       : setTimeout(() => kill("timeout"), options.timeout * 1000);
 
-  const onAbort = () => kill("aborted");
+  const onAbort = () => {
+    traced({ id, at: Date.now(), event: "kill", detail: { requested: "aborted" } });
+    kill("aborted");
+  };
 
   context.abortSignal?.addEventListener("abort", onAbort, { once: true });
 
   host.running.add(id);
+  traced({ id, at: Date.now(), event: "start", detail: { backend: host.backend?.id ?? null, signal: context.abortSignal !== undefined } });
 
   const execution = run().then(
     (exitCode) => ({ ok: true as const, exitCode }),
@@ -223,6 +245,7 @@ export const exec = async (
 
   // A command that outlives its kill grace period still releases its stubs when it ends.
   const finish = execution.finally(() => {
+    traced({ id, at: Date.now(), event: "end", detail: { stopped: stopped ?? null } });
     host.running.delete(id);
     workspace[Symbol.dispose]();
   });
@@ -251,16 +274,26 @@ export const exec = async (
 
     // Killed: wait briefly for the command to stop; a kill sent before it started is sent again.
     const deadline = Date.now() + KILL_GRACE_MS;
+    let killErrors = 0;
+    let lastKillError: string | undefined;
+    let ended = false;
 
     while (Date.now() < deadline) {
-      await workspace.runtime.killExec(id).catch(() => undefined);
+      await workspace.runtime.killExec(id).catch((cause: unknown) => {
+        killErrors++;
+        lastKillError = String(cause).slice(0, 200);
+      });
 
       if (
         (await Promise.race([finish.then(() => true), sleep(KILL_RETRY_MS).then(() => false)])) ===
         true
-      )
+      ) {
+        ended = true;
         break;
+      }
     }
+
+    traced({ id, at: Date.now(), event: "kill", detail: { reason: stopped ?? null, started, ended, killErrors, lastKillError: lastKillError ?? null } });
 
     if (callbackError !== undefined) return err(callbackError);
 

@@ -1,0 +1,167 @@
+{
+  "scenario": "restart",
+  "at": "2026-11-11T14:36:06.666Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "before": {
+    "call": [
+      {
+        "pid": 39,
+        "ppid": 38,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 40,
+        "ppid": 38,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 316,
+        "ppid": 315,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 317,
+        "ppid": 315,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 589,
+        "ppid": 588,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 590,
+        "ppid": 588,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      }
+    ],
+    "tree": [
+      {
+        "pid": 39,
+        "ppid": 38,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 38,
+        "ppid": 35,
+        "pgid": 1,
+        "sid": 1,
+        "args": "bash -c sleep 600 & sleep 600"
+      },
+      {
+        "pid": 35,
+        "ppid": 12,
+        "pgid": 1,
+        "sid": 1,
+        "args": "bash -c nice bash -c 'sleep 600 & sleep 600'"
+      },
+      {
+        "pid": 40,
+        "ppid": 38,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 316,
+        "ppid": 315,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 315,
+        "ppid": 314,
+        "pgid": 1,
+        "sid": 1,
+        "args": "bash -c sleep 600 & sleep 600"
+      },
+      {
+        "pid": 314,
+        "ppid": 12,
+        "pgid": 1,
+        "sid": 1,
+        "args": "bash -c nice bash -c 'sleep 600 & sleep 600'"
+      },
+      {
+        "pid": 317,
+        "ppid": 315,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 589,
+        "ppid": 588,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 588,
+        "ppid": 587,
+        "pgid": 1,
+        "sid": 1,
+        "args": "bash -c sleep 600 & sleep 600"
+      },
+      {
+        "pid": 587,
+        "ppid": 12,
+        "pgid": 1,
+        "sid": 1,
+        "args": "bash -c nice bash -c 'sleep 600 & sleep 600'"
+      },
+      {
+        "pid": 590,
+        "ppid": 588,
+        "pgid": 1,
+        "sid": 1,
+        "args": "sleep 600"
+      }
+    ]
+  },
+  "after": {
+    "secondsToGone": 29.8,
+    "left": [],
+    "firstRun": "cancelled",
+    "secondsSinceRestart": 30
+  },
+  "threadId": "2d6ab2cf-ab15-44a0-921f-b2468e06a18b",
+  "execTrace": [
+    {
+      "id": "d0dadae8",
+      "ms": 0,
+      "event": "start",
+      "detail": {
+        "backend": "container-shell",
+        "signal": true
+      }
+    },
+    {
+      "id": "d0dadae8",
+      "ms": 30331,
+      "event": "end",
+      "detail": {
+        "stopped": null
+      }
+    }
+  ],
+  "failures": [
+    "the call's two sleeps ran: [{\"pid\":1,\"ppid\":0,\"pgid\":1,\"sid\":1,\"args\":\"/bin/bash /usr/local/bin/cloudpid-supervise\"},{\"pid\":7,\"ppid\":1,\"pgid\":1,\"sid\":1,\"args\":\"sed -u -E s#(data:[-A-Za-z0-9.+/;=_]*;base64,)[-A-Za-z0-9+/=_]{64,}#\\\\1[base64 dropped]#g\"},{\"pid\":8,\"ppid\":1,\"pgid\":1,\"sid\":1,\"args\":\"tail -n 200\"},{\"pid\":9,\"ppid\":1,\"pgid\":1,\"sid\":1,\"args\":\"tee /dev/shm/cloudpid-supervise.cgW1tD/keep\"},{\"pid\":11,\"ppid\":1,\"pgid\":1,\"sid\":1,\"args\":\"/bin/bash /usr/local/bin/cloudpid-memory-guard\"},{\"pid\":12,\"ppid\":1,\"pgid\":1,\"sid\":1,\"args\":\"/usr/local/bin/computerd\"},{\"pid\":15,\"ppid\":11,\"pgid\":1,\"sid\":1,\"args\":\"/usr/bin/earlyoom -m 15,8 -M 1048576,524288 -r 0 -p --avoid ^(computerd|cloudpid-superv|cloudpid-memory|cloudpid-mcp-br)$\"},{\"pid\":28,\"ppid\":12,\"pgid\":28,\"sid\":28,\"args\":\"fusermount3 --auto-unmount -- /workspace\"},{\"pid\""
+  ],
+  "ok": false
+}

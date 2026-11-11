@@ -1,0 +1,99 @@
+{
+  "source": "commissary@0ad9d16b",
+  "now": "2026-11-12T10:00:00.000Z",
+  "model": "claude-haiku-5-5",
+  "answers": {
+    "cooldown": {
+      "status": 429,
+      "headers": {
+        "retry-after": "7384"
+      },
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model claude-haiku-5-5 are cooling down via provider claude (reset after 2h3m4s)\"}}"
+    },
+    "cooldownShort": {
+      "status": 429,
+      "headers": {
+        "retry-after": "120"
+      },
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model claude-haiku-5-5 are cooling down via provider claude (reset after 2m0s)\"}}"
+    },
+    "upstreamLimitWithRetryAfter": {
+      "status": 429,
+      "headers": {
+        "retry-after": "5400"
+      },
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}"
+    },
+    "upstreamLimit": {
+      "status": 429,
+      "headers": {},
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}"
+    },
+    "spendLimit": {
+      "status": 429,
+      "headers": {
+        "retry-after": "50400"
+      },
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"The daily Spend limit of this API key is reached; it resets at 2026-11-13T00:00:00.000Z\"}}"
+    },
+    "requestRate": {
+      "status": 429,
+      "headers": {
+        "retry-after": "60"
+      },
+      "body": "{\"error\":\"Rate limit exceeded\"}"
+    },
+    "invalidKey": {
+      "status": 401,
+      "headers": {},
+      "body": "{\"error\":\"Invalid API key\"}"
+    },
+    "missingKey": {
+      "status": 401,
+      "headers": {},
+      "body": "{\"error\":\"Missing API key\"}"
+    },
+    "forbidden": {
+      "status": 403,
+      "headers": {},
+      "body": "{\"error\":\"Forbidden\"}"
+    },
+    "accountRejected": {
+      "status": 401,
+      "headers": {},
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}"
+    },
+    "noAccount": {
+      "status": 503,
+      "headers": {},
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"no auth available\"}}"
+    },
+    "accountUnavailable": {
+      "status": 503,
+      "headers": {
+        "retry-after": "90"
+      },
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"no auth available\"}}"
+    },
+    "noAccountAtAll": {
+      "status": 503,
+      "headers": {},
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"no auth available\"}}"
+    },
+    "overloaded": {
+      "status": 529,
+      "headers": {},
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}"
+    },
+    "serverError": {
+      "status": 502,
+      "headers": {},
+      "body": "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"upstream connect error\"}}"
+    }
+  },
+  "streamed": {
+    "cooldown": "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model claude-haiku-5-5 are cooling down via provider claude (reset after 2h3m4s)\"}}\n\n",
+    "upstreamLimit": "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}\n\n",
+    "overloaded": "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}\n\n"
+  }
+}
