@@ -49,7 +49,7 @@ describe("t3flare's managed policy", () => {
     expect(new Set(summary?.lockedSettings)).toEqual(
       new Set(["enableAgentDeviceAccess", "enableDeviceSupport", "guestSharingEnabled", "simlockDeviceHostsEnabled", "textGenerators"]),
     );
-    expect(summary?.limits).toBeUndefined();
+    expect(summary?.limits).toEqual({ telemetry: false });
   });
 
   it("keeps guest links and the device panel off, whatever was stored", async () => {

@@ -1,6 +1,6 @@
 // t3flare's managed policy (ADR-0023): t3's own administrator policy, built in rather than read from a machine-wide file.
 // It locks the settings for features the Cloud Environment does not do, so the stock clients show them as "Managed by
-// t3flare" instead of offering a switch that fails. The capability flags are the other half (`./capabilities.ts`).
+// t3flare" instead of offering a switch that fails, and turns t3's product analytics off. The capability flags are the other half (`./capabilities.ts`).
 import type { ManagedPolicyDocument } from "@t3tools/contracts";
 import * as Layer from "effect/Layer";
 import * as ManagedPolicy from "t3/src/policy/ManagedPolicy.ts";
@@ -20,6 +20,11 @@ export const T3FLARE_POLICY = {
     simlockDeviceHostsEnabled: off,
     // Custom text generators hold a vendor key typed into t3: refused for now (owner decision D5).
     textGenerators: { value: {}, locked: true },
+  },
+  limits: {
+    // t3's product analytics (PostHog, `ingest.t3.codes`) is off in the Cloud Environment (owner decision D1, SPI-995).
+    // A policy can only turn analytics off; t3's `AnalyticsService` then drops every event before sending.
+    telemetry: false,
   },
 } as const satisfies ManagedPolicyDocument;
 
