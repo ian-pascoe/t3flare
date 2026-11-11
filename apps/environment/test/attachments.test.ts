@@ -75,6 +75,27 @@ describe("a message's attachments, as a Durable agent receives them", () => {
     expect(result.text.endsWith('[End of "huge.txt": cut.]')).toBe(true);
   });
 
+  it("does not read an image or a file whose recorded size is already past its bound", async () => {
+    const read: Array<string> = [];
+    const tracking: AttachmentReader = {
+      bytes: (attachment) => Effect.sync(() => (read.push(attachment.id), new Uint8Array([1]))),
+      extractedText: (attachment) => Effect.succeed(attachment.id === "pdf" ? "Extracted." : null),
+    };
+    const result = await prompt(
+      "",
+      [
+        { ...image("photo"), sizeBytes: 5_000_000 } as ChatAttachment,
+        file("log", "big.log", "text/plain", { sizeBytes: 30_000_000 }),
+        file("pdf", "big.pdf", "application/pdf", { sizeBytes: 30_000_000 }),
+      ],
+      tracking,
+    );
+    expect(read).toEqual([]);
+    expect(result.text).toContain('[Attached image "photo.png" (5.0 MB) is not shown');
+    expect(result.text).toContain('[Attached file "big.log" (text/plain, 30.0 MB) is too large for this agent to read.]');
+    expect(result.text).toContain('[Attached file "big.pdf" (application/pdf), as extracted text:]\nExtracted.');
+  });
+
   it("treats an image type providers do not take inline as a file", async () => {
     const result = await prompt("", [image("vector", "image/svg+xml")], reader({ vector: utf8("<svg/>") }));
     expect(result.images).toEqual([]);
