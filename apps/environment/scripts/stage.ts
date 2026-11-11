@@ -20,8 +20,11 @@ import { buildAgentsWorker } from "../../agents/build.ts";
 const here = path.resolve(import.meta.dirname, "..");
 const [command, stage, ...rest] = process.argv.slice(2);
 
-/** The stages this repo deploys to; anything else is refused, so a typo cannot create a stray stage. */
-const STAGES = new Set(["step1", "bump", "step2a"]);
+/**
+ * The stages this repo deploys to; anything else is refused, so a typo cannot create a stray stage. `prod` is the
+ * owner's long-lived Environment, deployed from `main` only; step branches use their own throwaway stages.
+ */
+const STAGES = new Set(["prod", "step1", "bump", "step2a"]);
 
 if (command === undefined || stage === undefined || !STAGES.has(stage)) {
   console.error(`usage: bun scripts/stage.ts deploy|run|destroy <${[...STAGES].join("|")}> …`);
@@ -68,6 +71,13 @@ const alchemy = (args: Array<string>, env: Record<string, string>) => {
 
 switch (command) {
   case "deploy": {
+    if (stage === "prod") {
+      const git = (...args: Array<string>) => spawnSync("git", args, { cwd: here, encoding: "utf8" }).stdout.trim();
+      if (git("branch", "--show-current") !== "main" || git("status", "--porcelain") !== "") {
+        console.error("t3flare: prod deploys only from a clean checkout of main");
+        process.exit(2);
+      }
+    }
     if (rest.includes("--web") || !fs.existsSync(path.join(here, "dist/web/index.html"))) {
       const web = spawnSync("bun", ["run", "prepare:web"], { cwd: here, stdio: "inherit" });
       if (web.status !== 0) process.exit(web.status ?? 1);
@@ -116,6 +126,10 @@ switch (command) {
     process.exit(result.status ?? 1);
   }
   case "destroy": {
+    if (stage === "prod" && !rest.includes("--really-destroy-prod")) {
+      console.error("t3flare: prod holds the owner's threads; pass --really-destroy-prod to destroy it");
+      process.exit(2);
+    }
     const status = alchemy(["destroy"], { ...stageSecrets(), ...deploySecrets() });
     if (status === 0) {
       fs.rmSync(secretsFile, { force: true });
