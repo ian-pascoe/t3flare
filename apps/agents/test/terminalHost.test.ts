@@ -36,7 +36,7 @@ const fakeShell = () => {
   };
 };
 
-const harness = (options: { running?: boolean; refuse?: string; answer?: (frames: ReadonlyArray<TerminalFrame>) => TerminalPushAnswer } = {}) => {
+const harness = (options: { running?: boolean; refuse?: string; pushMs?: number; answer?: (frames: ReadonlyArray<TerminalFrame>) => TerminalPushAnswer } = {}) => {
   let now = 1_000_000;
   let running = options.running ?? true;
   const shells: Array<ReturnType<typeof fakeShell>> = [];
@@ -61,6 +61,7 @@ const harness = (options: { running?: boolean; refuse?: string; answer?: (frames
     },
     kill: async (markers) => void killed.push(markers),
     push: async (push) => {
+      if (options.pushMs !== undefined) await tick(options.pushMs);
       frames.push(...push.frames);
       return options.answer?.(push.frames) ?? { unknown: [] };
     },
@@ -189,16 +190,109 @@ describe("TerminalHost", () => {
     expect(refused.spawned).toEqual([]);
   });
 
-  it("counts only input as use: output does not move the last input", async () => {
+  it("counts only input as use: neither an open (a re-attach after an Environment restart) nor output moves the last input", async () => {
     const h = harness();
     await h.host.open(open("term-a1"));
-    const opened = h.host.lastInput;
+    expect(h.host.lastInput).toBe(0);
     h.advance(60_000);
     h.shells[0]!.print(`${MARK_PROMPT}tick\r\n`.repeat(20));
     await tick();
-    expect(h.host.lastInput).toBe(opened);
+    expect(h.host.lastInput).toBe(0);
     await h.host.input("term-a1", "x");
-    expect(h.host.lastInput).toBe(opened + 60_000);
+    expect(h.host.lastInput).toBe(1_060_000);
+  });
+
+  describe("the Container hold (cost audit F1): an idle prompt holds less than a running command", () => {
+    const hold = { promptMs: 10 * 60_000, busyMs: 30 * 60_000 };
+
+    it("does not hold for a terminal that was only opened", async () => {
+      const h = harness({ running: false });
+      await h.host.open(open("term-a1"));
+      h.shells[0]!.print(`${MARK_PROMPT}$ `);
+      await tick();
+      expect(h.host.holdsContainer(hold)).toBe(false);
+    });
+
+    it("holds a terminal at its prompt for the prompt hold after the last input", async () => {
+      const h = harness();
+      await h.host.open(open("term-a1"));
+      h.shells[0]!.print(`${MARK_PROMPT}$ `);
+      await tick();
+      await h.host.input("term-a1", "ls\r");
+      h.shells[0]!.print(`${MARK_BUSY}a b\r\n${MARK_PROMPT}$ `);
+      await tick();
+      h.advance(9 * 60_000);
+      expect(h.host.holdsContainer(hold)).toBe(true);
+      h.advance(2 * 60_000);
+      expect(h.host.holdsContainer(hold)).toBe(false);
+    });
+
+    it("holds a terminal running a command for the busy hold after the last input", async () => {
+      const h = harness();
+      await h.host.open(open("term-a1"));
+      h.shells[0]!.print(`${MARK_PROMPT}$ `);
+      await tick();
+      await h.host.input("term-a1", "npm run dev\r");
+      h.shells[0]!.print(`${MARK_BUSY}listening\r\n`);
+      await tick();
+      h.advance(29 * 60_000);
+      expect(h.host.holdsContainer(hold)).toBe(true);
+      h.advance(2 * 60_000);
+      expect(h.host.holdsContainer(hold)).toBe(false);
+    });
+
+    it("holds nothing once every terminal is closed", async () => {
+      const h = harness();
+      await h.host.open(open("term-a1"));
+      await h.host.input("term-a1", "x");
+      h.shells[0]!.exit(0);
+      await tick();
+      expect(h.host.holdsContainer(hold)).toBe(false);
+    });
+  });
+
+  describe("output batching (cost audit F4): immediate while typing, 100 ms batches otherwise", () => {
+    it("batches output nobody typed for into one push", async () => {
+      const h = harness();
+      await h.host.open(open("term-a1"));
+      await h.host.settled();
+      const before = h.host.pushes;
+      h.shells[0]!.print("line 1\r\n");
+      await tick(30);
+      h.shells[0]!.print("line 2\r\n");
+      await tick(150);
+      expect(h.host.pushes - before).toBe(1);
+      expect(h.text("term-a1")).toBe("line 1\r\nline 2\r\n");
+    });
+
+    it("keeps batching continuous output nobody typed for, not pushing again as soon as each push returns", async () => {
+      const h = harness({ pushMs: 20 });
+      await h.host.open(open("term-a1"));
+      await h.host.settled();
+      const before = h.host.pushes;
+      for (let i = 0; i < 50; i++) {
+        h.shells[0]!.print(`line ${i}\r\n`);
+        await tick(10);
+      }
+      await h.host.settled();
+      // About 500 ms of output: at most one push per 100 ms (and the last), where one per round trip made about 20.
+      expect(h.host.pushes - before).toBeLessThanOrEqual(8);
+      expect(h.text("term-a1")).toContain("line 49");
+    });
+
+    it("pushes the echo of a keystroke promptly, even with a batch already waiting", async () => {
+      const h = harness();
+      await h.host.open(open("term-a1"));
+      h.shells[0]!.print(`${MARK_PROMPT}$ `);
+      await tick();
+      await h.host.settled();
+      h.shells[0]!.print("background noise\r\n");
+      await tick(5);
+      await h.host.input("term-a1", "x");
+      h.shells[0]!.print("x");
+      await tick(40);
+      expect(h.text("term-a1")).toBe("$ background noise\r\nx");
+    });
   });
 
   it("kills the shells an earlier instance started and lost, at the first open", async () => {

@@ -2,7 +2,7 @@
 // The admin routes (`/_t3flare/*`, ADR-0010). The Worker has verified the caller (Access assertion plus the
 // admin token, ../access.ts) before forwarding; these never boot t3 unless the route is about booting it.
 //
-//   GET  /_t3flare/health                       boot record, safe mode, runtime, activity, alarm, SQL adapter
+//   GET  /_t3flare/health                       boot record, safe mode, runtime, activity, alarm, SQL adapter and row counters
 //   POST /_t3flare/safe-mode?on=1|0             toggle safe mode by hand
 //   POST /_t3flare/fault/boot-failures?count=N  make the next N boots fail (to prove automatic safe mode)
 //   POST /_t3flare/sql                          read-only SQL: {"sql": "...", "params": [...]}
@@ -22,7 +22,7 @@
 //   POST /_t3flare/agents/proxy-fault?thread=<id> a test's fault (stages only; the Session refuses on prod): its model
 //                                               requests get {"fixture","resetAt"}'s answer until that reset
 //   GET  /_t3flare/agents/router-trace?clear=1   the process router's recent commands (git, gh, missing binaries)
-//   GET  /_t3flare/agents/workspaces            the Workspace registry, each with its Container's state
+//   GET  /_t3flare/agents/workspaces            the Workspace registry, each with its Container's and terminals' state
 //   POST /_t3flare/agents/workspace-stop?id=<id>  stop a Workspace's Container now
 //   POST /_t3flare/agents/workspace-remove?id=<id> purge a Workspace (step 2b: its DO's files with it; forced)
 //   POST /_t3flare/agents/workspace-purge?id=<id>[&force=1]  step 2b: purge, refused while referenced unless forced
@@ -90,7 +90,8 @@ const health = async (environment: EnvironmentDO) => {
     alarm: alarm === null ? null : new Date(alarm).toISOString(),
     openWork: Idle.openWork(storage.sql, new Date()),
     nextDue: Idle.nextDue(storage.sql),
-    sql: sqlStats,
+    // The rows are t3's statements through the adapter since `isolate.startedAt` (cost audit F2).
+    sql: { ...sqlStats, databaseSize: storage.sql.databaseSize },
     stateDirectory: StateStore.usage(),
     redactions,
     spawnAttempts: Object.fromEntries(spawnAttempts),
@@ -248,6 +249,7 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
               references: references.get(record.id) ?? [],
               container: await workspaceRpc(record.id).containerState().catch((error: unknown) => ({ error: String(error) })),
               info: await workspaceRpc(record.id).info().catch((error: unknown) => ({ error: String(error) })),
+              terminals: await workspaceRpc(record.id).terminalState().catch((error: unknown) => ({ error: String(error) })),
             })),
           ),
         });

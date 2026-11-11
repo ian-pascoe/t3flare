@@ -229,7 +229,7 @@ export interface SessionPushAnswer {
 // Bounds and timings
 
 /** How long the Session coalesces commits before a push while streaming. */
-export const PUSH_COALESCE_MS = 100;
+export const PUSH_COALESCE_MS = 300;
 /** The most a push's entries may hold (JSON); past it, `more` and the adapter pulls a snapshot. */
 export const PUSH_ENTRIES_BYTES = 256 * 1024;
 /** A tool result's text, as pushed. */

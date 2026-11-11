@@ -11,6 +11,7 @@ DO SQLite refuses some of what t3's queries do, so the client goes through an ad
 | About 100 view and subquery expansions per statement, **production only** | the thread window's inlined CTE | on that error, run each CTE as its own statement and pass its rows on as a `json_each` parameter, with no DDL |
 | 50-byte `LIKE` patterns | our own prefix matches | key ranges instead |
 | PRAGMAs refused | `Sqlite.layerSetup` | run only t3's migrations |
+| `PRAGMA auto_vacuum`, `page_count` and `freelist_count` refused | `DatabaseStorage`'s reads every minute | answer their read form with 0 (no automatic vacuum), so its reclaim does nothing; its history compaction still runs |
 
 ## Consequences
 

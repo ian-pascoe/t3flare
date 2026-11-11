@@ -23,6 +23,15 @@ designed this and never built it.
   settle) keeps a terminal running `npm run dev` and closes an idle one, and t3 never spawns `ps`.
 - **Only input holds the Container** (30 minutes from the last input), so a noisy terminal cannot keep it forever.
   Terminal output pushes are not activity for the Environment's idle reset (ADR-0003).
+- **Refinement (cost audit F1): a prompt holds less, and an open is not input.** While every shell sits at its prompt
+  the hold is 10 minutes from the last input; only a shell running a foreground command (the `PS0` marker) keeps the
+  30 minutes. Opening a terminal counts as use, like a command (the Container's 2-minute idle stop), but not as input:
+  t3 re-attaches every open panel after each Environment restart, and each re-attach used to hold the Container for
+  30 minutes. A re-attach to a stopped Container still starts it, then lets it stop after 2 minutes unless someone
+  types; not starting it until the first keystroke needs parked terminals that survive the Workspace DO's
+  hibernation, deferred until the idle-stop logs show terminal holds are still a large share of Container-hours.
+- Output is batched for 16 ms within a second of input and for 100 ms otherwise (cost audit F4), so a chatty process
+  makes about six times fewer pushes while echo stays prompt.
 - **Defence in depth for secrets:** the Workers run with `nodejs_compat_do_not_populate_process_env`, the terminal's base
   env is fixed (never `process.env`), and the adapter allowlists the env it passes.
 - Output is never dropped: a failed push goes back to the front of the queue, because a lost frame can be a setup
