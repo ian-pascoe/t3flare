@@ -105,3 +105,26 @@ follower completes the task from that cancelled run's last reply (t3 keeps the q
 starts no continuation). We raise the question again in a continuation of the cut run on our side; a follower that
 waits for a pending message-capable question of its run, as the local finalizer does (`childAwaitsRestartContinuation`
 and the dismissal in `Orchestrator.ts`), would make that unnecessary.
+
+## 12. A paused phase for usage limits (step 3+)
+
+A run that ends on a usage limit with auto-resume armed is a `failed` run, so `projectThreadAwarenessV2` publishes
+`failed` and the phone says "Agent failed", with the detail forced to "The agent run failed."
+(`apps/server/src/relay/AgentAwarenessRelay.ts`, `sanitizeRelayAgentActivityState`). **Ask:** a phase (or a flag on
+`failed`) for a run that will resume by itself at its reset, so the phone can say "Paused until 14:05" or stay quiet.
+
+## 13. `CloudLink.unlink` should unlink on the relay too (step 3+)
+
+`CloudLink.unlink` removes the link locally only; the relay keeps the environment linked until a client calls
+`DELETE /v1/client/environment-links/:environmentId` with the account token. **Ask:** when the server holds an account
+token (the CLI's), unlink on the relay as well, as the web client's Disconnect does.
+
+## 14. A supported publish-only link for a hosted server (step 3+)
+
+t3 signs a link proof only for a loopback origin (`cloud/linkChecks.ts`), so a server reached out of band (ours, at a
+public host behind its own auth) links publish-only by naming `http://127.0.0.1:<port>`, which the relay records as
+metadata for a `manual` link. **Ask:** a supported way to link with no endpoint at all (publish-only), and for that
+mode a link step and a server that never answer relay-initiated routes (`/api/t3-connect/health`, `mint-credential`).
+Related: those two routes have no scope check and rely on the stored mint key alone; and `CliState` reads an absent
+desired-link mark as `managed`, so a relink after an unlink asks for a managed tunnel unless the caller writes the
+mode first.
