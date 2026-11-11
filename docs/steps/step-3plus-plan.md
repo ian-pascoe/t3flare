@@ -8,6 +8,71 @@ notification when a cloud run ends or waits on the owner".
 `t3code/infra/relay/src/` (T3 Connect's relay is open source and sits in the submodule), `env/` =
 `apps/environment/src/`.
 
+## Changelog: review findings (Fable) and owner decisions, 2026-11-11
+
+These override the sections below wherever they disagree. Each was checked against the pin as it was reached; the
+verdict and the evidence are given. The report records how each was built.
+
+**Owner decisions.** D1 yes, D3 accept (plus the upstream ask), D4 yes, as defaulted. **D2 changed:** the stage keeps
+the account token; **prod discards it right after the link** (sign-out stays available, and works without the token
+for the local part). If the relay accepts the token for broad client-group operations, discarding is mandatory (it
+does: finding 5).
+
+1. **HIGH, security: `health` and `mint-credential` have no scope check, and a DO 404 is one layer only.**
+   *Verified.* `srv/cloud/http.ts:153-163` calls `answerHealthRequest` and `mintCredential` with no
+   `requireEnvironmentScope`; mint needs only a proof signed with the stored mint key and returns a 2-minute pairing
+   credential with `AuthStandardClientScopes` (`CloudLink.ts:1522-1625`). Also verified: our first-pairing sessions
+   have subject `desktop-bootstrap` (`auth/PairingGrantStore.ts:334-336`), the one subject `linkProof` lets sign a
+   proof from a non-loopback host (`CloudLink.ts:628-643`). Built:
+   - **Refusal at the service.** `CloudHttp.layer` gets a `CloudLink` whose `linkProof`, `applyRelayConfig`,
+     `answerHealthRequest` and `mintCredential` fail, as t3's policy variant does (`CloudLink.ts:1635-1657`). Our
+     Connect service keeps the real one. Both are built in `layerMakeServer` from one `CloudLink.layer` value, since
+     `CloudLink` is provided only to the routes there.
+   - **`cloud-mint-ed25519-public-key` is deleted after every link.** Publishing never reads it
+     (`AgentAwarenessRelay.ts` reads URL, issuer and environment credential only); without it, mint and health fail
+     even if reached, and `RelayDeliveryProof` (mounted with the webhook route) verifies nothing.
+   - **The DO 404 stays,** for any method, tested with trailing-slash, case and percent-encoded variants. The refusals
+     are verified on prod before its sign-in (A3).
+   - **The ADR reasons are corrected:** `relay-config` accepts any https relay URL and any well-formed mint key from a
+     `relay:write` session while no account is linked; a `manual` link proof lets another account link this
+     environment, receive its pushes and, by relinking, revoke our credential.
+2. **HIGH: a relink can fall back to a managed tunnel.** *Verified.* Unlink removes the desired-link mark, and its
+   absence reads as `managed` (`srv/cloud/CliState.ts:29-42`; `managedTunnelsEnabled = mode !== "publish_only"`,
+   `CloudLink.ts:852`). Built: every link operation writes `publish_only` itself, asserts the mode the reconcile
+   returns, and unlinks if `cloud-endpoint-runtime-config` exists afterwards. Test: relink after unlink.
+3. **MEDIUM: the drain does not cover retries or the 5 s confirmation.** *Verified.* `drain` waits for queued and
+   in-flight items only; retries and the confirmation are forked sleeps (`AgentAwarenessRelay.ts:794-817`, `:904`).
+   The worst case (five retries with 10 s timeouts) is about 91 s, longer than the 60 s idle window. Built instead of
+   the drain: the recorder counts threads with a deferred or a failed-not-exhausted publish, and `idleVerdict` holds
+   while any exist, capped at 120 s. No await is added between `setAlarm` and `abort` (`environmentDO.ts`
+   `checkIdle`). **Accepted loss:** a deploy (or eviction) has no hook, so a publish pending at that moment is lost.
+4. **MEDIUM: a restart's mapping has gaps.** Recovery runs before the relay starts; catch-up skips threads whose state
+   is null; `cancelled` maps to null. A restart while an approval waits has no continuation (ADR-0004), so the relay
+   keeps "Approval needed"; a completion inside the 5 s hold at a restart is lost. Built: M2 cases
+   restart-while-approval and restart-while-`ask_user`; then either tombstones after boot for threads the recorder
+   last saw live, or the gap recorded as accepted (decided on the M2 evidence). Pairing is never armed during a
+   sign-in (an in-place restart kills the sign-in fiber): arm refuses while a sign-in is pending.
+5. **MEDIUM: D2 and R8 understate the account token.** The relay accepts it as `clerk_oauth_bearer` on the whole
+   client group: it can unlink environments, delete the laptop's tunnel and link an attacker's environment. Built:
+   prod discards it after the link (above); P6 decides by status code, not by body; ADR-0023 states the
+   single-holder rule and that this is the first account credential the DO holds.
+6. **MEDIUM-LOW: admin exposure.** The stage's Access service token is admitted, and CI holds it with the admin token.
+   Built: on prod, Connect mutations and the R1 token import require the owner's Access identity (an Access assertion
+   with the owner's email), never the service token. The Worker tells the DO which kind of caller it admitted.
+7. **LOW: public config.** *Verified:* all three values are in `t3code/.env.example:9,11,22`, public, and account
+   constants rather than per-release values. Built: inlined as build defines (no JSON file, no executable read); a
+   test compares them with `.env.example`, so the bump fails on a change. A change requires a prod re-sign-in
+   (documented).
+8. **LOW: 401s.** t3 retries 5 times and never marks a publish-only link revoked. Built: the recorder classifies a
+   failure's status from the `Cause.pretty` text (redacted) and the status route reports `rejected`. M2 case: remove
+   the environment in the app, then publish.
+9. **LOW: privacy.** Thread and project titles reach APNs/FCM in the alert. Stated in the docs and in D1.
+
+**Milestones, re-ordered.** The real device-code approval (A1) moves to the end of M0: a throwaway link and one
+publish on the stage, so the token poll, the relay accepting the bearer, the real link and the publish proof are
+proven before the rest is built. If Clerk blocks Worker IPs, the R1 fallback (a headless CLI token import) is used,
+which implies D2 = discard everywhere.
+
 ## 0. The answer in one paragraph
 
 Our composition already holds every piece t3 uses for this: `CloudLink`, `CliTokenManager`, `AgentAwarenessRelay`
