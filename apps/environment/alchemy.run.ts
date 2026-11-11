@@ -106,6 +106,11 @@ export default Alchemy.Stack(
       main: path.join(here, "dist/worker/worker.js"),
       bundle: false,
       compatibility: COMPATIBILITY,
+      // Cloudflare defers a Durable Object's code update by up to five minutes while it is active (an open client socket),
+      // so a deploy would otherwise leave the Environment on its old code, and a check made right after it would see the
+      // old build. The Environment adopts new code at once, as a restart does (ADR-0004): clients reconnect, and running
+      // turns continue from their Sessions. The agents Worker keeps the default: its Sessions finish in-flight work first.
+      codeUpdateStrategy: { mode: "immediate" },
       env: {
         ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO" }),
         T3_BOOTSTRAP_TOKEN: Config.Redacted("T3_BOOTSTRAP_TOKEN"),
