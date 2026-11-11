@@ -7,6 +7,44 @@ cloudpid read at `~/src/cloudpid` (read only).
 This is a plan to review, not a report; nothing in it is built yet. Owner decisions and actions are in §12: one
 decision, which does not block the start, and one session at the owner's desktop near the end.
 
+## Changelog: owner decision and independent review (Fable), 2026-11-11
+
+These override the plan below where they conflict. Each is verified against the code as its milestone reaches it;
+the verdicts and any rebuttals, with evidence, are in the report (`docs/steps/step-3.md`, § Review findings).
+
+- **D1 = option 2 (owner).** Linked work may `git push` the project's repo, but **every push from a thread with a
+  `linkOrigin` needs its own approval**; "accept for session" never covers it. Enforced where pushes happen (C3), and
+  tested with a project whose `main` push would deploy.
+- **C1 (HIGH). Mode fixes before links.** `auto-accept-edits` and `auto` carry the same link scopes
+  (`contracts/src/auth.ts:268-278`), and our adapter maps `auto` to full access. F-modes and F-plan move into **M1**;
+  nothing turns links on (L1) before they are in. The fail-closed mapping (G3) lands on `main` from a separate branch
+  (`modefix`); step 3 rebases onto it and builds F-plan on it, without duplicating it.
+- **C2 (HIGH). `ask_user` across an Environment restart.** A request waiting at a restart blocks the continuation
+  (`RestartContinuation.ts:63-74`), so the cloud run ends and the laptop follower completes the task from the
+  cancelled run's last reply (`RemoteDelegation.ts:634-647`). Prod restarts on every push to main. New M4 case:
+  "Environment restart while `ask_user` waits on a delegated task". The question is re-raised from the Session's
+  stored ask (preferred); otherwise the result names the restart.
+- **C3 (HIGH). D1 enforced where pushes happen.** The Container token is per Workspace (`WorkspaceDO.ts:1073-1077`)
+  and a remote task runs in the project's shared checkout (`RemoteDelegation.ts:217`). The credential helper's token
+  route asks a fresh approval whenever the requesting thread has a `linkOrigin`, every time.
+- **C4 (MEDIUM). Per-tool approvals.** Approval kinds are only `command` and `file-change`
+  (`session-protocol/src/index.ts:186`, `permissions.ts:146`), and "accept for session" is per kind. Add an
+  `mcp-tool` kind, accepted per tool name: "always allow" on `delegate_task` never unlocks `bash`, nor the reverse.
+- **C5 (MEDIUM). G2 is not a hole.** t3 refuses a grant that is not one-time at `/oauth/mcp/decision`
+  (`EnvironmentAuth.ts:1362-1379`; our bootstrap is a `desktop-bootstrap` grant). L2 stays as defence in depth; R11
+  is dropped. F11 asserts the DO's refusal body, and a test shows t3 alone answers `not_a_pairing_code`. The harness
+  mints codes with `access` (`EnvironmentAuth.ts:1147-1149`); a plain code carries the standard scopes
+  (`auth.ts:150-162`), so the linking side could pick full access (`:1379`): the cap is tested.
+- **C6 (MEDIUM). Version skew.** The bump job also runs a forwarded launch from a stock `npx t3@<latest nightly>`;
+  R3 is rerun just before M5 (the owner's desktop: `0.1.10-nightly.20261111.4529`).
+- **C7 (LOW).** `EnvironmentDO.mcp` boots without a synthetic request (`#publicHost` stores the request's host,
+  `environmentDO.ts:231-240`): as `sessionPush`, boot and await `commandReady`.
+- **C8 (LOW).** The Session's MCP credential works on the public `/mcp` for 24 h idle: it stays out of `snapshot()`,
+  pushes and `/_t3flare/agents/session`, and those join the leak check.
+- **C9 (LOW).** `clientRequestId` holds across Session restarts but not across a credential re-issue
+  (`ProviderSessionManager.ts:476-535`): tested. Waits are chunked at 50 s from the start.
+- **C10 (LOW).** F3 belongs to M2 and F7 to M3, each with an exit.
+
 **Exit criterion (from `docs/plan.md`).** A laptop agent delegates to the cloud, follows the task and gets the result;
 the cloud child can report and ask; the link fence holds.
 
