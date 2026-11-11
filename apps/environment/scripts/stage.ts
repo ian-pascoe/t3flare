@@ -96,8 +96,10 @@ const putBuildInForce = async (): Promise<boolean> => {
   if ((await running()) === build.builtAt) return true;
   console.error("t3flare: the Environment is still running an earlier build; restarting it");
   await fetch(new URL("/_t3flare/restart", access.url), { method: "POST", headers }).catch(() => undefined);
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+  // The restarted object can come back on the earlier build until the code-update delay ends (seen from CI, run
+  // 43028065923), so wait out the whole delay.
+  for (let attempt = 0; attempt < 72; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
     if ((await running()) === build.builtAt) return true;
   }
   return false;
