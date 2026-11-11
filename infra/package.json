@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ci:setup": "MODEL_PROXY_URL=\"$(sed -n 's/^MODEL_PROXY_URL=//p' ~/.config/t3flare/dev.env)\" alchemy deploy --config github.ts --stage ci --profile admin && bun allow-actions-prs.ts",
+    "ci:setup": "bash -c 'set -a; . \"$HOME/.config/t3flare/dev.env\"; set +a; exec alchemy deploy --config github.ts --stage ci --profile admin' && bun allow-actions-prs.ts",
     "ci:destroy": "alchemy destroy --config github.ts --stage ci --profile admin",
     "typecheck": "effect-tsgo tsrs --noEmit",
     "lint": "oxlint --type-aware --deny-warnings github.ts allow-actions-prs.ts github-app-setup.ts src",

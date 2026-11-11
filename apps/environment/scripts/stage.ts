@@ -8,6 +8,7 @@
 // The stage's bootstrap and admin tokens are random, made on its first deploy and kept in
 // `.alchemy/stages/<stage>.env.json` (gitignored, 0600); its Access service token's credentials are written next
 // to it by alchemy.run.ts. Nothing secret is printed. The alchemy profile is $ALCHEMY_PROFILE or `default`.
+// CI passes the tokens in the environment instead (deploy-prod.yml: the laptop's prod tokens; CI never makes them).
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
@@ -34,8 +35,16 @@ if (command === undefined || stage === undefined || !STAGES.has(stage)) {
 const secretsFile = secretsFileOf(stage);
 const token = () => randomBytes(32).toString("base64url");
 
+const STAGE_SECRETS = ["T3_BOOTSTRAP_TOKEN", "T3FLARE_ADMIN_TOKEN"];
+const inCI = process.env.GITHUB_ACTIONS === "true";
 const stageSecrets = (): Record<string, string> => {
+  if (STAGE_SECRETS.every((name) => process.env[name])) return Object.fromEntries(STAGE_SECRETS.map((name) => [name, process.env[name]!]));
   if (fs.existsSync(secretsFile)) return JSON.parse(fs.readFileSync(secretsFile, "utf8"));
+  if (stage === "prod" && inCI) {
+    // New tokens would lock the owner's clients out of prod.
+    console.error(`t3flare: CI needs prod's ${STAGE_SECRETS.join(" and ")} (the GitHub environment \`prod\`)`);
+    process.exit(1);
+  }
   const secrets = { T3_BOOTSTRAP_TOKEN: token(), T3FLARE_ADMIN_TOKEN: token() };
   fs.mkdirSync(path.dirname(secretsFile), { recursive: true });
   fs.writeFileSync(secretsFile, JSON.stringify(secrets), { mode: 0o600 });
@@ -73,7 +82,9 @@ switch (command) {
   case "deploy": {
     if (stage === "prod") {
       const git = (...args: Array<string>) => spawnSync("git", args, { cwd: here, encoding: "utf8" }).stdout.trim();
-      if (git("branch", "--show-current") !== "main" || git("status", "--porcelain") !== "") {
+      // CI checks out a detached HEAD; the pushed ref says which branch it is.
+      const branch = inCI ? process.env.GITHUB_REF : `refs/heads/${git("branch", "--show-current")}`;
+      if (branch !== "refs/heads/main" || git("status", "--porcelain") !== "") {
         console.error("t3flare: prod deploys only from a clean checkout of main");
         process.exit(2);
       }

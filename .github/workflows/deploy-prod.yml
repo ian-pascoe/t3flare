@@ -1,0 +1,82 @@
+name: Deploy prod
+
+# Every push to main deploys the `prod` stage (the owner's Environment): `bun run check`, then
+# `apps/environment/scripts/stage.ts deploy prod`, then a smoke check that leaves nothing behind (scripts/smoke.ts: the
+# web client and the read-only admin health route, which must report this commit; no t3 boot, no Container).
+# Docs-only pushes are skipped. A manual run may deploy the `bump` stage instead, to try the job without touching prod.
+#
+# Needs, made by `bun run --cwd infra ci:setup` (infra/github.ts) on the GitHub environment `prod` (main only):
+#   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-prod`
+#   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
+#   vars.MODEL_PROXY_URL, secrets.MODEL_PROXY_API_KEY, secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY
+#   secrets.T3_BOOTSTRAP_TOKEN, secrets.T3FLARE_ADMIN_TOKEN   prod's own tokens, the same as the laptop's
+#     (apps/environment/.alchemy/stages/prod.env.json); stage.ts refuses to make new ones for prod in CI.
+# The Access service token's credentials come from alchemy's state on every deploy, so nothing else is stored.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "The stage to deploy: prod, or bump to try the job"
+        type: choice
+        options: [prod, bump]
+        default: prod
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ inputs.stage || 'prod' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: ${{ inputs.stage || 'prod' }}
+      url: https://t3flare-environment-${{ inputs.stage || 'prod' }}.ian-g-pascoe.workers.dev
+    env:
+      STAGE: ${{ inputs.stage || 'prod' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      MODEL_PROXY_URL: ${{ vars.MODEL_PROXY_URL }}
+      MODEL_PROXY_API_KEY: ${{ secrets.MODEL_PROXY_API_KEY }}
+      T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
+      T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
+      # Unset on `bump`, whose tokens the job makes fresh.
+      T3_BOOTSTRAP_TOKEN: ${{ secrets.T3_BOOTSTRAP_TOKEN }}
+      T3FLARE_ADMIN_TOKEN: ${{ secrets.T3FLARE_ADMIN_TOKEN }}
+    steps:
+      # The submodule is fetched by hand, not by the action (see bump.yml).
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - run: git submodule update --init t3code
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # Vitest stays on Node (ADR-0019).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run check
+
+      - name: Deploy
+        working-directory: apps/environment
+        run: bun scripts/stage.ts deploy "$STAGE" --web
+
+      - name: Smoke check
+        working-directory: apps/environment
+        run: bun scripts/stage.ts run "$STAGE" smoke "$GITHUB_SHA"
