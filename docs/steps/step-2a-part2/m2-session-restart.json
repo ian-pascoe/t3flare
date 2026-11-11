@@ -1,0 +1,61 @@
+{
+  "scenario": "restart",
+  "at": "2026-11-11T15:05:38.689Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "before": {
+    "call": [
+      {
+        "pid": 713,
+        "ppid": 712,
+        "pgid": 711,
+        "sid": 711,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 714,
+        "ppid": 712,
+        "pgid": 711,
+        "sid": 711,
+        "args": "sleep 600"
+      }
+    ],
+    "tree": [
+      {
+        "pid": 713,
+        "ppid": 712,
+        "pgid": 711,
+        "sid": 711,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 712,
+        "ppid": 711,
+        "pgid": 711,
+        "sid": 711,
+        "args": "bash -c sleep 600 & sleep 600"
+      },
+      {
+        "pid": 711,
+        "ppid": 12,
+        "pgid": 711,
+        "sid": 711,
+        "args": "bash -c bash -c 'sleep 600 & sleep 600'"
+      },
+      {
+        "pid": 714,
+        "ppid": 712,
+        "pgid": 711,
+        "sid": 711,
+        "args": "sleep 600"
+      }
+    ]
+  },
+  "after": {
+    "secondsToGone": 40.2,
+    "left": [],
+    "secondsSinceRestart": 40
+  },
+  "threadId": "4463ccd4-0948-43ee-b8c1-30e0ccd9e408",
+  "failures": [],
+  "ok": true
+}

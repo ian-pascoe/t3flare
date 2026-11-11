@@ -1,0 +1,25 @@
+{
+  "scenario": "survivor",
+  "at": "2026-11-11T15:06:29.528Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "background": [
+    {
+      "pid": 250,
+      "ppid": 1,
+      "pgid": 249,
+      "sid": 249,
+      "args": "sleep 900"
+    }
+  ],
+  "afterStop": [
+    {
+      "pid": 250,
+      "ppid": 1,
+      "pgid": 249,
+      "sid": 249,
+      "args": "sleep 900"
+    }
+  ],
+  "failures": [],
+  "ok": true
+}

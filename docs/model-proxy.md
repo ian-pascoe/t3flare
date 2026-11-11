@@ -67,6 +67,30 @@ Not checked: images, thinking, long contexts or parallel tool calls on a non-Cla
 
 Text generation uses `anthropic/claude-haiku-5-5` unless a thread's own model selection or the Environment's text-generation setting names another. The proxy must serve that id, or the setting must name one it does serve: there is no search for a small model.
 
+## Usage limits
+
+When the proxy cannot serve a turn because a limit is reached, the turn ends as t3's **"Usage limit reached"** with the time it resets, and the thread can resume by itself at that time; a refused key ends the turn with an error that names the key. Nothing retries into spend and nothing falls back to another key or model ([ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md)). Built and checked in step 2a part 2 ([report](steps/step-2a-part2.md)).
+
+**How it works.** The Session makes every model request through a recording `fetch` that keeps the answer's status and `retry-after` (pi-ai drops the headers). When a response fails, a pi-durable `afterResponse` hook classifies it once, with that answer, before pi-durable decides whether to retry ([`packages/models/src/proxyFailure.ts`](../packages/models/src/proxyFailure.ts), [`apps/agents/src/session/proxyLimits.ts`](../apps/agents/src/session/proxyLimits.ts)). It records the class, the code and the reset (counted from when the answer came) on the turn, and when no retry can help it leaves pi-durable an error text no retry pattern matches: **one request, no backoff.** The Environment's differ turns the record into t3's failure with a fixed message (never the proxy's body). The Session also counts each turn's requests (`GET /_t3flare/agents/session?thread=…` shows `proxy.requests`).
+
+| The proxy answers (Commissary) | t3 shows | Code | Reset | Retried by pi-durable |
+|---|---|---|---|---|
+| 429, every account for the model cooling down (`… are cooling down … (reset after 1h2m3s)`) | Usage limit | `proxy_cooldown` | `retry-after`, else the message's hint | No |
+| 429 passed through from the provider | Usage limit | `proxy_upstream_limit` | `retry-after`; none without it | Only without a reset (the next answer is the cooldown, with one) |
+| 429, a Spend limit of the key, member, team or org (`… it resets at <time>`) | Usage limit | `proxy_spend_limit` | The time in the message, else `retry-after` | No |
+| 429 `{"error":"Rate limit exceeded"}` (Commissary Cloud's request rate) | Usage limit | `proxy_request_rate` | `retry-after` (60 s) | No |
+| 503 `no auth available` with `retry-after` (no account usable until one recovers) | Usage limit | `proxy_account_unavailable` | `retry-after` | No |
+| 503 `no auth available` without it | Provider error | `proxy_no_account` | — | No |
+| 401/403 `{"error":"Invalid API key"}`, `Missing API key`, `Forbidden` (the proxy refused t3flare's key) | Error: "The model proxy refused this Environment's key. Check `MODEL_PROXY_API_KEY`." | `proxy_key_rejected` | — | No |
+| 401/403 in Anthropic's shape (an account in the proxy was refused upstream) | Error: reconnect the account in the proxy | `proxy_account_rejected` | — | No |
+| 529 overloaded, other 5xx | Provider error | `proxy_overloaded`, `proxy_server_error` | — | Yes (3 retries from 2 s) |
+| Any of these as an `event: error` inside a stream | As its body says | as above | The message's hint or time | as above |
+
+- A reset is held to at least **30 s after the turn ends**, so a `retry-after: 0` cannot start an instant resume (t3 arms no resume for a reset that is not after the run's end). There is no upper bound: a monthly spend limit resets weeks away.
+- **Resuming.** t3 offers the resume on the thread; with the client's "auto-resume limited threads" setting on (off by default, your own choice) it resumes by itself. An idle Environment's alarm wakes it at the reset. t3 resumes once per run and reset, so a limit that persists costs one request per window.
+- **Text generation** (titles, commit messages) uses the same classification for its error text.
+- **Not covered:** compaction's own model requests are retried by pi-durable as before (rare: a limited turn rarely compacts).
+
 ## Set it up
 
 1. **Deploy Commissary.** Self-hosted: follow its [README](https://github.com/spiritledsoftware/commissary#deploy) (a Workers Paid account, a zone, Cloudflare Zero Trust) and [`docs/DEPLOY.md`](https://github.com/spiritledsoftware/commissary/blob/main/docs/DEPLOY.md). Or use Commissary Cloud, the paid service ([DEPLOY.md, "Commissary Cloud"](https://github.com/spiritledsoftware/commissary/blob/main/docs/DEPLOY.md#commissary-cloud)). Either way, connect your accounts and provider keys in its control panel, so `GET /v1/models` lists the models you want. A self-hosted Commissary has no rate limits or spend caps of its own: set spend limits on the key you give t3flare.
@@ -109,7 +133,14 @@ Anthropic's terms for subscription tokens used by a third-party harness are the 
 
 | Symptom | Likely cause |
 |---|---|
-| Text generation: "The model proxy returned HTTP 401" | The key is wrong, revoked or expired; create a new one and redeploy (or rotate the `bump` secret) |
+| A turn ends "The model proxy refused this Environment's key" (`proxy_key_rejected`), or text generation says the same | The key is wrong, revoked or expired, or its member may not use the client API (403); create a new one and redeploy (or rotate the `bump` secret) |
+| "The proxy's account for this model was refused" (`proxy_account_rejected`) | An account behind the model was refused upstream (expired login, revoked key) and no other served it: reconnect it in the proxy's Accounts page |
+| "Usage limit reached" with "every account … is at its usage limit" (`proxy_cooldown`) | All the proxy's accounts for that model are cooling down; the thread resumes at the reset (auto-resume on) or offers it. Add accounts in the proxy, or pick another model |
+| "Usage limit reached", "the model provider's usage limit" (`proxy_upstream_limit`) without a reset time | The provider's own 429 came with no `retry-after`; resume by hand: the proxy then answers with its cooldown and a reset |
+| "Usage limit reached", spend limit (`proxy_spend_limit`) | A Spend limit on the key, member, team or org; it resets at the time shown. Raise it in the proxy |
+| "Usage limit reached", request rate (`proxy_request_rate`) | Commissary Cloud's per-org request rate; resets within a minute |
+| "No account … is available until one recovers" (`proxy_account_unavailable`) | Every account is disabled or cooling for another reason; resets at the time shown |
+| "The model proxy has no usable account for this model" (`proxy_no_account`) | No account in the proxy serves the model: connect one, or pick another model |
 | HTTP 404 on turns | `MODEL_PROXY_URL` ends in `/v1`, or points at the control panel's host rather than the client API's |
 | A redirect to `cloudflareaccess.com` | The URL is behind Access: use Commissary's API host |
 | The picker shows only four Claude models | The proxy's list has not been read: it failed (wrong key or URL) or the Environment has not checked yet; run the first two checks above |

@@ -12,6 +12,7 @@
 //                                                           a turn the proxy answers with a usage limit (the Session's fault
 //                                                           route): "Usage limit reached" with the reset, the requests it
 //                                                           made, the idle Environment woken at the reset, the resumed turn
+//   bun scripts/stage.ts run step2a2 part2 stopped          with the Container stopped, a kill does not start it
 //   bun scripts/stage.ts run step2a2 part2 overload         an overload (529): pi-durable retries it, then a provider error
 //   bun scripts/stage.ts run step2a2 part2 key              a turn the proxy refuses (the fault route's 401): the key error
 //                                                           after 1 request, no pause
@@ -125,6 +126,9 @@ const startSleeper = async (threadId: string) => {
     procs = await ps(fixture().workspaceId);
   }
   const call = sleepers(procs);
+  // The call's processes as the kill sees them: by their marker (the command ran on the Container).
+  const callMarked = (await marked(fixture().workspaceId)).filter((m) => call.some((p) => p.pid === m.pid));
+  check("the call's sleeps carry an exec id", callMarked.length === call.length && call.length > 0, { call, callMarked });
   // The call's tree: each sleep, its parents up to computerd's child.
   const tree = new Map<number, Proc>();
   for (const s of call) {
@@ -134,19 +138,37 @@ const startSleeper = async (threadId: string) => {
       at = procs.find((p) => p.pid === at!.ppid);
     }
   }
-  return { runId, call, tree: [...tree.values()], all: procs };
+  return { runId, call, marked: callMarked, tree: [...tree.values()], all: procs };
 };
 
-/** Polls `ps` until none of `pids` is alive or `ms` passes: the seconds it took, or null. */
+/** Polls `ps` until none of `pids` is alive or `ms` passes: the seconds it took, or null; and when one was last seen. */
 const goneWithin = async (pids: ReadonlyArray<number>, ms: number) => {
   const started = Date.now();
   let left: Array<Proc> = [];
+  let lastSeenAlive = started;
   while (Date.now() - started < ms) {
+    const asked = Date.now();
     left = (await ps(fixture().workspaceId)).filter((p) => pids.includes(p.pid));
-    if (left.length === 0) return { seconds: Math.round((Date.now() - started) / 100) / 10, left };
+    if (left.length === 0) return { seconds: Math.round((Date.now() - started) / 100) / 10, left, lastSeenAlive };
+    lastSeenAlive = asked;
     await sleep(500);
   }
-  return { seconds: null, left };
+  return { seconds: null, left, lastSeenAlive };
+};
+
+/** The processes whose environment carries an exec id (`T3FLARE_EXEC`): pid and id. */
+const marked = async (workspaceId: string) => {
+  const result = await exec(
+    workspaceId,
+    `for e in /proc/[0-9]*/environ; do m=$(tr '\\0' '\\n' < "$e" 2>/dev/null | sed -n 's/^T3FLARE_EXEC=//p'); [ -n "$m" ] && { p=\${e#/proc/}; echo "\${p%/environ} $m"; }; done; true`,
+  );
+  return (result?.stdout ?? "")
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => {
+      const [pid, id] = line.trim().split(" ");
+      return { pid: Number(pid), exec: id! };
+    });
 };
 
 switch (scenario) {
@@ -178,7 +200,7 @@ switch (scenario) {
   case "abort": {
     const threadId = await threadOn(`abort ${stamp}`);
     const started = await startSleeper(threadId);
-    report.before = { call: started.call, tree: started.tree };
+    report.before = { call: started.call, marked: started.marked, tree: started.tree };
     check("the call's two sleeps ran", started.call.length === 2, started.all);
     await dispatch(cookie, { type: "run.interrupt", commandId: uuid(), threadId, runId: started.runId });
     const stoppedAt = Date.now();
@@ -194,7 +216,7 @@ switch (scenario) {
     const session = flag("session");
     const threadId = await threadOn(`restart ${session ? "session" : "environment"} ${stamp}`);
     const started = await startSleeper(threadId);
-    report.before = { call: started.call, tree: started.tree };
+    report.before = { call: started.call, marked: started.marked, tree: started.tree };
     check("the call's two sleeps ran", started.call.length === 2, started.all);
     await sleep(2000);
     if (session) await admin("POST", `/_t3flare/agents/session-restart?thread=${threadId}`);
@@ -203,10 +225,23 @@ switch (scenario) {
     // The first run ends (an Environment restart cancels it; a Session restart reruns the waiting call, so the run goes
     // on); either way the first call's processes must go.
     const gone = await goneWithin(started.tree.map((p) => p.pid), 150_000);
-    report.after = { secondsToGone: gone.seconds, left: gone.left };
+    report.after = { secondsToGone: gone.seconds, left: gone.left, lastSeenAliveS: Math.round((gone.lastSeenAlive - restartedAt) / 100) / 10 };
     if (!session) {
-      const recovered = await waitFor(cookie, threadId, (p) => SETTLED.has(runsOf(p).find((r) => r.id === started.runId)?.status ?? ""), 120_000).catch(() => undefined);
-      (report.after as any).firstRun = runsOf(recovered?.projection).find((r) => r.id === started.runId)?.status ?? null;
+      const recovered = await waitFor(
+        cookie,
+        threadId,
+        (p) => SETTLED.has(runsOf(p).find((r) => r.id === started.runId)?.status ?? "") && runsOf(p).some((r) => r.restartContinuationOfRunId === started.runId && (r as any).startedAt),
+        180_000,
+      ).catch(() => undefined);
+      const runs = runsOf(recovered?.projection) as Array<any>;
+      const continuation = runs.find((r) => r.restartContinuationOfRunId === started.runId);
+      const continuationStart = Date.parse(continuation?.workStartedAt ?? continuation?.startedAt ?? "");
+      Object.assign(report.after as any, {
+        firstRun: runs.find((r) => r.id === started.runId)?.status ?? null,
+        continuationStartedS: Number.isFinite(continuationStart) ? Math.round((continuationStart - restartedAt) / 100) / 10 : null,
+      });
+      // The continuation's work starts after the last sight of the old call's processes.
+      check("the continuation started after the old call's processes were gone", Number.isFinite(continuationStart) && gone.seconds !== null && gone.lastSeenAlive < continuationStart, report.after);
     }
     (report.after as any).secondsSinceRestart = Math.round((Date.now() - restartedAt) / 1000);
     report.threadId = threadId;
@@ -239,6 +274,22 @@ switch (scenario) {
     report.afterStop = after;
     check("the completed call's background process survived the later Stop", after.length === background.length, after);
     await exec(fixture().workspaceId, `kill ${background.map((b) => b.pid).join(" ")} 2>/dev/null; true`);
+    finish();
+  }
+  // eslint-disable-next-line no-fallthrough
+  case "stopped": {
+    // With the Container stopped, a kill does not start it.
+    const id = fixture().workspaceId;
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${id}`);
+    await sleep(3000);
+    const answer = (await admin("POST", `/_t3flare/agents/workspace-call?id=${id}`, { killExecs: ["00000000-0000-0000-0000-000000000000"] })).json;
+    await sleep(3000);
+    const after = (await admin("GET", "/_t3flare/agents/workspaces")).json;
+    report.kill = answer;
+    report.workspaces = after;
+    check("the kill found the Container stopped", answer?.result?.running === false && answer?.container?.running === false, answer);
+    const entry = (Array.isArray(after) ? after : (after?.workspaces ?? [])).find((w: any) => w.id === id);
+    check("and it is still stopped", entry === undefined || entry.container?.running !== true, entry);
     finish();
   }
   // eslint-disable-next-line no-fallthrough

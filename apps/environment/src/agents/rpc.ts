@@ -47,6 +47,7 @@ export interface WorkspaceRpc {
   git(run: GitRun): Promise<GitAnswer>;
   checkpoint(op: CheckpointOp): Promise<CheckpointAnswer>;
   ensureCredentialHelper(id?: string): Promise<ExecResult>;
+  killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }>;
   clone(input: CloneInput): Promise<GitAnswer>;
   info(): Promise<ProvisionInfo>;
   exec(input: ExecInput): Promise<ExecResult>;
