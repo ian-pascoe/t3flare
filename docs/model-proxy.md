@@ -27,7 +27,7 @@ Nothing else calls a model today. A Container never sees the URL or the key; the
    - **Without `anthropic-version`**, OpenAI's shape, `{ object: "list", data: [{ id, object: "model", owned_by }] }`: every model under its **real id** (`gemini-3-flash`, `deepseek-v4-pro`, `claude-haiku-5-5`), but with no display name, context window or output limit. This list says which models there are.
    - **With `anthropic-version: 2023-06-01`** (and `limit=1000`, following `has_more`/`last_id` as `after_id`), Anthropic's shape, `{ data: [{ id, type: "model", display_name, max_input_tokens, max_tokens, owned_by }], has_more, first_id, last_id }`. This list says what each model is called and allows, but Commissary lists a model that is not Claude under an alias: `claude-fable-5-dd-` followed by the real id spelled backwards (`claude-fable-5-dd-eerf-maeb` is `beam-free`).
    - t3flare reads an alias back to its real id and joins the two lists on it. **Only real ids reach the picker, a Session or a request.** An alias with no counterpart in the plain list is dropped. (Both id forms answer `POST /v1/messages`, but only the real one means anything to a person.)
-   - Any other fields are ignored; every field but `id` may be missing.
+   - Any other fields are ignored, `owned_by` included: it names the route Commissary serves a model through (`opencode`, `antigravity`), not who makes it. Every field but `id` may be missing.
 4. **Reachability from a Worker**: a public `https:` address that needs no Cloudflare Access sign-in on the client API paths. Commissary's client API is outside Access by design (an API host, or the bypass the deploy creates), so a key is all a caller sends.
 
 ### How the list is kept
@@ -48,6 +48,9 @@ Each Durable Object that needs it (the Environment, and each Session) keeps its 
 | Context window | The proxy's, held to 400,000 as `models.json` holds the Claude models | The proxy's, else 200,000 |
 | Output limit | The proxy's, else 32,000 | The proxy's, else 32,000 |
 | Price (spend limits) | pi-ai's own, or the family's newest it knows | None: unpriced |
+| Picker label and group | Anthropic | Its vendor, by its id's family: `gpt-*`/`o<N>…` OpenAI, `gemini-*` Google, `deepseek-*` DeepSeek, `grok-*` xAI, `kimi-*` Moonshot AI, `glm-*` Z.ai, `qwen*` Alibaba, and so on; **Other** when the family is not known |
+
+The picker lists the models grouped by vendor, the vendors by name and Other last, in the proxy's order within each. The label is never the proxy's `owned_by`. t3's picker drops a leading vendor name from a model's name when the label repeats it, so `DeepSeek V4 Pro` shows as `V4 Pro` labelled DeepSeek. The families are in [`packages/models/src/index.ts`](../packages/models/src/index.ts) (`vendorOf`); a new family shows as Other until it is added there.
 
 A model is "Claude" here if its id names a Claude family and version and nothing else (`claude-(fable|opus|sonnet|haiku)-N[-M]`), so `claude-opus-4-6-thinking` and the aliases of other providers' models are not.
 
@@ -57,7 +60,7 @@ pi-ai speaks one protocol here, Anthropic Messages, whatever the model. A GPT, G
 
 Checked on 2026-11-11 against a Commissary on a throwaway stage ([`docs/steps/proxy-models/`](steps/proxy-models/)):
 
-- The provider's snapshot listed all 71 models the proxy served, by real id, named and grouped by who serves each, and no alias.
+- The provider's snapshot listed all 71 models the proxy served, by real id, named, and no alias. (They were labelled and grouped by the proxy's route then; the vendor came after.)
 - A chat turn completed on `claude-haiku-5-5` (thinking low), `gemini-3-flash` and `deepseek-v4-pro`.
 - The acceptance test's real turn (clone the fixture repo, an `edit` and `bash test.sh`, each approved, the checkpoint's diff) passed on all three, with tools, through the translation.
 

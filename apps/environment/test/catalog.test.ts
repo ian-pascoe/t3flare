@@ -2,7 +2,7 @@
 // by its request's headers, merged by real id; the keeper that reads it again when it is old; the provider snapshot made
 // from it. The lists are cut from Commissary's real answers of 2026-11-11.
 // @effect-diagnostics globalFetch:off
-import { DEFAULT_MODEL_SLUG } from "@t3flare/models";
+import { DEFAULT_MODEL_SLUG, vendorOf } from "@t3flare/models";
 import {
   CATALOG_RETRY_MS,
   CATALOG_TTL_MS,
@@ -17,6 +17,8 @@ import {
   UNKNOWN_LIMITS,
 } from "@t3flare/models/catalog";
 import { describe, expect, it } from "vitest";
+
+import recorded from "../../../packages/models/test/fixtures/proxy-models.json" with { type: "json" };
 
 import { snapshotModels } from "../src/provider/models.ts";
 
@@ -55,7 +57,6 @@ describe("reading the proxy's lists", () => {
     expect(parseList(ANTHROPIC)?.models[0]).toEqual({
       id: "claude-fable-5-dd-eerf-maeb",
       displayName: "Beam Free",
-      ownedBy: "opencode",
       contextWindow: 1048576,
       maxTokens: 131072,
     });
@@ -83,7 +84,7 @@ describe("merging the lists", () => {
       slug: "anthropic/gemini-3-flash",
       provider: "anthropic",
       api: "anthropic-messages",
-      ownedBy: "antigravity",
+      vendor: "Google",
       contextWindow: 1000000,
       maxTokens: 65536,
       reasoning: false,
@@ -109,7 +110,7 @@ describe("merging the lists", () => {
 
   it("works from the plain list alone: its ids, named by id, with the limits of an unknown model", () => {
     const only = byId(mergeLists(parseList(PLAIN)?.models, undefined));
-    expect(only["gemini-3-flash"]).toMatchObject({ name: "gemini-3-flash", ...UNKNOWN_LIMITS, ownedBy: "antigravity" });
+    expect(only["gemini-3-flash"]).toMatchObject({ name: "gemini-3-flash", ...UNKNOWN_LIMITS, vendor: "Google" });
     expect(only["claude-haiku-5-5"]).toMatchObject({ reasoning: true, contextWindow: 200_000 });
   });
 
@@ -254,7 +255,9 @@ describe("the kept catalog", () => {
     const kept = { models: mergeLists(parseList(PLAIN)?.models, parseList(ANTHROPIC)?.models), fetchedAt: 5 };
     expect(isCatalog(kept)).toBe(true);
     expect(modelCatalog({ store: memoryStore(kept).store, proxy: PROXY }).current()).toEqual(kept);
-    for (const wrong of [undefined, null, { models: [{ id: "x" }], fetchedAt: 1 }, { models: [], fetchedAt: 1 }, "x"]) {
+    // A copy kept before the vendor was (models labelled by the proxy's route) is read again rather than shown.
+    const routed = { ...kept, models: kept.models.map(({ vendor: _vendor, ...model }) => ({ ...model, ownedBy: "opencode" })) };
+    for (const wrong of [undefined, null, { models: [{ id: "x" }], fetchedAt: 1 }, { models: [], fetchedAt: 1 }, "x", routed]) {
       expect(modelCatalog({ store: memoryStore(wrong).store, proxy: PROXY }).current()).toBe(STATIC_CATALOG);
     }
   });
@@ -263,14 +266,78 @@ describe("the kept catalog", () => {
 describe("the provider snapshot's models", () => {
   const dynamic: Catalog = { models: mergeLists(parseList(PLAIN)?.models, parseList(ANTHROPIC)?.models), fetchedAt: 1 };
 
-  it("lists the catalog, grouped by who serves each model, with a thinking picker for the models that think", () => {
+  it("lists the catalog, labelled and grouped by vendor, with a thinking picker for the models that think", () => {
     const models = snapshotModels(dynamic);
-    expect(models.map((model) => model.slug)).toEqual(dynamic.models.map((model) => model.slug));
+    expect(models.map((model) => `${model.subProvider} ${model.slug}`)).toEqual([
+      "Anthropic anthropic/claude-fable-5-2",
+      "Anthropic anthropic/claude-haiku-5-5",
+      "DeepSeek anthropic/deepseek-v4.1-flash",
+      "Google anthropic/gemini-3-flash",
+      "Other anthropic/beam-free",
+    ]);
     const gemini = models.find((model) => model.slug === "anthropic/gemini-3-flash");
-    expect(gemini).toMatchObject({ name: "Gemini 3 Flash", subProvider: "antigravity", isCustom: false });
+    expect(gemini).toMatchObject({ name: "Gemini 3 Flash", subProvider: "Google", isCustom: false });
     expect(gemini?.capabilities?.optionDescriptors ?? []).toHaveLength(0);
     const haiku = models.find((model) => model.slug === "anthropic/claude-haiku-5-5");
     expect(haiku?.capabilities?.optionDescriptors?.map((option) => option.id)).toEqual(["thinking"]);
+  });
+
+  it("labels the proxy's recorded list by vendor, never by the route that serves a model, the unknown ones last as Other", () => {
+    const models = snapshotModels({ models: mergeLists(parseList(recorded)?.models, undefined), fetchedAt: 1 });
+    expect(models).toHaveLength(recorded.data.length);
+    const routes = new Set(recorded.data.map((model) => model.owned_by));
+    expect(models.filter((model) => routes.has(model.subProvider ?? ""))).toEqual([]);
+    const vendors = models.map((model) => model.subProvider);
+    expect([...new Set(vendors)]).toEqual([
+      "Alibaba",
+      "Anthropic",
+      "DeepSeek",
+      "Google",
+      "Meituan",
+      "MiniMax",
+      "Moonshot AI",
+      "NVIDIA",
+      "OpenAI",
+      "StepFun",
+      "xAI",
+      "Xiaomi",
+      "Z.ai",
+      "Other",
+    ]);
+    const vendorOfSlug = Object.fromEntries(models.map((model) => [model.slug.slice("anthropic/".length), model.subProvider]));
+    expect(vendorOfSlug).toMatchObject({
+      "claude-haiku-5-5": "Anthropic",
+      "claude-opus-4-6-thinking": "Anthropic",
+      "claude-3-5-haiku-20241022": "Anthropic",
+      "gpt-6-luna": "OpenAI",
+      "gpt-oss-120b-medium": "OpenAI",
+      "gemini-3.1-flash-lite": "Google",
+      "deepseek-v4-pro": "DeepSeek",
+      "grok-4.7": "xAI",
+      "kimi-k3": "Moonshot AI",
+      "glm-5.3-flash-free": "Z.ai",
+      "qwen3.8-max": "Alibaba",
+      "minimax-m3": "MiniMax",
+      "mimo-v2.6-pro": "Xiaomi",
+      "longcat-2.0": "Meituan",
+      "nemotron-3.5-super-vl-free": "NVIDIA",
+      "step-5-preview": "StepFun",
+      "beam-free": "Other",
+      "jev-latest": "Other",
+      "subq-snap-preview": "Other",
+    });
+  });
+
+  it("names OpenAI's o-series and a few vendors the recorded list lacks, and nothing from a near miss", () => {
+    expect(["o3", "o4-mini", "gemma-3-27b", "mistral-large-3", "codestral-2", "llama-4-maverick"].map(vendorOf)).toEqual([
+      "OpenAI",
+      "OpenAI",
+      "Google",
+      "Mistral",
+      "Mistral",
+      "Meta",
+    ]);
+    expect(["opus", "oracle-1", "gptish", "claudette"].map(vendorOf)).toEqual([undefined, undefined, undefined, undefined]);
   });
 
   it("makes the default model the picker's default, or the first model when the catalog lacks it", () => {
