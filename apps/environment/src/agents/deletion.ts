@@ -208,6 +208,8 @@ export interface SweepReport {
   readonly error?: string;
   readonly actions: ReadonlyArray<SweepAction>;
   readonly purged: ReadonlyArray<PurgeReport>;
+  /** Sessions of threads deleted more than the grace ago (destroyed, or that would be on a dry run). */
+  readonly sessions?: ReadonlyArray<string>;
   readonly costGuard: ReadonlyArray<{ readonly holder: string; readonly action: string }>;
   readonly nextDue: string;
 }
@@ -238,7 +240,18 @@ export const planSweep = (
       : { id: row.id, action: "skip", why: `unreferenced, in its grace until ${new Date(row.unreferencedSince + graceMs).toISOString()}` };
   });
 
-export const sweep = async (sql: SqlStorage, settings: SweepSettings & { readonly dry: boolean }, now = Date.now()): Promise<SweepReport> => {
+/** Which deleted threads' Sessions the sweep already destroyed (kept by the Environment DO). */
+export interface SweptSessions {
+  has(threadId: string): boolean;
+  add(threadId: string): void;
+}
+
+export const sweep = async (
+  sql: SqlStorage,
+  settings: SweepSettings & { readonly dry: boolean },
+  now = Date.now(),
+  sweptSessions?: SweptSessions,
+): Promise<SweepReport> => {
   const services = environmentServices();
   const dry = settings.dry || !settings.purge;
   const rows = services.workspaces.list();
@@ -267,6 +280,23 @@ export const sweep = async (sql: SqlStorage, settings: SweepSettings & { readonl
       if (action.action === "purge") purged.push(await purgeWorkspace(action.id, references.deletedThreads.get(action.id) ?? []));
     }
   }
+  // ADR-0008: the Sessions of threads deleted more than the grace ago go too, whether or not their Workspace does.
+  const sessions: Array<string> = [];
+  const purgedIds = new Set(purged.filter((p) => p.destroyed).flatMap((p) => p.sessionsDestroyed));
+  for (const thread of [...references.deletedThreads.values()].flat()) {
+    if (sessions.length >= 50 || purgedIds.has(thread.threadId) || sweptSessions?.has(thread.threadId) === true) continue;
+    if (now - Date.parse(thread.deletedAt) < settings.graceMs) continue;
+    if (!dry) {
+      try {
+        await destroyed(byName(services.agents.SESSIONS, `thread:${thread.threadId}`, "SESSIONS").destroy());
+        sweptSessions?.add(thread.threadId);
+      } catch (error) {
+        console.warn(JSON.stringify({ t3flare: "sweep-session-failed", thread: thread.threadId, error: String(error).slice(0, 200) }));
+        continue;
+      }
+    }
+    sessions.push(thread.threadId);
+  }
   const costGuard = await guardCost(dry);
   const deletingLeft = services.workspaces.list().some((ws) => ws.state === "deleting");
   const report: SweepReport = {
@@ -275,6 +305,7 @@ export const sweep = async (sql: SqlStorage, settings: SweepSettings & { readonl
     ok: true,
     actions,
     purged,
+    sessions,
     costGuard,
     nextDue: new Date(now + (deletingLeft ? DELETING_RETRY_MS : SWEEP_EVERY_MS)).toISOString(),
   };

@@ -770,27 +770,37 @@ export class WorkspaceDO extends ContainerHost {
     return { bytes: answer.ok, done: answer.ok.byteLength < length };
   }
 
+  /** Another Workspace DO of this namespace, by its Workspace id. */
+  #peer(id: string): WorkspaceDO {
+    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as WorkspaceDO;
+  }
+
+  /** Copies a file of Workspace `from`'s own files into this one's, object to object in 4 MiB chunks; the error, if any. */
+  async #copyFrom(from: string, path: string, to: string): Promise<string | undefined> {
+    const ops = fileOps(this.#workspace);
+    await ops.mkdir(to.slice(0, to.lastIndexOf("/")), true);
+    await ops.remove(to, { force: true });
+    const CHUNK = 4 * 1024 * 1024;
+    for (let offset = 0; ; offset += CHUNK) {
+      const chunk = await this.#peer(from).readChunk(path, offset, CHUNK);
+      if ("error" in chunk) return chunk.error;
+      const wrote = await ops.write(to, chunk.bytes, { append: offset > 0 });
+      if (!("ok" in wrote)) return wrote.message;
+      if (chunk.done) return undefined;
+    }
+  }
+
   /**
    * Step 3, in the worktree's object: copy the project's bundle (object to object, never through the Environment), fetch
    * it, check `ref` out at `commit`, copy `branch.<ref>.*`, and check HEAD.
    */
   async worktreeFinish(input: { readonly parent: string; readonly bundle: string | null; readonly ref: string; readonly commit: string; readonly config: ReadonlyArray<string> }): Promise<{ readonly ok: boolean; readonly head?: string; readonly error?: string }> {
     await this.#workspace.ready();
-    const ops = fileOps(this.#workspace);
     let local: string | null = null;
     if (input.bundle !== null) {
       local = `${HARNESS_ROOT}/tmp/seed.bundle`;
-      const project = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(input.parent)) as unknown as WorkspaceDO;
-      await ops.mkdir(`${HARNESS_ROOT}/tmp`, true);
-      await ops.remove(local, { force: true });
-      const CHUNK = 4 * 1024 * 1024;
-      for (let offset = 0; ; offset += CHUNK) {
-        const chunk = await project.readChunk(input.bundle, offset, CHUNK);
-        if ("error" in chunk) return { ok: false, error: `the project's bundle could not be read: ${chunk.error}` };
-        const wrote = await ops.write(local, chunk.bytes, { append: offset > 0 });
-        if (!("ok" in wrote)) return { ok: false, error: `the bundle could not be written: ${wrote.message}` };
-        if (chunk.done) break;
-      }
+      const copied = await this.#copyFrom(input.parent, input.bundle, local);
+      if (copied !== undefined) return { ok: false, error: `the project's bundle could not be copied: ${copied}` };
     }
     const script = worktreeFinishScript({ bundle: local, ref: input.ref, commit: input.commit, config: input.config });
     try {
@@ -840,21 +850,12 @@ export class WorkspaceDO extends ContainerHost {
     this.#alive();
     await this.#workspace.ready();
     const ops = fileOps(this.#workspace);
-    const project = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(input.parent)) as unknown as WorkspaceDO;
-    const listed = await project.projectRootFiles({ maxFiles: PROJECT_ROOT_MAX_FILES, maxBytes: PROJECT_ROOT_MAX_BYTES });
+    const listed = await this.#peer(input.parent).projectRootFiles({ maxFiles: PROJECT_ROOT_MAX_FILES, maxBytes: PROJECT_ROOT_MAX_BYTES });
     await ops.remove(PROJECT_ROOT_VIEW, { recursive: true, force: true });
     await ops.mkdir(PROJECT_ROOT_VIEW, true);
     let bytes = 0;
     for (const file of listed.files) {
-      const target = `${PROJECT_ROOT_VIEW}/${file.path}`;
-      await ops.mkdir(target.slice(0, target.lastIndexOf("/")), true);
-      for (let offset = 0; ; offset += 4 * 1024 * 1024) {
-        const chunk = await project.readChunk(`${REPO_ROOT}/${file.path}`, offset, 4 * 1024 * 1024);
-        if ("error" in chunk) break;
-        await ops.write(target, chunk.bytes, { append: offset > 0 });
-        bytes += chunk.bytes.byteLength;
-        if (chunk.done) break;
-      }
+      if ((await this.#copyFrom(input.parent, `${REPO_ROOT}/${file.path}`, `${PROJECT_ROOT_VIEW}/${file.path}`)) === undefined) bytes += file.size;
     }
     if (listed.capped) console.warn(JSON.stringify({ t3flare: "project-root-view-capped", files: listed.files.length, maxFiles: PROJECT_ROOT_MAX_FILES, maxBytes: PROJECT_ROOT_MAX_BYTES }));
     return { files: listed.files.length, bytes, capped: listed.capped, names: listed.files.slice(0, 20).map((file) => file.path) };
@@ -931,17 +932,9 @@ export class WorkspaceDO extends ContainerHost {
   async carryIn(input: { readonly worktree: string; readonly bundle: string; readonly dir: string; readonly carried: ReadonlyArray<{ readonly ref: string; readonly sha: string }> }): Promise<{ readonly ok: boolean; readonly lines: ReadonlyArray<string>; readonly error?: string }> {
     this.#alive();
     await this.#workspace.ready();
-    const ops = fileOps(this.#workspace);
     const local = `${HARNESS_ROOT}/tmp/carry-in.bundle`;
-    const source = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(input.worktree)) as unknown as WorkspaceDO;
-    await ops.mkdir(`${HARNESS_ROOT}/tmp`, true);
-    await ops.remove(local, { force: true });
-    for (let offset = 0; ; offset += 4 * 1024 * 1024) {
-      const chunk = await source.readChunk(input.bundle, offset, 4 * 1024 * 1024);
-      if ("error" in chunk) return { ok: false, lines: [], error: `the worktree's bundle could not be read: ${chunk.error}` };
-      await ops.write(local, chunk.bytes, { append: offset > 0 });
-      if (chunk.done) break;
-    }
+    const copied = await this.#copyFrom(input.worktree, input.bundle, local);
+    if (copied !== undefined) return { ok: false, lines: [], error: `the worktree's bundle could not be copied: ${copied}` };
     const result = await this.exec({ script: carryInScript({ bundle: local, dir: input.dir, carried: input.carried }), cwd: REPO_ROOT, timeoutMs: 10 * 60_000 });
     const lines = result.stdout.split("\n").filter((line) => /^(CREATED|FASTFORWARD|KEPT) /.test(line));
     if (result.exitCode !== 0) return { ok: false, lines, error: result.stderr.slice(-500) };

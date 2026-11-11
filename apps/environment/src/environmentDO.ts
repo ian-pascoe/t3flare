@@ -82,6 +82,8 @@ export interface BootReport {
 /** When the Workspace sweep is next due, and its last report (step 2b, plan section 5.5). */
 const NEXT_SWEEP_KEY = "t3flare:next-sweep";
 const LAST_SWEEP_KEY = "t3flare:last-sweep";
+/** The deleted threads whose Sessions the sweep destroyed. */
+const SWEPT_SESSIONS_KEY = "t3flare:swept-sessions";
 
 /** The proxy's model list, as the last read of it left it (ADR-0012). */
 const CATALOG_KEY = "t3flare:model-catalog";
@@ -360,7 +362,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async runSweep(options: { readonly dry: boolean }): Promise<unknown> {
     const { sweep } = await import("./agents/deletion.ts");
     const { environmentServices } = await import("./agents/bindings.ts");
-    const report = await sweep(this.ctx.storage.sql, { ...environmentServices().sweep, dry: options.dry });
+    const swept = new Set(this.ctx.storage.kv.get<ReadonlyArray<string>>(SWEPT_SESSIONS_KEY) ?? []);
+    const report = await sweep(this.ctx.storage.sql, { ...environmentServices().sweep, dry: options.dry }, Date.now(), {
+      has: (threadId) => swept.has(threadId),
+      add: (threadId) => void swept.add(threadId),
+    });
+    if (!options.dry) this.ctx.storage.kv.put(SWEPT_SESSIONS_KEY, [...swept].slice(-5000));
     if (!options.dry) {
       this.ctx.storage.kv.put(LAST_SWEEP_KEY, report);
       this.ctx.storage.kv.put(NEXT_SWEEP_KEY, Date.parse(report.nextDue));

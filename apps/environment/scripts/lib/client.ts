@@ -205,3 +205,11 @@ export const waitFor = async (cookie: string, threadId: string, done: (projectio
 };
 
 export const SETTLED = new Set(["completed", "failed", "interrupted", "cancelled"]);
+
+/** A file of a Workspace DO's own files (never its Container), as text; "" when it is missing. */
+export const readDoText = async (id: string, path: string): Promise<string> => {
+  const read = await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(id)}`, { fs: { op: "read", path } });
+  const ok = read.json?.result?.ok;
+  if (ok === undefined || ok === null) return "";
+  return typeof ok === "string" ? ok : Buffer.from(Object.values(ok as Record<string, number>)).toString("utf8");
+};

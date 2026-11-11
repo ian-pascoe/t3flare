@@ -9,7 +9,7 @@
 //   bun scripts/stage.ts run <stage> terminal settle --workspace <id>    a running command survives t3's closeIdle
 import * as fs from "node:fs";
 
-import { admin, pair, sleep, uuid, wsCall } from "./lib/client.ts";
+import { admin, pair, readDoText, sleep, uuid, wsCall } from "./lib/client.ts";
 import { attachTerminal, stripAnsi } from "./lib/terminal.ts";
 
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
@@ -36,14 +36,6 @@ const ps = async (id: string, pattern: string) => {
   return Number(String(result.json?.result?.stdout ?? "").trim());
 };
 
-/** A file of the Workspace DO's own files (never the Container), as text. */
-const readDoText = async (id: string, path: string): Promise<string> => {
-  const read = await workspaceCall(id, { fs: { op: "read", path } });
-  const ok = read.json?.result?.ok;
-  if (ok === undefined || ok === null) return "";
-  if (typeof ok === "string") return ok;
-  return Buffer.from(Object.values(ok as Record<string, number>)).toString("utf8");
-};
 
 const cookie = await pair();
 let id = arg("workspace");
