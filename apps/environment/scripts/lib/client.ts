@@ -46,136 +46,154 @@ export const pair = async (): Promise<string> => {
   return response.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
 };
 
-export const protocol = (cookie: string) => {
-  const socketUrl = new URL("/ws?orchestrationProtocol=2", base);
-  socketUrl.protocol = base.protocol === "https:" ? "wss:" : "ws:";
-  return Layer.effect(RpcClient.Protocol, RpcClient.makeProtocolSocket({ retryTransientErrors: false })).pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        Socket.layerWebSocket(socketUrl.toString()).pipe(
-          Layer.provide(
-            Layer.succeed(Socket.WebSocketConstructor, (url) => new WebSocket(url, { headers: { cookie, origin: base.origin } } as never)),
+/** The WebSocket and HTTP helpers against one t3 server: the stage's, or the laptop's (step 3). */
+export const clientAt = (base: URL) => {
+  const protocol = (cookie: string) => {
+    const socketUrl = new URL("/ws?orchestrationProtocol=2", base);
+    socketUrl.protocol = base.protocol === "https:" ? "wss:" : "ws:";
+    return Layer.effect(RpcClient.Protocol, RpcClient.makeProtocolSocket({ retryTransientErrors: false })).pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Socket.layerWebSocket(socketUrl.toString()).pipe(
+            Layer.provide(
+              Layer.succeed(Socket.WebSocketConstructor, (url) => new WebSocket(url, { headers: { cookie, origin: base.origin } } as never)),
+            ),
           ),
+          RpcSerialization.layerJson,
         ),
-        RpcSerialization.layerJson,
       ),
-    ),
-  );
+    );
+  };
+
+  /** Opens a /ws client for one call and closes it: the Environment sees a client only while a command is sent. */
+  const dispatch = (cookie: string, command: Record<string, unknown>) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const client = yield* RpcClient.make(WsRpcGroup);
+        return yield* client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand](command as never);
+      }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+    );
+
+  /** One WS method's answer (any of t3's `WS_METHODS`), on a socket opened for the call. */
+  const wsCall = (cookie: string, method: string, payload: unknown): Promise<unknown> =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Effect.Effect<unknown, unknown>>;
+        return yield* client[method]!(payload);
+      }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+    );
+
+  /** Every event of a streaming WS method, until it ends. */
+  const wsStream = (cookie: string, method: string, payload: unknown): Promise<ReadonlyArray<unknown>> =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Stream.Stream<unknown, unknown>>;
+        return yield* Stream.runCollect(client[method]!(payload));
+      }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+    ).then((chunk) => [...chunk]);
+
+  /** The first event of a streaming WS method (a subscription's snapshot), on a socket opened for the call. */
+  const wsFirst = (cookie: string, method: string, payload: unknown): Promise<unknown> =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Stream.Stream<unknown, unknown>>;
+        return yield* Stream.runHead(client[method]!(payload));
+      }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+    ).then((head) => (head._tag === "Some" ? head.value : undefined));
+
+  const updateSettings = (cookie: string, patch: Record<string, unknown>) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const client = yield* RpcClient.make(WsRpcGroup);
+        return yield* client[WS_METHODS.serverUpdateSettings]({ patch } as never);
+      }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+    );
+
+  const mutateProject = (cookie: string, command: Record<string, unknown>) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const client = yield* RpcClient.make(WsRpcGroup);
+        return yield* client[WS_METHODS.projectsMutate](command as never);
+      }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+    );
+
+  /** The thread's projection, through the bounded HTTP snapshot the web client reads. */
+  const threadWindow = async (cookie: string, threadId: string): Promise<any> => {
+    const response = await fetch(new URL(`/api/orchestration/threads/${threadId}/bounded`, base), {
+      headers: { cookie, "x-t3-orchestration-protocol": "2" },
+    });
+    if (response.status !== 200) throw new Error(`thread window ${response.status}`);
+    return response.json();
+  };
+
+  /** Finds the projection inside the bounded snapshot's answer, whatever wraps it. */
+  const projectionOf = (window: any): any => window?.projection ?? window?.snapshot?.projection ?? window;
+
+  const DEFAULT_MODEL = { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5", options: [{ id: "thinking", value: "low" }] };
+
+  const createProjectAndThread = async (
+    cookie: string,
+    options: { readonly title: string; readonly workspaceRoot: string; readonly runtimeMode?: string },
+  ) => {
+    const projectId = uuid();
+    await mutateProject(cookie, {
+      type: "project.create",
+      commandId: uuid(),
+      projectId,
+      title: options.title,
+      workspaceRoot: options.workspaceRoot,
+      createWorkspaceRootIfMissing: true,
+    });
+    const threadId = uuid();
+    await dispatch(cookie, {
+      type: "thread.create",
+      commandId: uuid(),
+      threadId,
+      projectId,
+      title: options.title,
+      modelSelection: DEFAULT_MODEL,
+      runtimeMode: options.runtimeMode ?? "full-access",
+      interactionMode: "default",
+      branch: null,
+      worktreePath: null,
+      createdBy: "user",
+      creationSource: "web",
+    });
+    return { projectId, threadId };
+  };
+
+  const sendMessage = (cookie: string, threadId: string, text: string, model = DEFAULT_MODEL, extra: Record<string, unknown> = {}) => {
+    const messageId = uuid();
+    return dispatch(cookie, {
+      type: "message.dispatch",
+      commandId: uuid(),
+      threadId,
+      messageId,
+      text,
+      attachments: [],
+      modelSelection: model,
+      dispatchMode: { type: "start_immediately" },
+      createdBy: "user",
+      creationSource: "web",
+      ...extra,
+    }).then(() => messageId);
+  };
+  return { protocol, dispatch, wsCall, wsStream, wsFirst, updateSettings, mutateProject, threadWindow, projectionOf, DEFAULT_MODEL, createProjectAndThread, sendMessage };
 };
 
-/** Opens a /ws client for one call and closes it: the Environment sees a client only while a command is sent. */
-export const dispatch = (cookie: string, command: Record<string, unknown>) =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const client = yield* RpcClient.make(WsRpcGroup);
-      return yield* client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand](command as never);
-    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
-  );
-
-/** One WS method's answer (any of t3's `WS_METHODS`), on a socket opened for the call. */
-export const wsCall = (cookie: string, method: string, payload: unknown): Promise<unknown> =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Effect.Effect<unknown, unknown>>;
-      return yield* client[method]!(payload);
-    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
-  );
-
-/** Every event of a streaming WS method, until it ends. */
-export const wsStream = (cookie: string, method: string, payload: unknown): Promise<ReadonlyArray<unknown>> =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Stream.Stream<unknown, unknown>>;
-      return yield* Stream.runCollect(client[method]!(payload));
-    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
-  ).then((chunk) => [...chunk]);
-
-/** The first event of a streaming WS method (a subscription's snapshot), on a socket opened for the call. */
-export const wsFirst = (cookie: string, method: string, payload: unknown): Promise<unknown> =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Stream.Stream<unknown, unknown>>;
-      return yield* Stream.runHead(client[method]!(payload));
-    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
-  ).then((head) => (head._tag === "Some" ? head.value : undefined));
-
-export const updateSettings = (cookie: string, patch: Record<string, unknown>) =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const client = yield* RpcClient.make(WsRpcGroup);
-      return yield* client[WS_METHODS.serverUpdateSettings]({ patch } as never);
-    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
-  );
-
-export const mutateProject = (cookie: string, command: Record<string, unknown>) =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const client = yield* RpcClient.make(WsRpcGroup);
-      return yield* client[WS_METHODS.projectsMutate](command as never);
-    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
-  );
-
-/** The thread's projection, through the bounded HTTP snapshot the web client reads. */
-export const threadWindow = async (cookie: string, threadId: string): Promise<any> => {
-  const response = await fetch(new URL(`/api/orchestration/threads/${threadId}/bounded`, base), {
-    headers: { cookie, "x-t3-orchestration-protocol": "2" },
-  });
-  if (response.status !== 200) throw new Error(`thread window ${response.status}`);
-  return response.json();
-};
-
-/** Finds the projection inside the bounded snapshot's answer, whatever wraps it. */
-export const projectionOf = (window: any): any => window?.projection ?? window?.snapshot?.projection ?? window;
-
-export const DEFAULT_MODEL = { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5", options: [{ id: "thinking", value: "low" }] };
-
-export const createProjectAndThread = async (
-  cookie: string,
-  options: { readonly title: string; readonly workspaceRoot: string; readonly runtimeMode?: string },
-) => {
-  const projectId = uuid();
-  await mutateProject(cookie, {
-    type: "project.create",
-    commandId: uuid(),
-    projectId,
-    title: options.title,
-    workspaceRoot: options.workspaceRoot,
-    createWorkspaceRootIfMissing: true,
-  });
-  const threadId = uuid();
-  await dispatch(cookie, {
-    type: "thread.create",
-    commandId: uuid(),
-    threadId,
-    projectId,
-    title: options.title,
-    modelSelection: DEFAULT_MODEL,
-    runtimeMode: options.runtimeMode ?? "full-access",
-    interactionMode: "default",
-    branch: null,
-    worktreePath: null,
-    createdBy: "user",
-    creationSource: "web",
-  });
-  return { projectId, threadId };
-};
-
-export const sendMessage = (cookie: string, threadId: string, text: string, model = DEFAULT_MODEL, extra: Record<string, unknown> = {}) => {
-  const messageId = uuid();
-  return dispatch(cookie, {
-    type: "message.dispatch",
-    commandId: uuid(),
-    threadId,
-    messageId,
-    text,
-    attachments: [],
-    modelSelection: model,
-    dispatchMode: { type: "start_immediately" },
-    createdBy: "user",
-    creationSource: "web",
-    ...extra,
-  }).then(() => messageId);
-};
+const stage = clientAt(base);
+export const protocol = stage.protocol;
+export const dispatch = stage.dispatch;
+export const wsCall = stage.wsCall;
+export const wsStream = stage.wsStream;
+export const wsFirst = stage.wsFirst;
+export const updateSettings = stage.updateSettings;
+export const mutateProject = stage.mutateProject;
+export const threadWindow = stage.threadWindow;
+export const projectionOf = stage.projectionOf;
+export const DEFAULT_MODEL = stage.DEFAULT_MODEL;
+export const createProjectAndThread = stage.createProjectAndThread;
+export const sendMessage = stage.sendMessage;
 
 export interface RunView {
   readonly id: string;
@@ -187,12 +205,18 @@ export const runsOf = (projection: any): Array<RunView> => projection?.runs ?? [
 export const itemsOf = (projection: any): Array<any> => projection?.turnItems ?? [];
 
 /** Polls until `done(projection)` holds or `timeoutMs` passes. */
-export const waitFor = async (cookie: string, threadId: string, done: (projection: any) => boolean, timeoutMs = 180_000) => {
+export const waitFor = async (
+  cookie: string,
+  threadId: string,
+  done: (projection: any) => boolean,
+  timeoutMs = 180_000,
+  at: Pick<ReturnType<typeof clientAt>, "threadWindow"> = stage,
+) => {
   const started = Date.now();
   let projection: any;
   while (Date.now() - started < timeoutMs) {
     // A window read while the Environment boots again (an idle reset, a restart) can fail: read it again.
-    const window = await threadWindow(cookie, threadId).catch(() => undefined);
+    const window = await at.threadWindow(cookie, threadId).catch(() => undefined);
     if (window === undefined) {
       await sleep(1000);
       continue;

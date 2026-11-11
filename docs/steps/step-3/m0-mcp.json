@@ -1,0 +1,151 @@
+{
+ "at": "2026-11-11T20:20:15.904Z",
+ "linkedEnvironmentsBefore": true,
+ "registerWhileOff": {
+  "status": 400,
+  "body": {
+   "error": "invalid_client_metadata",
+   "error_description": "Linked environments is off on that machine. Turn it on in its Settings → Labs."
+  }
+ },
+ "accessBoundCodeForLink": {
+  "refused": true,
+  "answer": {
+   "status": 400,
+   "body": {
+    "_tag": "AuthMcpApprovalError",
+    "message": "Linking needs a plain pairing code, not an app approval code."
+   }
+  }
+ },
+ "minted": {
+  "plain": true
+ },
+ "signIn": {
+  "scope": "orchestration:read orchestration:operate",
+  "tokenLength": 376
+ },
+ "initialize": {
+  "status": 200,
+  "contentType": "application/json",
+  "sessionId": true,
+  "protocolVersion": "2025-06-18",
+  "serverInfo": {
+   "name": "T3 Code",
+   "version": "0.1.8"
+  }
+ },
+ "tools": {
+  "count": 71,
+  "names": [
+   "create_threads",
+   "delegate_task",
+   "delete_scheduled_task",
+   "device_close",
+   "device_list",
+   "device_open",
+   "device_screenshot",
+   "html_preview",
+   "html_render",
+   "link_pull_request",
+   "link_pull_requests",
+   "list_scheduled_tasks",
+   "list_thread_pull_requests",
+   "orchestrator_capabilities",
+   "preview_act",
+   "preview_dialog",
+   "preview_evaluate",
+   "preview_navigate",
+   "preview_open",
+   "preview_recording_start",
+   "preview_recording_stop",
+   "preview_resize",
+   "preview_set_appearance",
+   "preview_snapshot",
+   "preview_status",
+   "preview_wait_for",
+   "read_pull_request_guide",
+   "request_secret",
+   "run_scheduled_task_now",
+   "schedule_task",
+   "t3_attachment_discard",
+   "t3_attachment_prepare_upload",
+   "t3_background_wait",
+   "t3_environment_link",
+   "t3_environment_links",
+   "t3_environment_preferences_update",
+   "t3_environment_read",
+   "t3_environment_unlink",
+   "t3_pending_request",
+   "t3_preview_close",
+   "t3_preview_list",
+   "t3_project_clone",
+   "t3_project_create",
+   "t3_project_delete",
+   "t3_project_list",
+   "t3_project_read",
+   "t3_project_update",
+   "t3_queue",
+   "t3_thread_configure",
+   "t3_thread_interrupt",
+   "t3_thread_launch",
+   "t3_thread_list",
+   "t3_thread_organize",
+   "t3_thread_read",
+   "t3_thread_search",
+   "t3_thread_send",
+   "t3_thread_send_attachments",
+   "t3_thread_transfer",
+   "t3_thread_update",
+   "t3_thread_wait",
+   "t3_workflow_stop",
+   "t3_worktree_handoff",
+   "t3_worktree_list",
+   "t3_worktree_status",
+   "task_cancel",
+   "task_status",
+   "unlink_pull_request",
+   "unlink_pull_requests",
+   "unwatch_pull_request",
+   "watch_pull_request",
+   "write_pull_request_guides"
+  ]
+ },
+ "projectList": {
+  "http": 200,
+  "isError": false,
+  "found": true,
+  "sample": "{\"projects\":[{\"id\":\"7d617537-4cfa-457a-aedd-a8589b223fe4\",\"title\":\"step3 m0\",\"workspaceRoot\":\"/w/scratch-step3-m0\",\"repositoryIdentity\":null,\"faviconPath\":null,\"projectIcon\":null,\"defaultModelSelection\":null,\"defaultThreadEnvMode\":null,\"autoPull\":false,\"scripts\":[],\"pinnedAt\":null,\"archivedAt\":null,\"createdAt\":\"2026-11-11T20:19:29.500Z\",\"updatedAt\":\"2026-11-11T20:19:29.500Z\",\"deletedAt\":null},{\"id"
+ },
+ "threadRead": {
+  "http": 200,
+  "isError": false,
+  "sample": "{\"thread\":{\"threadId\":\"998065e9-1aef-47c3-8b7b-b9047ee7ed46\",\"projectId\":\"3a4ccc7c-4055-49f6-859b-f9c505553fb1\",\"title\":\"step3 m0\",\"link\":\"[step3 m0](t3-thread://v2/82a08bc6-0c65-4566-9086-19271e502073/998065e9-1aef-47c3-8b7b-b9047ee7ed46)\",\"createdBy\":\"user\",\"creationSource\":\"web\",\"status\":\"idle\",\"latestRunId\":null,\"activeRunId\":null,\"providerInstanceId\":\"piDurable\",\"model\":\"anthropic/claude-haik"
+ },
+ "threadWait": {
+  "http": 200,
+  "isError": false,
+  "ms": 50,
+  "sample": "{\"threadId\":\"998065e9-1aef-47c3-8b7b-b9047ee7ed46\",\"runId\":null,\"status\":\"idle\",\"timedOut\":false}"
+ },
+ "afterRestartRaw": {
+  "status": 404
+ },
+ "afterRestart": {
+  "http": 200,
+  "isError": false,
+  "reinitialised": true,
+  "initialisations": [
+   200,
+   200
+  ]
+ },
+ "whileOff": {
+  "status": 403,
+  "text": "{\"error\":\"linked_environments_off\",\"message\":\"Linked environments is off on this machine. Turn it on in its Settings → Labs.\"}"
+ },
+ "backOn": {
+  "http": 200,
+  "isError": false
+ }
+}

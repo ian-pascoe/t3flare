@@ -1,0 +1,83 @@
+{
+ "at": "2026-11-11T20:25:31.749Z",
+ "version": "0.1.10-nightly.20261111.4529",
+ "cloud": "t3flare-environment-step3.ian-g-pascoe.workers.dev",
+ "cloudProject": {
+  "projectId": "e218c526-6e02-430c-bfef-39573ca7b289",
+  "workspaceRoot": "/w/step3-fixture",
+  "cloned": false
+ },
+ "laptop": {
+  "environmentId": "04f60ee9-9871-4fe3-bced-c0e20f44ff2f",
+  "serverVersion": "0.1.10-nightly.20261111.4529"
+ },
+ "link": {
+  "status": 0,
+  "stdout": "Linked t3flare (82a08bc6-0c65-4566-9086-19271e502073) with auto-accept-edits access, until 2026-12-11T20:25:24.956Z.\n\n",
+  "stderr": ""
+ },
+ "list": [
+  {
+   "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+   "label": "t3flare",
+   "urls": [
+    "https://t3flare-environment-step3.ian-g-pascoe.workers.dev"
+   ],
+   "access": "auto-accept-edits",
+   "linkedAt": "2026-11-11T20:25:24.956Z",
+   "expiresAt": "2026-12-11T20:25:24.956Z",
+   "lastReachedAt": "2026-11-11T20:25:24.956Z",
+   "lastError": null,
+   "status": "reachable"
+  }
+ ],
+ "environmentLinks": {
+  "isError": false,
+  "sample": "{\"environmentId\":\"04f60ee9-9871-4fe3-bced-c0e20f44ff2f\",\"links\":[{\"environmentId\":\"82a08bc6-0c65-4566-9086-19271e502073\",\"label\":\"t3flare\",\"status\":\"reachable\",\"access\":\"auto-accept-edits\",\"expiresAt\":\"2026-12-11T20:25:24.956Z\",\"lastError\":null}],\"notListed\":\"Not listed: not linked yet. Call t3_environment_link with a hint from the user's words.\"}"
+ },
+ "repoIdentity": {
+  "remote": {
+   "canonicalKey": "github.com/ian-pascoe/t3flare-fixture",
+   "locator": {
+    "source": "git-remote",
+    "remoteName": "origin",
+    "remoteUrl": "https://github.com/ian-pascoe/t3flare-fixture.git"
+   },
+   "rootPath": "/w/step3-fixture",
+   "displayName": "ian-pascoe/t3flare-fixture",
+   "provider": "github",
+   "owner": "ian-pascoe",
+   "name": "t3flare-fixture"
+  },
+  "local": {
+   "canonicalKey": "github.com/ian-pascoe/t3flare-fixture",
+   "locator": {
+    "source": "git-remote",
+    "remoteName": "origin",
+    "remoteUrl": "https://github.com/ian-pascoe/t3flare-fixture.git"
+   },
+   "rootPath": "/private/var/folders/7s/w381rjns5_7blt6vhvqs6nk80000gn/T/t3flare-laptop-fwvCMR/fixture",
+   "displayName": "ian-pascoe/t3flare-fixture",
+   "provider": "github",
+   "owner": "ian-pascoe",
+   "name": "t3flare-fixture"
+  },
+  "remoteError": null
+ },
+ "launch": {
+  "isError": false,
+  "sample": "{\"threadId\":\"mcp:launch:06d7f6777234fe821993ba147267a984bb6cf9a420b6fd2586c4ce80b6a5b092\",\"link\":\"[step3 forwarded 0.1.10-nightly.20261111.4529](t3-thread://v2/82a08bc6-0c65-4566-9086-19271e502073/mcp:launch:06d7f6777234fe821993ba147267a984bb6cf9a420b6fd2586c4ce80b6a5b092)\",\"projectId\":\"e218c526-6e02-430c-bfef-39573ca7b289\",\"modelSelection\":{\"instanceId\":\"piDurable\",\"model\":\"anthropic/claude-haiku-5-5\"},\"runId\":\"run:thread:mcp%3Alaunch%3A06d7f6777234fe821993ba147267a984bb6cf9a420b6fd2586c4ce80b6a5b092:ordinal:1\",\"status\":\"preparing\"}"
+ },
+ "wait": {
+  "isError": false,
+  "ms": 3339,
+  "sample": "{\"threadId\":\"mcp:launch:06d7f6777234fe821993ba147267a984bb6cf9a420b6fd2586c4ce80b6a5b092\",\"runId\":\"run:thread:mcp%3Alaunch%3A06d7f6777234fe821993ba147267a984bb6cf9a420b6fd2586c4ce80b6a5b092:ordinal:1\",\"status\":\"completed\",\"timedOut\":false}"
+ },
+ "read": {
+  "isError": false,
+  "pong": true,
+  "linkOrigin": false
+ },
+ "failures": [],
+ "ok": true
+}

@@ -1,0 +1,26 @@
+{
+ "at": "2026-11-11T20:26:46.305Z",
+ "version": "0.1.9-nightly.20261111.4515",
+ "turn": {
+  "ms": 14321,
+  "runs": [
+   "completed"
+  ],
+  "tools": [
+   {
+    "type": "dynamic_tool",
+    "name": "mcp__t3-code__orchestrator_capabilities",
+    "status": "completed"
+   }
+  ],
+  "reply": "DONE\n\nThe tool listed 10 providers: Codex, Claude, Cursor, Grok, OpenCode, Antigravity, fx, Kiro, Muse Code, and Pi.",
+  "types": [
+   "user_message",
+   "reasoning",
+   "dynamic_tool",
+   "assistant_message",
+   "checkpoint"
+  ]
+ },
+ "ok": true
+}
