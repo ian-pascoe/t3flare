@@ -24,6 +24,8 @@ import {
 import { relayUrlConfig } from "t3/src/cloud/publicConfig.ts";
 import * as ServerEnvironment from "t3/src/environment/ServerEnvironment.ts";
 import * as ManagedLimits from "t3/src/policy/managedLimits.ts";
+import * as AgentAwarenessRelay from "t3/src/relay/AgentAwarenessRelay.ts";
+import type { ThreadId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
@@ -48,6 +50,9 @@ export const LINK_ORIGIN = "http://127.0.0.1:443";
 
 /** The idle hold the sign-in's poll takes while its code is valid. */
 export const SIGN_IN_HOLD = Idle.CONNECT_SIGN_IN_HOLD;
+
+/** The phases that leave a card or an alert standing on the phone until something replaces them. */
+const LIVE_PHASES = new Set(["starting", "running", "waiting_for_approval", "waiting_for_input"]);
 
 export interface ConnectPolicy {
   /** Keep the T3 Connect account token after the link (stages); prod discards it (D2). */
@@ -112,6 +117,13 @@ export class Connect extends Context.Service<
      * the next publish meets the relay's refusal while the credential is still stored here.
      */
     readonly relayUnlinkOnly: Effect.Effect<UnlinkOutcome["relay"]>;
+    /**
+     * After a boot (review finding 4): republishes each thread the recorder last saw published live (starting, running
+     * or waiting). t3's publisher starts with an empty map and its catch-up skips threads whose state is now null, so
+     * a run a restart cancelled under a waiting approval would otherwise keep "Approval needed" on the phone; this
+     * makes t3 publish the thread's current state, a tombstone included. Answers the threads it republished.
+     */
+    readonly republishLastLive: Effect.Effect<ReadonlyArray<string>>;
     /** t3's own publish switch. */
     readonly setPublishing: (on: boolean) => Effect.Effect<void, ConnectError>;
     readonly status: (options: { readonly relay: boolean }) => Effect.Effect<Record<string, unknown>>;
@@ -126,6 +138,7 @@ export const make = (policy: ConnectPolicy, recorder: PublishRecorder) =>
     const environment = yield* ServerEnvironment.ServerEnvironment;
     const scope = yield* Effect.scope;
     const httpClient = yield* HttpClient.HttpClient;
+    const awareness = yield* AgentAwarenessRelay.AgentAwarenessRelay;
     const lock = yield* Semaphore.make(1);
     const withSecrets = Effect.provideService(ServerSecretStore.ServerSecretStore, secrets);
 
@@ -312,6 +325,11 @@ export const make = (policy: ConnectPolicy, recorder: PublishRecorder) =>
       unlink: unlinkNow(false),
       signOut: unlinkNow(true),
       relayUnlinkOnly: lock.withPermits(1)(deleteRelayLink),
+      republishLastLive: Effect.gen(function* () {
+        const live = [...recorder.lastPublishedPhases()].filter(([, phase]) => phase !== null && LIVE_PHASES.has(phase)).map(([threadId]) => threadId);
+        yield* Effect.forEach(live, (threadId) => awareness.publishThread(threadId as ThreadId).pipe(Effect.ignore), { discard: true });
+        return live;
+      }),
       setPublishing: (on) => cloudLink.updatePreferences({ publishAgentActivity: on }).pipe(Effect.asVoid, Effect.mapError((e) => fail("preferences", e.message))),
       status,
     });

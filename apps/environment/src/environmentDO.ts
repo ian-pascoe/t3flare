@@ -342,6 +342,10 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
           const { reraiseQuestionsAfterRestart } = await import("./agents/questionRestart.ts");
           const raised = await runtime.run(reraiseQuestionsAfterRestart);
           if (raised > 0) console.log(JSON.stringify({ t3flare: "questions-raised-again", count: raised }));
+          // Step 3+ (review finding 4): what the phone last heard of each live thread is published again as it is now.
+          const [{ Connect }, Effect] = await Promise.all([import("./connect/service.ts"), import("effect/Effect")]);
+          const republished = await runtime.run(Effect.flatMap(Connect, (connect) => connect.republishLastLive));
+          if (republished.length > 0) console.log(JSON.stringify({ t3flare: "connect-republished", count: republished.length }));
         })
         .catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "questions-reraise-failed", error: String(error).slice(0, 300) })));
       if (runtime.bootstrapSeeded) await Pairing.keepWindowClosing(this.ctx.storage);
