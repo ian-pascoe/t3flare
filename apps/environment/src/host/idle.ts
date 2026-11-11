@@ -1,13 +1,17 @@
-// @effect-diagnostics globalDate:off
+// @effect-diagnostics globalDate:off extendsNativeError:off
 // Idle reset (ADR-0003). t3 keeps timers running, so left alone the Environment DO would never be evicted.
 // When there is no client socket, no request in flight, no open run or provider session and no claimable
 // outbox effect for IDLE_AFTER_MS, the host reads the next due time from t3's tables, sets one alarm for
 // it and calls `ctx.abort()`. The alarm (or the next request) boots t3 again.
+// The reads of t3's private tables fail safe (fragility U2): a read that fails means "don't know", never
+// "no work", so the Environment stays up rather than reset under a turn or skip a wake.
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 
 export const IDLE_AFTER_MS = 60_000;
 /** How often the host checks whether it has gone idle. */
 export const IDLE_CHECK_EVERY_MS = 10_000;
+/** After a failed read of t3's tables, how long the idle check waits before reading them again. */
+export const UNREADABLE_BACKOFF_MS = 10 * 60_000;
 
 /** What keeps the Environment awake, counted by the host. Module state: the DO is the only one in its isolate. */
 export const activity = {
@@ -15,6 +19,8 @@ export const activity = {
   inFlight: 0,
   /** When the last socket closed or the last request ended (ms since epoch). */
   idleSince: Date.now(),
+  /** Until when the idle check backs off after t3's tables could not be read (ms since epoch; 0 for none). */
+  unreadableUntil: 0,
 };
 
 export const socketOpened = () => {
@@ -35,18 +41,35 @@ export const requestEnded = () => {
   if (activity.sockets === 0 && activity.inFlight === 0) activity.idleSince = Date.now();
 };
 
-/** The run and provider-session statuses that mean a turn is live (t3's OrchestrationV2RunStatus). */
-const OPEN_RUN_STATUSES = ["preparing", "queued", "starting", "running", "waiting"];
-const OPEN_SESSION_STATUSES = ["starting", "running", "waiting"];
+/**
+ * The run and provider-session statuses that mean nothing is live (t3's `OrchestrationV2RunStatus` and
+ * `OrchestrationV2ProviderSession.status`). Every other status counts as open, so a status a nightly adds keeps
+ * the Environment up rather than read as idle.
+ */
+const SETTLED_RUN_STATUSES = ["completed", "interrupted", "failed", "cancelled", "rolled_back"];
+const SETTLED_SESSION_STATUSES = ["ready", "stopped", "error"];
 
 const list = (values: ReadonlyArray<string>) => values.map((v) => `'${v}'`).join(", ");
 
-/** Runs a query over t3's tables; a table t3 has not created (or renamed on a bump) counts as empty. */
-const tryRows = <T extends Record<string, string | number | ArrayBuffer | null>>(sql: SqlStorage, query: string, ...params: Array<unknown>): Array<T> => {
+/** A read of t3's tables failed (a table or column renamed or gone on a bump): whether work is open is unknown. */
+export class UnreadableTables extends Error {
+  constructor(table: string, cause: unknown) {
+    super(`${table}: ${String(cause).slice(0, 300)}`, { cause });
+    this.name = "UnreadableTables";
+  }
+}
+
+/** Runs a query over one of t3's tables; any error is `UnreadableTables`, never "no rows". */
+const rows = <T extends Record<string, string | number | ArrayBuffer | null>>(
+  sql: SqlStorage,
+  table: string,
+  query: string,
+  ...params: Array<unknown>
+): Array<T> => {
   try {
     return sql.exec<T>(query, ...params).toArray();
-  } catch {
-    return [];
+  } catch (cause) {
+    throw new UnreadableTables(table, cause);
   }
 };
 
@@ -56,18 +79,14 @@ export interface OpenWork {
   readonly claimableEffects: number;
 }
 
-/** The work that keeps t3 resident, read from its projection and outbox tables. */
+/** The work that keeps t3 resident, read from its projection and outbox tables. Throws `UnreadableTables`. */
 export const openWork = (sql: SqlStorage, now: Date): OpenWork => {
-  const count = (query: string, ...params: Array<unknown>) => tryRows<{ n: number }>(sql, query, ...params)[0]?.n ?? 0;
+  const count = (table: string, where: string, ...params: Array<unknown>) =>
+    rows<{ n: number }>(sql, table, `SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`, ...params)[0]?.n ?? 0;
   return {
-    openRuns: count(`SELECT COUNT(*) AS n FROM orchestration_v2_projection_runs WHERE status IN (${list(OPEN_RUN_STATUSES)})`),
-    openProviderSessions: count(
-      `SELECT COUNT(*) AS n FROM orchestration_v2_projection_provider_sessions WHERE status IN (${list(OPEN_SESSION_STATUSES)})`,
-    ),
-    claimableEffects: count(
-      `SELECT COUNT(*) AS n FROM orchestration_v2_effect_outbox WHERE status IN ('pending', 'running') AND available_at <= ?`,
-      now.toISOString(),
-    ),
+    openRuns: count("orchestration_v2_projection_runs", `status NOT IN (${list(SETTLED_RUN_STATUSES)})`),
+    openProviderSessions: count("orchestration_v2_projection_provider_sessions", `status NOT IN (${list(SETTLED_SESSION_STATUSES)})`),
+    claimableEffects: count("orchestration_v2_effect_outbox", `status IN ('pending', 'running') AND available_at <= ?`, now.toISOString()),
   };
 };
 
@@ -88,20 +107,23 @@ const parseTime = (value: string | number | null | undefined): Date | null => {
  * The next time t3 has work due: the earliest pending outbox effect (`nextClaimableAt`), the earliest enabled
  * scheduled task, and the earliest usage-limit recovery (the query of t3's
  * `ProjectionStoreV2.getLimitRecoveryWakeAt`: a usage-limited thread set to resume when its limit resets, or
- * when its snooze ends).
+ * when its snooze ends). Throws `UnreadableTables`.
  */
 export const nextDue = (sql: SqlStorage, now: Date = new Date()): NextDue => {
-  const outbox = tryRows<{ at: string | null }>(
+  const outbox = rows<{ at: string | null }>(
     sql,
+    "orchestration_v2_effect_outbox",
     `SELECT MIN(available_at) AS at FROM orchestration_v2_effect_outbox WHERE status = 'pending'`,
   )[0]?.at;
-  const scheduled = tryRows<{ at: string | null }>(
+  const scheduled = rows<{ at: string | null }>(
     sql,
+    "scheduled_tasks",
     `SELECT MIN(next_run_at) AS at FROM scheduled_tasks WHERE enabled = 1 AND next_run_at IS NOT NULL`,
   )[0]?.at;
   const nowIso = now.toISOString();
-  const limits = tryRows<{ reset_ms: number | null; snooze_ms: number | null }>(
+  const limits = rows<{ reset_ms: number | null; snooze_ms: number | null }>(
     sql,
+    "orchestration_v2_projection_threads",
     `SELECT
        MIN(CASE WHEN julianday(reset_at) > julianday(?) THEN (julianday(reset_at) - 2440587.5) * 86400000 END) AS reset_ms,
        MIN(CASE WHEN julianday(snoozed_until) > julianday(?) THEN (julianday(snoozed_until) - 2440587.5) * 86400000 END) AS snooze_ms
@@ -125,15 +147,27 @@ export const nextDue = (sql: SqlStorage, now: Date = new Date()): NextDue => {
 };
 
 export type IdleVerdict =
-  | { readonly reset: false; readonly why: string }
+  | { readonly reset: false; readonly why: string; readonly unreadable?: string }
   | { readonly reset: true; readonly work: OpenWork; readonly due: NextDue };
 
-/** Whether the Environment should reset now. */
+/**
+ * Whether the Environment should reset now. When t3's tables cannot be read it does not reset, and reads them
+ * again only after `UNREADABLE_BACKOFF_MS` (the verdict's `unreadable` says what failed; the caller logs it).
+ */
 export const idleVerdict = (sql: SqlStorage, now: Date, idleAfterMs = IDLE_AFTER_MS): IdleVerdict => {
   if (activity.sockets > 0) return { reset: false, why: `${activity.sockets} client sockets` };
   if (activity.inFlight > 0) return { reset: false, why: `${activity.inFlight} requests in flight` };
   if (now.getTime() - activity.idleSince < idleAfterMs) return { reset: false, why: "not idle long enough" };
-  const work = openWork(sql, now);
-  if (hasOpenWork(work)) return { reset: false, why: `open work ${JSON.stringify(work)}` };
-  return { reset: true, work, due: nextDue(sql, now) };
+  if (now.getTime() < activity.unreadableUntil) {
+    return { reset: false, why: `t3's tables were unreadable; next read after ${new Date(activity.unreadableUntil).toISOString()}` };
+  }
+  try {
+    const work = openWork(sql, now);
+    if (hasOpenWork(work)) return { reset: false, why: `open work ${JSON.stringify(work)}` };
+    return { reset: true, work, due: nextDue(sql, now) };
+  } catch (error) {
+    if (!(error instanceof UnreadableTables)) throw error;
+    activity.unreadableUntil = now.getTime() + UNREADABLE_BACKOFF_MS;
+    return { reset: false, why: "t3's tables are unreadable", unreadable: error.message };
+  }
 };

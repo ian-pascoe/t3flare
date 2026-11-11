@@ -118,15 +118,45 @@ describe("idle queries", () => {
     expect(due.sources.usageLimitResets).toBe("2026-11-10T12:30:00.000Z");
   });
 
-  it("treats tables t3 has not created as empty", () => {
+  it("counts a run or provider-session status it does not know as open", () => {
+    const sql = t3Tables();
+    sql.exec("INSERT INTO orchestration_v2_projection_runs VALUES ('r1', 'rolled_back'), ('r2', 'awaiting_input')");
+    sql.exec("INSERT INTO orchestration_v2_projection_provider_sessions VALUES ('s1', 'ready'), ('s2', 'stopped'), ('s3', 'paused')");
+    expect(Idle.openWork(sql, now)).toEqual({ openRuns: 1, openProviderSessions: 1, claimableEffects: 0 });
+  });
+
+  it("refuses to read a missing table as empty", () => {
     const sql = nodeSqlStorage();
-    expect(Idle.openWork(sql, now)).toEqual({ openRuns: 0, openProviderSessions: 0, claimableEffects: 0 });
-    expect(Idle.nextDue(sql).at).toBeNull();
+    expect(() => Idle.openWork(sql, now)).toThrow(Idle.UnreadableTables);
+    expect(() => Idle.nextDue(sql, now)).toThrow(Idle.UnreadableTables);
+  });
+
+  it("does not reset when t3's tables cannot be read, and backs off before reading them again", () => {
+    const sql = nodeSqlStorage();
+    sql.exec("CREATE TABLE orchestration_v2_projection_runs (run_id TEXT, status TEXT)");
+    Object.assign(Idle.activity, { sockets: 0, inFlight: 0, idleSince: now.getTime() - 120_000, unreadableUntil: 0 });
+    const verdict = Idle.idleVerdict(sql, now);
+    expect(verdict.reset).toBe(false);
+    expect(verdict).toMatchObject({ unreadable: expect.stringContaining("orchestration_v2_projection_provider_sessions") });
+    expect(Idle.activity.unreadableUntil).toBe(now.getTime() + Idle.UNREADABLE_BACKOFF_MS);
+
+    const tables = t3Tables();
+    const soon = new Date(now.getTime() + 60_000);
+    expect(Idle.idleVerdict(tables, soon)).toEqual({ reset: false, why: `t3's tables were unreadable; next read after ${new Date(Idle.activity.unreadableUntil).toISOString()}` });
+    const later = new Date(now.getTime() + Idle.UNREADABLE_BACKOFF_MS);
+    expect(Idle.idleVerdict(tables, later).reset).toBe(true);
+  });
+
+  it("does not reset when the next due time cannot be read", () => {
+    const sql = t3Tables();
+    sql.exec("DROP TABLE scheduled_tasks");
+    Object.assign(Idle.activity, { sockets: 0, inFlight: 0, idleSince: now.getTime() - 120_000, unreadableUntil: 0 });
+    expect(Idle.idleVerdict(sql, now)).toMatchObject({ reset: false, unreadable: expect.stringContaining("scheduled_tasks") });
   });
 
   it("resets only with no socket, no request and the idle delay passed", () => {
     const sql = t3Tables();
-    Object.assign(Idle.activity, { sockets: 1, inFlight: 0, idleSince: now.getTime() - 120_000 });
+    Object.assign(Idle.activity, { sockets: 1, inFlight: 0, idleSince: now.getTime() - 120_000, unreadableUntil: 0 });
     expect(Idle.idleVerdict(sql, now).reset).toBe(false);
     Idle.socketClosed();
     expect(Idle.activity.idleSince).not.toBe(now.getTime() - 120_000);
