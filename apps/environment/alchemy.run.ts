@@ -107,6 +107,9 @@ export default Alchemy.Stack(
     const admin = yield* Cloudflare.Access.Application("AdminAccess", {
       name: `${name} admin`,
       type: "self_hosted",
+      // `domain` too: Cloudflare keeps the application's primary domain unless it is given, and refuses one that is not
+      // among the destinations (prod's was its workers.dev host).
+      domain: `${host}/_t3flare`,
       destinations: [{ type: "public", uri: `${host}/_t3flare` }],
       sessionDuration: "24h",
       appLauncherVisible: false,
