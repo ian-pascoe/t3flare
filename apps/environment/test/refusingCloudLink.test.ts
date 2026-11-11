@@ -47,3 +47,15 @@ it("t3flare's managed policy leaves T3 Connect allowed, so t3's own policy varia
   const policy = await Effect.runPromise(ManagedPolicy.fromDocument(T3FLARE_POLICY_SOURCE, T3FLARE_POLICY));
   expect(ManagedLimits.allowsConnect(policy)).toBe(true);
 });
+
+it("Connect mutations are owner-only unless the stage admits its service token (review finding 6)", async () => {
+  const { callerMayRun } = await import("../src/connect/admin.ts");
+  const prod = false;
+  const stage = true;
+  expect(callerMayRun("POST /_t3flare/connect/sign-in", "service-token", prod)).toBe(false);
+  expect(callerMayRun("POST /_t3flare/connect/import-token", "service-token", prod)).toBe(false);
+  expect(callerMayRun("POST /_t3flare/connect/sign-in", "owner", prod)).toBe(true);
+  expect(callerMayRun("POST /_t3flare/connect/sign-in", null, prod)).toBe(false);
+  expect(callerMayRun("GET /_t3flare/connect/status", "service-token", prod)).toBe(true);
+  expect(callerMayRun("POST /_t3flare/connect/relink", "service-token", stage)).toBe(true);
+});

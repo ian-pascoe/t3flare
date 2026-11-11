@@ -26,6 +26,6 @@ const normalize = (pathname: string): string | undefined => {
 
 export const isRefusedRelayRoute = (pathname: string): boolean => {
   const path = normalize(pathname);
-  // A path that cannot be decoded is refused: fail closed (t3 would not route it anyway).
-  return path === undefined || REFUSED.has(path);
+  // A Connect path that cannot be decoded is refused: fail closed (t3 would not route it anyway).
+  return path === undefined ? /connect/i.test(pathname) : REFUSED.has(path);
 };

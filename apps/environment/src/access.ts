@@ -11,6 +11,9 @@
 /** The header Access adds to every request it admits. */
 export const ACCESS_ASSERTION_HEADER = "cf-access-jwt-assertion";
 
+/** Which kind of admitted caller an admin request comes from: set by the Worker (worker.ts), read by connect/admin.ts. */
+export const ADMIN_CALLER_HEADER = "x-t3flare-admin-caller";
+
 export type Refusal =
   | "not_configured"
   | "missing"

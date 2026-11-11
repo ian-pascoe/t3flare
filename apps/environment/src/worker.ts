@@ -26,9 +26,6 @@ const SERVER_PREFIXES = ["/api", "/oauth", "/.well-known", "/ws", "/mcp", "/_t3f
 const isServerPath = (pathname: string) =>
   SERVER_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 
-/** Which admitted caller an admin request comes from (connect/admin.ts reads it). */
-const ADMIN_CALLER_HEADER = "x-t3flare-admin-caller";
-
 /** One Environment DO per deploy (ADR-0002). */
 const ENVIRONMENT_NAME = "environment";
 
@@ -65,7 +62,7 @@ export default {
       // Step 3+ (review finding 6): the DO admits the Connect mutations by who was admitted here, so the header is
       // always ours, never the caller's.
       const headers = new Headers(request.headers);
-      headers.set(ADMIN_CALLER_HEADER, verdict.caller.kind);
+      headers.set(Access.ADMIN_CALLER_HEADER, verdict.caller.kind);
       return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).fetch(new Request(request, { headers }));
     }
     if (isServerPath(url.pathname)) return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).fetch(request);

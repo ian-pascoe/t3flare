@@ -19,11 +19,10 @@ import * as Effect from "effect/Effect";
 import type * as CliTokenManager from "t3/src/cloud/CliTokenManager.ts";
 import { cloudCliOAuthConfig, relayUrlConfig } from "t3/src/cloud/publicConfig.ts";
 
+import { ADMIN_CALLER_HEADER } from "../access.ts";
 import type { EnvironmentDO } from "../environmentDO.ts";
 import { Connect, type ConnectError } from "./service.ts";
 
-/** Set by the Worker on every admin request it admits (worker.ts): `owner` or `service-token`. */
-export const ADMIN_CALLER_HEADER = "x-t3flare-admin-caller";
 
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value, null, 2), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
