@@ -71,3 +71,7 @@ journal ran past the DO's CPU limit, and the removal's check died with it (a tom
 Evidence: `docs/steps/bigrepo/` (the stage `bigrepo` before and after, through `scripts/bigrepo.ts`);
 `apps/environment/test/statusOverStale.test.ts` (t3's real `GitVcsDriver` over the router and `staleRead`, on a repo
 with a submodule); `apps/agents/test/staleReads.test.ts`, `containerOnly.test.ts`.
+
+## Refinement (SPI-1004): automatic fetch is off, and why
+
+t3's background fetch (`VcsStatusBroadcaster`'s automatic fetch interval) is set to zero in `composition.ts`. It would run `git fetch` in every watched Workspace on a timer, and each fetch starts that Workspace's Container (ADR-0009: git runs in the Container), so idle projects would keep Containers running for nothing. Ahead and behind counts are therefore as of the last fetch, pull, push or user action. A fetch the owner asks for runs as usual. Off is a refusal by design (parity: "automatic fetch off"), not a gap.

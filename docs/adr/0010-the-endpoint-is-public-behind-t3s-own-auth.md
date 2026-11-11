@@ -29,3 +29,9 @@ The WAF rule above was not built until now. Two changes, both in `apps/environme
 - `/api/t3-connect/health` and `/api/t3-connect/mint-credential`. They have no session middleware; t3's `CloudLink` verifies the relay's signed JWT proof (`verifyRelayJwt`) against the T3 Connect link (`t3code/apps/server/src/cloud/http.ts`). A request without a valid proof is refused.
 
 They stay mounted rather than refused in the Environment DO: step 3+ (the T3 Connect publish-only link) needs them, and t3's own auth already covers them. The guest routes (`t3code/apps/server/src/guest/http.ts`) are still not mounted, and guest links are off under ADR-0023's managed policy (`guestSharingEnabled` locked).
+
+## Refinement (SPI-1006): the bootstrap token pairs the first device only
+
+The bootstrap grant is t3's `desktop-bootstrap` grant, and t3 issues a session from it with `replaceActiveForSubjectAndMethod` (`t3code/apps/server/src/auth/EnvironmentAuth.ts:989`). That revokes every active session of the same subject and method (`persistence/AuthSessions.ts:267`). So pairing a second device with the armed bootstrap token signs the first one out, if it used the same kind of token (a bearer client such as the mobile app). Pair every later device with a **one-time pairing link** made in an already-paired client (Settings → Sharing & access), as stock t3 does. Arm the bootstrap token only for the first device, or to recover when no paired client is left.
+
+The mobile app speaks t3's orchestration protocol. Its version must match the pinned nightly's (`ORCHESTRATION_PROTOCOL_VERSION`, now 2), so a client far ahead of or behind the pin may refuse to connect. The desktop and web clients have the same rule, but the web client is served by the Environment itself, so it always matches.

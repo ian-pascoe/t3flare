@@ -15,13 +15,13 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Feature | Stock (anchor) | t3flare | Evidence | Step |
 |---|---|---|---|---|
 | Clone (GitHub) | `projectClone.start` `srv/ws.ts:2886` | W | router `clone` makes a Workspace (`env/agents/processRouter.ts`); step-2a M2 | done |
-| Clone (other hosts) | same | P: public repos only | token minted only for `github.com` (`processRouter.ts` `clone`) | — G9 |
+| Clone (other hosts) | same | R for now (D2): public repos only; GitHub is the only host | token minted only for `github.com` (`processRouter.ts` `clone`); ADR-0013 (D2 refinement) | done (refusal) |
 | New project | `projects.createNew` `ws.ts:2930` | W | Patch 0002 roots it at `/w` | done |
 | Open folder | `filesystem.browse` `ws.ts:3047` | R: only `/w` Workspaces exist | `env/workspace/layers.ts` `browse`; ADR-0008 | — |
 | Scratch threads | `projects.ensureScratch` `ws.ts:2924`; `srv/project/ManagedProjectFolders.ts:247` | M; `threadProjectFromScratch` stripped (SPI-994) | "Scratch threads stay unavailable" (`docs/steps/step-2a-plan.md:74`) | — G4 |
 | File tree, read, edit, `@` and content search | `ws.ts:2960-3019` | W | `layers.ts`; step-2a M2. Ignored-file list is always empty; reads cap at 1 MiB | done |
 | Attachments, images | upload route `srv/http.ts:464`; Pi inlines images `t3code/packages/provider-pi/src/server/adapter.ts:2671` | W (images); P (files: as text, unit-tested only); images past 0.9 MB per message are named, not shown (SPI-1027); no SnapShot window context (SPI-1028) | `env/provider/attachments.ts` (SPI-993): images inline within the Session's row budget, readable files as text, the rest named; stage `attach`: a green square named "green" on claude-haiku-5-5, a 1.2 MB image named "not shown" (`docs/steps/parity/spi-993-attachments.json`) | done |
-| Open in editor | `shell.openInEditor` `ws.ts:3045` | N/A (host launcher) | router answers "not found" | — |
+| Open in editor | `shell.openInEditor` `ws.ts:3045` | R (host launcher) | router answers "not found"; ADR-0024 | done (refusal) |
 
 ### Threads
 
@@ -50,16 +50,16 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Pi Durable | (ours) | W | `env/shadows/builtInDrivers.ts` | done |
 | Codex, Pi CLI | `srv/provider/builtInDrivers.ts:33-45` | M | Shadow lists Pi Durable only | 4a |
 | Claude, OpenCode | same | M; Claude over ACP loses fork, live steering, structured plan (ADR-0015) | same | 4b |
-| Cursor, Grok, Fx, Antigravity, Kiro, Muse | same | M | no plan or ADR names them | — D3 |
+| Cursor, Grok, Fx, Antigravity, Kiro, Muse | same | R (D3): vendor sign-in, no proxy base URL | no driver registered; ADR-0015 (D3 refinement), ADR-0012 | done (refusal) |
 | ACP registry agents | `ws.ts:2395-2453` | M | driver absent | — G13 |
 | Provider settings | `con/settings.ts:688-904` | P: Pi Durable has one hidden switch | `env/provider/settings.ts` | 4a/4b for CLIs |
-| Install or update a provider | `ws.ts:2631`, `:2681` | R (image-pinned) | ADR-0015; not stated outright | — |
+| Install or update a provider | `ws.ts:2631`, `:2681` | R (image-pinned) | ADR-0024, ADR-0015 | done (refusal) |
 | Account sign-in | `provider.auth.*` `ws.ts:2665-2679` | R | ADR-0012 | — |
 | Limit errors and resume | — | W | `docs/model-proxy.md` | done |
 | Usage page, limit meters | `ws.ts:2740`; `t3code/docs/user/usage.md` | M | `BUILT_IN_USAGE_DRIVERS = []` | *def* G8 |
 | Model list, picker, thinking | — | W | `docs/steps/proxy-models/` | done |
 | Titles, commit and PR text | `srv/textGeneration/TextGeneration.ts:42` | W | step-2a M1, M4 | done |
-| Custom text generators | `con/settings.ts:941` | R for now (D5): the setting is locked empty by t3flare's managed policy (SPI-994) | ADR-0023; `docs/steps/parity/spi-994-capabilities.json` | done (refusal ADR: SPI-1004) |
+| Custom text generators | `con/settings.ts:941` | R for now (D5): the setting is locked empty by t3flare's managed policy (SPI-994) | ADR-0012 (D5 refinement), ADR-0023; `docs/steps/parity/spi-994-capabilities.json` | done (refusal) |
 | Skills, slash commands | `con/server.ts:128-130` | M | snapshot has none; `step-2a-plan.md:116` | — G10 |
 
 ### Git/VCS
@@ -67,11 +67,11 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
 | Status, diff, commit, branch, push, pull, PR create | `ws.ts:3146-3223` | W (stale reads; automatic fetch off) | step-2a M2–M4; ADR-0009 | done |
-| PR list, detail, checks, comment, review | `ws.ts:2787-2874` | W†/P: acts as the GitHub App, not the owner | Environment token (`packages/github-app/src/permissions.ts:39`). I infer "my PRs" and review identity are affected; not traced | — G9 |
-| Starred repos, publish a repo | `ws.ts:2884`, `:2951` | M (inferred: an installation token cannot do either) | same | — G9 |
+| PR list, detail, checks, comment, review | `ws.ts:2787-2874` | W†/P: acts as the GitHub App, not the owner, by decision (D2) | Environment token (`packages/github-app/src/permissions.ts:39`); ADR-0013 (D2 refinement) | done (refusal of owner identity) |
+| Starred repos, publish a repo | `ws.ts:2884`, `:2951` | R for now (D2): need an owner token | ADR-0013 (D2 refinement); a token pasted into t3's settings still works | done (refusal) |
 | PR watch | `PullRequestWatchReactor` | P†: the alarm has no PR-watch source, so I infer it polls only while awake | `idle.ts` `nextDue` | *def* (webhook) G12 |
 | Review guide | `srv/pullRequest/PullRequestReviewGuideService.ts:314` (`worktree add --detach`) | M: refused | router `worktreeAdd` (2b finding F6) | — G7 |
-| Discovery | `ws.ts:2728`; `srv/sourceControl/SourceControlDiscovery.ts:49`, `:57` | P: git and gh emulated; jj, glab and the rest "not found" | `ghRouteOf` | — |
+| Discovery | `ws.ts:2728`; `srv/sourceControl/SourceControlDiscovery.ts:49`, `:57` | P: git and gh emulated; jj, glab and the rest "not found" (R: ADR-0024, ADR-0013) | `ghRouteOf` | done (refusal) |
 | Host sign-in | `ws.ts:2880-2882` | R for GitHub (ADR-0013); other hosts M | `ghAuthStatus` always signed in | — G9 |
 
 ### Terminals, setup scripts, worktrees
@@ -85,11 +85,11 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
 | Port discovery | `srv/preview/PortScanner.ts:338` (lsof); `ws.ts:3280` | M | lsof "not found" | — G11 |
-| Server browser, dev-server preview | `srv/preview/ServerBrowser.ts:225`; route `srv/server.ts:800` | M | capability stripped; route unmounted | — G11 |
-| Agent browser tools | `preview_*` | R | step-3 plan pins it off (L3) | 3 (as refusal) |
+| Server browser, dev-server preview | `srv/preview/ServerBrowser.ts:225`; route `srv/server.ts:800` | M, part of parity, built last (D4) | capability stripped; route unmounted; ADR-0024 | SPI-1002 (G11) |
+| Agent browser tools | `preview_*` | M until previews exist (D4); pinned off (L3) | ADR-0024, ADR-0022 | SPI-1002 |
 | HTML visual replies | `srv/htmlRender/HtmlRender.ts` | M | step-3 allowlist drops `html_*` | — G11 |
 | MCP apps | `ws.ts:2579-2582` | M | differ drops them | — |
-| Device hub | `srv/device/DeviceHubProxy.ts:241`; `ws.ts:3255-3278` | R; its settings (`enableDeviceSupport`, `enableAgentDeviceAccess`, `simlockDeviceHostsEnabled`) locked off (SPI-994) | unmounted; ADR-0010, ADR-0023 | — |
+| Device hub | `srv/device/DeviceHubProxy.ts:241`; `ws.ts:3255-3278` | R; its settings (`enableDeviceSupport`, `enableAgentDeviceAccess`, `simlockDeviceHostsEnabled`) locked off (SPI-994) | unmounted; ADR-0024, ADR-0010, ADR-0023 | done (refusal) |
 | Relay tunnel | `ws.ts:2762` | R | ADR-0010 | — |
 
 ### MCP, secrets
@@ -100,8 +100,8 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | t3's tools in Sessions | `srv/mcp/toolkits/` | M today | `supportsMcpTools: false` on main | 3 |
 | Agent's own MCP servers | each CLI's config | M | — | — G10 |
 | Secret store | — | W | `env/platform/secretStore.ts`; step 1 | done |
-| 1Password provider | `t3code/packages/secret-provider-onepassword` (`op` CLI) | M | `op` "not found" | — |
-| `request_secret` | `srv/mcp/toolkits/orchestrator/tools.ts:198`; `ws.ts:2376` | R | step-3 plan §4.3 | 3 (as refusal) D5 |
+| 1Password provider | `t3code/packages/secret-provider-onepassword` (`op` CLI) | M; possibly later through the broker pattern (D5) | `op` "not found"; ADR-0012 (D5 refinement) | — |
+| `request_secret` | `srv/mcp/toolkits/orchestrator/tools.ts:198`; `ws.ts:2376` | R for now (D5) | ADR-0022 and ADR-0012 refinements | done (refusal) |
 
 ### Settings, notifications, links, auth
 
@@ -115,7 +115,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Laptop-to-cloud link | `srv/peer/PeerLinks.ts:89` | in progress | `.worktrees/step-3/docs/steps/step-3/` (m0–m3 evidence) | 3 |
 | Cloud-to-laptop link | — | R for now | ADR-0011 | *def* |
 | First pairing | `/api/auth/browser-session` | W (armed window) | ADR-0010 | done |
-| More devices, sessions, revoke | `con/environmentHttp.ts:600-624` | W† | used by step 3 | 3 |
+| More devices, sessions, revoke | `con/environmentHttp.ts:600-624` | W† | used by step 3; later devices pair by pairing link, never the bootstrap token (ADR-0010, README; SPI-1006) | 3 |
 | Guest links | `srv/guest/http.ts:140`; `ws.ts:2372` | R; `guestSharingEnabled` locked off by the managed policy, so no client offers a link (SPI-994) | ADR-0010, ADR-0023; stage `truecaps`: the write is refused ("managed by t3flare") | done |
 
 ### Updates, telemetry, import, other
@@ -125,9 +125,9 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Server self-update | `ws.ts:2685`; `srv/cloud/selfUpdate.ts:161` | N/A: nightly bump and deploy | ADR-0017; `npmReleaseLookup` and the self-update flags stripped (SPI-994) | done |
 | Product analytics | `srv/telemetry/AnalyticsService.ts:67-74` (on by default, `ingest.t3.codes`) | **Off** (D1): t3flare's managed policy sets `limits.telemetry: false` (SPI-995) | ADR-0023, README; `test/analytics.test.ts` (t3's service sends nothing under the policy); stage: `docs/steps/parity/spi-995-analytics.json` | done |
 | OTLP export | `con/settings.ts:1017`; proxy route `srv/http.ts:335` | M | URLs `undefined` in composition; route unmounted | *def* |
-| Import agent sessions | `srv/project/AgentSessionScanner.ts:217`, `:1196`; `ws.ts:3060` | N/A: no provider homes in the State directory | — | — |
-| Voice | `con/environmentHttp.ts:795-927` | R: local voice is host-bound; cloud voice refused for now (D5) | both capabilities stripped (SPI-994) | done (refusal ADR: SPI-1004) |
-| Triage, host diagnostics | `ws.ts:2745`, `:2734-2738` | N/A | no host; `triage` stripped (SPI-994) | — |
+| Import agent sessions | `srv/project/AgentSessionScanner.ts:217`, `:1196`; `ws.ts:3060` | R: no provider homes in the State directory | ADR-0024 | done (refusal) |
+| Voice | `con/environmentHttp.ts:795-927` | R: local voice is host-bound; cloud voice refused for now (D5) | both capabilities stripped (SPI-994); ADR-0024, ADR-0012 | done (refusal) |
+| Triage, host diagnostics | `ws.ts:2745`, `:2734-2738` | R (host-bound) | `triage` stripped (SPI-994); ADR-0024 | done (refusal) |
 
 ## 2. Gaps no planned step covers, in dependency order
 
@@ -141,7 +141,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | G6 | **Fork and rollback**: prove the handoff fork; add conversation rollback in the Session plus checkpoint restore. | M | t3 needs rollback to return a snapshot |
 | G7 | **Review guide**: a real detached worktree inside the project's Container. | M | t3 may read the scratch path through `FileSystem` |
 | G8 | **Usage meters.** Lead: t3's `cliproxy` usage-limit source (`con/settings.ts:913`) is already composed. | M | Commissary's management API shape is unverified |
-| G9 | **GitHub as the owner, and other hosts** (after D2). | M per host | Loosens ADR-0013's per-repo scope |
+| G9 | ~~**GitHub as the owner, and other hosts** (after D2).~~ Not now: D2 keeps GitHub App-only and GitHub-only (ADR-0013 refinement, SPI-1004). | M per host | Loosens ADR-0013's per-repo scope |
 | G10 | **Skills and the agent's own MCP servers** (after 3 and 4a). | M | ADR-0016 |
 | G11 | **Previews**: Container port discovery, an authenticated port proxy, HTML renders, later a browser (after D4). | L | Exposing dev servers publicly; Container sleep |
 | G12 | **Webhook origin and PR-watch wake.** | S | Every hook wakes the DO |
@@ -149,7 +149,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 
 OTLP traces (M) stays deferred.
 
-## 3. Refused by design: what still needs writing down
+## 3. Refused by design: where each refusal is written down
 
 Already documented, no action:
 - Guest links, relay tunnel, Tailscale (ADR-0010).
@@ -159,21 +159,14 @@ Already documented, no action:
 - Terminal lifetime (ADR-0021).
 - Cloud-to-laptop links and thread transfer (ADR-0011).
 
-Needs an ADR or a line in one:
-1. **Host-bound features**, one new ADR:
-   - Device hub and simulators.
-   - Local voice models.
-   - Open in editor.
-   - Host diagnostics and power policy.
-   - Triage.
-   - jj.
-   - Import of agent sessions.
-   - Server self-update and provider install/update. ADR-0015 and ADR-0017 imply these but never say so.
-2. **Server browser and agent browser access**: today only step-3's L3 pin. Either refuse here or build under G11.
-3. **Vendor-login CLIs** (Cursor, Antigravity, Kiro, Muse, Grok, Fx): add to ADR-0012 or ADR-0015.
-4. **`request_secret` and `t3_attachment_*` withheld from agents**: step 3's planned ADR-0022 should state it as a parity refusal.
-5. **Automatic git fetch off**: lives only in a step plan; add to ADR-0009.
-6. **GitHub identity is the App**: add to ADR-0013 once D2 is settled.
+Written down (SPI-1004, SPI-1006):
+1. **Host-bound features**: [ADR-0024](adr/0024-host-bound-features-are-refused.md) (device hub and simulators, local voice, open in editor, host diagnostics and power, triage, jj, agent-session import, server self-update, provider install and update).
+2. **Server browser and agent browser access**: not refused (D4). Built last under G11 (SPI-1002); until then stripped and pinned off (ADR-0024).
+3. **Vendor-login CLIs**: refused (D3), [ADR-0015](adr/0015-cli-agents-run-through-platform-exec-codex-in-managed-mode-claude-and-opencode-over-acp.md) refinement.
+4. **`request_secret` and `t3_attachment_*` withheld from agents**: [ADR-0022](adr/0022-durable-agents-reach-t3s-mcp-through-the-environment-do-with-t3s-own-credential.md) refinement. Keys typed into t3 (D5): [ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md) refinement.
+5. **Automatic git fetch off**: [ADR-0009](adr/0009-git-runs-in-the-container-status-and-checkpoints-come-from-the-workspace.md) refinement.
+6. **GitHub identity is the App, GitHub only** (D2): [ADR-0013](adr/0013-github-access-through-a-github-app-with-per-repo-tokens.md) refinement.
+7. **Later devices pair by pairing link** (SPI-1006): [ADR-0010](adr/0010-the-endpoint-is-public-behind-t3s-own-auth.md) refinement and README.
 
 ## 4. Owner decisions
 

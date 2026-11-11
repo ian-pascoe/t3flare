@@ -34,3 +34,12 @@ Superseded on 2026-11-11 by the decision above. The original text:
 ### 2026-11-11: why it changed
 
 The proxy already holds the owner's subscriptions, pools several accounts per vendor, refreshes their tokens and rotates between them when one is limited. Holding Subscription logins in t3flare as well would have meant a second refresher for the same rotating tokens, one sign-in per Environment, a broker, sealed storage and vendor-specific request shapes (pi-ai's Claude Code identity, ChatGPT token sharing) to keep current. The step 2a part 2 plan that would have built them (branch `step-2a2`, `docs/steps/step-2a2-plan.md`) is shelved.
+
+## Refinement (SPI-1004): keys typed into t3 are refused for now (owner decision D5)
+
+Some stock t3 features keep a credential the owner types into t3's settings: cloud voice transcription (a vendor speech key), custom text generators (a vendor key per generator), and `request_secret` (an agent asks the owner for a secret). Each would put a credential in t3flare beside the proxy key, which this ADR rules out. They are **refused for now**:
+- `cloudVoiceTranscription` is stripped.
+- `textGenerators` is locked empty by t3flare's managed policy (ADR-0023).
+- Agents are not offered `request_secret` (ADR-0022).
+
+Text generation itself runs on the proxy through the Durable agent provider. A secret provider such as 1Password may come later through the broker pattern: the Environment DO fetches a secret per use and never stores it (ADR-0018's shape). That would take its own decision.
