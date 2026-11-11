@@ -6,3 +6,7 @@ Each Provider instance declares how it reaches models: a proxy (base URL plus a 
 
 - The owner carries the terms-of-service risk, chosen knowingly. The sharpest case is Durable agents on a Claude subscription: a third-party harness using subscription OAuth, where Anthropic's terms describe OAuth for its own applications.
 - At a usage limit a thread pauses and t3 auto-resumes at the reset time; it never falls back to the proxy key, which would turn a pause into spend.
+
+## Refinement (2026-11-11): the contract is Commissary's
+
+"Nothing in code names it" means the code names the proxy's **contract**, not its deployment. That contract is [Commissary](https://github.com/spiritledsoftware/commissary)'s: the Anthropic Messages API for turns and text generation, protocol translation (so every model it serves is reached as an Anthropic Messages model), and `GET /v1/models` for the model list. The list is no longer static config: both Workers read it from the proxy, keep a copy in their Durable Object's storage, and fall back to the static list in `packages/models` before the first read. Only real model ids are used; Commissary's alias ids for non-Claude models are read back to them. What the proxy must provide, how to set it up, and what was verified: [`docs/model-proxy.md`](../model-proxy.md).
