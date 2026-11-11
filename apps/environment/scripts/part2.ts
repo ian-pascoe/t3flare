@@ -12,6 +12,7 @@
 //                                                           a turn the proxy answers with a usage limit (the Session's fault
 //                                                           route): "Usage limit reached" with the reset, the requests it
 //                                                           made, the idle Environment woken at the reset, the resumed turn
+//   bun scripts/stage.ts run step2a2 part2 overload         an overload (529): pi-durable retries it, then a provider error
 //   bun scripts/stage.ts run step2a2 part2 key              a turn the proxy refuses (the fault route's 401): the key error
 //                                                           after 1 request, no pause
 //   … [--out file.json]
@@ -242,8 +243,9 @@ switch (scenario) {
   }
   // eslint-disable-next-line no-fallthrough
   case "limit":
-  case "key": {
-    const fixtureName = scenario === "key" ? "invalidKey" : option("fixture", "cooldown");
+  case "key":
+  case "overload": {
+    const fixtureName = scenario === "key" ? "invalidKey" : scenario === "overload" ? "overloaded" : option("fixture", "cooldown");
     const resume = scenario === "limit" && !flag("no-resume");
     if (resume) await updateSettings(cookie, { autoResumeLimitedThreads: true });
     const threadId = await threadOn(`${scenario} ${fixtureName} ${stamp}`);
@@ -254,16 +256,20 @@ switch (scenario) {
     const firstRun = runsOf(failed.projection)[0]!;
     const error = itemsOf(failed.projection).find((i: any) => i.type === "error");
     const turns = Object.values(await sessionTurns(threadId));
-    const thread = failed.projection?.thread ?? {};
     report.first = {
       run: firstRun.status,
       failure: error?.failure ?? error ?? null,
       proxy: turns[0]?.proxy ?? null,
-      thread: { lastErrorClass: thread.lastErrorClass ?? null, usageLimitResetAt: thread.usageLimitResetAt ?? null, limitRecovery: thread.limitRecovery ?? null },
       faultResetAt: new Date(resetAt).toISOString(),
     };
     report.threadId = threadId;
     check("the first run failed", firstRun.status === "failed", firstRun);
+    if (scenario === "overload") {
+      // pi-durable retries an overload (3 retries, from 2 s): four answers, then a provider error.
+      check("four proxy requests (retried)", turns[0]?.proxy?.requests === 4, turns[0]?.proxy);
+      check("a provider error", error?.failure?.class === "provider_error" && error?.failure?.code === "proxy_overloaded", error);
+      finish();
+    }
     check("one proxy request", turns[0]?.proxy?.requests === 1, turns[0]?.proxy);
     if (scenario === "key") {
       check("the key error", error?.failure?.class === "permission_error" && error?.failure?.code === "proxy_key_rejected", error);

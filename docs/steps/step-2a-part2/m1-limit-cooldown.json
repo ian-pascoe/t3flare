@@ -1,0 +1,73 @@
+{
+  "scenario": "limit",
+  "at": "2026-11-11T14:54:15.951Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "fault": {
+    "armed": {
+      "fixture": "cooldown",
+      "resetAt": 1794408979101
+    }
+  },
+  "first": {
+    "run": "failed",
+    "failure": {
+      "class": "usage_limit",
+      "message": "Every account the model proxy has for this model is at its usage limit.",
+      "code": "proxy_cooldown",
+      "retryable": true,
+      "resetAt": "2026-11-11T14:56:19.896Z"
+    },
+    "proxy": {
+      "requests": 1,
+      "failure": {
+        "class": "usage_limit",
+        "code": "proxy_cooldown",
+        "row": 1,
+        "resetAt": 1794408979896,
+        "stop": true,
+        "at": 1794408860896
+      }
+    },
+    "thread": {
+      "lastErrorClass": null,
+      "usageLimitResetAt": null,
+      "limitRecovery": null
+    },
+    "faultResetAt": "2026-11-11T14:56:19.101Z"
+  },
+  "threadId": "9b623ef6-2ba0-44da-a6a5-47220b17ff9b",
+  "idle": {
+    "reset": true,
+    "work": {
+      "openRuns": 0,
+      "openProviderSessions": 0,
+      "claimableEffects": 0
+    },
+    "due": {
+      "at": "2026-11-11T14:55:25.232Z",
+      "sources": {
+        "outbox": null,
+        "scheduledTasks": null,
+        "usageLimitResets": "2026-11-11T14:55:25.232Z"
+      }
+    },
+    "alarm": "2026-11-11T14:55:25.232Z"
+  },
+  "resumed": {
+    "runs": [
+      {
+        "id": "run:thread:9b623ef6-2ba0-44da-a6a5-47220b17ff9b:ordinal:1",
+        "status": "failed"
+      },
+      {
+        "id": "run:thread:9b623ef6-2ba0-44da-a6a5-47220b17ff9b:ordinal:2",
+        "status": "completed"
+      }
+    ],
+    "secondRunStartedAfterReset": 3183,
+    "answer": "pong",
+    "health": null
+  },
+  "failures": [],
+  "ok": true
+}

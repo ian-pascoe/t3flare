@@ -27,7 +27,7 @@ import {
   type WatchTarget,
 } from "@earendil-works/pi-durable/env";
 import { abortedResult, type Call, caller, type ComputerEnvHost } from "./client.ts";
-import { exec, killAll } from "./exec.ts";
+import { exec, type ExecLedger, killAll } from "./exec.ts";
 import { join, resolve } from "./paths.ts";
 import { inBash } from "./shell.ts";
 import { ComputerBinaryReader, ComputerDirReader, ComputerTextLineReader } from "./readers.ts";
@@ -64,6 +64,8 @@ export type ComputerExecutionEnvOptions = {
    * image's mise config, so git, gh and node resolve. The command's own `env` wins.
    */
   readonly containerEnv?: Readonly<Record<string, string>>;
+  /** t3flare: who keeps the ids of the commands run on the Container (step 2a part 2; `exec.ts`'s `ExecLedger`). */
+  readonly ledger?: ExecLedger;
 };
 
 /** A backend a command is sent to: its id in the Workspace, and how a command is made to run in bash on it. */
@@ -383,6 +385,7 @@ export class ComputerExecutionEnv implements ExecutionEnv {
         backend: this.#backend,
         cwd: this.cwd,
         running: this.#running,
+        ledger: this.#backend?.id === BACKENDS.container.id ? this.#options.ledger : undefined,
         // The spill of a command that was aborted is still written, so it runs outside the caller's context.
         spill: async (output) => {
           const path = await this.createTempFile({ suffix: ".log" }, BACKGROUND_CONTEXT);

@@ -191,7 +191,13 @@ export const waitFor = async (cookie: string, threadId: string, done: (projectio
   const started = Date.now();
   let projection: any;
   while (Date.now() - started < timeoutMs) {
-    projection = projectionOf(await threadWindow(cookie, threadId));
+    // A window read while the Environment boots again (an idle reset, a restart) can fail: read it again.
+    const window = await threadWindow(cookie, threadId).catch(() => undefined);
+    if (window === undefined) {
+      await sleep(1000);
+      continue;
+    }
+    projection = projectionOf(window);
     if (done(projection)) return { projection, ms: Date.now() - started };
     await sleep(1000);
   }

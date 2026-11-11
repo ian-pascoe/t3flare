@@ -12,7 +12,11 @@ const DASH = "/bin/dash";
 /** Runs `script` the way computerd does: `/bin/sh -c`, with dash as the shell. */
 const underDash = (script: string) => spawnSync(DASH, ["-c", inBash(script)], { encoding: "utf8" });
 
-describe.skipIf(!existsSync(DASH))("inBash under dash", () => {
+// t3flare: the wrapper starts bash with util-linux's `setsid`, which macOS lacks; apps/agents/test/killScript.test.ts runs
+// it under Ubuntu's dash in Docker as well.
+const setsid = spawnSync("sh", ["-c", "command -v setsid"]).status === 0;
+
+describe.skipIf(!existsSync(DASH) || !setsid)("inBash under dash", () => {
   it("runs bash syntax that dash cannot", () => {
     const result = underDash(
       'items=(a b c); [[ ${items[1]} == b ]] && echo "second: ${items[1]}"; cat <(echo substituted)',

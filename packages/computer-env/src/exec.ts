@@ -95,6 +95,21 @@ class Spill {
   }
 }
 
+/**
+ * t3flare (step 2a part 2): who keeps the Container commands' ids, so an aborted command's processes can be killed by
+ * them (`T3FLARE_EXEC` in each command's environment) even after the caller restarted. `stopped` is called when the
+ * command was killed (an abort, a timeout, a failing output sink), whether or not it stopped in the grace period;
+ * `ended` when it ended by itself.
+ */
+export type ExecLedger = {
+  started(id: string): void;
+  ended(id: string): void;
+  stopped(id: string): void;
+};
+
+/** The variable each command's environment carries its exec id in (apps/sandbox-image/src/kill.ts finds it there). */
+export const EXEC_MARKER = "T3FLARE_EXEC";
+
 export type ExecHost = {
   readonly workspace: WorkspaceHandle;
   /** The backend to run on; undefined runs on the Workspace's default backend. */
@@ -103,6 +118,7 @@ export type ExecHost = {
   readonly spill: SpillWriter;
   /** Executions still running, so `cleanup()` can kill them. */
   readonly running: Set<string>;
+  readonly ledger?: ExecLedger | undefined;
 };
 
 /** Run `command` on the host's backend, streaming its output to `options.onOutput`. */
@@ -174,7 +190,7 @@ export const exec = async (
       output: false,
     };
 
-    if (options?.env !== undefined) execOptions.env = options.env;
+    execOptions.env = { ...options?.env, [EXEC_MARKER]: id };
 
     if (host.backend !== undefined) execOptions.backend = host.backend.id;
 
@@ -215,6 +231,7 @@ export const exec = async (
   context.abortSignal?.addEventListener("abort", onAbort, { once: true });
 
   host.running.add(id);
+  host.ledger?.started(id);
 
   const execution = run().then(
     (exitCode) => ({ ok: true as const, exitCode }),
@@ -223,6 +240,7 @@ export const exec = async (
 
   // A command that outlives its kill grace period still releases its stubs when it ends.
   const finish = execution.finally(() => {
+    if (stopped === undefined) host.ledger?.ended(id);
     host.running.delete(id);
     workspace[Symbol.dispose]();
   });
@@ -261,6 +279,10 @@ export const exec = async (
       )
         break;
     }
+
+    // computerd's kill does not reach the command's children (nor, in M0, the command itself): the ledger's owner
+    // kills its processes by their marker.
+    host.ledger?.stopped(id);
 
     if (callbackError !== undefined) return err(callbackError);
 

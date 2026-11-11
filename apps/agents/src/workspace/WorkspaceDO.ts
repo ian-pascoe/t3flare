@@ -16,6 +16,7 @@ import {
 import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
 import { type EnvRequest, type EnvResponse, type HostOperation, withHarnessKept, WorkspaceEnvHost } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
+import { killCommand } from "@t3flare/sandbox-image/kill";
 import { DurableObject } from "cloudflare:workers";
 
 import type {
@@ -271,6 +272,19 @@ export class WorkspaceDO extends ContainerHost {
         await this.#scheduleAlarm();
       }
     }
+  }
+
+  /**
+   * Kills the processes of the Session's commands `execIds` (step 2a part 2; apps/sandbox-image/src/kill.ts): those whose
+   * environment carries one of the ids, by process group where the whole group is theirs. Nothing to do, and the
+   * Container not started, when it is not running: a stopped Container has no processes.
+   */
+  async killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }> {
+    if (!this.containerRunning() || execIds.length === 0) return { running: false, signalled: 0, survivors: 0 };
+    const result = await this.exec({ script: killCommand(execIds), passive: true, timeoutMs: 15_000 });
+    const answer = /\{"signalled":(\d+),"survivors":(\d+)\}/.exec(result.stdout);
+    if (answer === null) throw new Error(`t3flare: the kill script failed (exit ${result.exitCode}): ${result.stderr.slice(0, 300)}`);
+    return { running: true, signalled: Number(answer[1]), survivors: Number(answer[2]) };
   }
 
   /** Reads a text file from the Workspace's own files (never the Container). Paths inside the Workspace. */

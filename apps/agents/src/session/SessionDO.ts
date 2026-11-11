@@ -52,6 +52,7 @@ import { projectContext } from "../extensions/project-context.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
 import { FAULT_FIXTURES, type Fault, proxyLimits, recordingFetch } from "./proxyLimits.ts";
+import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
 import { liveOf, pushedEntry, turnOfEntry, usageOf } from "./state.ts";
 
 export interface SessionEnv {
@@ -80,6 +81,8 @@ const CATALOG_KEY = "t3flare:model-catalog";
 const PROXY_KEY = "t3flare:proxy";
 /** A test's model proxy fault (stages only). */
 const FAULT_KEY = "t3flare:proxy-fault";
+/** The most a Stop (or the object's start) waits for an aborted command's processes to be killed. */
+const KILL_BOUND_MS = 3_000;
 
 interface Meta {
   readonly threadId: string;
@@ -109,6 +112,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #catalog: ModelCatalog;
   /** Every model request's fetch: the proxy's answers recorded, a test fault answered (`proxyLimits.ts`). */
   readonly #proxyFetch: typeof fetch;
+  /** The Container commands running, kept so an aborted one's processes are killed, even after a restart. */
+  readonly #execs: RunningExecs;
 
   constructor(ctx: DurableObjectState, env: SessionEnv) {
     super(ctx, env);
@@ -125,6 +130,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       onRequest: () => this.#noteProxy((record) => ({ ...record, requests: record.requests + 1 })),
     });
     this.#proxyFetch = recorder.fetch;
+    this.#execs = new RunningExecs(ctx.storage.kv, (ids) => this.#killExecs(ids));
     const registry = createRegistry();
     registry.install(proxyLimits({ last: recorder.last, record: (failure) => this.#noteProxy((record) => ({ ...record, failure })) }));
     registry.install(codingTools());
@@ -163,9 +169,18 @@ export class SessionDO extends DurableObject<SessionEnv> {
           void harness.closed.then((end) => {
             if (end.kind === "failed") ctx.abort(`Harness failed: ${String(end.error)}`);
           });
+          // The commands that were running when this object last died: their calls are cut off (pi-durable reruns or ends
+          // them), so their processes are killed. Read before the Harness resumes, so a command it starts is not.
+          const orphans = this.#execs.ids();
           await this.#arm();
           this.#noteDiagnostic("constructed");
           harness.resume();
+          // Bounded, and never fails the open.
+          if (orphans.length > 0) {
+            console.warn(JSON.stringify({ t3flare: "kill-orphaned-execs", count: orphans.length }));
+            await this.#execs.killAll(KILL_BOUND_MS, orphans).catch(() => undefined);
+            await this.#arm();
+          }
           if (Object.values(this.#turns()).some(isLive)) void this.#watch();
           resolve(harness);
         } catch (error) {
@@ -227,7 +242,34 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const workspace = this.#workspaceStub();
     const id = this.#meta()?.workspaceId;
     if (workspace === undefined || id === undefined || id === null) return undefined;
-    return new ComputerExecutionEnv({ workspace, id: `computer:${id}`, cwd: cwd ?? REPO_ROOT, reachContainer: true, containerEnv: COMMAND_ENV });
+    return new ComputerExecutionEnv({
+      workspace,
+      id: `computer:${id}`,
+      cwd: cwd ?? REPO_ROOT,
+      reachContainer: true,
+      containerEnv: { ...COMMAND_ENV, T3FLARE_OWNER: this.ctx.id.toString() },
+      ledger: {
+        started: (execId) => this.#execs.started(execId),
+        ended: (execId) => this.#execs.ended(execId),
+        stopped: (execId) => {
+          // Not awaited by the command's caller; a kill that does not finish is tried again from the alarm.
+          void this.#execs.stopped(execId, KILL_BOUND_MS).then(() => this.#arm());
+        },
+      },
+    });
+  }
+
+  /** Kills the processes of `execIds` in the thread's Workspace Container (`WorkspaceDO.killExecs`). */
+  async #killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly survivors: number }> {
+    const id = this.#meta()?.workspaceId;
+    if (id === undefined || id === null) return { survivors: 0 };
+    // SAFETY: the Workspace DO answers `killExecs` (WorkspaceDO.ts); a stub's RPC types only rewrite its declared type.
+    const workspace = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as {
+      killExecs(ids: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }>;
+    };
+    const answer = await workspace.killExecs(execIds);
+    console.log(JSON.stringify({ t3flare: "kill-execs", count: execIds.length, ...answer }));
+    return answer;
   }
 
   #files(): ComputerFiles | undefined {
@@ -254,6 +296,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     const retry = this.ctx.storage.kv.get<number>(RETRY_KEY);
     if (retry !== undefined) candidates.push(retry);
+    if (this.#execs.retryDue()) candidates.push(now + KILL_RETRY_MS);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;
@@ -273,6 +316,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
         await this.#abortTurn(providerTurnId, "turn_deadline");
       }
     }
+    if (this.#execs.retryDue()) await this.#execs.retry(KILL_BOUND_MS);
     const live = Object.values(this.#turns()).some(isLive);
     if (live) void this.#watch();
     const lastPush = this.ctx.storage.kv.get<number>(LAST_PUSH_KEY) ?? 0;
@@ -366,7 +410,12 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const record = turn.submissionId === "" ? undefined : await harness.submission(turn.submissionId as never, context);
     const status = record === undefined ? undefined : (await record.status(context)).status;
     if (record !== undefined && status === "queued") await record.abort(context);
-    else if (status === "placed") await (await this.#root()).abort(context);
+    else if (status === "placed") {
+      await (await this.#root()).abort(context);
+      // The run's calls are aborted: their commands' processes are killed before the Stop returns (bounded).
+      await this.#execs.killAll(KILL_BOUND_MS);
+      await this.#arm();
+    }
     const turns = this.#turns();
     if (turns[providerTurnId] !== undefined && isLive(turns[providerTurnId]!)) {
       turns[providerTurnId] = { ...turns[providerTurnId]!, status: "aborted", reason, settledAt: Date.now() };
