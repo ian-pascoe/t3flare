@@ -1,0 +1,80 @@
+{
+ "at": "2026-11-11T21:56:09.915Z",
+ "ok": true,
+ "failures": [],
+ "fixture": {
+  "projectId": "e218c526-6e02-430c-bfef-39573ca7b289",
+  "workspaceRoot": "/w/step3-fixture",
+  "cloned": false
+ },
+ "link": {
+  "scope": "orchestration:read orchestration:operate"
+ },
+ "launch": {
+  "isError": false,
+  "threadId": "mcp:launch:9b4e882e039b043fe732c5058b2bbd6a24c57ca5d8553fe0e95740281d67dde5"
+ },
+ "launchResult": {
+  "status": "completed",
+  "pieces": 1,
+  "reply": true,
+  "runtimeMode": "auto-accept-edits",
+  "interactionMode": "default",
+  "linkOrigin": {
+   "sessionId": "12600f2b-69a3-45df-9fa1-47f21001d7c2",
+   "label": "t3flare acceptance mwcnqbrr",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "00000000-0000-4000-8000-000000000001",
+   "threadId": "laptop-mwcnqbrr",
+   "title": "laptop parent"
+  }
+ },
+ "F5": {
+  "runtimeMode": "auto-accept-edits",
+  "request": {
+   "kind": "command"
+  }
+ },
+ "waitHold": {
+  "ms": 49964,
+  "timedOut": true,
+  "status": "running"
+ },
+ "F7": {
+  "link": {
+   "isError": true,
+   "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"The pending user-input request was not found.\"}"
+  },
+  "stillPending": true,
+  "owner": {
+   "runs": [
+    "completed"
+   ],
+   "output": true
+  }
+ },
+ "F1": {
+  "send": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwcnqbrr through a linked environment, so it may change only threads that link star",
+  "interrupt": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwcnqbrr through a linked environment, so it may change only threads that link star",
+  "rename": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwcnqbrr through a linked environment, so it may change only threads that link star"
+ },
+ "F11": {
+  "armed": {
+   "ok": true,
+   "status": 400,
+   "body": {
+    "_tag": "AuthMcpApprovalError",
+    "message": "That is not a one-time pairing code."
+   }
+  },
+  "disarmed": {
+   "ok": true,
+   "status": 401,
+   "body": {
+    "error": "pairing is not armed"
+   }
+  }
+ }
+}
