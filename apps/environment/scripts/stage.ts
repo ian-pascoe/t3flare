@@ -9,7 +9,7 @@
 // `.alchemy/stages/<stage>.env.json` (gitignored, 0600); its Access service token's credentials are written next
 // to it by alchemy.run.ts. Nothing secret is printed. The alchemy profile is $ALCHEMY_PROFILE or `default`.
 // CI passes the tokens in the environment instead (deploy-prod.yml: the laptop's prod tokens; CI never makes them).
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -17,6 +17,7 @@ import * as path from "node:path";
 import { credentialsFile, secretsFile as secretsFileOf } from "../stage-files.ts";
 import { buildWorker } from "../build.ts";
 import { buildAgentsWorker } from "../../agents/build.ts";
+import { isDurableObjectClassNotFound } from "./deploy-retry.ts";
 
 const here = path.resolve(import.meta.dirname, "..");
 const [command, stage, ...rest] = process.argv.slice(2);
@@ -69,14 +70,29 @@ const deploySecrets = (): Record<string, string> => {
   return { ...Object.fromEntries(Object.entries(fromFile).filter(([, value]) => value !== "")), ...fromEnv };
 };
 
-const alchemy = (args: Array<string>, env: Record<string, string>) => {
-  const result = spawnSync(path.join(here, "node_modules/.bin/alchemy"), [...args, "--stage", stage, "--yes", "--no-input"], {
-    cwd: here,
-    stdio: "inherit",
-    env: { ...process.env, ...env },
+/** Runs alchemy, streaming its output live (it prints no secrets) while keeping a copy for the retry decision. */
+const alchemy = (args: Array<string>, env: Record<string, string>) =>
+  new Promise<{ status: number; output: string }>((resolve) => {
+    const child = spawn(path.join(here, "node_modules/.bin/alchemy"), [...args, "--stage", stage, "--yes", "--no-input"], {
+      cwd: here,
+      stdio: ["inherit", "pipe", "pipe"],
+      env: { ...process.env, ...env },
+    });
+    let output = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+      process.stdout.write(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+      process.stderr.write(chunk);
+    });
+    child.on("error", (error) => {
+      console.error(`t3flare: could not run alchemy: ${error.message}`);
+      resolve({ status: 1, output });
+    });
+    child.on("close", (code) => resolve({ status: code ?? 1, output }));
   });
-  return result.status ?? 1;
-};
 
 switch (command) {
   case "deploy": {
@@ -106,13 +122,15 @@ switch (command) {
       console.error(`t3flare: missing ${missing.join(", ")} (set them, or put them in ~/.config/t3flare/dev.env)`);
       process.exit(1);
     }
-    let status = alchemy(["deploy"], { ...stageSecrets(), ...secrets });
-    if (status !== 0) {
-      // On a stage whose Workers do not exist yet, each Worker's Durable Object binding to a class in the other fails
-      // (DurableObjectClassNotFound). Deploy both once without the cross-Worker bindings, then again with them.
-      console.error("t3flare: deploy failed; retrying in two passes (the first without cross-Worker bindings)");
-      const first = alchemy(["deploy"], { ...stageSecrets(), ...secrets, T3FLARE_DEPLOY_BOOTSTRAP: "1" });
-      status = first === 0 ? alchemy(["deploy"], { ...stageSecrets(), ...secrets }) : first;
+    const attempt = await alchemy(["deploy"], { ...stageSecrets(), ...secrets });
+    let status = attempt.status;
+    // Only a brand-new stage fails this way: each Worker's Durable Object binding to a class in the other does not
+    // exist yet (isDurableObjectClassNotFound). Deploy both once without the cross-Worker bindings, then again with
+    // them. Any other failure exits as is: the first pass would unbind a live stage.
+    if (status !== 0 && isDurableObjectClassNotFound(attempt.output)) {
+      console.error("t3flare: Durable Object class not found; retrying in two passes (the first without cross-Worker bindings)");
+      const first = await alchemy(["deploy"], { ...stageSecrets(), ...secrets, T3FLARE_DEPLOY_BOOTSTRAP: "1" });
+      status = first.status === 0 ? (await alchemy(["deploy"], { ...stageSecrets(), ...secrets })).status : first.status;
     }
     if (status === 0 && !fs.existsSync(credentialsFile(stage))) {
       console.error(`t3flare: deployed, but ${path.relative(here, credentialsFile(stage))} was not written`);
@@ -146,7 +164,7 @@ switch (command) {
       console.error("t3flare: prod holds the owner's threads; pass --really-destroy-prod to destroy it");
       process.exit(2);
     }
-    const status = alchemy(["destroy"], { ...stageSecrets(), ...deploySecrets() });
+    const { status } = await alchemy(["destroy"], { ...stageSecrets(), ...deploySecrets() });
     if (status === 0) {
       fs.rmSync(secretsFile, { force: true });
       fs.rmSync(credentialsFile(stage), { force: true });
