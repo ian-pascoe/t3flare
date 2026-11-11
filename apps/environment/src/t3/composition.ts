@@ -94,7 +94,6 @@ import * as Keybindings from "t3/src/keybindings.ts";
 import * as ServerRuntimeStartup from "t3/src/serverRuntimeStartup.ts";
 import * as AgentAwarenessRelay from "t3/src/relay/AgentAwarenessRelay.ts";
 import * as ServerSettings from "t3/src/serverSettings.ts";
-import * as ManagedPolicy from "t3/src/policy/ManagedPolicy.ts";
 import * as ProjectEnrichmentService from "t3/src/project/ProjectEnrichmentService.ts";
 import * as NativeAppIconResolver from "t3/src/assets/NativeAppIconResolver.ts";
 import * as AntigravityInstallation from "t3/src/provider/AntigravityInstallation.ts";
@@ -183,6 +182,8 @@ import * as WorkspaceCheckpoints from "../workspace/checkpoints.ts";
 import * as DoSql from "../platform/sql.ts";
 import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
+import { cloudCapabilities } from "./capabilities.ts";
+import { layerManagedPolicy } from "./managedPolicy.ts";
 import {
   layerPinAgentBrowserAccessOff,
   layerPinFastWorktreeCheckoutOff,
@@ -294,7 +295,8 @@ export const make = (options: CompositionOptions) => {
 
   const layerServerSettings = ServerSettings.layer.pipe(
     Layer.provide(layerSecretStore),
-    Layer.provideMerge(ManagedPolicy.layer),
+    // t3flare: t3flare's built-in managed policy, not a file on the host (ADR-0023).
+    Layer.provideMerge(layerManagedPolicy),
     Layer.provideMerge(layerPersistence),
   );
 
@@ -450,27 +452,18 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(T3ProjectFileLoader.layer),
   );
 
-  // t3flare: reduced capabilities and `platform.machine: "cloud"`.
+  // t3flare: the capabilities of what the Cloud Environment does (`./capabilities.ts`) and `platform.machine: "cloud"`.
   const layerServerEnvironment = Layer.effect(
     ServerEnvironment.ServerEnvironment,
     Effect.map(ServerEnvironment.make, (environment) =>
       ServerEnvironment.ServerEnvironment.of({
         getEnvironmentId: environment.getEnvironmentId,
-        getDescriptor: Effect.map(environment.getDescriptor, (descriptor) => {
-          const {
-            serverBrowser: _serverBrowser,
-            voiceTranscription: _voice,
-            localServerStop: _stop,
-            fastWorktreeCheckout: _fast,
-            ...capabilities
-          } = descriptor.capabilities;
-          return {
-            ...descriptor,
-            label: "t3flare",
-            platform: { ...descriptor.platform, os: "linux" as const, machine: "cloud" as const },
-            capabilities,
-          };
-        }),
+        getDescriptor: Effect.map(environment.getDescriptor, (descriptor) => ({
+          ...descriptor,
+          label: "t3flare",
+          platform: { ...descriptor.platform, os: "linux" as const, machine: "cloud" as const },
+          capabilities: cloudCapabilities(descriptor.capabilities),
+        })),
       }),
     ),
   ).pipe(
@@ -674,7 +667,7 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(layerResourceDiagnostics),
     Layer.provideMerge(TraceDiagnostics.layer),
     Layer.provideMerge(TriageService.layer.pipe(Layer.provide(GitVcsDriver.layer))),
-    Layer.provideMerge(AnalyticsService.layer.pipe(Layer.provide(ManagedPolicy.layer))),
+    Layer.provideMerge(AnalyticsService.layer.pipe(Layer.provide(layerManagedPolicy))),
     Layer.provideMerge(ExternalLauncher.layer),
     Layer.provideMerge(RemoteOpenTargets.layer),
     Layer.provideMerge(DirectEndpoints.layer),
@@ -774,7 +767,7 @@ export const make = (options: CompositionOptions) => {
         Layer.provideMerge(layerRuntimeServices),
         Layer.provideMerge(McpSessionRegistry.layer.pipe(Layer.provide(layerServerEnvironment))),
         Layer.provide(layerActivation),
-        Layer.provideMerge(RelayTracing.layerServerRelayBroker.pipe(Layer.provide(ManagedPolicy.layer))),
+        Layer.provideMerge(RelayTracing.layerServerRelayBroker.pipe(Layer.provide(layerManagedPolicy))),
         Layer.provideMerge(DoHttpServer.layer(httpServer)),
         Layer.provide(layerApplicationObservability),
         Layer.provideMerge(FetchHttpClient.layer),

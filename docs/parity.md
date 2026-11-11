@@ -18,7 +18,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Clone (other hosts) | same | P: public repos only | token minted only for `github.com` (`processRouter.ts` `clone`) | — G9 |
 | New project | `projects.createNew` `ws.ts:2930` | W | Patch 0002 roots it at `/w` | done |
 | Open folder | `filesystem.browse` `ws.ts:3047` | R: only `/w` Workspaces exist | `env/workspace/layers.ts` `browse`; ADR-0008 | — |
-| Scratch threads | `projects.ensureScratch` `ws.ts:2924`; `srv/project/ManagedProjectFolders.ts:247` | M, yet `threadProjectFromScratch` is still advertised (`srv/environment/ServerEnvironment.ts:259`) | "Scratch threads stay unavailable" (`docs/steps/step-2a-plan.md:74`) | — G4 |
+| Scratch threads | `projects.ensureScratch` `ws.ts:2924`; `srv/project/ManagedProjectFolders.ts:247` | M; `threadProjectFromScratch` stripped (SPI-994) | "Scratch threads stay unavailable" (`docs/steps/step-2a-plan.md:74`) | — G4 |
 | File tree, read, edit, `@` and content search | `ws.ts:2960-3019` | W | `layers.ts`; step-2a M2. Ignored-file list is always empty; reads cap at 1 MiB | done |
 | Attachments, images | upload route `srv/http.ts:464`; Pi inlines images `t3code/packages/provider-pi/src/server/adapter.ts:2671` | W (images); P (files: as text, unit-tested only); images past 0.9 MB per message are named, not shown (SPI-1027); no SnapShot window context (SPI-1028) | `env/provider/attachments.ts` (SPI-993): images inline within the Session's row budget, readable files as text, the rest named; stage `attach`: a green square named "green" on claude-haiku-5-5, a 1.2 MB image named "not shown" (`docs/steps/parity/spi-993-attachments.json`) | done |
 | Open in editor | `shell.openInEditor` `ws.ts:3045` | N/A (host launcher) | router answers "not found" | — |
@@ -59,7 +59,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Usage page, limit meters | `ws.ts:2740`; `t3code/docs/user/usage.md` | M | `BUILT_IN_USAGE_DRIVERS = []` | *def* G8 |
 | Model list, picker, thinking | — | W | `docs/steps/proxy-models/` | done |
 | Titles, commit and PR text | `srv/textGeneration/TextGeneration.ts:42` | W | step-2a M1, M4 | done |
-| Custom text generators | `con/settings.ts:941` | W†, but they hold a vendor key | not stripped | — D5 |
+| Custom text generators | `con/settings.ts:941` | R for now (D5): the setting is locked empty by t3flare's managed policy (SPI-994) | ADR-0023; `docs/steps/parity/spi-994-capabilities.json` | done (refusal ADR: SPI-1004) |
 | Skills, slash commands | `con/server.ts:128-130` | M | snapshot has none; `step-2a-plan.md:116` | — G10 |
 
 ### Git/VCS
@@ -89,7 +89,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Agent browser tools | `preview_*` | R | step-3 plan pins it off (L3) | 3 (as refusal) |
 | HTML visual replies | `srv/htmlRender/HtmlRender.ts` | M | step-3 allowlist drops `html_*` | — G11 |
 | MCP apps | `ws.ts:2579-2582` | M | differ drops them | — |
-| Device hub | `srv/device/DeviceHubProxy.ts:241`; `ws.ts:3255-3278` | R | unmounted; ADR-0010 | — |
+| Device hub | `srv/device/DeviceHubProxy.ts:241`; `ws.ts:3255-3278` | R; its settings (`enableDeviceSupport`, `enableAgentDeviceAccess`, `simlockDeviceHostsEnabled`) locked off (SPI-994) | unmounted; ADR-0010, ADR-0023 | — |
 | Relay tunnel | `ws.ts:2762` | R | ADR-0010 | — |
 
 ### MCP, secrets
@@ -116,25 +116,25 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Cloud-to-laptop link | — | R for now | ADR-0011 | *def* |
 | First pairing | `/api/auth/browser-session` | W (armed window) | ADR-0010 | done |
 | More devices, sessions, revoke | `con/environmentHttp.ts:600-624` | W† | used by step 3 | 3 |
-| Guest links | `srv/guest/http.ts:140`; `ws.ts:2372` | R; the RPC still answers, the link 404s | ADR-0010 | — G2 |
+| Guest links | `srv/guest/http.ts:140`; `ws.ts:2372` | R; `guestSharingEnabled` locked off by the managed policy, so no client offers a link (SPI-994) | ADR-0010, ADR-0023; stage `truecaps`: the write is refused ("managed by t3flare") | done |
 
 ### Updates, telemetry, import, other
 
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
-| Server self-update | `ws.ts:2685`; `srv/cloud/selfUpdate.ts:161` | N/A: nightly bump and deploy | ADR-0017; `npmReleaseLookup` still advertised | — G2 |
+| Server self-update | `ws.ts:2685`; `srv/cloud/selfUpdate.ts:161` | N/A: nightly bump and deploy | ADR-0017; `npmReleaseLookup` and the self-update flags stripped (SPI-994) | done |
 | Product analytics | `srv/telemetry/AnalyticsService.ts:67-74` (on by default, `ingest.t3.codes`) | Probably **on**, undocumented | `AnalyticsService.layer` in composition; no override; DO `process.env` empty | — D1 |
 | OTLP export | `con/settings.ts:1017`; proxy route `srv/http.ts:335` | M | URLs `undefined` in composition; route unmounted | *def* |
 | Import agent sessions | `srv/project/AgentSessionScanner.ts:217`, `:1196`; `ws.ts:3060` | N/A: no provider homes in the State directory | — | — |
-| Voice | `con/environmentHttp.ts:795-927` | Local R (capability stripped); cloud voice W† and stores a vendor key | `cloudVoiceTranscription` kept | — D5 |
-| Triage, host diagnostics | `ws.ts:2745`, `:2734-2738` | N/A | no host | — |
+| Voice | `con/environmentHttp.ts:795-927` | R: local voice is host-bound; cloud voice refused for now (D5) | both capabilities stripped (SPI-994) | done (refusal ADR: SPI-1004) |
+| Triage, host diagnostics | `ws.ts:2745`, `:2734-2738` | N/A | no host; `triage` stripped (SPI-994) | — |
 
 ## 2. Gaps no planned step covers, in dependency order
 
 | # | Ticket | Size | Key risk |
 |---|---|---|---|
 | G1 | ~~**Attachments and images reach Durable agents.**~~ Done (SPI-993): `apps/environment/src/provider/attachments.ts`. The user message's attachments are t3's own, so the differ has nothing to echo. Follow-ups: SPI-1027 (shrink large images), SPI-1028 (SnapShot context). | S | Bound: a DO SQLite row (2 MB) per Session message |
-| G2 | **Truthful capabilities.** Strip or hide scratch, npm release lookup, guest share and the device/browser/voice settings. | S | Client behaviour varies by nightly |
+| G2 | ~~**Truthful capabilities.**~~ Done (SPI-994, SPI-1012): every capability classified in `env/t3/capabilities.ts` (a new one fails typecheck and a test); settings of refused features locked by t3flare's managed policy (ADR-0023). | S | Client behaviour varies by nightly |
 | G3 | **Telemetry Layer**, per D1. | S | None |
 | G4 | **Scratch threads**: the scratch root becomes a Workspace. | S–M | Root is private to t3's runtime graph; likely a third Patch |
 | G5 | **Owner-facing plan mode and live output** (after step 3): toggle on, proposed plan, todos, streamed tool output. | M | pi-durable has no plan primitive |

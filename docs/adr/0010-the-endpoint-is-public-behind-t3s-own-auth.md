@@ -20,3 +20,12 @@ The WAF rule above was not built until now. Two changes, both in `apps/environme
 
 - **`/oauth/mcp/decision` joins the bootstrap refusal**: outside the Pairing window, a decision whose pairing code is the bootstrap token is refused by the Environment DO (`{"error":"pairing is not armed"}`, 401) before t3 sees it. This is defence in depth: t3 alone already refuses a grant that is not one-time there ("That is not a one-time pairing code", `EnvironmentAuth.consumeMcpApprovalCode`), and our bootstrap grant is a `desktop-bootstrap` one. `/oauth/mcp/approval` carries no credential. Both answers are checked by `acceptance.ts --peer` (F11).
 - **A Peer link is a 30-day MCP client session** with no refresh grant: it costs three rate-limited `POST`s per link, is renewed with a new pairing code, and is revoked in Sharing & access. A link takes a plain pairing code only (t3 refuses an access-bound "app approval" code for a link); the access the linking side asks for is capped by the code's scopes: a code minted with `orchestration:read` and `operate` alone cannot sign a full-access link, and is not spent by the refusal.
+
+## Refinement (SPI-1005): T3 Connect's routes are mounted
+
+"No relay routes" above is true of the relay tunnel and the guest routes, but not of T3 Connect's own HTTP group. `CloudHttp.layer` is part of `HttpApiBuilder.layer(EnvironmentHttpApi)` (`composition.ts`, `layerMakeRoutes`), and that builder needs every group, so these routes answer:
+
+- `/api/connect/link-proof`, `relay-config`, `link-state`, `reachability`, `unlink` and `preferences`. They sit behind t3's `EnvironmentAuthenticatedAuth`, so a paired client's session, like every other environment route.
+- `/api/t3-connect/health` and `/api/t3-connect/mint-credential`. They have no session middleware; t3's `CloudLink` verifies the relay's signed JWT proof (`verifyRelayJwt`) against the T3 Connect link (`t3code/apps/server/src/cloud/http.ts`). A request without a valid proof is refused.
+
+They stay mounted rather than refused in the Environment DO: step 3+ (the T3 Connect publish-only link) needs them, and t3's own auth already covers them. The guest routes (`t3code/apps/server/src/guest/http.ts`) are still not mounted, and guest links are off under ADR-0023's managed policy (`guestSharingEnabled` locked).
