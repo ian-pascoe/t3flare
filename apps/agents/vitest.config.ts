@@ -16,7 +16,7 @@ export default defineConfig({
             main: "./test/workerd.fixture.ts",
             miniflare: {
               compatibilityDate: "2026-11-01",
-              compatibilityFlags: ["nodejs_compat"],
+              compatibilityFlags: ["nodejs_compat", "nodejs_compat_do_not_populate_process_env"],
               bindings: { T3FLARE_LEASE_MS: "300", T3FLARE_MAX_CONTAINERS: "2" },
               durableObjects: {
                 // The fake-clock subclass for lease timing; the real class (wall clock) for the one test of the default.

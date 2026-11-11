@@ -7,7 +7,7 @@
   "no_bundle": true,
   "rules": [{ "type": "ESModule", "globs": ["**/*.js"] }],
   "compatibility_date": "2026-11-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "nodejs_compat_do_not_populate_process_env"],
   "assets": {
     "directory": "dist/web",
     "binding": "ASSETS",

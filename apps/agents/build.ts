@@ -11,7 +11,7 @@ const here = import.meta.dirname;
 
 export const COMPATIBILITY = {
   date: "2026-11-01",
-  flags: ["nodejs_compat"],
+  flags: ["nodejs_compat", "nodejs_compat_do_not_populate_process_env"],
 };
 
 export const buildAgentsWorker = async (options: { readonly quiet?: boolean } = {}) => {

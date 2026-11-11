@@ -18,7 +18,7 @@ export default defineConfig({
             main: "./test/workerd.fixture.ts",
             miniflare: {
               compatibilityDate: "2026-11-01",
-              compatibilityFlags: ["nodejs_compat"],
+              compatibilityFlags: ["nodejs_compat", "nodejs_compat_do_not_populate_process_env"],
               durableObjects: { TEST_OBJECTS: { className: "TestObject", useSQLite: true } },
             },
           }),
