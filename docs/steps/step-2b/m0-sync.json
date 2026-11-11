@@ -1,0 +1,54 @@
+{
+  "note": "step 2b M0: Workspace.pull()/push() against the Container backend; a 2,000-file commit made in the PTY (arg=2000)",
+  "files": {
+    "noopPull": {
+      "ms": 54,
+      "blocks": 1,
+      "entries": 0
+    },
+    "beforePull": "pty-1794413727057\n",
+    "pullAfterWrite": {
+      "ms": 149,
+      "blocks": 1,
+      "entries": 1
+    },
+    "afterPull": "pty-1794413820608\n",
+    "pullAfterCommit": {
+      "ms": 844,
+      "blocks": 1,
+      "entries": 1045
+    },
+    "headInDo": "ref: refs/heads/master\n",
+    "push": {
+      "ms": 117,
+      "blocks": 1,
+      "entries": 1
+    },
+    "catAfterPush": true,
+    "concurrent": {
+      "exit": 0,
+      "pull": {
+        "ms": 318,
+        "blocks": 1,
+        "entries": 2
+      },
+      "exec": "exec-1794413820608\n",
+      "pty": "conc-1794413820608\n"
+    },
+    "pullMany": {
+      "ms": 12665,
+      "blocks": 3,
+      "entries": 5256
+    },
+    "noopPullMany": {
+      "ms": 107,
+      "blocks": 1,
+      "entries": 0
+    },
+    "pullOneCommitMany": {
+      "ms": 273,
+      "blocks": 1,
+      "entries": 20
+    }
+  }
+}

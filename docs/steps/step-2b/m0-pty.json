@@ -1,0 +1,66 @@
+{
+  "note": "step 2b M0: the platform's PTY exec (ctx.container.exec with pty) on the step2b stage, scratch Workspace probe2b; raw probe answers (apps/agents/src/workspace/terminalProbe.ts, removed after M0)",
+  "pty": {
+    "execMs": 17,
+    "isPty": true,
+    "pid": 47,
+    "stderrIsNull": false,
+    "prompt": {
+      "matched": true,
+      "text": "\u001b[?2004hprobe$ ",
+      "ms": 20
+    },
+    "echo": {
+      "matched": true,
+      "text": "echo hello-$((40+2)); echo D$((1+1))NE\r\n\u001b[?2004l\rhello-42\r\nD2NE\r\n\u001b[?2004hprobe$ ",
+      "ms": 20
+    },
+    "sizeBefore": "stty size; echo D$((1+1))NE\n24 80\nD2NE\nprobe$ ",
+    "sizeAfter": "stty size; echo D$((1+1))NE\n40 120\nD2NE\nprobe$ ",
+    "session": "ps -o pid=,pgid=,sid=,tpgid=,tty=,comm= -p $$; echo sid-done; echo D$((1+1))NE\n     47      47      47      50 pts/0    bash\nsid-done\nD2NE\nprobe$ ",
+    "processTableWhileSleep": "      1       0       1       1      -1 ?        /bin/bash /usr/local/bin/cloudpid-supervise\n      7       1       1       1      -1 ?        sed -u -E s#(data:[-A-Za-z0-9.+/;=_]*;base64,)[-A-Za-z0-9+/=_]{64,}#\\1[base64 dropped]#g\n      8       1       1       1      -1 ?        tail -n 200\n      9       1       1       1      -1 ?        tee /dev/shm/cloudpid-supervise.lDb3VG/keep\n     11       1       1       1      -1 ?        /bin/bash /usr/local/bin/cloudpid-memory-guard\n     12       1       1       1      -1 ?        /usr/local/bin/computerd\n     15      11       1       1      -1 ?        /usr/bin/earlyoom -m 15,8 -M 1048576,524288 -r 0 -p --avoid ^(computerd|cloudpid-superv|cloudpid-memory|cloudpid-mcp-br)$\n     28      12      28      28      -1 ?        fusermount3 --auto-unmount -- /workspace\n     47       0      47      47      51 pts/0    bash --norc -i\n     51      47      51      47      51 pts/0    sleep 3\n",
+    "ctrlC": {
+      "matched": true,
+      "text": "^Cecho after-ctrl-c; echo D$((1+1))NE\r\n\r\n\u001b[?2004hprobe$ echo after-ctrl-c; echo D$((1+1))NE\r\n\u001b[?2004l\rafter-ctrl-c\r\nD2NE\r\n\u001b[?2004hprobe$ ",
+      "ms": 20,
+      "sinceCtrlCMs": 20
+    },
+    "background": "sleep 600 & echo bg=$!; echo D$((1+1))NE\n[1] 56\nbg=56\nD2NE\nprobe$ ",
+    "fullScreen": {
+      "drew": true,
+      "alternateScreen": true,
+      "bytes": 843
+    },
+    "shellOutputTail": "      4 4\n      5 5\n      6 6\n      7 7\n      8 8\n      9 9\n     10 10\n     11 11\n     12 12\n     13 13\n     14 14\n     15 15\n     16 16\n     17 17\n     18 18\n     19 19\n     20 20\n     21 21\n     22 22\n     23 23\n     24 24\n     25 25\n     26 26\n     27 27\n     28 28\n     29 29\n     30 30\n     31 31\n     32 32\n     33 33\n     34 34\n     35 35\n     36 36\n     37 37\n     38 38\n     39 39\n:\u001b>probe$ ",
+    "markedBeforeExit": [
+      "47 bash --norc -i ",
+      "56 sleep 600"
+    ],
+    "exit": {
+      "exitCode": 7
+    },
+    "markedAfterExit": [
+      "56 sleep 600"
+    ],
+    "killScript": "{\"signalled\":1,\"survivors\":0}",
+    "markedAfterKill": []
+  },
+  "afterExit": {
+    "resize": "ok, no error",
+    "kill": "ok, no error; the object kept its in-memory handles across the next call (no reset)",
+    "note": "review F2 adopted anyway: signals go through the marker kill script"
+  },
+  "env": {
+    "execEnvNames": [
+      "GIT_TERMINAL_PROMPT",
+      "HOME",
+      "MISE_GLOBAL_CONFIG_FILE",
+      "MISE_TRUSTED_CONFIG_PATHS",
+      "MISE_YES",
+      "PATH"
+    ],
+    "mise": "node=/usr/local/share/mise/installs/node/26.13.0/bin/node git=/usr/local/share/mise/installs/conda-git/2.56.0/.mise-bins/git gh=/usr/local/share/mise/installs/gh/2.103.3/gh_2.103.3_linux_amd64/bin/gh",
+    "bind": "bind-ok\n/w/probe2b",
+    "whoami": "uid=0(root) gid=0(root) groups=0(root)"
+  }
+}

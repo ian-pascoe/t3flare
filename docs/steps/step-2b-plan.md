@@ -165,6 +165,24 @@ a finding found wrong is recorded with its evidence in the report, not followed.
 
 ## 2. The terminal
 
+### 2.0 M0's decision (written after M0)
+
+- **The platform PTY works in production** (`m0-pty.json`): prompt in 20 ms after exec, echo, `stty size` 24 80 → 40
+  120 after `resize`, bash is its own session and group leader with the PTY's foreground group readable (`tpgid`),
+  Ctrl-C reaches the foreground job, `less` draws on the alternate screen (the image has no vim), `exit 7` gives 7.
+  The exec's env is what it is given plus `HOME` and `PATH`; mise activates; the bind mount at `/w/<id>` works. R1's
+  fallback is not needed.
+- **Resize and kill after exit** raised nothing in the probe; F2 is adopted anyway (the marker kill script also takes
+  the shell's leftovers, and there is one signal path).
+- **Lifetime** (`m0-lifetime.json`): a shell outlives `ctx.abort()` as an orphan the new instance cannot reach, so the
+  DO keeps its shells' markers in storage and kills the orphans at its next open (R3). An idle DO with a shell was not
+  evicted in 6 minutes; the Container's idle stop ended the shell.
+- **Sync** (`m0-sync.json`): a no-op pull 50–110 ms, a pull after a write 135–150 ms, after one commit in a 2,000-file
+  repo 270 ms; the first pull of 2,000 new files 12.7 s (3 blocks); a push 60–120 ms; a pull beside a computer exec
+  stays correct. The plan's timings stand.
+- **Transport: push**, as planned. The streamed-RPC comparison was not built: the push met the targets on the real
+  path in M1 (echo p50 73 ms, p95 95 ms; 3.1 MiB/s through t3), so the fallback was not needed.
+
 ### 2.1 Shape
 
 ```

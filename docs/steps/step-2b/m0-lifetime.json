@@ -1,0 +1,29 @@
+{
+  "note": "step 2b M0: the exec'd shell's lifetime",
+  "a_ctxAbort": {
+    "before": {
+      "pid": 85,
+      "marked": [
+        "85 bash --norc -i"
+      ]
+    },
+    "after": {
+      "handleInMemory": false,
+      "running": true,
+      "marked": [
+        "85 bash --norc -i"
+      ]
+    },
+    "finding": "the shell outlives ctx.abort() as an orphan; the new instance has no handle: kill by marker (the stored markers, killed at the next open)"
+  },
+  "b_idleNoRequests": {
+    "after6min": {
+      "handleInMemory": true,
+      "exitCode": -1,
+      "running": false,
+      "marked": []
+    },
+    "finding": "no eviction while the stdout read was pending; the Container's own idle stop (2 min) ended the shell (exitCode rejected)"
+  },
+  "c_containerDestroyed": "the shell ends with it (b, and M1's idle-hold)"
+}

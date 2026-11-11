@@ -1,0 +1,164 @@
+{
+  "url": "https://t3flare-environment-step2b.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-11T16:12:46.775Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "24e77473",
+      "commit": "441fe0847361",
+      "builtAt": "2026-11-11T16:11:38.712Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-11T16:22:48.642Z",
+    "paired": 200,
+    "ms": 3407,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "e445f339-0473-4cd9-b128-c7ec9eaf697b",
+    "threads": 3,
+    "ms": 4295
+  },
+  "fixtures": {
+    "threads": 3,
+    "runs": 6,
+    "messages": 12,
+    "turnItems": 30,
+    "events": 60,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 736,
+    "bytes": 5616,
+    "listedFixtureThreads": 3
+  },
+  "threadWindow": {
+    "threads": 3,
+    "allOk": true,
+    "minItems": 10,
+    "maxMs": 86,
+    "maxBytes": 23852
+  },
+  "subscribeThread": {
+    "ms": 37,
+    "bytes": 23793,
+    "items": 10
+  },
+  "search": {
+    "ms": 29,
+    "matches": 3,
+    "threads": 3
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 881
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 3,
+    "maxParameters": 300,
+    "compoundsRewritten": 8,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "refusedStatements": 0,
+    "pragmaRefusals": 3
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 192,
+      "modules": 108
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 4,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:04e045e8-00ef-4ae8-829b-13f8264db42c"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": []
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwcbif5i",
+      "ms": 16308,
+      "cwd": "/w/acceptance-mwcbif5i",
+      "error": null
+    },
+    "turn": {
+      "threadId": "e522a500-115d-466f-9141-073d13e527fe",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwcbif5i/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwcbif5i && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 29742
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "ms": 30162
+  },
+  "totalMs": 38382,
+  "failures": [],
+  "ok": true
+}
