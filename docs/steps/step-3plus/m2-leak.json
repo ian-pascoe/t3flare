@@ -1,0 +1,57 @@
+{
+ "workspace": "connect-m2-mwcrpr4t",
+ "threads": [
+  "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+  "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+  "b973a154-4d16-4e12-aed2-0b87a2319138",
+  "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6"
+ ],
+ "status": 200,
+ "checked": [
+  "ALCHEMY_CLOUDFLARE_ACCOUNT_ID",
+  "ALCHEMY_STAGE",
+  "ALCHEMY_WORKER_NAME",
+  "MODEL_PROXY_API_KEY",
+  "MODEL_PROXY_URL",
+  "T3FLARE_ACCESS_AUD",
+  "T3FLARE_ACCESS_SERVICE_CLIENT_ID",
+  "T3FLARE_ACCESS_TEAM_DOMAIN",
+  "T3FLARE_ADMIN_TOKEN",
+  "T3FLARE_GITHUB_APP_PRIVATE_KEY",
+  "T3FLARE_OWNER_EMAIL",
+  "T3_BOOTSTRAP_TOKEN",
+  "cloud-cli-oauth-token:access",
+  "cloud-cli-oauth-token:refresh",
+  "cloud-relay-environment-credential"
+ ],
+ "credentialsFound": 0,
+ "container": {
+  "exitCode": 0,
+  "bytes": 8893,
+  "files": 11,
+  "leaked": []
+ },
+ "sessions": [
+  {
+   "thread": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+   "bytes": 5403,
+   "leaked": []
+  },
+  {
+   "thread": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+   "bytes": 5560,
+   "leaked": []
+  },
+  {
+   "thread": "b973a154-4d16-4e12-aed2-0b87a2319138",
+   "bytes": 4956,
+   "leaked": []
+  },
+  {
+   "thread": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+   "bytes": 6655,
+   "leaked": []
+  }
+ ],
+ "leaked": 0
+}

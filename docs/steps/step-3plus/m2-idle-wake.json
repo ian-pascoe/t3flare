@@ -1,0 +1,7 @@
+{
+ "what": "after M2 the Environment reset when idle (health: runtime stopped, idleSince 23:55:33Z); a request booted it again; 20 s later the recorder had nothing new",
+ "lastEntryBefore": "2026-11-11T23:52:41.217Z",
+ "lastEntryAfter": "2026-11-11T23:52:41.217Z",
+ "newEntries": [],
+ "linked": true
+}

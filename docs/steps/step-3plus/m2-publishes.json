@@ -1,0 +1,1363 @@
+{
+ "at": "2026-11-11T23:52:35.902Z",
+ "stamp": "mwcrpr4t",
+ "projectId": "152dfdf5-897b-4187-9598-e07565bab12b",
+ "failures": [],
+ "a": {
+  "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+  "run": "completed",
+  "phases": [
+   "starting",
+   "running",
+   "completed"
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:46:35.482Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:36.220Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:36.399Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:46:37.513Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:38.544Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:46:39.684Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "deferred",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:44.684Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:44.684Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:44.867Z",
+    "threadId": "9c0d04f6-7122-4434-9e01-26614a33ff7c",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "completed"
+   }
+  ]
+ },
+ "b": {
+  "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+  "request": "command",
+  "run": "completed",
+  "phases": [
+   "starting",
+   "running",
+   "waiting_for_approval",
+   "running",
+   "completed"
+  ],
+  "waitingPublishedBeforeAnswer": [
+   "starting",
+   "running",
+   "waiting_for_approval"
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:46:52.650Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:53.233Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:53.423Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:46:54.759Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:54.915Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:46:56.806Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "publishing",
+    "phase": "waiting_for_approval",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:46:57.008Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "waiting_for_approval"
+   },
+   {
+    "at": "2026-11-11T23:47:29.146Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:47:29.332Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:47:32.562Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "deferred",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:47:37.563Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:47:37.563Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:47:37.742Z",
+    "threadId": "ba70389c-3a3f-4d9f-a0e7-a9eae387cd72",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "completed"
+   }
+  ]
+ },
+ "c": {
+  "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+  "asked": true,
+  "reply": "I'll ask you the question now.\nblue",
+  "phases": [
+   "starting",
+   "running",
+   "waiting_for_input",
+   "running",
+   "completed"
+  ],
+  "waitingPublishedBeforeAnswer": [
+   "starting",
+   "running",
+   "waiting_for_input"
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:47:46.665Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:47:47.186Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:47:47.350Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:47:48.129Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:47:48.308Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:47:50.138Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "publishing",
+    "phase": "waiting_for_input",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:47:50.305Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "waiting_for_input"
+   },
+   {
+    "at": "2026-11-11T23:48:20.991Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:21.142Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:48:23.804Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "deferred",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:28.805Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:28.805Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:28.995Z",
+    "threadId": "0d945fc9-0908-4d2f-8607-c7ed7dcae170",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "completed"
+   }
+  ]
+ },
+ "d": {
+  "threadId": "ea793c17-15a4-4bbd-b627-ac86831dc566",
+  "fault": {
+   "armed": {
+    "fixture": "cooldown",
+    "resetAt": 1794441036955
+   }
+  },
+  "run": "failed",
+  "phases": [
+   "starting",
+   "running",
+   "failed"
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:48:36.895Z",
+    "threadId": "ea793c17-15a4-4bbd-b627-ac86831dc566",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:38.926Z",
+    "threadId": "ea793c17-15a4-4bbd-b627-ac86831dc566",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:39.118Z",
+    "threadId": "ea793c17-15a4-4bbd-b627-ac86831dc566",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:48:39.143Z",
+    "threadId": "ea793c17-15a4-4bbd-b627-ac86831dc566",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:39.324Z",
+    "threadId": "ea793c17-15a4-4bbd-b627-ac86831dc566",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:48:39.707Z",
+    "threadId": "ea793c17-15a4-4bbd-b627-ac86831dc566",
+    "event": "publishing",
+    "phase": "failed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:39.917Z",
+    "threadId": "ea793c17-15a4-4bbd-b627-ac86831dc566",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "failed"
+   }
+  ]
+ },
+ "e": {
+  "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+  "interrupted": "sent",
+  "run": "interrupted",
+  "phases": [
+   "starting",
+   "running",
+   null
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:48:53.671Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:54.814Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:54.975Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:48:55.878Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:48:56.034Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:49:00.849Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:05.854Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "confirmed",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:05.854Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "publishing",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:06.047Z",
+    "threadId": "86c671a2-3652-4e9e-9e1b-8f18b9bbadd8",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": null
+   }
+  ]
+ },
+ "f": {
+  "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+  "restartedAt": "2026-11-11T23:49:19.941Z",
+  "runs": [
+   "cancelled",
+   "completed"
+  ],
+  "phases": [
+   "starting",
+   "running",
+   "starting",
+   "running",
+   "completed"
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:49:14.585Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:15.224Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:15.400Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:49:16.350Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:16.534Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:49:20.281Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:20.284Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:20.394Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:49:20.503Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:20.731Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:49:26.630Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "deferred",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:31.630Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:31.630Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:49:31.825Z",
+    "threadId": "8fe8d3ed-fb01-40fc-aa26-3af56c04c445",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "completed"
+   }
+  ]
+ },
+ "g": {
+  "threadId": "83ac9577-52f2-46e9-b826-b174d1def146",
+  "entries": []
+ },
+ "h": {
+  "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+  "pendingBefore": [
+   "command"
+  ],
+  "restartedAt": "2026-11-11T23:50:13.105Z",
+  "pendingAfterBoot": [],
+  "runsAfterBoot": [
+   "cancelled"
+  ],
+  "answeredAfterBoot": false,
+  "runs": [
+   "cancelled"
+  ],
+  "phases": [
+   "starting",
+   "running",
+   "waiting_for_approval",
+   null
+  ],
+  "publishedAfterBoot": [
+   "deferred:",
+   "confirmed:",
+   "publishing:",
+   "completed:"
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:49:59.544Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:00.138Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:00.327Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:50:01.596Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:01.751Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:50:03.816Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "publishing",
+    "phase": "waiting_for_approval",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:04.103Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "waiting_for_approval"
+   },
+   {
+    "at": "2026-11-11T23:50:38.293Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:43.293Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "confirmed",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:43.293Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "publishing",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:43.472Z",
+    "threadId": "b973a154-4d16-4e12-aed2-0b87a2319138",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": null
+   }
+  ]
+ },
+ "i": {
+  "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+  "pendingBefore": [
+   "user_input"
+  ],
+  "restartedAt": "2026-11-11T23:51:03.041Z",
+  "pendingAfterBoot": [
+   "user_input"
+  ],
+  "runsAfterBoot": [
+   "cancelled"
+  ],
+  "answeredAfterBoot": true,
+  "runs": [
+   "cancelled",
+   "completed"
+  ],
+  "phases": [
+   "starting",
+   "running",
+   "waiting_for_input",
+   "waiting_for_input",
+   "starting",
+   "running",
+   "completed"
+  ],
+  "publishedAfterBoot": [
+   "publishing:waiting_for_input",
+   "completed:waiting_for_input",
+   "publishing:starting",
+   "completed:starting",
+   "publishing:running",
+   "completed:running",
+   "deferred:completed",
+   "confirmed:completed",
+   "publishing:completed",
+   "completed:completed"
+  ],
+  "entries": [
+   {
+    "at": "2026-11-11T23:50:51.230Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "deferred",
+    "phase": null,
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:51.702Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:51.889Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:50:52.526Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:52.706Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:50:54.840Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "publishing",
+    "phase": "waiting_for_input",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:50:55.010Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "waiting_for_input"
+   },
+   {
+    "at": "2026-11-11T23:51:03.911Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "publishing",
+    "phase": "waiting_for_input",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:04.010Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "waiting_for_input"
+   },
+   {
+    "at": "2026-11-11T23:51:28.626Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:28.746Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:51:28.780Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:28.931Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:51:30.886Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "deferred",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:35.886Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:35.886Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:36.094Z",
+    "threadId": "9fccc147-24bc-4bfd-9d4b-c69b707fe0a6",
+    "event": "completed",
+    "ok": true,
+    "deliveries": {
+     "total": 0,
+     "queued": 0,
+     "successful": 0,
+     "failed": 0,
+     "kinds": [],
+     "failedReasons": []
+    },
+    "phase": "completed"
+   }
+  ]
+ },
+ "j": {
+  "removed": {
+   "relay": {
+    "status": 200
+   }
+  },
+  "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+  "entries": [
+   {
+    "at": "2026-11-11T23:51:46.450Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "starting",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:46.570Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "starting"
+   },
+   {
+    "at": "2026-11-11T23:51:47.228Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:47.338Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:51:47.339Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:47.479Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:51:49.479Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:49.568Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:51:49.570Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "running",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:49.658Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "running"
+   },
+   {
+    "at": "2026-11-11T23:51:49.659Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "deferred",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:54.659Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:54.659Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:54.769Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "completed"
+   },
+   {
+    "at": "2026-11-11T23:51:55.769Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:55.769Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:55.881Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "completed"
+   },
+   {
+    "at": "2026-11-11T23:51:57.881Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:57.881Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:51:57.996Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "completed"
+   },
+   {
+    "at": "2026-11-11T23:52:01.996Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:52:01.996Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:52:02.118Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "completed"
+   },
+   {
+    "at": "2026-11-11T23:52:10.118Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:52:10.118Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:52:10.257Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "completed"
+   },
+   {
+    "at": "2026-11-11T23:52:26.257Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "confirmed",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:52:26.257Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "publishing",
+    "phase": "completed",
+    "reason": "snapshot"
+   },
+   {
+    "at": "2026-11-11T23:52:26.392Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "completed"
+   },
+   {
+    "at": "2026-11-11T23:52:26.392Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "exhausted"
+   }
+  ],
+  "summary": {
+   "rejected": true,
+   "lastFailure": {
+    "at": "2026-11-11T23:52:26.392Z",
+    "threadId": "5fc530c2-b8df-48cc-afe8-b4ed9e3ee153",
+    "event": "failed",
+    "status": 401,
+    "errorTag": "RelayAuthInvalidError",
+    "rejected": true,
+    "phase": "completed"
+   }
+  },
+  "relinked": {
+   "mode": "publish_only",
+   "accountTokenKept": true,
+   "mintKeyRemoved": true
+  }
+ }
+}
