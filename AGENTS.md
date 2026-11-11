@@ -11,7 +11,7 @@
 
 ### Issue tracker
 
-Issues live in Linear (team SPI, project t3flare); GitHub Issues are the public intake and sync one-way into it. Reach Linear through Executor's Linear app, falling back to the `linear` CLI. See `docs/agents/issue-tracker.md`.
+Issues live in Linear (team SPI, project ian-pascoe/t3flare); GitHub Issues are the public intake and sync one-way into it. Reach Linear through Executor's Linear app, falling back to the `linear` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
