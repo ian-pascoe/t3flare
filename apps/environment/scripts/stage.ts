@@ -80,7 +80,14 @@ switch (command) {
       console.error(`t3flare: missing ${missing.join(", ")} (set them, or put them in ~/.config/t3flare/dev.env)`);
       process.exit(1);
     }
-    const status = alchemy(["deploy"], { ...stageSecrets(), ...secrets });
+    let status = alchemy(["deploy"], { ...stageSecrets(), ...secrets });
+    if (status !== 0) {
+      // On a stage whose Workers do not exist yet, each Worker's Durable Object binding to a class in the other fails
+      // (DurableObjectClassNotFound). Deploy both once without the cross-Worker bindings, then again with them.
+      console.error("t3flare: deploy failed; retrying in two passes (the first without cross-Worker bindings)");
+      const first = alchemy(["deploy"], { ...stageSecrets(), ...secrets, T3FLARE_DEPLOY_BOOTSTRAP: "1" });
+      status = first === 0 ? alchemy(["deploy"], { ...stageSecrets(), ...secrets }) : first;
+    }
     if (status === 0 && !fs.existsSync(credentialsFile(stage))) {
       console.error(`t3flare: deployed, but ${path.relative(here, credentialsFile(stage))} was not written`);
       process.exit(1);

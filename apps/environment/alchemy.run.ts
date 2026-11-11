@@ -52,6 +52,8 @@ export default Alchemy.Stack(
     const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
     const idleAfterMs = yield* Config.String("T3FLARE_IDLE_AFTER_MS").pipe(Config.withDefault(""));
+    // The first pass of a deploy to a new stage: no Durable Object bindings across the two Workers (scripts/stage.ts).
+    const bootstrapPass = (yield* Config.String("T3FLARE_DEPLOY_BOOTSTRAP").pipe(Config.withDefault(""))) === "1";
     // The turn deadline (2 h) shortened on a stage for its check (step 2a M5): unset in normal deploys.
     const turnDeadlineMs = yield* Config.String("T3FLARE_TURN_DEADLINE_MS").pipe(Config.withDefault(""));
 
@@ -90,7 +92,7 @@ export default Alchemy.Stack(
         SESSIONS: Cloudflare.DurableObject("SessionDO", { className: "SessionDO" }),
         WORKSPACES: Cloudflare.DurableObject("WorkspaceDO", { className: "WorkspaceDO", containers: [workspaceContainer] } as never),
         CONTAINER_BUDGET: Cloudflare.DurableObject("ContainerBudget", { className: "ContainerBudget" }),
-        ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO", scriptName: name }),
+        ...(bootstrapPass ? {} : { ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO", scriptName: name }) }),
         LOADER: Cloudflare.WorkerLoader(),
         MODEL_PROXY_URL: modelProxyUrl,
         MODEL_PROXY_API_KEY: modelProxyKey,
@@ -112,9 +114,13 @@ export default Alchemy.Stack(
         T3FLARE_ACCESS_AUD: admin.aud,
         T3FLARE_OWNER_EMAIL: ownerEmail,
         T3FLARE_ACCESS_SERVICE_CLIENT_ID: serviceToken.clientId,
-        SESSIONS: Cloudflare.DurableObject("SessionDO", { className: "SessionDO", scriptName: agentsName }),
-        WORKSPACES: Cloudflare.DurableObject("WorkspaceDO", { className: "WorkspaceDO", scriptName: agentsName }),
-        CONTAINER_BUDGET: Cloudflare.DurableObject("ContainerBudget", { className: "ContainerBudget", scriptName: agentsName }),
+        ...(bootstrapPass
+          ? {}
+          : {
+              SESSIONS: Cloudflare.DurableObject("SessionDO", { className: "SessionDO", scriptName: agentsName }),
+              WORKSPACES: Cloudflare.DurableObject("WorkspaceDO", { className: "WorkspaceDO", scriptName: agentsName }),
+              CONTAINER_BUDGET: Cloudflare.DurableObject("ContainerBudget", { className: "ContainerBudget", scriptName: agentsName }),
+            }),
         T3FLARE_GITHUB_APP_ID: Config.String("T3FLARE_GITHUB_APP_ID"),
         T3FLARE_GITHUB_APP_PRIVATE_KEY: Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),
         MODEL_PROXY_URL: modelProxyUrl,
