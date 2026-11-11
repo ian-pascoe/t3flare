@@ -18,6 +18,49 @@ process router gives t3's `git worktree add`, `list` and `remove` their cloud me
 machine in the Workspace registry, with a daily sweep, a 7-day grace and a reference check. No new Patch or Shadow
 is expected.
 
+## Changelog: the independent review (Fable), and the owner's D1
+
+These override the sections below where they conflict. Each is checked against the code when its milestone reaches it;
+a finding found wrong is recorded with its evidence in the report, not followed.
+
+- **D1 (owner):** terminals do not outlive clients (§2.7's default). ADR-0003 is unchanged.
+- **F0 (security, M0's first commit).** At our compatibility date `process.env` holds the Worker's string bindings,
+  secrets included, and t3 copies `process.env` into terminals (`Manager.ts:1529`) and ACP spawns. Both Workers get
+  `nodejs_compat_do_not_populate_process_env`; every runtime read of `process.env` is checked first, and the stage
+  must boot and work with it. §2.1's two layers stay (the base env is never `process.env`; the allowlist). M1's leak
+  check compares secret *values* inside the DO, not names.
+- **F1 (HIGH, M1).** `closeOnSettle` → `closeIdle` closes every running terminal whose inspector reports no
+  subprocess, so §2.8's v1 would kill `npm run dev` on settle. Foreground reporting moves into M1: the rc file emits
+  `PS0`/`PROMPT_COMMAND` markers that `TerminalHost` strips from the output; the inspector answers from them. The
+  same markers drive pull-on-prompt (§2.6) and the release of input buffered during start-up.
+- **F2 (HIGH, M1).** `ExecProcess.kill()` after the process exited raises an uncaught internal error in the DO, and
+  t3 sends SIGKILL 1 s after SIGTERM unless it saw the exit, which reaches us later by push. Signals go only through
+  part 2's marker kill script, never `ExecProcess.kill()`. M0 probes kill and resize after exit.
+- **F3 (HIGH, M4).** The sweep fails closed: any read error aborts the whole run (unlike `host/idle.ts`'s `[]`);
+  references match by `toWorkspace(path).id`, not path equality (a project may sit in a subdirectory); prod's sweep is
+  a dry run unless an env switch turns purging on.
+- **F4 (HIGH, M4).** A purged Workspace can be resurrected: Sessions reach the Workspace DO by name, bypassing the
+  registry, and `fileOperation` → `ready()` may recreate storage after `deleteAll`. Sessions are destroyed or detached
+  before the Workspace; `destroy()` leaves a marker that every RPC except provisioning refuses. Budget holders are hex
+  DO ids, so the cost guard compares `idFromName(id).toString()`.
+- **F5 (HIGH, M2/M4).** Path reuse: a worktree's directory is deterministic from the branch, and t3 re-creates a
+  missing worktree at the same path on the next turn or rollback. `worktree add` on a tombstone restores it; on
+  `deleting` it finishes the purge, then provisions; `deleting` rows are retried within minutes.
+- **F6 (MEDIUM, M2).** The PR review guide runs `git -c core.hooksPath=/dev/null worktree add --detach --quiet
+  <path> <sha>` at `/w/.wt/review-guide-*/checkout` after a temp directory in `worktreesDir`. Supported or refused
+  with a clear message; the argv is in `gitRoutes.test.ts`.
+- **F7 (MEDIUM, M2).** `--not --remotes` trusts stale remote-tracking refs: the bundle excludes the new clone's actual
+  tips, or falls back to a full bundle.
+- **F8 (MEDIUM, M4).** Carry-home carries every unreachable `refs/heads/*` and `refs/stash`; if any step cannot run
+  (two Containers under a budget of 3), the Workspace is tombstoned and never purged.
+- **F9 (MEDIUM, M1).** Sync: `Workspace.pull()` names `CONTAINER_BACKEND`; a sync starts a stopped Container and takes
+  a lease, so it is guarded on `ctx.container.running`; serialisation is per block, not per pull; empty pulls back off.
+- **F10 (MEDIUM).** Only input resets the 30-minute hold (or an absolute cap), so a noisy terminal cannot hold a
+  Container forever. `registerTerminalProcesses` (synthetic pids feed port discovery) and
+  `resolveProviderInstanceEnvironment` (may carry credentials, ADR-0016) are omitted from our Layer.
+- **F11 (LOW).** The adapter learns that the Workspace DO restarted and lost its handles (an epoch on every answer).
+  Every push to `main` restarts the Environment (immediate code update), which kills running setup scripts: documented.
+
 ---
 
 ## 1. What t3 does today (read in the pinned submodule)
