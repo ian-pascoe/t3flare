@@ -47,12 +47,22 @@ describe("publish recorder", () => {
 
   it("classifies a refusal by its status and keeps none of the failure's text", () => {
     const recorder = makePublishRecorder(memoryStore());
-    const cause = "HttpApiClientError: Unauthorized (status 401) Bearer abcdefghijklmnop https://relay.t3.codes/v1/environments/e/threads/t";
+    const cause = "Unauthorized (status 401) Bearer abcdefghijklmnop https://relay.t3.codes/v1/environments/e/threads/t";
     recorder.record(["agent activity publish failed", { threadId: T1, cause }], at(1));
     const [entry] = recorder.entries();
     expect(entry).toMatchObject({ event: "failed", status: 401, rejected: true });
     expect(JSON.stringify(entry)).not.toContain("abcdefghijklmnop");
     expect(recorder.summary()).toMatchObject({ rejected: true, lastFailure: { status: 401 } });
+  });
+
+  it("reads the status from the relay's named error, as t3's Cause.pretty gives it (seen on the stage, M2 row j)", () => {
+    const recorder = makePublishRecorder(memoryStore());
+    recorder.record(["agent activity publish failed", { threadId: T1, cause: "RelayAuthInvalidError: Relay authentication failed: invalid_bearer\n    at …" }], at(1));
+    recorder.record(["agent activity publish failed", { threadId: T1, cause: "RelayAgentActivityPublishProofExpiredError: proof expired" }], at(2));
+    expect(recorder.entries().map(({ status, errorTag, rejected }) => ({ status, errorTag, rejected }))).toEqual([
+      { status: 401, errorTag: "RelayAuthInvalidError", rejected: true },
+      { status: 401, errorTag: "RelayAgentActivityPublishProofExpiredError", rejected: false },
+    ]);
   });
 
   it("ignores other log events, keeps the last 100 and reads them back after a reset", () => {

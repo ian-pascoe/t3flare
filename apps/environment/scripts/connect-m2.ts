@@ -119,15 +119,21 @@ if (wants("d")) {
 
 if (wants("e")) {
   const threadId = await thread("m2 e stop");
-  await say(cookie, threadId, "Write the numbers from 1 to 400 in words, one per line, with no other text.");
-  const live = await until(cookie, threadId, (p) => running(p) || settled(p));
+  await say(cookie, threadId, "Run the shell command `sleep 60` with your bash tool, then reply with the word done.");
+  // Stop once the bash call is under way, so the run is surely still going.
+  const live = await until(cookie, threadId, (p) => (running(p) && (p?.turnItems ?? []).some((item: any) => item.type === "command_execution")) || settled(p));
   const run = runsOf(live).find((r) => r.status === "running");
-  await sleep(4000);
-  if (run !== undefined) await dispatch(cookie, { type: "run.interrupt", commandId: uuid(), threadId, runId: run.id });
+  const interrupted =
+    run === undefined
+      ? "not running"
+      : await dispatch(cookie, { type: "run.interrupt", commandId: uuid(), threadId, runId: run.id }).then(
+          () => "sent",
+          (error: unknown) => String(error).slice(0, 200),
+        );
   const done = await until(cookie, threadId, settled);
   const entries = await publishes(threadId);
   const alertable = phasesOf(entries).filter((phase) => ["completed", "failed", "waiting_for_approval", "waiting_for_input"].includes(phase));
-  out.e = { threadId, run: runsOf(done).at(-1)?.status, phases: phasesOf(entries), entries };
+  out.e = { threadId, interrupted, run: runsOf(done).at(-1)?.status, phases: phasesOf(entries), entries };
   check("e: Stop publishes no alertable phase (running was published)", run !== undefined && phasesOf(entries).includes("running") && alertable.length === 0, out.e);
 }
 

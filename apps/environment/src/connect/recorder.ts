@@ -65,11 +65,24 @@ const STATUS = /\bstatus(?:Code)?\D{0,3}([1-5]\d\d)\b/i;
 const BARE_STATUS = /\b(40[0-9]|429|5\d\d)\b/;
 const ERROR_TAG = /\b((?:Relay|HttpClient|HttpApiClient|Timeout|StatusCode|Transport|Response|Request)[A-Za-z]*Error)\b/;
 
+/**
+ * The relay's publish errors and the HTTP status each is declared with (`RelayAgentActivityPublishErrors`,
+ * `t3code/packages/contracts/src/relay.ts`): t3's `Cause.pretty` names the error, not the status.
+ */
+const RELAY_ERROR_STATUS: Record<string, number> = {
+  RelayAuthInvalidError: 401,
+  RelayAgentActivityPublishProofExpiredError: 401,
+  RelayAgentActivityPublishProofInvalidError: 401,
+  RelayInternalError: 500,
+};
+
 const failureOf = (cause: unknown): Pick<PublishEntry, "status" | "errorTag" | "rejected"> => {
   const text = typeof cause === "string" ? cause : "";
-  const status = Number((STATUS.exec(text) ?? BARE_STATUS.exec(text))?.[1]) || undefined;
   const errorTag = ERROR_TAG.exec(text)?.[1];
-  const rejected = status === 401 || status === 403 || /RelayAuthInvalidError|Unauthorized|Forbidden/.test(text);
+  const status = (errorTag === undefined ? undefined : RELAY_ERROR_STATUS[errorTag]) ?? (Number((STATUS.exec(text) ?? BARE_STATUS.exec(text))?.[1]) || undefined);
+  // Refused credential (the link removed or revoked), not a proof the relay found stale: only the auth error, or a
+  // bare 401/403 whose error is not named.
+  const rejected = errorTag === "RelayAuthInvalidError" || (errorTag === undefined && (status === 401 || status === 403));
   return { ...(status === undefined ? {} : { status }), ...(errorTag === undefined ? {} : { errorTag }), rejected };
 };
 
