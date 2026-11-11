@@ -9,7 +9,9 @@
 //   pull of the Container's files when a prompt returns.
 // - A terminal the Environment stops heartbeating for `HEARTBEAT_LAPSE_MS`, or names unknown in a push's answer, is
 //   killed: its Environment restarted or is gone (D1: terminals end with their Environment).
-// - Only input is use (review F10): the Container's terminal hold is measured from the last input.
+// - Only input is use (review F10): the Container's terminal hold is measured from the last input. Opening is not input
+//   (cost audit F1): t3 re-attaches every open panel after an Environment restart, so an open must not hold the
+//   Container. A shell at its prompt holds it for less than one running a foreground command.
 import { scanMarkers, terminalCommand } from "@t3flare/sandbox-image/terminal";
 import type { TerminalAnswer, TerminalFrame, TerminalOpenInput, TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 
@@ -18,6 +20,9 @@ export const HEARTBEAT_LAPSE_MS = 90_000;
 /** A batch closes after this long or this many bytes. */
 export const BATCH_MS = 16;
 export const BATCH_BYTES = 32 * 1024;
+/** Output with no input in the last `ECHO_WINDOW_MS` waits longer for its batch: fewer pushes (cost audit F4). */
+export const BULK_BATCH_MS = 100;
+export const ECHO_WINDOW_MS = 1_000;
 /** Reading a shell's output pauses while this much waits to be pushed. */
 export const BACKPRESSURE_BYTES = 1024 * 1024;
 /** Input typed before the first prompt is held at most this long. */
@@ -83,10 +88,12 @@ export class TerminalHost {
   #pending: Array<TerminalFrame> = [];
   #pendingBytes = 0;
   #flushTimer: ReturnType<typeof setTimeout> | undefined;
+  #flushDue = 0;
   #inFlight: Promise<void> | undefined;
   #drained: Array<() => void> = [];
   #lastInput = 0;
   #pushFailures = 0;
+  #pushes = 0;
   #orphansChecked = false;
 
   constructor(deps: TerminalHostDeps) {
@@ -97,9 +104,22 @@ export class TerminalHost {
     return this.#terminals.size;
   }
 
-  /** When input was last typed into any terminal (or one opened); 0 when never. */
+  /** When input was last typed into any terminal; 0 when never. */
   get lastInput(): number {
     return this.#lastInput;
+  }
+
+  /** Whether open terminals hold the Container now: `busyMs` from the last input while a command runs, else `promptMs`. */
+  holdsContainer(hold: { readonly promptMs: number; readonly busyMs: number }): boolean {
+    const open = [...this.#terminals.values()].filter((terminal) => !terminal.exited);
+    if (open.length === 0) return false;
+    const ms = open.some((terminal) => terminal.busy) ? hold.busyMs : hold.promptMs;
+    return this.#deps.now() - this.#lastInput < ms;
+  }
+
+  /** Batches pushed to the Environment since this object started (cost audit F4's check). */
+  get pushes(): number {
+    return this.#pushes;
   }
 
   keys(): ReadonlyArray<string> {
@@ -124,7 +144,6 @@ export class TerminalHost {
 
   async open(input: TerminalOpenInput): Promise<TerminalAnswer> {
     const now = this.#deps.now();
-    this.#lastInput = now;
     if (this.#terminals.has(input.key)) return this.#answer([]);
     const terminal: Terminal = {
       key: input.key,
@@ -230,16 +249,22 @@ export class TerminalHost {
     const full: TerminalFrame = { key: terminal.key, seq: terminal.seq++, ...frame };
     this.#pending.push(full);
     this.#pendingBytes += frame.data?.length ?? 16;
-    if (this.#pendingBytes >= BATCH_BYTES) this.#flushSoon(0);
-    else this.#flushSoon(BATCH_MS);
+    this.#flushSoon(this.#pendingBytes >= BATCH_BYTES ? 0 : this.#typing() ? BATCH_MS : BULK_BATCH_MS);
+  }
+
+  /** Input within the echo window: output is pushed promptly, so the echo of a keystroke shows at once. */
+  #typing(): boolean {
+    return this.#deps.now() - this.#lastInput < ECHO_WINDOW_MS;
   }
 
   #flushSoon(ms: number): void {
     if (this.#inFlight !== undefined) return; // the push in flight flushes again when it ends
+    const due = Date.now() + ms;
     if (this.#flushTimer !== undefined) {
-      if (ms > 0) return;
+      if (due >= this.#flushDue) return; // an earlier flush is already armed
       clearTimeout(this.#flushTimer);
     }
+    this.#flushDue = due;
     this.#flushTimer = setTimeout(() => {
       this.#flushTimer = undefined;
       void this.#flush();
@@ -256,6 +281,7 @@ export class TerminalHost {
       try {
         answer = await this.#deps.push({ epoch: this.#deps.epoch, frames });
         this.#pushFailures = 0;
+        this.#pushes++;
       } catch (error) {
         // Never dropped: a lost frame could be a setup script's sentinel. The batch goes back in front and is tried
         // again, backing off to 5 s; a terminal whose Environment is gone ends by the heartbeat's lapse.
@@ -280,7 +306,8 @@ export class TerminalHost {
     } finally {
       this.#inFlight = undefined;
       for (const resolve of this.#drained.splice(0)) resolve();
-      if (this.#pending.length > 0) this.#flushSoon(0);
+      // What came in meanwhile goes at once while typing or past a batch's bytes, else in the next 100 ms batch.
+      if (this.#pending.length > 0) this.#flushSoon(this.#pendingBytes >= BATCH_BYTES || this.#typing() ? 0 : BULK_BATCH_MS);
     }
   }
 

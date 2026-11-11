@@ -63,6 +63,7 @@ import {
   CONTAINER_IGNORE,
   CONTAINER_INSTANCE,
   TERMINAL_IDLE_MS,
+  TERMINAL_PROMPT_IDLE_MS,
   WORKER_SHELL_BACKEND,
   WORKSPACE_BINDING,
   WORKSPACE_CONTAINER,
@@ -79,6 +80,8 @@ export interface WorkspaceEnv {
   readonly T3FLARE_GIT_NAME?: string;
   readonly T3FLARE_GIT_EMAIL?: string;
   readonly CONTAINER_BUDGET: DurableObjectNamespace<ContainerBudget>;
+  /** Overrides TERMINAL_PROMPT_IDLE_MS (the stage's idle-hold check). */
+  readonly T3FLARE_TERMINAL_PROMPT_IDLE_MS?: string;
   /** Overrides CONTAINER_IDLE_MS (tests). */
   readonly T3FLARE_CONTAINER_IDLE_MS?: string;
   /** Overrides TERMINAL_IDLE_MS (the stage's idle-hold check). */
@@ -121,6 +124,18 @@ export type FsOp =
 
 
 const LAST_USE_KEY = "t3flare:container-last-use";
+/** When the Container started (its lease taken): the idle stop logs its lifetime (cost audit F2). */
+const STARTED_AT_KEY = "t3flare:container-started-at";
+/**
+ * Prints the memory peak (`peak <bytes>`) and CPU time (`usage_usec <µs>`) of the cgroup v2 the Container's commands run
+ * in (`/cloudchamber` on the platform's microVM; the root cgroup has no `memory.peak`).
+ */
+const USAGE_SCRIPT = [
+  "cg=/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)",
+  'peak=$(cat "$cg/memory.peak" 2>/dev/null) && echo "peak $peak"',
+  `grep -E '^usage_usec ' "$cg/cpu.stat" 2>/dev/null`,
+  "true",
+].join("\n");
 /** Set by `destroy()` (review F4): every RPC but provisioning refuses, so a purged Workspace is never recreated. */
 const DESTROYED_KEY = "t3flare:destroyed";
 /** A worktree's copy of its project's untracked files (step 2b, plan section 4.2), linked at the project's t3 path in its Container. */
@@ -281,6 +296,7 @@ export class WorkspaceDO extends ContainerHost {
       const answer = await this.#budget().acquire(this.ctx.id.toString());
       if (!answer.ok) throw new Error(`t3flare: the Container cannot start: ${answer.reason}`);
       await this.ctx.storage.put(LEASED_KEY, true);
+      if ((await this.ctx.storage.get<number>(STARTED_AT_KEY)) === undefined) await this.ctx.storage.put(STARTED_AT_KEY, Date.now());
       await this.#noteUse();
       await this.#scheduleAlarm();
     };
@@ -967,6 +983,8 @@ export class WorkspaceDO extends ContainerHost {
     this.#alive();
     this.#rememberId(input.t3Path.startsWith("/w/") ? input.t3Path.slice(3) : undefined);
     const answer = await this.#terminals.open(input);
+    // An open is use, like a command (the Container's idle stop), but not input: it does not hold the Container (F1).
+    await this.#noteUse();
     this.#terminalsChanged();
     await this.#scheduleAlarm();
     return answer;
@@ -988,14 +1006,19 @@ export class WorkspaceDO extends ContainerHost {
     return this.#terminals.heartbeat(keys);
   }
 
-  /** Diagnosis: the open terminals, the sync's counts, the last input. */
-  terminalState(): { readonly epoch: string; readonly keys: ReadonlyArray<string>; readonly lastInput: number; readonly sync: Readonly<Record<string, number>> } {
-    return { epoch: this.#epoch, keys: this.#terminals.keys(), lastInput: this.#terminals.lastInput, sync: { ...this.#terminalSync.stats } };
+  /** Diagnosis: the open terminals, the sync's counts, the last input, the output batches pushed. */
+  terminalState(): { readonly epoch: string; readonly keys: ReadonlyArray<string>; readonly lastInput: number; readonly pushes: number; readonly sync: Readonly<Record<string, number>> } {
+    return { epoch: this.#epoch, keys: this.#terminals.keys(), lastInput: this.#terminals.lastInput, pushes: this.#terminals.pushes, sync: { ...this.#terminalSync.stats } };
   }
 
   #terminalIdleMs(): number {
     const value = Number(this.env.T3FLARE_TERMINAL_IDLE_MS);
     return Number.isFinite(value) && value > 0 ? value : TERMINAL_IDLE_MS;
+  }
+
+  #terminalPromptIdleMs(): number {
+    const value = Number(this.env.T3FLARE_TERMINAL_PROMPT_IDLE_MS);
+    return Number.isFinite(value) && value > 0 ? value : TERMINAL_PROMPT_IDLE_MS;
   }
 
   /** Whether the Container runs, and the budget's view. */
@@ -1020,7 +1043,18 @@ export class WorkspaceDO extends ContainerHost {
 
   async #release(): Promise<void> {
     await this.#budget().release(this.ctx.id.toString());
-    await this.ctx.storage.delete(LEASED_KEY);
+    await this.ctx.storage.delete([LEASED_KEY, STARTED_AT_KEY]);
+  }
+
+  /** The stopping Container's memory peak and CPU time from its cgroup, and how long it ran (cost audit F2). */
+  async #usage(): Promise<{ readonly memoryPeakBytes: number | null; readonly cpuUsageUsec: number | null; readonly ranMs: number | null }> {
+    const startedAt = await this.ctx.storage.get<number>(STARTED_AT_KEY);
+    const read = await this.exec({ script: USAGE_SCRIPT, passive: true, timeoutMs: 10_000 }).catch(() => undefined);
+    const number = (pattern: RegExp) => {
+      const match = read === undefined ? null : pattern.exec(read.stdout);
+      return match === null ? null : Number(match[1]);
+    };
+    return { memoryPeakBytes: number(/^peak (\d+)$/m), cpuUsageUsec: number(/^usage_usec (\d+)$/m), ranMs: startedAt === undefined ? null : Date.now() - startedAt };
   }
 
   /** Idle stop and the budget lease's renewal: the object's one alarm. */
@@ -1033,9 +1067,9 @@ export class WorkspaceDO extends ContainerHost {
     await this.#terminals.expire().catch(() => undefined);
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
     // Terminals hold the Container until their last input is older than the hold (review F10: output is not use).
-    const held = this.#terminals.size > 0 && Date.now() - this.#terminals.lastInput < this.#terminalIdleMs();
+    const held = this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() });
     if (this.#running === 0 && !held && Date.now() - lastUse >= this.#idleMs()) {
-      console.log(JSON.stringify({ t3flare: "container-idle-stop", workspace: this.ctx.id.toString() }));
+      console.log(JSON.stringify({ t3flare: "container-idle-stop", workspace: this.ctx.id.toString(), ...(await this.#usage()) }));
       await this.stopContainer();
       return;
     }

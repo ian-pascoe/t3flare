@@ -101,6 +101,7 @@ export default Alchemy.Stack(
     const turnDeadlineMs = yield* Config.String("T3FLARE_TURN_DEADLINE_MS").pipe(Config.withDefault(""));
     // The terminal hold (30 min) and the sweep's grace (7 days) shortened on a stage for their checks (step 2b).
     const terminalIdleMs = yield* Config.String("T3FLARE_TERMINAL_IDLE_MS").pipe(Config.withDefault(""));
+    const terminalPromptIdleMs = yield* Config.String("T3FLARE_TERMINAL_PROMPT_IDLE_MS").pipe(Config.withDefault(""));
     const sweepGraceMs = yield* Config.String("T3FLARE_SWEEP_GRACE_MS").pipe(Config.withDefault(""));
 
     const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {
@@ -149,6 +150,7 @@ export default Alchemy.Stack(
         ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
         ...(turnDeadlineMs === "" ? {} : { T3FLARE_TURN_DEADLINE_MS: turnDeadlineMs }),
         ...(terminalIdleMs === "" ? {} : { T3FLARE_TERMINAL_IDLE_MS: terminalIdleMs }),
+        ...(terminalPromptIdleMs === "" ? {} : { T3FLARE_TERMINAL_PROMPT_IDLE_MS: terminalPromptIdleMs }),
       },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     } as never);

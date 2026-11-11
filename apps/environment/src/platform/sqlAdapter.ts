@@ -6,6 +6,7 @@
 // | 100 bound parameters                                       | inline escaped literals above 100              |
 // | 5 terms per compound SELECT                                | regroup UNION chains into nested subqueries    |
 // | ~100 view/subquery expansions per statement (production)   | run each CTE alone, pass rows on via json_each |
+// | storage PRAGMAs t3 reads every minute are not authorized   | answered here with 0 (cost audit F8)          |
 //
 // Everything here is pure text work over `SqlStorage.exec`, so it is tested on Node against real SQLite
 // (test/sqlAdapter.test.ts) and in workerd against DO SQLite (test/sqlAdapter.workerd.test.ts).
@@ -22,6 +23,9 @@ export const sqlStats = {
   maxCompoundTerms: 0,
   ctesMaterialized: 0,
   materializeFailures: 0,
+  /** Rows DO SQLite reports t3's statements wrote and read (cost audit F2); writes are what DO SQLite bills most. */
+  rowsWritten: 0,
+  rowsRead: 0,
   /** The last statements DO SQLite refused (at most 20), truncated. */
   errors: [] as Array<{ readonly at: string; readonly message: string; readonly sql: string }>,
 };
@@ -335,7 +339,7 @@ export const materializeCtes = (target: SqlStorage, query: string): Rows | null 
   };
   const run = (text: string) => {
     const { sql, params } = substitute(text);
-    const cursor = target.exec(sql, ...params);
+    const cursor = counted(target.exec(sql, ...params));
     const columns = cursor.columnNames;
     const rows = Array.from(cursor.raw()) as Array<Array<unknown>>;
     for (const row of rows) {
@@ -355,8 +359,49 @@ export const materializeCtes = (target: SqlStorage, query: string): Rows | null 
 
 const NESTED_TOO_DEEP = "nested too deep";
 
+/**
+ * The cursor, adding to `sqlStats` the rows it read and wrote as it is consumed: DO SQLite counts them as the rows are
+ * stepped, so every call on the cursor, or on an iterator it hands out, settles the difference.
+ */
+const counted = (cursor: Rows): Rows => {
+  let read = 0;
+  let written = 0;
+  const settle = () => {
+    sqlStats.rowsRead += cursor.rowsRead - read;
+    sqlStats.rowsWritten += cursor.rowsWritten - written;
+    read = cursor.rowsRead;
+    written = cursor.rowsWritten;
+  };
+  const settling = <T extends object>(inner: T): T => {
+    const proxy: T = new Proxy(inner, {
+      get(target, property) {
+        const value: unknown = Reflect.get(target, property, target);
+        if (typeof value !== "function") return value;
+        return (...args: Array<unknown>) => {
+          const out: unknown = value.apply(target, args);
+          settle();
+          if (out === target) return proxy;
+          return typeof out === "object" && out !== null && typeof (out as { next?: unknown }).next === "function" ? settling(out) : out;
+        };
+      },
+    });
+    return proxy;
+  };
+  settle();
+  return settling(cursor);
+};
+
+/**
+ * The storage PRAGMAs t3's DatabaseStorage reads every minute that DO SQLite does not authorize, in their read form:
+ * answered with 0. `auto_vacuum` 0 (none) means t3 never runs an incremental vacuum and its "reclaim space" answers
+ * that T3 Code must stop; it then reads `page_count` and `freelist_count` for its Storage page.
+ */
+const STORAGE_PRAGMA_READ = /^\s*PRAGMA\s+(auto_vacuum|page_count|freelist_count)\s*;?\s*$/i;
+
 /** `exec` with the adapter's rewrites: what t3's SQL client calls through `storageForClient`. */
 export const adaptedExec = (target: SqlStorage, raw: string, params: ReadonlyArray<unknown>): Rows => {
+  const pragma = STORAGE_PRAGMA_READ.exec(raw)?.[1];
+  if (pragma !== undefined) return rowsCursor([pragma.toLowerCase()], [[0]]);
   let query = rewriteCompoundSelects(raw);
   let bound = params;
   if (params.length > MAX_BOUND_PARAMETERS) {
@@ -366,7 +411,7 @@ export const adaptedExec = (target: SqlStorage, raw: string, params: ReadonlyArr
     bound = [];
   }
   try {
-    return target.exec(query, ...bound);
+    return counted(target.exec(query, ...bound));
   } catch (error) {
     if (String(error).includes(NESTED_TOO_DEEP)) {
       try {

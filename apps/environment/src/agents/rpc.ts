@@ -69,7 +69,7 @@ export interface WorkspaceRpc {
   terminalResize(key: string, cols: number, rows: number): Promise<TerminalAnswer>;
   terminalClose(key: string): Promise<TerminalAnswer>;
   terminalHeartbeat(keys: ReadonlyArray<string>): Promise<TerminalAnswer>;
-  terminalState(): Promise<{ readonly epoch: string; readonly keys: ReadonlyArray<string>; readonly lastInput: number; readonly sync: Readonly<Record<string, number>> }>;
+  terminalState(): Promise<{ readonly epoch: string; readonly keys: ReadonlyArray<string>; readonly lastInput: number; readonly pushes: number; readonly sync: Readonly<Record<string, number>> }>;
 }
 
 export interface SessionRpc {

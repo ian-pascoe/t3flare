@@ -30,8 +30,14 @@ export const CONTAINER_INSTANCE = { vcpu: 1, memoryMib: 3072, diskMb: 12000 } as
 /** A Container stops after this long without a command. */
 export const CONTAINER_IDLE_MS = 2 * 60_000;
 
-/** Open terminals hold the Container until their last input is this old (step 2b; review F10: output does not count). */
+/**
+ * While a terminal runs a foreground command, open terminals hold the Container until their last input is this old (step
+ * 2b; review F10: output does not count).
+ */
 export const TERMINAL_IDLE_MS = 30 * 60_000;
+
+/** While every terminal sits at its prompt, they hold the Container this long after the last input (cost audit F1). */
+export const TERMINAL_PROMPT_IDLE_MS = 10 * 60_000;
 
 /**
  * Dependency directories, build output and caches stay on the Container's disk, out of the Workspace DO (cloudpid's

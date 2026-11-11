@@ -47,6 +47,45 @@ describe("DO SQLite adapter", () => {
     });
   });
 
+  it("answers t3's storage PRAGMAs, which DO SQLite refuses or t3 reads every minute, without an error (cost audit F8)", async () => {
+    await runInDurableObject(env.TEST_OBJECTS.getByName("pragma"), async (_instance, state) => {
+      expect(() => state.storage.sql.exec("PRAGMA auto_vacuum").toArray()).toThrow(/not authorized/);
+      const sql = adaptSqlStorage(state.storage.sql);
+      const errors = sqlStats.errors.length;
+      // t3's DatabaseStorage: auto_vacuum 0 (none) means no incremental vacuum, so its reclaim does nothing.
+      expect(sql.exec("PRAGMA auto_vacuum").toArray()).toEqual([{ auto_vacuum: 0 }]);
+      expect(sql.exec(" pragma AUTO_VACUUM; ").toArray()).toEqual([{ auto_vacuum: 0 }]);
+      // Read next for t3's Storage page; DO SQLite refuses both, but answers page_size.
+      expect(sql.exec("PRAGMA page_count").toArray()).toEqual([{ page_count: 0 }]);
+      expect(sql.exec("PRAGMA freelist_count").toArray()).toEqual([{ freelist_count: 0 }]);
+      expect(sql.exec("PRAGMA page_size").one().page_size).toBeGreaterThan(0);
+      expect(sqlStats.errors.length).toBe(errors);
+      // Setting it is not answered: it still reaches DO SQLite.
+      expect(() => sql.exec("PRAGMA auto_vacuum = 2").toArray()).toThrow();
+    });
+  });
+
+  it("counts the rows t3's statements write and read, as DO SQLite reports them (cost audit F2)", async () => {
+    await runInDurableObject(env.TEST_OBJECTS.getByName("counters"), async (_instance, state) => {
+      const sql = adaptSqlStorage(state.storage.sql);
+      sql.exec("CREATE TABLE c (v INTEGER)");
+      const written = sqlStats.rowsWritten;
+      sql.exec("INSERT INTO c VALUES (1), (2), (3)");
+      expect(sqlStats.rowsWritten - written).toBe(3);
+      const read = sqlStats.rowsRead;
+      const select = sql.exec("SELECT v FROM c");
+      expect(Array.from(select.raw())).toEqual([[1], [2], [3]]);
+      expect(sqlStats.rowsRead - read).toBeGreaterThanOrEqual(3);
+      expect(sqlStats.rowsRead - read).toBe(select.rowsRead);
+      const before = sqlStats.rowsWritten;
+      const cursor = sql.exec("UPDATE c SET v = v + 1 RETURNING v");
+      for (const _row of cursor) {
+        // consumed row by row, as t3's client may
+      }
+      expect(sqlStats.rowsWritten - before).toBe(3);
+    });
+  });
+
   it("nested transactionSync, as the State directory's rename runs inside a remove", async () => {
     await runInDurableObject(env.TEST_OBJECTS.getByName("tx"), async (_instance, state) => {
       state.storage.sql.exec("CREATE TABLE n (v INTEGER)");
