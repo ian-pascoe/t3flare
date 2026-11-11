@@ -104,6 +104,8 @@ export default Alchemy.Stack(
         LOADER: Cloudflare.WorkerLoader(),
         MODEL_PROXY_URL: modelProxyUrl,
         MODEL_PROXY_API_KEY: modelProxyKey,
+        // The model proxy fault route (step 2a part 2) answers on test stages only.
+        ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
         ...(turnDeadlineMs === "" ? {} : { T3FLARE_TURN_DEADLINE_MS: turnDeadlineMs }),
       },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },

@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off
+// @effect-diagnostics asyncFunction:off globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off globalFetch:off
 // The Session DO (ADR-0005, step 2a plan): one Durable agent's conversation, a pi-durable Harness, per t3 thread. The
 // host follows pi-durable's test worker and cloudpid's Session host rules (docs/architecture/overview.md → Session host):
 // the Harness opens in the constructor after a fallback alarm is armed, `resume()` runs from the constructor and the
@@ -36,9 +36,10 @@ import {
   sessionNameOf,
   type ThinkingLevel,
   TURN_DEADLINE_MS,
+  type ProxyRecord,
   type TurnState,
 } from "@t3flare/session-protocol";
-import { ComputerExecutionEnv, ComputerFiles, type ComputerWorkspaceStub, execTrace, type ExecTraceEntry } from "@t3flare/computer-env";
+import { ComputerExecutionEnv, ComputerFiles, type ComputerWorkspaceStub } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
@@ -50,6 +51,7 @@ import { ApprovalStore, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
+import { FAULT_FIXTURES, type Fault, proxyLimits, recordingFetch } from "./proxyLimits.ts";
 import { liveOf, pushedEntry, turnOfEntry, usageOf } from "./state.ts";
 
 export interface SessionEnv {
@@ -58,6 +60,8 @@ export interface SessionEnv {
   readonly WORKSPACES: DurableObjectNamespace;
   readonly MODEL_PROXY_URL: string;
   readonly MODEL_PROXY_API_KEY: string;
+  /** "1" on a test stage (never prod): the model proxy fault route is accepted. */
+  readonly T3FLARE_FAULTS?: string;
   /** Overrides TURN_DEADLINE_MS (tests and the stage's deadline check). */
   readonly T3FLARE_TURN_DEADLINE_MS?: string;
 }
@@ -72,6 +76,10 @@ const RETRY_KEY = "t3flare:push-retry";
 const LAST_PUSH_KEY = "t3flare:last-push";
 const DIAG_KEY = "t3flare:diagnostics";
 const CATALOG_KEY = "t3flare:model-catalog";
+/** Each turn's model proxy record (requests, last failure), apart from the turns so no turn write can lose one. */
+const PROXY_KEY = "t3flare:proxy";
+/** A test's model proxy fault (stages only). */
+const FAULT_KEY = "t3flare:proxy-fault";
 
 interface Meta {
   readonly threadId: string;
@@ -99,6 +107,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #approvals: ApprovalStore;
   /** The proxy's model list (ADR-0012), kept in this object's storage and read again when it is old. */
   readonly #catalog: ModelCatalog;
+  /** Every model request's fetch: the proxy's answers recorded, a test fault answered (`proxyLimits.ts`). */
+  readonly #proxyFetch: typeof fetch;
 
   constructor(ctx: DurableObjectState, env: SessionEnv) {
     super(ctx, env);
@@ -107,7 +117,16 @@ export class SessionDO extends DurableObject<SessionEnv> {
       store: { read: () => ctx.storage.kv.get(CATALOG_KEY), write: (catalog) => ctx.storage.kv.put(CATALOG_KEY, catalog) },
     });
     this.#approvals = new ApprovalStore(ctx.storage.kv, () => this.#schedulePush(0));
+    const recorder = recordingFetch({
+      fetch: (input, init) => fetch(input, init),
+      fault: () => ctx.storage.kv.get<Fault>(FAULT_KEY),
+      clearFault: () => void ctx.storage.kv.delete(FAULT_KEY),
+      now: () => Date.now(),
+      onRequest: () => this.#noteProxy((record) => ({ ...record, requests: record.requests + 1 })),
+    });
+    this.#proxyFetch = recorder.fetch;
     const registry = createRegistry();
+    registry.install(proxyLimits({ last: recorder.last, record: (failure) => this.#noteProxy((record) => ({ ...record, failure })) }));
     registry.install(codingTools());
     registry.install(fileTools(() => this.#files()));
     registry.install(projectContext(REPO_ROOT));
@@ -133,7 +152,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
           const harness = await Harness.open(
             storage,
             {
-              models: proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current()),
+              models: proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current(), this.#proxyFetch),
               registry: this.#registry,
               settings: { retry: { enabled: true, maxRetries: 3 } },
               env: (target) => this.#envAt(target.cwd),
@@ -170,6 +189,24 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   #saveTurns(turns: Turns) {
     this.ctx.storage.kv.put(TURNS_KEY, turns);
+  }
+
+  /** The turns with their model proxy records. */
+  #turnsWithProxy(): Turns {
+    const turns = this.#turns();
+    const proxy = this.ctx.storage.kv.get<Record<string, ProxyRecord>>(PROXY_KEY) ?? {};
+    return Object.fromEntries(Object.entries(turns).map(([id, turn]) => [id, proxy[id] === undefined ? turn : { ...turn, proxy: proxy[id] }]));
+  }
+
+  /** Updates the model proxy record of the turn running now: the live turn started first (a follow-up waits for it). */
+  #noteProxy(update: (record: ProxyRecord) => ProxyRecord): void {
+    const running = Object.entries(this.#turns())
+      .filter(([, turn]) => isLive(turn))
+      .sort(([, a], [, b]) => a.startedAt - b.startedAt)[0]?.[0];
+    if (running === undefined) return;
+    const proxy = this.ctx.storage.kv.get<Record<string, ProxyRecord>>(PROXY_KEY) ?? {};
+    proxy[running] = update(proxy[running] ?? { requests: 0 });
+    this.ctx.storage.kv.put(PROXY_KEY, proxy);
   }
 
   #deadlineMs(): number {
@@ -260,7 +297,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const root = await this.#root(input.model, input.thinking);
     // The agent works in its Workspace's repo (t3's `/w/<id>`), or nowhere without one.
     if (input.workspaceId !== null) await root.configure({ cwd: REPO_ROOT }, context);
-    const turns = this.#turns();
+    const turns = this.#turnsWithProxy();
     return { epoch, busy: Object.values(turns).some(isLive), turns };
   }
 
@@ -355,6 +392,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   async dropTurns(): Promise<{ readonly dropped: number }> {
     const dropped = Object.keys(this.#turns()).length;
     this.#saveTurns({});
+    this.ctx.storage.kv.delete(PROXY_KEY);
     await (await this.#root()).abort(context);
     await this.#arm();
     return { dropped };
@@ -370,9 +408,17 @@ export class SessionDO extends DurableObject<SessionEnv> {
     return Promise.resolve(this.ctx.storage.kv.get<Record<string, number>>(DIAG_KEY) ?? {});
   }
 
-  /** The commands this isolate started, killed and saw end, newest last (step 2a part 2: aborted commands). */
-  execTrace(): Promise<ReadonlyArray<ExecTraceEntry>> {
-    return Promise.resolve([...execTrace]);
+  /**
+   * A test's fault, on a stage only (`T3FLARE_FAULTS`): every model request is answered with `fixture` until `resetAt`,
+   * in the proxy's place (`proxyLimits.ts`). Refused on prod.
+   */
+  proxyFault(input: { readonly fixture: string; readonly resetAt: number }): Promise<{ readonly armed: Fault }> {
+    if (this.env.T3FLARE_FAULTS !== "1") return Promise.reject(new Error("t3flare: faults are off in this deployment"));
+    const fixture = FAULT_FIXTURES.find((name) => name === input.fixture);
+    if (fixture === undefined || !Number.isFinite(input.resetAt)) return Promise.reject(new Error(`t3flare: no fixture ${input.fixture}`));
+    const armed: Fault = { fixture, resetAt: input.resetAt };
+    this.ctx.storage.kv.put(FAULT_KEY, armed);
+    return Promise.resolve({ armed });
   }
 
   /** A test's fault: the object restarts (as an eviction does), with whatever work it had in memory cut off. */
@@ -447,7 +493,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   async #state(fromEntry: number | undefined, bound: number): Promise<SessionState & { readonly lastEntry: number | undefined }> {
     const root = await this.#root();
-    const turns = this.#turns();
+    const turns = this.#turnsWithProxy();
     const entries: Array<PushedEntry> = [];
     let bytes = 0;
     let more = false;

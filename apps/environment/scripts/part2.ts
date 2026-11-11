@@ -8,13 +8,19 @@
 //                                                           an Environment restart (or, with --session, a Session restart)
 //                                                           while that command runs: its processes go
 //   bun scripts/stage.ts run step2a2 part2 survivor         a background process of a completed call survives a later Stop
+//   bun scripts/stage.ts run step2a2 part2 limit [--fixture cooldown] [--reset-s 120] [--no-resume]
+//                                                           a turn the proxy answers with a usage limit (the Session's fault
+//                                                           route): "Usage limit reached" with the reset, the requests it
+//                                                           made, the idle Environment woken at the reset, the resumed turn
+//   bun scripts/stage.ts run step2a2 part2 key              a turn the proxy refuses (the fault route's 401): the key error
+//                                                           after 1 request, no pause
 //   … [--out file.json]
 //
 // The fixture project is kept in `.alchemy/stages/<host>.part2.json` (gitignored) between runs.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { admin, base, dispatch, itemsOf, mutateProject, pair, runsOf, sendMessage, SETTLED, sleep, uuid, waitFor, wsCall } from "./lib/client.ts";
+import { admin, base, dispatch, itemsOf, mutateProject, pair, runsOf, sendMessage, SETTLED, sleep, updateSettings, uuid, waitFor, wsCall } from "./lib/client.ts";
 
 const [scenario = "ps"] = process.argv.slice(2);
 const flag = (name: string) => process.argv.includes(`--${name}`);
@@ -30,12 +36,9 @@ export const check = (name: string, ok: boolean, detail?: unknown) => {
   if (!ok) failures.push(`${name}: ${JSON.stringify(detail ?? null).slice(0, 800)}`);
   return ok;
 };
-/** The Session's command trace for `threadId` (starts, kills, ends), with times relative to the first entry. */
-const traceOf = async (threadId: string) => {
-  const entries = ((await admin("GET", `/_t3flare/agents/exec-trace?thread=${threadId}`)).json ?? []) as Array<{ id: string; at: number; event: string; detail?: unknown }>;
-  const first = entries[0]?.at ?? 0;
-  return entries.map((e) => ({ id: e.id.slice(0, 8), ms: e.at - first, event: e.event, detail: e.detail }));
-};
+/** The Session's turns as it would push them (each with its model proxy record). */
+const sessionTurns = async (threadId: string) =>
+  ((await admin("GET", `/_t3flare/agents/session?thread=${threadId}`)).json?.turns ?? {}) as Record<string, any>;
 
 const finish = (): never => {
   report.failures = failures;
@@ -99,9 +102,10 @@ const threadOn = async (title: string, runtimeMode = "full-access") => {
   return threadId;
 };
 
-// `nice` sends the whole command to the Container (`sleep` alone would run in the Worker Shell: bash-routing.ts).
-const SLEEPER = "nice bash -c 'sleep 600 & sleep 600'";
-const SLEEPER_TURN = `Use the bash tool to run exactly this command, once, with no timeout and nothing else: ${SLEEPER}`;
+// `sleep` alone would run in the Worker Shell (bash-routing.ts), which has no processes: the turn names the Container.
+const SLEEPER = "bash -c 'sleep 600 & sleep 600'";
+const CONTAINER = 'with its backend set to "container"';
+const SLEEPER_TURN = `Use the bash tool, ${CONTAINER}, to run exactly this command, once, with no timeout and nothing else: ${SLEEPER}`;
 const sleepers = (procs: ReadonlyArray<Proc>) => procs.filter((p) => /^sleep 600$/.test(p.args));
 
 /** Sends the sleeper turn and waits until its two `sleep 600` run: the run, and the processes of the call. */
@@ -181,7 +185,6 @@ switch (scenario) {
     const settled = await waitFor(cookie, threadId, (p) => SETTLED.has(runsOf(p).find((r) => r.id === started.runId)?.status ?? ""), 60_000);
     report.after = { secondsToGone: gone.seconds, left: gone.left, run: runsOf(settled.projection).find((r) => r.id === started.runId)?.status, msToSettle: Date.now() - stoppedAt };
     report.threadId = threadId;
-    report.execTrace = await traceOf(threadId);
     check("no process of the call within 3 s of Stop", gone.seconds !== null && gone.seconds <= 3, report.after);
     finish();
   }
@@ -206,7 +209,6 @@ switch (scenario) {
     }
     (report.after as any).secondsSinceRestart = Math.round((Date.now() - restartedAt) / 1000);
     report.threadId = threadId;
-    report.execTrace = await traceOf(threadId);
     check("the first call's processes are gone after the restart", gone.seconds !== null, report.after);
     // Stop whatever the thread runs now (a continuation may run the command again).
     const now = await waitFor(cookie, threadId, () => true, 5000);
@@ -221,7 +223,7 @@ switch (scenario) {
     await sendMessage(
       cookie,
       threadId,
-      "Use the bash tool to run exactly this command, once, and nothing else: nohup sleep 900 > /dev/null 2>&1 & echo started",
+      `Use the bash tool, ${CONTAINER}, to run exactly this command, once, and nothing else: nohup sleep 900 > /dev/null 2>&1 & echo started`,
       MODEL,
     );
     const done = await waitFor(cookie, threadId, (p) => runsOf(p).length > 0 && runsOf(p).every((r) => SETTLED.has(r.status)), 180_000);
@@ -236,6 +238,55 @@ switch (scenario) {
     report.afterStop = after;
     check("the completed call's background process survived the later Stop", after.length === background.length, after);
     await exec(fixture().workspaceId, `kill ${background.map((b) => b.pid).join(" ")} 2>/dev/null; true`);
+    finish();
+  }
+  // eslint-disable-next-line no-fallthrough
+  case "limit":
+  case "key": {
+    const fixtureName = scenario === "key" ? "invalidKey" : option("fixture", "cooldown");
+    const resume = scenario === "limit" && !flag("no-resume");
+    if (resume) await updateSettings(cookie, { autoResumeLimitedThreads: true });
+    const threadId = await threadOn(`${scenario} ${fixtureName} ${stamp}`);
+    const resetAt = Date.now() + Number(option("reset-s", scenario === "key" ? "60" : "120")) * 1000;
+    report.fault = (await admin("POST", `/_t3flare/agents/proxy-fault?thread=${threadId}`, { fixture: fixtureName, resetAt })).json;
+    await sendMessage(cookie, threadId, "Reply with the single word: pong", MODEL);
+    const failed = await waitFor(cookie, threadId, (p) => SETTLED.has(runsOf(p)[0]?.status ?? ""), 180_000);
+    const firstRun = runsOf(failed.projection)[0]!;
+    const error = itemsOf(failed.projection).find((i: any) => i.type === "error");
+    const turns = Object.values(await sessionTurns(threadId));
+    const thread = failed.projection?.thread ?? {};
+    report.first = {
+      run: firstRun.status,
+      failure: error?.failure ?? error ?? null,
+      proxy: turns[0]?.proxy ?? null,
+      thread: { lastErrorClass: thread.lastErrorClass ?? null, usageLimitResetAt: thread.usageLimitResetAt ?? null, limitRecovery: thread.limitRecovery ?? null },
+      faultResetAt: new Date(resetAt).toISOString(),
+    };
+    report.threadId = threadId;
+    check("the first run failed", firstRun.status === "failed", firstRun);
+    check("one proxy request", turns[0]?.proxy?.requests === 1, turns[0]?.proxy);
+    if (scenario === "key") {
+      check("the key error", error?.failure?.class === "permission_error" && error?.failure?.code === "proxy_key_rejected", error);
+      check("no pause: no reset", (error?.failure?.resetAt ?? null) === null, error);
+      finish();
+    }
+    const failure = error?.failure ?? {};
+    check("a usage limit", failure.class === "usage_limit", failure);
+    check("its reset is the proxy's (within 2 s)", Math.abs(Date.parse(failure.resetAt ?? "") - resetAt) <= 2000, { resetAt: failure.resetAt, expected: new Date(resetAt).toISOString() });
+    if (!resume) finish();
+    // The Environment goes idle, and its alarm brings it back at the reset.
+    await sleep(5000);
+    report.idle = (await admin("POST", "/_t3flare/idle-check?force=1")).json;
+    const resumed = await waitFor(cookie, threadId, (p) => runsOf(p).length > 1 && SETTLED.has(runsOf(p).at(-1)?.status ?? ""), resetAt - Date.now() + 240_000);
+    const runs = runsOf(resumed.projection);
+    const answer = itemsOf(resumed.projection).filter((i: any) => i.type === "assistant_message").at(-1);
+    report.resumed = {
+      runs: runs.map((r) => ({ id: r.id, status: r.status })),
+      secondRunStartedAfterReset: Date.parse(String((runs.at(-1) as any)?.startedAt ?? (runs.at(-1) as any)?.createdAt ?? 0)) - resetAt,
+      answer: String(answer?.text ?? answer?.content ?? "").slice(0, 200),
+      health: (await admin("GET", "/_t3flare/health")).json?.boot ?? null,
+    };
+    check("the thread resumed by itself and completed", runs.at(-1)?.status === "completed", runs);
     finish();
   }
   // eslint-disable-next-line no-fallthrough

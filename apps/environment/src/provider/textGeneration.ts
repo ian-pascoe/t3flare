@@ -5,6 +5,7 @@
 import { TextGenerationError } from "@t3tools/contracts";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import { SMALL_MODEL_SLUG } from "@t3flare/models";
+import { classifyProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
 import * as Effect from "effect/Effect";
 
 import { environmentServices } from "../agents/bindings.ts";
@@ -39,8 +40,13 @@ export const runText: TextGenerationOperations.Runner = (request) =>
       catch: (cause) => fail(request.operation, "The model proxy could not be reached.", cause),
     });
     if (!response.ok) {
-      // Only the status reaches the message: a provider's error body can echo request details.
-      return yield* fail(request.operation, `The model proxy returned HTTP ${response.status}.`);
+      // Only the classified failure's fixed text or the status reaches the message: an error body can echo request details.
+      const text = yield* Effect.promise(() => response.text().catch(() => ""));
+      const failure = classifyProxyFailure({ status: response.status, retryAfter: response.headers.get("retry-after"), text, at: 0 });
+      return yield* fail(
+        request.operation,
+        failure === undefined ? `The model proxy returned HTTP ${response.status}.` : `${proxyFailureMessage(failure)} (HTTP ${response.status})`,
+      );
     }
     const body = (yield* Effect.tryPromise({
       try: () => response.json(),

@@ -19,7 +19,8 @@
 //   POST /_t3flare/agents/drop-turns?thread=<id> a test's fault: the Session forgets its turns (the inverse guard)
 //   GET  /_t3flare/agents/session-diagnostics?thread=<id>  a Session's start and alarm counts
 //   POST /_t3flare/agents/session-restart?thread=<id>  a test's fault: the Session DO restarts (as an eviction does)
-//   GET  /_t3flare/agents/exec-trace?thread=<id>  the commands the Session's isolate started, killed and saw end
+//   POST /_t3flare/agents/proxy-fault?thread=<id> a test's fault (stages only; the Session refuses on prod): its model
+//                                               requests get {"fixture","resetAt"}'s answer until that reset
 //   GET  /_t3flare/agents/router-trace?clear=1   the process router's recent commands (git, gh, missing binaries)
 //   GET  /_t3flare/agents/workspaces            the Workspace registry, each with its Container's state
 //   POST /_t3flare/agents/workspace-stop?id=<id>  stop a Workspace's Container now
@@ -210,10 +211,11 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const thread = url.searchParams.get("thread") ?? "";
         return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").restart());
       }
-      case "GET /_t3flare/agents/exec-trace": {
+      case "POST /_t3flare/agents/proxy-fault": {
         const { byName } = await import("../agents/rpc.ts");
         const thread = url.searchParams.get("thread") ?? "";
-        return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").execTrace());
+        const body = (await request.json()) as { fixture: string; resetAt: number };
+        return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").proxyFault(body));
       }
       case "GET /_t3flare/agents/router-trace": {
         const { routerTrace, clearRouterTrace } = await import("../agents/processRouter.ts");

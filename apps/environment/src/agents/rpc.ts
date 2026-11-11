@@ -66,7 +66,7 @@ export interface SessionRpc {
   snapshot(input?: SnapshotInput): Promise<SessionState>;
   dropTurns(): Promise<{ readonly dropped: number }>;
   diagnostics(): Promise<Readonly<Record<string, number>>>;
-  execTrace(): Promise<ReadonlyArray<{ readonly id: string; readonly at: number; readonly event: string; readonly detail?: unknown }>>;
+  proxyFault(input: { readonly fixture: string; readonly resetAt: number }): Promise<{ readonly armed: { readonly fixture: string; readonly resetAt: number } }>;
   restart(): Promise<{ readonly restarting: true }>;
 }
 

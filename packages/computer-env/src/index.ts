@@ -16,8 +16,6 @@ export {
 
 export { HARNESS_ROOT, isContainerOnly, withHarnessKept } from "./container-paths.ts";
 
-export { execTrace, type ExecTraceEntry } from "./exec.ts";
-
 export { posixCode } from "./failure.ts";
 
 export { ComputerFiles, type ComputerFilesOptions } from "./files.ts";

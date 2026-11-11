@@ -20,6 +20,7 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import type { ProviderAdapterV2Event } from "@t3tools/provider-core/server/ProviderAdapter";
 import type { ApprovalDecision, ContentBlock, PendingApproval, PushedEntry, SessionState, TurnState } from "@t3flare/session-protocol";
+import { classifyProxyFailure, type ProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
 import * as DateTime from "effect/DateTime";
 
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
@@ -424,21 +425,38 @@ const emitApprovals = (
   }
 };
 
-/** A model error, classified: an HTTP 429 or a quota body is a usage limit (step 2a plan, section 3). */
-export const failureOf = (turn: TurnState): OrchestrationV2ProviderFailure => {
+/** The least time after the turn's end a usage limit's reset is held to: t3 arms no resume for one not after it. */
+export const MIN_RESET_MS = 30_000;
+
+/** A model proxy failure as t3's: fixed text by its code, the reset held to at least 30 s after `now`. */
+const proxyFailureOf = (failure: ProxyFailure, now: DateTime.Utc): OrchestrationV2ProviderFailure => {
+  const nowMs = DateTime.toEpochMillis(now);
+  const resetAt =
+    failure.class === "usage_limit" && failure.resetAt !== undefined
+      ? DateTime.formatIso(DateTime.makeUnsafe(Math.max(failure.resetAt, nowMs + MIN_RESET_MS)))
+      : null;
+  return makeProviderFailure({
+    class: failure.class,
+    message: proxyFailureMessage(failure),
+    code: failure.code,
+    retryable: failure.class === "permission_error" || failure.code === "proxy_no_account" ? false : true,
+    resetAt,
+  });
+};
+
+/**
+ * A model error, classified (step 2a part 2 plan, section 3): the Session's record of the proxy's answer first, else the
+ * error text (a push from before the record, or a failure the Session did not see), counted from the settle time.
+ */
+export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2ProviderFailure => {
   const reason = turn.reason ?? "unknown";
   const detail = turn.detail ?? "";
   if (reason === "model_error") {
+    const recorded = turn.proxy?.failure;
+    if (recorded !== undefined) return proxyFailureOf(recorded as ProxyFailure, now);
+    const classified = classifyProxyFailure({ status: 0, retryAfter: null, text: detail, at: turn.settledAt ?? DateTime.toEpochMillis(now) });
+    if (classified !== undefined) return proxyFailureOf(classified, now);
     const status = /\b([45]\d\d)\b/.exec(detail)?.[1];
-    const limited = status === "429" || /rate.?limit|quota|usage limit|too many requests|overloaded/i.test(detail);
-    if (limited) {
-      return makeProviderFailure({
-        class: "usage_limit",
-        message: "The model proxy reported a rate or usage limit.",
-        code: status ?? "rate_limited",
-        retryable: true,
-      });
-    }
     return makeProviderFailure({
       class: "provider_error",
       message: status === undefined ? "The model provider reported an error." : `The model provider returned HTTP ${status}.`,
@@ -555,7 +573,7 @@ export const diff = (
       state.toolCalls.delete(id);
       state.toolResults.delete(id);
     }
-    const failure = turnState.status === "failed" ? failureOf(turnState) : null;
+    const failure = turnState.status === "failed" ? failureOf(turnState, now) : null;
     out.push({
       type: "provider_turn.updated",
       driver,

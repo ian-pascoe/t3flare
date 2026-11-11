@@ -157,6 +157,25 @@ export interface TurnState {
    * next pi-durable run; it is still this turn's work, so the turn settles only when they have.
    */
   readonly steers?: ReadonlyArray<string>;
+  /** What the model proxy answered this turn (step 2a part 2); absent in pushes from before it. */
+  readonly proxy?: ProxyRecord;
+}
+
+/** A turn's model proxy requests, and its last failure as the Session classified it when the answer came. */
+export interface ProxyRecord {
+  /** The Session's requests to the proxy while this turn ran (the fault route's answers included). */
+  readonly requests: number;
+  readonly failure?: ProxyFailureRecord;
+}
+
+/** `@t3flare/models/proxyFailure`'s `ProxyFailure`, with the time of the answer (epoch ms). */
+export interface ProxyFailureRecord {
+  readonly class: "usage_limit" | "permission_error" | "provider_error";
+  readonly code: string;
+  readonly row: number;
+  readonly resetAt?: number;
+  readonly stop: boolean;
+  readonly at: number;
 }
 
 export interface PendingApproval {
