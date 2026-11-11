@@ -1,0 +1,50 @@
+{
+ "at": "2026-11-11T21:12:59.368Z",
+ "question": {
+  "threadId": "d9ea19bc-bbac-4d07-a639-2f96d84dd911",
+  "request": {
+   "kind": "user_input",
+   "capability": "live"
+  },
+  "item": [
+   {
+    "id": "12",
+    "header": "Question",
+    "question": "Which color for q-mwcm7ft8?",
+    "options": [
+     {
+      "label": "red",
+      "description": "red",
+      "value": "red"
+     },
+     {
+      "label": "blue",
+      "description": "blue",
+      "value": "blue"
+     }
+    ],
+    "allowCustomAnswer": false
+   }
+  ],
+  "reply": "I'll ask you the question now.\nblue q-mwcm7ft8"
+ },
+ "questionMcp": {
+  "listed": "{\"requestIds\":[\"runtime-request:piDurable:thread:mcp:launch:808eb67f982a0c05b3f4d9bbbc4192db7ebe3cd7666c349c2cd4bf7aa19b0ac2:approval:12\"]}",
+  "responded": {
+   "isError": false,
+   "text": "{\"sequence\":1026}"
+  },
+  "reply": "I'll ask the question now.\nred m-mwcm7ft8"
+ },
+ "restart": {
+  "constructedBefore": 1,
+  "constructedAfter": 2,
+  "stillPending": true,
+  "reply": "I'll ask you the question now.\nblue r-mwcm7ft8",
+  "runs": [
+   "completed"
+  ]
+ },
+ "failures": [],
+ "ok": true
+}

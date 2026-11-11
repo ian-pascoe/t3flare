@@ -91,6 +91,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   #lastBoot: BootReport | undefined;
   #constructedAt = Date.now();
   #github: GitHubTokens | undefined;
+  /**
+   * Step 3 (review C2): delegated tasks' questions a restart cut, raised again once t3 takes commands after this boot.
+   * `/mcp` waits for it, so a linked environment following such a task never reads the cut run as its end.
+   */
+  #reraised: Promise<unknown> = Promise.resolve();
 
   constructor(ctx: DurableObjectState, env: EnvironmentEnv) {
     super(ctx, env);
@@ -312,6 +317,14 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       };
       console.log(JSON.stringify({ t3flare: "booted", ...this.#lastBoot, constructions: isolate.constructions }));
       this.#startIdleChecks();
+      this.#reraised = runtime
+        .commandReady()
+        .then(async () => {
+          const { reraiseQuestionsAfterRestart } = await import("./agents/questionRestart.ts");
+          const raised = await runtime.run(reraiseQuestionsAfterRestart);
+          if (raised > 0) console.log(JSON.stringify({ t3flare: "questions-raised-again", count: raised }));
+        })
+        .catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "questions-reraise-failed", error: String(error).slice(0, 300) })));
       if (runtime.bootstrapSeeded) await Pairing.keepWindowClosing(this.ctx.storage);
       return runtime;
     } catch (error) {
@@ -485,6 +498,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         if (refused !== undefined) return refused;
       }
       const runtime = await this.boot("request", request);
+      if (url.pathname === "/mcp") await this.#reraised;
       return await runtime.fetch(request);
     } catch (error) {
       if (error instanceof SafeModeError) {

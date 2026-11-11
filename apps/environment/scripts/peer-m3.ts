@@ -116,6 +116,51 @@ if (wants("env-restart")) {
   }
 }
 
+if (wants("env-restart-delegated")) {
+  // Review C2: a thread delegated from another environment (`delegatedFrom`), its question cut by an Environment restart.
+  const link = await signIn((await mintPairingCode(cookie, { label: `m3 c2 ${stamp}` })).code, "auto-accept-edits", { clientName: `m3 c2 link ${stamp}` });
+  const mcp = new McpClient(link.token, { modeLimit: "auto-accept-edits/default" });
+  const launched = await mcp.call("t3_thread_launch", {
+    projectId: fixture.projectId,
+    title: `m3 delegated question ${stamp}`,
+    modelSelection: MODEL,
+    clientRequestId: `m3-c2-${stamp}`,
+    message: ASK(`d-${stamp}`),
+    delegatedFrom: { environmentId: "00000000-0000-4000-8000-000000000002", threadId: `laptop-c2-${stamp}`, title: "laptop parent" },
+  });
+  const threadId: string | undefined = launched.json?.threadId;
+  const runId: string | undefined = launched.json?.runId;
+  if (check("env-restart-delegated: launch", threadId !== undefined && runId !== undefined, launched.text.slice(0, 300))) {
+    const { request } = await waitQuestion(threadId!);
+    if (check("env-restart-delegated: the question waits", request !== undefined)) {
+      await admin("POST", "/_t3flare/restart");
+      await sleep(5000);
+      // What the laptop's follower asks (RemoteDelegation.followOnce): has the task's run settled, with its delegated work?
+      const early = await mcp.call("t3_thread_wait", { threadId, runId, untilDelegatedWorkSettled: true, timeoutMs: 5_000 });
+      const p = await until(cookie, threadId!, (q) => questionOf(q) !== undefined && questionOf(q).id !== request.id, 180_000);
+      const original = p?.runtimeRequests?.find((r: any) => r.id === request.id);
+      const again = questionOf(p);
+      lastSeen.set(threadId!, p);
+      out.envRestartDelegated = {
+        followerAfterRestart: { timedOut: early.json?.timedOut ?? null, status: early.json?.status ?? null, run: early.json?.runId ?? null },
+        original: original === undefined ? null : { status: original.status, capability: original.responseCapability?.type },
+        raisedAgain: again === undefined ? null : { question: questionItem(p, again)?.questions?.[0]?.question ?? null, capability: again.responseCapability?.type },
+        runs: p?.runs?.map((r: any) => ({ status: r.status, continuationOf: r.restartContinuationOfRunId === undefined ? null : r.restartContinuationOfRunId === runId ? "the cut run" : "other" })),
+      };
+      check("env-restart-delegated: the follower does not read the cut run as the task's end", early.json?.timedOut === true, out.envRestartDelegated);
+      check("env-restart-delegated: the question is raised again in a continuation of the cut run", again !== undefined && (p?.runs ?? []).some((r: any) => r.restartContinuationOfRunId === runId), out.envRestartDelegated);
+      check("env-restart-delegated: the stale request is closed", original?.status !== "pending", out.envRestartDelegated);
+      if (again !== undefined) {
+        await answerAsOwner(threadId!, again, "blue");
+        const { answer } = await mcp.waitThread({ threadId, runId, untilDelegatedWorkSettled: true }, 4 * 60_000);
+        const read = await mcp.call("t3_thread_read", { threadId });
+        (out.envRestartDelegated as Record<string, unknown>).final = { status: answer.json?.status ?? null, resultRun: answer.json?.resultRun?.runId === runId ? "the cut run" : answer.json?.resultRun?.runId ?? null, blue: read.text.includes("blue") };
+        check("env-restart-delegated: the follower's wait ends with the answered run, completed", answer.json?.status === "completed" && read.text.includes("blue"), out.envRestartDelegated);
+      }
+    }
+  }
+}
+
 if (wants("push")) {
   const remoteMain = () => spawnSync("git", ["ls-remote", `https://github.com/${FIXTURE}.git`, "refs/heads/main"], { encoding: "utf8", env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } }).stdout.split(/\s/)[0] ?? "";
   // gh's credentials for this machine's own git (the owner's), never the stage's.

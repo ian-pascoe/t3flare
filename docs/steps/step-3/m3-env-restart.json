@@ -1,0 +1,31 @@
+{
+ "at": "2026-11-11T21:14:25.181Z",
+ "envRestart": {
+  "original": {
+   "status": "pending",
+   "capability": {
+    "type": "message"
+   }
+  },
+  "pending": [
+   {
+    "id": "same",
+    "kind": "user_input",
+    "capability": "message"
+   }
+  ],
+  "runs": [
+   "cancelled"
+  ],
+  "after": {
+   "runs": [
+    "cancelled",
+    "completed"
+   ],
+   "reply": "I'll ask you the question now.\nblue e-mwcm9r59",
+   "pending": 0
+  }
+ },
+ "failures": [],
+ "ok": true
+}
