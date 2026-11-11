@@ -50,10 +50,11 @@ import {
   resolveCommit,
   withinGuard,
 } from "./gitRepo.ts";
+import { containerPatterns, ContainerOnlyBackend, submoduleDirsScript, submodulePaths } from "./containerOnly.ts";
 import { isomorphicFs } from "./isoFs.ts";
 import { credentialDecision, type LinkedWork, prunedLinkedWork } from "./linkedPush.ts";
 import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, withoutOwnGitDir } from "./gitDirReads.ts";
-import { kindOf, patchAnswer } from "./staleReads.ts";
+import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
@@ -172,13 +173,18 @@ export const CREDENTIAL_HELPER =
 
 /** The last checkpoint captured: its commit, the files' revision then, and HEAD then (the alias above the guard). */
 const LAST_CAPTURE_KEY = "t3flare:last-capture";
+/** While a worktree is being made: its project's submodule paths (`#containerPatterns`). */
+const SUBMODULE_HINT_KEY = "t3flare:submodule-hint";
+
+/** t3's repository probe, answered from the Workspace's own files when it was never answered (`#emulatedRead`). */
+const VCS_DETECT = "rev-parse --is-inside-work-tree --show-toplevel --git-common-dir";
 
 const ContainerHost = withWorkspaceContainer(class extends DurableObject<WorkspaceEnv> {});
 
 export class WorkspaceDO extends ContainerHost {
   readonly #workspace: ComputerWorkspace;
   readonly #reads: ReturnType<typeof readCache>;
-  readonly #container: ContainerBackend;
+  readonly #container: ContainerOnlyBackend;
   /** The Session's `ComputerExecutionEnv` file operations (the agent's tools), answered here. */
   readonly #host: WorkspaceEnvHost;
   #hostReady: Promise<void> | undefined;
@@ -193,15 +199,25 @@ export class WorkspaceDO extends ContainerHost {
   constructor(ctx: DurableObjectState, env: WorkspaceEnv) {
     super(ctx, env);
     const ref = { binding: WORKSPACE_BINDING, id: ctx.id.toString() };
-    this.#container = new ContainerBackend({
-      container: () => ({ getWorkspaceContainer: () => this.#budgeted(this.getWorkspaceContainer()) }),
-      workspace: ref,
-      name: WORKSPACE_CONTAINER,
-      instance: CONTAINER_INSTANCE,
-      // Unrestricted direct egress in part 1, as cloudpid's v1 (an allowlist is deferred, docs/plan.md).
-      egress: { mode: "direct" },
-      ignore: CONTAINER_IGNORE,
-      connectTimeoutMs: 60_000,
+    // Made again for each Container start whose ignore patterns differ: submodules stay on the Container's disk.
+    this.#container = new ContainerOnlyBackend({
+      make: (patterns) =>
+        new ContainerBackend({
+          container: () => ({ getWorkspaceContainer: () => this.#budgeted(this.getWorkspaceContainer()) }),
+          workspace: ref,
+          name: WORKSPACE_CONTAINER,
+          instance: CONTAINER_INSTANCE,
+          // Unrestricted direct egress in part 1, as cloudpid's v1 (an allowlist is deferred, docs/plan.md).
+          egress: { mode: "direct" },
+          ignore: [...patterns],
+          connectTimeoutMs: 60_000,
+        }),
+      initial: containerPatterns(CONTAINER_IGNORE, []),
+      patterns: () => this.#containerPatterns(),
+      stop: async () => {
+        if (this.ctx.container?.running === true) await this.ctx.container.destroy();
+      },
+      log: (event) => console.log(JSON.stringify({ ...event, workspace: this.#workspaceId() ?? null })),
     });
     this.#reads = readCache(ctx.storage.sql);
     this.#workspace = new ComputerWorkspace({
@@ -210,7 +226,7 @@ export class WorkspaceDO extends ContainerHost {
     });
     // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
     this.#host = new WorkspaceEnvHost(this.#workspace, {
-      patterns: () => Promise.resolve(withHarnessKept(CONTAINER_IGNORE)),
+      patterns: async () => withHarnessKept(await this.#containerPatterns()),
       running: () => this.containerRunning(),
       run: async (script, scriptEnv) => {
         const result = await this.exec({ script, env: { ...scriptEnv }, cwd: WORKSPACE_ROOT });
@@ -259,6 +275,37 @@ export class WorkspaceDO extends ContainerHost {
       },
       projectRootView: PROJECT_ROOT_VIEW,
     });
+  }
+
+  /**
+   * The ignore patterns the Container needs (`containerOnly.ts`): the static ones, and the submodules the repo's
+   * `.gitmodules` names, or, while a worktree is being made, its project's (`SUBMODULE_HINT_KEY`).
+   */
+  async #containerPatterns(): Promise<ReadonlyArray<string>> {
+    let gitmodules = "";
+    try {
+      await this.#workspace.ready();
+      gitmodules = await this.#workspace.fs.readFile(`${REPO_ROOT}/.gitmodules`, "utf8");
+    } catch {
+      // No `.gitmodules`: no submodules.
+    }
+    const hint = this.ctx.storage.kv.get<ReadonlyArray<string>>(SUBMODULE_HINT_KEY) ?? [];
+    return containerPatterns(CONTAINER_IGNORE, [...new Set([...hint, ...submodulePaths(gitmodules)])]);
+  }
+
+  /**
+   * Before a command that may write (an action, the agent's, a terminal's start): a running Container started without
+   * the patterns the repo's submodules need (a clone or a checkout that brought a `.gitmodules`) is stopped, so a
+   * `git submodule update` never pulls a submodule into the DO's files; the command starts it again with them. Passive
+   * reads go on in the running Container.
+   */
+  async #restartForSubmodules(): Promise<void> {
+    // Never under a running command or an open terminal: the restart waits for the next quiet command.
+    if (!this.containerRunning() || this.#running > 0 || this.#terminals.size > 0) return;
+    const needed = await this.#containerPatterns();
+    if (needed.every((pattern) => this.#container.patterns.includes(pattern))) return;
+    console.log(JSON.stringify({ t3flare: "container-restart-for-submodules", workspace: this.#workspaceId() ?? null, patterns: needed }));
+    await this.stopContainer();
   }
 
   /** One sync with the Container backend to completion (review F9: never the default backend). */
@@ -359,10 +406,13 @@ export class WorkspaceDO extends ContainerHost {
     this.#alive();
     const started = Date.now();
     const backend = input.backend === "worker-shell" ? WORKER_SHELL_BACKEND : CONTAINER_BACKEND;
+    if (backend === CONTAINER_BACKEND && input.passive !== true) await this.#restartForSubmodules().catch(() => undefined);
     this.#running++;
     try {
       await this.#workspace.ready();
-      const handle = await this.#workspace.runtime.exec(input.script, {
+      // The patterns this command's Container starts with, or started with (`containerOnly.ts`).
+      const script = backend === CONTAINER_BACKEND ? `${submoduleDirsScript(await this.#containerPatterns())}${input.script}` : input.script;
+      const handle = await this.#workspace.runtime.exec(script, {
         backend,
         cwd: input.cwd ?? WORKSPACE_ROOT,
         encoding: "utf8",
@@ -535,6 +585,12 @@ export class WorkspaceDO extends ContainerHost {
    */
   async #emulatedRead(run: GitRun): Promise<GitAnswer | undefined> {
     const args = run.argv.filter((arg, at, all) => !(arg === "--git-dir" || all[at - 1] === "--git-dir"));
+    if (args.join(" ") === VCS_DETECT && run.cwd === REPO_ROOT) {
+      // t3's VCS driver detection (`GitVcsDriver`'s repository probe, the first read of a project's thread launch):
+      // what git answers at the root of a repo with its own `.git`, which is every Workspace's.
+      if (!("ok" in (await fileOps(this.#workspace).stat(`${REPO_ROOT}/.git`, false)))) return undefined;
+      return { ran: true, exitCode: 0, stdout: `true\n${REPO_ROOT}\n.git\n`, stderr: "", ms: 0, cached: true, stale: "patched" };
+    }
     if (args[0] !== "remote" || (args.length > 1 && !(args.length === 2 && (args[1] === "-v" || args[1] === "--verbose")))) return undefined;
     const repo = await this.#repo();
     const remotes = await git.listRemotes({ fs: repo.fs, dir: repo.dir });
@@ -547,34 +603,35 @@ export class WorkspaceDO extends ContainerHost {
   /** Stale answers made since the files last changed, by read key: a client polling status patches once per change. */
   readonly #staleMemo = new Map<string, { readonly global: number; readonly answer: GitAnswer }>();
 
-  /** A passive read while the Container is stopped: its last real answer, patched with the paths written since. */
+  /**
+   * A passive read while the Container is stopped: its last real answer (or its sibling status shape's), patched with
+   * the paths written since where the DO can afford it (`staleRead`).
+   */
   async #stale(run: GitRun, key: string): Promise<GitAnswer> {
-    const last = this.#reads.last(key);
-    if (last === undefined) {
-      const emulated = await this.#emulatedRead(run).catch(() => undefined);
-      if (emulated !== undefined) return emulated;
-      return { ran: false, reason: "container_stopped", detail: "needs the Workspace's Container, which is stopped, and has no earlier answer" };
-    }
-    const shape = (run.readScope ?? "repo") === "repo" && last.answer.exitCode === 0 ? kindOf(run.argv, run.env) : undefined;
-    if (shape === undefined) return { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
     const global = currentRevision(this.ctx.storage.sql);
     const memo = this.#staleMemo.get(key);
     if (memo !== undefined && memo.global === global) return memo.answer;
     const started = Date.now();
-    const journal = this.#journalSince(last.rev, global);
-    let answer: GitAnswer;
+    let outcome: StaleOutcome;
     try {
-      const repo = await this.#repo();
-      if (journal.length > 0 && !(await withinGuard(repo))) {
-        answer = { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
-      } else {
-        const stdout = await patchAnswer(shape.kind, last.answer.stdout, journal, await repoFacts(repo, shape.base));
-        answer = { ran: true, ...last.answer, stdout, ms: Date.now() - started, cached: true, stale: "patched" };
-      }
+      outcome = await staleRead(run, {
+        last: async (argv) => (argv === run.argv ? this.#reads.last(key) : this.#reads.last(await readKey({ ...run, argv }))),
+        journalSince: (rev) => this.#journalSince(rev, global),
+        withinGuard: async () => withinGuard(await this.#repo()),
+        facts: async (base) => repoFacts(await this.#repo(), base),
+      });
     } catch (error) {
-      console.warn(JSON.stringify({ t3flare: "stale-read-patch-failed", kind: shape.kind, error: String(error).slice(0, 500) }));
-      answer = { ran: true, ...last.answer, ms: 0, cached: true, stale: "last-answer" };
+      console.warn(JSON.stringify({ t3flare: "stale-read-patch-failed", argv: run.argv.slice(0, 3), error: String(error).slice(0, 500) }));
+      const last = this.#reads.last(key);
+      outcome = last === undefined ? { found: false } : { found: true, answer: last.answer, stale: "last-answer" };
     }
+    if (!outcome.found) {
+      const emulated = await this.#emulatedRead(run).catch(() => undefined);
+      if (emulated !== undefined) return emulated;
+      return { ran: false, reason: "container_stopped", detail: "needs the Workspace's Container, which is stopped, and has no earlier answer" };
+    }
+    if (outcome.why !== undefined) console.log(JSON.stringify({ t3flare: "stale-read-last-answer", argv: run.argv.slice(0, 3), why: outcome.why }));
+    const answer: GitAnswer = { ran: true, ...outcome.answer, ms: outcome.stale === "patched" ? Date.now() - started : 0, cached: true, stale: outcome.stale };
     this.#staleMemo.set(key, { global, answer });
     if (this.#staleMemo.size > 200) this.#staleMemo.delete(this.#staleMemo.keys().next().value!);
     return answer;
@@ -744,9 +801,16 @@ export class WorkspaceDO extends ContainerHost {
   // the project has by a git bundle, read straight from the project's object.
 
   /** Step 1, in the worktree's object: a fresh clone without checkout (or `git init` with no remote); answers its tips. */
-  async worktreeClone(input: { readonly id: string; readonly url: string | null; readonly token: string | null }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }> {
+  async worktreeClone(input: { readonly id: string; readonly url: string | null; readonly token: string | null; readonly parent?: string }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }> {
     this.#revive();
     this.#rememberId(input.id);
+    // A Container left by an earlier attempt starts again: its submodules' directories are mounts that the clone's
+    // `rm -rf` of the repo cannot remove.
+    if (this.containerRunning()) await this.stopContainer().catch(() => undefined);
+    // The project's submodules, so the Container this clone starts keeps them local from the first command (t3 runs
+    // `git submodule update` right after the checkout).
+    const projectModules = input.parent === undefined ? null : await this.#peer(input.parent).readText(`${REPO_ROOT}/.gitmodules`).catch(() => null);
+    this.ctx.storage.kv.put(SUBMODULE_HINT_KEY, projectModules === null ? [] : submodulePaths(projectModules));
     const script = worktreeCloneScript({
       repo: REPO_ROOT,
       url: input.url,
@@ -831,6 +895,8 @@ export class WorkspaceDO extends ContainerHost {
       if (result.exitCode !== 0) return { ok: false, error: result.stderr.slice(-1000) };
       if (head !== input.commit) return { ok: false, error: `HEAD is ${head}, not ${input.commit}` };
       await this.#prime().catch(() => undefined);
+      // The checkout's own `.gitmodules` now says which paths are submodules.
+      this.ctx.storage.kv.delete(SUBMODULE_HINT_KEY);
       return { ok: true, head };
     } catch (error) {
       return { ok: false, error: String(error).slice(0, 1000) };

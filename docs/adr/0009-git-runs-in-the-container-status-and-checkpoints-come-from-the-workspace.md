@@ -40,3 +40,34 @@ Evidence: `docs/steps/step-2b/m2-watch.json` (a primed worktree with its Contain
 read cache and the 2,000-file guard work per Workspace unchanged. `rev-parse --git-common-dir` in a worktree answers its
 own `.git`; t3 uses it only for its config lock and the worktree directory's hash (the router trace audit in
 `docs/steps/step-2b/m2-trace.json`).
+
+## Refinement (large repos and submodules, the prod bug of 2026-11-11)
+
+The owner's worktree thread on t3flare itself (503 tracked files, so inside the guard, plus the `t3code` submodule's
+31,946) was slow and then broke: t3's worktree creation and the agent checked the submodule out, computer pulled every
+file into the Workspace DO (revision 37,474, about five minutes of sync), a stale review diff patched with a 37,000-path
+journal ran past the DO's CPU limit, and the removal's check died with it (a tombstone). Separately, the project showed
+"Git status failed": t3's `statusDetails` (ahead/behind counted) had never been answered, only its poll's
+`--no-ahead-behind` shape, and the Container was stopped.
+
+- **A submodule is Container-only**, like `node_modules`: what is under each path `.gitmodules` names, and the
+  submodules' git directories (`.git/modules`), stay on the Container's disk, never in the Workspace's files
+  (`apps/agents/src/workspace/containerOnly.ts`). computer takes its ignore patterns at the Container's start, so the
+  Container backend is made again for a start whose patterns differ; a worktree's first start takes its project's
+  submodules, and a command that may write first stops a Container started without the patterns its repo now needs.
+  Passive reads go on in the running Container. A Container that starts afresh has the submodules' directories empty,
+  as a fresh clone does: the command that filled them (`git submodule update`) fills them again. The agent's file tools
+  reach them through the Container. The DO's own git (checkpoints, stale reads) never looks inside a submodule: its
+  entry stays as git last answered it.
+- **A stale read patches at most 500 written paths** (`MAX_PATCHED_PATHS`); past that it gets its last answer, as above
+  the guard. Each patched path costs the DO a read and a hash.
+- **t3's two status shapes stand in for each other** when one has never been answered: the poll's answer serves
+  `statusDetails` with ahead/behind unknown (`+? -?`, read as zero by t3), and the reverse with the counts hidden as git
+  hides them. No passive read starts the Container for it.
+- **t3's repository probe** (`rev-parse --is-inside-work-tree --show-toplevel --git-common-dir`) is answered from the
+  Workspace's files when it has never been answered, as `git remote` is: a project left idle before its first worktree
+  launch could not resolve its VCS driver.
+
+Evidence: `docs/steps/bigrepo/` (the stage `bigrepo` before and after, through `scripts/bigrepo.ts`);
+`apps/environment/test/statusOverStale.test.ts` (t3's real `GitVcsDriver` over the router and `staleRead`, on a repo
+with a submodule); `apps/agents/test/staleReads.test.ts`, `containerOnly.test.ts`.

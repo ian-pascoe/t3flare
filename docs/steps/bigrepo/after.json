@@ -1,0 +1,214 @@
+{
+  "ok": true,
+  "failures": [],
+  "repo": "ian-pascoe/t3flare",
+  "at": "2026-11-11T23:23:08.229Z",
+  "clone": {
+    "ms": 11417,
+    "cwd": "/w/big-mwcqvrxv",
+    "remoteUrl": "https://github.com/ian-pascoe/t3flare.git",
+    "repository": null
+  },
+  "projectInfo": {
+    "provisioned": true,
+    "repo": true,
+    "containerRunning": true,
+    "revision": 627,
+    "gitRevision": 627,
+    "cachedReads": 13,
+    "id": "big-mwcqvrxv"
+  },
+  "worktreeSetup": {
+    "ms": 83355,
+    "path": "/w/.wt/big-mwcqvrxv/t3-1880a125-7f9af62bdd902008",
+    "stages": [
+      "fetch:skipped",
+      "checkout:done",
+      "setup-script:skipped",
+      "agent:done"
+    ],
+    "stageTimes": {
+      "fetch": 1097,
+      "checkout": 83355,
+      "setup-script": 83355,
+      "agent": 83355
+    },
+    "error": null
+  },
+  "turn": {
+    "msFromLaunch": 97657,
+    "runs": [
+      "completed"
+    ],
+    "requestToAgentStartMs": 84587,
+    "agentRunMs": 9627
+  },
+  "worktreeInfo": {
+    "provisioned": true,
+    "repo": true,
+    "containerRunning": true,
+    "revision": 784,
+    "gitRevision": 784,
+    "cachedReads": 36,
+    "id": ".wt/big-mwcqvrxv/t3-1880a125-7f9af62bdd902008"
+  },
+  "running": {
+    "status": {
+      "ms": 1007,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": null,
+      "reason": null,
+      "stdout": "# branch.oid de0027703c158a01b4f73710d2708427e6d82c34\\0# branch.head t3/update-t3code-submodule-readme\\0",
+      "running": true
+    },
+    "statusAb": {
+      "ms": 819,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": null,
+      "reason": null,
+      "stdout": "# branch.oid de0027703c158a01b4f73710d2708427e6d82c34\\0# branch.head t3/update-t3code-submodule-readme\\0",
+      "running": true
+    },
+    "review": {
+      "ms": 552,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": null,
+      "reason": null,
+      "stdout": "",
+      "running": true
+    }
+  },
+  "submodule": {
+    "ms": 368,
+    "http": 200,
+    "ran": true,
+    "exitCode": 0,
+    "stale": null,
+    "reason": null,
+    "stdout": " 24e77473ecf41bc1f7142529c7911c1c1aae1d76 t3code (v0.1.9)\n",
+    "running": true
+  },
+  "stopped": {
+    "status": {
+      "ms": 84,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": null,
+      "reason": null,
+      "stdout": "# branch.oid de0027703c158a01b4f73710d2708427e6d82c34\\0# branch.head t3/update-t3code-submodule-readme\\0",
+      "running": false
+    },
+    "statusAb": {
+      "ms": 86,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": null,
+      "reason": null,
+      "stdout": "# branch.oid de0027703c158a01b4f73710d2708427e6d82c34\\0# branch.head t3/update-t3code-submodule-readme\\0",
+      "running": false
+    },
+    "review": {
+      "ms": 92,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": null,
+      "reason": null,
+      "stdout": "",
+      "running": false
+    }
+  },
+  "removal": {
+    "ms": 8359,
+    "removed": "removed",
+    "row": null
+  },
+  "projectStatusStopped": {
+    "noAheadBehind": {
+      "ms": 118,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": "patched",
+      "reason": null,
+      "stdout": "# branch.oid c0640359853c877a911b67b15e3fd6ef2e778ae4\\0# branch.head main\\0# branch.upstream origin/main\\0# branch.ab +0 -0\\0",
+      "running": false
+    },
+    "aheadBehind": {
+      "ms": 55,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": "patched",
+      "reason": null,
+      "stdout": "# branch.oid c0640359853c877a911b67b15e3fd6ef2e778ae4\\0# branch.head main\\0# branch.upstream origin/main\\0# branch.ab +0 -0\\0",
+      "running": false
+    }
+  },
+  "trace": [
+    {
+      "argv": "clone --progress -- https://github.com/ian-pascoe/t3flare.git big-mwcqvrxv",
+      "cwd": "/w",
+      "route": "clone",
+      "exitCode": 0,
+      "ms": 11035,
+      "detail": "github-app"
+    },
+    {
+      "argv": "branch --no-track -- t3/1880a125 main",
+      "cwd": "/w/big-mwcqvrxv",
+      "route": "container",
+      "exitCode": 0,
+      "ms": 5908,
+      "detail": "action 5344ms"
+    },
+    {
+      "argv": "-c checkout.workers=0 worktree add -- /w/.wt/big-mwcqvrxv/t3-1880a125-7f9af62bdd902008 t3/1880a125",
+      "cwd": "/w/big-mwcqvrxv",
+      "route": "worktree",
+      "exitCode": 0,
+      "ms": 9475,
+      "detail": "{\"clone\":4413,\"bundle\":998,\"checkout\":3968,\"projectRoot\":{\"files\":0,\"bytes\":0,\"capped\":false,\"names\":[]},\"totalMs\":9470,\"bundled\":false}"
+    },
+    {
+      "argv": "submodule update --init --recursive",
+      "cwd": "/w/.wt/big-mwcqvrxv/t3-1880a125-7f9af62bdd902008",
+      "route": "container",
+      "exitCode": 128,
+      "ms": 63833,
+      "detail": "action 63950ms: Cloning into '/workspace/repo/t3code'...\nfatal: No url found for submodule path 't3code/.repos/alchemy-effect/submodules/distilled' in .gitmodules\nfatal: Failed to recurse into submodule path 't3code'"
+    },
+    {
+      "argv": "-c status.showUntrackedFiles=normal worktree remove -- /w/.wt/big-mwcqvrxv/t3-1880a125-7f9af62bdd902008",
+      "cwd": "/w/big-mwcqvrxv",
+      "route": "worktree",
+      "exitCode": 0,
+      "ms": 7328,
+      "detail": "{\"outcome\":\"purged\",\"carried\":[\"CREATED refs/heads/t3/update-t3code-submodule-readme\"],\"sessions\":0}"
+    },
+    {
+      "argv": "status --porcelain=2 --branch -z --no-ahead-behind",
+      "cwd": "/w/big-mwcqvrxv",
+      "route": "error",
+      "exitCode": 128,
+      "ms": 329,
+      "detail": "Error: WritableStream RPC stub was disposed without calling close()"
+    },
+    {
+      "argv": "diff-index -M --numstat -z HEAD --",
+      "cwd": "/w/big-mwcqvrxv",
+      "route": "error",
+      "exitCode": 128,
+      "ms": 329,
+      "detail": "Error: WritableStream RPC stub was disposed without calling close()"
+    }
+  ]
+}

@@ -30,6 +30,8 @@ export interface RepoFacts {
   headBytes(oid: string): Promise<Uint8Array>;
   /** Whether the index has a file under directory `dir` (repo-relative, no trailing slash). */
   trackedUnder(dir: string): boolean;
+  /** The submodules' paths (the index's gitlinks): their files are their own repos', never this one's. */
+  readonly submodules: ReadonlyArray<string>;
   /** The files under `dir` (recursive, repo-relative) that are neither tracked nor ignored. */
   untrackedUnder(dir: string): Promise<ReadonlyArray<string>>;
 }
@@ -264,7 +266,15 @@ const patchOthers = async (stdout: string, journal: ReadonlyArray<string>, repo:
 };
 
 /** `stdout` (the last real answer of a `kind` read) patched with the paths written since it ran. */
-export const patchAnswer = (kind: StaleKind, stdout: string, journal: ReadonlyArray<string>, repo: RepoFacts): Promise<string> => {
+/**
+ * The journal without a submodule's own paths: git shows a submodule by its checked-out commit and dirtiness, which this
+ * repo's files cannot say, so its entry stays as the last answer had it.
+ */
+export const outsideSubmodules = (journal: ReadonlyArray<string>, submodules: ReadonlyArray<string>): ReadonlyArray<string> =>
+  submodules.length === 0 ? journal : journal.filter((path) => !submodules.some((sub) => path === sub || path.startsWith(`${sub}/`)));
+
+export const patchAnswer = (kind: StaleKind, stdout: string, written: ReadonlyArray<string>, repo: RepoFacts): Promise<string> => {
+  const journal = outsideSubmodules(written, repo.submodules);
   if (journal.length === 0) return Promise.resolve(stdout);
   switch (kind) {
     case "status":
@@ -281,3 +291,86 @@ export const patchAnswer = (kind: StaleKind, stdout: string, journal: ReadonlyAr
 };
 
 export { latin1 };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The read as a whole (the Workspace DO's `#stale`, with its storage as `StaleSources`)
+
+/**
+ * The most written paths a stale read patches. Each costs a read and a hash of the file in the Workspace DO, whose CPU
+ * time per request is limited: the prod reset of 2026-11-11 was a review diff patched with a journal of 37,000 paths
+ * (a checked-out submodule). Past it the read gets its last answer, as above the guard.
+ */
+export const MAX_PATCHED_PATHS = 500;
+
+const STATUS_SHAPE = ["status", "--porcelain=2", "--branch", "-z"];
+
+/**
+ * t3's other status shape: `--no-ahead-behind` (its local poll) for the plain one (its `statusDetails`, which also
+ * counts ahead/behind), and back; undefined for any other argv.
+ */
+export const statusSibling = (argv: ReadonlyArray<string>): ReadonlyArray<string> | undefined => {
+  if (same(argv, STATUS_SHAPE)) return [...STATUS_SHAPE, "--no-ahead-behind"];
+  if (same(argv, [...STATUS_SHAPE, "--no-ahead-behind"])) return STATUS_SHAPE;
+  return undefined;
+};
+
+/**
+ * A status answer in `argv`'s shape: with `--no-ahead-behind`, git writes a branch's counts as `+? -?` unless both are
+ * zero. The plain shape keeps whatever the answer had (`+? -?` from the poll: the counts are unknown while the
+ * Container is stopped, which t3 reads as zero, ADR-0009).
+ */
+export const asStatusShape = (stdout: string, argv: ReadonlyArray<string>): string =>
+  argv.includes("--no-ahead-behind")
+    ? stdout
+        .split("\0")
+        .map((record) => (record.startsWith("# branch.ab ") && record !== "# branch.ab +0 -0" ? "# branch.ab +? -?" : record))
+        .join("\0")
+    : stdout;
+
+export interface StaleAnswer {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+/** What a stale read is made from: the Workspace DO's read cache, its change log, and its repo. */
+export interface StaleSources {
+  /** The last real answer to `argv` (with this read's cwd and env), and the revision it was made at. */
+  last(argv: ReadonlyArray<string>): Promise<{ readonly rev: number; readonly answer: StaleAnswer } | undefined>;
+  /** The repo's paths (relative, outside `.git`) written after revision `rev`. */
+  journalSince(rev: number): ReadonlyArray<string>;
+  /** Whether the repo is small enough for the DO's isomorphic-git (the 2,000-file, 16 MB guard). */
+  withinGuard(): Promise<boolean>;
+  facts(base: string): Promise<RepoFacts>;
+}
+
+export type StaleOutcome =
+  | { readonly found: false }
+  | { readonly found: true; readonly answer: StaleAnswer; readonly stale: "patched" | "last-answer"; readonly why?: string };
+
+/**
+ * A passive read while the Container is stopped: its last real answer (else, for status, its sibling shape's), patched
+ * with the paths written since where the shape allows and the DO can afford it; else that answer alone.
+ */
+export const staleRead = async (
+  read: { readonly argv: ReadonlyArray<string>; readonly env?: Readonly<Record<string, string>> | undefined; readonly readScope?: "git-dir" | "repo" | undefined },
+  sources: StaleSources,
+): Promise<StaleOutcome> => {
+  let last = await sources.last(read.argv);
+  if (last === undefined) {
+    const sibling = statusSibling(read.argv);
+    const theirs = sibling === undefined ? undefined : await sources.last(sibling);
+    if (theirs !== undefined) last = { rev: theirs.rev, answer: { ...theirs.answer, stdout: asStatusShape(theirs.answer.stdout, read.argv) } };
+  }
+  if (last === undefined) return { found: false };
+  const asIs = (why?: string): StaleOutcome => ({ found: true, answer: last.answer, stale: "last-answer", ...(why === undefined ? {} : { why }) });
+  const shape = (read.readScope ?? "repo") === "repo" && last.answer.exitCode === 0 ? kindOf(read.argv, read.env) : undefined;
+  if (shape === undefined) return asIs();
+  const written = sources.journalSince(last.rev);
+  if (written.length === 0) return { found: true, answer: last.answer, stale: "patched" };
+  if (!(await sources.withinGuard())) return asIs("above the guard");
+  const facts = await sources.facts(shape.base);
+  const journal = outsideSubmodules(written, facts.submodules);
+  if (journal.length > MAX_PATCHED_PATHS) return asIs(`${journal.length} paths written`);
+  return { found: true, answer: { ...last.answer, stdout: await patchAnswer(shape.kind, last.answer.stdout, journal, facts) }, stale: "patched" };
+};
