@@ -88,3 +88,20 @@ check found two module-level values that outlive a runtime: `packages/shared/src
 `activeMcpSessionRegistry` (replaced on the next boot; between a reset and the next boot it points at the
 disposed registry). **Ask:** keep mutable state in services rather than modules, so a runtime rebuilt in the
 same process starts clean.
+
+## 11. Wake the parent when a remote task's child asks (step 3)
+
+A delegated task whose child runs in a linked environment (`RemoteDelegation`) cannot ask its parent agent: for a local
+child `DelegatedTaskQuestionReactor` wakes the parent on the child's `user_input` request, but it skips a task with
+no `childThreadId` (`apps/server/src/orchestration-v2/DelegatedTaskQuestionReactor.ts:36`), which is every remote
+task. The desktop app does show the owner "Subagent needs input · Open question" on the parent thread (seen with
+0.1.10-nightly.20261111.4529), and the parent could answer with `t3_pending_request` and `environmentId`, but nothing
+tells it to. **Ask:** have the remote follower (`RemoteDelegation.followOnce`) notice a pending question on the remote
+thread (it already waits there with `t3_thread_wait`; `t3_pending_request list` is one more forwarded read) and wake
+the parent as the reactor does for a local child, with the question and the remote ids to answer it with.
+
+Related, for information: a remote task's question cut by a restart of the remote environment ends its run, and the
+follower completes the task from that cancelled run's last reply (t3 keeps the question answerable by a message, and
+starts no continuation). We raise the question again in a continuation of the cut run on our side; a follower that
+waits for a pending message-capable question of its run, as the local finalizer does (`childAwaitsRestartContinuation`
+and the dismissal in `Orchestrator.ts`), would make that unnecessary.

@@ -24,6 +24,22 @@ _Avoid_: orchestrator DO, server DO
 A sign-in from one Environment to another's MCP endpoint, letting its agents delegate work there.
 _Avoid_: link, bridge, connection
 
+**Linked work**:
+Threads a Peer link started in the Environment it signed in to, and the work derived from them; each carries the link's
+`linkOrigin` (its client session, label and access).
+_Avoid_: remote threads, foreign work
+
+**Link fence**:
+What Linked work from a link paired below full access may not do: change the owner's threads, projects, settings or
+schedules, or use that Environment's own links (t3's), exceed the modes the link hands down, or `git push` without an
+approval each time (ours). A full-access link is not fenced.
+_Avoid_: sandbox, isolation
+
+**Remote task**:
+A delegated task whose child thread runs in another Environment over a Peer link; the parent's Environment follows it
+and completes the task with the child's last reply.
+_Avoid_: remote subagent, cloud task
+
 ## Work
 
 **Project**:

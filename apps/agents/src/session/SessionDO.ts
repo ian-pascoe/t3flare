@@ -170,13 +170,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
         store: this.#approvals,
         mode: () => runtimeModeOf(this.#meta()?.runtimeMode),
         interaction: () => interactionModeOf(this.#meta()?.interactionMode),
-        turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null,
+        turn: () => this.#liveTurn(),
         workspaceId: () => this.#meta()?.workspaceId ?? null,
         beforeCommand: () => this.#noteLinkedWork(),
       }),
     );
     registry.install(interactionModeSection(() => interactionModeOf(this.#meta()?.interactionMode)));
-    registry.install(askUser({ store: this.#questions, turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null }));
+    registry.install(askUser({ store: this.#questions, turn: () => this.#liveTurn() }));
     this.#t3 = new T3McpClient(
       (request) => environmentStub(env.ENVIRONMENT).mcp(request),
       () => ctx.storage.kv.get<T3McpCredential>(T3_MCP_KEY),
@@ -257,9 +257,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
   async approveGitPush(input: { readonly workspace: string; readonly op: string; readonly command: string }): Promise<{ readonly approved: boolean; readonly reason?: string }> {
     await this.#opening;
     const meta = this.#meta();
-    const turn = Object.entries(this.#turns()).find(([, candidate]) => isLive(candidate))?.[0];
+    const turn = this.#liveTurn();
     if (meta?.linked == null) return { approved: false, reason: "not linked work" };
-    if (turn === undefined) return { approved: false, reason: "no live turn to ask on" };
+    if (turn === null) return { approved: false, reason: "no live turn to ask on" };
     const requestId = `push:${crypto.randomUUID()}`;
     const command = input.command.trim() === "" ? `git ${input.op}` : input.command.trim();
     const context = withAbortSignal(AbortSignal.timeout(PUSH_APPROVAL_MS), BACKGROUND_CONTEXT);
@@ -295,7 +295,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       store: this.#approvals,
       mode: () => runtimeModeOf(this.#meta()?.runtimeMode),
       interaction: () => interactionModeOf(this.#meta()?.interactionMode),
-      turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null,
+      turn: () => this.#liveTurn(),
       credential: () => this.ctx.storage.kv.get<T3McpCredential>(T3_MCP_KEY)?.providerSessionId,
       instructions: () => this.ctx.storage.kv.get<T3McpCredential>(T3_MCP_KEY)?.instructions,
       call: (tool, args) => this.#t3.callTool(tool, args),
@@ -333,6 +333,11 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   #meta(): Meta | undefined {
     return this.ctx.storage.kv.get<Meta>(META_KEY);
+  }
+
+  /** The turn the Session runs now (the asking turn of an approval or a question), or null. */
+  #liveTurn(): string | null {
+    return Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null;
   }
 
   #turns(): Turns {

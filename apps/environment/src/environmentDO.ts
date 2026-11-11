@@ -58,7 +58,6 @@ ModuleState.install();
 const HOST_KEY = "t3flare/host";
 export const DEFAULT_ARM_MINUTES = 15;
 
-
 export class SafeModeError extends Error {
   readonly safeMode: BootState.SafeMode;
   constructor(safeMode: BootState.SafeMode) {
@@ -216,8 +215,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   /**
    * RPC from a Workspace DO: its repo's Container token, for the git credential helper in its Container (ADR-0013;
    * the agent's own `git push`/`fetch`). One repo; `workflows` only when the Workspace is opted in; read-only for a
-   * fetch while linked work is active there (step 3, D1). Null for a
-   * Workspace the registry does not list or without a GitHub remote. Counted as a request for the idle check.
+   * fetch while linked work is active there (step 3, D1). Null for a Workspace the registry does not list or without a
+   * GitHub remote. Counted as a request for the idle check.
    */
   async workspaceToken(id: string, options?: { readonly readOnly?: boolean }): Promise<{ readonly token: string | null }> {
     Idle.requestStarted();
