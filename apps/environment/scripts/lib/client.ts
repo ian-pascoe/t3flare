@@ -90,6 +90,15 @@ export const wsStream = (cookie: string, method: string, payload: unknown): Prom
     }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
   ).then((chunk) => [...chunk]);
 
+/** The first event of a streaming WS method (a subscription's snapshot), on a socket opened for the call. */
+export const wsFirst = (cookie: string, method: string, payload: unknown): Promise<unknown> =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Stream.Stream<unknown, unknown>>;
+      return yield* Stream.runHead(client[method]!(payload));
+    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+  ).then((head) => (head._tag === "Some" ? head.value : undefined));
+
 export const updateSettings = (cookie: string, patch: Record<string, unknown>) =>
   Effect.runPromise(
     Effect.gen(function* () {
