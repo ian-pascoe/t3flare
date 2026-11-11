@@ -39,13 +39,14 @@ jobs:
     timeout-minutes: 45
     environment: bump
     steps:
+      # The submodule is fetched by hand, not by the action: the action walks t3code's nested gitlinks recursively,
+      # and one of them (.repos/alchemy-effect/submodules/distilled) has no URL, which fails the checkout.
       - uses: actions/checkout@v4
         with:
-          submodules: true
           fetch-depth: 0
-          # Persisting credentials walks t3code's nested gitlinks, one of which has no URL (.repos/alchemy-effect/…),
-          # and fails the checkout; the push below sets its own credentials instead.
           persist-credentials: false
+
+      - run: git submodule update --init t3code
 
       - uses: oven-sh/setup-bun@v2
         with:

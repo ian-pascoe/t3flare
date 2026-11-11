@@ -1,0 +1,388 @@
+{
+  "milestone": "M5",
+  "stage": "step2a",
+  "script": "bun scripts/stage.ts run step2a turns restart --tools [--approval|--no-continue]",
+  "turn": "fixture Workspace, full-access (approval-required for the approval variant): `sleep 25 && echo slept`, read src/add.sh, `bash test.sh`; POST /_t3flare/restart while the bash call runs (or while its approval waits)",
+  "fiveInARow": [
+    {
+      "ok": true,
+      "secondsToRecover": 44,
+      "runs": [
+        {
+          "id": "24:ordinal:1",
+          "status": "cancelled",
+          "continuationOf": null
+        },
+        {
+          "id": "24:ordinal:2",
+          "status": "completed",
+          "continuationOf": "24:ordinal:1"
+        }
+      ],
+      "sessionTurns": [
+        {
+          "status": "aborted",
+          "reason": "environment-restart"
+        },
+        {
+          "status": "answered",
+          "reason": null
+        }
+      ],
+      "toolItems": [
+        {
+          "type": "command_execution",
+          "status": "cancelled",
+          "run": "24:ordinal:1",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "24:ordinal:2",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "run": "24:ordinal:2",
+          "input": "[object Object]"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "24:ordinal:2",
+          "input": "cd /w/t3flare-fixture && bash test.sh"
+        }
+      ],
+      "continuationAnswer": [
+        "s as arguments and prints their sum. `bash test.sh` printed \"all checks passed.\""
+      ]
+    },
+    {
+      "ok": true,
+      "secondsToRecover": 42,
+      "runs": [
+        {
+          "id": "79:ordinal:1",
+          "status": "cancelled",
+          "continuationOf": null
+        },
+        {
+          "id": "79:ordinal:2",
+          "status": "completed",
+          "continuationOf": "79:ordinal:1"
+        }
+      ],
+      "sessionTurns": [
+        {
+          "status": "aborted",
+          "reason": "environment-restart"
+        },
+        {
+          "status": "answered",
+          "reason": null
+        }
+      ],
+      "toolItems": [
+        {
+          "type": "command_execution",
+          "status": "cancelled",
+          "run": "79:ordinal:1",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "79:ordinal:2",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "run": "79:ordinal:2",
+          "input": "[object Object]"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "79:ordinal:2",
+          "input": "cd /w/t3flare-fixture && bash test.sh"
+        }
+      ],
+      "continuationAnswer": [
+        "cks passed\".\n\n`src/add.sh` takes two integers as arguments and prints their sum."
+      ]
+    },
+    {
+      "ok": true,
+      "secondsToRecover": 51,
+      "runs": [
+        {
+          "id": "75:ordinal:1",
+          "status": "cancelled",
+          "continuationOf": null
+        },
+        {
+          "id": "75:ordinal:2",
+          "status": "completed",
+          "continuationOf": "75:ordinal:1"
+        }
+      ],
+      "sessionTurns": [
+        {
+          "status": "aborted",
+          "reason": "environment-restart"
+        },
+        {
+          "status": "answered",
+          "reason": null
+        }
+      ],
+      "toolItems": [
+        {
+          "type": "command_execution",
+          "status": "cancelled",
+          "run": "75:ordinal:1",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "command_execution",
+          "status": "failed",
+          "run": "75:ordinal:2",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "75:ordinal:2",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "run": "75:ordinal:2",
+          "input": "[object Object]"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "75:ordinal:2",
+          "input": "cd /w/t3flare-fixture && bash test.sh"
+        }
+      ],
+      "continuationAnswer": [
+        "t. Since sleep has no side effects, I reran it, and the third attempt succeeded."
+      ]
+    },
+    {
+      "ok": true,
+      "secondsToRecover": 43,
+      "runs": [
+        {
+          "id": "ac:ordinal:1",
+          "status": "cancelled",
+          "continuationOf": null
+        },
+        {
+          "id": "ac:ordinal:2",
+          "status": "completed",
+          "continuationOf": "ac:ordinal:1"
+        }
+      ],
+      "sessionTurns": [
+        {
+          "status": "aborted",
+          "reason": "environment-restart"
+        },
+        {
+          "status": "answered",
+          "reason": null
+        }
+      ],
+      "toolItems": [
+        {
+          "type": "command_execution",
+          "status": "cancelled",
+          "run": "ac:ordinal:1",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "ac:ordinal:2",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "run": "ac:ordinal:2",
+          "input": "[object Object]"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "ac:ordinal:2",
+          "input": "cd /w/t3flare-fixture && bash test.sh"
+        }
+      ],
+      "continuationAnswer": [
+        " it finished. `bash test.sh` printed \"all checks passed\", as AGENTS.md requires."
+      ]
+    },
+    {
+      "ok": true,
+      "secondsToRecover": 45,
+      "runs": [
+        {
+          "id": "a3:ordinal:1",
+          "status": "cancelled",
+          "continuationOf": null
+        },
+        {
+          "id": "a3:ordinal:2",
+          "status": "completed",
+          "continuationOf": "a3:ordinal:1"
+        }
+      ],
+      "sessionTurns": [
+        {
+          "status": "aborted",
+          "reason": "environment-restart"
+        },
+        {
+          "status": "answered",
+          "reason": null
+        }
+      ],
+      "toolItems": [
+        {
+          "type": "command_execution",
+          "status": "cancelled",
+          "run": "a3:ordinal:1",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "a3:ordinal:2",
+          "input": "sleep 25 && echo slept"
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "run": "a3:ordinal:2",
+          "input": "[object Object]"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "run": "a3:ordinal:2",
+          "input": "cd /w/t3flare-fixture && bash test.sh"
+        }
+      ],
+      "continuationAnswer": [
+        "`src/add.sh` takes two integers as arguments and prints their sum."
+      ]
+    }
+  ],
+  "approvalVariant": {
+    "scenario": "restart",
+    "at": "2026-11-10T23:50:38.722Z",
+    "model": "anthropic/claude-haiku-5-5",
+    "restart": {
+      "noContinue": false,
+      "tools": true,
+      "approval": true,
+      "threadId": "4c861d21-bb15-4f4a-b412-57cd1760f571",
+      "pendingRequest": {
+        "id": "57cd1760f571:approval:12",
+        "after": "expired",
+        "responseCapability": "not_resumable"
+      },
+      "sessionApprovals": 0,
+      "sessionSettledSeconds": 62,
+      "toolItems": [
+        {
+          "type": "command_execution",
+          "status": "cancelled",
+          "run": "71:ordinal:1",
+          "input": "cd /w/t3flare-fixture && sleep 25 && echo slept"
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "run": "71:ordinal:1",
+          "input": "[object Object]"
+        },
+        {
+          "type": "approval_request",
+          "status": "cancelled",
+          "run": "71:ordinal:1",
+          "input": "cd /w/t3flare-fixture && sleep 25 && echo slept"
+        }
+      ],
+      "objectReset": true,
+      "secondsToRecover": 62,
+      "runs": [
+        {
+          "id": "71:ordinal:1",
+          "status": "cancelled",
+          "continuationOf": null
+        }
+      ],
+      "sessionTurns": [
+        {
+          "status": "aborted",
+          "reason": "orphaned_by_environment"
+        }
+      ],
+      "continuationAnswer": [],
+      "liveSessionTurns": 0
+    },
+    "failures": [],
+    "ok": true
+  },
+  "noContinueVariant": {
+    "scenario": "restart",
+    "at": "2026-11-10T23:51:52.613Z",
+    "model": "anthropic/claude-haiku-5-5",
+    "restart": {
+      "noContinue": true,
+      "tools": true,
+      "approval": false,
+      "threadId": "346158f9-0daf-451f-883a-f16e33ba701e",
+      "pendingRequest": null,
+      "sessionApprovals": 0,
+      "sessionSettledSeconds": 26,
+      "toolItems": [
+        {
+          "type": "command_execution",
+          "status": "cancelled",
+          "run": "1e:ordinal:1",
+          "input": "sleep 25 && echo slept"
+        }
+      ],
+      "objectReset": true,
+      "secondsToRecover": 26,
+      "runs": [
+        {
+          "id": "1e:ordinal:1",
+          "status": "cancelled",
+          "continuationOf": null
+        }
+      ],
+      "sessionTurns": [
+        {
+          "status": "aborted",
+          "reason": "orphaned_by_environment"
+        }
+      ],
+      "continuationAnswer": [],
+      "liveSessionTurns": 0
+    },
+    "failures": [],
+    "ok": true
+  },
+  "pass": true
+}

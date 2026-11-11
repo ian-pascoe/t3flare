@@ -1,0 +1,71 @@
+{
+  "milestone": "M5",
+  "deadline": {
+    "scenario": "deadline",
+    "at": "2026-11-10T23:57:48.415Z",
+    "model": "anthropic/claude-haiku-5-5",
+    "deadline": {
+      "threadId": "39c680a1-b304-4f6a-8127-faf5232d510e",
+      "secondsFromRunning": 121,
+      "status": "failed",
+      "error": {
+        "class": "provider_error",
+        "message": "The turn ran longer than 2 hours and was stopped.",
+        "code": "turn_deadline",
+        "retryable": null
+      },
+      "sessionTurns": [
+        {
+          "status": "aborted",
+          "reason": "turn_deadline"
+        }
+      ],
+      "bash": [
+        {
+          "status": "failed",
+          "input": "sleep 900 && echo done"
+        }
+      ]
+    },
+    "failures": [],
+    "ok": true
+  },
+  "deadlineNote": "Stage deployed with T3FLARE_TURN_DEADLINE_MS=120000 (the 2 h cap, shortened) for this check only, then redeployed without it. The Session's alarm aborted the turn at 121 s with reason turn_deadline; t3 shows a failed run with 'The turn ran longer than 2 hours and was stopped.' (the differ maps the deadline's abort to failed, not interrupted).",
+  "budget": {
+    "check": "ContainerBudget under load (step 2a M5)",
+    "at": "2026-11-11T00:00Z",
+    "starts": [
+      {
+        "workspace": "t3flare-fixture",
+        "ms": 23773,
+        "exitCode": 0,
+        "refused": false,
+        "error": null
+      },
+      {
+        "workspace": "scratch-m2",
+        "ms": 21861,
+        "exitCode": 0,
+        "refused": false,
+        "error": null
+      },
+      {
+        "workspace": "r5-memory",
+        "ms": 31483,
+        "exitCode": 0,
+        "refused": false,
+        "error": null
+      },
+      {
+        "workspace": "budget-4",
+        "ms": null,
+        "exitCode": null,
+        "refused": true,
+        "error": "t3flare: the Container cannot start: 3 Containers are running, the most this deploy allows; try again when one stops."
+      }
+    ],
+    "pass": true,
+    "note": "Four Workspaces asked their Container to run `sleep 20` at the same moment, each Container stopped first; three started, the fourth was refused by the budget's lease with the message t3 shows. Every Container was stopped afterwards."
+  },
+  "pass": true
+}

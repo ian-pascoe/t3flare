@@ -49,6 +49,18 @@ _Avoid_: thread (that is t3's), run
 An agent running on pi-durable in a Session, mostly on Workers.
 _Avoid_: Mode 2, cloud agent
 
+**Approval**:
+A Durable agent's tool call waiting for the owner's Approve or Decline, kept in the Session's storage so it survives the Session restarting. The runtime mode decides which calls ask.
+_Avoid_: permission prompt, confirm
+
+**Write journal**:
+The paths written in a Workspace since a given revision of its files, read from computer's change log; what a stale git read is patched with.
+_Avoid_: change feed, dirty list
+
+**Stale read**:
+A passive git read answered while the Container is stopped: its last real answer, patched with the Write journal where its shape allows. A passive read never starts the Container.
+_Avoid_: cached status, emulated git
+
 **CLI agent**:
 A coding-agent CLI (Codex, Claude Code, OpenCode) running as a process in a Container.
 _Avoid_: Mode 1, container agent
@@ -65,6 +77,14 @@ _Avoid_: OAuth, account
 **Credential broker**:
 The single holder and refresher of Subscription logins.
 _Avoid_: vault, keychain
+
+**Container token**:
+A GitHub installation token for one Workspace's one repo, handed to git in its Container per command or on the credential helper's request; never stored there.
+_Avoid_: repo token, deploy key
+
+**Environment token**:
+The GitHub installation token t3's own PR features use, answered to `gh auth token`; it never reaches a Container or a Session.
+_Avoid_: gh token, PAT
 
 **Handle**:
 An opaque stand-in for a credential, given to one CLI agent process and redeemed only by the broker's intercept.
