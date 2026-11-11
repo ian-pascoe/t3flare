@@ -17,3 +17,26 @@ The journal is applied to the repo-scoped reads t3 polls, each entry recomputed 
 **Checkpoints and the turn diff come from the Workspace DO**, not a Container per turn and not a user action that starts it: t3's `VcsDriverRegistry` is wrapped so `checkpoints.*` for a `/w` cwd go to the Workspace DO, which captures with isomorphic-git (a commit of the working tree, HEAD its parent, as t3's `captureCheckpoint`) and makes the diff text itself, in git's format, unless the Container is running (then its git makes it). Above the guard a capture with nothing written since the previous one is an alias of it, else runs in the Container. Restores and the authored paths of a range where HEAD moved run in the Container.
 
 Evidence (`docs/steps/step-2a/m3-acceptance.json`): an edit-only turn and a question-only turn, each followed by a client watching status, left the Container stopped, with every checkpoint made by the DO and the status reads served `stale-patched`; the DO's checkpoint diffs were byte-identical to the Container's git for 55 ref pairs in patch and numstat (110 of 110); the Node tests compare both the patch writer and the journal patches with real git byte for byte (`apps/agents/test/gitPatch.test.ts`, `staleReads.test.ts`).
+
+## Refinement (step 2b; root's ruling on M2)
+
+**A worktree launch may start the project's Container for a `.git` read it has never answered.** t3's worktree launch
+asks the project a few `.git`-only reads (its remotes, the base branch's upstream, `--git-common-dir`, `checkout.workers`,
+the base commit) before anything else starts its Container, and a read never answered has no last answer to serve. So:
+
+- only an allow-list of five argv shapes may start a stopped Container, and only when they have no answer at all; each
+  is named in the code with its t3 caller (`apps/agents/src/workspace/gitDirReads.ts`), and each such start is logged in
+  the router trace;
+- whenever the Container is up (a clone, a worktree's provisioning, a routed action), those reads are answered
+  ("primed") for every branch and remote-tracking ref, keyed without the command's env, so a later launch starts
+  nothing; `git remote` is also answered from the Workspace's own files;
+- working-tree reads (status, diffs, t3's temporary indexes) are unchanged: stale only.
+
+Evidence: `docs/steps/step-2b/m2-watch.json` (a primed worktree with its Container stopped, watched by a client: 147 then
+174 reads, all from the cache, the Container still stopped, before and after an Environment restart);
+`apps/agents/test/gitDirReads.test.ts`.
+
+**A worktree Workspace has its own `.git`** (a full clone, not `gitdir:`/`commondir`), so checkpoints, stale reads, the
+read cache and the 2,000-file guard work per Workspace unchanged. `rev-parse --git-common-dir` in a worktree answers its
+own `.git`; t3 uses it only for its config lock and the worktree directory's hash (the router trace audit in
+`docs/steps/step-2b/m2-trace.json`).

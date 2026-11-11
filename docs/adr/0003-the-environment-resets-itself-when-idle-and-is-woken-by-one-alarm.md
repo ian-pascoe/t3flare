@@ -13,3 +13,10 @@ t3 runs many in-process timers (a 5 s Scheduler tick, `Schedule.spaced` reactors
 ## Considered Options
 
 - **Disposing only the Effect runtime in place**: the first design. It is not a clean restart either (module state survives) and it leaves the DO resident until eviction, so it buys nothing over `ctx.abort()`.
+
+## Refinement (step 2b)
+
+- **Terminal output is not activity.** The Workspace DOs' pushes (`EnvironmentDO.terminalOutput`) never boot t3 and are
+  not counted as requests, so a chatty shell with no client cannot keep the Environment awake (ADR-0021).
+- **The Workspace sweep's due time joins the one alarm.** An alarm due only for the sweep runs it without booting t3,
+  then arms again for t3's own due work (`docs/steps/step-2b.md`).

@@ -65,6 +65,26 @@ _Avoid_: change feed, dirty list
 A passive git read answered while the Container is stopped: its last real answer, patched with the Write journal where its shape allows. A passive read never starts the Container.
 _Avoid_: cached status, emulated git
 
+**Terminal**:
+t3's terminal, whose shell is a bash under the platform's PTY in the Workspace's Container. It ends with its Environment.
+_Avoid_: shell session, console, PTY (that is the seam under it)
+
+**Worktree Workspace**:
+The Workspace of a `worktree` thread: a full clone of its project's repo at `/w/.wt/<project dir>/<dir>`, with its own Container. Not a git worktree.
+_Avoid_: git worktree (for the cloud resource), linked worktree
+
+**Project-root view**:
+A Worktree Workspace's copy of its project's untracked files, at the project's path in its Container, for a setup script's `$T3CODE_PROJECT_ROOT`.
+_Avoid_: project mount, shared root
+
+**Tombstone**:
+A removed Workspace whose files are kept for the grace (uncommitted work, or a removal step that could not run): gone for t3, restorable.
+_Avoid_: trash, soft delete
+
+**Sweep**:
+The Environment's daily pass over the Workspace registry that purges what nothing references past the grace, and stops Containers no Workspace holds.
+_Avoid_: garbage collection, cleanup job
+
 **CLI agent**:
 A stock coding-agent CLI (Codex, Claude Code, OpenCode, pi) running as a process in a Container, through t3's own provider for it.
 _Avoid_: Mode 1, container agent

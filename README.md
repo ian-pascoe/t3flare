@@ -10,7 +10,7 @@ A t3code Environment on Cloudflare. The stock t3 clients (web, desktop, mobile) 
 
 ## Status
 
-Steps 0 (spike), 1 (platform) and 2a part 1 (Durable agents on the model proxy) are done; step 2a part 2 (usage limits from the proxy, and killing an aborted command's processes) is next ([plan](docs/steps/step-2a-part2-plan.md)). What works today, against a deployed stage and the stock web and desktop clients: pair, create a project, clone a repo from GitHub, run a Durable agent turn that edits files and runs `bash`, approve a tool call, see the diff, push and open a PR, and an Environment restart mid-turn that continues ([step 2a report](docs/steps/step-2a.md)). CLI agents, Peer links and the terminal are not built.
+Steps 0 (spike), 1 (platform), 2a (Durable agents on the model proxy, usage limits and aborted commands) and 2b (terminal, setup scripts, worktree Workspaces, deletion and sweep) are done. What works today, against a deployed stage and the stock web and desktop clients: pair, create a project, clone a repo from GitHub, run a Durable agent turn that edits files and runs `bash`, approve a tool call, see the diff, push and open a PR, and an Environment restart mid-turn that continues ([step 2a report](docs/steps/step-2a.md)); open t3's terminal in a Workspace, start a thread in a new worktree that runs its project's setup script, and delete it to free its Workspace ([step 2b report](docs/steps/step-2b.md)). CLI agents and Peer links are not built.
 
 ## Requirements
 
