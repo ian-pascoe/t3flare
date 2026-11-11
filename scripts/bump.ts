@@ -11,11 +11,14 @@
 //  6. Build the Worker and the web client, deploy the `bump` stage, and run the acceptance test against it
 //     (scripts/acceptance.ts: pairing, a /ws client, turn-item fixtures and t3's heavy queries, and since step 2a
 //     `--real-turn`: a Durable agent turn on a fresh clone of the fixture, both Workers and the Container image;
-//     `--terminal --worktree` (step 2b): a terminal, a worktree thread's setup script, its removal, the sweep's dry run).
+//     `--terminal --worktree` (step 2b): a terminal, a worktree thread's setup script, its removal, the sweep's dry run;
+//     `--peer` (step 3): a Peer link from the harness, a forwarded launch, the link fence F1–F12), then a stock t3
+//     from npm at its newest nightly as the laptop: it links to the stage and forwards a launch (version skew, review C6).
 //  7. Report. On any failure the submodule, package.json, bunfig.toml and bun.lock go back to the last good pin,
 //     so the pin is unchanged; on success they stay (and are committed with --commit).
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -153,8 +156,15 @@ const ok =
   step("acceptance test against the bump stage", () => {
     const out = path.join(environment, "dist/bump-acceptance.json");
     fs.rmSync(out, { force: true });
-    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--out", out], environment, { quiet: true });
+    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--out", out], environment, { quiet: true });
     return { ok: result.ok, detail: fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output };
+  }) &&
+  step("a stock t3 nightly from npm links to the bump stage and forwards a launch", () => {
+    // stdout alone, outside the workspace (npm warns about workspaces on stderr there).
+    const nightly = (spawnSync("npm", ["view", "t3", "dist-tags.nightly"], { cwd: os.tmpdir(), encoding: "utf8" }).stdout ?? "").trim();
+    if (nightly === "") return { ok: false, detail: "npm has no nightly t3" };
+    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "peer-laptop", "--version", nightly, "--skip-repo", "--out", path.join(environment, "dist/bump-peer-laptop.json")], environment, { quiet: true });
+    return { ok: result.ok, detail: `t3@${nightly}\n${result.output.slice(-3000)}` };
   });
 
 if (!ok) {

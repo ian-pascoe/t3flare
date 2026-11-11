@@ -24,6 +24,8 @@ const arg = (name: string, fallback: string) => {
 const version = arg("version", "0.1.9-nightly.20261111.4515");
 const outFile = arg("out", "m0-laptop-link.json");
 const port = Number(arg("port", "47912"));
+/** The bump job: no laptop clone of the private fixture (R4 is proved per step), only the link and a forwarded launch. */
+const skipRepo = process.argv.includes("--skip-repo");
 const out: Record<string, unknown> = { version, cloud: base.host };
 const failures: Array<string> = [];
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -50,17 +52,19 @@ try {
   const laptopCookie = await laptop.pair();
   await laptop.client.updateSettings(laptopCookie, { linkedEnvironmentsEnabled: true });
   const clone = path.join(dir, "fixture");
-  const cloned = spawnSync("gh", ["repo", "clone", FIXTURE, clone, "--", "--depth", "1"], { encoding: "utf8" });
-  check("the fixture clones on the laptop", cloned.status === 0, cloned.stderr.slice(-300));
   const laptopProjectId = uuid();
-  await laptop.client.mutateProject(laptopCookie, {
-    type: "project.create",
-    commandId: uuid(),
-    projectId: laptopProjectId,
-    title: "fixture (laptop)",
-    workspaceRoot: clone,
-    createWorkspaceRootIfMissing: false,
-  });
+  if (!skipRepo) {
+    const cloned = spawnSync("gh", ["repo", "clone", FIXTURE, clone, "--", "--depth", "1"], { encoding: "utf8" });
+    check("the fixture clones on the laptop", cloned.status === 0, cloned.stderr.slice(-300));
+    await laptop.client.mutateProject(laptopCookie, {
+      type: "project.create",
+      commandId: uuid(),
+      projectId: laptopProjectId,
+      title: "fixture (laptop)",
+      workspaceRoot: clone,
+      createWorkspaceRootIfMissing: false,
+    });
+  }
 
   // R2: link with the stock CLI.
   const code = (await mintPairingCode(cookie, { label: `laptop ${version}` })).code;
@@ -93,6 +97,7 @@ try {
     out.repoIdentity = { remote: remote?.repositoryIdentity ?? null, local: local?.repositoryIdentity ?? null, remoteError: remoteProjects.isError ? remoteProjects.text.slice(0, 300) : null };
     check(
       "R4: the stage's fixture project and the laptop's clone have the same canonicalKey",
+      skipRepo ||
       remote?.repositoryIdentity?.canonicalKey !== undefined && remote?.repositoryIdentity?.canonicalKey === local?.repositoryIdentity?.canonicalKey,
       out.repoIdentity,
     );

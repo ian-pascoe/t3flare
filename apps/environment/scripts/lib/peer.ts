@@ -103,10 +103,10 @@ export class LinkError extends Error {
 export const signIn = async (
   code: string,
   access: LinkAccess,
-  options: { readonly at?: URL; readonly peerLink?: boolean } = {},
+  options: { readonly at?: URL; readonly peerLink?: boolean; readonly clientName?: string } = {},
 ): Promise<{ readonly token: string; readonly scope: string; readonly clientId: string }> => {
   const at = options.at ?? base;
-  const registered = await registerPeerClient("t3flare step 3 harness", at, options.peerLink ?? true);
+  const registered = await registerPeerClient(options.clientName ?? "t3flare step 3 harness", at, options.peerLink ?? true);
   const clientId = (registered.body as { client_id?: string }).client_id;
   if (registered.status >= 300 || clientId === undefined) throw new LinkError("register", registered);
   const { answer, verifier, state } = await decide(clientId, code, access, at);

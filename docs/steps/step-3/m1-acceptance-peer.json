@@ -1,0 +1,128 @@
+{
+ "at": "2026-11-11T20:38:33.475Z",
+ "ok": true,
+ "failures": [],
+ "fixture": {
+  "projectId": "e218c526-6e02-430c-bfef-39573ca7b289",
+  "workspaceRoot": "/w/step3-fixture",
+  "cloned": false
+ },
+ "link": {
+  "scope": "orchestration:read orchestration:operate"
+ },
+ "cap": {
+  "fullAccess": {
+   "status": 400,
+   "body": {
+    "_tag": "AuthMcpApprovalError",
+    "message": "That pairing code cannot grant this access. It has not been used, so choose an access level it grants, or create a code with the standard scopes."
+   }
+  },
+  "autoAcceptEdits": 200
+ },
+ "launch": {
+  "isError": false,
+  "threadId": "mcp:launch:69450b2473e82f6e24d8cbf9d4cb703fdb35457d782fc5e52df28f7d3b7e5e62"
+ },
+ "launchResult": {
+  "status": "completed",
+  "pieces": 1,
+  "reply": true,
+  "runtimeMode": "auto-accept-edits",
+  "interactionMode": "default",
+  "linkOrigin": {
+   "sessionId": "05528d4c-421a-412e-84fa-b00e43420be7",
+   "label": "t3flare acceptance mwcky52d",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "00000000-0000-4000-8000-000000000001",
+   "threadId": "laptop-mwcky52d",
+   "title": "laptop parent"
+  }
+ },
+ "F5": {
+  "runtimeMode": "auto-accept-edits",
+  "request": {
+   "kind": "command"
+  }
+ },
+ "waitHold": {
+  "ms": 49961,
+  "timedOut": true,
+  "status": "running"
+ },
+ "F7": {
+  "link": {
+   "isError": true,
+   "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"The pending user-input request was not found.\"}"
+  },
+  "stillPending": true,
+  "owner": {
+   "runs": [
+    "completed"
+   ],
+   "output": true
+  }
+ },
+ "F6": {
+  "runtimeMode": "approval-required",
+  "interactionMode": "plan",
+  "write": null,
+  "request": {
+   "kind": "command"
+  }
+ },
+ "F1": {
+  "send": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwcky52d through a linked environment, so it may change only threads that link star",
+  "interrupt": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwcky52d through a linked environment, so it may change only threads that link star",
+  "rename": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwcky52d through a linked environment, so it may change only threads that link star"
+ },
+ "F2": {
+  "create": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}",
+  "clone": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}",
+  "prefs": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwcky52d through a linked environment, so it cannot change projects or environment ",
+  "schedule": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwcky52d through a linked environment, so it cannot schedule tasks in this environm"
+ },
+ "F4": {
+  "stages": [
+   "fetch:skipped",
+   "checkout:done",
+   "setup-script:skipped",
+   "agent:done"
+  ],
+  "worktreePath": "/w/.wt/step3-fixture/link-mwcky52d-8d2f893707d588c1",
+  "phase": "done"
+ },
+ "F12": {
+  "scope": "orchestration:read orchestration:operate settings:write source-control:write",
+  "rename": "{\"threadId\":\"23c83acc-f0c4-46d0-9c9d-ef647179b811\",\"action\":\"rename\",\"commandId\":\"command:mcp:client%3Af0bfdfd0-9415-450a-978c-935a252a6b1c:thread-update:23c83acc-f0c4-46d0-9c9d-ef647179b811:rename:re",
+  "interrupt": "{\"threadId\":\"23c83acc-f0c4-46d0-9c9d-ef647179b811\",\"runId\":null,\"status\":\"no_active_run\"}"
+ },
+ "F10": {
+  "off": 403,
+  "on": 200
+ },
+ "F9": {
+  "found": true,
+  "revoke": 200,
+  "after": 401
+ },
+ "F11": {
+  "armed": {
+   "ok": true,
+   "status": 400,
+   "body": {
+    "_tag": "AuthMcpApprovalError",
+    "message": "That is not a one-time pairing code."
+   }
+  },
+  "disarmed": {
+   "ok": true,
+   "status": 401,
+   "body": {
+    "error": "pairing is not armed"
+   }
+  }
+ }
+}

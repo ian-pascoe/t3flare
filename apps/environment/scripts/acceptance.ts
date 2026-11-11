@@ -15,6 +15,7 @@
 // 6. With `--real-turn [--push]` (step 2a): a Durable agent turn on a fresh clone of the fixture (`lib/realTurn.ts`).
 // 7. With `--terminal` and/or `--worktree` (step 2b): a terminal's echo, a worktree thread's setup script, its removal,
 //    and the sweep's dry run (`lib/terminalWorktree.ts`).
+// 8. With `--peer` (step 3): a Peer link from the harness, the forwarded launch and the link fence (`lib/peerAcceptance.ts`).
 import { WsRpcGroup, WS_METHODS, ORCHESTRATION_V2_WS_METHODS } from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -272,11 +273,29 @@ if (process.argv.includes("--terminal") || process.argv.includes("--worktree")) 
   for (const failure of result.failures) failures.push(`step 2b: ${failure}`);
 }
 
+// 8. Peer links and the link fence (step 3): the harness plays the laptop (`lib/peerAcceptance.ts`).
+const peer = process.argv.includes("--peer");
+if (peer) {
+  const { bootstrapAtDecision, peerAcceptance } = await import("./lib/peerAcceptance.ts");
+  const result = await peerAcceptance(cookie);
+  report.peer = result;
+  for (const failure of result.failures) failures.push(`peer: ${failure}`);
+  const f11 = await bootstrapAtDecision(bootstrapToken, true);
+  report.peerF11Armed = f11;
+  check("F11: t3 alone refuses the bootstrap grant at /oauth/mcp/decision", f11.ok, f11);
+}
+
 // Disarm, and the bootstrap token is refused again.
 await admin("POST", "/_t3flare/disarm-bootstrap");
 const refusedAfter = await pair();
 report.pairing = { ...(report.pairing as object), refusedAfterDisarming: refusedAfter.status };
 check("bootstrap refused after disarming", refusedAfter.status === 401, refusedAfter.status);
+if (peer) {
+  const { bootstrapAtDecision } = await import("./lib/peerAcceptance.ts");
+  const f11 = await bootstrapAtDecision(bootstrapToken, false);
+  report.peerF11Disarmed = f11;
+  check("F11: disarmed, the Environment DO refuses the bootstrap token at /oauth/mcp/decision", f11.ok, f11);
+}
 
 report.totalMs = ms();
 report.failures = failures;
