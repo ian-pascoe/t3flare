@@ -1,61 +1,73 @@
 {
   "scenario": "restart",
-  "at": "2026-11-11T15:05:38.689Z",
+  "at": "2026-11-11T15:19:49.372Z",
   "model": "anthropic/claude-haiku-5-5",
   "before": {
     "call": [
       {
-        "pid": 713,
-        "ppid": 712,
-        "pgid": 711,
-        "sid": 711,
+        "pid": 370,
+        "ppid": 369,
+        "pgid": 368,
+        "sid": 368,
         "args": "sleep 600"
       },
       {
-        "pid": 714,
-        "ppid": 712,
-        "pgid": 711,
-        "sid": 711,
+        "pid": 371,
+        "ppid": 369,
+        "pgid": 368,
+        "sid": 368,
         "args": "sleep 600"
+      }
+    ],
+    "marked": [
+      {
+        "pid": 370,
+        "exec": "86cf21ef-65ec-4033-afd2-13f0b8c9cb18"
+      },
+      {
+        "pid": 371,
+        "exec": "86cf21ef-65ec-4033-afd2-13f0b8c9cb18"
       }
     ],
     "tree": [
       {
-        "pid": 713,
-        "ppid": 712,
-        "pgid": 711,
-        "sid": 711,
+        "pid": 370,
+        "ppid": 369,
+        "pgid": 368,
+        "sid": 368,
         "args": "sleep 600"
       },
       {
-        "pid": 712,
-        "ppid": 711,
-        "pgid": 711,
-        "sid": 711,
+        "pid": 369,
+        "ppid": 368,
+        "pgid": 368,
+        "sid": 368,
         "args": "bash -c sleep 600 & sleep 600"
       },
       {
-        "pid": 711,
+        "pid": 368,
         "ppid": 12,
-        "pgid": 711,
-        "sid": 711,
+        "pgid": 368,
+        "sid": 368,
         "args": "bash -c bash -c 'sleep 600 & sleep 600'"
       },
       {
-        "pid": 714,
-        "ppid": 712,
-        "pgid": 711,
-        "sid": 711,
+        "pid": 371,
+        "ppid": 369,
+        "pgid": 368,
+        "sid": 368,
         "args": "sleep 600"
       }
     ]
   },
   "after": {
-    "secondsToGone": 40.2,
-    "left": [],
-    "secondsSinceRestart": 40
+    "secondsToGone": 0.6,
+    "lastSeenAliveS": null,
+    "continuationInSessionS": null,
+    "seenWithContinuation": [],
+    "secondsSinceRestart": 1
   },
-  "threadId": "4463ccd4-0948-43ee-b8c1-30e0ccd9e408",
+  "threadId": "8f5c73b5-e491-4714-9b4e-6884823479e0",
   "failures": [],
   "ok": true
 }

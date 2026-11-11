@@ -14,7 +14,8 @@
 //                                                           made, the idle Environment woken at the reset, the resumed turn
 //   bun scripts/stage.ts run step2a2 part2 stopped          with the Container stopped, a kill does not start it
 //   bun scripts/stage.ts run step2a2 part2 overload         an overload (529): pi-durable retries it, then a provider error
-//   bun scripts/stage.ts run step2a2 part2 key              a turn the proxy refuses (the fault route's 401): the key error
+//   bun scripts/stage.ts run step2a2 part2 key [--live]     a turn the proxy refuses (the fault route's 401, or with --live the
+//                                                           proxy's own, on a stage deployed with a refused key): the key error
 //                                                           after 1 request, no pause
 //   … [--out file.json]
 //
@@ -309,7 +310,8 @@ switch (scenario) {
     if (resume) await updateSettings(cookie, { autoResumeLimitedThreads: true });
     const threadId = await threadOn(`${scenario} ${fixtureName} ${stamp}`);
     const resetAt = Date.now() + Number(option("reset-s", scenario === "key" ? "60" : "120")) * 1000;
-    report.fault = (await admin("POST", `/_t3flare/agents/proxy-fault?thread=${threadId}`, { fixture: fixtureName, resetAt })).json;
+    // --live: no fault, the proxy's own answer (a stage deployed with a refused key).
+    if (!flag("live")) report.fault = (await admin("POST", `/_t3flare/agents/proxy-fault?thread=${threadId}`, { fixture: fixtureName, resetAt })).json;
     await sendMessage(cookie, threadId, "Reply with the single word: pong", MODEL);
     const failed = await waitFor(cookie, threadId, (p) => SETTLED.has(runsOf(p)[0]?.status ?? ""), 180_000);
     const firstRun = runsOf(failed.projection)[0]!;

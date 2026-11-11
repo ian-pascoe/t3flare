@@ -1,22 +1,22 @@
 {
   "scenario": "survivor",
-  "at": "2026-11-11T15:06:29.528Z",
+  "at": "2026-11-11T15:20:01.972Z",
   "model": "anthropic/claude-haiku-5-5",
   "background": [
     {
-      "pid": 250,
+      "pid": 632,
       "ppid": 1,
-      "pgid": 249,
-      "sid": 249,
+      "pgid": 631,
+      "sid": 631,
       "args": "sleep 900"
     }
   ],
   "afterStop": [
     {
-      "pid": 250,
+      "pid": 632,
       "ppid": 1,
-      "pgid": 249,
-      "sid": 249,
+      "pgid": 631,
+      "sid": 631,
       "args": "sleep 900"
     }
   ],

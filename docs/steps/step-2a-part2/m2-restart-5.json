@@ -1,0 +1,74 @@
+{
+  "scenario": "restart",
+  "at": "2026-11-11T15:18:40.086Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "before": {
+    "call": [
+      {
+        "pid": 39,
+        "ppid": 38,
+        "pgid": 35,
+        "sid": 35,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 40,
+        "ppid": 38,
+        "pgid": 35,
+        "sid": 35,
+        "args": "sleep 600"
+      }
+    ],
+    "marked": [
+      {
+        "pid": 39,
+        "exec": "304d2077-7ce0-4303-8952-e8a2124aa761"
+      },
+      {
+        "pid": 40,
+        "exec": "304d2077-7ce0-4303-8952-e8a2124aa761"
+      }
+    ],
+    "tree": [
+      {
+        "pid": 39,
+        "ppid": 38,
+        "pgid": 35,
+        "sid": 35,
+        "args": "sleep 600"
+      },
+      {
+        "pid": 38,
+        "ppid": 35,
+        "pgid": 35,
+        "sid": 35,
+        "args": "bash -c sleep 600 & sleep 600"
+      },
+      {
+        "pid": 35,
+        "ppid": 12,
+        "pgid": 35,
+        "sid": 35,
+        "args": "bash -c bash -c 'sleep 600 & sleep 600'"
+      },
+      {
+        "pid": 40,
+        "ppid": 38,
+        "pgid": 35,
+        "sid": 35,
+        "args": "sleep 600"
+      }
+    ]
+  },
+  "after": {
+    "secondsToGone": 57,
+    "lastSeenAliveS": 56.4,
+    "continuationInSessionS": null,
+    "seenWithContinuation": [],
+    "firstRun": "cancelled",
+    "secondsSinceRestart": 57
+  },
+  "threadId": "4526eadd-f483-4bcd-9882-9762162d2d3c",
+  "failures": [],
+  "ok": true
+}

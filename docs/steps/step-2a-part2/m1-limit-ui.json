@@ -1,0 +1,55 @@
+{
+  "scenario": "limit",
+  "at": "2026-11-11T15:22:16.452Z",
+  "model": "anthropic/claude-haiku-5-5",
+  "fault": {
+    "armed": {
+      "fixture": "cooldown",
+      "resetAt": 1794410779378
+    }
+  },
+  "first": {
+    "run": "failed",
+    "failure": {
+      "class": "usage_limit",
+      "message": "Every account the model proxy has for this model is at its usage limit.",
+      "code": "proxy_cooldown",
+      "retryable": true,
+      "resetAt": "2026-11-11T15:26:20.127Z"
+    },
+    "proxy": {
+      "requests": 1,
+      "failure": {
+        "class": "usage_limit",
+        "code": "proxy_cooldown",
+        "row": 1,
+        "resetAt": 1794410780127,
+        "stop": true,
+        "at": 1794410541127
+      }
+    },
+    "faultResetAt": "2026-11-11T15:26:19.378Z"
+  },
+  "threadId": "81c92e5f-eca0-4e51-a35d-83bc1d5a33f7",
+  "idle": {
+    "reset": false,
+    "why": "1 client sockets"
+  },
+  "resumed": {
+    "runs": [
+      {
+        "id": "run:thread:81c92e5f-eca0-4e51-a35d-83bc1d5a33f7:ordinal:1",
+        "status": "failed"
+      },
+      {
+        "id": "run:thread:81c92e5f-eca0-4e51-a35d-83bc1d5a33f7:ordinal:2",
+        "status": "completed"
+      }
+    ],
+    "secondRunStartedAfterReset": 3231,
+    "answer": "pong",
+    "health": null
+  },
+  "failures": [],
+  "ok": true
+}
