@@ -1,0 +1,386 @@
+{
+  "source": "Commissary's GET /v1/models without anthropic-version, 2026-11-11 (the 76 models prod's proxy served)",
+  "object": "list",
+  "data": [
+    {
+      "id": "beam-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "big-pickle",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-3-5-haiku-20241022",
+      "object": "model",
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-3-7-sonnet-20250219",
+      "object": "model",
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-fable-5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-fable-5-1",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-fable-5-2",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-haiku-4-5-20251001",
+      "object": "model",
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-opus-4-1-20250805",
+      "object": "model",
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-opus-4-20250514",
+      "object": "model",
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-opus-4-5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-opus-4-5-20251101",
+      "object": "model",
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-opus-4-6",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-opus-4-6-thinking",
+      "object": "model",
+      "owned_by": "antigravity"
+    },
+    {
+      "id": "claude-opus-4-7",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-opus-4-8",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-opus-5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-opus-5-5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-sonnet-4-20250514",
+      "object": "model",
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-sonnet-5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "deepseek-v4.1-flash",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "deepseek-v4.1-flash-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "flint-40b-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "gemini-3-flash",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "gemini-3.1-flash-image",
+      "object": "model",
+      "owned_by": "antigravity"
+    },
+    {
+      "id": "gemini-3.1-flash-lite",
+      "object": "model",
+      "owned_by": "antigravity"
+    },
+    {
+      "id": "gemini-3.5-flash-lite",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "gemini-3.8-flash-high",
+      "object": "model",
+      "owned_by": "antigravity"
+    },
+    {
+      "id": "gemini-4-argon",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "glm-5.2",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "glm-5.3",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "glm-5.3-flash",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "glm-5.3-flash-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "gpt-6-luna",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "gpt-oss-120b-medium",
+      "object": "model",
+      "owned_by": "antigravity"
+    },
+    {
+      "id": "grok-4.7",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "hy3",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "hy4",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "hy4-preview",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "iceman-contributor-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "iceman-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "inkling-2-small-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "jev-1.13",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "jev-1.13-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "jev-1.13.0",
+      "object": "model",
+      "owned_by": "typesafe"
+    },
+    {
+      "id": "jev-1.14.0",
+      "object": "model",
+      "owned_by": "typesafe"
+    },
+    {
+      "id": "jev-latest",
+      "object": "model",
+      "owned_by": "typesafe"
+    },
+    {
+      "id": "jev-preview",
+      "object": "model",
+      "owned_by": "typesafe"
+    },
+    {
+      "id": "kimi-k2.7-code",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "kimi-k3",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "kimi-k3.1-pro",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "longcat-2.0",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "longcat-2.5-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "mimo-v2.5",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "mimo-v2.5-pro",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "mimo-v2.6-flash",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "mimo-v2.6-flash-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "mimo-v2.6-pro",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "minimax-m3",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "minimax-m3.1-flash",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "minimax-m3.1-flash-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "muse-spark-1.2-contributor",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "muse-spark-1.3-contributor",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "nemotron-3.5-lightning-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "nemotron-3.5-super-vl-free",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "qwen3.7-plus",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "qwen3.8-flash",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "qwen3.8-max",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "step-5-preview",
+      "object": "model",
+      "owned_by": "opencode"
+    },
+    {
+      "id": "subq-snap-preview",
+      "object": "model",
+      "owned_by": "subquadratic"
+    }
+  ]
+}

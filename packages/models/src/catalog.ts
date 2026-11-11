@@ -11,7 +11,7 @@
 // Anthropic one (Anthropic's own API), still gives a catalog.
 //
 // Every listed model is served through the Anthropic Messages API (the proxy translates), so each is `anthropic/<id>`.
-import { CATALOG, type CatalogModel } from "./index.ts";
+import { CATALOG, type CatalogModel, OTHER_VENDOR, vendorOf } from "./index.ts";
 
 export interface ModelProxy {
   readonly url: string;
@@ -45,7 +45,6 @@ const MAX_PAGES = 10;
 export interface ListedModel {
   readonly id: string;
   readonly displayName?: string;
-  readonly ownedBy?: string;
   readonly contextWindow?: number;
   readonly maxTokens?: number;
 }
@@ -65,13 +64,11 @@ export const parseList = (
     const id = text(entry.id);
     if (id === undefined) continue;
     const displayName = text(entry.display_name);
-    const ownedBy = text(entry.owned_by);
     const contextWindow = count(entry.max_input_tokens);
     const maxTokens = count(entry.max_tokens);
     models.push({
       id,
       ...(displayName === undefined ? {} : { displayName }),
-      ...(ownedBy === undefined ? {} : { ownedBy }),
       ...(contextWindow === undefined ? {} : { contextWindow }),
       ...(maxTokens === undefined ? {} : { maxTokens }),
     });
@@ -97,7 +94,7 @@ export const catalogModelOf = (listed: ListedModel): CatalogModel => {
     contextWindow: claude ? Math.min(contextWindow, CLAUDE_CONTEXT_WINDOW) : contextWindow,
     maxTokens: listed.maxTokens ?? UNKNOWN_LIMITS.maxTokens,
     provider: "anthropic",
-    ownedBy: listed.ownedBy ?? "proxy",
+    vendor: vendorOf(listed.id) ?? OTHER_VENDOR,
     api: "anthropic-messages",
     slug: `anthropic/${listed.id}`,
   };
@@ -174,7 +171,7 @@ export const isCatalog = (value: unknown): value is Catalog =>
       typeof model.id === "string" &&
       typeof model.slug === "string" &&
       typeof model.name === "string" &&
-      typeof model.ownedBy === "string" &&
+      typeof model.vendor === "string" &&
       typeof model.reasoning === "boolean" &&
       Array.isArray(model.input) &&
       typeof model.contextWindow === "number" &&
