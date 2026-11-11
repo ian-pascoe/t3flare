@@ -35,3 +35,18 @@ They stay mounted rather than refused in the Environment DO: step 3+ (the T3 Con
 The bootstrap grant is t3's `desktop-bootstrap` grant, and t3 issues a session from it with `replaceActiveForSubjectAndMethod` (`t3code/apps/server/src/auth/EnvironmentAuth.ts:989`). That revokes every active session of the same subject and method (`persistence/AuthSessions.ts:267`). So pairing a second device with the armed bootstrap token signs the first one out, if it used the same kind of token (a bearer client such as the mobile app). Pair every later device with a **one-time pairing link** made in an already-paired client (Settings → Sharing & access), as stock t3 does. Arm the bootstrap token only for the first device, or to recover when no paired client is left.
 
 The mobile app speaks t3's orchestration protocol. Its version must match the pinned nightly's (`ORCHESTRATION_PROTOCOL_VERSION`, now 2), so a client far ahead of or behind the pin may refuse to connect. The desktop and web clients have the same rule, but the web client is served by the Environment itself, so it always matches.
+
+## Refinement (step 3+): T3 Connect, publish-only
+
+The cloud links outward to `relay.t3.codes` with a `manual` link scoped to agent-activity notifications, signed in by the owner through t3's device flow from an admin route (ADR-0025). It sends thread and project titles, phases and model ids, never content. It supersedes the SPI-1005 refinement for four routes: "no relay routes" above becomes **relay routes only for link state, preferences, unlink and the reachability answer** (`/api/connect/link-state`, `preferences`, `unlink`, `reachability`, each behind t3's session scopes). The four routes only the relay or a client-driven link would call are refused twice:
+
+- **In the Environment DO, before t3 boots, for any method:** `/api/connect/link-proof`, `/api/connect/relay-config`, `/api/t3-connect/health` and `/api/t3-connect/mint-credential` answer 404, compared after percent-decoding, dot segments, repeated and trailing slashes, `;` parameters and case (`host/relayRoutes.ts`). An upper-case spelling never reaches the DO at all: the Worker routes `/api` case-sensitively, so it gets the web client's assets.
+- **Inside t3:** its HTTP routes get a `CloudLink` whose `linkProof`, `applyRelayConfig`, `answerHealthRequest` and `mintCredential` fail with t3's own managed-policy refusal (403), as t3's policy variant does. The admin routes' Connect service keeps the real one.
+
+Why both, corrected from the plan:
+
+- `health` and `mint-credential` carry **no scope check** in t3 (`cloud/http.ts`): mint needs only a proof signed with the stored mint key, and answers a 2-minute pairing credential with the standard client scopes. So the mint key is also **deleted after every link**: publishing never reads it.
+- `relay-config` accepts, from any session with `relay:write`, any https relay URL and any well-formed mint key while no account is linked.
+- A `manual` link proof (`link-proof`) lets another T3 Connect account link this environment, receive its pushes and, by linking it again, revoke our credential. t3 signs one for a non-loopback request host when the session's subject is `desktop-bootstrap`, which is what our first pairing's sessions are.
+
+No tunnel, no `cloudflared`, no machine slot; T3 Connect can neither reach the Environment nor mint a session on it.

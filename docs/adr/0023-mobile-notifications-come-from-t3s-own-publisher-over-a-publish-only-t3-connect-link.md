@@ -1,0 +1,21 @@
+# Mobile notifications come from t3's own publisher over a publish-only T3 Connect link
+
+The owner's phone hears when a cloud run ends or waits through T3 Connect, the hosted relay at `t3.codes`: the T3 mobile app registers its push token only with that relay, so there is no other way to reach it. The cloud links outward to `relay.t3.codes` with t3's own `publish_only` link step (a `manual` endpoint scoped to `agent_activity_notifications`, a loopback origin, no tunnel), and t3's own `AgentAwarenessRelay` then publishes each top-level thread's awareness phase as it changes. The owner signs in once, by t3's device flow run inside the Environment DO from an admin route; the link is made at that moment and never again at boot. Nothing relay-initiated is answered (ADR-0010's refinement).
+
+## Considered options
+
+- **t3's startup relink** (what upstream servers do at every start): rejected. A relink per wake (many a day) is a relay round trip and a revoked-then-reissued credential each time, and it undoes an unlink the owner made in the app.
+- **Our own push service**: rejected. The mobile app registers its APNs/FCM token with the relay alone.
+- **A managed tunnel** (T3 Connect reaching the Environment): rejected by ADR-0010; no `cloudflared` in a Worker either.
+- **Copying the laptop's T3 Connect sign-in**: rejected by ADR-0018's rule: a rotating credential has one holder.
+
+## Consequences
+
+- **The first account credential in the DO.** The sign-in yields a Clerk OAuth token for the owner's T3 Connect account. The relay accepts it as a `clerk_oauth_bearer` for the account's whole client group: listing devices, linking and unlinking any environment (the laptop's included), deleting a tunnel. **Single holder:** it is never copied in or out (the R1 fallback imports a headless CLI token once, and its file is deleted). **On prod it is discarded right after the link** (owner decision D2); the stage keeps it so relink, the relay-side unlink and the relay's view work there. What stays on prod is the publish credential alone, a bearer the relay accepts only on this environment's own server routes (`/v1/environments/<id>/…`: publishes, link preferences, held-hook wakes, and tunnel recovery, which a publish-only link has nothing for).
+- **Every link is publish-only, whatever was stored.** t3 reads an absent desired-link mark as `managed`, so our link step writes `publish_only` itself, asserts the mode t3 returns, and unlinks if a tunnel config was stored. The relay's mint key is deleted after each link: publishing never reads it, and without it t3's mint and health answers and its relay delivery proofs verify nothing.
+- **What leaves for `t3.codes`, and through it APNs/FCM:** per publish, environment and thread ids, the **project and thread titles** (in the alert itself), the phase, a fixed headline and detail, the model id, a time and a deep link. Never message text, tool input or output, diffs, file names or failure text (t3 replaces failure details). Owner decision D1 accepted this.
+- **A usage-limit pause reads "Agent failed"** (t3's phase; D3), with an upstream ask for a paused phase.
+- **Publishing happens while the Environment is up.** An open run keeps it awake; a pending publish (in flight, inside t3's 5 s completion hold, or awaiting a retry) holds the idle reset for up to 120 s after the last activity. A deploy or eviction has no hook: a publish pending at that moment is lost (accepted).
+- **The owner's controls:** publishing off (`connect.ts publish off` or any client's Connect preferences), per-kind alerts on the phone, sign-out, or removing the environment in the T3 apps (the relay then refuses our publishes; the status route reports `rejected`, and nothing relinks automatically).
+- **Prod's Connect routes are owner-only:** the Worker tells the DO which caller it admitted, and the stage's Access service token (which CI holds with the admin token) cannot sign in, relink, unlink, import a token or switch publishing on prod.
+- **The public values are account constants** (relay URL, Clerk publishable key, CLI OAuth client id from `t3code/.env.example`), built in; a bump fails if they change, and a change means a new prod sign-in.

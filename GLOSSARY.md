@@ -40,6 +40,16 @@ A delegated task whose child thread runs in another Environment over a Peer link
 and completes the task with the child's last reply.
 _Avoid_: remote subagent, cloud task
 
+**T3 Connect**:
+The hosted relay at `t3.codes` that T3's mobile apps register with; it pushes an Environment's published thread
+phases to the owner's phone (ADR-0023).
+_Avoid_: the cloud, the relay service, push service
+
+**Publish-only link**:
+The Cloud Environment's link to T3 Connect: a `manual` link scoped to agent-activity notifications, made once from
+an admin route, with which the Environment publishes and T3 Connect can never call back.
+_Avoid_: Connect link, tunnel link, Peer link (that is laptop-to-cloud)
+
 ## Work
 
 **Project**:
