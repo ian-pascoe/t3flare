@@ -29,6 +29,12 @@ export const realTurn = async (cookie: string, options: { readonly push: boolean
   const id = `acceptance-${Date.now().toString(36)}`;
   const destination = `/w/${id}`;
 
+  // 0. Turn the Durable agent provider on, as the client's onboarding "Turn on" does (a new Environment has it off).
+  await wsCall(cookie, "server.updateSettings", {
+    patch: {},
+    providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } },
+  });
+
   // 1. Clone, as the client's Add project → Clone does.
   const cloneStarted = Date.now();
   const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${FIXTURE}.git`, destinationPath: destination }).catch(
