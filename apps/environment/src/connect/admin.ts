@@ -9,6 +9,7 @@
 //   POST /_t3flare/connect/publish?on=1|0     t3's publish switch
 //   GET  /_t3flare/connect/status[?relay=1]   the flow, t3's link state, secrets held (names only), the publish recorder;
 //                                             relay=1 adds the relay's view, read with the account token
+//   POST /_t3flare/connect/fault/relay-unlink stages only: the relay's link removed, ours kept (as the T3 apps' removal)
 //   POST /_t3flare/connect/probe              P2: the relay's /health and a device authorization started and dropped
 //   POST /_t3flare/check/connect-refusals     the four relay routes, sent to t3's own app past the DO's 404: refused
 //
@@ -34,6 +35,7 @@ const MUTATIONS = new Set([
   "POST /_t3flare/connect/unlink",
   "POST /_t3flare/connect/sign-out",
   "POST /_t3flare/connect/publish",
+  "POST /_t3flare/connect/fault/relay-unlink",
 ]);
 
 /** The four routes only the relay or a client-driven link call (plan section 5), refused twice: here and in t3. */
@@ -138,6 +140,9 @@ export const handleConnectAdmin = async (request: Request, environment: Environm
     }
     case "GET /_t3flare/connect/status":
       return answer((service) => service.status({ relay: url.searchParams.get("relay") === "1" }));
+    case "POST /_t3flare/connect/fault/relay-unlink":
+      if (!environment.connectServiceTokenAllowed) return json({ error: "stages only" }, 404);
+      return answer((service) => Effect.map(service.relayUnlinkOnly, (relay) => ({ relay })));
     case "POST /_t3flare/connect/probe":
       return json(await runtime.run(probe));
     case "POST /_t3flare/check/connect-refusals": {

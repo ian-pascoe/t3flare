@@ -107,6 +107,11 @@ export class Connect extends Context.Service<
     readonly unlink: Effect.Effect<UnlinkOutcome, ConnectError>;
     /** Unlinks, then removes the account token. */
     readonly signOut: Effect.Effect<UnlinkOutcome, ConnectError>;
+    /**
+     * A stage's fault (M2): removes the link on the relay only, as removing the environment in the T3 apps does, so
+     * the next publish meets the relay's refusal while the credential is still stored here.
+     */
+    readonly relayUnlinkOnly: Effect.Effect<UnlinkOutcome["relay"]>;
     /** t3's own publish switch. */
     readonly setPublishing: (on: boolean) => Effect.Effect<void, ConnectError>;
     readonly status: (options: { readonly relay: boolean }) => Effect.Effect<Record<string, unknown>>;
@@ -306,6 +311,7 @@ export const make = (policy: ConnectPolicy, recorder: PublishRecorder) =>
       relink: link,
       unlink: unlinkNow(false),
       signOut: unlinkNow(true),
+      relayUnlinkOnly: lock.withPermits(1)(deleteRelayLink),
       setPublishing: (on) => cloudLink.updatePreferences({ publishAgentActivity: on }).pipe(Effect.asVoid, Effect.mapError((e) => fail("preferences", e.message))),
       status,
     });
