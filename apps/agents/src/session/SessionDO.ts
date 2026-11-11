@@ -51,7 +51,7 @@ import { ApprovalStore, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
-import { FAULT_FIXTURES, type Fault, proxyLimits, recordingFetch } from "./proxyLimits.ts";
+import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
 import { liveOf, pushedEntry, turnOfEntry, usageOf } from "./state.ts";
 
@@ -112,6 +112,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #catalog: ModelCatalog;
   /** Every model request's fetch: the proxy's answers recorded, a test fault answered (`proxyLimits.ts`). */
   readonly #proxyFetch: typeof fetch;
+  /** How a failed model answer is classified and recorded: by generation's hook and by compaction's models. */
+  readonly #limits: ProxyLimitsOptions;
   /** The Container commands running, kept so an aborted one's processes are killed, even after a restart. */
   readonly #execs: RunningExecs;
 
@@ -132,7 +134,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.#proxyFetch = recorder.fetch;
     this.#execs = new RunningExecs(ctx.storage.kv, (ids) => this.#killExecs(ids));
     const registry = createRegistry();
-    registry.install(proxyLimits({ last: recorder.last, record: (failure) => this.#noteProxy((record) => ({ ...record, failure })) }));
+    this.#limits = { last: recorder.last, record: (failure) => this.#noteProxy((record) => ({ ...record, failure })) };
+    registry.install(proxyLimits(this.#limits));
     registry.install(codingTools());
     registry.install(fileTools(() => this.#files()));
     registry.install(projectContext(REPO_ROOT));
@@ -158,7 +161,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
           const harness = await Harness.open(
             storage,
             {
-              models: proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current(), this.#proxyFetch),
+              models: compactionLimits(
+                proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current(), this.#proxyFetch),
+                this.#limits,
+              ),
               registry: this.#registry,
               settings: { retry: { enabled: true, maxRetries: 3 } },
               env: (target) => this.#envAt(target.cwd),

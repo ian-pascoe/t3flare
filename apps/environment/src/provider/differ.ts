@@ -592,7 +592,9 @@ export const diff = (
         type: "turn_item.updated",
         driver,
         turnItem: {
-          id: derive.turnItemFromProviderItem({ driver, nativeItemId: `${state.sessionName}:${failureKey}` }),
+          // The id t3's ingestor gives the error item it makes from the failed `turn.terminal` below
+          // (provider-core `makeProviderFailureTurnItem`, as t3's own Pi adapter names it): one item, not two.
+          id: derive.turnItemFromProviderItem({ driver, nativeItemId: `terminal-failure:${turn.providerTurnId}` }),
           threadId: turn.threadId,
           runId: turn.runId,
           nodeId: turn.rootNodeId,

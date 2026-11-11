@@ -92,6 +92,15 @@ survivors=$(marked | grep -c . || true)
 printf '{"signalled":%d,"survivors":%d}\n' "$signalled" "$survivors"
 `.replaceAll("\\${", "${"); // \${ keeps bash's own expansions out of the template literal
 
-/** The command that runs the script for `execIds` (`/bin/sh -c`, as computerd runs a command). */
+/** The ids the script takes: nothing a shell would read as more than a word. */
+const killIds = (execIds: ReadonlyArray<string>) => execIds.filter((id) => /^[A-Za-z0-9-]+$/.test(id));
+
+/** The argv that runs the script for `execIds`, as the Workspace DO execs it on the Container (empty: nothing to kill). */
+export const killArgv = (execIds: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const ids = killIds(execIds);
+  return ids.length === 0 ? [] : ["bash", "-c", KILL_SCRIPT, "t3flare-kill", ...ids];
+};
+
+/** The same as one `/bin/sh -c` command line (the kill script's tests run it so). */
 export const killCommand = (execIds: ReadonlyArray<string>): string =>
-  `exec bash -c '${KILL_SCRIPT.replaceAll("'", "'\\''")}' t3flare-kill ${execIds.filter((id) => /^[A-Za-z0-9-]+$/.test(id)).join(" ")}`;
+  `exec bash -c '${KILL_SCRIPT.replaceAll("'", "'\\''")}' t3flare-kill ${killIds(execIds).join(" ")}`;

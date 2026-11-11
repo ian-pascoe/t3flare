@@ -16,7 +16,6 @@ import {
 import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
 import { type EnvRequest, type EnvResponse, type HostOperation, withHarnessKept, WorkspaceEnvHost } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
-import { KILL_SCRIPT, killCommand } from "@t3flare/sandbox-image/kill";
 import { DurableObject } from "cloudflare:workers";
 
 import type {
@@ -37,6 +36,7 @@ import * as git from "isomorphic-git";
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
 import { environmentStub } from "../environment.ts";
 import { changedBetween, currentRevision } from "./changeLog.ts";
+import { killInRunningContainer } from "./containerKill.ts";
 import { authoredScript, captureScript, restoreScript, shellWord } from "./checkpointScripts.ts";
 import { fileOps } from "./files.ts";
 import {
@@ -248,11 +248,9 @@ export class WorkspaceDO extends ContainerHost {
 
   /** Part 2's kill script on terminal markers, run straight on the Container (never starting it). */
   async #killMarkers(markers: ReadonlyArray<string>): Promise<void> {
-    const container = this.ctx.container;
-    if (container === undefined || !container.running || markers.length === 0) return;
-    const process = await container.exec(["bash", "-c", KILL_SCRIPT, "t3flare-kill", ...markers], {});
-    const output = await process.output();
-    console.log(JSON.stringify({ t3flare: "terminal-kill", markers: markers.length, answer: new TextDecoder().decode(output.stdout).trim() }));
+    const output = await killInRunningContainer(this.ctx.container, markers);
+    if (output === undefined) return;
+    console.log(JSON.stringify({ t3flare: "terminal-kill", markers: markers.length, answer: output.stdout.trim() }));
   }
 
   /** One of `ComputerExecutionEnv`'s file operations (the Session's tools), answered as plain data. */
@@ -367,13 +365,12 @@ export class WorkspaceDO extends ContainerHost {
   /**
    * Kills the processes of the Session's commands `execIds` (step 2a part 2; apps/sandbox-image/src/kill.ts): those whose
    * environment carries one of the ids, by process group where the whole group is theirs. Nothing to do, and the
-   * Container not started, when it is not running: a stopped Container has no processes.
+   * Container never started, when it is not running, even when it stops during the kill (`containerKill.ts`): a stopped
+   * Container has no processes.
    */
   async killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }> {
-    // A Container that stops between this check and the exec would be started again by it: the window is the length of
-    // one RPC, and the kill then finds nothing.
-    if (!this.containerRunning() || execIds.length === 0) return { running: false, signalled: 0, survivors: 0 };
-    const result = await this.exec({ script: killCommand(execIds), passive: true, timeoutMs: 15_000 });
+    const result = await killInRunningContainer(this.ctx.container, execIds);
+    if (result === undefined) return { running: false, signalled: 0, survivors: 0 };
     const answer = /\{"signalled":(\d+),"survivors":(\d+)\}/.exec(result.stdout);
     if (answer === null) throw new Error(`t3flare: the kill script failed (exit ${result.exitCode}): ${result.stderr.slice(0, 300)}`);
     return { running: true, signalled: Number(answer[1]), survivors: Number(answer[2]) };
