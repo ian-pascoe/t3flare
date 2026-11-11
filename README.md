@@ -5,6 +5,7 @@ A t3code Environment on Cloudflare. The stock t3 clients (web, desktop, mobile) 
 - [`docs/plan.md`](docs/plan.md): milestones and their exit criteria.
 - [`docs/adr/`](docs/adr/): the decisions that are hard to reverse.
 - [`docs/research/`](docs/research/): platform facts the decisions rest on.
+- [`docs/upstream-fragility.md`](docs/upstream-fragility.md): where following t3code's nightly tags breaks t3flare, and how to triage a failed bump.
 - [`GLOSSARY.md`](GLOSSARY.md): the terms.
 - Issues: Linear (team SPI, project ian-pascoe/t3flare); GitHub Issues sync into it ([`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)).
 
