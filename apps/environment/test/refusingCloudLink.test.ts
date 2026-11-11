@@ -39,3 +39,11 @@ it("refuses linkProof, applyRelayConfig, answerHealthRequest and mintCredential;
   });
   expect(calls).toEqual(["linkState", "unlink", "updatePreferences"]);
 });
+
+it("t3flare's managed policy leaves T3 Connect allowed, so t3's own policy variant does not refuse the link (P5)", async () => {
+  const ManagedLimits = await import("t3/src/policy/managedLimits.ts");
+  const ManagedPolicy = await import("t3/src/policy/ManagedPolicy.ts");
+  const { T3FLARE_POLICY, T3FLARE_POLICY_SOURCE } = await import("../src/t3/managedPolicy.ts");
+  const policy = await Effect.runPromise(ManagedPolicy.fromDocument(T3FLARE_POLICY_SOURCE, T3FLARE_POLICY));
+  expect(ManagedLimits.allowsConnect(policy)).toBe(true);
+});
