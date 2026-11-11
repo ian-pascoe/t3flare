@@ -1,7 +1,25 @@
 // The process router's rules (step 2a plan, section 2): what may start a Container, t3's clone, URLs, paths.
 import { describe, expect, it } from "vitest";
 
-import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, needsRemoteToken, readScopeOf, remoteRepoOf, subcommandOf } from "../src/agents/gitRoutes.ts";
+import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+import {
+  cloneRequestOf,
+  gitEnvOf,
+  intoWorkspace,
+  mayStartContainer,
+  needsRemoteToken,
+  parseWorktreeList,
+  readScopeOf,
+  remoteRepoOf,
+  subcommandOf,
+  worktreeCommandOf,
+  worktreeDestinationOf,
+  worktreeListPorcelain,
+} from "../src/agents/gitRoutes.ts";
 
 describe("subcommandOf", () => {
   it("skips git's global options", () => {
@@ -131,5 +149,84 @@ describe("needsRemoteToken (step 2a M4)", () => {
     expect(mayStartContainer(["branch", "--list", "--format=%(refname)"])).toBe(false);
     expect(mayStartContainer(["branch", "--show-current"])).toBe(false);
     expect(mayStartContainer(["branch", "-a"])).toBe(false);
+  });
+});
+
+describe("worktree commands (step 2b)", () => {
+  it("reads every shape t3 sends", () => {
+    // GitVcsDriverCore.createWorktree
+    expect(worktreeCommandOf(["-c", "checkout.workers=0", "worktree", "add", "--", "/w/.wt/fixture/feat-0123456789abcdef", "feat"])).toEqual({
+      verb: "add",
+      path: "/w/.wt/fixture/feat-0123456789abcdef",
+      ref: "feat",
+      detach: false,
+      newBranch: null,
+    });
+    // PullRequestReviewGuideService.addWorktree (review F6): a detached scratch checkout
+    expect(worktreeCommandOf(["-c", "core.hooksPath=/dev/null", "worktree", "add", "--detach", "--quiet", "/w/.wt/review-guide-abc/checkout", "0123abcd"])).toEqual({
+      verb: "add",
+      path: "/w/.wt/review-guide-abc/checkout",
+      ref: "0123abcd",
+      detach: true,
+      newBranch: null,
+    });
+    // GitVcsDriverCore.removeWorktree
+    expect(worktreeCommandOf(["-c", "status.showUntrackedFiles=normal", "worktree", "remove", "--force", "--", "/w/.wt/fixture/x"])).toEqual({
+      verb: "remove",
+      path: "/w/.wt/fixture/x",
+      force: true,
+    });
+    expect(worktreeCommandOf(["worktree", "remove", "/w/.wt/fixture/x"])).toEqual({ verb: "remove", path: "/w/.wt/fixture/x", force: false });
+    // listWorktreePaths
+    expect(worktreeCommandOf(["worktree", "list", "--porcelain", "-z"])).toEqual({ verb: "list", porcelain: true, z: true });
+    expect(worktreeCommandOf(["worktree", "prune"])).toEqual({ verb: "prune" });
+    expect(worktreeCommandOf(["worktree", "move", "a", "b"])).toEqual({ verb: "unsupported", name: "move" });
+    expect(worktreeCommandOf(["status"])).toBeNull();
+  });
+
+  it("accepts a destination below /w/.wt/<the project's dir>, and refuses any other with the reason", () => {
+    expect(worktreeDestinationOf("/w/fixture", "/w/.wt/fixture/feat-0123")).toEqual({ id: ".wt/fixture/feat-0123" });
+    // A project in a subdirectory of its repo: t3 names the worktree's folder after the subdirectory.
+    expect(worktreeDestinationOf("/w/mono/packages/app", "/w/.wt/app/feat-0123")).toEqual({ id: ".wt/app/feat-0123" });
+    for (const destination of ["/home/me/worktrees/fixture/x", "/w/.wt/other/x", "/w/.wt/fixture/x/nested", "/w/fixture-2"]) {
+      expect(worktreeDestinationOf("/w/fixture", destination), destination).toHaveProperty("refused");
+    }
+    expect((worktreeDestinationOf("/w/fixture", "/tmp/x") as { refused: string }).refused).toContain("clear Settings → Worktrees → Location");
+    expect(worktreeDestinationOf("/w/.wt/fixture/a", "/w/.wt/fixture/b")).toHaveProperty("refused");
+  });
+});
+
+const git = (cwd: string, ...args: Array<string>) => {
+  const result = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" });
+  if (result.status !== 0) throw new Error(result.stderr);
+  return result.stdout;
+};
+
+describe("the worktree list emulation", () => {
+  it("writes what real git writes for a main checkout and a worktree, with and without -z", () => {
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3flare-wt-")));
+    try {
+      const repo = path.join(dir, "repo");
+      fs.mkdirSync(repo);
+      git(repo, "init", "-q", "-b", "main");
+      fs.writeFileSync(path.join(repo, "a"), "a");
+      git(repo, "add", "a");
+      git(repo, "commit", "-qm", "a");
+      git(repo, "worktree", "add", "-q", "-b", "feature", path.join(dir, "wt"));
+      git(repo, "worktree", "add", "-q", "--detach", path.join(dir, "detached"));
+      const head = git(repo, "rev-parse", "HEAD").trim();
+      const entries = [
+        { path: repo, head, branch: "refs/heads/main" },
+        { path: path.join(dir, "detached"), head, branch: null },
+        { path: path.join(dir, "wt"), head, branch: "refs/heads/feature" },
+      ];
+      for (const z of [true, false]) {
+        const real = git(repo, "worktree", "list", "--porcelain", ...(z ? ["-z"] : []));
+        expect(worktreeListPorcelain(entries, z)).toBe(real);
+        expect(parseWorktreeList(real, z)).toEqual(entries);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

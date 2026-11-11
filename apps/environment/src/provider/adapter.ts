@@ -34,6 +34,8 @@ import * as Schedule from "effect/Schedule";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
+import { toWorkspace } from "@t3flare/workspace-client";
+
 import { environmentServices } from "../agents/bindings.ts";
 import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
@@ -64,10 +66,7 @@ const runtimeModeOf = (mode: string): RuntimeMode =>
   mode === "approval-required" || mode === "auto-accept-edits" ? mode : "full-access";
 
 /** The Workspace id of a cwd under `/w/<id>` (ADR-0008), or null. */
-export const workspaceOfCwd = (cwd: string | null | undefined): string | null => {
-  const match = /^\/w\/([^/]+)/.exec(cwd ?? "");
-  return match?.[1] ?? null;
-};
+export const workspaceOfCwd = (cwd: string | null | undefined): string | null => (cwd ? (toWorkspace(cwd)?.id ?? null) : null);
 
 const protocolError = (detail: string, cause?: unknown) =>
   new ProviderAdapter.ProviderAdapterProtocolError({ driver, detail, ...(cause === undefined ? {} : { cause }) });

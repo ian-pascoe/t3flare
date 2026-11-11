@@ -1,0 +1,14 @@
+{
+  "scenario": "wrong-location",
+  "at": "2026-11-11T17:20:25.585Z",
+  "created": {
+    "path": null,
+    "refName": null,
+    "ms": 3260,
+    "error": "GitCommandError: Git command failed in GitVcsDriver.createWorktree (/w/term-mwcc46eb): git worktree add failed {\"_tag\":\"GitCommandError\",\"operation\":\"GitVcsDriver.createWorktree\",\"command\":\"git\",\"cwd\":\"/w/term-mwcc46eb\",\"argumentCount\":7,\"exitCode\":128,\"stdoutLength\":0,\"stderrLength\":192,\"detail\":\"git worktree add failed\"}",
+    "router": null
+  },
+  "routerSaid": "destination refused: fatal: t3flare: worktrees live under /w/.wt in the Cloud Environment; clear Settings → Worktrees → Location (asked for '/tmp/elsewhere/term-mwcc46eb/t3flare-wrong-179441762-a7ecacabe45ab5fe')",
+  "failures": [],
+  "ok": true
+}

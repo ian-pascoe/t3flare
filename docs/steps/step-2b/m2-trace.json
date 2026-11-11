@@ -1,0 +1,15 @@
+{
+  "scenario": "trace",
+  "at": "2026-11-11T17:18:18.572Z",
+  "shapes": {
+    "cache 0 -C <path> rev-parse --is-inside-work-tree --show-toplevel --git-common-dir": 2,
+    "cache 0 rev-parse --git-common-dir": 4,
+    "container 0 --git-dir <path> worktree list --porcelain -z": 2,
+    "container 0 -C <path> rev-parse --is-inside-work-tree --show-toplevel --git-common-dir": 1,
+    "container 0 rev-parse --git-common-dir": 5,
+    "worktree 0 --git-dir <path> worktree list --porcelain -z": 1,
+    "worktree 0 -c checkout.workers=0 worktree add -- <path> <branch>": 1
+  },
+  "failures": [],
+  "ok": true
+}

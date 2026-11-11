@@ -183,7 +183,8 @@ import * as WorkspaceCheckpoints from "../workspace/checkpoints.ts";
 import * as DoSql from "../platform/sql.ts";
 import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
-import { layerSeedTextGenerationModel } from "../agents/seedSettings.ts";
+import { layerPinFastWorktreeCheckoutOff, layerSeedTextGenerationModel } from "../agents/seedSettings.ts";
+import { WORKTREES_ROOT } from "@t3flare/workspace-client";
 
 export interface CompositionOptions {
   readonly storage: DurableObjectStorage;
@@ -240,6 +241,8 @@ export const make = (options: CompositionOptions) => {
         cwd: BASE_DIR,
         baseDir: BASE_DIR,
         ...derived,
+        // t3flare: worktrees are Workspaces at /w/.wt/<project dir>/<dir> (step 2b, ADR-0008).
+        worktreesDir: WORKTREES_ROOT,
         mode: "web",
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: false,
@@ -594,6 +597,8 @@ export const make = (options: CompositionOptions) => {
     Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),
     // t3flare: text generation's model points at the Durable agent provider (step 2a, R12).
     layerSeedTextGenerationModel,
+    // t3flare: every worktree is a Workspace of its own (step 2b): no fast checkout cache.
+    layerPinFastWorktreeCheckoutOff,
   ).pipe(
     Layer.provideMerge(layerOrchestrationApplication),
     Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),

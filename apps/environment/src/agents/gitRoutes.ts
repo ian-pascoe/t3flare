@@ -181,3 +181,102 @@ export const gitEnvOf = (id: string, env: Readonly<Record<string, unknown>> | un
 };
 
 export { REPO_ROOT };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Worktrees (step 2b, plan section 3.5): t3's `git worktree …` in a project, given their cloud meaning.
+
+export type WorktreeCommand =
+  | { readonly verb: "add"; readonly path: string; readonly ref: string | null; readonly detach: boolean; readonly newBranch: string | null }
+  | { readonly verb: "list"; readonly porcelain: boolean; readonly z: boolean }
+  | { readonly verb: "remove"; readonly path: string; readonly force: boolean }
+  | { readonly verb: "prune" }
+  | { readonly verb: "unsupported"; readonly name: string };
+
+/** Options of `git worktree add` that take a value. */
+const ADD_WITH_VALUE = new Set(["-b", "-B", "--reason", "--orphan"]);
+
+/** t3's `git … worktree <verb> …` argv; null when it is not a worktree command. */
+export const worktreeCommandOf = (args: ReadonlyArray<string>): WorktreeCommand | null => {
+  const { name, rest } = subcommandOf(args);
+  if (name !== "worktree") return null;
+  const [verb, ...tail] = rest;
+  switch (verb) {
+    case "add": {
+      const words: Array<string> = [];
+      let detach = false;
+      let newBranch: string | null = null;
+      for (let i = 0; i < tail.length; i++) {
+        const arg = tail[i]!;
+        if (arg === "--") {
+          words.push(...tail.slice(i + 1));
+          break;
+        }
+        if (arg === "--detach" || arg === "-d") detach = true;
+        else if (ADD_WITH_VALUE.has(arg)) {
+          if (arg === "-b" || arg === "-B") newBranch = tail[i + 1] ?? null;
+          i++;
+        } else if (!arg.startsWith("-")) words.push(arg);
+      }
+      if (words.length === 0) return { verb: "unsupported", name: "add" };
+      return { verb: "add", path: words[0]!, ref: words[1] ?? null, detach, newBranch };
+    }
+    case "list":
+      return { verb: "list", porcelain: tail.includes("--porcelain"), z: tail.includes("-z") };
+    case "remove": {
+      const words = tail.filter((arg) => !arg.startsWith("-"));
+      const force = tail.includes("--force") || tail.includes("-f");
+      return words.length === 1 ? { verb: "remove", path: words[0]!, force } : { verb: "unsupported", name: "remove" };
+    }
+    case "prune":
+      return { verb: "prune" };
+    default:
+      return { verb: "unsupported", name: verb ?? "" };
+  }
+};
+
+/**
+ * Where a project's worktree may go: `/w/.wt/<the cwd's project dir>/<one segment>` (t3 builds it from the basename of
+ * the project's cwd and the branch). Answers the worktree Workspace's id, or the reason it is refused.
+ */
+export const worktreeDestinationOf = (cwd: string, path: string): { readonly id: string } | { readonly refused: string } => {
+  const project = toWorkspace(cwd);
+  const target = toWorkspace(path);
+  const dir = normalize(cwd).split("/").at(-1) ?? "";
+  if (project === null || project.id.startsWith(".wt/")) return { refused: "fatal: t3flare: worktrees are made from a project in /w" };
+  if (target === null || !target.id.startsWith(".wt/") || target.inner !== REPO_ROOT || target.id.split("/")[1] !== (project.inner === REPO_ROOT ? project.id : dir)) {
+    return {
+      refused: `fatal: t3flare: worktrees live under /w/.wt in the Cloud Environment; clear Settings → Worktrees → Location (asked for '${path}')`,
+    };
+  }
+  return { id: target.id };
+};
+
+export interface WorktreeListEntry {
+  readonly path: string;
+  readonly head: string | null;
+  /** `refs/heads/<name>`, or null when detached. */
+  readonly branch: string | null;
+}
+
+/** `git worktree list --porcelain [-z]`, as git writes it. */
+export const worktreeListPorcelain = (entries: ReadonlyArray<WorktreeListEntry>, z: boolean): string => {
+  const end = z ? "\0" : "\n";
+  return entries
+    .map((entry) =>
+      [`worktree ${entry.path}`, ...(entry.head === null ? [] : [`HEAD ${entry.head}`]), entry.branch === null ? "detached" : `branch ${entry.branch}`]
+        .map((line) => `${line}${end}`)
+        .join(""),
+    )
+    .map((record) => `${record}${end}`)
+    .join("");
+};
+
+/** The entries of a real `git worktree list --porcelain [-z]` answer. */
+export const parseWorktreeList = (text: string, z: boolean): ReadonlyArray<WorktreeListEntry> => {
+  const records = text.split(z ? "\0\0" : "\n\n").filter((record) => record.trim() !== "");
+  return records.map((record) => {
+    const lines = record.split(z ? "\0" : "\n");
+    const value = (key: string) => lines.find((line) => line.startsWith(`${key} `))?.slice(key.length + 1) ?? null;
+    return { path: value("worktree") ?? "", head: value("HEAD"), branch: value("branch") };
+  });
+};

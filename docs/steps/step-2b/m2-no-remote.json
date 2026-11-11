@@ -1,0 +1,16 @@
+{
+  "scenario": "no-remote",
+  "at": "2026-11-11T17:26:59.883Z",
+  "project": "noremote-mwce5pmh",
+  "created": {
+    "path": "/w/.wt/noremote-mwce5pmh/t3flare-noremote-179441-198c1785d99192db",
+    "refName": "t3flare-noremote-1794418027212",
+    "ms": 7032,
+    "error": null,
+    "router": "{\"clone\":4016,\"bundle\":400,\"checkout\":877,\"totalMs\":5333,\"bundled\":true}"
+  },
+  "log": "first",
+  "remotes": "",
+  "failures": [],
+  "ok": true
+}

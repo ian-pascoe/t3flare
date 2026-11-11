@@ -55,6 +55,7 @@ import { kindOf, patchAnswer } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
+import { parseBundleAnswer, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
 import {
   CONTAINER_BACKEND,
   CONTAINER_IDLE_MS,
@@ -69,6 +70,8 @@ import {
 
 export interface WorkspaceEnv {
   readonly LOADER: WorkerLoader;
+  /** This namespace: a worktree Workspace reads its project's bundle from the project's object (step 2b). */
+  readonly WORKSPACES: DurableObjectNamespace;
   /** The Environment DO, the token broker (ADR-0018): the credential helper's tokens come from it. */
   readonly ENVIRONMENT: DurableObjectNamespace;
   /** The identity of commits the agent makes (step 2a; defaults below). */
@@ -424,7 +427,14 @@ export class WorkspaceDO extends ContainerHost {
     if (key !== null) {
       const hit = this.#reads.get(key, rev);
       if (hit !== undefined) return { ran: true, ...hit, ms: 0, cached: true };
-      if (!this.containerRunning()) return this.#stale(run, key);
+      // Step 2b: a read of `.git` alone (refs, config) never answered before runs for real, starting the Container once
+      // for that shape: t3's worktree launch asks the project such reads (its base branch's upstream) before anything
+      // else starts it. Reads of the working tree (status, diffs, t3's temporary indexes, whose keys change every
+      // time) and reads answered before are served stale while the Container is stopped, as step 2a ruled.
+      const firstGitDirRead = (run.readScope ?? "repo") === "git-dir" && this.#reads.last(key) === undefined;
+      if (!this.containerRunning() && (!firstGitDirRead || (await this.#emulatedRead(run).catch(() => undefined)) !== undefined)) {
+        return this.#stale(run, key);
+      }
     }
     const script = `exec git ${run.argv.map(shellWord).join(" ")}`;
     try {
@@ -445,6 +455,21 @@ export class WorkspaceDO extends ContainerHost {
     }
   }
 
+  /**
+   * A passive read with no earlier answer while the Container is stopped, answered from the repo's own files when its
+   * shape is simple enough (step 2b: t3's worktree launch lists the project's remotes before anything starts it).
+   */
+  async #emulatedRead(run: GitRun): Promise<GitAnswer | undefined> {
+    const args = run.argv.filter((arg, at, all) => !(arg === "--git-dir" || all[at - 1] === "--git-dir"));
+    if (args[0] !== "remote" || (args.length > 1 && !(args.length === 2 && (args[1] === "-v" || args[1] === "--verbose")))) return undefined;
+    const repo = await this.#repo();
+    const remotes = await git.listRemotes({ fs: repo.fs, dir: repo.dir });
+    const stdout = args.length === 1
+      ? remotes.map((remote) => `${remote.remote}\n`).join("")
+      : remotes.map((remote) => `${remote.remote}\t${remote.url} (fetch)\n${remote.remote}\t${remote.url} (push)\n`).join("");
+    return { ran: true, exitCode: 0, stdout, stderr: "", ms: 0, cached: true, stale: "patched" };
+  }
+
   /** Stale answers made since the files last changed, by read key: a client polling status patches once per change. */
   readonly #staleMemo = new Map<string, { readonly global: number; readonly answer: GitAnswer }>();
 
@@ -452,6 +477,8 @@ export class WorkspaceDO extends ContainerHost {
   async #stale(run: GitRun, key: string): Promise<GitAnswer> {
     const last = this.#reads.last(key);
     if (last === undefined) {
+      const emulated = await this.#emulatedRead(run).catch(() => undefined);
+      if (emulated !== undefined) return emulated;
       return { ran: false, reason: "container_stopped", detail: "needs the Workspace's Container, which is stopped, and has no earlier answer" };
     }
     const shape = (run.readScope ?? "repo") === "repo" && last.answer.exitCode === 0 ? kindOf(run.argv, run.env) : undefined;
@@ -632,6 +659,102 @@ export class WorkspaceDO extends ContainerHost {
       return { ran: true, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, ms: result.ms };
     } catch (error) {
       return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
+    }
+  }
+
+  // -------------------------------------------------------------------------------------------------------------------
+  // Worktree Workspaces (step 2b, plan section 3.2): a full clone of the project's remote, seeded with the commits only
+  // the project has by a git bundle, read straight from the project's object.
+
+  /** Step 1, in the worktree's object: a fresh clone without checkout (or `git init` with no remote); answers its tips. */
+  async worktreeClone(input: { readonly id: string; readonly url: string | null; readonly token: string | null }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }> {
+    this.#rememberId(input.id);
+    const script = worktreeCloneScript({
+      repo: REPO_ROOT,
+      url: input.url,
+      helper: CREDENTIAL_HELPER,
+      name: this.env.T3FLARE_GIT_NAME ?? "t3flare",
+      email: this.env.T3FLARE_GIT_EMAIL ?? "t3flare@users.noreply.github.com",
+    });
+    try {
+      const result = await this.exec({ script, cwd: "/workspace", env: input.token === null ? {} : { T3FLARE_GIT_TOKEN: input.token }, timeoutMs: 15 * 60_000 });
+      if (result.exitCode !== 0) return { ok: false, tips: [], error: result.stderr.slice(-1000) };
+      return { ok: true, tips: parseTips(result.stdout) };
+    } catch (error) {
+      return { ok: false, tips: [], error: String(error).slice(0, 1000) };
+    }
+  }
+
+  /**
+   * Step 2, in the project's object: `ref`'s commit, and a bundle of what the new clone lacks: `ref` without the
+   * clone's actual tips that this repo has (review F7: not `--not --remotes`, which trusts stale remote-tracking refs).
+   * No bundle when the clone already has the commit. Also `ref`'s `branch.<ref>.*` config.
+   */
+  async worktreeBundle(input: { readonly ref: string; readonly tips: ReadonlyArray<string>; readonly name: string }): Promise<{ readonly ok: boolean; readonly commit?: string; readonly bundle?: string | null; readonly config?: ReadonlyArray<string>; readonly error?: string }> {
+    const bundle = `${HARNESS_ROOT}/tmp/wt-${input.name.replace(/[^A-Za-z0-9-]/g, "")}.bundle`;
+    const script = worktreeBundleScript({ ref: input.ref, tips: input.tips, bundle });
+    try {
+      const result = await this.exec({ script, cwd: REPO_ROOT, timeoutMs: 10 * 60_000 });
+      if (result.exitCode !== 0) return { ok: false, error: result.stderr.slice(-1000) };
+      const answer = parseBundleAnswer(result.stdout);
+      if (answer.commit === null) return { ok: false, error: `no commit for ${input.ref}` };
+      return { ok: true, commit: answer.commit, bundle: answer.bundled ? bundle : null, config: answer.config };
+    } catch (error) {
+      return { ok: false, error: String(error).slice(0, 1000) };
+    }
+  }
+
+  /** A slice of one of this object's own files (another Workspace DO copies a bundle with it). */
+  async readChunk(path: string, offset: number, length: number): Promise<{ readonly bytes: Uint8Array; readonly done: boolean } | { readonly error: string }> {
+    await this.#workspace.ready();
+    const answer = await fileOps(this.#workspace).read(path, { offset, length });
+    if (!("ok" in answer)) return { error: answer.message };
+    return { bytes: answer.ok, done: answer.ok.byteLength < length };
+  }
+
+  /**
+   * Step 3, in the worktree's object: copy the project's bundle (object to object, never through the Environment), fetch
+   * it, check `ref` out at `commit`, copy `branch.<ref>.*`, and check HEAD.
+   */
+  async worktreeFinish(input: { readonly parent: string; readonly bundle: string | null; readonly ref: string; readonly commit: string; readonly config: ReadonlyArray<string> }): Promise<{ readonly ok: boolean; readonly head?: string; readonly error?: string }> {
+    await this.#workspace.ready();
+    const ops = fileOps(this.#workspace);
+    let local: string | null = null;
+    if (input.bundle !== null) {
+      local = `${HARNESS_ROOT}/tmp/seed.bundle`;
+      const project = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(input.parent)) as unknown as WorkspaceDO;
+      await ops.mkdir(`${HARNESS_ROOT}/tmp`, true);
+      await ops.remove(local, { force: true });
+      const CHUNK = 4 * 1024 * 1024;
+      for (let offset = 0; ; offset += CHUNK) {
+        const chunk = await project.readChunk(input.bundle, offset, CHUNK);
+        if ("error" in chunk) return { ok: false, error: `the project's bundle could not be read: ${chunk.error}` };
+        const wrote = await ops.write(local, chunk.bytes, { append: offset > 0 });
+        if (!("ok" in wrote)) return { ok: false, error: `the bundle could not be written: ${wrote.message}` };
+        if (chunk.done) break;
+      }
+    }
+    const script = worktreeFinishScript({ bundle: local, ref: input.ref, commit: input.commit, config: input.config });
+    try {
+      const result = await this.exec({ script, cwd: REPO_ROOT, timeoutMs: 15 * 60_000 });
+      const head = result.stdout.trim().split("\n").at(-1) ?? "";
+      if (result.exitCode !== 0) return { ok: false, error: result.stderr.slice(-1000) };
+      if (head !== input.commit) return { ok: false, error: `HEAD is ${head}, not ${input.commit}` };
+      return { ok: true, head };
+    } catch (error) {
+      return { ok: false, error: String(error).slice(0, 1000) };
+    }
+  }
+
+  /** HEAD and its branch from this object's own files (isomorphic-git), never starting the Container (`worktree list`). */
+  async worktreeHead(): Promise<{ readonly head: string | null; readonly branch: string | null }> {
+    try {
+      const repo = await this.#repo();
+      const head = await resolveCommit(repo, "HEAD");
+      const branch = (await git.currentBranch({ fs: repo.fs, dir: repo.dir, fullname: true })) ?? null;
+      return { head, branch: typeof branch === "string" ? branch : null };
+    } catch {
+      return { head: null, branch: null };
     }
   }
 

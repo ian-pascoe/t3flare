@@ -1,0 +1,53 @@
+{
+  "scenario": "work",
+  "at": "2026-11-11T17:30:26.388Z",
+  "run": {
+    "id": "run:thread:584ed5a3-a628-4bb4-b7c5-98637fa9cda1:ordinal:2",
+    "threadId": "584ed5a3-a628-4bb4-b7c5-98637fa9cda1",
+    "ordinal": 2,
+    "providerInstanceId": "piDurable",
+    "modelSelection": {
+      "instanceId": "piDurable",
+      "model": "anthropic/claude-haiku-5-5",
+      "options": [
+        {
+          "id": "thinking",
+          "value": "low"
+        }
+      ]
+    },
+    "providerThreadId": "provider-thread:provider:piDurable:native-thread:pending%3Arun%3Athread%3A584ed5a3-a628-4bb4-b7c5-98637fa9cda1%3Aordinal%3A1",
+    "userMessageId": "ecf71e99-5f09-4303-95bb-e33258463b19",
+    "rootNodeId": "node:run:run%3Athread%3A584ed5a3-a628-4bb4-b7c5-98637fa9cda1%3Aordinal%3A2:root",
+    "activeAttemptId": "run-attempt:run:run%3Athread%3A584ed5a3-a628-4bb4-b7c5-98637fa9cda1%3Aordinal%3A2:attempt:1",
+    "status": "completed",
+    "queuePosition": null,
+    "requestedAt": "2026-11-11T17:30:27.483Z",
+    "startedAt": "2026-11-11T17:30:29.056Z",
+    "completedAt": "2026-11-11T17:30:37.219Z",
+    "checkpointId": "checkpoint:scope:checkpoint-scope%3Athread%3A584ed5a3-a628-4bb4-b7c5-98637fa9cda1%3Aname%3Aroot:name:2",
+    "contextHandoffId": null
+  },
+  "checkpointOps": [
+    "has:do /w/.wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60",
+    "capture:do /w/.wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60",
+    "has:do /w/.wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60",
+    "diff:container /w/.wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60",
+    "authored:do /w/.wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60"
+  ],
+  "push": [
+    [
+      "git add -A && git -c user.name=t3flare -c user.email=t3flare@users.noreply.github.com commit -qm \"worktree push\" && git push origin HEAD:refs/heads/t3flare-wtpush-1794418239236 2>&1 | tail -2; echo \"push=${PIPESTATUS[0]}\"; echo T3D$((3918965+1))",
+      " * [new branch]      HEAD -> t3flare-wtpush-1794418239236",
+      "push=0"
+    ],
+    [
+      "git push origin --delete t3flare-wtpush-1794418239236 2>&1 | tail -1; echo \"delete=${PIPESTATUS[0]}\"; echo T3D$((165407782+1))",
+      "/w/.wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60 # git push origin --delete t3flare-wtpush-1794418239236 2>&1 | tail -1; echo \"delete=${PIPESTATUS[0]}\"; echo T3D$((165407782+1))",
+      " - [deleted]         t3flare-wtpush-1794418239236",
+      "delete=0"
+    ]
+  ],
+  "failures": [],
+  "ok": true
+}

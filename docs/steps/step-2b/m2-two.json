@@ -1,0 +1,99 @@
+{
+  "scenario": "two",
+  "at": "2026-11-11T17:20:32.604Z",
+  "created": [
+    {
+      "path": "/w/.wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc",
+      "refName": "t3flare-two-a-1794417634825",
+      "ms": 10894,
+      "error": null,
+      "router": "{\"clone\":7376,\"bundle\":594,\"checkout\":627,\"totalMs\":8873,\"bundled\":false}"
+    },
+    {
+      "path": "/w/.wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3",
+      "refName": "t3flare-two-b-1794417634825",
+      "ms": 7257,
+      "error": null,
+      "router": "{\"clone\":3723,\"bundle\":863,\"checkout\":400,\"totalMs\":5344,\"bundled\":false}"
+    }
+  ],
+  "heads": [
+    "t3flare-two-a-1794417634825",
+    "t3flare-two-b-1794417634825"
+  ],
+  "registry": [
+    {
+      "id": ".wt/term-mwcc46eb/t3-30225f40-f63e701ba965ce60",
+      "kind": "worktree",
+      "parent": "term-mwcc46eb",
+      "state": "ready",
+      "running": false
+    },
+    {
+      "id": ".wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712",
+      "kind": "worktree",
+      "parent": "term-mwcc46eb",
+      "state": "ready",
+      "running": false
+    },
+    {
+      "id": ".wt/term-mwcc46eb/t3flare-two-a-179441752-cccd01b263667f01",
+      "kind": "worktree",
+      "parent": "term-mwcc46eb",
+      "state": "ready",
+      "running": false
+    },
+    {
+      "id": ".wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc",
+      "kind": "worktree",
+      "parent": "term-mwcc46eb",
+      "state": "ready",
+      "running": true
+    },
+    {
+      "id": ".wt/term-mwcc46eb/t3flare-two-b-179441752-9b7aa5740a57b5f1",
+      "kind": "worktree",
+      "parent": "term-mwcc46eb",
+      "state": "failed",
+      "running": false
+    },
+    {
+      "id": ".wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3",
+      "kind": "worktree",
+      "parent": "term-mwcc46eb",
+      "state": "ready",
+      "running": true
+    },
+    {
+      "id": "term-mwcc46eb",
+      "kind": "project",
+      "parent": null,
+      "state": "ready",
+      "running": true
+    }
+  ],
+  "refsInWorktrees": [
+    {
+      "name": "main",
+      "worktreePath": "/w/term-mwcc46eb"
+    },
+    {
+      "name": "t3flare-local-1794417500881",
+      "worktreePath": "/w/.wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712"
+    },
+    {
+      "name": "t3flare-two-a-1794417523368",
+      "worktreePath": "/w/.wt/term-mwcc46eb/t3flare-two-a-179441752-cccd01b263667f01"
+    },
+    {
+      "name": "t3flare-two-a-1794417634825",
+      "worktreePath": "/w/.wt/term-mwcc46eb/t3flare-two-a-179441763-4ff98979b995cdcc"
+    },
+    {
+      "name": "t3flare-two-b-1794417634825",
+      "worktreePath": "/w/.wt/term-mwcc46eb/t3flare-two-b-179441763-58de163b0fbf31d3"
+    }
+  ],
+  "failures": [],
+  "ok": true
+}

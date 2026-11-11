@@ -23,3 +23,17 @@ export const layerSeedTextGenerationModel = Layer.effectDiscard(
     yield* Effect.logInfo("t3flare: text generation now uses the Durable agent provider", { replaced: named });
   }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: text generation's model was not seeded", cause))),
 );
+
+/**
+ * t3's fast worktree checkout (a copy-on-write cache on the Environment's own disk, macOS only) is off in the Cloud
+ * Environment (step 2b): every worktree is a Workspace of its own, made by `git worktree add`. The capability is
+ * stripped from the descriptor; a client that set the setting anyway has it turned off at each boot.
+ */
+export const layerPinFastWorktreeCheckoutOff = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const settings = yield* ServerSettings.ServerSettingsService;
+    if (!(yield* settings.getSettings).fastWorktreeCheckout) return;
+    yield* settings.updateSettings({ fastWorktreeCheckout: false });
+    yield* Effect.logInfo("t3flare: fast worktree checkout turned off");
+  }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: fast worktree checkout was not pinned off", cause))),
+);

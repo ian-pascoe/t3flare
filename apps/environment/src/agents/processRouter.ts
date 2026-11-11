@@ -21,13 +21,27 @@ import type * as ChildProcess from "effect/process/ChildProcess";
 
 import * as StateStore from "../platform/stateStore.ts";
 import { environmentServices } from "./bindings.ts";
-import { cloneRequestOf, gitEnvOf, intoWorkspace, mayStartContainer, needsRemoteToken, readScopeOf, remoteRepoOf, subcommandOf } from "./gitRoutes.ts";
+import {
+  cloneRequestOf,
+  gitEnvOf,
+  intoWorkspace,
+  mayStartContainer,
+  needsRemoteToken,
+  parseWorktreeList,
+  readScopeOf,
+  remoteRepoOf,
+  subcommandOf,
+  type WorktreeCommand,
+  worktreeCommandOf,
+  worktreeDestinationOf,
+  worktreeListPorcelain,
+} from "./gitRoutes.ts";
 import { workspaceRpc } from "./workspaceClient.ts";
 
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
 
-export type Route = "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
+export type Route = "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
 
 export interface TraceEntry {
   readonly at: number;
@@ -135,7 +149,7 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
  * `workflows` only when the Workspace is opted in. Null for a Workspace without a GitHub remote or outside the App.
  */
 export const containerToken = async (id: string): Promise<string | null> => {
-  const record = environmentServices().workspaces.get(id);
+  const record = environmentServices().workspaces.resolve(id);
   if (record === undefined || record.host !== "github.com" || record.owner === null || record.name === null) return null;
   try {
     return (
@@ -182,7 +196,7 @@ const bridgeIndex = async (id: string, env: Record<string, string>): Promise<Rec
 
 const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Record<string, unknown>> | undefined, stdin: string | undefined): Promise<Answer> => {
   const at = toWorkspace(cwd);
-  if (at === null || environmentServices().workspaces.get(at.id) === undefined) {
+  if (at === null || environmentServices().workspaces.resolve(at.id) === undefined) {
     return { exitCode: 128, stdout: "", stderr: `fatal: cannot change to '${cwd}': No such file or directory\n`, route: "no-workspace" };
   }
   const startContainer = mayStartContainer(args);
@@ -215,6 +229,124 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
       startContainer && answer.exitCode !== 0 ? `: ${redactTokens(answer.stderr).trim().slice(0, 400)}` : ""
     }`,
   };
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Worktrees (step 2b, plan sections 3.2–3.5): a worktree is a Workspace of its own, a full clone.
+
+// t3 never shows git's stderr (it reports its own fixed text), so the trace keeps the reason too.
+const fail = (stderr: string, detail?: string): Answer => ({
+  exitCode: 128,
+  stdout: "",
+  stderr: stderr.endsWith("\n") ? stderr : `${stderr}\n`,
+  route: "worktree",
+  detail: `${detail === undefined ? "" : `${detail}: `}${stderr.trim()}`.slice(0, 1000),
+});
+
+/** t3's `git worktree add -- <path> <ref>` in a project: provisions the worktree Workspace (plan section 3.2). */
+const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb: "add" }>): Promise<Answer> => {
+  const services = environmentServices();
+  if (command.detach) {
+    // Review F6: the PR review guide's scratch checkout (`worktree add --detach`).
+    return fail("fatal: t3flare: detached scratch worktrees are not made in the Cloud Environment: every worktree is a Workspace of its own (a clone and a Container), too heavy for a temporary checkout", "detached refused");
+  }
+  const destination = worktreeDestinationOf(cwd, command.path);
+  if ("refused" in destination) return fail(destination.refused, "destination refused");
+  const project = toWorkspace(cwd);
+  const parent = project === null ? undefined : services.workspaces.resolve(project.id);
+  if (parent === undefined || parent.kind !== "project") return fail(`fatal: t3flare: the project at ${cwd} is not a Workspace`);
+  const ref = command.newBranch ?? command.ref;
+  if (ref === null) return fail("fatal: t3flare: a worktree needs a branch");
+  const id = destination.id;
+  const existing = services.workspaces.get(id);
+  if (existing !== undefined) {
+    if (existing.state === "ready" || existing.state === "provisioning") return fail(`fatal: '${command.path}' already exists`);
+    // A failed attempt's row: provisioning starts again from nothing (the clone script empties the repo first).
+    if (existing.state === "failed") services.workspaces.remove(id);
+    else return fail(`fatal: t3flare: '${command.path}' is being removed; try again in a minute`, existing.state);
+  }
+  const started = Date.now();
+  services.workspaces.createWorktree({ id, parent, branch: ref });
+  const timings: Record<string, number> = {};
+  const step = async <A>(name: string, run: () => Promise<A>): Promise<A> => {
+    const at = Date.now();
+    try {
+      return await run();
+    } finally {
+      timings[name] = Date.now() - at;
+    }
+  };
+  const failed = (raw: string): Answer => {
+    // The budget's own reason, out of computer's connect-retry wrapping.
+    const budget = /the Container cannot start: (.+?)(?:"|$)/s.exec(raw)?.[1];
+    const reason = budget === undefined ? raw : `the Container cannot start: ${budget}`;
+    services.workspaces.setState(id, "failed", { lastError: raw });
+    console.warn(JSON.stringify({ t3flare: "worktree-failed", id, reason: redactTokens(reason).slice(0, 500), timings }));
+    return fail(`fatal: t3flare: the worktree Workspace was not made: ${redactTokens(reason).slice(0, 800)}`, JSON.stringify(timings));
+  };
+  try {
+    const worktree = workspaceRpc(id);
+    const token = await containerToken(id);
+    const cloned = await step("clone", () => worktree.worktreeClone({ id, url: parent.cloneUrl, token }));
+    if (!cloned.ok) return failed(`clone: ${cloned.error ?? "failed"}`);
+    const name = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id)))].slice(0, 8).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    const projectRpc = workspaceRpc(parent.id);
+    const bundled = await step("bundle", () => projectRpc.worktreeBundle({ ref, tips: cloned.tips, name }));
+    if (!bundled.ok || bundled.commit === undefined) return failed(`bundle: ${bundled.error ?? "failed"}`);
+    const finished = await step("checkout", () =>
+      worktree.worktreeFinish({ parent: parent.id, bundle: bundled.bundle ?? null, ref, commit: bundled.commit!, config: bundled.config ?? [] }),
+    );
+    if (bundled.bundle) await projectRpc.fs({ op: "remove", path: bundled.bundle, options: { force: true } }).catch(() => undefined);
+    if (!finished.ok) return failed(`checkout: ${finished.error ?? "failed"}`);
+    services.workspaces.setState(id, "ready", { lastError: null });
+    const detail = JSON.stringify({ ...timings, totalMs: Date.now() - started, bundled: bundled.bundle !== null && bundled.bundle !== undefined });
+    console.log(JSON.stringify({ t3flare: "worktree-ready", id, detail }));
+    return { exitCode: 0, stdout: "", stderr: `Preparing worktree (checking out '${ref}')\nHEAD is now at ${bundled.commit.slice(0, 7)}\n`, route: "worktree", detail };
+  } catch (error) {
+    return failed(String(error));
+  }
+};
+
+/**
+ * `git worktree list --porcelain [-z]` in a project: the project's own entry (its real answer, passive), then one per
+ * worktree Workspace of it, with HEAD and branch read from that Workspace's own files (never starting a Container).
+ */
+const worktreeList = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Record<string, unknown>> | undefined, command: Extract<WorktreeCommand, { verb: "list" }>): Promise<Answer> => {
+  const own = await git(args, cwd, env, undefined);
+  if (own.exitCode !== 0 || !command.porcelain) return own;
+  const project = toWorkspace(cwd)!;
+  const worktrees = environmentServices().workspaces.worktreesOf(project.id).filter((ws) => ws.state === "ready");
+  const entries = await Promise.all(
+    worktrees.map(async (ws) => {
+      const head = await workspaceRpc(ws.id).worktreeHead().catch(() => ({ head: null, branch: null }));
+      return { path: `/w/${ws.id}`, head: head.head, branch: head.branch ?? (ws.branch === null ? null : `refs/heads/${ws.branch}`) };
+    }),
+  );
+  const main = parseWorktreeList(own.stdout, command.z).slice(0, 1);
+  return { ...own, stdout: worktreeListPorcelain([...main, ...entries], command.z), route: "worktree", detail: `${entries.length} worktree Workspaces` };
+};
+
+/** The worktree verbs in a project; null for a worktree command that its own Workspace's git answers. */
+const worktreeRouteOf = (
+  args: ReadonlyArray<string>,
+  cwd: string,
+): ((env: Readonly<Record<string, unknown>> | undefined, stdin: string | undefined) => Promise<Answer>) | null => {
+  const command = worktreeCommandOf(args);
+  const at = toWorkspace(cwd);
+  if (command === null || at === null || at.id.startsWith(".wt/")) return null;
+  switch (command.verb) {
+    case "add":
+      return () => worktreeAdd(cwd, command);
+    case "list":
+      return (env) => worktreeList(args, cwd, env, command);
+    case "prune":
+      // The registry keeps no stale links.
+      return async () => ({ exitCode: 0, stdout: "", stderr: "", route: "worktree" });
+    case "remove":
+      return null;
+    case "unsupported":
+      return async () => fail(`fatal: t3flare: 'git worktree ${command.name}' is not supported in the Cloud Environment`);
+  }
 };
 
 /** What `git --version` says: the Workspace image's git (apps/sandbox-image; M0's check printed 2.56.0). */
@@ -274,6 +406,8 @@ const routeOf = (
   const cloneRequest = cloneRequestOf(args, cwd);
   if (cloneRequest !== null) return () => clone(cloneRequest);
   const normal = normalize(cwd);
+  const worktree = worktreeRouteOf(args, normal);
+  if (worktree !== null) return worktree;
   // Outside the Workspaces there is no repository: git says so, as it would on a laptop.
   if (!normal.startsWith("/w/")) {
     return async () => ({

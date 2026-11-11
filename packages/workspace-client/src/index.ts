@@ -9,13 +9,52 @@ export const WORKSPACE_ROOT = "/workspace";
 export const REPO_ROOT = "/workspace/repo";
 export const HARNESS_ROOT = "/workspace/.t3flare";
 
-/** A Workspace id: the one path segment under `/w` (ADR-0008). */
+/** A project Workspace id: the one path segment under `/w` (ADR-0008). */
 export const WORKSPACE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 export const isWorkspaceId = (value: string): boolean => WORKSPACE_ID.test(value) && value !== "." && value !== "..";
 
-/** `/w/<id>/rest` → `{ id, inner: "/workspace/repo/rest" }`; null for a path outside one Workspace. */
+/** Where worktree Workspaces live (t3's `worktreesDir`, step 2b): `/w/.wt/<project dir>/<worktree dir>`. */
+export const WORKTREES_SEGMENT = ".wt";
+export const WORKTREES_ROOT = `${W_ROOT}/${WORKTREES_SEGMENT}`;
+
+/** One path segment t3 may make from a branch name: no `/`, NUL or control character, not `.`/`..`, at most 100 bytes. */
+export const isWorktreeDir = (value: string): boolean =>
+  value.length > 0 &&
+  value !== "." &&
+  value !== ".." &&
+  // oxlint-disable-next-line no-control-regex
+  !/[/\x00-\x1f\x7f]/.test(value) &&
+  new TextEncoder().encode(value).byteLength <= 100;
+
+/** A worktree Workspace id: its path below `/w`, `.wt/<project dir>/<dir>` (step 2b). */
+export const isWorktreeId = (value: string): boolean => {
+  const parts = value.split("/");
+  return parts.length === 3 && parts[0] === WORKTREES_SEGMENT && isWorkspaceId(parts[1]!) && isWorktreeDir(parts[2]!);
+};
+
+/** Any Workspace id: a project's or a worktree's. */
+export const isAnyWorkspaceId = (value: string): boolean => isWorkspaceId(value) || isWorktreeId(value);
+
+/** The directories t3 sees above worktree Workspaces (`/w/.wt`, `/w/.wt/<project dir>`), which hold no files of their own. */
+export const worktreeDirOf = (path: string): { readonly project: string | null } | null => {
+  const normal = normalize(path);
+  if (normal === WORKTREES_ROOT) return { project: null };
+  const match = /^\/w\/\.wt\/([^/]+)$/.exec(normal);
+  return match !== null && isWorkspaceId(match[1]!) ? { project: match[1]! } : null;
+};
+
+/**
+ * `/w/<id>/rest` → `{ id, inner: "/workspace/repo/rest" }`, for a project (`/w/<p>/…`) or a worktree
+ * (`/w/.wt/<p>/<dir>/…`, id `.wt/<p>/<dir>`); null for a path outside one Workspace.
+ */
 export const toWorkspace = (path: string): { readonly id: string; readonly inner: string } | null => {
-  const match = /^\/w\/([^/]+)(\/.*)?$/.exec(normalize(path));
+  const normal = normalize(path);
+  const worktree = /^\/w\/(\.wt\/[^/]+\/[^/]+)(\/.*)?$/.exec(normal);
+  if (worktree !== null) {
+    if (!isWorktreeId(worktree[1]!)) return null;
+    return { id: worktree[1]!, inner: `${REPO_ROOT}${worktree[2] ?? ""}` };
+  }
+  const match = /^\/w\/([^/]+)(\/.*)?$/.exec(normal);
   if (match === null || !isWorkspaceId(match[1]!)) return null;
   const rest = match[2] ?? "";
   return { id: match[1]!, inner: `${REPO_ROOT}${rest === "/" ? "" : rest}` };

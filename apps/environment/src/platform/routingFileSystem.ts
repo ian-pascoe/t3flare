@@ -2,7 +2,10 @@
 // The Environment's file system with Workspaces in it (ADR-0008; step 2a plan, section 2): `/w` lists the registry's
 // Workspaces and `/w/<id>/…` is that Workspace DO's files over RPC; every other path is the State directory
 // (fileSystem.ts). An id the registry does not list is NotFound and never reaches a Durable Object.
-import { REPO_ROOT, W_ROOT, isUnderW, normalize, toWorkspace, type DirEntry, type FileStat, type FsAnswer } from "@t3flare/workspace-client";
+//
+// Step 2b: worktree Workspaces are at `/w/.wt/<project dir>/<dir>`. `/w/.wt` and `/w/.wt/<project dir>` are directories
+// listed from the registry and hold nothing else; `/w` lists projects only.
+import { REPO_ROOT, W_ROOT, WORKTREES_ROOT, WORKTREES_SEGMENT, isUnderW, normalize, toWorkspace, worktreeDirOf, type DirEntry, type FileStat, type FsAnswer } from "@t3flare/workspace-client";
 import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -75,11 +78,40 @@ const createWorkspace = (path: string, id: string): Effect.Effect<void, Platform
     yield* call("makeDirectory", path, at, { op: "mkdir", path: REPO_ROOT, recursive: true }).pipe(
       Effect.tapError(() => Effect.sync(() => environmentServices().workspaces.remove(id))),
     );
+    // An empty project folder is a ready Workspace (a New project's `git init`, or a clone into it later): step 2b's
+    // sweep purges `provisioning` rows older than an hour.
+    environmentServices().workspaces.setState(id, "ready");
   });
 
 const ROOT_INFO = info({ kind: "directory", size: 0, mtimeMs: 0, mode: 0o755 });
 
 const isRoot = (path: string) => normalize(path) === W_ROOT;
+
+/** `/w/.wt` or `/w/.wt/<project dir>`: a directory of worktree Workspaces, from the registry. */
+const isVirtual = (path: string) => worktreeDirOf(path) !== null;
+
+/** The names in `/w/.wt` (project dirs with worktrees) or in `/w/.wt/<project dir>` (its worktree dirs). */
+const listVirtual = (path: string): ReadonlyArray<string> => {
+  const at = worktreeDirOf(path);
+  const worktrees = environmentServices()
+    .workspaces.list()
+    .filter((ws) => ws.kind === "worktree" && (ws.state === "provisioning" || ws.state === "ready"))
+    .map((ws) => ws.id.split("/"));
+  if (at === null) return [];
+  const names = at.project === null ? worktrees.map((parts) => parts[1]!) : worktrees.filter((parts) => parts[1] === at.project).map((parts) => parts[2]!);
+  return [...new Set(names)].toSorted();
+};
+
+/** PR review guides make a scratch checkout in t3's worktrees directory (review F6): refused, with the reason. */
+const noScratchCheckouts = (method: string, path: string) =>
+  Effect.fail(
+    failure(
+      method,
+      path,
+      "BadResource",
+      `t3flare: no scratch checkouts in ${WORKTREES_ROOT}: in the Cloud Environment every worktree is a Workspace of its own (a clone with its own Container), so t3's PR review guide, which reads a temporary checkout, is not available here`,
+    ),
+  );
 
 /** The Workspace of a `/w/<id>/…` path, or a NotFound when the id is not listed. */
 const workspace = (method: string, path: string): Effect.Effect<Located, PlatformError.PlatformError> =>
@@ -88,10 +120,14 @@ const workspace = (method: string, path: string): Effect.Effect<Located, Platfor
     return at === undefined ? notFound(method, path) : Effect.succeed(at);
   });
 
-const listRoot = () => environmentServices().workspaces.list().map((record) => record.id);
+// `.wt` is listed once any worktree exists, so t3's own walks of `/w` find them.
+const listRoot = () => {
+  const ids = environmentServices().workspaces.projects().map((record) => record.id);
+  return listVirtual(WORKTREES_ROOT).length > 0 ? [...ids, WORKTREES_SEGMENT] : ids;
+};
 
 const statOf = (method: string, path: string, follow: boolean) =>
-  isRoot(path)
+  isRoot(path) || (isVirtual(path) && (normalize(path) === WORKTREES_ROOT || listVirtual(path).length > 0))
     ? Effect.succeed(ROOT_INFO)
     : Effect.flatMap(workspace(method, path), (at) => Effect.map(call<FileStat>(method, path, at, { op: "stat", path: at.inner, follow }), info));
 
@@ -155,6 +191,8 @@ export const routing = (local: Impl): Impl => ({
   makeDirectory: (path, options) => {
     if (!isUnderW(path)) return local.makeDirectory(path, options);
     if (isRoot(path)) return options?.recursive === true ? Effect.void : Effect.fail(failure("makeDirectory", path, "AlreadyExists", "/w exists"));
+    // The worktree directories exist as long as a worktree does; making them is a no-op (`git worktree add` makes the Workspace).
+    if (isVirtual(path)) return Effect.void;
     const target = toWorkspace(path);
     // A new folder directly in `/w` is a new, empty Workspace (t3's project folder, before a clone or `git init`).
     if (target !== null && target.inner === REPO_ROOT && locate(path) === undefined) return createWorkspace(path, target.id);
@@ -163,10 +201,16 @@ export const routing = (local: Impl): Impl => ({
     );
   },
   makeTempDirectory: (options) =>
-    options?.directory !== undefined && isUnderW(options.directory) ? readOnly("makeTempDirectory", options.directory) : local.makeTempDirectory(options),
+    options?.directory !== undefined && isUnderW(options.directory)
+      ? isVirtual(options.directory)
+        ? noScratchCheckouts("makeTempDirectory", options.directory)
+        : readOnly("makeTempDirectory", options.directory)
+      : local.makeTempDirectory(options),
   makeTempDirectoryScoped: (options) =>
     options?.directory !== undefined && isUnderW(options.directory)
-      ? readOnly("makeTempDirectory", options.directory)
+      ? isVirtual(options.directory)
+        ? noScratchCheckouts("makeTempDirectory", options.directory)
+        : readOnly("makeTempDirectory", options.directory)
       : local.makeTempDirectoryScoped(options),
   makeTempFile: (options) =>
     options?.directory !== undefined && isUnderW(options.directory) ? readOnly("makeTempFile", options.directory) : local.makeTempFile(options),
@@ -180,6 +224,7 @@ export const routing = (local: Impl): Impl => ({
   readDirectory: (path, options) => {
     if (!isUnderW(path)) return local.readDirectory(path, options);
     if (isRoot(path)) return Effect.sync(listRoot);
+    if (isVirtual(path)) return Effect.sync(() => [...listVirtual(path)]);
     if (options?.recursive === true) {
       return Effect.flatMap(workspace("readDirectory", path), (at) =>
         Effect.map(call<ReadonlyArray<{ readonly path: string }>>("readDirectory", path, at, { op: "find", path: at.inner, limit: 20_000 }), (found) =>
@@ -196,6 +241,7 @@ export const routing = (local: Impl): Impl => ({
   readDirectoryEntries: (path) => {
     if (!isUnderW(path)) return local.readDirectoryEntries(path);
     if (isRoot(path)) return Effect.sync(() => listRoot().map((name) => ({ name, type: "Directory" as const })));
+    if (isVirtual(path)) return Effect.sync(() => listVirtual(path).map((name) => ({ name, type: "Directory" as const })));
     return Effect.flatMap(workspace("readDirectoryEntries", path), (at) =>
       Effect.map(call<ReadonlyArray<DirEntry>>("readDirectoryEntries", path, at, { op: "readdir", path: at.inner }), (entries) =>
         entries.map((entry) => ({ name: entry.name, type: fileType(entry.kind) })),
@@ -207,6 +253,7 @@ export const routing = (local: Impl): Impl => ({
   realPath: (path) => {
     if (!isUnderW(path)) return local.realPath(path);
     if (isRoot(path)) return Effect.succeed(W_ROOT);
+    if (isVirtual(path)) return Effect.succeed(normalize(path));
     return Effect.flatMap(workspace("realPath", path), (at) =>
       Effect.map(call<string>("realPath", path, at, { op: "realPath", path: at.inner }), (inner) => {
         const back = inner === REPO_ROOT || inner.startsWith(`${REPO_ROOT}/`) ? `${W_ROOT}/${at.id}${inner.slice(REPO_ROOT.length)}` : null;
@@ -217,7 +264,7 @@ export const routing = (local: Impl): Impl => ({
   remove: (path, options) => {
     if (!isUnderW(path)) return local.remove(path, options);
     const at = toWorkspace(path);
-    if (isRoot(path)) return readOnly("remove", path);
+    if (isRoot(path) || isVirtual(path)) return readOnly("remove", path);
     // A Workspace's root goes with the Workspace: its files, then its registry entry.
     if (at !== null && at.inner === REPO_ROOT) {
       return Effect.flatMap(workspace("remove", path), (located) =>

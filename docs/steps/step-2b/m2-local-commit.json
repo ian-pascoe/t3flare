@@ -1,0 +1,18 @@
+{
+  "scenario": "local-commit",
+  "at": "2026-11-11T17:18:19.862Z",
+  "created": {
+    "path": "/w/.wt/term-mwcc46eb/t3flare-local-179441750-3bfa86cb8f505712",
+    "refName": "t3flare-local-1794417500881",
+    "ms": 10085,
+    "error": null,
+    "router": "{\"clone\":6239,\"bundle\":690,\"checkout\":1522,\"totalMs\":8488,\"bundled\":true}"
+  },
+  "log": [
+    "local only 1794417500881",
+    "Fixture for t3flare's acceptance tests"
+  ],
+  "branch": "refs/heads/t3flare-local-1794417500881",
+  "failures": [],
+  "ok": true
+}

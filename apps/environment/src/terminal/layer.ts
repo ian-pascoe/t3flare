@@ -44,7 +44,7 @@ export const makeTerminalProcesses = (): TerminalProcesses =>
     newKey,
     place: (cwd) => {
       const located = locate(cwd);
-      if (located === undefined || located.record.state !== "ready") return undefined;
+      if (located === undefined) return undefined;
       return { workspace: located.id, t3Path: `/w/${located.id}`, remote: located.rpc };
     },
   });

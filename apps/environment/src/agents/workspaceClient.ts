@@ -22,11 +22,11 @@ export const workspaceRpc = (id: string): WorkspaceRpc => {
   return byName(environmentServices().agents.WORKSPACES, id, "WORKSPACES");
 };
 
-/** The Workspace a t3 path is in, or undefined when the path is not in a listed Workspace. */
+/** The Workspace a t3 path is in, or undefined when the path is not in a listed Workspace that resolves (not being deleted). */
 export const locate = (path: string): Located | undefined => {
   const at = toWorkspace(path);
   if (at === null) return undefined;
-  const record = environmentServices().workspaces.get(at.id);
+  const record = environmentServices().workspaces.resolve(at.id);
   if (record === undefined) return undefined;
   return { id: at.id, inner: at.inner, record, rpc: workspaceRpc(at.id) };
 };
