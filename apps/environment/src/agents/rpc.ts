@@ -55,7 +55,7 @@ export interface WorkspaceRpc {
   stopContainer(): Promise<void>;
   readText(path: string): Promise<string | null>;
   writeText(path: string, text: string): Promise<void>;
-  worktreeClone(input: { readonly id: string; readonly url: string | null; readonly token: string | null }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }>;
+  worktreeClone(input: { readonly id: string; readonly url: string | null; readonly token: string | null; readonly parent?: string }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }>;
   worktreeBundle(input: { readonly ref: string; readonly tips: ReadonlyArray<string>; readonly name: string }): Promise<{ readonly ok: boolean; readonly commit?: string; readonly bundle?: string | null; readonly config?: ReadonlyArray<string>; readonly error?: string }>;
   worktreeFinish(input: { readonly parent: string; readonly bundle: string | null; readonly ref: string; readonly commit: string; readonly config: ReadonlyArray<string> }): Promise<{ readonly ok: boolean; readonly head?: string; readonly error?: string }>;
   destroy(): Promise<{ readonly destroyed: true }>;

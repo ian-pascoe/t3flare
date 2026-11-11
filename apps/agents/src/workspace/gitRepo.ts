@@ -64,8 +64,8 @@ export const flatTree = async (repo: Repo, commit: string | null): Promise<Map<s
   return out;
 };
 
-/** The index's files, by path (stage 0 only). */
-export const indexEntries = async (repo: Repo): Promise<Map<string, TreeEntry>> => {
+/** The index's files, by path (stage 0 only); its submodules' paths (gitlinks) go to `gitlinks` when given. */
+export const indexEntries = async (repo: Repo, gitlinks?: Set<string>): Promise<Map<string, TreeEntry>> => {
   const out = new Map<string, TreeEntry>();
   await git.walk({
     fs: repo.fs,
@@ -74,7 +74,9 @@ export const indexEntries = async (repo: Repo): Promise<Map<string, TreeEntry>> 
     trees: [git.STAGE()],
     map: async (path, [entry]) => {
       if (entry === null || entry === undefined || path === ".") return true;
-      if ((await entry.type()) !== "blob") return true;
+      const type = await entry.type();
+      if (type === "commit") gitlinks?.add(path);
+      if (type !== "blob") return true;
       const mode = (await entry.mode()).toString(8);
       out.set(path, { mode: mode.padStart(6, "0"), oid: await entry.oid() });
       return true;
@@ -231,9 +233,10 @@ export { byPath };
 export const repoFacts = async (repo: Repo, base = "HEAD"): Promise<RepoFacts> => {
   const head = await resolveCommit(repo, base);
   const headTree = await flatTree(repo, head);
-  const index = await indexEntries(repo);
+  const gitlinks = new Set<string>();
+  const index = await indexEntries(repo, gitlinks);
   const trackedDirs = new Set<string>();
-  for (const path of index.keys()) {
+  for (const path of [...index.keys(), ...gitlinks]) {
     const parts = path.split("/");
     for (let at = 1; at < parts.length; at++) trackedDirs.add(parts.slice(0, at).join("/"));
   }
@@ -249,6 +252,7 @@ export const repoFacts = async (repo: Repo, base = "HEAD"): Promise<RepoFacts> =
         ignored: index.has(path) || file === null ? false : await ignored(path),
       };
     },
+    submodules: [...gitlinks],
     headBytes: async (oid) => (await git.readBlob({ fs: repo.fs, dir: repo.dir, oid, cache: repo.cache })).blob,
     trackedUnder: (dir) => trackedDirs.has(dir),
     untrackedUnder: async (dir) => {
@@ -262,7 +266,7 @@ export const repoFacts = async (repo: Repo, base = "HEAD"): Promise<RepoFacts> =
         }
         for (const name of names) {
           const path = `${relative}/${name}`;
-          if (name === ".git" || (await ignored(path))) continue;
+          if (name === ".git" || gitlinks.has(path) || (await ignored(path))) continue;
           const stat = (await repo.fs.promises.lstat(`${repo.dir}/${path}`)) as { isDirectory(): boolean };
           if (stat.isDirectory()) await walk(path);
           else if (!index.has(path)) out.push(path);

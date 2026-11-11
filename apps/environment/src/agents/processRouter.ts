@@ -299,7 +299,7 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
   try {
     const worktree = workspaceRpc(id);
     const token = await containerToken(id);
-    const cloned = await step("clone", () => worktree.worktreeClone({ id, url: parent.cloneUrl, token }));
+    const cloned = await step("clone", () => worktree.worktreeClone({ id, url: parent.cloneUrl, token, parent: parent.id }));
     if (!cloned.ok) return failed(`clone: ${cloned.error ?? "failed"}`);
     const name = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id)))].slice(0, 8).map((byte) => byte.toString(16).padStart(2, "0")).join("");
     const projectRpc = workspaceRpc(parent.id);

@@ -54,6 +54,10 @@ _Avoid_: sandbox, worktree (for the cloud resource)
 The Linux machine a Workspace starts only to run real binaries. A synced copy of the Workspace's files, never their source of truth.
 _Avoid_: sandbox, VM, box
 
+**Container-only path**:
+A path of a Workspace kept on its Container's disk alone, never in its files: dependency and build caches (`node_modules`, `.next`, …) and the repo's submodules with their git directories. Gone when the Container stops; the command that made it makes it again.
+_Avoid_: ignored path (that is git's), local-only
+
 **Worker Shell**:
 The shell that runs commands in a Worker, without a Container.
 

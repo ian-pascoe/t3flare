@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { repoFacts } from "../src/workspace/gitRepo.ts";
-import { kindOf, patchAnswer } from "../src/workspace/staleReads.ts";
+import { kindOf, MAX_PATCHED_PATHS, patchAnswer, staleRead } from "../src/workspace/staleReads.ts";
 
 const root = fs.mkdtempSync(join(tmpdir(), "t3flare-stale-"));
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -116,6 +116,29 @@ describe("stale reads: last answer plus the journal match git", { timeout: GIT_T
     });
   });
 
+  it("a submodule checked out (its files in the journal) and an edit beside it", async () => {
+    // The prod bug of 2026-11-11: t3's worktree creation and the agent checked out t3flare's `t3code` submodule, whose
+    // files all reached the journal. git shows nothing for a submodule at its recorded commit.
+    const sub = setup("submodule-source");
+    for (let at = 0; at < 30; at++) sub.put(`d${at % 3}/f${at}.txt`, `${at}\n`);
+    git(sub.dir, ["add", "-A"]);
+    git(sub.dir, ["commit", "-q", "-m", "sub"]);
+    const r = setup("submodule");
+    r.put("README.md", "# readme\n");
+    git(r.dir, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", sub.dir, "vendor/sub"]);
+    git(r.dir, ["add", "-A"]);
+    git(r.dir, ["commit", "-q", "-m", "one"]);
+    // A clone leaves the submodule's directory empty, as the project's clone does.
+    const clone = join(root, "submodule-clone");
+    git(root, ["clone", "-q", r.dir, clone]);
+    await compare(clone, () => {
+      git(clone, ["-c", "protocol.file.allow=always", "submodule", "update", "--init", "-q"]);
+      fs.writeFileSync(join(clone, "README.md"), "# readme 2\n");
+      const files = git(join(clone, "vendor/sub"), ["ls-files"]).trim().split("\n");
+      return ["README.md", "vendor/sub/.git", "vendor/sub/d0", "vendor/sub/d1", "vendor/sub/d2", ...files.map((file) => `vendor/sub/${file}`)];
+    });
+  });
+
   it("no writes: the last answer as it was", async () => {
     const r = setup("none");
     r.put("x.txt", "x\n");
@@ -123,5 +146,59 @@ describe("stale reads: last answer plus the journal match git", { timeout: GIT_T
     git(r.dir, ["commit", "-q", "-m", "one"]);
     r.put("x.txt", "y\n");
     await compare(r.dir, () => []);
+  });
+});
+
+describe("a passive read while the Container is stopped (staleRead)", { timeout: GIT_TEST_TIMEOUT_MS }, () => {
+  const STATUS = ["status", "--porcelain=2", "--branch", "-z"];
+  const STATUS_NAB = [...STATUS, "--no-ahead-behind"];
+  /** A clone one commit ahead of its upstream, with `answers` as the reads' last real answers (at revision 0). */
+  const sourcesOver = (dir: string, answers: ReadonlyMap<string, string>, written: ReadonlyArray<string> = []) => ({
+    last: (argv: ReadonlyArray<string>) => {
+      const stdout = answers.get(argv.join(" "));
+      return Promise.resolve(stdout === undefined ? undefined : { rev: 0, answer: { exitCode: 0, stdout, stderr: "" } });
+    },
+    journalSince: () => written,
+    withinGuard: () => Promise.resolve(true),
+    facts: (base: string) => repoFacts({ fs, dir, cache: {} }, base),
+  });
+  const ahead = (name: string) => {
+    const origin = setup(`${name}-origin`);
+    origin.put("a.txt", "a\n");
+    git(origin.dir, ["add", "-A"]);
+    git(origin.dir, ["commit", "-q", "-m", "one"]);
+    const dir = join(root, `${name}-clone`);
+    git(root, ["clone", "-q", origin.dir, dir]);
+    fs.writeFileSync(join(dir, "a.txt"), "a2\n");
+    git(dir, ["commit", "-q", "-am", "two"]);
+    return dir;
+  };
+
+  it("t3's statusDetails shape, never answered, gets the local poll's answer (ahead/behind unknown, as git says it)", async () => {
+    const dir = ahead("sibling");
+    const answers = new Map([[STATUS_NAB.join(" "), git(dir, STATUS_NAB)]]);
+    fs.writeFileSync(join(dir, "b.txt"), "b\n");
+    const outcome = await staleRead({ argv: STATUS, env: undefined }, sourcesOver(dir, answers, ["b.txt"]));
+    expect(outcome).toEqual({ found: true, stale: "patched", answer: { exitCode: 0, stdout: git(dir, STATUS_NAB), stderr: "" } });
+  });
+
+  it("the local poll's shape, never answered, gets statusDetails' answer with its counts hidden as git hides them", async () => {
+    const dir = ahead("sibling-back");
+    const answers = new Map([[STATUS.join(" "), git(dir, STATUS)]]);
+    const outcome = await staleRead({ argv: STATUS_NAB, env: undefined }, sourcesOver(dir, answers));
+    expect(outcome).toEqual({ found: true, stale: "patched", answer: { exitCode: 0, stdout: git(dir, STATUS_NAB), stderr: "" } });
+  });
+
+  it("no answer to either shape: nothing to serve", async () => {
+    const dir = ahead("none-known");
+    expect(await staleRead({ argv: STATUS, env: undefined }, sourcesOver(dir, new Map()))).toEqual({ found: false });
+  });
+
+  it("more paths written than the DO patches: the last answer as it was", async () => {
+    const dir = ahead("many");
+    const before = git(dir, STATUS_NAB);
+    const written = Array.from({ length: MAX_PATCHED_PATHS + 1 }, (_, at) => `gen/f${at}.txt`);
+    const outcome = await staleRead({ argv: STATUS_NAB, env: undefined }, sourcesOver(dir, new Map([[STATUS_NAB.join(" "), before]]), written));
+    expect(outcome).toEqual({ found: true, stale: "last-answer", why: `${MAX_PATCHED_PATHS + 1} paths written`, answer: { exitCode: 0, stdout: before, stderr: "" } });
   });
 });
