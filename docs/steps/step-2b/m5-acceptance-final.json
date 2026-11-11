@@ -1,0 +1,193 @@
+{
+  "url": "https://t3flare-environment-step2b.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-11T18:51:44.857Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.9",
+      "commit": "4c0c25ffcdae",
+      "builtAt": "2026-11-11T18:51:24.513Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-11T19:01:48.398Z",
+    "paired": 200,
+    "ms": 5190,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "efb2f0ce-d34b-4af8-a3d6-9babe7b79d70",
+    "threads": 12,
+    "ms": 6106
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 584,
+    "bytes": 56333,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 91,
+    "maxBytes": 46535
+  },
+  "subscribeThread": {
+    "ms": 50,
+    "bytes": 46474,
+    "items": 20
+  },
+  "search": {
+    "ms": 42,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1536
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 2,
+    "maxParameters": 300,
+    "compoundsRewritten": 19,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "refusedStatements": 0,
+    "pragmaRefusals": 4
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 192,
+      "modules": 108
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 5,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:a02e8f23-1c22-4527-8e1b-6b2652815486"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": []
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwch6xtx",
+      "ms": 5336,
+      "cwd": "/w/acceptance-mwch6xtx",
+      "error": null
+    },
+    "turn": {
+      "threadId": "f4321aa7-5c95-44f2-a25f-336b182545a2",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwch6xtx/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwch6xtx && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 23183
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "ms": 23841
+  },
+  "step2b": {
+    "ok": true,
+    "failures": [],
+    "terminal": {
+      "ms": 900,
+      "echoed": true
+    },
+    "worktree": {
+      "ms": 14389,
+      "path": "/w/.wt/acc2b-mwch7g8a/t3-cab261fc-8189ea943e15ed6b",
+      "stages": [
+        "fetch:skipped",
+        "checkout:done",
+        "setup-script:done",
+        "agent:done"
+      ],
+      "error": null
+    },
+    "removal": {
+      "removed": "removed",
+      "inRegistry": true,
+      "leased": false
+    },
+    "sweepDry": {
+      "ok": true,
+      "error": null,
+      "actions": 15
+    }
+  },
+  "totalMs": 61935,
+  "failures": [],
+  "ok": true
+}
