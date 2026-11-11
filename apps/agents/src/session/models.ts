@@ -4,7 +4,7 @@
 // replace its endpoint. A model pi-ai does not know (a newer Claude, or any other model the proxy translates) is
 // a generic Anthropic Messages model with the limits the catalog gives it. Adapted from
 // cloudpid@ae5a7b73:apps/server/src/session/models.ts (`proxyModels`).
-import { createModels, type Model, type MutableModels } from "@earendil-works/pi-ai";
+import { createModels, type FetchFunction, type Model, type MutableModels } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import type { CatalogModel } from "@t3flare/models";
 import type { Catalog, ModelProxy } from "@t3flare/models/catalog";
@@ -58,9 +58,10 @@ export const modelOf = (entry: CatalogModel, known: ReadonlyArray<AnthropicModel
 
 /**
  * pi-ai `Models` whose one provider, `anthropic`, goes through the model proxy and lists the catalog `catalog` gives at
- * each lookup: a catalog the Session has read again is in force from its next request.
+ * each lookup: a catalog the Session has read again is in force from its next request. `fetch`, when given, makes every
+ * model request (the Session's recording fetch: it sees each answer's status and `retry-after`, which pi-ai drops).
  */
-export const proxyModels = (proxy: ModelProxy, catalog: () => Catalog): MutableModels => {
+export const proxyModels = (proxy: ModelProxy, catalog: () => Catalog, fetch?: FetchFunction): MutableModels => {
   const models = createModels();
   const base = anthropicProvider();
   const known = base.getModels();
@@ -86,6 +87,14 @@ export const proxyModels = (proxy: ModelProxy, catalog: () => Catalog): MutableM
     },
     getModels: current,
     getAllModels: current,
+    ...(fetch === undefined
+      ? {}
+      : {
+          stream: (model: AnthropicModel, context: Parameters<typeof base.stream>[1], options?: Parameters<typeof base.stream>[2]) =>
+            base.stream(model, context, { ...options, fetch }),
+          streamSimple: (model: AnthropicModel, context: Parameters<typeof base.streamSimple>[1], options?: Parameters<typeof base.streamSimple>[2]) =>
+            base.streamSimple(model, context, { ...options, fetch }),
+        }),
   });
   return models;
 };

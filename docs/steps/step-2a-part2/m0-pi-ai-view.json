@@ -1,0 +1,113 @@
+{
+  "what": "each fixture through pi-ai 1.5.0's real Anthropic client (fake fetch): errorMessage, and whether pi-ai's pattern calls it retryable (apps/agents/test/proxyErrors.scratch.test.ts)",
+  "results": {
+    "cooldown": {
+      "stopReason": "error",
+      "errorMessage": "429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model claude-haiku-5-5 are cooling down via provider claude (reset after 2h3m4s)\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "cooldownShort": {
+      "stopReason": "error",
+      "errorMessage": "429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model claude-haiku-5-5 are cooling down via provider claude (reset after 2m0s)\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "upstreamLimitWithRetryAfter": {
+      "stopReason": "error",
+      "errorMessage": "429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "upstreamLimit": {
+      "stopReason": "error",
+      "errorMessage": "429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "spendLimit": {
+      "stopReason": "error",
+      "errorMessage": "429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"The daily Spend limit of this API key is reached; it resets at 2026-11-13T00:00:00.000Z\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "requestRate": {
+      "stopReason": "error",
+      "errorMessage": "429 {\"error\":\"Rate limit exceeded\"}",
+      "retryable": true,
+      "calls": 1
+    },
+    "invalidKey": {
+      "stopReason": "error",
+      "errorMessage": "401 {\"error\":\"Invalid API key\"}",
+      "retryable": false,
+      "calls": 1
+    },
+    "missingKey": {
+      "stopReason": "error",
+      "errorMessage": "401 {\"error\":\"Missing API key\"}",
+      "retryable": false,
+      "calls": 1
+    },
+    "forbidden": {
+      "stopReason": "error",
+      "errorMessage": "403 {\"error\":\"Forbidden\"}",
+      "retryable": false,
+      "calls": 1
+    },
+    "accountRejected": {
+      "stopReason": "error",
+      "errorMessage": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "retryable": false,
+      "calls": 1
+    },
+    "noAccount": {
+      "stopReason": "error",
+      "errorMessage": "503 {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"no auth available\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "accountUnavailable": {
+      "stopReason": "error",
+      "errorMessage": "503 {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"no auth available\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "noAccountAtAll": {
+      "stopReason": "error",
+      "errorMessage": "503 {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"no auth available\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "overloaded": {
+      "stopReason": "error",
+      "errorMessage": "529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "serverError": {
+      "stopReason": "error",
+      "errorMessage": "502 {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"upstream connect error\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "streamed.cooldown": {
+      "stopReason": "error",
+      "errorMessage": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model claude-haiku-5-5 are cooling down via provider claude (reset after 2h3m4s)\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "streamed.upstreamLimit": {
+      "stopReason": "error",
+      "errorMessage": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}",
+      "retryable": true,
+      "calls": 1
+    },
+    "streamed.overloaded": {
+      "stopReason": "error",
+      "errorMessage": "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
+      "retryable": true,
+      "calls": 1
+    }
+  }
+}

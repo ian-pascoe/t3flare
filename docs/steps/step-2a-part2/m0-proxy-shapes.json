@@ -1,0 +1,32 @@
+{
+  "at": "2026-11-11",
+  "what": "live Commissary answers on POST /v1/messages and GET /v1/models (row 5), headers other than CORS/security dropped; the key was a made-up one",
+  "answers": {
+    "bogusKey.stream=false": {
+      "status": 401,
+      "headers": {
+        "content-type": "application/json; charset=utf-8"
+      },
+      "body": "{\"error\":\"Invalid API key\"}"
+    },
+    "bogusKey.stream=true": {
+      "status": 401,
+      "headers": {
+        "content-type": "application/json; charset=utf-8"
+      },
+      "body": "{\"error\":\"Invalid API key\"}"
+    },
+    "noKey": {
+      "status": 401,
+      "body": "{\"error\":\"Missing API key\"}"
+    },
+    "models.bogusKey": {
+      "status": 401,
+      "body": "{\"error\":\"Invalid API key\"}"
+    }
+  },
+  "notes": [
+    "A refused key is refused before streaming starts: 401 with the gate's flat body, no retry-after, the same as the fixtures invalidKey and missingKey (made by Commissary's code at 0ad9d16b).",
+    "No spend-limited key exists (owner decision): rows 1-4 and 7-10 come from Commissary's source only."
+  ]
+}

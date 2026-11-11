@@ -1,0 +1,30 @@
+{
+  "what": "a real pi-durable 1.5.0 Harness (MemoryStorage) whose proxy answers the cooldown fixture to every request, retry {maxRetries 3, baseDelayMs 10}; with and without an afterResponse hook that rewrites the error text",
+  "results": {
+    "plain": {
+      "requests": 4,
+      "status": {
+        "conversationId": 1,
+        "type": "input",
+        "status": "unanswered",
+        "entry": 7,
+        "id": 8,
+        "reason": "model_error",
+        "detail": "429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model claude-haiku-5-5 are cooling down via provider claude (reset after 2h3m4s)\"}}"
+      }
+    },
+    "rewritten": {
+      "requests": 1,
+      "status": {
+        "conversationId": 1,
+        "type": "input",
+        "status": "unanswered",
+        "entry": 7,
+        "id": 8,
+        "reason": "model_error",
+        "detail": "t3flare: proxy failure proxy_cooldown"
+      }
+    }
+  },
+  "conclusion": "afterResponse runs on the mutable message before retry classification: the rewrite gives 1 request, no backoff, and the rewritten text as the submission's detail. Used instead of a fetch-level gate (review finding 3)."
+}
