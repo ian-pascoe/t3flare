@@ -45,6 +45,7 @@ import { environmentServices } from "../agents/bindings.ts";
 import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "./capabilities.ts";
+import { type AttachmentReader, turnPrompt } from "./attachments.ts";
 import { approvalIdOf, diff, makeDifferState, type DifferState, type TurnContext } from "./differ.ts";
 
 const driver = PI_DURABLE_DRIVER;
@@ -96,7 +97,11 @@ export const linkedWorkOf = (threadId: string): LinkedWork | null => {
 const call = <A>(what: string, thunk: () => Promise<A>) =>
   Effect.tryPromise({ try: thunk, catch: (cause) => protocolError(`The agent's session did not answer ${what}`, cause) });
 
-export const makePiDurableAdapter = (instanceId: ProviderInstanceId, mcpSessions: McpProviderSessions.McpProviderSessions["Service"]) =>
+export const makePiDurableAdapter = (
+  instanceId: ProviderInstanceId,
+  mcpSessions: McpProviderSessions.McpProviderSessions["Service"],
+  attachments: AttachmentReader,
+) =>
   ProviderAdapter.ProviderAdapterV2.of({
     instanceId,
     driver,
@@ -364,6 +369,10 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId, mcpSessions
               completedAt: null,
             };
             const { model, thinking } = modelOf(turnInput.modelSelection);
+            const catalogModel = environmentServices().catalog.find(`${model.provider}/${model.modelId}`);
+            // A model the catalog does not list yet gets the images: pi-durable shows a text-only model a placeholder.
+            const acceptsImages = catalogModel === undefined || catalogModel.input.includes("image");
+            const prompt = yield* turnPrompt(turnInput.message, { acceptsImages, reader: attachments });
             const context: TurnContext = {
               providerTurnId: providerTurn.id,
               threadId: turnInput.threadId,
@@ -374,7 +383,8 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId, mcpSessions
               providerTurnOrdinal: turnInput.providerTurnOrdinal,
               startedAt,
               providerTurn,
-              contextWindow: environmentServices().catalog.find(`${model.provider}/${model.modelId}`)?.contextWindow ?? null,
+              contextWindow: catalogModel?.contextWindow ?? null,
+              acceptsImages,
               providerSessionId: input.providerSessionId,
             };
             // Registered before the submit, so a push that arrives first is not taken for an orphan (plan revision 3).
@@ -394,8 +404,8 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId, mcpSessions
                 providerTurnId: providerTurn.id,
                 runId: turnInput.runId,
                 attemptId: turnInput.attemptId,
-                text: turnInput.message.text,
-                images: [],
+                text: prompt.text,
+                images: prompt.images,
                 model,
                 thinking,
                 runtimeMode: runtimeModeOf(turnInput.runtimePolicy.runtimeMode),
@@ -427,12 +437,14 @@ export const makePiDurableAdapter = (instanceId: ProviderInstanceId, mcpSessions
             ),
         ),
         steerTurn: Effect.fn("PiDurableAdapter.steerTurn")(function* (steerInput) {
+          const acceptsImages = differ.turns.get(steerInput.providerTurnId)?.acceptsImages ?? true;
+          const prompt = yield* turnPrompt(steerInput.message, { acceptsImages, reader: attachments });
           yield* call("steer", () =>
             client().steer({
               providerTurnId: steerInput.providerTurnId,
               key: `${steerInput.providerTurnId}:${steerInput.message.messageId}`,
-              text: steerInput.message.text,
-              images: [],
+              text: prompt.text,
+              images: prompt.images,
             }),
           ).pipe(
             Effect.mapError(
