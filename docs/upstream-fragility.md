@@ -62,11 +62,11 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 
 ### U4. The descriptor's capability flags
 
-- **Where**: `composition.ts:449-475` serves t3's own descriptor (`ServerEnvironment.make`, `t3code/apps/server/src/environment/ServerEnvironment.ts:186`; capabilities `:221-292`) minus four host-bound flags (`serverBrowser`, `voiceTranscription`, `localServerStop`, `fastWorktreeCheckout`, `:455-461`), with `label: "t3flare"` and `platform: { os: "linux", machine: "cloud" }`. The stock clients decide which features to show from these flags.
-- **Breaks when**: t3 adds a flag for a feature that needs the host (a local browser, a native helper, a self-update path), which happens often; or renames one of the four.
-- **Detection**: typecheck catches a renamed stripped flag (the destructuring names a missing property). **Silent**: a new flag is advertised as is. Cheapest check: [T3](#gaps-in-detection), a test of the capability keys against a classified list.
+- **Where**: `composition.ts` serves t3's own descriptor (`ServerEnvironment.make`, `t3code/apps/server/src/environment/ServerEnvironment.ts:186`; capabilities `:221-292`) through `cloudCapabilities` (`apps/environment/src/t3/capabilities.ts`), which strips every flag classified `strip` there, with `label: "t3flare"` and `platform: { os: "linux", machine: "cloud" }`. The stock clients decide which features to show from these flags. Settings with no flag are locked by t3flare's managed policy (`t3/managedPolicy.ts`, ADR-0023; t3's `ManagedPolicy.fromDocument`).
+- **Breaks when**: t3 adds a flag for a feature that needs the host (a local browser, a native helper, a self-update path), which happens often; renames a flag; adds a setting for a host-bound feature; or changes the managed policy document's schema.
+- **Detection**: typecheck (`CAPABILITIES … satisfies Record<keyof ExecutionEnvironmentCapabilities, …>`) and `test/capabilities.test.ts` fail on a new or removed flag, naming it (SPI-1012, T3). The policy test fails if t3 refuses the document. **Silent**: a new setting for a host-bound feature, and a flag t3 sends that its schema does not list.
 - **Blast radius**: the clients show a button or panel that fails in the cloud.
-- **Fix**: classify the new flag: keep it, or strip it in `composition.ts` with a `t3flare:` note. [SPI-994](https://linear.app/spiritledsoftware/issue/SPI-994) strips the flags that already fail.
+- **Fix**: classify the new flag in `capabilities.ts` (keep, or strip with a one-line reason); lock a new host-bound setting in `managedPolicy.ts`.
 
 ### U5. MCP, `delegate_task` and `linkOrigin` (step 3)
 
@@ -266,7 +266,7 @@ Checks worth adding, each closing a silent or late path above. Each has a ticket
 | --- | --- | --- | --- |
 | T1 | The bump runs the whole `bun run check` | U27, U20 | [SPI-1010](https://linear.app/spiritledsoftware/issue/SPI-1010) |
 | T2 | Fingerprint the t3 code we restate or emulate (the `server.ts` layer graph and routes, `TerminalManager.make`, `ServerEnvironment.make`'s capabilities, the git argv and `gh` schema literals); the bump fails on any change until the matching file of ours is reviewed | U1, U12, U13, U15 | [SPI-1011](https://linear.app/spiritledsoftware/issue/SPI-1011) |
-| T3 | A test of the descriptor's capability keys against a classified list (kept, stripped), failing on a new key | U4 | [SPI-1012](https://linear.app/spiritledsoftware/issue/SPI-1012) |
+| T3 | ~~A test of the descriptor's capability keys against a classified list (kept, stripped), failing on a new key~~ Done: `test/capabilities.test.ts` and typecheck | U4 | [SPI-1012](https://linear.app/spiritledsoftware/issue/SPI-1012) |
 | T4 | A workerd test that runs t3's migrations, then each private-table query of `idle.ts` (and step 3's) and expects no `UnreadableTables`, and compares the status lists with t3's; the same for computer's VFS tables | U2, U23 | [SPI-1013](https://linear.app/spiritledsoftware/issue/SPI-1013) |
 | T5 | Assert `dist/build-report.json` against the pin's: Shadows applied, alias importers, skipped dependency imports, stub names | U9, U11 | [SPI-1014](https://linear.app/spiritledsoftware/issue/SPI-1014) |
 | T6 | Acceptance asserts from the router trace that t3's polls started no stopped Container and that patched read shapes were not answered `last-answer` | U6, U13 | [SPI-1015](https://linear.app/spiritledsoftware/issue/SPI-1015) |
