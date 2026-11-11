@@ -27,6 +27,7 @@ import {
   PUSH_ENTRIES_BYTES,
   type PushedEntry,
   type RuntimeMode,
+  runtimeModeOf,
   type SessionPush,
   type SessionPushAnswer,
   type SessionState,
@@ -142,7 +143,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     registry.install(
       permissions({
         store: this.#approvals,
-        mode: () => this.#meta()?.runtimeMode ?? "full-access",
+        mode: () => runtimeModeOf(this.#meta()?.runtimeMode),
         turn: () => Object.entries(this.#turns()).find(([, turn]) => isLive(turn))?.[0] ?? null,
         workspaceId: () => this.#meta()?.workspaceId ?? null,
       }),

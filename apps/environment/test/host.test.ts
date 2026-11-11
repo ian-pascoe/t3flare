@@ -1,9 +1,10 @@
-// The host's pure parts: the boot record and safe mode, the redacting Console, and the idle queries over
-// t3's tables (on Node's SQLite).
+// The host's pure parts: the boot record and safe mode, the redacting Console, the idle queries over t3's
+// tables (on Node's SQLite), and the Pairing window's alarm and bootstrap refusal.
 import { describe, expect, it } from "vitest";
 
 import * as BootState from "../src/host/bootState.ts";
 import * as Idle from "../src/host/idle.ts";
+import * as Pairing from "../src/host/pairing.ts";
 import { redact, redactingConsole, redactions } from "../src/host/redactingConsole.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
@@ -133,5 +134,84 @@ describe("idle queries", () => {
     expect(Idle.idleVerdict(sql, now)).toEqual({ reset: false, why: "not idle long enough" });
     Object.assign(Idle.activity, { idleSince: now.getTime() - 61_000 });
     expect(Idle.idleVerdict(sql, now).reset).toBe(true);
+  });
+});
+
+/** A DO's storage as the Pairing window uses it: one alarm, which firing clears (ADR-0003). */
+const memoryStorage = () => {
+  const kv = memoryKv();
+  let alarm: number | null = null;
+  return {
+    ...kv,
+    getAlarm: async () => alarm,
+    setAlarm: async (at: number) => {
+      alarm = at;
+    },
+    /** The alarm fires: workerd clears it before `alarm()` runs. */
+    fire: () => {
+      alarm = null;
+    },
+  };
+};
+
+describe("Pairing window", () => {
+  const now = new Date("2026-11-10T12:00:00Z");
+  const minutes = (n: number) => new Date(now.getTime() + n * 60_000);
+
+  it("an earlier alarm that fires while the window is open leaves the window's close pending", async () => {
+    const storage = memoryStorage();
+    const until = await Pairing.arm(storage, 30, now);
+    await Pairing.keepWindowClosing(storage);
+    expect(await storage.getAlarm()).toBe(until.getTime());
+
+    // The sweep takes the one alarm for an earlier time, and fires.
+    await storage.setAlarm(minutes(5).getTime());
+    storage.fire();
+    expect(await Pairing.onAlarm(storage, { seeded: true }, minutes(5))).toBe("keep");
+    expect(await storage.getAlarm()).toBe(until.getTime());
+
+    // At the close, the seeded grant must go.
+    storage.fire();
+    expect(await Pairing.onAlarm(storage, { seeded: true }, until)).toBe("close-window");
+  });
+
+  it("keeps an earlier pending alarm, and moves a later one up to the window's close", async () => {
+    const storage = memoryStorage();
+    const until = await Pairing.arm(storage, 30, now);
+    await storage.setAlarm(minutes(5).getTime());
+    await Pairing.keepWindowClosing(storage);
+    expect(await storage.getAlarm()).toBe(minutes(5).getTime());
+
+    await storage.setAlarm(minutes(60).getTime());
+    expect(await Pairing.onAlarm(storage, { seeded: true }, minutes(10))).toBe("keep");
+    expect(await storage.getAlarm()).toBe(until.getTime());
+  });
+
+  it("caps the window at an hour and closes it on disarm", async () => {
+    const storage = memoryStorage();
+    expect(await Pairing.arm(storage, 600, now)).toEqual(minutes(Pairing.MAX_ARM_MINUTES));
+    expect(await Pairing.isArmed(storage, now)).toBe(true);
+    await Pairing.disarm(storage);
+    expect(await Pairing.isArmed(storage, now)).toBe(false);
+    expect(await Pairing.onAlarm(storage, { seeded: false }, now)).toBe("keep");
+    expect(await storage.getAlarm()).toBeNull();
+  });
+
+  it("finds the bootstrap token in the parsed credential, however it is encoded", () => {
+    const token = "boot-token-1";
+    const presents = (body: string) => Pairing.presentsBootstrapToken(body, token);
+    expect(presents(JSON.stringify({ credential: token }))).toBe(true);
+    // JSON escapes dodge a substring match; t3 trims the credential it reads.
+    expect(presents('{"credential":"\\u0062oot-token-1"}')).toBe(true);
+    expect(presents(JSON.stringify({ credential: `  ${token}\n` }))).toBe(true);
+    // The token exchange is form-encoded; percent-escapes dodge a substring match too.
+    expect(presents(`grant_type=x&subject_token=${token}&client_label=laptop`)).toBe(true);
+    expect(presents("subject_token=%62oot-token-1")).toBe(true);
+    expect(presents(JSON.stringify({ subject_token: token }))).toBe(true);
+
+    expect(presents(JSON.stringify({ credential: "a-pairing-token" }))).toBe(false);
+    expect(presents("subject_token=a-pairing-token")).toBe(false);
+    expect(presents("not a body")).toBe(false);
+    expect(presents("")).toBe(false);
   });
 });
