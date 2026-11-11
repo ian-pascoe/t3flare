@@ -387,23 +387,29 @@ const withoutDashC = (argv: ReadonlyArray<string>, cwd: string | undefined): { r
   return { args: [...args, ...argv.slice(i)], cwd: at === undefined ? undefined : normalize(at) };
 };
 
+/** The account `gh auth status` names when no GitHub Workspace names the GitHub App installation's account yet. */
+const GH_APP_LOGIN = "t3flare[bot]";
+
+/**
+ * `gh auth status --json hosts`: always signed in to github.com, as the Environment's GitHub tokens come from the
+ * GitHub App (ADR-0013), not a login. The account is the installation's (a GitHub Workspace's owner, the one
+ * `gh auth token` mints for), else the App's own label. In the shape t3's `parseGitHubAuth` reads (gh 2.81+).
+ */
+const ghAuthStatus = async (): Promise<Answer> => {
+  const owner = environmentServices()
+    .workspaces.list()
+    .find((ws) => ws.host === "github.com" && ws.owner !== null)?.owner;
+  const login = owner ?? GH_APP_LOGIN;
+  const hosts = { "github.com": [{ state: "success", active: true, host: "github.com", login, tokenSource: "t3flare-github-app" }] };
+  return { exitCode: 0, stdout: `${JSON.stringify({ hosts })}\n`, stderr: "", route: "emulated" };
+};
+
 /** gh as t3's GitHub provider uses it: its version, its sign-in, and its token, from the GitHub App. */
 const ghRouteOf = (args: ReadonlyArray<string>): (() => Promise<Answer>) | null => {
   if (args[0] === "--version") return async () => ({ exitCode: 0, stdout: "gh version 2.83.0 (t3flare)\n", stderr: "", route: "emulated" });
   if (args[0] === "config" && args[1] === "get") return async () => ({ exitCode: 0, stdout: "\n", stderr: "", route: "emulated" });
   if (args[0] === "auth" && args[1] === "token") return () => ghToken();
-  if (args[0] === "auth" && args[1] === "status") {
-    return async () => {
-      const owner = environmentServices()
-        .workspaces.list()
-        .find((ws) => ws.host === "github.com" && ws.owner !== null)?.owner;
-      if (owner === undefined || owner === null) {
-        return { exitCode: 1, stdout: JSON.stringify({ hosts: {} }), stderr: "You are not logged into any GitHub hosts.\n", route: "emulated" };
-      }
-      const hosts = { "github.com": [{ state: "success", active: true, host: "github.com", login: owner, tokenSource: "t3flare-github-app" }] };
-      return { exitCode: 0, stdout: `${JSON.stringify({ hosts })}\n`, stderr: "", route: "emulated" };
-    };
-  }
+  if (args[0] === "auth" && args[1] === "status") return () => ghAuthStatus();
   return null;
 };
 
