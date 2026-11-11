@@ -1,0 +1,84 @@
+{
+  "scenario": "inspect",
+  "at": "2026-11-11T18:01:36.757Z",
+  "threadId": "34d51d58-16cc-4c46-b8e5-9480ad672b93",
+  "worktreePath": "/w/.wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682",
+  "setupTerminal": [
+    "t3flare: /w/term-mwcc46eb holds the project's untracked files only (.env t3flare-term.txt)",
+    "/w/.wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682 #  ( cp \"$T3CODE_PROJECT_ROOT/.env\" . && mise install && for i in 1 2 3 4 5; do echo \"setup step $i\"; sleep 2; done && echo ready",
+    "> ); printf '\\n__T3_SETUP_DONE___40fd51286b9e4988bf6908b4af4c521e:%s\\n' \"$?\"",
+    "mise 2026.11.2 by @jdx  ░░░░░░░░░░░░░░░░░░░░░░░░  0/7",
+    "mise all tools are installed",
+    "setup step 1",
+    "setup step 2",
+    "setup step 3",
+    "setup step 4",
+    "setup step 5",
+    "ready",
+    "__T3_SETUP_DONE___40fd51286b9e4988bf6908b4af4c521e:0"
+  ],
+  "envInWorktree": "T3FLARE_SETUP=from-project-root\n",
+  "viewInWorktree": "T3FLARE_SETUP=from-project-root\n",
+  "worktreeSetup": {
+    "threadId": "34d51d58-16cc-4c46-b8e5-9480ad672b93",
+    "phase": "done",
+    "startedAt": "2026-11-11T18:00:51.448Z",
+    "endedAt": "2026-11-11T18:01:39.684Z",
+    "branch": "t3/71a8a3f2",
+    "baseRef": "main",
+    "worktreePath": "/w/.wt/term-mwcc46eb/t3-71a8a3f2-4da3632a1aa80682",
+    "setupScript": {
+      "name": "Setup",
+      "command": "cp \"$T3CODE_PROJECT_ROOT/.env\" . && mise install && for i in 1 2 3 4 5; do echo \"setup step $i\"; sleep 2; done && echo ready",
+      "terminalId": "setup-setup"
+    },
+    "stages": [
+      {
+        "id": "fetch",
+        "status": "done",
+        "startedAt": "2026-11-11T18:00:51.680Z",
+        "endedAt": "2026-11-11T18:00:53.556Z",
+        "percent": null,
+        "detail": null,
+        "tail": []
+      },
+      {
+        "id": "checkout",
+        "status": "done",
+        "startedAt": "2026-11-11T18:00:53.904Z",
+        "endedAt": "2026-11-11T18:01:05.560Z",
+        "percent": null,
+        "detail": null,
+        "tail": []
+      },
+      {
+        "id": "setup-script",
+        "status": "done",
+        "startedAt": "2026-11-11T18:01:05.560Z",
+        "endedAt": null,
+        "percent": null,
+        "detail": "exited with 0",
+        "tail": [
+          "setup step 3",
+          "setup step 4",
+          "setup step 5",
+          "ready"
+        ]
+      },
+      {
+        "id": "agent",
+        "status": "done",
+        "startedAt": "2026-11-11T18:01:05.602Z",
+        "endedAt": "2026-11-11T18:01:05.602Z",
+        "percent": null,
+        "detail": null,
+        "tail": []
+      }
+    ],
+    "error": null,
+    "sequence": 20
+  },
+  "setupMentions": [],
+  "failures": [],
+  "ok": true
+}

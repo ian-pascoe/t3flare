@@ -121,6 +121,10 @@ export type FsOp =
 
 
 const LAST_USE_KEY = "t3flare:container-last-use";
+/** A worktree's copy of its project's untracked files (step 2b, plan section 4.2), linked at the project's t3 path in its Container. */
+export const PROJECT_ROOT_VIEW = `${HARNESS_ROOT}/project-root`;
+const PROJECT_ROOT_MAX_FILES = 1000;
+const PROJECT_ROOT_MAX_BYTES = 20 * 1024 * 1024;
 const LEASED_KEY = "t3flare:container-leased";
 /** Where the Container's git credential helper asks this object for the repo's token (through computer's egress host). */
 export const CREDENTIAL_PATH = "/t3flare/git-credential";
@@ -224,6 +228,10 @@ export class WorkspaceDO extends ContainerHost {
       filesMayHaveChanged: (why) => this.#terminalSync.changed(why),
       remember: (markers) => ctx.storage.kv.put(TERMINAL_MARKERS_KEY, [...markers]),
       remembered: () => ctx.storage.kv.get<ReadonlyArray<string>>(TERMINAL_MARKERS_KEY) ?? [],
+      beforeSpawn: async () => {
+        if (this.containerRunning()) await this.#syncEntries("push");
+      },
+      projectRootView: PROJECT_ROOT_VIEW,
     });
   }
 
@@ -782,6 +790,59 @@ export class WorkspaceDO extends ContainerHost {
     } catch (error) {
       return { ok: false, error: String(error).slice(0, 1000) };
     }
+  }
+
+  /**
+   * The project-root view's files (step 2b, plan section 4.2): this project's untracked files, gitignored ones included,
+   * from its own files (never the Container; the Container-only paths are not here at all), up to `maxFiles` and
+   * `maxBytes`. Tracked files are not in it: a worktree has them at its own commit.
+   */
+  async projectRootFiles(input: { readonly maxFiles: number; readonly maxBytes: number }): Promise<{ readonly files: ReadonlyArray<{ readonly path: string; readonly size: number }>; readonly capped: boolean }> {
+    const repo = await this.#repo();
+    const tracked = new Set(await git.listFiles({ fs: repo.fs, dir: repo.dir, cache: repo.cache }).catch(() => [] as Array<string>));
+    const found = await fileOps(this.#workspace).find(REPO_ROOT, undefined, 50_000);
+    if (!("ok" in found)) return { files: [], capped: false };
+    const files: Array<{ path: string; size: number }> = [];
+    let bytes = 0;
+    let capped = false;
+    for (const entry of found.ok) {
+      if (entry.kind !== "file") continue;
+      const path = entry.path.startsWith(`${REPO_ROOT}/`) ? entry.path.slice(REPO_ROOT.length + 1) : entry.path;
+      if (path === ".git" || path.startsWith(".git/") || tracked.has(path)) continue;
+      const stat = await fileOps(this.#workspace).stat(`${REPO_ROOT}/${path}`, false);
+      const size = "ok" in stat ? stat.ok.size : 0;
+      if (files.length >= input.maxFiles || bytes + size > input.maxBytes) {
+        capped = true;
+        continue;
+      }
+      files.push({ path, size });
+      bytes += size;
+    }
+    return { files, capped };
+  }
+
+  /** Copies the project's untracked files into this worktree's project-root view (step 2b), object to object. */
+  async seedProjectRoot(input: { readonly parent: string }): Promise<{ readonly files: number; readonly bytes: number; readonly capped: boolean; readonly names: ReadonlyArray<string> }> {
+    await this.#workspace.ready();
+    const ops = fileOps(this.#workspace);
+    const project = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(input.parent)) as unknown as WorkspaceDO;
+    const listed = await project.projectRootFiles({ maxFiles: PROJECT_ROOT_MAX_FILES, maxBytes: PROJECT_ROOT_MAX_BYTES });
+    await ops.remove(PROJECT_ROOT_VIEW, { recursive: true, force: true });
+    await ops.mkdir(PROJECT_ROOT_VIEW, true);
+    let bytes = 0;
+    for (const file of listed.files) {
+      const target = `${PROJECT_ROOT_VIEW}/${file.path}`;
+      await ops.mkdir(target.slice(0, target.lastIndexOf("/")), true);
+      for (let offset = 0; ; offset += 4 * 1024 * 1024) {
+        const chunk = await project.readChunk(`${REPO_ROOT}/${file.path}`, offset, 4 * 1024 * 1024);
+        if ("error" in chunk) break;
+        await ops.write(target, chunk.bytes, { append: offset > 0 });
+        bytes += chunk.bytes.byteLength;
+        if (chunk.done) break;
+      }
+    }
+    if (listed.capped) console.warn(JSON.stringify({ t3flare: "project-root-view-capped", files: listed.files.length, maxFiles: PROJECT_ROOT_MAX_FILES, maxBytes: PROJECT_ROOT_MAX_BYTES }));
+    return { files: listed.files.length, bytes, capped: listed.capped, names: listed.files.slice(0, 20).map((file) => file.path) };
   }
 
   /** HEAD and its branch from this object's own files (isomorphic-git), never starting the Container (`worktree list`). */

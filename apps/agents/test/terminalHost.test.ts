@@ -68,6 +68,8 @@ const harness = (options: { running?: boolean; refuse?: string; answer?: (frames
     filesMayHaveChanged: (why) => void changes.push(why),
     remember: (markers) => void (remembered = markers),
     remembered: () => remembered,
+    beforeSpawn: async () => undefined,
+    projectRootView: "/workspace/.t3flare/project-root",
   };
   const host = new TerminalHost(deps);
   return {

@@ -53,6 +53,10 @@ export interface TerminalHostDeps {
   readonly remember: (markers: ReadonlyArray<string>) => void;
   readonly remembered: () => ReadonlyArray<string>;
   readonly epoch: string;
+  /** Brings the DO's pending writes into a running Container before a shell starts (a worktree's project-root view). */
+  readonly beforeSpawn: () => Promise<void>;
+  /** Where a worktree's project-root view is, in the Workspace. */
+  readonly projectRootView: string;
 }
 
 interface Terminal {
@@ -82,6 +86,7 @@ export class TerminalHost {
   #inFlight: Promise<void> | undefined;
   #drained: Array<() => void> = [];
   #lastInput = 0;
+  #pushFailures = 0;
   #orphansChecked = false;
 
   constructor(deps: TerminalHostDeps) {
@@ -152,8 +157,15 @@ export class TerminalHost {
     }
     if (terminal.exited) return this.#answer([]);
     await this.#killOrphans().catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "terminal-orphans-failed", error: String(error) })));
+    await this.#deps.beforeSpawn().catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "terminal-push-before-spawn-failed", error: String(error).slice(0, 300) })));
     try {
-      const process = await this.#deps.spawn(["bash", "-c", terminalCommand({ marker: input.key, t3Path: input.t3Path, cwd: input.cwd })], {
+      const command = terminalCommand({
+        marker: input.key,
+        t3Path: input.t3Path,
+        cwd: input.cwd,
+        ...(input.projectRoot === undefined ? {} : { projectRoot: { t3Path: input.projectRoot, view: this.#deps.projectRootView } }),
+      });
+      const process = await this.#deps.spawn(["bash", "-c", command], {
         cols: input.cols,
         rows: input.rows,
         env: { ...this.#deps.baseEnv, ...input.env, T3FLARE_EXEC: input.key },
@@ -240,18 +252,22 @@ export class TerminalHost {
     this.#pending = [];
     this.#pendingBytes = 0;
     this.#inFlight = (async () => {
-      let answer: TerminalPushAnswer | undefined;
-      for (let attempt = 0; attempt < 3 && answer === undefined; attempt++) {
-        try {
-          answer = await this.#deps.push({ epoch: this.#deps.epoch, frames });
-        } catch (error) {
-          console.warn(JSON.stringify({ t3flare: "terminal-push-failed", attempt, error: String(error).slice(0, 300) }));
-          await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
-        }
+      let answer: TerminalPushAnswer;
+      try {
+        answer = await this.#deps.push({ epoch: this.#deps.epoch, frames });
+        this.#pushFailures = 0;
+      } catch (error) {
+        // Never dropped: a lost frame could be a setup script's sentinel. The batch goes back in front and is tried
+        // again, backing off to 5 s; a terminal whose Environment is gone ends by the heartbeat's lapse.
+        this.#pushFailures++;
+        console.warn(JSON.stringify({ t3flare: "terminal-push-failed", attempt: this.#pushFailures, frames: frames.length, error: String(error).slice(0, 300) }));
+        this.#pending = [...frames, ...this.#pending];
+        this.#pendingBytes += frames.reduce((sum, frame) => sum + (frame.data?.length ?? 16), 0);
+        await new Promise((resolve) => setTimeout(resolve, Math.min(5000, 100 * 2 ** Math.min(this.#pushFailures, 6))));
+        return;
       }
       // An Environment that does not know a terminal restarted or closed it: nobody reads the shell any more.
-      const unknown = answer?.unknown ?? [];
-      for (const key of unknown) {
+      for (const key of answer.unknown) {
         const terminal = this.#terminals.get(key);
         if (terminal !== undefined && !terminal.exited) {
           console.log(JSON.stringify({ t3flare: "terminal-unknown-to-environment", key }));

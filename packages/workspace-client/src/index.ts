@@ -204,6 +204,8 @@ export interface TerminalOpenInput {
   readonly rows: number;
   /** Already allowlisted by the adapter. */
   readonly env: Readonly<Record<string, string>>;
+  /** A worktree's project (`/w/<project>`): linked to the worktree's project-root view in its Container (step 2b). */
+  readonly projectRoot?: string;
 }
 
 /** Every answer names the Workspace DO instance (its epoch): a new epoch means the old one's terminals are gone. */

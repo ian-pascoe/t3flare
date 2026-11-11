@@ -45,9 +45,27 @@ export const makeTerminalProcesses = (): TerminalProcesses =>
     place: (cwd) => {
       const located = locate(cwd);
       if (located === undefined) return undefined;
-      return { workspace: located.id, t3Path: `/w/${located.id}`, remote: located.rpc };
+      const parent = located.record.kind === "worktree" ? located.record.parent : null;
+      return { workspace: located.id, t3Path: `/w/${located.id}`, remote: located.rpc, ...(parent === null ? {} : { projectRoot: `/w/${parent}` }) };
     },
   });
+
+/** `makeWithOptions`' options for this Environment's terminals (shared with the Node test of the real stack). */
+export const terminalManagerOptions = (processes: TerminalProcesses, logsDir: string) => ({
+  logsDir,
+  env: { ...TERMINAL_BASE_ENV },
+  shellResolver: () => "/bin/bash",
+  historyByteLimit: HISTORY_BYTE_LIMIT,
+  maxRetainedInactiveSessions: MAX_RETAINED_INACTIVE_SESSIONS,
+  ptyAdapter: {
+    spawn: (input: PtyAdapter.PtySpawnInput) =>
+      Effect.try({
+        try: (): PtyAdapter.PtyProcess => processes.spawn(input),
+        catch: (cause) => new PtyAdapter.PtySpawnError({ adapter: "t3flare", shell: input.shell, cause }),
+      }),
+  },
+  subprocessInspector: (pid: number) => Effect.succeed({ hasRunningSubprocess: processes.busy(pid), childCommand: null, processIds: [] }),
+});
 
 export const layer = Layer.effect(
   TerminalManager.TerminalManager,
@@ -55,21 +73,6 @@ export const layer = Layer.effect(
     const { terminalLogsDir } = yield* ServerConfig.ServerConfig;
     const processes = makeTerminalProcesses();
     setCurrentTerminals(processes);
-    return yield* TerminalManager.makeWithOptions({
-      logsDir: terminalLogsDir,
-      env: { ...TERMINAL_BASE_ENV },
-      shellResolver: () => "/bin/bash",
-      historyByteLimit: HISTORY_BYTE_LIMIT,
-      maxRetainedInactiveSessions: MAX_RETAINED_INACTIVE_SESSIONS,
-      ptyAdapter: {
-        spawn: (input) =>
-          Effect.try({
-            try: (): PtyAdapter.PtyProcess => processes.spawn(input),
-            catch: (cause) => new PtyAdapter.PtySpawnError({ adapter: "t3flare", shell: input.shell, cause }),
-          }),
-      },
-      subprocessInspector: (pid) =>
-        Effect.succeed({ hasRunningSubprocess: processes.busy(pid), childCommand: null, processIds: [] }),
-    });
+    return yield* TerminalManager.makeWithOptions(terminalManagerOptions(processes, terminalLogsDir));
   }),
 ).pipe(Layer.provide(ProcessRunner.layer));

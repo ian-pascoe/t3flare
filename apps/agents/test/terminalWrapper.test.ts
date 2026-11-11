@@ -12,11 +12,17 @@ const IMAGE = "ubuntu:26.04";
 const docker = spawnSync("docker", ["image", "inspect", IMAGE], { encoding: "utf8" }).status === 0;
 
 /** Runs the wrapper under a PTY with `input` typed, as root; answers the raw output and the exit code. */
-const run = (input: string, options: { readonly privileged: boolean; readonly after?: string }) => {
-  const wrapper = terminalCommand({ marker: "term-test1", t3Path: "/w/demo", cwd: "/w/demo/sub" });
+const run = (input: string, options: { readonly privileged: boolean; readonly after?: string; readonly projectRoot?: boolean }) => {
+  const wrapper = terminalCommand({
+    marker: "term-test1",
+    t3Path: options.projectRoot ? "/w/.wt/demo/feat" : "/w/demo",
+    cwd: options.projectRoot ? "/w/.wt/demo/feat" : "/w/demo/sub",
+    ...(options.projectRoot ? { projectRoot: { t3Path: "/w/demo", view: "/workspace/.t3flare/project-root" } } : {}),
+  });
   const script = `set -u
 mkdir -p /workspace/repo/sub /tmp/case
 echo repo-file > /workspace/repo/file.txt
+mkdir -p /workspace/.t3flare/project-root && echo SECRET_FROM_PROJECT=1 > /workspace/.t3flare/project-root/.env
 cat > /tmp/case/wrapper.sh <<'T3FLARE_WRAPPER_EOF'
 ${wrapper}
 T3FLARE_WRAPPER_EOF
@@ -48,6 +54,15 @@ describe.skipIf(!docker)("the terminal wrapper", () => {
     expect(text).toMatch(/^\/w\/demo\r?$/m); // findmnt: a bind mount
     expect(result.output).toContain(MARK_PROMPT);
     expect(result.output).toContain(MARK_BUSY);
+  }, 120_000);
+
+  it("links a worktree's project-root view at the project's path, and says what it holds first", () => {
+    const result = run('cp "/w/demo/.env" . && cat .env && pwd; exit 0', { privileged: true, projectRoot: true });
+    expect(result.exit).toBe(0);
+    const { text } = scanMarkers("", result.output);
+    expect(text).toContain("t3flare: /w/demo holds the project's untracked files only (.env)");
+    expect(text).toContain("SECRET_FROM_PROJECT=1");
+    expect(text).toMatch(/^\/w\/\.wt\/demo\/feat\r?$/m);
   }, 120_000);
 
   it("falls back to a symlink when the bind mount is not allowed", () => {

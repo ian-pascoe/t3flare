@@ -298,8 +298,10 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
     );
     if (bundled.bundle) await projectRpc.fs({ op: "remove", path: bundled.bundle, options: { force: true } }).catch(() => undefined);
     if (!finished.ok) return failed(`checkout: ${finished.error ?? "failed"}`);
+    // The project-root view (plan section 4.2): the project's untracked files, for setup scripts' `$T3CODE_PROJECT_ROOT`.
+    const view = await step("projectRoot", () => worktree.seedProjectRoot({ parent: parent.id })).catch((error: unknown) => ({ error: String(error).slice(0, 300) }));
     services.workspaces.setState(id, "ready", { lastError: null });
-    const detail = JSON.stringify({ ...timings, totalMs: Date.now() - started, bundled: bundled.bundle !== null && bundled.bundle !== undefined });
+    const detail = JSON.stringify({ ...timings, totalMs: Date.now() - started, bundled: bundled.bundle !== null && bundled.bundle !== undefined, projectRoot: view });
     console.log(JSON.stringify({ t3flare: "worktree-ready", id, detail }));
     return { exitCode: 0, stdout: "", stderr: `Preparing worktree (checking out '${ref}')\nHEAD is now at ${bundled.commit.slice(0, 7)}\n`, route: "worktree", detail };
   } catch (error) {

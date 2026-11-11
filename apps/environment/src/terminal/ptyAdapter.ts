@@ -29,6 +29,8 @@ export interface TerminalPlace {
   /** `/w/<id>`. */
   readonly t3Path: string;
   readonly remote: TerminalRemote;
+  /** A worktree's project path (`/w/<project>`), linked to its project-root view. */
+  readonly projectRoot?: string;
 }
 
 export interface SpawnInput {
@@ -187,7 +189,14 @@ export class TerminalProcess {
   }
 
   emitData(data: string): void {
-    for (const listener of this.#data) listener(data);
+    // A listener's failure must not stop delivery: the push would fail and its frames be sent again.
+    for (const listener of this.#data) {
+      try {
+        listener(data);
+      } catch (error) {
+        console.warn(JSON.stringify({ t3flare: "terminal-listener-failed", error: String(error).slice(0, 300) }));
+      }
+    }
   }
 
   /** Frames for this terminal, in the Workspace's order. */
@@ -203,7 +212,13 @@ export class TerminalProcess {
     this.exited = exit;
     this.busy = false;
     this.#processes.forget(this);
-    for (const listener of this.#exit) listener(exit);
+    for (const listener of this.#exit) {
+      try {
+        listener(exit);
+      } catch (error) {
+        console.warn(JSON.stringify({ t3flare: "terminal-listener-failed", error: String(error).slice(0, 300) }));
+      }
+    }
   }
 }
 
@@ -242,7 +257,7 @@ export class TerminalProcesses {
     this.#byPid.set(process.pid, process);
     this.#startHeartbeat();
     place.remote
-      .terminalOpen({ key, t3Path: place.t3Path, cwd: input.cwd, cols: input.cols, rows: input.rows, env })
+      .terminalOpen({ key, t3Path: place.t3Path, cwd: input.cwd, cols: input.cols, rows: input.rows, env, ...(place.projectRoot === undefined ? {} : { projectRoot: place.projectRoot }) })
       .then((answer) => process.opened(answer))
       .catch((error: unknown) => {
         process.emitData(`\x1b[31mt3flare: the terminal did not open: ${String(error).slice(0, 300)}\x1b[0m\r\n`);

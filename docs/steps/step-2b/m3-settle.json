@@ -1,0 +1,9 @@
+{
+  "scenario": "settle",
+  "thread": "cad337a9-7466-4279-9a5f-1757d0b6a798",
+  "worktree": ".wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a",
+  "settleScript": "echo \"settled at $(date -u +%H:%M:%S)\" > settled.txt && echo settle-done",
+  "settledClickedAt": "18:04:46Z",
+  "fileInWorktreeDo": "settled at 18:04:50",
+  "note": "Settle thread clicked in the stock web client; the settle script ran in its own terminal in the worktree's Container (started for it) and its file reached the worktree's DO by the terminal's pull."
+}

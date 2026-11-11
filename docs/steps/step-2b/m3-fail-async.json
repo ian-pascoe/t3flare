@@ -1,0 +1,76 @@
+{
+  "scenario": "inspect",
+  "at": "2026-11-11T18:03:05.507Z",
+  "threadId": "cad337a9-7466-4279-9a5f-1757d0b6a798",
+  "worktreePath": "/w/.wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a",
+  "setupTerminal": [
+    "t3flare: /w/term-mwcc46eb holds the project's untracked files only (.env t3flare-term.txt)",
+    "/w/.wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a #  ( echo failing on purpose; exit 3",
+    "> ); printf '\\n__T3_SETUP_DONE___4b1bea7ac3064e3cb9b76f6d0d056812:%s\\n' \"$?\"",
+    "failing on purpose",
+    "__T3_SETUP_DONE___4b1bea7ac3064e3cb9b76f6d0d056812:3",
+    "/w/.wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a # /w/.wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a # "
+  ],
+  "envInWorktree": null,
+  "viewInWorktree": "T3FLARE_SETUP=from-project-root\n",
+  "worktreeSetup": {
+    "threadId": "cad337a9-7466-4279-9a5f-1757d0b6a798",
+    "phase": "done",
+    "startedAt": "2026-11-11T18:02:22.639Z",
+    "endedAt": "2026-11-11T18:02:41.523Z",
+    "branch": "t3/394624dc",
+    "baseRef": "main",
+    "worktreePath": "/w/.wt/term-mwcc46eb/t3-394624dc-886b97a6f6d9674a",
+    "setupScript": {
+      "name": "Setup",
+      "command": "echo failing on purpose; exit 3",
+      "terminalId": "setup-setup"
+    },
+    "stages": [
+      {
+        "id": "fetch",
+        "status": "done",
+        "startedAt": "2026-11-11T18:02:22.924Z",
+        "endedAt": "2026-11-11T18:02:25.653Z",
+        "percent": null,
+        "detail": null,
+        "tail": []
+      },
+      {
+        "id": "checkout",
+        "status": "done",
+        "startedAt": "2026-11-11T18:02:26.144Z",
+        "endedAt": "2026-11-11T18:02:40.488Z",
+        "percent": null,
+        "detail": null,
+        "tail": []
+      },
+      {
+        "id": "setup-script",
+        "status": "failed",
+        "startedAt": "2026-11-11T18:02:40.488Z",
+        "endedAt": null,
+        "percent": null,
+        "detail": "exited with 3",
+        "tail": [
+          "t3flare: /w/term-mwcc46eb holds the project's untracked files only (.env t3flare-term.txt)",
+          "failing on purpose"
+        ]
+      },
+      {
+        "id": "agent",
+        "status": "done",
+        "startedAt": "2026-11-11T18:02:40.536Z",
+        "endedAt": "2026-11-11T18:02:40.536Z",
+        "percent": null,
+        "detail": null,
+        "tail": []
+      }
+    ],
+    "error": null,
+    "sequence": 13
+  },
+  "setupMentions": [],
+  "failures": [],
+  "ok": true
+}

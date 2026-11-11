@@ -70,7 +70,13 @@ export const terminalCommand = (input: TerminalCommandInput): string => {
     link(input.t3Path, "/workspace/repo"),
     ...(input.projectRoot === undefined
       ? []
-      : [`mkdir -p ${quote(input.projectRoot.view)}`, link(input.projectRoot.t3Path, input.projectRoot.view)]),
+      : [
+          `mkdir -p ${quote(input.projectRoot.view)}`,
+          link(input.projectRoot.t3Path, input.projectRoot.view),
+          // The first line says what the project-root view holds (plan section 4.2): its untracked files only.
+          `files=$(cd ${quote(input.projectRoot.view)} && find . -type f | sed 's|^\\./||' | sort | head -8 | paste -sd ' ' -)`,
+          `printf '\\033[2mt3flare: %s holds the project'"'"'s untracked files only (%s)\\033[0m\\r\\n' ${quote(input.projectRoot.t3Path)} "\${files:-none}"`,
+        ]),
     `cat > ${rc} <<'T3FLARE_RC'`,
     terminalRc(),
     "T3FLARE_RC",

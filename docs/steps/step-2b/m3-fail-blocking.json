@@ -1,0 +1,78 @@
+{
+  "scenario": "inspect",
+  "at": "2026-11-11T18:04:12.463Z",
+  "threadId": "3b9c3ea6-9fd1-4d64-ac7d-161ae73a2df7",
+  "worktreePath": "/w/.wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878",
+  "setupTerminal": [
+    "t3flare: /w/term-mwcc46eb holds the project's untracked files only (.env t3flare-term.txt)",
+    "/w/.wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878 #  ( echo failing on purpose; exit 3",
+    "> ); printf '\\n__T3_SETUP_DONE___81c4a1f55e93458fa7940985a1226d69:%s\\n' \"$?\"",
+    "failing on purpose",
+    "__T3_SETUP_DONE___81c4a1f55e93458fa7940985a1226d69:3",
+    "/w/.wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878 # /w/.wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878 # "
+  ],
+  "envInWorktree": null,
+  "viewInWorktree": "T3FLARE_SETUP=from-project-root\n",
+  "worktreeSetup": {
+    "threadId": "3b9c3ea6-9fd1-4d64-ac7d-161ae73a2df7",
+    "phase": "failed",
+    "startedAt": "2026-11-11T18:03:29.667Z",
+    "endedAt": "2026-11-11T18:03:47.897Z",
+    "branch": "t3/967024b6",
+    "baseRef": "main",
+    "worktreePath": "/w/.wt/term-mwcc46eb/t3-967024b6-9589a7af73f72878",
+    "setupScript": {
+      "name": "Setup",
+      "command": "echo failing on purpose; exit 3",
+      "terminalId": "setup-setup"
+    },
+    "stages": [
+      {
+        "id": "fetch",
+        "status": "done",
+        "startedAt": "2026-11-11T18:03:30.011Z",
+        "endedAt": "2026-11-11T18:03:32.308Z",
+        "percent": null,
+        "detail": null,
+        "tail": []
+      },
+      {
+        "id": "checkout",
+        "status": "done",
+        "startedAt": "2026-11-11T18:03:32.792Z",
+        "endedAt": "2026-11-11T18:03:46.984Z",
+        "percent": null,
+        "detail": null,
+        "tail": []
+      },
+      {
+        "id": "setup-script",
+        "status": "failed",
+        "startedAt": "2026-11-11T18:03:46.984Z",
+        "endedAt": null,
+        "percent": null,
+        "detail": "exited with 3",
+        "tail": [
+          "t3flare: /w/term-mwcc46eb holds the project's untracked files only (.env t3flare-term.txt)",
+          "failing on purpose"
+        ]
+      },
+      {
+        "id": "agent",
+        "status": "pending",
+        "startedAt": null,
+        "endedAt": null,
+        "percent": null,
+        "detail": null,
+        "tail": []
+      }
+    ],
+    "error": "Workspace preparation failed during run setup script: Setup script exited with 3.",
+    "sequence": 11
+  },
+  "setupMentions": [
+    "Workspace preparation failed during run setup script: Setup script exited with 3."
+  ],
+  "failures": [],
+  "ok": true
+}
