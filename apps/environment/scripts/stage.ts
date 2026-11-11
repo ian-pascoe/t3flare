@@ -88,6 +88,11 @@ switch (command) {
         console.error("t3flare: prod deploys only from a clean checkout of main");
         process.exit(2);
       }
+      // prod is served at its custom domain (alchemy.run.ts); a deploy without it would drop that host from Access.
+      if (!process.env.T3FLARE_DOMAIN) {
+        console.error("t3flare: set T3FLARE_DOMAIN (prod's custom domain) to deploy prod");
+        process.exit(2);
+      }
     }
     if (rest.includes("--web") || !fs.existsSync(path.join(here, "dist/web/index.html"))) {
       const web = spawnSync("bun", ["run", "prepare:web"], { cwd: here, stdio: "inherit" });

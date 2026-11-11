@@ -54,6 +54,14 @@ const STAGE_DEPLOY_PERMISSIONS = [
   ACCESS_SERVICE_TOKENS_WRITE,
 ] as const;
 
+/**
+ * prod's custom domain (apps/environment/alchemy.run.ts reads it as T3FLARE_DOMAIN), and the zone it is in. Attaching a
+ * Workers Custom Domain needs zone permissions the other stages do not: Zone Read (alchemy looks the zone up by name)
+ * and Workers Routes Write ("Worker domains and routes"), on this zone only, for the prod token only.
+ */
+const PROD_DOMAIN = "t3.ianpascoe.dev";
+const PROD_DOMAIN_ZONE_ID = "c36c6e2b6bda856f9d4f6175059c6df4"; // ianpascoe.dev
+
 /** prod's bootstrap and admin tokens from the laptop's stage file (apps/environment/stage-files.ts), never printed. */
 const readStageTokens = (file: string) => {
   const tokens = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, string | undefined>;
@@ -121,7 +129,8 @@ export default Alchemy.Stack(
     });
 
     // prod (deploy-prod.yml): deployable from main only, retained on destroy like `bump`. Its own token, with the same
-    // permissions (a prod deploy touches the same kinds of resource; Cloudflare cannot scope these groups to a stage).
+    // permissions (a prod deploy touches the same kinds of resource; Cloudflare cannot scope these groups to a stage),
+    // plus its custom domain's zone permissions.
     const prod = yield* GitHub.Environment("Prod", {
       ...repo,
       name: "prod",
@@ -135,6 +144,13 @@ export default Alchemy.Stack(
           effect: "allow",
           permissionGroups: [...STAGE_DEPLOY_PERMISSIONS],
           resources: { [`com.cloudflare.api.account.${accountId}`]: "*" },
+        },
+        {
+          effect: "allow",
+          permissionGroups: ["Zone Read", "Workers Routes Write"],
+          resources: {
+            [`com.cloudflare.api.account.${accountId}`]: { [`com.cloudflare.api.account.zone.${PROD_DOMAIN_ZONE_ID}`]: "*" },
+          },
         },
       ],
     });
@@ -172,6 +188,12 @@ export default Alchemy.Stack(
       environment: prod,
       name: "MODEL_PROXY_URL",
       value: modelProxyUrl,
+    });
+    yield* GitHub.Variable("ProdDomain", {
+      ...repo,
+      environment: prod,
+      name: "T3FLARE_DOMAIN",
+      value: PROD_DOMAIN,
     });
 
     return { environments: ["bump", "prod"], tokens: ["t3flare-ci-bump", "t3flare-ci-prod"] };

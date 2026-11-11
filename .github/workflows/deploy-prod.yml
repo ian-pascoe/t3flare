@@ -8,6 +8,7 @@ name: Deploy prod
 # Needs, made by `bun run --cwd infra ci:setup` (infra/github.ts) on the GitHub environment `prod` (main only):
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-prod`
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
+#   vars.T3FLARE_DOMAIN            prod's custom domain (unset on `bump`, which stays on workers.dev)
 #   vars.MODEL_PROXY_URL, secrets.MODEL_PROXY_API_KEY, secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY
 #   secrets.T3_BOOTSTRAP_TOKEN, secrets.T3FLARE_ADMIN_TOKEN   prod's own tokens, the same as the laptop's
 #     (apps/environment/.alchemy/stages/prod.env.json); stage.ts refuses to make new ones for prod in CI.
@@ -40,11 +41,12 @@ jobs:
     timeout-minutes: 45
     environment:
       name: ${{ inputs.stage || 'prod' }}
-      url: https://t3flare-environment-${{ inputs.stage || 'prod' }}.ian-g-pascoe.workers.dev
+      url: ${{ vars.T3FLARE_DOMAIN && format('https://{0}', vars.T3FLARE_DOMAIN) || format('https://t3flare-environment-{0}.ian-g-pascoe.workers.dev', inputs.stage || 'prod') }}
     env:
       STAGE: ${{ inputs.stage || 'prod' }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      T3FLARE_DOMAIN: ${{ vars.T3FLARE_DOMAIN }}
       MODEL_PROXY_URL: ${{ vars.MODEL_PROXY_URL }}
       MODEL_PROXY_API_KEY: ${{ secrets.MODEL_PROXY_API_KEY }}
       T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}

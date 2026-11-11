@@ -9,10 +9,14 @@
 // The Worker is prebuilt by build.ts and uploaded with `bundle: false` (ADR-0020): alchemy 2.0.0-beta.85 drops
 // `build.input.plugins` on every update after the first deploy.
 //
+// A stage may also have a custom domain (`T3FLARE_DOMAIN`, a hostname in a Cloudflare zone of the account; prod's is
+// `t3.ianpascoe.dev`, from the GitHub environment `prod` in CI and the laptop's environment otherwise). When set, it is
+// attached as a Workers Custom Domain and becomes the stage's `url` and `host`; the workers.dev URL keeps working.
+//
 // Access (ADR-0010): `/ws`, `/mcp` and t3's auth routes are public (stock clients cannot pass Access); only
-// `<host>/_t3flare` (and below) has an Access application, admitting the owner by email and the stage's own
-// service token (for the acceptance test and the bump job). The Worker verifies the assertion itself against
-// the application's `aud` (src/access.ts), and also requires the admin token.
+// `<host>/_t3flare` (and below, on every host the Worker serves) has an Access application, admitting the owner by
+// email and the stage's own service token (for the acceptance test and the bump job). The Worker verifies the
+// assertion itself against the application's `aud` (src/access.ts), and also requires the admin token.
 //
 // The agents Worker (ADR-0014, step 2a) deploys in the same stack: its Session DOs, Workspace DOs with their Container
 // (the image in apps/sandbox-image, built here with Docker), and the Container budget. It has no public URL. The two
@@ -47,7 +51,11 @@ export default Alchemy.Stack(
     const stage = yield* Alchemy.Stage;
     const name = `t3flare-environment-${stage}`;
     const agentsName = `t3flare-agents-${stage}`;
-    const host = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
+    const workersDevHost = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
+    // The stage's custom domain, if it has one (unset or empty: workers.dev only).
+    const domain = yield* Config.String("T3FLARE_DOMAIN").pipe(Config.withDefault(""));
+    const host = domain === "" ? workersDevHost : domain;
+    const hosts = domain === "" ? [workersDevHost] : [domain, workersDevHost];
     const teamDomain = yield* Config.String("T3FLARE_ACCESS_TEAM_DOMAIN").pipe(Config.withDefault(ACCESS_TEAM_DOMAIN));
     const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
@@ -64,7 +72,7 @@ export default Alchemy.Stack(
     const admin = yield* Cloudflare.Access.Application("AdminAccess", {
       name: `${name} admin`,
       type: "self_hosted",
-      destinations: [{ type: "public", uri: `${host}/_t3flare` }],
+      destinations: hosts.map((h) => ({ type: "public", uri: `${h}/_t3flare` })),
       sessionDuration: "24h",
       appLauncherVisible: false,
       policies: [
@@ -111,6 +119,7 @@ export default Alchemy.Stack(
       // old build. The Environment adopts new code at once, as a restart does (ADR-0004): clients reconnect, and running
       // turns continue from their Sessions. The agents Worker keeps the default: its Sessions finish in-flight work first.
       codeUpdateStrategy: { mode: "immediate" },
+      ...(domain === "" ? {} : { domain }),
       env: {
         ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO" }),
         T3_BOOTSTRAP_TOKEN: Config.Redacted("T3_BOOTSTRAP_TOKEN"),
