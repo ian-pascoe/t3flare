@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off
+// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off globalFetch:off
 // Step 3, M0 R2–R4 (and R3's rerun before M5): a stock t3 server from npm at `--version` plays the laptop. It links to
 // the stage with the stock CLI (`t3 environment link`, a plain pairing code the stage's owner session mints, access
 // auto-accept-edits), lists the link, and, as an outside MCP client of the laptop, forwards t3_project_list,
