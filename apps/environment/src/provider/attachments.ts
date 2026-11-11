@@ -15,6 +15,9 @@ import type * as FileSystem from "effect/FileSystem";
 /** The base64 a message's images may take inline (0.9 MB of image bytes). */
 export const INLINE_IMAGE_BUDGET_CHARS = 1_200_000;
 
+/** The largest file read to look for text (an attachment may be 50 MB; the Environment DO has 128 MB). */
+export const FILE_READ_CAP_BYTES = 2_000_000;
+
 /** How the adapter reads t3's attachment store. */
 export interface AttachmentReader {
   /** The attachment's bytes, or null when t3 has no saved file for it. */
@@ -74,16 +77,19 @@ export const turnPrompt = Effect.fn("PiDurable.turnPrompt")(function* (
       notes.push(`[Attached ${label} is not shown: this model does not take images.]`);
       continue;
     }
-    const bytes = yield* options.reader.bytes(attachment);
+    // Too big to send or to scan for text: named without reading it (t3's extracted text, if any, still goes in).
+    const overImageBudget = inlineImage && imageChars + Math.ceil(attachment.sizeBytes / 3) * 4 > INLINE_IMAGE_BUDGET_CHARS;
+    const overFileCap = !inlineImage && attachment.sizeBytes > FILE_READ_CAP_BYTES;
+    const bytes = overImageBudget || overFileCap ? new Uint8Array(0) : yield* options.reader.bytes(attachment);
     if (bytes === null) {
       notes.push(`[Attached ${label} is unavailable: t3 has no saved file for it.]`);
       continue;
     }
     if (inlineImage) {
       const data = Buffer.from(bytes).toString("base64");
-      if (imageChars + data.length > INLINE_IMAGE_BUDGET_CHARS) {
+      if (overImageBudget || imageChars + data.length > INLINE_IMAGE_BUDGET_CHARS) {
         notes.push(
-          `[Attached ${label} (${megabytes(bytes.length)}) is not shown: a message takes at most ${megabytes((INLINE_IMAGE_BUDGET_CHARS * 3) / 4)} of images inline. Ask the user for a smaller image.]`,
+          `[Attached ${label} (${megabytes(Math.max(bytes.length, attachment.sizeBytes))}) is not shown: a message takes at most ${megabytes((INLINE_IMAGE_BUDGET_CHARS * 3) / 4)} of images inline. Ask the user for a smaller image.]`,
         );
         continue;
       }
@@ -93,7 +99,11 @@ export const turnPrompt = Effect.fn("PiDurable.turnPrompt")(function* (
       continue;
     }
     const extracted = yield* options.reader.extractedText(attachment);
-    const content = extracted ?? asText(bytes);
+    const content = extracted ?? (overFileCap ? null : asText(bytes));
+    if (content === null && overFileCap) {
+      notes.push(`[Attached ${label} (${attachment.mimeType}, ${megabytes(attachment.sizeBytes)}) is too large for this agent to read.]`);
+      continue;
+    }
     if (content === null) {
       notes.push(`[Attached ${label} (${attachment.mimeType}) is not readable as text by this agent.]`);
       continue;
