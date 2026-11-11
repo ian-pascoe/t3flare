@@ -1,0 +1,89 @@
+{
+ "at": "2026-11-11T21:24:36.417Z",
+ "variant": "question-restart",
+ "version": "0.1.9-nightly.20261111.4515",
+ "nonce": "N-mwcmm9th",
+ "laptop": {
+  "environmentId": "54b90aa9-2fe6-4e7c-83d1-fbe36d0bdfe2",
+  "serverVersion": "0.1.9-nightly.20261111.4515"
+ },
+ "remoteChild": {
+  "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+  "threadId": "mcp:launch:ba8fdb829ca0abbd375480b5bdb42ca32add1434b0a998a02589be7d4836d9ca",
+  "label": "t3flare",
+  "title": "e2e question-restart mwcmm9th",
+  "runId": "run:thread:mcp%3Alaunch%3Aba8fdb829ca0abbd375480b5bdb42ca32add1434b0a998a02589be7d4836d9ca:ordinal:1"
+ },
+ "events": [
+  "cloud Environment restarted while the question waited",
+  {
+   "answer": {
+    "requestId": "runtime-request:piDurable:thread:mcp:launch:ba8fdb829ca0abbd375480b5bdb42ca32add1434b0a998a02589be7d4836d9ca:approval:18",
+    "questionId": "18",
+    "read": "{\"requestId\":\"runtime-request:piDurable:thread:mcp:launch:ba8fdb829ca0abbd375480b5bdb42ca32add1434b0a998a02589be7d4836d9ca:approval:18\",\"questions\":[{\"id\":\"18\",\"header\":\"Question\",\"question\":\"Proceed with N-mwcmm9th?\",\"options\":[{\"label\":\"yes\",\"description\":\"yes\",\"value\":\"yes\"},{\"label\":\"no\",\"descri",
+    "responded": {
+     "isError": false,
+     "text": "{\"sequence\":1725}"
+    }
+   }
+  },
+  {
+   "approved": "command"
+  }
+ ],
+ "laptopTask": {
+  "status": "completed",
+  "result": "N-mwcmm9th-7",
+  "remoteChild": {
+   "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+   "threadId": "mcp:launch:ba8fdb829ca0abbd375480b5bdb42ca32add1434b0a998a02589be7d4836d9ca",
+   "label": "t3flare",
+   "title": "e2e question-restart mwcmm9th",
+   "runId": "run:thread:mcp%3Alaunch%3Aba8fdb829ca0abbd375480b5bdb42ca32add1434b0a998a02589be7d4836d9ca:ordinal:1"
+  },
+  "runs": [
+   "completed",
+   "completed"
+  ],
+  "lastReply": "N-mwcmm9th-7"
+ },
+ "cloudThread": {
+  "threadId": "mcp:launch:ba8fdb829ca0abbd375480b5bdb42ca32add1434b0a998a02589be7d4836d9ca",
+  "runs": [
+   {
+    "status": "cancelled",
+    "continuation": false
+   },
+   {
+    "status": "completed",
+    "continuation": true
+   }
+  ],
+  "linkOrigin": {
+   "sessionId": "58411d24-1bc0-4fd1-a270-7de58dac4b5f",
+   "label": "T3 Code · Ian's MacBook",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "54b90aa9-2fe6-4e7c-83d1-fbe36d0bdfe2",
+   "threadId": "b2ad4c7d-cfb3-4b5b-9eb7-29bfaa49bc3b",
+   "title": "e2e question-restart mwcmm9th"
+  },
+  "runtimeMode": "auto-accept-edits",
+  "commands": [
+   {
+    "input": "Preparing workspace",
+    "status": "completed",
+    "exitCode": 0
+   },
+   {
+    "input": "echo N-mwcmm9th-$(wc -l < README.md | tr -d ' ')",
+    "status": "completed",
+    "exitCode": 0
+   }
+  ]
+ },
+ "laptopLog": "/var/folders/7s/w381rjns5_7blt6vhvqs6nk80000gn/T/t3flare-laptop-o7jiG9/serve.log",
+ "failures": [],
+ "ok": true
+}

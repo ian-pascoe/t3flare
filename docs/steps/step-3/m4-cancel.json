@@ -1,0 +1,75 @@
+{
+ "at": "2026-11-11T21:21:44.449Z",
+ "variant": "cancel",
+ "version": "0.1.9-nightly.20261111.4515",
+ "nonce": "N-mwcmim97",
+ "laptop": {
+  "environmentId": "c8fdfedc-0bbc-4048-a872-012d6b254048",
+  "serverVersion": "0.1.9-nightly.20261111.4515"
+ },
+ "remoteChild": {
+  "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+  "threadId": "mcp:launch:845deec26e820cf033374f4a410d262f51a444a095ecff4d154c496b1c3dbb51",
+  "label": "t3flare",
+  "title": "e2e cancel mwcmim97",
+  "runId": "run:thread:mcp%3Alaunch%3A845deec26e820cf033374f4a410d262f51a444a095ecff4d154c496b1c3dbb51:ordinal:1"
+ },
+ "events": [
+  {
+   "approved": "command"
+  },
+  "asked the laptop agent to task_cancel"
+ ],
+ "laptopTask": {
+  "status": "cancelled",
+  "result": "Cancelled: Cancelled at user request.",
+  "remoteChild": {
+   "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+   "threadId": "mcp:launch:845deec26e820cf033374f4a410d262f51a444a095ecff4d154c496b1c3dbb51",
+   "label": "t3flare",
+   "title": "e2e cancel mwcmim97",
+   "runId": "run:thread:mcp%3Alaunch%3A845deec26e820cf033374f4a410d262f51a444a095ecff4d154c496b1c3dbb51:ordinal:1"
+  },
+  "runs": [
+   "completed",
+   "completed"
+  ],
+  "lastReply": "The delegated task is cancelled and won't deliver a result. The `sleep 600` command never produced output."
+ },
+ "cloudThread": {
+  "threadId": "mcp:launch:845deec26e820cf033374f4a410d262f51a444a095ecff4d154c496b1c3dbb51",
+  "runs": [
+   {
+    "status": "interrupted",
+    "continuation": false
+   }
+  ],
+  "linkOrigin": {
+   "sessionId": "3c1c42d4-1b6c-4e60-9c26-5f0049ff32b4",
+   "label": "T3 Code · Ian's MacBook",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "c8fdfedc-0bbc-4048-a872-012d6b254048",
+   "threadId": "d1f4cea8-4757-4b38-949c-7c4149dcfabd",
+   "title": "e2e cancel mwcmim97"
+  },
+  "runtimeMode": "auto-accept-edits",
+  "commands": [
+   {
+    "input": "Preparing workspace",
+    "status": "completed",
+    "exitCode": 0
+   },
+   {
+    "input": "sleep 600 && echo N-mwcmim97",
+    "status": "failed",
+    "exitCode": null
+   }
+  ]
+ },
+ "sleepsLeft": "0",
+ "laptopLog": "/var/folders/7s/w381rjns5_7blt6vhvqs6nk80000gn/T/t3flare-laptop-kcegoG/serve.log",
+ "failures": [],
+ "ok": true
+}

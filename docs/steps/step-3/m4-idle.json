@@ -1,0 +1,59 @@
+{
+ "at": "2026-11-11T21:28:24.564Z",
+ "stopped": 1,
+ "before": {
+  "runtime": "running",
+  "constructedAt": "2026-11-11T21:24:14.180Z",
+  "activity": {
+   "sockets": 0,
+   "inFlight": 0,
+   "idleSince": "2026-11-11T21:27:22.867Z"
+  }
+ },
+ "after": {
+  "runtime": "stopped",
+  "constructedAt": "2026-11-11T21:28:24.532Z",
+  "alarm": "2026-11-12T21:19:06.722Z",
+  "openWork": {
+   "openRuns": 0,
+   "openProviderSessions": 0,
+   "claimableEffects": 0
+  }
+ },
+ "samples": [
+  {
+   "s": 20,
+   "runtime": "running",
+   "constructions": 6,
+   "openWork": {
+    "openRuns": 0,
+    "openProviderSessions": 0,
+    "claimableEffects": 0
+   },
+   "alarm": "2026-11-11T21:35:06.591Z"
+  },
+  {
+   "s": 40,
+   "runtime": "running",
+   "constructions": 6,
+   "openWork": {
+    "openRuns": 0,
+    "openProviderSessions": 0,
+    "claimableEffects": 0
+   },
+   "alarm": "2026-11-11T21:35:06.591Z"
+  },
+  {
+   "s": 60,
+   "runtime": "stopped",
+   "constructions": 7,
+   "openWork": {
+    "openRuns": 0,
+    "openProviderSessions": 0,
+    "claimableEffects": 0
+   },
+   "alarm": "2026-11-12T21:19:06.722Z"
+  }
+ ],
+ "ok": true
+}

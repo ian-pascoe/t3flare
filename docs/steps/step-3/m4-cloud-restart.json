@@ -1,0 +1,86 @@
+{
+ "at": "2026-11-11T21:23:49.405Z",
+ "variant": "cloud-restart",
+ "version": "0.1.9-nightly.20261111.4515",
+ "nonce": "N-mwcmksx4",
+ "laptop": {
+  "environmentId": "df1d3a17-67e5-42a0-8da3-14b26dec577b",
+  "serverVersion": "0.1.9-nightly.20261111.4515"
+ },
+ "remoteChild": {
+  "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+  "threadId": "mcp:launch:19ea4c380816db680676849f8c50c36b53f60bb47b7daaba8ccac4bea2b3e6e2",
+  "label": "t3flare",
+  "title": "e2e cloud-restart mwcmksx4",
+  "runId": "run:thread:mcp%3Alaunch%3A19ea4c380816db680676849f8c50c36b53f60bb47b7daaba8ccac4bea2b3e6e2:ordinal:1"
+ },
+ "events": [
+  {
+   "approved": "command"
+  },
+  "cloud Environment restarted while bash ran",
+  {
+   "approvedAgain": "command"
+  }
+ ],
+ "laptopTask": {
+  "status": "completed",
+  "result": "N-mwcmksx4",
+  "remoteChild": {
+   "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+   "threadId": "mcp:launch:19ea4c380816db680676849f8c50c36b53f60bb47b7daaba8ccac4bea2b3e6e2",
+   "label": "t3flare",
+   "title": "e2e cloud-restart mwcmksx4",
+   "runId": "run:thread:mcp%3Alaunch%3A19ea4c380816db680676849f8c50c36b53f60bb47b7daaba8ccac4bea2b3e6e2:ordinal:1"
+  },
+  "runs": [
+   "completed",
+   "completed"
+  ],
+  "lastReply": "N-mwcmksx4"
+ },
+ "cloudThread": {
+  "threadId": "mcp:launch:19ea4c380816db680676849f8c50c36b53f60bb47b7daaba8ccac4bea2b3e6e2",
+  "runs": [
+   {
+    "status": "cancelled",
+    "continuation": false
+   },
+   {
+    "status": "completed",
+    "continuation": true
+   }
+  ],
+  "linkOrigin": {
+   "sessionId": "fcdddedd-f9df-4733-9a1e-a450b914e7af",
+   "label": "T3 Code · Ian's MacBook",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "df1d3a17-67e5-42a0-8da3-14b26dec577b",
+   "threadId": "90091861-e81d-4169-aea6-b0e1503f3bea",
+   "title": "e2e cloud-restart mwcmksx4"
+  },
+  "runtimeMode": "auto-accept-edits",
+  "commands": [
+   {
+    "input": "Preparing workspace",
+    "status": "completed",
+    "exitCode": 0
+   },
+   {
+    "input": "sleep 25 && echo N-mwcmksx4",
+    "status": "cancelled",
+    "exitCode": null
+   },
+   {
+    "input": "sleep 25 && echo N-mwcmksx4",
+    "status": "completed",
+    "exitCode": 0
+   }
+  ]
+ },
+ "laptopLog": "/var/folders/7s/w381rjns5_7blt6vhvqs6nk80000gn/T/t3flare-laptop-ac51yY/serve.log",
+ "failures": [],
+ "ok": true
+}

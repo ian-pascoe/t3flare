@@ -1,0 +1,115 @@
+{
+ "at": "2026-11-11T21:20:52.060Z",
+ "variant": "main",
+ "version": "0.1.9-nightly.20261111.4515",
+ "nonce": "N-mwcmhh14",
+ "laptop": {
+  "environmentId": "1ba27634-a229-484c-8b87-14526f6cf7c5",
+  "serverVersion": "0.1.9-nightly.20261111.4515"
+ },
+ "remoteChild": {
+  "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+  "threadId": "mcp:launch:ee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407",
+  "label": "t3flare",
+  "title": "e2e main mwcmhh14",
+  "runId": "run:thread:mcp%3Alaunch%3Aee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407:ordinal:1"
+ },
+ "events": [
+  {
+   "answer": {
+    "requestId": "runtime-request:piDurable:thread:mcp:launch:ee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407:approval:12",
+    "questionId": "12",
+    "read": "{\"requestId\":\"runtime-request:piDurable:thread:mcp:launch:ee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407:approval:12\",\"questions\":[{\"id\":\"12\",\"header\":\"Question\",\"question\":\"Proceed with N-mwcmhh14?\",\"options\":[{\"label\":\"yes\",\"description\":\"yes\",\"value\":\"yes\"},{\"label\":\"no\",\"descri",
+    "responded": {
+     "isError": false,
+     "text": "{\"sequence\":1411}"
+    }
+   }
+  },
+  {
+   "approved": "command"
+  }
+ ],
+ "laptopTask": {
+  "status": "completed",
+  "result": "N-mwcmhh14-7",
+  "remoteChild": {
+   "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+   "threadId": "mcp:launch:ee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407",
+   "label": "t3flare",
+   "title": "e2e main mwcmhh14",
+   "runId": "run:thread:mcp%3Alaunch%3Aee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407:ordinal:1"
+  },
+  "runs": [
+   "completed",
+   "completed"
+  ],
+  "lastReply": "N-mwcmhh14-7"
+ },
+ "cloudThread": {
+  "threadId": "mcp:launch:ee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407",
+  "runs": [
+   {
+    "status": "completed",
+    "continuation": false
+   }
+  ],
+  "linkOrigin": {
+   "sessionId": "b0fd100f-00e5-4d4f-950d-88d551043f82",
+   "label": "T3 Code · Ian's MacBook",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "1ba27634-a229-484c-8b87-14526f6cf7c5",
+   "threadId": "dd94f872-9711-4363-9ef9-861b3ba95797",
+   "title": "e2e main mwcmhh14"
+  },
+  "runtimeMode": "auto-accept-edits",
+  "commands": [
+   {
+    "input": "Preparing workspace",
+    "status": "completed",
+    "exitCode": 0
+   },
+   {
+    "input": "echo N-mwcmhh14-$(wc -l < README.md | tr -d ' ')",
+    "status": "completed",
+    "exitCode": 0
+   }
+  ]
+ },
+ "leak": {
+  "checked": [
+   "ALCHEMY_CLOUDFLARE_ACCOUNT_ID",
+   "ALCHEMY_WORKER_NAME",
+   "MODEL_PROXY_API_KEY",
+   "MODEL_PROXY_URL",
+   "T3FLARE_ACCESS_AUD",
+   "T3FLARE_ACCESS_SERVICE_CLIENT_ID",
+   "T3FLARE_ACCESS_TEAM_DOMAIN",
+   "T3FLARE_ADMIN_TOKEN",
+   "T3FLARE_GITHUB_APP_PRIVATE_KEY",
+   "T3FLARE_OWNER_EMAIL",
+   "T3_BOOTSTRAP_TOKEN",
+   "t3-mcp-credential:mcp:launch:ee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407"
+  ],
+  "credentialsFound": 1,
+  "container": {
+   "exitCode": 0,
+   "bytes": 8744,
+   "files": 11,
+   "leaked": []
+  },
+  "sessions": [
+   {
+    "thread": "mcp:launch:ee6aa4c0e5740b1c9bd0ddb8ff12f51761d9bb4a1029537b14d0603f11309407",
+    "bytes": 7837,
+    "leaked": []
+   }
+  ],
+  "leaked": 0
+ },
+ "laptopLog": "/var/folders/7s/w381rjns5_7blt6vhvqs6nk80000gn/T/t3flare-laptop-fpqWFE/serve.log",
+ "failures": [],
+ "ok": true
+}

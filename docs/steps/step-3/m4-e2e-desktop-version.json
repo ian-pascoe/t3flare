@@ -1,0 +1,84 @@
+{
+ "at": "2026-11-11T21:26:55.290Z",
+ "variant": "main",
+ "version": "0.1.10-nightly.20261111.4529",
+ "nonce": "N-mwcmpg9a",
+ "laptop": {
+  "environmentId": "ebb5ae58-9302-42bf-8978-2581bed4078b",
+  "serverVersion": "0.1.10-nightly.20261111.4529"
+ },
+ "remoteChild": {
+  "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+  "threadId": "mcp:launch:9bbd74013a85b194626ce60296073877322ee5ab555f2c9d4bda0404c369d3b7",
+  "label": "t3flare",
+  "title": "e2e main mwcmpg9a",
+  "runId": "run:thread:mcp%3Alaunch%3A9bbd74013a85b194626ce60296073877322ee5ab555f2c9d4bda0404c369d3b7:ordinal:1"
+ },
+ "events": [
+  {
+   "answer": {
+    "requestId": "runtime-request:piDurable:thread:mcp:launch:9bbd74013a85b194626ce60296073877322ee5ab555f2c9d4bda0404c369d3b7:approval:12",
+    "questionId": "12",
+    "read": "{\"requestId\":\"runtime-request:piDurable:thread:mcp:launch:9bbd74013a85b194626ce60296073877322ee5ab555f2c9d4bda0404c369d3b7:approval:12\",\"questions\":[{\"id\":\"12\",\"header\":\"Question\",\"question\":\"Proceed with N-mwcmpg9a?\",\"options\":[{\"label\":\"yes\",\"description\":\"yes\",\"value\":\"yes\"},{\"label\":\"no\",\"descri",
+    "responded": {
+     "isError": false,
+     "text": "{\"sequence\":1823}"
+    }
+   }
+  },
+  {
+   "approved": "command"
+  }
+ ],
+ "laptopTask": {
+  "status": "completed",
+  "result": "N-mwcmpg9a-7",
+  "remoteChild": {
+   "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+   "threadId": "mcp:launch:9bbd74013a85b194626ce60296073877322ee5ab555f2c9d4bda0404c369d3b7",
+   "label": "t3flare",
+   "title": "e2e main mwcmpg9a",
+   "runId": "run:thread:mcp%3Alaunch%3A9bbd74013a85b194626ce60296073877322ee5ab555f2c9d4bda0404c369d3b7:ordinal:1"
+  },
+  "runs": [
+   "completed",
+   "completed"
+  ],
+  "lastReply": "N-mwcmpg9a-7"
+ },
+ "cloudThread": {
+  "threadId": "mcp:launch:9bbd74013a85b194626ce60296073877322ee5ab555f2c9d4bda0404c369d3b7",
+  "runs": [
+   {
+    "status": "completed",
+    "continuation": false
+   }
+  ],
+  "linkOrigin": {
+   "sessionId": "f76e169c-d692-4be7-ad8a-af1f883f0404",
+   "label": "T3 Code · Ian's MacBook",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "ebb5ae58-9302-42bf-8978-2581bed4078b",
+   "threadId": "6e50da95-07c3-41bb-bb89-6d2c9fce0600",
+   "title": "e2e main mwcmpg9a"
+  },
+  "runtimeMode": "auto-accept-edits",
+  "commands": [
+   {
+    "input": "Preparing workspace",
+    "status": "completed",
+    "exitCode": 0
+   },
+   {
+    "input": "echo N-mwcmpg9a-$(wc -l < README.md | tr -d ' ')",
+    "status": "completed",
+    "exitCode": 0
+   }
+  ]
+ },
+ "laptopLog": "/var/folders/7s/w381rjns5_7blt6vhvqs6nk80000gn/T/t3flare-laptop-8cnlMb/serve.log",
+ "failures": [],
+ "ok": true
+}

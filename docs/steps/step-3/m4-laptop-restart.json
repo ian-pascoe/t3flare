@@ -1,0 +1,86 @@
+{
+ "at": "2026-11-11T21:22:33.048Z",
+ "variant": "laptop-restart",
+ "version": "0.1.9-nightly.20261111.4515",
+ "nonce": "N-mwcmjle2",
+ "laptop": {
+  "environmentId": "7be09d2f-4285-49fe-8088-a720158c48c9",
+  "serverVersion": "0.1.9-nightly.20261111.4515"
+ },
+ "remoteChild": {
+  "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+  "threadId": "mcp:launch:11aae0c70c35518f5fc8d6ea39ed6aeed91db1e3285416617cf8893d6ba54acb",
+  "label": "t3flare",
+  "title": "e2e laptop-restart mwcmjle2",
+  "runId": "run:thread:mcp%3Alaunch%3A11aae0c70c35518f5fc8d6ea39ed6aeed91db1e3285416617cf8893d6ba54acb:ordinal:1"
+ },
+ "events": [
+  "laptop stopped",
+  "laptop started again",
+  {
+   "answer": {
+    "requestId": "runtime-request:piDurable:thread:mcp:launch:11aae0c70c35518f5fc8d6ea39ed6aeed91db1e3285416617cf8893d6ba54acb:approval:12",
+    "questionId": "12",
+    "read": "{\"requestId\":\"runtime-request:piDurable:thread:mcp:launch:11aae0c70c35518f5fc8d6ea39ed6aeed91db1e3285416617cf8893d6ba54acb:approval:12\",\"questions\":[{\"id\":\"12\",\"header\":\"Question\",\"question\":\"Proceed with N-mwcmjle2?\",\"options\":[{\"label\":\"yes\",\"description\":\"yes\",\"value\":\"yes\"},{\"label\":\"no\",\"descri",
+    "responded": {
+     "isError": false,
+     "text": "{\"sequence\":1528}"
+    }
+   }
+  },
+  {
+   "approved": "command"
+  }
+ ],
+ "laptopTask": {
+  "status": "completed",
+  "result": "N-mwcmjle2-7",
+  "remoteChild": {
+   "environmentId": "82a08bc6-0c65-4566-9086-19271e502073",
+   "threadId": "mcp:launch:11aae0c70c35518f5fc8d6ea39ed6aeed91db1e3285416617cf8893d6ba54acb",
+   "label": "t3flare",
+   "title": "e2e laptop-restart mwcmjle2",
+   "runId": "run:thread:mcp%3Alaunch%3A11aae0c70c35518f5fc8d6ea39ed6aeed91db1e3285416617cf8893d6ba54acb:ordinal:1"
+  },
+  "runs": [
+   "completed",
+   "completed"
+  ],
+  "lastReply": "N-mwcmjle2-7"
+ },
+ "cloudThread": {
+  "threadId": "mcp:launch:11aae0c70c35518f5fc8d6ea39ed6aeed91db1e3285416617cf8893d6ba54acb",
+  "runs": [
+   {
+    "status": "completed",
+    "continuation": false
+   }
+  ],
+  "linkOrigin": {
+   "sessionId": "8ccc3997-9e85-48f1-89e1-194d45133509",
+   "label": "T3 Code · Ian's MacBook",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "7be09d2f-4285-49fe-8088-a720158c48c9",
+   "threadId": "9e086397-f220-4e48-b575-09d64b3d4913",
+   "title": "e2e laptop-restart mwcmjle2"
+  },
+  "runtimeMode": "auto-accept-edits",
+  "commands": [
+   {
+    "input": "Preparing workspace",
+    "status": "completed",
+    "exitCode": 0
+   },
+   {
+    "input": "echo N-mwcmjle2-$(wc -l < README.md | tr -d ' ')",
+    "status": "completed",
+    "exitCode": 0
+   }
+  ]
+ },
+ "laptopLog": "/var/folders/7s/w381rjns5_7blt6vhvqs6nk80000gn/T/t3flare-laptop-2KcmRX/serve.log",
+ "failures": [],
+ "ok": true
+}
