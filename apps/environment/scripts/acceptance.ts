@@ -12,6 +12,7 @@
 //    thread window (bounded snapshot over HTTP and subscribeThread), the shell snapshot, and search.
 // 5. t3's SQL client on DO SQLite (transaction rollback, >100 parameters), the SQL adapter's record (no
 //    statement refused except t3's PRAGMAs), and the twice-in-one-isolate boot check.
+// 6. With `--real-turn [--push]` (step 2a): a Durable agent turn on a fresh clone of the fixture (`lib/realTurn.ts`).
 import { WsRpcGroup, WS_METHODS, ORCHESTRATION_V2_WS_METHODS } from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -252,6 +253,14 @@ check("no statement refused by DO SQLite (t3's PRAGMAs aside)", refused.length =
 const reboot = await admin("POST", "/_t3flare/check/reboot");
 report.rebootCheck = reboot.json;
 check("t3 boots twice in one isolate", reboot.json?.bothBootsServed === true && reboot.json?.sameEnvironmentId === true, reboot.json);
+
+// 6. A real turn (step 2a): clone the fixture, edit and `bash test.sh` with approvals, the checkpoint; `--push` adds a PR.
+if (process.argv.includes("--real-turn")) {
+  const { realTurn } = await import("./lib/realTurn.ts");
+  const real = await realTurn(cookie, { push: process.argv.includes("--push") });
+  report.realTurn = real;
+  for (const failure of real.failures) failures.push(`real turn: ${failure}`);
+}
 
 // Disarm, and the bootstrap token is refused again.
 await admin("POST", "/_t3flare/disarm-bootstrap");

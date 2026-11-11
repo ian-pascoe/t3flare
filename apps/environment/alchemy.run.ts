@@ -52,6 +52,8 @@ export default Alchemy.Stack(
     const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
     const idleAfterMs = yield* Config.String("T3FLARE_IDLE_AFTER_MS").pipe(Config.withDefault(""));
+    // The turn deadline (2 h) shortened on a stage for its check (step 2a M5): unset in normal deploys.
+    const turnDeadlineMs = yield* Config.String("T3FLARE_TURN_DEADLINE_MS").pipe(Config.withDefault(""));
 
     const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {
       name: `${name}-admin`,
@@ -92,6 +94,7 @@ export default Alchemy.Stack(
         LOADER: Cloudflare.WorkerLoader(),
         MODEL_PROXY_URL: modelProxyUrl,
         MODEL_PROXY_API_KEY: modelProxyKey,
+        ...(turnDeadlineMs === "" ? {} : { T3FLARE_TURN_DEADLINE_MS: turnDeadlineMs }),
       },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     } as never);

@@ -9,7 +9,8 @@
 //  4. `git apply --check` every Patch against the new tree.
 //  5. Typecheck, lint and test (`bun run check` minus the patch step already done).
 //  6. Build the Worker and the web client, deploy the `bump` stage, and run the acceptance test against it
-//     (scripts/acceptance.ts: pairing, a /ws client, turn-item fixtures and t3's heavy queries).
+//     (scripts/acceptance.ts: pairing, a /ws client, turn-item fixtures and t3's heavy queries, and since step 2a
+//     `--real-turn`: a Durable agent turn on a fresh clone of the fixture, both Workers and the Container image).
 //  7. Report. On any failure the submodule, package.json, bunfig.toml and bun.lock go back to the last good pin,
 //     so the pin is unchanged; on success they stay (and are committed with --commit).
 import { spawnSync } from "node:child_process";
@@ -151,7 +152,7 @@ const ok =
   step("acceptance test against the bump stage", () => {
     const out = path.join(environment, "dist/bump-acceptance.json");
     fs.rmSync(out, { force: true });
-    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "acceptance", "--threads", "12", "--runs", "4", "--out", out], environment, { quiet: true });
+    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--out", out], environment, { quiet: true });
     return { ok: result.ok, detail: fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output };
   });
 

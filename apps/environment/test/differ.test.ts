@@ -176,4 +176,13 @@ describe("differ", () => {
     expect(bash).toMatchObject({ input: "cd /w/fixture && bash test.sh", output: "all checks passed\n", exitCode: 0 });
     expect(events.filter((event) => event.type === "turn.terminal").length).toBe(1);
   });
+
+  it("a turn the Session aborted at the 2 h cap ends failed, with the deadline's reason", () => {
+    const turnId = Object.keys(state.turns)[0]!;
+    const differ = withTurns();
+    const events = diff(differ, { ...state, entries: [], turns: { [turnId]: { ...state.turns[turnId]!, status: "aborted", reason: "turn_deadline" } } }, now);
+    const terminal = events.find((event) => event.type === "turn.terminal") as { status: string; failure: { code: string } | null } | undefined;
+    expect(terminal?.status).toBe("failed");
+    expect(terminal?.failure?.code).toBe("turn_deadline");
+  });
 });

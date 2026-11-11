@@ -1,0 +1,192 @@
+{
+  "url": "https://t3flare-environment-step2a.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-10T23:52:42.024Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.9-nightly.20261110.4478",
+      "commit": "fbf47b9c4757",
+      "builtAt": "2026-11-10T23:41:18.242Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-11T00:02:42.946Z",
+    "paired": 200,
+    "ms": 1270,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "918c323a-0985-46d7-84c1-7240766f0212",
+    "threads": 4,
+    "ms": 2058
+  },
+  "fixtures": {
+    "threads": 4,
+    "runs": 8,
+    "messages": 16,
+    "turnItems": 40,
+    "events": 80,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 671,
+    "bytes": 71219,
+    "listedFixtureThreads": 4
+  },
+  "threadWindow": {
+    "threads": 4,
+    "allOk": true,
+    "minItems": 10,
+    "maxMs": 147,
+    "maxBytes": 23854
+  },
+  "subscribeThread": {
+    "ms": 69,
+    "bytes": 23795,
+    "items": 10
+  },
+  "search": {
+    "ms": 42,
+    "matches": 4,
+    "threads": 4
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 883
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 2,
+    "maxParameters": 300,
+    "compoundsRewritten": 509,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 622,
+    "materializeFailures": 0,
+    "refusedStatements": 0,
+    "pragmaRefusals": 20
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 187,
+      "modules": 105
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 34,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:dded73da-47eb-4d5e-b0ec-50f03e165cb0"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": []
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwbci075",
+      "ms": 4768,
+      "cwd": "/w/acceptance-mwbci075",
+      "error": null
+    },
+    "turn": {
+      "threadId": "298e6ac3-eb08-4daf-8df9-f9fcec8c00b9",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwbci075/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwbci075 && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 19929
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "push": {
+      "events": [
+        "action_started",
+        "phase_started",
+        "phase_started",
+        "hook_output",
+        "hook_output",
+        "phase_started",
+        "phase_started",
+        "phase_started",
+        "phase_started",
+        "action_finished"
+      ],
+      "branch": "feature/fixture-greeting-acceptance",
+      "pr": {
+        "status": "created",
+        "url": "https://github.com/ian-pascoe/t3flare-fixture/pull/2",
+        "number": 2,
+        "baseBranch": "main",
+        "headBranch": "feature/fixture-greeting-acceptance",
+        "title": "Add acceptance test greeting line to fixture"
+      },
+      "failed": null
+    },
+    "cleanup": {
+      "closed": true,
+      "output": "✓ Closed pull request ian-pascoe/t3flare-fixture#2 (Add acceptance test greeting line to fixture)\n! Skipped deleting the local branch since current directory is not a git repository\n✓ Deleted branch feature/fixture-greeting-acceptance"
+    },
+    "ms": 47745
+  },
+  "totalMs": 55945,
+  "failures": [],
+  "ok": true
+}

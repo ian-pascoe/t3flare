@@ -1,9 +1,10 @@
-// @effect-diagnostics globalJsonInEffect:off globalDateInEffect:off globalDate:off globalConsole:off globalFetch:off cryptoRandomUUID:off globalTimers:off
+// @effect-diagnostics globalJsonInEffect:off globalDateInEffect:off globalDate:off globalConsole:off globalFetch:off cryptoRandomUUID:off globalTimers:off anyUnknownInErrorContext:off
 // A headless stock-protocol t3 client for the stage scripts (step 2a): pairs with the armed bootstrap token, sends
 // commands over /ws (t3's own WsRpcGroup), and reads threads through the bounded HTTP snapshot.
 import { ORCHESTRATION_V2_WS_METHODS, WS_METHODS, WsRpcGroup } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Stream from "effect/Stream";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 import * as Socket from "effect/socket/Socket";
 
@@ -70,6 +71,24 @@ export const dispatch = (cookie: string, command: Record<string, unknown>) =>
       return yield* client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand](command as never);
     }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
   );
+
+/** One WS method's answer (any of t3's `WS_METHODS`), on a socket opened for the call. */
+export const wsCall = (cookie: string, method: string, payload: unknown): Promise<unknown> =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Effect.Effect<unknown, unknown>>;
+      return yield* client[method]!(payload);
+    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+  );
+
+/** Every event of a streaming WS method, until it ends. */
+export const wsStream = (cookie: string, method: string, payload: unknown): Promise<ReadonlyArray<unknown>> =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Stream.Stream<unknown, unknown>>;
+      return yield* Stream.runCollect(client[method]!(payload));
+    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped),
+  ).then((chunk) => [...chunk]);
 
 export const updateSettings = (cookie: string, patch: Record<string, unknown>) =>
   Effect.runPromise(

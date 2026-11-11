@@ -512,7 +512,10 @@ export const diff = (
     if (entry.turn !== null && entry.usage !== undefined) usageByTurn.set(entry.turn, entry.usage);
   }
 
-  for (const [providerTurnId, turnState] of Object.entries(pushed.turns)) {
+  for (const [providerTurnId, pushedTurn] of Object.entries(pushed.turns)) {
+    // The 2 h cap aborts the run in the Session; t3 shows it as a failed turn, not a Stop (step 2a plan, section 3).
+    const turnState: TurnState =
+      pushedTurn.status === "aborted" && pushedTurn.reason === "turn_deadline" ? { ...pushedTurn, status: "failed" } : pushedTurn;
     const turn = state.turns.get(providerTurnId);
     if (turn === undefined || state.terminated.has(providerTurnId)) continue;
     const usage = usageByTurn.get(providerTurnId);

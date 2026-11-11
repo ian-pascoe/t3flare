@@ -5,6 +5,11 @@
 //   bun scripts/stage.ts run step2a turns restart [--no-continue]
 //                                                    an Environment restart mid-turn continues (or, with continuation
 //                                                    off, the Session's turn is aborted as an orphan)
+//   bun scripts/stage.ts run step2a turns restart --tools [--approval]
+//                                                    (M5) the same with a turn that runs tools in the fixture Workspace
+//                                                    (restart while its `bash` runs); with --approval, while an approval
+//                                                    waits: no continuation, the turn aborted, the request withdrawn
+//   bun scripts/stage.ts run step2a turns deadline   (M5, stage deployed with T3FLARE_TURN_DEADLINE_MS) the turn cap
 //   bun scripts/stage.ts run step2a turns lost       a Session that loses its turn: the inverse guard ends it
 //   … [--model anthropic/claude-haiku-5-5] [--out file.json]
 import * as fs from "node:fs";
@@ -12,6 +17,8 @@ import * as fs from "node:fs";
 import {
   admin,
   createProjectAndThread,
+  dispatch,
+  uuid,
   DEFAULT_MODEL,
   itemsOf,
   pair,
@@ -98,16 +105,55 @@ if (scenario === "liveness") {
   finish();
 }
 
+/** A thread in the fixture Workspace's project (step 2a M3–M5). */
+const fixtureThread = async (title: string, runtimeMode: string) => {
+  const threadId = uuid();
+  await dispatch(cookie, {
+    type: "thread.create",
+    commandId: uuid(),
+    threadId,
+    projectId: process.env.T3FLARE_FIXTURE_PROJECT ?? "945fed9f-4b65-4c0d-89a1-cae2ef93839f",
+    title,
+    modelSelection: model,
+    runtimeMode,
+    interactionMode: "default",
+    branch: null,
+    worktreePath: null,
+    createdBy: "user",
+    creationSource: "web",
+  });
+  return threadId;
+};
+
+const TOOLS_TURN =
+  "Use the bash tool to run `sleep 25 && echo slept`, then read src/add.sh with the read tool, then run `bash test.sh`, and finally tell me in one sentence what add.sh does.";
+
 if (scenario === "restart") {
   const noContinue = flag("no-continue");
+  const tools = flag("tools");
+  const approval = flag("approval");
   if (noContinue) {
     await updateSettings(cookie, { continueThreadsAfterServerUpdate: false });
   }
-  const { threadId } = await createProjectAndThread(cookie, { title: `restart ${stamp}`, workspaceRoot: `/t3/home/restart-${stamp}` });
-  await sendMessage(cookie, threadId, LONG, model);
-  const running = await waitFor(cookie, threadId, (p) => runsOf(p).some((r) => r.status === "running"), 60_000);
+  const threadId = tools
+    ? await fixtureThread(`restart tools ${stamp}`, approval ? "approval-required" : "full-access")
+    : (await createProjectAndThread(cookie, { title: `restart ${stamp}`, workspaceRoot: `/t3/home/restart-${stamp}` })).threadId;
+  await sendMessage(cookie, threadId, tools ? TOOLS_TURN : LONG, model);
+  // Text turns: restart while the answer streams. Tool turns: while `bash` runs, or while its approval waits.
+  const running = await waitFor(
+    cookie,
+    threadId,
+    (p) =>
+      runsOf(p).some((r) => r.status === "running") &&
+      (!tools ||
+        (approval
+          ? (p?.runtimeRequests ?? []).some((r: any) => r.status === "pending")
+          : itemsOf(p).some((i: any) => i.type === "command_execution" && i.status === "running"))),
+    180_000,
+  );
   const firstRun = runsOf(running.projection).find((r) => r.status === "running")!.id;
-  await sleep(3000);
+  const pendingRequest = (running.projection?.runtimeRequests ?? []).find((r: any) => r.status === "pending")?.id ?? null;
+  await sleep(tools ? 2000 : 3000);
   const before = (await health()).object?.constructedAt;
   await admin("POST", "/_t3flare/restart");
   const restartedAt = Date.now();
@@ -119,7 +165,7 @@ if (scenario === "restart") {
       const runs = runsOf(p);
       const first = runs.find((r) => r.id === firstRun);
       if (first === undefined || !SETTLED.has(first.status)) return false;
-      if (noContinue) return true;
+      if (noContinue || approval) return true;
       const continuation = runs.find((r: any) => r.restartContinuationOfRunId === firstRun);
       return continuation !== undefined && SETTLED.has(continuation.status);
     },
@@ -127,11 +173,31 @@ if (scenario === "restart") {
   );
   const runs = runsOf(recovered.projection) as Array<any>;
   const continuation = runs.find((r) => r.restartContinuationOfRunId === firstRun);
-  await sleep(5000);
-  const session = (await admin("GET", `/_t3flare/agents/session?thread=${threadId}`)).json;
+  // The Session learns the turn is gone from the answer to its next push (the orphans): at once while it streams, at
+  // its next liveness push (60 s) while it waits on a tool or an approval.
+  let session: any;
+  const sessionWaitStarted = Date.now();
+  do {
+    await sleep(5000);
+    session = (await admin("GET", `/_t3flare/agents/session?thread=${threadId}`)).json;
+  } while (
+    Object.values(session?.turns ?? {}).some((t: any) => t.status === "running" || t.status === "queued") &&
+    Date.now() - sessionWaitStarted < 150_000
+  );
+  const sessionSettledSeconds = Math.round((Date.now() - restartedAt) / 1000);
   const sessionTurns = Object.values(session?.turns ?? {}) as Array<any>;
+  const requestAfter = pendingRequest === null ? null : (recovered.projection?.runtimeRequests ?? []).find((r: any) => r.id === pendingRequest);
   report.restart = {
     noContinue,
+    tools,
+    approval,
+    threadId,
+    pendingRequest: pendingRequest === null ? null : { id: pendingRequest.slice(-24), after: requestAfter?.status ?? null, responseCapability: requestAfter?.responseCapability?.type ?? null },
+    sessionApprovals: (session?.approvals ?? []).length,
+    sessionSettledSeconds,
+    toolItems: itemsOf(recovered.projection)
+      .filter((i: any) => i.type === "command_execution" || i.type === "dynamic_tool" || i.type === "approval_request")
+      .map((i: any) => ({ type: i.type, status: i.status, run: String(i.runId).slice(-12), input: String(i.input ?? i.toolName ?? i.prompt ?? "").slice(0, 60) })),
     objectReset: (await health()).object?.constructedAt !== before,
     secondsToRecover: Math.round((Date.now() - restartedAt) / 1000),
     runs: runs.map((r) => ({ id: r.id.slice(-12), status: r.status, continuationOf: r.restartContinuationOfRunId?.slice(-12) ?? null })),
@@ -142,13 +208,41 @@ if (scenario === "restart") {
     liveSessionTurns: sessionTurns.filter((t) => t.status === "running" || t.status === "queued").length,
   };
   check("the first run ended", SETTLED.has(runs.find((r) => r.id === firstRun)?.status ?? ""), report.restart);
-  if (noContinue) check("no continuation", continuation === undefined, report.restart);
+  if (noContinue || approval) check("no continuation", continuation === undefined, report.restart);
   else check("a continuation run completed", continuation?.status === "completed", report.restart);
+  if (approval) {
+    check("the approval is no longer pending in t3", requestAfter !== undefined && requestAfter.status !== "pending", report.restart);
+    check("the Session withdrew the approval", (session?.approvals ?? []).length === 0, report.restart);
+  }
   check("the Session's first turn was aborted (no turn left live)", (report.restart as any).liveSessionTurns === 0, report.restart);
   check("the Session's first turn ended aborted", sessionTurns.some((t) => t.status === "aborted"), report.restart);
   if (noContinue) {
     await updateSettings(cookie, { continueThreadsAfterServerUpdate: true });
   }
+  finish();
+}
+
+if (scenario === "deadline") {
+  // Deploy the stage with T3FLARE_TURN_DEADLINE_MS=120000 first (the 2 h cap, shortened).
+  const threadId = await fixtureThread(`deadline ${stamp}`, "full-access");
+  await sendMessage(cookie, threadId, "Run `sleep 900 && echo done` with the bash tool and tell me when it finishes.", model);
+  const running = await waitFor(cookie, threadId, (p) => runsOf(p).some((r) => r.status === "running"), 120_000);
+  const runId = runsOf(running.projection).find((r) => r.status === "running")!.id;
+  const startedAt = Date.now();
+  const ended = await waitFor(cookie, threadId, (p) => SETTLED.has(runsOf(p).find((r) => r.id === runId)?.status ?? ""), 8 * 60_000);
+  const run = runsOf(ended.projection).find((r) => r.id === runId);
+  const error = itemsOf(ended.projection).find((i: any) => i.type === "error" && i.runId === runId);
+  const session = (await admin("GET", `/_t3flare/agents/session?thread=${threadId}`)).json;
+  report.deadline = {
+    threadId,
+    secondsFromRunning: Math.round((Date.now() - startedAt) / 1000),
+    status: run?.status,
+    error: error?.failure ?? null,
+    sessionTurns: Object.values(session?.turns ?? {}).map((t: any) => ({ status: t.status, reason: t.reason ?? null })),
+    bash: itemsOf(ended.projection).filter((i: any) => i.type === "command_execution").map((i: any) => ({ status: i.status, input: i.input })),
+  };
+  check("the run failed at the deadline", run?.status === "failed" && (error?.failure?.code === "turn_deadline"), report.deadline);
+  check("the Session's turn was aborted for the deadline", (report.deadline as any).sessionTurns.some((t: any) => t.reason === "turn_deadline"), report.deadline);
   finish();
 }
 
