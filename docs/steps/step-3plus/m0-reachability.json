@@ -1,0 +1,25 @@
+{
+ "status": 200,
+ "json": {
+  "relay": {
+   "url": "https://relay.t3.codes/health",
+   "status": 200,
+   "ms": 107,
+   "body": "{\"ok\":true,\"service\":\"relay\"}"
+  },
+  "deviceAuthorization": {
+   "endpoint": "https://clerk.t3.codes/oauth/device_authorization",
+   "status": 200,
+   "ms": 64,
+   "fields": [
+    "device_code",
+    "expires_in",
+    "interval",
+    "user_code",
+    "verification_uri",
+    "verification_uri_complete"
+   ],
+   "error": null
+  }
+ }
+}
