@@ -33,6 +33,7 @@
 //   POST /_t3flare/agents/workspace-workflows?id=<id>&on=1|0  the owner's opt-in to `workflows: write` on the Workspace's Container tokens
 //   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec"|"credentialHelper"|"killExecs": input} on the Workspace DO
 //   GET  /_t3flare/agents/checkpoint-trace?clear=1 the checkpoint operations the Workspace DOs answered, and by which side
+//   POST /_t3flare/check/connect-leak            step 3+: T3 Connect's secrets (names only) found in {"text"} (Workers Logs)
 //   POST /_t3flare/check/peer-leak               step 3: secrets (names only) in a Workspace's Container and Sessions' state
 //   GET  /_t3flare/agents/session-tools?thread=<id>  step 3: the T3 tools a Session offers and those left out
 //   POST /_t3flare/check/terminal-leak           step 2b: a terminal's `env` output compared with this Worker's binding values (names only)
@@ -331,6 +332,14 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                       ? await rpc.killExecs(body.killExecs as never)
                       : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
+      }
+      case "POST /_t3flare/check/connect-leak": {
+        // Step 3+: which T3 Connect secrets (names only) appear in text the caller collected, such as Workers Logs.
+        const { connectSecrets, leakedIn } = await import("./peerLeak.ts");
+        const body = (await request.json()) as { text?: string };
+        const runtime = await environment.boot("check-connect-leak", request);
+        const secrets = await runtime.run(connectSecrets);
+        return json({ checked: secrets.map(({ name }) => name), bytes: (body.text ?? "").length, leaked: leakedIn(body.text ?? "", secrets) });
       }
       case "POST /_t3flare/check/peer-leak": {
         // Step 3 (plan section 4.6, review C8): after turns that called t3's tools and answered linked work, look for

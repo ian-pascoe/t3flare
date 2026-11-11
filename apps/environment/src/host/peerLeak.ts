@@ -3,6 +3,8 @@
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import type { ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as ServerSecretStore from "t3/src/auth/ServerSecretStore.ts";
 
 import { byName } from "../agents/rpc.ts";
 import { workspaceRpc } from "../agents/workspaceClient.ts";
@@ -23,7 +25,44 @@ interface Secret {
   readonly value: string;
 }
 
-const leakedIn = (text: string, secrets: ReadonlyArray<Secret>): Array<string> =>
+/**
+ * Step 3+: the T3 Connect secrets t3 keeps in its secret store: the publish credential, and the account token's access
+ * and refresh tokens while held (stages; prod discards it after the link).
+ */
+const CONNECT_SECRETS = ["cloud-relay-environment-credential", "cloud-cli-oauth-token"];
+
+/** The account token's stored JSON, as its two secrets. */
+const tokenParts = (text: string): Array<Secret> => {
+  try {
+    const token = JSON.parse(text) as { accessToken?: string; refreshToken?: string };
+    return [
+      ...(token.accessToken ? [{ name: "access", value: token.accessToken }] : []),
+      ...(token.refreshToken ? [{ name: "refresh", value: token.refreshToken }] : []),
+    ];
+  } catch {
+    return [];
+  }
+};
+
+export const connectSecrets = Effect.gen(function* () {
+  const store = yield* ServerSecretStore.ServerSecretStore;
+  const found: Array<Secret> = [];
+  for (const name of CONNECT_SECRETS) {
+    const value = yield* store.get(name).pipe(Effect.orElseSucceed(() => Option.none<Uint8Array>()));
+    if (Option.isNone(value)) continue;
+    const text = new TextDecoder().decode(value.value);
+    if (name !== "cloud-cli-oauth-token") {
+      found.push({ name, value: text });
+      continue;
+    }
+    const token = tokenParts(text);
+    if (token.length === 0) found.push({ name, value: text });
+    for (const part of token) found.push({ name: `${name}:${part.name}`, value: part.value });
+  }
+  return found;
+});
+
+export const leakedIn = (text: string, secrets: ReadonlyArray<Secret>): Array<string> =>
   secrets.filter(({ value }) => text.includes(value) || value.split("\n").some((line) => line.length >= 16 && text.includes(line))).map(({ name }) => name);
 
 export const peerLeakCheck = async (
@@ -35,6 +74,7 @@ export const peerLeakCheck = async (
   for (const [name, value] of Object.entries(env)) if (typeof value === "string" && value.length >= 8) secrets.push({ name, value });
   environment.github.live().forEach((value, at) => secrets.push({ name: `github-token-${at}`, value }));
   const runtime = await environment.boot("check-peer-leak");
+  secrets.push(...(await runtime.run(connectSecrets)));
   const credentials: Array<string> = [];
   for (const threadId of input.threads) {
     const config = await runtime.run(Effect.flatMap(McpProviderSessions.McpProviderSessions, (sessions) => sessions.read(threadId as ThreadId)));

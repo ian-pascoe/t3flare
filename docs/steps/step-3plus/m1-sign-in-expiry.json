@@ -1,0 +1,25 @@
+{
+ "what": "connect sign-in started on step3plus and left to expire (no one approved); the hold is released and the Environment then reset when idle",
+ "codeValidMinutes": 10,
+ "flow": {
+  "state": "failed",
+  "at": "2026-11-11T23:08:55.823Z",
+  "error": "CloudCliAuthorizationTimeoutError: Timed out waiting for T3 Connect authorization."
+ },
+ "link": {
+  "linked": false
+ },
+ "secretsHeld": {
+  "environmentCredential": false,
+  "mintKey": false,
+  "tunnelConfig": false
+ },
+ "accountToken": {
+  "held": false
+ },
+ "healthAfter": {
+  "holds": {},
+  "idleSince": "2026-11-11T23:09:04.151Z",
+  "runtime": "stopped (idle reset)"
+ }
+}
