@@ -7,3 +7,4 @@ dist/
 .env.spike
 /bump-report.json
 .worktrees/
+docs/steps/step-4a/out/

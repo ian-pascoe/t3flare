@@ -1,0 +1,60 @@
+{
+  "step": "4a",
+  "milestone": "M0 (local Docker half)",
+  "date": "2026-11-12",
+  "how": "docs/steps/step-4a/probes: image t3flare-probe4a (node 24 bookworm, codex 0.167.2 aarch64 musl, pi 1.5.2 from npm); keyhost sidecar = computer.internal (key route, key only in its env) + CONNECT logger; protocol logs in docs/steps/step-4a/out/ (not committed)",
+  "P3": {
+    "verdict": "pass",
+    "bearer": "Commissary accepts the cms_ key as `Authorization: Bearer` on /v1/models and /v1/responses",
+    "toolTurns": {
+      "gpt-6-luna": "completed: fileChange + commandExecution",
+      "gpt-5.6-luna": "completed (shell tools)",
+      "claude-sonnet-5-5": "completed: fileChange + commandExecution",
+      "gemini-3-flash": "completed (shell tools)"
+    },
+    "decision": "Codex lists the whole catalog (every family drives tools through Commissary's Responses API)",
+    "required": [
+      "CODEX_HOME must not be under /tmp: Codex refuses to make its helper aliases (apply_patch) there",
+      "-c allow_login_shell=false: Debian/Ubuntu /etc/profile resets PATH in `bash -lc`, so the apply_patch alias is 'command not found' and models fall back to shell writes"
+    ]
+  },
+  "P4": {
+    "verdict": "pass",
+    "turns": { "claude-sonnet-5-5": "write + bash, done in 6.0 s", "gemini-3-flash": "write + bash, done in 5.3 s" },
+    "keyHelperRunsPerTurn": "one per model request (3 in a two-tool turn)",
+    "models": "a custom `models` list on the built-in anthropic provider is merged with pi's built-ins (20 available)",
+    "sessionDir": "PI_CODING_AGENT_SESSION_DIR wins over a hostile repo's .pi/settings.json sessionDir (the repo's directory was never created); sessions are flat files in that dir"
+  },
+  "P8_local": {
+    "verdict": "pass",
+    "codex": "turn 1, then a fresh CODEX_HOME and CODEX_SQLITE_HOME (only sessions/ linked to the synced dir) and the rollout's last line cut in half: thread/resume of the same id completed and recalled the word",
+    "pi": "turn 1, then a fresh agent dir and the session file's last line cut in half: switch_session succeeded and recalled the word",
+    "conclusion": "CODEX_SQLITE_HOME on Container-local disk is the default (F2); only sessions/ is synced"
+  },
+  "P10": {
+    "verdict": "pass with settings",
+    "network": "an --internal Docker network: the CLI's only way out is the CONNECT logger",
+    "codexDefaults": ["github.com", "chatgpt.com", "<proxy host>"],
+    "codexWithPluginsOff": ["<proxy host>"],
+    "codexSettings": "features.plugins, plugin_discovery_prefetch, remote_plugin, plugin_sharing = false (these alone remove github.com and chatgpt.com); apps, tool_suggest, analytics off as well; check_for_update_on_startup=false",
+    "piDefaults": ["<proxy host>", "pi.dev"],
+    "piWithProfile": ["<proxy host>"],
+    "piSettings": "PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0"
+  },
+  "P11_codex": {
+    "nonce": "F4 confirmed: with Codex's default shell policy a shell sees T3FLARE_MODEL_KEY_NONCE (count 1); with -c shell_environment_policy.exclude=[\"T3FLARE_MODEL_KEY_NONCE\"] it does not (0) and the shell's helper call reaches the route with no nonce",
+    "repoConfig": "a repo's .codex/config.toml with model_provider/model_providers is ignored: 'Ignored unsupported project-local config keys … model_provider, model_providers'",
+    "processLevelApproval": "F5 amended: Codex 0.167.2 refuses `-c approval_policy=\"untrusted\"` at process level ('no longer supported; remove this setting'); the per-turn approvalPolicy \"untrusted\" still works. The process default is approval_policy=\"on-request\" with sandbox_mode=\"read-only\"; every turn/start carries the guard's own policy"
+  },
+  "P2_local": {
+    "bwrap": "fails in Docker Desktop (no unprivileged user namespaces); the stage probe decides for Cloudflare",
+    "matrix_without_sandbox": {
+      "untrusted+readOnly": "asked: fileChange, command (both ran after approval)",
+      "on-request+workspaceWrite": "asked: fileChange, then the command failed in the broken sandbox and asked to escalate",
+      "untrusted+dangerFullAccess": "asked: the command (the model wrote with the shell)",
+      "never+dangerFullAccess": "nothing asked"
+    },
+    "conclusion": "without a sandbox, untrusted asks before every write and every command: the fail-closed column of §5.1 holds"
+  },
+  "P11_pi_mode": "answered by code (F9): pi's adapter reports supportsRuntimeModeSwitchInSession=false and Orchestrator.ts:4626-4632 detaches such sessions on thread.runtime-mode.set, so the next turn spawns pi with the new mode"
+}
