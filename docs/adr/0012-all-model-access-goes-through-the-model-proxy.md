@@ -43,3 +43,15 @@ Some stock t3 features keep a credential the owner types into t3's settings: clo
 - Agents are not offered `request_secret` (ADR-0022).
 
 Text generation itself runs on the proxy through the Durable agent provider. A secret provider such as 1Password may come later through the broker pattern: the Environment DO fetches a secret per use and never stores it (ADR-0018's shape). That would take its own decision.
+
+## Refinement (SPI-1061): a Route's Access service token is typed in (owner decision E2, 2026-11-12)
+
+D5 above refuses credentials typed into t3flare. The owner has granted a second exception, beside the one for owner-added MCP servers' credentials (the tools step's, owner decision (b), recorded with that step): the Access service token of a Route that runs over the owner's own Cloudflare Tunnel ([ADR-0029](0029-the-outbound-link-is-the-owners-to-make-capped-at-supervised-and-every-send-over-it-waits-for-the-owner.md), rule 8).
+
+- The owner makes the tunnel, the Access application and the token in his own Cloudflare account, and enters the token's id and secret once in the harness panel.
+- It is stored write-only in the Environment's secret store, and never enters a Session, a Workspace, a Container or a log. Only the owner sets it, and nothing reads it back.
+- It is not a model or vendor credential: it opens only the owner's own Access application in front of his laptop, and is sent only to that Route's address.
+
+Rejected: prod's alchemy stack making the tunnel, the Access application and the token, with the token as a deploy secret. No credential would be typed, but prod's CI token would gain tunnel and DNS permissions and every deploy would touch the laptop's front door.
+
+D5 otherwise stands: cloud voice, custom text generators and `request_secret` stay refused.

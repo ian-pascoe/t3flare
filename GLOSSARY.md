@@ -24,6 +24,40 @@ _Avoid_: orchestrator DO, server DO
 A sign-in from one Environment to another's MCP endpoint, letting its agents delegate work there.
 _Avoid_: link, bridge, connection
 
+**Inbound link**:
+A Peer link another Environment made to the Cloud Environment; what it starts here is Linked work.
+_Avoid_: laptop link, incoming connection
+
+**Outbound link**:
+A Peer link the Cloud Environment made to a Registered machine, today the Laptop Environment. Only the owner makes
+one, and only the owner's threads use it.
+_Avoid_: reverse link, cloud-to-laptop link, laptop tunnel
+
+**Registered machine**:
+An Environment the owner has allowed the Cloud Environment to link out to, named by its environment id, with its
+Routes and the highest access a link to it may have.
+_Avoid_: Owner machine, target, peer
+
+**Route**:
+One way the Cloud Environment reaches a Registered machine: an https address and the kind of tunnel behind it (T3
+Connect, the owner's own Cloudflare Tunnel, or Tailscale Funnel). Used in t3's sense.
+_Avoid_: transport, endpoint, tunnel (for the address)
+
+**Outbound work**:
+Threads the Cloud Environment started in another Environment over an Outbound link; that Environment sees them as
+its Linked work.
+_Avoid_: laptop threads, remote threads
+
+**Outbound send**:
+A message a cloud agent sends to another Environment over an Outbound link: launching a thread, delegating a task,
+messaging a thread or answering its question. Each one waits for the owner's answer on a card of its own.
+_Avoid_: forwarded call, remote prompt
+
+**Send permit**:
+The owner's approval of one Outbound send, kept by the Environment and matched when that send leaves; it covers
+that thread, that tool and those arguments, once.
+_Avoid_: grant (that is t3's bootstrap grant), token, Expectation (that is a push's)
+
 **Linked work**:
 Threads a Peer link started in the Environment it signed in to, and the work derived from them; each carries the link's
 `linkOrigin` (its client session, label and access).
@@ -43,13 +77,13 @@ _Avoid_: remote subagent, cloud task
 
 **T3 Connect**:
 The hosted relay at `t3.codes` that T3's mobile apps register with; it pushes an Environment's published thread
-phases to the owner's phone (ADR-0025).
+phases to the owner's phone (ADR-0025), and gives an Environment that asks for one a public address.
 _Avoid_: the cloud, the relay service, push service
 
 **Publish-only link**:
 The Cloud Environment's link to T3 Connect: a `manual` link scoped to agent-activity notifications, made once from
 an admin route, with which the Environment publishes and T3 Connect can never call back.
-_Avoid_: Connect link, tunnel link, Peer link (that is laptop-to-cloud)
+_Avoid_: Connect link, tunnel link, Peer link (that is between two Environments)
 
 ## Work
 
