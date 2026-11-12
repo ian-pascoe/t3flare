@@ -1,0 +1,73 @@
+{
+ "at": "2026-11-12T16:24:43.392Z",
+ "cases": [
+  {
+   "name": "P13: only the callback and the client document are public on the admin host",
+   "clientDocument": {
+    "status": 200,
+    "clientId": "https://t3flare-admin-tools.ian-g-pascoe.workers.dev/_t3flare/harness/oauth/client.json",
+    "redirectUris": [
+     "https://t3flare-admin-tools.ian-g-pascoe.workers.dev/_t3flare/harness/oauth/callback"
+    ]
+   },
+   "callback": 400,
+   "panel": 302,
+   "api": 302,
+   "ok": true
+  },
+  {
+   "name": "a sign-in started in the panel completes through the public callback; the same callback again is refused (single-use state)",
+   "added": 200,
+   "testBefore": "failed",
+   "begun": 200,
+   "authorizationHost": "[redacted]",
+   "pkce": true,
+   "callbackHost": "t3flare-admin-tools.ian-g-pascoe.workers.dev",
+   "landed": 200,
+   "landedText": "Signed inSigned in to fixoauth. You can close this tab.",
+   "replay": 400,
+   "ok": true
+  },
+  {
+   "name": "an answer whose iss is not the authorization server's is refused",
+   "status": 400,
+   "ok": true
+  },
+  {
+   "name": "with the token the server lists its tools; the panel shows signed in (never the token)",
+   "test": {
+    "server": "fixoauth",
+    "status": "ok",
+    "error": null,
+    "tools": 6,
+    "refused": 0,
+    "ms": 40
+   },
+   "oauth": {
+    "signedIn": true,
+    "expiresAt": 1794500692966,
+    "refreshable": true
+   },
+   "ok": true
+  },
+  {
+   "name": "a Durable call with the token, and again after it aged: refreshed once, the call succeeds",
+   "first": "Script completed\nWall time 0.3 seconds\nOutput:\noauth-ok",
+   "second": "Script completed\nWall time 0.4 seconds\nOutput:\nafter-refresh",
+   "grants": {
+    "before": {
+     "unauthorized": 1
+    },
+    "after": {
+     "unauthorized": 1,
+     "register": 1,
+     "authorize": 2,
+     "code": 1,
+     "refresh": 1
+    }
+   },
+   "ok": true
+  }
+ ],
+ "ok": true
+}
