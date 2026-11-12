@@ -107,3 +107,17 @@ The owner switched notifications on in the T3 Code app (the relay then listed th
 **The owner confirmed both arrived: "Agent finished" and "Waiting for input".** No screenshots were taken; the
 evidence is the owner's confirmation and the relay's delivery records (`m3-deliveries.json`). Both deliveries were
 APNs `queued`, the relay's answer for a push it handed on.
+
+### M4: close
+
+- **Sign-out** on the stage: the relay's `DELETE /v1/client/environment-links/<id>` answered 200, then t3's local
+  unlink and the token's removal; afterwards no link, no desired mark, no publish credential, no mint key, no token.
+  `m4-sign-out.json`. (The relay's listing after sign-out could not be read: the token that reads it was gone by
+  design. The owner can confirm in the T3 apps that "t3flare" is no longer listed.)
+- **The bump check:** `test/connectPublicConfig.test.ts` runs in the bump's "typecheck, lint, test" step
+  (`apps/environment`), so a changed value in t3's `.env.example` fails the bump; the fake-relay link test runs there
+  too. The bump job never signs in. A changed value means prod's link was made against other values: sign in again.
+- **Workers Logs** over the M2 and M3 window (45 minutes, 1371 events, 149 publish lines): none of the publish
+  credential or the token's two parts (`m2-leak-logs.json`). The check compares the secrets held at its end; the
+  credential the row-j relink replaced was held during most of the window and was covered by the in-DO check.
+- **`step3plus` destroyed.**
