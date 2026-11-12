@@ -13,9 +13,68 @@ runs on a branch cut from `step-4a`'s head (§8). Paths: `t3/` is `t3code/apps/s
 Line numbers are from the pin and drift; the symbol beside each is the stable handle. "4a §x" and "4a Fn" refer to the
 4a plan and its changelog.
 
-## Changelog
+## Changelog: owner decisions and independent review (Fable), 2026-11-12
 
-None yet. Review findings and owner answers go here and override the body, as in 4a.
+These override the body where they conflict. Each finding was checked against the code at the pin (t3code 24e7747)
+and, for the CLIs, against the shipped packages (`@agentclientprotocol/claude-agent-acp` 0.106.0 `dist/`, the
+`claude` 2.1.322 binary's strings, `@opencode/cli` 2.2.7); the CLI-behaviour halves are proved by M0's probes, whose
+verdicts are recorded below as they land. The report (`docs/steps/step-4b.md`) carries the evidence.
+
+- **OD-1 confirmed (owner).** Ship over ACP; SPI-1037 tracks ACP flavor parity (fork, steering, usage classification).
+- **OD-2 accepted (owner).** Cold start up to 45 s; P7 measures, and only over 45 s goes back to the owner.
+- **OD-3** only if P1 fails: message the owner; the intent is a fix in Commissary.
+- **F1 (HIGH), verified. Plan capture.** `extractProposedPlanMarkdown` is called only from `bufferPostSettleWake`
+  (`acp/adapter.ts:4747`), which returns early unless post-settle continuation is on (`:4710`), so it never fires
+  in a turn; and approving `ExitPlanMode` with t3's `accept` picks `allow_once`, which is `claude-agent-acp`'s
+  `exit-plan-default` (`permissions/options/tools.js` `buildExitPlanModePermissionOptions`): mode `default`, and
+  Claude implements inside the plan turn. Replaces §3.2's `extractProposedPlanMarkdown` row and §5.4's Claude half:
+  the flavor captures the plan with `registerExtensions`' `captureProposedPlan` (`acp/adapter.ts:6798`, as Grok,
+  `provider-grok/src/server/adapter.ts:159-180`) when the `ExitPlanMode` permission request arrives in plan mode
+  (our runtime wrapper sees the request before t3's handler), and the plan-turn disposition **denies** it. A
+  `reject` interrupts Claude's turn; P4 records the terminal status t3 then shows.
+- **F2 (HIGH), verified. `auto-accept-edits` has no containment at the pin.** t3's `RuntimePolicy` carries no
+  `sandboxPolicy` (`t3/orchestration-v2/RuntimePolicy.ts:186-191`), so `acpOperationDisposition` takes `case
+  undefined` (`acp/clientPolicy.ts:173-182`) and allows every edit at `auto-accept-edits`, wherever it points; §5.1's
+  "edits inside the cwd allowed" was wrong. The agent is root and Claude Code reloads settings live, so an allowed
+  edit could rewrite `/etc/claude-code/managed-settings.json`. Both flavors' `permissionDisposition` contain edits
+  themselves, lexically, on `/w/<id>`: at `auto-accept-edits` an edit is allowed only when it names locations, every
+  one inside the cwd, none under `.git/`, `.claude/` or `.opencode/`; otherwise it asks. P6's realpath item is
+  dropped (the flavor never calls `realpathSync`).
+- **F3 (HIGH), verified in the binary; P4 proves it. A repo can redirect the key.** Project `env` applies without a
+  trust prompt in SDK mode, and pinning `ANTHROPIC_BASE_URL` alone leaves `HTTPS_PROXY` plus CA variables, the
+  Bedrock/Vertex switches (`CLAUDE_CODE_USE_BEDROCK`, `ANTHROPIC_BEDROCK_BASE_URL`, `CLAUDE_CODE_SKIP_BEDROCK_AUTH`,
+  …), `ANTHROPIC_CUSTOM_HEADERS` and `ANTHROPIC_AUTH_TOKEN`. The managed file adds `allowedProviders:
+  ["customEndpoint"]` (the 2.1.322 binary knows it: "under allowedProviders, X is honored only when the env block of
+  managed settings pins the same value") and pins the proxy, CA, provider-selection and auth variables to `""` in
+  managed `env`. P4's hostile repo plants each.
+- **F4 (MEDIUM), verified. Fail-closed modes.** `claude-agent-acp` starts in `auto` when no `defaultMode` is set
+  (`session-mode.js` `resolveInitialPermissionMode`) and applies managed policy best-effort (`managed-policy.js`).
+  Before the first prompt the flavor asserts the mode is `default` and that the advertised modes lack `auto` and
+  `bypassPermissions`, else it ends the session. The drift guard lives in the flavor (`onSessionConfigurationUpdate`,
+  `acp/adapter.ts:6326-6336`, and our runtime wrapper's view of `current_mode_update`), with `plan` allowed. The
+  replay test pins `accept` → `exit-plan-default` and the `acceptForSession` → `accept` downgrade
+  (`acp/adapter.ts:6625`) for a card that does not offer it.
+- **F5 (MEDIUM), keys verified in the binary. Repo surfaces.** Managed adds `strictKnownMarketplaces: []`,
+  `disableSkillShellExecution: true`, `strictPluginOnlyCustomization` for hooks, MCP and agents. The fixture plants an
+  agent with `permissionMode`, a skill with `allowed-tools`, and an inline `!` block.
+- **F6 (MEDIUM), P2/P4 prove it. OpenCode V2 config.** `permissions` is an ordered rule array (actions include `shell`
+  and `subagent`); the snapshot key is `snapshots`. Invalid statements are dropped with a warning, which fails open:
+  the generated file is validated against 2.2.7's schema in a test, and the spawn fails on any config warning on
+  stderr. `always` saves durable project rules (never offered). The key hook tries `ctx.provider.transform` headers
+  before the loopback relay. The fixture plants repo `formatter`/`lsp` commands and overrides of `build`, `plan`,
+  `general`.
+- **F7 (MEDIUM), verified. Kind reuse.** `/goal` goes verbatim to `claudeAgent` (`Orchestrator.ts:1202-1213`), and
+  idle compaction sends `/compact` to `claudeAgent` instances (`IdleCompactionService.ts:40-43`). Idle compaction is
+  locked off for these instances, each snapshot marks a default model (`isDefault`; OpenCode's client default is
+  `openai/gpt-5`, `contracts/src/model.ts:157`), and P4 probes `/goal` and `/compact`.
+- **F8 (MEDIUM). Resume proof** is `session/load` or `session/resume` succeeding in the protocol log with no handoff
+  transition (4a F9), not a code word. Replaces M4's code word.
+- **F9 (MEDIUM), verified.** The proxy's 429 maps to a usage limit in 4b through the flavor's `promptFailure`, as
+  Grok does (`provider-grok/src/server/adapter.ts:306-318`). P8 is spent on `session/fork` instead of the native SDK,
+  findings recorded on SPI-1037. Replaces §1.4's "no usage-limit classification" and R13.
+- **F10 (LOW).** D1 linked pushes depend on 4a's injected-request work; the refusal fallback stays. Leak checks
+  assert a subset of env names plus no canary. `/proc/<pid>/environ` is readable by root, so only the grant count
+  bounds the nonce (§4.7). P7 records free disk.
 
 ## Settled (not reopened here)
 
