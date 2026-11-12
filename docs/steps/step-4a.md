@@ -1,7 +1,7 @@
 # Step 4a: report (CLI agents over stdio: Codex and the pi CLI)
 
 Plan: [`step-4a-plan.md`](step-4a-plan.md) (its changelog carries the owner's confirmation and Fable's review, F1–F10).
-Evidence: [`step-4a/`](step-4a/) (one JSON file per proof, named below). Stage: `step4a` (destroyed at the end).
+Evidence: [`step-4a/`](step-4a/) (one JSON file per proof, named below). Stage: `step4a`, destroyed after the report (`stage.ts destroy step4a`: 6 resources deleted).
 Branch `step-4a`; nothing reached `main`.
 
 ## Result
