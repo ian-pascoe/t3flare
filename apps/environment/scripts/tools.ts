@@ -983,7 +983,7 @@ const callPrompt = (state: ExecutorState, line: string, tool = "mcp__executor__c
   ].join(" ");
 
 /** A linked thread: a peer link at full access launches it on a fresh fixture project, its cards answered by `decide`. */
-const linkedThread = async (label: string, modelSelection: unknown, message: string, decide: (index: number) => "accept" | "decline") => {
+const linkedThread = async (label: string, modelSelection: unknown, message: string, decide: (index: number) => "accept" | "acceptForSession" | "decline") => {
   await updateSettings(cookie, { linkedEnvironmentsEnabled: true });
   const project = await newThread(`${label}-owner`, "approval-required");
   const link = await signIn((await mintPairingCode(cookie, { label: `tools ${label}` })).code, "full-access", { clientName: `tools ${label}` });
@@ -999,9 +999,14 @@ const linkedThread = async (label: string, modelSelection: unknown, message: str
     projection = projectionOf(await threadWindow(cookie, threadId).catch(() => undefined)) ?? projection;
     for (const request of (projection?.runtimeRequests ?? []).filter((r: any) => r.status === "pending" && !seen.has(r.id))) {
       seen.add(request.id);
-      const decision = decide(cards.length);
+      let decision: string = decide(cards.length);
       const item = itemsOf(projection).find((candidate: any) => candidate.requestId === request.id);
-      await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision }).catch(() => undefined);
+      const answered = await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision }).then(() => true, () => false);
+      // A per-call card offers no "for the session": answered "accept" instead (recorded as such).
+      if (!answered && decision === "acceptForSession") {
+        decision = "accept";
+        await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision }).catch(() => undefined);
+      }
       cards.push({ id: String(request.id).replace(/[0-9a-f]{16,}/g, "…"), kind: request.kind, prompt: String(item?.prompt ?? "").slice(0, 600), options: item?.options ?? null, decision });
     }
     const runs = runsOf(projection);
@@ -1116,6 +1121,41 @@ const executorResume = async () => {
   writeEvidence("m6-executor.json", { server: EXECUTOR, route: "direct (panel; owner decision: not through Commissary)", marker: state.marker, cases: results, ok: results.every((c) => c.ok) });
 };
 
+// M4/M5 linked writes (D1's rule) on the direct fixture: a linked thread at full access, Durable and Codex. A read runs;
+// each write raises its own card; the first approved "for the session" still leaves the second asking; declined, no note.
+const linkedWrites = async () => {
+  await enableCli(cookie, "codex", "codex");
+  await mcpChange({ op: "server", server: "fixture", linkedOffered: true, exposure: "direct" });
+  const cases: Array<Case> = [];
+  const only = process.argv[3];
+  for (const [label, model, tool] of [["durable", MODEL, (name: string) => `mcp__fixture__${name}`], ["codex", CODEX_MODEL, (name: string) => `${name} tool of the "fixture" MCP server`]] as const) {
+    if (only !== undefined && only !== label) continue;
+    const marker = `lw-${label}-${Date.now().toString(36)}`;
+    const before = (await notes()).length;
+    const message = [
+      "This is my t3flare environment and my test MCP server; I'm testing per-call approvals from a linked thread.",
+      `1. Call the ${tool("fixture_echo")} with text "${marker}-echo".`,
+      `2. Call the ${tool("fixture_note")} with line "${marker}-1".`,
+      `3. Call the ${tool("fixture_note")} with line "${marker}-2".`,
+      "Then reply with what each call answered. Do not run any shell command.",
+    ].join("\n");
+    const run = await linkedThread(`lw-${label}`, model, message, (index) => (index === 0 ? "acceptForSession" : "decline"));
+    const added = (await notes()).slice(before);
+    await cleanup(run.workspace);
+    cases.push({
+      name: `${label}: a linked thread at full access: the read runs, each write raises its own card ("accept for the session" on the first covers that call only), the declined one writes nothing`,
+      cards: run.cards,
+      reply: replyText(run.projection).slice(-500),
+      runs: runsOf(run.projection).map((r: any) => ({ status: r.status, failure: r.failure ?? null })),
+      items: itemsOf(run.projection).filter((item: any) => item.type !== "assistant_message").map((item: any) => `${item.type}:${item.toolName ?? item.title ?? ""}:${item.status ?? ""}`).slice(0, 20),
+      notesAdded: added,
+      ok: run.cards.length >= 2 && run.cards.every((card: any) => !/trust this Workspace/i.test(JSON.stringify(card.options ?? ""))) && added.length === 1 && added[0]!.includes(`${marker}-1`),
+    });
+  }
+  await mcpChange({ op: "server", server: "fixture", linkedOffered: false, exposure: "deferred" });
+  writeEvidence("m5-linked-writes.json", { cases, ok: cases.every((c) => c.ok) });
+};
+
 const command = process.argv[2];
 cookie = await pair();
 switch (command) {
@@ -1162,6 +1202,9 @@ switch (command) {
     break;
   case "cli-mcp":
     await cliMcp((process.argv[3] ?? "codex") as RelayCli);
+    break;
+  case "linked-writes":
+    await linkedWrites();
     break;
   case "executor": {
     const phase = process.argv[3];

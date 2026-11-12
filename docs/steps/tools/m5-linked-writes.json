@@ -1,0 +1,117 @@
+{
+ "at": "2026-11-12T19:12:42.984Z",
+ "cases": [
+  {
+   "name": "durable: a linked thread at full access: the read runs, each write raises its own card (\"accept for the session\" on the first covers that call only), the declined one writes nothing",
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:mcp:launch:\u2026:approval:18",
+     "kind": "permission",
+     "prompt": "fixture: fixture_note\n{\n  \"line\": \"lw-durable-mwdxavpr-1\"\n}\n\nA write tool (class set in the harness panel). A linked thread's write: this answer covers this call only.",
+     "options": null,
+     "decision": "acceptForSession"
+    },
+    {
+     "id": "runtime-request:piDurable:thread:mcp:launch:\u2026:approval:19",
+     "kind": "permission",
+     "prompt": "fixture: fixture_note\n{\n  \"line\": \"lw-durable-mwdxavpr-2\"\n}\n\nA write tool (class set in the harness panel). A linked thread's write: this answer covers this call only.",
+     "options": null,
+     "decision": "decline"
+    }
+   ],
+   "reply": "Here is what each call returned:\n\n1. `fixture_echo` with \"lw-durable-mwdxavpr-echo\" returned `lw-durable-mwdxavpr-echo`.\n2. `fixture_note` with \"lw-durable-mwdxavpr-1\" returned `noted #22`.\n3. `fixture_note` with \"lw-durable-mwdxavpr-2\" did not run. The owner declined the approval, so I haven't retried it.",
+   "notesAdded": [
+    "lw-durable-mwdxavpr-1"
+   ],
+   "ok": true
+  },
+  {
+   "name": "codex: a linked thread at full access: the read runs, each write raises its own card (\"accept for the session\" on the first covers that call only), the declined one writes nothing",
+   "cards": [
+    {
+     "id": "runtime-request:codex:t3flare-push:91c85938-c672-4428-8442-f5d5ecffc723",
+     "kind": "permission",
+     "prompt": "fixture: fixture_note\n{\n  \"line\": \"lw-codex-mwdxctq5-1\"\n}\n\nA write tool (class set in the harness panel), called by codex. Linked work's write: this answer covers this call only.",
+     "options": [
+      {
+       "decision": "accept",
+       "label": "Allow this call"
+      },
+      {
+       "decision": "decline",
+       "label": "Decline"
+      }
+     ],
+     "decision": "acceptForSession"
+    },
+    {
+     "id": "runtime-request:codex:t3flare-push:1348e1f5-aa00-4499-b59e-591e6775471c",
+     "kind": "permission",
+     "prompt": "fixture: fixture_note\n{\n  \"line\": \"lw-codex-mwdxctq5-2\"\n}\n\nA write tool (class set in the harness panel), called by codex. Linked work's write: this answer covers this call only.",
+     "options": [
+      {
+       "decision": "accept",
+       "label": "Allow this call"
+      },
+      {
+       "decision": "decline",
+       "label": "Decline"
+      }
+     ],
+     "decision": "decline"
+    }
+   ],
+   "reply": "I\u2019ll make the three fixture calls in the requested order and report their responses.\n1. `fixture_echo` answered: `lw-codex-mwdxctq5-echo`\n2. First `fixture_note` answered: `noted #24`\n3. Second `fixture_note` was not run because the owner declined approval.",
+   "runs": [
+    {
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "items": [
+    "user_message::completed",
+    "command_execution:Workspace ready:completed",
+    "dynamic_tool:fixture.fixture_echo:completed",
+    "approval_request:Allow fixture: fixture_note?:completed",
+    "dynamic_tool:fixture.fixture_note:completed",
+    "approval_request:Allow fixture: fixture_note?:completed",
+    "dynamic_tool:fixture.fixture_note:failed",
+    "checkpoint::completed"
+   ],
+   "notesAdded": [
+    "lw-codex-mwdxctq5-1"
+   ],
+   "ok": true
+  }
+ ],
+ "firstCodexAttempt": {
+  "note": "the first Codex attempt was read before its turn finished (one card, one note, reply was the preface only); rerun with `linked-writes codex`",
+  "case": {
+   "name": "codex: a linked thread at full access: the read runs, each write raises its own card (\"accept for the session\" on the first covers that call only), the declined one writes nothing",
+   "cards": [
+    {
+     "id": "runtime-request:codex:t3flare-push:2e0a2bdb-f4b8-49ec-a872-faebc80e30e4",
+     "kind": "permission",
+     "prompt": "fixture: fixture_note\n{\n  \"line\": \"lw-codex-mwdxbo3x-1\"\n}\n\nA write tool (class set in the harness panel), called by codex. Linked work's write: this answer covers this call only.",
+     "options": [
+      {
+       "decision": "accept",
+       "label": "Allow this call"
+      },
+      {
+       "decision": "decline",
+       "label": "Decline"
+      }
+     ],
+     "decision": "acceptForSession"
+    }
+   ],
+   "reply": "I\u2019ll make the three fixture calls in the order you gave and report their returned answers.",
+   "notesAdded": [
+    "lw-codex-mwdxbo3x-1"
+   ],
+   "ok": false
+  }
+ },
+ "ok": true
+}
