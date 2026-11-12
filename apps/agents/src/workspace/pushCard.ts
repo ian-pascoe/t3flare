@@ -29,8 +29,38 @@ export const escapeText = (value: string): string =>
 
 const short = (oid: string): string => oid.slice(0, 8);
 
-/** The card's summary (one line per update) and its detail. */
-export const pushCard = (input: PushCardInput): { readonly summary: string; readonly detail: string } => {
+/** A button of the card (t3's `ProviderApprovalOption`): its decision, label and warning. */
+export interface PushCardOption {
+  readonly decision: "accept" | "acceptForSession" | "decline";
+  readonly label: string;
+  readonly warning?: string;
+}
+
+/** The trust option's label: the one answer that clears the Workspace's taint, so it says so (never t3's default "Always allow this session"). */
+export const TRUST_LABEL = "Allow and trust this Workspace again (clears the linked-work mark)";
+
+/**
+ * The card's buttons. A linked card approves one push or declines it: there is nothing to accept for the session. An
+ * owner's card in a tainted Workspace adds the trust option, labelled and warned, under t3's "more" menu.
+ */
+export const pushCardOptions = (linked: boolean): ReadonlyArray<PushCardOption> =>
+  linked
+    ? [
+        { decision: "decline", label: "Decline" },
+        { decision: "accept", label: "Allow this push" },
+      ]
+    : [
+        { decision: "decline", label: "Decline" },
+        { decision: "accept", label: "Allow this push once" },
+        {
+          decision: "acceptForSession",
+          label: TRUST_LABEL,
+          warning: "Anything linked work left in this Workspace (git hooks, git config, scripts, background processes) can then push without asking.",
+        },
+      ];
+
+/** The card's summary (one line per update), its detail and its buttons. */
+export const pushCard = (input: PushCardInput): { readonly summary: string; readonly detail: string; readonly options: ReadonlyArray<PushCardOption> } => {
   const lines: Array<string> = [];
   const details: Array<string> = [];
   for (const update of input.updates) {
@@ -49,9 +79,9 @@ export const pushCard = (input: PushCardInput): { readonly summary: string; read
     details.push(`${ref}: ${github}; new ${short(update.new)}${claim}`);
   }
   const intro = input.linkLabel === null
-    ? "This Workspace ran work from a linked environment, so each push asks until you trust the Workspace again. Approve for the session to approve and trust this Workspace again."
+    ? `This Workspace ran work from a linked environment, so each push asks until you trust the Workspace again. "Allow this push once" keeps asking; "${TRUST_LABEL}" stops asking for every later push, including any a linked environment's leftovers make.`
     : `Work started from ${escapeText(input.linkLabel)} through a linked environment wants to push to this project's repository. Each push asks.`;
-  return { summary: lines.join("\n"), detail: [intro, ...details].join("\n") };
+  return { summary: lines.join("\n"), detail: [intro, ...details].join("\n"), options: pushCardOptions(input.linkLabel !== null) };
 };
 
 /** The refs a receive-pack advertisement lists (GitHub's real tips), by name. */

@@ -2,7 +2,7 @@
 // are GitHub's; the commit subject and ancestry are the Workspace's own claims and are labelled so.
 import { describe, expect, it } from "vitest";
 
-import { advertisedTips, pushCard } from "../src/workspace/pushCard.ts";
+import { advertisedTips, pushCard, TRUST_LABEL } from "../src/workspace/pushCard.ts";
 
 const ZERO = "0".repeat(40);
 const A = "a".repeat(40);
@@ -11,6 +11,19 @@ const C = "c".repeat(40);
 
 describe("pushCard", () => {
   const base = { linkLabel: "Laptop (Ian's MacBook)", defaultBranch: "main", reported: {} };
+
+  it("labels the one answer that clears the taint, and offers it only on an owner's card", () => {
+    const update = { updates: [{ old: A, new: B, ref: "refs/heads/x" }], tips: { "refs/heads/x": A } };
+    const owner = pushCard({ ...base, ...update, linkLabel: null });
+    const trust = owner.options.find((option) => option.decision === "acceptForSession");
+    expect(trust?.label).toBe(TRUST_LABEL);
+    expect(trust?.label).toMatch(/trust this Workspace again.*clears the linked-work mark/);
+    expect(trust?.warning).toMatch(/push without asking/);
+    expect(owner.options.find((option) => option.decision === "accept")?.label).toBe("Allow this push once");
+    expect(owner.detail).toContain(TRUST_LABEL);
+    const linked = pushCard({ ...base, ...update });
+    expect(linked.options.map((option) => option.decision)).toEqual(["decline", "accept"]);
+  });
 
   it("shows each update against GitHub's tip, not the old id the Workspace sent", () => {
     const card = pushCard({ ...base, updates: [{ old: A, new: B, ref: "refs/heads/feature" }], tips: { "refs/heads/feature": C }, reported: { [B]: { subject: "Fix it", ancestor: { "refs/heads/feature": true } } } });

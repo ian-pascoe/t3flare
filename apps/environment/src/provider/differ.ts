@@ -358,6 +358,7 @@ const approvalView = (approval: PendingApproval, textOut: (text: string) => stri
     type: "approval_request",
     requestKind: requestKindOf(approval.kind),
     prompt: textOut(approval.detail === undefined ? approval.summary : `${approval.summary}\n\n${approval.detail}`),
+    ...(approval.options === undefined ? {} : { options: approval.options }),
   },
 });
 

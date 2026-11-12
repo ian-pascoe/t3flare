@@ -287,7 +287,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const context = withAbortSignal(AbortSignal.any([AbortSignal.timeout(PUSH_APPROVAL_MS), withdrawn.signal]), BACKGROUND_CONTEXT);
     try {
       const answer = await this.#approvals.ask(
-        { requestId, turn, callId: "", tool: "git push", kind: "git-push", summary: card.summary, detail: card.detail, createdAt: Date.now() },
+        { requestId, turn, callId: "", tool: "git push", kind: "git-push", summary: card.summary, detail: card.detail, options: card.options, createdAt: Date.now() },
         () => Promise.resolve(),
         context,
       );

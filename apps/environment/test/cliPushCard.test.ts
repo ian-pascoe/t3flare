@@ -25,6 +25,7 @@ import { describe, expect, it } from "vitest";
 import * as TestProviderHost from "../../../t3code/packages/provider-testing/src/TestProviderHost.ts";
 import { makeTurnInput } from "t3/src/orchestration-v2/Adapters/AcpAdapterV2.testkit.ts";
 import { acpAdapterOptions, acpFlavor } from "../src/provider/cli/acpDriver.ts";
+import { pushCardOptions, TRUST_LABEL } from "../../agents/src/workspace/pushCard.ts";
 import { approveCliPush, cancelCliPush } from "../src/provider/cli/linkedPushAsk.ts";
 import { wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 
@@ -132,7 +133,7 @@ const isPush = (event: Event) => event.type === "runtime_request.updated" && eve
 const pushCardOpened = (event: Event) => isPush(event) && event.type === "runtime_request.updated" && event.runtimeRequest.status === "pending";
 
 const ask = (harness: Harness, askId: string, linked: boolean) =>
-  Effect.promise(() => approveCliPush({ thread: harness.threadId, linked, askId, summary: "push refs/heads/main 1111aaaa → 2222bbbb", detail: "refs/heads/main: GitHub has 1111aaaa; new 2222bbbb" }));
+  Effect.promise(() => approveCliPush({ thread: harness.threadId, linked, askId, summary: "push refs/heads/main 1111aaaa → 2222bbbb", detail: "refs/heads/main: GitHub has 1111aaaa; new 2222bbbb", options: pushCardOptions(linked) }));
 
 const test = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never);
 
@@ -155,6 +156,8 @@ describe("a gateway push asked on a CLI thread (SPI-1040, P5)", () => {
         if (item.type !== "turn_item.updated" || item.turnItem.type !== "approval_request") throw new Error("expected the card's turn item");
         expect(item.turnItem.title).toBe("Allow git push?");
         expect(item.turnItem.prompt).toContain("push refs/heads/main 1111aaaa → 2222bbbb");
+        // The owner's card labels its trust answer (never t3's default "Always allow this session").
+        expect(item.turnItem.options?.find((option) => option.decision === "acceptForSession")?.label).toBe(TRUST_LABEL);
         // The agent's own items are numbered from the turn's ordinal; the card comes after them.
         const ordinals = harness.seen.flatMap((event) => (event.type === "turn_item.updated" && event.turnItem.id !== item.turnItem.id ? [event.turnItem.ordinal] : []));
         expect(item.turnItem.ordinal).toBeGreaterThan(Math.max(0, ...ordinals));
@@ -180,6 +183,10 @@ describe("a gateway push asked on a CLI thread (SPI-1040, P5)", () => {
         const first = yield* ask(harness, "ask-2", true).pipe(Effect.forkScoped);
         const card = yield* harness.until(pushCardOpened);
         if (card.type !== "runtime_request.updated") throw new Error("expected the push card");
+        // A linked card offers no session answer at all.
+        const item = harness.seen.findLast((event) => event.type === "turn_item.updated" && "requestId" in event.turnItem && event.turnItem.requestId === card.runtimeRequest.id);
+        expect(item?.type === "turn_item.updated" && item.turnItem.type === "approval_request" && item.turnItem.options?.map((option) => option.decision)).toEqual(["decline", "accept"]);
+        // Sent anyway (an old client), it approves this push only.
         yield* harness.runtime.respondToRuntimeRequest({ requestId: card.runtimeRequest.id, decision: "acceptForSession" });
         expect(yield* Fiber.join(first)).toEqual({ approved: true, trust: false });
 

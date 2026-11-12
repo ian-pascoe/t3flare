@@ -20,7 +20,7 @@ export interface EnvironmentRpc {
    * SPI-1040: asks the owner about a push on a CLI thread's live turn (the card the CLI wrapper raises). Refused with
    * no live turn, or no answer within the push approval wait. `trust`: the owner also trusted the Workspace again.
    */
-  approvePush(input: { readonly thread: string; readonly workspace: string; readonly linked: boolean; readonly askId: string; readonly summary: string; readonly detail: string }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }>;
+  approvePush(input: { readonly thread: string; readonly workspace: string; readonly linked: boolean; readonly askId: string; readonly summary: string; readonly detail: string; readonly options: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline"; readonly label: string; readonly warning?: string }> }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }>;
   /** The push's git went away (review M7): the card `approvePush` raised is withdrawn. */
   cancelPush(input: { readonly askId: string }): Promise<void>;
   /** A Session's call of t3's `/mcp` (step 3, ADR-0022): t3's HTTP app answers it, never over the public host. */

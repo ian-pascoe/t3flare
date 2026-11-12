@@ -118,7 +118,8 @@ interface OpenPushCard {
 const pushRequestPrefix = (driver: string) => `runtime-request:${driver}:t3flare-push:`;
 
 const approvedOf = (decision: ProviderApprovalDecision): CliPushAnswer =>
-  decision === "accept" ? { approved: true, trust: false } : decision === "acceptForSession" || decision === "acceptAlways" ? { approved: true, trust: true } : { approved: false, reason: decision };
+  // Only the card's labelled trust answer trusts; any other approval (t3's `acceptAlways` included) is this push only.
+  decision === "acceptForSession" ? { approved: true, trust: true } : decision === "accept" || decision === "acceptAlways" ? { approved: true, trust: false } : { approved: false, reason: decision };
 
 /** t3's adapter, as the Cloud Environment runs it. */
 export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Service"], options: WrapOptions): ProviderAdapter.ProviderAdapterV2["Service"] => {
@@ -221,6 +222,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               requestId: id,
               requestKind: "command",
               prompt: `${push.summary}\n\n${push.detail}`,
+              ...(push.options.length === 0 ? {} : { options: push.options }),
             };
             cards.set(id, { runtimeRequest, node, turnItem, answer: resolve });
             signal.addEventListener("abort", () => offer(closeCard(id, null, { approved: false, reason: "withdrawn" })), { once: true });

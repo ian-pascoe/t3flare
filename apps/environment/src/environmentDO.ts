@@ -4,6 +4,7 @@
 // limit), counts boots and falls back to safe mode (bootState.ts), seeds t3's bootstrap grant only while
 // pairing is armed (ADR-0010), resets itself when idle and wakes on one alarm (ADR-0003), and answers the
 // admin routes the Worker has already verified (admin.ts).
+import type { CliPushAsk } from "./provider/cli/linkedPushAsk.ts";
 import { DurableObject } from "cloudflare:workers";
 import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
@@ -282,11 +283,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * RPC from a Workspace DO (the push gateway's policy): asks the owner about a push on a CLI thread's live turn
    * (SPI-1040). Counted as open work for the idle check while it waits (review M7).
    */
-  async approvePush(input: { readonly thread: string; readonly workspace: string; readonly linked: boolean; readonly askId: string; readonly summary: string; readonly detail: string }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }> {
+  async approvePush(input: { readonly thread: string; readonly workspace: string; readonly linked: boolean; readonly askId: string; readonly summary: string; readonly detail: string; readonly options?: CliPushAsk["options"] }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }> {
     Idle.requestStarted();
     try {
       const { approveCliPush } = await import("./provider/cli/linkedPushAsk.ts");
-      return await approveCliPush(input);
+      return await approveCliPush({ ...input, options: input.options ?? [] });
     } finally {
       Idle.requestEnded();
     }

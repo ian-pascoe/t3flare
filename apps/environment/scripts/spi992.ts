@@ -286,7 +286,7 @@ const linkedRun = async (label: string, command: string, onPush: (index: number,
     ].join("\n"),
   });
   const threadId: string | undefined = launched.json?.threadId;
-  const answers: Array<{ title: string; decision: string; at: number; summary?: string }> = [];
+  const answers: Array<{ title: string; decision: string; at: number; summary?: string; options?: unknown }> = [];
   if (!check(`${label}: the linked thread launched`, threadId !== undefined, launched.text.slice(0, 300))) return { threadId: null, answers, projection: null, mcp };
   const started = Date.now();
   const seen = new Set<string>();
@@ -301,7 +301,7 @@ const linkedRun = async (label: string, command: string, onPush: (index: number,
       const decision = title === "Allow git push?" ? await onPush(pushes++, threadId!, request, mcp) : "acceptForSession";
       // A card can be withdrawn meanwhile (its git went away, review M7): answering it then fails, which is fine.
       await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision }).catch((error: unknown) => console.log(`answer failed: ${String(error).slice(0, 120)}`));
-      answers.push({ title, decision, at: Date.now() - started, ...(title === "Allow git push?" ? { summary: String(item?.prompt ?? "").slice(0, 400) } : {}) });
+      answers.push({ title, decision, at: Date.now() - started, ...(title === "Allow git push?" ? { summary: String(item?.prompt ?? "").slice(0, 600), options: item?.options ?? null } : {}) });
     }
     if (p !== undefined && settled(p) && pendingOf(p).length === 0) break;
     await sleep(1500);
@@ -397,7 +397,7 @@ if (mode === "p5") {
     ].join("\n");
   /** Answers the thread's requests until its runs settle: push cards with `onPush`, the CLI's own with accept. */
   const answerAll = async (threadId: string, onPush: () => string) => {
-    const answers: Array<{ title: string; decision: string; prompt?: string }> = [];
+    const answers: Array<{ title: string; decision: string; prompt?: string; options?: unknown }> = [];
     const seen = new Set<string>();
     const started = Date.now();
     let p: any;
@@ -409,7 +409,7 @@ if (mode === "p5") {
         const push = item?.title === "Allow git push?";
         const decision = push ? onPush() : "accept";
         await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision }).catch((error: unknown) => console.log(`answer failed: ${String(error).slice(0, 160)}`));
-        answers.push({ title: String(item?.title ?? request.kind), decision, ...(push ? { prompt: String(item?.prompt ?? "").slice(0, 400), id: request.id } : {}) });
+        answers.push({ title: String(item?.title ?? request.kind), decision, ...(push ? { prompt: String(item?.prompt ?? "").slice(0, 800), options: item?.options ?? null, id: request.id } : {}) });
       }
       if (p !== undefined && settled(p) && pendingOf(p).length === 0 && seen.size > 0) break;
       await sleep(1500);
@@ -432,18 +432,39 @@ if (mode === "p5") {
   check("p5 owner: the CLI thread got one \"Allow git push?\" card naming the ref", ownerCards.length === 1 && String(ownerCards[0]?.prompt).includes(`spi992/cli-owner-${stamp}`), out.owner);
   check("p5 owner: approved, the push landed at the commit", remoteRef(ownerRef) === ownerHead && ownerHead.length === 40, out.owner);
   check("p5 owner: \"for the session\" trusted the Workspace again", afterOwner?.taint === null, afterOwner);
+  const ownerTrust = ((ownerCards[0]?.options ?? []) as Array<any>).find((option) => option.decision === "acceptForSession");
+  check("p5 owner: the card's trust answer was labelled as clearing the linked-work mark, with a warning", /trust this Workspace again \(clears the linked-work mark\)/.test(String(ownerTrust?.label)) && typeof ownerTrust?.warning === "string", ownerCards[0]?.options);
 
-  // 2. A linked Claude thread: its push asks on it; approved, it lands; the Workspace stays tainted.
-  const linkedRef = `refs/heads/spi992/cli-linked-${stamp}`;
-  created.push(linkedRef);
-  const linkedHead = (await sh(commitScript(`spi992/cli-linked-${stamp}`, [[`cli-linked-${stamp}.bin`, 64]]))).stdout.trim();
-  const linked = await linkedRun("p5", `git push origin HEAD:${linkedRef}`, () => Promise.resolve("acceptForSession"), CLAUDE);
-  const afterLinked = (await call({ probePush: {} }))?.result;
-  out.linked = { threadId: linked.threadId, answers: linked.answers, reply: replyOf(linked.projection).slice(-300), head: linkedHead, remote: remoteRef(linkedRef), taintAfter: afterLinked?.taint ?? null };
-  const linkedCards = linked.answers.filter((a) => a.title === "Allow git push?");
-  check("p5 linked: the linked CLI thread got one \"Allow git push?\" card naming the ref and the link", linkedCards.length === 1 && String(linkedCards[0]?.summary).includes(`spi992/cli-linked-${stamp}`), out.linked);
-  check("p5 linked: approved, the push landed at the commit", remoteRef(linkedRef) === linkedHead && linkedHead.length === 40, out.linked);
-  check("p5 linked: a linked card never trusts the Workspace (still tainted)", afterLinked?.taint !== null && afterLinked?.taint !== undefined, afterLinked);
+  // 2. A linked thread of each CLI pushes three times: approved, declined, approved (each asks again). The cards are
+  // the CLI wrapper's for all four (one code path over t3's Codex, Pi and ACP adapters), each adapter's turn events
+  // feeding it. The Workspace stays tainted.
+  const CLIS: Record<string, { instanceId: string; driver: string; model: string }> = {
+    claude: { instanceId: "claudeAgent", driver: "claudeAgent", model: "anthropic/claude-sonnet-5-5" },
+    codex: { instanceId: "codex", driver: "codex", model: "gpt-6-luna" },
+    pi: { instanceId: "pi", driver: "pi", model: "anthropic/claude-haiku-5-5" },
+    opencode: { instanceId: "opencode", driver: "opencode", model: "anthropic/claude-sonnet-5-5" },
+  };
+  const wanted = process.argv.slice(3).filter((name) => name in CLIS);
+  let linked: Awaited<ReturnType<typeof linkedRun>> | undefined;
+  out.linked = {};
+  for (const cli of wanted.length === 0 ? Object.keys(CLIS) : wanted) {
+    const spec = CLIS[cli]!;
+    await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: spec.instanceId, instance: { driver: spec.driver, enabled: true } } });
+    const refs = ["a", "b", "c"].map((r) => `refs/heads/spi992/${cli}-${r}-${stamp}`);
+    created.push(...refs);
+    const head = (await sh(commitScript(`spi992/${cli}-${stamp}`, [[`${cli}-${stamp}.bin`, 64]]))).stdout.trim();
+    const decisions = ["accept", "decline", "accept"];
+    const run = await linkedRun(`p5-${cli}`, refs.map((ref) => `git push origin HEAD:${ref}; echo "push-exit $?"`).join("; "), (index) => Promise.resolve(decisions[index] ?? "decline"), { instanceId: spec.instanceId, model: spec.model, options: [] });
+    linked = run;
+    const after = (await call({ probePush: {} }))?.result;
+    const cards = run.answers.filter((a) => a.title === "Allow git push?");
+    const landed = refs.map((ref) => remoteRef(ref));
+    (out.linked as Record<string, unknown>)[cli] = { threadId: run.threadId, answers: run.answers, reply: replyOf(run.projection).slice(-300), head, landed, taintAfter: after?.taint ?? null };
+    check(`p5 ${cli}: three pushes, three "Allow git push?" cards (each asks again), naming their refs, no session answer offered`, cards.length === 3 && cards.every((card, i) => String(card.summary).includes(refs[i]!.replace("refs/heads/", "")) && !JSON.stringify(card.options ?? []).includes("acceptForSession")), cards);
+    check(`p5 ${cli}: approved landed, declined did not, approved again landed`, landed[0] === head && landed[1] === null && landed[2] === head && head.length === 40, { head, landed });
+    check(`p5 ${cli}: the Workspace stays tainted`, after?.taint !== null && after?.taint !== undefined, after);
+  }
+  if (linked === undefined) throw new Error("no CLI ran");
 
   // 3. Review M3: the allowed t3 tools that touch git, called by the auto-accept-edits link and by a full-access one
   // (t3 lets only the latter change projects), register no push expectation and run no git push.

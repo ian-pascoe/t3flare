@@ -258,6 +258,8 @@ export interface PendingApproval {
   readonly kind: "command" | "file-change" | "mcp-tool" | "git-push";
   readonly summary: string;
   readonly detail?: string;
+  /** The card's own buttons (t3's `ProviderApprovalOption`s), instead of t3's defaults (SPI-992's push card). */
+  readonly options?: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline" | "cancel"; readonly label: string; readonly warning?: string }>;
   readonly createdAt: number;
 }
 

@@ -9,6 +9,8 @@ export interface CliPushAsk {
   readonly linked: boolean;
   readonly summary: string;
   readonly detail: string;
+  /** The card's buttons (`pushCardOptions`): only an owner's card offers the trust answer, labelled as such. */
+  readonly options: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline"; readonly label: string; readonly warning?: string }>;
 }
 
 export interface CliPushAnswer {
@@ -47,7 +49,7 @@ export const approveCliPush = async (input: { readonly thread: string; readonly 
   withdrawals.set(input.askId, withdrawn);
   try {
     const answer = await asker.ask(
-      { askId: input.askId, linked: input.linked, summary: input.summary, detail: input.detail },
+      { askId: input.askId, linked: input.linked, summary: input.summary, detail: input.detail, options: input.options },
       AbortSignal.any([AbortSignal.timeout(CLI_PUSH_APPROVAL_MS), withdrawn.signal]),
     );
     if (answer.reason === "withdrawn") return { approved: false, reason: withdrawn.signal.aborted ? "git went away" : "no answer in time" };
