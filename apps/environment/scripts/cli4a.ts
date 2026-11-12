@@ -188,6 +188,55 @@ switch (scenario) {
     finish(arg("out"), { cli, result, processes: await processState(workspaceArg(`cli-${cli}`)) });
     break;
   }
+  case "resume": {
+    // M5: a turn, the Container stopped (its lease gone), a turn that resumes the same native thread (not a handoff).
+    const cookie = await pair();
+    const cli = arg("cli") ?? "codex";
+    const workspace = workspaceArg(`cli-${cli}`);
+    await enable(cookie, cli, cli);
+    await admin("GET", "/_t3flare/agents/router-trace?clear=1");
+    const first = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "Remember the code word HERON-52 for later. Reply with ok only." });
+    check("turn 1 completed", first.runs.at(-1)?.status === "completed", first.runs);
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${workspace}`);
+    await sleep(5000);
+    const budget = (await admin("GET", "/_t3flare/agents/budget")).json;
+    const container = (await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces?.find((ws: any) => ws.id === workspace)?.container ?? null;
+    check("the Container stopped and its lease went", container?.running === false && container?.leased === false, { container, budget });
+    const second = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "What was the code word? Reply with it only.", threadId: first.threadId });
+    check("turn 2 completed", second.runs.at(-1)?.status === "completed", second.runs);
+    const native = (turn: typeof first) => turn.providerThreads.map((thread: any) => thread.nativeThreadRef?.nativeId ?? null);
+    check("the same native thread", native(first).length === 1 && JSON.stringify(native(first)) === JSON.stringify(native(second)), { first: native(first), second: native(second) });
+    check("a new provider session (a new process)", second.providerSessions.some((session: any) => !first.providerSessions.some((old: any) => old.id === session.id)), second.providerSessions);
+    const trace = ((await admin("GET", "/_t3flare/agents/router-trace")).json?.entries ?? []) as Array<any>;
+    const protocol = trace.filter((entry: any) => entry.route === "protocol" || entry.route === "process");
+    const resumed = protocol.filter((entry: any) => entry.route === "protocol" && (entry.detail ?? "").includes(String(native(first)[0])) && !String(entry.detail).startsWith("failed"));
+    check("the protocol log shows the CLI resumed that native thread", resumed.length >= 1, protocol);
+    check("no context handoff", !JSON.stringify(second.items).includes("handoff"), second.items);
+    finish(arg("out") ?? `m5-resume-${cli}.json`, { cli, workspace, first, container, budget, second, protocol });
+    break;
+  }
+  case "two": {
+    // M5: a Codex turn and a Pi turn at once in two Workspaces (each runs a 60 s command); the budget read mid-turn.
+    const cookie = await pair();
+    await enable(cookie, "codex", "codex");
+    await enable(cookie, "pi", "pi");
+    const prompt = "Run the shell command `sleep 60 && echo slept` and then reply with the single word done.";
+    const started = Date.now();
+    const turns = Promise.all([
+      cliTurn(cookie, { cli: "codex", workspace: "cli-codex", mode: "full-access", plan: false, prompt }),
+      cliTurn(cookie, { cli: "pi", workspace: "cli-pi", mode: "full-access", plan: false, prompt }),
+    ]);
+    await sleep(45_000);
+    const budget = (await admin("GET", "/_t3flare/agents/budget")).json;
+    const states = { codex: await processState("cli-codex"), pi: await processState("cli-pi") };
+    const [codex, pi] = await turns;
+    check("both turns completed", codex.runs.at(-1)?.status === "completed" && pi.runs.at(-1)?.status === "completed", { codex: codex.runs, pi: pi.runs });
+    const leases = JSON.stringify(budget);
+    check("both Workspaces held a lease at once", (budget?.leases ?? []).length >= 2, budget);
+    check("both processes were in a turn at once", JSON.stringify(states.codex).includes('"inTurn":true') && JSON.stringify(states.pi).includes('"inTurn":true'), states);
+    finish(arg("out") ?? "m5-two-at-once.json", { ms: Date.now() - started, budget, leases, states, codex, pi });
+    break;
+  }
   default:
     console.error(`unknown scenario ${scenario}`);
     process.exit(2);

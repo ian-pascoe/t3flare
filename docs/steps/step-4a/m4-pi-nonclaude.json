@@ -1,0 +1,125 @@
+{
+ "at": "2026-11-12T01:53:18.227Z",
+ "scenario": "turn",
+ "ok": true,
+ "failures": [],
+ "cli": "pi",
+ "result": {
+  "threadId": "01a83892-3568-410e-b023-ee66dc58a18b",
+  "root": "/w/cli-pi",
+  "model": "anthropic/gemini-3-flash",
+  "runs": [
+   {
+    "id": "run:thread:01a83892-3568-410e-b023-ee66dc58a18b:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "dynamic_tool",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "dynamic_tool",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "bash test.sh",
+    "exitCode": 0
+   },
+   {
+    "type": "file_change",
+    "status": "completed",
+    "fileName": "src/greeting.txt",
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "bash test.sh",
+    "exitCode": 0
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "Yes, `bash test.sh` ran successfully and printed \"all checks passed\".",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3A01a83892-3568-410e-b023-ee66dc58a18b%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T01-53-07-541Z_01a1cd75-6dd0-739c-8a4a-0ad73ed55a5e.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:01a83892-3568-410e-b023-ee66dc58a18b:f25624cb-fc35-4883-8b4a-f6a0fdfdc768",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:01a83892-3568-410e-b023-ee66dc58a18b:f25624cb-fc35-4883-8b4a-f6a0fdfdc768",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 14367
+ },
+ "processes": {
+  "channel": {
+   "live": 2,
+   "environmentEpoch": 18
+  },
+  "workspace": {
+   "epoch": 1,
+   "processes": [
+    {
+     "key": "proc-8fa17428-4e5c-42be-952b-1f4b248761c2",
+     "thread": "ec976675-9347-4f2c-a7f1-912b30dfcba3",
+     "environmentEpoch": 18,
+     "inTurn": false,
+     "idleMs": 24785
+    },
+    {
+     "key": "proc-73222cd5-a2a1-4ef4-a6ef-31c5c7e57cbe",
+     "thread": "01a83892-3568-410e-b023-ee66dc58a18b",
+     "environmentEpoch": 18,
+     "inTurn": false,
+     "idleMs": 1233
+    }
+   ],
+   "pushes": 63
+  }
+ }
+}

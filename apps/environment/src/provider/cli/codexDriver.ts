@@ -29,6 +29,7 @@ import { type CodexAppServerClientFactoryShape, makeCodexAdapterV2 } from "t3/sr
 import { ServerConfig } from "t3/src/config.ts";
 
 import { environmentServices } from "../../agents/bindings.ts";
+import { traceProtocol } from "../../agents/processRouter.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
 import { type CliSession, type CliSessions, sessionFor, wrapCliAdapter } from "./wrapper.ts";
@@ -75,7 +76,14 @@ export const guardClient = (client: CodexClient.CodexAppServerClient["Service"],
       console.warn(JSON.stringify({ t3flare: "codex-request-refused", method }));
       return Effect.fail(refusedError(method, answer.refused));
     }
-    return send(answer.params as never);
+    const sent = send(answer.params as never);
+    // The resume proof (M5): Codex resumed this native thread itself, not a handoff.
+    if (method !== "thread/resume") return sent;
+    const threadId = (answer.params as { threadId?: unknown }).threadId;
+    return sent.pipe(
+      Effect.tap(() => Effect.sync(() => traceProtocol("codex", "thread/resume", `ok ${String(threadId)}`))),
+      Effect.tapError((error) => Effect.sync(() => traceProtocol("codex", "thread/resume", `failed ${String(threadId)}: ${String(error).slice(0, 200)}`))),
+    );
   };
   return {
     ...client,

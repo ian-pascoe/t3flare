@@ -1,19 +1,17 @@
 {
- "at": "2026-11-12T01:51:36.206Z",
+ "at": "2026-11-12T01:52:55.099Z",
  "scenario": "turn",
- "ok": false,
- "failures": [
-  "the turn completed: [{\"id\":\"run:thread:c419d53b-34fa-437d-b661-169cfb208bba:ordinal:1\",\"status\":\"failed\",\"failure\":null}]"
- ],
+ "ok": true,
+ "failures": [],
  "cli": "pi",
  "result": {
-  "threadId": "c419d53b-34fa-437d-b661-169cfb208bba",
+  "threadId": "ec976675-9347-4f2c-a7f1-912b30dfcba3",
   "root": "/w/cli-pi",
   "model": "anthropic/claude-haiku-5-5",
   "runs": [
    {
-    "id": "run:thread:c419d53b-34fa-437d-b661-169cfb208bba:ordinal:1",
-    "status": "failed",
+    "id": "run:thread:ec976675-9347-4f2c-a7f1-912b30dfcba3:ordinal:1",
+    "status": "completed",
     "failure": null
    }
   ],
@@ -26,42 +24,115 @@
     "exitCode": null
    },
    {
-    "type": "error",
-    "status": "failed",
+    "type": "reasoning",
+    "status": "completed",
     "fileName": null,
     "input": null,
-    "exitCode": null,
-    "detail": "{\"id\":\"turn-item:run:run%3Athread%3Ac419d53b-34fa-437d-b661-169cfb208bba%3Aordinal%3A1:signal:provider-thread-load-failure\",\"threadId\":\"c419d53b-34fa-437d-b661-169cfb208bba\",\"runId\":\"run:thread:c419d53b-34fa-437d-b661-169cfb208bba:ordinal:1\",\"nodeId\":\"node:run:run%3Athread%3Ac419d53b-34fa-437d-b661-169cfb208bba%3Aordinal%3A1:root\",\"providerThreadId\":\"provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Ac419d53b-34fa-437d-b661-169cfb208bba%3Aordinal%3A1\",\"providerTurnId\":null,\"nativeItemRef\":null,\"parentItemId\":null,\"ordinal\":1000002,\"status\":\"failed\",\"title\":\"Provider turn failed to start\",\"startedAt\":\"2026-11-12T01:51:35.899Z\",\"completedAt\":\"2026-11-12T01:51:35.899Z\",\"updatedAt\":\"2026-11-12T01:51:35.899Z\",\"type\":\"error\",\"failure\":{\"class\":\"provider_error\",\"message\":\"Pi RPC r"
+    "exitCode": null
+   },
+   {
+    "type": "dynamic_tool",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "file_change",
+    "status": "completed",
+    "fileName": "src/greeting.txt",
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "cd /w/cli-pi && bash test.sh; echo \"exit=$?\"",
+    "exitCode": 0
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
    }
   ],
-  "text": "",
-  "requests": [],
+  "text": "Yes, it passed: `bash test.sh` printed \"all checks passed\" and exited with status 0, after I added `Hello from the CLI.` as the last line of `src/greeting.txt`.",
+  "requests": [
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": null
+   },
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": null
+   }
+  ],
   "providerThreads": [
    {
-    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Ac419d53b-34fa-437d-b661-169cfb208bba%3Aordinal%3A1",
-    "nativeThreadRef": null,
-    "providerSessionId": "provider-session:provider-instance:pi:thread:c419d53b-34fa-437d-b661-169cfb208bba:1acba3c3-659f-407e-b0de-4392d0702642",
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Aec976675-9347-4f2c-a7f1-912b30dfcba3%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T01-52-39-098Z_01a1cd74-fea1-7032-a9cc-0584b350a638.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:ec976675-9347-4f2c-a7f1-912b30dfcba3:35efbccd-2032-4395-aff8-4233ccc337cd",
     "providerInstanceId": "pi"
    }
   ],
   "providerSessions": [
    {
-    "id": "provider-session:provider-instance:pi:thread:c419d53b-34fa-437d-b661-169cfb208bba:1acba3c3-659f-407e-b0de-4392d0702642",
-    "status": "error",
+    "id": "provider-session:provider-instance:pi:thread:ec976675-9347-4f2c-a7f1-912b30dfcba3:35efbccd-2032-4395-aff8-4233ccc337cd",
+    "status": "ready",
     "cwd": "/w/cli-pi"
    }
   ],
-  "ms": 16417
+  "ms": 19314
  },
  "processes": {
   "channel": {
-   "live": 0,
-   "environmentEpoch": 17
+   "live": 1,
+   "environmentEpoch": 18
   },
   "workspace": {
    "epoch": 1,
-   "processes": [],
-   "pushes": 10
+   "processes": [
+    {
+     "key": "proc-8fa17428-4e5c-42be-952b-1f4b248761c2",
+     "thread": "ec976675-9347-4f2c-a7f1-912b30dfcba3",
+     "environmentEpoch": 18,
+     "inTurn": false,
+     "idleMs": 1643
+    }
+   ],
+   "pushes": 38
   }
  }
 }

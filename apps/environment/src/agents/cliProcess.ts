@@ -12,6 +12,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type * as ChildProcess from "effect/process/ChildProcess";
 
 import { environmentServices } from "./bindings.ts";
+import { traceProtocol } from "./processRouter.ts";
 import { type ChannelProcess, type ChannelStart, ProcessRefused } from "./processChannel.ts";
 import { type CliName, profileLaunch } from "./cliProfiles.ts";
 import { CliSpawn } from "../provider/cli/wrapper.ts";
@@ -41,7 +42,17 @@ export const handleOf = (process: ChannelProcess, stdinEndOnDone: boolean): Chil
     ),
     isRunning: Effect.sync(() => process.running),
     kill: () => Effect.sync(() => process.kill()),
-    stdin: Sink.forEach((chunk: Uint8Array) => Effect.promise(() => process.write(chunk))).pipe(
+    stdin: Sink.forEach((chunk: Uint8Array) =>
+      Effect.promise(() => {
+        // The resume proof (M5): pi opens a native session file by name, not a handoff.
+        if (process.cli === "pi") {
+          const text = new TextDecoder().decode(chunk);
+          const at = text.indexOf('"type":"switch_session"');
+          if (at !== -1) traceProtocol("pi", "switch_session", /"sessionPath":"([^"]+)"/.exec(text)?.[1] ?? "?");
+        }
+        return process.write(chunk);
+      }),
+    ).pipe(
       Sink.ensuring(stdinEndOnDone ? Effect.promise(() => process.closeStdin()) : Effect.void),
     ),
     stdout: streamOf(process.stdout),

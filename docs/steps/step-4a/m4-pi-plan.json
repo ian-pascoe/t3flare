@@ -1,0 +1,93 @@
+{
+ "at": "2026-11-12T01:54:16.579Z",
+ "scenario": "turn",
+ "ok": false,
+ "failures": [
+  "the turn completed: [{\"id\":\"run:thread:5db36d46-a2e4-4590-af94-09f5bda4ced1:ordinal:1\",\"status\":\"failed\",\"failure\":null}]"
+ ],
+ "cli": "pi",
+ "result": {
+  "threadId": "5db36d46-a2e4-4590-af94-09f5bda4ced1",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:5db36d46-a2e4-4590-af94-09f5bda4ced1:ordinal:1",
+    "status": "failed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "error",
+    "status": "failed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null,
+    "detail": "{\"id\":\"turn-item:provider:pi:native-item:terminal-failure%3Aprovider-turn%3Aprovider%3Api%3Anative-turn%3Afailed%253Arun-attempt%253Arun%253Arun%25253Athread%25253A5db36d46-a2e4-4590-af94-09f5bda4ced1%25253Aordinal%25253A1%253Aattempt%253A1\",\"threadId\":\"5db36d46-a2e4-4590-af94-09f5bda4ced1\",\"runId\":\"run:thread:5db36d46-a2e4-4590-af94-09f5bda4ced1:ordinal:1\",\"nodeId\":\"node:run:run%3Athread%3A5db36d46-a2e4-4590-af94-09f5bda4ced1%3Aordinal%3A1:root\",\"providerThreadId\":\"provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3A5db36d46-a2e4-4590-af94-09f5bda4ced1%3Aordinal%3A1\",\"providerTurnId\":\"provider-turn:provider:pi:native-turn:failed%3Arun-attempt%3Arun%3Arun%253Athread%253A5db36d46-a2e4-4590-af94-09f5bda4ced1%253Aordinal%253A1%3Aattempt%3A1\",\"nativeItemRef\":null,\"parentItemId\":"
+   }
+  ],
+  "text": "",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3A5db36d46-a2e4-4590-af94-09f5bda4ced1%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T01-54-14-621Z_01a1cd76-73da-732f-8724-4ddee99a2209.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:5db36d46-a2e4-4590-af94-09f5bda4ced1:c1101793-cf53-4163-97a6-44a62ea14340",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:5db36d46-a2e4-4590-af94-09f5bda4ced1:c1101793-cf53-4163-97a6-44a62ea14340",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 5513
+ },
+ "processes": {
+  "channel": {
+   "live": 4,
+   "environmentEpoch": 18
+  },
+  "workspace": {
+   "epoch": 1,
+   "processes": [
+    {
+     "key": "proc-8fa17428-4e5c-42be-952b-1f4b248761c2",
+     "thread": "ec976675-9347-4f2c-a7f1-912b30dfcba3",
+     "environmentEpoch": 18,
+     "inTurn": false,
+     "idleMs": 83161
+    },
+    {
+     "key": "proc-73222cd5-a2a1-4ef4-a6ef-31c5c7e57cbe",
+     "thread": "01a83892-3568-410e-b023-ee66dc58a18b",
+     "environmentEpoch": 18,
+     "inTurn": false,
+     "idleMs": 59609
+    },
+    {
+     "key": "proc-db3b242a-a259-451f-a60a-fbe0f3e440ed",
+     "thread": "5db36d46-a2e4-4590-af94-09f5bda4ced1",
+     "environmentEpoch": 18,
+     "inTurn": false,
+     "idleMs": 913
+    }
+   ],
+   "pushes": 66
+  }
+ }
+}

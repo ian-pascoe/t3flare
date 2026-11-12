@@ -42,7 +42,7 @@ import { CLI_NAMES, spawnCli } from "./cliProcess.ts";
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
 
-export type Route = "process" | "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
+export type Route = "protocol" | "process" | "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
 
 export interface TraceEntry {
   readonly at: number;
@@ -59,6 +59,10 @@ const TRACE_MAX = 300;
 const trace: Array<TraceEntry> = [];
 
 export const routerTrace = (): ReadonlyArray<TraceEntry> => [...trace];
+
+/** Step 4a: a CLI protocol step worth proving later (a native thread resumed), in the same trace. */
+export const traceProtocol = (cli: string, step: string, detail: string): void =>
+  record({ at: Date.now(), command: cli, argv: [step], cwd: null, route: "protocol", exitCode: null, ms: 0, detail: detail.slice(0, 300) });
 export const clearRouterTrace = (): void => void trace.splice(0);
 
 const record = (entry: TraceEntry) => {
