@@ -111,7 +111,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Keybindings | `srv/keybindings.ts:208` | W† | `Keybindings.layer` | — |
 | Storage page | `ws.ts:2701-2704` | P: inspection fails on refused PRAGMAs | `docs/upstream/t3code-asks.md` §4 | — |
 | Browser notifications | `t3code/apps/web/src/threadNotifications.ts` | W† (client-side) | client-side | — |
-| Mobile push | `srv/relay/AgentAwarenessRelay.ts:56` | M | — | 3+ |
+| Mobile push | `srv/relay/AgentAwarenessRelay.ts:56` | W (publish-only T3 Connect link; prod after its sign-in, A3) | `docs/steps/step-3plus.md`; ADR-0025 | 3+ |
 | Laptop-to-cloud link | `srv/peer/PeerLinks.ts:89` | in progress | `.worktrees/step-3/docs/steps/step-3/` (m0–m3 evidence) | 3 |
 | Cloud-to-laptop link | — | R for now | ADR-0011 | *def* |
 | First pairing | `/api/auth/browser-session` | W (armed window) | ADR-0010 | done |

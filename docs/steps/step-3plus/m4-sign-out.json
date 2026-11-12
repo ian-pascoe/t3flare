@@ -1,0 +1,64 @@
+{
+ "before": {
+  "relayEnvironments": {
+   "status": 200,
+   "items": [
+    {
+     "environmentId": "2bf13dc5-a59f-493d-8515-0f6b433357c1",
+     "label": "Ian's MacBook",
+     "providerKind": "cloudflare_tunnel",
+     "linkedAt": "2026-09-18T10:56:09.187Z"
+    },
+    {
+     "environmentId": "69834765-298d-4478-baba-ad1ec577aee9",
+     "label": "t3flare",
+     "providerKind": "manual",
+     "linkedAt": "2026-11-11T23:37:42.321Z"
+    }
+   ]
+  },
+  "secretsHeld": {
+   "environmentCredential": true,
+   "mintKey": false,
+   "tunnelConfig": false
+  },
+  "accountTokenHeld": true
+ },
+ "signOut": {
+  "status": 200,
+  "json": {
+   "relay": {
+    "status": 200
+   },
+   "local": true,
+   "accountTokenCleared": true
+  }
+ },
+ "after": {
+  "link": {
+   "linked": false,
+   "linkRevoked": false,
+   "cloudUserId": null,
+   "relayUrl": null,
+   "relayIssuer": null,
+   "managedTunnelActive": false,
+   "publishAgentActivity": false,
+   "holdWebhooksWhileOffline": false
+  },
+  "desired": {
+   "marked": false,
+   "mode": "managed"
+  },
+  "secretsHeld": {
+   "environmentCredential": false,
+   "mintKey": false,
+   "tunnelConfig": false
+  },
+  "accountToken": {
+   "held": false
+  },
+  "flow": {
+   "state": "idle"
+  }
+ }
+}

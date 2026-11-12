@@ -1,0 +1,16 @@
+{
+ "worker": "t3flare-environment-step3plus",
+ "from": "2026-11-11T23:38:41.679Z",
+ "to": "2026-11-12T00:23:45.610Z",
+ "tailBytes": 6193129,
+ "tailEvents": 1371,
+ "publishLines": 149,
+ "checked": [
+  "cloud-relay-environment-credential",
+  "cloud-cli-oauth-token:access",
+  "cloud-cli-oauth-token:refresh"
+ ],
+ "bytes": 6193129,
+ "leaked": [],
+ "ok": true
+}
