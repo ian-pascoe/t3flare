@@ -19,6 +19,32 @@ export const memoryKv = (): ApprovalStorage => {
   };
 };
 
+/**
+ * Opens `kv` once per instance, as a Durable Object's constructor gets its storage: each open cuts the view the previous
+ * instance holds, which then throws, as an evicted Durable Object's storage does. A store reopened for a restarted
+ * Harness must take a new view: on a shared, uncut one, the old instance's calls, aborted when it notices it was cut off
+ * (mid-resume), settle their requests after the new instance's reruns asked again, withdrawing the card the reruns wait
+ * on (SPI-1087).
+ */
+export const instanceKv = (kv: ApprovalStorage): (() => ApprovalStorage) => {
+  let cut = () => {};
+  return () => {
+    cut();
+    let live = true;
+    cut = () => {
+      live = false;
+    };
+    const guard = () => {
+      if (!live) throw new Error("cut off");
+    };
+    return {
+      get: <T>(key: string) => (guard(), kv.get<T>(key)),
+      put: <T>(key: string, value: T) => (guard(), kv.put(key, value)),
+      delete: (key: string) => (guard(), kv.delete(key)),
+    };
+  };
+};
+
 /** Polls `check` until it holds, for up to 90 s of wall time (CI runners resume a restarted Harness much slower). */
 export const until = async (check: () => boolean | Promise<boolean>, what: string, withinMs = 90_000): Promise<void> => {
   const deadline = Date.now() + withinMs;

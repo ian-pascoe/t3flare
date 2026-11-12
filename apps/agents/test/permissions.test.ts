@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { ApprovalStore, asks, interactionModeSection, permissions, PLAN_MODE_REFUSAL, toToolPath } from "../src/extensions/permissions.ts";
 
-import { context, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
+import { context, instanceKv, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
 /** A `bash` that records its runs (not replay-safe, as pi-durable's own). */
 const fakeBash = (runs: Array<string>, hold?: Promise<void>) =>
@@ -56,14 +56,13 @@ const callBash = (command: string): AssistantMessage =>
   fauxAssistantMessage([fauxToolCall("bash", { command }, { id: "call-bash" })], { stopReason: "toolUse" });
 
 const setup = (mode: RuntimeMode, interaction: InteractionMode = "default") => {
-  const kv = memoryKv();
-  let store = new ApprovalStore(kv, () => {});
+  const open = instanceKv(memoryKv());
+  let store = new ApprovalStore(open(), () => {});
   return {
-    kv,
     store: () => store,
     /** A new instance's store over the same storage (the Session DO's constructor). */
     reopenStore: () => {
-      store = new ApprovalStore(kv, () => {});
+      store = new ApprovalStore(open(), () => {});
     },
     extension: permissions({
       get store() {

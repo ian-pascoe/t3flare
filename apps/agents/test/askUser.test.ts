@@ -5,14 +5,14 @@ import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 
 import { askUser, answerText, QuestionStore } from "../src/extensions/ask-user.ts";
-import { memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
+import { instanceKv, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
 const ask = (args: Record<string, unknown>) => fauxAssistantMessage([fauxToolCall("ask_user", args as never, { id: "ask-1" })], { stopReason: "toolUse" });
 
 describe("ask_user", () => {
   it("waits through restarts for the owner's answer, which is the tool's result", async () => {
-    const kv = memoryKv();
-    let store = new QuestionStore(kv, () => {});
+    const open = instanceKv(memoryKv());
+    let store = new QuestionStore(open(), () => {});
     const host = {
       get store() {
         return store;
@@ -24,7 +24,7 @@ describe("ask_user", () => {
     const question = store.pending()[0]!;
     expect(question).toMatchObject({ question: "Which color?", options: ["red", "blue"], allowFreeText: true, turn: "turn-1" });
     for (let restart = 0; restart < 7; restart++) {
-      store = new QuestionStore(kv, () => {});
+      store = new QuestionStore(open(), () => {});
       await harness.restart();
       await until(() => store.pending().length === 1, `the question after restart ${restart + 1}`);
       await new Promise((resolve) => setTimeout(resolve, 30));

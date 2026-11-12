@@ -12,7 +12,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { codemodeExtension } from "../src/extensions/codemode.ts";
 import { ApprovalStore, PLAN_MODE_REFUSAL, permissions } from "../src/extensions/permissions.ts";
 
-import { memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
+import { instanceKv, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
 const sandboxes: Array<CodemodeSandbox> = [];
 afterAll(async () => {
@@ -75,8 +75,8 @@ const setup = async (
   responses: ReadonlyArray<AssistantMessage>,
   options: { interaction?: InteractionMode; hold?: Promise<void> } = {},
 ) => {
-  const kv = memoryKv();
-  let store = new ApprovalStore(kv, () => {});
+  const open = instanceKv(memoryKv());
+  let store = new ApprovalStore(open(), () => {});
   const ran: Array<string> = [];
   const sandbox = new CodemodeSandbox({ timeoutMs: Number.POSITIVE_INFINITY });
   sandboxes.push(sandbox);
@@ -101,7 +101,7 @@ const setup = async (
     harness,
     store: () => store,
     reopen: () => {
-      store = new ApprovalStore(kv, () => {});
+      store = new ApprovalStore(open(), () => {});
     },
     result: async () => {
       await until(async () => (await harness.lastToolResult()) !== undefined, "the script's result");
@@ -135,21 +135,22 @@ describe("code mode: nested calls are judged like direct ones", () => {
     expect(run.ran).toEqual([]);
   }, 30_000);
 
-  // Hangs on GitHub Actions runners (possible restart race, SPI-1087); passes locally and on stage (m0-p5-restart).
-  it.skipIf(process.env.CI)("approval-required: a nested command asks, survives restarts with one card, and runs once when approved", async () => {
+  it("approval-required: a nested command asks, survives restarts with one card, and runs once when approved", async () => {
     const run = await setup("approval-required", [script(`text(await tools.bash({ command: "rm -rf build" }))`), fauxAssistantMessage("done")]);
     await until(() => run.store().pending().length === 1, "the card");
     const requestId = run.store().pending()[0]!.requestId;
-    for (let restart = 0; restart < 3; restart++) {
+    // Restarts land mid-resume (the code mode call re-running while its nested call waits again) as well as after it
+    // (SPI-1087): the card is in storage throughout, whichever instance's calls were cut off when.
+    for (const [restart, pauseMs] of [20, 20, 300].entries()) {
       run.reopen();
       await run.harness.restart();
       await until(() => run.store().pending().length === 1, `the card after restart ${restart + 1}`);
       expect(run.store().pending()[0]!.requestId).toBe(requestId);
-      // Let the resumed run reach its wait again before the next restart (the card is in storage throughout).
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, pauseMs));
     }
+    expect(run.store().pending().map((card) => card.requestId)).toEqual([requestId]);
     expect(run.ran).toEqual([]);
-    run.store().answer(requestId, "accept");
+    expect(run.store().answer(requestId, "accept")).toBe(true);
     expect(textOf(await run.result())).toContain("ran rm -rf build");
     expect(run.ran).toEqual(["bash rm -rf build"]);
   }, 120_000);
