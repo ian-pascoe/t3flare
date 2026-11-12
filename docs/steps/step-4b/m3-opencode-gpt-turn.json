@@ -1,0 +1,108 @@
+{
+ "at": "2026-11-12T02:45:00.117Z",
+ "scenario": "turn",
+ "ok": true,
+ "failures": [],
+ "cli": "opencode",
+ "result": {
+  "threadId": "ce1c4654-b7ae-4ce9-a585-b506a40f5c71",
+  "root": "/w/cli-opencode-gpt",
+  "model": "anthropic/gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:ce1c4654-b7ae-4ce9-a585-b506a40f5c71:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "dynamic_tool",
+    "status": "completed",
+    "title": "Read /w/cli-opencode-gpt/src/greeting.txt",
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "file_change",
+    "status": "completed",
+    "title": "Tool",
+    "fileName": "/w/cli-opencode-gpt/src/greeting.txt",
+    "input": null
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "title": "Tool",
+    "fileName": null,
+    "input": "bash test.sh"
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   }
+  ],
+  "proposedPlan": [],
+  "text": "Added `Hello from the CLI.` as the last line in [src/greeting.txt](/w/cli-opencode-gpt/src/greeting.txt); `bash test.sh` passed.",
+  "requests": [
+   {
+    "kind": "file-change",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept",
+    "options": []
+   },
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept",
+    "options": []
+   }
+  ],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:opencode:native-thread:pending%3Arun%3Athread%3Ace1c4654-b7ae-4ce9-a585-b506a40f5c71%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "opencode",
+     "nativeId": "ses_e325b4f01ffeDS3ubQqV9Aamfx",
+     "strength": "strong"
+    },
+    "providerInstanceId": "opencode"
+   }
+  ],
+  "ms": 26616
+ },
+ "changed": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)"
+}

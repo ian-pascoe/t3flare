@@ -222,6 +222,75 @@ switch (scenario) {
     finish(arg("out") ?? `m${cli === "claude" ? 2 : 3}-modes.json`, { cli, workspace, rows });
     break;
   }
+  case "resume": {
+    // M4: a turn sets a code word, the Workspace's Container stops, the next turn on the same thread resumes the
+    // agent's own session from the synced state (Claude's projects/, OpenCode's snapshot). Review F8: the proof is the
+    // `acp-request` log line of a session/load or session/resume that succeeded, read from the Worker's logs after.
+    const cookie = await pair();
+    const cli = arg("cli") ?? "claude";
+    await enable(cookie, cli);
+    const workspace = workspaceArg(`resume-${cli}-${Date.now().toString(36)}`);
+    const word = `${cli === "claude" ? "PERSIMMON" : "QUINCE"}-${Math.floor(Math.random() * 90 + 10)}`;
+    const first = await cliTurn(cookie, { cli, workspace, mode: "approval-required", plan: false, prompt: `Remember the code word ${word}. Reply with the single word ok.` });
+    // OpenCode's snapshot is taken within 15 s of a change.
+    await sleep(20_000);
+    const stoppedAt = Date.now();
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(workspace)}`);
+    await sleep(20_000);
+    const second = await cliTurn(cookie, { cli, workspace, mode: "approval-required", plan: false, threadId: first.threadId, prompt: "What was the code word? Reply with it only." });
+    const native = (result: typeof first) => result.providerThreads.map((thread) => thread.nativeThreadRef?.nativeId ?? null);
+    check("turn 1 completed", first.runs.at(-1)?.status === "completed", first.runs);
+    check("turn 2 completed", second.runs.at(-1)?.status === "completed", second.runs);
+    check("turn 2 recalls the code word", second.text.includes(word), second.text);
+    check("the same native session", JSON.stringify(native(first)) === JSON.stringify(native(second)) && native(second).length === 1, { first: native(first), second: native(second) });
+    check("no handoff", !second.items.some((item: any) => /handoff|context_transfer/i.test(String(item.type))), second.items);
+    finish(arg("out") ?? `m4-resume-${cli}.json`, { cli, workspace, word, stoppedAt, first: { threadId: first.threadId, runs: first.runs, native: native(first) }, second: { runs: second.runs, native: native(second), text: second.text, items: second.items } });
+    break;
+  }
+  case "two": {
+    // M4: a Claude turn in one project and an OpenCode turn in another, at once (two Containers).
+    const cookie = await pair();
+    await enable(cookie, "claude");
+    await enable(cookie, "opencode");
+    const stamp = Date.now().toString(36);
+    const [claude, opencode] = await Promise.all([
+      cliTurn(cookie, { cli: "claude", workspace: `two-claude-${stamp}`, mode: "full-access", plan: false, prompt: EDIT_AND_TEST }),
+      cliTurn(cookie, { cli: "opencode", workspace: `two-opencode-${stamp}`, mode: "full-access", plan: false, prompt: EDIT_AND_TEST }),
+    ]);
+    check("Claude completed", claude.runs.at(-1)?.status === "completed", claude.runs);
+    check("OpenCode completed", opencode.runs.at(-1)?.status === "completed", opencode.runs);
+    finish(arg("out") ?? "m4-two-at-once.json", { claude: { runs: claude.runs, ms: claude.ms, text: claude.text }, opencode: { runs: opencode.runs, ms: opencode.ms, text: opencode.text } });
+    break;
+  }
+  case "restart": {
+    // M4: the Environment restarts mid-turn; the old epoch's processes (Claude's child included) are gone before the
+    // new spawn, and t3's continuation finishes the turn.
+    const cookie = await pair();
+    const cli = arg("cli") ?? "claude";
+    await enable(cookie, cli);
+    const workspace = workspaceArg(`restart-${cli}-${Date.now().toString(36)}`);
+    const { projectId } = await ensureProject(cookie, workspace);
+    const threadId = uuid();
+    const model = { instanceId: INSTANCE[cli]!.instanceId, model: INSTANCE[cli]!.model, options: [] };
+    await dispatch(cookie, { type: "thread.create", commandId: uuid(), threadId, projectId, title: `${cli} restart`, modelSelection: model, runtimeMode: "full-access", interactionMode: "default", branch: null, worktreePath: null, createdBy: "user", creationSource: "web" });
+    await sendMessage(cookie, threadId, "Run the shell command `sleep 25 && echo slept`, then reply with the single word done.", model);
+    await sleep(12_000);
+    const before = (await admin("GET", `/_t3flare/agents/process-state?id=${encodeURIComponent(workspace)}`)).json;
+    await admin("POST", "/_t3flare/restart");
+    const restartedAt = Date.now();
+    let projection: any;
+    while (Date.now() - restartedAt < 6 * 60_000) {
+      await sleep(5000);
+      projection = projectionOf(await threadWindow(cookie, threadId).catch(() => undefined));
+      const runs = runsOf(projection);
+      if (runs.length > 0 && runs.every((run) => SETTLED.has(run.status))) break;
+    }
+    const after = (await admin("GET", `/_t3flare/agents/process-state?id=${encodeURIComponent(workspace)}`)).json;
+    const runs = runsOf(projection).map((run: any) => ({ status: run.status, failure: run.failure ?? null }));
+    check("the turn settled", runs.length > 0, runs);
+    finish(arg("out") ?? `m4-restart-${cli}.json`, { cli, workspace, runs, items: itemsOf(projection).map((item: any) => item.type), processesBefore: before, processesAfter: after });
+    break;
+  }
   default:
     console.error(`unknown scenario ${scenario}`);
     process.exit(2);

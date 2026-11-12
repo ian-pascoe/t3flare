@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off effectFnOpportunity:off
+// @effect-diagnostics globalConsole:off globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off
 // Claude Code and OpenCode in the Cloud Environment (step 4b, plan §3 with the review's F1, F2, F4, F7, F9): t3's own
 // kinds (`claudeAgent` "Claude", `opencode` "OpenCode"), so the stock clients' names and icons apply, each built on
 // t3's generic ACP adapter (`makeAcpAdapterV2`) with a flavor of ours, running `claude-agent-acp` or `opencode acp` in
@@ -91,6 +91,8 @@ export const acpCapabilities = (cli: AcpCli) => ({
 /** Never used: only t3's MCP bridge reads it, and t3's MCP is withheld (OD-3). */
 const SELF_INVOCATION = { command: "t3flare-no-self-invocation", entrypoint: undefined } as const;
 
+const LIFECYCLE: ReadonlySet<string> = new Set(["initialize", "session/new", "session/load", "session/resume", "session/fork", "session/close"]);
+
 /** The runtime each session runs: the CLI through t3's spawner (the process channel). */
 const spawnRuntime = (cli: AcpCli) => (input: AcpAdapterV2RuntimeInput) =>
   Effect.gen(function* () {
@@ -100,6 +102,15 @@ const spawnRuntime = (cli: AcpCli) => (input: AcpAdapterV2RuntimeInput) =>
     const context = yield* Layer.build(
       AcpSessionRuntime.layer({
         ...options,
+        // The session lifecycle in the log (method and outcome, never a payload): review F8's resume proof is a
+        // `session/load` or `session/resume` that succeeded.
+        requestLogger: (event) =>
+          Effect.andThen(
+            LIFECYCLE.has(event.method) && event.status !== "started"
+              ? Effect.sync(() => console.log(JSON.stringify({ t3flare: "acp-request", cli, method: event.method, status: event.status })))
+              : Effect.void,
+            options.requestLogger?.(event) ?? Effect.void,
+          ),
         spawn: cli === "claude" ? { command: "claude-agent-acp", args: [], cwd: input.cwd, env: {}, extendEnv: false, shell: false } : { command: "opencode", args: ["acp"], cwd: input.cwd, env: {}, extendEnv: false, shell: false },
         ownDetachedProcessGroup: true,
         ownDescendantProcessGroups: false,

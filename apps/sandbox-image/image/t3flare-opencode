@@ -8,8 +8,15 @@ home=/var/lib/t3flare/cli/${T3FLARE_EXEC:?}
 mkdir -p /etc/opencode "$XDG_DATA_HOME/opencode/log"
 install -m 644 "$home/opencode.json" "/etc/opencode/.opencode.$$.json"
 mv -f "/etc/opencode/.opencode.$$.json" /etc/opencode/opencode.json
-snapshot=/workspace/.t3flare/opencode/opencode.db
-[ -f "$snapshot" ] && cp "$snapshot" "$XDG_DATA_HOME/opencode/opencode.db"
+# Sessions resume from the synced snapshot (plan §7, M0 P5). The snapshot is on agent-writable disk, so what OpenCode
+# would trust from it is removed first: saved "always" approvals (durable allow rules) and accounts.
+snapshot_dir=/workspace/.t3flare/opencode
+snapshot=$snapshot_dir/opencode.db
+db=$XDG_DATA_HOME/opencode/opencode.db
+if [ -f "$snapshot" ]; then
+  cp "$snapshot" "$db"
+  for table in permission account account_state control_account; do sqlite3 "$db" "DELETE FROM $table" 2>/dev/null || true; done
+fi
 log=$XDG_DATA_HOME/opencode/log/opencode.log
 self=$$
 ( while kill -0 "$self" 2>/dev/null; do
@@ -20,4 +27,14 @@ self=$$
     fi
     sleep 1
   done ) </dev/null >/dev/null &
+# The snapshot: a consistent copy (VACUUM INTO reads in one transaction) whenever the database changed, every 15 s.
+( mkdir -p "$snapshot_dir"; last=""
+  while kill -0 "$self" 2>/dev/null; do
+    sleep 15
+    [ -f "$db" ] || continue
+    now=$(stat -c %Y "$db" "$db-wal" 2>/dev/null | sort -n | tail -1)
+    [ "$now" = "$last" ] && continue
+    rm -f "$snapshot_dir/.opencode.db.tmp"
+    if sqlite3 "$db" "VACUUM INTO '$snapshot_dir/.opencode.db.tmp'" 2>/dev/null; then mv -f "$snapshot_dir/.opencode.db.tmp" "$snapshot"; last=$now; fi
+  done ) </dev/null >/dev/null 2>&1 &
 exec /opt/t3flare/opencode/opencode acp
