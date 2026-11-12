@@ -24,7 +24,9 @@ export interface AcpCheckInput {
 export const acpCheck = async (input: AcpCheckInput): Promise<Record<string, unknown>> => {
   const scope = Scope.makeUnsafe();
   const started = Date.now();
-  const command = input.cli === "claude" ? ChildProcess.make("claude-agent-acp", [], { cwd: `/w/${input.workspace}` }) : ChildProcess.make("opencode", ["acp"], { cwd: `/w/${input.workspace}` });
+  // One stdin stream for the process's life, as t3's ACP client keeps (each `Stream.run` into the sink would end it).
+  const options = { cwd: `/w/${input.workspace}`, stdin: { stream: "pipe", endOnDone: false } } as const;
+  const command = input.cli === "claude" ? ChildProcess.make("claude-agent-acp", [], options) : ChildProcess.make("opencode", ["acp"], options);
   const report: Record<string, unknown> = { cli: input.cli };
   const handle = await Effect.runPromise(spawn(command).pipe(Scope.provide(scope)));
   report.spawnMs = Date.now() - started;
@@ -35,7 +37,24 @@ export const acpCheck = async (input: AcpCheckInput): Promise<Record<string, unk
   const permissions: Array<unknown> = [];
   let text = "";
   let stderr = "";
-  const write = (message: unknown) => Effect.runPromise(Stream.run(Stream.make(encoder.encode(`${JSON.stringify(message)}\n`)), handle.stdin).pipe(Effect.ignore));
+  const queue: Array<Uint8Array> = [];
+  const waiters: Array<() => void> = [];
+  const source = Stream.fromAsyncIterable(
+    {
+      async *[Symbol.asyncIterator]() {
+        for (;;) {
+          while (queue.length === 0) await new Promise<void>((resolve) => waiters.push(resolve));
+          yield queue.shift()!;
+        }
+      },
+    },
+    () => new Error("stdin"),
+  );
+  void Effect.runPromise(Stream.run(source, handle.stdin).pipe(Effect.ignore));
+  const write = async (message: unknown) => {
+    queue.push(encoder.encode(`${JSON.stringify(message)}\n`));
+    for (const waiter of waiters.splice(0)) waiter();
+  };
   const decoder = new TextDecoder();
   let carry = "";
   void Effect.runPromise(

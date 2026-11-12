@@ -1,0 +1,56 @@
+{
+ "at": "2026-11-12T02:27:10.803Z",
+ "scenario": "acp",
+ "ok": true,
+ "failures": [],
+ "cli": "claude",
+ "workspace": "acp-claude",
+ "report": {
+  "cli": "claude",
+  "spawnMs": 141,
+  "key": "proc-1c80b93a-d1d1-4b0f-9db0-6c1ef8097a13",
+  "initialize": {
+   "ms": 2109,
+   "authMethods": [],
+   "agent": {
+    "name": "@agentclientprotocol/claude-agent-acp",
+    "title": "Claude Agent",
+    "version": "0.106.0"
+   }
+  },
+  "session": {
+   "ms": 6210,
+   "modes": {
+    "current": "default",
+    "available": [
+     "default",
+     "acceptEdits",
+     "plan"
+    ]
+   },
+   "config": [
+    "mode=default",
+    "model=default",
+    "effort=default",
+    "fast=off",
+    "ultracode=off"
+   ]
+  },
+  "setModel": {
+   "model": "claude-haiku-5-5",
+   "ms": 1849,
+   "error": null
+  },
+  "prompt": {
+   "ms": 1644,
+   "stopReason": "end_turn",
+   "error": null,
+   "text": "ok"
+  },
+  "permissions": [],
+  "markerProcesses": 3,
+  "stderr": " phase=sdk-initialize durationMs=5525 totalMs=5874\n[session/create] sessionId=34a1287d-4448-48e7-b254-fd60d8b0095e phase=models durationMs=65 totalMs=5938\n[session/create] sessionId=34a1287d-4448-48e7-b254-fd60d8b0095e phase=modes durationMs=3 totalMs=5942\n[session/create] sessionId=34a1287d-4448-48e7-b254-fd60d8b0095e phase=agents durationMs=1 totalMs=5943\n[session/create] sessionId=34a1287d-4448-48e7-b254-fd60d8b0095e phase=ultracode durationMs=136 totalMs=6079\n[session/create] sessionId=34a1287d-4448-48e7-b254-fd60d8b0095e phase=register durationMs=6 totalMs=6085\nUnexpected case: {\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"17371aab-0a9f-4701-94ed-9cb5f9b1f4ba\",\"session_id\":\"34a1287d-4448-48e7-b254-fd60d8b0095e\"}\n[idle-compaction] skip: cache TTL is 5m, not 1h\n",
+  "totalMs": 12303,
+  "markerProcessesAfterKill": 0
+ }
+}

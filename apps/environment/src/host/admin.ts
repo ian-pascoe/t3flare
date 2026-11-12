@@ -362,7 +362,14 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const { environmentServices } = await import("../agents/bindings.ts");
         if (!environmentServices().faults) return json({ error: "stages only" }, 403);
         const { acpCheck } = await import("./acpCheck.ts");
-        return json(await acpCheck((await request.json()) as never));
+        const idle = await import("./idle.ts");
+        // A check outlasts the idle window; it is work in flight (the admin routes are not counted otherwise).
+        idle.requestStarted();
+        try {
+          return json(await acpCheck((await request.json()) as never));
+        } finally {
+          idle.requestEnded();
+        }
       }
       case "POST /_t3flare/check/leak": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");

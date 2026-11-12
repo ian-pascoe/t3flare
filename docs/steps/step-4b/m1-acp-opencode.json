@@ -1,0 +1,48 @@
+{
+ "at": "2026-11-12T02:28:11.949Z",
+ "scenario": "acp",
+ "ok": true,
+ "failures": [],
+ "cli": "opencode",
+ "workspace": "acp-opencode",
+ "report": {
+  "cli": "opencode",
+  "spawnMs": 96,
+  "key": "proc-7abd7694-ef82-4d38-8e92-076b24edbc90",
+  "initialize": {
+   "ms": 1612,
+   "authMethods": [
+    "opencode-login"
+   ],
+   "agent": {
+    "name": "OpenCode",
+    "version": "2.2.7"
+   }
+  },
+  "session": {
+   "ms": 2699,
+   "modes": null,
+   "config": [
+    "model=t3flare/claude-sonnet-5-5",
+    "effort=default",
+    "mode=build"
+   ]
+  },
+  "setModel": {
+   "model": "t3flare/claude-haiku-5-5",
+   "ms": 110,
+   "error": null
+  },
+  "prompt": {
+   "ms": 3048,
+   "stopReason": "end_turn",
+   "error": null,
+   "text": "ok"
+  },
+  "permissions": [],
+  "markerProcesses": 5,
+  "stderr": "",
+  "totalMs": 7719,
+  "markerProcessesAfterKill": 0
+ }
+}

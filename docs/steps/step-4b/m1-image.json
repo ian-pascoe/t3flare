@@ -1,0 +1,32 @@
+{
+  "step": "4b",
+  "milestone": "M1 (image, profiles, key) on stage step4b",
+  "date": "2026-11-12",
+  "image": {
+    "size": "1.05 GB (docker's image size, amd64) against step 4a's 751 MB: +0.3 GB",
+    "layers": "claude: npm ci from apps/sandbox-image/image/claude/package-lock.json (claude-agent-acp 0.106.0, SDK 0.3.322, only the linux-x64 platform package); opencode: the release tarball opencode-linux-x64.tar.gz v2.2.7, sha256 89a6cee2…ca7, one binary (npm's package would add the musl build, M0 P7)",
+    "coldBuildOfTheNewLayers": "about 80 s (apt + tarball in their own stage, npm ci 30 s), the rest from step 4a's cache"
+  },
+  "coldStart": {
+    "how": "Workspace acp-claude's Container stopped (admin workspace-stop), 15 s later POST /_t3flare/agents/acp-check {cli: claude}",
+    "spawnMs": 3168,
+    "initializeMs": 2059,
+    "sessionNewMs": 5829,
+    "promptMs": 2115,
+    "wallMs": 18115,
+    "verdict": "first answer of a cold Claude Code session in 18 s wall, under OD-2's 45 s"
+  },
+  "smoke": {
+    "claude": "m1-acp-claude.json: initialize (authMethods []), session/new with modes [default, acceptEdits, plan] current default, model claude-haiku-5-5 set, prompt end_turn 'ok', 3 marker processes, 0 after the kill",
+    "opencode": "m1-acp-opencode.json: initialize, session/new (model t3flare/claude-sonnet-5-5, mode build), model t3flare/claude-haiku-5-5 set, prompt end_turn 'ok', 5 marker processes (launcher watcher, opencode acp, its serve child), 0 after the kill"
+  },
+  "leak": {
+    "how": "POST /_t3flare/check/leak?id=<workspace> (4a's scan: DO files, Container files, /proc environ and cmdline) after each smoke",
+    "acp-claude": { "do": [], "containerHits": [], "files": 591 },
+    "acp-opencode": { "do": [], "containerHits": [], "files": 593 }
+  },
+  "findings": [
+    "The admin routes are not counted as requests in flight: a check longer than the idle window (60 s) was cut by the idle reset; acp-check now counts itself",
+    "Each Stream.run into a channel handle's stdin sink ends stdin when endOnDone is left true: the harness keeps one stream for the process's life, as t3's ACP client does"
+  ]
+}
