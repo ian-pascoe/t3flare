@@ -1,20 +1,20 @@
 {
- "at": "2026-11-12T16:14:28.231Z",
+ "at": "2026-11-12T18:59:42.242Z",
  "cli": "opencode",
- "workspace": "tools-cli-opencode-mwdqxbcj",
+ "workspace": "tools-cli-opencode-mwdwta8e",
  "cases": [
   {
    "name": "a read (fixture_echo) runs without a card",
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:a0753a52-dc11-4b1b-b715-9c41938e88c6:ordinal:1",
+    "id": "run:thread:d57e28f1-9a27-46e0-9ed0-1d9ae32c4a61:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "hello-opencode-mwdqxbcj",
+   "text": "hello-opencode-mwdwta8e",
    "items": [
     {
      "type": "dynamic_tool",
@@ -32,13 +32,13 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:dc4859e4-b88f-4245-bd1e-0196c1dd28f4:ordinal:1",
+    "id": "run:thread:35c44906-b3ca-4695-bf62-c261fe12b4d3:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [
     {
-     "id": "runtime-request:opencode:t3flare-push:07963138-4cb6-4885-81bb-57b4fe844b06",
+     "id": "runtime-request:opencode:t3flare-push:658ed6d3-3e6b-447b-b724-8e39219d15ef",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
@@ -48,7 +48,7 @@
    ],
    "requests": [
     {
-     "id": "runtime-request:opencode:t3flare-push:07963138-4cb6-4885-81bb-57b4fe844b06",
+     "id": "runtime-request:opencode:t3flare-push:658ed6d3-3e6b-447b-b724-8e39219d15ef",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
@@ -67,7 +67,7 @@
     }
    ],
    "notesAdded": [
-    "opencode-mwdqxbcj-approved"
+    "opencode-mwdwta8e-approved"
    ],
    "ok": true
   },
@@ -76,13 +76,13 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:bf1b9b0b-880d-41d8-a2e6-29851f9b6013:ordinal:1",
+    "id": "run:thread:378ae695-79ff-4950-93df-e572ce7d7aee:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [
     {
-     "id": "runtime-request:opencode:t3flare-push:ce299771-aa9b-4ec7-98f1-71559f91771c",
+     "id": "runtime-request:opencode:t3flare-push:cc169fff-b93c-4563-b14b-5cc5a8af8de7",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
@@ -92,7 +92,7 @@
    ],
    "requests": [
     {
-     "id": "runtime-request:opencode:t3flare-push:ce299771-aa9b-4ec7-98f1-71559f91771c",
+     "id": "runtime-request:opencode:t3flare-push:cc169fff-b93c-4563-b14b-5cc5a8af8de7",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
@@ -100,7 +100,7 @@
      "options": []
     }
    ],
-   "text": "The call was refused. The owner declined to approve `fixture_note`, so it didn't run and nothing was logged. I stopped there, as you asked.",
+   "text": "The call was refused. The owner declined to approve `fixture_note` on the \"fixture\" MCP server, so the line \"opencode-mwdwta8e-declined\" was not recorded. I've stopped there.",
    "items": [
     {
      "type": "dynamic_tool",
@@ -118,7 +118,7 @@
    "mode": "full-access",
    "plan": false,
    "run": {
-    "id": "run:thread:002fef49-4b6e-4e45-9887-af5177416759:ordinal:1",
+    "id": "run:thread:1ff2c3e8-e68a-42bc-8df2-b13de22a414d:ordinal:1",
     "status": "completed",
     "failure": null
    },
@@ -135,7 +135,7 @@
     }
    ],
    "notesAdded": [
-    "opencode-mwdqxbcj-full"
+    "opencode-mwdwta8e-full"
    ],
    "ok": true
   },
@@ -144,13 +144,13 @@
    "mode": "full-access",
    "plan": true,
    "run": {
-    "id": "run:thread:cc35263f-4d13-4cc6-a94f-e59f4cb54173:ordinal:1",
+    "id": "run:thread:426c2f05-eb97-446a-8e72-a8ee0e0c1789:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "things outside the thread. The tool writes to the fixture's log, so plan mode blocks it.\n\nI haven't tried another route, such as the `commissary` server's copy of the tool or a shell command. You said to use only that tool, and a workaround would sidestep the read-only restriction.\n\nTo run it, switch this thread out of plan mode and ask me again. I'll then call the tool and report what it answers.",
+   "text": "used with this message: \"this thread is in plan mode, which is read-only; this tool may change things outside it.\"\n\nThe tool writes a line to the fixture's log, so plan mode blocks it. I didn't try another route, and I ran no shell commands.\n\nTo run it, switch this thread out of Plan mode and ask again. I'll then call `fixture_note` with `line: \"opencode-mwdwta8e-plan\"` and report what it answers.",
    "items": [
     {
      "type": "dynamic_tool",
@@ -168,14 +168,21 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:49bb283d-1e23-496c-a11d-a535afac217d:ordinal:1",
+    "id": "run:thread:8235a3de-3185-4ba4-a0d0-ffa0e0f2d5f4:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "`t3_thread_list` lists **6 threads**. The response reports `total: 6` and `nextCursor: null`, so there are no further pages.",
+   "text": "`t3_thread_list` lists **6 threads**. The returned total is 6, and all 6 came back in one page with no further pages. With no arguments it lists only the current project's threads and leaves out subagent threads.",
    "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Tool",
+     "fileName": null,
+     "input": null
+    },
     {
      "type": "dynamic_tool",
      "status": "completed",
