@@ -68,3 +68,28 @@ All on the throwaway stage `step3plus` (workers.dev host), linked to the owner's
 - **Sign-in expiry:** a code left unapproved ended `CloudCliAuthorizationTimeoutError` after 10 minutes, the hold was
   released, and the Environment then reset when idle. `m1-sign-in-expiry.json`.
 - `bun run check` passes.
+
+### M2: every row against the real relay, no phone
+
+`scripts/connect-m2.ts` on the stage, from the stock client's protocol; read from the publish recorder (the relay's
+own answers). `m2-publishes.json` (the run on the final build), `m2-publishes-2.json` (the earlier run of rows e–j).
+
+| Row | What ran | Published (relay `ok: true` for each) | Pass |
+|---|---|---|---|
+| a | a turn that completes, no socket open | `starting`, `running`, `completed` (after the 5 s hold) | ✅ |
+| b | an approval-required `bash`, answered after 30 s | … `waiting_for_approval` while it waited, then `running`, `completed` | ✅ |
+| c | an `ask_user` question, answered after 30 s | … `waiting_for_input`, then `running`, `completed` | ✅ |
+| d | a proxy-fault usage limit | `starting`, `running`, `failed` (D3: "Agent failed") | ✅ |
+| e | Stop during a `bash` | `starting`, `running`, then a tombstone; nothing alertable | ✅ |
+| f | `restart?mode=abort` mid-turn | `running`; after the boot the continuation's `starting`, `running`, `completed` | ✅ |
+| g | publishing off, one turn | nothing | ✅ |
+| h | restart while an approval waits (finding 4) | before: `waiting_for_approval`. After: the run is `cancelled` (ADR-0004, no continuation for an approval) and the after-boot republish sends a **tombstone**, which clears the phone's card | ✅ built, not accepted |
+| i | restart while `ask_user` waits (finding 4) | after the boot step 3's re-raise asks again: `waiting_for_input` published; answered, then `completed` | ✅ |
+| j | the environment removed on the relay (as the T3 apps' removal), then a turn (finding 8) | every publish refused: `RelayAuthInvalidError`, status 401, `rejected: true`; t3 retried 5 times then gave up; `relink` restored it | ✅ |
+
+- **Idle:** after the runs the Environment reset when idle (no holds left), and a later wake published nothing new.
+  `m2-idle-wake.json`.
+- **Leaks:** the publish credential and both parts of the account token appear in neither the Workspace's Container
+  nor the four Sessions' state (`m2-leak.json`, 0), nor in Workers Logs over the M2 window (`m2-leak-logs.json`).
+- **Deliveries were 0** throughout: the relay lists one iOS device (app 2.3.0) with notifications switched off. That is
+  the phone's setting, and the relay still accepted every publish.
