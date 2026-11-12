@@ -29,35 +29,14 @@ A Peer link another Environment made to the Cloud Environment; what it starts he
 _Avoid_: laptop link, incoming connection
 
 **Outbound link**:
-A Peer link the Cloud Environment made to a Registered machine, today the Laptop Environment. Only the owner makes
-one, and only the owner's threads use it.
+A Peer link the Cloud Environment made to another Environment, today the Laptop Environment. Made and governed as
+on stock t3: by the owner or at an agent's asking, at the access the owner picks.
 _Avoid_: reverse link, cloud-to-laptop link, laptop tunnel
 
-**Registered machine**:
-An Environment the owner has allowed the Cloud Environment to link out to, named by its environment id, with its
-Routes and the highest access a link to it may have.
-_Avoid_: Owner machine, target, peer
-
 **Route**:
-One way the Cloud Environment reaches a Registered machine: an https address and the kind of tunnel behind it (T3
-Connect, the owner's own Cloudflare Tunnel, or Tailscale Funnel). Used in t3's sense.
+One https address at which an Environment can be reached, and the kind of tunnel behind it (T3 Connect, Tailscale
+Funnel, or the owner's own Cloudflare Tunnel). Used in t3's sense.
 _Avoid_: transport, endpoint, tunnel (for the address)
-
-**Outbound work**:
-Threads the Cloud Environment started in another Environment over an Outbound link; that Environment sees them as
-its Linked work.
-_Avoid_: laptop threads, remote threads
-
-**Outbound send**:
-A message a cloud agent sends to another Environment over an Outbound link: launching a thread, delegating a task,
-messaging a thread, replacing a queued message or answering a question. Each one waits for the owner's answer on a
-card of its own.
-_Avoid_: forwarded call, remote prompt
-
-**Send permit**:
-The owner's approval of one Outbound send exactly as it will leave, made by the Environment alone from the owner's
-own answer and matched when that send leaves; it covers that thread, that tool and those arguments, once.
-_Avoid_: grant (that is t3's bootstrap grant), token, Expectation (that is a push's)
 
 **Linked work**:
 Threads a Peer link started in the Environment it signed in to, and the work derived from them; each carries the link's
