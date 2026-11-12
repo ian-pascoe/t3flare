@@ -1,4 +1,4 @@
-// @effect-diagnostics globalFetch:off globalConsole:off
+// @effect-diagnostics globalFetch:off globalConsole:off cryptoRandomUUID:off
 // computer's `WorkspaceProxy` (the Container's egress back to its Workspace DO, `ctx.exports.WorkspaceProxy`) with more
 // paths, which computer's proxy answers 404 (it forwards only `/api` and its connect callbacks):
 //
@@ -33,12 +33,17 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
     const workspace = namespace.get(target);
     if (gateway) {
       // SAFETY: the Workspace DO answers `pushTarget` and `authorizePush` (WorkspaceDO.ts).
-      const rpc = workspace as unknown as Pick<WorkspaceDO, "pushTarget" | "authorizePush">;
+      const rpc = workspace as unknown as Pick<WorkspaceDO, "pushTarget" | "authorizePush" | "cancelPushAsk">;
       const pushTarget = await rpc.pushTarget().catch(() => null);
       return handleGitRequest(request, {
         repo: pushTarget?.repo ?? null,
         token: () => (pushTarget === null ? Promise.reject(new Error("no push target")) : Promise.resolve(pushTarget.token)),
-        authorize: (push) => rpc.authorizePush(push),
+        authorize: (push, signal) => {
+          // git went away while the owner was asked (review M7): the card is withdrawn.
+          const askId = crypto.randomUUID();
+          signal.addEventListener("abort", () => void rpc.cancelPushAsk({ askId }).catch(() => undefined));
+          return rpc.authorizePush({ ...push, askId });
+        },
         fetch: (input, init) => fetch(input, init),
       }).catch((error: unknown) => {
         console.warn(JSON.stringify({ t3flare: "push-gateway-failed", error: String(error).slice(0, 300) }));

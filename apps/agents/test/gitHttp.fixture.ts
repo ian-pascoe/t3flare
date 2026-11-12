@@ -88,13 +88,37 @@ export const serve = async (handler: (request: Request) => Promise<Response>) =>
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) if (typeof value === "string") headers.set(key, value);
     const hasBody = req.method !== "GET" && req.method !== "HEAD";
-    const body = hasBody ? (new ReadableStream({ start(controller) { const safely = (act: () => void) => { try { act(); } catch { /* the handler cancelled the body */ } }; req.on("data", (chunk: Buffer) => safely(() => controller.enqueue(new Uint8Array(chunk)))); req.on("end", () => safely(() => controller.close())); } }) as ReadableStream<Uint8Array>) : null;
-    const response = await handler(new Request(url, { method: req.method, headers, body, ...(hasBody ? { duplex: "half" } : {}) } as RequestInit));
+    // The client going away (git killed) errors the body and aborts the request's signal, as workerd does.
+    const gone = new AbortController();
+    let ended = false;
+    req.on("end", () => (ended = true));
+    res.on("close", () => {
+      if (!res.writableFinished) gone.abort();
+    });
+    const body = hasBody
+      ? (new ReadableStream({
+          start(controller) {
+            const safely = (act: () => void) => {
+              try {
+                act();
+              } catch {
+                /* the handler cancelled the body */
+              }
+            };
+            req.on("data", (chunk: Buffer) => safely(() => controller.enqueue(new Uint8Array(chunk))));
+            req.on("end", () => safely(() => controller.close()));
+            req.on("close", () => {
+              if (!ended) safely(() => controller.error(new Error("client went away")));
+            });
+          },
+        }) as ReadableStream<Uint8Array>)
+      : null;
+    const response = await handler(new Request(url, { method: req.method, headers, body, signal: gone.signal, ...(hasBody ? { duplex: "half" } : {}) } as RequestInit));
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  return { port: (server.address() as AddressInfo).port, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  return { port: (server.address() as AddressInfo).port, close: () => new Promise<void>((resolve) => { server.close(() => resolve()); server.closeAllConnections(); }) };
 };
 
 export const tempDir = (prefix: string): string => fs.mkdtempSync(path.join(os.tmpdir(), prefix));

@@ -196,8 +196,11 @@ export interface GatewayDeps {
   readonly repo: { readonly owner: string; readonly name: string } | null;
   /** The gateway's write token (`contents: write`, review M4): only ever sent to github.com in a header. */
   readonly token: () => Promise<string>;
-  /** The push policy (Workspace DO `authorizePush`): may hold the request while the owner is asked. */
-  readonly authorize: (push: { readonly updates: ReadonlyArray<RefUpdate>; readonly pushOptions: ReadonlyArray<string> }) => Promise<{ readonly allow: true } | { readonly allow: false; readonly reason: string }>;
+  /**
+   * The push policy (Workspace DO `authorizePush`): may hold the request while the owner is asked. `signal` aborts when
+   * git goes away meanwhile (a CLI's command timeout, review M7), so the owner's card is withdrawn.
+   */
+  readonly authorize: (push: { readonly updates: ReadonlyArray<RefUpdate>; readonly pushOptions: ReadonlyArray<string> }, signal: AbortSignal) => Promise<{ readonly allow: true } | { readonly allow: false; readonly reason: string }>;
   readonly fetch: (input: string, init: RequestInit) => Promise<Response>;
 }
 
@@ -270,7 +273,15 @@ export const handleGitRequest = async (request: Request, deps: GatewayDeps): Pro
     const token = await deps.token();
     return downstream(await deps.fetch(`${base}/git-receive-pack`, { method: "POST", headers: upstreamHeaders(request.headers, token, true), body: FLUSH, redirect: "manual" }));
   }
-  const decision = await deps.authorize({ updates: parsed.updates, pushOptions: parsed.pushOptions });
+  // While the policy decides (the owner may be asked), the next read of the body notices git going away; a chunk it
+  // reads is kept for GitHub.
+  const gone = new AbortController();
+  const onAbort = () => gone.abort();
+  request.signal.addEventListener("abort", onAbort);
+  let early: Promise<ReadableStreamReadResult<Uint8Array>> | undefined = done ? undefined : reader.read();
+  early?.catch(() => gone.abort());
+  const decision = await deps.authorize({ updates: parsed.updates, pushOptions: parsed.pushOptions }, gone.signal).finally(() => request.signal.removeEventListener("abort", onAbort));
+  if (gone.signal.aborted) return text(499, "git went away while the push waited");
   if (!decision.allow) {
     void reader.cancel().catch(() => undefined);
     return refusalResponse(parsed, decision.reason);
@@ -283,7 +294,12 @@ export const handleGitRequest = async (request: Request, deps: GatewayDeps): Pro
       if (rest.length > 0) controller.enqueue(rest);
     },
     async pull(controller) {
-      const chunk = done ? ({ done: true } as const) : await reader.read();
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      if (early !== undefined) {
+        chunk = await early;
+        early = undefined;
+        if (chunk.done) done = true;
+      } else chunk = done ? { done: true, value: undefined } : await reader.read();
       if (chunk.done) controller.close();
       else controller.enqueue(chunk.value);
     },

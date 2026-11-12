@@ -282,7 +282,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * RPC from a Workspace DO (the push gateway's policy): asks the owner about a push on a CLI thread's live turn
    * (SPI-1040). Counted as open work for the idle check while it waits (review M7).
    */
-  async approvePush(input: { readonly thread: string; readonly workspace: string; readonly linked: boolean; readonly summary: string; readonly detail: string }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }> {
+  async approvePush(input: { readonly thread: string; readonly workspace: string; readonly linked: boolean; readonly askId: string; readonly summary: string; readonly detail: string }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }> {
     Idle.requestStarted();
     try {
       const { approveCliPush } = await import("./provider/cli/linkedPushAsk.ts");
@@ -290,6 +290,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     } finally {
       Idle.requestEnded();
     }
+  }
+
+  /** RPC from a Workspace DO: the push's git went away (review M7); the card `approvePush` raised is withdrawn. */
+  async cancelPush(input: { readonly askId: string }): Promise<void> {
+    const { cancelCliPush } = await import("./provider/cli/linkedPushAsk.ts");
+    cancelCliPush(input.askId);
   }
 
   /**

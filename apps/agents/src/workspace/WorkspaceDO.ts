@@ -242,6 +242,10 @@ export class WorkspaceDO extends ContainerHost {
   #readToken: { readonly token: string; readonly expiresAt: number } | undefined;
   /** The push gateway's write token and the repo it is for: in this object's memory only, never sent to the Container. */
   #pushToken: { readonly token: string; readonly expiresAt: number; readonly repo: { readonly owner: string; readonly name: string } } | undefined;
+  /** The owner's questions about pushes in flight, by the gateway's ask id: how to withdraw each (review M7). */
+  readonly #pushAsks = new Map<string, () => Promise<void>>();
+  /** Ask ids withdrawn before their question was raised. */
+  readonly #withdrawnAsks = new Set<string>();
   /** Test stages only (`probePush`): how long each gateway decision is held (P2). */
   #probeHoldMs = 0;
   /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
@@ -1569,7 +1573,7 @@ export class WorkspaceDO extends ContainerHost {
    * The gateway's question (SPI-992): may this request's exact ref updates reach GitHub? Answered by `pushDecision`;
    * an ask holds the request until the owner answers (PUSH_APPROVAL_MS). Every decision is logged, never a token.
    */
-  async authorizePush(input: { readonly updates: ReadonlyArray<RefUpdate>; readonly pushOptions: ReadonlyArray<string> }): Promise<{ readonly allow: true } | { readonly allow: false; readonly reason: string }> {
+  async authorizePush(input: { readonly updates: ReadonlyArray<RefUpdate>; readonly pushOptions: ReadonlyArray<string>; readonly askId?: string }): Promise<{ readonly allow: true } | { readonly allow: false; readonly reason: string }> {
     const id = this.#workspaceId() ?? null;
     if (this.#probeHoldMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#probeHoldMs));
     const now = Date.now();
@@ -1593,14 +1597,27 @@ export class WorkspaceDO extends ContainerHost {
       log("refused", { reason: decision.reason });
       return { allow: false, reason: decision.reason };
     }
-    const answer = await this.#askPush(decision.on, input.updates).catch((error: unknown) => ({ approved: false, trust: false, reason: String(error).slice(0, 200) }));
+    const answer = await this.#askPush(decision.on, input.updates, input.askId ?? crypto.randomUUID()).catch((error: unknown) => ({ approved: false, trust: false, reason: String(error).slice(0, 200) }));
     if (answer.approved && answer.trust && !decision.on.linked) await this.trustAgain({ by: decision.on.kind === "session" ? decision.on.name : `cli:${decision.on.thread}` });
     log(answer.approved ? "approved" : "declined", { on: decision.on, reason: answer.reason ?? null, trusted: answer.trust });
     return answer.approved ? { allow: true } : { allow: false, reason: answer.reason === "decline" || answer.reason === undefined ? "declined by the owner" : `not approved: ${answer.reason}` };
   }
 
+  /** The gateway's git went away while its push was asked (review M7): the owner's card is withdrawn. */
+  async cancelPushAsk(input: { readonly askId: string }): Promise<void> {
+    const withdraw = this.#pushAsks.get(input.askId);
+    if (withdraw === undefined) {
+      this.#withdrawnAsks.add(input.askId);
+      if (this.#withdrawnAsks.size > 64) this.#withdrawnAsks.delete(this.#withdrawnAsks.values().next().value!);
+      return;
+    }
+    console.log(JSON.stringify({ t3flare: "push-ask-withdrawn", workspace: this.#workspaceId() ?? null }));
+    await withdraw();
+  }
+
   /** Asks `on` about the push, with a card built from GitHub's tips and what the Workspace reports (review M6). */
-  async #askPush(on: Asked, updates: ReadonlyArray<RefUpdate>): Promise<{ readonly approved: boolean; readonly trust: boolean; readonly reason?: string }> {
+  async #askPush(on: Asked, updates: ReadonlyArray<RefUpdate>, askId: string): Promise<{ readonly approved: boolean; readonly trust: boolean; readonly reason?: string }> {
+    if (this.#withdrawnAsks.delete(askId)) return { approved: false, trust: false, reason: "git went away" };
     const target = await this.pushTarget();
     const facts = target === null ? { tips: {}, defaultBranch: null } : await this.#githubFacts(target);
     const reported = await this.#reportedCommits(updates, facts.tips).catch(() => ({}));
@@ -1608,17 +1625,29 @@ export class WorkspaceDO extends ContainerHost {
     if (on.kind === "cli") {
       // SPI-1040 (M3): a CLI thread is asked through the Environment, which raises the card on that thread's live turn.
       const card = pushCard({ updates, tips: facts.tips, defaultBranch: facts.defaultBranch, reported, linkLabel: on.linked ? "a linked environment" : null });
-      const answer = await environmentStub(this.env.ENVIRONMENT).approvePush({ thread: on.thread, workspace, linked: on.linked, ...card });
-      return { approved: answer.approved, trust: answer.trust === true, ...(answer.reason === undefined ? {} : { reason: answer.reason }) };
+      const environment = environmentStub(this.env.ENVIRONMENT);
+      this.#pushAsks.set(askId, () => environment.cancelPush({ askId }));
+      try {
+        const answer = await environment.approvePush({ thread: on.thread, workspace, linked: on.linked, askId, ...card });
+        return { approved: answer.approved, trust: answer.trust === true, ...(answer.reason === undefined ? {} : { reason: answer.reason }) };
+      } finally {
+        this.#pushAsks.delete(askId);
+      }
     }
     const sessions = this.env.SESSIONS;
     if (sessions === undefined) return { approved: false, trust: false, reason: "no Session binding" };
     // SAFETY: the Session DO answers `approveGitPush` (SessionDO.ts).
     const session = sessions.get(sessions.idFromName(on.name)) as unknown as {
-      approveGitPush(input: { readonly workspace: string; readonly linked: boolean; readonly updates: ReadonlyArray<RefUpdate>; readonly tips: Readonly<Record<string, string>>; readonly defaultBranch: string | null; readonly reported: Readonly<Record<string, ReportedCommit>> }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }>;
+      approveGitPush(input: { readonly workspace: string; readonly linked: boolean; readonly askId: string; readonly updates: ReadonlyArray<RefUpdate>; readonly tips: Readonly<Record<string, string>>; readonly defaultBranch: string | null; readonly reported: Readonly<Record<string, ReportedCommit>> }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }>;
+      cancelGitPush(input: { readonly askId: string }): Promise<void>;
     };
-    const answer = await session.approveGitPush({ workspace, linked: on.linked, updates, tips: facts.tips, defaultBranch: facts.defaultBranch, reported });
-    return { approved: answer.approved, trust: answer.trust === true, ...(answer.reason === undefined ? {} : { reason: answer.reason }) };
+    this.#pushAsks.set(askId, () => session.cancelGitPush({ askId }));
+    try {
+      const answer = await session.approveGitPush({ workspace, linked: on.linked, askId, updates, tips: facts.tips, defaultBranch: facts.defaultBranch, reported });
+      return { approved: answer.approved, trust: answer.trust === true, ...(answer.reason === undefined ? {} : { reason: answer.reason }) };
+    } finally {
+      this.#pushAsks.delete(askId);
+    }
   }
 
   /** GitHub's tips (its receive-pack advertisement) and default branch, read with the gateway's token. Empty on failure. */

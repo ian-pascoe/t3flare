@@ -1,0 +1,18 @@
+{
+ "at": "2026-11-12T12:35:57.863Z",
+ "mode": "p2",
+ "stamp": "mwdj5x20",
+ "fixture": "ian-pascoe/t3flare-fixture",
+ "p2": {
+  "holdMs": 600000,
+  "output": "",
+  "ms": 0,
+  "remote": null,
+  "commit": "81eb5000d2fa4c3449606274cf8dba8cae3cdf76"
+ },
+ "cleanup": [],
+ "failures": [
+  "P2: a receive-pack POST held 10 min lands: {\"holdMs\":600000,\"output\":\"\",\"ms\":0,\"remote\":null,\"commit\":\"81eb5000d2fa4c3449606274cf8dba8cae3cdf76\"}"
+ ],
+ "ok": false
+}

@@ -130,6 +130,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   /** Registry the tool extensions install into, before the Harness resumes work that needs them. */
   readonly #registry: RegistryReader;
   readonly #approvals: ApprovalStore;
+  /** Push questions in flight, by the gateway's ask id (SPI-992, review M7): aborted when the push's git goes away. */
+  readonly #pushAsks = new Map<string, AbortController>();
   /** The agent's questions to the owner (`ask_user`, step 3). */
   readonly #questions: QuestionStore;
   /** The proxy's model list (ADR-0012), kept in this object's storage and read again when it is old. */
@@ -266,6 +268,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   async approveGitPush(input: {
     readonly workspace: string;
     readonly linked: boolean;
+    readonly askId?: string;
     readonly updates: ReadonlyArray<RefUpdate>;
     readonly tips: Readonly<Record<string, string>>;
     readonly defaultBranch: string | null;
@@ -279,7 +282,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (turn === null) return { approved: false, reason: "no live turn to ask on" };
     const requestId = `push:${crypto.randomUUID()}`;
     const card = pushCard({ updates: input.updates, tips: input.tips, defaultBranch: input.defaultBranch, reported: input.reported, linkLabel: input.linked ? (meta?.linked?.label ?? "a linked environment") : null });
-    const context = withAbortSignal(AbortSignal.timeout(PUSH_APPROVAL_MS), BACKGROUND_CONTEXT);
+    const withdrawn = new AbortController();
+    if (input.askId !== undefined) this.#pushAsks.set(input.askId, withdrawn);
+    const context = withAbortSignal(AbortSignal.any([AbortSignal.timeout(PUSH_APPROVAL_MS), withdrawn.signal]), BACKGROUND_CONTEXT);
     try {
       const answer = await this.#approvals.ask(
         { requestId, turn, callId: "", tool: "git push", kind: "git-push", summary: card.summary, detail: card.detail, createdAt: Date.now() },
@@ -290,10 +295,17 @@ export class SessionDO extends DurableObject<SessionEnv> {
       const trust = !input.linked && answer.decision === "acceptForSession";
       return approved ? { approved, trust } : { approved, reason: answer.decision };
     } catch {
-      return { approved: false, reason: "no answer in time" };
+      return { approved: false, reason: withdrawn.signal.aborted ? "git went away" : "no answer in time" };
     } finally {
       this.#approvals.settle(requestId);
+      if (input.askId !== undefined) this.#pushAsks.delete(input.askId);
     }
+  }
+
+  /** RPC from the Workspace DO: the push's git went away while it was asked (review M7): its card is withdrawn. */
+  cancelGitPush(input: { readonly askId: string }): Promise<void> {
+    this.#pushAsks.get(input.askId)?.abort();
+    return Promise.resolve();
   }
 
   // -------------------------------------------------------------------------------------------------------------------

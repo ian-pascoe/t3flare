@@ -1,6 +1,7 @@
 // The push gateway (SPI-992, review M1): what it reads from a Container's receive-pack request, checked against the
 // request prefixes git 2.56 sent in probe P4 (`scripts/p4-push-shapes.ts`) and against a strict pkt-line grammar.
-// @effect-diagnostics nodeBuiltinImport:off globalFetch:off
+// @effect-diagnostics nodeBuiltinImport:off globalFetch:off globalTimers:off
+import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -104,9 +105,9 @@ describe("handleGitRequest: real git through the gateway to a local GitHub stand
     const deps: GatewayDeps = {
       repo: { owner: "owner", name: "Repo" },
       token: () => Promise.resolve("ghs_gatewaytoken"),
-      authorize: (push) => {
+      authorize: (push, signal) => {
         calls.push(push);
-        return authorize(push);
+        return authorize(push, signal);
       },
       fetch: upstream.fetch,
     };
@@ -158,6 +159,20 @@ describe("handleGitRequest: real git through the gateway to a local GitHub stand
     expect(t.calls).toHaveLength(1);
     expect(t.upstream.refs()).toContain("refs/heads/main");
   });
+
+  it("cancels the owner's question when git goes away while it waits (review M7: a CLI's command timeout)", async () => {
+    let aborted: Promise<void> | undefined;
+    const t = await setup((_push, signal) => {
+      aborted = new Promise((resolve) => signal.addEventListener("abort", () => resolve()));
+      return new Promise(() => undefined);
+    });
+    // A command timeout kills the command's process group: git and its `git-remote-http`, which holds the connection.
+    const push = spawn("git", ["push", t.remote, "HEAD:refs/heads/spi992/c"], { cwd: t.work, env: t.env, detached: true });
+    for (let i = 0; i < 100 && aborted === undefined; i++) await new Promise((resolve) => setTimeout(resolve, 50));
+    process.kill(-push.pid!, "SIGKILL");
+    await expect(Promise.race([aborted!.then(() => "aborted"), new Promise((resolve) => setTimeout(() => resolve("still waiting"), 5000))])).resolves.toBe("aborted");
+    await t.server.close();
+  }, 20_000);
 
   it("refuses another repo, other paths and query strings, and a compressed receive-pack body", async () => {
     const t = await setup(() => Promise.resolve({ allow: true }));
