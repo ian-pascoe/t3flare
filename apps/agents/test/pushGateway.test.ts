@@ -100,7 +100,9 @@ describe("parseCommands: the strict grammar (review M1)", () => {
 describe("handleGitRequest: real git through the gateway to a local GitHub stand-in", { timeout: 30_000 }, () => {
   const setup = async (authorize: GatewayDeps["authorize"]) => {
     const root = tempDir("gateway-");
-    const upstream = makeUpstream(path.join(root, "github"), "Owner", "repo");
+    // The registry's spelling (`deps.repo`), which the gateway sends upstream; the client's `OWNER/repo` differs on purpose.
+    // Linux file systems are case-sensitive, so the stand-in repo must sit at exactly that path.
+    const upstream = makeUpstream(path.join(root, "github"), "owner", "Repo");
     const calls: Array<{ readonly updates: ReadonlyArray<RefUpdate> }> = [];
     const deps: GatewayDeps = {
       repo: { owner: "owner", name: "Repo" },
