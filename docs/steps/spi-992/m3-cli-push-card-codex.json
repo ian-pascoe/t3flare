@@ -1,0 +1,233 @@
+{
+ "at": "2026-11-12T14:12:16.943Z",
+ "mode": "p5",
+ "stamp": "mwdmkxjb",
+ "fixture": "ian-pascoe/t3flare-fixture",
+ "owner": {
+  "threadId": "601027ad-4419-4630-90c5-e648e5d504fa",
+  "answers": [
+   {
+    "title": "command",
+    "decision": "accept"
+   },
+   {
+    "title": "Allow git push?",
+    "decision": "acceptForSession",
+    "prompt": "create refs/heads/spi992/cli-owner-mwdmkxjb → e1e8d30d\n\nThis Workspace ran work from a linked environment, so each push asks until you trust the Workspace again. \"Allow this push once\" keeps asking; \"Allow and trust this Workspace again (clears the linked-work mark)\" stops asking for every later push, including any a linked environment's leftovers make.\nrefs/heads/spi992/cli-owner-mwdmkxjb: GitHub does not have it; new e1e8d30d — as reported by the Workspace: \"spi992 spi992/cli-owner-mwdmkxjb\"",
+    "options": [
+     {
+      "decision": "decline",
+      "label": "Decline"
+     },
+     {
+      "decision": "accept",
+      "label": "Allow this push once"
+     },
+     {
+      "decision": "acceptForSession",
+      "label": "Allow and trust this Workspace again (clears the linked-work mark)",
+      "warning": "Anything linked work left in this Workspace (git hooks, git config, scripts, background processes) can then push without asking."
+     }
+    ],
+    "id": "runtime-request:claudeAgent:t3flare-push:08fa2b81-a820-4810-86e7-51dff913f22a"
+   }
+  ],
+  "reply": "The command's last output line was:\n\n`* [new branch]      HEAD -> spi992/cli-owner-mwdmkxjb`",
+  "head": "e1e8d30de801f0ed85729e526af57badb6dcb8da",
+  "remote": "e1e8d30de801f0ed85729e526af57badb6dcb8da",
+  "taintAfter": null
+ },
+ "linked": {
+  "codex": {
+   "threadId": "mcp:launch:4c1e068dfd6f14ad7a1b062861c7b24d775ecda9698b24ed5f957dfa171c9600",
+   "answers": [
+    {
+     "title": "Allow git push?",
+     "decision": "accept",
+     "at": 11793,
+     "summary": "create refs/heads/spi992/codex-a-mwdmkxjb → 81f4c528\n\nWork started from another environment through a linked environment wants to push to this project's repository. Each push asks.\nrefs/heads/spi992/codex-a-mwdmkxjb: GitHub does not have it; new 81f4c528 — as reported by the Workspace: \"spi992 spi992/codex-mwdmkxjb\"",
+     "options": [
+      {
+       "decision": "decline",
+       "label": "Decline"
+      },
+      {
+       "decision": "accept",
+       "label": "Allow this push"
+      }
+     ]
+    },
+    {
+     "title": "Allow git push?",
+     "decision": "decline",
+     "at": 15702,
+     "summary": "create refs/heads/spi992/codex-b-mwdmkxjb → 81f4c528\n\nWork started from another environment through a linked environment wants to push to this project's repository. Each push asks.\nrefs/heads/spi992/codex-b-mwdmkxjb: GitHub does not have it; new 81f4c528 — as reported by the Workspace: \"spi992 spi992/codex-mwdmkxjb\"",
+     "options": [
+      {
+       "decision": "decline",
+       "label": "Decline"
+      },
+      {
+       "decision": "accept",
+       "label": "Allow this push"
+      }
+     ]
+    },
+    {
+     "title": "Allow git push?",
+     "decision": "accept",
+     "at": 17812,
+     "summary": "create refs/heads/spi992/codex-c-mwdmkxjb → 81f4c528\n\nWork started from another environment through a linked environment wants to push to this project's repository. Each push asks.\nrefs/heads/spi992/codex-c-mwdmkxjb: GitHub does not have it; new 81f4c528 — as reported by the Workspace: \"spi992 spi992/codex-mwdmkxjb\"",
+     "options": [
+      {
+       "decision": "decline",
+       "label": "Decline"
+      },
+      {
+       "decision": "accept",
+       "label": "Allow this push"
+      }
+     ]
+    }
+   ],
+   "reply": "push-exit 0\npush-exit 1\npush-exit 0",
+   "head": "81f4c5280e96f4fa2be34b921bede47fc0d0ae1b",
+   "landed": [
+    "81f4c5280e96f4fa2be34b921bede47fc0d0ae1b",
+    null,
+    "81f4c5280e96f4fa2be34b921bede47fc0d0ae1b"
+   ],
+   "taintAfter": {
+    "since": 1794492691886,
+    "by": [
+     "cli:mcp:launch:4c1e068dfd6f14ad7a1b062861c7b24d775ecda9698b24ed5f957dfa171c9600"
+    ]
+   }
+  }
+ },
+ "tools": {
+  "tools": [
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_environment_read",
+    "isError": false,
+    "text": "{\"environmentId\":\"22ee53bd-2bc5-4cab-9afe-94284134be79\",\"label\":\"t3flare\",\"serverVersion\":\"0.1.8\",\"platform\":{\"os\":\"linux\",\"arch\":\"x64\",\"machine\":\"cloud\"},\"preferences\":{\"newWorktreesStartFromOrigin\":"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_project_list",
+    "isError": false,
+    "text": "{\"projects\":[{\"id\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"t3flare-fixture (cloud)\",\"workspaceRoot\":\"/w/step3-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixtu"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_project_read",
+    "isError": false,
+    "text": "{\"id\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"t3flare-fixture (cloud)\",\"workspaceRoot\":\"/w/step3-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixture\",\"locator\""
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_thread_read",
+    "isError": false,
+    "text": "{\"thread\":{\"threadId\":\"mcp:launch:4c1e068dfd6f14ad7a1b062861c7b24d775ecda9698b24ed5f957dfa171c9600\",\"projectId\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"spi992 p5-codex mwdmkxjb\",\"link\":\"[spi99"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "list_thread_pull_requests",
+    "isError": false,
+    "text": "{\"pullRequests\":[],\"chains\":[]}"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_project_clone",
+    "isError": false,
+    "text": "{\"cwd\":\"/w/p5-clone-auto-accept-edits-mwdmkxjb\",\"remoteUrl\":\"https://github.com/ian-pascoe/t3flare-fixture.git\",\"repository\":null}"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_project_create",
+    "isError": false,
+    "text": "{\"id\":\"f6d9ea7c-62b8-466c-b4a2-5bc159a3325e\",\"title\":\"p5-made-auto-accept-edits-mwdmkxjb\",\"workspaceRoot\":\"/w/p5-made-auto-accept-edits-mwdmkxjb\",\"repositoryIdentity\":null,\"faviconPath\":null,\"projectI"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_environment_read",
+    "isError": false,
+    "text": "{\"environmentId\":\"22ee53bd-2bc5-4cab-9afe-94284134be79\",\"label\":\"t3flare\",\"serverVersion\":\"0.1.8\",\"platform\":{\"os\":\"linux\",\"arch\":\"x64\",\"machine\":\"cloud\"},\"preferences\":{\"newWorktreesStartFromOrigin\":"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_project_list",
+    "isError": false,
+    "text": "{\"projects\":[{\"id\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"t3flare-fixture (cloud)\",\"workspaceRoot\":\"/w/step3-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixtu"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_project_read",
+    "isError": false,
+    "text": "{\"id\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"t3flare-fixture (cloud)\",\"workspaceRoot\":\"/w/step3-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixture\",\"locator\""
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_thread_read",
+    "isError": false,
+    "text": "{\"thread\":{\"threadId\":\"mcp:launch:4c1e068dfd6f14ad7a1b062861c7b24d775ecda9698b24ed5f957dfa171c9600\",\"projectId\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"spi992 p5-codex mwdmkxjb\",\"link\":\"[spi99"
+   },
+   {
+    "link": "full-access",
+    "tool": "list_thread_pull_requests",
+    "isError": false,
+    "text": "{\"pullRequests\":[],\"chains\":[]}"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_project_clone",
+    "isError": true,
+    "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"orchestration_error\",\"message\":\"fatal: WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=Conta"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_project_create",
+    "isError": true,
+    "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"orchestration_error\",\"message\":\"Failed to create the project folder.\"}"
+   }
+  ],
+  "gitCommands": [
+   "-C /w/p5-made-full-access-mwdlagvn remote -v",
+   "-C /w/p5-made-full-access-mwdljuk5 remote -v",
+   "-C /w/p5-made-full-access-mwdm7tog remote -v",
+   "-C /w/p5-made-auto-accept-edits-mwdmi27c remote -v",
+   "-C /w/p5-made-auto-accept-edits-mwdmewpv remote -v",
+   "clone --progress -- https://github.com/ian-pascoe/t3flare-fixture.git",
+   "config --get init.defaultBranch",
+   "init --initial-branch=main",
+   "-c core.safecrlf=false add --force",
+   "commit --message Initial commit",
+   "-C /w/p5-made-auto-accept-edits-mwdmkxjb rev-parse --show-toplevel",
+   "-C /w/p5-made-auto-accept-edits-mwdmkxjb remote -v",
+   "clone --progress -- https://github.com/ian-pascoe/t3flare-fixture.git",
+   "config --get init.defaultBranch",
+   "init --initial-branch=main"
+  ],
+  "pushes": [],
+  "expectations": []
+ },
+ "cleanup": [
+  {
+   "ref": "refs/heads/spi992/cli-owner-mwdmkxjb",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/codex-a-mwdmkxjb",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/codex-c-mwdmkxjb",
+   "deleted": true
+  }
+ ],
+ "failures": [
+  "p5 tools: the full-access link's clone and create ran (the git-touching tools): [{\"link\":\"auto-accept-edits\",\"tool\":\"t3_environment_read\",\"isError\":false,\"text\":\"{\\\"environmentId\\\":\\\"22ee53bd-2bc5-4cab-9afe-94284134be79\\\",\\\"label\\\":\\\"t3flare\\\",\\\"serverVersion\\\":\\\"0.1.8\\\",\\\"platform\\\":{\\\"os\\\":\\\"linux\\\",\\\"arch\\\":\\\"x64\\\",\\\"machine\\\":\\\"cloud\\\"},\\\"preferences\\\":{\\\"newWorktreesStartFromOrigin\\\":\"},{\"link\":\"auto-accept-edits\",\"tool\":\"t3_project_list\",\"isError\":false,\"text\":\"{\\\"projects\\\":[{\\\"id\\\":\\\"2183c43d-5c70-4b54-b6a1-6f4c93453374\\\",\\\"title\\\":\\\"t3flare-fixture (cloud)\\\",\\\"workspaceRoot\\\":\\\"/w/step3-fixture\\\",\\\"repositoryIdentity\\\":{\\\"canonicalKey\\\":\\\"github.com/ian-pascoe/t3flare-fixtu\"},{\"link\":\"auto-accept-edits\",\"tool\":\"t3_project_read\",\"isError\":false,\"text\":\"{\\\"id\\\":\\"
+ ],
+ "ok": false
+}

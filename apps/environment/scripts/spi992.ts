@@ -269,15 +269,15 @@ const install = async (...names: Array<string>) => {
  * A linked thread (a link at auto-accept-edits) runs `command`, its command approvals accepted by the harness as the
  * owner's client; each "Allow git push?" card is answered by `onPush` (in order). The answers, and the final projection.
  */
-const linkedRun = async (label: string, command: string, onPush: (index: number, threadId: string, request: any, mcp: McpClient) => Promise<string>, modelSelection: Record<string, unknown> = MODEL) => {
-  const link = await signIn((await mintPairingCode(cookie, { label: `spi992 ${label} ${stamp}` })).code, "auto-accept-edits", { clientName: `spi992 ${label} ${stamp}` });
-  const mcp = new McpClient(link.token, { modeLimit: "auto-accept-edits/default" });
+const linkedRun = async (label: string, command: string, onPush: (index: number, threadId: string, request: any, mcp: McpClient) => Promise<string>, modelSelection: Record<string, unknown> = MODEL, access: "auto-accept-edits" | "full-access" = "auto-accept-edits", message?: string) => {
+  const link = await signIn((await mintPairingCode(cookie, { label: `spi992 ${label} ${stamp}` })).code, access, { clientName: `spi992 ${label} ${stamp}` });
+  const mcp = new McpClient(link.token, { modeLimit: `${access}/default` });
   const launched = await mcp.call("t3_thread_launch", {
     projectId: fixture.projectId,
     title: `spi992 ${label} ${stamp}`,
     modelSelection,
     clientRequestId: `spi992-${label}-${stamp}`,
-    message: [
+    message: message ?? [
       "This is my repository and my t3flare environment; I'm testing t3flare's push gateway (ticket SPI-992) from this linked thread.",
       "My test script tries a few pushes, including ones the gateway must refuse; each push it makes asks me for approval in this thread, and I answer them.",
       `Please run this one bash command, once, with a timeout of 900 seconds: \`${command}\``,
@@ -389,6 +389,9 @@ if (mode === "p5") {
   const CLAUDE = { instanceId: "claudeAgent", model: "anthropic/claude-sonnet-5-5", options: [] as Array<{ id: string; value: string }> };
   await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "claudeAgent", instance: { driver: "claudeAgent", enabled: true } } });
   await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+  // No CLI process of an earlier run lingers (a live linked one would be asked instead of the owner's thread).
+  await admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(id)}`);
+  await sleep(5_000);
   const prompt = (ref: string) =>
     [
       "This is my repository and my t3flare environment; I'm testing t3flare's push gateway (ticket SPI-1040).",
@@ -438,9 +441,11 @@ if (mode === "p5") {
   // 2. A linked thread of each CLI pushes three times: approved, declined, approved (each asks again). The cards are
   // the CLI wrapper's for all four (one code path over t3's Codex, Pi and ACP adapters), each adapter's turn events
   // feeding it. The Workspace stays tainted.
-  const CLIS: Record<string, { instanceId: string; driver: string; model: string }> = {
+  // Codex at auto-accept-edits runs commands in its own sandbox, without network: its push fails (exit 128) before the
+  // gateway, which is fail-closed but asks nothing. Its card is proved through a full-access link (no sandbox).
+  const CLIS: Record<string, { instanceId: string; driver: string; model: string; access?: "full-access" }> = {
     claude: { instanceId: "claudeAgent", driver: "claudeAgent", model: "anthropic/claude-sonnet-5-5" },
-    codex: { instanceId: "codex", driver: "codex", model: "gpt-6-luna" },
+    codex: { instanceId: "codex", driver: "codex", model: "gpt-6-luna", access: "full-access" },
     pi: { instanceId: "pi", driver: "pi", model: "anthropic/claude-haiku-5-5" },
     opencode: { instanceId: "opencode", driver: "opencode", model: "anthropic/claude-sonnet-5-5" },
   };
@@ -458,7 +463,11 @@ if (mode === "p5") {
     created.push(...refs);
     const head = (await sh(commitScript(`spi992/${cli}-${stamp}`, [[`${cli}-${stamp}.bin`, 64]]))).stdout.trim();
     const decisions = ["accept", "decline", "accept"];
-    const run = await linkedRun(`p5-${cli}`, refs.map((ref) => `git push origin HEAD:${ref}; echo "push-exit $?"`).join("; "), (index) => Promise.resolve(decisions[index] ?? "decline"), { instanceId: spec.instanceId, model: spec.model, options: [] });
+    const run = await linkedRun(`p5-${cli}`, refs.map((ref) => `git push origin HEAD:${ref}; echo "push-exit $?"`).join("; "), (index) => Promise.resolve(decisions[index] ?? "decline"), { instanceId: spec.instanceId, model: spec.model, options: [] }, spec.access, [
+      "This is my repository and my t3flare environment; I'm testing t3flare's push gateway (tickets SPI-992, SPI-1040) from this linked thread.",
+      `Please run exactly this one shell command, once, with a timeout of 900 seconds: \`${refs.map((ref) => `git push origin HEAD:${ref}; echo "push-exit $?"`).join("; ")}\``,
+      "It pushes the current commit to three new test branches of my fixture repository. Each push waits for my approval in this thread (I approve some and decline one on purpose). Run nothing else, and reply with the command's output lines that start with push-exit.",
+    ].join("\n"));
     linked = run;
     const after = (await call({ probePush: {} }))?.result;
     const cards = run.answers.filter((a) => a.title === "Allow git push?");
@@ -542,5 +551,5 @@ if (mode === "p5fa") {
 // The fixture's refs this run made are deleted (the owner's gh).
 out.cleanup = created.filter((ref) => remoteRef(ref) !== null).map((ref) => ({ ref, deleted: deleteRef(ref) }));
 await sh("git checkout -q --detach origin/main 2>/dev/null; true");
-evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : mode === "repro" ? "m2-repro-owner-push" : mode === "p5" ? "m3-cli-push-card" : mode === "p5fa" ? "m3-full-access-card" : `m0-${mode}`}.json`);
+evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : mode === "repro" ? "m2-repro-owner-push" : mode === "p5" ? `m3-cli-push-card${process.argv.length > 3 ? `-${process.argv.slice(3).join("-")}` : ""}` : mode === "p5fa" ? "m3-full-access-card" : `m0-${mode}`}.json`);
 process.exit(failures.length === 0 ? 0 : 1);
