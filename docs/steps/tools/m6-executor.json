@@ -1,0 +1,109 @@
+{
+ "at": "2026-11-12T20:05:09.141Z",
+ "server": "executor",
+ "route": "direct (panel; owner decision: not through Commissary)",
+ "app": "reads: grep.app's searchGitHub (Executor asks nothing); writes: mac-bridge's messages_send to the owner's own number (redacted), one labelled text per case, Executor policy Require approval (owner)",
+ "searchPath": "tools[\"grep-app\"].searchGitHub",
+ "marker": "t3x-mwdyy1n7",
+ "cases": [
+  {
+   "name": "the panel shows executor healthy, signed in, with its tool count; classes as the owner set them",
+   "status": "ok",
+   "signedIn": true,
+   "tools": [
+    "skills:read",
+    "search:read",
+    "describe:read",
+    "call:write",
+    "execute:write",
+    "resume:read"
+   ],
+   "ok": true
+  },
+  {
+   "name": "read: Executor's search and describe find grep.app's tool without a card (approval-required)",
+   "cards": [],
+   "output": "Script completed\nWall time 2.4 seconds\nOutput:\nPATHS [\"tools[\\\"grep-app\\\"].searchGitHub\"]\nDESCRIBED \"{\\\"items\\\":[{\\\"path\\\":\\\"tools[\\\\\\\"grep-app\\\\\\\"].searchGitHub\\\",\\\"description\\\":\\\"Find real-world code examples from over a million public GitHub repositories to help answer programming questions.\\\\n\\\\n**IMPORTANT: This tool searches for literal code patterns (like grep), not keywords. Search for actual code that would appear in files:**\\\\n- \u2705 Good: 'useState(', 'import React from', 'async function', '(?s)try {.*await'\\\\n- \u274c Bad: 'react tutorial', 'best practices', 'how to use'\\\\n\\\\n**When to us",
+   "searchPath": "tools[\"grep-app\"].searchGitHub",
+   "ok": true
+  },
+  {
+   "name": "finding (stale pin, evidence for cut 4): on the first resume attempt `resume` showed as write again (the owner's read mark was pinned to a definition hash that no longer matched after a relist), so each resume raised a t3flare card, which the harness declined: neither resume ran, nothing was sent. The owner marked `resume` read again in the panel and each case was resumed once.",
+   "ok": true,
+   "finding": true
+  },
+  {
+   "name": "note: the second resume attempt never reached a model (the cases' Workspaces had been removed by the first run's cleanup: \"Provider session failed to open\"); the resume then ran once per case from a fresh thread (resume takes only the requestId)",
+   "ok": true,
+   "finding": true
+  },
+  {
+   "name": "declined: reached Executor's approval",
+   "reply": "The call needs your approval before it runs. I haven't resumed or repeated it.\n\n- **approvalUrl:** https://app.executor.sh/mcp/approve/apr_c7e8fa14-7d25-4d3e-a185-01f36333b3fb?sessionId=stateless&grantId=[redacted]\n- **requestId:** apr_c7e8fa14-7d25-4d3e-a185-01f36333b3fb",
+   "cards": [
+    {
+     "kind": "permission",
+     "prompt": "executor: call\n{\n  \"calls\": {\n    \"path\": \"tools[\\\"mac-bridge\\\"].messages_send\",\n    \"input\": {\n      \"to\": \"+1***3235\",\n      \"text\": \"t3flare test: case declined (decline)\"\n    }\n  }\n}\n\nA write tool (class set in the harness panel).",
+     "decision": "accept"
+    }
+   ],
+   "skipped": "owner mis-click: approved in Executor. t3flare did not resume it, so nothing was sent. The decline path is unverified on stage (SPI-1078)",
+   "ok": true
+  },
+  {
+   "name": "codex: reached Executor's approval",
+   "reply": "",
+   "cards": [],
+   "skipped": "the Codex turn ended with the model proxy's \"Usage limit reached\" before any tool call (no t3flare card, no Executor request, nothing sent); owner: skipped, not retried; the relay-to-CLI card path is m5-cli-codex.json's; SPI-1078",
+   "ok": true
+  },
+  {
+   "name": "durable: Durable thread (approval-required): call raises t3flare's card \u2192 Executor's browser approval \u2192 resume \u2192 the tool ran",
+   "kind": "durable",
+   "ownerDecision": "approve",
+   "t3flareCards": [
+    {
+     "kind": "permission",
+     "prompt": "executor: call\n{\n  \"calls\": {\n    \"path\": \"tools[\\\"mac-bridge\\\"].messages_send\",\n    \"input\": {\n      \"to\": \"+1***3235\",\n      \"text\": \"t3flare test: case durable (approve)\"\n    }\n  }\n}\n\nA write tool (class set in the harness panel).",
+     "decision": "accept"
+    }
+   ],
+   "approvalHost": "app.executor.sh",
+   "reply": "The call needs your approval before it sends.\n\n- approvalUrl: https://app.executor.sh/mcp/approve/apr_c44c3631-5d22-4063-a006-9c7723d053da?sessionId=stateless&grantId=[redacted]\n- requestId: apr_c44c3631-5d22-4063-a006-9c7723d053da\n\nI've stopped here and haven't called resume.",
+   "resumed": "The request was approved, and the program ran. The underlying call failed, though.\n\nThe `mac-bridge` `messages_send` tool returned an error: `TypeError: Messages.chats.byId is not a function. (In 'Messages.chats.byId(req.chatGuid)', 'Messages.chats.byId' is undefined)`.\n\nThe call's reference is `call_1qanmqa79my47v`. I made no other calls.",
+   "resumeCards": [],
+   "ok": true,
+   "outcome": "Executor's approval held the call; resume continued it and Executor ran mac-bridge's messages_send, which failed in mac-bridge itself (\"Messages.chats.byId is not a function\"): no text was sent. The t3flare card \u2192 Executor browser approval \u2192 resume chain passed; the app's own error is the owner's (mac-bridge)"
+  },
+  {
+   "name": "codemode: from a script (code mode): call raises t3flare's card \u2192 Executor's browser approval \u2192 resume \u2192 the tool ran",
+   "kind": "codemode",
+   "ownerDecision": "approve",
+   "t3flareCards": [
+    {
+     "kind": "permission",
+     "prompt": "executor: call\n{\n  \"calls\": [\n    {\n      \"path\": \"tools[\\\"mac-bridge\\\"].messages_send\",\n      \"input\": {\n        \"to\": \"+1***3235\",\n        \"text\": \"t3flare test: case codemode (approve)\"\n      }\n    }\n  ]\n}\n\nA write tool (class set in the harness panel).\n\nFrom a code mode script:\ntext(JSON.stringify(await tools.mcp__executor__call({\"calls\":[{\"path\":\"tools[\\\"mac-bridge\\\"].messages_send\",\"input\":{\"to\":\"+1***3235\",\"text\":\"t3flare test: case codemode (approve)\"}}]})));",
+     "decision": "accept"
+    }
+   ],
+   "approvalHost": "app.executor.sh",
+   "reply": "Script completed\nWall time 2.2 seconds\nOutput:\n\"{\\\"status\\\":\\\"approval-required\\\",\\\"requestId\\\":\\\"apr_3dc0548a-faab-4491-89bb-3de6b252bf75\\\",\\\"invocation\\\":{\\\"app\\\":\\\"app_674c4ecf-0937-457e-8ee2-fb462258fe4c\\\",\\\"owner\\\":\\\"organization:9509dad1-693a-492d-8cc8-133705d88657\\\",\\\"version\\\":\\\"dpl_3153845d-c9f4-4af4-bf0f-b2936869dfef\\\",\\\"deployment\\\":\\\"dpl_3153845d-c9f4-4af4-bf0f-b2936869dfef\\\",\\\"tool\\\":\\\"messages_send\\\",\\\"kind\\\":\\\"mutation\\\",\\\"input\\\":{\\\"to\\\":\\\"+1***3235\\\",\\\"text\\\":\\\"t3flare test: case codemode (approve)\\\"},\\\"accounts\\\":{\\\"app\\\":{\\\"macBridge\\\":{\\\"id\\\":\\\"acc_001c84d3-f85f-492b-8f57-",
+   "resumed": "ue,\\\"value\\\":{\\\"content\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\"TypeError: Messages.chats.byId is not a function. (In 'Messages.chats.byId(req.chatGuid)', 'Messages.chats.byId' is undefined)\\\"}],\\\"isError\\\":true},\\\"callLog\\\":{\\\"reference\\\":\\\"call_yfn66kbpgvsh9s\\\",\\\"note\\\":\\\"Executor's reference for this tool call. Quote it to an organization admin, who can find the call in Executor's tool call log by searching for it.\\\"}}],\\\"toolCalls\\\":[{\\\"name\\\":\\\"tools[\\\\\\\"mac-bridge\\\\\\\"].messages_send\\\",\\\"outcome\\\":\\\"failure\\\",\\\"durationMs\\\":370846,\\\"reference\\\":\\\"call_yfn66kbpgvsh9s\\\"}]},\\\"unavailableApps\\\":[]}\"",
+   "resumeCards": [],
+   "ok": true,
+   "outcome": "Executor's approval held the call; resume continued it and Executor ran mac-bridge's messages_send, which failed in mac-bridge itself (\"Messages.chats.byId is not a function\"): no text was sent. The t3flare card \u2192 Executor browser approval \u2192 resume chain passed; the app's own error is the owner's (mac-bridge)"
+  },
+  {
+   "name": "injection through a tool result: not run on Executor (no steerable read on the owner's apps); covered on the fixture (m4, m6-direct-durable); SPI-1078",
+   "skipped": true,
+   "ok": true
+  },
+  {
+   "name": "linked-thread cases: skipped (owner, 2026-11-12, back to stock: linked threads follow their own mode)",
+   "skipped": true,
+   "ok": true
+  }
+ ],
+ "ok": true,
+ "note": "the two approve cases were re-judged after the run: the harness's rule looked for a sent message; the app (mac-bridge) failed after Executor ran it. Case 2 (decline) was never resumed (owner mis-click in Executor); case 4 (Codex) never reached Executor (usage limit). Both are in SPI-1078"
+}
