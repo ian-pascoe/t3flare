@@ -142,4 +142,4 @@ Standards: 2 fixed, 2 judgement calls kept (worst: duplicated harness code). Spe
 
 ## Branch
 
-`step-4b` (pushed; rebased on `origin/step-4a` 5f232cc). Nothing of 4b reaches `main` before 4a has.
+`step-4b` at 7b06082 (this commit's parent; pushed, rebased on `origin/step-4a` 5f232cc). Nothing of 4b reaches `main` before 4a has.
