@@ -8,6 +8,57 @@ This is a plan to review, not a report; nothing in it is built. Paths under `t3/
 `pi/` is `t3code/packages/provider-pi/src/server/`, `env/` is `apps/environment/src/`, `agents/` is
 `apps/agents/src/`. Line numbers are from the pin and drift; the symbol beside each is the stable handle.
 
+## Changelog: owner confirmation and independent review (Fable), 2026-11-12
+
+These override the plan below where they conflict. Each is verified against the code as its milestone reaches it;
+the verdicts and any rebuttals, with evidence, are in the report (`docs/steps/step-4a.md`, § Review findings).
+
+- **OD-3 confirmed (owner).** CLI agents get no t3 MCP tools in 4a. The parity cost is listed in `docs/parity.md`
+  and a ticket brings them back after 4b. OD-1 and OD-2 apply only if their probe fails.
+- **F1 (BLOCKER). One Codex app-server per provider instance.** With `supportsMultipleProviderThreadsPerSession`
+  true, t3 derives the provider session from the instance (`Orchestrator.ts:1259-1272`, `CodexAdapterV2.ts:247`)
+  and `ProviderSessionManager.open` attaches later threads to the live session without spawning (`:2428-2445`): a
+  second project's thread would run in the first Workspace's Container. The wrapper reports `false` in
+  `getCapabilities()` **and** on the session entity it returns (read at `ProviderSessionManager.ts:2534-2536`). M0
+  gains P12 (two Codex threads in two Workspaces open two processes); M3 and M5 gain the same case. Forks across
+  Workspaces are refused (`CodexAdapterV2.ts:8159-8176`; pi `adapter.ts:3335-3350`).
+- **F2 (HIGH). Synced CLI homes are an agent-writable control plane.** The CLI homes are built fresh on
+  Container-local disk at each spawn; only `sessions/` is synced. Codex: `CODEX_HOME` local, `sessions/` a symlink
+  into `/workspace/.t3flare/codex/sessions`, `CODEX_SQLITE_HOME` local (the default, not a fallback). pi:
+  `PI_CODING_AGENT_DIR` local, `PI_CODING_AGENT_SESSION_DIR` synced, `--no-approve` (no project trust), and a
+  session retention bound. Replaces §2.7's layout and §4.4's synced `models.json`.
+- **F3 (HIGH). Scan before the pull, not after.** The hash scanner runs in the Container on the changed files before
+  each pull; a hit quarantines the file (never synced), kills the CLI and flags the key for rotation. The launcher
+  sets `ulimit -c 0`. The DO-side redaction stays as a second line; the exit claim reads "no credential is ever on
+  synced disk *as far as the in-Container scan before each pull can see*" (see the report). Replaces §4.9's "detect
+  and contain".
+- **F4 (HIGH). The nonce leaks to Codex's shells** when `ignore_default_excludes` is true. Codex gets `-c
+  shell_environment_policy.exclude=["T3FLARE_MODEL_KEY_NONCE"]`; and for Codex the route grants **once per nonce**
+  (with `refresh_interval_ms=0` Codex asks once, and again only after a 401).
+- **F5 (MEDIUM). The request guard is an allowlist.** Methods and config keys are allowlisted (t3's own keys,
+  `CODEX_THREAD_CONFIG`, `CodexAdapterV2.ts:1391-1397`, plus the thread-id shell variable), `thread/fork` included;
+  `feedback/*` (uploads logs to the vendor) and `account/*` are refused. The process starts with `-c
+  approval_policy="untrusted" -c sandbox_mode="read-only"`. `bwrap` is probed at each Container start.
+- **F6 (MEDIUM). Channel specifics.** Byte frames end to end (TerminalHost decodes to strings; the process channel
+  does not). One `processInput` in flight per key with contiguous `seq`; a failed write kills the process, never
+  skips. Bounded Environment-side queues; `processOutput` awaits the offer (backpressure to the Workspace). The epoch
+  is a durable boot counter, not a UUID. Handle and pid registries live on the DO instance, not in module state
+  (module state survives `ctx.abort()`; `processRouter.ts:41,58,173` keeps module maps today); the reboot check
+  covers it.
+- **F7 (MEDIUM). The hold is decided in M1, not M5.** Default: the Workspace releases a CLI session's Container hold
+  10 minutes after its last turn ends; idle CLI sessions end when the Container budget is full; the per-Workspace
+  process cap is derived from P9's memory probe. Replaces §2.5's "decided in M5" and Patch 0003's conditionality.
+- **F8 (MEDIUM). D1 for CLI processes.** Linked work is held under `cli:<thread>` while that thread's process lives
+  (not only per turn), and released by marker when the process ends; `credentialDecision` (`linkedPush.ts:28-35`)
+  otherwise returns the full token once nothing is active.
+- **F9 (MEDIUM). Milestones.** P12 for F1. P8 gains a stop gate on DO CPU and rows per pull at 5, 20 and 50 MB
+  rollouts, and resume from a torn last line. The DO-side leak scan moves to M3's exit. Nothing reaches `main` before
+  M6. M5's resume proof is the protocol log (`thread/resume` or `switch_session` succeeding with no handoff
+  transition), not a code word. P11's pi-mode question is answered: t3 restarts pi on a mode change. The Docker egress
+  proof uses a network that reaches only the fake proxy and the stub host, with a logging resolver.
+- **F10 (LOW).** `docs/parity.md` records withholding MCP. The wrapper filters pi's "t3-code MCP unavailable"
+  warning.
+
 ## Settled (not reopened here)
 
 - **Every model call goes through the model proxy** (Commissary). No vendor login; Codex never uses its ChatGPT
