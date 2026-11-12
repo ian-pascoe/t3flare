@@ -132,7 +132,8 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
                 ),
                 Effect.forkDetach,
               );
-              yield* runtime.startTurn(turn);
+              // A turn that never started ends here: no `turn.terminal` follows, and the hold and the cap would stay.
+              yield* runtime.startTurn(turn).pipe(Effect.onError(() => turnEnded(session)));
             }),
           forkThread: (fork) => {
             const target = workspaceOf(fork.runtimePolicy?.cwd);

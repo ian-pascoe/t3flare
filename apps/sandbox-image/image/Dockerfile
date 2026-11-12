@@ -13,7 +13,7 @@
 ARG COMPUTERD_VERSION=0.9.0
 ARG MISE_VERSION=v2026.11.2
 ARG MISE_SHA256=62cad463c1413f05398ca339168a8f655120b6f0b0b8adce3bc6758bafaf0602
-# The CLI agents (step 4a; apps/sandbox-image/src/clis.ts holds the same values, test/clis.test.ts keeps them equal).
+# The CLI agents (step 4a; apps/sandbox-image/src/clis.ts holds the same values, apps/environment/test/cliManifest.test.ts keeps them equal).
 ARG CODEX_VERSION=0.167.2
 ARG CODEX_SHA256=8246e846c550ea21197fcc4067bc270dca895e94ea42ed6a282e6f4e0125b15f
 

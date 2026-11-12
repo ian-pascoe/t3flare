@@ -1,5 +1,5 @@
 // The CLI agents the Workspace image carries (step 4a, plan §6): fixed versions, changed only by a commit and a
-// deploy (ADR-0024: install and update are refused). The Dockerfile's ARGs equal these (test/clis.test.ts), and each
+// deploy (ADR-0024: install and update are refused). The Dockerfile's ARGs equal these (apps/environment/test/cliManifest.test.ts), and each
 // pinned version satisfies t3's compatibility manifest at the pin (apps/environment/test/cliManifest.test.ts): a nightly
 // that raises a minimum fails with "bump the CLI in clis.ts".
 export const CLIS = {
