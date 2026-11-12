@@ -29,6 +29,7 @@ import { isRefusedRelayRoute } from "./host/relayRoutes.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
 import type { HarnessCaller } from "./harness/panel.ts";
 import { harnessStore } from "./harness/store.ts";
+import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpView } from "./mcp/host.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
 
@@ -60,6 +61,12 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_FAULTS?: string;
   /** The harness panel's admin host (ADR-0026): what a change's `Origin` must name. */
   readonly T3FLARE_HARNESS_HOST?: string;
+  /** The MCP Worker's engine (ADR-0028): every MCP list and call goes through it. */
+  readonly MCP_ENGINE?: McpEngineBinding;
+  /** Commissary's MCP endpoint; default `${MODEL_PROXY_URL}/mcp`. */
+  readonly COMMISSARY_TOOLS_URL?: string;
+  /** `?toolkits=` narrowing of Commissary's tools. */
+  readonly COMMISSARY_TOOLKITS?: string;
 }
 
 /** Module state that outlives `ctx.abort()` in a warm isolate (ADR-0003); reported by the health route. */
@@ -78,6 +85,12 @@ ModuleState.install();
 
 const HOST_KEY = "t3flare/host";
 export const DEFAULT_ARM_MINUTES = 15;
+
+/**
+ * The Commissary tools key (decision 1 of the tools step): the Workers' own proxy key for now, never the Containers'
+ * (`COMMISSARY_CONTAINER_API_KEY`). One place, so a dedicated key can replace it.
+ */
+export const toolsKeyOf = (env: { readonly MODEL_PROXY_API_KEY?: string }): string | undefined => env.MODEL_PROXY_API_KEY;
 
 export class SafeModeError extends Error {
   readonly safeMode: BootState.SafeMode;
@@ -322,7 +335,45 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    */
   async harness(request: Request, caller: HarnessCaller): Promise<Response> {
     const { handleHarness } = await import("./harness/panel.ts");
-    return handleHarness(request, { caller, host: this.env.T3FLARE_HARNESS_HOST ?? "", store: harnessStore(this.ctx.storage.kv) });
+    return handleHarness(request, { caller, host: this.env.T3FLARE_HARNESS_HOST ?? "", store: harnessStore(this.ctx.storage.kv), mcp: this.mcpHost });
+  }
+
+  /** The MCP host (ADR-0028), over this object's storage and the MCP Worker's engine. */
+  #mcpHost: McpHost | undefined;
+  get mcpHost(): McpHost {
+    this.#mcpHost ??= new McpHost({
+      kv: this.ctx.storage.kv,
+      engine: this.env.MCP_ENGINE,
+      commissary: {
+        url: this.env.COMMISSARY_TOOLS_URL ?? (this.env.MODEL_PROXY_URL === undefined ? undefined : `${this.env.MODEL_PROXY_URL.replace(/\/+$/, "")}/mcp`),
+        key: toolsKeyOf(this.env),
+        ...(this.env.COMMISSARY_TOOLKITS === undefined ? {} : { toolkits: this.env.COMMISSARY_TOOLKITS }),
+      },
+      settings: () => harnessStore(this.ctx.storage.kv).load(),
+      background: (work) => this.ctx.waitUntil(work),
+    });
+    return this.#mcpHost;
+  }
+
+  /** The MCP tools a Session may install (ADR-0028), from kept inventories. Never boots t3. */
+  async mcpView(input: { readonly linked: boolean }): Promise<McpView> {
+    return this.mcpHost.view(input);
+  }
+
+  /** A Session's MCP call, already judged by `decideCall` in its tool. Open work while it runs (the idle reset waits). */
+  async mcpCall(input: {
+    readonly server: string;
+    readonly tool: string;
+    readonly args: Readonly<Record<string, unknown>>;
+    readonly linked: boolean;
+    readonly judged?: "read" | "write";
+  }): Promise<McpCallAnswer> {
+    Idle.requestStarted();
+    try {
+      return await this.mcpHost.call(input);
+    } finally {
+      Idle.requestEnded();
+    }
   }
 
   /** The harness settings for a Session's turn (ADR-0026), resolved and secret-free. Never boots t3. */

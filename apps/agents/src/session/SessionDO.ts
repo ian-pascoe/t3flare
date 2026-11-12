@@ -53,6 +53,7 @@ import { EMPTY_HARNESS, resolveHarness, type ResolvedHarness } from "@t3flare/ha
 
 import { environmentStub } from "../environment.ts";
 import { type CodemodeSandboxNamespace, codemodeExtension, remoteSandbox, toolSearchExtension } from "../extensions/codemode.ts";
+import { mcpExtension, mcpNamespaces, type McpView } from "../extensions/mcp.ts";
 import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
 import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
@@ -104,6 +105,9 @@ const T3_MCP_KEY = "t3flare:t3-mcp";
 const T3_CATALOG_KEY = "t3flare:t3-mcp-catalog";
 /** The harness settings the Session last took (ADR-0026), so a restart installs the same extensions before resuming. */
 const HARNESS_KEY = "t3flare:harness";
+/** The MCP tools the Session last installed (ADR-0028), in chunks (review M12): a restart installs the same first. */
+const MCP_BUILD_KEY = "t3flare:mcp-build";
+const MCP_CHUNK_CHARS = 100_000;
 /** How long a turn's start waits for the Environment's harness settings before it keeps the ones it has. */
 const HARNESS_READ_MS = 5_000;
 /** A test's model proxy fault (stages only). */
@@ -198,7 +202,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
     // The tools the last turn had, before work that may call them resumes.
     const catalog = ctx.storage.kv.get<T3Catalog>(T3_CATALOG_KEY);
     if (catalog !== undefined) registry.install(this.#t3Extension(catalog));
-    // Code mode and tool search as the settings last taken say (defaults before the first), after every tool they reach.
+    // The MCP tools the last turn had, then code mode and tool search as the settings last taken say (defaults before the
+    // first), after every tool they reach.
+    const mcp = this.#mcpBuild();
+    if (mcp !== undefined) registry.install(this.#mcpExtension(mcp));
     this.#installHarness(ctx.storage.kv.get<ResolvedHarness>(HARNESS_KEY) ?? resolveHarness(EMPTY_HARNESS));
     this.#registry = registry;
     this.#opening = new Promise((resolve, reject) => {
@@ -371,7 +378,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const sandbox = this.env.CODEMODE_SANDBOX;
     const sessionName = this.ctx.id.name ?? this.ctx.id.toString();
     if (harness.codemode.enabled && sandbox !== undefined) {
-      registry.install(codemodeExtension(remoteSandbox(sandbox, sessionName), { inlineBudget: harness.codemode.inlineBudget }));
+      const view = this.#mcpBuild();
+      registry.install(
+        codemodeExtension(remoteSandbox(sandbox, sessionName), {
+          inlineBudget: harness.codemode.inlineBudget,
+          ...(view === undefined ? {} : { namespaces: mcpNamespaces(view) }),
+        }),
+      );
     } else {
       registry.uninstall({ name: "codemode" });
     }
@@ -383,6 +396,58 @@ export class SessionDO extends DurableObject<SessionEnv> {
       registry.install(toolSearchExtension(names, harness.offered));
     } else {
       registry.uninstall({ name: "tool-search" });
+    }
+  }
+
+  // MCP tools (ADR-0028)
+
+  #mcpExtension(view: McpView) {
+    return mcpExtension(view, {
+      store: this.#approvals,
+      mode: () => runtimeModeOf(this.#meta()?.runtimeMode),
+      interaction: () => interactionModeOf(this.#meta()?.interactionMode),
+      turn: () => this.#liveTurn(),
+      linked: () => this.#meta()?.linked != null,
+      call: (input) => environmentStub(this.env.ENVIRONMENT).mcpCall(input),
+    });
+  }
+
+  /** The MCP view the Session last installed, from its chunks. */
+  #mcpBuild(): McpView | undefined {
+    const kv = this.ctx.storage.kv;
+    const meta = kv.get<{ readonly version: string; readonly chunks: number }>(MCP_BUILD_KEY);
+    if (meta === undefined) return undefined;
+    let text = "";
+    for (let index = 0; index < meta.chunks; index++) text += kv.get<string>(`${MCP_BUILD_KEY}:${index}`) ?? "";
+    try {
+      return JSON.parse(text) as McpView;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * The Environment's MCP view at a turn's start: a new version is kept and installed (with code mode's namespaces and
+   * tool search's deferral, once: a positional tools entry), never mid-turn. Bounded; never fails the turn.
+   */
+  async #takeMcp(): Promise<void> {
+    try {
+      const view = await Promise.race([
+        environmentStub(this.env.ENVIRONMENT).mcpView({ linked: this.#meta()?.linked != null }),
+        new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), HARNESS_READ_MS)),
+      ]);
+      if (view === undefined) return console.warn(JSON.stringify({ t3flare: "mcp-view-timeout" }));
+      const kv = this.ctx.storage.kv;
+      if (kv.get<{ version: string }>(MCP_BUILD_KEY)?.version === view.version) return;
+      const text = JSON.stringify(view);
+      const chunks = Math.max(1, Math.ceil(text.length / MCP_CHUNK_CHARS));
+      for (let index = 0; index < chunks; index++) kv.put(`${MCP_BUILD_KEY}:${index}`, text.slice(index * MCP_CHUNK_CHARS, (index + 1) * MCP_CHUNK_CHARS));
+      kv.put(MCP_BUILD_KEY, { version: view.version, chunks });
+      this.#registryWriter.install(this.#mcpExtension(view));
+      this.#installHarness(kv.get<ResolvedHarness>(HARNESS_KEY) ?? resolveHarness(EMPTY_HARNESS));
+      console.log(JSON.stringify({ t3flare: "mcp-view", version: view.version, servers: view.servers.map((server) => [server.name, server.tools.length, server.state]) }));
+    } catch (error) {
+      console.warn(JSON.stringify({ t3flare: "mcp-view-failed", error: String(error).slice(0, 300) }));
     }
   }
 
@@ -585,6 +650,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     await this.#takeT3Mcp(input.t3Mcp);
     await this.#takeHarness();
+    await this.#takeMcp();
     // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
     if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
     const root = await this.#root(input.model, input.thinking);

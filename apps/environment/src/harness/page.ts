@@ -22,6 +22,29 @@ table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #eee;pad
 const SCRIPT = `"use strict";
 const csrf = document.querySelector('meta[name="t3flare-csrf"]').getAttribute("content");
 const result = document.getElementById("result");
+const post = async (path, body) => {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-t3flare-csrf": csrf },
+    body: JSON.stringify(body),
+    credentials: "same-origin",
+  });
+  if (response.ok) return response;
+  result.textContent = "Refused: " + (await response.text());
+  return undefined;
+};
+for (const button of document.querySelectorAll("button[data-mcp]")) {
+  button.addEventListener("click", async () => {
+    const response = await post("/_t3flare/harness/api/mcp", JSON.parse(button.dataset.mcp));
+    if (response !== undefined) location.reload();
+  });
+}
+for (const button of document.querySelectorAll("button[data-mcp-test]")) {
+  button.addEventListener("click", async () => {
+    const response = await post("/_t3flare/harness/api/mcp/test", { server: button.dataset.mcpTest });
+    if (response !== undefined) result.textContent = JSON.stringify(await response.json());
+  });
+}
 for (const form of document.querySelectorAll("form[data-extension]")) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -95,7 +118,43 @@ const extensionCard = (resolved: ResolvedHarness, entry: (typeof EXTENSIONS)[num
 <div class="muted">${escapeHtml(entry.description)}</div>${toggle}${settings.join("")}${editable ? "<button type=\"submit\">Save</button>" : ""}</form>`;
 };
 
+/** One server of the panel's MCP section (panel.ts `mcpOverview`). */
+export interface McpRow {
+  readonly name: string;
+  readonly setting: { readonly kind: string; readonly enabled: boolean; readonly exposure: string; readonly linkedOffered: boolean; readonly url?: string };
+  readonly status: string;
+  readonly listedAt: number | null;
+  readonly error: string | null;
+  readonly tools: ReadonlyArray<{ readonly name: string; readonly upstream: string; readonly class: string; readonly hash: string; readonly exposure: string; readonly unconfirmed?: true; readonly suggested?: string }>;
+  readonly refused: ReadonlyArray<{ readonly tool: string; readonly reason: string }>;
+}
+
+const action = (label: string, change: unknown) => `<button type="button" data-mcp="${escapeHtml(JSON.stringify(change))}">${escapeHtml(label)}</button>`;
+
+const mcpSection = (rows: ReadonlyArray<McpRow>): string =>
+  rows
+    .map((row) => {
+      const tools = row.tools
+        .map((tool) => {
+          const other = tool.class === "read" ? "write" : "read";
+          const note = tool.unconfirmed === true ? ` <span class="locked">changed since its class was set; hint says ${escapeHtml(tool.suggested ?? "?")}</span>` : tool.suggested === undefined ? "" : ` <span class="muted">(hint: ${escapeHtml(tool.suggested)})</span>`;
+          return `<tr><td>${escapeHtml(tool.upstream)}</td><td>${escapeHtml(tool.class)}${note}</td><td>${escapeHtml(tool.exposure)}</td><td>${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other, hash: tool.hash })}${
+            tool.unconfirmed === true ? action(`Confirm ${tool.class}`, { op: "class", server: row.name, tool: tool.upstream, class: tool.class, hash: tool.hash }) : ""
+          }</td></tr>`;
+        })
+        .join("");
+      const refused = row.refused.map((r) => `<li>${escapeHtml(r.tool)}: ${escapeHtml(r.reason)}</li>`).join("");
+      return `<div class="ext"><h3>${escapeHtml(row.name)} <span class="muted">(${escapeHtml(row.setting.kind)}${row.setting.url === undefined ? "" : `, ${escapeHtml(row.setting.url)}`})</span></h3>
+<div class="muted">${row.setting.enabled ? "Enabled" : "Disabled"} · Exposure ${escapeHtml(row.setting.exposure)} · ${row.setting.linkedOffered ? "offered to linked threads (their writes ask every call)" : "not offered to linked threads"} · ${escapeHtml(row.status)}${
+        row.listedAt === null ? "" : `, listed ${escapeHtml(new Date(row.listedAt).toISOString())}`
+      }${row.error === null ? "" : ` · <span class="locked">${escapeHtml(row.error)}</span>`}</div>
+<div>${action(row.setting.enabled ? "Disable" : "Enable", { op: "server", server: row.name, enabled: !row.setting.enabled })}${action(row.setting.linkedOffered ? "Stop offering to linked threads" : "Offer to linked threads", { op: "server", server: row.name, linkedOffered: !row.setting.linkedOffered })}<button type="button" data-mcp-test="${escapeHtml(row.name)}">Test</button></div>
+<table><tr><th>Tool</th><th>Class</th><th>Exposure</th><th></th></tr>${tools}</table>${refused === "" ? "" : `<ul>${refused}</ul>`}</div>`;
+    })
+    .join("\n");
+
 export interface PageInput {
+  readonly mcp?: ReadonlyArray<McpRow>;
   readonly resolved: ResolvedHarness;
   readonly csrf: string;
   readonly audit: ReadonlyArray<AuditEntry>;
@@ -123,7 +182,7 @@ export const renderPage = (input: PageInput): string => {
 <h2>Extensions</h2>
 ${EXTENSIONS.map((entry) => extensionCard(input.resolved, entry)).join("\n")}
 <h2>MCP servers</h2>
-<p class="muted">Commissary's toolkits and direct servers arrive with the tools step's parts 2–4 (after SPI-992).</p>
+${input.mcp === undefined || input.mcp.length === 0 ? '<p class="muted">No MCP server.</p>' : mcpSection(input.mcp)}
 <h2>Skills</h2>
 <p class="muted">Deferred (SPI-1001).</p>
 <h2>Status</h2>

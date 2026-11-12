@@ -3,6 +3,18 @@
 // validate against it) and the agents Worker (the Session builds its registry from the resolved view). Later ports
 // (pi-parity: web, todo, context, guardian…) add an entry here and appear in the panel without panel work.
 //
+import {
+  defaultCommissary,
+  type Exposure,
+  type McpServerSetting,
+  RESERVED_SERVER_NAMES,
+  SERVER_NAME,
+  type ServerAuth,
+  type ToolClass,
+} from "./mcp.ts";
+
+export * from "./mcp.ts";
+
 // Settings are Global (the Cloud Environment) now; the stored shape has per-Project `overrides`, empty, resolved with
 // cloudpid ADR-0027's merge (an Override's keyed settings merge over Global's key by key; lists are replaced whole) so a
 // later step only adds a scope picker.
@@ -109,11 +121,96 @@ export interface StoredHarness {
   /** Bumped by every change; a Session reinstalls what changed when it sees a new one. */
   readonly revision: number;
   readonly global: HarnessLayer;
+  /** The MCP server set (ADR-0028), Environment-wide; Commissary's entry is implied until changed. */
+  readonly mcp?: { readonly servers: Readonly<Record<string, McpServerSetting>> };
   /** Per-Project overrides, by project id: the later seam (empty now). */
   readonly overrides: Readonly<Record<string, HarnessLayer>>;
 }
 
 export const EMPTY_HARNESS: StoredHarness = { revision: 0, global: {}, overrides: {} };
+
+/** The MCP server set with Commissary's entry (enabled by default, ADR-0028). */
+export const mcpServersOf = (stored: StoredHarness): Readonly<Record<string, McpServerSetting>> => ({
+  commissary: defaultCommissary(),
+  ...stored.mcp?.servers,
+});
+
+/** One change to the MCP server set from the panel or a script. */
+export type McpChange =
+  | {
+      readonly op: "server";
+      readonly server: string;
+      readonly enabled?: boolean;
+      readonly exposure?: Exposure;
+      readonly linkedOffered?: boolean;
+      readonly toolExposure?: Readonly<Record<string, Exposure | null>>;
+    }
+  | { readonly op: "class"; readonly server: string; readonly tool: string; readonly class: ToolClass; readonly hash: string }
+  | { readonly op: "add"; readonly server: string; readonly url: string; readonly auth: ServerAuth }
+  | { readonly op: "remove"; readonly server: string };
+
+const EXPOSURES: ReadonlyArray<Exposure> = ["direct", "deferred", "codemode", "hidden"];
+
+/** `url` as a direct server may have it (plan §5.3, review M5): HTTPS, a name not an IP literal, no userinfo, no port games. */
+export const directUrlProblem = (url: string): string | undefined => {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return "not a URL";
+  }
+  if (parsed.protocol !== "https:") return "only https";
+  if (parsed.username !== "" || parsed.password !== "") return "no credentials in the URL";
+  const host = parsed.hostname.toLowerCase();
+  if (/^[\d.]+$/.test(host) || host.startsWith("[") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) return "a public host name, not an address";
+  return undefined;
+};
+
+/** `stored` with the MCP `change` applied and the revision bumped, or why it is refused. */
+export const applyMcpChange = (
+  stored: StoredHarness,
+  change: McpChange,
+): { readonly ok: true; readonly harness: StoredHarness } | { readonly ok: false; readonly error: string } => {
+  const servers: Record<string, McpServerSetting> = { ...mcpServersOf(stored) };
+  const current = servers[change.server];
+  const save = (next: Record<string, McpServerSetting>) => ({ ok: true as const, harness: { ...stored, revision: stored.revision + 1, mcp: { servers: next } } });
+  if (change.op === "add") {
+    if (!SERVER_NAME.test(change.server)) return { ok: false, error: `${change.server}: a name of 1-20 of a-z, 0-9 and -` };
+    if (RESERVED_SERVER_NAMES.has(change.server)) return { ok: false, error: `${change.server}: reserved` };
+    if (current !== undefined) return { ok: false, error: `${change.server}: exists` };
+    const problem = directUrlProblem(change.url);
+    if (problem !== undefined) return { ok: false, error: `${change.server}: ${problem}` };
+    if (change.auth.kind === "header" && !/^[A-Za-z0-9-]{1,64}$/.test(change.auth.header)) return { ok: false, error: `${change.server}: a header name` };
+    return save({ ...servers, [change.server]: { kind: "direct", url: change.url, auth: change.auth, enabled: true, exposure: "deferred", linkedOffered: false } });
+  }
+  if (current === undefined) return { ok: false, error: `${change.server}: no such server` };
+  if (change.op === "remove") {
+    if (current.kind === "commissary") return { ok: false, error: "commissary: disable it instead" };
+    const { [change.server]: _removed, ...rest } = servers;
+    return save(rest);
+  }
+  if (change.op === "class") {
+    if (change.class !== "read" && change.class !== "write") return { ok: false, error: "class: read or write" };
+    return save({ ...servers, [change.server]: { ...current, classes: { ...current.classes, [change.tool]: { class: change.class, hash: change.hash, by: "owner" } } } });
+  }
+  if (change.exposure !== undefined && !EXPOSURES.includes(change.exposure)) return { ok: false, error: `exposure: one of ${EXPOSURES.join(", ")}` };
+  const toolExposure: Record<string, Exposure> = { ...current.toolExposure };
+  for (const [tool, exposure] of Object.entries(change.toolExposure ?? {})) {
+    if (exposure === null) delete toolExposure[tool];
+    else if (!EXPOSURES.includes(exposure)) return { ok: false, error: `exposure: one of ${EXPOSURES.join(", ")}` };
+    else toolExposure[tool] = exposure;
+  }
+  return save({
+    ...servers,
+    [change.server]: {
+      ...current,
+      ...(change.enabled === undefined ? {} : { enabled: change.enabled }),
+      ...(change.exposure === undefined ? {} : { exposure: change.exposure }),
+      ...(change.linkedOffered === undefined ? {} : { linkedOffered: change.linkedOffered }),
+      toolExposure,
+    },
+  });
+};
 
 /** What a Session reads: secret-free, every extension resolved. */
 export interface ResolvedHarness {

@@ -10,7 +10,9 @@
 //   (the stage's service token plus the admin token, checked by worker.ts) sends no cookie a page could ride, so it
 //   needs none.
 // - Every change is validated against the registry, bumps the revision, and is written to the audit log.
-import { applyChange, EXTENSIONS, type HarnessChange, resolveHarness } from "@t3flare/harness-registry";
+import { applyChange, applyMcpChange, EXTENSIONS, type HarnessChange, type McpChange, resolveHarness } from "@t3flare/harness-registry";
+
+import type { McpHost } from "../mcp/host.ts";
 
 import { csrfToken, csrfValid } from "./csrf.ts";
 import { pageCsp, renderPage } from "./page.ts";
@@ -27,8 +29,30 @@ export interface HarnessDeps {
   /** The admin host as configured (`T3FLARE_HARNESS_HOST`): what `Origin` must name. */
   readonly host: string;
   readonly store: HarnessStore;
+  /** The MCP host (ADR-0028): the servers' inventories and their test. */
+  readonly mcp?: Pick<McpHost, "servers" | "inventory" | "tools" | "list">;
   readonly now?: () => number;
 }
+
+/** The MCP server set as the panel shows it: settings (no secret), inventory state, tools with classes. */
+export const mcpOverview = async (deps: HarnessDeps) => {
+  if (deps.mcp === undefined) return [];
+  const rows = [];
+  for (const [name, server] of Object.entries(deps.mcp.servers())) {
+    const inventory = deps.mcp.inventory(name);
+    const { tools, refused } = await deps.mcp.tools(name, server, inventory);
+    rows.push({
+      name,
+      setting: server,
+      status: inventory.status,
+      listedAt: inventory.listedAt > 0 ? inventory.listedAt : null,
+      error: inventory.error ?? null,
+      tools: tools.map(({ inputSchema: _schema, ...tool }) => tool),
+      refused,
+    });
+  }
+  return rows;
+};
 
 export const isHarnessPath = (pathname: string) => pathname === HARNESS_PATH || pathname.startsWith(`${HARNESS_PATH}/`);
 
@@ -51,7 +75,6 @@ const statusOf = (deps: HarnessDeps) => {
     "settings revision": stored.revision,
     "last taken by a Session (revision)": read?.revision ?? null,
     "last taken by a Session (at)": read === undefined ? null : new Date(read.at).toISOString(),
-    "MCP servers": "parts 2-4 (after SPI-992)",
     Skills: "deferred (SPI-1001)",
   };
 };
@@ -80,7 +103,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === HARNESS_PATH || path === `${HARNESS_PATH}/`) {
       const subject = deps.caller.kind === "owner" ? deps.caller.subject : "";
       const csrf = subject === "" ? "" : await csrfToken(deps.store.csrfKey(), subject, deps.now?.() ?? Date.now());
-      const html = renderPage({ resolved: resolveHarness(deps.store.load()), csrf, audit: deps.store.auditLog(50), status: statusOf(deps) });
+      const html = renderPage({ resolved: resolveHarness(deps.store.load()), csrf, audit: deps.store.auditLog(50), status: statusOf(deps), mcp: await mcpOverview(deps) });
       return new Response(html, { headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp() } });
     }
     if (path === `${HARNESS_PATH}/api/settings`) {
@@ -88,16 +111,20 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
       return json({ revision: stored.revision, resolved: resolveHarness(stored), registry: EXTENSIONS, stored });
     }
     if (path === `${HARNESS_PATH}/api/status`) return json(statusOf(deps));
+    if (path === `${HARNESS_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });
     if (path === `${HARNESS_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
     return refused(404, "Not found");
   }
   if (request.method !== "POST") return refused(405, "Method not allowed");
-  if (path !== `${HARNESS_PATH}/api/extensions`) return refused(404, "Not found");
+  const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`];
+  if (!routes.includes(path)) return refused(404, "Not found");
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
     console.log(JSON.stringify({ t3flare: "harness-refused", reason: why, caller: deps.caller.kind }));
     return refused(403, why);
   }
+  if (path === `${HARNESS_PATH}/api/mcp/test`) return testServer(request, deps);
+  if (path === `${HARNESS_PATH}/api/mcp`) return changeMcp(request, deps);
   let change: HarnessChange;
   try {
     const body: unknown = await request.json();
@@ -119,4 +146,45 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     after: applied.harness.global.extensions?.[change.extension] ?? null,
   });
   return json({ ok: true, revision: applied.harness.revision, resolved: resolveHarness(applied.harness) });
+};
+
+const bodyOf = async (request: Request): Promise<Record<string, unknown> | undefined> => {
+  try {
+    const body: unknown = await request.json();
+    return body !== null && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** The panel's "test": lists the server now, from the MCP Worker, and shows what came back. */
+const testServer = async (request: Request, deps: HarnessDeps): Promise<Response> => {
+  const body = await bodyOf(request);
+  const server = typeof body?.server === "string" ? body.server : "";
+  if (deps.mcp === undefined || deps.mcp.servers()[server] === undefined) return refused(404, "no such server");
+  const started = deps.now?.() ?? Date.now();
+  const inventory = await deps.mcp.list(server);
+  deps.store.audit({ at: started, caller: callerName(deps.caller), action: "mcp.test", target: server, after: { status: inventory.status } });
+  return json({ server, status: inventory.status, error: inventory.error ?? null, tools: Object.keys(inventory.definitions).length, refused: inventory.refused.length, ms: (deps.now?.() ?? Date.now()) - started });
+};
+
+/** One change to the MCP server set (enable, Exposure, the linked switch, a tool's class, remove). */
+const changeMcp = async (request: Request, deps: HarnessDeps): Promise<Response> => {
+  const body = await bodyOf(request);
+  if (body === undefined || typeof body.op !== "string" || typeof body.server !== "string") return refused(400, "the body is one change: { op, server, … }");
+  // A direct server is added with its secret through its own route (part 4); here only what holds no secret.
+  if (body.op === "add") return refused(400, "add a server through /api/mcp/servers");
+  const before = deps.store.load();
+  const applied = applyMcpChange(before, body as unknown as McpChange);
+  if (!applied.ok) return refused(400, applied.error);
+  deps.store.save(applied.harness);
+  deps.store.audit({
+    at: deps.now?.() ?? Date.now(),
+    caller: callerName(deps.caller),
+    action: `mcp.${body.op}`,
+    target: body.op === "class" ? `${body.server}/${String(body.tool)}` : body.server,
+    before: before.mcp?.servers?.[body.server] ?? null,
+    after: applied.harness.mcp?.servers?.[body.server] ?? null,
+  });
+  return json({ ok: true, revision: applied.harness.revision });
 };

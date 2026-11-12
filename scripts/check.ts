@@ -42,6 +42,8 @@ const tasks: Array<Task> = [
     command: "bun",
     args: ["run", "test", "--exclude", "conformance/**", "--exclude", "src/import-rule.test.ts", "--exclude", "src/sdk-isolation.test.ts"],
   },
+  { name: "typecheck (mcp-worker)", cwd: path.join(root, "apps/mcp-worker"), command: "bun", args: ["run", "typecheck"] },
+  { name: "test (mcp-worker)", cwd: path.join(root, "apps/mcp-worker"), command: "bun", args: ["run", "test"] },
   { name: "typecheck (codemode-sandbox)", cwd: path.join(root, "apps/codemode-sandbox"), command: "bun", args: ["run", "typecheck"] },
   ...["effect-durable", "computer-env", "github-app", "workspace-client", "harness-registry"].flatMap((name): Array<Task> => [
     { name: `typecheck (${name})`, cwd: pkg(name), command: "bun", args: ["run", "typecheck"] },

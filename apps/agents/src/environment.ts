@@ -6,6 +6,7 @@ import { ENVIRONMENT_NAME } from "@t3flare/session-protocol";
 import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 import type { ResolvedHarness } from "@t3flare/harness-registry";
+import type { McpCallAnswer, McpView } from "./extensions/mcp.ts";
 
 export interface EnvironmentRpc {
   agentsPing(message: string): Promise<{ readonly environment: string; readonly message: string }>;
@@ -30,6 +31,16 @@ export interface EnvironmentRpc {
   terminalOutput(push: TerminalPush): Promise<TerminalPushAnswer>;
   /** The harness settings, resolved and secret-free (ADR-0026): read at a turn's start. Never boots t3. */
   harnessSettings(input: { readonly projectId?: string }): Promise<ResolvedHarness>;
+  /** The MCP tools this Session may install (ADR-0028); a linked thread sees only servers offered to linked threads. */
+  mcpView(input: { readonly linked: boolean }): Promise<McpView>;
+  /** An MCP call the Session's tool has judged (`decideCall`). */
+  mcpCall(input: {
+    readonly server: string;
+    readonly tool: string;
+    readonly args: Readonly<Record<string, unknown>>;
+    readonly linked: boolean;
+    readonly judged: "read" | "write";
+  }): Promise<McpCallAnswer>;
 }
 
 export const environmentStub = (namespace: DurableObjectNamespace): EnvironmentRpc =>

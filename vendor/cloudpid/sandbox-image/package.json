@@ -1,0 +1,7 @@
+{
+  "name": "@cloudpid/sandbox-image",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { "./mcp-bridge": "./src/mcp-bridge.ts" }
+}

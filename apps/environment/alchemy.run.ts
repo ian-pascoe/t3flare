@@ -36,6 +36,8 @@ import * as path from "node:path";
 
 import { sandboxImageContext } from "@t3flare/sandbox-image";
 
+import { MCP_WORKER_COMPATIBILITY } from "../mcp-worker/src/engine/compatibility.ts";
+
 import { COMPATIBILITY } from "./build.ts";
 import { credentialsFile } from "./stage-files.ts";
 
@@ -95,6 +97,7 @@ export default Alchemy.Stack(
     const agentsName = `t3flare-agents-${stage}`;
     const codemodeName = `t3flare-codemode-${stage}`;
     const adminName = `t3flare-admin-${stage}`;
+    const mcpName = `t3flare-mcp-${stage}`;
     const workersDevHost = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
     // The stage's custom domain, if it has one (unset or empty: workers.dev only).
     const domain = yield* Config.String("T3FLARE_DOMAIN").pipe(Config.withDefault(""));
@@ -180,6 +183,17 @@ export default Alchemy.Stack(
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     } as never);
 
+    // The MCP Worker (ADR-0028; cloudpid's ADR-0038): the MCP SDK's engine, kept out of the agents and Environment
+    // isolates. No bindings (review M3), `global_fetch_strictly_public` (review M5), no URL: only the Environment's
+    // `MCP_ENGINE` binding reaches it. Bundled by alchemy (ADR-0020's refinement: nothing of t3).
+    const mcpWorker = yield* Cloudflare.Worker("McpWorker", {
+      name: mcpName,
+      main: path.join(here, "../mcp-worker/src/worker.ts"),
+      compatibility: { date: MCP_WORKER_COMPATIBILITY.date, flags: [...MCP_WORKER_COMPATIBILITY.flags] },
+      workersDev: { enabled: false, previewsEnabled: false },
+      observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
+    } as never);
+
     const agents = yield* Cloudflare.Worker("Agents", {
       name: agentsName,
       main: path.join(here, "../agents/dist/worker/worker.js"),
@@ -229,6 +243,7 @@ export default Alchemy.Stack(
         T3FLARE_ACCESS_AUD: admin.aud,
         T3FLARE_OWNER_EMAIL: ownerEmail,
         T3FLARE_ACCESS_SERVICE_CLIENT_ID: serviceToken.clientId,
+        MCP_ENGINE: Cloudflare.WorkerEntrypoint(mcpWorker as never, "McpEngine"),
         T3FLARE_HARNESS_HOST: adminHost,
         T3FLARE_HARNESS_ACCESS_AUD: harnessAccess.aud,
         ...(bootstrapPass

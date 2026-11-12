@@ -34,7 +34,8 @@
     "effect": "catalog:",
     "effect-acp": "workspace:*",
     "effect-codex-app-server": "workspace:*",
-    "t3": "workspace:*"
+    "t3": "workspace:*",
+    "@cloudpid/mcp": "workspace:*"
   },
   "devDependencies": {
     "@alchemy.run/cloudflare": "catalog:",
