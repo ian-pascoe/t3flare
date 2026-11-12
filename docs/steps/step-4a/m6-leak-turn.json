@@ -1,0 +1,89 @@
+{
+ "at": "2026-11-12T02:16:03.429Z",
+ "scenario": "turn",
+ "ok": true,
+ "failures": [],
+ "cli": "pi",
+ "result": {
+  "threadId": "56123672-d029-40c3-9b1a-a503faa18874",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:56123672-d029-40c3-9b1a-a503faa18874:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "reasoning",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "/opt/t3flare/bin/t3flare-model-key pi > /w/cli-pi/leak.txt && echo written",
+    "exitCode": 0
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "Done. The command wrote its output to `/w/cli-pi/leak.txt`, and I didn't open the file.\n\nThat file now holds a model key in plain text inside the repo. Check that it's gitignored or delete it when the test is finished.",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3A56123672-d029-40c3-9b1a-a503faa18874%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-15-53-880Z_01a1cd8a-4715-74fd-b2dd-3c034d54252d.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:56123672-d029-40c3-9b1a-a503faa18874:b5d3f1cc-6caf-462c-9b22-f5502292bcc1",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:56123672-d029-40c3-9b1a-a503faa18874:b5d3f1cc-6caf-462c-9b22-f5502292bcc1",
+    "status": "error",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 13230
+ },
+ "processes": {
+  "channel": {
+   "live": 0,
+   "environmentEpoch": 40
+  },
+  "workspace": {
+   "epoch": 35,
+   "processes": [],
+   "pushes": 82
+  }
+ }
+}

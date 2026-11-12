@@ -1,0 +1,20 @@
+{
+ "at": "2026-11-12T02:17:00Z",
+ "how": "POST /_t3flare/check/leak?id=<workspace> (WorkspaceDO.leakCheck): the DO's own files (the synced tree) searched for the CLI agents' key by value with computer's grep; the Container's /workspace, /root, /tmp, /var/lib/t3flare, /var/lib/computerd and every process's environ and cmdline scanned by prefix, length and SHA-256 (nothing sent in). Names and paths only.",
+ "baseline": {
+  "cli-codex": { "do": [], "container": { "hits": [], "files": 899, "bytes": 28427187 } },
+  "cli-pi": { "do": [], "container": { "hits": [], "files": 709, "bytes": 11212751 } },
+  "note": "after Codex and Pi turns (M3–M5), live CLI processes in both: the key is in no file and in no process's environment or command line"
+ },
+ "deliberateLeak": {
+  "turn": "a Pi turn at full access ran `/opt/t3flare/bin/t3flare-model-key pi > /w/cli-pi/leak.txt` (the A′ residual: a CLI's own agent can run the helper; m6-leak-turn.json)",
+  "syncGuard": "the scan before the turn-end pull found the key in /workspace/repo/leak.txt, moved it to /var/lib/t3flare/quarantine (Container disk), killed the Workspace's CLI processes and flagged the key for rotation ({names: [model-key], paths: [/workspace/repo/leak.txt]})",
+  "afterwards": {
+   "do": [],
+   "checkpointFiles": [],
+   "containerHits": ["/var/lib/t3flare/quarantine/…-leak.txt", "/var/lib/computerd/state.db", "/var/lib/computerd/state.db-wal"]
+  },
+  "finding": "computerd's own copy of the Workspace (COMPUTERD_DB, Container disk, never synced) keeps the bytes of a file written to /workspace before the DO pulls it. Not synced disk, and gone with the Container (no snapshots in 4a), but the plan's claim that no Container-only path holds a credential does not hold after a leak: the quarantine cannot reach computerd's database. Recorded in the report and ADR-0016's refinement."
+ },
+ "keyRotation": "flagged on stage only; the stage's key is the owner's COMMISSARY_CONTAINER_API_KEY. The owner rotates it (docs/model-proxy.md)."
+}

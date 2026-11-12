@@ -16,6 +16,8 @@
 // 7. With `--terminal` and/or `--worktree` (step 2b): a terminal's echo, a worktree thread's setup script, its removal,
 //    and the sweep's dry run (`lib/terminalWorktree.ts`).
 // 8. With `--peer` (step 3): a Peer link from the harness, the forwarded launch and the link fence (`lib/peerAcceptance.ts`).
+// 8b. With `--codex` and/or `--pi` (step 4a): a CLI agent's turn with approvals, resumed after its Container stopped,
+//     the leak check and the key route (`lib/cliAcceptance.ts`).
 import { WsRpcGroup, WS_METHODS, ORCHESTRATION_V2_WS_METHODS } from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -271,6 +273,15 @@ if (process.argv.includes("--terminal") || process.argv.includes("--worktree")) 
   const result = await terminalWorktree(cookie, { terminal: process.argv.includes("--terminal"), worktree: process.argv.includes("--worktree") });
   report.step2b = result;
   for (const failure of result.failures) failures.push(`step 2b: ${failure}`);
+}
+
+// 8b. CLI agents (step 4a): a Codex and/or a Pi turn in a Workspace's Container, resumed after the Container stopped.
+for (const cli of ["codex", "pi"] as const) {
+  if (!process.argv.includes(`--${cli}`)) continue;
+  const { cliAcceptance } = await import("./lib/cliAcceptance.ts");
+  const result = await cliAcceptance(cookie, cli);
+  report[cli] = result;
+  for (const failure of result.failures) failures.push(`${cli}: ${failure}`);
 }
 
 // 8. Peer links and the link fence (step 3): the harness plays the laptop (`lib/peerAcceptance.ts`).
