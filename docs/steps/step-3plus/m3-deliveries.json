@@ -273,5 +273,12 @@
     "phase": "completed"
    }
   ]
+ },
+ "ownerConfirmation": {
+  "at": "2026-11-12T00:2xZ",
+  "via": "root (owner relayed)",
+  "text": "Both notifications arrived on the phone: \"Agent finished\" and \"Waiting for input\". No screenshots taken.",
+  "device": "iOS, T3 Code 2.3.0",
+  "pairedToStage": false
  }
 }

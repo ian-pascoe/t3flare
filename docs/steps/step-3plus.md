@@ -93,3 +93,17 @@ own answers). `m2-publishes.json` (the run on the final build), `m2-publishes-2.
   nor the four Sessions' state (`m2-leak.json`, 0), nor in Workers Logs over the M2 window (`m2-leak-logs.json`).
 - **Deliveries were 0** throughout: the relay lists one iOS device (app 2.3.0) with notifications switched off. That is
   the phone's setting, and the relay still accepted every publish.
+
+### M3: the owner's phone (the exit criterion)
+
+The owner switched notifications on in the T3 Code app (the relay then listed the iOS device with
+`notifications.enabled: true`). `scripts/connect-m3.ts` ran two threads on the stage with no client attached:
+
+- "Phone check: finishes" → `completed` published at 00:07:30Z, relay `ok: true`, one `push_notification` delivery.
+- "Phone check: asks you" → `waiting_for_input` published at 00:07:43Z, relay `ok: true`, one `push_notification`
+  delivery. (The phone was paired to prod, not the stage, so the question was answered by the script after 10 minutes;
+  tapping to open the thread was not tried: R4 stays open.)
+
+**The owner confirmed both arrived: "Agent finished" and "Waiting for input".** No screenshots were taken; the
+evidence is the owner's confirmation and the relay's delivery records (`m3-deliveries.json`). Both deliveries were
+APNs `queued`, the relay's answer for a push it handed on.
