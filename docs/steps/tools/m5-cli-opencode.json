@@ -1,29 +1,20 @@
 {
- "at": "2026-11-12T15:56:14.844Z",
+ "at": "2026-11-12T16:14:28.231Z",
  "cli": "opencode",
- "workspace": "tools-cli-opencode",
+ "workspace": "tools-cli-opencode-mwdqxbcj",
  "cases": [
   {
    "name": "a read (fixture_echo) runs without a card",
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:643c86c0-299e-4f0a-ac50-33eeaa7a1407:ordinal:1",
+    "id": "run:thread:a0753a52-dc11-4b1b-b715-9c41938e88c6:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
-   "requests": [
-    {
-     "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e2f8897fbffe417pEJGNx2tz6W%253Aturn%253A1:native-request:toolu_01MVtWJcNUZqFAMozKZpcAEe:ff1ba998-68ef-401f-ba4f-5cebb2e57c31",
-     "kind": "command",
-     "requestKind": null,
-     "status": "resolved",
-     "decision": "accept",
-     "options": []
-    }
-   ],
-   "text": "hello-opencode-mwdq9tyr",
+   "requests": [],
+   "text": "hello-opencode-mwdqxbcj",
    "items": [
     {
      "type": "dynamic_tool",
@@ -41,13 +32,13 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:3b9fbd55-77d9-49cc-8ce7-3efb58f1aeed:ordinal:1",
+    "id": "run:thread:dc4859e4-b88f-4245-bd1e-0196c1dd28f4:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [
     {
-     "id": "runtime-request:opencode:t3flare-push:1a5c4ea7-8bc4-40c4-9a7f-3d8992acabfd",
+     "id": "runtime-request:opencode:t3flare-push:07963138-4cb6-4885-81bb-57b4fe844b06",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
@@ -57,15 +48,7 @@
    ],
    "requests": [
     {
-     "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e2f88415dffenK4meToiWmIgAE%253Aturn%253A1:native-request:toolu_01A4UmsceJDLHiyjRtzzTZcb:a60343f3-aa68-4236-8575-31953dc366bc",
-     "kind": "command",
-     "requestKind": null,
-     "status": "resolved",
-     "decision": "accept",
-     "options": []
-    },
-    {
-     "id": "runtime-request:opencode:t3flare-push:1a5c4ea7-8bc4-40c4-9a7f-3d8992acabfd",
+     "id": "runtime-request:opencode:t3flare-push:07963138-4cb6-4885-81bb-57b4fe844b06",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
@@ -84,7 +67,7 @@
     }
    ],
    "notesAdded": [
-    "opencode-mwdq9tyr-approved"
+    "opencode-mwdqxbcj-approved"
    ],
    "ok": true
   },
@@ -93,22 +76,31 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:f46e184e-ba3d-4283-b4cb-9bb7e50b36a7:ordinal:1",
+    "id": "run:thread:bf1b9b0b-880d-41d8-a2e6-29851f9b6013:ordinal:1",
     "status": "completed",
     "failure": null
    },
-   "cards": [],
-   "requests": [
+   "cards": [
     {
-     "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e2f87dd2dffea4gMHis9hltSZK%253Aturn%253A1:native-request:toolu_01H6UsZSGLsTyn4QRCZhdLwz:0dddd7b2-1f93-412e-a18e-bc6ab14c86b3",
-     "kind": "command",
+     "id": "runtime-request:opencode:t3flare-push:ce299771-aa9b-4ec7-98f1-71559f91771c",
+     "kind": "permission",
      "requestKind": null,
      "status": "resolved",
      "decision": "decline",
      "options": []
     }
    ],
-   "text": "The call to `fixture_note` on the \"fixture\" MCP server was refused with a `Permission.DeclinedError`. I stopped there and ran nothing else.",
+   "requests": [
+    {
+     "id": "runtime-request:opencode:t3flare-push:ce299771-aa9b-4ec7-98f1-71559f91771c",
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "decline",
+     "options": []
+    }
+   ],
+   "text": "The call was refused. The owner declined to approve `fixture_note`, so it didn't run and nothing was logged. I stopped there, as you asked.",
    "items": [
     {
      "type": "dynamic_tool",
@@ -119,14 +111,14 @@
     }
    ],
    "notesAdded": [],
-   "ok": false
+   "ok": true
   },
   {
    "name": "a write runs in full access without a card",
    "mode": "full-access",
    "plan": false,
    "run": {
-    "id": "run:thread:5c28c2c0-c319-4947-8d29-fbc7848c35d7:ordinal:1",
+    "id": "run:thread:002fef49-4b6e-4e45-9887-af5177416759:ordinal:1",
     "status": "completed",
     "failure": null
    },
@@ -143,7 +135,7 @@
     }
    ],
    "notesAdded": [
-    "opencode-mwdq9tyr-full"
+    "opencode-mwdqxbcj-full"
    ],
    "ok": true
   },
@@ -152,22 +144,13 @@
    "mode": "full-access",
    "plan": true,
    "run": {
-    "id": "run:thread:dcdfe2a0-3c0b-4617-bc17-849f3c6c1caf:ordinal:1",
+    "id": "run:thread:cc35263f-4d13-4cc6-a94f-e59f4cb54173:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
-   "requests": [
-    {
-     "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e2f873b8effeK8yOsleBNg5InK%253Aturn%253A1:native-request:toolu_01GKDPn7RNLZN635DRYxFrLs:75a36e02-986f-4c97-9c47-569e8af8b0f5",
-     "kind": "command",
-     "requestKind": null,
-     "status": "resolved",
-     "decision": "accept",
-     "options": []
-    }
-   ],
-   "text": "ich is read-only, and that the tool may change things outside the thread. The tool writes a line to the fixture's log, so plan mode blocks it.\n\nI didn't try another route, such as the `commissary` server's copy of the tool or a shell command. Those would get around the read-only restriction, and you also asked for no shell commands.\n\nTo run it, switch this thread out of plan mode and ask me again.",
+   "requests": [],
+   "text": "things outside the thread. The tool writes to the fixture's log, so plan mode blocks it.\n\nI haven't tried another route, such as the `commissary` server's copy of the tool or a shell command. You said to use only that tool, and a workaround would sidestep the read-only restriction.\n\nTo run it, switch this thread out of plan mode and ask me again. I'll then call the tool and report what it answers.",
    "items": [
     {
      "type": "dynamic_tool",
@@ -185,30 +168,14 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:e90c7b03-e6c4-4cce-bb97-38549480238b:ordinal:1",
+    "id": "run:thread:49bb283d-1e23-496c-a11d-a535afac217d:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
-   "requests": [
-    {
-     "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e2f86d7a0ffegBOsiqZMnCizbQ%253Aturn%253A1:native-request:toolu_01J22MSjvy7pcVrHTxroB6NT:231e2ea1-b127-4583-bb66-f14c908bb2df",
-     "kind": "command",
-     "requestKind": null,
-     "status": "resolved",
-     "decision": "accept",
-     "options": []
-    }
-   ],
-   "text": "`t3_thread_list` lists **6 threads**. The reported total is 6, all 6 came back on a single page, and there is no next cursor. The call used the default scope, which is the current project.",
+   "requests": [],
+   "text": "`t3_thread_list` lists **6 threads**. The response reports `total: 6` and `nextCursor: null`, so there are no further pages.",
    "items": [
-    {
-     "type": "dynamic_tool",
-     "status": "completed",
-     "title": "Tool",
-     "fileName": null,
-     "input": null
-    },
     {
      "type": "dynamic_tool",
      "status": "completed",
@@ -221,5 +188,5 @@
    "ok": true
   }
  ],
- "ok": false
+ "ok": true
 }

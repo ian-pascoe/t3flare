@@ -30,6 +30,7 @@ import { bindStateStorage } from "./platform/stateStore.ts";
 import type { HarnessCaller } from "./harness/panel.ts";
 import { harnessSecrets } from "./harness/secrets.ts";
 import { harnessStore } from "./harness/store.ts";
+import { HarnessOAuth, type McpOAuthBinding, OAUTH_CALLBACK_PATH, OAUTH_CLIENT_PATH } from "./harness/oauth.ts";
 import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpView } from "./mcp/host.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
@@ -64,6 +65,8 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_HARNESS_HOST?: string;
   /** The MCP Worker's engine (ADR-0028): every MCP list and call goes through it. */
   readonly MCP_ENGINE?: McpEngineBinding;
+  /** The MCP Worker's OAuth entrypoint (review M4, M5): every sign-in and refresh request is made there. */
+  readonly MCP_OAUTH?: McpOAuthBinding;
   /** Commissary's MCP endpoint; default `${MODEL_PROXY_URL}/mcp`. */
   readonly COMMISSARY_TOOLS_URL?: string;
   /** `?toolkits=` narrowing of Commissary's tools. */
@@ -341,7 +344,32 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    */
   async harness(request: Request, caller: HarnessCaller): Promise<Response> {
     const { handleHarness } = await import("./harness/panel.ts");
-    return handleHarness(request, { caller, host: this.env.T3FLARE_HARNESS_HOST ?? "", store: harnessStore(this.ctx.storage.kv), mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv) });
+    return handleHarness(request, { caller, host: this.env.T3FLARE_HARNESS_HOST ?? "", store: harnessStore(this.ctx.storage.kv), mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth });
+  }
+
+  /**
+   * The admin host's public paths (review M4: the OAuth callback and the client metadata document, under an Access
+   * Bypass application), RPC from `HarnessAdmin` only. Nothing else is answered here.
+   */
+  async harnessPublic(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (request.method !== "GET") return new Response("Method not allowed\n", { status: 405 });
+    if (url.pathname === OAUTH_CLIENT_PATH) return this.harnessOAuth.clientDocument();
+    if (url.pathname === OAUTH_CALLBACK_PATH) return this.harnessOAuth.callback(url);
+    return new Response("Not found\n", { status: 404 });
+  }
+
+  #harnessOAuth: HarnessOAuth | undefined;
+  get harnessOAuth(): HarnessOAuth {
+    const store = harnessStore(this.ctx.storage.kv);
+    this.#harnessOAuth ??= new HarnessOAuth({
+      kv: this.ctx.storage.kv,
+      secrets: harnessSecrets(this.ctx.storage.kv),
+      engine: this.env.MCP_OAUTH,
+      host: this.env.T3FLARE_HARNESS_HOST ?? "",
+      audit: (entry) => store.audit({ at: Date.now(), caller: "oauth", ...entry }),
+    });
+    return this.#harnessOAuth;
   }
 
   /** The MCP host (ADR-0028), over this object's storage and the MCP Worker's engine. */
@@ -357,6 +385,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       },
       settings: () => harnessStore(this.ctx.storage.kv).load(),
       secret: async (server, field) => harnessSecrets(this.ctx.storage.kv).read(server, field),
+      oauthToken: (server, stale) => this.harnessOAuth.accessToken(server, stale),
       background: (work) => this.ctx.waitUntil(work),
     });
     return this.#mcpHost;

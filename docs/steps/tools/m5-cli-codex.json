@@ -1,20 +1,20 @@
 {
- "at": "2026-11-12T15:49:49.461Z",
+ "at": "2026-11-12T16:16:22.225Z",
  "cli": "codex",
- "workspace": "tools-cli-codex",
+ "workspace": "tools-cli-codex-mwdr0bk2",
  "cases": [
   {
    "name": "a read (fixture_echo) runs without a card",
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:3b276b98-aeea-43f7-9f4e-3b0a7082c996:ordinal:1",
+    "id": "run:thread:e6742438-68a1-4658-b0b3-45e9851fec3e:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "hello-codex-mwdq1yz1",
+   "text": "hello-codex-mwdr0bk2",
    "items": [
     {
      "type": "dynamic_tool",
@@ -32,12 +32,13 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:b6ee72b9-e895-45c0-8a97-239ac15e718a:ordinal:1",
+    "id": "run:thread:d7df1aae-cdf9-444c-8719-4f06fd13f3d3:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [
     {
+     "id": "runtime-request:codex:t3flare-push:25c093da-506c-41d3-b60c-fc96dbebb178",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
@@ -46,13 +47,14 @@
    ],
    "requests": [
     {
+     "id": "runtime-request:codex:t3flare-push:25c093da-506c-41d3-b60c-fc96dbebb178",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
      "decision": "accept"
     }
    ],
-   "text": "done",
+   "text": "Done.",
    "items": [
     {
      "type": "dynamic_tool",
@@ -63,7 +65,7 @@
     }
    ],
    "notesAdded": [
-    "codex-mwdq1yz1-approved"
+    "codex-mwdr0bk2-approved"
    ],
    "ok": true
   },
@@ -72,12 +74,13 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:8722731e-1ce4-481b-9fbc-f9ee491ce1d4:ordinal:1",
+    "id": "run:thread:1f6b1d55-f0e5-45ab-bb83-c0dfd19a31d5:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [
     {
+     "id": "runtime-request:codex:t3flare-push:5d647754-49a3-4f04-ad45-1cdf55cc5b06",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
@@ -86,13 +89,14 @@
    ],
    "requests": [
     {
+     "id": "runtime-request:codex:t3flare-push:5d647754-49a3-4f04-ad45-1cdf55cc5b06",
      "kind": "permission",
      "requestKind": null,
      "status": "resolved",
      "decision": "decline"
     }
    ],
-   "text": "The `fixture_note` call was refused because the owner did not approve it.",
+   "text": "The `fixture_note` call was refused because the owner did not approve it. I stopped here.",
    "items": [
     {
      "type": "dynamic_tool",
@@ -110,13 +114,13 @@
    "mode": "full-access",
    "plan": false,
    "run": {
-    "id": "run:thread:29610764-b2e9-464d-b7e0-cebf02bcb050:ordinal:1",
+    "id": "run:thread:9e4514a2-9591-4760-a6a1-96fddcac415a:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "done",
+   "text": "Done.",
    "items": [
     {
      "type": "dynamic_tool",
@@ -127,7 +131,7 @@
     }
    ],
    "notesAdded": [
-    "codex-mwdq1yz1-full"
+    "codex-mwdr0bk2-full"
    ],
    "ok": true
   },
@@ -136,13 +140,13 @@
    "mode": "full-access",
    "plan": true,
    "run": {
-    "id": "run:thread:18d29059-c4fa-4f45-8ce2-f7f2e9b653f2:ordinal:1",
+    "id": "run:thread:1d6ffa0c-8e92-49a7-b3a1-b42f40dd78e3:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "I can’t call `fixture_note` while Plan Mode is active because it writes to a log. No tool call was made, so I don’t know what it would answer.",
+   "text": "I can’t invoke `fixture_note` while Plan Mode is active; it prohibits executing actions. I can plan the exact call:\n\n",
    "items": [],
    "notesAdded": [],
    "ok": true
@@ -152,13 +156,13 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:9c2567dd-03de-4eaf-9f4d-56902cd5e427:ordinal:1",
+    "id": "run:thread:54ba3335-85be-48f5-bc61-e6d043b24a6a:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "The tool lists 6 threads.",
+   "text": "It listed 6 threads.",
    "items": [
     {
      "type": "dynamic_tool",

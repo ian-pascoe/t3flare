@@ -159,6 +159,21 @@ export default Alchemy.Stack(
       ],
     } as never);
 
+    // Review M4 (ADR-0010's refinement): the direct MCP servers' OAuth callback and our client metadata document are
+    // public, exact paths only, so an authorization server can send the owner's browser back and fetch the document. The
+    // more specific application wins over HarnessAccess for these two paths; the callback checks its single-use state.
+    yield* Cloudflare.Access.Application("HarnessOAuthBypass", {
+      name: `${adminName} harness OAuth`,
+      type: "self_hosted",
+      domain: `${adminHost}/_t3flare/harness/oauth/callback`,
+      destinations: [
+        { type: "public", uri: `${adminHost}/_t3flare/harness/oauth/callback` },
+        { type: "public", uri: `${adminHost}/_t3flare/harness/oauth/client.json` },
+      ],
+      appLauncherVisible: false,
+      policies: [{ name: "public (OAuth redirect)", decision: "bypass", include: ["everyone"] }],
+    } as never);
+
     // The model proxy (ADR-0012) and the GitHub App (ADR-0013), from ~/.config/t3flare/dev.env or CI's environment.
     const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL");
     const modelProxyKey = Config.Redacted("MODEL_PROXY_API_KEY");
@@ -260,6 +275,7 @@ export default Alchemy.Stack(
         T3FLARE_OWNER_EMAIL: ownerEmail,
         T3FLARE_ACCESS_SERVICE_CLIENT_ID: serviceToken.clientId,
         MCP_ENGINE: Cloudflare.WorkerEntrypoint(mcpWorker as never, "McpEngine"),
+        MCP_OAUTH: Cloudflare.WorkerEntrypoint(mcpWorker as never, "McpOAuth"),
         T3FLARE_HARNESS_HOST: adminHost,
         T3FLARE_HARNESS_ACCESS_AUD: harnessAccess.aud,
         ...(bootstrapPass

@@ -709,8 +709,8 @@ const cliMcp = async (cli: RelayCli) => {
   const acp = cli === "claude" || cli === "opencode";
   if (acp) await enableAcp(cookie, cli);
   else await enableCli(cookie, cli, cli);
-  const workspace = `tools-cli-${cli}`;
   const marker = `${cli}-${Date.now().toString(36)}`;
+  const workspace = `tools-cli-${marker}`;
   const cases: Array<Case> = [];
   // The relay's cards (their ids keep the push card's prefix, M9); a CLI's own prompts are counted apart.
   const card = (request: any) => String(request.id ?? "").includes(":t3flare-push:") && request.kind === "permission";
@@ -751,6 +751,7 @@ const cliMcp = async (cli: RelayCli) => {
     cases.push({ ...r, ok: r.cards.length === 0 && /\d/.test(r.text) && !/unavailable/i.test(r.text) });
   }
   writeEvidence(`m5-cli-${cli}.json`, { cli, workspace, cases, ok: cases.every((c) => c.ok) });
+  await cleanup(workspace);
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -824,6 +825,84 @@ const relayHostile = async () => {
   writeEvidence("m5-relay-hostile.json", { workspace, cases, ok: cases.every((c) => c.ok) });
 };
 
+// ---------------------------------------------------------------------------------------------------------------------
+// M4 / P13: OAuth for a direct server, end to end against the fixture's own authorization server (no person needed):
+// the public paths answer without Access while the panel does not; a sign-in started in the panel completes through the
+// public callback; the state is single use; a wrong `iss` is refused; the token works and is refreshed when it ages.
+
+const oauthCases = async () => {
+  const cases: Array<Case> = [];
+  const server = "fixoauth";
+  const unsigned = (pathname: string) => fetch(new URL(pathname, HARNESS), { redirect: "manual" });
+  {
+    const client = await unsigned("/_t3flare/harness/oauth/client.json");
+    const doc = client.status === 200 ? await client.json() : null;
+    const callback = await unsigned("/_t3flare/harness/oauth/callback?state=00");
+    const panel = await unsigned("/_t3flare/harness");
+    const api = await unsigned("/_t3flare/harness/api/settings");
+    cases.push({
+      name: "P13: only the callback and the client document are public on the admin host",
+      clientDocument: { status: client.status, clientId: (doc as any)?.client_id ?? null, redirectUris: (doc as any)?.redirect_uris ?? null },
+      callback: callback.status,
+      panel: panel.status,
+      api: api.status,
+      ok: client.status === 200 && callback.status === 400 && panel.status !== 200 && api.status !== 200,
+    });
+  }
+  const existing = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).some((row: any) => row.name === server);
+  if (existing) await mcpChange({ op: "remove", server });
+  const added = await harness("POST", "/_t3flare/harness/api/mcp/servers", { server, url: `${FIXTURE_URL}/oauth-mcp`, auth: { kind: "oauth" } });
+  const before = await harness("POST", "/_t3flare/harness/api/mcp/test", { server });
+  const statsBefore = await fixture("/oauth/stats");
+  const begun = await harness("POST", "/_t3flare/harness/api/mcp/oauth", { server });
+  const authorizationUrl = String(begun.json?.authorizationUrl ?? "");
+  const authorized = authorizationUrl === "" ? null : await fetch(authorizationUrl, { redirect: "manual" });
+  const back = authorized?.headers.get("location") ?? "";
+  const landed = back === "" ? null : await fetch(back, { redirect: "manual" });
+  const landedText = landed === null ? "" : await landed.text();
+  const replay = back === "" ? null : await fetch(back, { redirect: "manual" });
+  cases.push({
+    name: "a sign-in started in the panel completes through the public callback; the same callback again is refused (single-use state)",
+    added: added.status,
+    testBefore: before.json?.status ?? before.status,
+    begun: begun.status,
+    authorizationHost: authorizationUrl === "" ? null : new URL(authorizationUrl).host,
+    pkce: authorizationUrl.includes("code_challenge_method=S256"),
+    callbackHost: back === "" ? null : new URL(back).host,
+    landed: landed?.status ?? null,
+    landedText: landedText.replace(/<[^>]+>/g, "").trim().slice(0, 120),
+    replay: replay?.status ?? null,
+    ok: added.status === 200 && begun.status === 200 && landed?.status === 200 && /Signed in/.test(landedText) && replay?.status === 400,
+  });
+  {
+    const again = await harness("POST", "/_t3flare/harness/api/mcp/oauth", { server });
+    const url2 = String(again.json?.authorizationUrl ?? "");
+    const loc = url2 === "" ? "" : ((await fetch(url2, { redirect: "manual" })).headers.get("location") ?? "");
+    const forged = loc === "" ? null : new URL(loc);
+    forged?.searchParams.set("iss", "https://evil.example");
+    const refused = forged === null ? null : await fetch(forged, { redirect: "manual" });
+    cases.push({ name: "an answer whose iss is not the authorization server's is refused", status: refused?.status ?? null, ok: refused?.status === 400 });
+  }
+  const tested = await harness("POST", "/_t3flare/harness/api/mcp/test", { server });
+  const row = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((entry: any) => entry.name === server);
+  cases.push({ name: "with the token the server lists its tools; the panel shows signed in (never the token)", test: tested.json, oauth: row?.oauth ?? null, ok: tested.json?.status === "ok" && tested.json?.tools === 6 && row?.oauth?.signedIn === true });
+  {
+    const run = await mcpScript("oauth-call", "full-access", `text(await tools.mcp__fixoauth__fixture_echo({ text: "oauth-ok" }));`, () => "accept");
+    // Access tokens live 120 s and are refreshed 60 s before they end: a call after 70 s refreshes first.
+    await sleep(70_000);
+    const second = await mcpScript("oauth-refresh", "full-access", `text(await tools.mcp__fixoauth__fixture_echo({ text: "after-refresh" }));`, () => "accept");
+    const statsAfter = await fixture("/oauth/stats");
+    cases.push({
+      name: "a Durable call with the token, and again after it aged: refreshed once, the call succeeds",
+      first: run.output.slice(0, 200),
+      second: second.output.slice(0, 200),
+      grants: { before: statsBefore, after: statsAfter },
+      ok: run.output.includes("oauth-ok") && second.output.includes("after-refresh") && (statsAfter.refresh ?? 0) > (statsBefore.refresh ?? 0),
+    });
+  }
+  writeEvidence("m6-oauth.json", { cases, ok: cases.every((c) => c.ok) });
+};
+
 const command = process.argv[2];
 cookie = await pair();
 switch (command) {
@@ -858,6 +937,9 @@ switch (command) {
     break;
   case "p3-breakdown":
     await p3Breakdown();
+    break;
+  case "oauth":
+    await oauthCases();
     break;
   case "relay-hostile":
     await relayHostile();

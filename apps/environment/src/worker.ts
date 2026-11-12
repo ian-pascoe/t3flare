@@ -1,6 +1,7 @@
 // @effect-diagnostics globalConsole:off
 // The environment Worker (ADR-0014): the front door, the Environment DO, and the stock t3 web client as
 // static assets. Kept tiny: t3 itself loads inside the DO, on first use.
+import { OAUTH_PUBLIC_PATHS } from "./harness/oauth.ts";
 import { WorkerEntrypoint } from "cloudflare:workers";
 
 import * as Access from "./access.ts";
@@ -11,7 +12,7 @@ export { EnvironmentDO } from "./environmentDO.ts";
 
 export interface Env extends EnvironmentEnv {
   readonly ENVIRONMENT: {
-    getByName(name: string): { fetch(request: Request): Promise<Response>; harness(request: Request, caller: HarnessCaller): Promise<Response> };
+    getByName(name: string): { fetch(request: Request): Promise<Response>; harness(request: Request, caller: HarnessCaller): Promise<Response>; harnessPublic(request: Request): Promise<Response> };
   };
   readonly ASSETS: { fetch(request: Request): Promise<Response> };
   readonly T3FLARE_ADMIN_TOKEN?: string;
@@ -64,6 +65,9 @@ export class HarnessAdmin extends WorkerEntrypoint<Env> {
     if (!env.T3FLARE_HARNESS_HOST || url.host !== env.T3FLARE_HARNESS_HOST) return new Response("Not found\n", { status: 404 });
     if (url.pathname === "/" && request.method === "GET") return Response.redirect(`https://${url.host}${HARNESS_PATH}`, 302);
     if (!isHarnessPath(url.pathname)) return new Response("Not found\n", { status: 404 });
+    // Review M4: the OAuth callback and the client metadata document are public (an Access Bypass application covers
+    // these exact paths only); they take nothing but a GET, and the callback checks its single-use state.
+    if (OAUTH_PUBLIC_PATHS.has(url.pathname)) return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).harnessPublic(request);
     const config = { ...guardConfig(env), audience: env.T3FLARE_HARNESS_ACCESS_AUD };
     const verdict = await Access.verifyHarnessRequest(request, config, keysFor(config.teamDomain ?? ""));
     if (!verdict.admitted) {

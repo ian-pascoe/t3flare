@@ -45,6 +45,15 @@ for (const button of document.querySelectorAll("button[data-mcp-test]")) {
     if (response !== undefined) result.textContent = JSON.stringify(await response.json());
   });
 }
+for (const button of document.querySelectorAll("button[data-mcp-oauth]")) {
+  button.addEventListener("click", async () => {
+    const response = await post("/_t3flare/harness/api/mcp/oauth", { server: button.dataset.mcpOauth });
+    if (response === undefined) return;
+    const answer = await response.json();
+    const target = new URL(answer.authorizationUrl);
+    if (target.protocol === "https:") window.open(target.toString(), "_blank", "noopener,noreferrer");
+  });
+}
 for (const form of document.querySelectorAll("form[data-extension]")) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -121,7 +130,8 @@ const extensionCard = (resolved: ResolvedHarness, entry: (typeof EXTENSIONS)[num
 /** One server of the panel's MCP section (panel.ts `mcpOverview`). */
 export interface McpRow {
   readonly name: string;
-  readonly setting: { readonly kind: string; readonly enabled: boolean; readonly exposure: string; readonly linkedOffered: boolean; readonly url?: string };
+  readonly setting: { readonly kind: string; readonly enabled: boolean; readonly exposure: string; readonly linkedOffered: boolean; readonly url?: string; readonly auth?: { readonly kind: string } };
+  readonly oauth?: { readonly signedIn: boolean };
   readonly status: string;
   readonly listedAt: number | null;
   readonly error: string | null;
@@ -148,7 +158,11 @@ const mcpSection = (rows: ReadonlyArray<McpRow>): string =>
 <div class="muted">${row.setting.enabled ? "Enabled" : "Disabled"} · Exposure ${escapeHtml(row.setting.exposure)} · ${row.setting.linkedOffered ? "offered to linked threads (their writes ask every call)" : "not offered to linked threads"} · ${escapeHtml(row.status)}${
         row.listedAt === null ? "" : `, listed ${escapeHtml(new Date(row.listedAt).toISOString())}`
       }${row.error === null ? "" : ` · <span class="locked">${escapeHtml(row.error)}</span>`}</div>
-<div>${action(row.setting.enabled ? "Disable" : "Enable", { op: "server", server: row.name, enabled: !row.setting.enabled })}${action(row.setting.linkedOffered ? "Stop offering to linked threads" : "Offer to linked threads", { op: "server", server: row.name, linkedOffered: !row.setting.linkedOffered })}<button type="button" data-mcp-test="${escapeHtml(row.name)}">Test</button></div>
+<div>${action(row.setting.enabled ? "Disable" : "Enable", { op: "server", server: row.name, enabled: !row.setting.enabled })}${action(row.setting.linkedOffered ? "Stop offering to linked threads" : "Offer to linked threads", { op: "server", server: row.name, linkedOffered: !row.setting.linkedOffered })}<button type="button" data-mcp-test="${escapeHtml(row.name)}">Test</button>${
+        row.setting.auth?.kind === "oauth"
+          ? `<button type="button" data-mcp-oauth="${escapeHtml(row.name)}">${row.oauth?.signedIn === true ? "Sign in again" : "Sign in"}</button> <span class="muted">${row.oauth?.signedIn === true ? "signed in" : "not signed in"}</span>`
+          : ""
+      }</div>
 <table><tr><th>Tool</th><th>Class</th><th>Exposure</th><th></th></tr>${tools}</table>${refused === "" ? "" : `<ul>${refused}</ul>`}</div>`;
     })
     .join("\n");

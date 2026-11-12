@@ -6,6 +6,7 @@
 // `engine/` is cloudpid's engine as copied at 93ba45a3 (vendor/cloudpid/README.md), unchanged; stdio targets fail there,
 // since this Worker has no Container bridge (stdio servers are refused, OD-T12).
 export { McpEngine } from "./engine/engine.ts";
+export { McpOAuth } from "./oauth.ts";
 
 /** Reached over RPC only. */
 export default {

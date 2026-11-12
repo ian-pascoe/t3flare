@@ -128,6 +128,8 @@ export interface McpHostDeps {
   readonly settings: () => StoredHarness;
   /** A direct server's header value, from the secret store (part 4). */
   readonly secret?: (server: string, field: string) => Promise<string | undefined>;
+  /** An OAuth server's access token (review M4): refreshed when stale; undefined when the owner must sign in. */
+  readonly oauthToken?: (server: string, stale: boolean) => Promise<string | undefined>;
   readonly now?: () => number;
   /** Keeps background work alive past the request (`ctx.waitUntil`). */
   readonly background?: (work: Promise<unknown>) => void;
@@ -169,6 +171,13 @@ export class McpHost {
       redact.push(value);
     }
     return { kind: "http", conn: name, name, url: server.url, headers, redact, timeoutMs: CALL_TIMEOUT_MS };
+  }
+
+  /** The engine's `auth` hook for an OAuth server: asked for a token, and again with `stale` after a 401. */
+  #authHooks(name: string, server: McpServerSetting): McpEngineHooks {
+    const token = this.#deps.oauthToken;
+    if (server.auth?.kind !== "oauth" || token === undefined) return {};
+    return { auth: (stale: boolean) => token(name, stale) };
   }
 
   #prior(name: string): McpEnginePriorEncoded {
@@ -213,7 +222,7 @@ export class McpHost {
     if (typeof target === "string") return failed(target);
     let result: typeof McpEngineDiscoverResult.Encoded;
     try {
-      result = await this.#deps.engine.discover(target, this.#prior(name), {});
+      result = await this.#deps.engine.discover(target, this.#prior(name), this.#authHooks(name, server));
     } catch (error) {
       return failed(`the MCP engine failed: ${String(error).slice(0, 300)}`);
     }
@@ -342,7 +351,7 @@ export class McpHost {
         target,
         this.#prior(input.server),
         { op: "tools/call", tool: definition as never, arguments: input.args as never, ctx: { origin: "agent" } },
-        input.signal === undefined ? {} : { untilAborted: () => aborted },
+        { ...this.#authHooks(input.server, server), ...(input.signal === undefined ? {} : { untilAborted: () => aborted }) },
       );
     } catch (error) {
       return { kind: "unavailable", message: `The MCP call failed; it may have run: ${String(error).slice(0, 300)}`, mayHaveRun: true };
