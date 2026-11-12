@@ -66,7 +66,8 @@ const remoteAndProject = () => {
   return { remote, project };
 };
 
-describe("worktree provisioning scripts", () => {
+// Real git in temp repos; slow under the full parallel check.
+describe("worktree provisioning scripts", { timeout: 30_000 }, () => {
   it("checks out a new branch at a commit the remote has, with no bundle", () => {
     const { remote, project } = remoteAndProject();
     git(project, "branch --track feature origin/main");
@@ -145,7 +146,7 @@ describe("worktree provisioning scripts", () => {
   });
 });
 
-describe("carrying a removed worktree's work home (review F8)", () => {
+describe("carrying a removed worktree's work home (review F8)", { timeout: 30_000 }, () => {
   /** A project and a provisioned worktree of it on branch `feature`. */
   const projectAndWorktree = () => {
     const { remote, project } = remoteAndProject();

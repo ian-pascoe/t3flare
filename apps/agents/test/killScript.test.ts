@@ -57,7 +57,8 @@ done
 
 const sleeps = (left: ReadonlyArray<Proc>) => left.filter((proc) => proc.args.startsWith("sleep")).map((proc) => proc.args).toSorted();
 
-describe.skipIf(!docker)("the kill script", () => {
+// Each case starts a Docker container, which takes seconds under the full parallel check.
+describe.skipIf(!docker)("the kill script", { timeout: 60_000 }, () => {
   it("kills a command's group: its shell, its child and its background grandchild", () => {
     const result = run(`T3FLARE_EXEC=a setsid bash -c 'sleep 600 & sleep 601' &`, ["a"]);
     expect(result.answer).toMatchObject({ survivors: 0 });
