@@ -97,7 +97,7 @@ rebutted.
 
 ## Counts (ADR-0001)
 
-Shadows 2, Patches 3, unchanged; no new Build shim. New fragility entries U32–U35.
+Shadows 2, Patches 3, unchanged; no new Build shim. New fragility entries U33–U36.
 
 ## Tickets
 
