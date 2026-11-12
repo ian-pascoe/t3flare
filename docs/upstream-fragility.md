@@ -70,11 +70,11 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 
 ### U5. MCP, `delegate_task` and `linkOrigin` (step 3)
 
-- **Where** (all on `step-3`): `EnvironmentDO.mcp` (`apps/environment/src/environmentDO.ts:172`) forwards a Session's MCP call to t3's `/mcp` with `authorization`, `mcp-session-id` and `mcp-protocol-version`; the adapter hands t3's per-thread MCP credential to the Session (`provider/adapter.ts:114`, from `McpProviderSessions.read`) with t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` (`@t3tools/provider-core/server/orchestrationInstructions`); the Session's `t3-mcp` extension offers only `T3_TOOL_ALLOWLIST` (`apps/agents/src/extensions/t3-mcp.ts:32-78`, `delegate_task` among them), splits `t3_thread_wait`/`t3_background_wait` into `WAIT_PIECE_MS` pieces (`:81-83`), and adds a `clientRequestId` to tools whose schema has one (`:149`, `:183`); the seeds `linkedEnvironmentsEnabled` and `enableAgentBrowserAccess` (`agents/seedSettings.ts:50`, `:67`).
+- **Where** (all on `step-3`): `EnvironmentDO.mcp` (`apps/environment/src/environmentDO.ts:172`) forwards a Session's MCP call to t3's `/mcp` with `authorization`, `mcp-session-id` and `mcp-protocol-version`; the adapter hands t3's per-thread MCP credential to the Session (`provider/adapter.ts:114`, from `McpProviderSessions.read`) with t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` (`@t3tools/provider-core/server/orchestrationInstructions`); the Session's `t3-mcp` extension offers every tool t3 lists but `T3_TOOL_DENYLIST` (`packages/harness-registry/src/t3Tools.ts`; owner, 2026-11-12, back to stock), splits `t3_thread_wait`/`t3_background_wait` into `WAIT_PIECE_MS` pieces (`:81-83`), and adds a `clientRequestId` to tools whose schema has one (`:149`, `:183`); the seeds `linkedEnvironmentsEnabled` and `enableAgentBrowserAccess` (`agents/seedSettings.ts:50`, `:67`).
 - **Breaks when**: t3 renames or adds a tool, changes a tool's input schema or annotations, changes how `/mcp` authenticates or its session headers, changes the instructions to name tools we do not offer, or changes `linkOrigin`'s shape.
-- **Detection**: `acceptance --peer` (step 3) catches a broken link, forwarded launch or fence. **Silent**: the allowlist fails closed, so a renamed tool just disappears from the agent. Cheapest check: [T13](#gaps-in-detection), failing `--peer` on a tool `tools/list` returns that is neither allowed nor denied.
+- **Detection**: `acceptance --peer` (step 3) catches a broken link, forwarded launch or fence; `test/t3Guidance.test.ts` fails when a denied name is no longer a t3 tool. **Silent**: a new tool that cannot work here is offered until someone denies it (stock t3's behaviour).
 - **Blast radius**: delegation from the laptop to the cloud fails, or the agent loses a tool without notice.
-- **Fix**: `git -C t3code diff <old>..<new> -- apps/server/src/mcp packages/provider-core/src/server/orchestrationInstructions.ts`, then classify each tool in `t3-mcp.ts`.
+- **Fix**: `git -C t3code diff <old>..<new> -- apps/server/src/mcp packages/provider-core/src/server/orchestrationInstructions.ts`, then deny a tool that cannot work here in `t3Tools.ts`.
 
 ### U6. The process router's git argv table
 
@@ -382,12 +382,12 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Detection**: typecheck (each wrapper spreads and overrides the whole service type); `test/peerLinks.test.ts` on t3's real layers (seeded row cannot be resolved, list empty, link refused, no cause); `acceptance --peer` check `outbound` (a web-client link attempt refused before any request; `GET /_t3flare/peer-links/count` is 0).
 - **Fix**: wrap the new method or path in the same Layer; keep refusals on final reasons.
 
-### U49. t3's orchestration guidance, filtered to the tools we offer (SPI-1060)
+### U49. t3's orchestration guidance, filtered by the denylist (SPI-1060)
 
-- **Where**: `packages/harness-registry/src/t3Guidance.ts` (re-exported by `apps/agents/src/extensions/t3-guidance.ts`) filters t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` by bullet against the offered catalog before the `t3_orchestration` section is rendered (`t3-mcp.ts`), and the offered tools' descriptions by sentence, for Durable agents (CLI agents get t3's full list and guidance, as stock t3 gives them, since the back-to-stock cut, owner 2026-11-12); `peerLinks.ts` replaces `t3_environment_links`' `notListed` pointer at `t3_environment_link`.
-- **Breaks when**: t3 names a new tool in its instructions, its tool descriptions or a tool result, or restructures the instructions so a bullet no longer holds one tool's guidance.
-- **Detection**: `test/t3Guidance.test.ts` (every backticked tool name in the guidance and the offered tools' descriptions is classified; a new name fails until classified) and `test/t3Mcp.test.ts`; `test/peerLinks.test.ts` for `notListed`. **Silent** for a tool named only in a result other than `t3_environment_links`.
-- **Fix**: classify the new name; extend the filter or the result rewrite.
+- **Where**: `packages/harness-registry/src/t3Guidance.ts` (re-exported by `apps/agents/src/extensions/t3-guidance.ts`) drops each bullet of t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` and each sentence of an offered tool's description that names a denied tool (`T3_TOOL_DENYLIST`, `t3Tools.ts`), before the `t3_orchestration` section is rendered (`t3-mcp.ts`), for Durable agents (CLI agents get t3's full list and guidance, as stock t3 gives them); `peerLinks.ts` replaces `t3_environment_links`' `notListed` pointer at `t3_environment_link`. Since the back-to-stock cut (owner, 2026-11-12) it no longer fails closed on names it has not classified.
+- **Breaks when**: t3 renames or drops a denied tool, restructures the instructions so a bullet no longer holds one tool's guidance, or names a denied tool in a tool result.
+- **Detection**: `test/t3Guidance.test.ts` (every denied name, and each family's prefix, is still a t3 tool; the rendered prompt and descriptions name no denied tool) and `test/t3Mcp.test.ts`; `test/peerLinks.test.ts` for `notListed`. **Silent** for a denied tool named only in a result other than `t3_environment_links`.
+- **Fix**: rename the entry in `t3Tools.ts`; extend the filter or the result rewrite.
 
 ## Gaps in detection
 
@@ -407,6 +407,6 @@ Checks worth adding, each closing a silent or late path above. Each has a ticket
 | T10 | The differ builds turn items with `satisfies`, not `as`, so a new required field fails typecheck | U3, U26 | [SPI-1019](https://linear.app/spiritledsoftware/issue/SPI-1019) |
 | T11 | Run the acceptance `/ws` client built from the newest nightly's contracts against the bump stage | U7 | [SPI-1020](https://linear.app/spiritledsoftware/issue/SPI-1020) |
 | T12 | A test that walks `EnvironmentHttpApi` for endpoints taking a credential and for path prefixes, against `BOOTSTRAP_EXCHANGE_PATHS` and `SERVER_PREFIXES` | U16 | [SPI-1021](https://linear.app/spiritledsoftware/issue/SPI-1021) |
-| T13 | Step 3: `--peer` fails on a tool from t3's `tools/list` that `t3-mcp.ts` neither allows nor denies | U5 | [SPI-1022](https://linear.app/spiritledsoftware/issue/SPI-1022) |
+| T13 | ~~Step 3: `--peer` fails on a tool from t3's `tools/list` that `t3-mcp.ts` neither allows nor denies~~ Moot since the denylist (owner, 2026-11-12, back to stock): a new tool is offered, as in stock t3 | U5 | [SPI-1022](https://linear.app/spiritledsoftware/issue/SPI-1022) |
 | T14 | Acceptance fails on any `SQLITE_AUTH` refusal (`pragmaRefusals`), now that t3's storage PRAGMAs are answered | U8 | [SPI-1023](https://linear.app/spiritledsoftware/issue/SPI-1023) |
 

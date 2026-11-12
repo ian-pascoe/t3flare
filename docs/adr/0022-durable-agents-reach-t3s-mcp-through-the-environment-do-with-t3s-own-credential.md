@@ -20,7 +20,7 @@ t3 lists for that credential and installed again when its hash changes (cloudpid
 
 ## Consequences
 
-- **The allowlist fails closed** (41 tools at the pin). Not offered: `request_secret` and `t3_attachment_*` (their
+- **The allowlist fails closed** (41 tools at the pin; replaced by a short denylist, owner 2026-11-12, back to stock: see the last refinement). Not offered: `request_secret` and `t3_attachment_*` (their
   purpose is a secret or an upload URL for a shell), `preview_*`, `html_*`, `device_*` (no browser or device), the link
   tools `t3_environment_link`/`unlink` (cloud-to-elsewhere links are deferred, ADR-0011), `t3_worktree_*`,
   `t3_environment_preferences_update`. A tool t3 adds later is not offered until a bump adds it.
@@ -41,6 +41,8 @@ t3 lists for that credential and installed again when its hash changes (cloudpid
 
 ## Refinement (SPI-1004): what the allowlist withholds are parity refusals
 
+**Superseded** by the back-to-stock refinement below (owner, 2026-11-12, back to stock).
+
 The tools listed above as not offered are refusals by design, not omissions:
 - `request_secret`: a credential typed into t3 (owner decision D5, ADR-0012's refinement).
 - `t3_attachment_*`: an upload URL for a shell. Attachments reach a Durable agent through its prompt instead (SPI-993).
@@ -56,3 +58,23 @@ A CLI agent gets t3's own MCP config: t3's per-thread bearer, at t3's public `/m
 This sets aside this ADR's rule for CLI agents: t3's bearer is in the CLI's Container, and root there can read it. It reaches t3's tools for that thread until the thread's MCP session is cleared. t3's own auth, Link fence and mode ceiling run unchanged, and F7 holds: no agent answers a card (`m2-h6-proof.json`).
 
 First built (and removed, owner, 2026-11-12, back to stock): a relay at `computer.internal/t3flare/mcp/t3` that swapped a per-process handle for t3's bearer in the Environment, applied the allowlist, the guidance filter and per-call linked asks, and refused an owner handle outright while the Workspace was tainted (review H1). Evidence after the cut: `m5-cli-{codex,claude,opencode,pi}.json` (`t3_thread_list`).
+
+## Refinement (back to stock, owner 2026-11-12): a short denylist; `request_secret` offered
+
+Owner, 2026-11-12, back to stock (scope audit rows 7 and 12). A Durable agent is offered every tool t3 lists for its
+thread, as stock t3 offers it, but those that cannot work here (`T3_TOOL_DENYLIST`, `packages/harness-registry/src/t3Tools.ts`):
+- `t3_attachment_*` and `t3_thread_send_attachments`: an upload URL for a shell, and sending what was uploaded.
+  Attachments reach a Durable agent through its prompt (SPI-993).
+- `html_*`, `preview_*`, `t3_preview_*`: headless Chromium on the host (`serverBrowser` stripped, ADR-0023).
+- `device_*`: host-bound, locked off (ADR-0023).
+- `t3_worktree_*`: its git is not routed through the process router yet.
+- `t3_environment_link`/`unlink`: until SPI-1061 M1, with `peerLinks.ts`'s Layers (left to SPI-1061).
+
+`request_secret` and `t3_environment_preferences_update` are offered again (D5 lifted, ADR-0012). A tool a nightly adds
+is offered at once, as in stock t3. t3's guidance and the offered tools' descriptions are filtered only by the denylist:
+a bullet or sentence naming a denied tool is dropped, everything else is t3's own text (U49). The classification test
+is now "every denied name is still a real t3 tool" (`apps/environment/test/t3Guidance.test.ts`).
+
+Known gap: `request_secret`'s `delivery: "file"` writes the value into t3's State directory, on the Environment, which
+an agent's commands in a Container cannot read; `secretRef` and pasted values work as stock. SPI-1088.
+

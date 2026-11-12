@@ -1,80 +1,9 @@
-// t3's guidance as an agent is told it (SPI-1060, plan SPI-1061 §11.1, D8): the agent is never told about a t3
-// tool it does not have. t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` and its tools' descriptions name tools in backticks;
-// a bullet (or paragraph) of the guidance, or a sentence of a description, that names a tool not offered is dropped
-// whole, and a heading left with nothing under it goes with it. Fail closed: a backticked name is kept only when it is
-// offered or classified here as not a tool, so a name t3 adds is dropped until someone classifies it, and the
-// classification test (apps/environment/test/t3Guidance.test.ts) fails until then (U40).
-
-/**
- * t3 tools the guidance or an offered tool's description names that a Durable agent is never offered (see
- * `T3_TOOL_ALLOWLIST`'s note for why). `prefix_*` stands for t3's whole family.
- */
-export const WITHHELD_T3_TOOLS: ReadonlySet<string> = new Set([
-  "t3_environment_link",
-  "request_secret",
-  "html_preview",
-  "html_render",
-  "preview_*",
-]);
-
-/** Backticked names in the guidance and in the offered tools' descriptions that are not tools: arguments, fields, other agents' tools. */
-export const NOT_T3_TOOLS: ReadonlySet<string> = new Set([
-  // other providers' own tools and words, from the guidance
-  "Agent",
-  "spawn_agent",
-  "task",
-  "sleep",
-  "next",
-  // arguments and result fields
-  "activity",
-  "allProjects",
-  "answers",
-  "beforeRunId",
-  "childThreadId",
-  "clientRequestId",
-  "commitError",
-  "createWorkspaceRootIfMissing",
-  "cursor",
-  "destinationPath",
-  "environmentId",
-  "guide",
-  "hint",
-  "invalidUrls",
-  "itemId",
-  "limit",
-  "link",
-  "maxCharsPerItem",
-  "message",
-  "messages",
-  "modelSelection",
-  "projectId",
-  "prompt",
-  "queue",
-  "requestId",
-  "restart",
-  "runId",
-  "schedule",
-  "scheduledTaskId",
-  "scratch",
-  "search",
-  "snooze",
-  "snoozedUntil",
-  "sourcePoint",
-  "states",
-  "steer",
-  "subagentId",
-  "summary",
-  "targetRunId",
-  "targetThreadId",
-  "taskId",
-  "text",
-  "threadId",
-  "title",
-  "webhookUrl",
-  "workState",
-  "workspaceRoot",
-  "workspaceStrategy",
-]);
+// t3's guidance as a Durable agent is told it (SPI-1060, plan SPI-1061 §11.1, D8): the agent is never told about a t3
+// tool it is denied. t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` and its tools' descriptions name tools in backticks; a
+// bullet (or paragraph) of the guidance, or a sentence of a description, that names a denied tool (`T3_TOOL_DENYLIST`)
+// is dropped whole, and a heading left with nothing under it goes with it. Everything else is t3's, as stock t3 gives it
+// (owner, 2026-11-12, back to stock: filtered by the denylist, no longer fail-closed on unclassified names; U49).
+import { isDeniedT3Tool } from "./t3Tools.ts";
 
 /**
  * Our own line, after t3's guidance (§11.1). True before the Outbound link exists: nothing here can make a link.
@@ -91,22 +20,17 @@ export const toolLikeNamesIn = (text: string): ReadonlyArray<string> => [
   ...new Set([...text.matchAll(/`([^`\n]+)`/g)].map((match) => match[1]!).filter((name) => TOOL_LIKE.test(name))),
 ];
 
-const isOffered = (name: string, offered: ReadonlySet<string>) =>
-  NOT_T3_TOOLS.has(name) ||
-  (name.endsWith("*") ? [...offered].some((tool) => tool.startsWith(name.slice(0, -1))) : offered.has(name));
-
-/** Whether `text` names only offered tools (and names that are not tools). */
-const namesOnlyOffered = (text: string, offered: ReadonlySet<string>) =>
-  toolLikeNamesIn(text).every((name) => isOffered(name, offered));
+/** Whether `text` names no denied tool. */
+const namesNoDenied = (text: string) => !toolLikeNamesIn(text).some(isDeniedT3Tool);
 
 const BULLET = /^\s*(?:[-*+]|\d+[.)])\s/;
 const HEADING = /^#{1,6}\s/;
 
 /**
- * t3's guidance with every bullet or paragraph that names a tool not in `offered` dropped whole (a bullet's indented
- * continuation lines with it), and every heading left with nothing under it before the next heading.
+ * t3's guidance with every bullet or paragraph that names a denied tool dropped whole (a bullet's indented continuation
+ * lines with it), and every heading left with nothing under it before the next heading.
  */
-export const guidanceFor = (text: string, offered: ReadonlySet<string>): string => {
+export const guidanceFor = (text: string): string => {
   // Units: a heading, a blank line, a bullet with its continuation lines, or a paragraph's lines.
   const units: Array<{ kind: "heading" | "blank" | "text"; lines: Array<string> }> = [];
   for (const line of text.split("\n")) {
@@ -116,7 +40,7 @@ export const guidanceFor = (text: string, offered: ReadonlySet<string>): string 
     else if (!BULLET.test(line) && last?.kind === "text") last.lines.push(line);
     else units.push({ kind: "text", lines: [line] });
   }
-  const kept = units.filter((unit) => unit.kind !== "text" || namesOnlyOffered(unit.lines.join("\n"), offered));
+  const kept = units.filter((unit) => unit.kind !== "text" || namesNoDenied(unit.lines.join("\n")));
   const hadText = (from: ReadonlyArray<typeof units[number]>, heading: (typeof units)[number]) => {
     const at = from.indexOf(heading);
     const next = from.findIndex((unit, index) => index > at && unit.kind === "heading");
@@ -130,15 +54,15 @@ export const guidanceFor = (text: string, offered: ReadonlySet<string>): string 
     .trim();
 };
 
-/** An offered tool's description with every sentence that names a tool not in `offered` dropped. */
-export const descriptionFor = (text: string, offered: ReadonlySet<string>): string =>
+/** An offered tool's description with every sentence that names a denied tool dropped. */
+export const descriptionFor = (text: string): string =>
   text
     .split("\n")
     .flatMap((line) => {
       if (line.trim() === "") return [line];
       const kept = line
         .split(/(?<=[.!?])\s+/)
-        .filter((sentence) => namesOnlyOffered(sentence, offered))
+        .filter((sentence) => namesNoDenied(sentence))
         .join(" ");
       return kept.trim() === "" ? [] : [kept];
     })

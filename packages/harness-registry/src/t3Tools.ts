@@ -1,55 +1,36 @@
-// t3's own MCP tools t3flare offers its agents (ADR-0022; CLI agents through the relay, ADR-0028, SPI-1039).
+// t3's own MCP tools a Durable agent is not offered (ADR-0022). CLI agents get t3's whole list, as stock t3 hands it.
 
 /**
- * The T3 tools a Durable agent is offered (plan section 4.3). Not offered: `request_secret` and `t3_attachment_*` (their
- * purpose is a secret or an upload URL for a shell, which is a Container), `preview_*`, `html_*`, `device_*` (no browser
- * or device in the cloud), `t3_environment_link`/`unlink` (cloud-to-elsewhere links are deferred, ADR-0011), and
- * `t3_worktree_*` (t3's worktree handoff runs git the router has not been audited for).
+ * The T3 tools that cannot work for a Durable agent here; every other tool t3 lists for the thread is offered, as stock
+ * t3 offers it (owner, 2026-11-12, back to stock: a short denylist instead of an allowlist). `prefix_*` is a family.
+ * - `t3_attachment_*` and `t3_thread_send_attachments`: an upload URL for a shell's `curl`, and sending what it uploaded.
+ * - `html_*`, `preview_*`, `t3_preview_*`: headless Chromium on the host (`serverBrowser` is stripped, ADR-0023).
+ * - `device_*`: the device hub is host-bound and locked off (ADR-0023).
+ * - `t3_worktree_*`: t3's worktree handoff runs git the process router has not been audited for.
+ * - `t3_environment_link`, `t3_environment_unlink`: cloud-to-elsewhere links wait for SPI-1061 M1 (ADR-0011).
  */
-export const T3_TOOL_ALLOWLIST: ReadonlySet<string> = new Set([
-  // orchestration
-  "orchestrator_capabilities",
-  "delegate_task",
-  "task_status",
-  "task_cancel",
-  "t3_workflow_stop",
-  "t3_background_wait",
-  "create_threads",
-  "t3_thread_list",
-  "t3_thread_read",
-  "t3_thread_update",
-  "t3_thread_send",
-  "t3_thread_wait",
-  "t3_thread_interrupt",
-  "t3_pending_request",
-  "t3_queue",
-  "t3_thread_search",
-  "t3_thread_organize",
-  "t3_thread_configure",
-  "t3_thread_transfer",
-  "schedule_task",
-  "list_scheduled_tasks",
-  "delete_scheduled_task",
-  "run_scheduled_task_now",
-  // projects
-  "t3_project_list",
-  "t3_project_read",
-  "t3_project_create",
-  "t3_project_update",
-  "t3_project_delete",
-  "t3_project_clone",
-  "t3_thread_launch",
-  // pull requests
-  "link_pull_request",
-  "link_pull_requests",
-  "unlink_pull_request",
-  "unlink_pull_requests",
-  "list_thread_pull_requests",
-  "watch_pull_request",
-  "unwatch_pull_request",
-  "read_pull_request_guide",
-  "write_pull_request_guides",
-  // environment
-  "t3_environment_read",
-  "t3_environment_links",
+export const T3_TOOL_DENYLIST: ReadonlySet<string> = new Set([
+  "t3_attachment_*",
+  "t3_thread_send_attachments",
+  "html_*",
+  "preview_*",
+  "t3_preview_*",
+  "device_*",
+  "t3_worktree_*",
+  "t3_environment_link",
+  "t3_environment_unlink",
 ]);
+
+const prefixOf = (pattern: string) => pattern.slice(0, -1);
+const isFamily = (name: string) => name.endsWith("*");
+
+/**
+ * Whether a tool name, or a family `prefix_*` as t3's text names one, is denied: a family is denied when it could
+ * name a denied tool.
+ */
+export const isDeniedT3Tool = (name: string): boolean =>
+  [...T3_TOOL_DENYLIST].some((denied) => {
+    if (!isFamily(name)) return isFamily(denied) ? name.startsWith(prefixOf(denied)) : name === denied;
+    const family = prefixOf(name);
+    return isFamily(denied) ? prefixOf(denied).startsWith(family) || family.startsWith(prefixOf(denied)) : denied.startsWith(family);
+  });

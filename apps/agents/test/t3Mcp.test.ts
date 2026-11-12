@@ -1,5 +1,5 @@
 // The `t3-mcp` extension (step 3, plan section 4.3) on a real pi-durable Harness with pi-ai's faux provider, and its
-// catalog: the allowlist, t3's tool names, the approvals per mode and annotation (accepted per tool name), the replay of a
+// catalog: the denylist, t3's tool names, the approvals per mode and annotation (accepted per tool name), the replay of a
 // call cut off by a Session restart (the same clientRequestId; refused under a credential t3 issued again), a 401 as a
 // tool error, plan mode, and waits in 50 s pieces.
 // @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { ApprovalStore, PLAN_MODE_REFUSAL } from "../src/extensions/permissions.ts";
 import { OTHER_MACHINES } from "../src/extensions/t3-guidance.ts";
-import { type CatalogTool, catalogOf, type McpCallAnswer, t3McpExtension, t3ToolName, T3_TOOL_ALLOWLIST } from "../src/extensions/t3-mcp.ts";
+import { type CatalogTool, catalogOf, type McpCallAnswer, t3McpExtension, t3ToolName, T3_TOOL_DENYLIST } from "../src/extensions/t3-mcp.ts";
 import { context, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
 const schema = (properties: Record<string, unknown>) => ({ type: "object", properties });
@@ -63,14 +63,15 @@ const setup = (options: Setup = {}) => {
 };
 
 describe("t3-mcp catalog", () => {
-  it("offers the allowlisted tools under t3's names and reports what it left out", () => {
-    const catalog = catalogOf(LISTED);
-    expect(catalog.tools.map((tool) => tool.name)).toEqual(["delegate_task", "t3_thread_read", "t3_thread_update", "t3_thread_wait"]);
-    expect(catalog.left).toEqual(["preview_open", "request_secret", "t3_environment_link"]);
+  it("offers every listed tool but the denied ones under t3's names, and reports what it left out", () => {
+    const catalog = catalogOf([...LISTED, { name: "t3_brand_new_tool" }, { name: "t3_attachment_prepare_upload" }, { name: "t3_worktree_handoff" }]);
+    expect(catalog.tools.map((tool) => tool.name)).toEqual(["delegate_task", "request_secret", "t3_brand_new_tool", "t3_thread_read", "t3_thread_update", "t3_thread_wait"]);
+    expect(catalog.left).toEqual(["preview_open", "t3_attachment_prepare_upload", "t3_environment_link", "t3_worktree_handoff"]);
     expect(t3ToolName("delegate_task")).toBe("mcp__t3-code__delegate_task");
     const extension = setup().extension();
     expect(extension.tools?.map((tool) => tool.name)).toContain("mcp__t3-code__t3_thread_read");
-    expect(T3_TOOL_ALLOWLIST.has("request_secret")).toBe(false);
+    // D5 lifted (owner, 2026-11-12, back to stock): an agent may ask the owner for a secret.
+    expect(T3_TOOL_DENYLIST.has("request_secret")).toBe(false);
   });
 
   it("changes its hash when t3's catalog changes, and only then", () => {
@@ -210,7 +211,7 @@ describe("t3-mcp guidance (SPI-1060)", () => {
       call: () => Promise.resolve({ kind: "result", text: "{}", isError: false }),
     });
 
-  it("drops each bullet naming a tool not offered, and a heading left with none, then adds our line", async () => {
+  it("drops each bullet naming a denied tool, and a heading left with none, then adds our line", async () => {
     const text = await render(GUIDANCE).sections![0]!.render({} as never, context);
     expect(text).toBe(
       [
@@ -219,6 +220,8 @@ describe("t3-mcp guidance (SPI-1060)", () => {
         "Ordinary coding tasks need no T3 tools.",
         "",
         "- Call `delegate_task` with a `task`.",
+        "- A secret: call `request_secret`,",
+        "  never a chat ask.",
         "- Given a thread id, `t3_thread_read` it.",
         "",
         OTHER_MACHINES,
@@ -226,18 +229,12 @@ describe("t3-mcp guidance (SPI-1060)", () => {
     );
   });
 
-  it("drops a bullet naming an allowlisted tool t3 did not list for this thread", async () => {
-    const text = await render(GUIDANCE, LISTED.filter((tool) => tool.name !== "t3_thread_read")).sections![0]!.render({} as never, context);
-    expect(text).not.toContain("t3_thread_read");
-    expect(text).toContain("`delegate_task`");
-  });
-
-  it("drops a bullet naming a name it has not classified, so an unknown tool is never told about", async () => {
+  it("keeps a bullet naming a tool it does not know: t3's own guidance, as stock t3 gives it", async () => {
     const text = await render("- Call `delegate_task`.\n- Call `t3_brand_new_tool`.").sections![0]!.render({} as never, context);
-    expect(text).toBe(`- Call \`delegate_task\`.\n\n${OTHER_MACHINES}`);
+    expect(text).toBe(`- Call \`delegate_task\`.\n- Call \`t3_brand_new_tool\`.\n\n${OTHER_MACHINES}`);
   });
 
-  it("drops each sentence of an offered tool's description that names a tool not offered", () => {
+  it("drops each sentence of an offered tool's description that names a denied tool", () => {
     const listed: ReadonlyArray<CatalogTool> = [
       {
         name: "t3_environment_links",

@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
-// SPI-994's stage check: what a stock client is told the Cloud Environment does (and SPI-995's: analytics off). Through t3's own protocol it reads the
+// SPI-994's stage check: what a stock client is told the Cloud Environment does (and SPI-995's: analytics off; D5 lifted). Through t3's own protocol it reads the
 // server config (the descriptor's capabilities and the managed policy) and tries to turn guest links on, which the
 // policy refuses. Run against a stage:
 //
@@ -26,6 +26,9 @@ check("kept capabilities are advertised", capabilities.pullRequests === true && 
 check("the managed policy is t3flare's", config.managedPolicy?.organization === "t3flare", config.managedPolicy);
 check("product analytics is off (SPI-995)", config.managedPolicy?.limits?.telemetry === false, config.managedPolicy);
 check("guest links are locked", (config.managedPolicy?.lockedSettings ?? []).includes("guestSharingEnabled"), config.managedPolicy);
+// D5 lifted (owner, 2026-11-12, back to stock): t3's typed-key settings work as stock.
+check("custom text generators are unlocked", !(config.managedPolicy?.lockedSettings ?? []).includes("textGenerators"), config.managedPolicy);
+check("cloud voice transcription is advertised", capabilities.cloudVoiceTranscription === true, capabilities);
 
 const refused = await wsCall(cookie, "server.updateSettings", { patch: { guestSharingEnabled: true } }).then(
   (value) => ({ ok: true, value }),

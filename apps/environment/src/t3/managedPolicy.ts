@@ -18,8 +18,6 @@ export const T3FLARE_POLICY = {
     enableDeviceSupport: off,
     enableAgentDeviceAccess: off,
     simlockDeviceHostsEnabled: off,
-    // Custom text generators hold a vendor key typed into t3: refused for now (owner decision D5).
-    textGenerators: { value: {}, locked: true },
     // Step 4b (review F7): t3 compacts idle Claude threads with a `/compact` turn, which would start a Container;
     // the worker is not started (composition.ts), and the setting shows as managed.
     idleCompaction: { value: "off", locked: true },

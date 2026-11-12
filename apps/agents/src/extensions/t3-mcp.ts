@@ -4,7 +4,8 @@
 // from a Container: the credential lives in the Session's storage alone.
 //
 // - Names are t3's own, `mcp__t3-code__<tool>`, so t3's tool presentation and pending-work detection know them.
-// - The allowlist fails closed: a tool t3 adds later is not offered until a bump adds it here.
+// - Every tool t3 lists for the thread is offered, as stock t3 offers it, but a short denylist of tools that cannot work
+//   here (`T3_TOOL_DENYLIST`; owner, 2026-11-12, back to stock).
 // - Approvals as t3's Pi bridge decides (provider-pi/src/server/mcpExtensionSource.ts): a tool annotated read-only never
 //   asks, nothing asks in full access, otherwise the call asks, accepted for the session per tool name (review C4). In
 //   plan mode only read-only tools run.
@@ -25,9 +26,9 @@ import { descriptionFor, guidanceFor, OTHER_MACHINES } from "./t3-guidance.ts";
 export const T3_MCP_SERVER = "t3-code";
 export const t3ToolName = (name: string): string => `mcp__${T3_MCP_SERVER}__${name}`;
 
-/** The T3 tools a Durable agent (and, through the relay, a CLI agent) is offered: harness-registry's (ADR-0022, 0028). */
-export { T3_TOOL_ALLOWLIST } from "@t3flare/harness-registry";
-import { T3_TOOL_ALLOWLIST } from "@t3flare/harness-registry";
+/** The T3 tools a Durable agent is not offered: harness-registry's (ADR-0022). */
+export { T3_TOOL_DENYLIST } from "@t3flare/harness-registry";
+import { isDeniedT3Tool } from "@t3flare/harness-registry";
 
 /** Tools that wait on t3 for up to `timeoutMs`: sent in pieces of at most WAIT_PIECE_MS. */
 const WAIT_TOOLS: ReadonlySet<string> = new Set(["t3_thread_wait", "t3_background_wait"]);
@@ -44,7 +45,7 @@ export interface CatalogTool {
   readonly annotations?: { readonly readOnlyHint?: boolean; readonly [key: string]: unknown };
 }
 
-/** The tools offered from one `tools/list`, and the listed ones the allowlist left out. */
+/** The tools offered from one `tools/list`, and the listed ones the denylist left out. */
 export interface T3Catalog {
   readonly tools: ReadonlyArray<CatalogTool>;
   readonly hash: string;
@@ -62,11 +63,11 @@ const hashOf = (text: string): string => {
 };
 
 export const catalogOf = (listed: ReadonlyArray<CatalogTool>): T3Catalog => {
-  const tools = listed.filter((tool) => T3_TOOL_ALLOWLIST.has(tool.name)).sort((a, b) => a.name.localeCompare(b.name));
+  const tools = listed.filter((tool) => !isDeniedT3Tool(tool.name)).sort((a, b) => a.name.localeCompare(b.name));
   return {
     tools,
     hash: hashOf(JSON.stringify(tools)),
-    left: listed.filter((tool) => !T3_TOOL_ALLOWLIST.has(tool.name)).map((tool) => tool.name).sort(),
+    left: listed.filter((tool) => isDeniedT3Tool(tool.name)).map((tool) => tool.name).sort(),
   };
 };
 
@@ -98,14 +99,14 @@ const textResult = (text: string, isError: boolean, tool: string) => ({
 const takesKey = (tool: CatalogTool) =>
   typeof tool.inputSchema?.properties === "object" && tool.inputSchema.properties !== null && "clientRequestId" in (tool.inputSchema.properties as object);
 
-/** One tool of the catalog as a pi-durable tool; its description names no tool outside `offered` (SPI-1060). */
-const toolOf = (tool: CatalogTool, host: T3McpHost, offered: ReadonlySet<string>): ToolRegistration => {
+/** One tool of the catalog as a pi-durable tool; its description names no denied tool (SPI-1060). */
+const toolOf = (tool: CatalogTool, host: T3McpHost): ToolRegistration => {
   const name = t3ToolName(tool.name);
   const readOnly = tool.annotations?.readOnlyHint === true;
   const keyed = takesKey(tool);
   return {
     name,
-    description: descriptionFor(tool.description ?? tool.title ?? tool.name, offered),
+    description: descriptionFor(tool.description ?? tool.title ?? tool.name),
     parameters: (tool.inputSchema ?? { type: "object", properties: {} }) as object,
     // Every call may run again after a restart: an approval waits again, a keyed call is t3's same work, and the rest
     // refuse a second run below.
@@ -169,19 +170,17 @@ const waitInPieces = async (
 
 /**
  * The extension for `catalog`; installed again (replaced in place) whenever the catalog's hash changes. t3's guidance
- * is told without what names a tool not offered, then our line on other machines (SPI-1060).
+ * is told without what names a denied tool, then our line on other machines (SPI-1060).
  */
-export const t3McpExtension = (catalog: T3Catalog, host: T3McpHost): Extension => {
-  const offered: ReadonlySet<string> = new Set(catalog.tools.map((tool) => tool.name));
-  return defineExtension({
+export const t3McpExtension = (catalog: T3Catalog, host: T3McpHost): Extension =>
+  defineExtension({
     name: "t3-mcp",
-    tools: catalog.tools.map((tool) => toolOf(tool, host, offered)),
+    tools: catalog.tools.map((tool) => toolOf(tool, host)),
     sections: [
       section("t3_orchestration", () => {
         const instructions = host.instructions();
         if (instructions === undefined) return undefined;
-        return [guidanceFor(instructions, offered), OTHER_MACHINES].filter((part) => part !== "").join("\n\n");
+        return [guidanceFor(instructions), OTHER_MACHINES].filter((part) => part !== "").join("\n\n");
       }),
     ],
   });
-};

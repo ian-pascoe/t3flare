@@ -32,7 +32,9 @@ describe("the descriptor's capabilities", () => {
       localServerStop: true,
       fastWorktreeCheckout: true,
     } as ExecutionEnvironmentCapabilities);
-    expect(advertised).toEqual({ repositoryIdentity: true, pullRequests: true, peerLinks: true });
+    // Cloud voice transcription is kept: t3 calls the vendor over fetch with the key typed into its settings (D5 lifted,
+    // owner 2026-11-12, back to stock).
+    expect(advertised).toEqual({ repositoryIdentity: true, pullRequests: true, peerLinks: true, cloudVoiceTranscription: true });
   });
 });
 
@@ -47,9 +49,15 @@ describe("t3flare's managed policy", () => {
     const { summary } = await policy;
     expect(summary?.organization).toBe("t3flare");
     expect(new Set(summary?.lockedSettings)).toEqual(
-      new Set(["enableAgentDeviceAccess", "enableDeviceSupport", "guestSharingEnabled", "idleCompaction", "simlockDeviceHostsEnabled", "textGenerators"]),
+      new Set(["enableAgentDeviceAccess", "enableDeviceSupport", "guestSharingEnabled", "idleCompaction", "simlockDeviceHostsEnabled"]),
     );
     expect(summary?.limits).toEqual({ telemetry: false });
+  });
+
+  it("leaves custom text generators to the owner, as stock t3 does (D5 lifted)", async () => {
+    const { settings } = await policy;
+    expect(settings.vetWrite(DEFAULT_SERVER_SETTINGS, DEFAULT_SERVER_SETTINGS, { textGenerators: {} })).not.toMatchObject({ _tag: "Locked" });
+    expect(settings.vetWrite(DEFAULT_SERVER_SETTINGS, DEFAULT_SERVER_SETTINGS, { guestSharingEnabled: true })).toMatchObject({ _tag: "Locked" });
   });
 
   it("keeps guest links and the device panel off, whatever was stored", async () => {

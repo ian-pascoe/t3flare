@@ -37,6 +37,8 @@ The proxy already holds the owner's subscriptions, pools several accounts per ve
 
 ## Refinement (SPI-1004): keys typed into t3 are refused for now (owner decision D5)
 
+**Lifted** (owner, 2026-11-12, back to stock): see the last refinement.
+
 Some stock t3 features keep a credential the owner types into t3's settings: cloud voice transcription (a vendor speech key), custom text generators (a vendor key per generator), and `request_secret` (an agent asks the owner for a secret). Each would put a credential in t3flare beside the proxy key, which this ADR rules out. They are **refused for now**:
 - `cloudVoiceTranscription` is stripped.
 - `textGenerators` is locked empty by t3flare's managed policy (ADR-0023).
@@ -52,4 +54,19 @@ An exception to D5. A direct MCP server's credential is a header value the owner
 
 Commissary's tools key is not typed in: it is `MODEL_PROXY_API_KEY`, a deploy secret, read through `toolsKeyOf(env)`.
 
-D5 itself is being lifted entirely (owner, 2026-11-12, back to stock, `docs/scope-audit.md`); that lands in the next step, and this exception then becomes the general rule.
+Subsumed by D5's lifting (below): what this exception allowed for MCP servers is now the general rule.
+
+## Refinement (back to stock, owner 2026-11-12): D5 lifted
+
+Owner, 2026-11-12, back to stock (scope audit row 12). t3's typed-key settings work as in stock t3: the owner may type a
+vendor key into t3, and t3 keeps it in the Environment's secret store as it keeps its other secrets.
+- Custom text generators: `textGenerators` is no longer locked by the managed policy (ADR-0023).
+- Cloud voice transcription: `cloudVoiceTranscription` is advertised again. It is not host-bound: t3's `CloudSpeech`
+  calls the vendor over fetch with the typed key, from the Environment DO.
+- `request_secret` is offered to Durable agents (ADR-0022's back-to-stock refinement); CLI agents already had t3's list.
+- The tools step's exception for owner-added MCP servers' credentials is subsumed.
+
+The rest of this ADR stands: every model call of t3flare's own (Durable agents, CLI agents, titles and commit text by
+default) still goes to the Model proxy, and no Subscription login is held. A text generator the owner adds is his
+choice of a second path, as in stock t3.
+

@@ -13,7 +13,7 @@ import * as PeerLinks from "t3/src/peer/PeerLinks.ts";
 import { descriptorOf, layerLinkingEnvironment } from "t3/src/peer/PeerLinks.testkit.ts";
 import { expect, it } from "vitest";
 
-import { WITHHELD_T3_TOOLS } from "../../agents/src/extensions/t3-guidance.ts";
+import { T3_TOOL_DENYLIST } from "../../agents/src/extensions/t3-guidance.ts";
 import {
   layerOwnerPeerForwarding,
   layerOwnerPeerLinkRequests,
@@ -79,12 +79,12 @@ it("a stored link cannot be resolved, finally, and is not listed; unlink still r
   expect(result.after).toBe(0);
 });
 
-it("t3's `notListed` points at the withheld `t3_environment_link`; ours, which replaces it, names no withheld tool", async () => {
+it("t3's `notListed` points at the denied `t3_environment_link`; ours, which replaces it, names no denied tool", async () => {
   const source = NodeFs.readFileSync(new URL("../../../t3code/apps/server/src/peer/PeerForwarding.ts", import.meta.url), "utf8");
   const t3Line = /const NOT_LISTED =\s*"([^"]+)"/.exec(source)?.[1];
   expect(t3Line, "t3's NOT_LISTED moved; re-read PeerForwarding.links (U41)").toBeDefined();
   const namesWithheld = (text: string) =>
-    [...WITHHELD_T3_TOOLS].filter((name) => new RegExp(`\\b${name.replace("*", "")}`).test(text));
+    [...T3_TOOL_DENYLIST].filter((name) => new RegExp(`\\b${name.replace("*", "")}`).test(text));
   expect(namesWithheld(t3Line!)).toEqual(["t3_environment_link"]);
 
   const real = { links: () => Effect.succeed({ environmentId: "cloud", links: [], notListed: t3Line! }) } as unknown as PeerForwarding.PeerForwarding["Service"];

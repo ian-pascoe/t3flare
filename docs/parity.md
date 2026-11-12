@@ -59,7 +59,7 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | Usage page, limit meters | `ws.ts:2740`; `t3code/docs/user/usage.md` | M | `BUILT_IN_USAGE_DRIVERS = []` | *def* G8 |
 | Model list, picker, thinking | — | W | `docs/steps/proxy-models/` | done |
 | Titles, commit and PR text | `srv/textGeneration/TextGeneration.ts:42` | W | step-2a M1, M4 | done |
-| Custom text generators | `con/settings.ts:941` | R for now (D5): the setting is locked empty by t3flare's managed policy (SPI-994) | ADR-0012 (D5 refinement), ADR-0023; `docs/steps/parity/spi-994-capabilities.json` | done (refusal) |
+| Custom text generators | `con/settings.ts:941` | W: as stock; the owner types the generator's key into t3 (D5 lifted, owner 2026-11-12, back to stock) | ADR-0012 (back-to-stock refinement), ADR-0023; `docs/steps/stock/` | done (stock) |
 | Skills, slash commands | `con/server.ts:128-130` | M | snapshot has none; `step-2a-plan.md:116` | — G10 |
 
 ### Git/VCS
@@ -104,7 +104,7 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | Agent's own MCP servers | each CLI's config | W for remote servers: Commissary toolkits and Direct servers added in the Harness panel (header or OAuth sign-in), for Durable agents and Codex, Claude and OpenCode (the pi CLI: t3's tools only, deferred); local stdio R (ADR-0024) | ADR-0028; `docs/steps/tools/m4-*.json`, `m5-*.json`, `m6-*.json` | done (tools) |
 | Secret store | — | W | `env/platform/secretStore.ts`; step 1 | done |
 | 1Password provider | `t3code/packages/secret-provider-onepassword` (`op` CLI) | M; possibly later through the broker pattern (D5) | `op` "not found"; ADR-0012 (D5 refinement) | — |
-| `request_secret` | `srv/mcp/toolkits/orchestrator/tools.ts:198`; `ws.ts:2376` | R for now (D5) | ADR-0022 and ADR-0012 refinements | done (refusal) |
+| `request_secret` | `srv/mcp/toolkits/orchestrator/tools.ts:198`; `ws.ts:2376` | W for `secretRef` and pasted values (D5 lifted, owner 2026-11-12, back to stock); P: `delivery: "file"` lands in the Environment's State directory, which a Container cannot read | ADR-0022 and ADR-0012 back-to-stock refinements | done (stock) |
 
 ### Settings, notifications, links, auth
 
@@ -129,7 +129,7 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | Product analytics | `srv/telemetry/AnalyticsService.ts:67-74` (on by default, `ingest.t3.codes`) | **Off** (D1): t3flare's managed policy sets `limits.telemetry: false` (SPI-995) | ADR-0023, README; `test/analytics.test.ts` (t3's service sends nothing under the policy); stage: `docs/steps/parity/spi-995-analytics.json` | done |
 | OTLP export | `con/settings.ts:1017`; proxy route `srv/http.ts:335` | M | URLs `undefined` in composition; route unmounted | *def* |
 | Import agent sessions | `srv/project/AgentSessionScanner.ts:217`, `:1196`; `ws.ts:3060` | R: no provider homes in the State directory | ADR-0024 | done (refusal) |
-| Voice | `con/environmentHttp.ts:795-927` | R: local voice is host-bound; cloud voice refused for now (D5) | both capabilities stripped (SPI-994); ADR-0024, ADR-0012 | done (refusal) |
+| Voice | `con/environmentHttp.ts:795-927` | R: local voice is host-bound (stripped); W: cloud voice, with the key typed into t3 (D5 lifted, owner 2026-11-12, back to stock) | `capabilities.ts`; ADR-0024, ADR-0012 | done (stock) |
 | Triage, host diagnostics | `ws.ts:2745`, `:2734-2738` | R (host-bound) | `triage` stripped (SPI-994); ADR-0024 | done (refusal) |
 
 ## 2. Gaps no planned step covers, in dependency order
@@ -166,7 +166,7 @@ Written down (SPI-1004, SPI-1006):
 1. **Host-bound features**: [ADR-0024](adr/0024-host-bound-features-are-refused.md) (device hub and simulators, local voice, open in editor, host diagnostics and power, triage, jj, agent-session import, server self-update, provider install and update).
 2. **Server browser and agent browser access**: not refused (D4). Built last under G11 (SPI-1002); until then stripped and pinned off (ADR-0024).
 3. **Vendor-login CLIs**: refused (D3), [ADR-0015](adr/0015-cli-agents-run-through-platform-exec-codex-in-managed-mode-claude-and-opencode-over-acp.md) refinement.
-4. **`request_secret` and `t3_attachment_*` withheld from agents**: [ADR-0022](adr/0022-durable-agents-reach-t3s-mcp-through-the-environment-do-with-t3s-own-credential.md) refinement. Keys typed into t3 (D5): [ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md) refinement.
+4. **`t3_attachment_*` withheld from Durable agents** (`request_secret` offered again since D5 was lifted, owner 2026-11-12, back to stock): [ADR-0022](adr/0022-durable-agents-reach-t3s-mcp-through-the-environment-do-with-t3s-own-credential.md) refinement. Keys typed into t3 (D5): [ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md) refinement.
 5. **Automatic git fetch off**: [ADR-0009](adr/0009-git-runs-in-the-container-status-and-checkpoints-come-from-the-workspace.md) refinement.
 6. **GitHub identity is the App, GitHub only** (D2): [ADR-0013](adr/0013-github-access-through-a-github-app-with-per-repo-tokens.md) refinement.
 7. **Later devices pair by pairing link** (SPI-1006): [ADR-0010](adr/0010-the-endpoint-is-public-behind-t3s-own-auth.md) refinement and README.
@@ -185,5 +185,5 @@ Written down (SPI-1004, SPI-1006):
 - **D2** GitHub stays **App-only and GitHub-only** for now: no owner token, no other hosts (SPI-1000 canceled; ADR-0013 note in SPI-1004).
 - **D3** Vendor-login CLIs (Cursor, Antigravity, Kiro, Muse, Grok, Fx): **refused** (ADR-0012/0015 via SPI-1004).
 - **D4** Dev-server previews: **part of parity, built last** (SPI-1002).
-- **D5** Keys typed into t3 (cloud voice, custom text generators, `request_secret`): **refused for now**; 1Password possibly later via the broker pattern.
+- **D5** Keys typed into t3 (cloud voice, custom text generators, `request_secret`): **refused for now**; 1Password possibly later via the broker pattern. **Lifted** (owner, 2026-11-12, back to stock): they work as in stock t3.
 - **ADR-0016** CLI agents get the Commissary key by an on-demand helper, never in env or on disk (option A′).

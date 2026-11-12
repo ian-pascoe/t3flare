@@ -83,7 +83,8 @@ export const CAPABILITIES = {
   freshContext: keep,
   scheduledTaskThreadModes: keep,
   voiceTranscription: strip("speech models on the host's CPU"),
-  cloudVoiceTranscription: strip("stores a vendor key typed into t3: refused for now (owner decision D5)"),
+  // A vendor key typed into t3's settings, called over fetch (D5 lifted, owner 2026-11-12, back to stock).
+  cloudVoiceTranscription: keep,
 } as const satisfies Record<keyof ExecutionEnvironmentCapabilities, Classification>;
 
 /** The capabilities the Cloud Environment advertises: t3's, without the stripped ones. */

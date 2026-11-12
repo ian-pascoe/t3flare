@@ -1,14 +1,13 @@
-// SPI-1060 (plan SPI-1061 §11.1, D8; U40): a Durable agent is never told about a t3 tool it does not have. Every
-// backticked tool-like name in t3's orchestration guidance (as our adapter hands it to the Session) and in the offered
-// tools' descriptions is classified: offered (`T3_TOOL_ALLOWLIST`), withheld, or not a tool. A bump whose text names
-// something new fails here until it is classified.
+// SPI-1060 (plan SPI-1061 §11.1, D8; U49): a Durable agent is never told about a t3 tool it is denied. The denylist
+// (`T3_TOOL_DENYLIST`; owner, 2026-11-12, back to stock) names only real t3 tools, so a bump that renames or drops one
+// fails here; the prompt and the offered tools' descriptions name no denied tool.
 import * as NodeFs from "node:fs";
 
 import { T3_CODE_ORCHESTRATION_INSTRUCTIONS } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { NOT_T3_TOOLS, toolLikeNamesIn, WITHHELD_T3_TOOLS } from "../../agents/src/extensions/t3-guidance.ts";
-import { type CatalogTool, catalogOf, t3McpExtension, T3_TOOL_ALLOWLIST } from "../../agents/src/extensions/t3-mcp.ts";
+import { T3_TOOL_DENYLIST } from "../../agents/src/extensions/t3-guidance.ts";
+import { type CatalogTool, catalogOf, t3McpExtension } from "../../agents/src/extensions/t3-mcp.ts";
 
 const TOOLKITS = new URL("../../../t3code/apps/server/src/mcp/toolkits/", import.meta.url);
 
@@ -29,31 +28,25 @@ beforeAll(async () => {
   t3Tools = [...byName.values()];
 }, 120_000);
 
-const offeredDescriptions = () => t3Tools.filter((tool) => T3_TOOL_ALLOWLIST.has(tool.name)).map((tool) => tool.description ?? "");
 const isT3Tool = (name: string) =>
   name.endsWith("*") ? t3Tools.some((tool) => tool.name.startsWith(name.slice(0, -1))) : t3Tools.some((tool) => tool.name === name);
 
-describe("t3's guidance and tool descriptions, classified (U40)", () => {
-  it("finds t3's tools", () => {
+describe("the denylist (U49)", () => {
+  it("names only t3's tools: each name, and each family's prefix, is still a tool t3 defines", () => {
     expect(t3Tools.length).toBeGreaterThan(40);
-    expect([...T3_TOOL_ALLOWLIST].filter((name) => !isT3Tool(name))).toEqual([]);
+    expect([...T3_TOOL_DENYLIST].filter((name) => !isT3Tool(name)), "t3 renamed or dropped these; update packages/harness-registry/src/t3Tools.ts").toEqual([]);
   });
 
-  it("classifies every backticked name in the guidance and in the offered tools' descriptions", () => {
-    const names = toolLikeNamesIn([T3_CODE_ORCHESTRATION_INSTRUCTIONS, ...offeredDescriptions()].join("\n"));
-    const unclassified = names.filter((name) => !T3_TOOL_ALLOWLIST.has(name) && !WITHHELD_T3_TOOLS.has(name) && !NOT_T3_TOOLS.has(name));
-    expect(unclassified, "classify these in packages/harness-registry/src/t3Guidance.ts").toEqual([]);
-  });
-
-  it("classifies honestly: withheld names are t3 tools not offered, and the rest name no t3 tool", () => {
-    expect([...WITHHELD_T3_TOOLS].filter((name) => !isT3Tool(name))).toEqual([]);
-    expect([...WITHHELD_T3_TOOLS].filter((name) => [...T3_TOOL_ALLOWLIST].some((offered) => (name.endsWith("*") ? offered.startsWith(name.slice(0, -1)) : offered === name)))).toEqual([]);
-    expect([...NOT_T3_TOOLS].filter(isT3Tool)).toEqual([]);
+  it("leaves request_secret and t3's orchestration tools offered (D5 lifted)", () => {
+    const offered = catalogOf(t3Tools).tools.map((tool) => tool.name);
+    expect(offered).toContain("request_secret");
+    expect(offered).toContain("delegate_task");
+    expect(offered).toContain("t3_environment_links");
   });
 });
 
 describe("the Durable agent's prompt and tools (SPI-1060)", () => {
-  it("name no t3 tool outside the offered set", async () => {
+  it("name no denied t3 tool", async () => {
     const catalog = catalogOf(t3Tools);
     const extension = t3McpExtension(catalog, {
       store: {} as never,
@@ -70,7 +63,7 @@ describe("the Durable agent's prompt and tools (SPI-1060)", () => {
     const notOffered = t3Tools.map((tool) => tool.name).filter((name) => !offered.has(name));
     const named = notOffered.filter((name) => texts.some((text) => new RegExp(`\\b${name}\\b`).test(text)));
     expect(named).toEqual([]);
-    for (const family of ["preview_", "html_", "device_", "t3_attachment_", "t3_worktree_"]) {
+    for (const family of ["preview_", "t3_preview_", "html_", "device_", "t3_attachment_", "t3_worktree_"]) {
       expect(texts.filter((text) => new RegExp(`\\b${family}`).test(text))).toEqual([]);
     }
     // What survives is still t3's guidance, with our line on other machines.
