@@ -1,0 +1,27 @@
+{
+ "at": "2026-11-12T18:02:46.327Z",
+ "ok": true,
+ "failures": [],
+ "outbound": {
+  "refused": {
+   "ok": false,
+   "error": {
+    "_tag": "PeerLinkError",
+    "reason": "disabled",
+    "message": "No machine is registered; Outbound links are made from the harness panel (SPI-1061)."
+   }
+  },
+  "listed": {
+   "links": []
+  },
+  "ms": 1733
+ },
+ "fixture": {
+  "projectId": "ae1448bc-be9f-4c4a-bca6-19dbc4fa84af",
+  "workspaceRoot": "/w/step3-fixture",
+  "cloned": true
+ },
+ "link": {
+  "scope": "orchestration:read orchestration:operate"
+ }
+}
