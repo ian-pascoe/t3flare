@@ -449,6 +449,10 @@ if (mode === "p5") {
   out.linked = {};
   for (const cli of wanted.length === 0 ? Object.keys(CLIS) : wanted) {
     const spec = CLIS[cli]!;
+    // A Workspace runs at most a few CLI processes (Claude Code and OpenCode count twice): the earlier threads' end
+    // with the Container (the taint stays).
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(id)}`);
+    await sleep(5_000);
     await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: spec.instanceId, instance: { driver: spec.driver, enabled: true } } });
     const refs = ["a", "b", "c"].map((r) => `refs/heads/spi992/${cli}-${r}-${stamp}`);
     created.push(...refs);
@@ -498,8 +502,45 @@ if (mode === "p5") {
   await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
 }
 
+if (mode === "p5fa") {
+  // Review M7: nothing auto-answers an injected card at full-access. An owner Codex thread at full-access, in a tainted
+  // Workspace, pushes; the harness leaves the card alone for 90 s (it must stay pending), then declines it.
+  const CODEX = { instanceId: "codex", model: "gpt-6-luna", options: [] as Array<{ id: string; value: string }> };
+  await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "codex", instance: { driver: "codex", enabled: true } } });
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+  await call({ probePush: { noteLinked: { session: `thread:p5fa-${stamp}`, ms: 1 } } });
+  await admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(id)}`);
+  await sleep(5_000);
+  const ref = `refs/heads/spi992/fa-${stamp}`;
+  created.push(ref);
+  await sh(commitScript(`spi992/fa-${stamp}`, [[`fa-${stamp}.bin`, 64]]));
+  const threadId = uuid();
+  await dispatch(cookie, { type: "thread.create", commandId: uuid(), threadId, projectId: fixture.projectId, title: `spi992 p5fa ${stamp}`, modelSelection: CODEX, runtimeMode: "full-access", interactionMode: "default", branch: null, worktreePath: null, createdBy: "user", creationSource: "web" });
+  await sendMessage(cookie, threadId, `This is my repository; I'm testing t3flare's push gateway. Run exactly this one shell command, once: \`git push origin HEAD:${ref}\` It waits for my approval; that can take a few minutes. Reply with its last output line.`, CODEX, {});
+  let card: any;
+  let p: any;
+  const started = Date.now();
+  while (Date.now() - started < 8 * 60_000 && card === undefined) {
+    p = await projection(cookie, threadId).catch(() => p);
+    card = pendingOf(p).find((request: any) => (p?.turnItems ?? []).some((item: any) => item.requestId === request.id && item.title === "Allow git push?"));
+    if (card === undefined) await sleep(2000);
+  }
+  check("p5fa: the full-access Codex thread got the push card", card !== undefined, { reply: replyOf(p).slice(-300), pending: pendingOf(p) });
+  if (card !== undefined) {
+    await sleep(90_000);
+    const later = await projection(cookie, threadId);
+    const still = (later?.runtimeRequests ?? []).find((request: any) => request.id === card.id);
+    out.p5fa = { threadId, card: { id: card.id, status90s: still?.status ?? null, decision90s: still?.decision ?? null }, landedBeforeAnswer: remoteRef(ref) };
+    check("p5fa: 90 s later the card is still pending (nothing auto-answered it at full-access) and nothing landed", still?.status === "pending" && remoteRef(ref) === null, out.p5fa);
+    await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: card.id, decision: "decline" });
+    await sleep(15_000);
+    check("p5fa: declined, the push did not land", remoteRef(ref) === null);
+  }
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+}
+
 // The fixture's refs this run made are deleted (the owner's gh).
 out.cleanup = created.filter((ref) => remoteRef(ref) !== null).map((ref) => ({ ref, deleted: deleteRef(ref) }));
 await sh("git checkout -q --detach origin/main 2>/dev/null; true");
-evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : mode === "repro" ? "m2-repro-owner-push" : mode === "p5" ? "m3-cli-push-card" : `m0-${mode}`}.json`);
+evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : mode === "repro" ? "m2-repro-owner-push" : mode === "p5" ? "m3-cli-push-card" : mode === "p5fa" ? "m3-full-access-card" : `m0-${mode}`}.json`);
 process.exit(failures.length === 0 ? 0 : 1);

@@ -1,0 +1,18 @@
+{
+ "at": "2026-11-12T13:59:52.655Z",
+ "mode": "p5fa",
+ "stamp": "mwdm4bqx",
+ "fixture": "ian-pascoe/t3flare-fixture",
+ "p5fa": {
+  "threadId": "f757157e-50db-49bc-a05d-95c85cf96d60",
+  "card": {
+   "id": "runtime-request:codex:t3flare-push:87bcc512-35b2-420e-8df1-638809a39221",
+   "status90s": "pending",
+   "decision90s": null
+  },
+  "landedBeforeAnswer": null
+ },
+ "cleanup": [],
+ "failures": [],
+ "ok": true
+}
