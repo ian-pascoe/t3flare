@@ -114,7 +114,7 @@ describes the branch after the cut.
 | **M7** ADRs, GLOSSARY, parity, fragility, model-proxy, README, this report | **pass** | see Documents |
 | **M7** `acceptance --tools` in the bump job | **not done** | SPI-1077 |
 | `bun run check` | **pass** at the branch head | — |
-| Stage destroyed | **pending** (root's go; the owner removes Commissary's `fixture` toolkit) | — |
+| Stage destroyed | **pass**: `bun scripts/stage.ts destroy tools` (9 resources deleted), after the owner removed Commissary's `fixture` toolkit | — |
 
 ## Findings worth keeping
 
@@ -266,5 +266,5 @@ The implementer did the review, one axis after the other.
 
 ## Branch
 
-`tools`, pushed (never `main`). The stage `tools` is still up; it is destroyed on root's go, after the owner removes
-Commissary's `fixture` toolkit.
+`tools`, pushed (never `main`). Stage `tools` destroyed after the last run (the owner removed Commissary's `fixture`
+toolkit first).
