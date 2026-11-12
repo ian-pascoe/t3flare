@@ -176,3 +176,23 @@ linked CLI pushes refused instead of asked).
   t3's `node:sea` users), excluded from the `node` project so `bun run check` does not need Docker.
 - Spec: every SPI-1043 item is done; the one change from the ticket is that the bump workflow was not dispatched on the
   branch (its flags ran on `step4a` instead).
+
+## Rebase onto `main` (step 3+, T3 Connect)
+
+`step-4a` was rebased from `5e8e4ac` onto `origin/main` `b05e495`, keeping both features in every conflict:
+- `alchemy.run.ts`, `environmentDO.ts`: Connect's stage variables next to `T3FLARE_FAULTS`.
+- `host/admin.ts`: the Connect routes next to the process routes.
+- `stage.ts`: `step3plus` and `step4a` in `STAGES`.
+- `vitest.config.ts`: Connect's defines plus the `test/docker` exclusion. `vitest.docker.config.ts` gets the defines too.
+- `README.md`: one status line naming both steps.
+- `docs/upstream-fragility.md`: main keeps U28 (T3 Connect), and step 4a's entries are now **U29–U32**.
+
+There is no ADR collision: step 4a adds no ADR and refines ADR-0001, 0015 and 0016, while main added ADR-0025. The ADR-0001
+counts still hold: Shadows 2, Patches 3, because step 3+ added none.
+
+Checked on a fresh `step4a` deploy of the rebased branch, which was then destroyed:
+- `bun run check` passes.
+- `connect refusals` passes: every relay route gets 404 at the door and is refused inside t3 (`rebase-connect-refusals.json`).
+- `acceptance --threads 12 --runs 4 --real-turn --peer --codex --pi` (`rebase-acceptance.json`) passes everything (the real turn,
+  the reboot check, Codex, Pi, `--peer`) except the known F6 flake (SPI-1048). The recorded items show this run's
+  agent refused both the write and the `ls` in plan mode.
