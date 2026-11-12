@@ -341,6 +341,20 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 - **Detection**: `test/cliPushCard.test.ts` ("never gives t3's adapter client terminals"); `scripts/spi992.ts p5` (the allowed git-touching tools from an auto-accept-edits and a full-access link: no `git push` in the router trace, no expectation). **Silent** for a new tool until T13 lists it.
 - **Fix**: keep the option out; deny the tool in `t3-mcp.ts`, or mark its pushes as the caller's (linked) work.
 
+### U45. Outbound-link policy Layers over t3's peer services (SPI-1061)
+
+- **Where**: `apps/environment/src/t3/peerLinks.ts`, provided in `composition.ts` over t3's `PeerLinks`, `PeerForwarding` and `PeerLinkRequests` (`t3code/apps/server/src/peer/*`). Until a machine is registered (SPI-1061's M1), `link` is refused, `resolve` fails as `expired` (final: `PeerMcpClient` maps it to `capability_denied`, which `RemoteDelegation.isFinal` stops on), `list` is empty and probes nothing, `request` raises no link card, and no `PeerLinkError` carries a `cause`. Numbers U40–U44 belong to the tools step.
+- **Breaks when**: a bump adds a method or a second path to a peer (a new service, a WS RPC that bypasses `PeerLinks`), renames or reshapes these services, or changes which failure reasons are final.
+- **Detection**: typecheck (each wrapper spreads and overrides the whole service type); `test/peerLinks.test.ts` on t3's real layers (seeded row cannot be resolved, list empty, link refused, no cause); `acceptance --peer` check `outbound` (a web-client link attempt refused before any request; `GET /_t3flare/peer-links/count` is 0).
+- **Fix**: wrap the new method or path in the same Layer; keep refusals on final reasons.
+
+### U49. t3's orchestration guidance, filtered to the tools we offer (SPI-1060)
+
+- **Where**: `apps/agents/src/extensions/t3-guidance.ts` filters t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` by bullet against the offered catalog before the `t3_orchestration` section is rendered (`t3-mcp.ts`); `peerLinks.ts` replaces `t3_environment_links`' `notListed` pointer at `t3_environment_link`.
+- **Breaks when**: t3 names a new tool in its instructions, its tool descriptions or a tool result, or restructures the instructions so a bullet no longer holds one tool's guidance.
+- **Detection**: `test/t3Guidance.test.ts` (every backticked tool name in the guidance and the offered tools' descriptions is classified; a new name fails until classified) and `test/t3Mcp.test.ts`; `test/peerLinks.test.ts` for `notListed`. **Silent** for a tool named only in a result other than `t3_environment_links`.
+- **Fix**: classify the new name; extend the filter or the result rewrite.
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).

@@ -1,6 +1,6 @@
 // SPI-1061 pre-items: this Environment links to no other machine until the owner registers one (ADR-0029). Pre-B:
 // t3's `PeerLinks` refuses to make a link, and treats any stored one as gone. Pre-A: `t3_environment_links` does not
-// point an agent at `t3_environment_link`, a tool it is never offered. Layers over t3's services (ADR-0001); U41.
+// point an agent at `t3_environment_link`, a tool it is never offered. Layers over t3's services (ADR-0001); U45, U49.
 import { OrchestratorMcpFailure, PeerLinkError } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
