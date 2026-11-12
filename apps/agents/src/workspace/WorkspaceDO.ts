@@ -242,6 +242,8 @@ export class WorkspaceDO extends ContainerHost {
   #readToken: { readonly token: string; readonly expiresAt: number } | undefined;
   /** The push gateway's write token and the repo it is for: in this object's memory only, never sent to the Container. */
   #pushToken: { readonly token: string; readonly expiresAt: number; readonly repo: { readonly owner: string; readonly name: string } } | undefined;
+  /** Test stages only (`probePush`): how long each gateway decision is held (P2). */
+  #probeHoldMs = 0;
   /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
   #sandbox: Promise<boolean> | undefined;
 
@@ -1569,6 +1571,7 @@ export class WorkspaceDO extends ContainerHost {
    */
   async authorizePush(input: { readonly updates: ReadonlyArray<RefUpdate>; readonly pushOptions: ReadonlyArray<string> }): Promise<{ readonly allow: true } | { readonly allow: false; readonly reason: string }> {
     const id = this.#workspaceId() ?? null;
+    if (this.#probeHoldMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#probeHoldMs));
     const now = Date.now();
     const expectations = this.ctx.storage.kv.get<ReadonlyArray<PushExpectation>>(EXPECTATIONS_KEY) ?? [];
     const linked = this.ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {};
@@ -1679,6 +1682,25 @@ export class WorkspaceDO extends ContainerHost {
       console.warn(JSON.stringify({ t3flare: "git-credential-failed", workspace: id, error: String(error).slice(0, 300) }));
       return new Response("", { status: 503 });
     }
+  }
+
+  /**
+   * Test stages only (SPI-992 M0/M2): `holdMs` holds every gateway request's decision that long (P2, the long-held
+   * POST); `lapseLinked` ends every linked-work window now (the taint stays: H1's lapse without waiting 30 minutes);
+   * `noteLinked` notes linked work as a linked Session would; `state` answers the policy's inputs.
+   */
+  probePush(op: { readonly holdMs?: number; readonly lapseLinked?: boolean; readonly noteLinked?: { readonly session: string; readonly ms: number } }): Promise<Record<string, unknown>> {
+    if (this.env.T3FLARE_FAULTS !== "1") throw new Error("t3flare: probes answer on test stages only");
+    if (op.holdMs !== undefined) this.#probeHoldMs = Math.max(0, Math.min(op.holdMs, 20 * 60_000));
+    if (op.lapseLinked === true) this.ctx.storage.kv.put(LINKED_WORK_KEY, {});
+    if (op.noteLinked !== undefined) void this.noteLinkedWork({ session: op.noteLinked.session, until: Date.now() + op.noteLinked.ms });
+    return Promise.resolve({
+      holdMs: this.#probeHoldMs,
+      linked: this.ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {},
+      taint: this.ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null,
+      expectations: (this.ctx.storage.kv.get<ReadonlyArray<PushExpectation>>(EXPECTATIONS_KEY) ?? []).map((e) => ({ id: e.id, refs: e.updates.map((u) => u.ref), until: e.until })),
+      owners: this.ctx.storage.kv.get<LinkedWork>(OWNER_COMMANDS_KEY) ?? {},
+    });
   }
 
   /** Test stages only (step 4a M1's restart case): this object's abort, as an eviction does. */

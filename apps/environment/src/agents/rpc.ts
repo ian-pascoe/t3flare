@@ -73,6 +73,8 @@ export interface WorkspaceRpc {
   unexpectPush(input: { readonly id: string }): Promise<void>;
   /** SPI-992 (review H1): the owner trusts the Workspace again; its taint is cleared. */
   trustAgain(input: { readonly by: string }): Promise<{ readonly cleared: { readonly since: number; readonly by: ReadonlyArray<string> } | null }>;
+  /** Test stages only (SPI-992): the gateway's probes. */
+  probePush(op: { readonly holdMs?: number; readonly lapseLinked?: boolean; readonly noteLinked?: { readonly session: string; readonly ms: number } }): Promise<Record<string, unknown>>;
   /** The Workspace's taint, or null. */
   taint(): Promise<{ readonly since: number; readonly by: ReadonlyArray<string> } | null>;
   containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }>;

@@ -1,0 +1,108 @@
+{
+ "at": "2026-11-12T12:34:44.111Z",
+ "mode": "m1",
+ "stamp": "mwdj4w6j",
+ "fixture": "ian-pascoe/t3flare-fixture",
+ "systemGitconfig": [
+  "file:/usr/local/share/mise/installs/conda-git/2.56.0/etc/gitconfig\turl.http://computer.internal/t3flare/git/.pushinsteadof https://github.com/",
+  "file:/usr/local/share/mise/installs/conda-git/2.56.0/etc/gitconfig\tcredential.helper !f() { test \"$1\" = get || exit 0; pr=; h=; while IFS== read -r k v; do [ -n",
+  "",
+  "http://computer.internal/t3flare/git/ian-pascoe/t3flare-fixture.git",
+  "https://github.com/ian-pascoe/t3flare-fixture.git",
+  "git version 2.56.0"
+ ],
+ "p1": {
+  "exitCode": 0,
+  "output": "remote: \nremote: Create a pull request for 'spi992/p1-mwdj4w6j' on GitHub by visiting:        \nremote:      https://github.com/ian-pascoe/t3flare-fixture/pull/new/spi992/p1-mwdj4w6j        \nremote: \nTo http://computer.internal/t3flare/git/ian-pascoe/t3flare-fixture.git\n * [new branch]      HEAD -> spi992/p1-mwdj4w6j",
+  "ms": 1910,
+  "remote": "daa8610ca4ceb7d5986a56d49c7951008af2b2c8",
+  "commit": "daa8610ca4ceb7d5986a56d49c7951008af2b2c8"
+ },
+ "containerTokens": [
+  "token 34cf8a02b514 api-write=403 git-direct=refused api-read=200"
+ ],
+ "bypass": "remote: Write access to repository not granted.\nfatal: unable to access 'https://github.com/ian-pascoe/t3flare-fixture.git/': The requested URL returned error: 403\nexit 128",
+ "foreign": [
+  "foreign-fill 128",
+  "old-helper 403",
+  "new-helper-other-host 403"
+ ],
+ "gatewayRefusals": [
+  "other-repo 404",
+  "upload-pack 404",
+  "gzip 415",
+  "advertise 200"
+ ],
+ "tainted": {
+  "output": "remote: t3flare: this Workspace ran linked work, so each push needs your approval, and none of your threads could be asked; push with Commit & push, or trust the Workspace again        \nTo http://computer.internal/t3flare/git/ian-pascoe/t3flare-fixture.git\n ! [remote rejected] HEAD -> spi992/tainted-mwdj4w6j (this Workspace ran linked work, so each push needs your approval, and none of your threads could be asked; push with Commit & push, or trust the Workspace again)\nerror: failed to push some refs to 'http://computer.internal/t3flare/git/ian-pascoe/t3flare-fixture.git'\nexit 1",
+  "state": {
+   "holdMs": 0,
+   "linked": {},
+   "taint": {
+    "since": 1794486857216,
+    "by": [
+     "thread:spi992-mwdj4w6j"
+    ]
+   },
+   "expectations": [],
+   "owners": {}
+  }
+ },
+ "t3Push": {
+  "events": [
+   "action_started",
+   "phase_started",
+   "hook_output",
+   "hook_output",
+   "hook_output",
+   "phase_started",
+   "action_finished"
+  ],
+  "failed": null,
+  "remote": "657fa1e30ec710bc81d29edd3449134d58986d81",
+  "head": "657fa1e30ec710bc81d29edd3449134d58986d81"
+ },
+ "routerPushes": [
+  {
+   "at": 1794486863583,
+   "command": "git",
+   "argv": [
+    "commit",
+    "-m",
+    "spi992 t3 commit & push mwdj4w6j"
+   ],
+   "cwd": "/w/step3-fixture",
+   "route": "container",
+   "exitCode": 0,
+   "ms": 924,
+   "detail": "action 845ms"
+  },
+  {
+   "at": 1794486869880,
+   "command": "git",
+   "argv": [
+    "push",
+    "--",
+    "origin",
+    "HEAD:refs/heads/spi992/t3-mwdj4w6j"
+   ],
+   "cwd": "/w/step3-fixture",
+   "route": "container",
+   "exitCode": 0,
+   "ms": 2204,
+   "detail": "action 1700ms"
+  }
+ ],
+ "cleanup": [
+  {
+   "ref": "refs/heads/spi992/p1-mwdj4w6j",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/t3-mwdj4w6j",
+   "deleted": true
+  }
+ ],
+ "failures": [],
+ "ok": true
+}

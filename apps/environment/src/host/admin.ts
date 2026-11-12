@@ -350,7 +350,9 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                       ? await rpc.killExecs(body.killExecs as never)
                       : "probeProcess" in body
                         ? await rpc.probeProcess(body.probeProcess as never)
-                        : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess" };
+                        : "probePush" in body
+                          ? await rpc.probePush(body.probePush as never)
+                          : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess, probePush" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
       }
       case "POST /_t3flare/check/connect-leak": {
