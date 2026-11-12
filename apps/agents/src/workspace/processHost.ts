@@ -367,7 +367,12 @@ export class ProcessHost {
   turn(key: string, active: boolean): ProcessAnswer {
     const proc = this.#procs.get(key);
     if (proc === undefined || proc.exited) return this.#answer([key]);
-    if (proc.inTurn && !active) proc.turnEndedAt = this.#deps.now();
+    if (proc.inTurn && !active) {
+      proc.turnEndedAt = this.#deps.now();
+      // A turn ended: its session file and edits come into the DO now, not at the next quiet pull (a deploy or a
+      // crash can take the Container before that).
+      this.#deps.filesMayHaveChanged("exit");
+    }
     proc.inTurn = active;
     return this.#answer([]);
   }

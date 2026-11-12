@@ -1,0 +1,219 @@
+{
+ "at": "2026-11-12T02:13:05.481Z",
+ "scenario": "two",
+ "ok": true,
+ "failures": [],
+ "ms": 70044,
+ "budget": {
+  "max": 3,
+  "leases": [
+   {
+    "holder": "fc4d44ebe5090d2c42f78ddfe52236f0e5745d62174e5af76bfb86083595eefc",
+    "until": 1794450142712,
+    "workspace": "cli-codex"
+   },
+   {
+    "holder": "43588527543d366a5dd538197d962d32871a62ce7370bfc19f0dbdab80a698c4",
+    "until": 1794450156564,
+    "workspace": "cli-pi"
+   }
+  ]
+ },
+ "leases": "{\"max\":3,\"leases\":[{\"holder\":\"fc4d44ebe5090d2c42f78ddfe52236f0e5745d62174e5af76bfb86083595eefc\",\"until\":1794450142712,\"workspace\":\"cli-codex\"},{\"holder\":\"43588527543d366a5dd538197d962d32871a62ce7370bfc19f0dbdab80a698c4\",\"until\":1794450156564,\"workspace\":\"cli-pi\"}]}",
+ "states": {
+  "codex": {
+   "channel": {
+    "live": 4,
+    "environmentEpoch": 39
+   },
+   "workspace": {
+    "epoch": 9,
+    "processes": [
+     {
+      "key": "proc-54a3b356-e3e4-4111-9bbb-5de778d6cfb3",
+      "thread": "7f317325-88b2-4673-954c-ce8bf4d3aa57",
+      "environmentEpoch": 39,
+      "inTurn": false,
+      "idleMs": 54353
+     },
+     {
+      "key": "proc-ac2c2415-c4d7-4438-a433-b2e8c035d507",
+      "thread": "13901fbf-7b62-4f37-9747-86f28a9479e5",
+      "environmentEpoch": 39,
+      "inTurn": true,
+      "idleMs": 42934
+     }
+    ],
+    "pushes": 194
+   }
+  },
+  "pi": {
+   "channel": {
+    "live": 4,
+    "environmentEpoch": 39
+   },
+   "workspace": {
+    "epoch": 35,
+    "processes": [
+     {
+      "key": "proc-cc0c242d-6ad1-4d0e-930f-d5d485d5b1d4",
+      "thread": "7df44018-4de8-46d0-9e1e-e93214bb014d",
+      "environmentEpoch": 39,
+      "inTurn": false,
+      "idleMs": 94450
+     },
+     {
+      "key": "proc-883a972f-fc46-47cb-9095-5e9ad1510811",
+      "thread": "40b4c2d1-4632-4ba8-9568-600df4acc265",
+      "environmentEpoch": 39,
+      "inTurn": true,
+      "idleMs": 40757
+     }
+    ],
+    "pushes": 38
+   }
+  }
+ },
+ "codex": {
+  "threadId": "13901fbf-7b62-4f37-9747-86f28a9479e5",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:13901fbf-7b62-4f37-9747-86f28a9479e5:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "/bin/bash -c 'sleep 60 && echo slept'",
+    "exitCode": 0
+   },
+   {
+    "type": "reasoning",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "Running the requested command.done",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A13901fbf-7b62-4f37-9747-86f28a9479e5%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cd86-a9a1-7483-b3af-76e72b5daf9d",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:13901fbf-7b62-4f37-9747-86f28a9479e5:fb84d437-b3f1-436d-a7d0-e880feb02112",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:13901fbf-7b62-4f37-9747-86f28a9479e5:fb84d437-b3f1-436d-a7d0-e880feb02112",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 69756
+ },
+ "pi": {
+  "threadId": "40b4c2d1-4632-4ba8-9568-600df4acc265",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:40b4c2d1-4632-4ba8-9568-600df4acc265:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "sleep 60 && echo slept",
+    "exitCode": 0
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "done",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3A40b4c2d1-4632-4ba8-9568-600df4acc265%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-11-58-374Z_01a1cd86-af23-7097-b850-66615a664e59.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:40b4c2d1-4632-4ba8-9568-600df4acc265:2dbbafed-8eb2-49d2-9c88-d8277fda04c6",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:40b4c2d1-4632-4ba8-9568-600df4acc265:2dbbafed-8eb2-49d2-9c88-d8277fda04c6",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 70036
+ }
+}

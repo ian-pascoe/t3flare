@@ -1,0 +1,209 @@
+{
+ "at": "2026-11-12T02:13:37.375Z",
+ "scenario": "f1",
+ "ok": true,
+ "failures": [],
+ "a": {
+  "threadId": "a9652a11-6fd8-4dcd-b4bd-b93fe6684799",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:a9652a11-6fd8-4dcd-b4bd-b93fe6684799:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "/bin/bash -c pwd",
+    "exitCode": 0
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "/w/cli-codex",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3Aa9652a11-6fd8-4dcd-b4bd-b93fe6684799%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cd88-1296-7242-90dc-7f02f3b4916a",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:a9652a11-6fd8-4dcd-b4bd-b93fe6684799:a3f1978f-f0f3-4b59-8385-cec514736581",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:a9652a11-6fd8-4dcd-b4bd-b93fe6684799:a3f1978f-f0f3-4b59-8385-cec514736581",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 8569
+ },
+ "b": {
+  "threadId": "fe8b2269-b353-43fa-bfdb-40adf618f211",
+  "root": "/w/cli-pi",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:fe8b2269-b353-43fa-bfdb-40adf618f211:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "/bin/bash -c pwd",
+    "exitCode": 0
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "I’ll run `pwd` in the shell./w/cli-pi",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3Afe8b2269-b353-43fa-bfdb-40adf618f211%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cd88-17bc-7001-b586-c6a0f560a2e7",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:fe8b2269-b353-43fa-bfdb-40adf618f211:ce2ba6e7-e618-4b62-a6bb-1b8e12677eb0",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:fe8b2269-b353-43fa-bfdb-40adf618f211:ce2ba6e7-e618-4b62-a6bb-1b8e12677eb0",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 10373
+ },
+ "states": {
+  "cli-codex": {
+   "channel": {
+    "live": 6,
+    "environmentEpoch": 39
+   },
+   "workspace": {
+    "epoch": 9,
+    "processes": [
+     {
+      "key": "proc-54a3b356-e3e4-4111-9bbb-5de778d6cfb3",
+      "thread": "7f317325-88b2-4673-954c-ce8bf4d3aa57",
+      "environmentEpoch": 39,
+      "inTurn": false,
+      "idleMs": 111001
+     },
+     {
+      "key": "proc-ac2c2415-c4d7-4438-a433-b2e8c035d507",
+      "thread": "13901fbf-7b62-4f37-9747-86f28a9479e5",
+      "environmentEpoch": 39,
+      "inTurn": false,
+      "idleMs": 34149
+     },
+     {
+      "key": "proc-8fcb17b4-3b36-4e44-b2ad-bf4f39fb20d4",
+      "thread": "a9652a11-6fd8-4dcd-b4bd-b93fe6684799",
+      "environmentEpoch": 39,
+      "inTurn": false,
+      "idleMs": 3490
+     }
+    ],
+    "pushes": 211
+   }
+  },
+  "cli-pi": {
+   "channel": {
+    "live": 6,
+    "environmentEpoch": 39
+   },
+   "workspace": {
+    "epoch": 35,
+    "processes": [
+     {
+      "key": "proc-cc0c242d-6ad1-4d0e-930f-d5d485d5b1d4",
+      "thread": "7df44018-4de8-46d0-9e1e-e93214bb014d",
+      "environmentEpoch": 39,
+      "inTurn": false,
+      "idleMs": 151062
+     },
+     {
+      "key": "proc-883a972f-fc46-47cb-9095-5e9ad1510811",
+      "thread": "40b4c2d1-4632-4ba8-9568-600df4acc265",
+      "environmentEpoch": 39,
+      "inTurn": false,
+      "idleMs": 33839
+     },
+     {
+      "key": "proc-4ce9ea7c-57a2-4d84-80df-991c4ca234fb",
+      "thread": "fe8b2269-b353-43fa-bfdb-40adf618f211",
+      "environmentEpoch": 39,
+      "inTurn": false,
+      "idleMs": 757
+     }
+    ],
+    "pushes": 56
+   }
+  }
+ }
+}

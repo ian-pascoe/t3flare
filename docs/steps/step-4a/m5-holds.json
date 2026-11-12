@@ -1,0 +1,19 @@
+{
+ "at": "2026-11-12T02:16:00Z",
+ "decision": {
+  "release": "Patch 0003: t3 releases an idle provider session after 10 minutes (all providers); a CLI process holds its Container while its thread is in a turn and for 11 minutes after (CLI_IDLE_HOLD_MS), so the hold ends with the session",
+  "why": "review F7: t3's 30-minute release would hold a Container about 32 minutes per turn; 10 minutes matches the terminals' prompt hold (TERMINAL_PROMPT_IDLE_MS)",
+  "budgetFull": "a start refused by the budget asks each holder to release if nothing there works (no command, no terminal holding, every CLI process out of a turn for 30 s); one that does stops its Container (CLI processes ended first, their session files pulled)",
+  "processCap": "4 per Workspace, from m3-memory.json"
+ },
+ "reclaimRun": {
+  "before": ["cli-codex (Codex, idle)", "cli-pi (Codex, idle)", "step3-fixture (no CLI, idle 35 s)"],
+  "start": "a Codex thread in a fourth Workspace, cli-four (its clone and its process)",
+  "after": ["cli-codex", "cli-four", "cli-pi"],
+  "turn": "completed (m5-reclaim.json)"
+ },
+ "observedOnStage": [
+  "The Environment resets after 60 s with no client (ADR-0003). Its read loops stop, so a CLI process whose Environment reset ends at the Workspace's 90 s lapse and the next turn resumes it in a new process (m5-resume-*.json shows the resume path).",
+  "A deploy of the agents Worker restarts running Containers within a few minutes ('workspace.container.exited', expected: false, 'exited normally'): a CLI session open across a deploy ends, and what its CLI wrote since the last pull is lost; t3 then hands the context over instead of resuming (seen once on step4a, right after a deploy)."
+ ]
+}

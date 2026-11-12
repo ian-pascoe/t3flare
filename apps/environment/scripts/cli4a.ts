@@ -241,6 +241,25 @@ switch (scenario) {
     finish(arg("out") ?? "m5-two-at-once.json", { ms: Date.now() - started, budget, leases, states, codex, pi });
     break;
   }
+  case "f1": {
+    // Review F1 (P12): two Codex threads in two Workspaces each get a process in their own Workspace's Container; t3
+    // never attaches the second thread to the first one's app-server.
+    const cookie = await pair();
+    await enable(cookie, "codex", "codex");
+    const prompt = "Run `pwd` in the shell and reply with its output only.";
+    const [a, b] = await Promise.all([
+      cliTurn(cookie, { cli: "codex", workspace: "cli-codex", mode: "full-access", plan: false, prompt }),
+      cliTurn(cookie, { cli: "codex", workspace: "cli-pi", mode: "full-access", plan: false, prompt }),
+    ]);
+    const states = { "cli-codex": await processState("cli-codex"), "cli-pi": await processState("cli-pi") };
+    const threadsIn = (state: any) => (state?.workspace?.processes ?? []).map((p: any) => p.thread);
+    check("both turns completed", a.runs.at(-1)?.status === "completed" && b.runs.at(-1)?.status === "completed", { a: a.runs, b: b.runs });
+    check("each answered from its own Workspace", a.text.includes("/w/cli-codex") && b.text.includes("/w/cli-pi"), { a: a.text, b: b.text });
+    check("each thread's process lives in its own Workspace", threadsIn(states["cli-codex"]).includes(a.threadId) && threadsIn(states["cli-pi"]).includes(b.threadId) && !threadsIn(states["cli-codex"]).includes(b.threadId), states);
+    check("two provider sessions", a.providerSessions[0]?.id !== b.providerSessions[0]?.id, { a: a.providerSessions, b: b.providerSessions });
+    finish(arg("out") ?? "m5-f1-two-codex.json", { a, b, states });
+    break;
+  }
   default:
     console.error(`unknown scenario ${scenario}`);
     process.exit(2);
