@@ -18,7 +18,7 @@ import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { buildServerProvider, type ServerProviderPresentation } from "@t3tools/provider-core/server/snapshotProbe";
 import { haveProviderSnapshotSettingsChanged, makeProviderSnapshotSettingsSource } from "@t3tools/provider-core/server/snapshotSettings";
 import * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
-import { AcpProviderCapabilitiesV2, makeAcpAdapterV2, type AcpAdapterV2Flavor, type AcpAdapterV2RuntimeInput } from "@t3tools/provider-acp/server/adapter";
+import { AcpProviderCapabilitiesV2, makeAcpAdapterV2, type AcpAdapterV2Flavor, type AcpAdapterV2Options, type AcpAdapterV2RuntimeInput } from "@t3tools/provider-acp/server/adapter";
 import { ACP_SESSION_MODE_OPTION_ID } from "@t3tools/provider-acp/server/sessionConfig";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
@@ -199,6 +199,16 @@ const promptBuilder = (host: ProviderHost.ProviderHost["Service"], fileSystem: F
     );
 };
 
+/**
+ * The options t3's ACP adapter runs with here. Never `clientTerminals` (SPI-992 U39): with it the adapter would run the
+ * agent's terminal commands itself, in t3's process, outside the Workspace and around the push gateway's policy.
+ */
+export const acpAdapterOptions = (
+  instanceId: ProviderInstanceId,
+  flavor: AcpAdapterV2Flavor,
+  continuationRequests: AcpAdapterV2Options["continuationRequests"],
+): AcpAdapterV2Options => ({ instanceId, flavor, selfInvocation: SELF_INVOCATION, ...(continuationRequests === undefined ? {} : { continuationRequests }) });
+
 /** One instance of an ACP CLI driver (`ProviderDriver.create`'s body). */
 export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <Config extends { readonly enabled: boolean }>(
   spec: AcpCliDriverSpec,
@@ -236,12 +246,9 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
   const host = yield* ProviderHost.ProviderHost;
   const fileSystem = yield* FileSystem.FileSystem;
-  const adapter = yield* makeAcpAdapterV2({
-    instanceId,
-    flavor: acpFlavor(spec.cli, spec.driver, { buildPrompt: promptBuilder(host, fileSystem) }),
-    selfInvocation: SELF_INVOCATION,
-    continuationRequests,
-  }).pipe(Effect.provideService(McpProviderSessions.McpProviderSessions, noMcp));
+  const adapter = yield* makeAcpAdapterV2(
+    acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { buildPrompt: promptBuilder(host, fileSystem) }), continuationRequests),
+  ).pipe(Effect.provideService(McpProviderSessions.McpProviderSessions, noMcp));
   const sessions: CliSessions = new Map();
   return {
     instanceId,

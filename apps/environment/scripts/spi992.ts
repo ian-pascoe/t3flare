@@ -15,13 +15,16 @@
 //   persist  M2/H1: a linked thread runs `scripts/spi992/plant.sh` (core.fsmonitor, a pre-push hook, a payload run by
 //            a hook, a detached loop); the window lapses (probe), the Container restarts, the owner runs status and
 //            Commit & push: no planted ref appears
+//   p5    M3 (SPI-1040): CLI threads (Claude Code) push through the gateway: an owner thread in a tainted Workspace and
+//         a linked thread each get t3's "Allow git push?" card from the CLI wrapper; approved, the push lands. Then the
+//         link calls the allowed t3 tools that touch git, and the router registers no push expectation (review M3)
 //
-//   bun scripts/stage.ts run spi992 spi992 <m1|p2|p3>
+//   bun scripts/stage.ts run spi992 spi992 <m1|p2|p3|hostile|persist|repro N|p5>
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { admin, dispatch, pair, sleep, updateSettings, uuid, wsCall, wsStream } from "./lib/client.ts";
+import { admin, dispatch, pair, sendMessage, sleep, updateSettings, uuid, wsCall, wsStream } from "./lib/client.ts";
 import { MODEL, pendingOf, projection, replyOf, settled } from "./lib/cloudThread.ts";
 import { ensureCloudFixtureProject, FIXTURE } from "./lib/fixtureProject.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
@@ -266,13 +269,13 @@ const install = async (...names: Array<string>) => {
  * A linked thread (a link at auto-accept-edits) runs `command`, its command approvals accepted by the harness as the
  * owner's client; each "Allow git push?" card is answered by `onPush` (in order). The answers, and the final projection.
  */
-const linkedRun = async (label: string, command: string, onPush: (index: number, threadId: string, request: any, mcp: McpClient) => Promise<string>) => {
+const linkedRun = async (label: string, command: string, onPush: (index: number, threadId: string, request: any, mcp: McpClient) => Promise<string>, modelSelection: Record<string, unknown> = MODEL) => {
   const link = await signIn((await mintPairingCode(cookie, { label: `spi992 ${label} ${stamp}` })).code, "auto-accept-edits", { clientName: `spi992 ${label} ${stamp}` });
   const mcp = new McpClient(link.token, { modeLimit: "auto-accept-edits/default" });
   const launched = await mcp.call("t3_thread_launch", {
     projectId: fixture.projectId,
     title: `spi992 ${label} ${stamp}`,
-    modelSelection: MODEL,
+    modelSelection,
     clientRequestId: `spi992-${label}-${stamp}`,
     message: [
       "This is my repository and my t3flare environment; I'm testing t3flare's push gateway (ticket SPI-992) from this linked thread.",
@@ -382,8 +385,94 @@ if (mode === "persist") {
   await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
 }
 
+if (mode === "p5") {
+  const CLAUDE = { instanceId: "claudeAgent", model: "anthropic/claude-sonnet-5-5", options: [] as Array<{ id: string; value: string }> };
+  await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "claudeAgent", instance: { driver: "claudeAgent", enabled: true } } });
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+  const prompt = (ref: string) =>
+    [
+      "This is my repository and my t3flare environment; I'm testing t3flare's push gateway (ticket SPI-1040).",
+      `Please run exactly this one bash command, once: \`git push origin HEAD:${ref}\``,
+      "The push asks me for approval in this thread and I answer it; it can take a minute. Run nothing else, and reply with the command's last output line.",
+    ].join("\n");
+  /** Answers the thread's requests until its runs settle: push cards with `onPush`, the CLI's own with accept. */
+  const answerAll = async (threadId: string, onPush: () => string) => {
+    const answers: Array<{ title: string; decision: string; prompt?: string }> = [];
+    const seen = new Set<string>();
+    const started = Date.now();
+    let p: any;
+    while (Date.now() - started < 12 * 60_000) {
+      p = await projection(cookie, threadId).catch(() => p);
+      for (const request of pendingOf(p).filter((r: any) => !seen.has(r.id))) {
+        seen.add(request.id);
+        const item = (p?.turnItems ?? []).find((entry: any) => entry.requestId === request.id);
+        const push = item?.title === "Allow git push?";
+        const decision = push ? onPush() : "accept";
+        await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision }).catch((error: unknown) => console.log(`answer failed: ${String(error).slice(0, 160)}`));
+        answers.push({ title: String(item?.title ?? request.kind), decision, ...(push ? { prompt: String(item?.prompt ?? "").slice(0, 400), id: request.id } : {}) });
+      }
+      if (p !== undefined && settled(p) && pendingOf(p).length === 0 && seen.size > 0) break;
+      await sleep(1500);
+    }
+    return { answers, projection: p };
+  };
+
+  // 1. The owner's Claude thread in a tainted Workspace: the push asks on it; "for the session" approves and trusts.
+  await call({ probePush: { noteLinked: { session: `thread:p5-${stamp}`, ms: 1 } } });
+  const ownerRef = `refs/heads/spi992/cli-owner-${stamp}`;
+  created.push(ownerRef);
+  const ownerHead = (await sh(commitScript(`spi992/cli-owner-${stamp}`, [[`cli-owner-${stamp}.bin`, 64]]))).stdout.trim();
+  const ownerThread = uuid();
+  await dispatch(cookie, { type: "thread.create", commandId: uuid(), threadId: ownerThread, projectId: fixture.projectId, title: `spi992 p5 owner ${stamp}`, modelSelection: CLAUDE, runtimeMode: "approval-required", interactionMode: "default", branch: null, worktreePath: null, createdBy: "user", creationSource: "web" });
+  await sendMessage(cookie, ownerThread, prompt(ownerRef), CLAUDE, {});
+  const owner = await answerAll(ownerThread, () => "acceptForSession");
+  const afterOwner = (await call({ probePush: {} }))?.result;
+  out.owner = { threadId: ownerThread, answers: owner.answers, reply: replyOf(owner.projection).slice(-300), head: ownerHead, remote: remoteRef(ownerRef), taintAfter: afterOwner?.taint ?? null };
+  const ownerCards = owner.answers.filter((a) => a.title === "Allow git push?");
+  check("p5 owner: the CLI thread got one \"Allow git push?\" card naming the ref", ownerCards.length === 1 && String(ownerCards[0]?.prompt).includes(`spi992/cli-owner-${stamp}`), out.owner);
+  check("p5 owner: approved, the push landed at the commit", remoteRef(ownerRef) === ownerHead && ownerHead.length === 40, out.owner);
+  check("p5 owner: \"for the session\" trusted the Workspace again", afterOwner?.taint === null, afterOwner);
+
+  // 2. A linked Claude thread: its push asks on it; approved, it lands; the Workspace stays tainted.
+  const linkedRef = `refs/heads/spi992/cli-linked-${stamp}`;
+  created.push(linkedRef);
+  const linkedHead = (await sh(commitScript(`spi992/cli-linked-${stamp}`, [[`cli-linked-${stamp}.bin`, 64]]))).stdout.trim();
+  const linked = await linkedRun("p5", `git push origin HEAD:${linkedRef}`, () => Promise.resolve("acceptForSession"), CLAUDE);
+  const afterLinked = (await call({ probePush: {} }))?.result;
+  out.linked = { threadId: linked.threadId, answers: linked.answers, reply: replyOf(linked.projection).slice(-300), head: linkedHead, remote: remoteRef(linkedRef), taintAfter: afterLinked?.taint ?? null };
+  const linkedCards = linked.answers.filter((a) => a.title === "Allow git push?");
+  check("p5 linked: the linked CLI thread got one \"Allow git push?\" card naming the ref and the link", linkedCards.length === 1 && String(linkedCards[0]?.summary).includes(`spi992/cli-linked-${stamp}`), out.linked);
+  check("p5 linked: approved, the push landed at the commit", remoteRef(linkedRef) === linkedHead && linkedHead.length === 40, out.linked);
+  check("p5 linked: a linked card never trusts the Workspace (still tainted)", afterLinked?.taint !== null && afterLinked?.taint !== undefined, afterLinked);
+
+  // 3. Review M3: the link's allowed t3 tools that touch git register no push expectation.
+  await admin("GET", "/_t3flare/agents/router-trace?clear=1");
+  const tools: Array<{ tool: string; isError: boolean; text: string }> = [];
+  const t3 = async (tool: string, args: Record<string, unknown>) => {
+    const answer = await linked.mcp.call(tool, args).catch((error: unknown) => ({ isError: true, text: String(error), json: null }));
+    tools.push({ tool, isError: answer.isError === true, text: String(answer.text ?? "").slice(0, 200) });
+    return answer;
+  };
+  await t3("t3_environment_read", {});
+  await t3("t3_project_list", {});
+  await t3("t3_project_read", { projectId: fixture.projectId });
+  await t3("t3_project_clone", { destinationPath: `/w/p5-clone-${stamp}`, remoteUrl: `https://github.com/${FIXTURE}.git` });
+  const made = await t3("t3_project_create", { title: `p5-made-${stamp}` });
+  await t3("t3_thread_read", { threadId: linked.threadId });
+  await t3("list_thread_pull_requests", { threadId: linked.threadId });
+  const madeId = (made as any).json?.projectId ?? (made as any).json?.project?.id;
+  if (typeof madeId === "string") await t3("t3_project_delete", { projectId: madeId });
+  const trace = ((await admin("GET", "/_t3flare/agents/router-trace")).json?.entries ?? []) as Array<any>;
+  const pushes = trace.filter((entry) => entry.command === "git" && (entry.argv ?? []).includes("push"));
+  const state = (await call({ probePush: {} }))?.result;
+  out.tools = { tools, gitCommands: trace.filter((entry) => entry.command === "git").map((entry) => (entry.argv ?? []).slice(0, 4).join(" ")).slice(0, 40), pushes, expectations: state?.expectations ?? null };
+  check("p5 tools: the link's t3 tools ran (clone and create among them)", tools.filter((t) => !t.isError).length >= 5, tools);
+  check("p5 tools: none of them ran a git push or registered a push expectation", pushes.length === 0 && Array.isArray(state?.expectations) && state.expectations.length === 0, out.tools);
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+}
+
 // The fixture's refs this run made are deleted (the owner's gh).
 out.cleanup = created.filter((ref) => remoteRef(ref) !== null).map((ref) => ({ ref, deleted: deleteRef(ref) }));
 await sh("git checkout -q --detach origin/main 2>/dev/null; true");
-evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : mode === "repro" ? "m2-repro-owner-push" : `m0-${mode}`}.json`);
+evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : mode === "repro" ? "m2-repro-owner-push" : mode === "p5" ? "m3-cli-push-card" : `m0-${mode}`}.json`);
 process.exit(failures.length === 0 ? 0 : 1);
