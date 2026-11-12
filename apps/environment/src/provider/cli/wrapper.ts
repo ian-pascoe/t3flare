@@ -224,8 +224,13 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               prompt: `${push.summary}\n\n${push.detail}`,
               ...(push.options.length === 0 ? {} : { options: push.options }),
             };
-            cards.set(id, { runtimeRequest, node, turnItem, answer: resolve });
-            signal.addEventListener("abort", () => offer(closeCard(id, null, { approved: false, reason: "withdrawn" })), { once: true });
+            const onAbort = () => offer(closeCard(id, null, { approved: false, reason: "withdrawn" }));
+            const answer = (value: CliPushAnswer) => {
+              signal.removeEventListener("abort", onAbort);
+              resolve(value);
+            };
+            cards.set(id, { runtimeRequest, node, turnItem, answer });
+            signal.addEventListener("abort", onAbort, { once: true });
             offer([
               { type: "runtime_request.updated", driver: adapter.driver, threadId: turn.threadId, runtimeRequest },
               { type: "node.updated", driver: adapter.driver, node },
