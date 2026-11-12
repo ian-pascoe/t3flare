@@ -22,11 +22,28 @@
   },
   "leak": {
     "how": "POST /_t3flare/check/leak?id=<workspace> (4a's scan: DO files, Container files, /proc environ and cmdline) after each smoke",
-    "acp-claude": { "do": [], "containerHits": [], "files": 591 },
-    "acp-opencode": { "do": [], "containerHits": [], "files": 593 }
+    "acp-claude": {
+      "do": [],
+      "containerHits": [],
+      "files": 591
+    },
+    "acp-opencode": {
+      "do": [],
+      "containerHits": [],
+      "files": 593
+    }
   },
   "findings": [
     "The admin routes are not counted as requests in flight: a check longer than the idle window (60 s) was cut by the idle reset; acp-check now counts itself",
     "Each Stream.run into a channel handle's stdin sink ends stdin when endOnDone is left true: the harness keeps one stream for the process's life, as t3's ACP client does"
-  ]
+  ],
+  "freeDisk": {
+    "how": "df in Workspace acp-claude's Container on step4b (review F10's P7 item)",
+    "root": "12 GB, 1.5 GB used, 9.7 GB free",
+    "workspace": "/workspace (fuse) 4.0 GB",
+    "installs": {
+      "/opt/t3flare/claude": "402 MB",
+      "/opt/t3flare/opencode": "247 MB"
+    }
+  }
 }
