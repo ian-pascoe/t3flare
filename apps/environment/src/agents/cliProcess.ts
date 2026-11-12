@@ -15,7 +15,7 @@ import { environmentServices } from "./bindings.ts";
 import { traceProtocol } from "./processRouter.ts";
 import { type ChannelProcess, type ChannelStart, ProcessRefused } from "./processChannel.ts";
 import { type CliName, profileLaunch } from "./cliProfiles.ts";
-import { CliSpawn } from "../provider/cli/wrapper.ts";
+import { CliSpawn, newToolHandle } from "../provider/cli/wrapper.ts";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import * as StateStore from "../platform/stateStore.ts";
 
@@ -85,6 +85,8 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     // The opening session (the wrapper's), when t3's adapter spawns inside `openSession`.
     const session = yield* CliSpawn;
     if (services.modelProxy === undefined && name !== "t3flare-probe") return yield* refused(name, "this Environment has no model proxy");
+    // ADR-0028: the process's tool handle (the session's, so t3's MCP config can name it too; SPI-1039).
+    const toolHandle = session?.toolHandle ?? newToolHandle();
     const launch = profileLaunch(
       {
         cli: cliOf(name),
@@ -102,6 +104,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
           return entry !== undefined && entry.kind === "file" ? new TextDecoder().decode(StateStore.readFile(path)) : undefined;
         },
         piExtensionSource: PI_T3_MCP_EXTENSION_SOURCE,
+        relay: { handle: toolHandle, servers: services.relayServers(session?.linked === true) },
       },
     );
     if ("refused" in launch) {
@@ -120,6 +123,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       ...(launch.prune === undefined ? {} : { prune: launch.prune }),
       ...(session !== undefined ? { thread: session.thread } : launch.thread === undefined ? {} : { thread: launch.thread }),
       ...(session?.linked === true ? { linked: true } : {}),
+      toolHandle,
     };
     const process = yield* Effect.acquireRelease(
       Effect.tryPromise({

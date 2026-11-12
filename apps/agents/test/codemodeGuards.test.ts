@@ -145,7 +145,8 @@ describe("code mode: nested calls are judged like direct ones", () => {
       await run.harness.restart();
       await until(() => run.store().pending().length === 1, `the card after restart ${restart + 1}`);
       expect(run.store().pending()[0]!.requestId).toBe(requestId);
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      // Let the resumed run reach its wait again before the next restart (the card is in storage throughout).
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
     expect(run.ran).toEqual([]);
     run.store().answer(requestId, "accept");

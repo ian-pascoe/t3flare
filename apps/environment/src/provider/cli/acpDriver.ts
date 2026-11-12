@@ -48,7 +48,10 @@ import {
   guardSlots,
   PINNED_MODE,
 } from "./acpFlavor.ts";
-import { type CliSessions, wrapCliAdapter } from "./wrapper.ts";
+import { relayedMcp } from "./relayedMcp.ts";
+import { CliSpawn, type CliSessions, wrapCliAdapter } from "./wrapper.ts";
+import { relayUrl } from "../../agents/cliProfiles.ts";
+import { T3_RELAY_SERVER } from "@t3flare/harness-registry";
 
 export type AcpCliDriverEnv =
   | ChildProcessSpawner.ChildProcessSpawner
@@ -99,9 +102,21 @@ const spawnRuntime = (cli: AcpCli) => (input: AcpAdapterV2RuntimeInput) =>
     // t3's environment, MCP servers and policy are not passed on: the profile decides the environment (4a §4.6), OD-3
     // withholds MCP, and the flavor applies the policy.
     const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...options } = input;
+    // ADR-0028: the MCP relay's servers, with this session's process's tool handle (per process, review H2), on every
+    // session/new, load, resume and fork; t3's own (none here) are replaced.
+    const session = yield* CliSpawn;
+    // t3's own (SPI-1039) under t3's name, `t3-code`, so t3's tool presentation knows its calls.
+    const relayServers: ReadonlyArray<EffectAcpSchema.McpServer> =
+      session === undefined
+        ? []
+        : [...environmentServices().relayServers(session.linked).map((name) => [name, name] as const), ["t3-code", T3_RELAY_SERVER] as const].map(
+            ([name, path]) => ({ type: "http" as const, name, url: relayUrl(path), headers: [{ name: "Authorization", value: `Bearer ${session.toolHandle}` }] }) as EffectAcpSchema.McpServer,
+          );
+    const relayActivation = { mcpServers: relayServers, acpMcpServers: [], httpMcpServers: relayServers };
     const context = yield* Layer.build(
       AcpSessionRuntime.layer({
         ...options,
+        ...relayActivation,
         // The session lifecycle in the log (method and outcome, never a payload): review F8's resume proof is a
         // `session/load` or `session/resume` that succeeded.
         requestLogger: (event) =>
@@ -120,7 +135,14 @@ const spawnRuntime = (cli: AcpCli) => (input: AcpAdapterV2RuntimeInput) =>
         authenticateOnAuthRequired: false,
       }),
     );
-    return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
+    const runtime = yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
+    if (relayServers.length === 0) return runtime;
+    return {
+      ...runtime,
+      loadSession: (sessionId, activation) => runtime.loadSession(sessionId, { ...activation, ...relayActivation }),
+      resumeSession: (sessionId, activation) => runtime.resumeSession(sessionId, { ...activation, ...relayActivation }),
+      forkSession: (sessionId, activation, meta) => runtime.forkSession(sessionId, { ...activation, ...relayActivation }, meta),
+    } satisfies typeof runtime;
   });
 
 export interface AcpCliDriverSpec {
@@ -241,15 +263,16 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   }).pipe(Effect.orDie);
   yield* Effect.forkScoped(snapshot.refresh);
   const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
-  // OD-3: t3's per-thread MCP credential never reaches a CLI (ADR-0022): the adapter reads none.
-  const noMcp = McpProviderSessions.McpProviderSessions.of({ ...realMcpSessions, read: () => Effect.void.pipe(Effect.as(undefined)) });
+  const sessions: CliSessions = new Map();
+  // SPI-1039: t3's credential is read for the relay only (relayedMcp.ts); the session's servers are the relay's
+  // (spawnRuntime), so t3's own entry never reaches the agent with t3's bearer (ADR-0022, ADR-0028).
+  const relayed = relayedMcp(realMcpSessions, sessions);
   const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
   const host = yield* ProviderHost.ProviderHost;
   const fileSystem = yield* FileSystem.FileSystem;
   const adapter = yield* makeAcpAdapterV2(
     acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { buildPrompt: promptBuilder(host, fileSystem) }), continuationRequests),
-  ).pipe(Effect.provideService(McpProviderSessions.McpProviderSessions, noMcp));
-  const sessions: CliSessions = new Map();
+  ).pipe(Effect.provideService(McpProviderSessions.McpProviderSessions, relayed));
   return {
     instanceId,
     driverKind: spec.driver,

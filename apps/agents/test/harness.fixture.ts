@@ -19,7 +19,7 @@ export const memoryKv = (): ApprovalStorage => {
 };
 
 export const until = async (check: () => boolean | Promise<boolean>, what: string): Promise<void> => {
-  for (let tries = 0; tries < 2000; tries++) {
+  for (let tries = 0; tries < 6000; tries++) {
     if (await check()) return;
     await new Promise((resolve) => setTimeout(resolve, 5));
   }

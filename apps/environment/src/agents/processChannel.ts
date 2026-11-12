@@ -283,6 +283,8 @@ export interface ChannelStart {
   readonly prune?: ProcessStartInput["prune"];
   readonly thread?: string;
   readonly linked?: boolean;
+  /** The process's tool handle for the MCP relay (ADR-0028). */
+  readonly toolHandle?: string;
   /** Made by the caller when it needs the key before the start (the profile's per-process home). */
   readonly key?: string;
 }
@@ -340,6 +342,7 @@ export class ProcessChannel {
         ...(input.prune === undefined ? {} : { prune: input.prune }),
         ...(input.thread === undefined ? {} : { thread: input.thread }),
         ...(input.linked === true ? { linked: true } : {}),
+        ...(input.toolHandle === undefined ? {} : { toolHandle: input.toolHandle }),
       });
     } catch (error) {
       process.finish(129);

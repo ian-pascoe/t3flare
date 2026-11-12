@@ -57,7 +57,7 @@ export interface ByteBudgetApi {
 }
 
 export class ByteBudget extends Context.Service<ByteBudget, ByteBudgetApi>()(
-  "@cloudpid/mcp-worker/budget/ByteBudget",
+  "@t3flare/mcp-worker/engine/budget/ByteBudget",
 ) {
   /** The isolate's budget: the 8 MiB pool and the one large slot. */
   static readonly layer = Layer.sync(ByteBudget, () => makeBudget());

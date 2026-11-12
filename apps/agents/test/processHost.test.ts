@@ -310,3 +310,23 @@ describe("ProcessHost", () => {
     expect(answer).toMatchObject({ ok: false });
   });
 });
+
+describe("tool handles (ADR-0028)", () => {
+  const HANDLE = "c".repeat(64);
+  it("resolve to their live process's thread and link, and are revoked when it exits", async () => {
+    const h = harness();
+    await h.host.start(start("proc-a", { toolHandle: HANDLE, linked: true }));
+    expect(h.host.toolCaller(HANDLE)).toEqual({ key: "proc-a", cli: "codex", thread: "thread-1", linked: true });
+    expect(h.host.toolCaller("d".repeat(64))).toBeNull();
+    expect(h.host.toolCaller(null)).toBeNull();
+    h.procs[0]!.exit(0);
+    await tick();
+    expect(h.host.toolCaller(HANDLE)).toBeNull();
+  });
+
+  it("ignore a malformed handle", async () => {
+    const h = harness();
+    await h.host.start(start("proc-a", { toolHandle: "short" }));
+    expect(h.host.toolCaller("short")).toBeNull();
+  });
+});

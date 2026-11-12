@@ -3,6 +3,7 @@
 // its only model provider with the key helper, and a home built fresh on the Container's own disk with only its session
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
+import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
 import { HARNESS_ROOT } from "@t3flare/workspace-client";
 
 import { acpProfileLaunch } from "./acpProfiles.ts";
@@ -42,7 +43,15 @@ export interface ProfileContext {
   readonly readStateFile: (path: string) => string | undefined;
   /** t3's own extension source: a copy is accepted only when it is exactly this (plan §5.2). */
   readonly piExtensionSource: string;
+  /**
+   * The MCP relay's entries for this process (ADR-0028): its tool handle and the servers it gets. The handle goes only
+   * into this process's environment (review H2: never a Container-wide file).
+   */
+  readonly relay?: { readonly handle: string; readonly servers: ReadonlyArray<string> };
 }
+
+/** The relay's URL for `server` as the Container reaches it. */
+export const relayUrl = (server: string): string => `http://computer.internal${MCP_RELAY_PREFIX}${server}`;
 
 export interface Launch {
   readonly argv: ReadonlyArray<string>;
@@ -65,6 +74,17 @@ const READ_ENV = new Set(["T3CODE_THREAD_ID", "T3_PI_RUNTIME_MODE", "T3_PI_MCP_E
 const dropped = (env: LaunchInput["env"]): ReadonlyArray<string> => Object.keys(env).filter((key) => env[key] !== undefined && !READ_ENV.has(key));
 
 const tomlString = (value: string) => JSON.stringify(value);
+
+/**
+ * Codex's MCP relay entries (ADR-0028, plan §3.2): one server per relayed source, the handle from the process's
+ * environment, Codex's own approval off for them (the relay decides and asks on the thread), timeouts above the
+ * relay's 10-minute hold (review M11).
+ */
+export const codexRelayOverrides = (servers: ReadonlyArray<string>): ReadonlyArray<string> =>
+  servers.map(
+    (server) =>
+      `mcp_servers.${server}={url=${tomlString(relayUrl(server))},bearer_token_env_var=${tomlString(TOOL_HANDLE_ENV)},default_tools_approval_mode="approve",tool_timeout_sec=${CLI_TOOL_TIMEOUT_SEC},startup_timeout_sec=20}`,
+  );
 
 /** Codex's `-c` overrides (plan §4.3; M0: P3, P10, P11). Each value is TOML. */
 export const codexOverrides = (proxyUrl: string, key: string): ReadonlyArray<string> => {
@@ -98,7 +118,7 @@ export const codexOverrides = (proxyUrl: string, key: string): ReadonlyArray<str
     "features.multi_agent=false",
     "analytics.enabled=false",
     // Review F4: the nonce stays out of Codex's shells; the marker stays in them (part 2's kill script).
-    `shell_environment_policy.exclude=[${tomlString(NONCE_ENV)}]`,
+    `shell_environment_policy.exclude=[${tomlString(NONCE_ENV)},${tomlString(TOOL_HANDLE_ENV)}]`,
     `shell_environment_policy.set.T3FLARE_EXEC=${tomlString(key)}`,
   ];
 };
@@ -107,9 +127,10 @@ const codexLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer 
   if (input.args.length !== 1 || input.args[0] !== "app-server") return { refused: `Codex runs here only as \`codex app-server\` (not \`codex ${input.args.join(" ")}\`)` };
   const home = homeOf(input.key);
   const thread = input.env.T3CODE_THREAD_ID;
+  const relay = context.relay;
   return {
-    argv: [`${CLI_BIN}/codex`, "app-server", ...codexOverrides(context.proxyUrl, input.key).flatMap((value) => ["-c", value])],
-    env: { HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: `${home}/codex`, CODEX_SQLITE_HOME: `${home}/sqlite` },
+    argv: [`${CLI_BIN}/codex`, "app-server", ...[...codexOverrides(context.proxyUrl, input.key), ...codexRelayOverrides(relay?.servers ?? [])].flatMap((value) => ["-c", value])],
+    env: { HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: `${home}/codex`, CODEX_SQLITE_HOME: `${home}/sqlite`, ...(relay === undefined ? {} : { [TOOL_HANDLE_ENV]: relay.handle }) },
     files: [{ path: `${home}/codex/config.toml`, text: "# t3flare: every setting comes from the command line (-c)\n" }],
     links: [{ path: `${home}/codex/sessions`, target: CODEX_SESSIONS }],
     ...(thread === undefined ? {} : { thread }),

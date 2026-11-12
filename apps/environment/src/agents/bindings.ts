@@ -26,6 +26,8 @@ export interface EnvironmentServices {
   readonly processes: ProcessChannel;
   /** Test stages: stage-only probes and faults answer. */
   readonly faults: boolean;
+  /** The MCP servers a CLI process gets relay entries for (ADR-0028), at its spawn; a linked thread's are M13's. */
+  readonly relayServers: (linked: boolean) => ReadonlyArray<string>;
 }
 
 let current: EnvironmentServices | undefined;

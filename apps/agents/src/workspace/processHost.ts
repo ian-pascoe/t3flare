@@ -108,6 +108,16 @@ interface Proc {
   turnEndedAt: number;
   exited: boolean;
   killing: boolean;
+  /** The process's tool handle (ADR-0028), in memory only: gone with the process or this object. */
+  readonly toolHandle: string | undefined;
+}
+
+/** Who a tool handle speaks for: a live CLI process of this Workspace. */
+export interface ToolCaller {
+  readonly key: string;
+  readonly cli: string;
+  readonly thread: string | null;
+  readonly linked: boolean;
 }
 
 const encoder = new TextEncoder();
@@ -146,6 +156,16 @@ export class ProcessHost {
 
   keys(): ReadonlyArray<string> {
     return [...this.#procs.keys()];
+  }
+
+  /** The live process `handle` was issued to, or null (unknown, or its process exited: revoked with it). */
+  toolCaller(handle: string | null): ToolCaller | null {
+    if (handle === null || handle.length < 32) return null;
+    for (const proc of this.#procs.values()) {
+      if (proc.exited || proc.toolHandle === undefined || proc.toolHandle !== handle) continue;
+      return { key: proc.key, cli: proc.cli, thread: proc.marker.thread ?? null, linked: proc.marker.linked === true };
+    }
+    return null;
   }
 
   /** Diagnosis: each live process, its turn state and how long it has been quiet. */
@@ -239,6 +259,7 @@ export class ProcessHost {
       turnEndedAt: now,
       exited: false,
       killing: false,
+      toolHandle: input.toolHandle !== undefined && /^[0-9a-f]{64}$/.test(input.toolHandle) ? input.toolHandle : undefined,
     };
     this.#procs.set(input.key, proc);
     this.#save();

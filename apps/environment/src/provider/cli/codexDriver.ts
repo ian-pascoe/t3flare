@@ -32,6 +32,7 @@ import { environmentServices } from "../../agents/bindings.ts";
 import { traceProtocol } from "../../agents/processRouter.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
+import { relayedMcp } from "./relayedMcp.ts";
 import { type CliSession, type CliSessions, sessionFor, wrapCliAdapter } from "./wrapper.ts";
 
 export const CODEX_DRIVER = ProviderDriverKind.make("codex");
@@ -161,9 +162,9 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
     yield* Effect.forkScoped(snapshot.refresh);
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
-    // OD-3: t3's per-thread MCP credential never reaches a CLI (ADR-0022): the adapter reads none.
-    const noMcp = McpProviderSessions.McpProviderSessions.of({ ...realMcpSessions, read: () => Effect.void.pipe(Effect.as(undefined)) });
     const sessions: CliSessions = new Map();
+    // SPI-1039: t3's tools through the relay; t3's per-thread credential never reaches a CLI (ADR-0022, ADR-0028).
+    const relayed = relayedMcp(realMcpSessions, sessions);
     // binaryPath, homePath and launchArgs are not used: the image's binary and the CLI profile decide (plan §3).
     const settings = { ...config, enabled, setupMode: "existing" as const, binaryPath: "codex", homePath: "", launchArgs: "" } satisfies CodexSettings;
     const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
@@ -177,7 +178,7 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       idAllocator: yield* IdAllocator.IdAllocatorV2,
       serverConfig: yield* ServerConfig,
       continuationRequests,
-    }).pipe(Effect.provideService(McpProviderSessions.McpProviderSessions, noMcp));
+    }).pipe(Effect.provideService(McpProviderSessions.McpProviderSessions, relayed));
     return {
       instanceId,
       driverKind: CODEX_DRIVER,

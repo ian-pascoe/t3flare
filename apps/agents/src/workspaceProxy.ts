@@ -7,10 +7,13 @@
 // - the push gateway (`GATEWAY_PREFIX`, SPI-992): the Container's `git push` (rerouted by `pushInsteadOf` in the image's
 //   system gitconfig), forwarded to GitHub with the write token after the Workspace DO's policy allowed its exact ref
 //   updates. The request body streams through this Worker; it never goes through the DO.
+// - the CLI agents' MCP relay (`/t3flare/mcp/<server>`, ADR-0028): one MCP message per request, with the process's
+//   tool handle, to the Workspace DO and on to the Environment DO.
 //
 // Addressed as computer's proxy addresses its host.
 import { WorkspaceProxy as ComputerWorkspaceProxy } from "@cloudflare/computer";
 
+import { handleRelayRequest, isRelayPath } from "./workspace/mcpRelay.ts";
 import { GATEWAY_PREFIX, handleGitRequest } from "./workspace/pushGateway.ts";
 import { CREDENTIAL_PATH, MODEL_KEY_PATH, type WorkspaceDO } from "./workspace/WorkspaceDO.ts";
 
@@ -24,13 +27,26 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
   override async fetch(request: Request): Promise<Response> {
     const pathname = new URL(request.url).pathname;
     const gateway = pathname.startsWith(GATEWAY_PREFIX);
-    if (pathname !== CREDENTIAL_PATH && pathname !== MODEL_KEY_PATH && !gateway) return super.fetch(request);
+    const relay = isRelayPath(pathname);
+    if (pathname !== CREDENTIAL_PATH && pathname !== MODEL_KEY_PATH && !gateway && !relay) return super.fetch(request);
     const { binding, id, name } = (this.ctx as unknown as { props: ProxyProps }).props;
     const namespace = (this.env as Record<string, DurableObjectNamespace | undefined>)[binding];
     if (namespace === undefined) return new Response("", { status: 500 });
     const named = name === undefined || name === "" ? undefined : namespace.idFromName(name);
     const target = named !== undefined && named.toString() === id ? named : namespace.idFromString(id);
     const workspace = namespace.get(target);
+    if (relay) {
+      // SAFETY: the Workspace DO answers `mcpRelay` and `cancelMcpAsk` (WorkspaceDO.ts).
+      const rpc = workspace as unknown as Pick<WorkspaceDO, "mcpRelay" | "cancelMcpAsk">;
+      return handleRelayRequest(request, {
+        relay: (input) => rpc.mcpRelay(input),
+        cancel: (askId) => void rpc.cancelMcpAsk({ askId }).catch(() => undefined),
+        newId: () => crypto.randomUUID(),
+      }).catch((error: unknown) => {
+        console.warn(JSON.stringify({ t3flare: "mcp-relay-failed", error: String(error).slice(0, 300) }));
+        return new Response("t3flare: the MCP relay failed\n", { status: 502 });
+      });
+    }
     if (gateway) {
       // SAFETY: the Workspace DO answers `pushTarget` and `authorizePush` (WorkspaceDO.ts).
       const rpc = workspace as unknown as Pick<WorkspaceDO, "pushTarget" | "authorizePush" | "cancelPushAsk">;

@@ -131,3 +131,59 @@ export const defaultCommissary = (): McpServerSetting => ({ kind: "commissary", 
 /** Most tools taken from one server, and most bytes of their schemas (review M12). */
 export const MAX_TOOLS_PER_SERVER = 200;
 export const MAX_SCHEMA_BYTES = 256 * 1024;
+
+/** The CLI relay's path prefix in the Container (`computer.internal/t3flare/mcp/<server>`, ADR-0028). */
+export const MCP_RELAY_PREFIX = "/t3flare/mcp/";
+
+/** The relay's own server for t3's tools (SPI-1039). */
+export const T3_RELAY_SERVER = "t3";
+
+/** CLI MCP timeouts (review M11): above a 10-minute approval hold plus a 270 s call. */
+export const CLI_TOOL_TIMEOUT_SEC = 900;
+
+/** The variable a CLI process reads its tool handle from (Codex's `bearer_token_env_var`). */
+export const TOOL_HANDLE_ENV = "T3FLARE_TOOL_HANDLE";
+
+/** A CLI process's MCP message, as the Workspace DO passes it to the Environment DO (the caller from the handle). */
+export interface McpRelayInput {
+  readonly workspace: string;
+  readonly thread: string;
+  readonly cli: string;
+  /** The process's thread came through a peer link. */
+  readonly linked: boolean;
+  /** The Workspace carries SPI-992's taint (review H1): the caller is treated as linked. */
+  readonly tainted: boolean;
+  /** The threads of the Workspace's live CLI processes (review M7: the strictest mode among them decides). */
+  readonly threads: ReadonlyArray<string>;
+  readonly server: string;
+  /** One JSON-RPC message (a request or a notification). */
+  readonly message: unknown;
+  /** Withdraws the call's card when the CLI goes away (`cancelPush`). */
+  readonly askId: string;
+}
+
+/** The relay's answer: a JSON-RPC response, nothing (a notification: 202), or a refusal before MCP (HTTP status). */
+export type McpRelayAnswer = { readonly kind: "response"; readonly body: unknown } | { readonly kind: "accepted" } | { readonly kind: "refused"; readonly status: 401 | 403 | 404; readonly message: string };
+
+/** How strict a thread's mode is for `decideCall` (review M7): the strictest of several wins. */
+const MODE_RANK: Readonly<Record<string, number>> = { "full-access": 0, "auto-accept-edits": 1, "approval-required": 2 };
+
+/**
+ * The strictest of several threads' modes (review M7): a handle taken from a full-access thread is judged as the
+ * Workspace's strictest live thread would be. Unknown modes count as the strictest; plan wins over everything.
+ */
+export const strictestMode = (modes: ReadonlyArray<{ readonly runtimeMode: string | undefined; readonly interactionMode: string | undefined }>): { readonly mode: RuntimeModeName; readonly interaction: string } => {
+  if (modes.length === 0) return { mode: "approval-required", interaction: "default" };
+  let rank = -1;
+  let mode: RuntimeModeName = "full-access";
+  let plan = false;
+  for (const entry of modes) {
+    if (entry.interactionMode === "plan") plan = true;
+    const r = entry.runtimeMode === undefined ? 3 : (MODE_RANK[entry.runtimeMode] ?? 3);
+    if (r > rank) {
+      rank = r;
+      mode = r === 3 ? "approval-required" : (entry.runtimeMode as RuntimeModeName);
+    }
+  }
+  return { mode, interaction: plan ? "plan" : "default" };
+};

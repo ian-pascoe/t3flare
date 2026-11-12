@@ -51,7 +51,7 @@ export interface ValidatorsApi {
 }
 
 export class Validators extends Context.Service<Validators, ValidatorsApi>()(
-  "@cloudpid/mcp-worker/validators",
+  "@t3flare/mcp-worker/engine/validators",
 ) {
   static readonly layer = Layer.sync(Validators, () => makeValidators());
 }

@@ -2,7 +2,7 @@
 // thread's modes and whether it is linked; `classOf`, a tool's class pinned by its definition hash; tool names.
 import { describe, expect, it } from "vitest";
 
-import { classOf, decideCall, mcpToolName, toolNamesOf } from "./mcp.ts";
+import { classOf, decideCall, mcpToolName, strictestMode, toolNamesOf } from "./mcp.ts";
 
 describe("decideCall", () => {
   const owner = { linked: false, accepted: false, interaction: "default" } as const;
@@ -59,5 +59,15 @@ describe("tool names", () => {
     const named = toolNamesOf("fixture", ["a.b", "a_b", "ok", "x".repeat(60)]);
     expect(named.names).toEqual({ ok: "mcp__fixture__ok" });
     expect(named.refused.map((r) => r.tool).sort()).toEqual(["a.b", "a_b", "x".repeat(60)].sort());
+  });
+});
+
+describe("strictestMode (review M7)", () => {
+  it("takes the strictest runtime mode, plan over everything, unknown as approval-required", () => {
+    expect(strictestMode([{ runtimeMode: "full-access", interactionMode: "default" }])).toEqual({ mode: "full-access", interaction: "default" });
+    expect(strictestMode([{ runtimeMode: "full-access", interactionMode: "default" }, { runtimeMode: "auto-accept-edits", interactionMode: "default" }])).toEqual({ mode: "auto-accept-edits", interaction: "default" });
+    expect(strictestMode([{ runtimeMode: "full-access", interactionMode: "default" }, { runtimeMode: "auto", interactionMode: "default" }])).toEqual({ mode: "approval-required", interaction: "default" });
+    expect(strictestMode([{ runtimeMode: "full-access", interactionMode: "plan" }, { runtimeMode: "full-access", interactionMode: "default" }])).toEqual({ mode: "full-access", interaction: "plan" });
+    expect(strictestMode([])).toEqual({ mode: "approval-required", interaction: "default" });
   });
 });

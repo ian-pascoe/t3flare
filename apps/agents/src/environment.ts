@@ -5,7 +5,7 @@ import { ENVIRONMENT_NAME } from "@t3flare/session-protocol";
 
 import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
-import type { ResolvedHarness } from "@t3flare/harness-registry";
+import type { McpRelayAnswer, McpRelayInput, ResolvedHarness } from "@t3flare/harness-registry";
 import type { McpCallAnswer, McpView } from "./extensions/mcp.ts";
 
 export interface EnvironmentRpc {
@@ -41,6 +41,8 @@ export interface EnvironmentRpc {
     readonly linked: boolean;
     readonly judged: "read" | "write";
   }): Promise<McpCallAnswer>;
+  /** A CLI process's MCP message through the relay (ADR-0028), its caller resolved by the Workspace DO. */
+  mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer>;
 }
 
 export const environmentStub = (namespace: DurableObjectNamespace): EnvironmentRpc =>

@@ -268,6 +268,11 @@ export interface ProcessStartInput {
   readonly thread?: string;
   /** The thread came through a peer link: its pushes ask, while the process lives (review F8). */
   readonly linked?: boolean;
+  /**
+   * The process's tool handle (ADR-0028): what the CLI sends the MCP relay (`/t3flare/mcp/*`) as its bearer. Kept only
+   * while the process lives; never logged.
+   */
+  readonly toolHandle?: string;
 }
 
 /** Every answer names the Workspace DO's boot counter: another value means the processes it held are gone. */

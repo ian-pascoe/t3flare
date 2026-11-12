@@ -56,7 +56,12 @@ export interface CliSession {
   readonly workspace: string | null;
   turnActive: boolean;
   capFiber: Fiber.Fiber<void> | undefined;
+  /** The session's process's tool handle for the MCP relay (ADR-0028): 256 random bits, never logged. */
+  readonly toolHandle: string;
 }
+
+/** A new tool handle (ADR-0028): 32 random bytes, hex. */
+export const newToolHandle = (): string => [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 /** Sessions of one driver instance, by provider session id: shared by its client factory and its wrapper. */
 export type CliSessions = Map<string, CliSession>;
@@ -70,7 +75,7 @@ export const CliSpawn = Context.Reference<CliSession | undefined>("t3flare/CliSp
 export const sessionFor = (sessions: CliSessions, providerSessionId: string, cwd: string | null, thread: string, linkedOf: (thread: string) => boolean = (id) => linkedWorkOf(id) !== null): CliSession => {
   let session = sessions.get(providerSessionId);
   if (session === undefined) {
-    session = { thread, linked: linkedOf(thread), process: undefined, runtimeMode: undefined, interactionMode: undefined, workspace: cwd === null ? null : (toWorkspace(cwd)?.id ?? null), turnActive: false, capFiber: undefined };
+    session = { thread, linked: linkedOf(thread), process: undefined, runtimeMode: undefined, interactionMode: undefined, workspace: cwd === null ? null : (toWorkspace(cwd)?.id ?? null), turnActive: false, capFiber: undefined, toolHandle: newToolHandle() };
     sessions.set(providerSessionId, session);
   }
   return session;
@@ -180,7 +185,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               nodeId,
               providerTurnId: turn.providerTurnId,
               nativeRequestRef: nativeItemRef,
-              kind: "command",
+              kind: push.requestKind ?? "command",
               status: "pending",
               responseCapability: { type: "live", providerSessionId: input.providerSessionId, supportsFeedback: false },
               createdAt: now,
@@ -214,13 +219,13 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               parentItemId: null,
               ordinal: turn.ordinal,
               status: "waiting",
-              title: "Allow git push?",
+              title: push.title ?? "Allow git push?",
               startedAt: now,
               completedAt: null,
               updatedAt: now,
               type: "approval_request",
               requestId: id,
-              requestKind: "command",
+              requestKind: push.requestKind ?? "command",
               prompt: `${push.summary}\n\n${push.detail}`,
               ...(push.options.length === 0 ? {} : { options: push.options }),
             };
@@ -237,7 +242,11 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               { type: "turn_item.updated", driver: adapter.driver, turnItem },
             ]);
           });
-        const unregister = registerCliPushAsker(session.thread, { linked: session.linked, ask });
+        const unregister = registerCliPushAsker(session.thread, {
+          linked: session.linked,
+          ask,
+          state: () => ({ runtimeMode: session.runtimeMode, interactionMode: session.interactionMode, workspace: session.workspace }),
+        });
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => {
             unregister();

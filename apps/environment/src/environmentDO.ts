@@ -11,7 +11,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
-import { resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
+import { type McpRelayAnswer, type McpRelayInput, resolveHarness, T3_RELAY_SERVER, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
@@ -193,6 +193,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       marks: { has: (key) => ctx.storage.kv.get(key) !== undefined, set: (key) => ctx.storage.kv.put(key, Date.now()) },
       processes: this.#processes,
       faults: env.T3FLARE_FAULTS === "1",
+      relayServers: (linked) =>
+        Object.entries(this.mcpHost.servers())
+          .filter(([, server]) => server.enabled && (!linked || server.linkedOffered))
+          .map(([name]) => name)
+          .sort(),
     });
   }
 
@@ -373,6 +378,47 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     Idle.requestStarted();
     try {
       return await this.mcpHost.call(input);
+    } finally {
+      Idle.requestEnded();
+    }
+  }
+
+  /** The CLI relay's "accept for the session" answers, by thread (memory: a restart asks again). */
+  readonly #relayAccepted = new Map<string, Set<string>>();
+  /** The relay's MCP sessions with t3's `/mcp`, by t3's credential (memory). */
+  readonly #t3RelaySessions = new Map<string, { sessionId?: string; tools?: ReadonlyArray<{ readonly name: string }>; listedAt?: number; nextId?: number }>();
+
+  /**
+   * RPC from a Workspace DO: one MCP message of a CLI process through the relay (ADR-0028), its caller resolved from
+   * the process's tool handle. Open work while it runs (a held call keeps the idle reset away, review M9).
+   */
+  async mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer> {
+    Idle.requestStarted();
+    try {
+      const [{ relayMessage }, { relayT3Message }, { approveCliTool, cliThreadStates }, { t3CredentialOf }] = await Promise.all([
+        import("./mcp/relay.ts"),
+        import("./mcp/t3Relay.ts"),
+        import("./provider/cli/linkedPushAsk.ts"),
+        import("./provider/cli/relayedMcp.ts"),
+      ]);
+      const accepted = this.#relayAccepted;
+      const shared = {
+        states: cliThreadStates,
+        ask: approveCliTool,
+        accepted: {
+          has: (thread: string, key: string) => accepted.get(thread)?.has(key) === true,
+          add: (thread: string, key: string) => {
+            const set = accepted.get(thread) ?? new Set<string>();
+            set.add(key);
+            accepted.set(thread, set);
+          },
+        },
+        log: (event: Record<string, unknown>) => console.log(JSON.stringify(event)),
+      };
+      if (input.server === T3_RELAY_SERVER) {
+        return await relayT3Message(input, { ...shared, post: (request) => this.mcp(request), credential: t3CredentialOf, cache: this.#t3RelaySessions, now: () => Date.now() });
+      }
+      return await relayMessage(input, { ...shared, view: (view) => this.mcpHost.view(view), call: (call) => this.mcpHost.call(call) });
     } finally {
       Idle.requestEnded();
     }

@@ -306,3 +306,5 @@ export const applyChange = (
     harness: { ...stored, revision: stored.revision + 1, global: { extensions: { ...stored.global.extensions, [entry.id]: next } } },
   };
 };
+export { CARD_TEXT_MAX, cardText, visible } from "./cardText.ts";
+export { T3_TOOL_ALLOWLIST } from "./t3Tools.ts";

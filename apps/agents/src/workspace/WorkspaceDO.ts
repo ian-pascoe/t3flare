@@ -42,6 +42,7 @@ import * as git from "isomorphic-git";
 import { CREDENTIAL_HELPER, CREDENTIAL_PATH } from "./credentialHelper.ts";
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
 import { environmentStub } from "../environment.ts";
+import type { McpRelayAnswer } from "@t3flare/harness-registry";
 import { changedBetween, currentRevision } from "./changeLog.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { authoredScript, captureScript, restoreScript, shellWord } from "./checkpointScripts.ts";
@@ -1601,6 +1602,38 @@ export class WorkspaceDO extends ContainerHost {
     if (answer.approved && answer.trust && !decision.on.linked) await this.trustAgain({ by: decision.on.kind === "session" ? decision.on.name : `cli:${decision.on.thread}` });
     log(answer.approved ? "approved" : "declined", { on: decision.on, reason: answer.reason ?? null, trusted: answer.trust });
     return answer.approved ? { allow: true } : { allow: false, reason: answer.reason === "decline" || answer.reason === undefined ? "declined by the owner" : `not approved: ${answer.reason}` };
+  }
+
+  /**
+   * The CLI relay (ADR-0028), from `WorkspaceProxy`: one MCP message of a CLI process, by its tool handle. The handle
+   * names a live process of this Workspace (revoked at its exit); the Workspace's taint (review H1) and the threads of
+   * its live CLI processes (review M7) go to the Environment DO, which decides and calls. Never logs the handle.
+   */
+  async mcpRelay(input: { readonly handle: string | null; readonly server: string; readonly message: unknown; readonly askId: string }): Promise<McpRelayAnswer> {
+    const caller = this.#processes.toolCaller(input.handle);
+    const workspace = this.#workspaceId() ?? null;
+    if (caller === null || caller.thread === null || workspace === null) {
+      console.warn(JSON.stringify({ t3flare: "mcp-relay-refused", workspace, server: input.server, why: caller === null ? "unknown or revoked handle" : "no thread" }));
+      return { kind: "refused", status: 401, message: "unknown tool handle (a handle ends with its process)" };
+    }
+    const taint = this.ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null;
+    const threads = [...new Set(this.#processes.state().flatMap((proc) => (proc.thread === null ? [] : [proc.thread])))];
+    return environmentStub(this.env.ENVIRONMENT).mcpRelay({
+      workspace,
+      thread: caller.thread,
+      cli: caller.cli,
+      linked: caller.linked,
+      tainted: taint !== null,
+      threads,
+      server: input.server,
+      message: input.message,
+      askId: input.askId,
+    });
+  }
+
+  /** The relay's CLI went away while its call was asked: the card is withdrawn. */
+  async cancelMcpAsk(input: { readonly askId: string }): Promise<void> {
+    await environmentStub(this.env.ENVIRONMENT).cancelPush({ askId: input.askId });
   }
 
   /** The gateway's git went away while its push was asked (review M7): the owner's card is withdrawn. */

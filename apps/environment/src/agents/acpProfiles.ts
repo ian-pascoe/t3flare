@@ -93,8 +93,18 @@ const claudeSwitches = (proxyUrl: string): Record<string, string> => ({
   CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "0",
 });
 
-/** Claude Code's managed settings (`/etc/claude-code/managed-settings.json`). */
-export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<CatalogModel>) => ({
+/** The relay's server names an ACP agent is given (acpDriver's session servers): the owner's and t3's own (SPI-1039). */
+const relayNames = (context: ProfileContext): ReadonlyArray<string> => (context.relay === undefined ? [] : [...context.relay.servers, "t3-code"]);
+
+/** Where the MCP relay's servers are (ADR-0028): the only MCP URLs Claude Code and OpenCode admit. */
+export const RELAY_URL_PATTERN = "http://computer.internal/t3flare/mcp/*";
+
+/**
+ * Claude Code's managed settings (`/etc/claude-code/managed-settings.json`). `relayServers`: the MCP relay's servers
+ * (ADR-0028; the entries themselves, with the process's handle, come per session over ACP, review H2), allowed without
+ * Claude's own prompt because the relay decides and asks.
+ */
+export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = []) => ({
   apiKeyHelper: CLAUDE_KEY_HELPER,
   // Review F3: only the endpoint the managed env pins is admitted.
   allowedProviders: ["customEndpoint"],
@@ -103,12 +113,12 @@ export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<Ca
   skipWebFetchPreflight: true,
   disableClaudeAiConnectors: true,
   cleanupPeriodDays: 60,
-  permissions: { defaultMode: "default", disableBypassPermissionsMode: "disable", allow: [], ask: [], deny: [] },
+  permissions: { defaultMode: "default", disableBypassPermissionsMode: "disable", allow: relayServers.map((server) => `mcp__${server}`), ask: [], deny: [] },
   disableAutoMode: "disable",
   allowManagedPermissionRulesOnly: true,
   allowManagedHooksOnly: true,
   allowManagedMcpServersOnly: true,
-  allowedMcpServers: [],
+  allowedMcpServers: relayServers.length === 0 ? [] : [{ serverUrl: RELAY_URL_PATTERN }],
   // Review F5: no marketplace, no skill shell injection, no repo hooks, MCP servers or agents.
   strictKnownMarketplaces: [],
   disableSkillShellExecution: true,
@@ -133,7 +143,7 @@ const claudeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer
       CLAUDE_CODE_API_KEY_HELPER_TTL_MS: String(24 * 3_600_000),
       ...claudeSwitches(context.proxyUrl),
     },
-    files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(context.proxyUrl, context.models), null, 1)}\n` }],
+    files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(context.proxyUrl, context.models, relayNames(context)), null, 1)}\n` }],
     links: [{ path: `${home}/claude/projects`, target: CLAUDE_PROJECTS }],
     ...(thread === undefined ? {} : { thread }),
     droppedEnv: dropped(input.env),
@@ -150,8 +160,11 @@ const ASKING: ReadonlyArray<{ readonly action: string; readonly resource: string
 const deny = (action: string, resource = "*") => ({ action, resource, effect: "deny" as const });
 const allow = (action: string, resource: string) => ({ action, resource, effect: "allow" as const });
 
-/** OpenCode's system configuration (`/etc/opencode/opencode.json`). */
-export const opencodeConfig = (proxyUrl: string, models: ReadonlyArray<CatalogModel>) => {
+/**
+ * OpenCode's system configuration (`/etc/opencode/opencode.json`). `relayServers`: the MCP relay's servers (ADR-0028),
+ * admitted by policy and their tools allowed without OpenCode's prompt (the relay decides and asks).
+ */
+export const opencodeConfig = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = []) => {
   const ids = new Set(models.map((model) => model.id));
   const pick = (slug: string) => (ids.has(idOf(slug)) ? idOf(slug) : models[0]?.id);
   const main = pick(DEFAULT_MODEL_SLUG);
@@ -176,6 +189,8 @@ export const opencodeConfig = (proxyUrl: string, models: ReadonlyArray<CatalogMo
       allow("provider.use", "t3flare"),
       deny("integration.connect"),
       deny("mcp.use"),
+      ...relayServers.map((server) => allow("mcp.use", server)),
+      ...relayServers.map((server) => allow("tool.use", `${server}_*`)),
       deny("skill.use"),
       deny("plugin.use"),
       allow("plugin.use", OPENCODE_KEY_PLUGIN),
@@ -219,7 +234,7 @@ const opencodeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnsw
       OPENCODE_DISABLE_CLAUDE_CODE: "1",
       OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
     },
-    files: [{ path: `${home}/opencode.json`, text: `${JSON.stringify(opencodeConfig(context.proxyUrl, context.models), null, 1)}\n` }],
+    files: [{ path: `${home}/opencode.json`, text: `${JSON.stringify(opencodeConfig(context.proxyUrl, context.models, relayNames(context)), null, 1)}\n` }],
     ...(thread === undefined ? {} : { thread }),
     droppedEnv: dropped(input.env),
   } satisfies Launch;
