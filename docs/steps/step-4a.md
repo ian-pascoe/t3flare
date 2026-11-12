@@ -56,6 +56,48 @@ holder is idle.
 | M4 Pi in t3 | PASS, plan refused. Claude (2 asks) and Gemini turns; pi has no plan mode, so a plan turn is refused | `m4-pi-turn.json`, `m4-pi-nonclaude.json`, `m4-pi-plan.json` |
 | M5 lifetime, resume, two Containers | PASS | `m5-two-at-once.json`, `m5-resume-codex.json`, `m5-resume-pi.json`, `m5-f1-two-codex.json`, `m5-holds.json`, `m5-reclaim.json` |
 | M6 proofs, acceptance, docs | PASS with gaps (below) | `m6-acceptance.json` (`--codex --pi`), `m6-leak.json`, `m6-leak-turn.json`, `m6-egress.json` |
+| SPI-1043 (before prod) | PASS | below |
+
+## SPI-1043: restarts, idle sessions, the bump's flags, the desktop (before prod)
+
+On a fresh `step4a` deploy of the branch (every deploy restarts Containers, so these are the cases a prod deploy hits).
+
+**The Environment restarts mid-turn** (`cli4a.ts restart-turn`; `spi1043-restart-codex.json`, `spi1043-restart-pi.json`).
+A turn runs `sleep 120`; `POST /_t3flare/restart` aborts the Environment DO as an eviction or a deploy does. Outcome,
+the same for both CLIs: **continuation, never a hang**.
+
+| | Codex | Pi |
+| --- | --- | --- |
+| Interrupted run settles | `cancelled` 1.1 s after the restart, its command item `cancelled` | `cancelled` 1.3 s after |
+| Old process gone in the Container | 6.3 s (the new epoch's first read answers the old key unknown) | 6.4 s |
+| t3's restart continuation (`restartContinuationOfRunId`) | resumes the native thread; Codex answers "Interrupted" | resumes the session; pi checks for a leftover `sleep`, reruns it, answers "done" |
+| Next user turn | same native thread, remembers the code word | same session file, remembers the code word |
+
+The desktop shows it as "T3 Code restarted and resumed this turn" (`m6-desktop-2-codex-restart-continuation.png`).
+
+**An idle CLI session with no client** (`cli4a.ts idle`; `spi1043-idle-codex.json`, `spi1043-idle-pi.json`). No timer
+was shortened: the real ones finish in under three minutes. The Environment's idle reset ends its reads at about 60–75 s
+(the channel's live count drops to 0); the Workspace kills the CLI when its heartbeat lapses (90 s) and stops the Container
+in the same pass: process gone and Container stopped with its lease released at 153 s after the turn, for both. The next
+turn starts a new Container and resumes the same native thread (code word remembered). The 11-minute hold (F7) applies
+only while an Environment that still reads holds the session; without a client it never comes into play.
+
+**The bump's flags.** `scripts/bump.ts` runs `acceptance … --peer --codex --pi`, and a new step before the deploy:
+`bun run test:docker` (`apps/environment/test/docker/`, plan §9): the pinned Codex and pi, launched by our own
+`profileLaunch` → `processCommand` and the guard's turn policy, in a container with the Workspace image's CLI layer on
+the same Node, against the real model proxy. Per CLI: a tool turn with an approval answered, then a fresh container (only
+the synced directory survives) resumes the same conversation; then no key in the synced directory, and the CLI network
+(internal, its only peer a stand-in `computer.internal` with a CONNECT logger and a logging resolver) tunnelled only to
+the proxy's host. It needs Docker and the proxy key, so it runs in the bump job (which has both; timeout raised to 60
+min), not in `bun run check`. Local run: passes in about 15 s after the image build. The bump workflow itself was not
+dispatched on this branch (it would deploy the `bump` stage and may open a pin PR); the same flags ran on `step4a`:
+ACCEPTANCE_RESULT.
+
+**The owner's desktop app** (T3 Code Nightly 0.1.10, driven with agent-desktop; `m6-desktop-1…7-*.png`). `step4a`
+added as its own environment beside prod (`-1`), a Codex thread (GPT-6 Luna, Supervised) that edits a file and runs the
+fixture's test with two approvals given in the app (`-3`, `-4`), a Pi thread (Claude Haiku 5.5, Supervised) with three
+(`-5`, `-6`), and `step4a` removed again with prod untouched (`-7`). Both environments are named "t3flare" in the app;
+the step4a row was told apart by its URL.
 
 ## Deviations from the plan
 
@@ -63,8 +105,8 @@ holder is idle.
 - **Linked CLI pushes are refused**, not asked on the thread (F8 row; SPI-1040). No `m6-linked-push.json`.
 - **pi's plan mode is refused** with t3's generic turn-start error, not a t3flare-worded message in the UI.
 - **Egress is proved locally only** (`m6-egress.json`); the stage-side egress log and an allowlist are SPI-1041.
-- **Not done**: the owner's desktop demo (`m6-desktop-*.png`), the bump job's run with the new flags, `acceptance.ts
-  --real-turn --peer` together with `--codex --pi`, and M5's Environment-restart-mid-turn cases (SPI-1043).
+- **Done after the first report** (SPI-1043): the desktop demo, the bump's flags and `test:docker`, the restart-mid-turn
+  and idle cases. The bump workflow was not dispatched on the branch (see above).
 - **Observed, unchanged**: the Environment's 60 s idle reset ends CLI sessions through the heartbeat lapse; a deploy
   restarts the Containers. Both end the process; the next turn resumes natively.
 
@@ -79,7 +121,7 @@ Patches: 3 (0003 is new: `provider-session-idle-10-minutes`). Upstream fragility
 - SPI-1040: linked CLI pushes ask on their thread (D1 for CLIs).
 - SPI-1041: egress allowlist and the stage-side egress proof.
 - SPI-1042: computerd's `state.db` keeps the bytes of a quarantined file.
-- SPI-1043: the desktop demo, the bump job's new flags, M5's restart cases.
+- SPI-1043: the desktop demo, the bump job's new flags, M5's restart cases. Done (above) and closed.
 
 ## Owner action: rotate the key
 
@@ -110,11 +152,21 @@ of the diff, weighted to the process channel, the key route, the Codex guard and
 - Fixed: a `startTurn` that failed left the session's turn marked active, so the Container hold and the 2 h cap fiber
   stayed until the process died (no `turn.terminal` follows a turn that never started). The wrapper now ends the turn
   on failure (`Effect.onError`).
-- Partial, ticketed: D1 for CLIs refuses rather than asks (SPI-1040); stage egress log (SPI-1041); desktop demo, bump
-  flags and M5 restart cases (SPI-1043); the "no Container-only path holds the key" claim fails after a leak
-  (SPI-1042).
+- Partial, ticketed: D1 for CLIs refuses rather than asks (SPI-1040); stage egress log (SPI-1041); the "no
+  Container-only path holds the key" claim fails after a leak (SPI-1042). SPI-1043's gaps are closed (above).
 - Scope beyond the plan: the pull-model channel (forced by the platform, F6) and the budget's reclaim of idle CLI
   holders (F7's design).
 
-Standards: 2 fixed, 2 judgement calls kept (worst: the unchecked Node path). Spec: 1 fixed, 4 ticketed gaps (worst:
+Standards: 2 fixed, 2 judgement calls kept (worst: the unchecked Node path). Spec: 1 fixed, 3 ticketed gaps (worst:
 linked CLI pushes refused instead of asked).
+
+### SPI-1043's delta (same two axes)
+
+- Standards, fixed: `test:docker`'s image names the image's Node again (`FROM node:<v>`, the mise path); the
+  `cliManifest.test.ts` Node check now covers it too.
+- Standards, judgement call, kept: `test/docker/codex-rpc.mjs` and `pi-rpc.mjs` are M0's probe drivers with the spawn
+  generalised (Duplicated Code with `docs/steps/step-4a/probes/`, which stays as the record of M0's evidence).
+- Standards: `test:docker` is a Vitest file under its own config (ADR-0019: Vitest stays on Node; Bun cannot import
+  t3's `node:sea` users), excluded from the `node` project so `bun run check` does not need Docker.
+- Spec: every SPI-1043 item is done; the one change from the ticket is that the bump workflow was not dispatched on the
+  branch (its flags ran on `step4a` instead).

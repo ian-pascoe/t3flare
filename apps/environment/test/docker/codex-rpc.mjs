@@ -28,8 +28,8 @@ const request = (method, params) =>
     pending.set(id, { resolve, reject, method });
     send({ jsonrpc: "2.0", id, method, params });
   });
-let turnDone;
-const turnCompleted = new Promise((resolve) => (turnDone = resolve));
+// Replaced by each turn's own waiter; also called on exit and on the timeout.
+let turnDone = () => undefined;
 let buffer = "";
 child.stdout.on("data", (chunk) => {
   buffer += chunk.toString("utf8");

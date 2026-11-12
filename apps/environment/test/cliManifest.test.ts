@@ -33,6 +33,10 @@ describe("the CLI manifest", () => {
     expect(IMAGE_NODE).toBe(`${bin}/node`);
     expect(fs.readFileSync(path.join(image, "t3flare-pi"), "utf8")).toContain(`${bin}/node `);
     expect(fs.readFileSync(path.join(image, "Dockerfile"), "utf8")).toContain(`PATH=${bin}:$PATH npm ci`);
+    // test:docker's image stands in for the Workspace image's CLI layer on the same Node.
+    const testImage = fs.readFileSync(path.resolve(import.meta.dirname, "docker/Dockerfile"), "utf8");
+    expect(testImage).toContain(`FROM node:${node}-`);
+    expect(testImage).toContain(`NODE_VERSION_DIR=/usr/local/share/mise/installs/node/${node}`);
   });
 
   it("pins a Codex t3 marks supported, and a pi at or above t3's minimum: else bump the CLI in clis.ts", () => {
