@@ -4,7 +4,7 @@ export { ENVIRONMENT_NAME } from "@t3flare/session-protocol";
 import { ENVIRONMENT_NAME } from "@t3flare/session-protocol";
 
 import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
-import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
+import type { ProcessPush, ProcessPushAnswer, TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 
 export interface EnvironmentRpc {
   agentsPing(message: string): Promise<{ readonly environment: string; readonly message: string }>;
@@ -16,6 +16,8 @@ export interface EnvironmentRpc {
   mcp(input: McpRpcRequest): Promise<McpRpcAnswer>;
   /** A Workspace's terminal output (step 2b): never boots t3, and is not activity (ADR-0003). */
   terminalOutput(push: TerminalPush): Promise<TerminalPushAnswer>;
+  /** A Workspace's CLI process output (step 4a): never boots t3, not activity; resolves once the spawner took it. */
+  processOutput(push: ProcessPush): Promise<ProcessPushAnswer>;
 }
 
 export const environmentStub = (namespace: DurableObjectNamespace): EnvironmentRpc =>

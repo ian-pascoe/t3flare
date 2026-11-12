@@ -6,7 +6,8 @@
     ".": "./src/index.ts",
     "./env": "./src/env.ts",
     "./kill": "./src/kill.ts",
-    "./terminal": "./src/terminal.ts"
+    "./terminal": "./src/terminal.ts",
+    "./process": "./src/process.ts"
   },
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit"

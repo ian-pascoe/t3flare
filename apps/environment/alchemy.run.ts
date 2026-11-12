@@ -126,6 +126,9 @@ export default Alchemy.Stack(
     // The model proxy (ADR-0012) and the GitHub App (ADR-0013), from ~/.config/t3flare/dev.env or CI's environment.
     const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL");
     const modelProxyKey = Config.Redacted("MODEL_PROXY_API_KEY");
+    // Step 4a (ADR-0016, A′): the CLI agents' own proxy key, answered by the Workspace DO's key route only while a CLI
+    // process lives there. Never the Workers' MODEL_PROXY_API_KEY; bound to the agents Worker alone.
+    const containerModelKey = Config.Redacted("COMMISSARY_CONTAINER_API_KEY");
 
     const workspaceContainer = Cloudflare.Container("WorkspaceContainer", {
       schedulingPolicy: "durable_object",
@@ -146,6 +149,7 @@ export default Alchemy.Stack(
         LOADER: Cloudflare.WorkerLoader(),
         MODEL_PROXY_URL: modelProxyUrl,
         MODEL_PROXY_API_KEY: modelProxyKey,
+        COMMISSARY_CONTAINER_API_KEY: containerModelKey,
         // The model proxy fault route (step 2a part 2) answers on test stages only.
         ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
         ...(turnDeadlineMs === "" ? {} : { T3FLARE_TURN_DEADLINE_MS: turnDeadlineMs }),
@@ -193,6 +197,8 @@ export default Alchemy.Stack(
         // Step 3+ (ADR-0025): test stages keep the T3 Connect account token and let the service token run the Connect
         // routes; prod discards the token after the link and admits only the owner's own identity there.
         ...(stage === "prod" ? {} : { T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN: "1", T3FLARE_CONNECT_SERVICE_TOKEN: "1" }),
+        // Step 4a: the process channel's probe program and stage-only checks answer on test stages only.
+        ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
         ...(sweepGraceMs === "" ? {} : { T3FLARE_SWEEP_GRACE_MS: sweepGraceMs }),
       },
       assets: {

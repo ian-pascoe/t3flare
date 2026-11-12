@@ -25,6 +25,10 @@ import type {
   FsAnswer,
   GitAnswer,
   GitRun,
+  ProcessAnswer,
+  ProcessInputAnswer,
+  ProcessStartAnswer,
+  ProcessStartInput,
   ProvisionInfo,
   TerminalAnswer,
   TerminalOpenInput,
@@ -56,6 +60,8 @@ import { credentialDecision, type LinkedWork, prunedLinkedWork } from "./linkedP
 import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, withoutOwnGitDir } from "./gitDirReads.ts";
 import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
+import { ProcessHost, type ProcessMarker } from "./processHost.ts";
+import { ProcessProbe, type ProbeOp } from "./processProbe.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
@@ -90,6 +96,8 @@ export interface WorkspaceEnv {
   readonly T3FLARE_TERMINAL_IDLE_MS?: string;
   /** This Worker's Session DOs (step 3, D1): a linked thread's Session approves each push from its Workspace. */
   readonly SESSIONS?: DurableObjectNamespace;
+  /** Test stages only: the stage-only probes and faults answer. */
+  readonly T3FLARE_FAULTS?: string;
 }
 
 export interface ExecInput {
@@ -154,6 +162,17 @@ const WORKSPACE_ID_KEY = "t3flare:workspace-id";
 const LINKED_WORK_KEY = "t3flare:linked-work";
 /** The markers of the shells this object started (orphans after a restart are killed by them). */
 const TERMINAL_MARKERS_KEY = "t3flare:terminal-markers";
+/** Step 4a: the markers of the CLI processes this object started, with their Environment epoch. */
+const PROCESS_MARKERS_KEY = "t3flare:process-markers";
+/** Step 4a (review F6): this object's boot counter, the process channel's epoch. */
+const BOOT_COUNT_KEY = "t3flare:boot-count";
+/**
+ * CLI processes per Workspace (plan §2.1). Each is a Codex app-server or a pi (Node) of a few hundred MB, beside
+ * computerd and the agent's own commands in 3 GiB; P9's memory probe sets the number (docs/steps/step-4a/m0-p9.json).
+ */
+export const MAX_CLI_PROCESSES = 2;
+/** Linked work held while a linked thread's CLI process lives (review F8): until it exits, not a time. */
+const LINKED_WHILE_ALIVE = Number.MAX_SAFE_INTEGER;
 /** How often terminals' heartbeats are checked while any is open. */
 const TERMINAL_EXPIRE_EVERY_MS = 15_000;
 
@@ -195,6 +214,11 @@ export class WorkspaceDO extends ContainerHost {
   readonly #terminals: TerminalHost;
   readonly #terminalSync: TerminalSync;
   #expireTimer: ReturnType<typeof setInterval> | undefined;
+  readonly #probe = new ProcessProbe();
+  /** The CLI processes (step 4a). */
+  readonly #processes: ProcessHost;
+  /** This object's boot counter (review F6): the process channel's epoch, durable, never a UUID. */
+  readonly #boot: number;
 
   constructor(ctx: DurableObjectState, env: WorkspaceEnv) {
     super(ctx, env);
@@ -240,7 +264,7 @@ export class WorkspaceDO extends ContainerHost {
       pull: () => this.#syncEntries("pull"),
       push: () => this.#syncEntries("push"),
       revision: () => currentRevision(ctx.storage.sql),
-      active: () => this.#terminals.size > 0,
+      active: () => this.#terminals.size > 0 || this.#processes.size > 0,
     });
     this.#terminals = new TerminalHost({
       now: () => Date.now(),
@@ -275,6 +299,49 @@ export class WorkspaceDO extends ContainerHost {
       },
       projectRootView: PROJECT_ROOT_VIEW,
     });
+    this.#boot = (ctx.storage.kv.get<number>(BOOT_COUNT_KEY) ?? 0) + 1;
+    ctx.storage.kv.put(BOOT_COUNT_KEY, this.#boot);
+    this.#processes = new ProcessHost({
+      now: () => Date.now(),
+      epoch: this.#boot,
+      running: () => this.containerRunning(),
+      startContainer: () => this.#startContainerFor("process"),
+      spawn: async (argv, env) => {
+        const container = this.ctx.container;
+        if (container === undefined) throw new Error("no Container binding");
+        return container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env });
+      },
+      kill: (markers) => this.#killMarkers(markers),
+      push: async (push) => {
+        const id = this.#workspaceId();
+        if (id === undefined) return { unknown: [...new Set(push.frames.map((frame) => frame.key))] };
+        return environmentStub(this.env.ENVIRONMENT).processOutput({ workspace: id, ...push });
+      },
+      baseEnv: terminalEnv,
+      remember: (markers) => ctx.storage.kv.put(PROCESS_MARKERS_KEY, [...markers]),
+      remembered: () => ctx.storage.kv.get<ReadonlyArray<ProcessMarker>>(PROCESS_MARKERS_KEY) ?? [],
+      filesMayHaveChanged: (why) => this.#terminalSync.changed(why),
+      maxProcesses: MAX_CLI_PROCESSES,
+      allowProbe: env.T3FLARE_FAULTS === "1",
+      linkedWork: (thread, alive) => {
+        const linked: Record<string, number> = { ...prunedLinkedWork(ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {}, Date.now()) };
+        const name = `cli:${thread}`;
+        if (alive) linked[name] = LINKED_WHILE_ALIVE;
+        else delete linked[name];
+        ctx.storage.kv.put(LINKED_WORK_KEY, linked);
+      },
+    });
+  }
+
+  /** Starts the Container for a terminal or a CLI process; the budget's own reason when refused. */
+  async #startContainerFor(_what: "terminal" | "process"): Promise<void> {
+    try {
+      await this.exec({ script: "true", timeoutMs: 180_000 });
+    } catch (error) {
+      // The budget's own reason, out of computer's connect-retry wrapping.
+      const reason = /the Container cannot start: (.+?)(?:"|$)/s.exec(String(error))?.[1];
+      throw new Error(reason === undefined ? String(error).slice(0, 300) : `the Container cannot start: ${reason}`);
+    }
   }
 
   /**
@@ -349,7 +416,8 @@ export class WorkspaceDO extends ContainerHost {
   /** The platform's Container API with the budget's lease taken before every start (step 2a cost guardrails). */
   #budgeted(api: IWorkspaceContainerAPI): IWorkspaceContainerAPI {
     const lease = async () => {
-      const answer = await this.#budget().acquire(this.ctx.id.toString());
+      let answer = await this.#budget().acquire(this.ctx.id.toString());
+      if (!answer.ok && (await this.#reclaimFrom(answer.running))) answer = await this.#budget().acquire(this.ctx.id.toString());
       if (!answer.ok) throw new Error(`t3flare: the Container cannot start: ${answer.reason}`);
       await this.ctx.storage.put(LEASED_KEY, true);
       if ((await this.ctx.storage.get<number>(STARTED_AT_KEY)) === undefined) await this.ctx.storage.put(STARTED_AT_KEY, Date.now());
@@ -375,6 +443,28 @@ export class WorkspaceDO extends ContainerHost {
     };
   }
 
+  /**
+   * The budget is full (review F7): asks each holder to stop its Container if nothing there works, idle CLI sessions
+   * included; answers whether one did.
+   */
+  async #reclaimFrom(holders: ReadonlyArray<string>): Promise<boolean> {
+    for (const holder of holders) {
+      if (holder === this.ctx.id.toString()) continue;
+      try {
+        // SAFETY: a holder is a Workspace DO's id (`#budgeted`); `releaseIfIdle` is its RPC.
+        const stub = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromString(holder)) as unknown as { releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }> };
+        const answer = await stub.releaseIfIdle();
+        if (answer.released) {
+          console.log(JSON.stringify({ t3flare: "container-reclaimed", from: holder, for: this.#workspaceId() ?? null }));
+          return true;
+        }
+      } catch (error) {
+        console.warn(JSON.stringify({ t3flare: "container-reclaim-failed", from: holder, error: String(error).slice(0, 200) }));
+      }
+    }
+    return false;
+  }
+
   #budget() {
     return this.env.CONTAINER_BUDGET.get(this.env.CONTAINER_BUDGET.idFromName(BUDGET_NAME));
   }
@@ -388,7 +478,7 @@ export class WorkspaceDO extends ContainerHost {
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? Date.now();
     let at = Math.min(lastUse + this.#idleMs(), Date.now() + RENEW_EVERY_MS);
     // Open terminals: their heartbeats are checked and their hold measured at least every 30 s.
-    if (this.#terminals.size > 0) at = Math.min(at, Date.now() + 30_000);
+    if (this.#terminals.size > 0 || this.#processes.size > 0) at = Math.min(at, Date.now() + 30_000);
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > at) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000));
   }
@@ -986,7 +1076,9 @@ export class WorkspaceDO extends ContainerHost {
    */
   async destroy(): Promise<{ readonly destroyed: true }> {
     this.#terminals.containerStopped();
+    this.#processes.containerStopped();
     await this.#terminals.settled().catch(() => undefined);
+    await this.#processes.settled().catch(() => undefined);
     if (this.ctx.container?.running === true) await this.ctx.container.destroy().catch(() => undefined);
     await this.#budget().release(this.ctx.id.toString()).catch(() => undefined);
     await this.ctx.storage.deleteAlarm();
@@ -1086,6 +1178,75 @@ export class WorkspaceDO extends ContainerHost {
     return { epoch: this.#epoch, keys: this.#terminals.keys(), lastInput: this.#terminals.lastInput, pushes: this.#terminals.pushes, sync: { ...this.#terminalSync.stats } };
   }
 
+  // -------------------------------------------------------------------------------------------------------------------
+  // CLI processes (step 4a, the process channel): the Environment's spawner calls these; output goes back by push.
+
+  #processesChanged(): void {
+    if (this.#processes.size > 0) {
+      this.#terminalSync.startPushing();
+      this.#expireTimer ??= setInterval(() => {
+        void this.#terminals.expire().catch(() => undefined);
+        void this.#processes.expire().catch(() => undefined);
+        if (this.#terminals.size === 0 && this.#processes.size === 0 && this.#expireTimer !== undefined) {
+          clearInterval(this.#expireTimer);
+          this.#expireTimer = undefined;
+        }
+      }, TERMINAL_EXPIRE_EVERY_MS);
+    }
+  }
+
+  async processStart(input: ProcessStartInput): Promise<ProcessStartAnswer> {
+    this.#alive();
+    this.#rememberId(input.t3Path.startsWith("/w/") ? input.t3Path.slice(3) : undefined);
+    if (this.containerRunning()) await this.#syncEntries("push").catch(() => undefined);
+    const answer = await this.#processes.start(input);
+    await this.#noteUse();
+    this.#processesChanged();
+    await this.#scheduleAlarm();
+    return answer;
+  }
+
+  processInput(key: string, seq: number, data: Uint8Array | null): Promise<ProcessInputAnswer> {
+    return this.#processes.input(key, seq, data);
+  }
+
+  processTurn(key: string, active: boolean): ProcessAnswer {
+    return this.#processes.turn(key, active);
+  }
+
+  processSignal(key: string): Promise<ProcessAnswer> {
+    return this.#processes.signal(key);
+  }
+
+  processHeartbeat(keys: ReadonlyArray<string>): ProcessAnswer {
+    return this.#processes.heartbeat(keys);
+  }
+
+  /** Diagnosis: the live CLI processes and this object's boot counter. */
+  processState(): { readonly epoch: number; readonly processes: ReturnType<ProcessHost["state"]>; readonly pushes: number } {
+    return { epoch: this.#boot, processes: this.#processes.state(), pushes: this.#processes.pushes };
+  }
+
+  /**
+   * The budget is full and another Workspace asks for a Container (review F7): if nothing here works (no command, no
+   * terminal holding, no CLI process in a turn or recently used), the CLI processes end and the Container stops.
+   */
+  async releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }> {
+    if (!this.containerRunning()) return { released: false, reason: "not running" };
+    const reclaimable = this.#processes.reclaimable();
+    const busy =
+      this.#running > 0 ||
+      this.#probe.live > 0 ||
+      this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() }) ||
+      reclaimable.length < this.#processes.size;
+    if (busy) return { released: false, reason: "in use" };
+    const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
+    if (this.#processes.size === 0 && Date.now() - lastUse < 30_000) return { released: false, reason: "used in the last 30 s" };
+    console.log(JSON.stringify({ t3flare: "container-released-for-budget", workspace: this.#workspaceId() ?? null, processes: reclaimable.length, ...(await this.#usage()) }));
+    await this.stopContainer();
+    return { released: true, reason: "idle" };
+  }
+
   #terminalIdleMs(): number {
     const value = Number(this.env.T3FLARE_TERMINAL_IDLE_MS);
     return Number.isFinite(value) && value > 0 ? value : TERMINAL_IDLE_MS;
@@ -1113,6 +1274,7 @@ export class WorkspaceDO extends ContainerHost {
       await this.ctx.container.destroy();
     }
     this.#terminals.containerStopped();
+    this.#processes.containerStopped();
     await this.#release();
   }
 
@@ -1140,10 +1302,11 @@ export class WorkspaceDO extends ContainerHost {
       return;
     }
     await this.#terminals.expire().catch(() => undefined);
+    await this.#processes.expire().catch(() => undefined);
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
     // Terminals hold the Container until their last input is older than the hold (review F10: output is not use).
-    const held = this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() });
-    if (this.#running === 0 && !held && Date.now() - lastUse >= this.#idleMs()) {
+    const held = this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() }) || this.#processes.holdsContainer();
+    if (this.#running === 0 && this.#probe.live === 0 && !held && Date.now() - lastUse >= this.#idleMs()) {
       console.log(JSON.stringify({ t3flare: "container-idle-stop", workspace: this.ctx.id.toString(), ...(await this.#usage()) }));
       await this.stopContainer();
       return;
@@ -1196,6 +1359,12 @@ export class WorkspaceDO extends ContainerHost {
     const decision = credentialDecision(this.ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {}, Date.now(), op);
     let readOnly = false;
     if (decision.kind === "read-only") readOnly = true;
+    if (decision.kind === "ask" && decision.session.startsWith("cli:")) {
+      // A linked thread's CLI process lives here (step 4a, review F8): its pushes are refused, stricter than D1, until
+      // the Environment can raise the approval on that thread (plan §5.4).
+      console.log(JSON.stringify({ t3flare: "git-credential-linked", workspace: id, op, session: decision.session, approved: false, reason: "linked CLI work: pushes are refused" }));
+      return new Response("", { status: 403, headers: { "cache-control": "no-store" } });
+    }
     if (decision.kind === "ask") {
       const sessions = this.env.SESSIONS;
       // SAFETY: the Session DO answers `approveGitPush` (SessionDO.ts).
@@ -1216,6 +1385,26 @@ export class WorkspaceDO extends ContainerHost {
       console.warn(JSON.stringify({ t3flare: "git-credential-failed", workspace: id, error: String(error).slice(0, 300) }));
       return new Response("", { status: 503 });
     }
+  }
+
+  /** Step 4a M0 P1 (test stages only): a long-lived non-PTY exec, or this object's abort (`{op: "abort"}`). */
+  async probeProcess(op: ProbeOp | { readonly op: "abort" } | { readonly op: "ps" }): Promise<unknown> {
+    if (this.env.T3FLARE_FAULTS !== "1") throw new Error("t3flare: probes answer on test stages only");
+    this.#alive();
+    if (op.op === "abort") {
+      setTimeout(() => this.ctx.abort("t3flare: probe abort"), 0);
+      return { aborting: true, epoch: this.#epoch };
+    }
+    if (op.op === "ps") return this.exec({ script: "ps -eo pid,pgid,sid,etimes,args --sort=pid | grep -v ' ps -eo' | tail -40", passive: true, timeoutMs: 20_000 });
+    if (op.op === "start" && !this.containerRunning()) await this.exec({ script: "true", timeoutMs: 180_000 });
+    const result = await this.#probe.run(op, async (argv, env) => {
+      const container = this.ctx.container;
+      if (container === undefined) throw new Error("no Container binding");
+      return container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...COMMAND_ENV, ...env } });
+    });
+    await this.#noteUse();
+    await this.#scheduleAlarm();
+    return { epoch: this.#epoch, result };
   }
 
   /** Points the repo's git credentials at `CREDENTIAL_HELPER` (repos cloned before it existed). */

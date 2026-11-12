@@ -7,6 +7,7 @@ name: Nightly bump
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-bump`
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
 #   vars.MODEL_PROXY_URL, secrets.MODEL_PROXY_API_KEY   the model proxy (ADR-0012), for the agents and the real turn
+#   secrets.COMMISSARY_CONTAINER_API_KEY   the CLI agents' own proxy key (step 4a, ADR-0016 A′), set by hand on `bump`
 # and by `bun run --cwd infra github-app:setup`: secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY.
 # and the repository setting that lets Actions create pull requests (infra/allow-actions-prs.ts).
 # The stage's own bootstrap and admin tokens are made fresh by the job; nothing else is stored.
@@ -75,6 +76,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           MODEL_PROXY_URL: ${{ vars.MODEL_PROXY_URL }}
           MODEL_PROXY_API_KEY: ${{ secrets.MODEL_PROXY_API_KEY }}
+          COMMISSARY_CONTAINER_API_KEY: ${{ secrets.COMMISSARY_CONTAINER_API_KEY }}
           T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
           T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
 

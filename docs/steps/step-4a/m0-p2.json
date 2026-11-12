@@ -1,0 +1,11 @@
+{
+ "at": "2026-11-12T00:34:43.949Z",
+ "scenario": "p2",
+ "result": {
+  "exitCode": 1,
+  "status": "failed",
+  "stdout": "kernel=6.18.56-cloudflare-microvm-2026.10.9\nuserns_max=812\nunpriv_userns=cat: /proc/sys/kernel/unprivileged_userns_clone: No such file or directory\napparmor_restrict=cat: /proc/sys/kernel/apparmor_restrict_unprivileged_userns: No such file or directory\nuid=0(root) gid=0(root) groups=0(root)\nbwrap-unshare-all=ok\nbwrap-userns=ok\nbwrap-netns=ok\nunshare-U=ok\nCapEff:\t00000000abac35fb\nNoNewPrivs:\t0\nSeccomp:\t2\nSeccomp_filters:\t1\n",
+  "stderr": "",
+  "ms": 98
+ }
+}

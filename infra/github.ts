@@ -14,7 +14,8 @@
  Read from the environment (never committed; `ci:setup` exports ~/.config/t3flare/dev.env first):
  *
  *   GITHUB_REPOSITORY  owner/name (default: ian-pascoe/t3flare)
- *   MODEL_PROXY_URL, MODEL_PROXY_API_KEY, T3FLARE_GITHUB_APP_ID, T3FLARE_GITHUB_APP_PRIVATE_KEY   (required)
+ *   MODEL_PROXY_URL, MODEL_PROXY_API_KEY, T3FLARE_GITHUB_APP_ID, T3FLARE_GITHUB_APP_PRIVATE_KEY,
+ *   COMMISSARY_CONTAINER_API_KEY (the CLI agents' own proxy key, step 4a)   (required)
  *   T3FLARE_PROD_ENV_FILE  prod's bootstrap and admin tokens, the laptop's (default:
  *                      ../apps/environment/.alchemy/stages/prod.env.json; set it when running from a worktree)
  *
@@ -170,6 +171,7 @@ export default Alchemy.Stack(
     });
     const prodSecrets: Record<string, Redacted.Redacted<string>> = {
       MODEL_PROXY_API_KEY: yield* Config.Redacted("MODEL_PROXY_API_KEY"),
+      COMMISSARY_CONTAINER_API_KEY: yield* Config.Redacted("COMMISSARY_CONTAINER_API_KEY"),
       T3FLARE_GITHUB_APP_ID: yield* Config.Redacted("T3FLARE_GITHUB_APP_ID"),
       T3FLARE_GITHUB_APP_PRIVATE_KEY: yield* Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),
       T3_BOOTSTRAP_TOKEN: fromProdEnvFile("T3_BOOTSTRAP_TOKEN"),

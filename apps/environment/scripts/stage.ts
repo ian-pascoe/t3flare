@@ -26,7 +26,7 @@ const [command, stage, ...rest] = process.argv.slice(2);
  * The stages this repo deploys to; anything else is refused, so a typo cannot create a stray stage. `prod` is the
  * owner's long-lived Environment, deployed from `main` only; step branches use their own throwaway stages.
  */
-const STAGES = new Set(["prod", "step1", "bump", "step2a", "models", "step2a2", "step2b", "debug2b", "leftovers", "ghfix", "modefix", "costwins", "step3", "idlesafe", "attach", "truecaps", "noanalytics", "bigrepo", "step3plus"]);
+const STAGES = new Set(["prod", "step1", "bump", "step2a", "models", "step2a2", "step2b", "debug2b", "leftovers", "ghfix", "modefix", "costwins", "step3", "idlesafe", "attach", "truecaps", "noanalytics", "bigrepo", "step3plus", "step4a"]);
 
 if (command === undefined || stage === undefined || !STAGES.has(stage)) {
   console.error(`usage: bun scripts/stage.ts deploy|run|destroy <${[...STAGES].join("|")}> …`);
@@ -57,7 +57,7 @@ const stageSecrets = (): Record<string, string> => {
  * ~/.config/t3flare/dev.env (0600, outside the repo), which bash reads as it is written (multi-line values included).
  * Never printed.
  */
-const DEPLOY_SECRETS = ["MODEL_PROXY_URL", "MODEL_PROXY_API_KEY", "T3FLARE_GITHUB_APP_ID", "T3FLARE_GITHUB_APP_PRIVATE_KEY"];
+const DEPLOY_SECRETS = ["MODEL_PROXY_URL", "MODEL_PROXY_API_KEY", "T3FLARE_GITHUB_APP_ID", "T3FLARE_GITHUB_APP_PRIVATE_KEY", "COMMISSARY_CONTAINER_API_KEY"];
 const deploySecrets = (): Record<string, string> => {
   const fromEnv = Object.fromEntries(DEPLOY_SECRETS.flatMap((name) => (process.env[name] ? [[name, process.env[name]!]] : [])));
   if (Object.keys(fromEnv).length === DEPLOY_SECRETS.length) return fromEnv;

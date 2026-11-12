@@ -37,11 +37,12 @@ import {
   worktreeListPorcelain,
 } from "./gitRoutes.ts";
 import { workspaceRpc } from "./workspaceClient.ts";
+import { CLI_NAMES, spawnCli } from "./cliProcess.ts";
 
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
 
-export type Route = "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
+export type Route = "process" | "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
 
 export interface TraceEntry {
   readonly at: number;
@@ -468,6 +469,14 @@ export const spawn = (command: ChildProcess.Command) =>
     const name = command.command.replace(/^.*\//, "");
     const args = command.args.map((word) => (typeof word === "string" ? word : Redacted.value(word)));
     const cwd = command.options.cwd;
+    // Step 4a: a CLI agent streams through the process channel to its Workspace's Container.
+    if (CLI_NAMES.has(name)) {
+      const started = Date.now();
+      return yield* spawnCli(command).pipe(
+        Effect.tap(() => Effect.sync(() => record({ at: started, command: name, argv: traceArgv(args.slice(0, 4)), cwd: cwd ?? null, route: "process", exitCode: null, ms: Date.now() - started }))),
+        Effect.tapError((error) => Effect.sync(() => record({ at: started, command: name, argv: traceArgv(args.slice(0, 4)), cwd: cwd ?? null, route: "error", exitCode: null, ms: Date.now() - started, detail: String(error).slice(0, 300) }))),
+      );
+    }
     const route = routeOf(name, args, cwd);
     if (route === null) {
       spawnAttempts.set(name, (spawnAttempts.get(name) ?? 0) + 1);

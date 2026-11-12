@@ -10,7 +10,21 @@ import type {
   SteerInput,
   SubmitTurnInput,
 } from "@t3flare/session-protocol";
-import type { CheckpointAnswer, CheckpointOp, CloneInput, FsAnswer, GitAnswer, GitRun, ProvisionInfo, TerminalAnswer, TerminalOpenInput } from "@t3flare/workspace-client";
+import type {
+  CheckpointAnswer,
+  CheckpointOp,
+  CloneInput,
+  FsAnswer,
+  GitAnswer,
+  GitRun,
+  ProcessAnswer,
+  ProcessInputAnswer,
+  ProcessStartAnswer,
+  ProcessStartInput,
+  ProvisionInfo,
+  TerminalAnswer,
+  TerminalOpenInput,
+} from "@t3flare/workspace-client";
 
 /** One file operation of the Workspace DO's (`fs`); paths inside the Workspace. */
 export type FsOp =
@@ -69,6 +83,16 @@ export interface WorkspaceRpc {
   terminalResize(key: string, cols: number, rows: number): Promise<TerminalAnswer>;
   terminalClose(key: string): Promise<TerminalAnswer>;
   terminalHeartbeat(keys: ReadonlyArray<string>): Promise<TerminalAnswer>;
+  /** Step 4a: the process channel (agents/src/workspace/processHost.ts). */
+  processStart(input: ProcessStartInput): Promise<ProcessStartAnswer>;
+  processInput(key: string, seq: number, data: Uint8Array | null): Promise<ProcessInputAnswer>;
+  processTurn(key: string, active: boolean): Promise<ProcessAnswer>;
+  processSignal(key: string): Promise<ProcessAnswer>;
+  processHeartbeat(keys: ReadonlyArray<string>): Promise<ProcessAnswer>;
+  processState(): Promise<{ readonly epoch: number; readonly processes: ReadonlyArray<unknown>; readonly pushes: number }>;
+  releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }>;
+  /** Step 4a M0 P1, test stages only. */
+  probeProcess(op: unknown): Promise<unknown>;
   terminalState(): Promise<{ readonly epoch: string; readonly keys: ReadonlyArray<string>; readonly lastInput: number; readonly pushes: number; readonly sync: Readonly<Record<string, number>> }>;
 }
 

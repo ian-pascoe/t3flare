@@ -237,3 +237,66 @@ export interface TerminalPush {
 export interface TerminalPushAnswer {
   readonly unknown: ReadonlyArray<string>;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The process channel (step 4a, ADR-0015's refinement): t3's spawns of `codex app-server` and `pi --mode rpc` run in a
+// Workspace's Container under the platform's non-PTY exec. The Environment's spawner ⇄ the Workspace DO's process host.
+// Keys are made by the spawner (`proc-<uuid>`) and are also the process's marker in the Container (`T3FLARE_EXEC`).
+// Data is bytes end to end (review F6): JSON lines split across frames are joined by t3's own line decoder.
+
+/** The CLI a process runs; `probe` is M1's test program, refused unless the stage allows faults. */
+export type ProcessCli = "codex" | "pi" | "probe";
+
+export interface ProcessStartInput {
+  readonly key: string;
+  /** The Environment DO's boot counter (durable): processes of any other epoch in this Workspace are killed first. */
+  readonly environmentEpoch: number;
+  readonly cli: ProcessCli;
+  /** t3's path of the Workspace's repo (`/w/<id>`) and t3's cwd at or below it: the launcher makes them resolve. */
+  readonly t3Path: string;
+  readonly cwd: string;
+  /** The binary (absolute, in the image) and its arguments, as the CLI profile built them. */
+  readonly argv: ReadonlyArray<string>;
+  /** The profile's allowlisted environment; the host adds `T3FLARE_EXEC` and the key nonce. */
+  readonly env: Readonly<Record<string, string>>;
+  /** Files the profile writes on the Container's own disk before the start (the CLI's home), by absolute path. */
+  readonly files?: ReadonlyArray<{ readonly path: string; readonly text: string; readonly mode?: number }>;
+  /** t3's thread, for linked work (D1) and the logs. */
+  readonly thread?: string;
+  /** The thread came through a peer link: its pushes ask, while the process lives (review F8). */
+  readonly linked?: boolean;
+}
+
+/** Every answer names the Workspace DO's boot counter: another value means the processes it held are gone. */
+export interface ProcessAnswer {
+  readonly epoch: number;
+  readonly unknown: ReadonlyArray<string>;
+}
+
+export type ProcessStartAnswer =
+  | { readonly ok: true; readonly epoch: number }
+  | { readonly ok: false; readonly epoch: number; readonly reason: string };
+
+/** One process's output in order (`seq`, one counter per process across both streams); `exit` comes last. */
+export interface ProcessFrame {
+  readonly key: string;
+  readonly seq: number;
+  readonly stream: "stdout" | "stderr" | "exit";
+  readonly data?: Uint8Array;
+  readonly code?: number;
+}
+
+export interface ProcessPush {
+  readonly workspace: string;
+  readonly epoch: number;
+  readonly frames: ReadonlyArray<ProcessFrame>;
+}
+
+/** The Environment's answer: keys it does not know (restarted, or the handle ended): kill them. */
+export interface ProcessPushAnswer {
+  readonly unknown: ReadonlyArray<string>;
+}
+
+/** `processInput`'s answer: `gap` and `failed` end the process (a write is never skipped, review F6). */
+export type ProcessInputAnswer = ProcessAnswer & { readonly accepted: "written" | "duplicate" | "gap" | "failed" | "unknown" };
+

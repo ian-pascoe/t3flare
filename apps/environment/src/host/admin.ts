@@ -39,6 +39,8 @@
 //   POST /_t3flare/check/terminal-leak           step 2b: a terminal's `env` output compared with this Worker's binding values (names only)
 //   POST /_t3flare/check/terminal-close-idle?thread=<id>  step 2b: t3's own `closeIdle` for a thread's terminals (as settling runs it)
 //   /_t3flare/connect/*, POST /_t3flare/check/connect-refusals  step 3+: the T3 Connect link (connect/admin.ts)
+//   POST /_t3flare/agents/process-check           step 4a (stages only): the probe through t3's spawner and the process channel
+//   GET  /_t3flare/agents/process-state?id=<id>   step 4a: a Workspace's CLI processes and this instance's channel
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -136,6 +138,8 @@ const rebootCheck = async (environment: EnvironmentDO, request: Request) => {
     survivedIntoSecondBoot: afterSecond,
     changedAfterFirstBoot: afterFirst.length,
     globalsAddedDuringCheck: globalsAdded,
+    // Step 4a (review F6): the process channel's handles and pids belong to this object, not to module state.
+    processChannelOnInstance: (await import("../agents/bindings.ts")).environmentServices().processes === environment.processChannel,
   };
 };
 
@@ -330,7 +334,9 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                     ? await rpc.ensureCredentialHelper(url.searchParams.get("id") ?? "")
                     : "killExecs" in body
                       ? await rpc.killExecs(body.killExecs as never)
-                      : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs" };
+                      : "probeProcess" in body
+                        ? await rpc.probeProcess(body.probeProcess as never)
+                        : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
       }
       case "POST /_t3flare/check/connect-leak": {
@@ -340,6 +346,19 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const runtime = await environment.boot("check-connect-leak", request);
         const secrets = await runtime.run(connectSecrets);
         return json({ checked: secrets.map(({ name }) => name), bytes: (body.text ?? "").length, leaked: leakedIn(body.text ?? "", secrets) });
+      }
+      case "POST /_t3flare/agents/process-check": {
+        const { environmentServices } = await import("../agents/bindings.ts");
+        if (!environmentServices().faults) return json({ error: "stages only" }, 403);
+        const { processCheck, releaseHeld } = await import("./processCheck.ts");
+        const body = (await request.json()) as { op: string; workspace: string; marker?: string; roundTrips?: number };
+        if (body.op === "release") return json({ released: await releaseHeld() });
+        return json(await processCheck(body));
+      }
+      case "GET /_t3flare/agents/process-state": {
+        const { workspaceRpc } = await import("../agents/workspaceClient.ts");
+        const id = url.searchParams.get("id") ?? "";
+        return json({ channel: { live: environment.processChannel.size, environmentEpoch: environment.processChannel.environmentEpoch }, workspace: id === "" ? null : await workspaceRpc(id).processState() });
       }
       case "POST /_t3flare/check/peer-leak": {
         // Step 3 (plan section 4.6, review C8): after turns that called t3's tools and answered linked work, look for

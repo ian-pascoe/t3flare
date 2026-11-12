@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off extendsNativeError:off
+// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off extendsNativeError:off cryptoRandomUUID:off
 // The host is plain DO code around t3's Effect runtime, so it uses the platform's timers and errors.
 // The Environment DO (ADR-0002): the host around t3's runtime. It boots t3 lazily (the 1 s startup
 // limit), counts boots and falls back to safe mode (bootState.ts), seeds t3's bootstrap grant only while
@@ -9,12 +9,14 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
-import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
+import type { ProcessPush, ProcessPushAnswer, TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
 import { deliverPush } from "./agents/sessionSink.ts";
 import { GRACE_MS } from "./agents/deletionConstants.ts";
+import { ProcessChannel } from "./agents/processChannel.ts";
+import { locate } from "./agents/workspaceClient.ts";
 import { workspaceRegistry } from "./agents/workspaces.ts";
 import type { AgentsBindings } from "./agents/rpc.ts";
 import * as BootState from "./host/bootState.ts";
@@ -50,6 +52,8 @@ export interface EnvironmentEnv extends AgentsBindings {
    * as on prod, only the owner's own Access identity may.
    */
   readonly T3FLARE_CONNECT_SERVICE_TOKEN?: string;
+  /** Test stages: the stage-only probes and faults answer (step 4a's process probe). */
+  readonly T3FLARE_FAULTS?: string;
 }
 
 /** Module state that outlives `ctx.abort()` in a warm isolate (ADR-0003); reported by the health route. */
@@ -91,6 +95,9 @@ const LAST_SWEEP_KEY = "t3flare:last-sweep";
 /** The deleted threads whose Sessions the sweep destroyed. */
 const SWEPT_SESSIONS_KEY = "t3flare:swept-sessions";
 
+/** Step 4a (review F6): this object's boot counter, the process channel's Environment epoch. */
+const BOOT_COUNT_KEY = "t3flare:boot-count";
+
 /** The proxy's model list, as the last read of it left it (ADR-0012). */
 const CATALOG_KEY = "t3flare:model-catalog";
 
@@ -106,6 +113,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * `/mcp` waits for it, so a linked environment following such a task never reads the cut run as its end.
    */
   #reraised: Promise<unknown> = Promise.resolve();
+  /** Step 4a: this instance's CLI processes in the Workspaces' Containers. */
+  readonly #processes: ProcessChannel;
 
   constructor(ctx: DurableObjectState, env: EnvironmentEnv) {
     super(ctx, env);
@@ -121,6 +130,17 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     resetTerminals();
     // Before any t3 code runs: the `node:fs` shim and FileSystem Layer read this.
     bindStateStorage({ sql: ctx.storage.sql, transactionSync: (closure) => ctx.storage.transactionSync(closure) });
+    const boot = (ctx.storage.kv.get<number>(BOOT_COUNT_KEY) ?? 0) + 1;
+    ctx.storage.kv.put(BOOT_COUNT_KEY, boot);
+    this.#processes = new ProcessChannel({
+      environmentEpoch: boot,
+      place: (cwd) => {
+        const at = locate(cwd);
+        if (at === undefined || at.record.state !== "ready") return undefined;
+        return { workspace: at.id, t3Path: `/w/${at.id}`, remote: at.rpc };
+      },
+      newKey: () => `proc-${crypto.randomUUID()}`,
+    });
     const modelProxy =
       env.MODEL_PROXY_URL && env.MODEL_PROXY_API_KEY ? { url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY } : undefined;
     bindEnvironmentServices({
@@ -138,6 +158,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         graceMs: Number(env.T3FLARE_SWEEP_GRACE_MS) > 0 ? Number(env.T3FLARE_SWEEP_GRACE_MS) : GRACE_MS,
       },
       marks: { has: (key) => ctx.storage.kv.get(key) !== undefined, set: (key) => ctx.storage.kv.put(key, Date.now()) },
+      processes: this.#processes,
+      faults: env.T3FLARE_FAULTS === "1",
     });
   }
 
@@ -252,6 +274,20 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     const terminals = currentTerminals();
     if (terminals === undefined) return { unknown: [...new Set(push.frames.filter((frame) => frame.exit === undefined).map((frame) => frame.key))] };
     return terminals.deliver(push);
+  }
+
+  /**
+   * A Workspace DO's CLI process output (step 4a), RPC from the agents Worker. Never boots t3 and is not activity (an
+   * open run keeps the Environment awake during a turn anyway). Resolves once the readers took the bytes (review F6:
+   * backpressure to the Workspace); answers the processes this instance does not know, which the Workspace kills.
+   */
+  processOutput(push: ProcessPush): Promise<ProcessPushAnswer> {
+    return this.#processes.deliver(push);
+  }
+
+  /** Diagnosis and the reboot check: this instance's channel. */
+  get processChannel(): ProcessChannel {
+    return this.#processes;
   }
 
   /** Resets the object, as an eviction or deploy does: memory and sockets go, storage stays. */

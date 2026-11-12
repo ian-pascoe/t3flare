@@ -56,6 +56,10 @@ const FS_ALIASES: Record<string, string> = {
 export const SHADOWS: Record<string, string> = {
   // Step 2a: the Cloud Environment's provider drivers are the Durable agent driver alone.
   "apps/server/src/provider/builtInDrivers.ts": path.join(here, "src/shadows/builtInDrivers.ts"),
+  // Step 4a: t3's CLI adapters signal process groups with `process.kill`, which cannot reach a Container; the process
+  // channel's pids are signalled through it instead. Imported by package subpath, so the redirect resolves bare
+  // `@t3tools/*` specifiers too.
+  "packages/provider-core/src/server/processGroup.ts": path.join(here, "src/shadows/processGroup.ts"),
 };
 
 /** Node builtins workerd lacks, replaced for every importer. */
@@ -193,7 +197,7 @@ const shadows = (applied: Set<string>): Plugin => {
     },
     async resolveId(source, importer, extra) {
       if (importer === undefined || !T3_MODULE.test(importer)) return null;
-      if (!source.startsWith(".") && !source.startsWith("/")) return null;
+      if (!source.startsWith(".") && !source.startsWith("/") && !source.startsWith("@t3tools/")) return null;
       const resolved = await this.resolve(source, importer, { ...extra, skipSelf: true });
       if (resolved === null) return null;
       const shadow = byRealPath.get(resolved.id);

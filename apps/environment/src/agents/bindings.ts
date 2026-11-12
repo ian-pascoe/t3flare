@@ -8,6 +8,7 @@ import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 
 import type { SweepSettings } from "./deletion.ts";
 import type { WorkspaceRegistry } from "./workspaces.ts";
+import type { ProcessChannel } from "./processChannel.ts";
 
 export interface EnvironmentServices {
   readonly agents: AgentsBindings;
@@ -21,6 +22,10 @@ export interface EnvironmentServices {
   readonly sweep: SweepSettings;
   /** One-time marks in the Environment DO's storage (step 3: a setting seeded once, L1). */
   readonly marks: { has(key: string): boolean; set(key: string): void };
+  /** Step 4a: this instance's CLI processes (review F6: never module state). */
+  readonly processes: ProcessChannel;
+  /** Test stages: stage-only probes and faults answer. */
+  readonly faults: boolean;
 }
 
 let current: EnvironmentServices | undefined;
