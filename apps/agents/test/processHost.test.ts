@@ -273,6 +273,18 @@ describe("ProcessHost", () => {
     ]);
   });
 
+  it("ends every process by marker before a stop and waits for their exits", async () => {
+    const h = harness();
+    await h.host.start(start("proc-a"));
+    await h.host.start(start("proc-b"));
+    const stopping = h.host.stopAll(2000);
+    await tick(20);
+    expect(h.killed).toEqual([["proc-a"], ["proc-b"]]);
+    for (const proc of h.procs) proc.exit(143);
+    expect(await stopping).toBe(2);
+    expect(h.host.size).toBe(0);
+  });
+
   it("ends every process with exit 129 when the Container stops", async () => {
     const h = harness();
     await h.host.start(start("proc-a"));

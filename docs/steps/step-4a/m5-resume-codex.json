@@ -1,0 +1,182 @@
+{
+ "at": "2026-11-12T01:56:23.430Z",
+ "scenario": "resume",
+ "ok": false,
+ "failures": [
+  "the same native thread: {\"first\":[\"01a1cd78-1029-7d70-98d7-8bb1cf8c4bbf\"],\"second\":[\"01a1cd78-507a-7fd1-9860-307c95ee5bc3\"]}",
+  "a new provider session (a new process): [{\"id\":\"provider-session:provider-instance:codex:thread:93d054f4-2b05-47a6-8397-540525876035:632d0afb-79cb-4d7e-aa8f-1a6dfc7107a6\",\"status\":\"ready\",\"cwd\":\"/w/cli-codex\"}]",
+  "the protocol log shows the CLI resumed that native thread: [{\"at\":1794448559224,\"command\":\"codex\",\"argv\":[\"app-server\"],\"cwd\":\"/w/cli-codex\",\"route\":\"process\",\"exitCode\":null,\"ms\":209},{\"at\":1794448571958,\"command\":\"codex\",\"argv\":[\"app-server\"],\"cwd\":\"/w/cli-codex\",\"route\":\"process\",\"exitCode\":null,\"ms\":3017},{\"at\":1794448576715,\"command\":\"codex\",\"argv\":[\"thread/resume\"],\"cwd\":null,\"route\":\"protocol\",\"exitCode\":null,\"ms\":0,\"detail\":\"failed 01a1cd78-1029-7d70-98d7-8bb1cf8c4bbf: CodexAppServerRequestError: no rollout found for thread id 01a1cd78-1029-7d70-98d7-8bb1cf8c4bbf\"}]"
+ ],
+ "cli": "codex",
+ "workspace": "cli-codex",
+ "first": {
+  "threadId": "93d054f4-2b05-47a6-8397-540525876035",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:93d054f4-2b05-47a6-8397-540525876035:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "ok",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A93d054f4-2b05-47a6-8397-540525876035%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cd78-1029-7d70-98d7-8bb1cf8c4bbf",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:93d054f4-2b05-47a6-8397-540525876035:632d0afb-79cb-4d7e-aa8f-1a6dfc7107a6",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:93d054f4-2b05-47a6-8397-540525876035:632d0afb-79cb-4d7e-aa8f-1a6dfc7107a6",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 7057
+ },
+ "container": {
+  "running": false,
+  "leased": false,
+  "lastUse": 1794448559722
+ },
+ "budget": {
+  "max": 3,
+  "leases": [
+   {
+    "holder": "43588527543d366a5dd538197d962d32871a62ce7370bfc19f0dbdab80a698c4",
+    "until": 1794449168027,
+    "workspace": "cli-pi"
+   }
+  ]
+ },
+ "second": {
+  "threadId": "93d054f4-2b05-47a6-8397-540525876035",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:93d054f4-2b05-47a6-8397-540525876035:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:93d054f4-2b05-47a6-8397-540525876035:ordinal:2",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "HERON-52",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A93d054f4-2b05-47a6-8397-540525876035%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cd78-507a-7fd1-9860-307c95ee5bc3",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:93d054f4-2b05-47a6-8397-540525876035:632d0afb-79cb-4d7e-aa8f-1a6dfc7107a6",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:93d054f4-2b05-47a6-8397-540525876035:632d0afb-79cb-4d7e-aa8f-1a6dfc7107a6",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 12892
+ },
+ "protocol": [
+  {
+   "at": 1794448559224,
+   "command": "codex",
+   "argv": [
+    "app-server"
+   ],
+   "cwd": "/w/cli-codex",
+   "route": "process",
+   "exitCode": null,
+   "ms": 209
+  },
+  {
+   "at": 1794448571958,
+   "command": "codex",
+   "argv": [
+    "app-server"
+   ],
+   "cwd": "/w/cli-codex",
+   "route": "process",
+   "exitCode": null,
+   "ms": 3017
+  },
+  {
+   "at": 1794448576715,
+   "command": "codex",
+   "argv": [
+    "thread/resume"
+   ],
+   "cwd": null,
+   "route": "protocol",
+   "exitCode": null,
+   "ms": 0,
+   "detail": "failed 01a1cd78-1029-7d70-98d7-8bb1cf8c4bbf: CodexAppServerRequestError: no rollout found for thread id 01a1cd78-1029-7d70-98d7-8bb1cf8c4bbf"
+  }
+ ]
+}

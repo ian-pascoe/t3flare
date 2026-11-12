@@ -386,6 +386,20 @@ export class ProcessHost {
     return this.#answer([]);
   }
 
+  /**
+   * Ends every process before the Container stops (TERM, then KILL from 2 s, by marker) and waits for their exits, so
+   * a CLI flushes its session file and the stop's pull takes it (M5 on step4a: a Codex rollout not yet written when
+   * the Container went could not be resumed).
+   */
+  async stopAll(timeoutMs = 8000): Promise<number> {
+    const keys = [...this.#procs.values()].filter((proc) => !proc.exited).map((proc) => proc.key);
+    if (keys.length === 0) return 0;
+    await Promise.all(keys.map((key) => this.signal(key).catch(() => undefined)));
+    const deadline = this.#deps.now() + timeoutMs;
+    while (this.size > 0 && this.#deps.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
+    return keys.length;
+  }
+
   heartbeat(keys: ReadonlyArray<string>): ProcessAnswer {
     const now = this.#deps.now();
     for (const key of keys) {

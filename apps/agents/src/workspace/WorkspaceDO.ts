@@ -238,6 +238,8 @@ export class WorkspaceDO extends ContainerHost {
   readonly #keyGate = new ModelKeyGate(() => crypto.randomUUID());
   /** When the sync guard last scanned (its files changed after this are scanned next). */
   #lastScan = 0;
+  /** A CLI process ran since the last scan: the next pull is scanned even if none runs now. */
+  #cliSinceScan = false;
   /** Patterns of the git tokens this object handed to the Container lately (the sync guard looks for them too). */
   readonly #tokenPatterns: Array<CredentialPattern> = [];
   /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
@@ -389,7 +391,9 @@ export class WorkspaceDO extends ContainerHost {
    * killed, and the key is flagged for rotation.
    */
   async #scanBeforePull(): Promise<void> {
-    if (this.#processes.size === 0) return;
+    // While a CLI process lives, and once more after the last one ended (what it wrote last).
+    if (this.#processes.size === 0 && !this.#cliSinceScan) return;
+    this.#cliSinceScan = this.#processes.size > 0;
     const started = Date.now();
     const answer = await this.#scan({ roots: ["/workspace"], since: this.#lastScan === 0 ? 0 : this.#lastScan - 2000, quarantine: QUARANTINE, skip: SCAN_SKIP }).catch(() => undefined);
     if (answer === undefined) return;
@@ -1336,6 +1340,7 @@ export class WorkspaceDO extends ContainerHost {
 
   async processStart(input: ProcessStartInput): Promise<ProcessStartAnswer> {
     this.#alive();
+    this.#cliSinceScan = true;
     this.#rememberId(input.t3Path.startsWith("/w/") ? input.t3Path.slice(3) : undefined);
     if (this.containerRunning()) await this.#syncEntries("push").catch(() => undefined);
     const answer = await this.#processes.start(input);
@@ -1413,8 +1418,10 @@ export class WorkspaceDO extends ContainerHost {
   /** Stops the Container now and frees its slot. */
   async stopContainer(): Promise<void> {
     if (this.ctx.container?.running === true) {
-      // The shells' writes not yet pulled would go with the Container.
-      await this.#terminalSync.pullNow().catch(() => undefined);
+      // CLI processes end first (they flush their session files), then the writes not yet pulled come into the DO.
+      const stopped = await this.#processes.stopAll().catch(() => 0);
+      const pulled = await this.#terminalSync.pullNow().catch(() => -1);
+      if (stopped > 0) console.log(JSON.stringify({ t3flare: "container-stop-cli", workspace: this.#workspaceId() ?? null, processes: stopped, pulled }));
       await this.ctx.container.destroy();
     }
     this.#terminals.containerStopped();
