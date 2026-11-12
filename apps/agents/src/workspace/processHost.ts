@@ -85,8 +85,17 @@ export interface ProcessHostDeps {
   readonly linkedWork?: (thread: string, alive: boolean) => void;
 }
 
+/**
+ * Step 4b: what a CLI process counts against the Workspace's cap, in Codex processes. Claude Code (its Node adapter and
+ * `claude`) peaked at 344 MiB and OpenCode (`opencode acp` and its `serve` child) at 439 MiB in a turn running
+ * `npm ci && npm test` (docs/steps/step-4b/m0-local.json P7), about twice an idle Codex app-server.
+ */
+export const CLI_WEIGHT: Readonly<Record<string, number>> = { claude: 2, opencode: 2 };
+const weightOf = (cli: string) => CLI_WEIGHT[cli] ?? 1;
+
 interface Proc {
   readonly key: string;
+  readonly cli: string;
   readonly marker: ProcessMarker;
   process: CliProcess | undefined;
   writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
@@ -118,6 +127,11 @@ export class ProcessHost {
 
   constructor(deps: ProcessHostDeps) {
     this.#deps = deps;
+  }
+
+  /** The live processes' weight against the cap (`CLI_WEIGHT`). */
+  get weight(): number {
+    return [...this.#procs.values()].filter((proc) => !proc.exited).reduce((sum, proc) => sum + weightOf(proc.cli), 0);
   }
 
   /** Live processes (not exited). */
@@ -172,7 +186,7 @@ export class ProcessHost {
     const refuse = (reason: string): ProcessStartAnswer => ({ ok: false, epoch: this.#deps.epoch, reason });
     if (this.#procs.has(input.key)) return { ok: true, epoch: this.#deps.epoch };
     if (input.cli === "probe" && !this.#deps.allowProbe) return refuse("the probe program runs on test stages only");
-    if (this.size >= this.#deps.maxProcesses) return refuse(`this Workspace already runs ${this.#deps.maxProcesses} CLI agent processes; let one finish first`);
+    if (this.weight + weightOf(input.cli) > this.#deps.maxProcesses) return refuse(`this Workspace already runs ${this.size} CLI agent processes (Claude Code and OpenCode count twice); let one finish first`);
     if (!this.#deps.running()) {
       try {
         await this.#deps.startContainer();
@@ -207,6 +221,7 @@ export class ProcessHost {
     const now = this.#deps.now();
     const proc: Proc = {
       key: input.key,
+      cli: input.cli,
       marker: {
         key: input.key,
         environmentEpoch: input.environmentEpoch,

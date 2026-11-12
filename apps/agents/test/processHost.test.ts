@@ -141,6 +141,15 @@ describe("ProcessHost", () => {
     expect(h.spawned).toHaveLength(0);
   });
 
+  it("weighs Claude Code and OpenCode as two Codex processes each (step 4b, M0 P7's memory)", async () => {
+    const h = harness({ maxProcesses: 4 });
+    expect((await h.host.start(start("proc-a", { cli: "claude" }))).ok).toBe(true);
+    expect((await h.host.start(start("proc-b", { cli: "opencode" }))).ok).toBe(true);
+    const third = await h.host.start(start("proc-c", { cli: "codex" }));
+    expect(third.ok).toBe(false);
+    expect(h.spawned).toHaveLength(2);
+  });
+
   it("refuses past the per-Workspace cap", async () => {
     const h = harness({ maxProcesses: 1 });
     await h.host.start(start("proc-a"));

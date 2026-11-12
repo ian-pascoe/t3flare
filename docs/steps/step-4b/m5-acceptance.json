@@ -1,0 +1,288 @@
+{
+  "url": "https://t3flare-environment-step4b.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-12T02:58:58.838Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.9",
+      "commit": "135713a74700",
+      "builtAt": "2026-11-12T02:54:27.579Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-12T03:08:59.821Z",
+    "paired": 200,
+    "ms": 2354,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "554c07af-63e0-4758-831b-ffe8fe1d15c2",
+    "threads": 12,
+    "ms": 3080
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 954,
+    "bytes": 73828,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 113,
+    "maxBytes": 46535
+  },
+  "subscribeThread": {
+    "ms": 48,
+    "bytes": 46475,
+    "items": 20
+  },
+  "search": {
+    "ms": 32,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1537
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 2,
+    "maxParameters": 300,
+    "compoundsRewritten": 75,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "rowsWritten": 15948,
+    "rowsRead": 41717,
+    "databaseSize": 13828096,
+    "refusedStatements": 0,
+    "pragmaRefusals": 0
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 193,
+      "modules": 109
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 5,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:aed83671-a3ca-4563-a42c-83ea9a46d189"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": [],
+    "processChannelOnInstance": true
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwcylg27",
+      "ms": 5117,
+      "cwd": "/w/acceptance-mwcylg27",
+      "error": null
+    },
+    "turn": {
+      "threadId": "d370ec0d-91d7-4eff-a9c0-53741fb84c31",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwcylg27/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwcylg27 && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 20375
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "ms": 20807
+  },
+  "claude": {
+    "ok": true,
+    "failures": [],
+    "cli": "claude",
+    "workspace": "acceptance-claude-mwcylw4b",
+    "turn": {
+      "runs": [
+        {
+          "id": "run:thread:d53d492f-5f59-4b72-bc92-2468199c29be:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "requests": [
+        {
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+      "ms": 24998
+    },
+    "plan": {
+      "runs": [
+        {
+          "id": "run:thread:d53d492f-5f59-4b72-bc92-2468199c29be:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:d53d492f-5f59-4b72-bc92-2468199c29be:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "proposedPlan": [
+        "# Plan: add a greeting line\n\n## Context\n`src/greeting.txt` currently contains only `Hello from the t3flare fixture.` (an earlier edit is no longer on disk). The goal is to append `Hello from the CLI.` as the new last line and confirm the repo checks still pass.\n\n## Steps\n1. Use the Edit tool (not th"
+      ],
+      "diff": ""
+    },
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 606,
+        "bytes": 7679193,
+        "ms": 327
+      },
+      "flagged": null
+    }
+  },
+  "opencode": {
+    "ok": true,
+    "failures": [],
+    "cli": "opencode",
+    "workspace": "acceptance-opencode-mwcymp6r",
+    "turn": {
+      "runs": [
+        {
+          "id": "run:thread:7d15a091-b2fa-48c6-b87c-6293d21a0641:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "requests": [
+        {
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+      "ms": 27158
+    },
+    "plan": {
+      "runs": [
+        {
+          "id": "run:thread:7d15a091-b2fa-48c6-b87c-6293d21a0641:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:7d15a091-b2fa-48c6-b87c-6293d21a0641:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "proposedPlan": [],
+      "diff": ""
+    },
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 605,
+        "bytes": 30253156,
+        "ms": 253
+      },
+      "flagged": null
+    }
+  },
+  "totalMs": 106969,
+  "failures": [],
+  "ok": true
+}
