@@ -11,6 +11,52 @@ merges** (§7.2). Evidence comes from reading the repo, from read-only runs in t
 experiments in `/tmp/pnpm-exp` (Appendix A). Nothing was installed globally. `node_modules` in the main checkout was not
 touched. No credential file was read.
 
+## Review changelog (2026-11-12, implementation)
+
+Fable's review (`pnpm-plan-review.md`) overrides this plan. Each finding is folded in below; where a section further
+down disagrees with this changelog, the changelog wins. Re-inventoried at `main` `d54af10` (t3code `24e77473ec`):
+`tools` has merged (vendored `@cloudpid/*`, `packages/harness-registry`, `apps/mcp-worker`, `apps/codemode-sandbox`)
+and the back-to-stock step removed the push gateway.
+
+**Re-inventory (R12).**
+
+- `apps/agents/scripts/p4-push-shapes.ts` is gone with the push gateway: **D6 is moot.**
+- New `bun` spawns: `apps/environment/scripts/tools.ts:318` (`bun scripts/stage.ts deploy tools`); `stage.ts`'s two
+  are now `:123` and `:157`.
+- `scripts/check.ts` has 29 tasks: the plan's list plus `typecheck`/`test` of `@cloudpid/mcp` (`--noEmit`; tests with
+  three excludes), `@t3flare/mcp-worker`, `@t3flare/harness-registry`, and `typecheck` of `@t3flare/codemode-sandbox`.
+- `vendor/cloudpid/{mcp,protocol}` depend on `@cloudpid/protocol`/`@cloudpid/config` as `"*"` (H2).
+- Bun APIs: `scripts/gen-workspace.ts`, `scripts/verify-lock.ts` and (history, left alone)
+  `docs/steps/step-2a-part2/gen-proxy-fixtures.ts`. `vendor/cloudpid/mcp/src/server/caller.ts`'s `"bun"` is a
+  User-Agent token, not a spawn.
+
+**Findings.**
+
+| # | Change to the plan |
+|---|---|
+| H1 | gen-workspace emits only those t3 `patchedDependencies` whose `name@version` is in the snapshot closure of our t3 importers in t3's lock. `allowUnusedPatches` stays unset. |
+| H2 | `OUR_OVERRIDES` gets `"@cloudpid/protocol": "workspace:*"` and `"@cloudpid/config": "workspace:*"`; M0 asserts both resolve as `link:`. `vendor/` is not edited. |
+| H3 | `bump.ts` runs `pnpm install --no-frozen-lockfile`. The bump proof's second run against another tag is mandatory. |
+| H4 / D4 | **D4 follows the review:** every t3 `allowBuilds: true` becomes `false`, `@google/genai`, `@mongodb-js/zstd`, `node-liblzma` and `protobufjs` are added as `false`, and the `react-native-enriched-markdown@file:…` key is dropped. An entry is allowed only when proven needed. `deploy-prod.yml`'s and `bump.yml`'s secrets move from job level to the steps that need them. |
+| H5 | Rollback: bump PRs made after the swap are held for a soak (two green nightlies and one further prod deploy). If one merged anyway, revert only the swap, keep the pin, and regenerate under Bun. The docs ride in the swap commit, so one `git revert` restores them too. |
+| M1 | `seed-lock` drops t3's settings header (`overrides`, `packageExtensionsChecksum`, `pnpmfileChecksum`, `patchedDependencies`, `catalogs`); pnpm rewrites it for our root. t3's `.pnpmfile.cjs` was read: its only hook, `updateConfig`, guards mobile fork tarballs and widens Windows architectures, and it has no `readPackage`, so not running it at our root changes no resolution. `verify-lock` compares the transitive snapshot closure of each t3 importer. The core no-move rule applies to every lock-diff group. §2.6 is corrected: the lock has **two** YAML documents. |
+| M2 | `minimumReleaseAge` is not emitted (R10 dropped); pnpm's default applies, like t3's. |
+| M3 | `verifyDepsBeforeRun: error` in the generated file; `NPM_CONFIG_WORKSPACE_DIR=<root>` in `stage.ts`, `bump.ts` and CI; `stage.ts deploy` refuses when `t3code/node_modules/.pnpm` exists. |
+| M4 | gen-workspace allowlists the t3 keys present today and fails on an unknown key ("classify it"). |
+| M5 | M1 proves the red path: a failing task exits non-zero, a misspelt `pkg#task` fails. `@cloudpid/mcp`'s typecheck is a root task with `--noEmit`. |
+| M6 | gen-workspace also writes `mise.toml`'s `node` and `pnpm`; `mise.toml` joins `PINNED_FILES`. |
+| M7 | Bump proof adds a forced-failure run (clean submodule, passing frozen install afterwards). M0 greps a marker line of every `patches/deps` patch and of t3's alchemy patch in `node_modules`. M2 diffs the bundled `name@version` list and the stub export names against the Bun build. |
+| M8 | CI moves to Node 26 in P1, apart from the swap. |
+| LOW | Plain `setup-vp` with its own cache first, no `~/.vite-plus` machinery. `gen-proxy-fixtures.ts` is history (above). |
+
+**Not rebutted.** I found nothing to disprove; M1 is confirmed (two `---` documents; the header carries
+`pnpmfileChecksum` and `packageExtensionsChecksum`).
+
+**Owner-directed changes to the rollout** (2026-11-12 brief): `deploy-prod.yml` and `bump.yml` are not dispatched from the
+branch. CI is proved by a temporary checks-only workflow, deleted afterwards (as SPI-1087 did). The bump proof runs
+`bump.ts` on the throwaway stage `pnpm`, not `bump`. Milestones are renumbered: P1, M0 install, M1 check, M2 stage
+deploy + acceptance + bundle diff, M3 bump proof (current pin, another tag, forced failure), then the swap.
+
 ## 0. Summary
 
 - **Workspace**: a root `pnpm-workspace.yaml`, generated from `t3code/pnpm-workspace.yaml` by a much smaller
@@ -385,7 +431,7 @@ direct dependencies.
 **Seed from t3's lock instead of pinning.** Same package manager, same lock format (v9), so t3's resolutions can be
 reused directly. A new `scripts/seed-lock.ts` (about 60 lines) runs at migration and in every bump:
 
-1. Take the **main document** of `t3code/pnpm-lock.yaml`, the one with `settings`/`importers`. It's the second of three
+1. Take the **main document** of `t3code/pnpm-lock.yaml`, the one with `settings`/`importers`. It's the second of two
    YAML documents. Skip the env document (`packageManagerDependencies`), which pnpm writes for our root.
 2. Keep only the importers in the closure. Re-key each `apps/server` → `t3code/apps/server`. Their `link:` specifiers
    are relative between t3 directories, so they stay valid.
