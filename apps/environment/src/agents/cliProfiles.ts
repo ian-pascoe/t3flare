@@ -69,7 +69,7 @@ export type LaunchAnswer = Launch | { readonly refused: string };
 const homeOf = (key: string) => `${CLI_HOMES}/${key}`;
 
 /** t3's env keys the profiles read; everything else is dropped. */
-const READ_ENV = new Set(["T3CODE_THREAD_ID", "T3_PI_RUNTIME_MODE", "T3_PI_MCP_EXTENSION_PATH"]);
+const READ_ENV = new Set(["T3CODE_THREAD_ID", "T3_PI_RUNTIME_MODE", "T3_PI_MCP_EXTENSION_PATH", "T3_MCP_URL", "T3_MCP_BEARER_TOKEN"]);
 
 const dropped = (env: LaunchInput["env"]): ReadonlyArray<string> => Object.keys(env).filter((key) => env[key] !== undefined && !READ_ENV.has(key));
 
@@ -236,6 +236,11 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     // A missing or unknown mode is the extension's full access: here it is always set, and never above what t3 asked.
     const mode = input.env.T3_PI_RUNTIME_MODE;
     env.T3_PI_RUNTIME_MODE = mode !== undefined && RUNTIME_MODES.has(mode) ? mode : "approval-required";
+    // SPI-1039: t3's MCP server, only as the relay with this process's own handle (relayedMcp.ts); anything else, none.
+    if (context.relay !== undefined && input.env.T3_MCP_URL === relayUrl("t3") && input.env.T3_MCP_BEARER_TOKEN === context.relay.handle) {
+      env.T3_MCP_URL = input.env.T3_MCP_URL;
+      env.T3_MCP_BEARER_TOKEN = context.relay.handle;
+    }
   }
   const thread = input.env.T3CODE_THREAD_ID;
   return {

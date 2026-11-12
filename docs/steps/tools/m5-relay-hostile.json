@@ -1,0 +1,49 @@
+{
+ "at": "2026-11-12T16:03:32.659Z",
+ "workspace": "tools-relay-hostile",
+ "cases": [
+  {
+   "name": "no handle or a forged one: 401, nothing reaches the server",
+   "none": "401",
+   "forged": "401",
+   "get": "405",
+   "ok": true
+  },
+  {
+   "name": "a handle read from a live owner Codex process (root sees /proc): judged as that owner thread at full access (accepted risk, plan §3.2)",
+   "out": [
+    "found",
+    "200"
+   ],
+   "notesAdded": 1,
+   "ok": true
+  },
+  {
+   "name": "tainted Workspace (H1): the stolen owner handle's write asks per call on the owner's thread (no live turn: refused, no note); t3's tools refuse it outright (403)",
+   "write": [
+    "found",
+    "200",
+    "{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"Not run: the owner did not approve this call (no live turn to ask on).\"}],\"isError\":true}}"
+   ],
+   "t3": [
+    "found",
+    "403"
+   ],
+   "notesAdded": 0,
+   "ok": true
+  },
+  {
+   "name": "tainted Workspace (H1): an owner thread at full access gets a card for each write, approved each time",
+   "cards": 2,
+   "notesAdded": 2,
+   "text": "Done.",
+   "ok": true
+  },
+  {
+   "name": "a handle replayed after its process ended: 401 (revoked with the process)",
+   "out": "401",
+   "ok": true
+  }
+ ],
+ "ok": true
+}

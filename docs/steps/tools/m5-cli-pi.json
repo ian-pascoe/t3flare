@@ -1,5 +1,5 @@
 {
- "at": "2026-11-12T15:56:36.385Z",
+ "at": "2026-11-12T16:02:32.287Z",
  "cli": "pi",
  "workspace": "tools-cli-pi",
  "cases": [
@@ -8,13 +8,13 @@
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:4b895b98-552e-4fe0-b103-d37d9232ef27:ordinal:1",
+    "id": "run:thread:c763fd4e-cdad-499f-b11b-d5b43cc250d9:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "l `t3_thread_list`. None of the tools available to me in this session is a t3-code MCP tool. The only tools I have are file read, bash, edit, and write, and you asked me not to use bash.\n\nTo get the thread count, you could run the tool from your t3-code client directly. Or, if the t3-code MCP server is configured for this harness, it may need to be connected or enabled, and then I could try again.",
+   "text": "I can't call `t3_thread_list` because it isn't among the tools available to me. The only tools I have are file read, bash, file edit, and file write, and none of them is a t3-code MCP tool. I haven't run any commands.\n\nIf the t3-code MCP server is configured in your environment, it may not be connected to this session. You could check that, or tell me which tool I should use instead.",
    "items": [],
    "notesAdded": [],
    "ok": true

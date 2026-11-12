@@ -96,7 +96,9 @@ describe("pi's profile", () => {
       T3_PI_MCP_EXTENSION_PATH: "/var/lib/t3flare/cli/proc-1/ext/pi-t3-mcp-extension.ts",
       T3_PI_RUNTIME_MODE: "auto-accept-edits",
     });
-    expect(answer.droppedEnv).toEqual(["T3_MCP_BEARER_TOKEN"]);
+    // Read (SPI-1039), but passed on only as the relay with the process's own handle: never t3's own bearer.
+    expect(answer.droppedEnv).toEqual([]);
+    expect(answer.env.T3_MCP_BEARER_TOKEN).toBeUndefined();
     const models = JSON.parse(answer.files!.find((file) => file.path.endsWith("models.json"))!.text);
     expect(models.providers.anthropic.baseUrl).toBe("https://proxy.example");
     expect(models.providers.anthropic.apiKey).toBe("!/opt/t3flare/bin/t3flare-model-key pi");

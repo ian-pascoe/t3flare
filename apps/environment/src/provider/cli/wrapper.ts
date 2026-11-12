@@ -7,7 +7,8 @@
 //   ProviderSessionManager `open`), which would run another project's thread in this Workspace's Container. The flag is
 //   false both in `getCapabilities()` and on the session entity t3 keeps.
 // - A fork into another Workspace is refused: the fork runs in the source's process, so in the source's Container.
-// - No t3 tools (OD-3): `supportsMcpTools` is false, MCP apps are gone, feedback uploads (to the vendor) are gone.
+// - t3's tools through the MCP relay (SPI-1039, `relayedMcp.ts`; OD-3 lifted); MCP apps and feedback uploads (to the
+//   vendor) are gone.
 // - The turn's state reaches the Workspace (`processTurn`): the Container's hold (review F7).
 // - The 2 h turn cap (ADR-0015): a turn still running then ends its process, and with it the session.
 // - Events can be filtered (pi's "t3-code MCP unavailable" notice, review F10).
@@ -85,7 +86,8 @@ export const sessionFor = (sessions: CliSessions, providerSessionId: string, cwd
 export const cliCapabilities = (capabilities: OrchestrationV2ProviderCapabilities): OrchestrationV2ProviderCapabilities => ({
   ...capabilities,
   sessions: { ...capabilities.sessions, supportsMultipleProviderThreadsPerSession: false },
-  tools: { ...capabilities.tools, supportsMcpTools: false },
+  // SPI-1039: t3's tools reach CLI agents through the relay (relayedMcp.ts), never with t3's bearer.
+  tools: { ...capabilities.tools, supportsMcpTools: true },
 });
 
 const workspaceOf = (cwd: string | null | undefined): string | null => (cwd === null || cwd === undefined ? null : (toWorkspace(cwd)?.id ?? null));

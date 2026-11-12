@@ -1,5 +1,5 @@
 {
- "at": "2026-11-12T14:54:20.995Z",
+ "at": "2026-11-12T16:04:13.188Z",
  "status": "cancelled",
  "script": {
   "title": "Code mode",
@@ -22,6 +22,26 @@
  },
  "cards": [],
  "lostLog": "",
+ "redeployed": [
+  "[11:03:53.102] INFO: Deploy · tools",
+  "[11:03:57.894] INFO: Plan: 3 to update, 2 binding changes",
+  "[11:03:57.896] INFO: [CodemodeSandbox] update",
+  "[11:03:57.896] INFO: [CodemodeSandbox/T3FLARE_SANDBOX_GEN] create",
+  "[11:03:57.896] INFO: [Environment] update",
+  "[11:03:57.898] INFO: [Agents/WorkspaceDO-Containers] update",
+  "[11:03:57.898] INFO: [Agents/WorkspaceDO-Containers/WorkspaceContainer] update",
+  "[11:03:58.050] INFO: [Agents/WorkspaceDO-Containers] updating",
+  "[11:03:58.056] INFO: [CodemodeSandbox] updating",
+  "[11:03:58.097] INFO: [Environment] updating",
+  "[11:03:58.465] INFO: [Environment] Cloudflare Worker update: preparing bundle for t3flare-environment-tools",
+  "[11:03:58.669] INFO: [CodemodeSandbox] Cloudflare Worker update: preparing bundle for t3flare-codemode-tools",
+  "[11:03:58.738] INFO: [CodemodeSandbox] Cloudflare Worker update: uploading script for t3flare-codemode-tools",
+  "[11:03:59.339] INFO: [Environment] Cloudflare Worker update: uploading assets for t3flare-environment-tools",
+  "[11:04:00.628] INFO: [Environment] Cloudflare Worker update: uploading script for t3flare-environment-tools",
+  "[11:04:01.860] INFO: [CodemodeSandbox] updated — Uploading worker (688.54 KB) ... (3.8s)",
+  "[11:04:08.192] INFO: [Environment] updated — Uploading worker (8.86 MB) ... (10.1s)",
+  "[11:04:08.249] INFO: [Agents/WorkspaceDO-Containers] updated (10.2s)"
+ ],
  "expectation": "the script fails closed: it ends with an error listing the calls it completed; the card is withdrawn or, if answered, the command does not run twice",
  "ok": true
 }

@@ -257,3 +257,21 @@ describe("the CLIs' relay entries (H2, M11)", () => {
     expect(isRelayedT3Server({ url: "http://computer.internal/t3flare/mcp/t3", http_headers: { Authorization: "Bearer t3-real-token" } })).toBe(false);
   });
 });
+
+describe("pi's t3 entry (SPI-1039)", () => {
+  const handle = "f".repeat(64);
+  const pi = (env: Record<string, string>) =>
+    profileLaunch(
+      { cli: "pi", args: ["--mode", "rpc", "--extension", "/s/ext.ts"], key: "k", cwd: "/w/x", env: { T3_PI_RUNTIME_MODE: "approval-required", ...env }, allowProbe: false },
+      { proxyUrl: "https://proxy.example", models: [], readStateFile: () => "SRC", piExtensionSource: "SRC", relay: { handle, servers: [] } },
+    );
+  it("passes t3's MCP variables only as the relay with this process's handle", () => {
+    const ok = pi({ T3_MCP_URL: "http://computer.internal/t3flare/mcp/t3", T3_MCP_BEARER_TOKEN: handle });
+    if ("refused" in ok) throw new Error(ok.refused);
+    expect(ok.env.T3_MCP_URL).toBe("http://computer.internal/t3flare/mcp/t3");
+    const real = pi({ T3_MCP_URL: "https://t3.example/mcp", T3_MCP_BEARER_TOKEN: "t3-real" });
+    if ("refused" in real) throw new Error(real.refused);
+    expect(real.env.T3_MCP_URL).toBeUndefined();
+    expect(real.env.T3_MCP_BEARER_TOKEN).toBeUndefined();
+  });
+});
