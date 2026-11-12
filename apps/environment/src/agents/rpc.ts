@@ -67,11 +67,19 @@ export interface WorkspaceRpc {
   clone(input: CloneInput): Promise<GitAnswer>;
   info(): Promise<ProvisionInfo>;
   exec(input: ExecInput): Promise<ExecResult>;
+  /** SPI-992 (review M2): t3's own push is about to run with these updates; only this router calls it. */
+  expectPush(input: { readonly id: string; readonly updates: ReadonlyArray<{ readonly ref: string; readonly new: string }>; readonly ttlMs?: number }): Promise<void>;
+  /** t3's push returned: its expectation is gone. */
+  unexpectPush(input: { readonly id: string }): Promise<void>;
+  /** SPI-992 (review H1): the owner trusts the Workspace again; its taint is cleared. */
+  trustAgain(input: { readonly by: string }): Promise<{ readonly cleared: { readonly since: number; readonly by: ReadonlyArray<string> } | null }>;
+  /** The Workspace's taint, or null. */
+  taint(): Promise<{ readonly since: number; readonly by: ReadonlyArray<string> } | null>;
   containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }>;
   stopContainer(): Promise<void>;
   readText(path: string): Promise<string | null>;
   writeText(path: string, text: string): Promise<void>;
-  worktreeClone(input: { readonly id: string; readonly url: string | null; readonly token: string | null; readonly parent?: string }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }>;
+  worktreeClone(input: { readonly id: string; readonly url: string | null; readonly parent?: string }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }>;
   worktreeBundle(input: { readonly ref: string; readonly tips: ReadonlyArray<string>; readonly name: string }): Promise<{ readonly ok: boolean; readonly commit?: string; readonly bundle?: string | null; readonly config?: ReadonlyArray<string>; readonly error?: string }>;
   worktreeFinish(input: { readonly parent: string; readonly bundle: string | null; readonly ref: string; readonly commit: string; readonly config: ReadonlyArray<string> }): Promise<{ readonly ok: boolean; readonly head?: string; readonly error?: string }>;
   destroy(): Promise<{ readonly destroyed: true }>;

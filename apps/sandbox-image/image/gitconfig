@@ -1,0 +1,8 @@
+# The image's system gitconfig (SPI-992, review M5; installed by the Dockerfile as conda git's $PREFIX/etc/gitconfig and
+# /etc/gitconfig): every push to github.com goes to t3flare's push gateway, and the credential helper (a read-only token
+# for https://github.com only). Nothing is written per Container start. Generated from CREDENTIAL_HELPER
+# (apps/agents/src/workspace/credentialHelper.ts); apps/agents/test/systemGitconfig.test.ts keeps them equal.
+[url "http://computer.internal/t3flare/git/"]
+	pushInsteadOf = https://github.com/
+[credential]
+	helper = "!f() { test \"$1\" = get || exit 0; pr=; h=; while IFS== read -r k v; do [ -n \"$k\" ] || break; case \"$k\" in protocol) pr=\"$v\";; host) h=\"$v\";; esac; done; [ \"$pr\" = https ] && [ \"$h\" = github.com ] || exit 0; t=\"$(curl -fsS --max-time 60 -G --data-urlencode v=2 --data-urlencode protocol=https --data-urlencode host=github.com http://computer.internal/t3flare/git-credential 2>/dev/null)\"; [ -n \"$t\" ] || exit 0; echo username=x-access-token; echo \"password=$t\"; }; f"

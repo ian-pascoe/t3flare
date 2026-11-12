@@ -57,7 +57,9 @@ import { ApprovalStore, interactionModeSection, permissions } from "../extension
 import { projectContext } from "../extensions/project-context.ts";
 import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
-import { LINKED_WORK_MS, PUSH_APPROVAL_MS } from "../workspace/linkedPush.ts";
+import { LINKED_WORK_MS, OWNER_COMMAND_MS, PUSH_APPROVAL_MS } from "../workspace/linkedPush.ts";
+import { pushCard, type ReportedCommit } from "../workspace/pushCard.ts";
+import type { RefUpdate } from "../workspace/pushGateway.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
@@ -238,48 +240,55 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // -------------------------------------------------------------------------------------------------------------------
   // Pushes from linked work (step 3, owner decision D1: each push of a thread a link started asks the owner)
 
-  /** Before each command of a linked thread: its Workspace counts as holding linked work for LINKED_WORK_MS. */
+  /**
+   * Before each command: a linked thread's Workspace counts as holding linked work for LINKED_WORK_MS (and is tainted,
+   * SPI-992 H1); an owner's thread notes that it may be the one pushing for OWNER_COMMAND_MS (the gateway's attribution).
+   */
   async #noteLinkedWork(): Promise<void> {
     const meta = this.#meta();
-    if (meta?.linked == null || meta.workspaceId === null) return;
-    // SAFETY: the Workspace DO answers `noteLinkedWork` (WorkspaceDO.ts).
+    if (meta === undefined || meta.workspaceId === null) return;
+    // SAFETY: the Workspace DO answers `noteLinkedWork` and `noteOwnerCommand` (WorkspaceDO.ts).
     const workspace = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(meta.workspaceId)) as unknown as {
       noteLinkedWork(input: { readonly session: string; readonly until: number }): Promise<void>;
+      noteOwnerCommand(input: { readonly session: string; readonly until: number }): Promise<void>;
     };
-    await workspace.noteLinkedWork({ session: sessionNameOf(meta.threadId), until: Date.now() + LINKED_WORK_MS });
+    const session = sessionNameOf(meta.threadId);
+    if (meta.linked == null) await workspace.noteOwnerCommand({ session, until: Date.now() + OWNER_COMMAND_MS });
+    else await workspace.noteLinkedWork({ session, until: Date.now() + LINKED_WORK_MS });
   }
 
   /**
-   * RPC from the Workspace DO: a push (or a git request it cannot tell is a fetch) while this linked thread's work is
-   * active there. Asks the owner for this push alone, on this thread's live turn; never accepted for the session, in any
-   * mode. No live turn, or no answer within PUSH_APPROVAL_MS: refused.
+   * RPC from the Workspace DO (the push gateway's policy, SPI-992): a push's exact ref updates, asked of the owner on
+   * this thread's live turn. On a linked thread, once (never accepted for the session, in any mode). On the owner's own
+   * thread in a tainted Workspace, "accept for the session" approves and trusts the Workspace again (review H1). No live
+   * turn, or no answer within PUSH_APPROVAL_MS: refused.
    */
-  async approveGitPush(input: { readonly workspace: string; readonly op: string; readonly command: string }): Promise<{ readonly approved: boolean; readonly reason?: string }> {
+  async approveGitPush(input: {
+    readonly workspace: string;
+    readonly linked: boolean;
+    readonly updates: ReadonlyArray<RefUpdate>;
+    readonly tips: Readonly<Record<string, string>>;
+    readonly defaultBranch: string | null;
+    readonly reported: Readonly<Record<string, ReportedCommit>>;
+  }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }> {
     await this.#opening;
     const meta = this.#meta();
     const turn = this.#liveTurn();
-    if (meta?.linked == null) return { approved: false, reason: "not linked work" };
+    if (input.linked && meta?.linked == null) return { approved: false, reason: "not linked work" };
+    if (!input.linked && meta?.linked != null) return { approved: false, reason: "a linked thread cannot trust the Workspace" };
     if (turn === null) return { approved: false, reason: "no live turn to ask on" };
     const requestId = `push:${crypto.randomUUID()}`;
-    const command = input.command.trim() === "" ? `git ${input.op}` : input.command.trim();
+    const card = pushCard({ updates: input.updates, tips: input.tips, defaultBranch: input.defaultBranch, reported: input.reported, linkLabel: input.linked ? (meta?.linked?.label ?? "a linked environment") : null });
     const context = withAbortSignal(AbortSignal.timeout(PUSH_APPROVAL_MS), BACKGROUND_CONTEXT);
     try {
       const answer = await this.#approvals.ask(
-        {
-          requestId,
-          turn,
-          callId: "",
-          tool: "git push",
-          kind: "git-push",
-          summary: `${command}`,
-          detail: `Work started from ${meta.linked.label} through a linked environment wants to push to this project's repository. Each push asks.`,
-          createdAt: Date.now(),
-        },
+        { requestId, turn, callId: "", tool: "git push", kind: "git-push", summary: card.summary, detail: card.detail, createdAt: Date.now() },
         () => Promise.resolve(),
         context,
       );
       const approved = answer.decision === "accept" || answer.decision === "acceptForSession";
-      return approved ? { approved } : { approved, reason: answer.decision };
+      const trust = !input.linked && answer.decision === "acceptForSession";
+      return approved ? { approved, trust } : { approved, reason: answer.decision };
     } catch {
       return { approved: false, reason: "no answer in time" };
     } finally {

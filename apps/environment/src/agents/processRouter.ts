@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off globalConsole:off
+// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off globalConsole:off cryptoRandomUUID:off
 // The Environment's process spawner (step 2a plan, section 2): the Environment DO runs no processes, so every command
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is
@@ -6,8 +6,9 @@
 import { fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, toWorkspace } from "@t3flare/workspace-client";
 import {
   CONTAINER_GITHUB_PERMISSIONS,
-  CONTAINER_WORKFLOWS_PERMISSIONS,
   ENVIRONMENT_GITHUB_PERMISSIONS,
+  PUSH_GATEWAY_PERMISSIONS,
+  PUSH_GATEWAY_WORKFLOWS_PERMISSIONS,
 } from "@t3flare/github-app/permissions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -26,7 +27,8 @@ import {
   gitEnvOf,
   intoWorkspace,
   mayStartContainer,
-  needsRemoteToken,
+  gatewayUrlsToGitHub,
+  pushPlanOf,
   parseWorktreeList,
   readScopeOf,
   remoteRepoOf,
@@ -111,34 +113,16 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
   if (existing !== undefined && existing.cloneUrl !== null) {
     return { exitCode: 128, stdout: "", stderr: `fatal: destination path '${request.id}' already exists and is not an empty directory.\n`, route: "clone" };
   }
-  let created;
   try {
-    if (existing === undefined) created = services.workspaces.create({ id: request.id, ...fields });
-    else {
-      services.workspaces.setRemote(request.id, fields);
-      created = services.workspaces.get(request.id)!;
-    }
+    if (existing === undefined) services.workspaces.create({ id: request.id, ...fields });
+    else services.workspaces.setRemote(request.id, fields);
   } catch (error) {
     return { exitCode: 128, stdout: "", stderr: `fatal: ${(error as Error).message}\n`, route: "clone" };
   }
-  let token: string | null = null;
-  let detail = "public";
-  if (remote?.host === "github.com") {
-    try {
-      token = (
-        await services.github().mint({
-          owner: remote.owner.toLowerCase(),
-          repositories: [remote.name],
-          permissions: created.workflows ? CONTAINER_WORKFLOWS_PERMISSIONS : CONTAINER_GITHUB_PERMISSIONS,
-        })
-      ).token;
-      detail = "github-app";
-    } catch (error) {
-      // Not in the App's installation: a public repo still clones, a private one fails with git's own message.
-      detail = `no token: ${String(error).slice(0, 200)}`;
-    }
-  }
-  const answer = await workspaceRpc(request.id).clone({ id: request.id, url, token });
+  // The clone's credential helper asks the Workspace DO, which asks this object for a read-only token (SPI-992). Not in
+  // the App's installation: a public repo still clones, a private one fails with git's own message.
+  const detail = remote?.host === "github.com" ? "github-app" : "public";
+  const answer = await workspaceRpc(request.id).clone({ id: request.id, url });
   if (!answer.ran || answer.exitCode !== 0) {
     if (existing === undefined) services.workspaces.remove(request.id);
     else services.workspaces.setRemote(request.id, { host: null, owner: null, name: null, cloneUrl: null });
@@ -150,25 +134,26 @@ const clone = async (request: { readonly id: string; readonly url: string }): Pr
 };
 
 /**
- * The Workspace's Container token for its repo (ADR-0013): one repo, `contents` and `pull_requests` write, and
- * `workflows` only when the Workspace is opted in. Null for a Workspace without a GitHub remote or outside the App.
+ * A Workspace's token for its one repo (ADR-0013; SPI-992), with the repo and its expiry. `read`: the Container token
+ * (`CONTAINER_GITHUB_PERMISSIONS`: code read-only, `pull_requests: write`), for the credential helper. `push`: the push
+ * gateway's (`contents: write`, and `workflows` only when the Workspace is opted in), which the agents Worker adds to an
+ * allowed push and never hands to a Container. Null for a Workspace without a GitHub remote or outside the App.
  */
-/** `contents: read` alone: a linked thread's fetch while linked work is active in its Workspace (step 3, D1). */
-const CONTAINER_READ_PERMISSIONS = { contents: "read", metadata: "read" } as const;
-
-export const containerToken = async (id: string, readOnly = false): Promise<string | null> => {
+export const workspaceGitHubToken = async (
+  id: string,
+  purpose: "read" | "push",
+): Promise<{ readonly token: string; readonly expiresAt: number; readonly repo: { readonly owner: string; readonly name: string } } | null> => {
   const record = environmentServices().workspaces.resolve(id);
   if (record === undefined || record.host !== "github.com" || record.owner === null || record.name === null) return null;
   try {
-    return (
-      await environmentServices().github().mint({
-        owner: record.owner.toLowerCase(),
-        repositories: [record.name],
-        permissions: readOnly ? CONTAINER_READ_PERMISSIONS : record.workflows ? CONTAINER_WORKFLOWS_PERMISSIONS : CONTAINER_GITHUB_PERMISSIONS,
-      })
-    ).token;
+    const minted = await environmentServices().github().mint({
+      owner: record.owner.toLowerCase(),
+      repositories: [record.name],
+      permissions: purpose === "read" ? CONTAINER_GITHUB_PERMISSIONS : record.workflows ? PUSH_GATEWAY_WORKFLOWS_PERMISSIONS : PUSH_GATEWAY_PERMISSIONS,
+    });
+    return { token: minted.token, expiresAt: minted.expiresAt, repo: { owner: record.owner, name: record.name } };
   } catch (error) {
-    console.warn(JSON.stringify({ t3flare: "container-token-failed", id, error: String(error).slice(0, 300) }));
+    console.warn(JSON.stringify({ t3flare: "container-token-failed", id, purpose, error: String(error).slice(0, 300) }));
     return null;
   }
 };
@@ -208,15 +193,19 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
     return { exitCode: 128, stdout: "", stderr: `fatal: cannot change to '${cwd}': No such file or directory\n`, route: "no-workspace" };
   }
   const startContainer = mayStartContainer(args);
-  const token = needsRemoteToken(args) ? await containerToken(at.id) : null;
-  const answer = await workspaceRpc(at.id).git({
-    argv: args.map((arg) => intoWorkspace(at.id, arg)),
-    cwd: at.inner,
-    env: { ...(await bridgeIndex(at.id, gitEnvOf(at.id, env))), ...(token === null ? {} : { T3FLARE_GIT_TOKEN: token }) },
-    ...(stdin === undefined ? {} : { stdin }),
-    startContainer,
-    readScope: readScopeOf(args),
-  });
+  // SPI-992: no token goes with any git command (the credential helper asks for a read-only one); t3's own push is
+  // announced to the push gateway as an expectation for as long as the command runs (review M2).
+  const expectation = await expectOwnPush(at.id, at.inner, args);
+  const answer = await workspaceRpc(at.id)
+    .git({
+      argv: args.map((arg) => intoWorkspace(at.id, arg)),
+      cwd: at.inner,
+      env: await bridgeIndex(at.id, gitEnvOf(at.id, env)),
+      ...(stdin === undefined ? {} : { stdin }),
+      startContainer,
+      readScope: readScopeOf(args),
+    })
+    .finally(() => (expectation === null ? undefined : workspaceRpc(at.id).unexpectPush({ id: expectation }).catch(() => undefined)));
   if (!answer.ran) {
     const stopped = answer.reason === "container_stopped";
     return {
@@ -229,7 +218,7 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
   }
   return {
     exitCode: answer.exitCode,
-    stdout: redactTokens(fromWorkspaceText(at.id, answer.stdout)),
+    stdout: gatewayUrlsToGitHub(args, redactTokens(fromWorkspaceText(at.id, answer.stdout))),
     stderr: redactTokens(fromWorkspaceText(at.id, answer.stderr)),
     route: answer.stale !== undefined ? `stale-${answer.stale}` : answer.cached === true ? "cache" : "container",
     // An action's failure keeps git's own words in the trace (tokens taken out), as the evidence of what the remote said.
@@ -237,6 +226,40 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
       startContainer && answer.exitCode !== 0 ? `: ${redactTokens(answer.stderr).trim().slice(0, 400)}` : ""
     }`,
   };
+};
+
+/**
+ * t3's own push (the owner's Commit & push, the stack rebase; SPI-992, review M2): what it will update, resolved in the
+ * Workspace (`pushPlanOf`'s sources to commits; bare `push` through the branch's push destination), registered with the
+ * Workspace DO as an expectation. Null when the argv is not a push, a form `pushPlanOf` does not read, or nothing
+ * resolved: the gateway's policy then decides alone.
+ */
+const expectOwnPush = async (id: string, cwd: string, args: ReadonlyArray<string>): Promise<string | null> => {
+  const plan = pushPlanOf(args);
+  if (plan.kind === "not-push" || plan.kind === "unparsed") return null;
+  const zero = "0".repeat(40);
+  const quote = (word: string) => `'${word.replace(/'/g, "'\\''")}'`;
+  const script =
+    plan.kind === "current"
+      ? `b=$(git symbolic-ref -q HEAD) || exit 3; printf 'U %s %s\\n' "$(git for-each-ref --format='%(push:remoteref)' "$b")" "$(git rev-parse --verify -q HEAD^{commit})"`
+      : plan.refspecs
+          .map((spec) => (spec.src === null ? `printf 'U %s %s\\n' ${quote(spec.dst)} ${zero}` : `printf 'U %s %s\\n' ${quote(spec.dst)} "$(git rev-parse --verify -q ${quote(`${spec.src}^{commit}`)})"`))
+          .join("\n");
+  const resolved = await workspaceRpc(id)
+    .exec({ script, cwd, timeoutMs: 30_000 })
+    .catch(() => null);
+  if (resolved === null || resolved.exitCode !== 0) return null;
+  const updates = resolved.stdout
+    .split("\n")
+    .flatMap((line) => {
+      const match = /^U (refs\/\S+) ([0-9a-f]{40}|[0-9a-f]{64})$/.exec(line);
+      return match === null ? [] : [{ ref: match[1]!, new: match[2]! }];
+    });
+  if (updates.length === 0) return null;
+  const expectation = crypto.randomUUID();
+  await workspaceRpc(id).expectPush({ id: expectation, updates });
+  console.log(JSON.stringify({ t3flare: "push-expected", id, refs: updates.map((u) => u.ref) }));
+  return expectation;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -303,8 +326,7 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
   };
   try {
     const worktree = workspaceRpc(id);
-    const token = await containerToken(id);
-    const cloned = await step("clone", () => worktree.worktreeClone({ id, url: parent.cloneUrl, token, parent: parent.id }));
+    const cloned = await step("clone", () => worktree.worktreeClone({ id, url: parent.cloneUrl, parent: parent.id }));
     if (!cloned.ok) return failed(`clone: ${cloned.error ?? "failed"}`);
     const name = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id)))].slice(0, 8).map((byte) => byte.toString(16).padStart(2, "0")).join("");
     const projectRpc = workspaceRpc(parent.id);

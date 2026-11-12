@@ -78,15 +78,63 @@ const writes = (name: string, rest: ReadonlyArray<string>): boolean => {
   }
 };
 
-/** git subcommands that reach the remote: the router gives them the Workspace's Container token (step 2a M4). */
-const NETWORK = new Set(["push", "fetch", "pull", "ls-remote"]);
+/**
+ * What t3's `git push` is about to update (SPI-992, review M2), for the push gateway's expectation. The forms t3 sends
+ * at the pin: `push -- <remote> HEAD:refs/heads/<b>` and bare `push` (`GitVcsDriverCore` pushCurrentBranch), and the
+ * stack rebase's `push --quiet --force-with-lease=… origin <sha>:refs/heads/<b>`; deletes too. Anything else is
+ * `unparsed`: no expectation, and the gateway's policy decides (asked or refused while the Workspace is tainted).
+ * `src` null is a delete.
+ */
+export type PushPlan =
+  | { readonly kind: "not-push" }
+  | { readonly kind: "unparsed" }
+  | { readonly kind: "current" }
+  | { readonly kind: "refspecs"; readonly remote: string; readonly refspecs: ReadonlyArray<{ readonly src: string | null; readonly dst: string }> };
 
-/** Whether this git argv talks to the remote, so it needs the repo's token in `T3FLARE_GIT_TOKEN` (the credential helper reads it). */
-export const needsRemoteToken = (args: ReadonlyArray<string>): boolean => {
+const FULL_REF = /^refs\/(?:heads|tags)\/[^\s:+*?[\\^~]+$/;
+const PUSH_SOURCE = /^(?:HEAD|[0-9a-f]{40}|[0-9a-f]{64}|refs\/heads\/[^\s:+*?[\\^~]+)$/;
+
+export const pushPlanOf = (args: ReadonlyArray<string>): PushPlan => {
   const { name, rest } = subcommandOf(args);
-  if (name === null) return false;
-  if (NETWORK.has(name)) return true;
-  return (name === "remote" && rest[0] === "update") || (name === "submodule" && rest.includes("update"));
+  if (name !== "push") return { kind: "not-push" };
+  let deleting = false;
+  const words: Array<string> = [];
+  let dashdash = false;
+  for (const arg of rest) {
+    if (!dashdash && arg === "--") dashdash = true;
+    else if (!dashdash && (arg === "--quiet" || arg === "-q" || arg === "--force-with-lease" || arg.startsWith("--force-with-lease="))) continue;
+    else if (!dashdash && (arg === "--delete" || arg === "-d")) deleting = true;
+    else if (!dashdash && arg.startsWith("-")) return { kind: "unparsed" };
+    else words.push(arg);
+  }
+  if (words.length === 0) return deleting ? { kind: "unparsed" } : { kind: "current" };
+  const [remote, ...specs] = words as [string, ...Array<string>];
+  if (specs.length === 0 || !/^[A-Za-z0-9._-]+$/.test(remote)) return { kind: "unparsed" };
+  const refspecs: Array<{ src: string | null; dst: string }> = [];
+  for (const spec of specs) {
+    if (deleting) {
+      if (!FULL_REF.test(spec)) return { kind: "unparsed" };
+      refspecs.push({ src: null, dst: spec });
+      continue;
+    }
+    const at = spec.indexOf(":");
+    if (at < 0) return { kind: "unparsed" };
+    const src = spec.slice(0, at);
+    const dst = spec.slice(at + 1);
+    if (!FULL_REF.test(dst) || (src !== "" && !PUSH_SOURCE.test(src))) return { kind: "unparsed" };
+    refspecs.push({ src: src === "" ? null : src, dst });
+  }
+  return { kind: "refspecs", remote, refspecs };
+};
+
+/** Where git's push URLs point (the image's system gitconfig, `pushInsteadOf`, review M5). */
+export const GATEWAY_URL_PREFIX = "http://computer.internal/t3flare/git/";
+
+/** t3 is shown `https://github.com/…` where git shows the push gateway: `remote` and `ls-remote --get-url` output only. */
+export const gatewayUrlsToGitHub = (args: ReadonlyArray<string>, stdout: string): string => {
+  const { name, rest } = subcommandOf(args);
+  if (name !== "remote" && !(name === "ls-remote" && rest.includes("--get-url"))) return stdout;
+  return stdout.split(GATEWAY_URL_PREFIX).join("https://github.com/");
 };
 
 /** Whether this git argv may start a stopped Container (the router's allow-list). */

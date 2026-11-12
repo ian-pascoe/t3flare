@@ -262,16 +262,31 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /**
-   * RPC from a Workspace DO: its repo's Container token, for the git credential helper in its Container (ADR-0013;
-   * the agent's own `git push`/`fetch`). One repo; `workflows` only when the Workspace is opted in; read-only for a
-   * fetch while linked work is active there (step 3, D1). Null for a Workspace the registry does not list or without a
-   * GitHub remote. Counted as a request for the idle check.
+   * RPC from a Workspace DO: a token for its one repo (ADR-0013; SPI-992), with the repo and its expiry. `read`: the
+   * Container token, for the git credential helper there (code read-only). `push`: the push gateway's (`contents:
+   * write`; `workflows` only when the Workspace is opted in), which never reaches a Container. Null for a Workspace the
+   * registry does not list or without a GitHub remote. Counted as a request for the idle check.
    */
-  async workspaceToken(id: string, options?: { readonly readOnly?: boolean }): Promise<{ readonly token: string | null }> {
+  async workspaceToken(id: string, options: { readonly purpose: "read" | "push" }): Promise<{ readonly token: string | null; readonly expiresAt?: number; readonly repo?: { readonly owner: string; readonly name: string } }> {
     Idle.requestStarted();
     try {
-      const { containerToken } = await import("./agents/processRouter.ts");
-      return { token: await containerToken(id, options?.readOnly === true) };
+      const { workspaceGitHubToken } = await import("./agents/processRouter.ts");
+      const minted = await workspaceGitHubToken(id, options.purpose === "push" ? "push" : "read");
+      return minted === null ? { token: null } : minted;
+    } finally {
+      Idle.requestEnded();
+    }
+  }
+
+  /**
+   * RPC from a Workspace DO (the push gateway's policy): asks the owner about a push on a CLI thread's live turn
+   * (SPI-1040). Counted as open work for the idle check while it waits (review M7).
+   */
+  async approvePush(input: { readonly thread: string; readonly workspace: string; readonly linked: boolean; readonly summary: string; readonly detail: string }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }> {
+    Idle.requestStarted();
+    try {
+      const { approveCliPush } = await import("./provider/cli/linkedPushAsk.ts");
+      return await approveCliPush(input);
     } finally {
       Idle.requestEnded();
     }

@@ -97,6 +97,22 @@ RUN cd /usr/local/share/cloudpid \
  && mise reshim --system \
  && rm -rf /root/.cache /root/.local /tmp/*
 
+# SPI-992 (review M5): the system gitconfig of every git the image installs (conda git reads $PREFIX/etc/gitconfig, not
+# /etc) and /etc/gitconfig: pushes to github.com go to t3flare's push gateway (`pushInsteadOf`), and the credential
+# helper gives a read-only token for https://github.com only. Nothing is written per Container start; each git here
+# must read it back, or the build fails.
+COPY gitconfig /usr/local/share/t3flare/gitconfig
+RUN set -e; found=0; \
+ for git in /usr/local/share/mise/installs/*/*/bin/git; do \
+   [ -x "$git" ] || continue; \
+   prefix="$(cd "$("$git" --exec-path)/../.." && pwd)"; \
+   mkdir -p "$prefix/etc" && cp /usr/local/share/t3flare/gitconfig "$prefix/etc/gitconfig"; \
+   test "$("$git" config --system --get url.http://computer.internal/t3flare/git/.pushinsteadof)" = https://github.com/; \
+   found=1; \
+ done; \
+ test "$found" = 1; \
+ cp /usr/local/share/t3flare/gitconfig /etc/gitconfig
+
 # The CLI agents (step 4a, plan §6), at fixed paths the CLI profiles name absolutely, after the mise layer so a CLI bump
 # rebuilds only this: Codex's checked binary, pi from a committed lock with the image's Node (`npm ci`, no scripts), the
 # key helper. Not mise: a project's toolchains must never shadow them.

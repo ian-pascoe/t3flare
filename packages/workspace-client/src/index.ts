@@ -150,9 +150,8 @@ export type GitAnswer =
 export interface CloneInput {
   /** The Workspace's id, which the object keeps (the credential helper asks for its repo's token by it). */
   readonly id?: string;
-  /** An https URL with no credentials; the token goes in the command's environment. */
+  /** An https URL with no credentials; the credential helper asks the Workspace DO for a read-only token (SPI-992). */
   readonly url: string;
-  readonly token: string | null;
   readonly timeoutMs?: number;
 }
 
