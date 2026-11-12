@@ -1,0 +1,33 @@
+{
+ "at": "2026-11-12T12:42:50.246Z",
+ "mode": "p3",
+ "stamp": "mwdjbfhg",
+ "fixture": "ian-pascoe/t3flare-fixture",
+ "p3_90": {
+  "output": "remote: Create a pull request for 'spi992/p3-90-mwdjbfhg' on GitHub by visiting:        \nremote:      https://github.com/ian-pascoe/t3flare-fixture/pull/new/spi992/p3-90-mwdjbfhg        \nremote: \nTo http://computer.internal/t3flare/git/ian-pascoe/t3flare-fixture.git\n * [new branch]      HEAD -> spi992/p3-90-mwdjbfhg\npush-exit 0",
+  "packBytes": 94401018,
+  "packMiB": 90,
+  "pushExit": "0",
+  "ms": 49407,
+  "remote": "6d389e78f71af0e6fdd14341e2aa8775cad6505a",
+  "commit": "6d389e78f71af0e6fdd14341e2aa8775cad6505a"
+ },
+ "p3_110": {
+  "output": "447154a915350b2ca0748f80c717236cc820f4e7\npack-bytes 115378976\nerror: RPC failed; HTTP 413 curl 22 The requested URL returned error: 413\nsend-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly\nEverything up-to-date",
+  "packBytes": 115378976,
+  "packMiB": 110,
+  "pushExit": null,
+  "ms": 51657,
+  "remote": null,
+  "commit": "447154a915350b2ca0748f80c717236cc820f4e7"
+ },
+ "p3_110_landed": false,
+ "cleanup": [
+  {
+   "ref": "refs/heads/spi992/p3-90-mwdjbfhg",
+   "deleted": true
+  }
+ ],
+ "failures": [],
+ "ok": true
+}

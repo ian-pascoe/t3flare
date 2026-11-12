@@ -371,8 +371,8 @@ export class WorkspaceDO extends ContainerHost {
     return [...(key === undefined || key === "" ? [] : [await patternOf("model-key", key)]), ...this.#tokenPatterns];
   }
 
-  async #rememberToken(token: string): Promise<void> {
-    this.#tokenPatterns.push(await patternOf("github-token", token));
+  async #rememberToken(token: string, name: "github-token" | "gateway-token" = "github-token"): Promise<void> {
+    this.#tokenPatterns.push(await patternOf(name, token));
     if (this.#tokenPatterns.length > 20) this.#tokenPatterns.splice(0, this.#tokenPatterns.length - 20);
   }
 
@@ -1564,7 +1564,7 @@ export class WorkspaceDO extends ContainerHost {
       if (minted.token === null || minted.repo === undefined) return null;
       this.#pushToken = { token: minted.token, expiresAt: minted.expiresAt ?? Date.now() + 30 * 60_000, repo: minted.repo };
       // The leak scan looks for it too: it must never be found in the Workspace (M2's assertion).
-      await this.#rememberToken(minted.token);
+      await this.#rememberToken(minted.token, "gateway-token");
     }
     return { repo: this.#pushToken.repo, token: this.#pushToken.token };
   }

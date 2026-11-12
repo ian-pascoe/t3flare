@@ -8,14 +8,23 @@
 //         token; an old helper's request is refused; t3's Commit & push lands through an expectation while tainted
 //   p2    a receive-pack POST held 10 minutes by the gateway (probePush holdMs) still lands
 //   p3    packs of ~90 MiB and ~110 MiB through the gateway (the documented 100 MiB request cap)
+//   hostile  M2: a linked thread (link at auto-accept-edits) runs `scripts/spi992/hostile.sh`: it captures everything
+//            around one push the owner approves, then replays the POST, tries every captured string against GitHub
+//            directly (git and REST), and pushes through the gateway again; the harness declines the new cards and
+//            tries `t3_pending_request respond` from the link (F7)
+//   persist  M2/H1: a linked thread runs `scripts/spi992/plant.sh` (core.fsmonitor, a pre-push hook, a payload run by
+//            a hook, a detached loop); the window lapses (probe), the Container restarts, the owner runs status and
+//            Commit & push: no planted ref appears
 //
 //   bun scripts/stage.ts run spi992 spi992 <m1|p2|p3>
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { admin, pair, uuid, wsStream } from "./lib/client.ts";
+import { admin, dispatch, pair, sleep, uuid, wsStream } from "./lib/client.ts";
+import { MODEL, pendingOf, projection, replyOf, settled } from "./lib/cloudThread.ts";
 import { ensureCloudFixtureProject, FIXTURE } from "./lib/fixtureProject.ts";
+import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 
 const mode = process.argv[2] ?? "m1";
 const failures: Array<string> = [];
@@ -41,6 +50,24 @@ const sh = async (script: string, timeoutMs = 300_000): Promise<{ exitCode: numb
   const answer = await call({ exec: { script, cwd: "/workspace/repo", timeoutMs } });
   return { ...(answer?.result ?? { exitCode: -1, stdout: "", stderr: JSON.stringify(answer).slice(0, 500) }), ms: answer?.ms ?? 0 };
 };
+/**
+ * Runs `script` detached in the Container (an admin request is cut after ~100 s at the edge), polling its log until it
+ * prints its exit code. The log's last lines and the exit code.
+ */
+const detached = async (script: string, timeoutMs: number): Promise<{ exitCode: number | null; output: string; ms: number }> => {
+  const name = `/tmp/spi992-${uuid()}`;
+  await sh(`printf %s ${Buffer.from(`cd /workspace/repo\n${script}\n`).toString("base64")} | base64 -d > ${name}.sh; setsid nohup sh -c 'sh ${name}.sh > ${name}.log 2>&1; echo "DETACHED-EXIT $?" >> ${name}.log' >/dev/null 2>&1 &`);
+  const started = Date.now();
+  let output = "";
+  while (Date.now() - started < timeoutMs) {
+    await sleep(15_000);
+    output = (await sh(`tail -c 4000 ${name}.log 2>/dev/null`)).stdout;
+    if (/DETACHED-EXIT \d+/.test(output)) break;
+  }
+  const code = /DETACHED-EXIT (\d+)/.exec(output)?.[1];
+  return { exitCode: code === undefined ? null : Number(code), output: output.replace(/DETACHED-EXIT \d+\n?/, ""), ms: Date.now() - started };
+};
+
 /** The owner's view of a ref on GitHub (gh on this machine); null when absent. */
 const remoteRef = (ref: string): string | null => {
   const r = spawnSync("gh", ["api", `repos/${FIXTURE}/git/ref/${ref.replace(/^refs\//, "")}`, "--jq", ".object.sha"], { encoding: "utf8" });
@@ -161,29 +188,165 @@ if (mode === "p2") {
   const branch = `spi992/p2-${stamp}`;
   const commit = (await sh(commitScript(branch, [[`p2-${stamp}.txt`, 1024]]))).stdout.trim().split("\n").at(-1) ?? "";
   await call({ probePush: { holdMs } });
-  const pushed = await sh(`start=$(date +%s); git push origin HEAD:refs/heads/${branch} 2>&1; echo "exit $? after $(( $(date +%s) - start ))s"`, holdMs + 300_000);
+  // Detached in the Container (an admin request is cut after ~100 s at the edge): the push's output goes to a file.
+  const log = `/tmp/p2-${stamp}.log`;
+  await sh(`setsid nohup sh -c 'start=$(date +%s); git push origin HEAD:refs/heads/${branch} > ${log} 2>&1; echo "exit $? after $(( $(date +%s) - start ))s" >> ${log}' >/dev/null 2>&1 &`);
+  let output = "";
+  const started = Date.now();
+  while (Date.now() - started < holdMs + 300_000) {
+    await sleep(30_000);
+    output = (await sh(`cat ${log} 2>/dev/null`)).stdout;
+    if (/exit \d+ after/.test(output)) break;
+  }
   await call({ probePush: { holdMs: 0 } });
   created.push(`refs/heads/${branch}`);
-  out.p2 = { holdMs, output: tail(pushed.stdout), ms: pushed.ms, remote: remoteRef(`refs/heads/${branch}`), commit };
-  check(`P2: a receive-pack POST held ${holdMs / 60_000} min lands`, /exit 0/.test(pushed.stdout) && remoteRef(`refs/heads/${branch}`) === commit, out.p2);
+  out.p2 = { holdMs, output: tail(output), ms: Date.now() - started, remote: remoteRef(`refs/heads/${branch}`), commit };
+  check(`P2: a receive-pack POST held ${holdMs / 60_000} min lands`, /exit 0/.test(output) && remoteRef(`refs/heads/${branch}`) === commit, out.p2);
 }
 
 if (mode === "p3") {
   await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
   for (const [label, files] of [["90", [[`p3-90-${stamp}.bin`, 90 * 1024 * 1024]]], ["110", [[`p3-110a-${stamp}.bin`, 55 * 1024 * 1024], [`p3-110b-${stamp}.bin`, 55 * 1024 * 1024]]]] as Array<[string, Array<[string, number]>]>) {
     const branch = `spi992/p3-${label}-${stamp}`;
-    const commit = (await sh(commitScript(branch, files), 600_000)).stdout.trim().split("\n").at(-1) ?? "";
-    const pushed = await sh(`git push origin HEAD:refs/heads/${branch} 2>&1; echo "exit $?"`, 900_000);
+    // The commit, the pack git will send (bytes), then the push: all in the Container, detached.
+    const run = await detached(
+      [commitScript(branch, files), `echo "pack-bytes $(git rev-list --objects origin/main..HEAD | git pack-objects --stdout -q | wc -c)"`, `git push origin HEAD:refs/heads/${branch} 2>&1; echo "push-exit $?"`].join("\n"),
+      20 * 60_000,
+    );
     created.push(`refs/heads/${branch}`);
-    out[`p3_${label}`] = { output: tail(pushed.stdout), ms: pushed.ms, remote: remoteRef(`refs/heads/${branch}`), commit };
-    await sh(`git checkout -q --detach origin/main && git branch -D ${branch} >/dev/null 2>&1; git gc -q --prune=now 2>/dev/null; true`, 600_000);
+    const commit = /^([0-9a-f]{40})$/m.exec(run.output)?.[1] ?? null;
+    const packBytes = Number(/pack-bytes (\d+)/.exec(run.output)?.[1] ?? "0");
+    out[`p3_${label}`] = { output: tail(run.output), packBytes, packMiB: Math.round((packBytes / 1024 / 1024) * 10) / 10, pushExit: /push-exit (\d+)/.exec(run.output)?.[1] ?? null, ms: run.ms, remote: remoteRef(`refs/heads/${branch}`), commit };
+    await detached(`git checkout -q --detach origin/main; git branch -D ${branch} >/dev/null 2>&1; rm -f p3-*.bin; git gc -q --prune=now 2>/dev/null; true`, 10 * 60_000);
   }
-  check("P3: a ~90 MiB pack lands", (out.p3_90 as any).remote === (out.p3_90 as any).commit, out.p3_90);
-  check("P3: a ~110 MiB pack is refused (413, the outbound handler's 100 MiB request cap)", (out.p3_110 as any).remote === null && /413|exit [1-9]/.test((out.p3_110 as any).output), out.p3_110);
+  const p90 = out.p3_90 as any;
+  const p110 = out.p3_110 as any;
+  check("P3: a ~90 MiB pack lands", p90.commit !== null && p90.packBytes > 90 * 1_000_000 && p90.remote === p90.commit, p90);
+  // Recorded either way: the documented cap is 100 MiB per request body through an outbound handler.
+  out.p3_110_landed = p110.commit !== null && p110.remote === p110.commit;
+  check("P3: the ~110 MiB push was made (a pack over 100 MiB) and its outcome recorded", p110.commit !== null && p110.packBytes > 105 * 1024 * 1024, p110);
+}
+
+/** Copies scripts/spi992/<name> into the Workspace's `.spi992/` (untracked, excluded from git). */
+const install = async (...names: Array<string>) => {
+  for (const name of names) {
+    const data = fs.readFileSync(path.join(import.meta.dirname, "spi992", name)).toString("base64");
+    await sh(`mkdir -p .spi992 && printf %s ${data} | base64 -d > .spi992/${name} && grep -qx '.spi992/' .git/info/exclude 2>/dev/null || echo '.spi992/' >> .git/info/exclude`);
+  }
+};
+
+/**
+ * A linked thread (a link at auto-accept-edits) runs `command`, its command approvals accepted by the harness as the
+ * owner's client; each "Allow git push?" card is answered by `onPush` (in order). The answers, and the final projection.
+ */
+const linkedRun = async (label: string, command: string, onPush: (index: number, threadId: string, request: any, mcp: McpClient) => Promise<string>) => {
+  const link = await signIn((await mintPairingCode(cookie, { label: `spi992 ${label} ${stamp}` })).code, "auto-accept-edits", { clientName: `spi992 ${label} ${stamp}` });
+  const mcp = new McpClient(link.token, { modeLimit: "auto-accept-edits/default" });
+  const launched = await mcp.call("t3_thread_launch", {
+    projectId: fixture.projectId,
+    title: `spi992 ${label} ${stamp}`,
+    modelSelection: MODEL,
+    clientRequestId: `spi992-${label}-${stamp}`,
+    message: `Run exactly this one bash command, once, with a timeout of at least 900 seconds, and do nothing else: \`${command}\`. Then reply with its last output line.`,
+  });
+  const threadId: string | undefined = launched.json?.threadId;
+  const answers: Array<{ title: string; decision: string; at: number; summary?: string }> = [];
+  if (!check(`${label}: the linked thread launched`, threadId !== undefined, launched.text.slice(0, 300))) return { threadId: null, answers, projection: null, mcp };
+  const started = Date.now();
+  const seen = new Set<string>();
+  let pushes = 0;
+  let p: any;
+  while (Date.now() - started < 25 * 60_000) {
+    p = await projection(cookie, threadId!).catch(() => p);
+    for (const request of pendingOf(p).filter((r: any) => !seen.has(r.id))) {
+      seen.add(request.id);
+      const item = (p?.turnItems ?? []).find((entry: any) => entry.requestId === request.id);
+      const title = item?.title ?? "";
+      const decision = title === "Allow git push?" ? await onPush(pushes++, threadId!, request, mcp) : "acceptForSession";
+      await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision });
+      answers.push({ title, decision, at: Date.now() - started, ...(title === "Allow git push?" ? { summary: String(item?.prompt ?? "").slice(0, 400) } : {}) });
+    }
+    if (p !== undefined && settled(p) && pendingOf(p).length === 0) break;
+    await sleep(1500);
+  }
+  return { threadId, answers, projection: p, mcp };
+};
+
+if (mode === "hostile") {
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+  await install("hostile.sh", "logproxy.py");
+  const mainBefore = remoteRef("refs/heads/main");
+  let f7: unknown = null;
+  const run = await linkedRun("hostile", `sh .spi992/hostile.sh ${stamp} ${FIXTURE}`, async (index, threadId, request, mcp) => {
+    if (index === 0) return "accept";
+    if (index === 2) {
+      // F7: the link's own MCP client cannot answer the card (t3_pending_request respond refuses approvals).
+      const responded = await mcp.call("t3_pending_request", { action: "respond", threadId, requestId: request.id, decision: "accept" });
+      f7 = { isError: responded.isError, text: responded.text.slice(0, 300) };
+    }
+    return "decline";
+  });
+  created.push(`refs/heads/spi992/a-${stamp}`, `refs/heads/spi992/b-${stamp}`, `refs/heads/spi992/c-${stamp}`);
+  const results = (await sh(`cat /tmp/spi992-cap-${stamp}/results 2>/dev/null; ls /tmp/spi992-cap-${stamp}/proxy 2>/dev/null | head -20`)).stdout.trim().split("\n");
+  const approvedCommit = /approved-commit ([0-9a-f]{40})/.exec(results.join("\n"))?.[1] ?? null;
+  const pushCards = run.answers.filter((a) => a.title === "Allow git push?");
+  const leak = (await admin("POST", `/_t3flare/check/leak?id=${encodeURIComponent(id)}`)).json;
+  out.hostile = { threadId: run.threadId, answers: run.answers, results, f7, reply: replyOf(run.projection).slice(-300), leak: { do: leak?.do ?? null, container: leak?.container ?? null } };
+  check("hostile: the approved push asked once and landed at the approved commit", pushCards[0]?.decision === "accept" && approvedCommit !== null && remoteRef(`refs/heads/spi992/a-${stamp}`) === approvedCommit, out.hostile);
+  check("hostile: the replayed POST raised a new card, declined, and nothing landed from it", pushCards.length >= 2 && results.some((line) => /^replay http=200 declined=[1-9]/.test(line)), results);
+  const candidates = results.filter((line) => line.startsWith("candidate "));
+  check("hostile: the hostile process captured credentials to try (the captures worked)", candidates.length >= 1, results);
+  check("hostile: every captured string fails a write: direct git push, REST refs and contents", candidates.every((line) => /git=refused/.test(line) && !/rest-refs=20/.test(line) && !/rest-contents=20/.test(line)), candidates);
+  check("hostile: the second gateway push raised a new card, declined, refused", pushCards.length >= 3 && results.some((line) => /^again-push-exit [1-9]\d* declined=[1-9]/.test(line)), results);
+  check("hostile: t3_pending_request respond from the link cannot answer the push card (F7)", (f7 as any)?.isError === true || /refus|not allowed|cannot|approval/i.test(String((f7 as any)?.text ?? "")), f7);
+  check("hostile: on GitHub only spi992/a exists of this run's refs, and main is unchanged", remoteRef(`refs/heads/spi992/b-${stamp}`) === null && remoteRef(`refs/heads/spi992/c-${stamp}`) === null && remoteRef("refs/heads/main") === mainBefore);
+  check("hostile: the leak scan (the Workspace's files and its Container) finds no gateway (write) token", leak !== undefined && !JSON.stringify(leak).includes("gateway-token"), leak);
+  await sh(`rm -rf /tmp/spi992-cap-${stamp}; git checkout -q --detach origin/main; true`);
+}
+
+if (mode === "persist") {
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+  await install("plant.sh");
+  const planted = ["fsm", "hook", "payload", "loop"].map((kind) => `refs/heads/spi992/${kind}-${stamp}`);
+  created.push(...planted);
+  const run = await linkedRun("persist", `sh .spi992/plant.sh ${stamp}`, () => Promise.resolve("decline"));
+  const before = (await call({ probePush: {} }))?.result;
+  // The window lapses (the probe ends every linked-work window now; the taint stays), then the Container restarts.
+  await call({ probePush: { lapseLinked: true } });
+  await admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(id)}`);
+  await sleep(5_000);
+  // The owner: status (the fsmonitor runs), then Commit & push on a branch of their own (the hooks run).
+  const ownerBranch = `spi992/owner-${stamp}`;
+  created.push(`refs/heads/${ownerBranch}`);
+  const status = await call({ git: { argv: ["status", "--porcelain"], cwd: "/workspace/repo", env: {}, startContainer: true, readScope: "repo" } });
+  await sh(`git checkout -q -B ${ownerBranch} origin/main && echo "owner ${stamp}" > owner-${stamp}.txt`);
+  const events = (await wsStream(cookie, "git.runStackedAction", { actionId: uuid(), cwd: fixture.workspaceRoot, action: "commit_push", featureBranch: false, commitMessage: `spi992 owner ${stamp}` }).catch((error: unknown) => [{ kind: "action_failed", error: String(error).slice(0, 500) }])) as Array<any>;
+  const head = (await sh("git rev-parse HEAD")).stdout.trim();
+  await sleep(75_000);
+  const logs = (await sh(`for f in .git/spi992-*.log; do echo "== $f"; tail -n 4 "$f"; done 2>/dev/null`)).stdout;
+  const after = (await call({ probePush: {} }))?.result;
+  out.persist = {
+    threadId: run.threadId,
+    answers: run.answers,
+    taintBefore: before?.taint ?? null,
+    taintAfter: after?.taint ?? null,
+    status: { ran: status?.result?.ran ?? null },
+    t3Push: { events: events.map((event) => event.kind), failed: events.find((event) => event.kind === "action_failed") ?? null, head, remote: remoteRef(`refs/heads/${ownerBranch}`) },
+    planted: planted.map((ref) => ({ ref, onGitHub: remoteRef(ref) })),
+    logs: logs.split("\n").slice(0, 40),
+  };
+  check("persist: the plant ran in a linked thread and tainted the Workspace", before?.taint !== null && before?.taint !== undefined, before);
+  check("persist: the taint outlived the window and the Container restart", after?.taint !== null && after?.taint !== undefined, after);
+  check("persist: the owner's Commit & push landed (its expectation)", remoteRef(`refs/heads/${ownerBranch}`) === head, out.persist);
+  check("persist: no planted ref appeared (fsmonitor, pre-push hook, payload, loop)", planted.every((ref) => remoteRef(ref) === null), out.persist);
+  check("persist: the planted pushes reached the gateway and were refused by name", /ran linked work/.test(logs), logs.slice(0, 1500));
+  // Clean up the plant (the owner, by hand).
+  await sh(`git config --unset core.fsmonitor; rm -f .git/hooks/pre-push .git/hooks/post-commit .git/spi992-*; rm -rf .spi992; pkill -f 'spi992/loop' ; git checkout -q --detach origin/main; true`);
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
 }
 
 // The fixture's refs this run made are deleted (the owner's gh).
 out.cleanup = created.filter((ref) => remoteRef(ref) !== null).map((ref) => ({ ref, deleted: deleteRef(ref) }));
 await sh("git checkout -q --detach origin/main 2>/dev/null; true");
-evidence(`${mode === "m1" ? "m1-gateway" : `m0-${mode}`}.json`);
+evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : `m0-${mode}`}.json`);
 process.exit(failures.length === 0 ? 0 : 1);

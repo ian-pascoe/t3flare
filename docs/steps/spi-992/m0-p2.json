@@ -1,18 +1,21 @@
 {
- "at": "2026-11-12T12:35:57.863Z",
+ "at": "2026-11-12T12:53:00.199Z",
  "mode": "p2",
- "stamp": "mwdj5x20",
+ "stamp": "mwdjg4r6",
  "fixture": "ian-pascoe/t3flare-fixture",
  "p2": {
   "holdMs": 600000,
-  "output": "",
-  "ms": 0,
-  "remote": null,
-  "commit": "81eb5000d2fa4c3449606274cf8dba8cae3cdf76"
+  "output": "remote: Create a pull request for 'spi992/p2-mwdjg4r6' on GitHub by visiting:        \nremote:      https://github.com/ian-pascoe/t3flare-fixture/pull/new/spi992/p2-mwdjg4r6        \nremote: \nTo http://computer.internal/t3flare/git/ian-pascoe/t3flare-fixture.git\n * [new branch]      HEAD -> spi992/p2-mwdjg4r6\nexit 0 after 601s",
+  "ms": 604249,
+  "remote": "557c74c33be33dd666de3360e9a6ae47be8836d1",
+  "commit": "557c74c33be33dd666de3360e9a6ae47be8836d1"
  },
- "cleanup": [],
- "failures": [
-  "P2: a receive-pack POST held 10 min lands: {\"holdMs\":600000,\"output\":\"\",\"ms\":0,\"remote\":null,\"commit\":\"81eb5000d2fa4c3449606274cf8dba8cae3cdf76\"}"
+ "cleanup": [
+  {
+   "ref": "refs/heads/spi992/p2-mwdjg4r6",
+   "deleted": true
+  }
  ],
- "ok": false
+ "failures": [],
+ "ok": true
 }
