@@ -1,31 +1,31 @@
 {
- "at": "2026-11-12T01:13:48.918Z",
+ "at": "2026-11-12T01:45:04.399Z",
  "scenario": "channel",
  "ok": true,
  "failures": [],
  "workspace": "step3-fixture",
  "report": {
-  "startMs": 46374,
-  "key": "proc-07614f1a-1881-46f8-b2a4-2a246e708bed",
-  "pid": 200000,
+  "startMs": 49,
+  "key": "proc-f1022880-4205-4c08-9b6a-e3d019bf9c78",
+  "pid": 200003,
   "roundTrips": {
    "n": 200,
-   "p50": 51,
-   "p95": 72,
-   "max": 162
+   "p50": 46,
+   "p95": 64,
+   "max": 78
   },
   "stderrLines": 200,
   "in4MiB": {
    "ok": true,
-   "ms": 5866
+   "ms": 4948
   },
   "out4MiB": {
    "ok": true,
-   "ms": 5460
+   "ms": 4647
   },
   "kill": {
    "exitCode": 143,
-   "ms": 2969
+   "ms": 3536
   },
   "markerProcessesAfterKill": 0
  }

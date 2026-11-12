@@ -1,16 +1,14 @@
 {
- "at": "2026-11-12T01:25:14.706Z",
+ "at": "2026-11-12T01:45:49.854Z",
  "scenario": "restart",
- "ok": false,
- "failures": [
-  "the new start works"
- ],
+ "ok": true,
+ "failures": [],
  "workspace": "step3-fixture",
  "environmentRestart": {
   "held": {
-   "key": "proc-406640eb-34de-4599-b143-65bf3a9738d7",
-   "pid": 200000,
-   "startMs": 2599
+   "key": "proc-3ea8c63c-91f5-4274-a358-29d537354a6c",
+   "pid": 200004,
+   "startMs": 58
   },
   "before": {
    "count": 4
@@ -18,21 +16,27 @@
   "stateBefore": {
    "channel": {
     "live": 1,
-    "environmentEpoch": 8
+    "environmentEpoch": 13
    },
    "workspace": {
-    "epoch": 5,
+    "epoch": 11,
     "processes": [
      {
-      "key": "proc-406640eb-34de-4599-b143-65bf3a9738d7",
+      "key": "proc-3ea8c63c-91f5-4274-a358-29d537354a6c",
       "thread": null,
-      "environmentEpoch": 8,
+      "environmentEpoch": 13,
       "inTurn": false,
-      "idleMs": 734
+      "idleMs": 487
      }
     ],
-    "pushes": 0
+    "pushes": 856
    }
+  },
+  "after": {
+   "n": 5,
+   "p50": 58,
+   "p95": 82,
+   "max": 82
   },
   "oldAfter": {
    "count": 0
@@ -40,41 +44,41 @@
  },
  "workspaceAbort": {
   "held": {
-   "key": "proc-5f308ebf-9602-4ce0-b587-65b4754551f5",
+   "key": "proc-9f651011-6a2e-4b59-b215-2f01b467fc67",
    "pid": 200001,
-   "startMs": 78
+   "startMs": 54
   },
   "stateHeld": {
    "channel": {
     "live": 1,
-    "environmentEpoch": 9
+    "environmentEpoch": 14
    },
    "workspace": {
-    "epoch": 5,
+    "epoch": 11,
     "processes": [
      {
-      "key": "proc-5f308ebf-9602-4ce0-b587-65b4754551f5",
+      "key": "proc-9f651011-6a2e-4b59-b215-2f01b467fc67",
       "thread": null,
-      "environmentEpoch": 9,
+      "environmentEpoch": 14,
       "inTurn": false,
-      "idleMs": 169
+      "idleMs": 148
      }
     ],
-    "pushes": 23
+    "pushes": 876
    }
   },
   "channelAfterAbort": {
    "channel": {
     "live": 0,
-    "environmentEpoch": 9
+    "environmentEpoch": 14
    },
    "workspace": {
-    "epoch": 6,
+    "epoch": 12,
     "processes": [],
     "pushes": 0
    }
   },
-  "handleEndedMs": 31611,
+  "handleEndedMs": 20735,
   "held2After": {
    "count": 0
   }
