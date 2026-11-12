@@ -1,0 +1,78 @@
+{
+  "step": "4b",
+  "milestone": "M0 (local Docker half)",
+  "date": "2026-11-12",
+  "how": "docs/steps/step-4b/probes: image t3flare-probe4b (node 24 bookworm arm64; @agentclientprotocol/claude-agent-acp 0.106.0 with claude 2.1.322 from npm; @opencode/cli 2.2.7 from npm); keyhost4b sidecar = computer.internal (key route, key only in its env) + CONNECT logger + the hostile repo's logging host (:8081); acp-client.mjs speaks ACP as t3's adapter does (no client fs, no client terminal); protocol logs in docs/steps/step-4b/out/ (not committed)",
+  "P1": {
+    "verdict": "pass (no OD-3)",
+    "noLogin": "initialize answers authMethods [] (the managed apiKeyHelper hides login), no authenticate call, no prompt on stderr",
+    "modes": "with the managed file: currentModeId default, availableModes [default, acceptEdits, plan] (no auto, no bypassPermissions)",
+    "bearer": "Commissary accepts Claude Code's requests (x-api-key and Bearer from the helper, its anthropic-beta headers): no CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS needed",
+    "toolTurns": {
+      "claude-sonnet-5-5": "completed: Write asked + Bash asked",
+      "claude-haiku-5-5": "completed",
+      "gpt-6-luna": "completed: Write asked; its command was read-only (cat), which Claude Code runs without asking",
+      "deepseek-v4-pro": "completed: Write asked + Bash asked",
+      "gemini-3.x": "refused by Commissary's upstream for every client (410 deprecated, 403 access disabled, 402 balance): not a Claude Code limit"
+    },
+    "modelSelection": "managed `availableModels` lists catalog ids; `session/set_config_option` model=<catalog id> selects one. Commissary validates on set: an id it refuses fails the set with -32603 (t3: AcpModelSelectionError) and the session stays on `default`. Decision: Claude lists the whole catalog (§3.4's first fallback holds)",
+    "grants": "one per process with CLAUDE_CODE_API_KEY_HELPER_TTL_MS=24h, across two prompts and a model switch",
+    "scrub": "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 in 2.1.322 isolates every Bash command with bubblewrap AND plants empty decoy files in the cwd (.env*, package.json, package-lock.json, yarn.lock, pnpm-lock.yaml, bunfig.toml, .npmrc, .yarnrc*, .gitmodules, node_modules/.bin, .claude/.cc-writes) that it leaves behind: an empty package.json and .gitmodules in a user's repo. Decision: scrub off (0, pinned in managed env); the nonce rides in the managed apiKeyHelper command (`T3FLARE_MODEL_KEY_NONCE=<n> t3flare-model-key claude`) written by the launcher, and the launch environment has no nonce. Bash sees nonce-seen=0; the helper sends it (keyhost logs it)",
+    "marker": "claude-agent-acp and its claude child both carry T3FLARE_EXEC (procwatch)",
+    "approvalOptions": "Claude offers allow_always ('allow-with-updates', 'allow-skill-exact') even with allowManagedPermissionRulesOnly: the flavor must never offer acceptForSession"
+  },
+  "P2": {
+    "verdict": "pass with option (a)",
+    "provider": "providers.t3flare: package @opencode/ai/providers/anthropic-compatible, settings.baseURL <MODEL_PROXY_URL>/v1 (the /v1 is needed), models by real catalog id",
+    "keyHook": "(a) holds: a server plugin in /etc/opencode/plugins/t3flare-key (plain `export default { id, setup }`, no package import) runs the helper once and sets x-api-key through ctx.provider.transform on provider t3flare only; it deletes the nonce from process.env first (bash: nonce-seen=0; /proc/<pid>/environ keeps it, changelog F10). No relay needed",
+    "toolTurns": {
+      "claude-sonnet-5-5": "edit asked + shell asked",
+      "gpt-6-luna": "edit asked + shell asked",
+      "deepseek-v4-pro": "edit asked + shell asked"
+    },
+    "modelSelection": "session/set_config_option model=t3flare/<id>; ACP modes are absent, the agent is config option `mode` (build, plan)",
+    "processes": "`opencode acp` runs a private `opencode serve --stdio --port 0` child (listening on 127.0.0.1:<random>) that dies with it. Any other subcommand (`opencode debug …`) starts the shared background service `opencode serve --service`, which outlives it: the argv allowlist is `opencode acp` exactly",
+    "grants": "one per process",
+    "configWarnings": "an invalid statement is dropped and logged to $XDG_DATA_HOME/opencode/log/opencode.log as `level=WARN message=\"configuration normalization diagnostic\" source=/etc/opencode/opencode.json`; unknown keys are silent. The launcher watches the log and kills the process on a diagnostic whose source is ours; the unit test validates the generated file against the schema"
+  },
+  "P3": {
+    "verdict": "pass",
+    "claudeDefaults": "api.anthropic.com x7 (feature flags, telemetry, WebFetch preflight) beside the proxy; mode auto (WebFetch ran without asking: changelog F4)",
+    "claudeProfile": "the proxy's host only, plus example.com (the WebFetch the prompt asked for, which asked first)",
+    "opencodeDefaults": "models.opencode.ai (catalog) beside the proxy",
+    "opencodeProfile": "the proxy's host only, plus example.com (asked first)",
+    "note": "on the probe's internal network the proxy variables are the only route out, so the P3 profile run does not pin them empty; in a Container egress is computer's"
+  },
+  "P4": {
+    "verdict": "pass (CLI half); the t3-adapter half is M2/M3's replay tests through our flavors",
+    "claudeHostile": "every Write and every non-read Bash asked; repo allow rules, defaultMode bypassPermissions, hooks (SessionStart, PreToolUse), .mcp.json + enableAllProjectMcpServers, project env (ANTHROPIC_BASE_URL, HTTPS_PROXY, NODE_EXTRA_CA_CERTS, Bedrock switches, ANTHROPIC_CUSTOM_HEADERS, ANTHROPIC_AUTH_TOKEN), the agent with permissionMode (not loaded: 'no agent type named helper'), the skill's inline ! block (not run), settings.local.json: all without effect. Logging host: no request. Proxy: every model call",
+    "claudePlan": "plan mode: Claude writes its plan file into CLAUDE_CONFIG_DIR/plans without asking (Container-local) and edits nothing else; ExitPlanMode arrives as kind switch_mode with options exit-plan-default (allow_once), exit-plan-clear-accept-edits and exit-plan-accept-edits (allow_always), reject. reject: the prompt ends stopReason cancelled. allow_once (t3's accept): mode default and Claude goes on to implement in the same turn (changelog F1)",
+    "claudeEnterPlan": "EnterPlanMode runs without asking and moves the mode to plan (a drift to plan, which the guard allows)",
+    "claudeGoalCompact": "/goal answers 'can't run while hooks are restricted (allowManagedHooksOnly)'; /compact compacts (a tool 'Compact conversation'). Decision: idle compaction locked off for these instances (no Container starts for it)",
+    "opencodeHostile": "edits and shell asked despite repo permissions [*,*,allow] and build/plan/general overrides (system agent rules win); repo subagents (config and .opencode/agents) blocked by tool.use subagent policy; repo provider override and provider evil unused; plugin x.ts not loaded; MCP, formatter and LSP commands not run; no marker; logging host silent",
+    "opencodePlan": "mode plan: no edit, no request",
+    "opencodeAlways": "`always` saves a durable rule in opencode.db's permission table: the next process (same data) ran `touch e2.txt` without asking. The flavor offers once and reject only; the snapshot never carries a saved rule"
+  },
+  "P5": {
+    "verdict": "pass (local); computer's mount on step4b is M4",
+    "claude": "fresh CLAUDE_CONFIG_DIR with only projects/ linked to the synced directory: session/load and session/resume recall the code word, also with the JSONL's last line cut in half",
+    "opencode": "VACUUM INTO snapshot copied into a fresh data directory: session/load and session/resume recall the code word",
+    "leak": "no key fragment or nonce in the synced directory or the protocol logs",
+    "note": "Claude writes auto memory under projects/<cwd>/memory, which syncs with the sessions"
+  },
+  "P7": {
+    "verdict": "local half: sizes and memory; the amd64 image and cold start on step4b are M1",
+    "layers": "claude layer 633 MB (claude 326 MiB + the SDK and its deps; only the glibc binary is installed); opencode layer 796 MB because npm installs both cli-linux-arm64 and cli-linux-arm64-musl (243 + 242 MiB). The image takes OpenCode from its release tarball (one binary)",
+    "peakRss": {
+      "claude-agent-acp": "135 MiB",
+      "claude": "209 MiB",
+      "opencode acp": "129 MiB",
+      "opencode serve": "310 MiB"
+    },
+    "turn": "npm ci && npm test: Claude 4.5 s, OpenCode 5.9 s"
+  },
+  "P8": {
+    "verdict": "recorded on SPI-1037 (changelog F9)",
+    "fork": "both agents answer session/fork at protocol 1 (claude-agent-acp: sessionId, modes, configOptions; opencode: sessionId, configOptions); the fork recalls the parent's context. t3's ACP adapter reports canForkThread false; enabling it is a flavor change (forkFromTurn) left to SPI-1037"
+  }
+}

@@ -9,3 +9,4 @@ dist/
 .worktrees/
 docs/steps/step-4a/out/
 apps/environment/test/docker/.work-*
+docs/steps/step-4b/out/
