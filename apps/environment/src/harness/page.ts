@@ -15,7 +15,7 @@ const STYLE = `body{font:14px/1.45 system-ui,sans-serif;margin:0 auto;max-width:
 h1{font-size:20px}h2{font-size:16px;margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:4px}
 .ext{background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;margin:10px 0}
 .ext h3{margin:0 0 4px;font-size:14px}.muted{color:#666}.locked{color:#8a5a00}
-label{display:block;margin:6px 0}input[type=number]{width:8em}
+label{display:block;margin:6px 0}input[type=number]{width:8em}input[type=url]{width:36em;max-width:100%}
 button{margin-top:6px}#result{white-space:pre-wrap;color:#8a0000}
 table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #eee;padding:4px 6px;text-align:left;font-size:12px}`;
 
@@ -35,7 +35,9 @@ const post = async (path, body) => {
 };
 for (const button of document.querySelectorAll("button[data-mcp]")) {
   button.addEventListener("click", async () => {
-    const response = await post("/_t3flare/harness/api/mcp", JSON.parse(button.dataset.mcp));
+    const change = JSON.parse(button.dataset.mcp);
+    if (change.op === "remove" && !confirm("Remove " + change.server + " and its sign-in?")) return;
+    const response = await post("/_t3flare/harness/api/mcp", change);
     if (response !== undefined) location.reload();
   });
 }
@@ -52,6 +54,26 @@ for (const button of document.querySelectorAll("button[data-mcp-oauth]")) {
     const answer = await response.json();
     const target = new URL(answer.authorizationUrl);
     if (target.protocol === "https:") window.open(target.toString(), "_blank", "noopener,noreferrer");
+  });
+}
+const adding = document.querySelector("form[data-mcp-add]");
+if (adding !== null) {
+  const auth = adding.querySelector("[name=auth]");
+  const headerFields = adding.querySelector("[data-header-fields]");
+  const showHeader = () => { headerFields.hidden = auth.value !== "header"; };
+  auth.addEventListener("change", showHeader);
+  showHeader();
+  adding.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const field = (name) => adding.querySelector("[name=" + name + "]").value.trim();
+    const body = { server: field("server"), url: field("url"), auth: { kind: auth.value } };
+    if (auth.value === "header") {
+      body.auth.header = field("header");
+      body.value = adding.querySelector("[name=value]").value;
+    }
+    const response = await post("/_t3flare/harness/api/mcp/servers", body);
+    adding.querySelector("[name=value]").value = "";
+    if (response !== undefined) location.reload();
   });
 }
 for (const form of document.querySelectorAll("form[data-extension]")) {
@@ -162,10 +184,23 @@ const mcpSection = (rows: ReadonlyArray<McpRow>): string =>
         row.setting.auth?.kind === "oauth"
           ? `<button type="button" data-mcp-oauth="${escapeHtml(row.name)}">${row.oauth?.signedIn === true ? "Sign in again" : "Sign in"}</button> <span class="muted">${row.oauth?.signedIn === true ? "signed in" : "not signed in"}</span>`
           : ""
-      }</div>
+      }${row.setting.kind === "direct" ? action("Remove", { op: "remove", server: row.name }) : ""}</div>
 <table><tr><th>Tool</th><th>Class</th><th>Exposure</th><th></th></tr>${tools}</table>${refused === "" ? "" : `<ul>${refused}</ul>`}</div>`;
     })
     .join("\n");
+
+/**
+ * The form that adds a direct server (Route B). Every tool starts as write until marked read (review H3); an OAuth
+ * server is signed in with its Sign in button once added. A header value goes to the write-only secret store.
+ */
+const ADD_SERVER = `<form class="ext" data-mcp-add autocomplete="off"><h3>Add a server</h3>
+<div class="muted">A remote MCP server over streamable HTTP (https only). Its tools start as write (each call follows the thread's mode) until you mark one read.</div>
+<label>Name <input name="server" required pattern="[a-z0-9-]{1,20}" placeholder="executor"></label>
+<label>URL <input name="url" type="url" required placeholder="https://mcp.example.com/mcp"></label>
+<label>Sign-in <select name="auth"><option value="oauth">OAuth (sign in after adding)</option><option value="header">A header</option><option value="none">None</option></select></label>
+<div data-header-fields><label>Header name <input name="header" value="Authorization" pattern="[A-Za-z0-9-]{1,64}"></label>
+<label>Header value <input name="value" type="password" autocomplete="new-password"> <span class="muted">stored write-only; never shown again</span></label></div>
+<button type="submit">Add</button></form>`;
 
 export interface PageInput {
   readonly mcp?: ReadonlyArray<McpRow>;
@@ -197,6 +232,7 @@ export const renderPage = (input: PageInput): string => {
 ${EXTENSIONS.map((entry) => extensionCard(input.resolved, entry)).join("\n")}
 <h2>MCP servers</h2>
 ${input.mcp === undefined || input.mcp.length === 0 ? '<p class="muted">No MCP server.</p>' : mcpSection(input.mcp)}
+${ADD_SERVER}
 <h2>Skills</h2>
 <p class="muted">Deferred (SPI-1001).</p>
 <h2>Status</h2>

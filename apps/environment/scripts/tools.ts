@@ -950,6 +950,15 @@ switch (command) {
   case "cli-mcp":
     await cliMcp((process.argv[3] ?? "codex") as RelayCli);
     break;
+  case "mcp-list": {
+    // The panel's MCP section as a script sees it (names, status, tool classes; never a secret), and whether the page
+    // carries the add-a-server form.
+    const page = await fetch(new URL("/_t3flare/harness", HARNESS), { redirect: "manual", headers: { ...accessHeaders, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN ?? ""}` } });
+    const html = await page.text();
+    const rows = (await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? [];
+    console.log(JSON.stringify({ page: page.status, addForm: html.includes("data-mcp-add"), servers: rows.map((row: any) => ({ name: row.name, kind: row.setting?.kind, enabled: row.setting?.enabled, auth: row.setting?.auth?.kind, signedIn: row.oauth?.signedIn, status: row.status, error: row.error, tools: (row.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`) })) }, null, 1));
+    break;
+  }
   case "stop-all": {
     // Every Workspace's Container stopped (the stage's budget is 3 at once).
     const listed = (await admin("GET", "/_t3flare/agents/workspaces")).json;
