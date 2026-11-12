@@ -410,7 +410,21 @@ export class ProcessHost {
       const proc = this.#procs.get(key);
       if (proc !== undefined) proc.lastHeartbeat = now;
     }
+    // A key the Environment holds but this instance does not: an earlier instance's process, still running.
+    if (keys.some((key) => !this.#procs.has(key))) void this.killOrphans().catch(() => undefined);
     return this.#answer(keys);
+  }
+
+  /** Kills processes an earlier instance of this object started (their handles went with it); by stored markers. */
+  async killOrphans(): Promise<number> {
+    if (!this.#deps.running()) return 0;
+    const orphans = this.#deps.remembered().filter((marker) => !this.#procs.has(marker.key));
+    if (orphans.length === 0) return 0;
+    console.log(JSON.stringify({ t3flare: "process-orphans-killed", count: orphans.length }));
+    await this.#deps.kill(orphans.map((marker) => marker.key));
+    for (const marker of orphans) if (marker.linked === true && marker.thread !== undefined) this.#deps.linkedWork?.(marker.thread, false);
+    this.#save();
+    return orphans.length;
   }
 
   /** Kills processes whose Environment stopped heartbeating, and those silent past the backstop. */

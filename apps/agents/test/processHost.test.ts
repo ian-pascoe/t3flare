@@ -227,6 +227,16 @@ describe("ProcessHost", () => {
     expect(h.killed).toContainEqual(["proc-a"]);
   });
 
+  it("kills an earlier instance's process when the Environment heartbeats a key this instance does not hold", async () => {
+    const h = harness();
+    h.setRemembered([{ key: "proc-orphan", environmentEpoch: 3, thread: "t", linked: true }]);
+    h.host.heartbeat(["proc-orphan"]);
+    await tick(20);
+    expect(h.killed).toEqual([["proc-orphan"]]);
+    expect(h.linked).toEqual([["t", false]]);
+    expect(h.remembered()).toEqual([]);
+  });
+
   it("holds the Container during a turn and for the idle hold after it, then lets it go (review F7)", async () => {
     const h = harness();
     await h.host.start(start("proc-a"));

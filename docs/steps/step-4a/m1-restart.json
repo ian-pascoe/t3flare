@@ -1,16 +1,16 @@
 {
- "at": "2026-11-12T01:18:32.676Z",
+ "at": "2026-11-12T01:21:27.900Z",
  "scenario": "restart",
  "ok": false,
  "failures": [
-  "the Environment's handle ended (heartbeat or push answered unknown): {\"live\":1,\"environmentEpoch\":4}"
+  "the aborted Workspace's process is gone: {\"count\":2}"
  ],
  "workspace": "step3-fixture",
  "environmentRestart": {
   "held": {
-   "key": "proc-0bd5bc47-2946-497b-84b0-5c4c5692f249",
+   "key": "proc-5b37aaad-c5a7-4beb-926a-5aaf0b9daff4",
    "pid": 200000,
-   "startMs": 190
+   "startMs": 344
   },
   "before": {
    "count": 4
@@ -18,17 +18,17 @@
   "stateBefore": {
    "channel": {
     "live": 1,
-    "environmentEpoch": 3
+    "environmentEpoch": 5
    },
    "workspace": {
-    "epoch": 3,
+    "epoch": 4,
     "processes": [
      {
-      "key": "proc-0bd5bc47-2946-497b-84b0-5c4c5692f249",
+      "key": "proc-5b37aaad-c5a7-4beb-926a-5aaf0b9daff4",
       "thread": null,
-      "environmentEpoch": 3,
+      "environmentEpoch": 5,
       "inTurn": false,
-      "idleMs": 1597
+      "idleMs": 1506
      }
     ],
     "pushes": 0
@@ -37,8 +37,8 @@
   "after": {
    "n": 5,
    "p50": 50,
-   "p95": 52,
-   "max": 52
+   "p95": 55,
+   "max": 55
   },
   "oldAfter": {
    "count": 0
@@ -46,43 +46,43 @@
  },
  "workspaceAbort": {
   "held": {
-   "key": "proc-f2e87b0f-220e-44a9-99f5-6cfc993f56e9",
+   "key": "proc-cc326a8d-d758-448b-bbd9-3dbb893deeff",
    "pid": 200001,
-   "startMs": 61
+   "startMs": 81
   },
   "stateHeld": {
    "channel": {
     "live": 1,
-    "environmentEpoch": 4
+    "environmentEpoch": 6
    },
    "workspace": {
-    "epoch": 3,
+    "epoch": 4,
     "processes": [
      {
-      "key": "proc-f2e87b0f-220e-44a9-99f5-6cfc993f56e9",
+      "key": "proc-cc326a8d-d758-448b-bbd9-3dbb893deeff",
       "thread": null,
-      "environmentEpoch": 4,
+      "environmentEpoch": 6,
       "inTurn": false,
-      "idleMs": 105
+      "idleMs": 167
      }
     ],
-    "pushes": 29
+    "pushes": 21
    }
   },
   "channelAfterAbort": {
    "channel": {
-    "live": 1,
-    "environmentEpoch": 4
+    "live": 0,
+    "environmentEpoch": 6
    },
    "workspace": {
-    "epoch": 4,
+    "epoch": 5,
     "processes": [],
     "pushes": 0
    }
   },
-  "handleEndedMs": 152903,
+  "handleEndedMs": 30983,
   "held2After": {
-   "count": 0
+   "count": 2
   }
  }
 }

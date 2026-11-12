@@ -1446,6 +1446,7 @@ export class WorkspaceDO extends ContainerHost {
     }
     await this.#terminals.expire().catch(() => undefined);
     await this.#processes.expire().catch(() => undefined);
+    await this.#processes.killOrphans().catch(() => undefined);
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
     // Terminals hold the Container until their last input is older than the hold (review F10: output is not use).
     const held = this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() }) || this.#processes.holdsContainer();
