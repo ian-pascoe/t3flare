@@ -107,8 +107,7 @@ export class ProcessHost {
   readonly #procs = new Map<string, Proc>();
   #pending: Array<ProcessFrame> = [];
   #pendingBytes = 0;
-  #flushTimer: ReturnType<typeof setTimeout> | undefined;
-  #flushDue = 0;
+  #pumping = false;
   #inFlight: Promise<void> | undefined;
   #drained: Array<() => void> = [];
   #pushFailures = 0;
@@ -248,6 +247,7 @@ export class ProcessHost {
       return refuse(`the process did not start: ${String(error instanceof Error ? error.message : error).slice(0, 300)}`);
     }
     if (proc.killing) await this.#deps.kill([proc.key]);
+    this.#startPump();
     console.log(JSON.stringify({ t3flare: "process-started", key: input.key, cli: input.cli, thread: input.thread ?? null, environmentEpoch: input.environmentEpoch, sandbox: sandbox ?? null }));
     return { ok: true, epoch: this.#deps.epoch, ...(sandbox === undefined ? {} : { sandbox }) };
   }
@@ -287,22 +287,29 @@ export class ProcessHost {
   #frame(proc: Proc, frame: Omit<ProcessFrame, "key" | "seq">): void {
     this.#pending.push({ key: proc.key, seq: proc.outSeq++, ...frame });
     this.#pendingBytes += frame.data?.byteLength ?? 16;
-    this.#flushSoon(this.#pendingBytes >= BATCH_BYTES ? 0 : this.#deps.now() - this.#lastInput < ECHO_WINDOW_MS ? BATCH_MS : BULK_BATCH_MS);
     if (frame.stream !== "exit") this.#deps.filesMayHaveChanged("output");
   }
 
-  #flushSoon(ms: number): void {
-    if (this.#inFlight !== undefined) return;
-    const due = Date.now() + ms;
-    if (this.#flushTimer !== undefined) {
-      if (due >= this.#flushDue) return;
-      clearTimeout(this.#flushTimer);
-    }
-    this.#flushDue = due;
-    this.#flushTimer = setTimeout(() => {
-      this.#flushTimer = undefined;
-      void this.#flush();
-    }, ms);
+  /**
+   * Pushes run only from this loop, started in a start's context and continued by its own timers: never from the
+   * context of the Environment's `processInput` (a read that the input woke, review F6's channel). A push made there
+   * would answer the Environment inside a call the Environment made inside the previous push: each round trip one
+   * level deeper, until the platform's subrequest depth limit (M1 on step4a: "Subrequest depth limit exceeded").
+   */
+  #startPump(): void {
+    if (this.#pumping) return;
+    this.#pumping = true;
+    void (async () => {
+      try {
+        while (this.size > 0 || this.#pending.length > 0) {
+          const wait = this.#pendingBytes >= BATCH_BYTES ? 0 : this.#deps.now() - this.#lastInput < ECHO_WINDOW_MS ? BATCH_MS : BULK_BATCH_MS;
+          await new Promise((resolve) => setTimeout(resolve, wait));
+          await this.#flush();
+        }
+      } finally {
+        this.#pumping = false;
+      }
+    })();
   }
 
   async #flush(): Promise<void> {
@@ -339,17 +346,12 @@ export class ProcessHost {
     } finally {
       this.#inFlight = undefined;
       for (const resolve of this.#drained.splice(0)) resolve();
-      if (this.#pending.length > 0) this.#flushSoon(this.#pendingBytes >= BATCH_BYTES ? 0 : BATCH_MS);
     }
   }
 
   /** Waits until every frame so far was pushed (tests, and before a stop). */
   async settled(): Promise<void> {
-    for (let i = 0; i < 50 && (this.#pending.length > 0 || this.#inFlight !== undefined || this.#flushTimer !== undefined); i++) {
-      if (this.#flushTimer !== undefined) {
-        clearTimeout(this.#flushTimer);
-        this.#flushTimer = undefined;
-      }
+    for (let i = 0; i < 50 && (this.#pending.length > 0 || this.#inFlight !== undefined); i++) {
       if (this.#inFlight !== undefined) await this.#inFlight.catch(() => undefined);
       await this.#flush();
     }
