@@ -1,0 +1,12 @@
+{
+ "at": "2026-11-12T15:52:23.272Z",
+ "status": "completed",
+ "perCallMs": {
+  "tool_search": 0,
+  "read": 267,
+  "bash_true": 194,
+  "t3_environment_read": 77
+ },
+ "output": "Script completed\nWall time 10.8 seconds\nOutput:\ntool_search=0 (threw: tools.tool_search does not exist. Did you mean tools.ls? ALL_TOOLS lists every t)\nread=267\nbash_true=194\nt3_environment_read=77",
+ "ok": true
+}

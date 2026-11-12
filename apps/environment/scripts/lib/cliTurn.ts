@@ -89,7 +89,7 @@ export const cliTurn = async (cookie: string, options: TurnOptions) => {
       .map((item: any) => String(item.text ?? ""))
       .join("")
       .slice(-400),
-    requests: (projection?.runtimeRequests ?? []).map((r: any) => ({ kind: r.kind, requestKind: r.requestKind ?? null, status: r.status, decision: r.decision ?? null })),
+    requests: (projection?.runtimeRequests ?? []).map((r: any) => ({ id: r.id, kind: r.kind, requestKind: r.requestKind ?? null, status: r.status, decision: r.decision ?? null })),
     providerThreads: (projection?.providerThreads ?? []).map((thread: any) => ({ id: thread.id, nativeThreadRef: thread.nativeThreadRef ?? null, providerSessionId: thread.providerSessionId ?? null, providerInstanceId: thread.providerInstanceId ?? null })),
     providerSessions: (projection?.providerSessions ?? []).map((session: any) => ({ id: session.id, status: session.status, cwd: session.cwd ?? null })),
     ms: Date.now() - started,

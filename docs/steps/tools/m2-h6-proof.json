@@ -1,0 +1,25 @@
+{
+ "at": "2026-11-12T15:51:54.109Z",
+ "name": "H6: t3_pending_request respond on a script's pending nested card is refused; the card stays pending until the owner declines",
+ "attempt": {
+  "cardId": "runtime-request:piDurable:thread:ed813fc5-9c32-4b2c-87d5-7d03ce554f06:approval:17",
+  "cardKind": "command",
+  "bStatus": "completed",
+  "bCards": 0,
+  "output": "Script completed\nWall time 0.5 seconds\nOutput:\nLIST {\"requestIds\":[]}\nRESPOND respond threw: {\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"The pending user-input request was not found.\"}"
+ },
+ "stillPendingAfterRespond": true,
+ "turnA": {
+  "status": "completed",
+  "cards": [
+   {
+    "kind": "command",
+    "prompt": "echo self-approved > h6.txt\n\nFrom a code mode script:\ntext(await tools.bash({ command: \"echo self-approved > h6.txt\" }).catch((e) => \"bash: \" + e.message));",
+    "decision": "decline"
+   }
+  ]
+ },
+ "outputA": "Script completed\nWall time 12.8 seconds\nOutput:\nbash: Declined by the owner: the call did not run. Do not ask again for the same change unless the owner wants it.",
+ "file": "",
+ "ok": true
+}

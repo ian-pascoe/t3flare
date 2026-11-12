@@ -13,6 +13,8 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { cliTurn as acpTurn, enable as enableAcp } from "./lib/acpTurn.ts";
+import { cliTurn, enable as enableCli } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, mutateProject, pair, projectionOf, readDoText, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
 
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
@@ -286,6 +288,7 @@ text(out.join("\\n"));`;
 const sandboxLoss = async () => {
   const thread = await newThread("p14s", "approval-required");
   let redeployed = false;
+  let redeployLog = "";
   const turn = await runTurn(
     thread.threadId,
     verbatim(`const done = await tools.read({ path: "src/greeting.txt" });\nawait tools.bash({ command: "echo should-not-run > lost.log" });\ntext("ran");`),
@@ -302,6 +305,8 @@ const sandboxLoss = async () => {
           encoding: "utf8",
         });
         console.log(`redeploy exit ${deployed.status}`);
+        // Which resources the deploy changed (root's follow-up: only the sandbox Worker, whose env alone differs).
+        redeployLog = `${deployed.stdout ?? ""}\n${deployed.stderr ?? ""}`;
       },
     },
   );
@@ -313,6 +318,7 @@ const sandboxLoss = async () => {
     script: scripts[0] ?? null,
     cards: turn.cards,
     lostLog: lost,
+    redeployed: [...new Set(redeployLog.split("\n").filter((line) => /updat|creat|replac|deploy/i.test(line) && !/token|secret/i.test(line)).map((line) => line.trim().slice(0, 160)))].slice(0, 40),
     expectation: "the script fails closed: it ends with an error listing the calls it completed; the card is withdrawn or, if answered, the command does not run twice",
     ok: scripts[0] !== undefined,
   });
@@ -622,6 +628,127 @@ const classCases = async () => {
   writeEvidence("m6-direct-classes.json", { cases, ok: cases.every((c) => c.ok) });
 };
 
+// ---------------------------------------------------------------------------------------------------------------------
+// P3's breakdown (root's follow-up): per nested call, timed inside the script, for calls that stop at different layers:
+// a Session-local tool (sandbox RPC + Session dispatch + the step's commit), a read (+ the Workspace DO), a command
+// (+ the Container), and a read-only t3 tool (+ the Environment DO and t3).
+
+const p3Breakdown = async () => {
+  const thread = await newThread("p3b", "full-access");
+  const code = `const N = 20;
+const out = [];
+const time = async (name, call) => {
+  const started = Date.now();
+  let failed = "";
+  for (let i = 0; i < N; i++) { try { await call(); } catch (e) { failed = e.message; } }
+  out.push(name + "=" + Math.round((Date.now() - started) / N) + (failed ? " (threw: " + failed.slice(0, 80) + ")" : ""));
+};
+await time("tool_search", () => tools.tool_search({ query: "grep" }));
+await time("read", () => tools.read({ path: "src/greeting.txt" }));
+await time("bash_true", () => tools.bash({ command: "true" }));
+await time("t3_environment_read", () => tools.mcp__t3_code__t3_environment_read({}));
+text(out.join("\\n"));`;
+  const turn = await runTurn(thread.threadId, verbatim(code), () => "accept");
+  const output = (await scriptOutputs(thread.threadId)).at(-1) ?? "";
+  const ms = Object.fromEntries([...output.matchAll(/^(\w+)=(\d+)/gm)].map((m) => [m[1], Number(m[2])]));
+  writeEvidence("m0-p3-breakdown.json", { status: turn.status, perCallMs: ms, output: output.slice(0, 800), ok: turn.status === "completed" && Object.keys(ms).length >= 3 });
+  await cleanup(thread.id);
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// H6, the real proof (root's follow-up): a script's nested command waits on its card; t3_pending_request list and respond
+// on that card's id (from another thread of the same project, at full access so its own calls run) are refused by t3
+// (F7: "cannot approve a permission request"), and the card is still pending afterwards.
+
+const h6Proof = async () => {
+  const a = await newThread("h6a", "approval-required");
+  const bThread = await threadIn(a.projectId, `${a.id}-b`, "full-access");
+  const code = `text(await tools.bash({ command: "echo self-approved > h6.txt" }).catch((e) => "bash: " + e.message));`;
+  let attempt: any = null;
+  let stillPending: boolean | null = null;
+  const turnA = await runTurn(a.threadId, verbatim(code), () => (attempt === null ? undefined : "decline"), {
+    timeoutMs: 6 * 60_000,
+    during: async (projection) => {
+      if (attempt !== null) return;
+      const card = (projection?.runtimeRequests ?? []).find((r: any) => r.status === "pending");
+      if (card === undefined) return;
+      const b = `const listed = await tools.mcp__t3_code__t3_pending_request({ action: "list", threadId: ${JSON.stringify(a.threadId)} }).catch((e) => "list threw: " + e.message);
+const responded = await tools.mcp__t3_code__t3_pending_request({ action: "respond", threadId: ${JSON.stringify(a.threadId)}, requestId: ${JSON.stringify(card.id)}, answers: {} }).catch((e) => "respond threw: " + e.message);
+text("LIST " + String(listed).slice(0, 400) + "\\nRESPOND " + String(responded).slice(0, 600));`;
+      const turnB = await runTurn(bThread, verbatim(b), () => "accept", { timeoutMs: 4 * 60_000 });
+      const after = projectionOf(await threadWindow(cookie, a.threadId));
+      stillPending = (after?.runtimeRequests ?? []).some((r: any) => r.id === card.id && r.status === "pending");
+      attempt = { cardId: card.id, cardKind: card.kind, bStatus: turnB.status, bCards: turnB.cards.length, output: ((await scriptOutputs(bThread)).at(-1) ?? "").slice(0, 1200) };
+    },
+  });
+  const file = await workspaceFile(a.id, "h6.txt");
+  const outputA = (await scriptOutputs(a.threadId)).at(-1) ?? "";
+  const respondRefused = /RESPOND[\s\S]*(cannot|not a user|permission|refus|threw|error|invalid)/i.test(String(attempt?.output ?? ""));
+  const result = {
+    name: "H6: t3_pending_request respond on a script's pending nested card is refused; the card stays pending until the owner declines",
+    attempt,
+    stillPendingAfterRespond: stillPending,
+    turnA: { status: turnA.status, cards: turnA.cards },
+    outputA: outputA.slice(0, 400),
+    file,
+    ok: attempt !== null && respondRefused && stillPending === true && !file.includes("self-approved"),
+  };
+  writeEvidence("m2-h6-proof.json", result);
+  await cleanup(a.id);
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// CLI agents through the relay (parts 3/5, M5): the direct fixture server and t3's own tools, per CLI
+
+type RelayCli = "codex" | "pi" | "claude" | "opencode";
+const cliMcp = async (cli: RelayCli) => {
+  const acp = cli === "claude" || cli === "opencode";
+  if (acp) await enableAcp(cookie, cli);
+  else await enableCli(cookie, cli, cli);
+  const workspace = `tools-cli-${cli}`;
+  const marker = `${cli}-${Date.now().toString(36)}`;
+  const cases: Array<Case> = [];
+  // The relay's cards (their ids keep the push card's prefix, M9); a CLI's own prompts are counted apart.
+  const card = (request: any) => String(request.id ?? "").includes(":t3flare-push:") && request.kind === "permission";
+  const turn = async (name: string, mode: string, prompt: string, approve: "accept" | "decline", plan = false) => {
+    const before = (await notes()).length;
+    const result: any = await (acp ? acpTurn : cliTurn)(cookie, { cli, workspace, mode, plan, prompt, approve });
+    const added = (await notes()).slice(before);
+    // Each case on a fresh process: a Workspace holds at most 4 CLI processes.
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${workspace}`);
+    return { name, mode, plan, run: result.runs.at(-1) ?? null, cards: result.requests.filter(card), requests: result.requests, text: result.text, items: result.items.filter((item: any) => /mcp|tool/i.test(item.type)).slice(0, 8), notesAdded: added };
+  };
+  const only = "Do not run any shell command; use only that MCP tool.";
+  // pi has no MCP client of its own in the image: only t3's tools reach it (through t3's pi extension).
+  if (cli !== "pi") {
+    {
+      const r = await turn("a read (fixture_echo) runs without a card", "approval-required", `Call the MCP tool fixture_echo of the "fixture" MCP server with text "hello-${marker}" and reply with exactly what it returned. ${only}`, "accept");
+      cases.push({ ...r, ok: r.cards.length === 0 && r.text.includes(`hello-${marker}`) });
+    }
+    {
+      const r = await turn("a write (fixture_note) asks in approval-required; approved: one note", "approval-required", `Call the MCP tool fixture_note of the "fixture" MCP server with line "${marker}-approved". Then say done. ${only}`, "accept");
+      cases.push({ ...r, ok: r.cards.length === 1 && r.notesAdded.length === 1 });
+    }
+    {
+      const r = await turn("a write declined: no note", "approval-required", `Call the MCP tool fixture_note of the "fixture" MCP server with line "${marker}-declined". If it is refused, say so and stop. ${only}`, "decline");
+      cases.push({ ...r, ok: r.cards.length >= 1 && r.notesAdded.length === 0 });
+    }
+    {
+      const r = await turn("a write runs in full access without a card", "full-access", `Call the MCP tool fixture_note of the "fixture" MCP server with line "${marker}-full". Then say done. ${only}`, "accept");
+      cases.push({ ...r, ok: r.cards.length === 0 && r.notesAdded.length === 1 });
+    }
+    {
+      const r = await turn("plan mode refuses a write", "full-access", `Call the MCP tool fixture_note of the "fixture" MCP server with line "${marker}-plan" now, then say what it answered. ${only}`, "accept", true);
+      cases.push({ ...r, ok: r.notesAdded.length === 0 });
+    }
+  }
+  {
+    const r = await turn("t3's own tools through the relay (SPI-1039): t3_thread_list", "approval-required", `Call the t3-code MCP tool t3_thread_list and tell me how many threads it lists. ${only}`, "accept");
+    cases.push({ ...r, ok: r.cards.length === 0 && /\d/.test(r.text) && !/unavailable/i.test(r.text) });
+  }
+  writeEvidence(`m5-cli-${cli}.json`, { cli, workspace, cases, ok: cases.every((c) => c.ok) });
+};
+
 const command = process.argv[2];
 cookie = await pair();
 switch (command) {
@@ -653,6 +780,15 @@ switch (command) {
     break;
   case "classes":
     await classCases();
+    break;
+  case "p3-breakdown":
+    await p3Breakdown();
+    break;
+  case "h6":
+    await h6Proof();
+    break;
+  case "cli-mcp":
+    await cliMcp((process.argv[3] ?? "codex") as RelayCli);
     break;
   case "stop-all": {
     // Every Workspace's Container stopped (the stage's budget is 3 at once).

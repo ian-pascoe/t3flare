@@ -1,0 +1,176 @@
+{
+ "at": "2026-11-12T15:49:49.461Z",
+ "cli": "codex",
+ "workspace": "tools-cli-codex",
+ "cases": [
+  {
+   "name": "a read (fixture_echo) runs without a card",
+   "mode": "approval-required",
+   "plan": false,
+   "run": {
+    "id": "run:thread:3b276b98-aeea-43f7-9f4e-3b0a7082c996:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [],
+   "requests": [],
+   "text": "hello-codex-mwdq1yz1",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "fileName": null,
+     "input": null,
+     "exitCode": null
+    }
+   ],
+   "notesAdded": [],
+   "ok": true
+  },
+  {
+   "name": "a write (fixture_note) asks in approval-required; approved: one note",
+   "mode": "approval-required",
+   "plan": false,
+   "run": {
+    "id": "run:thread:b6ee72b9-e895-45c0-8a97-239ac15e718a:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [
+    {
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "requests": [
+    {
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "text": "done",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "fileName": null,
+     "input": null,
+     "exitCode": null
+    }
+   ],
+   "notesAdded": [
+    "codex-mwdq1yz1-approved"
+   ],
+   "ok": true
+  },
+  {
+   "name": "a write declined: no note",
+   "mode": "approval-required",
+   "plan": false,
+   "run": {
+    "id": "run:thread:8722731e-1ce4-481b-9fbc-f9ee491ce1d4:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [
+    {
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "decline"
+    }
+   ],
+   "requests": [
+    {
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "decline"
+    }
+   ],
+   "text": "The `fixture_note` call was refused because the owner did not approve it.",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "failed",
+     "fileName": null,
+     "input": null,
+     "exitCode": null
+    }
+   ],
+   "notesAdded": [],
+   "ok": true
+  },
+  {
+   "name": "a write runs in full access without a card",
+   "mode": "full-access",
+   "plan": false,
+   "run": {
+    "id": "run:thread:29610764-b2e9-464d-b7e0-cebf02bcb050:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [],
+   "requests": [],
+   "text": "done",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "fileName": null,
+     "input": null,
+     "exitCode": null
+    }
+   ],
+   "notesAdded": [
+    "codex-mwdq1yz1-full"
+   ],
+   "ok": true
+  },
+  {
+   "name": "plan mode refuses a write",
+   "mode": "full-access",
+   "plan": true,
+   "run": {
+    "id": "run:thread:18d29059-c4fa-4f45-8ce2-f7f2e9b653f2:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [],
+   "requests": [],
+   "text": "I can’t call `fixture_note` while Plan Mode is active because it writes to a log. No tool call was made, so I don’t know what it would answer.",
+   "items": [],
+   "notesAdded": [],
+   "ok": true
+  },
+  {
+   "name": "t3's own tools through the relay (SPI-1039): t3_thread_list",
+   "mode": "approval-required",
+   "plan": false,
+   "run": {
+    "id": "run:thread:9c2567dd-03de-4eaf-9f4d-56902cd5e427:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [],
+   "requests": [],
+   "text": "The tool lists 6 threads.",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "fileName": null,
+     "input": null,
+     "exitCode": null
+    }
+   ],
+   "notesAdded": [],
+   "ok": true
+  }
+ ],
+ "ok": true
+}

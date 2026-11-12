@@ -1,0 +1,250 @@
+{
+ "at": "2026-11-12T15:53:41.220Z",
+ "cli": "claude",
+ "workspace": "tools-cli-claude",
+ "cases": [
+  {
+   "name": "a read (fixture_echo) runs without a card",
+   "mode": "approval-required",
+   "plan": false,
+   "run": {
+    "id": "run:thread:685785a7-e767-4b1e-8f8b-501e44fcc640:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [],
+   "requests": [],
+   "text": "hello-claude-mwdq6mgs",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Tool",
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "fixture echo",
+     "fileName": null,
+     "input": null
+    }
+   ],
+   "notesAdded": [],
+   "ok": true
+  },
+  {
+   "name": "a write (fixture_note) asks in approval-required; approved: one note",
+   "mode": "approval-required",
+   "plan": false,
+   "run": {
+    "id": "run:thread:749463bf-9be0-4700-883b-996182662bcd:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [
+    {
+     "id": "runtime-request:claudeAgent:t3flare-push:a82b4fe0-41e9-441f-9eca-3f103cb10d7a",
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "accept",
+     "options": []
+    }
+   ],
+   "requests": [
+    {
+     "id": "runtime-request:claudeAgent:t3flare-push:a82b4fe0-41e9-441f-9eca-3f103cb10d7a",
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "accept",
+     "options": []
+    }
+   ],
+   "text": "Done. The fixture server logged the line as note #7.",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Tool",
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "fixture note",
+     "fileName": null,
+     "input": null
+    }
+   ],
+   "notesAdded": [
+    "claude-mwdq6mgs-approved"
+   ],
+   "ok": true
+  },
+  {
+   "name": "a write declined: no note",
+   "mode": "approval-required",
+   "plan": false,
+   "run": {
+    "id": "run:thread:7a12b99c-e2b1-4a11-b8f5-2ca8fefb6d69:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [
+    {
+     "id": "runtime-request:claudeAgent:t3flare-push:bc365561-3f56-4012-8f5e-bb81d10c7585",
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "decline",
+     "options": []
+    }
+   ],
+   "requests": [
+    {
+     "id": "runtime-request:claudeAgent:t3flare-push:bc365561-3f56-4012-8f5e-bb81d10c7585",
+     "kind": "permission",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "decline",
+     "options": []
+    }
+   ],
+   "text": "The call was refused: the owner declined to approve `fixture_note`, so nothing was logged. I'm stopping here, as you asked.",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Tool",
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "failed",
+     "title": "fixture note",
+     "fileName": null,
+     "input": null
+    }
+   ],
+   "notesAdded": [],
+   "ok": true
+  },
+  {
+   "name": "a write runs in full access without a card",
+   "mode": "full-access",
+   "plan": false,
+   "run": {
+    "id": "run:thread:137fa266-7351-4972-a213-a3891bf6fb18:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [],
+   "requests": [],
+   "text": "Done.",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Tool",
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "fixture note",
+     "fileName": null,
+     "input": null
+    }
+   ],
+   "notesAdded": [
+    "claude-mwdq6mgs-full"
+   ],
+   "ok": true
+  },
+  {
+   "name": "plan mode refuses a write",
+   "mode": "full-access",
+   "plan": true,
+   "run": {
+    "id": "run:thread:9ba192b5-fca0-45ea-9aec-3241232ab9c3:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [],
+   "requests": [
+    {
+     "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A0c7de07e-34c8-4632-86fe-b62b2a2e1ec3%253Aturn%253A1:native-request:0c7de07e-34c8-4632-86fe-b62b2a2e1ec3%3Aelicitation%3A0:7dde79e5-7e0d-42b0-b5ae-229cb19aa5f0",
+     "kind": "user_input",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "accept",
+     "options": []
+    }
+   ],
+   "text": "de is active and blocks write actions. The tool's description says it \"records a line in the fixture's log\", so it is a write.\n\nI also tried to ask how you wanted to proceed, but that prompt was aborted before you could answer.\n\nIf you want the call made, either switch out of Plan mode or tell me to go ahead anyway. I'll then call it with the line `claude-mwdq6mgs-plan` and report what it answers.",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Tool",
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "failed",
+     "title": "Tool",
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Action required",
+     "fileName": null,
+     "input": null
+    }
+   ],
+   "notesAdded": [],
+   "ok": true
+  },
+  {
+   "name": "t3's own tools through the relay (SPI-1039): t3_thread_list",
+   "mode": "approval-required",
+   "plan": false,
+   "run": {
+    "id": "run:thread:116ea0ec-22db-4091-b2a9-8a29345e86a5:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   "cards": [],
+   "requests": [],
+   "text": "`t3_thread_list` lists **6 threads**. The response's `total` is 6 and `nextCursor` is null, so there are no further pages. The list covers the current project only, since I didn't set `allProjects`.",
+   "items": [
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Tool",
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "t3-code.t3_thread_list",
+     "fileName": null,
+     "input": null
+    }
+   ],
+   "notesAdded": [],
+   "ok": true
+  }
+ ],
+ "ok": true
+}

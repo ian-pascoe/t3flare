@@ -96,7 +96,7 @@ export const cliTurn = async (cookie: string, options: TurnOptions) => {
       .join("")
       .slice(-400),
     // This turn's requests only (the projection keeps the thread's).
-    requests: (projection?.runtimeRequests ?? []).filter((r: any) => !requestsBefore.has(r.id)).map((r: any) => ({ kind: r.kind, requestKind: r.requestKind ?? null, status: r.status, decision: r.decision ?? null, options: (r.options ?? []).map((o: any) => o.decision) })),
+    requests: (projection?.runtimeRequests ?? []).filter((r: any) => !requestsBefore.has(r.id)).map((r: any) => ({ id: r.id, kind: r.kind, requestKind: r.requestKind ?? null, status: r.status, decision: r.decision ?? null, options: (r.options ?? []).map((o: any) => o.decision) })),
     providerThreads: (projection?.providerThreads ?? []).map((thread: any) => ({ id: thread.id, nativeThreadRef: thread.nativeThreadRef ?? null, providerInstanceId: thread.providerInstanceId ?? null })),
     ms: Date.now() - started,
   };
