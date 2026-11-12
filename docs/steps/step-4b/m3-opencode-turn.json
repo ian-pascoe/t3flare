@@ -1,0 +1,136 @@
+{
+ "at": "2026-11-12T02:30:41.623Z",
+ "scenario": "turn",
+ "ok": true,
+ "failures": [],
+ "cli": "opencode",
+ "result": {
+  "threadId": "4034c21f-9eb4-46ad-8d85-b32de0b61078",
+  "root": "/w/cli-opencode",
+  "model": "anthropic/claude-sonnet-5-5",
+  "runs": [
+   {
+    "id": "run:thread:4034c21f-9eb4-46ad-8d85-b32de0b61078:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "dynamic_tool",
+    "status": "completed",
+    "title": "Read /w/cli-opencode/src/greeting.txt",
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "title": "Tool",
+    "fileName": null,
+    "input": "tail -c 20 src/greeting.txt | od -c | tail -3"
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "file_change",
+    "status": "completed",
+    "title": "Tool",
+    "fileName": "/w/cli-opencode/src/greeting.txt",
+    "input": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "title": "Tool",
+    "fileName": null,
+    "input": "bash test.sh"
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   }
+  ],
+  "proposedPlan": [],
+  "text": "The file ends with a newline, so I'll add the new line after it.I added `Hello from the CLI.` as the new last line of `src/greeting.txt`, and `bash test.sh` passed, printing \"all checks passed\".",
+  "requests": [
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept",
+    "options": []
+   },
+   {
+    "kind": "file-change",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept",
+    "options": []
+   },
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept",
+    "options": []
+   }
+  ],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:opencode:native-thread:pending%3Arun%3Athread%3A4034c21f-9eb4-46ad-8d85-b32de0b61078%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "opencode",
+     "nativeId": "ses_e32686ba5ffeybhtshjWH3jLBX",
+     "strength": "strong"
+    },
+    "providerInstanceId": "opencode"
+   }
+  ],
+  "ms": 26435
+ },
+ "changed": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)"
+}

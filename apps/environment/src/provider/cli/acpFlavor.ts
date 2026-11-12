@@ -197,11 +197,25 @@ export const exitPlanMarkdown = (request: Pick<EffectAcpSchema.RequestPermission
 
 type Runtime = AcpSessionRuntime.AcpSessionRuntime["Service"];
 
+/**
+ * Review F1: denying ExitPlanMode stops Claude's turn (ACP v2: an `idle` whose stop reason is `cancelled` or, after its
+ * interrupted query, `error`). When we captured the plan in that turn, the turn ended with its plan: `end_turn`.
+ */
+const planTurnEnd = (slot: GuardSlot, notification: EffectAcpSchema.SessionNotification): EffectAcpSchema.SessionNotification => {
+  const update = notification.update as { sessionUpdate: string; state?: string; stopReason?: string };
+  if (!slot.planCaptured || update.sessionUpdate !== "state_update" || update.state !== "idle" || (update.stopReason !== "cancelled" && update.stopReason !== "error")) return notification;
+  slot.planCaptured = false;
+  const { error: _error, ...rest } = notification.update as unknown as Record<string, unknown>;
+  return { ...notification, update: { ...rest, stopReason: "end_turn" } as unknown as EffectAcpSchema.SessionNotification["update"] };
+};
+
 /** What `registerExtensions` gives the runtime it wraps: t3's proposed-plan capture. */
 export interface GuardSlot {
   capture: ((input: { readonly planMarkdown: string }) => Effect.Effect<void>) | undefined;
   /** Why the session was ended for its mode; from then on no request is answered and no prompt sent. */
   drifted: string | undefined;
+  /** A plan was handed to t3 during the running prompt: Claude's stop after the denied ExitPlanMode is the plan's end. */
+  planCaptured: boolean;
   /** Fails a running prompt with the drift, so t3's failure names it (`cliPromptFailure`). */
   readonly signal: Deferred.Deferred<never, EffectAcpErrors.AcpError>;
 }
@@ -226,7 +240,7 @@ const drift = (cli: AcpCli, runtime: Runtime, slot: GuardSlot, why: string) =>
  * - Claude's `ExitPlanMode` request in plan mode hands its plan to t3 (review F1) before t3's handler denies it.
  */
 export const guardedRuntime = (cli: AcpCli, runtime: Runtime): Runtime => {
-  const slot: GuardSlot = { capture: undefined, drifted: undefined, signal: Deferred.makeUnsafe<never, EffectAcpErrors.AcpError>() };
+  const slot: GuardSlot = { capture: undefined, drifted: undefined, planCaptured: false, signal: Deferred.makeUnsafe<never, EffectAcpErrors.AcpError>() };
   const refuseAfterDrift = Effect.suspend(() =>
     slot.drifted === undefined ? Effect.void : Effect.fail(new EffectAcpErrors.AcpTransportError({ detail: `${MODE_DRIFT} (${slot.drifted})`, cause: slot.drifted })),
   );
@@ -237,12 +251,25 @@ export const guardedRuntime = (cli: AcpCli, runtime: Runtime): Runtime => {
       if (problem !== undefined) return yield* drift(cli, runtime, slot, problem);
       return result;
     });
+  // ACP v1 reports the mode as a session mode; v2 as the `mode` config option.
+  const inPlanMode = Effect.gen(function* () {
+    if ((yield* runtime.getModeState)?.currentModeId === "plan") return true;
+    const mode = (yield* runtime.getConfigOptions).find((option) => option.id === "mode");
+    return mode?.type === "select" && mode.currentValue === "plan";
+  });
   const wrapped: Runtime = {
     ...runtime,
     start: () => checked(runtime.start()),
     loadSession: (sessionId, options) => checked(runtime.loadSession(sessionId, options)),
     resumeSession: (sessionId, options) => checked(runtime.resumeSession(sessionId, options)),
-    prompt: (payload, options) => refuseAfterDrift.pipe(Effect.andThen(Effect.raceFirst(runtime.prompt(payload, options), Deferred.await(slot.signal)))),
+    prompt: (payload, options) =>
+      Effect.gen(function* () {
+        yield* refuseAfterDrift;
+        slot.planCaptured = false;
+        const result = yield* Effect.raceFirst(runtime.prompt(payload, options), Deferred.await(slot.signal));
+        // Review F1: denying ExitPlanMode makes Claude stop the prompt as cancelled; the plan turn ended with its plan.
+        return slot.planCaptured && result.stopReason === "cancelled" ? { ...result, stopReason: "end_turn" as const } : result;
+      }),
     handleSessionUpdate: (handler) =>
       runtime.handleSessionUpdate((notification) =>
         Effect.gen(function* () {
@@ -254,7 +281,7 @@ export const guardedRuntime = (cli: AcpCli, runtime: Runtime): Runtime => {
                 ? configModeProblem(cli, update.configOptions)
                 : undefined;
           if (problem !== undefined) return yield* drift(cli, runtime, slot, problem);
-          return yield* handler(notification);
+          return yield* handler(planTurnEnd(slot, notification));
         }),
       ),
     handleRequestPermission: (handler) =>
@@ -263,8 +290,9 @@ export const guardedRuntime = (cli: AcpCli, runtime: Runtime): Runtime => {
           // Fail closed: once the agent left its mode, nothing it asks is answered.
           if (slot.drifted !== undefined) return { outcome: { outcome: "cancelled" } } as const;
           const plan = cli === "claude" ? exitPlanMarkdown(params) : undefined;
-          if (plan !== undefined && slot.capture !== undefined && (yield* runtime.getModeState)?.currentModeId === "plan") {
+          if (plan !== undefined && slot.capture !== undefined && (yield* inPlanMode)) {
             yield* slot.capture({ planMarkdown: plan });
+            slot.planCaptured = true;
           }
           return yield* handler(params, context);
         }),

@@ -1,0 +1,95 @@
+{
+ "at": "2026-11-12T02:43:02.248Z",
+ "scenario": "modes",
+ "ok": true,
+ "failures": [],
+ "cli": "opencode",
+ "workspace": "modes-opencode-mwcxy7cb",
+ "rows": [
+  {
+   "mode": "approval-required",
+   "plan": false,
+   "status": "completed",
+   "failure": null,
+   "asked": [
+    "file-change",
+    "command"
+   ],
+   "items": [
+    "user_message:",
+    "dynamic_tool:Read /w/modes-opencode-mwcxy7cb/src/greeting.txt",
+    "file_change:Tool",
+    "approval_request:",
+    "command_execution:Tool",
+    "approval_request:",
+    "assistant_message:",
+    "checkpoint:"
+   ],
+   "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+   "proposedPlan": [],
+   "text": "Yes, it passed: after I added `Hello from the CLI.` as the last line of [src/greeting.txt](/w/modes-opencode-mwcxy7cb/src/greeting.txt), `bash test.sh` printed \"all checks passed\".",
+   "threadId": "7bff88a8-bb62-42bd-baa9-41c05be136e6"
+  },
+  {
+   "mode": "auto-accept-edits",
+   "plan": false,
+   "status": "completed",
+   "failure": null,
+   "asked": [
+    "command"
+   ],
+   "items": [
+    "user_message:",
+    "assistant_message:",
+    "dynamic_tool:Read /w/modes-opencode-mwcxy7cb/src/greeting.txt",
+    "file_change:Tool",
+    "command_execution:Tool",
+    "approval_request:",
+    "assistant_message:",
+    "checkpoint:"
+   ],
+   "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+   "proposedPlan": [],
+   "text": "I'll check the file's current state first.Yes, it passed. `src/greeting.txt` didn't have the line yet, so I added `Hello from the CLI.` as the last line, and `bash test.sh` printed \"all checks passed\".",
+   "threadId": "7bff88a8-bb62-42bd-baa9-41c05be136e6"
+  },
+  {
+   "mode": "full-access",
+   "plan": false,
+   "status": "completed",
+   "failure": null,
+   "asked": [],
+   "items": [
+    "user_message:",
+    "dynamic_tool:Read /w/modes-opencode-mwcxy7cb/src/greeting.txt",
+    "file_change:Tool",
+    "command_execution:Tool",
+    "assistant_message:",
+    "checkpoint:"
+   ],
+   "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+   "proposedPlan": [],
+   "text": "Yes, it passed. `src/greeting.txt` only had the fixture line, so I added `Hello from the CLI.` as the new last line, and `bash test.sh` printed \"all checks passed\".",
+   "threadId": "7bff88a8-bb62-42bd-baa9-41c05be136e6"
+  },
+  {
+   "mode": "full-access",
+   "plan": true,
+   "status": "completed",
+   "failure": null,
+   "asked": [],
+   "items": [
+    "user_message:",
+    "assistant_message:",
+    "dynamic_tool:Read /w/modes-opencode-mwcxy7cb/src/greeting.txt",
+    "dynamic_tool:Read /w/modes-opencode-mwcxy7cb/test.sh",
+    "assistant_message:",
+    "checkpoint:"
+   ],
+   "diff": "",
+   "proposedPlan": [],
+   "text": "d.\n\n**Risks**\n- The test only checks that the file is non-empty, so it passes regardless of the new line's content. I'll re-read the file after the edit to confirm the line is there.\n- The edit needs to keep a newline between the two lines, so the new text isn't joined onto the fixture line. The original has no trailing newline, so the edit has to add one.\n\nTo run this, switch me out of Plan mode.",
+   "threadId": "7bff88a8-bb62-42bd-baa9-41c05be136e6"
+  }
+ ]
+}

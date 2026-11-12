@@ -1,0 +1,105 @@
+{
+ "at": "2026-11-12T02:44:20.609Z",
+ "scenario": "modes",
+ "ok": true,
+ "failures": [],
+ "cli": "claude",
+ "workspace": "modes-claude-mwcy0t75",
+ "rows": [
+  {
+   "mode": "approval-required",
+   "plan": false,
+   "status": "completed",
+   "failure": null,
+   "asked": [
+    "file-change",
+    "command"
+   ],
+   "items": [
+    "user_message:",
+    "dynamic_tool:Read /w/modes-claude-mwcy0t75/src/greeting.txt",
+    "file_change:Edit src/greeting.txt",
+    "command_execution:Terminal",
+    "command_execution:bash test.sh",
+    "dynamic_tool:Action required",
+    "approval_request:",
+    "approval_request:",
+    "assistant_message:",
+    "checkpoint:"
+   ],
+   "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+   "proposedPlan": [],
+   "text": "Yes, `bash test.sh` passed and printed \"all checks passed\" after I added `Hello from the CLI.` as the last line of `src/greeting.txt`.",
+   "threadId": "df1dfb13-dda1-4357-9ad0-90b5f31a27ec"
+  },
+  {
+   "mode": "auto-accept-edits",
+   "plan": false,
+   "status": "completed",
+   "failure": null,
+   "asked": [
+    "command"
+   ],
+   "items": [
+    "user_message:",
+    "dynamic_tool:Read /w/modes-claude-mwcy0t75/src/greeting.txt",
+    "file_change:Edit src/greeting.txt",
+    "command_execution:Terminal",
+    "command_execution:bash test.sh",
+    "dynamic_tool:Action required",
+    "approval_request:",
+    "assistant_message:",
+    "checkpoint:"
+   ],
+   "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+   "proposedPlan": [],
+   "text": "Yes, it passed: after I re-added `Hello from the CLI.` as the last line of [greeting.txt](/w/modes-claude-mwcy0t75/src/greeting.txt) (my earlier edit had been undone), `bash test.sh` printed \"all checks passed\".",
+   "threadId": "df1dfb13-dda1-4357-9ad0-90b5f31a27ec"
+  },
+  {
+   "mode": "full-access",
+   "plan": false,
+   "status": "completed",
+   "failure": null,
+   "asked": [],
+   "items": [
+    "user_message:",
+    "dynamic_tool:Read /w/modes-claude-mwcy0t75/src/greeting.txt",
+    "file_change:Edit src/greeting.txt",
+    "command_execution:Terminal",
+    "command_execution:bash test.sh",
+    "dynamic_tool:Action required",
+    "assistant_message:",
+    "checkpoint:"
+   ],
+   "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+   "proposedPlan": [],
+   "text": "Yes, it passed: after adding `Hello from the CLI.` as the last line of [greeting.txt](/w/modes-claude-mwcy0t75/src/greeting.txt), `bash test.sh` printed \"all checks passed\".",
+   "threadId": "df1dfb13-dda1-4357-9ad0-90b5f31a27ec"
+  },
+  {
+   "mode": "full-access",
+   "plan": true,
+   "status": "completed",
+   "failure": null,
+   "asked": [],
+   "items": [
+    "user_message:",
+    "dynamic_tool:Read /w/modes-claude-mwcy0t75/src/greeting.txt",
+    "dynamic_tool:Read /w/modes-claude-mwcy0t75/test.sh",
+    "dynamic_tool:Tool",
+    "file_change:Write /var/lib/t3flare/cli/proc-4ec621f8-16ab-4be8-987c-91e8081f963f/claude/plans/runtime-info-in-case-you-re-asked-radiant-kernighan.md",
+    "dynamic_tool:Tool",
+    "dynamic_tool:Action required",
+    "proposed_plan:",
+    "checkpoint:"
+   ],
+   "diff": "",
+   "proposedPlan": [
+    "# Plan: Add \"Hello from the CLI.\" to greeting.txt\n\n## Context\nThe user wants `Hello from the CLI.` added as the new last line of `src/greeting.txt`, then a test run. Right now the file holds one line, `Hello from the t3flare fixture.`, followed by a trailing newline. My earlier edits in this session"
+   ],
+   "text": "",
+   "threadId": "df1dfb13-dda1-4357-9ad0-90b5f31a27ec"
+  }
+ ]
+}

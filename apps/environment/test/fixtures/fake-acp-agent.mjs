@@ -3,7 +3,8 @@
 // steps per prompt, and writes every message it receives to $FAKE_ACP_LOG, one JSON line each.
 //   FAKE_ACP_SCRIPT=<json file> FAKE_ACP_LOG=<file> node fake-acp-agent.mjs
 // Script: { initialize, sessionNew, prompts: [[step…]…] }; a step is { update } (a session/update), { request:
-// { method, params } } (waits for the answer), or { result } (the prompt's own answer, default end_turn).
+// { method, params } } (waits for the answer), { result } (the prompt's own answer, default end_turn), or { respond }
+// (answers the prompt now and goes on: ACP v2, whose prompt is answered before the turn's work).
 import * as fs from "node:fs";
 import * as readline from "node:readline";
 
@@ -24,13 +25,18 @@ const request = (method, params) =>
 const runPrompt = async (id) => {
   const steps = script.prompts[promptIndex++] ?? [];
   let result = { stopReason: "end_turn" };
+  let answered = false;
   for (const step of steps) {
+    if (step.respond !== undefined) {
+      send({ id, result: step.respond });
+      answered = true;
+    }
     if (step.update !== undefined) send({ method: "session/update", params: { sessionId, update: step.update } });
     if (step.request !== undefined) log({ answered: step.request.method, result: await request(step.request.method, step.request.params) });
     if (step.result !== undefined) result = step.result;
     if (step.error !== undefined) return send({ id, error: step.error });
   }
-  send({ id, result });
+  if (!answered) send({ id, result });
 };
 
 readline.createInterface({ input: process.stdin }).on("line", (line) => {

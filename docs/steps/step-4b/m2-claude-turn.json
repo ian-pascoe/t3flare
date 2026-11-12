@@ -1,0 +1,122 @@
+{
+ "at": "2026-11-12T02:30:05.355Z",
+ "scenario": "turn",
+ "ok": true,
+ "failures": [],
+ "cli": "claude",
+ "result": {
+  "threadId": "61aa5a68-3528-4bea-b1c3-0f9ce2f07b7c",
+  "root": "/w/cli-claude",
+  "model": "anthropic/claude-sonnet-5-5",
+  "runs": [
+   {
+    "id": "run:thread:61aa5a68-3528-4bea-b1c3-0f9ce2f07b7c:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "dynamic_tool",
+    "status": "completed",
+    "title": "Read /w/cli-claude/src/greeting.txt",
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "file_change",
+    "status": "completed",
+    "title": "Edit src/greeting.txt",
+    "fileName": "/w/cli-claude/src/greeting.txt",
+    "input": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "title": "Terminal",
+    "fileName": null,
+    "input": "Terminal"
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "title": "bash test.sh",
+    "fileName": null,
+    "input": "bash test.sh"
+   },
+   {
+    "type": "dynamic_tool",
+    "status": "completed",
+    "title": "Action required",
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   }
+  ],
+  "proposedPlan": [],
+  "text": "Yes, it passed: I added `Hello from the CLI.` as the new last line of `src/greeting.txt`, and `bash test.sh` printed \"all checks passed\".",
+  "requests": [
+   {
+    "kind": "file-change",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept",
+    "options": []
+   },
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept",
+    "options": []
+   }
+  ],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:claudeAgent:native-thread:pending%3Arun%3Athread%3A61aa5a68-3528-4bea-b1c3-0f9ce2f07b7c%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "claudeAgent",
+     "nativeId": "0efab8fb-b42b-4bda-84f3-b3cbe3800d4b",
+     "strength": "strong"
+    },
+    "providerInstanceId": "claudeAgent"
+   }
+  ],
+  "ms": 22194
+ },
+ "changed": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)"
+}

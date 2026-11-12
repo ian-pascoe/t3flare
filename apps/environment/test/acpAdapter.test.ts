@@ -201,7 +201,8 @@ describe("Claude Code through t3's ACP adapter", () => {
         expect(answers(log)).toEqual(["reject"]);
         expect(JSON.stringify(harness.seen)).toContain("Write d.txt containing z.");
         expect(harness.seen.some((event) => event.type === "turn_item.updated" && event.turnItem.type === "proposed_plan")).toBe(true);
-        expect(terminal.type === "turn.terminal" && terminal.status).toBeDefined();
+        // Claude stops the prompt as cancelled after the denial; the plan turn completed with its plan.
+        expect(terminal.type === "turn.terminal" && terminal.status).toBe("completed");
       }),
     ));
 

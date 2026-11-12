@@ -38,8 +38,11 @@ const INSTANCE: Readonly<Record<string, { readonly instanceId: string; readonly 
   opencode: { instanceId: "opencode", driver: "opencode", model: "anthropic/claude-sonnet-5-5" },
 };
 
-/** A Workspace with the fixture cloned through t3's own clone, and its project. */
+/** A Workspace with the fixture cloned through t3's own clone, and its project (made once per id in this run). */
+const projects = new Map<string, { projectId: string; root: string }>();
 const ensureProject = async (cookie: string, id: string): Promise<{ projectId: string; root: string }> => {
+  const known = projects.get(id);
+  if (known !== undefined) return known;
   const root = `/w/${id}`;
   const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${FIXTURE}.git`, destinationPath: root }).catch((error: unknown) => ({
     error: String(error).slice(0, 300),
@@ -47,6 +50,7 @@ const ensureProject = async (cookie: string, id: string): Promise<{ projectId: s
   if (cloned.cwd !== root && !String(cloned.error).includes("exist")) throw new Error(`clone of ${id} failed: ${cloned.error}`);
   const projectId = uuid();
   await mutateProject(cookie, { type: "project.create", commandId: uuid(), projectId, title: id, workspaceRoot: root, createWorkspaceRootIfMissing: false }).catch(() => undefined);
+  projects.set(id, { projectId, root });
   return { projectId, root };
 };
 
@@ -87,7 +91,9 @@ const cliTurn = async (cookie: string, options: TurnOptions) => {
       creationSource: "web",
     });
   }
-  const runsBefore = runsOf(projectionOf(await threadWindow(cookie, threadId))).length;
+  const before = projectionOf(await threadWindow(cookie, threadId));
+  const runsBefore = runsOf(before).length;
+  const requestsBefore = new Set<string>((before?.runtimeRequests ?? []).map((r: any) => r.id));
   await sendMessage(cookie, threadId, options.prompt, model, options.plan ? { interactionMode: "plan" } : {});
   const answered: Array<{ id: string; at: number }> = [];
   let projection: any;
@@ -117,14 +123,15 @@ const cliTurn = async (cookie: string, options: TurnOptions) => {
       .map((item: any) => String(item.text ?? ""))
       .join("")
       .slice(-400),
-    requests: (projection?.runtimeRequests ?? []).map((r: any) => ({ kind: r.kind, requestKind: r.requestKind ?? null, status: r.status, decision: r.decision ?? null, options: (r.options ?? []).map((o: any) => o.decision) })),
+    // This turn's requests only (the projection keeps the thread's).
+    requests: (projection?.runtimeRequests ?? []).filter((r: any) => !requestsBefore.has(r.id)).map((r: any) => ({ kind: r.kind, requestKind: r.requestKind ?? null, status: r.status, decision: r.decision ?? null, options: (r.options ?? []).map((o: any) => o.decision) })),
     providerThreads: (projection?.providerThreads ?? []).map((thread: any) => ({ id: thread.id, nativeThreadRef: thread.nativeThreadRef ?? null, providerInstanceId: thread.providerInstanceId ?? null })),
     ms: Date.now() - started,
   };
 };
 
 const workspaceArg = (fallback: string) => arg("workspace") ?? fallback;
-const EDIT_AND_TEST = "In src/greeting.txt add a new last line `Hello from the CLI.` (edit the file), then run `bash test.sh` and tell me in one sentence whether it passed.";
+const EDIT_AND_TEST = "In src/greeting.txt add a new last line `Hello from the CLI.` with your file edit tool (not the shell), then run `bash test.sh` and tell me in one sentence whether it passed.";
 
 /** The files of a Workspace's repo that differ from HEAD (git status), through the admin route. */
 const changed = async (workspace: string): Promise<string> => {
@@ -171,8 +178,10 @@ switch (scenario) {
     const cookie = await pair();
     const cli = arg("cli") ?? "claude";
     await enable(cookie, cli);
-    const workspace = workspaceArg(`modes-${cli}`);
+    const workspace = workspaceArg(`modes-${cli}-${Date.now().toString(36)}`);
     const rows: Array<Record<string, unknown>> = [];
+    // One thread, its mode changed between turns as the client does (t3 restarts the agent on a runtime-mode change).
+    let threadId: string | undefined;
     for (const [mode, plan] of [
       ["approval-required", false],
       ["auto-accept-edits", false],
@@ -181,17 +190,31 @@ switch (scenario) {
     ] as const) {
       await ensureProject(cookie, workspace);
       await reset(workspace);
-      const result = await cliTurn(cookie, { cli, workspace, ...(arg("model") === undefined ? {} : { model: arg("model")! }), mode, plan, prompt: plan ? `Plan this change, do not make it: ${EDIT_AND_TEST}` : EDIT_AND_TEST });
+      if (threadId !== undefined) {
+        await dispatch(cookie, { type: "thread.runtime-mode.set", commandId: uuid(), threadId, runtimeMode: mode });
+        await dispatch(cookie, { type: "thread.interaction-mode.set", commandId: uuid(), threadId, interactionMode: plan ? "plan" : "default" });
+      }
+      const result = await cliTurn(cookie, {
+        cli,
+        workspace,
+        ...(arg("model") === undefined ? {} : { model: arg("model")! }),
+        mode,
+        plan,
+        prompt: plan ? `Plan this change, do not make it: ${EDIT_AND_TEST}` : EDIT_AND_TEST,
+        ...(threadId === undefined ? {} : { threadId }),
+      });
+      threadId = result.threadId;
       const diff = await changed(workspace);
       const kinds = result.requests.map((r: any) => r.requestKind ?? r.kind);
-      rows.push({ mode, plan, status: result.runs.at(-1)?.status, asked: kinds, diff, proposedPlan: result.proposedPlan, text: result.text, threadId: result.threadId });
+      rows.push({ mode, plan, status: result.runs.at(-1)?.status, failure: result.runs.at(-1)?.failure ?? null, asked: kinds, items: result.items.map((item: any) => `${item.type}:${item.title ?? ""}`), diff, proposedPlan: result.proposedPlan, text: result.text, threadId: result.threadId });
       if (plan) {
         check(`${mode} plan: edits nothing`, !diff.includes("greeting"), diff);
         if (cli === "claude") check(`${mode} plan: a proposed plan`, result.proposedPlan.length > 0, result.items);
       } else {
         check(`${mode}: the edit happened`, diff.includes("greeting"), { diff, runs: result.runs });
-        if (mode === "approval-required") check(`${mode}: the edit and the command asked`, kinds.some((k: string) => /file|edit/i.test(k)) && kinds.some((k: string) => /command|exec/i.test(k)), kinds);
-        if (mode === "auto-accept-edits") check(`${mode}: the command asked, the edit did not`, kinds.some((k: string) => /command|exec/i.test(k)) && !kinds.some((k: string) => /file|edit/i.test(k)), kinds);
+        // The edit asks as a file change, or as the command that made it (a model may append with the shell).
+        if (mode === "approval-required") check(`${mode}: the edit and the command asked`, kinds.some((k: string) => /file/i.test(k)) && kinds.some((k: string) => /command/i.test(k)), kinds);
+        if (mode === "auto-accept-edits") check(`${mode}: the command asked, the edit inside the project did not`, kinds.some((k: string) => /command/i.test(k)) && !kinds.some((k: string) => /file/i.test(k)), kinds);
         if (mode === "full-access") check(`${mode}: nothing asked`, kinds.length === 0, kinds);
       }
     }
