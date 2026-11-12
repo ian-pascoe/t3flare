@@ -48,6 +48,8 @@ export interface ProfileContext {
    * into this process's environment (review H2: never a Container-wide file).
    */
   readonly relay?: { readonly handle: string; readonly servers: ReadonlyArray<string> };
+  /** t3's own `/mcp` as the Container reaches it (relayedMcp.ts): the one other MCP URL an ACP agent admits. */
+  readonly t3McpUrl?: string;
 }
 
 /** The relay's URL for `server` as the Container reaches it. */
@@ -236,10 +238,12 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     // A missing or unknown mode is the extension's full access: here it is always set, and never above what t3 asked.
     const mode = input.env.T3_PI_RUNTIME_MODE;
     env.T3_PI_RUNTIME_MODE = mode !== undefined && RUNTIME_MODES.has(mode) ? mode : "approval-required";
-    // SPI-1039: t3's MCP server, only as the relay with this process's own handle (relayedMcp.ts); anything else, none.
-    if (context.relay !== undefined && input.env.T3_MCP_URL === relayUrl("t3") && input.env.T3_MCP_BEARER_TOKEN === context.relay.handle) {
-      env.T3_MCP_URL = input.env.T3_MCP_URL;
-      env.T3_MCP_BEARER_TOKEN = context.relay.handle;
+    // SPI-1039: t3's MCP server as stock t3 hands it, t3's public `/mcp` with t3's per-thread bearer (relayedMcp.ts;
+    // owner, 2026-11-12, back to stock). Only an https `/mcp` URL passes.
+    const t3Url = input.env.T3_MCP_URL;
+    if (t3Url !== undefined && /^https:\/\/[^/?#]+\/mcp$/.test(t3Url) && input.env.T3_MCP_BEARER_TOKEN !== undefined && input.env.T3_MCP_BEARER_TOKEN !== "") {
+      env.T3_MCP_URL = t3Url;
+      env.T3_MCP_BEARER_TOKEN = input.env.T3_MCP_BEARER_TOKEN;
     }
   }
   const thread = input.env.T3CODE_THREAD_ID;

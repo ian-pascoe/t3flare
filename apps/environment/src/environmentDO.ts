@@ -11,7 +11,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
-import { type McpRelayAnswer, type McpRelayInput, resolveHarness, T3_RELAY_SERVER, type ResolvedHarness } from "@t3flare/harness-registry";
+import { type McpRelayAnswer, type McpRelayInput, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
@@ -61,8 +61,9 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_CONNECT_SERVICE_TOKEN?: string;
   /** Test stages: the stage-only probes and faults answer (step 4a's process probe). */
   readonly T3FLARE_FAULTS?: string;
+  /** The t3 host as deployed (alchemy.run.ts): the panel's Origin, the OAuth redirect's host, the CLIs' `/mcp`. */
+  readonly T3FLARE_HOST?: string;
   /** The harness panel's admin host (ADR-0026): what a change's `Origin` must name. */
-  readonly T3FLARE_HARNESS_HOST?: string;
   /** The MCP Worker's engine (ADR-0028): every MCP list and call goes through it. */
   readonly MCP_ENGINE?: McpEngineBinding;
   /** The MCP Worker's OAuth entrypoint (review M4, M5): every sign-in and refresh request is made there. */
@@ -196,11 +197,14 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       marks: { has: (key) => ctx.storage.kv.get(key) !== undefined, set: (key) => ctx.storage.kv.put(key, Date.now()) },
       processes: this.#processes,
       faults: env.T3FLARE_FAULTS === "1",
-      relayServers: (linked) =>
+      relayServers: () =>
         Object.entries(this.mcpHost.servers())
-          .filter(([, server]) => server.enabled && (!linked || server.linkedOffered))
+          .filter(([, server]) => server.enabled)
           .map(([name]) => name)
           .sort(),
+      // t3's own `/mcp` as a Container reaches it (public, behind t3's bearer, ADR-0010): what a CLI is given in place of
+      // t3's in-isolate address (owner, 2026-11-12, back to stock: t3's bearer goes to the CLI as stock t3 hands it).
+      t3McpUrl: () => `https://${this.#configuredHost()}/mcp`,
     });
   }
 
@@ -339,17 +343,17 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /**
-   * The harness panel (ADR-0026), RPC from the Worker's `HarnessAdmin` entrypoint only, after it verified Access on the
-   * admin host. Never boots t3. Not reachable through `fetch` (the t3 host never serves the panel).
+   * The harness panel (ADR-0026) at `/_t3flare/harness` on the t3 host, RPC from the Worker after it verified Access.
+   * Never boots t3. Not reachable through `fetch`.
    */
   async harness(request: Request, caller: HarnessCaller): Promise<Response> {
     const { handleHarness } = await import("./harness/panel.ts");
-    return handleHarness(request, { caller, host: this.env.T3FLARE_HARNESS_HOST ?? "", store: harnessStore(this.ctx.storage.kv), mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth });
+    return handleHarness(request, { caller, host: this.#configuredHost(), store: harnessStore(this.ctx.storage.kv), mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth });
   }
 
   /**
-   * The admin host's public paths (review M4: the OAuth callback and the client metadata document, under an Access
-   * Bypass application), RPC from `HarnessAdmin` only. Nothing else is answered here.
+   * The t3 host's public OAuth paths (review M4: the callback and the client metadata document, outside `/_t3flare`),
+   * RPC from the Worker. Nothing else is answered here.
    */
   async harnessPublic(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -366,7 +370,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       kv: this.ctx.storage.kv,
       secrets: harnessSecrets(this.ctx.storage.kv),
       engine: this.env.MCP_OAUTH,
-      host: this.env.T3FLARE_HARNESS_HOST ?? "",
+      host: () => this.#configuredHost(),
       audit: (entry) => store.audit({ at: Date.now(), caller: "oauth", ...entry }),
     });
     return this.#harnessOAuth;
@@ -417,8 +421,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /** The MCP tools a Session may install (ADR-0028), from kept inventories. Never boots t3. */
-  async mcpView(input: { readonly linked: boolean }): Promise<McpView> {
-    return this.mcpHost.view(input);
+  async mcpView(): Promise<McpView> {
+    return this.mcpHost.view();
   }
 
   /** A Session's MCP call, already judged by `decideCall` in its tool. Open work while it runs (the idle reset waits). */
@@ -426,7 +430,6 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     readonly server: string;
     readonly tool: string;
     readonly args: Readonly<Record<string, unknown>>;
-    readonly linked: boolean;
     readonly judged?: "read" | "write";
   }): Promise<McpCallAnswer> {
     Idle.requestStarted();
@@ -439,8 +442,6 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   /** The CLI relay's "accept for the session" answers, by thread (memory: a restart asks again). */
   readonly #relayAccepted = new Map<string, Set<string>>();
-  /** The relay's MCP sessions with t3's `/mcp`, by t3's credential (memory). */
-  readonly #t3RelaySessions = new Map<string, { sessionId?: string; tools?: ReadonlyArray<{ readonly name: string }>; listedAt?: number; nextId?: number }>();
 
   /**
    * RPC from a Workspace DO: one MCP message of a CLI process through the relay (ADR-0028), its caller resolved from
@@ -449,15 +450,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer> {
     Idle.requestStarted();
     try {
-      const [{ relayMessage }, { relayT3Message }, { approveCliTool, cliThreadStates }, { t3CredentialOf }] = await Promise.all([
-        import("./mcp/relay.ts"),
-        import("./mcp/t3Relay.ts"),
-        import("./provider/cli/linkedPushAsk.ts"),
-        import("./provider/cli/relayedMcp.ts"),
-      ]);
+      const [{ relayMessage }, { approveCliTool, cliThreadState }] = await Promise.all([import("./mcp/relay.ts"), import("./provider/cli/linkedPushAsk.ts")]);
       const accepted = this.#relayAccepted;
-      const shared = {
-        states: cliThreadStates,
+      return await relayMessage(input, {
+        view: () => this.mcpHost.view(),
+        call: (call) => this.mcpHost.call(call),
+        state: cliThreadState,
         ask: approveCliTool,
         accepted: {
           has: (thread: string, key: string) => accepted.get(thread)?.has(key) === true,
@@ -468,11 +466,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
           },
         },
         log: (event: Record<string, unknown>) => console.log(JSON.stringify(event)),
-      };
-      if (input.server === T3_RELAY_SERVER) {
-        return await relayT3Message(input, { ...shared, post: (request) => this.mcp(request), credential: t3CredentialOf, cache: this.#t3RelaySessions, now: () => Date.now() });
-      }
-      return await relayMessage(input, { ...shared, view: (view) => this.mcpHost.view(view), call: (call) => this.mcpHost.call(call) });
+      });
     } finally {
       Idle.requestEnded();
     }
@@ -519,6 +513,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   isArmed(now = new Date()): Promise<boolean> {
     return Pairing.isArmed(this.ctx.storage, now);
+  }
+
+  /** The t3 host as deployed (`T3FLARE_HOST`), never a request's; local workerd falls back to the last seen. */
+  #configuredHost(): string {
+    return this.env.T3FLARE_HOST ?? this.#host ?? "t3flare.invalid";
   }
 
   async #publicHost(request?: Request): Promise<string> {

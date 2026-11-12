@@ -1,10 +1,10 @@
 // @effect-diagnostics globalDate:off globalConsole:off
-// The harness panel's routes (ADR-0026, plan §6 with review H4): the page and its JSON API, reached only through the
-// Environment Worker's `HarnessAdmin` entrypoint on the dedicated admin host (worker.ts), which has verified Access
-// before this runs. Pure over its deps, so the safety rules are tested without a Worker:
+// The harness panel's routes (ADR-0026, plan §6): the page and its JSON API at `/_t3flare/harness` on the t3 host, behind
+// the `/_t3flare` Access application (worker.ts verifies it before this runs; owner, 2026-11-12, back to stock: no admin
+// host). Pure over its deps, so the safety rules are tested without a Worker:
 //
 // - `GET` never changes state. A change is a `POST` with `Content-Type: application/json` (a form post from elsewhere is
-//   refused before anything else), an `Origin` (when sent) equal to the configured admin host, never the request's, and
+//   refused before anything else), an `Origin` (when sent) equal to the configured t3 host (`T3FLARE_HOST`), never the request's, and
 //   `Sec-Fetch-Site` (when sent) `same-origin`.
 // - The owner in a browser (Access assertion, no admin token) must also send the page's CSRF token (csrf.ts). A script
 //   (the stage's service token plus the admin token, checked by worker.ts) sends no cookie a page could ride, so it
@@ -28,7 +28,7 @@ export type HarnessCaller = { readonly kind: "owner"; readonly subject: string }
 
 export interface HarnessDeps {
   readonly caller: HarnessCaller;
-  /** The admin host as configured (`T3FLARE_HARNESS_HOST`): what `Origin` must name. */
+  /** The t3 host as configured (`T3FLARE_HOST`): what `Origin` must name. */
   readonly host: string;
   readonly store: HarnessStore;
   /** The MCP host (ADR-0028): the servers' inventories and their test. */
@@ -56,6 +56,7 @@ export const mcpOverview = async (deps: HarnessDeps) => {
       listedAt: inventory.listedAt > 0 ? inventory.listedAt : null,
       error: inventory.error ?? null,
       tools: tools.map(({ inputSchema: _schema, ...tool }) => tool),
+      overrides: Object.fromEntries(Object.entries(server.classes ?? {}).filter(([, value]) => value === "read" || value === "write")),
       refused,
     });
   }

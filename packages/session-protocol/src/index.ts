@@ -281,8 +281,6 @@ export interface PendingApproval {
   readonly options?: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline" | "cancel"; readonly label: string; readonly warning?: string }>;
   /** A call a code mode script made (tools step, ADR-0027): the script's call and the start of its code. */
   readonly via?: { readonly parentCallId: string; readonly script: string };
-  /** The answer covers this call only, never the session (a linked thread's MCP write, ADR-0028). */
-  readonly perCall?: true;
   /** An MCP tool's definition hash (ADR-0028, review H3): an acceptance for the session covers that definition only. */
   readonly definition?: string;
   readonly createdAt: number;

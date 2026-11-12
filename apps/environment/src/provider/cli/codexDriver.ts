@@ -32,7 +32,7 @@ import { environmentServices } from "../../agents/bindings.ts";
 import { traceProtocol } from "../../agents/processRouter.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
-import { relayedMcp } from "./relayedMcp.ts";
+import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSession, type CliSessions, sessionFor, wrapCliAdapter } from "./wrapper.ts";
 
 export const CODEX_DRIVER = ProviderDriverKind.make("codex");
@@ -163,8 +163,9 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
     const sessions: CliSessions = new Map();
-    // SPI-1039: t3's tools through the relay; t3's per-thread credential never reaches a CLI (ADR-0022, ADR-0028).
-    const relayed = relayedMcp(realMcpSessions, sessions);
+    // t3's own tools with t3's per-thread bearer, as stock t3 hands them, at t3's public `/mcp` (owner, 2026-11-12, back
+    // to stock; relayedMcp.ts).
+    const relayed = t3McpForCli(realMcpSessions, () => environmentServices().t3McpUrl());
     // binaryPath, homePath and launchArgs are not used: the image's binary and the CLI profile decide (plan §3).
     const settings = { ...config, enabled, setupMode: "existing" as const, binaryPath: "codex", homePath: "", launchArgs: "" } satisfies CodexSettings;
     const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;

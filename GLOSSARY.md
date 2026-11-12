@@ -161,7 +161,7 @@ Claude Code's highest settings source, `/etc/claude-code/managed-settings.json`,
 ## Tools
 
 **Harness panel**:
-The owner's page for Pi Durable's harness, on its own admin host: extensions and their settings, the MCP server set,
+The owner's page for Pi Durable's harness, at `/_t3flare/harness` on the t3 host: extensions and their settings, the MCP server set,
 Status and the audit log. Changes apply at a thread's next turn.
 _Avoid_: settings page, dashboard, admin UI
 
@@ -179,8 +179,8 @@ through Commissary.
 _Avoid_: custom server, Route B (the plan's word)
 
 **MCP server set**:
-Every MCP server the Environment offers, with each one's switches (enabled, Exposure, offered to Linked work) and its
-Tool classes.
+Every MCP server the Environment offers, with each one's switches (enabled, Exposure) and the owner's Tool class
+overrides.
 
 **MCP host**:
 The Environment DO's part that holds the MCP server set, its inventory and credentials, and makes every MCP call through
@@ -188,8 +188,8 @@ the MCP engine.
 _Avoid_: MCP proxy, gateway
 
 **MCP relay**:
-The `computer.internal/t3flare/mcp/<server>` routes through which CLI agents call MCP tools, t3's own included, with a
-Tool handle.
+The `computer.internal/t3flare/mcp/<server>` routes through which CLI agents call Commissary's and Direct servers'
+tools, with a Tool handle. t3's own tools reach a CLI as stock t3 hands them, with t3's bearer.
 _Avoid_: MCP proxy, bridge
 
 **Exposure**:
@@ -197,8 +197,8 @@ How a Durable agent is offered an MCP tool: `direct` (in its tool list), `deferr
 (from scripts only) or `hidden`.
 
 **Tool class**:
-Read or write. A read runs; a write follows the thread's mode, and asks every call for Linked work. Unknown is write;
-a Direct server's tools are write until the owner marks one read.
+Read or write: the tool's own `readOnlyHint` (true is read; anything else, write), unless the owner overrides it in
+the Harness panel. A read runs; a write follows the thread's mode, Linked work included.
 _Avoid_: permission level
 
 **Tool handle**:

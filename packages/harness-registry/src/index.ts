@@ -142,10 +142,10 @@ export type McpChange =
       readonly server: string;
       readonly enabled?: boolean;
       readonly exposure?: Exposure;
-      readonly linkedOffered?: boolean;
       readonly toolExposure?: Readonly<Record<string, Exposure | null>>;
     }
-  | { readonly op: "class"; readonly server: string; readonly tool: string; readonly class: ToolClass; readonly hash: string }
+  /** The owner's class for a tool; `null` returns it to the tool's own hint. */
+  | { readonly op: "class"; readonly server: string; readonly tool: string; readonly class: ToolClass | null }
   | { readonly op: "add"; readonly server: string; readonly url: string; readonly auth: ServerAuth }
   | { readonly op: "remove"; readonly server: string };
 
@@ -181,7 +181,7 @@ export const applyMcpChange = (
     const problem = directUrlProblem(change.url);
     if (problem !== undefined) return { ok: false, error: `${change.server}: ${problem}` };
     if (change.auth.kind === "header" && !/^[A-Za-z0-9-]{1,64}$/.test(change.auth.header)) return { ok: false, error: `${change.server}: a header name` };
-    return save({ ...servers, [change.server]: { kind: "direct", url: change.url, auth: change.auth, enabled: true, exposure: "deferred", linkedOffered: false } });
+    return save({ ...servers, [change.server]: { kind: "direct", url: change.url, auth: change.auth, enabled: true, exposure: "deferred" } });
   }
   if (current === undefined) return { ok: false, error: `${change.server}: no such server` };
   if (change.op === "remove") {
@@ -190,8 +190,9 @@ export const applyMcpChange = (
     return save(rest);
   }
   if (change.op === "class") {
-    if (change.class !== "read" && change.class !== "write") return { ok: false, error: "class: read or write" };
-    return save({ ...servers, [change.server]: { ...current, classes: { ...current.classes, [change.tool]: { class: change.class, hash: change.hash, by: "owner" } } } });
+    if (change.class !== null && change.class !== "read" && change.class !== "write") return { ok: false, error: "class: read, write or null" };
+    const { [change.tool]: _previous, ...classes } = current.classes ?? {};
+    return save({ ...servers, [change.server]: { ...current, classes: change.class === null ? classes : { ...classes, [change.tool]: change.class } } });
   }
   if (change.exposure !== undefined && !EXPOSURES.includes(change.exposure)) return { ok: false, error: `exposure: one of ${EXPOSURES.join(", ")}` };
   const toolExposure: Record<string, Exposure> = { ...current.toolExposure };
@@ -206,7 +207,6 @@ export const applyMcpChange = (
       ...current,
       ...(change.enabled === undefined ? {} : { enabled: change.enabled }),
       ...(change.exposure === undefined ? {} : { exposure: change.exposure }),
-      ...(change.linkedOffered === undefined ? {} : { linkedOffered: change.linkedOffered }),
       toolExposure,
     },
   });

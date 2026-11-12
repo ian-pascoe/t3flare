@@ -152,12 +152,14 @@ const extensionCard = (resolved: ResolvedHarness, entry: (typeof EXTENSIONS)[num
 /** One server of the panel's MCP section (panel.ts `mcpOverview`). */
 export interface McpRow {
   readonly name: string;
-  readonly setting: { readonly kind: string; readonly enabled: boolean; readonly exposure: string; readonly linkedOffered: boolean; readonly url?: string; readonly auth?: { readonly kind: string } };
+  readonly setting: { readonly kind: string; readonly enabled: boolean; readonly exposure: string; readonly url?: string; readonly auth?: { readonly kind: string } };
   readonly oauth?: { readonly signedIn: boolean };
   readonly status: string;
   readonly listedAt: number | null;
   readonly error: string | null;
-  readonly tools: ReadonlyArray<{ readonly name: string; readonly upstream: string; readonly class: string; readonly hash: string; readonly exposure: string; readonly unconfirmed?: true; readonly suggested?: string }>;
+  readonly tools: ReadonlyArray<{ readonly name: string; readonly upstream: string; readonly class: string; readonly hinted: string; readonly exposure: string }>;
+  /** The owner's overrides, by upstream name. */
+  readonly overrides?: Readonly<Record<string, string>>;
   readonly refused: ReadonlyArray<{ readonly tool: string; readonly reason: string }>;
 }
 
@@ -169,18 +171,19 @@ const mcpSection = (rows: ReadonlyArray<McpRow>): string =>
       const tools = row.tools
         .map((tool) => {
           const other = tool.class === "read" ? "write" : "read";
-          const note = tool.unconfirmed === true ? ` <span class="locked">changed since its class was set; hint says ${escapeHtml(tool.suggested ?? "?")}</span>` : tool.suggested === undefined ? "" : ` <span class="muted">(hint: ${escapeHtml(tool.suggested)})</span>`;
-          return `<tr><td>${escapeHtml(tool.upstream)}</td><td>${escapeHtml(tool.class)}${note}</td><td>${escapeHtml(tool.exposure)}</td><td>${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other, hash: tool.hash })}${
-            tool.unconfirmed === true ? action(`Confirm ${tool.class}`, { op: "class", server: row.name, tool: tool.upstream, class: tool.class, hash: tool.hash }) : ""
+          const overridden = row.overrides?.[tool.upstream] !== undefined;
+          const note = overridden ? ` <span class="muted">(set by you; the tool's hint says ${escapeHtml(tool.hinted)})</span>` : ' <span class="muted">(the tool\'s hint)</span>';
+          return `<tr><td>${escapeHtml(tool.upstream)}</td><td>${escapeHtml(tool.class)}${note}</td><td>${escapeHtml(tool.exposure)}</td><td>${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other })}${
+            overridden ? action("Use the tool's hint", { op: "class", server: row.name, tool: tool.upstream, class: null }) : ""
           }</td></tr>`;
         })
         .join("");
       const refused = row.refused.map((r) => `<li>${escapeHtml(r.tool)}: ${escapeHtml(r.reason)}</li>`).join("");
       return `<div class="ext"><h3>${escapeHtml(row.name)} <span class="muted">(${escapeHtml(row.setting.kind)}${row.setting.url === undefined ? "" : `, ${escapeHtml(row.setting.url)}`})</span></h3>
-<div class="muted">${row.setting.enabled ? "Enabled" : "Disabled"} · Exposure ${escapeHtml(row.setting.exposure)} · ${row.setting.linkedOffered ? "offered to linked threads (their writes ask every call)" : "not offered to linked threads"} · ${escapeHtml(row.status)}${
+<div class="muted">${row.setting.enabled ? "Enabled" : "Disabled"} · Exposure ${escapeHtml(row.setting.exposure)} · ${escapeHtml(row.status)}${
         row.listedAt === null ? "" : `, listed ${escapeHtml(new Date(row.listedAt).toISOString())}`
       }${row.error === null ? "" : ` · <span class="locked">${escapeHtml(row.error)}</span>`}</div>
-<div>${action(row.setting.enabled ? "Disable" : "Enable", { op: "server", server: row.name, enabled: !row.setting.enabled })}${action(row.setting.linkedOffered ? "Stop offering to linked threads" : "Offer to linked threads", { op: "server", server: row.name, linkedOffered: !row.setting.linkedOffered })}<button type="button" data-mcp-test="${escapeHtml(row.name)}">Test</button>${
+<div>${action(row.setting.enabled ? "Disable" : "Enable", { op: "server", server: row.name, enabled: !row.setting.enabled })}<button type="button" data-mcp-test="${escapeHtml(row.name)}">Test</button>${
         row.setting.auth?.kind === "oauth"
           ? `<button type="button" data-mcp-oauth="${escapeHtml(row.name)}">${row.oauth?.signedIn === true ? "Sign in again" : "Sign in"}</button> <span class="muted">${row.oauth?.signedIn === true ? "signed in" : "not signed in"}</span>`
           : ""
@@ -190,11 +193,12 @@ const mcpSection = (rows: ReadonlyArray<McpRow>): string =>
     .join("\n");
 
 /**
- * The form that adds a direct server (Route B). Every tool starts as write until marked read (review H3); an OAuth
- * server is signed in with its Sign in button once added. A header value goes to the write-only secret store.
+ * The form that adds a direct server (Route B). Each tool's class is its own `readOnlyHint` until the owner overrides it
+ * (owner, 2026-11-12, back to stock); an OAuth server is signed in with its Sign in button once added. A header value
+ * goes to the write-only secret store.
  */
 const ADD_SERVER = `<form class="ext" data-mcp-add autocomplete="off"><h3>Add a server</h3>
-<div class="muted">A remote MCP server over streamable HTTP (https only). Its tools start as write (each call follows the thread's mode) until you mark one read.</div>
+<div class="muted">A remote MCP server over streamable HTTP (https only). Each tool's class is its own read-only hint until you change it; write tools follow the thread's mode.</div>
 <label>Name <input name="server" required pattern="[a-z0-9-]{1,20}" placeholder="executor"></label>
 <label>URL <input name="url" type="url" required placeholder="https://mcp.example.com/mcp"></label>
 <label>Sign-in <select name="auth"><option value="oauth">OAuth (sign in after adding)</option><option value="header">A header</option><option value="none">None</option></select></label>

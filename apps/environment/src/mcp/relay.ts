@@ -6,7 +6,7 @@
 // Hand-written rather than the SDK's server (plan §3.2 named `McpRelayServer` in the MCP Worker): stateless, tools
 // only, never an elicitation, so `initialize`, `ping`, `tools/list` and `tools/call` are the whole surface, and the MCP
 // Worker keeps no inbound entrypoint.
-import { cardText, decideCall, type McpRelayAnswer, type McpRelayInput, strictestMode, type ToolClass } from "@t3flare/harness-registry";
+import { cardText, decideCall, type McpRelayAnswer, type McpRelayInput, type ToolClass } from "@t3flare/harness-registry";
 
 import type { McpCallAnswer, McpView } from "./host.ts";
 
@@ -14,11 +14,11 @@ import type { McpCallAnswer, McpView } from "./host.ts";
 export const RELAY_PROTOCOL_VERSIONS: ReadonlyArray<string> = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 export interface RelayDeps {
-  readonly view: (input: { readonly linked: boolean }) => Promise<McpView>;
-  readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly linked: boolean; readonly judged: ToolClass }) => Promise<McpCallAnswer>;
-  /** The live threads' modes, by thread (review M7). */
-  readonly states: (threads: ReadonlyArray<string>) => ReadonlyArray<{ readonly thread: string; readonly runtimeMode: string | undefined; readonly interactionMode: string | undefined; readonly workspace: string | null }>;
-  readonly ask: (input: { readonly thread: string; readonly linked: boolean; readonly perCall: boolean; readonly askId: string; readonly title: string; readonly summary: string; readonly detail: string }) => Promise<{ readonly approved: boolean; readonly forSession?: boolean; readonly reason?: string }>;
+  readonly view: () => Promise<McpView>;
+  readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly judged: ToolClass }) => Promise<McpCallAnswer>;
+  /** The calling thread's modes: the call follows them (owner, 2026-11-12, back to stock: no strictest-mode rule). */
+  readonly state: (thread: string) => { readonly runtimeMode: string | undefined; readonly interactionMode: string | undefined } | undefined;
+  readonly ask: (input: { readonly thread: string; readonly askId: string; readonly title: string; readonly summary: string; readonly detail: string }) => Promise<{ readonly approved: boolean; readonly forSession?: boolean; readonly reason?: string }>;
   /** "Accept for the session" by thread, keyed by server, upstream name and definition hash. */
   readonly accepted: { has(thread: string, key: string): boolean; add(thread: string, key: string): void };
   readonly log: (event: Record<string, unknown>) => void;
@@ -41,10 +41,6 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
   const method = typeof message.method === "string" ? message.method : undefined;
   if (method === undefined) return id === undefined ? { kind: "accepted" } : fail(id, -32600, "not a request");
   if (id === undefined || id === null) return { kind: "accepted" };
-  // Review H1: a caller in a tainted Workspace is judged as linked (every write asks, per call). Which servers it sees
-  // stays its thread's (review M13's switch is about linked threads).
-  const linked = input.linked || input.tainted;
-  const offeredTo = { linked: input.linked };
   switch (method) {
     case "initialize": {
       const asked = (message.params as { protocolVersion?: unknown } | undefined)?.protocolVersion;
@@ -59,7 +55,7 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
     case "ping":
       return ok(id, {});
     case "tools/list": {
-      const server = offered(await deps.view(offeredTo), input.server);
+      const server = offered(await deps.view(), input.server);
       if (server === undefined) return ok(id, { tools: [] });
       return ok(id, {
         tools: server.tools.map((tool) => ({
@@ -75,15 +71,17 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
       if (typeof params.name !== "string") return fail(id, -32602, "tools/call needs a tool name");
       const args = params.arguments === undefined ? {} : params.arguments;
       if (args === null || typeof args !== "object" || Array.isArray(args)) return fail(id, -32602, "arguments must be an object");
-      const server = offered(await deps.view(offeredTo), input.server);
+      const server = offered(await deps.view(), input.server);
       const tool = server?.tools.find((candidate) => candidate.upstream === params.name);
       if (server === undefined || tool === undefined) return toolError(id, `${input.server} offers no tool ${params.name} to this thread.`);
-      const states = deps.states(input.threads).filter((state) => state.workspace === null || state.workspace === input.workspace);
-      const { mode, interaction } = strictestMode(states.length === 0 ? [{ runtimeMode: undefined, interactionMode: undefined }] : states);
+      // The thread's own modes; a thread whose state is unknown is judged as approval-required.
+      const state = deps.state(input.thread);
+      const mode = state?.runtimeMode ?? "approval-required";
+      const interaction = state?.interactionMode ?? "default";
       const acceptKey = `${input.server}/${tool.upstream}@${tool.hash}`;
-      const verdict = decideCall({ class: tool.class, mode, interaction, linked, accepted: deps.accepted.has(input.thread, acceptKey) });
+      const verdict = decideCall({ class: tool.class, mode, interaction, accepted: deps.accepted.has(input.thread, acceptKey) });
       const log = (outcome: string, extra: Record<string, unknown> = {}) =>
-        deps.log({ t3flare: "mcp-relay-call", workspace: input.workspace, thread: input.thread, cli: input.cli, server: input.server, tool: tool.upstream, class: tool.class, mode, interaction, linked: input.linked, tainted: input.tainted, outcome, ...extra });
+        deps.log({ t3flare: "mcp-relay-call", workspace: input.workspace, thread: input.thread, cli: input.cli, server: input.server, tool: tool.upstream, class: tool.class, mode, interaction, outcome, ...extra });
       if (verdict.kind === "refuse") {
         log("refused");
         return toolError(id, verdict.reason);
@@ -91,23 +89,19 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
       if (verdict.kind === "ask") {
         const answer = await deps.ask({
           thread: input.thread,
-          linked: input.linked,
-          perCall: verdict.perCall,
           askId: input.askId,
           title: cardText(`Allow ${input.server}: ${tool.upstream}?`, 200),
           summary: cardText(`${input.server}: ${tool.upstream}\n${JSON.stringify(args, null, 2)}`),
-          detail: `A ${tool.class} tool (${server.kind === "commissary" ? "Commissary's class" : "class set in the harness panel"}${tool.unconfirmed === true ? "; its definition changed since" : ""}), called by ${input.cli}.${
-            verdict.perCall ? (input.tainted && !input.linked ? " This Workspace carries linked work's taint: this answer covers this call only." : " Linked work's write: this answer covers this call only.") : ""
-          }`,
+          detail: `A ${tool.class} tool (${tool.class === tool.hinted ? "the tool's own hint" : "class set in the harness panel"}), called by ${input.cli}.`,
         });
         if (!answer.approved) {
           log("declined", { reason: answer.reason ?? null });
           return toolError(id, `Not run: the owner did not approve this call (${answer.reason ?? "declined"}).`);
         }
-        if (answer.forSession === true && !verdict.perCall) deps.accepted.add(input.thread, acceptKey);
+        if (answer.forSession === true) deps.accepted.add(input.thread, acceptKey);
         log("approved", { forSession: answer.forSession === true });
       } else log("run");
-      const result = await deps.call({ server: input.server, tool: tool.upstream, args: args as Record<string, unknown>, linked: input.linked, judged: tool.class });
+      const result = await deps.call({ server: input.server, tool: tool.upstream, args: args as Record<string, unknown>, judged: tool.class });
       if (result.kind === "unavailable") return toolError(id, result.message);
       return ok(id, { content: [{ type: "text", text: result.text }], isError: result.isError });
     }

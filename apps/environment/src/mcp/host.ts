@@ -6,13 +6,12 @@
 //
 // - Inventory: each server's tools, listed at most every 10 minutes, on the panel's test, or after a failure; a failed
 //   list keeps the last one, marked stale. Capped per server (review M12).
-// - Classes (review H3): pinned by the definition's hash (`classOf`): a Commissary tool's first sighting pins its hint
-//   here (`t3flare:mcp:pins`), the owner's choices live in the settings and win.
+// - Classes: the owner's choice in the settings, else the tool's own `readOnlyHint` (`classOf`), as t3 does (owner,
+//   2026-11-12, back to stock: no definition-hash pins).
 // - Calls: the Session or the relay has already decided (`decideCall`); the host checks the server is enabled and offered
 //   to the caller, finds the tool's definition, and calls. A failed or timed-out write is never retried.
 import {
   classOf,
-  type ClassPin,
   type Exposure,
   MAX_SCHEMA_BYTES,
   MAX_TOOLS_PER_SERVER,
@@ -60,8 +59,8 @@ export interface InventoryTool {
   readonly inputSchema: Readonly<Record<string, unknown>>;
   readonly hash: string;
   readonly class: ToolClass;
-  readonly unconfirmed?: true;
-  readonly suggested?: ToolClass;
+  /** What the tool's own hint says, shown beside an owner's override. */
+  readonly hinted: ToolClass;
   readonly exposure: Exposure;
 }
 
@@ -95,7 +94,6 @@ export type McpCallAnswer =
 
 const inventoryKey = (server: string) => `t3flare:mcp:inventory:${server}`;
 const priorKey = (server: string) => `t3flare:mcp:prior:${server}`;
-const PINS_KEY = "t3flare:mcp:pins";
 
 const canonical = (value: unknown): string =>
   value === null || typeof value !== "object"
@@ -113,6 +111,8 @@ export const definitionHash = async (definition: Readonly<Record<string, unknown
   const bytes = new TextEncoder().encode(canonical({ name, title, description, inputSchema, outputSchema, annotations }));
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("").slice(0, 32);
 };
+
+const overrideOf = (value: unknown): ToolClass | undefined => (value === "read" || value === "write" ? value : undefined);
 
 const errorText = (error: unknown): string => {
   const record = (error ?? {}) as { _tag?: unknown; message?: unknown; status?: unknown };
@@ -253,50 +253,36 @@ export class McpHost {
     return next;
   }
 
-  #pins(): Readonly<Record<string, ClassPin>> {
-    return this.#deps.kv.get<Record<string, ClassPin>>(PINS_KEY) ?? {};
-  }
-
-  /** `name`'s tools with names, classes and exposure resolved; pins a Commissary tool's first-seen hint. */
+  /** `name`'s tools with names, classes and exposure resolved. */
   async tools(name: string, server: McpServerSetting, inventory: Inventory): Promise<{ readonly tools: ReadonlyArray<InventoryTool>; readonly refused: Inventory["refused"] }> {
     const named = toolNamesOf(name, Object.keys(inventory.definitions));
-    const pins = { ...this.#pins() };
-    let pinned = false;
     const tools: Array<InventoryTool> = [];
     for (const [upstream, toolName] of Object.entries(named.names)) {
       const definition = inventory.definitions[upstream]!;
-      const hash = await definitionHash(definition);
-      const owner = server.classes?.[upstream];
-      const hostPin = pins[`${name}/${upstream}`];
-      const resolved = classOf(server.kind, { name: upstream, hash, annotations: definition.annotations as never }, owner ?? hostPin);
-      if (resolved.pin !== undefined) {
-        pins[`${name}/${upstream}`] = resolved.pin;
-        pinned = true;
-      }
+      const annotations = definition.annotations as { readonly readOnlyHint?: unknown } | undefined;
       tools.push({
         name: toolName,
         upstream,
         description: (typeof definition.description === "string" ? definition.description : typeof definition.title === "string" ? definition.title : upstream).slice(0, 4000),
         inputSchema: (definition.inputSchema ?? { type: "object", properties: {} }) as Record<string, unknown>,
-        hash,
-        class: resolved.class,
-        ...(resolved.unconfirmed === undefined ? {} : { unconfirmed: true }),
-        ...(resolved.suggested === undefined ? {} : { suggested: resolved.suggested }),
+        hash: await definitionHash(definition),
+        // Only "read" or "write" is an override (settings stored before the back-to-stock cut held hash pins: ignored).
+        class: classOf(annotations === undefined ? {} : { annotations }, overrideOf(server.classes?.[upstream])),
+        hinted: classOf(annotations === undefined ? {} : { annotations }, undefined),
         exposure: server.toolExposure?.[upstream] ?? server.exposure,
       });
     }
-    if (pinned) this.#deps.kv.put(PINS_KEY, pins);
     return { tools, refused: [...inventory.refused, ...named.refused] };
   }
 
   /**
-   * What a caller may use: the enabled servers (offered to linked threads only where the owner turned that on, review
-   * M13), from the kept inventories; an inventory older than INVENTORY_TTL_MS is listed again in the background.
+   * What a caller may use: the enabled servers, linked threads included (owner, 2026-11-12, back to stock), from the
+   * kept inventories; an inventory older than INVENTORY_TTL_MS is listed again in the background.
    */
-  async view(input: { readonly linked: boolean }): Promise<McpView> {
+  async view(): Promise<McpView> {
     const servers: Array<McpView["servers"][number]> = [];
     for (const [name, server] of Object.entries(this.servers()).sort(([a], [b]) => a.localeCompare(b))) {
-      if (!server.enabled || (input.linked && !server.linkedOffered)) continue;
+      if (!server.enabled) continue;
       const inventory = this.inventory(name);
       if (this.#now() - inventory.listedAt > INVENTORY_TTL_MS) {
         const refresh = this.list(name).catch(() => undefined);
@@ -321,19 +307,17 @@ export class McpHost {
     readonly server: string;
     readonly tool: string;
     readonly args: Readonly<Record<string, unknown>>;
-    readonly linked: boolean;
     /** The class the caller judged the call by: a read whose class is write now is refused, to be asked again. */
     readonly judged?: ToolClass;
     readonly signal?: AbortSignal;
   }): Promise<McpCallAnswer> {
     const server = this.servers()[input.server];
     if (server === undefined || !server.enabled) return { kind: "unavailable", message: `The owner removed or disabled the MCP server ${input.server}; its tools are gone from the next turn.`, mayHaveRun: false };
-    if (input.linked && !server.linkedOffered) return { kind: "unavailable", message: `The MCP server ${input.server} is not offered to linked threads.`, mayHaveRun: false };
     const definition = this.inventory(input.server).definitions[input.tool];
     if (definition === undefined) return { kind: "unavailable", message: `${input.server} has no tool ${input.tool} (any more).`, mayHaveRun: false };
     if (server.toolExposure?.[input.tool] === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
     if (input.judged !== "write") {
-      // A class change applies to the next call (plan §6.2): a read the owner (or a changed definition) made write asks.
+      // A class change applies to the next call (plan §6.2): a read the owner (or a new hint) made write asks.
       const now = (await this.tools(input.server, server, this.inventory(input.server))).tools.find((tool) => tool.upstream === input.tool);
       if (now?.class !== "read") return { kind: "unavailable", message: `${input.tool} is now a write tool; call it again and it asks the owner.`, mayHaveRun: false };
     }

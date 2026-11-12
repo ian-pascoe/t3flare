@@ -25,7 +25,7 @@ import { PiSettings } from "../../../../../t3code/packages/provider-pi/src/setti
 import { environmentServices } from "../../agents/bindings.ts";
 import { snapshotModels } from "../models.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
-import { relayedMcp } from "./relayedMcp.ts";
+import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSessions, wrapCliAdapter } from "./wrapper.ts";
 
 export const PI_CLI_DRIVER = ProviderDriverKind.make("pi");
@@ -96,8 +96,9 @@ export const PiCliDriver: ProviderDriver<PiSettings, PiCliDriverEnv> = {
     yield* Effect.forkScoped(snapshot.refresh);
     const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
     const sessions: CliSessions = new Map();
-    // SPI-1039: t3's tools through the relay; t3's per-thread credential never reaches a CLI (ADR-0022, ADR-0028).
-    const relayed = relayedMcp(realMcpSessions, sessions);
+    // t3's own tools with t3's per-thread bearer, as stock t3 hands them, at t3's public `/mcp` (owner, 2026-11-12, back
+    // to stock; relayedMcp.ts).
+    const relayed = t3McpForCli(realMcpSessions, () => environmentServices().t3McpUrl());
     const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
     // binaryPath and launchArgs are not used: the profile decides the binary and the flags (plan §3).
     const adapter = yield* makePiAdapterV2({

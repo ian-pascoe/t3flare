@@ -21,6 +21,12 @@ The Fable review (`tools-plan-review.md`) and the owner's settled decisions over
 - **ODs:** T4 code mode + core tools; T5 alchemy bundles + cloudpid's `sdk-isolation.test.ts`; T6 "call again" with the review's binding conditions; T7 later; T9 no settings tools; T10 copy `@cloudpid/mcp` and its dependencies at a pinned commit; T11 `browser`; T12 stdio refused; T13 four Workers (plus the admin forwarder, H4); T14 stage `tools`, fixture bearer fixed (LOW below), ~10 attended minutes for Executor.
 - **D5 exception (b):** MCP servers only, recorded in ADR-0012. **Skills:** placeholder only.
 
+**Owner decision, 2026-11-12, after the stage runs: back to stock** (scope audit, `docs/scope-audit.md` on `main`). It overrides the decisions above and the findings below where they differ. Each removal is recorded as "owner, 2026-11-12, back to stock":
+1. **Linked threads and MCP**: linked threads follow their own mode for MCP writes and see every enabled server. Removed: the per-call linked rule (decision 3 for MCP, M10), the "offered to linked threads" switch (M13), judging a tainted Workspace as linked (H1 for the relay), and the strictest-mode rule (M7).
+2. **t3's tools for CLI agents**: the CLI gets t3's per-thread MCP bearer, as stock t3 hands it, at t3's public `/mcp` (only the endpoint is rewritten). Removed: `mcp/t3Relay.ts`, the handle swap, the allowlist and guidance filter for CLIs, and the tainted-owner-handle refusal (H1). The relay with per-process handles stays for Commissary and direct servers.
+3. **The panel**: `/_t3flare/harness` on the t3 host, behind the `/_t3flare` Access application. Removed: the admin Worker and its forwarder, the admin domain, the second Access application and the OAuth Bypass application (H4's dedicated host). The OAuth callback and client document move to public paths outside `/_t3flare`. CSRF, the Origin check (against the configured `T3FLARE_HOST`), escaping and the CSP stay.
+4. **Tool classes**: each tool's `readOnlyHint` is trusted, as t3 does; the owner can override a class in the panel. Removed: definition-hash pinning and write-until-marked for direct servers (H3's pins; colliding names are still refused).
+
 **Findings:**
 
 | # | Verdict | Evidence checked | Applied as |

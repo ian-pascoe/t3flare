@@ -48,10 +48,9 @@ import {
   guardSlots,
   PINNED_MODE,
 } from "./acpFlavor.ts";
-import { relayedMcp } from "./relayedMcp.ts";
+import { t3McpForCli } from "./relayedMcp.ts";
 import { CliSpawn, type CliSessions, wrapCliAdapter } from "./wrapper.ts";
 import { relayUrl } from "../../agents/cliProfiles.ts";
-import { T3_RELAY_SERVER } from "@t3flare/harness-registry";
 
 export type AcpCliDriverEnv =
   | ChildProcessSpawner.ChildProcessSpawner
@@ -99,19 +98,29 @@ const LIFECYCLE: ReadonlySet<string> = new Set(["initialize", "session/new", "se
 /** The runtime each session runs: the CLI through t3's spawner (the process channel). */
 const spawnRuntime = (cli: AcpCli) => (input: AcpAdapterV2RuntimeInput) =>
   Effect.gen(function* () {
-    // t3's environment, MCP servers and policy are not passed on: the profile decides the environment (4a §4.6), OD-3
-    // withholds MCP, and the flavor applies the policy.
-    const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...options } = input;
-    // ADR-0028: the MCP relay's servers, with this session's process's tool handle (per process, review H2), on every
-    // session/new, load, resume and fork; t3's own (none here) are replaced.
+    // t3's environment and policy are not passed on: the profile decides the environment (4a §4.6) and the flavor applies
+    // the policy. Of t3's MCP servers only its own (`t3-code`, with t3's per-thread bearer at t3's public `/mcp`, as stock
+    // t3 hands it: owner, 2026-11-12, back to stock) is kept.
+    const { processEnvironment, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...options } = input;
+    // t3's adapter offers its server as a stdio bridge (not in a Container) or, per flavor, over HTTP; here it is always
+    // the HTTP entry, from the session config t3 put in the process environment (the endpoint relayedMcp.ts rewrote).
+    const t3Endpoint = processEnvironment?.T3_ACP_MCP_ENDPOINT;
+    const t3Authorization = processEnvironment?.T3_ACP_MCP_AUTHORIZATION;
+    const t3Own: ReadonlyArray<EffectAcpSchema.McpServer> =
+      typeof t3Endpoint === "string" && typeof t3Authorization === "string"
+        ? [{ type: "http", name: "t3-code", url: t3Endpoint, headers: [{ name: "Authorization", value: t3Authorization }] } as EffectAcpSchema.McpServer]
+        : [];
+    // ADR-0028: the MCP relay's third-party servers, with this session's process's tool handle (per process, review H2),
+    // on every session/new, load, resume and fork.
     const session = yield* CliSpawn;
-    // t3's own (SPI-1039) under t3's name, `t3-code`, so t3's tool presentation knows its calls.
-    const relayServers: ReadonlyArray<EffectAcpSchema.McpServer> =
-      session === undefined
+    const relayServers: ReadonlyArray<EffectAcpSchema.McpServer> = [
+      ...(session === undefined
         ? []
-        : [...environmentServices().relayServers(session.linked).map((name) => [name, name] as const), ["t3-code", T3_RELAY_SERVER] as const].map(
-            ([name, path]) => ({ type: "http" as const, name, url: relayUrl(path), headers: [{ name: "Authorization", value: `Bearer ${session.toolHandle}` }] }) as EffectAcpSchema.McpServer,
-          );
+        : environmentServices()
+            .relayServers()
+            .map((name) => ({ type: "http" as const, name, url: relayUrl(name), headers: [{ name: "Authorization", value: `Bearer ${session.toolHandle}` }] }) as EffectAcpSchema.McpServer)),
+      ...t3Own,
+    ];
     const relayActivation = { mcpServers: relayServers, acpMcpServers: [], httpMcpServers: relayServers };
     const context = yield* Layer.build(
       AcpSessionRuntime.layer({
@@ -264,9 +273,9 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   yield* Effect.forkScoped(snapshot.refresh);
   const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
   const sessions: CliSessions = new Map();
-  // SPI-1039: t3's credential is read for the relay only (relayedMcp.ts); the session's servers are the relay's
-  // (spawnRuntime), so t3's own entry never reaches the agent with t3's bearer (ADR-0022, ADR-0028).
-  const relayed = relayedMcp(realMcpSessions, sessions);
+  // t3's own tools with t3's per-thread bearer, as stock t3 hands them, at t3's public `/mcp` (owner, 2026-11-12, back
+  // to stock; relayedMcp.ts).
+  const relayed = t3McpForCli(realMcpSessions, () => environmentServices().t3McpUrl());
   const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
   const host = yield* ProviderHost.ProviderHost;
   const fileSystem = yield* FileSystem.FileSystem;

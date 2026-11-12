@@ -51,8 +51,8 @@ export type ApprovalKind = PendingApproval["kind"];
  * tool by name for t3's MCP tools (so accepting `delegate_task` never unlocks `bash` or another T3 tool, nor the
  * reverse), and nothing for a linked thread's push (owner decision D1: every push asks).
  */
-export const acceptanceKeyOf = (call: { readonly tool: string; readonly kind: ApprovalKind; readonly perCall?: true; readonly definition?: string }): string | null =>
-  call.kind === "git-push" || call.perCall === true
+export const acceptanceKeyOf = (call: { readonly tool: string; readonly kind: ApprovalKind; readonly definition?: string }): string | null =>
+  call.kind === "git-push"
     ? null
     : call.kind === "mcp-tool"
       ? `mcp-tool:${call.tool}${call.definition === undefined ? "" : `@${call.definition}`}`

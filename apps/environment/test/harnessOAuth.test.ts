@@ -47,17 +47,17 @@ const setup = (options: { issSupported?: boolean; expiresIn?: number } = {}) => 
     },
   };
   const secrets = harnessSecrets(kv, () => now);
-  const oauth = new HarnessOAuth({ kv, secrets, engine, host: "admin.example", now: () => now });
+  const oauth = new HarnessOAuth({ kv, secrets, engine, host: () => "t3.example", now: () => now });
   const stateOf = (url: string) => new URL(url).searchParams.get("state")!;
   return { oauth, kv, calls, secrets, advance: (ms: number) => void (now += ms), stateOf, refreshes: () => refreshes };
 };
 
-const callback = (state: string, extra: Record<string, string> = {}) => new URL(`https://admin.example/_t3flare/harness/oauth/callback?${new URLSearchParams({ state, code: "code-1", ...extra })}`);
+const callback = (state: string, extra: Record<string, string> = {}) => new URL(`https://t3.example/t3flare/oauth/callback?${new URLSearchParams({ state, code: "code-1", ...extra })}`);
 
 describe("OAuth sign-ins (review M4)", () => {
   it("serves a client metadata document naming the public callback", async () => {
     const { oauth } = setup();
-    expect(await oauth.clientDocument().json()).toMatchObject({ client_id: "https://admin.example/_t3flare/harness/oauth/client.json", redirect_uris: ["https://admin.example/_t3flare/harness/oauth/callback"], token_endpoint_auth_method: "none" });
+    expect(await oauth.clientDocument().json()).toMatchObject({ client_id: "https://t3.example/t3flare/oauth/client.json", redirect_uris: ["https://t3.example/t3flare/oauth/callback"], token_endpoint_auth_method: "none" });
   });
 
   it("completes once per state; the tokens are kept write-only", async () => {

@@ -50,6 +50,8 @@ describe("the Codex request guard", () => {
             mcp_optional_startup_grace_ms: 10_000,
             "features.concurrent_reasoning_summaries": true,
             "shell_environment_policy.set.T3CODE_THREAD_ID": "t1",
+            // t3's own entry passes as stock t3 writes it (owner, 2026-11-12, back to stock).
+            "mcp_servers.t3-code": { url: "https://x/mcp", http_headers: { Authorization: "Bearer secret" } },
           },
         },
       });

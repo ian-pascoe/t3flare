@@ -139,8 +139,8 @@ Codex, the pi CLI, Claude Code and OpenCode run in the Workspaces' Containers an
 Commissary's MCP endpoint is also a tool source for every agent (ADR-0028). There is no new secret: the Environment Worker uses `MODEL_PROXY_API_KEY` as Commissary's **tools key**, read through one accessor (`toolsKeyOf`) so a dedicated key can replace it later. It is a Workers-only secret and never enters a Container; the CLIs reach Commissary's tools through the MCP relay with a per-process handle.
 
 - **Scope.** Give the key a tool scope of the toolkits t3flare should see. With "every tool you may use", every new private toolkit reaches t3flare at once.
-- **No Commissary approval rules on it** (OD-T3). t3flare asks by mode, and every linked write asks per call. Commissary's rules would ask a second time, on its own panel.
-- **Classes.** A Commissary tool's class comes from its read-only hint as first seen. Fix a wrong class in Commissary (it then applies to every client), or for t3flare alone in the Harness panel.
+- **No Commissary approval rules on it** (OD-T3). t3flare asks by each thread's mode, linked threads included. Commissary's rules would ask a second time, on its own panel.
+- **Classes.** A tool's class comes from its read-only hint (owner, 2026-11-12, back to stock: no pins). Fix a wrong class in Commissary (it then applies to every client), or for t3flare alone in the Harness panel.
 - **Limits.** Calls end after 240 s (Commissary's upstream cap), progress is not passed on, and upstream elicitation is not forwarded. Servers that need those are added as Direct servers in the Harness panel instead.
 - **`COMMISSARY_CONTAINER_API_KEY` keeps an empty tool scope.** It is models only.
 

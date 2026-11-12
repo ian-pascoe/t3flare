@@ -1,16 +1,18 @@
 {
- "at": "2026-11-12T14:45:18.104Z",
- "adminHost": "t3flare-admin-tools.ian-g-pascoe.workers.dev",
+ "at": "2026-11-12T20:21:06.820Z",
+ "host": "t3flare-environment-tools.ian-g-pascoe.workers.dev",
+ "note": "rerun after the back-to-stock cuts (owner, 2026-11-12): the panel on the t3 host; security case 2 included",
  "cases": [
   {
-   "name": "service token + admin token reads the settings",
+   "name": "service token + admin token reads the settings at /_t3flare/harness on the t3 host",
+   "host": true,
    "status": 200,
    "ok": true
   },
   {
    "name": "and changes them (revision bumps)",
    "status": 200,
-   "revision": 7,
+   "revision": 43,
    "ok": true
   },
   {
@@ -24,25 +26,54 @@
    "ok": true
   },
   {
-   "name": "a forged assertion header changes nothing (Access replaces it; the Worker verifies)",
-   "status": 200,
+   "name": "a forged assertion header alone: refused at the edge",
+   "status": 302,
    "ok": true
   },
   {
-   "name": "t3 host /_t3flare/harness: 404",
-   "status": 404,
+   "name": "t3's session cookie: refused",
+   "status": 302,
    "ok": true
   },
   {
-   "name": "t3 host /_t3flare/harness/api/settings: 404",
-   "status": 404,
-   "ok": true
-  },
-  {
-   "name": "t3's session cookie: refused on both hosts",
+   "name": "a linked laptop's MCP bearer on every panel route (GET and a change): refused",
    "statuses": [
     302,
+    302,
+    302,
+    302,
     302
+   ],
+   "ok": true
+  },
+  {
+   "name": "from a Container: computer.internal 404, the public host refused at the edge, forged assertions and changes refused",
+   "answers": [
+    "internal /_t3flare/harness 404",
+    "public /_t3flare/harness 302",
+    "forged /_t3flare/harness 302",
+    "post /_t3flare/harness 302",
+    "internal /_t3flare/harness/api/settings 404",
+    "public /_t3flare/harness/api/settings 302",
+    "forged /_t3flare/harness/api/settings 302",
+    "post /_t3flare/harness/api/settings 302",
+    "internal /_t3flare/harness/api/mcp 404",
+    "public /_t3flare/harness/api/mcp 302",
+    "forged /_t3flare/harness/api/mcp 302",
+    "post /_t3flare/harness/api/mcp 302"
+   ],
+   "ok": true
+  },
+  {
+   "name": "a Durable agent's code mode script cannot reach the panel (no fetch in the sandbox)",
+   "output": "Script completed\nWall time 0.2 seconds\nOutput:\nno fetch",
+   "ok": true
+  },
+  {
+   "name": "the OAuth callback and client document are public outside /_t3flare (an unknown state refused)",
+   "statuses": [
+    400,
+    200
    ],
    "ok": true
   },
@@ -56,7 +87,7 @@
   },
   {
    "name": "the page's CSP allows only its own hashed script and style",
-   "csp": "default-src 'none'; style-src 'sha256-BsiKmJngrdCBje5gLIxAoZqmKxX+yh+3JYPNIWMR/D0='; script-src 'sha256-mzFQ1z/iCkiCAZcVQQG34rVYTHzJpjKplAv22zsxpKw='; connect-src 'self'; img-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
+   "csp": "default-src 'none'; style-src 'sha256-N9pjZXGhJ825hJjVSptkMUTZlZd1eCxtmcOH0l8XiBA='; script-src 'sha256-Mjx7VSWtimn/aBisVOBGsekPELkG6vkLW+fmwVZjSDU='; connect-src 'self'; img-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
    "ok": true
   }
  ],

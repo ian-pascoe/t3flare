@@ -27,7 +27,9 @@ export interface EnvironmentServices {
   /** Test stages: stage-only probes and faults answer. */
   readonly faults: boolean;
   /** The MCP servers a CLI process gets relay entries for (ADR-0028), at its spawn; a linked thread's are M13's. */
-  readonly relayServers: (linked: boolean) => ReadonlyArray<string>;
+  readonly relayServers: () => ReadonlyArray<string>;
+  /** t3's `/mcp` at the public host, as a CLI in a Container reaches it with t3's per-thread bearer. */
+  readonly t3McpUrl: () => string;
 }
 
 let current: EnvironmentServices | undefined;

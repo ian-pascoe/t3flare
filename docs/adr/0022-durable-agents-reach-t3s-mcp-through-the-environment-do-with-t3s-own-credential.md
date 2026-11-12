@@ -49,11 +49,10 @@ The tools listed above as not offered are refusals by design, not omissions:
 
 A bump that adds a tool leaves it withheld until it is classified here and in `T3_TOOL_ALLOWLIST`.
 
-## Refinement (tools step, SPI-1039): CLI agents reach t3's MCP through the relay
+## Refinement (tools step, SPI-1039): CLI agents get t3's MCP as stock t3 hands it
 
-A CLI agent's t3 tools go to `http://computer.internal/t3flare/mcp/t3` with its process's tool handle. The Environment DO swaps the handle for t3's real per-thread bearer, which never leaves it, and calls t3's `/mcp` through `EnvironmentDO.mcp`, as a Session does. The relay applies:
-- the same allowlist (`T3_TOOL_ALLOWLIST`, now in `packages/harness-registry`, failing closed);
-- the same guidance filter on descriptions (SPI-1060);
-- `decideCall` with t3's `readOnlyHint` as the class, and linked writes asked per call.
+A CLI agent gets t3's own MCP config: t3's per-thread bearer, at t3's public `/mcp` (owner, 2026-11-12, back to stock). t3 names its in-isolate address, which a Container cannot reach, so `relayedMcp.ts` rewrites only the endpoint (to `https://<T3FLARE_HOST>/mcp`). Codex's guard admits t3's entry only as an https `/mcp` with one `Authorization` header; pi's profile passes `T3_MCP_URL` and `T3_MCP_BEARER_TOKEN` only for an https `/mcp`; Claude Code admits that URL beside the relay's, and its t3 tools are not pre-allowed (Claude asks, through t3's card). The CLI sees t3's full tool list, as in stock t3; `T3_TOOL_ALLOWLIST` and the guidance filter apply to Durable agents only.
 
-While the Workspace is tainted, an owner thread's handle is refused outright (review H1). t3's own auth, Link fence and mode ceiling run unchanged, and F7 holds: no agent answers a card (`m2-h6-proof.json`).
+This sets aside this ADR's rule for CLI agents: t3's bearer is in the CLI's Container, and root there can read it. It reaches t3's tools for that thread until the thread's MCP session is cleared. t3's own auth, Link fence and mode ceiling run unchanged, and F7 holds: no agent answers a card (`m2-h6-proof.json`).
+
+First built (and removed, owner, 2026-11-12, back to stock): a relay at `computer.internal/t3flare/mcp/t3` that swapped a per-process handle for t3's bearer in the Environment, applied the allowlist, the guidance filter and per-call linked asks, and refused an owner handle outright while the Workspace was tainted (review H1). Evidence after the cut: `m5-cli-{codex,claude,opencode,pi}.json` (`t3_thread_list`).

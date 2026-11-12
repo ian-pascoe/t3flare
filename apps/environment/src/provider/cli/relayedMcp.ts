@@ -1,49 +1,15 @@
 // @effect-diagnostics effectFnOpportunity:off
-// SPI-1039 (ADR-0028, ADR-0022's refinement): t3's own MCP server for CLI agents, through the relay. t3's adapters read
-// the thread's MCP config (`McpProviderSessions.read`) to wire `t3-code` into the CLI; here they get a copy whose
-// endpoint is the relay's `/t3flare/mcp/t3` and whose bearer is the thread's process's tool handle. t3's real bearer
-// stays in this module (the Environment DO's isolate) for the relay to swap back in: it never reaches a Container.
-import { T3_RELAY_SERVER } from "@t3flare/harness-registry";
+// t3's own MCP server for CLI agents, as stock t3 hands it (owner, 2026-11-12, back to stock; SPI-1039): the CLI gets
+// the thread's MCP config with t3's per-thread bearer. Only the endpoint is changed: t3 names its in-isolate address,
+// which a Container cannot reach, so the CLI is given t3's public `/mcp` (ADR-0010: public, behind t3's own bearer).
+// The relay's per-process handles stay for third-party servers (Commissary and direct ones), whose credentials are real
+// secrets (ADR-0028).
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as Effect from "effect/Effect";
 
-import { relayUrl } from "../../agents/cliProfiles.ts";
-import type { CliSessions } from "./wrapper.ts";
-
-/** t3's real `Authorization` by thread, as last read for a CLI session (memory: an Environment restart ends the CLIs). */
-const credentials = new Map<string, string>();
-
-/** The tool handle given to t3's adapter for `thread` (pi spawns outside the session's fiber: its spawn finds it here). */
-const handles = new Map<string, string>();
-/** The thread `handle` was given to t3 for, or undefined (a value relayedMcp never issued). */
-export const relayThreadOf = (handle: string): string | undefined => [...handles].find(([, value]) => value === handle)?.[0];
-
-/** The real bearer the relay sends t3 for `thread`, or undefined. */
-export const t3CredentialOf = (thread: string): string | undefined => credentials.get(thread);
-
-/** t3's MCP sessions as a CLI adapter reads them: the relay's endpoint and the process's handle in place of t3's. */
-export const relayedMcp = (real: McpProviderSessions.McpProviderSessions["Service"], sessions: CliSessions): McpProviderSessions.McpProviderSessions["Service"] =>
+/** t3's MCP sessions as a CLI adapter reads them: t3's own config, at the endpoint a Container reaches. */
+export const t3McpForCli = (real: McpProviderSessions.McpProviderSessions["Service"], publicUrl: () => string): McpProviderSessions.McpProviderSessions["Service"] =>
   McpProviderSessions.McpProviderSessions.of({
     ...real,
-    read: (threadId) =>
-      real.read(threadId).pipe(
-        Effect.map((config) => {
-          if (config === undefined) return undefined;
-          const session = [...sessions.values()].find((candidate) => candidate.thread === threadId);
-          // No CLI session of this driver runs the thread: nothing to relay to, so no t3 tools (as before SPI-1039).
-          if (session === undefined) return undefined;
-          credentials.set(threadId, config.authorizationHeader);
-          handles.set(threadId, session.toolHandle);
-          return { ...config, endpoint: relayUrl(T3_RELAY_SERVER), authorizationHeader: `Bearer ${session.toolHandle}` };
-        }),
-      ),
-    clear: (threadId) =>
-      real.clear(threadId).pipe(
-        Effect.tap(() =>
-          Effect.sync(() => {
-            credentials.delete(threadId);
-            handles.delete(threadId);
-          }),
-        ),
-      ),
+    read: (threadId) => real.read(threadId).pipe(Effect.map((config) => (config === undefined ? undefined : { ...config, endpoint: publicUrl() }))),
   });

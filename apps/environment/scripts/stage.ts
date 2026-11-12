@@ -162,7 +162,7 @@ switch (command) {
         ...stageSecrets(),
         ...deploySecrets(),
         T3_URL: access.url,
-        ...(access.adminUrl === undefined ? {} : { T3FLARE_HARNESS_URL: access.adminUrl }),
+        T3FLARE_HARNESS_URL: access.url,
         T3FLARE_ACCESS_CLIENT_ID: access.clientId,
         T3FLARE_ACCESS_CLIENT_SECRET: access.clientSecret,
       },

@@ -32,13 +32,12 @@ export interface EnvironmentRpc {
   /** The harness settings, resolved and secret-free (ADR-0026): read at a turn's start. Never boots t3. */
   harnessSettings(input: { readonly projectId?: string }): Promise<ResolvedHarness>;
   /** The MCP tools this Session may install (ADR-0028); a linked thread sees only servers offered to linked threads. */
-  mcpView(input: { readonly linked: boolean }): Promise<McpView>;
+  mcpView(): Promise<McpView>;
   /** An MCP call the Session's tool has judged (`decideCall`). */
   mcpCall(input: {
     readonly server: string;
     readonly tool: string;
     readonly args: Readonly<Record<string, unknown>>;
-    readonly linked: boolean;
     readonly judged: "read" | "write";
   }): Promise<McpCallAnswer>;
   /** A CLI process's MCP message through the relay (ADR-0028), its caller resolved by the Workspace DO. */

@@ -1606,8 +1606,8 @@ export class WorkspaceDO extends ContainerHost {
 
   /**
    * The CLI relay (ADR-0028), from `WorkspaceProxy`: one MCP message of a CLI process, by its tool handle. The handle
-   * names a live process of this Workspace (revoked at its exit); the Workspace's taint (review H1) and the threads of
-   * its live CLI processes (review M7) go to the Environment DO, which decides and calls. Never logs the handle.
+   * names a live process of this Workspace (revoked at its exit); the Environment DO decides by that process's thread's
+   * own mode and calls. Never logs the handle.
    */
   async mcpRelay(input: { readonly handle: string | null; readonly server: string; readonly message: unknown; readonly askId: string }): Promise<McpRelayAnswer> {
     const caller = this.#processes.toolCaller(input.handle);
@@ -1616,15 +1616,10 @@ export class WorkspaceDO extends ContainerHost {
       console.warn(JSON.stringify({ t3flare: "mcp-relay-refused", workspace, server: input.server, why: caller === null ? "unknown or revoked handle" : "no thread" }));
       return { kind: "refused", status: 401, message: "unknown tool handle (a handle ends with its process)" };
     }
-    const taint = this.ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null;
-    const threads = [...new Set(this.#processes.state().flatMap((proc) => (proc.thread === null ? [] : [proc.thread])))];
     return environmentStub(this.env.ENVIRONMENT).mcpRelay({
       workspace,
       thread: caller.thread,
       cli: caller.cli,
-      linked: caller.linked,
-      tainted: taint !== null,
-      threads,
       server: input.server,
       message: input.message,
       askId: input.askId,

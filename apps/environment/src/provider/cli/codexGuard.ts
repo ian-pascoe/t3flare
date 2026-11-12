@@ -22,7 +22,7 @@ export const ALLOWED_METHODS: ReadonlySet<string> = new Set([
   "turn/start",
   "turn/steer",
   "turn/interrupt",
-  // Lists the MCP servers the thread has: the relay's (ADR-0028, SPI-1039).
+  // Lists the MCP servers the thread has: t3's own and the relay's (ADR-0028, SPI-1039).
   "mcpServerStatus/list",
 ]);
 
@@ -38,11 +38,20 @@ export const ALLOWED_THREAD_CONFIG: ReadonlySet<string> = new Set([...Object.key
 /** t3's MCP entries (CodexAdapterV2's `mcp_servers.t3-code` and its direct-only twin), SPI-1039. */
 const T3_MCP_KEYS: ReadonlySet<string> = new Set(["mcp_servers.t3-code", "mcp_servers.t3-code-direct"]);
 
-/** Only the relay's t3 entry with a tool handle passes (relayedMcp.ts): never another URL, never t3's own bearer. */
-export const isRelayedT3Server = (value: unknown): boolean => {
+/**
+ * t3's own entry passes as stock t3 writes it (owner, 2026-11-12, back to stock): t3's public `/mcp` over https with
+ * t3's per-thread bearer (relayedMcp.ts), and nothing else in it.
+ */
+export const isT3Server = (value: unknown): boolean => {
   const server = record(value);
   const headers = record(server.http_headers);
-  return server.url === "http://computer.internal/t3flare/mcp/t3" && Object.keys(headers).length === 1 && typeof headers.Authorization === "string" && /^Bearer [0-9a-f]{64}$/.test(headers.Authorization);
+  let url: URL | undefined;
+  try {
+    url = typeof server.url === "string" ? new URL(server.url) : undefined;
+  } catch {
+    url = undefined;
+  }
+  return url?.protocol === "https:" && url.pathname === "/mcp" && url.search === "" && Object.keys(headers).length === 1 && typeof headers.Authorization === "string" && /^Bearer \S+$/.test(headers.Authorization);
 };
 
 /** Thread params that would set a policy or a provider beside the guard's: dropped (the process defaults apply). */
@@ -85,7 +94,7 @@ const threadParams = (params: unknown): Record<string, unknown> => {
   const next = record(params);
   for (const key of DROPPED_THREAD_PARAMS) delete next[key];
   if (next.config !== undefined) {
-    next.config = Object.fromEntries(Object.entries(record(next.config)).filter(([key, value]) => ALLOWED_THREAD_CONFIG.has(key) || (T3_MCP_KEYS.has(key) && isRelayedT3Server(value))));
+    next.config = Object.fromEntries(Object.entries(record(next.config)).filter(([key, value]) => ALLOWED_THREAD_CONFIG.has(key) || (T3_MCP_KEYS.has(key) && isT3Server(value))));
   }
   return next;
 };

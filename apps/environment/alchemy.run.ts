@@ -82,12 +82,6 @@ const AUTH_PATHS = ["/oauth/token", "/api/auth/browser-session", "/oauth/mcp/reg
  */
 const AUTH_RATE_LIMIT = { requestsPerPeriod: 10, period: 10, mitigationTimeout: 10 };
 
-/** The admin host for a stage domain (ADR-0026): its first label with `-admin`, in the same zone. */
-export const adminDomainOf = (domain: string): string => {
-  const [first, ...rest] = domain.split(".");
-  return [`${first}-admin`, ...rest].join(".");
-};
-
 export default Alchemy.Stack(
   "t3flare",
   { providers: Cloudflare.providers(), state: Cloudflare.state() },
@@ -96,7 +90,6 @@ export default Alchemy.Stack(
     const name = `t3flare-environment-${stage}`;
     const agentsName = `t3flare-agents-${stage}`;
     const codemodeName = `t3flare-codemode-${stage}`;
-    const adminName = `t3flare-admin-${stage}`;
     const mcpName = `t3flare-mcp-${stage}`;
     const fixtureName = `t3flare-mcpfixture-${stage}`;
     // Test stages: the tools step's fixture MCP server, when the stage has its bearer (scripts/stage.ts).
@@ -105,10 +98,6 @@ export default Alchemy.Stack(
     // The stage's custom domain, if it has one (unset or empty: workers.dev only).
     const domain = yield* Config.String("T3FLARE_DOMAIN").pipe(Config.withDefault(""));
     const host = domain === "" ? workersDevHost : domain;
-    // The harness panel's own host (ADR-0026, review H4): never the t3 host. With a domain, `<first label>-admin.<rest>`
-    // (prod: t3-admin.ianpascoe.dev) unless T3FLARE_ADMIN_DOMAIN names another; without one, the forwarder's workers.dev.
-    const adminDomain = domain === "" ? "" : yield* Config.String("T3FLARE_ADMIN_DOMAIN").pipe(Config.withDefault(adminDomainOf(domain)));
-    const adminHost = adminDomain === "" ? `${adminName}.${WORKERS_DEV_SUBDOMAIN}.workers.dev` : adminDomain;
     const teamDomain = yield* Config.String("T3FLARE_ACCESS_TEAM_DOMAIN").pipe(Config.withDefault(ACCESS_TEAM_DOMAIN));
     const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
@@ -143,35 +132,6 @@ export default Alchemy.Stack(
         { name: "owner", decision: "allow", include: [{ email: ownerEmail }] },
         { name: "stage service token", decision: "non_identity", include: [{ serviceToken: serviceToken.serviceTokenId }] },
       ],
-    } as never);
-
-    // The harness panel's Access application (ADR-0026): the whole admin host, the owner and the stage's service token.
-    const harnessAccess = yield* Cloudflare.Access.Application("HarnessAccess", {
-      name: `${adminName} harness`,
-      type: "self_hosted",
-      domain: adminHost,
-      destinations: [{ type: "public", uri: adminHost }],
-      sessionDuration: "24h",
-      appLauncherVisible: false,
-      policies: [
-        { name: "owner", decision: "allow", include: [{ email: ownerEmail }] },
-        { name: "stage service token", decision: "non_identity", include: [{ serviceToken: serviceToken.serviceTokenId }] },
-      ],
-    } as never);
-
-    // Review M4 (ADR-0010's refinement): the direct MCP servers' OAuth callback and our client metadata document are
-    // public, exact paths only, so an authorization server can send the owner's browser back and fetch the document. The
-    // more specific application wins over HarnessAccess for these two paths; the callback checks its single-use state.
-    yield* Cloudflare.Access.Application("HarnessOAuthBypass", {
-      name: `${adminName} harness OAuth`,
-      type: "self_hosted",
-      domain: `${adminHost}/_t3flare/harness/oauth/callback`,
-      destinations: [
-        { type: "public", uri: `${adminHost}/_t3flare/harness/oauth/callback` },
-        { type: "public", uri: `${adminHost}/_t3flare/harness/oauth/client.json` },
-      ],
-      appLauncherVisible: false,
-      policies: [{ name: "public (OAuth redirect)", decision: "bypass", include: ["everyone"] }],
     } as never);
 
     // The model proxy (ADR-0012) and the GitHub App (ADR-0013), from ~/.config/t3flare/dev.env or CI's environment.
@@ -272,12 +232,13 @@ export default Alchemy.Stack(
         T3FLARE_ADMIN_TOKEN: Config.Redacted("T3FLARE_ADMIN_TOKEN"),
         T3FLARE_ACCESS_TEAM_DOMAIN: teamDomain,
         T3FLARE_ACCESS_AUD: admin.aud,
+        // The t3 host as deployed (ADR-0026): what the panel's `Origin` must name, the OAuth redirect's host, and the
+        // `/mcp` a CLI is given (never taken from a request).
+        T3FLARE_HOST: host,
         T3FLARE_OWNER_EMAIL: ownerEmail,
         T3FLARE_ACCESS_SERVICE_CLIENT_ID: serviceToken.clientId,
         MCP_ENGINE: Cloudflare.WorkerEntrypoint(mcpWorker as never, "McpEngine"),
         MCP_OAUTH: Cloudflare.WorkerEntrypoint(mcpWorker as never, "McpOAuth"),
-        T3FLARE_HARNESS_HOST: adminHost,
-        T3FLARE_HARNESS_ACCESS_AUD: harnessAccess.aud,
         ...(bootstrapPass
           ? {}
           : {
@@ -304,21 +265,11 @@ export default Alchemy.Stack(
         directory: path.join(here, "dist/web"),
         notFoundHandling: "single-page-application",
         // t3's server paths (DEV_PROXIED_PATH_PREFIXES) reach the Worker before the assets.
-        runWorkerFirst: ["/api/*", "/ws", "/oauth/*", "/.well-known/*", "/mcp", "/mcp/*", "/_t3flare", "/_t3flare/*"],
+        // `/t3flare/oauth/*`: the direct MCP servers' OAuth callback and client document (public; ADR-0026, ADR-0010).
+        runWorkerFirst: ["/api/*", "/ws", "/oauth/*", "/.well-known/*", "/mcp", "/mcp/*", "/_t3flare", "/_t3flare/*", "/t3flare/oauth/*"],
       },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     });
-
-    // The harness panel's forwarder (ADR-0026): its host is the panel's only host; it reaches the Environment Worker's
-    // `HarnessAdmin` entrypoint over a service binding. No version preview URLs (a host Access does not cover).
-    yield* Cloudflare.Worker("AdminForwarder", {
-      name: adminName,
-      main: path.join(here, "src/harness/forwarder.ts"),
-      compatibility: COMPATIBILITY,
-      ...(adminDomain === "" ? { workersDev: { enabled: true, previewsEnabled: false } } : { domain: adminDomain, workersDev: false }),
-      env: { HARNESS: Cloudflare.WorkerEntrypoint(environment, "HarnessAdmin") },
-      observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
-    } as never);
 
     if (domain !== "") {
       // Owns the zone's whole http_ratelimit entrypoint (one per zone; the Free plan allows one rule in it), so only one
@@ -353,13 +304,13 @@ export default Alchemy.Stack(
           fs.mkdirSync(path.dirname(file), { recursive: true });
           fs.writeFileSync(
             file,
-            JSON.stringify({ url, adminUrl: `https://${adminHost}`, clientId, clientSecret: Redacted.value(clientSecret as Redacted.Redacted<string>) }),
+            JSON.stringify({ url, clientId, clientSecret: Redacted.value(clientSecret as Redacted.Redacted<string>) }),
             { mode: 0o600 },
           );
         }
         return path.relative(here, file);
       },
     );
-    return { url: environment.url, host, adminHost, accessAud: admin.aud, credentials, agents: agents.workerName };
+    return { url: environment.url, host, accessAud: admin.aud, credentials, agents: agents.workerName };
   }),
 );

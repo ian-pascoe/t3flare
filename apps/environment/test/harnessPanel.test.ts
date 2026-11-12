@@ -181,7 +181,7 @@ describe("harness panel", () => {
     const post = async (path: string, body: unknown) =>
       handleHarness(new Request(`https://${HOST}${path}`, { method: "POST", headers: { "content-type": "application/json", ...(await ownerHeaders(store)) }, body: JSON.stringify(body) }), deps);
     expect((await post("/_t3flare/harness/api/mcp/servers", { server: "executor", url, auth: { kind: "oauth" } })).status).toBe(200);
-    expect(mcp.servers()["executor"]).toMatchObject({ kind: "direct", url, auth: { kind: "oauth" }, enabled: true, linkedOffered: false });
+    expect(mcp.servers()["executor"]).toMatchObject({ kind: "direct", url, auth: { kind: "oauth" }, enabled: true });
     const shown = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
     expect(shown).toContain('data-mcp-oauth="executor"');
     expect(shown).toContain(escapeHtml(JSON.stringify({ op: "remove", server: "executor" })));

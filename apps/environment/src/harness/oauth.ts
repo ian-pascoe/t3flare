@@ -1,7 +1,7 @@
 // @effect-diagnostics globalDate:off globalConsole:off asyncFunction:off
 // OAuth sign-ins for direct MCP servers (review M4, ADR-0010's and ADR-0012's refinements; cloudpid ADR-0034's model):
 // the owner starts one in the harness panel, the server's authorization server sends the browser back to a public exact
-// path on the admin host (an Access Bypass application covers only it and the client metadata document), and the
+// path on the t3 host, outside `/_t3flare` (with the client metadata document; owner, 2026-11-12, back to stock), and the
 // Environment DO keeps the client and the tokens write-only in its secret store. Every outbound request (discovery,
 // registration, the token exchange, each refresh) is the MCP Worker's (`McpOAuth`, review M5).
 //
@@ -13,9 +13,12 @@
 import type { HarnessSecrets } from "./secrets.ts";
 import type { KvStorage } from "./store.ts";
 
-export const OAUTH_CALLBACK_PATH = "/_t3flare/harness/oauth/callback";
-export const OAUTH_CLIENT_PATH = "/_t3flare/harness/oauth/client.json";
-/** The admin host's public paths (the Access Bypass application's): nothing else of the panel is reachable unsigned. */
+export const OAUTH_CALLBACK_PATH = "/t3flare/oauth/callback";
+export const OAUTH_CLIENT_PATH = "/t3flare/oauth/client.json";
+/**
+ * The t3 host's public OAuth paths, outside `/_t3flare` (so outside its Access application, like `/mcp`): nothing else of
+ * the panel is reachable unsigned (owner, 2026-11-12, back to stock: no admin host, no Bypass application).
+ */
 export const OAUTH_PUBLIC_PATHS: ReadonlySet<string> = new Set([OAUTH_CALLBACK_PATH, OAUTH_CLIENT_PATH]);
 
 export const STATE_TTL_MS = 10 * 60_000;
@@ -80,8 +83,8 @@ export interface OAuthDeps {
   readonly kv: KvStorage & { delete(key: string): unknown };
   readonly secrets: HarnessSecrets;
   readonly engine: McpOAuthBinding | undefined;
-  /** The admin host (`T3FLARE_HARNESS_HOST`). */
-  readonly host: string;
+  /** The t3 host (the Environment's public host), read when used. */
+  readonly host: () => string;
   readonly now?: () => number;
   readonly audit?: (entry: { readonly action: string; readonly target: string; readonly after?: unknown }) => void;
 }
@@ -109,11 +112,11 @@ export class HarnessOAuth {
   }
 
   get redirectUrl(): string {
-    return `https://${this.#deps.host}${OAUTH_CALLBACK_PATH}`;
+    return `https://${this.#deps.host()}${OAUTH_CALLBACK_PATH}`;
   }
 
   get clientMetadataUrl(): string {
-    return `https://${this.#deps.host}${OAUTH_CLIENT_PATH}`;
+    return `https://${this.#deps.host()}${OAUTH_CLIENT_PATH}`;
   }
 
   /** Our Client ID Metadata Document (served publicly at OAUTH_CLIENT_PATH). */
@@ -121,7 +124,7 @@ export class HarnessOAuth {
     return Response.json(
       {
         client_id: this.clientMetadataUrl,
-        client_name: `t3flare (${this.#deps.host})`,
+        client_name: `t3flare (${this.#deps.host()})`,
         redirect_uris: [this.redirectUrl],
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
@@ -166,7 +169,7 @@ export class HarnessOAuth {
       serverUrl,
       redirectUrl: this.redirectUrl,
       clientMetadataUrl: this.clientMetadataUrl,
-      clientName: `t3flare (${this.#deps.host})`,
+      clientName: `t3flare (${this.#deps.host()})`,
       state,
       ...(kept === undefined ? {} : { client: kept }),
     });

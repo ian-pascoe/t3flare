@@ -1,20 +1,20 @@
 {
- "at": "2026-11-12T19:00:26.297Z",
+ "at": "2026-11-12T20:24:10.008Z",
  "cli": "pi",
- "workspace": "tools-cli-pi-mwdwwxoz",
+ "workspace": "tools-cli-pi-mwdzwmi8",
  "cases": [
   {
-   "name": "t3's own tools through the relay (SPI-1039): t3_thread_list",
+   "name": "t3's own tools with t3's bearer, as stock t3 hands them (SPI-1039): t3_thread_list",
    "mode": "approval-required",
    "plan": false,
    "run": {
-    "id": "run:thread:0cde75c3-bcfd-4886-8de0-a92bccb92a6a:ordinal:1",
+    "id": "run:thread:517b9e79-b5a4-4a91-a875-a2b0b72c9183:ordinal:1",
     "status": "completed",
     "failure": null
    },
    "cards": [],
    "requests": [],
-   "text": "The `t3_thread_list` tool lists **1** thread: \"[pi tools-cli-pi-mwdwwxoz](t3-thread://v2/0a5b0542-91df-4613-ab42-8cb9127f27b6/0cde75c3-bcfd-4886-8de0-a92bccb92a6a)\". It's the current thread, and the total is 1 with no next page.",
+   "text": "The `t3_thread_list` tool lists **1** thread: the current one, \"[pi tools-cli-pi-mwdzwmi8](t3-thread://v2/0a5b0542-91df-4613-ab42-8cb9127f27b6/517b9e79-b5a4-4a91-a875-a2b0b72c9183)\". The response reports `total: 1` and no next page.",
    "items": [
     {
      "type": "dynamic_tool",

@@ -407,7 +407,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
       mode: () => runtimeModeOf(this.#meta()?.runtimeMode),
       interaction: () => interactionModeOf(this.#meta()?.interactionMode),
       turn: () => this.#liveTurn(),
-      linked: () => this.#meta()?.linked != null,
       call: (input) => environmentStub(this.env.ENVIRONMENT).mcpCall(input),
     });
   }
@@ -433,7 +432,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   async #takeMcp(): Promise<void> {
     try {
       const view = await Promise.race([
-        environmentStub(this.env.ENVIRONMENT).mcpView({ linked: this.#meta()?.linked != null }),
+        environmentStub(this.env.ENVIRONMENT).mcpView(),
         new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), HARNESS_READ_MS)),
       ]);
       if (view === undefined) return console.warn(JSON.stringify({ t3flare: "mcp-view-timeout" }));

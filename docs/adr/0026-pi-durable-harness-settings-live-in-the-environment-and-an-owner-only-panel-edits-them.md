@@ -6,10 +6,10 @@ Pi Durable's harness has things the owner should switch: code mode, which tools 
 
 So t3flare has its own **Harness panel**:
 
-1. **Its own host.** The panel is served only by the Environment Worker's named entrypoint `HarnessAdmin`, which a small forwarder Worker `t3flare-admin-<stage>` reaches over a service binding. It has its own hostname (`<first label>-admin.<rest of T3FLARE_DOMAIN>`, or the forwarder's workers.dev host on a domain-less stage) and its own Access application (the owner's email and the stage's service token). The t3 host never serves `/_t3flare/harness*`: one hostile page or script on t3's origin cannot reach it.
+1. **At `/_t3flare/harness` on the t3 host**, behind the existing `/_t3flare` Access application (the owner's email and the stage's service token). Owner, 2026-11-12, back to stock: there is no separate admin Worker, forwarder, admin domain or second Access application (see "Back to stock" below).
 2. **Access verified by the Worker**, never assumed (ADR-0010's `classifyAssertion`). The owner's browser is admitted on the Access assertion alone, since a browser cannot send the admin token. Every state-changing call then needs:
    - a CSRF token: an HMAC of the assertion's subject and the hour (the previous hour accepted);
-   - `Origin` equal to the configured admin host, never the request's own;
+   - `Origin` equal to the configured t3 host (`T3FLARE_HOST`, set at deploy), never the request's own;
    - `Sec-Fetch-Site: same-origin`;
    - a JSON body.
 
@@ -23,13 +23,23 @@ So t3flare has its own **Harness panel**:
 
 ## Considered options
 
-- **The panel under `/_t3flare/harness` on t3's own host** (the plan's first draft). Rejected (review H4): t3's web client and the panel would share an origin, so script on t3's origin could drive the owner's panel.
+- **A dedicated admin host** (review H4, built first): a forwarder Worker `t3flare-admin-<stage>` on its own hostname and Access application, so no script on t3's origin shares the panel's. Removed (owner, 2026-11-12, back to stock): the CSRF token, the Origin check, escaping and the hash-only CSP stay, and the second host, Worker and Access applications were not worth their cost.
 - **A t3 settings Layer or Shadow.** Rejected: t3 has no fields for this and its clients would show nothing (ADR-0001).
 - **Deploy-time configuration** (a JSON in `dev.env`). Rejected: no OAuth sign-ins, and more secrets in CI.
 - **Agent settings tools** (cloudpid's ADR-0019). Deferred: read-only `harness_mcp_list`/`harness_status` later, and changes only with the owner's Approval.
 
 ## Consequences
 
-- One more Worker per stage (the forwarder) and one more Access application, plus the OAuth bypass application (ADR-0010's tools refinement).
+- The panel shares t3's origin. A script running on t3's web origin with the owner's Access session could call the panel's API; it would still need the CSRF token, which only the panel's page carries (H4's residual, accepted by the owner).
+- The direct servers' OAuth callback and client document are public paths outside `/_t3flare` (`/t3flare/oauth/callback`, `/t3flare/oauth/client.json`), like `/mcp`, with no Access application of their own (ADR-0010's tools refinement).
 - An owner assertion without the admin token now reaches something. That is only the harness routes; every other admin route still needs the token (`m3-panel-safety.json`).
 - The panel is the place where later pi-harness ports (`docs/pi-parity.md`) get their switches, without panel work.
+
+## Back to stock (owner, 2026-11-12)
+
+The owner chose to stay close to stock t3 (`docs/scope-audit.md`). Removed from this decision, each "owner, 2026-11-12, back to stock":
+
+- the dedicated admin host: the `HarnessAdmin` entrypoint, the forwarder Worker `t3flare-admin-<stage>`, the admin domain, the harness Access application and the OAuth Bypass application. The panel is `/_t3flare/harness` on the t3 host behind the `/_t3flare` Access application. Re-checked on stage in `m3-panel-safety.json` (12/12), including the Container, linked-laptop and code mode cases.
+- the per-server "offered to linked threads" switch (ADR-0028).
+
+Kept: CSRF, the Origin check against the configured host, escaping, the hash-only CSP, write-only secrets, and the audit log.

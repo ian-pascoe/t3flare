@@ -5,7 +5,7 @@
 //
 // Every call is judged by `decideCall` inside `execute`, so a script's nested call is judged as a direct one: reads run;
 // writes follow the thread's mode (plan refuses; full access runs; otherwise the owner is asked, and may accept the tool
-// for the session); a linked thread's every write asks, that call only. A write is memoed before it is sent: a restart
+// for the session), linked threads included (owner, 2026-11-12, back to stock). A write is memoed before it is sent: a restart
 // after that answers "cut off", never sends it twice (ADR-0022's rule; Commissary keeps no idempotency key).
 // @effect-diagnostics asyncFunction:off preferEffectArray:off globalConsole:off
 import type { Context } from "@earendil-works/chord";
@@ -34,7 +34,8 @@ export interface McpView {
       /** The definition's hash: "accept for the session" covers this definition only (review H3). */
       readonly hash: string;
       readonly class: ToolClass;
-      readonly unconfirmed?: true;
+      /** What the tool's own hint says; differs from `class` where the owner overrode it. */
+      readonly hinted?: ToolClass;
       readonly exposure: string;
     }>;
   }>;
@@ -49,9 +50,7 @@ export interface McpHostOfSession {
   readonly mode: () => RuntimeMode;
   readonly interaction: () => InteractionMode;
   readonly turn: () => string | null;
-  /** A linked thread (sticky on the Session). */
-  readonly linked: () => boolean;
-  readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly linked: boolean; readonly judged: ToolClass }) => Promise<McpCallAnswer>;
+  readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly judged: ToolClass }) => Promise<McpCallAnswer>;
 }
 
 const result = (text: string, isError: boolean, details: Record<string, string>) => ({ output: [{ type: "text" as const, text }], isError, details });
@@ -66,12 +65,10 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
     ...(tool.exposure === "deferred" ? { deferred: true as const } : {}),
     ...(tool.exposure === "codemode" ? { callers: ["tools"] as const } : {}),
     async execute(args: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
-      const linked = host.linked();
       const verdict = decideCall({
         class: tool.class,
         mode: host.mode(),
         interaction: host.interaction(),
-        linked,
         accepted: host.store.acceptedFor({ tool: tool.name, kind: "mcp-tool", definition: tool.hash }),
       });
       if (verdict.kind === "refuse") return result(verdict.reason, true, details);
@@ -85,10 +82,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
             kind: "mcp-tool",
             definition: tool.hash,
             summary: cardText(`${server.name}: ${tool.upstream}\n${JSON.stringify(args, null, 2)}`),
-            detail: `A ${tool.class} tool (${server.kind === "commissary" ? "Commissary's class" : "class set in the harness panel"}${tool.unconfirmed === true ? "; its definition changed since" : ""}).${
-              verdict.perCall ? " A linked thread's write: this answer covers this call only." : ""
-            }`,
-            ...(verdict.perCall ? { perCall: true as const } : {}),
+            detail: `A ${tool.class} tool (${tool.hinted === undefined || tool.hinted === tool.class ? "the tool's own hint" : "class set in the harness panel"}).`,
           },
           api,
           context,
@@ -96,7 +90,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
         if (declined !== undefined) return declined;
       }
       if (tool.class === "write") await api.memo(STARTED_MEMO, true, context);
-      const answer = await host.call({ server: server.name, tool: tool.upstream, args, linked, judged: tool.class });
+      const answer = await host.call({ server: server.name, tool: tool.upstream, args, judged: tool.class });
       if (answer.kind === "unavailable") return result(answer.message, true, details);
       return result(answer.text, answer.isError, details);
     },

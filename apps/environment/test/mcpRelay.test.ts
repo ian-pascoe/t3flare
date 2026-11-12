@@ -1,13 +1,12 @@
-// The CLI relay's MCP server (ADR-0028, plan §3.2–3.4, §4; review H1, M7, M9, M10): what a CLI process sees and what a
-// call does, for owner, linked and tainted callers, and t3's own tools (SPI-1039).
+// The CLI relay's MCP server (ADR-0028, plan §3.2–3.4; review M9, M10): what a CLI process sees and what a call does,
+// judged by the calling thread's own mode, linked threads included; and t3's own entry as stock t3 hands it (SPI-1039).
+// Owner, 2026-11-12, back to stock: no per-call linked rule, no strictest-mode rule, no taint rule, no t3 relay.
 import type { McpRelayInput } from "@t3flare/harness-registry";
-import type { McpRpcRequest } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
 import type { McpView } from "../src/mcp/host.ts";
 import { relayMessage, type RelayDeps } from "../src/mcp/relay.ts";
-import { relayT3Message, T3_TAINTED, type T3RelayDeps } from "../src/mcp/t3Relay.ts";
-import { isRelayedT3Server } from "../src/provider/cli/codexGuard.ts";
+import { isT3Server } from "../src/provider/cli/codexGuard.ts";
 import { codexRelayOverrides, profileLaunch } from "../src/agents/cliProfiles.ts";
 
 const tool = (upstream: string, cls: "read" | "write", exposure: "direct" | "deferred" | "codemode" | "hidden" = "deferred") => ({
@@ -17,6 +16,7 @@ const tool = (upstream: string, cls: "read" | "write", exposure: "direct" | "def
   inputSchema: { type: "object", properties: {} },
   hash: `h-${upstream}`,
   class: cls,
+  hinted: cls,
   exposure,
 });
 
@@ -36,8 +36,8 @@ const VIEW: McpView = {
 
 interface Harness {
   readonly deps: RelayDeps;
-  readonly asks: Array<{ thread: string; perCall: boolean; title: string }>;
-  readonly calls: Array<{ tool: string; linked: boolean }>;
+  readonly asks: Array<{ thread: string; title: string }>;
+  readonly calls: Array<{ tool: string }>;
 }
 
 const harness = (options: { modes?: Record<string, { runtimeMode?: string; interactionMode?: string }>; answer?: { approved: boolean; forSession?: boolean; reason?: string } } = {}): Harness => {
@@ -51,12 +51,12 @@ const harness = (options: { modes?: Record<string, { runtimeMode?: string; inter
     deps: {
       view: async () => VIEW,
       call: async (input) => {
-        calls.push({ tool: input.tool, linked: input.linked });
+        calls.push({ tool: input.tool });
         return { kind: "result", isError: false, text: `ran ${input.tool}` };
       },
-      states: (threads) => threads.flatMap((thread) => (modes[thread] === undefined ? [] : [{ thread, runtimeMode: modes[thread]!.runtimeMode, interactionMode: modes[thread]!.interactionMode, workspace: "ws-1" }])),
+      state: (thread) => (modes[thread] === undefined ? undefined : { runtimeMode: modes[thread]!.runtimeMode, interactionMode: modes[thread]!.interactionMode }),
       ask: async (input) => {
-        asks.push({ thread: input.thread, perCall: input.perCall, title: input.title });
+        asks.push({ thread: input.thread, title: input.title });
         return options.answer ?? { approved: true };
       },
       accepted: {
@@ -72,9 +72,6 @@ const input = (message: unknown, extra: Partial<McpRelayInput> = {}): McpRelayIn
   workspace: "ws-1",
   thread: "thread-1",
   cli: "codex",
-  linked: false,
-  tainted: false,
-  threads: ["thread-1"],
   server: "commissary",
   message,
   askId: "ask-1",
@@ -116,7 +113,7 @@ describe("the relay's MCP server", () => {
     const h = harness({ answer: { approved: false, reason: "decline" } });
     const result = resultOf(await relayMessage(input(call("fixture_note")), h.deps));
     expect(result.isError).toBe(true);
-    expect(h.asks).toEqual([{ thread: "thread-1", perCall: false, title: "Allow commissary: fixture_note?" }]);
+    expect(h.asks).toEqual([{ thread: "thread-1", title: "Allow commissary: fixture_note?" }]);
     expect(h.calls).toEqual([]);
   });
 
@@ -130,35 +127,25 @@ describe("the relay's MCP server", () => {
     expect(plan.calls).toEqual([]);
   });
 
-  it("decides with the strictest mode among the Workspace's live threads (M7)", async () => {
+  it("decides by the calling thread's own mode, whatever other threads of the Workspace run in", async () => {
     const h = harness({ modes: { "thread-1": { runtimeMode: "full-access", interactionMode: "default" }, "thread-2": { runtimeMode: "approval-required", interactionMode: "default" } } });
-    await relayMessage(input(call("fixture_note"), { threads: ["thread-1", "thread-2"] }), h.deps);
+    await relayMessage(input(call("fixture_note")), h.deps);
+    expect(h.asks).toEqual([]);
+    await relayMessage(input(call("fixture_note"), { thread: "thread-2" }), h.deps);
+    expect(h.asks.map((ask) => ask.thread)).toEqual(["thread-2"]);
+  });
+
+  it("a thread with no known mode is judged as approval-required", async () => {
+    const h = harness({ modes: {} });
+    await relayMessage(input(call("fixture_note")), h.deps);
     expect(h.asks).toHaveLength(1);
-  });
-
-  it("asks a linked caller per call even in full access, and never keeps a session acceptance (D1, M9)", async () => {
-    const h = harness({ modes: { "thread-1": { runtimeMode: "full-access", interactionMode: "default" } }, answer: { approved: true, forSession: true } });
-    await relayMessage(input(call("fixture_note"), { linked: true }), h.deps);
-    await relayMessage(input(call("fixture_note"), { linked: true }), h.deps);
-    expect(h.asks.map((ask) => ask.perCall)).toEqual([true, true]);
-    expect(h.calls).toEqual([
-      { tool: "fixture_note", linked: true },
-      { tool: "fixture_note", linked: true },
-    ]);
-  });
-
-  it("asks per call for an owner thread in a tainted Workspace (H1), with the owner's servers", async () => {
-    const h = harness({ modes: { "thread-1": { runtimeMode: "full-access", interactionMode: "default" } } });
-    await relayMessage(input(call("fixture_note"), { tainted: true }), h.deps);
-    expect(h.asks.map((ask) => ask.perCall)).toEqual([true]);
-    expect(h.calls).toEqual([{ tool: "fixture_note", linked: false }]);
   });
 
   it("keeps an owner's 'for the session' for that tool on that thread only", async () => {
     const h = harness({ answer: { approved: true, forSession: true } });
     await relayMessage(input(call("fixture_note")), h.deps);
     await relayMessage(input(call("fixture_note")), h.deps);
-    await relayMessage(input(call("fixture_note"), { thread: "thread-2", threads: ["thread-1"] }), h.deps);
+    await relayMessage(input(call("fixture_note"), { thread: "thread-2" }), h.deps);
     expect(h.asks.map((ask) => ask.thread)).toEqual(["thread-1", "thread-2"]);
   });
 
@@ -167,76 +154,6 @@ describe("the relay's MCP server", () => {
     expect(resultOf(await relayMessage(input(call("fixture_script")), h.deps)).isError).toBe(true);
     expect(resultOf(await relayMessage(input(call("nope")), h.deps)).isError).toBe(true);
     expect(h.calls).toEqual([]);
-  });
-});
-
-const t3Harness = (tools: ReadonlyArray<{ name: string; description?: string; annotations?: { readOnlyHint?: boolean } }>, credential: string | null = "Bearer real-t3") => {
-  const posts: Array<McpRpcRequest> = [];
-  const asks: Array<{ perCall: boolean }> = [];
-  const deps: T3RelayDeps = {
-    post: async (request) => {
-      posts.push(request);
-      const body = JSON.parse(request.body) as { method: string; id?: number; params?: { name?: string } };
-      if (body.method === "initialize") return { status: 200, contentType: "application/json", sessionId: "s-1", body: JSON.stringify({ jsonrpc: "2.0", id: 0, result: {} }) };
-      if (body.method === "tools/list") return { status: 200, contentType: "text/event-stream", body: `event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id: body.id, result: { tools } })}\n\n` };
-      if (body.method === "tools/call") return { status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `t3 ran ${body.params?.name}` }] } }) };
-      return { status: 202, contentType: "", body: "" };
-    },
-    credential: () => credential ?? undefined,
-    cache: new Map(),
-    now: () => 0,
-    states: () => [{ thread: "thread-1", runtimeMode: "approval-required", interactionMode: "default", workspace: "ws-1" }],
-    ask: async (input) => {
-      asks.push({ perCall: input.perCall });
-      return { approved: true };
-    },
-    accepted: { has: () => false, add: () => undefined },
-    log: () => undefined,
-  };
-  return { deps, posts, asks };
-};
-
-describe("t3's tools through the relay (SPI-1039)", () => {
-  const TOOLS = [{ name: "t3_thread_list", annotations: { readOnlyHint: true } }, { name: "delegate_task" }, { name: "request_secret" }, { name: "t3_worktree_create" }];
-
-  it("lists only the allowlisted tools and sends t3 its real bearer, never the handle", async () => {
-    const t = t3Harness(TOOLS);
-    const tools = resultOf(await relayT3Message(input({ jsonrpc: "2.0", id: 3, method: "tools/list" }, { server: "t3" }), t.deps)).tools!;
-    expect(tools.map((entry) => entry.name)).toEqual(["t3_thread_list", "delegate_task"]);
-    expect(new Set(t.posts.map((post) => post.authorization))).toEqual(new Set(["Bearer real-t3"]));
-  });
-
-  it("drops a description's sentence naming a t3 tool not offered (SPI-1060's rule)", async () => {
-    const t = t3Harness([{ name: "t3_thread_list", description: "Lists threads. Link one first with `t3_environment_link`.", annotations: { readOnlyHint: true } }]);
-    const tools = resultOf(await relayT3Message(input({ jsonrpc: "2.0", id: 3, method: "tools/list" }, { server: "t3" }), t.deps)).tools! as ReadonlyArray<{ description?: string }>;
-    expect(tools[0]!.description).toBe("Lists threads.");
-  });
-
-  it("runs a read-only tool, asks for a write in approval-required, refuses a tool outside the allowlist", async () => {
-    const t = t3Harness(TOOLS);
-    expect(resultOf(await relayT3Message(input(call("t3_thread_list"), { server: "t3" }), t.deps)).content).toEqual([{ type: "text", text: "t3 ran t3_thread_list" }]);
-    expect(t.asks).toEqual([]);
-    await relayT3Message(input(call("delegate_task"), { server: "t3" }), t.deps);
-    expect(t.asks).toEqual([{ perCall: false }]);
-    expect(resultOf(await relayT3Message(input(call("request_secret"), { server: "t3" }), t.deps)).isError).toBe(true);
-    expect(t.posts.filter((post) => post.body.includes("request_secret"))).toEqual([]);
-  });
-
-  it("refuses an owner thread's handle outright while the Workspace is tainted (H1), reads included", async () => {
-    const t = t3Harness(TOOLS);
-    expect(await relayT3Message(input(call("t3_thread_list"), { server: "t3", tainted: true }), t.deps)).toEqual({ kind: "refused", status: 403, message: T3_TAINTED });
-    expect(t.posts).toEqual([]);
-  });
-
-  it("asks a linked thread per call for t3's writes (M10's one rule)", async () => {
-    const t = t3Harness(TOOLS);
-    await relayT3Message(input(call("delegate_task"), { server: "t3", linked: true, tainted: true }), t.deps);
-    expect(t.asks).toEqual([{ perCall: true }]);
-  });
-
-  it("answers that t3's tools are unavailable without a credential", async () => {
-    const t = t3Harness(TOOLS, null);
-    expect(resultOf(await relayT3Message(input(call("t3_thread_list"), { server: "t3" }), t.deps)).isError).toBe(true);
   });
 });
 
@@ -256,28 +173,29 @@ describe("the CLIs' relay entries (H2, M11)", () => {
     expect(JSON.stringify(launch.files)).not.toContain(handle);
   });
 
-  it("lets only the relay's t3 entry with a handle into Codex's thread config", () => {
-    const handle = `Bearer ${"b".repeat(64)}`;
-    expect(isRelayedT3Server({ url: "http://computer.internal/t3flare/mcp/t3", http_headers: { Authorization: handle }, tool_timeout_sec: 3900 })).toBe(true);
-    expect(isRelayedT3Server({ url: "https://t3.example/mcp", http_headers: { Authorization: handle } })).toBe(false);
-    expect(isRelayedT3Server({ url: "http://computer.internal/t3flare/mcp/t3", http_headers: { Authorization: "Bearer t3-real-token" } })).toBe(false);
+  it("lets t3's own entry into Codex's thread config as stock t3 writes it: https `/mcp` with t3's bearer only", () => {
+    expect(isT3Server({ url: "https://t3.example/mcp", http_headers: { Authorization: "Bearer t3-real-token" }, tool_timeout_sec: 3900 })).toBe(true);
+    expect(isT3Server({ url: "http://t3.example/mcp", http_headers: { Authorization: "Bearer t3-real-token" } })).toBe(false);
+    expect(isT3Server({ url: "https://t3.example/other", http_headers: { Authorization: "Bearer t3-real-token" } })).toBe(false);
+    expect(isT3Server({ url: "https://t3.example/mcp", http_headers: { Authorization: "Bearer t3-real-token", "X-Extra": "1" } })).toBe(false);
   });
 });
 
-describe("pi's t3 entry (SPI-1039)", () => {
+describe("pi's t3 entry (SPI-1039, as stock t3 hands it)", () => {
   const handle = "f".repeat(64);
   const pi = (env: Record<string, string>) =>
     profileLaunch(
       { cli: "pi", args: ["--mode", "rpc", "--extension", "/s/ext.ts"], key: "k", cwd: "/w/x", env: { T3_PI_RUNTIME_MODE: "approval-required", ...env }, allowProbe: false },
       { proxyUrl: "https://proxy.example", models: [], readStateFile: () => "SRC", piExtensionSource: "SRC", relay: { handle, servers: [] } },
     );
-  it("passes t3's MCP variables only as the relay with this process's handle", () => {
-    const ok = pi({ T3_MCP_URL: "http://computer.internal/t3flare/mcp/t3", T3_MCP_BEARER_TOKEN: handle });
-    if ("refused" in ok) throw new Error(ok.refused);
-    expect(ok.env.T3_MCP_URL).toBe("http://computer.internal/t3flare/mcp/t3");
+  it("passes t3's MCP variables when the URL is an https `/mcp`; anything else, none", () => {
     const real = pi({ T3_MCP_URL: "https://t3.example/mcp", T3_MCP_BEARER_TOKEN: "t3-real" });
     if ("refused" in real) throw new Error(real.refused);
-    expect(real.env.T3_MCP_URL).toBeUndefined();
-    expect(real.env.T3_MCP_BEARER_TOKEN).toBeUndefined();
+    expect(real.env.T3_MCP_URL).toBe("https://t3.example/mcp");
+    expect(real.env.T3_MCP_BEARER_TOKEN).toBe("t3-real");
+    const other = pi({ T3_MCP_URL: "http://evil.example/x", T3_MCP_BEARER_TOKEN: handle });
+    if ("refused" in other) throw new Error(other.refused);
+    expect(other.env.T3_MCP_URL).toBeUndefined();
+    expect(other.env.T3_MCP_BEARER_TOKEN).toBeUndefined();
   });
 });
