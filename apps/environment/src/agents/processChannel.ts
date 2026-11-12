@@ -24,6 +24,8 @@ import type {
 } from "@t3flare/workspace-client";
 
 export const HEARTBEAT_EVERY_MS = 30_000;
+/** Heartbeats that fail in a row before a Workspace's processes end here (its lapse, 90 s, has killed them there). */
+export const HEARTBEAT_FAILURES = 3;
 /** stdin is sent in pieces of at most this many bytes (a `data:` image can be several MB). */
 export const INPUT_PIECE_BYTES = 1024 * 1024;
 /** A queue's bound: stdout waits past it; stderr drops its oldest past it. */
@@ -280,6 +282,8 @@ export class ProcessChannel {
   readonly #byPid = new Map<number, ChannelProcess>();
   #nextPid = 200_000;
   #heartbeat: ReturnType<typeof setInterval> | undefined;
+  /** Consecutive failed heartbeats by Workspace: past `HEARTBEAT_FAILURES` its processes end here (the Workspace's lapse kills them there). */
+  readonly #beatFailures = new Map<string, number>();
 
   constructor(deps: ProcessChannelDeps) {
     this.#deps = deps;
@@ -379,11 +383,16 @@ export class ProcessChannel {
     }
     await Promise.all(
       [...byWorkspace.values()].map(async (processes) => {
+        const workspace = processes[0]!.place.workspace;
         try {
           const answer = await processes[0]!.place.remote.processHeartbeat(processes.map((process) => process.key));
+          this.#beatFailures.delete(workspace);
           for (const process of processes) process.checkAnswer(answer);
         } catch (error) {
-          console.warn(JSON.stringify({ t3flare: "process-heartbeat-failed", error: String(error).slice(0, 200) }));
+          const failures = (this.#beatFailures.get(workspace) ?? 0) + 1;
+          this.#beatFailures.set(workspace, failures);
+          console.warn(JSON.stringify({ t3flare: "process-heartbeat-failed", workspace, failures, error: String(error).slice(0, 200) }));
+          if (failures >= HEARTBEAT_FAILURES) for (const process of processes) process.finish(129);
         }
       }),
     );

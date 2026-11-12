@@ -1,0 +1,91 @@
+{
+ "at": "2026-11-12T01:10:14.840Z",
+ "scenario": "p1-abort",
+ "before": {
+  "ms": 60,
+  "result": {
+   "epoch": "11bf0ab8-d751-4c13-90d5-6ac5aa045506",
+   "result": {
+    "started": true
+   }
+  },
+  "container": {
+   "running": true,
+   "leased": true,
+   "lastUse": 1794445808331
+  }
+ },
+ "aborting": {
+  "error": "Error: t3flare: probe abort",
+  "causes": [],
+  "stack": [
+   "Error: t3flare: probe abort",
+   "    at async handleAdmin (admin-DRrfKvip.js:1:8676)"
+  ]
+ },
+ "afterState": {
+  "ms": 583,
+  "result": {
+   "epoch": "5ad5d9e7-23b8-47ca-8c12-415287a0c829",
+   "result": {
+    "known": false
+   }
+  },
+  "container": {
+   "running": true,
+   "leased": true,
+   "lastUse": 1794445813420
+  }
+ },
+ "processesWithMarker": 0,
+ "workspaces": {
+  "workspaces": [
+   {
+    "id": "step3-fixture",
+    "host": "github.com",
+    "owner": "ian-pascoe",
+    "name": "t3flare-fixture",
+    "cloneUrl": "https://github.com/ian-pascoe/t3flare-fixture.git",
+    "createdAt": 1794443624132,
+    "state": "ready",
+    "workflows": false,
+    "kind": "project",
+    "parent": null,
+    "branch": null,
+    "unreferencedSince": null,
+    "deletedAt": null,
+    "purgeAfter": null,
+    "lastError": null,
+    "references": [
+     "project ce396dcb-0656-4077-ae76-b3a2afe2c4f7"
+    ],
+    "container": {
+     "running": true,
+     "leased": true,
+     "lastUse": 1794445814488
+    },
+    "info": {
+     "provisioned": true,
+     "repo": true,
+     "containerRunning": true,
+     "revision": 55,
+     "gitRevision": 55,
+     "cachedReads": 7,
+     "id": "step3-fixture"
+    },
+    "terminals": {
+     "epoch": "5ad5d9e7-23b8-47ca-8c12-415287a0c829",
+     "keys": [],
+     "lastInput": 0,
+     "pushes": 0,
+     "sync": {
+      "pulls": 0,
+      "pushes": 0,
+      "emptyPulls": 0,
+      "failures": 0
+     }
+    }
+   }
+  ]
+ }
+}

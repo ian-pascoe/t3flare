@@ -1,0 +1,93 @@
+{
+ "at": "2026-11-12T01:09:53.591Z",
+ "scenario": "p1",
+ "minutes": 35,
+ "gap": 10,
+ "writes": [
+  {
+   "at": 193,
+   "text": "hello"
+  },
+  {
+   "at": 600329,
+   "text": "ping-10"
+  },
+  {
+   "at": 1200879,
+   "text": "ping-20"
+  },
+  {
+   "at": 1802249,
+   "text": "ping-30"
+  },
+  {
+   "at": 2100005,
+   "text": "exit"
+  }
+ ],
+ "state": {
+  "epoch": "11bf0ab8-d751-4c13-90d5-6ac5aa045506",
+  "result": {
+   "known": true,
+   "ageMs": 2104091,
+   "exit": {
+    "code": 7,
+    "at": 2100908
+   },
+   "readError": null,
+   "chunks": [
+    {
+     "at": 128,
+     "stream": "stdout",
+     "text": "out:hello\n"
+    },
+    {
+     "at": 128,
+     "stream": "stderr",
+     "text": "err:hello\n"
+    },
+    {
+     "at": 600679,
+     "stream": "stdout",
+     "text": "out:ping-10\n"
+    },
+    {
+     "at": 600679,
+     "stream": "stderr",
+     "text": "err:ping-10\n"
+    },
+    {
+     "at": 1202029,
+     "stream": "stdout",
+     "text": "out:ping-20\n"
+    },
+    {
+     "at": 1202029,
+     "stream": "stderr",
+     "text": "err:ping-20\n"
+    },
+    {
+     "at": 1803209,
+     "stream": "stdout",
+     "text": "out:ping-30\n"
+    },
+    {
+     "at": 1803209,
+     "stream": "stderr",
+     "text": "err:ping-30\n"
+    },
+    {
+     "at": 2100908,
+     "stream": "stdout",
+     "text": "out:exit\n"
+    },
+    {
+     "at": 2100908,
+     "stream": "stderr",
+     "text": "err:exit\n"
+    }
+   ],
+   "total": 10
+  }
+ }
+}

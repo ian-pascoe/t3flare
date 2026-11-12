@@ -16,7 +16,7 @@ import { GitHubTokens } from "./agents/github.ts";
 import { deliverPush } from "./agents/sessionSink.ts";
 import { GRACE_MS } from "./agents/deletionConstants.ts";
 import { ProcessChannel } from "./agents/processChannel.ts";
-import { locate } from "./agents/workspaceClient.ts";
+import { locate, workspaceRpc } from "./agents/workspaceClient.ts";
 import { workspaceRegistry } from "./agents/workspaces.ts";
 import type { AgentsBindings } from "./agents/rpc.ts";
 import * as BootState from "./host/bootState.ts";
@@ -137,7 +137,19 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       place: (cwd) => {
         const at = locate(cwd);
         if (at === undefined || at.record.state !== "ready") return undefined;
-        return { workspace: at.id, t3Path: `/w/${at.id}`, remote: at.rpc };
+        // A fresh stub for every call: a stub to a Workspace DO that reset stays broken (its heartbeats would fail forever).
+        const rpc = () => workspaceRpc(at.id);
+        return {
+          workspace: at.id,
+          t3Path: `/w/${at.id}`,
+          remote: {
+            processStart: (input) => rpc().processStart(input),
+            processInput: (key, seq, data) => rpc().processInput(key, seq, data),
+            processTurn: (key, active) => rpc().processTurn(key, active),
+            processSignal: (key) => rpc().processSignal(key),
+            processHeartbeat: (keys) => rpc().processHeartbeat(keys),
+          },
+        };
       },
       newKey: () => `proc-${crypto.randomUUID()}`,
     });

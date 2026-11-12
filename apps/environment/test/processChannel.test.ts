@@ -153,6 +153,20 @@ describe("ProcessChannel", () => {
     expect(ch.size).toBe(0);
   });
 
+  it("ends a Workspace's processes after three failed heartbeats in a row (its lapse killed them there)", async () => {
+    const ws = fakeWorkspace();
+    const ch = channel(ws);
+    const process = await ch.start(start);
+    ws.remote.processHeartbeat = async () => {
+      throw new Error("stub broken");
+    };
+    await ch.beat();
+    await ch.beat();
+    expect(process.running).toBe(true);
+    await ch.beat();
+    expect(await process.exit).toBe(129);
+  });
+
   it("kills through the Workspace by marker, and finds a process by its pid", async () => {
     const ws = fakeWorkspace();
     const ch = channel(ws);
