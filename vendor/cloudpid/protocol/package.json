@@ -1,0 +1,35 @@
+{
+  "name": "@cloudpid/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./base64": "./src/base64.ts",
+    "./call-diff": "./src/call-diff.ts",
+    "./csp": "./src/csp.ts",
+    "./harness-tools": "./src/harness-tools/index.ts",
+    "./live-view": "./src/live-view.ts",
+    "./mcp-api": "./src/mcp-api.ts",
+    "./mcp-tools": "./src/mcp-tools.ts",
+    "./mirror": "./src/mirror.ts",
+    "./repo": "./src/repo.ts",
+    "./visuals": "./src/visuals.ts"
+  },
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs",
+    "lint": "oxlint",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cloudpid/config": "*",
+    "@earendil-works/chord": "^1.5.0",
+    "@earendil-works/pi-ai": "^1.5.0",
+    "@earendil-works/pi-durable": "^1.5.0",
+    "croner": "^11.0.0",
+    "effect": "^4.1.2"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

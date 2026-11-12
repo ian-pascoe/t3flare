@@ -1,0 +1,27 @@
+{
+ "at": "2026-11-12T14:54:20.995Z",
+ "status": "cancelled",
+ "script": {
+  "title": "Code mode",
+  "status": "cancelled",
+  "output": "null",
+  "children": [
+   {
+    "type": "dynamic_tool",
+    "title": "read",
+    "status": "completed",
+    "input": "{\"path\":\"src/greeting.txt\"}"
+   },
+   {
+    "type": "command_execution",
+    "title": "bash",
+    "status": "cancelled",
+    "input": "echo should-not-run > lost.log"
+   }
+  ]
+ },
+ "cards": [],
+ "lostLog": "",
+ "expectation": "the script fails closed: it ends with an error listing the calls it completed; the card is withdrawn or, if answered, the command does not run twice",
+ "ok": true
+}

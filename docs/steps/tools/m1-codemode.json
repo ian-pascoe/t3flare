@@ -1,0 +1,67 @@
+{
+ "at": "2026-11-12T14:40:55.592Z",
+ "name": "m1-codemode",
+ "status": "completed",
+ "scripts": [
+  {
+   "title": "Code mode",
+   "status": "completed",
+   "output": "null",
+   "children": [
+    {
+     "type": "dynamic_tool",
+     "title": "read",
+     "status": "completed",
+     "input": "[object Object]"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "grep",
+     "status": "completed",
+     "input": "[object Object]"
+    },
+    {
+     "type": "file_change",
+     "title": "edit",
+     "status": "completed",
+     "input": "src/greeting.txt"
+    },
+    {
+     "type": "command_execution",
+     "title": "bash",
+     "status": "completed",
+     "input": "bash test.sh"
+    }
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "kind": "file-change",
+   "prompt": "Edit src/greeting.txt (1 change)\n\n- Hello from the t3flare fixture.\n+ Hello from the t3flare fixture.\nHello from code mode.\n\nFrom a code mode script:\nconst text0 = await tools.read({ path: \"src/greeting.txt\" });\nconst hits = await tools.grep({ pattern: \"Hello\", path: \"src\" });\nconst first = text0.split(\"\\n\").find((line) => line.trim() !== \"\");\nawait tools.edit({ path: \"src/greeting.txt\", edits: [{ oldText: first, newText: first + \"\\nHello from code mode.\" }] });\nconst test = await tools.bash({ command: \"bash test.sh\" });\ntext(JSON.stringify({ firstLine: first, grepHits: String(hits).split(\"\\n\").length, test: String(test).slice(-200) }));",
+   "decision": "accept"
+  },
+  {
+   "kind": "command",
+   "prompt": "bash test.sh\n\nFrom a code mode script:\nconst text0 = await tools.read({ path: \"src/greeting.txt\" });\nconst hits = await tools.grep({ pattern: \"Hello\", path: \"src\" });\nconst first = text0.split(\"\\n\").find((line) => line.trim() !== \"\");\nawait tools.edit({ path: \"src/greeting.txt\", edits: [{ oldText: first, newText: first + \"\\nHello from code mode.\" }] });\nconst test = await tools.bash({ command: \"bash test.sh\" });\ntext(JSON.stringify({ firstLine: first, grepHits: String(hits).split(\"\\n\").length, test: String(test).slice(-200) }));",
+   "decision": "accept"
+  }
+ ],
+ "checkpointFiles": [
+  {
+   "path": "src/greeting.txt",
+   "kind": "modified",
+   "additions": 1,
+   "deletions": 0
+  }
+ ],
+ "ms": 19327,
+ "checks": {
+  "completed": true,
+  "oneScriptItem": true,
+  "childrenNested": true,
+  "cardsNameTheScript": true,
+  "checkpointHasTheEdit": true
+ },
+ "ok": true
+}

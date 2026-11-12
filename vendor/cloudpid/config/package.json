@@ -1,0 +1,23 @@
+{
+  "name": "@cloudpid/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sha256": "./src/sha256.ts",
+    "./vitest": "./src/vitest.ts",
+    "./tsconfig/base.json": "./tsconfig/base.json"
+  },
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs",
+    "lint": "oxlint",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "effect": "^4.1.2"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

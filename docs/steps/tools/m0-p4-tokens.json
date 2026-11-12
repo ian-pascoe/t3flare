@@ -1,0 +1,25 @@
+{
+ "at": "2026-11-12T14:42:27.126Z",
+ "model": "anthropic/claude-sonnet-5-5",
+ "presets": [
+  {
+   "preset": "codemode-only",
+   "status": "completed",
+   "inputTokens": 3890,
+   "cachedInputTokens": 0
+  },
+  {
+   "preset": "core",
+   "status": "completed",
+   "inputTokens": 21666,
+   "cachedInputTokens": 16537
+  },
+  {
+   "preset": "everything",
+   "status": "completed",
+   "inputTokens": 21666,
+   "cachedInputTokens": 21664
+  }
+ ],
+ "ok": true
+}

@@ -1,0 +1,64 @@
+{
+ "at": "2026-11-12T14:45:18.104Z",
+ "adminHost": "t3flare-admin-tools.ian-g-pascoe.workers.dev",
+ "cases": [
+  {
+   "name": "service token + admin token reads the settings",
+   "status": 200,
+   "ok": true
+  },
+  {
+   "name": "and changes them (revision bumps)",
+   "status": 200,
+   "revision": 7,
+   "ok": true
+  },
+  {
+   "name": "service token without the admin token: refused",
+   "status": 404,
+   "ok": true
+  },
+  {
+   "name": "no Access credentials: refused at the edge",
+   "status": 302,
+   "ok": true
+  },
+  {
+   "name": "a forged assertion header changes nothing (Access replaces it; the Worker verifies)",
+   "status": 200,
+   "ok": true
+  },
+  {
+   "name": "t3 host /_t3flare/harness: 404",
+   "status": 404,
+   "ok": true
+  },
+  {
+   "name": "t3 host /_t3flare/harness/api/settings: 404",
+   "status": 404,
+   "ok": true
+  },
+  {
+   "name": "t3's session cookie: refused on both hosts",
+   "statuses": [
+    302,
+    302
+   ],
+   "ok": true
+  },
+  {
+   "name": "cross-origin and form-encoded changes refused",
+   "statuses": [
+    403,
+    403
+   ],
+   "ok": true
+  },
+  {
+   "name": "the page's CSP allows only its own hashed script and style",
+   "csp": "default-src 'none'; style-src 'sha256-BsiKmJngrdCBje5gLIxAoZqmKxX+yh+3JYPNIWMR/D0='; script-src 'sha256-mzFQ1z/iCkiCAZcVQQG34rVYTHzJpjKplAv22zsxpKw='; connect-src 'self'; img-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
+   "ok": true
+  }
+ ],
+ "ok": true
+}

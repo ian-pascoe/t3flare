@@ -117,6 +117,8 @@ export default Alchemy.Stack(
     const terminalIdleMs = yield* Config.String("T3FLARE_TERMINAL_IDLE_MS").pipe(Config.withDefault(""));
     const terminalPromptIdleMs = yield* Config.String("T3FLARE_TERMINAL_PROMPT_IDLE_MS").pipe(Config.withDefault(""));
     const sweepGraceMs = yield* Config.String("T3FLARE_SWEEP_GRACE_MS").pipe(Config.withDefault(""));
+    // A test stage's way to replace the codemode sandbox's code (its objects reset), for the sandbox-loss probe (M0 P14).
+    const sandboxGeneration = yield* Config.String("T3FLARE_SANDBOX_GEN").pipe(Config.withDefault(""));
 
     const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {
       name: `${name}-admin`,
@@ -171,7 +173,10 @@ export default Alchemy.Stack(
       main: path.join(here, "../codemode-sandbox/src/worker.ts"),
       compatibility: COMPATIBILITY,
       workersDev: { enabled: false, previewsEnabled: false },
-      env: { CODEMODE_SANDBOX: Cloudflare.DurableObject("CodemodeSandbox", { className: "CodemodeSandbox" }) },
+      env: {
+        CODEMODE_SANDBOX: Cloudflare.DurableObject("CodemodeSandbox", { className: "CodemodeSandbox" }),
+        ...(sandboxGeneration === "" || stage === "prod" ? {} : { T3FLARE_SANDBOX_GEN: sandboxGeneration }),
+      },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     } as never);
 

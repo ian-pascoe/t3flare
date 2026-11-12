@@ -1,0 +1,430 @@
+// Adapted from Cloudflare's `agents` repository, `examples/next/harnesses/pi/src/transcript.ts` as of commit 1e54cf1
+// https://github.com/cloudflare/agents/blob/1e54cf19d747f122c141e0eb323226ec8b4d4865/examples/next/harnesses/pi/src/transcript.ts
+//
+// MIT License
+//
+// Copyright (c) 2025 Cloudflare, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+// rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+// Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+// WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
+// Changes: types renamed (`PiMessage` → `TranscriptMessage`, `PiMessagePart` → `TranscriptPart`), functions written as
+// `const` arrow functions, `Predicate.isString` for the typeof check, and `projectMessage` builds its result in steps.
+// Resets, compaction summaries, and extension entries with a `notice` title in their data project as titled notices; an
+// owner's message the Session expanded (`cloudpid.user`) projects as what the owner typed, with its Skills beside it.
+// Formatted for this repository.
+
+// @effect-diagnostics preferEffectArray:off missingPipeableSignature:off -- plain TypeScript over pi's arrays, as the example is.
+
+import type {
+  AssistantMessage,
+  ImageContent,
+  JsonValue,
+  Message,
+  TextContent,
+  UserMessage,
+} from "@earendil-works/pi-ai";
+import type { EntryRecord } from "@earendil-works/pi-durable";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
+import { type PageCrop, PageCropType } from "./annotations.ts";
+import type { McpPromptData } from "./mcp-prompts.ts";
+import { type AttachedPage, isPageBlock } from "./attached-pages.ts";
+import { type AttachedResource, isResourcesBlock } from "./attached-resources.ts";
+import { isPayloadBlock, type TriggerPayloadChip } from "./trigger-payload.ts";
+import type { SessionVia } from "./mcp-api.ts";
+import type { SentAppMessage } from "./mcp-apps.ts";
+import { reviewTitle, type ShownReviewAnnotation, shownReview } from "./review.ts";
+import { skillBlocksIn, type UserEntryData, userEntryData } from "./user-entry.ts";
+
+/** Whether an image's type is one a crop may have. */
+const isCropType = Schema.is(PageCropType);
+
+/**
+ * The display model of a transcript. The Session sends pi's own entries; the UI projects them into these messages, in
+ * the browser (`view.ts`).
+ */
+export type TranscriptPart =
+  | TextContent
+  | ImageContent
+  | { readonly type: "thinking"; readonly text: string }
+  | {
+      readonly type: "tool-call";
+      readonly id: string;
+      readonly name: string;
+      readonly arguments: JsonValue;
+    }
+  | {
+      readonly type: "tool-result";
+      readonly id: string;
+      readonly name: string;
+      readonly content: readonly (TextContent | ImageContent)[];
+      readonly details?: JsonValue;
+      readonly error: boolean;
+    };
+
+/** A Skill the Session expanded into an owner's message: its name, its `SKILL.md`, and the block the model got. */
+export type TranscriptSkill = {
+  readonly name: string;
+  readonly location: string;
+  readonly text: string;
+};
+
+/** One display-ready message projected from a pi transcript entry. */
+export type TranscriptMessage = {
+  /** The pi entry ID, or `live` for the message being streamed. */
+  readonly id: string;
+  readonly role: "user" | "assistant" | "tool" | "notice";
+  /** A notice's heading, such as `Handoff`; its parts hold the text it carried, if any. */
+  readonly title?: string;
+  readonly parts: readonly TranscriptPart[];
+  readonly timestamp: number;
+  readonly stopReason?: string;
+  readonly error?: string;
+  /** The Skills the Session expanded into an owner's message, which shows the typed text instead. */
+  readonly skills?: readonly TranscriptSkill[];
+  /** The pages attached to an owner's message, which shows a chip for each instead of the block the model got. */
+  readonly pages?: readonly AttachedPage[];
+  /** The MCP resources attached to an owner's message, which shows a chip for each instead of the block the model got. */
+  readonly resources?: readonly AttachedResource[];
+  /** The webhook delivery a Trigger's Fire carried, which shows a chip instead of the block the model got. */
+  readonly triggerPayload?: TriggerPayloadChip;
+  /** The App messages an owner's message sent (`submit.app`), which the message shows as "sent from the <server> app" blocks, not as text of the owner's. */
+  readonly app?: readonly SentAppMessage[];
+  /** A Review's Annotations, each with its quote and the owner's text: the message shows its summary instead. */
+  readonly review?: readonly ShownReviewAnnotation[];
+  /** Who sent an owner's message that came over the MCP endpoint (never the owner's email). */
+  readonly via?: SessionVia;
+  /**
+   * The MCP prompt an owner's message got (`text`: the block the model got), which the message shows by its parts and
+   * the typed text instead of the block and its inline images.
+   */
+  readonly mcpPrompt?: McpPromptData & { readonly text: string };
+};
+
+const userParts = (content: UserMessage["content"]): TranscriptPart[] =>
+  Predicate.isString(content) ? [{ type: "text", text: content }] : [...content];
+
+const assistantParts = (content: AssistantMessage["content"]): TranscriptPart[] =>
+  content.map((part): TranscriptPart => {
+    switch (part.type) {
+      case "text":
+        return { type: "text", text: part.text };
+      case "thinking":
+        return { type: "thinking", text: part.thinking };
+      case "toolCall":
+        return { type: "tool-call", id: part.id, name: part.name, arguments: part.arguments };
+    }
+  });
+
+/** Project one pi-ai message. */
+export const projectMessage = (message: Message, id: string): TranscriptMessage => {
+  switch (message.role) {
+    case "system":
+      // pi records prompt changes as system entries; the UI does not show them.
+      return { id, role: "notice", parts: [], timestamp: 0 };
+    case "user":
+      return {
+        id,
+        role: "user",
+        parts: userParts(message.content),
+        timestamp: message.timestamp,
+      };
+    case "assistant": {
+      const projected: TranscriptMessage = {
+        id,
+        role: "assistant",
+        parts: assistantParts(message.content),
+        timestamp: message.timestamp,
+        stopReason: message.stopReason,
+      };
+
+      return message.errorMessage === undefined
+        ? projected
+        : { ...projected, error: message.errorMessage };
+    }
+
+    case "toolResult": {
+      const result: TranscriptPart = {
+        type: "tool-result",
+        id: message.toolCallId,
+        name: message.toolName,
+        content: message.content,
+        error: message.isError,
+      };
+
+      return {
+        id,
+        role: "tool",
+        parts: [message.details === undefined ? result : { ...result, details: message.details }],
+        timestamp: message.timestamp,
+      };
+    }
+  }
+};
+
+/** The title of an entry shown as a notice, or `undefined` for an entry shown as its message. */
+const noticeTitle = (entry: EntryRecord): string | undefined => {
+  if (entry.kind === "pi.reset") return entry.model === undefined ? "Context reset" : "Handoff";
+
+  if (entry.kind === "pi.compaction") {
+    const reason = Predicate.hasProperty(entry.data, "reason") ? entry.data.reason : undefined;
+
+    return Predicate.isString(reason) ? `Context compacted (${reason})` : "Context compacted";
+  }
+
+  // An extension's own entry kind asks to be a notice with a `notice` title in its data.
+  const notice =
+    !entry.kind.startsWith("pi.") && Predicate.hasProperty(entry.data, "notice")
+      ? entry.data.notice
+      : undefined;
+
+  return Predicate.isString(notice) ? notice : undefined;
+};
+
+/**
+ * `parts` without the block of attached pages the Session added (the last text part shaped like one: the owner's own
+ * text comes before it).
+ */
+const withoutPageBlock = (parts: readonly TranscriptPart[]): TranscriptPart[] => {
+  const at = parts.findLastIndex((part) => part.type === "text" && isPageBlock(part.text));
+
+  return parts.filter((_, index) => index !== at);
+};
+
+/**
+ * `parts` without the block of Attached resources the Session added (the last text part shaped like one) and the inline
+ * pictures right after it, one for each resource that went in as an image (`resources`): the chips show them instead.
+ */
+const withoutResourcesBlock = (
+  parts: readonly TranscriptPart[],
+  resources: readonly AttachedResource[],
+): TranscriptPart[] => {
+  const at = parts.findLastIndex((part) => part.type === "text" && isResourcesBlock(part.text));
+
+  if (at === -1) return [...parts];
+
+  // One picture of the block's for each `images` the chips count: a chip's `kind` is only its first content's.
+  let pictures = resources.reduce((sum, resource) => sum + (resource.images ?? 0), 0);
+
+  return parts.filter((part, index) => {
+    if (index === at) return false;
+
+    if (index > at && pictures > 0 && part.type === "image") {
+      pictures -= 1;
+
+      return false;
+    }
+
+    return true;
+  });
+};
+
+/** `parts` without the block of a Trigger's webhook payload the Session added (the last text part shaped like one): the chip shows it instead. */
+const withoutPayloadBlock = (parts: readonly TranscriptPart[]): TranscriptPart[] => {
+  const at = parts.findLastIndex((part) => part.type === "text" && isPayloadBlock(part.text));
+
+  return parts.filter((_, index) => index !== at);
+};
+
+/**
+ * `parts` without the text parts of the App messages the owner sent (each the last text part with its text, from the last
+ * message back, so a typed text equal to one stays): the message shows them as blocks of their own.
+ */
+const withoutAppParts = (
+  parts: readonly TranscriptPart[],
+  app: readonly SentAppMessage[],
+): TranscriptPart[] => {
+  const removed = new Set<number>();
+
+  for (const message of app.toReversed()) {
+    const at = parts.findLastIndex(
+      (part, index) => !removed.has(index) && part.type === "text" && part.text === message.text,
+    );
+
+    if (at !== -1) removed.add(at);
+  }
+
+  return parts.filter((_, index) => !removed.has(index));
+};
+
+/**
+ * `parts` without the crops of a Review's page Annotations (`ReviewData.crops`: a label and an image each, the last parts
+ * of the message), and the crops, in order, for the Review's chips.
+ */
+const withoutCrops = (parts: readonly TranscriptPart[], data: UserEntryData) => {
+  const count = data.review?.crops?.length ?? 0;
+  const none: readonly PageCrop[] = [];
+
+  if (count === 0 || parts.length < count * 2) return { parts, crops: none };
+
+  const at = parts.length - count * 2;
+
+  const crops = parts.slice(at).flatMap((part): PageCrop[] => {
+    if (part.type !== "image") return [];
+
+    const { mimeType } = part;
+
+    return isCropType(mimeType) ? [{ mimeType, data: part.data }] : [];
+  });
+
+  return { parts: parts.slice(0, at), crops };
+};
+
+/**
+ * `parts` of a message that got an MCP prompt without the prompt: its block (the first text part, returned as `block`)
+ * and the inline images after it, which the prompt's parts count (an image kept in a file has a `path`).
+ */
+const promptShown = (parts: TranscriptPart[], prompt: McpPromptData | undefined) => {
+  const first = parts[0];
+
+  if (prompt === undefined || first?.type !== "text") return { parts, block: undefined };
+
+  const inline = prompt.parts.filter(
+    (part) => part.type === "image" && part.path === undefined,
+  ).length;
+
+  let skipped = 0;
+
+  const rest = parts.slice(1).filter((part) => {
+    if (part.type !== "image" || skipped >= inline) return true;
+
+    skipped++;
+
+    return false;
+  });
+
+  return { parts: rest, block: first.text };
+};
+
+/**
+ * An owner's message the Session expanded or attached pages to, as the owner typed it: the typed text in place of the
+ * expansion, which is the message's first text part (left as it is when the owner typed none), its other parts as they
+ * were but for the block of page content, which a chip per page replaces, and each expanded Skill with the block the
+ * model got. A Review shows its summary, or "Review: n Annotations" without one, and carries its Annotations, read from
+ * the Markdown that ends the first text.
+ */
+const typedMessage = (entry: EntryRecord): TranscriptMessage | undefined => {
+  const data = userEntryData(entry);
+  const message = entry.model?.[0];
+
+  if (data === undefined || message?.role !== "user") return undefined;
+
+  const prompted = promptShown(userParts(message.content), data.mcpPrompt);
+  const { parts: carried, crops } = withoutCrops(prompted.parts, data);
+  const unpaged = data.pages === undefined ? carried : withoutPageBlock(carried);
+
+  const unsourced =
+    data.resources === undefined ? unpaged : withoutResourcesBlock(unpaged, data.resources);
+
+  const delivered = data.triggerPayload === undefined ? unsourced : withoutPayloadBlock(unsourced);
+
+  const parts = data.app === undefined ? delivered : withoutAppParts(delivered, data.app);
+
+  const first = parts.findIndex((part) => part.type === "text");
+  const expanded = parts[first];
+  const text = expanded?.type === "text" ? expanded.text : "";
+  const review = data.review === undefined ? undefined : shownReview(text, data.review, crops);
+
+  // The Skills' blocks are in what comes before the Review's Markdown.
+  const blocks = skillBlocksIn(
+    data.review === undefined
+      ? text
+      : text.slice(0, Math.max(0, text.length - data.review.length)).trimEnd(),
+    data,
+  );
+
+  const display =
+    review !== undefined && data.display.trim() === "" ? reviewTitle(review.length) : data.display;
+
+  const typed: TranscriptPart = { type: "text", text: display };
+
+  const shown =
+    display === ""
+      ? parts
+      : first === -1
+        ? [typed, ...parts]
+        : parts.map((part, index) => (index === first ? typed : part));
+
+  const projected: TranscriptMessage = {
+    id: String(entry.id),
+    role: "user",
+    parts: shown,
+    timestamp: message.timestamp,
+    skills: data.skills.map((skill, index) => ({ ...skill, text: blocks[index] ?? "" })),
+  };
+
+  const paged =
+    data.pages === undefined || data.pages.length === 0
+      ? projected
+      : { ...projected, pages: data.pages };
+
+  const sourced =
+    data.resources === undefined || data.resources.length === 0
+      ? paged
+      : { ...paged, resources: data.resources };
+
+  const chipped =
+    data.triggerPayload === undefined
+      ? sourced
+      : { ...sourced, triggerPayload: data.triggerPayload };
+
+  const messaged =
+    data.app === undefined || data.app.length === 0 ? chipped : { ...chipped, app: data.app };
+
+  const reviewed = review === undefined ? messaged : { ...messaged, review };
+
+  const prompt =
+    prompted.block === undefined || data.mcpPrompt === undefined
+      ? reviewed
+      : { ...reviewed, mcpPrompt: { ...data.mcpPrompt, text: prompted.block } };
+
+  return data.via === undefined ? prompt : { ...prompt, via: data.via };
+};
+
+/**
+ * Project one transcript entry. Entries that carry a model message become that message; a reset (with the Handoff it
+ * carries), a compaction summary, and an extension's entry whose data has a `notice` title become notices; an owner's
+ * message the Session expanded shows what the owner typed; system-prompt entries and other bookkeeping have no
+ * projection.
+ */
+export const projectEntry = (entry: EntryRecord): TranscriptMessage | undefined => {
+  const message = entry.model?.[0];
+  const title = noticeTitle(entry);
+
+  if (title !== undefined) {
+    return {
+      id: String(entry.id),
+      role: "notice",
+      title,
+      parts: message?.role === "user" ? userParts(message.content) : [],
+      timestamp: message?.timestamp ?? 0,
+    };
+  }
+
+  if (entry.kind === "pi.system" || message === undefined) return undefined;
+
+  const typed = typedMessage(entry);
+
+  if (typed !== undefined) return typed;
+
+  return projectMessage(message, String(entry.id));
+};
+
+/** Project entries, leaving out those with no projection. */
+export const projectEntries = (entries: readonly EntryRecord[]): TranscriptMessage[] =>
+  entries.flatMap((entry) => {
+    const message = projectEntry(entry);
+
+    return message === undefined ? [] : [message];
+  });

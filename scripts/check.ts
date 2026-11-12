@@ -34,6 +34,14 @@ const tasks: Array<Task> = [
   { name: "lint (agents)", cwd: agents, command: "bun", args: ["run", "lint"] },
   { name: "test (agents)", cwd: agents, command: "bun", args: ["run", "test"] },
   { name: "test (infra)", cwd: infra, command: "bun", args: ["run", "test"] },
+  // cloudpid's MCP core, vendored (vendor/cloudpid/README.md): its own tests, but those about cloudpid's repo layout.
+  { name: "typecheck (cloudpid mcp)", cwd: path.join(root, "vendor/cloudpid/mcp"), command: "bun", args: ["run", "typecheck", "--noEmit"] },
+  {
+    name: "test (cloudpid mcp)",
+    cwd: path.join(root, "vendor/cloudpid/mcp"),
+    command: "bun",
+    args: ["run", "test", "--exclude", "conformance/**", "--exclude", "src/import-rule.test.ts", "--exclude", "src/sdk-isolation.test.ts"],
+  },
   { name: "typecheck (codemode-sandbox)", cwd: path.join(root, "apps/codemode-sandbox"), command: "bun", args: ["run", "typecheck"] },
   ...["effect-durable", "computer-env", "github-app", "workspace-client", "harness-registry"].flatMap((name): Array<Task> => [
     { name: `typecheck (${name})`, cwd: pkg(name), command: "bun", args: ["run", "typecheck"] },
