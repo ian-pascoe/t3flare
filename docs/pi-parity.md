@@ -19,8 +19,9 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 | Questions to the user | W | `extensions/ask-user.ts` (t3's `user_input` card) | — |
 | pi-minimal-subagents | C | t3's `delegate_task`, `create_threads`, `t3_thread_*` (`extensions/t3-mcp.ts`, step 3) | — |
 | Scheduled tasks | C | t3's `schedule_task` tools | — |
-| `codemode`, `tool_search` | M | pi-durable 1.5.0 ships both; Commissary tools step, part 1 | tools step |
-| MCP servers (pi-mcp-selector, `mcp.json`: Executor, REA, Superlogical) | M | Commissary tools step, parts 2 and 4 (Commissary toolkits, or t3flare-direct servers); `t3` is covered by t3's tools | tools step, SPI-1039 |
+| `codemode`, `tool_search` | W | `extensions/codemode.ts`, sandbox Worker `t3flare-codemode-<stage>` (ADR-0027); switchable in the Harness panel | — |
+| MCP servers (pi-mcp-selector, `mcp.json`: Executor, REA, Superlogical) | W | `extensions/mcp.ts` over the Environment's MCP host (ADR-0028): Commissary toolkits, and Direct servers added in the Harness panel (Executor, in browser mode); REA and Superlogical once served over HTTP (stdio refused); `t3` is covered by t3's tools | — |
+| Harness settings | W | the Harness panel (ADR-0026): extensions, offered tools, MCP servers; later ports register in its extension registry | — |
 | pi-web-tools (`web_search`, `web_fetch`) | M | port cloudpid `web` | SPI-1054 |
 | pi-todo | M | port cloudpid `todo`, shown as t3's todos (parity G5) | SPI-1055 |
 | pi-context-management (notes, history, rollover) | M | port cloudpid `context` | SPI-1056 |
@@ -41,4 +42,4 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 
 ## Order
 
-After the Commissary tools step (code mode, tool search, MCP): web tools (SPI-1054), todo (SPI-1055), context management (SPI-1056), terminals (SPI-1057), guardian (SPI-1058), advisor (SPI-1059).
+Next: web tools (SPI-1054), todo (SPI-1055), context management (SPI-1056), terminals (SPI-1057), guardian (SPI-1058), advisor (SPI-1059).

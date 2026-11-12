@@ -62,3 +62,7 @@ Revised on 2026-11-11 by the text above. The original:
 ## Refinement (SPI-992)
 
 The same holds for GitHub write access: no token that can write code enters a Container. The Container token is read-only; pushes are authorised outside, at the push gateway (ADR-0013's SPI-992 refinement).
+
+## Refinement (tools step): tool handles, and no MCP credential in a Container
+
+CLI agents reach MCP tools with a **tool handle**: an opaque per-process bearer that the Workspace DO issues when the process starts and revokes when it exits. It is passed per process (argv, ACP `session/new`, or a per-home helper), never in a Container-wide file. Outside its Workspace or after its process it is useless, and the relay judges it as its own thread. Commissary's key, direct servers' headers and OAuth tokens, and t3's per-thread bearer never enter a Container: the Environment DO adds them outside (ADR-0028). Evidence: `docs/steps/tools/m5-relay-hostile.json`.

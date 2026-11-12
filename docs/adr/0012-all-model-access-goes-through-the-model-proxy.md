@@ -43,3 +43,13 @@ Some stock t3 features keep a credential the owner types into t3's settings: clo
 - Agents are not offered `request_secret` (ADR-0022).
 
 Text generation itself runs on the proxy through the Durable agent provider. A secret provider such as 1Password may come later through the broker pattern: the Environment DO fetches a secret per use and never stores it (ADR-0018's shape). That would take its own decision.
+## Refinement (tools step): owner-added MCP servers' credentials (owner decision (b))
+
+An exception to D5. A direct MCP server's credential is a header value the owner types once in the harness panel, or an OAuth sign-in he completes there (cloudpid's ADR-0034 model: per server name and URL, owner-only, refreshed on use).
+- It is stored write-only in the Environment DO's secret store, never read back (the API answers `set`, `setAt` and an HMAC fingerprint), and never in a Session, a Workspace, a Container or a log.
+- Only the owner sets it, and removing the server deletes it at once.
+- It is sent only from the strictly public MCP Worker, to that server's URL (ADR-0028).
+
+Commissary's tools key is not typed in: it is `MODEL_PROXY_API_KEY`, a deploy secret, read through `toolsKeyOf(env)`.
+
+D5 itself is being lifted entirely (owner, 2026-11-12, back to stock, `docs/scope-audit.md`); that lands in the next step, and this exception then becomes the general rule.

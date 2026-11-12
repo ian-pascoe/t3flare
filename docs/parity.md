@@ -48,8 +48,8 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
 | Pi Durable | (ours) | W | `env/shadows/builtInDrivers.ts` | done |
-| Codex, Pi CLI | `srv/provider/builtInDrivers.ts:33-45` | W, on proxy models, in the Workspace's Container; no t3 tools (OD-3, below); Pi has no plan mode (a plan turn is refused) | `env/provider/cli/`; `docs/steps/step-4a.md`, `step-4a/m6-acceptance.json` | done (4a) |
-| Claude, OpenCode | same | W over ACP, on proxy models, in the Workspace's Container (t3's kinds `claudeAgent`, `opencode`); no t3 tools (OD-3). Against t3's native drivers: fork M (both CLIs answer `session/fork`; SPI-1037), live steering P (interrupt and restart), rollback M (off), OpenCode's plan P (text and todos, no proposed plan; Claude's proposed plan is W), idle compaction M (not started), provider settings P (binary, home, server URL, launch arguments ignored); usage limit W (the proxy's 429) | `env/provider/cli/acpDriver.ts`, `acpFlavor.ts`; `docs/steps/step-4b.md`, `step-4b/m5-acceptance.json` | done (4b) |
+| Codex, Pi CLI | `srv/provider/builtInDrivers.ts:33-45` | W, on proxy models, in the Workspace's Container; t3's tools and MCP servers through the MCP relay (tools step; the pi CLI gets t3's tools only); Pi has no plan mode (a plan turn is refused) | `env/provider/cli/`; `docs/steps/step-4a.md`, `step-4a/m6-acceptance.json` | done (4a) |
+| Claude, OpenCode | same | W over ACP, on proxy models, in the Workspace's Container (t3's kinds `claudeAgent`, `opencode`); t3's tools and MCP servers through the MCP relay (tools step). Against t3's native drivers: fork M (both CLIs answer `session/fork`; SPI-1037), live steering P (interrupt and restart), rollback M (off), OpenCode's plan P (text and todos, no proposed plan; Claude's proposed plan is W), idle compaction M (not started), provider settings P (binary, home, server URL, launch arguments ignored); usage limit W (the proxy's 429) | `env/provider/cli/acpDriver.ts`, `acpFlavor.ts`; `docs/steps/step-4b.md`, `step-4b/m5-acceptance.json` | done (4b) |
 | Cursor, Grok, Fx, Antigravity, Kiro, Muse | same | R (D3): vendor sign-in, no proxy base URL | no driver registered; ADR-0015 (D3 refinement), ADR-0012 | done (refusal) |
 | ACP registry agents | `ws.ts:2395-2453` | M | driver absent | — G13 |
 | Provider settings | `con/settings.ts:688-904` | P: Pi Durable has one hidden switch; Codex and Pi show t3's forms but binary path, home and launch arguments are ignored (the image and the CLI profile decide), Codex's managed (ChatGPT) setup is refused | `env/provider/settings.ts`, `env/provider/cli/` | 4a (CLIs), 4b |
@@ -98,9 +98,10 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
 | `/mcp` and OAuth for outside agents | `con/environmentHttp.ts:633-674` | W† | mounted; step-3 M0 probes it | 3 |
-| t3's tools in Sessions | `srv/mcp/toolkits/` | M today | `supportsMcpTools: false` on main | 3 |
-| t3's tools for CLI agents (Codex, Pi) | t3 hands its per-thread MCP bearer to the CLI's process | M by decision (OD-3): no `delegate_task`, thread tools, `t3_thread_wait`, browser or device tools from a CLI agent; Pi's extension warns of no MCP, filtered | `env/provider/cli/wrapper.ts` (`supportsMcpTools: false`), the `McpProviderSessions` stub | after 4b, SPI-1039 |
-| Agent's own MCP servers | each CLI's config | M | — | — G10 |
+| t3's tools in Sessions | `srv/mcp/toolkits/` | W, direct and from code mode scripts | `apps/agents/src/extensions/t3-mcp.ts`; step 3; `docs/steps/tools/m1-codemode.json` | done (3, tools) |
+| Code mode and tool search (Durable agent) | (Pi provider's codemode) | W: `codemode` in a sandbox Worker, `tool_search`, MCP tools deferred; nested calls as child items | ADR-0027; `docs/steps/tools/m1-codemode.json`, `m2-*.json` | done (tools) |
+| t3's tools for CLI agents (Codex, Pi, Claude, OpenCode) | t3 hands its per-thread MCP bearer to the CLI's process | W through the MCP relay: a per-process Tool handle the Environment DO swaps for t3's bearer; the same allowlist, guidance filter and approvals as Sessions; F7 holds. OD-3 lifted | ADR-0022's tools refinement; `env/mcp/t3Relay.ts`; `docs/steps/tools/m5-cli-*.json` | done (tools, SPI-1039) |
+| Agent's own MCP servers | each CLI's config | W for remote servers: Commissary toolkits and Direct servers added in the Harness panel (header or OAuth sign-in), for Durable agents and Codex, Claude and OpenCode (the pi CLI: t3's tools only, deferred); local stdio R (ADR-0024) | ADR-0028; `docs/steps/tools/m4-*.json`, `m5-*.json`, `m6-*.json` | done (tools) |
 | Secret store | — | W | `env/platform/secretStore.ts`; step 1 | done |
 | 1Password provider | `t3code/packages/secret-provider-onepassword` (`op` CLI) | M; possibly later through the broker pattern (D5) | `op` "not found"; ADR-0012 (D5 refinement) | — |
 | `request_secret` | `srv/mcp/toolkits/orchestrator/tools.ts:198`; `ws.ts:2376` | R for now (D5) | ADR-0022 and ADR-0012 refinements | done (refusal) |
@@ -144,7 +145,7 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | G7 | **Review guide**: a real detached worktree inside the project's Container. | M | t3 may read the scratch path through `FileSystem` |
 | G8 | **Usage meters.** Lead: t3's `cliproxy` usage-limit source (`con/settings.ts:913`) is already composed. | M | Commissary's management API shape is unverified |
 | G9 | ~~**GitHub as the owner, and other hosts** (after D2).~~ Not now: D2 keeps GitHub App-only and GitHub-only (ADR-0013 refinement, SPI-1004). | M per host | Loosens ADR-0013's per-repo scope |
-| G10 | **Skills and the agent's own MCP servers** (after 3 and 4a). | M | ADR-0016 |
+| G10 | **Skills and the agent's own MCP servers** (after 3 and 4a). MCP servers: done (tools step, ADR-0028). Skills: deferred by the owner (SPI-1001). | M | ADR-0016 |
 | G11 | **Previews**: Container port discovery, an authenticated port proxy, HTML renders, later a browser (after D4). | L | Exposing dev servers publicly; Container sleep |
 | G12 | **Webhook origin and PR-watch wake.** | S | Every hook wakes the DO |
 | G13 | **ACP registry agents** (after 4b). | S–M | Each agent needs a proxy base URL |

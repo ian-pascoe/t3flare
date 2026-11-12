@@ -5,3 +5,14 @@ The `environment` Worker holds the front door, the Environment DO and the t3 web
 ## Refinement (step 2a, R5)
 
 Measured in step 2a (`docs/steps/step-2a/m3-memory.json`): the Workspace DO's isomorphic-git work fits the agents isolate. A checkpoint capture of a 2,000-file working tree (the guard) peaks at 40–52 MB of heap above the baseline in V8 and releases it; a checkpoint diff or a stale status patch peaks under 20 MB. Deployed, a 2,000-file capture took 2.3–2.9 s with no memory errors. Two live Sessions and one capture fit in 128 MB with room; the guard stays at 2,000 tracked files and 16 MB of packs, and no third Worker is needed.
+
+## Refinement (tools step): four Workers, plus the admin forwarder
+
+A stage now runs five Workers:
+- **environment**;
+- **agents**;
+- **codemode** (`t3flare-codemode-<stage>`): pi-codemode's sandbox Durable Object, so a computing script never holds the Session's isolate (ADR-0027);
+- **mcp** (`t3flare-mcp-<stage>`): the MCP engine, with no bindings and strictly public fetch, so the SDK's heap and every outbound MCP request stay apart from t3 (ADR-0028);
+- **admin** (`t3flare-admin-<stage>`): a forwarder that gives the harness panel its own host and Access application (ADR-0026).
+
+A stage-only fixture MCP Worker (`t3flare-mcpfixture-<stage>`) is deployed on test stages only. `stage.ts` orders the deploys, and prod's CI deploys the same stack.

@@ -341,6 +341,42 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 - **Detection**: `test/cliPushCard.test.ts` ("never gives t3's adapter client terminals"); `scripts/spi992.ts p5` (the allowed git-touching tools from an auto-accept-edits and a full-access link: no `git push` in the router trace, no expectation). **Silent** for a new tool until T13 lists it.
 - **Fix**: keep the option out; deny the tool in `t3-mcp.ts`, or mark its pushes as the caller's (linked) work.
 
+### U40. Code mode and pi-codemode (tools step)
+
+- **Where**: `apps/agents/src/extensions/codemode.ts` installs pi-durable's `codemode` and `tool-search` (`createCodemodeExtension` with a `RemoteCodemodeSandbox`, `callers`, `modelTools`, `deferred`, `pi.live.nestedTools`, `CodemodeToolDetails`); `apps/codemode-sandbox/src/worker.ts` hosts `CodemodeSandboxDurableObject` (`@earendil-works/pi-codemode/cloudflare`, its `quickjs-wasi/quickjs.wasm` import bundled by alchemy, `maxMemoryLimitBytes` 16 MiB). Approvals inside a script survive restarts through our pi-durable patch's `progressed` (#647) and its 64 KiB cap (#97), extending U24.
+- **Breaks when**: a pi-durable or pi-codemode bump changes `CODEMODE_MODULE_VERSION` or the VM fingerprint (scripts in flight fail on replay), moves the wasm path, renames a live-doc field the differ reads, changes `maxMemoryLimitBytes`, or drops the patch.
+- **Detection**: `apps/agents/test/codemodeGuards.test.ts` (nested calls run the guarded tools in each mode; replay across a restart with a pending approval; `progressed` present); `test/differNested.test.ts`; the stage's `scripts/tools.ts m1`, `hostile` and `probes` (P5). T9 (SPI-1018) for the patch. **Silent**: a fingerprint change shows only as failed scripts after a deploy with a script waiting.
+- **Blast radius**: the Durable agent's code mode (scripts fail, "script failed, completed calls listed"); direct tool calls are unaffected.
+- **Fix**: deploy a bump with no script waiting; re-check the live-doc fields against `dist/codemode/codemode.d.ts`; re-apply the patch.
+
+### U41. Nested items in t3's thread (tools step)
+
+- **Where**: `apps/environment/src/provider/differ.ts` turns a script's nested calls (`LiveSlim.nestedTools`) into child turn items with `OrchestrationV2TurnItem.parentItemId` and `ExecutionNode.parentNodeId`, ids from `IdAllocator.derive`, the way t3's own Pi provider shows codemode's nested calls (`t3code/packages/provider-pi/src/server/adapter.ts`).
+- **Breaks when**: t3 changes how it validates or renders children, or its Pi provider stops nesting (then t3's clients may drop or flatten ours).
+- **Detection**: typecheck (field shapes); `test/differNested.test.ts` (ids stable from live and committed states, `omittedCalls`); a look at a script's turn in the web client on a bump that touches the timeline.
+- **Fix**: follow the Pi provider's current shape, or fall back to the script's summary item alone.
+
+### U42. t3's MCP for CLI agents through the relay (SPI-1039)
+
+- **Where**: `apps/environment/src/provider/cli/relayedMcp.ts` rewrites t3's `McpProviderSessionConfig` (`endpoint`, `authorizationHeader`) for each CLI driver into the relay's plain-HTTP entry `http://computer.internal/t3flare/mcp/t3` with the process's tool handle; `apps/environment/src/mcp/t3Relay.ts` swaps the handle for t3's real per-thread bearer and calls t3's `/mcp` through `EnvironmentDO.mcp`, with `T3_TOOL_ALLOWLIST` (harness-registry) and t3's `readOnlyHint` as the class. Codex takes it as `mcp_servers.t3-code`; pi through t3's `T3_MCP_URL_ENV`/`T3_MCP_BEARER_ENV` and its own extension; ACP agents through `session/new` `mcpServers` (`acpDriver.ts` drops every entry but the relay's). F7 relies on `t3_pending_request` answering `user_input` only.
+- **Breaks when**: t3 changes how an adapter wires its MCP server, adds a direct-only server, insists on a loopback or HTTPS endpoint, or lets `t3_pending_request` answer approvals.
+- **Detection**: `test/mcpRelay.test.ts`, `test/cliProfiles.test.ts`; the stage's `scripts/tools.ts cli-mcp <cli>` (t3_thread_list from each CLI) and `h6`; `acceptance --peer` F7. **Silent**: a CLI that quietly stops listing t3's tools (each CLI case fails, but only when run).
+- **Fix**: follow the adapter's new wiring in `relayedMcp.ts`; keep the endpoint the relay's.
+
+### U43. The CLIs' MCP configuration surfaces (tools step; extends U32, U35)
+
+- **Where**: `apps/environment/src/agents/cliProfiles.ts` (Codex `mcp_servers.<name>` with `bearer_token_env_var`, `default_tools_approval_mode="approve"`, `tool_timeout_sec` 900, `startup_timeout_sec`), `acpProfiles.ts` (Claude Code's managed settings: `allowedMcpServers` by `serverUrl`, `strictPluginOnlyCustomization` including `mcp`; OpenCode's `mcp` entries and its tool permissions for the relay's tools), the handles per process (review H2: never a Container-wide file).
+- **Breaks when**: an image bump renames a key, changes a precedence (a repo's `opencode.json` or `.mcp.json` winning over ours) or a default timeout, or adds a CLI-side approval that answers before ours.
+- **Detection**: `test/cliProfiles.test.ts` (snapshot of the managed files and argv); the stage's `cli-mcp <cli>` per CLI (read without a card, write asks, decline, full access, plan); `relay-hostile`.
+- **Fix**: re-read the CLI's config reference at the new version; adjust the profile and its snapshot.
+
+### U44. The MCP SDK pin, the vendored cloudpid MCP core, and Commissary's MCP contract (tools step)
+
+- **Where**: `vendor/cloudpid/mcp` (`@cloudpid/mcp`, copied at cloudpid `93ba45a3`, OD-T10) on `@modelcontextprotocol/{client,core,server}` 2.4.0, run in `apps/mcp-worker` (no bindings, `global_fetch_strictly_public`); its OAuth helpers (`discoverOAuthServerInfo`, `selectResource`, `registerClient`, `startAuthorization`) for direct servers' sign-ins. Commissary's endpoint: its eras, `readOnlyHint` on read tools, its `<toolkit>_<tool>` names, its text fallbacks for pending approvals and connect links (like U25 for models).
+- **Breaks when**: an SDK bump changes the client, the OAuth discovery or resource selection; a cloudpid sync changes `scrub.ts` or the call budget; Commissary changes its hints, fallbacks or name rule.
+- **Detection**: the vendored core's tests and `apps/mcp-worker/test/sdk-isolation.test.ts` in `bun run check`; `test/mcpHost.test.ts`; the stage's `durable-mcp commissary`, `classes` (H3: a changed definition stays write until confirmed) and `oauth`. **Silent**: a Commissary hint flip on a tool the owner never marked (it stays write, so it asks more, never less).
+- **Fix**: sync from cloudpid as a copy (its README names the commit); re-run the stage cases.
+
 ### U45. Outbound-link policy Layers over t3's peer services (SPI-1061)
 
 - **Where**: `apps/environment/src/t3/peerLinks.ts`, provided in `composition.ts` over t3's `PeerLinks`, `PeerForwarding` and `PeerLinkRequests` (`t3code/apps/server/src/peer/*`). Until a machine is registered (SPI-1061's M1), `link` is refused, `resolve` fails as `expired` (final: `PeerMcpClient` maps it to `capability_denied`, which `RemoteDelegation.isFinal` stops on), `list` is empty and probes nothing, `request` raises no link card, and no `PeerLinkError` carries a `cause`. Numbers U40–U44 belong to the tools step.
@@ -350,7 +386,7 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 
 ### U49. t3's orchestration guidance, filtered to the tools we offer (SPI-1060)
 
-- **Where**: `apps/agents/src/extensions/t3-guidance.ts` filters t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` by bullet against the offered catalog before the `t3_orchestration` section is rendered (`t3-mcp.ts`); `peerLinks.ts` replaces `t3_environment_links`' `notListed` pointer at `t3_environment_link`.
+- **Where**: `packages/harness-registry/src/t3Guidance.ts` (re-exported by `apps/agents/src/extensions/t3-guidance.ts`) filters t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` by bullet against the offered catalog before the `t3_orchestration` section is rendered (`t3-mcp.ts`), and the offered tools' descriptions by sentence, for Durable agents and for CLI agents through the relay (`apps/environment/src/mcp/t3Relay.ts`, tools step); `peerLinks.ts` replaces `t3_environment_links`' `notListed` pointer at `t3_environment_link`.
 - **Breaks when**: t3 names a new tool in its instructions, its tool descriptions or a tool result, or restructures the instructions so a bullet no longer holds one tool's guidance.
 - **Detection**: `test/t3Guidance.test.ts` (every backticked tool name in the guidance and the offered tools' descriptions is classified; a new name fails until classified) and `test/t3Mcp.test.ts`; `test/peerLinks.test.ts` for `notListed`. **Silent** for a tool named only in a result other than `t3_environment_links`.
 - **Fix**: classify the new name; extend the filter or the result rewrite.

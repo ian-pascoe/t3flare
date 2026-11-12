@@ -50,3 +50,13 @@ Why both, corrected from the plan:
 - A `manual` link proof (`link-proof`) lets another T3 Connect account link this environment, receive its pushes and, by linking it again, revoke our credential. t3 signs one for a non-loopback request host when the session's subject is `desktop-bootstrap`, which is what our first pairing's sessions are.
 
 No tunnel, no `cloudflared`, no machine slot; T3 Connect can neither reach the Environment nor mint a session on it.
+
+## Refinement (tools step): the harness panel's own host, and two public OAuth paths
+
+The harness panel (ADR-0026) is served only on a dedicated admin host, `t3flare-admin-<stage>`, which has its own Access application. There the Worker admits the owner's Access assertion **without the admin token**: a browser cannot send it, so CSRF, Origin and `Sec-Fetch-Site` checks take its place. A service-token caller still needs the admin token, and every other admin route is unchanged. The t3 host never serves `/_t3flare/harness*`.
+
+Two exact paths on the admin host are public, under an Access **Bypass** application, because an OAuth authorization server must reach them without Access:
+- `/_t3flare/harness/oauth/callback`, the redirect. It is a GET, but it changes state only by redeeming a single-use 256-bit `state`, with PKCE and an `iss` check.
+- `/_t3flare/harness/oauth/client.json`, our Client ID Metadata Document.
+
+Evidence: `docs/steps/tools/m3-panel-safety.json`, `m6-oauth.json` (P13).

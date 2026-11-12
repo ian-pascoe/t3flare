@@ -22,3 +22,9 @@ Dev-server previews and t3's server browser are part of parity and are **built l
 
 - A nightly that adds a host-bound feature adds a capability flag or a setting. The flag fails typecheck until it is classified (ADR-0023). The setting does not: classify it by hand when the bump's diff shows one (fragility U4).
 - Lifting a refusal needs an ADR that says where the feature runs instead, as D4 does for previews.
+
+## Refinement (tools step): local stdio MCP servers
+
+| Feature | Why refused | Instead |
+| --- | --- | --- |
+| Local stdio MCP servers (a command the agent's host runs) | They would run in the Container, where no secret may go (ADR-0016), and they sleep with it. Most useful ones need a credential, and one without a credential buys nothing over the agent running it with `bash`. | Serve it over HTTP somewhere public and add it as a direct server in the harness panel, or as a Commissary toolkit (ADR-0028). |

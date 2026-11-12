@@ -134,6 +134,16 @@ Codex, the pi CLI, Claude Code and OpenCode run in the Workspaces' Containers an
 - **A second key.** The CLIs get `COMMISSARY_CONTAINER_API_KEY`, never `MODEL_PROXY_API_KEY`: anything in a Container that runs the key helper while a CLI process lives can read it. Create it as its own Commissary API key with an **empty tool scope** (models only), its **own spend limit**, and optionally an expiry. Put it in `~/.config/t3flare/dev.env`; `stage.ts` binds it to the agents Worker alone and refuses a stage deploy without it. CI: `bun run --cwd infra ci:setup` sets it on the `prod` environment from `dev.env`; on `bump` set it by hand: `gh secret set COMMISSARY_CONTAINER_API_KEY --env bump --repo <owner>/<repo>`.
 - **Rotate it** after a `credential-in-workspace` error in the agents Worker's logs (the sync guard found it in a Workspace and flagged it; `POST /_t3flare/check/leak?id=<workspace>` shows the flag) or on any doubt: revoke it in Commissary, update `dev.env`, run `ci:setup`, set it on `bump`, redeploy.
 
+## MCP tools (tools step)
+
+Commissary's MCP endpoint is also a tool source for every agent (ADR-0028). There is no new secret: the Environment Worker uses `MODEL_PROXY_API_KEY` as Commissary's **tools key**, read through one accessor (`toolsKeyOf`) so a dedicated key can replace it later. It is a Workers-only secret and never enters a Container; the CLIs reach Commissary's tools through the MCP relay with a per-process handle.
+
+- **Scope.** Give the key a tool scope of the toolkits t3flare should see. With "every tool you may use", every new private toolkit reaches t3flare at once.
+- **No Commissary approval rules on it** (OD-T3). t3flare asks by mode, and every linked write asks per call. Commissary's rules would ask a second time, on its own panel.
+- **Classes.** A Commissary tool's class comes from its read-only hint as first seen. Fix a wrong class in Commissary (it then applies to every client), or for t3flare alone in the Harness panel.
+- **Limits.** Calls end after 240 s (Commissary's upstream cap), progress is not passed on, and upstream elicitation is not forwarded. Servers that need those are added as Direct servers in the Harness panel instead.
+- **`COMMISSARY_CONTAINER_API_KEY` keeps an empty tool scope.** It is models only.
+
 ## Another Anthropic-compatible endpoint
 
 **Untested.** What was checked is that the requests above are ordinary Anthropic Messages requests (read in pi-ai's `anthropic-messages` implementation and the Anthropic SDK it uses: `x-api-key`, `anthropic-version: 2023-06-01`, `/v1/messages?beta=true`), so any endpoint that serves that API with an API key is a candidate, Anthropic's own (`https://api.anthropic.com`) included. Nothing was run against anything but Commissary. Two things are unverified and likely differ:

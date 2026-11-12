@@ -56,3 +56,13 @@ Built in step 4b (`docs/steps/step-4b.md`); owner decision OD-1 confirmed shippi
 ## Refinement (SPI-1040): pushes from CLI threads ask on the thread
 
 Before SPI-1040 a linked CLI thread could not push at all (step 4a F8: the credential helper had no way to ask). Now a CLI's `git push` goes through the push gateway like any push (ADR-0013's SPI-992 refinement), and when the gateway's policy asks on a CLI thread, the wrapper around t3's adapter raises t3's own "Allow git push?" card on that thread's live turn and answers t3's response itself; the CLI never sees the card. The ACP driver gives t3's adapter no client terminals, so an ACP agent's commands stay its own processes in the Container (U39). Evidence: `test/cliPushCard.test.ts`, `docs/steps/spi-992/m3-cli-push-card.json`.
+
+## Refinement (tools step): CLI agents get MCP tools through the relay
+
+OD-3 is lifted. Each CLI gets MCP entries only in its managed or system scope, all pointing at the MCP relay (`http://computer.internal/t3flare/mcp/<server>`, ADR-0028) with a per-process tool handle:
+- **Codex:** `mcp_servers.<name>` on argv, approval mode `approve`, a 900 s timeout.
+- **Claude Code:** `allowManagedMcpServersOnly` and `allowedMcpServers` by the relay's URL pattern.
+- **OpenCode:** `mcp.use` denied but for the relay's servers.
+- **pi:** t3's own tools only, through t3's pi extension pointed at the relay. Commissary and direct servers wait for an MCP client in the image.
+
+A repo's own MCP configuration is never admitted. A write that asks raises t3's card on the CLI thread, injected by the wrapper as for pushes (SPI-1040). Evidence: `docs/steps/tools/m5-cli-*.json`.

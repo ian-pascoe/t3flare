@@ -48,3 +48,12 @@ The tools listed above as not offered are refusals by design, not omissions:
 - The link tools: cloud-to-elsewhere links (ADR-0011).
 
 A bump that adds a tool leaves it withheld until it is classified here and in `T3_TOOL_ALLOWLIST`.
+
+## Refinement (tools step, SPI-1039): CLI agents reach t3's MCP through the relay
+
+A CLI agent's t3 tools go to `http://computer.internal/t3flare/mcp/t3` with its process's tool handle. The Environment DO swaps the handle for t3's real per-thread bearer, which never leaves it, and calls t3's `/mcp` through `EnvironmentDO.mcp`, as a Session does. The relay applies:
+- the same allowlist (`T3_TOOL_ALLOWLIST`, now in `packages/harness-registry`, failing closed);
+- the same guidance filter on descriptions (SPI-1060);
+- `decideCall` with t3's `readOnlyHint` as the class, and linked writes asked per call.
+
+While the Workspace is tainted, an owner thread's handle is refused outright (review H1). t3's own auth, Link fence and mode ceiling run unchanged, and F7 holds: no agent answers a card (`m2-h6-proof.json`).

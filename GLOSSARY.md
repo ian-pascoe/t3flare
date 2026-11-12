@@ -46,8 +46,9 @@ _Avoid_: remote threads, foreign work
 **Link fence**:
 What Linked work from a link paired below full access may not do: change the owner's threads, projects, settings or
 schedules, or use that Environment's own links (t3's), exceed the modes the link hands down (t3's), or `git push`
-without an approval each time (ours, at the Push gateway). The push half applies to every link, full-access included:
-it is the Workspace's Taint, not the link's access, that makes a push ask.
+without an approval each time (ours, at the Push gateway), or call a write Tool without an approval each time (ours,
+at the MCP host). The push and tool halves apply to every link, full-access included: for pushes it is the Workspace's
+Taint, not the link's access, that makes a push ask.
 _Avoid_: sandbox, isolation
 
 **Remote task**:
@@ -157,6 +158,53 @@ _Avoid_: ACP driver, registry agent (t3's ACP Registry driver is another thing, 
 **Managed settings**:
 Claude Code's highest settings source, `/etc/claude-code/managed-settings.json`, written per process by the image's launcher: the proxy as the only endpoint, the key helper, and the permission, hook, MCP and plugin locks a repository's `.claude/` cannot override. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`.
 
+## Tools
+
+**Harness panel**:
+The owner's page for Pi Durable's harness, on its own admin host: extensions and their settings, the MCP server set,
+Status and the audit log. Changes apply at a thread's next turn.
+_Avoid_: settings page, dashboard, admin UI
+
+**Code mode**:
+The Durable agent's `codemode` tool: one short script that calls the agent's tools as functions, each nested call
+judged exactly as a direct one.
+_Avoid_: scripting, eval
+
+**MCP server**:
+A remote MCP endpoint whose tools t3flare's agents may call: Commissary's, or a Direct server.
+
+**Direct server**:
+An MCP server the owner adds in the Harness panel, with its own sign-in kept by t3flare, as opposed to one reached
+through Commissary.
+_Avoid_: custom server, Route B (the plan's word)
+
+**MCP server set**:
+Every MCP server the Environment offers, with each one's switches (enabled, Exposure, offered to Linked work) and its
+Tool classes.
+
+**MCP host**:
+The Environment DO's part that holds the MCP server set, its inventory and credentials, and makes every MCP call through
+the MCP engine.
+_Avoid_: MCP proxy, gateway
+
+**MCP relay**:
+The `computer.internal/t3flare/mcp/<server>` routes through which CLI agents call MCP tools, t3's own included, with a
+Tool handle.
+_Avoid_: MCP proxy, bridge
+
+**Exposure**:
+How a Durable agent is offered an MCP tool: `direct` (in its tool list), `deferred` (found by a search), `codemode`
+(from scripts only) or `hidden`.
+
+**Tool class**:
+Read or write. A read runs; a write follows the thread's mode, and asks every call for Linked work. Unknown is write;
+a Direct server's tools are write until the owner marks one read.
+_Avoid_: permission level
+
+**Tool handle**:
+An opaque per-process bearer a CLI agent sends to the MCP relay; useless outside its Workspace and after its process.
+_Avoid_: token, nonce
+
 ## Credentials
 
 **Provider instance**:
@@ -183,7 +231,7 @@ The ref updates of a push t3 itself is about to run, registered by the process r
 _Avoid_: allowlist, pre-approval
 
 **Taint**:
-The Workspace's durable mark that it ran Linked work; while it stands, a push that matches no Expectation asks the owner. Cleared by the owner only.
+The Workspace's durable mark that it ran Linked work; while it stands, a push that matches no Expectation asks the owner, every write Tool call from a CLI agent there asks, and t3's own tools refuse an owner thread's Tool handle. Cleared by the owner only.
 _Avoid_: dirty, compromised
 
 **Environment token**:
