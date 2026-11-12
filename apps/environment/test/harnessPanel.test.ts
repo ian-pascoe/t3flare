@@ -201,4 +201,19 @@ describe("harness panel", () => {
       expect(response.status).toBe(400);
     }
   });
+
+  it("refuses an unknown sign-in kind and a header sign-in without its header name", async () => {
+    const { deps } = setup({ kind: "service-token" });
+    const withSecrets = { ...deps, secrets: harnessSecrets(memory()) };
+    for (const body of [
+      { server: "x", url: "https://a.example/mcp", auth: { kind: "basic" } },
+      { server: "x", url: "https://a.example/mcp", auth: { kind: "header" }, value: "v" },
+    ]) {
+      const response = await handleHarness(
+        new Request(`https://${HOST}/_t3flare/harness/api/mcp/servers`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+        withSecrets,
+      );
+      expect(response.status).toBe(400);
+    }
+  });
 });

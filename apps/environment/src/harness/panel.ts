@@ -214,6 +214,8 @@ const addServer = async (request: Request, deps: HarnessDeps): Promise<Response>
   const url = typeof body?.url === "string" ? body.url : "";
   const auth = (body?.auth ?? { kind: "none" }) as { kind?: unknown; header?: unknown };
   const value = typeof body?.value === "string" ? body.value : undefined;
+  if (auth.kind !== "none" && auth.kind !== "header" && auth.kind !== "oauth") return refused(400, "auth.kind is none, header or oauth");
+  if (auth.kind === "header" && typeof auth.header !== "string") return refused(400, "a header sign-in needs its header name");
   if (auth.kind === "header" && (value === undefined || value === "")) return refused(400, "a header sign-in needs its value");
   if (deps.secrets === undefined) return refused(500, "no secret store");
   const before = deps.store.load();

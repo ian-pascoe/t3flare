@@ -29,8 +29,8 @@ const VIEW: McpView = {
       listedAt: 1,
       exposure: "deferred",
       tools: [
-        { name: "mcp__commissary__fixture_echo", upstream: "fixture_echo", description: "echo", inputSchema: { type: "object", properties: { text: { type: "string" } } }, class: "read", exposure: "direct" },
-        { name: "mcp__commissary__fixture_note", upstream: "fixture_note", description: "note", inputSchema: { type: "object", properties: { line: { type: "string" } } }, class: "write", exposure: "direct" },
+        { name: "mcp__commissary__fixture_echo", upstream: "fixture_echo", description: "echo", inputSchema: { type: "object", properties: { text: { type: "string" } } }, hash: "h-echo", class: "read", exposure: "direct" },
+        { name: "mcp__commissary__fixture_note", upstream: "fixture_note", description: "note", inputSchema: { type: "object", properties: { line: { type: "string" } } }, hash: "h-note", class: "write", exposure: "direct" },
       ],
     },
   ],
@@ -91,6 +91,9 @@ describe("mcp extension", () => {
     run.store.answer(card.requestId, "acceptForSession");
     await until(() => run.sent.length === 2, "both writes");
     expect(run.store.pending()).toEqual([]);
+    // The acceptance covers that definition only: a changed definition (hash) asks again (review H3).
+    expect(run.store.acceptedFor({ tool: "mcp__commissary__fixture_note", kind: "mcp-tool", definition: "h-note" })).toBe(true);
+    expect(run.store.acceptedFor({ tool: "mcp__commissary__fixture_note", kind: "mcp-tool", definition: "h-changed" })).toBe(false);
   });
 
   it("full access runs an owner's write without a card", async () => {

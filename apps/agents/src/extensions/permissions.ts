@@ -51,8 +51,12 @@ export type ApprovalKind = PendingApproval["kind"];
  * tool by name for t3's MCP tools (so accepting `delegate_task` never unlocks `bash` or another T3 tool, nor the
  * reverse), and nothing for a linked thread's push (owner decision D1: every push asks).
  */
-export const acceptanceKeyOf = (call: { readonly tool: string; readonly kind: ApprovalKind; readonly perCall?: true }): string | null =>
-  call.kind === "git-push" || call.perCall === true ? null : call.kind === "mcp-tool" ? `mcp-tool:${call.tool}` : call.kind;
+export const acceptanceKeyOf = (call: { readonly tool: string; readonly kind: ApprovalKind; readonly perCall?: true; readonly definition?: string }): string | null =>
+  call.kind === "git-push" || call.perCall === true
+    ? null
+    : call.kind === "mcp-tool"
+      ? `mcp-tool:${call.tool}${call.definition === undefined ? "" : `@${call.definition}`}`
+      : call.kind;
 
 /** A request a tool call waits on: stored by the asking call's task, withdrawn when its turn ends. */
 export interface WaitingRequest {
@@ -218,7 +222,7 @@ export class ApprovalStore extends WaitingRequests<PendingApproval, StoredAnswer
   }
 
   /** Whether the owner accepted calls like this one for the rest of the Session. */
-  acceptedFor(call: { readonly tool: string; readonly kind: ApprovalKind }): boolean {
+  acceptedFor(call: { readonly tool: string; readonly kind: ApprovalKind; readonly definition?: string }): boolean {
     const key = acceptanceKeyOf(call);
     return key !== null && this.#accepted().has(key);
   }

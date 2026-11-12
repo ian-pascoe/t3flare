@@ -31,6 +31,8 @@ export interface McpView {
       readonly upstream: string;
       readonly description: string;
       readonly inputSchema: Readonly<Record<string, unknown>>;
+      /** The definition's hash: "accept for the session" covers this definition only (review H3). */
+      readonly hash: string;
       readonly class: ToolClass;
       readonly unconfirmed?: true;
       readonly exposure: string;
@@ -70,7 +72,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
         mode: host.mode(),
         interaction: host.interaction(),
         linked,
-        accepted: host.store.acceptedFor({ tool: tool.name, kind: "mcp-tool" }),
+        accepted: host.store.acceptedFor({ tool: tool.name, kind: "mcp-tool", definition: tool.hash }),
       });
       if (verdict.kind === "refuse") return result(verdict.reason, true, details);
       if (tool.class === "write" && (await api.memo<boolean>(STARTED_MEMO, context)) === true) return cutOffResult();
@@ -81,6 +83,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
             turn: host.turn(),
             tool: tool.name,
             kind: "mcp-tool",
+            definition: tool.hash,
             summary: cardText(`${server.name}: ${tool.upstream}\n${JSON.stringify(args, null, 2)}`),
             detail: `A ${tool.class} tool (${server.kind === "commissary" ? "Commissary's class" : "class set in the harness panel"}${tool.unconfirmed === true ? "; its definition changed since" : ""}).${
               verdict.perCall ? " A linked thread's write: this answer covers this call only." : ""

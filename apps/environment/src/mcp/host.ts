@@ -211,7 +211,7 @@ export class McpHost {
     const server = this.servers()[name];
     const before = this.inventory(name);
     const failed = (error: string): Inventory => {
-      const next: Inventory = { ...before, status: before.status === "never" ? "failed" : "failed", error, listedAt: before.listedAt };
+      const next: Inventory = { ...before, status: "failed", error, listedAt: before.listedAt };
       this.#deps.kv.put(inventoryKey(name), { ...next, failedAt: this.#now() });
       console.warn(JSON.stringify({ t3flare: "mcp-list-failed", server: name, error: error.slice(0, 300) }));
       return next;

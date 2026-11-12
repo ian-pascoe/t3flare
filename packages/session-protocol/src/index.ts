@@ -283,6 +283,8 @@ export interface PendingApproval {
   readonly via?: { readonly parentCallId: string; readonly script: string };
   /** The answer covers this call only, never the session (a linked thread's MCP write, ADR-0028). */
   readonly perCall?: true;
+  /** An MCP tool's definition hash (ADR-0028, review H3): an acceptance for the session covers that definition only. */
+  readonly definition?: string;
   readonly createdAt: number;
 }
 
