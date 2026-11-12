@@ -48,6 +48,8 @@ export interface ProcessCommandInput {
   readonly files?: ReadonlyArray<ProcessFile>;
   /** Symbolic links made before the start: `{ path, target }` (Codex's `sessions/` into the synced directory). */
   readonly links?: ReadonlyArray<{ readonly path: string; readonly target: string }>;
+  /** Session retention (review F2): files under `dir` (in the synced harness directory) untouched for `days` are removed. */
+  readonly prune?: ReadonlyArray<{ readonly dir: string; readonly days: number }>;
 }
 
 /** Where a profile may write: the process's own home, or the synced harness directory (session directories only). */
@@ -58,7 +60,7 @@ const writable = (marker: string, path: string): boolean =>
 export const processCommand = (input: ProcessCommandInput): string => {
   if (!isProcessMarker(input.marker)) throw new Error(`t3flare: bad process marker ${input.marker}`);
   if (input.argv.length === 0 || !input.argv[0]!.startsWith("/")) throw new Error("t3flare: a process's binary must be an absolute path");
-  for (const file of [...(input.files ?? []), ...(input.links ?? [])]) {
+  for (const file of [...(input.files ?? []), ...(input.links ?? []), ...(input.prune ?? []).map((entry) => ({ path: `${entry.dir}/x` }))]) {
     if (!writable(input.marker, file.path)) throw new Error(`t3flare: a process may not write ${file.path}`);
   }
   const home = cliHomeOf(input.marker);
@@ -81,6 +83,7 @@ export const processCommand = (input: ProcessCommandInput): string => {
       `chmod ${(file.mode ?? 0o600).toString(8)} ${quote(file.path)}`,
     ]),
     ...(input.links ?? []).flatMap((link) => [`mkdir -p ${quote(link.target)} "$(dirname ${quote(link.path)})"`, `ln -sfn ${quote(link.target)} ${quote(link.path)}`]),
+    ...(input.prune ?? []).map((entry) => `[ -d ${quote(entry.dir)} ] && find ${quote(entry.dir)} -type f -mtime +${Math.max(1, Math.floor(entry.days))} -delete 2>/dev/null`),
     `cd -- ${quote(input.cwd)} 2>/dev/null || cd -- ${quote(input.t3Path)}`,
     `exec 1>&3 3>&-`,
     `exec setsid --wait ${input.argv.map(quote).join(" ")}`,

@@ -166,7 +166,7 @@ export class ProcessHost {
       .map((proc) => proc.key);
   }
 
-  async start(input: ProcessStartInput & { readonly files?: ReadonlyArray<ProcessFile>; readonly links?: ReadonlyArray<{ readonly path: string; readonly target: string }> }): Promise<ProcessStartAnswer> {
+  async start(input: ProcessStartInput & { readonly files?: ReadonlyArray<ProcessFile> }): Promise<ProcessStartAnswer> {
     const refuse = (reason: string): ProcessStartAnswer => ({ ok: false, epoch: this.#deps.epoch, reason });
     if (this.#procs.has(input.key)) return { ok: true, epoch: this.#deps.epoch };
     if (input.cli === "probe" && !this.#deps.allowProbe) return refuse("the probe program runs on test stages only");
@@ -197,6 +197,7 @@ export class ProcessHost {
         argv: input.argv,
         ...(input.files === undefined ? {} : { files: input.files }),
         ...(input.links === undefined ? {} : { links: input.links }),
+        ...(input.prune === undefined ? {} : { prune: input.prune }),
       });
     } catch (error) {
       return refuse(String(error instanceof Error ? error.message : error));

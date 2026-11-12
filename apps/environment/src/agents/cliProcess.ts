@@ -104,6 +104,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       env: launch.env,
       ...(launch.files === undefined ? {} : { files: launch.files }),
       ...(launch.links === undefined ? {} : { links: launch.links }),
+      ...(launch.prune === undefined ? {} : { prune: launch.prune }),
       ...(session !== undefined ? { thread: session.thread } : launch.thread === undefined ? {} : { thread: launch.thread }),
       ...(session?.linked === true ? { linked: true } : {}),
     };

@@ -41,6 +41,7 @@
 //   /_t3flare/connect/*, POST /_t3flare/check/connect-refusals  step 3+: the T3 Connect link (connect/admin.ts)
 //   POST /_t3flare/agents/process-check           step 4a (stages only): the probe through t3's spawner and the process channel
 //   GET  /_t3flare/agents/process-state?id=<id>   step 4a: a Workspace's CLI processes and this instance's channel
+//   POST /_t3flare/check/leak?id=<id>             step 4a: credentials in a Workspace's files (DO and Container), names and paths only
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -354,6 +355,10 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const body = (await request.json()) as { op: string; workspace: string; marker?: string; roundTrips?: number };
         if (body.op === "release") return json({ released: await releaseHeld() });
         return json(await processCheck(body));
+      }
+      case "POST /_t3flare/check/leak": {
+        const { workspaceRpc } = await import("../agents/workspaceClient.ts");
+        return json(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck());
       }
       case "GET /_t3flare/agents/process-state": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");

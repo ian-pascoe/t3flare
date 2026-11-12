@@ -47,6 +47,7 @@ export interface Launch {
   readonly env: Readonly<Record<string, string>>;
   readonly files?: ReadonlyArray<{ readonly path: string; readonly text: string; readonly mode?: number }>;
   readonly links?: ReadonlyArray<{ readonly path: string; readonly target: string }>;
+  readonly prune?: ReadonlyArray<{ readonly dir: string; readonly days: number }>;
   readonly thread?: string;
   /** Names of t3's env keys not passed on (for the log). */
   readonly droppedEnv: ReadonlyArray<string>;
@@ -218,6 +219,7 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     argv: [`${CLI_BIN}/pi`, "--mode", "rpc", ...rest, ...extensionArgs, "--no-approve"],
     env,
     files,
+    prune: [{ dir: PI_SESSIONS, days: PI_SESSION_RETENTION_DAYS }],
     ...(thread === undefined ? {} : { thread }),
     droppedEnv: dropped(input.env),
   };

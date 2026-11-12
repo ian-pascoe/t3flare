@@ -266,6 +266,7 @@ export interface ChannelStart {
   readonly env: Readonly<Record<string, string>>;
   readonly files?: ProcessStartInput["files"];
   readonly links?: ReadonlyArray<{ readonly path: string; readonly target: string }>;
+  readonly prune?: ProcessStartInput["prune"];
   readonly thread?: string;
   readonly linked?: boolean;
   /** Made by the caller when it needs the key before the start (the profile's per-process home). */
@@ -321,9 +322,10 @@ export class ProcessChannel {
         env: input.env,
         ...(input.files === undefined ? {} : { files: input.files }),
         ...(input.links === undefined ? {} : { links: input.links }),
+        ...(input.prune === undefined ? {} : { prune: input.prune }),
         ...(input.thread === undefined ? {} : { thread: input.thread }),
         ...(input.linked === true ? { linked: true } : {}),
-      } as ProcessStartInput);
+      });
     } catch (error) {
       process.finish(129);
       throw new ProcessRefused(`the Workspace did not start the process: ${String(error).slice(0, 300)}`);

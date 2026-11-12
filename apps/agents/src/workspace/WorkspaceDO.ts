@@ -61,6 +61,7 @@ import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, wit
 import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { ModelKeyGate } from "./modelKey.ts";
+import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { ProcessProbe, type ProbeOp } from "./processProbe.ts";
 import { TerminalHost } from "./terminalHost.ts";
@@ -176,6 +177,12 @@ const BOOT_COUNT_KEY = "t3flare:boot-count";
  * computerd and the agent's own commands in 3 GiB; P9's memory probe sets the number (docs/steps/step-4a/m0-p9.json).
  */
 export const MAX_CLI_PROCESSES = 2;
+/** Set when the sync guard found a credential in the Workspace: the key is to be rotated (review F3). */
+const LEAK_FLAG_KEY = "t3flare:credential-leak";
+/** Where the sync guard moves a file holding a credential: the Container's own disk, never synced. */
+const QUARANTINE = "/var/lib/t3flare/quarantine";
+/** Directories the sync guard never reads: they stay on the Container's disk (`CONTAINER_IGNORE`). */
+const SCAN_SKIP = ["node_modules", ".venv", "target", ".cache", ".pnpm-store", "__pycache__", ".turbo", ".next", ".gradle"];
 /** Linked work held while a linked thread's CLI process lives (review F8): until it exits, not a time. */
 const LINKED_WHILE_ALIVE = Number.MAX_SAFE_INTEGER;
 /** How often terminals' heartbeats are checked while any is open. */
@@ -226,6 +233,10 @@ export class WorkspaceDO extends ContainerHost {
   readonly #boot: number;
   /** The key route's nonces: one per live CLI process, with its CLI and the grants it took. */
   readonly #keyGate = new ModelKeyGate(() => crypto.randomUUID());
+  /** When the sync guard last scanned (its files changed after this are scanned next). */
+  #lastScan = 0;
+  /** Patterns of the git tokens this object handed to the Container lately (the sync guard looks for them too). */
+  readonly #tokenPatterns: Array<CredentialPattern> = [];
   /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
   #sandbox: Promise<boolean> | undefined;
 
@@ -270,7 +281,10 @@ export class WorkspaceDO extends ContainerHost {
     this.#terminalSync = new TerminalSync({
       now: () => Date.now(),
       running: () => this.containerRunning(),
-      pull: () => this.#syncEntries("pull"),
+      pull: async () => {
+        await this.#scanBeforePull();
+        return this.#syncEntries("pull");
+      },
       push: () => this.#syncEntries("push"),
       revision: () => currentRevision(ctx.storage.sql),
       active: () => this.#terminals.size > 0 || this.#processes.size > 0,
@@ -341,6 +355,100 @@ export class WorkspaceDO extends ContainerHost {
         ctx.storage.kv.put(LINKED_WORK_KEY, linked);
       },
     });
+  }
+
+  /** The credentials the sync guard looks for: the CLI agents' key and the git tokens handed out lately. */
+  async #patterns(): Promise<ReadonlyArray<CredentialPattern>> {
+    const key = this.env.COMMISSARY_CONTAINER_API_KEY;
+    return [...(key === undefined || key === "" ? [] : [await patternOf("model-key", key)]), ...this.#tokenPatterns];
+  }
+
+  async #rememberToken(token: string): Promise<void> {
+    this.#tokenPatterns.push(await patternOf("github-token", token));
+    if (this.#tokenPatterns.length > 20) this.#tokenPatterns.splice(0, this.#tokenPatterns.length - 20);
+  }
+
+  /** Runs the scanner in the running Container, straight through the platform's exec (no computer sync around it). */
+  async #scan(input: Omit<LeakScanInput, "patterns">): Promise<LeakScanAnswer | undefined> {
+    const container = this.ctx.container;
+    if (container === undefined || !container.running) return undefined;
+    const patterns = await this.#patterns();
+    if (patterns.length === 0) return undefined;
+    const process = await container.exec([...leakScanArgv({ ...input, patterns })], { stdout: "pipe", stderr: "pipe" });
+    const output = await process.output();
+    const text = new TextDecoder().decode(output.stdout as unknown as Uint8Array);
+    try {
+      return JSON.parse(text.trim().split("\n").at(-1) ?? "") as LeakScanAnswer;
+    } catch {
+      console.warn(JSON.stringify({ t3flare: "leakscan-failed", workspace: this.#workspaceId() ?? null, stderr: new TextDecoder().decode(output.stderr as unknown as Uint8Array).slice(0, 300) }));
+      return undefined;
+    }
+  }
+
+  /**
+   * The sync guard (review F3): while a CLI process lives, the files changed since the last scan are scanned in the
+   * Container before computer pulls them. A file with a credential is moved out of the synced tree, every CLI process is
+   * killed, and the key is flagged for rotation.
+   */
+  async #scanBeforePull(): Promise<void> {
+    if (this.#processes.size === 0) return;
+    const started = Date.now();
+    const answer = await this.#scan({ roots: ["/workspace"], since: this.#lastScan === 0 ? 0 : this.#lastScan - 2000, quarantine: QUARANTINE, skip: SCAN_SKIP }).catch(() => undefined);
+    if (answer === undefined) return;
+    this.#lastScan = started;
+    if (answer.hits.length > 0) await this.#onLeak(answer.hits);
+  }
+
+  /** The scanner as a script suffix, its answer left in a file on the Container's disk (`#readScanResult`). */
+  async #scanSuffix(): Promise<string | undefined> {
+    const patterns = await this.#patterns();
+    if (patterns.length === 0) return undefined;
+    const started = Date.now();
+    const argv = leakScanArgv({ patterns, roots: ["/workspace"], since: this.#lastScan === 0 ? 0 : this.#lastScan - 2000, quarantine: QUARANTINE, skip: SCAN_SKIP });
+    this.#lastScan = started;
+    const b64 = (text: string) => btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+    return `mkdir -p /var/lib/t3flare && ${argv[0]} -e "$(printf %s '${b64(argv[2]!)}' | base64 -d)" "$(printf %s '${b64(argv[3]!)}' | base64 -d)" > /var/lib/t3flare/last-scan.json 2>/dev/null`;
+  }
+
+  async #readScanResult(): Promise<void> {
+    const container = this.ctx.container;
+    if (container === undefined || !container.running) return;
+    const process = await container.exec(["cat", "/var/lib/t3flare/last-scan.json"], { stdout: "pipe", stderr: "ignore" }).catch(() => undefined);
+    if (process === undefined) return;
+    const output = await process.output();
+    try {
+      const answer = JSON.parse(new TextDecoder().decode(output.stdout as unknown as Uint8Array)) as LeakScanAnswer;
+      if (answer.hits.length > 0) await this.#onLeak(answer.hits);
+    } catch {
+      // No answer: the command's scan did not run.
+    }
+  }
+
+  async #onLeak(hits: LeakScanAnswer["hits"]): Promise<void> {
+    console.error(JSON.stringify({ t3flare: "credential-in-workspace", workspace: this.#workspaceId() ?? null, hits: hits.map((hit) => ({ name: hit.name, path: hit.path, quarantined: hit.quarantined ?? null })) }));
+    this.ctx.storage.kv.put(LEAK_FLAG_KEY, { at: Date.now(), names: [...new Set(hits.map((hit) => hit.name))], paths: hits.map((hit) => hit.path).slice(0, 20) });
+    for (const key of this.#processes.keys()) await this.#processes.signal(key).catch(() => undefined);
+  }
+
+  /**
+   * The leak check (plan §4.7, acceptance): the Workspace's own files searched for each credential's value (the DO side),
+   * and the Container's files, process environments and command lines scanned by hash (nothing sent in). Names and paths
+   * only, never a value.
+   */
+  async leakCheck(): Promise<{ readonly do: ReadonlyArray<{ readonly name: string; readonly path: string }>; readonly container: LeakScanAnswer | null; readonly flagged: unknown }> {
+    this.#alive();
+    await this.#workspace.ready();
+    const values: Array<[string, string]> = [];
+    const key = this.env.COMMISSARY_CONTAINER_API_KEY;
+    if (key !== undefined && key !== "") values.push(["model-key", key]);
+    const found: Array<{ name: string; path: string }> = [];
+    for (const [credential, value] of values) {
+      // computer's own grep over the DO's files; only the paths are kept (the matched text would hold the value).
+      const matches = await this.#workspace.fs.grep(value, WORKSPACE_ROOT, { regex: false, limit: 200 });
+      for (const path of new Set(matches.map((match) => match.path))) found.push({ name: credential, path });
+    }
+    const container = (await this.#scan({ roots: ["/workspace", "/root", "/tmp", "/var/lib/t3flare", "/var/lib/computerd"], since: 0, procs: true, skip: [] }).catch(() => undefined)) ?? null;
+    return { do: found, container, flagged: this.ctx.storage.kv.get(LEAK_FLAG_KEY) ?? null };
   }
 
   /** bubblewrap in the running Container (Codex's Linux sandbox needs user namespaces): once per Container start. */
@@ -528,7 +636,11 @@ export class WorkspaceDO extends ContainerHost {
     try {
       await this.#workspace.ready();
       // The patterns this command's Container starts with, or started with (`containerOnly.ts`).
-      const script = backend === CONTAINER_BACKEND ? `${submoduleDirsScript(await this.#containerPatterns())}${input.script}` : input.script;
+      // While a CLI process lives, the command's own pull (computer syncs when it ends) is guarded too (review F3): the
+      // command runs in a subshell, then the scanner, before computer reads the files.
+      const guard = backend === CONTAINER_BACKEND && input.passive !== true && this.#processes.size > 0 ? await this.#scanSuffix() : undefined;
+      const body = guard === undefined ? input.script : `(\n${input.script}\n)\n__t3flare_rc=$?\n${guard}\nexit $__t3flare_rc`;
+      const script = backend === CONTAINER_BACKEND ? `${submoduleDirsScript(await this.#containerPatterns())}${body}` : body;
       const handle = await this.#workspace.runtime.exec(script, {
         backend,
         cwd: input.cwd ?? WORKSPACE_ROOT,
@@ -538,6 +650,7 @@ export class WorkspaceDO extends ContainerHost {
         timeoutMs: input.timeoutMs ?? 120_000,
       });
       const result = await handle.result();
+      if (guard !== undefined) await this.#readScanResult();
       return {
         exitCode: result.exitCode,
         status: result.status,
@@ -628,6 +741,8 @@ export class WorkspaceDO extends ContainerHost {
   async git(run: GitRun): Promise<GitAnswer> {
     if (this.#isDestroyed()) return { ran: false, reason: "container_refused", detail: "t3flare: this Workspace was deleted" };
     const passive = !run.startContainer;
+    const routerToken = run.env?.T3FLARE_GIT_TOKEN;
+    if (routerToken !== undefined && routerToken !== "") await this.#rememberToken(routerToken);
     // Step 2b (root's ruling, ADR-0009 refinement): the allow-listed `.git` reads are keyed without env and own
     // `--git-dir`, so the answers primed while the Container was up match t3's later reads.
     const allowed = passive ? allowedRead(run.argv, REPO_ROOT) : undefined;
@@ -1409,6 +1524,7 @@ export class WorkspaceDO extends ContainerHost {
     try {
       const { token } = await environmentStub(this.env.ENVIRONMENT).workspaceToken(id, readOnly ? { readOnly: true } : undefined);
       console.log(JSON.stringify({ t3flare: "git-credential", workspace: id, granted: token !== null }));
+      if (token !== null) await this.#rememberToken(token);
       return new Response(token ?? "", { status: token === null ? 404 : 200, headers: { "cache-control": "no-store" } });
     } catch (error) {
       console.warn(JSON.stringify({ t3flare: "git-credential-failed", workspace: id, error: String(error).slice(0, 300) }));

@@ -261,6 +261,10 @@ export interface ProcessStartInput {
   readonly env: Readonly<Record<string, string>>;
   /** Files the profile writes on the Container's own disk before the start (the CLI's home), by absolute path. */
   readonly files?: ReadonlyArray<{ readonly path: string; readonly text: string; readonly mode?: number }>;
+  /** Symbolic links made before the start (Codex's `sessions/` into the synced directory). */
+  readonly links?: ReadonlyArray<{ readonly path: string; readonly target: string }>;
+  /** Session retention: files under `dir` untouched for `days` are removed before the start. */
+  readonly prune?: ReadonlyArray<{ readonly dir: string; readonly days: number }>;
   /** t3's thread, for linked work (D1) and the logs. */
   readonly thread?: string;
   /** The thread came through a peer link: its pushes ask, while the process lives (review F8). */
