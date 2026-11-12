@@ -180,3 +180,22 @@ the asks).
    and approve the code. Prod discards the account token after the link; relink or a relay-side unlink needs a new
    sign-in (or the T3 apps).
 3. `connect status` should show `linked: true`, `mintKey: false`, `accountToken.held: false`.
+
+## Code review (against `origin/main`)
+
+Run by hand on both axes (this agent cannot start sub-agents). One finding fixed during review: on prod a **failed**
+link left the account token stored; the token now goes whether or not the link succeeds (tested). Also folded in: one
+admin-caller header constant shared by the Worker and the DO; the after-boot republish separated from step 3's
+question re-raise so one cannot hide the other's failure; an undecodable path refused only under Connect routes.
+
+**Standards** (AGENTS.md, ADR-0001, `docs/upstream-fragility.md`, the smell baseline): no Patch or Shadow; every t3
+coupling is listed in U28 with a test or a bump check; credential files never read by new code except
+`connect-tail.ts`, which reads the alchemy profile as `logs-check.ts` already does (to run wrangler; never printed).
+Judgement calls left: *Duplicated Code*: the scripts each build Access headers (`connect.ts`, `connect-tail.ts`,
+`logs-check.ts`), as the older scripts do; *Primitive Obsession*: the admin caller is a string header, matched against
+`access.ts`'s `Caller.kind`; raw `fetch` in `connect/` for the relay's client routes (diagnostics turned off per file,
+as elsewhere in the repo) rather than t3's typed `RelayApi` client.
+
+**Spec** (the plan with its changelog): every finding built or rebutted with evidence (above). Partial: the kept relay
+routes were checked unauthenticated (401) but not with a session; the refusals on prod wait for A3 by rule; R4
+(tap-to-open) untested. No scope creep beyond the stage-only `fault/relay-unlink` route, which row j needed.
