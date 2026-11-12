@@ -12,6 +12,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid } from "./lib/client.ts";
+import { CLAUDE_PINNED_EMPTY } from "../src/agents/acpProfiles.ts";
 import { changed, cliTurn, EDIT_AND_TEST, enable, ensureProject, INSTANCE, reset } from "./lib/acpTurn.ts";
 import { writeEvidence as writeAt } from "./lib/evidence.ts";
 
@@ -213,7 +214,10 @@ switch (scenario) {
     check("the turn completed on the proxy", result.runs.at(-1)?.status === "completed", result.runs);
     check("the write asked", kinds.includes("file-change"), kinds);
     check("the commands asked", kinds.filter((k: string) => k === "command").length >= 1, kinds);
-    check("no marker file", !String(markers?.result?.stdout ?? "").includes("/tmp/marker-"), markers?.result?.stdout);
+    // The skill's own instruction (`touch /tmp/marker-claude-skill-tool`) is a command the agent asked for and the
+    // harness approved; every other marker is code the repository would have run by itself.
+    const ran = String(markers?.result?.stdout ?? "").split("\n").filter((line) => line.startsWith("/tmp/marker-") && line !== "/tmp/marker-claude-skill-tool");
+    check("no marker file of code the repository ran by itself", ran.length === 0, ran);
     finish(arg("out") ?? `m5-hostile-${cli}.json`, { cli, workspace, requests: result.requests, items: result.items, text: result.text, after: markers?.result?.stdout ?? null });
     break;
   }
@@ -233,7 +237,10 @@ switch (scenario) {
       check(`${cli}: the turn answered`, report?.prompt?.stopReason === "end_turn", report?.prompt);
       check(`${cli}: no process holds the canary`, processes.length > 0 && processes.every((process) => process.canaryHits === 0), processes);
       check(`${cli}: the profile's names are there`, ["HOME", "LANG", "T3FLARE_EXEC"].every((name) => names.includes(name)), names);
-      check(`${cli}: no key or token by name`, !names.some((name) => /API_KEY|AUTH_TOKEN|OAUTH|GITHUB_TOKEN|GH_TOKEN|MODEL_PROXY|COMMISSARY|BOOTSTRAP|ADMIN_TOKEN/.test(name)), names);
+      // Names only: Claude's managed env pins its provider and auth variables to "" (claude-agent-acp applies the managed
+      // env to its own process), so those names are present, empty.
+      const keyish = names.filter((name) => /API_KEY$|AUTH_TOKEN|OAUTH|GITHUB_TOKEN|GH_TOKEN|MODEL_PROXY|COMMISSARY|BOOTSTRAP|ADMIN_TOKEN/.test(name) && !CLAUDE_PINNED_EMPTY.includes(name));
+      check(`${cli}: no key or token by name (beyond the managed env's empty pins)`, keyish.length === 0, keyish);
       check(`${cli}: the leak scan finds nothing`, (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0, scan);
       rows[cli] = { processes: processes.map((process) => ({ command: process.command, envNames: process.envNames, canaryHits: process.canaryHits })), names, scan };
     }

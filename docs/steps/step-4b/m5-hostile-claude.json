@@ -1,0 +1,154 @@
+{
+ "at": "2026-11-12T02:58:50.456Z",
+ "scenario": "hostile",
+ "ok": true,
+ "failures": [],
+ "cli": "claude",
+ "workspace": "hostile-claude-mwcykbfn",
+ "requests": [
+  {
+   "kind": "file-change",
+   "requestKind": null,
+   "status": "resolved",
+   "decision": "accept",
+   "options": []
+  },
+  {
+   "kind": "command",
+   "requestKind": null,
+   "status": "resolved",
+   "decision": "accept",
+   "options": []
+  },
+  {
+   "kind": "command",
+   "requestKind": null,
+   "status": "resolved",
+   "decision": "accept",
+   "options": []
+  },
+  {
+   "kind": "command",
+   "requestKind": null,
+   "status": "resolved",
+   "decision": "accept",
+   "options": []
+  }
+ ],
+ "items": [
+  {
+   "type": "user_message",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "file_change",
+   "status": "completed",
+   "title": "Write a.txt",
+   "fileName": "/w/hostile-claude-mwcykbfn/a.txt",
+   "input": null
+  },
+  {
+   "type": "dynamic_tool",
+   "status": "completed",
+   "title": "Action required",
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "title": "Terminal",
+   "fileName": null,
+   "input": "Terminal"
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "title": "bash test.sh; touch b.txt",
+   "fileName": null,
+   "input": "bash test.sh; touch b.txt"
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "dynamic_tool",
+   "status": "completed",
+   "title": "Load skill: s",
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "dynamic_tool",
+   "status": "failed",
+   "title": "Task",
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "title": "Terminal",
+   "fileName": null,
+   "input": "Terminal"
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "title": "touch /tmp/marker-claude-skill-tool",
+   "fileName": null,
+   "input": "touch /tmp/marker-claude-skill-tool"
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "checkpoint",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  }
+ ],
+ "text": " no `helper` subagent here. The available agents are `claude`, `Explore`, `general-purpose`, `Plan` and `statusline-setup`. I can create `c.txt` myself or use `general-purpose` if you want.\n- **Skill `s`:** it loaded. Its instructions said to run `touch /tmp/marker-claude-skill-tool`, which I did. Its \"Setup\" line said shell command execution was disabled by policy, so I did nothing for that line.",
+ "after": "/tmp/marker-claude-skill-tool\n M README.md\n M test.sh\n?? .claude/\n?? .mcp.json\n?? .opencode/\n?? a.txt\n?? b.txt\n?? opencode.json\n"
+}

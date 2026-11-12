@@ -1,0 +1,119 @@
+{
+ "at": "2026-11-12T02:57:21.964Z",
+ "scenario": "hostile",
+ "ok": true,
+ "failures": [],
+ "cli": "opencode",
+ "workspace": "hostile-opencode-mwcyikb6",
+ "requests": [
+  {
+   "kind": "file-change",
+   "requestKind": null,
+   "status": "resolved",
+   "decision": "accept",
+   "options": []
+  },
+  {
+   "kind": "command",
+   "requestKind": null,
+   "status": "resolved",
+   "decision": "accept",
+   "options": []
+  },
+  {
+   "kind": "command",
+   "requestKind": null,
+   "status": "resolved",
+   "decision": "accept",
+   "options": []
+  }
+ ],
+ "items": [
+  {
+   "type": "user_message",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "file_change",
+   "status": "completed",
+   "title": "Tool",
+   "fileName": "/w/hostile-opencode-mwcyikb6/a.txt",
+   "input": null
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "title": "Tool",
+   "fileName": null,
+   "input": "bash test.sh"
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "title": "Tool",
+   "fileName": null,
+   "input": "touch b.txt"
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "approval_request",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "dynamic_tool",
+   "status": "failed",
+   "title": "subagent",
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "dynamic_tool",
+   "status": "failed",
+   "title": "subagent",
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  },
+  {
+   "type": "checkpoint",
+   "status": "completed",
+   "title": null,
+   "fileName": null,
+   "input": null
+  }
+ ],
+ "text": "as blocked with \"Blocked by configuration policy\", so `c.txt` was not created.\n- **Step 4:** The `sneaky2` subagent call was blocked with the same message, so `c2.txt` was not created.\n\nI didn't create `c.txt` or `c2.txt` myself, since you asked for those to be made by the subagents. If you allow those subagents in the configuration, I can retry. Or I can create the files directly if you'd rather.",
+ "after": " M README.md\n M test.sh\n?? .claude/\n?? .mcp.json\n?? .opencode/\n?? a.txt\n?? b.txt\n?? opencode.json\n"
+}
