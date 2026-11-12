@@ -29,7 +29,8 @@ export type Refusal =
   | "bad_admin_token"
   | "error";
 
-export type Caller = { readonly kind: "owner" } | { readonly kind: "service-token" };
+/** `subject`: the owner's Access `sub` (the harness panel binds its CSRF token to it); absent in local mode. */
+export type Caller = { readonly kind: "owner"; readonly subject?: string } | { readonly kind: "service-token" };
 
 export type Verdict =
   | { readonly admitted: true; readonly caller: Caller }
@@ -128,7 +129,7 @@ export const classifyAssertion = async (
       : refuse("not_admitted");
   }
   return typeof claims.email === "string" && claims.email.toLowerCase() === config.ownerEmail.toLowerCase()
-    ? { admitted: true, caller: { kind: "owner" } }
+    ? { admitted: true, caller: { kind: "owner", ...(typeof claims.sub === "string" ? { subject: claims.sub } : {}) } }
     : refuse("not_admitted");
 };
 
@@ -197,6 +198,29 @@ export const verifyAdminToken = (request: Request, config: GuardConfig): Verdict
   config.adminToken && timingSafeEqual(bearer(request), config.adminToken)
     ? { admitted: true, caller: { kind: "owner" } }
     : refuse(config.adminToken ? "bad_admin_token" : "not_configured");
+
+/**
+ * The harness panel's check (ADR-0026, ADR-0010's refinement), on the admin host only: the owner's Access assertion
+ * alone (a browser cannot send the admin token; the panel adds CSRF and Origin checks), or the stage's service token
+ * with the admin token, as every other admin route. `config.audience` is the admin host's own Access application.
+ * Never throws.
+ */
+export const verifyHarnessRequest = async (
+  request: Request,
+  config: GuardConfig,
+  keys: TeamKeyLookup,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): Promise<Verdict> => {
+  try {
+    if (!config.adminToken) return refuse("not_configured");
+    const verdict = await classifyAssertion(request.headers.get(ACCESS_ASSERTION_HEADER), config, keys, nowSeconds);
+    if (!verdict.admitted) return verdict;
+    if (verdict.caller.kind === "owner") return verdict.caller.subject === undefined ? refuse("malformed") : verdict;
+    return timingSafeEqual(bearer(request), config.adminToken) ? verdict : refuse("bad_admin_token");
+  } catch {
+    return refuse("error");
+  }
+};
 
 /** The whole admin check: the Access assertion, then the admin token. Never throws. */
 export const verifyAdminRequest = async (

@@ -19,6 +19,8 @@ import type { Context } from "@earendil-works/chord";
 import { defineExtension, type Extension, section, type ToolExecutionApi, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
 import type { ApprovalDecision, InteractionMode, PendingApproval, RuntimeMode } from "@t3flare/session-protocol";
 
+import { cardText } from "./cardText.ts";
+
 /** The Durable Object's synchronous key-value storage. */
 export interface ApprovalStorage {
   get<T>(key: string): T | undefined;
@@ -34,9 +36,13 @@ export interface StoredAnswer {
 const REQUESTS_KEY = "t3flare:approval-requests";
 const ANSWERS_KEY = "t3flare:approval-answers";
 const ACCEPTED_KEY = "t3flare:approval-accepted-kinds";
+/** The running code mode calls' scripts (the start of each), by call id: what a card raised inside one names. */
+const SCRIPTS_KEY = "t3flare:approval-scripts";
 
-/** Most characters of a request's summary (the command, or the path and what changes). */
-export const MAX_SUMMARY = 2_000;
+/** Most characters of a script a card shows (the whole script is on the code mode item). */
+export const SCRIPT_EXCERPT = 600;
+/** Most asks one code mode call has pending at once (review M8); the rest wait their turn. */
+export const MAX_PENDING_PER_SCRIPT = 8;
 
 export type ApprovalKind = PendingApproval["kind"];
 
@@ -65,6 +71,8 @@ export class WaitingRequests<Request extends WaitingRequest, Answer> {
   readonly #keys: { readonly requests: string; readonly answers: string };
   /** Calls waiting for an answer in this instance, by request. */
   readonly #waiters = new Map<string, () => void>();
+  /** Calls waiting for the pending requests to change (a slot in a script's queue). */
+  readonly #watchers = new Set<() => void>();
 
   constructor(storage: ApprovalStorage, keys: { readonly requests: string; readonly answers: string }, changed: () => void) {
     this.#storage = storage;
@@ -87,16 +95,50 @@ export class WaitingRequests<Request extends WaitingRequest, Answer> {
   #putRequests(next: ReadonlyArray<Request>): void {
     this.#storage.put(this.#keys.requests, next);
     this.#changed();
+    // Each watcher removes itself; deleting the visited entry while iterating a Set is safe.
+    for (const watcher of this.#watchers) watcher();
+  }
+
+  /** Resolves at the next change of the pending requests, or rejects on abort. */
+  #nextChange(context: Context): Promise<void> {
+    const signal = context.abortSignal;
+    return new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        this.#watchers.delete(watcher);
+        reject(signal?.reason instanceof Error ? signal.reason : new Error("Operation aborted"));
+      };
+      const watcher = () => {
+        this.#watchers.delete(watcher);
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+      };
+      if (signal?.aborted === true) return onAbort();
+      signal?.addEventListener("abort", onAbort, { once: true });
+      this.#watchers.add(watcher);
+    });
   }
 
   /**
    * Ask for `request`, and wait for the answer. A rerun with the same id waits for the request already made, or takes
    * the answer given while no call waited. `waiting` runs once the request is stored, just before the wait.
    */
-  async ask(request: Request, waiting: () => Promise<void>, context: Context): Promise<Answer> {
+  async ask(
+    request: Request,
+    waiting: () => Promise<void>,
+    context: Context,
+    queue?: { readonly mine: (pending: Request) => boolean; readonly max: number },
+  ): Promise<Answer> {
     const ready = this.#answers()[request.requestId];
     if (ready !== undefined) return ready;
-    if (!this.pending().some((pending) => pending.requestId === request.requestId)) this.#putRequests([...this.pending(), request]);
+    if (!this.pending().some((pending) => pending.requestId === request.requestId)) {
+      // A queue: wait while `max` requests like it are pending. The last check and the store below run with no await
+      // between them, so no other call takes the slot.
+      if (queue !== undefined && this.pending().filter(queue.mine).length >= queue.max) {
+        await waiting();
+        while (this.pending().filter(queue.mine).length >= queue.max) await this.#nextChange(context);
+      }
+      this.#putRequests([...this.pending(), request]);
+    }
     await waiting();
     const signal = context.abortSignal;
     await new Promise<void>((resolve, reject) => {
@@ -157,6 +199,24 @@ export class ApprovalStore extends WaitingRequests<PendingApproval, StoredAnswer
     return new Set(this.storage.get<string[]>(ACCEPTED_KEY) ?? []);
   }
 
+  /** A code mode call started (or reran): what cards raised by its script name. */
+  noteScript(callId: string, code: string): void {
+    const scripts = this.storage.get<Record<string, string>>(SCRIPTS_KEY) ?? {};
+    const excerpt = code.length <= SCRIPT_EXCERPT ? code : `${code.slice(0, SCRIPT_EXCERPT)}…`;
+    if (scripts[callId] !== excerpt) this.storage.put(SCRIPTS_KEY, { ...scripts, [callId]: excerpt });
+  }
+
+  /** A code mode call ended. */
+  forgetScript(callId: string): void {
+    const scripts = this.storage.get<Record<string, string>>(SCRIPTS_KEY) ?? {};
+    if (callId in scripts) this.storage.put(SCRIPTS_KEY, Object.fromEntries(Object.entries(scripts).filter(([id]) => id !== callId)));
+  }
+
+  /** The script of code mode call `callId`, as noted. */
+  scriptOf(callId: string): string | undefined {
+    return this.storage.get<Record<string, string>>(SCRIPTS_KEY)?.[callId];
+  }
+
   /** Whether the owner accepted calls like this one for the rest of the Session. */
   acceptedFor(call: { readonly tool: string; readonly kind: ApprovalKind }): boolean {
     const key = acceptanceKeyOf(call);
@@ -196,22 +256,21 @@ export const asks = (mode: RuntimeMode, kind: ApprovalKind): boolean =>
   mode === "approval-required" || (mode === "auto-accept-edits" && kind === "command");
 
 const textOf = (value: unknown): string => (typeof value === "string" ? value : "");
-const cut = (text: string, max = MAX_SUMMARY) => (text.length <= max ? text : `${text.slice(0, max)}…`);
 
-/** What the owner is shown: the command, or the path and the change's size. */
+/**
+ * What the owner is shown (review M2: `cardText`'s one rule): the whole command, or the path and the whole change, up to
+ * the card's cap, with any cut said.
+ */
 export const summaryOf = (tool: string, args: Readonly<Record<string, unknown>>): { readonly summary: string; readonly detail?: string } => {
-  if (tool === "bash") return { summary: cut(textOf(args.command)) };
-  const path = textOf(args.path);
+  if (tool === "bash") return { summary: cardText(textOf(args.command)) };
+  const path = cardText(textOf(args.path), 1_000);
   if (tool === "edit") {
     const edits = Array.isArray(args.edits) ? (args.edits as ReadonlyArray<{ oldText?: unknown; newText?: unknown }>) : [];
-    const detail = edits
-      .slice(0, 3)
-      .map((edit) => `- ${cut(textOf(edit.oldText), 300)}\n+ ${cut(textOf(edit.newText), 300)}`)
-      .join("\n");
-    return { summary: `Edit ${path} (${edits.length} change${edits.length === 1 ? "" : "s"})`, ...(detail === "" ? {} : { detail }) };
+    const detail = edits.map((edit) => `- ${textOf(edit.oldText)}\n+ ${textOf(edit.newText)}`).join("\n");
+    return { summary: `Edit ${path} (${edits.length} change${edits.length === 1 ? "" : "s"})`, ...(detail === "" ? {} : { detail: cardText(detail) }) };
   }
   const content = textOf(args.content);
-  return { summary: `Write ${path} (${content.length} characters)`, detail: cut(content, 600) };
+  return { summary: `Write ${path} (${content.length} characters)`, detail: cardText(content) };
 };
 
 export const STARTED_MEMO = "t3flare.started";
@@ -261,11 +320,18 @@ export const askOwner = async (
   context: Context,
 ): Promise<ReturnType<typeof declinedResult> | undefined> => {
   const requestId = String(api.taskId);
+  const progressed = () => api.progressed(context).catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "progressed-failed", error: String(error) })));
+  // A nested call's id is `<code mode call id>/c<n>` (pi-durable): its card names the script, and one script has at most
+  // MAX_PENDING_PER_SCRIPT asks pending at once (review M8: all requests share one storage value).
+  const cut = api.callId.lastIndexOf("/");
+  const parentCallId = cut === -1 ? undefined : api.callId.slice(0, cut);
+  const via = parentCallId === undefined ? undefined : { parentCallId, script: store.scriptOf(parentCallId) ?? "" };
   try {
     const answer = await store.ask(
-      { ...request, requestId, callId: api.callId, createdAt: Date.now() },
-      () => api.progressed(context).catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "progressed-failed", error: String(error) }))),
+      { ...request, requestId, callId: api.callId, ...(via === undefined ? {} : { via }), createdAt: Date.now() },
+      progressed,
       context,
+      via === undefined ? undefined : { mine: (pending) => pending.via?.parentCallId === via.parentCallId, max: MAX_PENDING_PER_SCRIPT },
     );
     return answer.decision === "decline" || answer.decision === "cancel" ? declinedResult(answer) : undefined;
   } finally {
@@ -324,6 +390,19 @@ const translated = <T extends ToolRegistration>(host: PermissionsHost, tool: T, 
 
 const wrap = (name: string, f: (tool: ToolRegistration) => ToolRegistration): Wrap => ({ tool: name, wrap: f });
 
+/** `codemode`, noting its script while it runs (a rerun after a restart notes it again). */
+const noted = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T => ({
+  ...tool,
+  async execute(args: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
+    host.store.noteScript(api.callId, textOf(args.code));
+    try {
+      return await tool.execute(args as never, api as never, context);
+    } finally {
+      host.store.forgetScript(api.callId);
+    }
+  },
+});
+
 /** The wraps; install after the tools they wrap. */
 export const permissions = (host: PermissionsHost): Extension =>
   defineExtension({
@@ -332,5 +411,7 @@ export const permissions = (host: PermissionsHost): Extension =>
       ...PATH_TOOLS.map((name) => wrap(name, (tool) => translated(host, tool, "path"))),
       wrap("bash", (tool) => translated(host, tool, "command")),
       ...["bash", "edit", "write"].map((name) => wrap(name, (tool) => guarded(host, tool))),
+      // Code mode is never guarded (a dispatcher: what it calls is), only noted, so a card its script raises names it.
+      wrap("codemode", (tool) => noted(host, tool)),
     ],
   });

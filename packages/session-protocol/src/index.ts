@@ -260,6 +260,8 @@ export interface PendingApproval {
   readonly detail?: string;
   /** The card's own buttons (t3's `ProviderApprovalOption`s), instead of t3's defaults (SPI-992's push card). */
   readonly options?: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline" | "cancel"; readonly label: string; readonly warning?: string }>;
+  /** A call a code mode script made (tools step, ADR-0027): the script's call and the start of its code. */
+  readonly via?: { readonly parentCallId: string; readonly script: string };
   readonly createdAt: number;
 }
 

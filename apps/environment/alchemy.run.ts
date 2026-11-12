@@ -80,6 +80,12 @@ const AUTH_PATHS = ["/oauth/token", "/api/auth/browser-session", "/oauth/mcp/reg
  */
 const AUTH_RATE_LIMIT = { requestsPerPeriod: 10, period: 10, mitigationTimeout: 10 };
 
+/** The admin host for a stage domain (ADR-0026): its first label with `-admin`, in the same zone. */
+export const adminDomainOf = (domain: string): string => {
+  const [first, ...rest] = domain.split(".");
+  return [`${first}-admin`, ...rest].join(".");
+};
+
 export default Alchemy.Stack(
   "t3flare",
   { providers: Cloudflare.providers(), state: Cloudflare.state() },
@@ -87,10 +93,16 @@ export default Alchemy.Stack(
     const stage = yield* Alchemy.Stage;
     const name = `t3flare-environment-${stage}`;
     const agentsName = `t3flare-agents-${stage}`;
+    const codemodeName = `t3flare-codemode-${stage}`;
+    const adminName = `t3flare-admin-${stage}`;
     const workersDevHost = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
     // The stage's custom domain, if it has one (unset or empty: workers.dev only).
     const domain = yield* Config.String("T3FLARE_DOMAIN").pipe(Config.withDefault(""));
     const host = domain === "" ? workersDevHost : domain;
+    // The harness panel's own host (ADR-0026, review H4): never the t3 host. With a domain, `<first label>-admin.<rest>`
+    // (prod: t3-admin.ianpascoe.dev) unless T3FLARE_ADMIN_DOMAIN names another; without one, the forwarder's workers.dev.
+    const adminDomain = domain === "" ? "" : yield* Config.String("T3FLARE_ADMIN_DOMAIN").pipe(Config.withDefault(adminDomainOf(domain)));
+    const adminHost = adminDomain === "" ? `${adminName}.${WORKERS_DEV_SUBDOMAIN}.workers.dev` : adminDomain;
     const teamDomain = yield* Config.String("T3FLARE_ACCESS_TEAM_DOMAIN").pipe(Config.withDefault(ACCESS_TEAM_DOMAIN));
     const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
@@ -125,6 +137,20 @@ export default Alchemy.Stack(
       ],
     } as never);
 
+    // The harness panel's Access application (ADR-0026): the whole admin host, the owner and the stage's service token.
+    const harnessAccess = yield* Cloudflare.Access.Application("HarnessAccess", {
+      name: `${adminName} harness`,
+      type: "self_hosted",
+      domain: adminHost,
+      destinations: [{ type: "public", uri: adminHost }],
+      sessionDuration: "24h",
+      appLauncherVisible: false,
+      policies: [
+        { name: "owner", decision: "allow", include: [{ email: ownerEmail }] },
+        { name: "stage service token", decision: "non_identity", include: [{ serviceToken: serviceToken.serviceTokenId }] },
+      ],
+    } as never);
+
     // The model proxy (ADR-0012) and the GitHub App (ADR-0013), from ~/.config/t3flare/dev.env or CI's environment.
     const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL");
     const modelProxyKey = Config.Redacted("MODEL_PROXY_API_KEY");
@@ -137,6 +163,18 @@ export default Alchemy.Stack(
       context: sandboxImageContext,
     } as never);
 
+    // Code mode's sandbox (ADR-0027): pi-codemode's QuickJS Durable Object, one object per Session, in a Worker of its own
+    // so a computing script holds this isolate's thread rather than the Session's. Bundled by alchemy (ADR-0020's
+    // refinement: a wasm module, nothing of t3). No URL; only the agents Worker's binding reaches it.
+    yield* Cloudflare.Worker("CodemodeSandbox", {
+      name: codemodeName,
+      main: path.join(here, "../codemode-sandbox/src/worker.ts"),
+      compatibility: COMPATIBILITY,
+      workersDev: { enabled: false, previewsEnabled: false },
+      env: { CODEMODE_SANDBOX: Cloudflare.DurableObject("CodemodeSandbox", { className: "CodemodeSandbox" }) },
+      observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
+    } as never);
+
     const agents = yield* Cloudflare.Worker("Agents", {
       name: agentsName,
       main: path.join(here, "../agents/dist/worker/worker.js"),
@@ -147,7 +185,12 @@ export default Alchemy.Stack(
         SESSIONS: Cloudflare.DurableObject("SessionDO", { className: "SessionDO" }),
         WORKSPACES: Cloudflare.DurableObject("WorkspaceDO", { className: "WorkspaceDO", containers: [workspaceContainer] } as never),
         CONTAINER_BUDGET: Cloudflare.DurableObject("ContainerBudget", { className: "ContainerBudget" }),
-        ...(bootstrapPass ? {} : { ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO", scriptName: name }) }),
+        ...(bootstrapPass
+          ? {}
+          : {
+              ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO", scriptName: name }),
+              CODEMODE_SANDBOX: Cloudflare.DurableObject("CodemodeSandbox", { className: "CodemodeSandbox", scriptName: codemodeName }),
+            }),
         LOADER: Cloudflare.WorkerLoader(),
         MODEL_PROXY_URL: modelProxyUrl,
         MODEL_PROXY_API_KEY: modelProxyKey,
@@ -181,6 +224,8 @@ export default Alchemy.Stack(
         T3FLARE_ACCESS_AUD: admin.aud,
         T3FLARE_OWNER_EMAIL: ownerEmail,
         T3FLARE_ACCESS_SERVICE_CLIENT_ID: serviceToken.clientId,
+        T3FLARE_HARNESS_HOST: adminHost,
+        T3FLARE_HARNESS_ACCESS_AUD: harnessAccess.aud,
         ...(bootstrapPass
           ? {}
           : {
@@ -211,6 +256,17 @@ export default Alchemy.Stack(
       },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     });
+
+    // The harness panel's forwarder (ADR-0026): its host is the panel's only host; it reaches the Environment Worker's
+    // `HarnessAdmin` entrypoint over a service binding. No version preview URLs (a host Access does not cover).
+    yield* Cloudflare.Worker("AdminForwarder", {
+      name: adminName,
+      main: path.join(here, "src/harness/forwarder.ts"),
+      compatibility: COMPATIBILITY,
+      ...(adminDomain === "" ? { workersDev: { enabled: true, previewsEnabled: false } } : { domain: adminDomain, workersDev: false }),
+      env: { HARNESS: Cloudflare.WorkerEntrypoint(environment, "HarnessAdmin") },
+      observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
+    } as never);
 
     if (domain !== "") {
       // Owns the zone's whole http_ratelimit entrypoint (one per zone; the Free plan allows one rule in it), so only one
@@ -243,11 +299,15 @@ export default Alchemy.Stack(
         const file = credentialsFile(stage);
         if (clientSecret !== undefined) {
           fs.mkdirSync(path.dirname(file), { recursive: true });
-          fs.writeFileSync(file, JSON.stringify({ url, clientId, clientSecret: Redacted.value(clientSecret as Redacted.Redacted<string>) }), { mode: 0o600 });
+          fs.writeFileSync(
+            file,
+            JSON.stringify({ url, adminUrl: `https://${adminHost}`, clientId, clientSecret: Redacted.value(clientSecret as Redacted.Redacted<string>) }),
+            { mode: 0o600 },
+          );
         }
         return path.relative(here, file);
       },
     );
-    return { url: environment.url, host, accessAud: admin.aud, credentials, agents: agents.workerName };
+    return { url: environment.url, host, adminHost, accessAud: admin.aud, credentials, agents: agents.workerName };
   }),
 );

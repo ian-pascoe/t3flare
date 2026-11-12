@@ -19,11 +19,13 @@
         "@cloudflare/computer": "0.9.0",
         "@earendil-works/chord": "1.5.0",
         "@earendil-works/pi-ai": "1.5.0",
+        "@earendil-works/pi-codemode": "1.5.0",
         "@earendil-works/pi-durable": "1.5.0",
         "@earendil-works/pi-schema": "1.5.0",
         "@platformatic/vfs": "0.5.0",
         "@t3flare/computer-env": "workspace:*",
         "@t3flare/effect-durable": "workspace:*",
+        "@t3flare/harness-registry": "workspace:*",
         "@t3flare/models": "workspace:*",
         "@t3flare/sandbox-image": "workspace:*",
         "@t3flare/session-protocol": "workspace:*",
@@ -42,12 +44,22 @@
         "vitest": "5.0.5",
       },
     },
+    "apps/codemode-sandbox": {
+      "name": "@t3flare/codemode-sandbox",
+      "dependencies": {
+        "@earendil-works/pi-codemode": "1.5.0",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "^5.20261104.1",
+      },
+    },
     "apps/environment": {
       "name": "@t3flare/environment",
       "dependencies": {
         "@effect/platform-node": "catalog:",
         "@effect/sql-sqlite-do": "catalog:",
         "@t3flare/github-app": "workspace:*",
+        "@t3flare/harness-registry": "workspace:*",
         "@t3flare/models": "workspace:*",
         "@t3flare/session-protocol": "workspace:*",
         "@t3flare/workspace-client": "workspace:*",
@@ -136,6 +148,13 @@
       "dependencies": {
         "effect": "catalog:",
       },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "vitest": "5.0.5",
+      },
+    },
+    "packages/harness-registry": {
+      "name": "@t3flare/harness-registry",
       "devDependencies": {
         "@types/node": "catalog:",
         "vitest": "5.0.5",
@@ -3385,6 +3404,8 @@
 
     "@t3flare/agents": ["@t3flare/agents@workspace:apps/agents"],
 
+    "@t3flare/codemode-sandbox": ["@t3flare/codemode-sandbox@workspace:apps/codemode-sandbox"],
+
     "@t3flare/computer-env": ["@t3flare/computer-env@workspace:packages/computer-env"],
 
     "@t3flare/effect-durable": ["@t3flare/effect-durable@workspace:packages/effect-durable"],
@@ -3392,6 +3413,8 @@
     "@t3flare/environment": ["@t3flare/environment@workspace:apps/environment"],
 
     "@t3flare/github-app": ["@t3flare/github-app@workspace:packages/github-app"],
+
+    "@t3flare/harness-registry": ["@t3flare/harness-registry@workspace:packages/harness-registry"],
 
     "@t3flare/infra": ["@t3flare/infra@workspace:infra"],
 

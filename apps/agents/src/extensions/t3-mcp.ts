@@ -18,8 +18,9 @@ import type { Context } from "@earendil-works/chord";
 import { defineExtension, type Extension, section, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
 
+import { cardText } from "./cardText.ts";
+import { type ApprovalStore, askOwner, cutOffResult, planRefusal, STARTED_MEMO } from "./permissions.ts";
 import { descriptionFor, guidanceFor, OTHER_MACHINES } from "./t3-guidance.ts";
-import { type ApprovalStore, askOwner, cutOffResult, MAX_SUMMARY, planRefusal, STARTED_MEMO } from "./permissions.ts";
 
 export const T3_MCP_SERVER = "t3-code";
 export const t3ToolName = (name: string): string => `mcp__${T3_MCP_SERVER}__${name}`;
@@ -144,8 +145,6 @@ const textResult = (text: string, isError: boolean, tool: string) => ({
   details: { server: T3_MCP_SERVER, tool },
 });
 
-const cut = (text: string, max = MAX_SUMMARY) => (text.length <= max ? text : `${text.slice(0, max)}…`);
-
 const takesKey = (tool: CatalogTool) =>
   typeof tool.inputSchema?.properties === "object" && tool.inputSchema.properties !== null && "clientRequestId" in (tool.inputSchema.properties as object);
 
@@ -161,6 +160,9 @@ const toolOf = (tool: CatalogTool, host: T3McpHost, offered: ReadonlySet<string>
     // Every call may run again after a restart: an approval waits again, a keyed call is t3's same work, and the rest
     // refuse a second run below.
     replay: "safe",
+    // A wait is direct-only (ADR-0027, as t3's Codex adapter registers them): from a script it would block the script
+    // while the model works around it.
+    ...(WAIT_TOOLS.has(tool.name) ? { callers: ["model"] as const } : {}),
     async execute(input: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
       const credential = host.credential();
       if (credential === undefined) return textResult("T3's tools are unavailable in this turn; they come back with the next turn.", true, tool.name);
@@ -173,7 +175,7 @@ const toolOf = (tool: CatalogTool, host: T3McpHost, offered: ReadonlySet<string>
         if (host.mode() !== "full-access" && !host.store.acceptedFor({ tool: name, kind: "mcp-tool" })) {
           const declined = await askOwner(
             host.store,
-            { turn: host.turn(), tool: name, kind: "mcp-tool", summary: cut(`${tool.name} ${JSON.stringify(input)}`) },
+            { turn: host.turn(), tool: name, kind: "mcp-tool", summary: cardText(`${tool.name} ${JSON.stringify(input, null, 2)}`) },
             api,
             context,
           );

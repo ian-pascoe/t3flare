@@ -11,6 +11,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
+import { resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
@@ -26,6 +27,8 @@ import * as ModuleState from "./host/moduleState.ts";
 import * as Pairing from "./host/pairing.ts";
 import { isRefusedRelayRoute } from "./host/relayRoutes.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
+import type { HarnessCaller } from "./harness/panel.ts";
+import { harnessStore } from "./harness/store.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
 
@@ -55,6 +58,8 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_CONNECT_SERVICE_TOKEN?: string;
   /** Test stages: the stage-only probes and faults answer (step 4a's process probe). */
   readonly T3FLARE_FAULTS?: string;
+  /** The harness panel's admin host (ADR-0026): what a change's `Origin` must name. */
+  readonly T3FLARE_HARNESS_HOST?: string;
 }
 
 /** Module state that outlives `ctx.abort()` in a warm isolate (ADR-0003); reported by the health route. */
@@ -309,6 +314,23 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     const terminals = currentTerminals();
     if (terminals === undefined) return { unknown: [...new Set(push.frames.filter((frame) => frame.exit === undefined).map((frame) => frame.key))] };
     return terminals.deliver(push);
+  }
+
+  /**
+   * The harness panel (ADR-0026), RPC from the Worker's `HarnessAdmin` entrypoint only, after it verified Access on the
+   * admin host. Never boots t3. Not reachable through `fetch` (the t3 host never serves the panel).
+   */
+  async harness(request: Request, caller: HarnessCaller): Promise<Response> {
+    const { handleHarness } = await import("./harness/panel.ts");
+    return handleHarness(request, { caller, host: this.env.T3FLARE_HARNESS_HOST ?? "", store: harnessStore(this.ctx.storage.kv) });
+  }
+
+  /** The harness settings for a Session's turn (ADR-0026), resolved and secret-free. Never boots t3. */
+  async harnessSettings(input: { readonly projectId?: string }): Promise<ResolvedHarness> {
+    const store = harnessStore(this.ctx.storage.kv);
+    const stored = store.load();
+    store.noteRead(stored.revision, Date.now());
+    return resolveHarness(stored, input);
   }
 
   /** Diagnosis and the reboot check: this instance's channel. */

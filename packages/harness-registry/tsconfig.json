@@ -1,0 +1,5 @@
+{
+  "extends": "../../t3code/tsconfig.base.json",
+  "compilerOptions": { "types": ["node"], "lib": ["ESNext"] },
+  "include": ["src"]
+}

@@ -18,6 +18,7 @@
     "@effect/platform-node": "catalog:",
     "@effect/sql-sqlite-do": "catalog:",
     "@t3flare/github-app": "workspace:*",
+    "@t3flare/harness-registry": "workspace:*",
     "@t3flare/models": "workspace:*",
     "@t3flare/session-protocol": "workspace:*",
     "@t3flare/workspace-client": "workspace:*",

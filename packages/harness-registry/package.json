@@ -1,0 +1,8 @@
+{
+  "name": "@t3flare/harness-registry",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "effect-tsgo tsrs --noEmit", "test": "vitest run" },
+  "devDependencies": { "@types/node": "catalog:", "vitest": "5.0.5" }
+}

@@ -49,7 +49,10 @@ import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
 
+import { EMPTY_HARNESS, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
+
 import { environmentStub } from "../environment.ts";
+import { type CodemodeSandboxNamespace, codemodeExtension, remoteSandbox, toolSearchExtension } from "../extensions/codemode.ts";
 import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
 import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
@@ -76,6 +79,8 @@ export interface SessionEnv {
   readonly T3FLARE_FAULTS?: string;
   /** Overrides TURN_DEADLINE_MS (tests and the stage's deadline check). */
   readonly T3FLARE_TURN_DEADLINE_MS?: string;
+  /** Code mode's sandbox objects (ADR-0027), from the codemode Worker; absent in a deploy's bootstrap pass. */
+  readonly CODEMODE_SANDBOX?: CodemodeSandboxNamespace;
 }
 
 const context = BACKGROUND_CONTEXT;
@@ -97,6 +102,10 @@ const PROXY_KEY = "t3flare:proxy";
 const T3_MCP_KEY = "t3flare:t3-mcp";
 /** The catalog the `t3-mcp` extension was built from (installed again at each start, before work resumes). */
 const T3_CATALOG_KEY = "t3flare:t3-mcp-catalog";
+/** The harness settings the Session last took (ADR-0026), so a restart installs the same extensions before resuming. */
+const HARNESS_KEY = "t3flare:harness";
+/** How long a turn's start waits for the Environment's harness settings before it keeps the ones it has. */
+const HARNESS_READ_MS = 5_000;
 /** A test's model proxy fault (stages only). */
 const FAULT_KEY = "t3flare:proxy-fault";
 /** The most a Stop (or the object's start) waits for an aborted command's processes to be killed. */
@@ -189,6 +198,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     // The tools the last turn had, before work that may call them resumes.
     const catalog = ctx.storage.kv.get<T3Catalog>(T3_CATALOG_KEY);
     if (catalog !== undefined) registry.install(this.#t3Extension(catalog));
+    // Code mode and tool search as the settings last taken say (defaults before the first), after every tool they reach.
+    this.#installHarness(ctx.storage.kv.get<ResolvedHarness>(HARNESS_KEY) ?? resolveHarness(EMPTY_HARNESS));
     this.#registry = registry;
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {
@@ -343,9 +354,55 @@ export class SessionDO extends DurableObject<SessionEnv> {
       if (kv.get<T3Catalog>(T3_CATALOG_KEY)?.hash === catalog.hash) return;
       kv.put(T3_CATALOG_KEY, catalog);
       this.#registryWriter.install(this.#t3Extension(catalog));
+      // tool_search's deferral wraps name every other tool: t3's changed.
+      this.#installHarness(kv.get<ResolvedHarness>(HARNESS_KEY) ?? resolveHarness(EMPTY_HARNESS));
       console.log(JSON.stringify({ t3flare: "t3-mcp-catalog", tools: catalog.tools.length, left: catalog.left.length, hash: catalog.hash }));
     } catch (error) {
       console.warn(JSON.stringify({ t3flare: "t3-mcp-catalog-failed", error: String(error).slice(0, 300) }));
+    }
+  }
+
+  // -------------------------------------------------------------------------------------------------------------------
+  // Harness settings (ADR-0026): code mode, tool search and the offered tools, taken at a turn's start
+
+  /** Installs (or removes) code mode and tool search as `harness` says. pi-durable applies it from the next phase. */
+  #installHarness(harness: ResolvedHarness): void {
+    const registry = this.#registryWriter;
+    const sandbox = this.env.CODEMODE_SANDBOX;
+    const sessionName = this.ctx.id.name ?? this.ctx.id.toString();
+    if (harness.codemode.enabled && sandbox !== undefined) {
+      registry.install(codemodeExtension(remoteSandbox(sandbox, sessionName), { inlineBudget: harness.codemode.inlineBudget }));
+    } else {
+      registry.uninstall({ name: "codemode" });
+    }
+    if (harness.toolSearch.enabled) {
+      const names = registry
+        .snapshot()
+        .tools()
+        .flatMap(({ extension, tool }) => (extension.name === "tool-search" ? [] : [tool.name]));
+      registry.install(toolSearchExtension(names, harness.offered));
+    } else {
+      registry.uninstall({ name: "tool-search" });
+    }
+  }
+
+  /**
+   * The Environment's harness settings at a turn's start: a new revision is kept and installed (applies to this turn's
+   * next phase, never one under way). Bounded; on failure the Session keeps what it has. Never fails the turn.
+   */
+  async #takeHarness(): Promise<void> {
+    try {
+      const resolved = await Promise.race([
+        environmentStub(this.env.ENVIRONMENT).harnessSettings({}),
+        new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), HARNESS_READ_MS)),
+      ]);
+      if (resolved === undefined) return console.warn(JSON.stringify({ t3flare: "harness-settings-timeout" }));
+      if (this.ctx.storage.kv.get<ResolvedHarness>(HARNESS_KEY)?.revision === resolved.revision) return;
+      this.ctx.storage.kv.put(HARNESS_KEY, resolved);
+      this.#installHarness(resolved);
+      console.log(JSON.stringify({ t3flare: "harness-settings", revision: resolved.revision }));
+    } catch (error) {
+      console.warn(JSON.stringify({ t3flare: "harness-settings-failed", error: String(error).slice(0, 300) }));
     }
   }
 
@@ -527,6 +584,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       } satisfies Meta);
     }
     await this.#takeT3Mcp(input.t3Mcp);
+    await this.#takeHarness();
     // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
     if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
     const root = await this.#root(input.model, input.thinking);

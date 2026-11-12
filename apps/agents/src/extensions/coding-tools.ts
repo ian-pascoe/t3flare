@@ -2,7 +2,7 @@
 // `write` and `edit`, and a `bash` that chooses where its command runs (`./bash-routing.ts`): the Worker Shell unless
 // the command needs a real binary, so the Container (the costly backend) starts only when a command needs it. Dropped
 // from cloudpid's: the Images binding (`read` keeps pi-durable's own image checks), the Call diff of `write` and of
-// codemode's nested calls (no codemode here; `edit` records its patch itself). Added: `bash`'s exit code in its result's
+// codemode's nested calls (`edit` records its patch itself; a script's edits show as its children, ADR-0027). Added: `bash`'s exit code in its result's
 // `details`, which the Environment's differ shows on the command item.
 // @effect-diagnostics asyncFunction:off preferEffectArray:off
 import type { Context } from "@earendil-works/chord";
@@ -197,6 +197,7 @@ const Guidelines = section("coding_tools", (input) => {
 export const codingTools = (): Extension =>
   defineExtension({
     name: "coding-tools",
-    tools: [throughContainer(createReadTool()), throughContainer(createWriteTool()), throughContainer(createEditTool()), bashTool(new Map())],
+    // `read` is replay-safe (tools step, plan §2.6): it has no effect, so a script's read cut off by a restart reruns.
+    tools: [throughContainer({ ...createReadTool(), replay: "safe" as const }), throughContainer(createWriteTool()), throughContainer(createEditTool()), bashTool(new Map())],
     sections: [Guidelines],
   });
