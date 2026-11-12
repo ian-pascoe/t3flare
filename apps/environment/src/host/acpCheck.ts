@@ -49,6 +49,14 @@ export const acpCheck = async (input: AcpCheckInput): Promise<Record<string, unk
   const scope = Scope.makeUnsafe();
   const started = Date.now();
   if (input.canary !== undefined) process.env.T3FLARE_CANARY = input.canary;
+  try {
+    return await check(input, scope, started);
+  } finally {
+    if (input.canary !== undefined) delete process.env.T3FLARE_CANARY;
+  }
+};
+
+const check = async (input: AcpCheckInput, scope: Scope.Closeable, started: number): Promise<Record<string, unknown>> => {
   // One stdin stream for the process's life, as t3's ACP client keeps (each `Stream.run` into the sink would end it).
   const options = { cwd: `/w/${input.workspace}`, stdin: { stream: "pipe", endOnDone: false } } as const;
   const command = input.cli === "claude" ? ChildProcess.make("claude-agent-acp", [], options) : ChildProcess.make("opencode", ["acp"], options);
@@ -148,7 +156,6 @@ export const acpCheck = async (input: AcpCheckInput): Promise<Record<string, unk
     report.markerProcesses = key === null ? null : await countMarker(input.workspace, key);
     if (key !== null) report.processes = await envReport(input.workspace, key, input.canary);
   } finally {
-    if (input.canary !== undefined) delete process.env.T3FLARE_CANARY;
     report.stderr = stderr.slice(-800);
     await Effect.runPromise(Scope.close(scope, Exit.void));
     report.totalMs = Date.now() - started;

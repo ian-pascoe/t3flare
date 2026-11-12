@@ -9,12 +9,13 @@
 // one provider and deny-by-default policies, the key set by the image's server plugin, every home on local disk.
 import type { CatalogModel } from "@t3flare/models";
 import { SMALL_MODEL_SLUG, DEFAULT_MODEL_SLUG } from "@t3flare/models";
+import { CLI_HOMES } from "@t3flare/sandbox-image/process";
 import { HARNESS_ROOT } from "@t3flare/workspace-client";
 
 import type { Launch, LaunchAnswer, LaunchInput, ProfileContext } from "./cliProfiles.ts";
 
+/** The image's CLI binaries (`cliProfiles.ts` `CLI_BIN`, restated: that module imports this one). */
 const CLI_BIN = "/opt/t3flare/bin";
-const CLI_HOMES = "/var/lib/t3flare/cli";
 const homeOf = (key: string) => `${CLI_HOMES}/${key}`;
 
 /** Claude's session files, synced (resume after the Container sleeps, M0 P5). */
