@@ -6,6 +6,7 @@
     "typecheck": "effect-tsgo tsrs --noEmit",
     "lint": "oxlint --type-aware --deny-warnings src test scripts build.ts alchemy.run.ts stage-files.ts vitest.config.ts",
     "test": "vitest run",
+    "test:docker": "vitest run --config vitest.docker.config.ts",
     "build": "bun build.ts",
     "prepare:web": "bun run --cwd ../../t3code/apps/web build && git -C ../../t3code checkout -- apps/web/src/routeTree.gen.ts && mkdir -p dist/web && rsync -a --delete --exclude \"*.map\" ../../t3code/apps/web/dist/ dist/web/",
     "deploy": "bun scripts/stage.ts deploy",

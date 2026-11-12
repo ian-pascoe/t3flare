@@ -7,6 +7,8 @@ export const CLIS = {
     version: "0.167.2",
     /** The release tarball `codex-x86_64-unknown-linux-musl.tar.gz` of `rust-v<version>`. */
     sha256: "8246e846c550ea21197fcc4067bc270dca895e94ea42ed6a282e6f4e0125b15f",
+    /** `codex-aarch64-unknown-linux-musl.tar.gz`: only test:docker's image on an arm64 host (the Workspace image is amd64). */
+    sha256Arm64: "ed81fa2c7d209689af061b6f305ed554218de92a1c2c4019142b28f66fa64add",
   },
   pi: {
     version: "1.5.2",

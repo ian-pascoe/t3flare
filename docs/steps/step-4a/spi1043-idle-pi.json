@@ -1,0 +1,265 @@
+{
+ "at": "2026-11-12T02:43:19.522Z",
+ "scenario": "idle",
+ "ok": true,
+ "failures": [],
+ "cli": "pi",
+ "workspace": "cli-pi",
+ "first": {
+  "threadId": "b1bd8094-efa7-4127-a71a-3c5a9b362ca7",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:b1bd8094-efa7-4127-a71a-3c5a9b362ca7:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "ok",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Ab1bd8094-efa7-4127-a71a-3c5a9b362ca7%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-40-24-888Z_01a1cda0-b934-7146-b8f3-8c6d01740430.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:b1bd8094-efa7-4127-a71a-3c5a9b362ca7:8b619df3-a511-467e-a8ec-69a10f01fac2",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:b1bd8094-efa7-4127-a71a-3c5a9b362ca7:8b619df3-a511-467e-a8ec-69a10f01fac2",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 16601
+ },
+ "processGoneMs": 152591,
+ "releasedMs": 152591,
+ "timeline": [
+  {
+   "s": 15,
+   "processes": 1,
+   "channel": {
+    "live": 2,
+    "environmentEpoch": 9
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 31,
+   "processes": 1,
+   "channel": {
+    "live": 2,
+    "environmentEpoch": 9
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 46,
+   "processes": 1,
+   "channel": {
+    "live": 2,
+    "environmentEpoch": 9
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 61,
+   "processes": 1,
+   "channel": {
+    "live": 2,
+    "environmentEpoch": 9
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 76,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 10
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 92,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 11
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 107,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 12
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 122,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 13
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 137,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 14
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451220912
+   }
+  },
+  {
+   "s": 153,
+   "processes": 0,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 15
+   },
+   "container": {
+    "running": false,
+    "leased": false,
+    "lastUse": 1794451220912
+   }
+  }
+ ],
+ "budget": {
+  "max": 3,
+  "leases": []
+ },
+ "second": {
+  "threadId": "b1bd8094-efa7-4127-a71a-3c5a9b362ca7",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:b1bd8094-efa7-4127-a71a-3c5a9b362ca7:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:b1bd8094-efa7-4127-a71a-3c5a9b362ca7:ordinal:2",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "PLOVER-88",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Ab1bd8094-efa7-4127-a71a-3c5a9b362ca7%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-40-24-888Z_01a1cda0-b934-7146-b8f3-8c6d01740430.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:b1bd8094-efa7-4127-a71a-3c5a9b362ca7:8b619df3-a511-467e-a8ec-69a10f01fac2",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:b1bd8094-efa7-4127-a71a-3c5a9b362ca7:8b619df3-a511-467e-a8ec-69a10f01fac2",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 14630
+ }
+}

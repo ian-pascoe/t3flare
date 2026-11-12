@@ -1,0 +1,267 @@
+{
+ "at": "2026-11-12T02:48:25.143Z",
+ "scenario": "restart-turn",
+ "ok": true,
+ "failures": [],
+ "cli": "pi",
+ "workspace": "cli-pi",
+ "key": "proc-2594d461-d138-44f6-9e02-fca51d1e4586",
+ "first": {
+  "threadId": "a0eea70f-87a8-4300-805f-c12a72d3069f",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "ok",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Aa0eea70f-87a8-4300-805f-c12a72d3069f%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-45-47-898Z_01a1cda5-a6ed-7675-9420-aafcf500879d.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:d7c16c2a-8d09-4ae2-89d6-a56a8085dbea",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:d7c16c2a-8d09-4ae2-89d6-a56a8085dbea",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 8179
+ },
+ "interrupted": {
+  "threadId": "a0eea70f-87a8-4300-805f-c12a72d3069f",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:ordinal:2",
+    "status": "cancelled",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "cancelled",
+    "fileName": null,
+    "input": "sleep 120 && echo slept",
+    "exitCode": null
+   }
+  ],
+  "text": "",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Aa0eea70f-87a8-4300-805f-c12a72d3069f%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-45-47-898Z_01a1cda5-a6ed-7675-9420-aafcf500879d.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:d7c16c2a-8d09-4ae2-89d6-a56a8085dbea",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:d7c16c2a-8d09-4ae2-89d6-a56a8085dbea",
+    "status": "stopped",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 14363
+ },
+ "settledAfterMs": 1288,
+ "oldProcessGoneMs": 6396,
+ "runs": [
+  {
+   "ordinal": 1,
+   "status": "completed",
+   "restartContinuationOfRunId": null,
+   "startedAt": "2026-11-12T02:45:48.605Z",
+   "completedAt": "2026-11-12T02:45:51.642Z"
+  },
+  {
+   "ordinal": 2,
+   "status": "cancelled",
+   "restartContinuationOfRunId": null,
+   "startedAt": "2026-11-12T02:45:54.938Z",
+   "completedAt": "2026-11-12T02:46:07.149Z"
+  },
+  {
+   "ordinal": 3,
+   "status": "completed",
+   "restartContinuationOfRunId": "run:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:ordinal:2",
+   "startedAt": "2026-11-12T02:46:09.566Z",
+   "completedAt": "2026-11-12T02:48:18.310Z"
+  },
+  {
+   "ordinal": 4,
+   "status": "completed",
+   "restartContinuationOfRunId": null,
+   "startedAt": "2026-11-12T02:48:21.957Z",
+   "completedAt": "2026-11-12T02:48:24.238Z"
+  }
+ ],
+ "continuationItems": [
+  {
+   "type": "notification",
+   "status": "completed",
+   "text": ""
+  },
+  {
+   "type": "reasoning",
+   "status": "completed",
+   "text": "I'm weighing whether the aborted sleep needs a status check before I rerun it. Sleep doesn't change state, so a repeat is low risk, but I'll look for any lingering sleep processes first since the user"
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "text": "pgrep -af \"sleep 120\" || echo \"no sleep 120 process running\""
+  },
+  {
+   "type": "reasoning",
+   "status": "completed",
+   "text": "The process check came back empty of real matches, since pgrep only found its own shell command. With no sleep 120 actually running, I'll just rerun the original command.\n\n"
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "text": "The earlier `sleep 120` isn't running anymore; the only match is my check command itself. The sleep is read-only, so I'll run it again."
+  },
+  {
+   "type": "command_execution",
+   "status": "completed",
+   "text": "sleep 120 && echo slept"
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "text": "done"
+  },
+  {
+   "type": "checkpoint",
+   "status": "completed",
+   "text": ""
+  }
+ ],
+ "third": {
+  "threadId": "a0eea70f-87a8-4300-805f-c12a72d3069f",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:ordinal:2",
+    "status": "cancelled",
+    "failure": null
+   },
+   {
+    "id": "run:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:ordinal:3",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:ordinal:4",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "OSPREY-17",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Aa0eea70f-87a8-4300-805f-c12a72d3069f%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-45-47-898Z_01a1cda5-a6ed-7675-9420-aafcf500879d.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:d7c16c2a-8d09-4ae2-89d6-a56a8085dbea",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:a0eea70f-87a8-4300-805f-c12a72d3069f:d7c16c2a-8d09-4ae2-89d6-a56a8085dbea",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 132517
+ }
+}

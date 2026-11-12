@@ -8,9 +8,11 @@
 //                                                                             M3/M4: a CLI turn from t3's client protocol
 //   bun scripts/stage.ts run step4a cli4a two                                  M5: a Codex and a Pi turn at once, two Workspaces
 //   bun scripts/stage.ts run step4a cli4a resume --cli codex|pi                M5: a turn, the Container stopped, a turn that resumes
+//   bun scripts/stage.ts run step4a cli4a restart-turn --cli codex|pi          SPI-1043: the Environment restarts mid-turn
+//   bun scripts/stage.ts run step4a cli4a idle --cli codex|pi                  SPI-1043: an idle session with no client
 import * as path from "node:path";
 
-import { admin, pair, sleep } from "./lib/client.ts";
+import { admin, itemsOf, pair, projectionOf, runsOf, sleep, threadWindow } from "./lib/client.ts";
 import { writeEvidence as writeAt } from "./lib/evidence.ts";
 import { cliTurn, enable } from "./lib/cliTurn.ts";
 
@@ -167,6 +169,96 @@ switch (scenario) {
     check("each thread's process lives in its own Workspace", threadsIn(states["cli-codex"]).includes(a.threadId) && threadsIn(states["cli-pi"]).includes(b.threadId) && !threadsIn(states["cli-codex"]).includes(b.threadId), states);
     check("two provider sessions", a.providerSessions[0]?.id !== b.providerSessions[0]?.id, { a: a.providerSessions, b: b.providerSessions });
     finish(arg("out") ?? "m5-f1-two-codex.json", { a, b, states });
+    break;
+  }
+  case "restart-turn": {
+    // SPI-1043: the Environment restarts (as a deploy or an eviction does) while a CLI turn runs. ADR-0004: a restart
+    // ends running turns. Proved here: the turn settles with a reason (never a silent hang), the old process goes, and
+    // the next turn on the thread continues the CLI's own native thread.
+    const cookie = await pair();
+    const cli = arg("cli") ?? "codex";
+    const workspace = workspaceArg(`cli-${cli}`);
+    await enable(cookie, cli, cli);
+    const first = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "Remember the code word OSPREY-17 for later. Reply with ok only." });
+    check("turn 1 completed", first.runs.at(-1)?.status === "completed", first.runs);
+    const long = cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "Run the shell command `sleep 120 && echo slept` and then reply with the single word done.", threadId: first.threadId });
+    const inTurnKey = async () => ((await processState(workspace))?.workspace?.processes ?? []).find((p: any) => p.thread === first.threadId && p.inTurn === true)?.key as string | undefined;
+    let key: string | undefined;
+    for (let i = 0; i < 40 && key === undefined; i++) {
+      await sleep(3000);
+      key = await inTurnKey();
+    }
+    check("the CLI was in its turn before the restart", key !== undefined);
+    await sleep(10_000);
+    const restartedAt = Date.now();
+    await admin("POST", "/_t3flare/restart");
+    const interrupted = await long;
+    const settledAfterMs = Date.now() - restartedAt;
+    const status = interrupted.runs.at(-1)?.status;
+    check("the interrupted turn settled (no hang)", status !== undefined && status !== "running" && status !== "pending" && settledAfterMs < 5 * 60_000, { status, settledAfterMs });
+    check("the interrupted turn did not finish its command", status !== "completed" || !interrupted.text.includes("done"), interrupted.runs);
+    let oldProcess: unknown = "unchecked";
+    const goneBy = Date.now();
+    for (;;) {
+      const state = await processState(workspace);
+      oldProcess = (state?.workspace?.processes ?? []).find((p: any) => p.key === key) ?? null;
+      if (oldProcess === null || Date.now() - goneBy > 180_000) break;
+      await sleep(5000);
+    }
+    check("the old epoch's process is gone", oldProcess === null, oldProcess);
+    const oldProcessGoneMs = Date.now() - restartedAt;
+    const third = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "What was the code word? Reply with it only.", threadId: first.threadId });
+    check("the next turn completed", third.runs.at(-1)?.status === "completed", third.runs);
+    check("the next turn knew the code word", third.text.includes("OSPREY-17"), third.text);
+    const native = (turn: typeof first) => turn.providerThreads.map((thread: any) => thread.nativeThreadRef?.nativeId ?? null);
+    check("the same native thread (continuation, not a handoff)", JSON.stringify(native(first)) === JSON.stringify(native(third)), { first: native(first), third: native(third) });
+    // t3's own answer to the restart (ADR-0004): the interrupted run is cancelled, and a restart continuation run
+    // (`restartContinuationOfRunId`) resumes the CLI's thread and tells it the turn was interrupted.
+    const projection = projectionOf(await threadWindow(cookie, first.threadId));
+    const runs = runsOf(projection).map((run: any) => ({ ordinal: run.ordinal, status: run.status, restartContinuationOfRunId: run.restartContinuationOfRunId ?? null, startedAt: run.startedAt, completedAt: run.completedAt }));
+    const continuation = runs.find((run) => run.restartContinuationOfRunId !== null);
+    check("t3 started a restart continuation of the interrupted run", continuation !== undefined && continuation.status === "completed", runs);
+    const continuationItems = itemsOf(projection)
+      .filter((item: any) => continuation !== undefined && String(item.runId).endsWith(`:ordinal:${continuation.ordinal}`))
+      .map((item: any) => ({ type: item.type, status: item.status, text: String(item.text ?? item.input ?? "").slice(0, 200) }));
+    finish(arg("out") ?? `spi1043-restart-${cli}.json`, { cli, workspace, key, first, interrupted, settledAfterMs, oldProcessGoneMs, runs, continuationItems, third });
+    break;
+  }
+  case "idle": {
+    // SPI-1043: a CLI session nobody is connected to. The Environment resets when idle (no client), its reads (the
+    // processes' heartbeat) stop, the Workspace kills the process at the lapse and stops the Container; the next turn
+    // resumes the native thread.
+    const cookie = await pair();
+    const cli = arg("cli") ?? "codex";
+    const workspace = workspaceArg(`cli-${cli}`);
+    await enable(cookie, cli, cli);
+    const first = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "Remember the code word PLOVER-88 for later. Reply with ok only." });
+    check("turn 1 completed", first.runs.at(-1)?.status === "completed", first.runs);
+    const endedAt = Date.now();
+    const timeline: Array<Record<string, unknown>> = [];
+    let processGoneMs: number | null = null;
+    let releasedMs: number | null = null;
+    while (Date.now() - endedAt < 15 * 60_000) {
+      await sleep(15_000);
+      const state = await processState(workspace);
+      const container = (await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces?.find((ws: any) => ws.id === workspace)?.container ?? null;
+      const mine = (state?.workspace?.processes ?? []).filter((p: any) => p.thread === first.threadId);
+      timeline.push({ s: Math.round((Date.now() - endedAt) / 1000), processes: mine.length, channel: state?.channel ?? null, container });
+      if (processGoneMs === null && mine.length === 0) processGoneMs = Date.now() - endedAt;
+      if (container?.running === false && container?.leased === false) {
+        releasedMs = Date.now() - endedAt;
+        break;
+      }
+    }
+    check("the idle session's process ended", processGoneMs !== null, timeline.at(-1));
+    check("the Container stopped and its lease went", releasedMs !== null, timeline.at(-1));
+    const budget = (await admin("GET", "/_t3flare/agents/budget")).json;
+    const second = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "What was the code word? Reply with it only.", threadId: first.threadId });
+    check("turn 2 completed", second.runs.at(-1)?.status === "completed", second.runs);
+    check("turn 2 knew the code word", second.text.includes("PLOVER-88"), second.text);
+    const native = (turn: typeof first) => turn.providerThreads.map((thread: any) => thread.nativeThreadRef?.nativeId ?? null);
+    check("the same native thread", JSON.stringify(native(first)) === JSON.stringify(native(second)), { first: native(first), second: native(second) });
+    finish(arg("out") ?? `spi1043-idle-${cli}.json`, { cli, workspace, first, processGoneMs, releasedMs, timeline, budget, second });
     break;
   }
   default:

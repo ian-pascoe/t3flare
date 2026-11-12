@@ -1,0 +1,271 @@
+{
+ "at": "2026-11-12T02:40:13.612Z",
+ "scenario": "idle",
+ "ok": true,
+ "failures": [],
+ "cli": "codex",
+ "workspace": "cli-codex",
+ "first": {
+  "threadId": "db26b1e8-b893-44e9-891d-d80a05b51e72",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:db26b1e8-b893-44e9-891d-d80a05b51e72:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "ok",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3Adb26b1e8-b893-44e9-891d-d80a05b51e72%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cd9d-eb39-7951-9f90-0734eea1f89f",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:db26b1e8-b893-44e9-891d-d80a05b51e72:ee74db6d-5f01-4412-aeb1-c21aea2ac18c",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:db26b1e8-b893-44e9-891d-d80a05b51e72:ee74db6d-5f01-4412-aeb1-c21aea2ac18c",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 12831
+ },
+ "processGoneMs": 152597,
+ "releasedMs": 152597,
+ "timeline": [
+  {
+   "s": 15,
+   "processes": 1,
+   "channel": {
+    "live": 2,
+    "environmentEpoch": 3
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 30,
+   "processes": 1,
+   "channel": {
+    "live": 2,
+    "environmentEpoch": 3
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 46,
+   "processes": 1,
+   "channel": {
+    "live": 2,
+    "environmentEpoch": 3
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 61,
+   "processes": 1,
+   "channel": {
+    "live": 2,
+    "environmentEpoch": 3
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 76,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 4
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 92,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 5
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 107,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 6
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 122,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 7
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 137,
+   "processes": 1,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 8
+   },
+   "container": {
+    "running": true,
+    "leased": true,
+    "lastUse": 1794451039384
+   }
+  },
+  {
+   "s": 153,
+   "processes": 0,
+   "channel": {
+    "live": 0,
+    "environmentEpoch": 9
+   },
+   "container": {
+    "running": false,
+    "leased": false,
+    "lastUse": 1794451039384
+   }
+  }
+ ],
+ "budget": {
+  "max": 3,
+  "leases": [
+   {
+    "holder": "7bbc410589176e6b34dde879abeb482945bec9dc3dd56cbd41600e75053feaf7",
+    "until": 1794451799914,
+    "workspace": "cli-pi"
+   }
+  ]
+ },
+ "second": {
+  "threadId": "db26b1e8-b893-44e9-891d-d80a05b51e72",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:db26b1e8-b893-44e9-891d-d80a05b51e72:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:db26b1e8-b893-44e9-891d-d80a05b51e72:ordinal:2",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "PLOVER-88",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3Adb26b1e8-b893-44e9-891d-d80a05b51e72%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cd9d-eb39-7951-9f90-0734eea1f89f",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:db26b1e8-b893-44e9-891d-d80a05b51e72:ee74db6d-5f01-4412-aeb1-c21aea2ac18c",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:db26b1e8-b893-44e9-891d-d80a05b51e72:ee74db6d-5f01-4412-aeb1-c21aea2ac18c",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 13275
+ }
+}

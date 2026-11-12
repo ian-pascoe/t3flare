@@ -8,3 +8,4 @@ dist/
 /bump-report.json
 .worktrees/
 docs/steps/step-4a/out/
+apps/environment/test/docker/.work-*

@@ -14,7 +14,7 @@ export default defineConfig({
       defineProject({
         // T3 Connect's public values, as build.ts defines them for the Worker.
         define: T3_CONNECT_DEFINES,
-        test: { name: "node", include: ["test/**/*.test.ts"], exclude: [...configDefaults.exclude, workerd] },
+        test: { name: "node", include: ["test/**/*.test.ts"], exclude: [...configDefaults.exclude, workerd, "test/docker/**"] },
       }),
       defineProject({
         define: T3_CONNECT_DEFINES,

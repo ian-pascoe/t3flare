@@ -37,7 +37,8 @@ concurrency:
 jobs:
   bump:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 60: step 4a added test:docker (an image build and four CLI turns) and the acceptance test's --codex --pi.
+    timeout-minutes: 60
     environment: bump
     steps:
       # The submodule is fetched by hand, not by the action: the action walks t3code's nested gitlinks recursively,

@@ -1,0 +1,242 @@
+{
+ "at": "2026-11-12T02:45:43.274Z",
+ "scenario": "restart-turn",
+ "ok": true,
+ "failures": [],
+ "cli": "codex",
+ "workspace": "cli-codex",
+ "key": "proc-9e19d54e-09cc-42c5-ba38-6a328f47973b",
+ "first": {
+  "threadId": "52776e74-cb71-46be-8d66-ec0ea196b371",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:52776e74-cb71-46be-8d66-ec0ea196b371:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "ok",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A52776e74-cb71-46be-8d66-ec0ea196b371%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cda5-0497-7370-85f3-23d4756a8462",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:52776e74-cb71-46be-8d66-ec0ea196b371:1381c126-1cb0-4659-ace4-6f8196cf65ac",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:52776e74-cb71-46be-8d66-ec0ea196b371:1381c126-1cb0-4659-ace4-6f8196cf65ac",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 14341
+ },
+ "interrupted": {
+  "threadId": "52776e74-cb71-46be-8d66-ec0ea196b371",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:52776e74-cb71-46be-8d66-ec0ea196b371:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:52776e74-cb71-46be-8d66-ec0ea196b371:ordinal:2",
+    "status": "cancelled",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "cancelled",
+    "fileName": null,
+    "input": "/bin/bash -c 'sleep 120 && echo slept'",
+    "exitCode": null
+   }
+  ],
+  "text": "",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A52776e74-cb71-46be-8d66-ec0ea196b371%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cda5-0497-7370-85f3-23d4756a8462",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:52776e74-cb71-46be-8d66-ec0ea196b371:1381c126-1cb0-4659-ace4-6f8196cf65ac",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:52776e74-cb71-46be-8d66-ec0ea196b371:1381c126-1cb0-4659-ace4-6f8196cf65ac",
+    "status": "stopped",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 14155
+ },
+ "settledAfterMs": 1081,
+ "oldProcessGoneMs": 6265,
+ "runs": [
+  {
+   "ordinal": 1,
+   "status": "completed",
+   "restartContinuationOfRunId": null,
+   "startedAt": "2026-11-12T02:45:08.987Z",
+   "completedAt": "2026-11-12T02:45:12.250Z"
+  },
+  {
+   "ordinal": 2,
+   "status": "cancelled",
+   "restartContinuationOfRunId": null,
+   "startedAt": "2026-11-12T02:45:16.994Z",
+   "completedAt": "2026-11-12T02:45:28.265Z"
+  },
+  {
+   "ordinal": 3,
+   "status": "completed",
+   "restartContinuationOfRunId": "run:thread:52776e74-cb71-46be-8d66-ec0ea196b371:ordinal:2",
+   "startedAt": "2026-11-12T02:45:30.524Z",
+   "completedAt": "2026-11-12T02:45:34.994Z"
+  },
+  {
+   "ordinal": 4,
+   "status": "completed",
+   "restartContinuationOfRunId": null,
+   "startedAt": "2026-11-12T02:45:39.039Z",
+   "completedAt": "2026-11-12T02:45:41.390Z"
+  }
+ ],
+ "continuationItems": [
+  {
+   "type": "notification",
+   "status": "completed",
+   "text": ""
+  },
+  {
+   "type": "assistant_message",
+   "status": "completed",
+   "text": "Interrupted"
+  },
+  {
+   "type": "checkpoint",
+   "status": "completed",
+   "text": ""
+  }
+ ],
+ "third": {
+  "threadId": "52776e74-cb71-46be-8d66-ec0ea196b371",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:52776e74-cb71-46be-8d66-ec0ea196b371:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:52776e74-cb71-46be-8d66-ec0ea196b371:ordinal:2",
+    "status": "cancelled",
+    "failure": null
+   },
+   {
+    "id": "run:thread:52776e74-cb71-46be-8d66-ec0ea196b371:ordinal:3",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:52776e74-cb71-46be-8d66-ec0ea196b371:ordinal:4",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "OSPREY-17",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A52776e74-cb71-46be-8d66-ec0ea196b371%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cda5-0497-7370-85f3-23d4756a8462",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:52776e74-cb71-46be-8d66-ec0ea196b371:1381c126-1cb0-4659-ace4-6f8196cf65ac",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:52776e74-cb71-46be-8d66-ec0ea196b371:1381c126-1cb0-4659-ace4-6f8196cf65ac",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 9338
+ }
+}

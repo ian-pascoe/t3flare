@@ -7,12 +7,14 @@
 //  3. Regenerate the workspace from t3's pnpm-workspace.yaml and pnpm-lock.yaml, install, and check that
 //     Bun's resolution matches t3's lock with a single `effect` (ADR-0019).
 //  4. `git apply --check` every Patch against the new tree.
-//  5. Typecheck, lint and test (`bun run check` minus the patch step already done).
+//  5. Typecheck, lint and test (`bun run check` minus the patch step already done), then `test:docker` (step 4a): the
+//     pinned Codex and pi in Docker, launched by our profiles and guard against the new t3, on the model proxy.
 //  6. Build the Worker and the web client, deploy the `bump` stage, and run the acceptance test against it
 //     (scripts/acceptance.ts: pairing, a /ws client, turn-item fixtures and t3's heavy queries, and since step 2a
 //     `--real-turn`: a Durable agent turn on a fresh clone of the fixture, both Workers and the Container image;
 //     `--terminal --worktree` (step 2b): a terminal, a worktree thread's setup script, its removal, the sweep's dry run;
-//     `--peer` (step 3): a Peer link from the harness, a forwarded launch, the link fence F1–F12), then a stock t3
+//     `--peer` (step 3): a Peer link from the harness, a forwarded launch, the link fence F1–F12; `--codex --pi`
+//     (step 4a): a Codex and a Pi turn with approvals, resumed after their Containers stopped), then a stock t3
 //     from npm at its newest nightly as the laptop: it links to the stage and forwards a launch (version skew, review C6).
 //  7. Report. On any failure the submodule, package.json, bunfig.toml and bun.lock go back to the last good pin,
 //     so the pin is unchanged; on success they stay (and are committed with --commit).
@@ -149,6 +151,10 @@ const ok =
     const test = sh("bun", ["run", "test"], environment);
     return { ok: typecheck.ok && lint.ok && test.ok, detail: [typecheck, lint, test].filter((r) => !r.ok).map((r) => r.output).join("\n") };
   }) &&
+  step("the CLI agents in Docker (test:docker: the pinned Codex and pi, launched as the Workspace launches them)", () => {
+    const result = sh("bun", ["run", "test:docker"], environment, { quiet: true });
+    return { ok: result.ok, detail: result.output.slice(-4000) };
+  }) &&
   step("deploy the bump stage (build, web client)", () => {
     const result = sh("bun", ["scripts/stage.ts", "deploy", "bump", "--web"], environment);
     return { ok: result.ok, detail: result.output };
@@ -156,7 +162,7 @@ const ok =
   step("acceptance test against the bump stage", () => {
     const out = path.join(environment, "dist/bump-acceptance.json");
     fs.rmSync(out, { force: true });
-    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--out", out], environment, { quiet: true });
+    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--codex", "--pi", "--out", out], environment, { quiet: true });
     return { ok: result.ok, detail: fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output };
   }) &&
   step("a stock t3 nightly from npm links to the bump stage and forwards a launch", () => {
