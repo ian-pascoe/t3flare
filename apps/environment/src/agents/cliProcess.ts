@@ -16,6 +16,7 @@ import { traceProtocol } from "./processRouter.ts";
 import { type ChannelProcess, type ChannelStart, ProcessRefused } from "./processChannel.ts";
 import { type CliName, profileLaunch } from "./cliProfiles.ts";
 import { CliSpawn, newToolHandle } from "../provider/cli/wrapper.ts";
+import { relayThreadOf } from "../provider/cli/relayedMcp.ts";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import * as StateStore from "../platform/stateStore.ts";
 
@@ -86,7 +87,11 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     const session = yield* CliSpawn;
     if (services.modelProxy === undefined && name !== "t3flare-probe") return yield* refused(name, "this Environment has no model proxy");
     // ADR-0028: the process's tool handle (the session's, so t3's MCP config can name it too; SPI-1039).
-    const toolHandle = session?.toolHandle ?? newToolHandle();
+    // pi spawns outside the session's fiber (no CliSpawn): t3 put the handle relayedMcp gave it in the spawn's env; only
+    // a handle relayedMcp issued is taken, with its thread.
+    const offered = (command.options.env as Record<string, string | undefined> | undefined)?.T3_MCP_BEARER_TOKEN;
+    const offeredThread = offered === undefined ? undefined : relayThreadOf(offered);
+    const toolHandle = session?.toolHandle ?? (offeredThread === undefined ? undefined : offered) ?? newToolHandle();
     const launch = profileLaunch(
       {
         cli: cliOf(name),
@@ -111,6 +116,8 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       console.warn(JSON.stringify({ t3flare: "cli-spawn-refused", cli: name, reason: launch.refused, argv: args.slice(0, 6) }));
       return yield* refused(name, launch.refused);
     }
+    // The relay's wiring for this process (never the handle): whether t3's tools reach it, and through which session.
+    console.log(JSON.stringify({ t3flare: "cli-relay", cli: name, session: session !== undefined, offered: offered !== undefined, offeredKnown: offeredThread !== undefined, t3Tools: launch.env.T3_MCP_URL !== undefined }));
     if (launch.droppedEnv.length > 0) console.log(JSON.stringify({ t3flare: "cli-env-dropped", cli: name, keys: launch.droppedEnv }));
     const start: ChannelStart = {
       key,
@@ -121,7 +128,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       ...(launch.files === undefined ? {} : { files: launch.files }),
       ...(launch.links === undefined ? {} : { links: launch.links }),
       ...(launch.prune === undefined ? {} : { prune: launch.prune }),
-      ...(session !== undefined ? { thread: session.thread } : launch.thread === undefined ? {} : { thread: launch.thread }),
+      ...(session !== undefined ? { thread: session.thread } : launch.thread !== undefined ? { thread: launch.thread } : offeredThread === undefined ? {} : { thread: offeredThread }),
       ...(session?.linked === true ? { linked: true } : {}),
       toolHandle,
     };

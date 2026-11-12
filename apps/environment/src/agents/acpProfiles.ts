@@ -167,6 +167,8 @@ const allow = (action: string, resource: string) => ({ action, resource, effect:
 export const opencodeConfig = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = []) => {
   const ids = new Set(models.map((model) => model.id));
   const pick = (slug: string) => (ids.has(idOf(slug)) ? idOf(slug) : models[0]?.id);
+  // The relay's tools are not asked about by OpenCode: the relay decides and asks on the thread (one card per write).
+  const asking = [...ASKING, ...relayServers.map((server) => allow(`${server}_*`, "*"))];
   const main = pick(DEFAULT_MODEL_SLUG);
   const small = pick(SMALL_MODEL_SLUG);
   return {
@@ -200,12 +202,12 @@ export const opencodeConfig = (proxyUrl: string, models: ReadonlyArray<CatalogMo
       allow("tool.use", "subagent:general"),
       allow("tool.use", "subagent:explore"),
     ],
-    permissions: ASKING,
+    permissions: asking,
     agents: {
-      build: { permissions: ASKING },
-      plan: { permissions: [...ASKING, deny("edit")] },
-      general: { permissions: ASKING },
-      explore: { permissions: ASKING },
+      build: { permissions: asking },
+      plan: { permissions: [...asking, deny("edit")] },
+      general: { permissions: asking },
+      explore: { permissions: asking },
     },
     update: "disable",
     share: "disabled",

@@ -13,6 +13,11 @@ import type { CliSessions } from "./wrapper.ts";
 /** t3's real `Authorization` by thread, as last read for a CLI session (memory: an Environment restart ends the CLIs). */
 const credentials = new Map<string, string>();
 
+/** The tool handle given to t3's adapter for `thread` (pi spawns outside the session's fiber: its spawn finds it here). */
+const handles = new Map<string, string>();
+/** The thread `handle` was given to t3 for, or undefined (a value relayedMcp never issued). */
+export const relayThreadOf = (handle: string): string | undefined => [...handles].find(([, value]) => value === handle)?.[0];
+
 /** The real bearer the relay sends t3 for `thread`, or undefined. */
 export const t3CredentialOf = (thread: string): string | undefined => credentials.get(thread);
 
@@ -28,6 +33,7 @@ export const relayedMcp = (real: McpProviderSessions.McpProviderSessions["Servic
           // No CLI session of this driver runs the thread: nothing to relay to, so no t3 tools (as before SPI-1039).
           if (session === undefined) return undefined;
           credentials.set(threadId, config.authorizationHeader);
+          handles.set(threadId, session.toolHandle);
           return { ...config, endpoint: relayUrl(T3_RELAY_SERVER), authorizationHeader: `Bearer ${session.toolHandle}` };
         }),
       ),
@@ -36,6 +42,7 @@ export const relayedMcp = (real: McpProviderSessions.McpProviderSessions["Servic
         Effect.tap(() =>
           Effect.sync(() => {
             credentials.delete(threadId);
+            handles.delete(threadId);
           }),
         ),
       ),

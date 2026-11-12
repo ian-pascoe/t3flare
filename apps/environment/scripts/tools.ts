@@ -123,8 +123,12 @@ const runTurn = async (threadId: string, text: string, decide: Decide = () => "a
       const decision = decide(request, projection);
       if (decision === undefined) continue;
       answered.add(request.id);
-      cards.push({ kind: request.kind, prompt: String(item?.prompt ?? "").slice(0, 1200), decision });
-      await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision });
+      // A card withdrawn meanwhile (expired) refuses the answer: recorded, not fatal.
+      const refused = await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision }).then(
+        () => undefined,
+        (error: unknown) => String((error as { detail?: unknown })?.detail ?? error).slice(0, 200),
+      );
+      cards.push({ kind: request.kind, prompt: String(item?.prompt ?? "").slice(0, 1200), decision, ...(refused === undefined ? {} : { refused }) });
     }
     await options.during?.(projection);
     const runs = runsOf(projection);
@@ -749,6 +753,77 @@ const cliMcp = async (cli: RelayCli) => {
   writeEvidence(`m5-cli-${cli}.json`, { cli, workspace, cases, ok: cases.every((c) => c.ok) });
 };
 
+// ---------------------------------------------------------------------------------------------------------------------
+// The relay against a hostile Container (M5 cases 3-4, H1, H2): no or forged handles, a handle stolen from a live Codex
+// process through /proc, the Workspace's taint, and a handle replayed after its process ended. Only statuses and notes
+// are recorded; the handle never leaves the Container's shell variables.
+
+const relayHostile = async () => {
+  await enableCli(cookie, "codex", "codex");
+  const workspace = `tools-relay-hostile`;
+  const marker = `rh-${Date.now().toString(36)}`;
+  const cases: Array<Case> = [];
+  const exec = async (script: string) => ((await admin("POST", `/_t3flare/agents/workspace-call?id=${workspace}`, { exec: { script, timeoutMs: 60_000 } })).json as any)?.result ?? {};
+  const relayPost = (server: string, auth: string, body: string) =>
+    `curl -s -o /tmp/rh.out -w '%{http_code}' -X POST -H 'content-type: application/json' ${auth} --data '${body}' http://computer.internal/t3flare/mcp/${server}; echo; head -c 300 /tmp/rh.out`;
+  const note = (line: string) => JSON.stringify({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "fixture_note", arguments: { line } } });
+  const t3list = JSON.stringify({ jsonrpc: "2.0", id: 10, method: "tools/call", params: { name: "t3_thread_list", arguments: {} } });
+  const steal = `H=$(for p in /proc/[0-9]*; do tr '\\0' '\\n' < $p/environ 2>/dev/null | sed -n 's/^T3FLARE_TOOL_HANDLE=//p'; done | head -1); test -n "$H" && echo found || echo none;`;
+  const stolen = (server: string, body: string) => `${steal} ${relayPost(server, `-H "authorization: Bearer $H"`, body)}`;
+  // An owner Codex thread at full access: its process stays alive after the turn (the idle hold).
+  const owner = await cliTurn(cookie, { cli: "codex", workspace, mode: "full-access", plan: false, prompt: `Call the MCP tool fixture_echo of the "fixture" MCP server with text "${marker}" and reply with its output. Do not run any shell command.`, approve: "accept" });
+  {
+    const none = await exec(relayPost("fixture", "", note(`${marker}-nohandle`)));
+    const forged = await exec(relayPost("fixture", `-H "authorization: Bearer ${"0".repeat(64)}"`, note(`${marker}-forged`)));
+    const get = await exec(`curl -s -o /dev/null -w '%{http_code}' -H "authorization: Bearer ${"0".repeat(64)}" http://computer.internal/t3flare/mcp/fixture`);
+    cases.push({ name: "no handle or a forged one: 401, nothing reaches the server", none: String(none.stdout).slice(0, 3), forged: String(forged.stdout).slice(0, 3), get: String(get.stdout).slice(0, 3), ok: String(none.stdout).startsWith("401") && String(forged.stdout).startsWith("401") });
+  }
+  {
+    const before = (await notes()).length;
+    const r = await exec(stolen("fixture", note(`${marker}-stolen-untainted`)));
+    const added = (await notes()).slice(before);
+    cases.push({
+      name: "a handle read from a live owner Codex process (root sees /proc): judged as that owner thread at full access (accepted risk, plan §3.2)",
+      out: String(r.stdout).split("\n").slice(0, 2),
+      notesAdded: added.length,
+      ok: String(r.stdout).startsWith("found"),
+    });
+  }
+  await admin("POST", `/_t3flare/agents/workspace-call?id=${workspace}`, { probePush: { noteLinked: { session: "rh-linked", ms: 60_000 } } });
+  {
+    const before = (await notes()).length;
+    const r = await exec(stolen("fixture", note(`${marker}-stolen-tainted`)));
+    const t3 = await exec(stolen("t3", t3list));
+    const added = (await notes()).slice(before);
+    cases.push({
+      name: "tainted Workspace (H1): the stolen owner handle's write asks per call on the owner's thread (no live turn: refused, no note); t3's tools refuse it outright (403)",
+      write: String(r.stdout).split("\n").slice(0, 3).map((line) => line.slice(0, 200)),
+      t3: String(t3.stdout).split("\n").slice(0, 2).map((line) => line.slice(0, 200)),
+      notesAdded: added.length,
+      ok: added.length === 0 && /\n?200/.test(String(r.stdout)) && /not approve|no live turn/i.test(String(r.stdout)) && String(t3.stdout).split("\n")[1]?.startsWith("403") === true,
+    });
+  }
+  {
+    const before = (await notes()).length;
+    const r = await cliTurn(cookie, { cli: "codex", workspace, mode: "full-access", plan: false, threadId: owner.threadId, prompt: `Call the MCP tool fixture_note of the "fixture" MCP server twice: first with line "${marker}-t1", then with line "${marker}-t2". Then say done. Do not run any shell command.`, approve: "accept" });
+    const added = (await notes()).slice(before);
+    const cards = r.requests.filter((request: any) => String(request.id).includes(":t3flare-push:") && request.kind === "permission");
+    cases.push({ name: "tainted Workspace (H1): an owner thread at full access gets a card for each write, approved each time", cards: cards.length, notesAdded: added.length, text: r.text, ok: cards.length >= 2 && added.length === cards.length });
+  }
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${workspace}`);
+  {
+    // Steal again, end every process (the Container stops), then replay the handle from a new shell.
+    // Kept in this script's memory only (never in evidence): the Container's disk does not outlive the stop.
+    const taken = String((await exec(`${steal} printf %s "$H"`)).stdout ?? "").replace(/^(found|none)\s*/, "").trim();
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${workspace}`);
+    await sleep(5000);
+    await exec("true");
+    const r = await exec(relayPost("fixture", `-H "authorization: Bearer ${/^[0-9a-f]{64}$/.test(taken) ? taken : "x"}"`, note(`${marker}-replayed`)));
+    cases.push({ name: "a handle replayed after its process ended: 401 (revoked with the process)", out: String(r.stdout).slice(0, 3), ok: String(r.stdout).startsWith("401") || String(r.stdout).startsWith("000") });
+  }
+  writeEvidence("m5-relay-hostile.json", { workspace, cases, ok: cases.every((c) => c.ok) });
+};
+
 const command = process.argv[2];
 cookie = await pair();
 switch (command) {
@@ -783,6 +858,9 @@ switch (command) {
     break;
   case "p3-breakdown":
     await p3Breakdown();
+    break;
+  case "relay-hostile":
+    await relayHostile();
     break;
   case "h6":
     await h6Proof();
