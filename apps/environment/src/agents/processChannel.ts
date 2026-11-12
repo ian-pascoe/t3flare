@@ -155,8 +155,12 @@ export class ChannelProcess {
     return this.exitCode === undefined;
   }
 
-  started(epoch: number): void {
+  /** Whether Codex's sandbox (bubblewrap) works in this process's Container; undefined when not probed. */
+  sandbox: boolean | undefined;
+
+  started(epoch: number, sandbox?: boolean): void {
     this.#epoch = epoch;
+    this.sandbox = sandbox;
   }
 
   /** An answer from the Workspace DO: another instance, or this key unknown, ends the process. */
@@ -328,7 +332,7 @@ export class ProcessChannel {
       process.finish(1);
       throw new ProcessRefused(answer.reason);
     }
-    process.started(answer.epoch);
+    process.started(answer.epoch, answer.sandbox);
     this.#startHeartbeat();
     return process;
   }

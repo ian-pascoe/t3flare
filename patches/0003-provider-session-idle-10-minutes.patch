@@ -1,0 +1,17 @@
+diff --git a/apps/server/src/orchestration-v2/runtimeLayer.ts b/apps/server/src/orchestration-v2/runtimeLayer.ts
+index ba1dadad18..0b9d12535a 100644
+--- a/apps/server/src/orchestration-v2/runtimeLayer.ts
++++ b/apps/server/src/orchestration-v2/runtimeLayer.ts
+@@ -131,7 +131,11 @@ const layerCommandOutputHubProvided = CommandOutputHub.layer.pipe(
+   Layer.provide(Layer.merge(layerEventSink, ProjectionStore.layer)),
+ );
+ 
+-const layerProviderSessionManagerProvided = ProviderSessionManager.layer.pipe(
++// t3flare: an idle provider session is released after 10 minutes, not 30: a CLI agent's session holds its
++// Workspace's Container while it lives (step 4a, review F7; docs/cost.md).
++const layerProviderSessionManagerProvided = ProviderSessionManager.layerWithOptions({
++  idleTimeoutMs: 10 * 60_000,
++}).pipe(
+   Layer.provide(
+     Layer.mergeAll(
+       layerCommandOutputHubProvided,

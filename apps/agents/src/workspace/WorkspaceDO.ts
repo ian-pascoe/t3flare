@@ -60,6 +60,7 @@ import { credentialDecision, type LinkedWork, prunedLinkedWork } from "./linkedP
 import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, withoutOwnGitDir } from "./gitDirReads.ts";
 import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
+import { ModelKeyGate } from "./modelKey.ts";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { ProcessProbe, type ProbeOp } from "./processProbe.ts";
 import { TerminalHost } from "./terminalHost.ts";
@@ -98,6 +99,8 @@ export interface WorkspaceEnv {
   readonly SESSIONS?: DurableObjectNamespace;
   /** Test stages only: the stage-only probes and faults answer. */
   readonly T3FLARE_FAULTS?: string;
+  /** Step 4a (ADR-0016 A′): the CLI agents' own model proxy key, answered by the key route only. */
+  readonly COMMISSARY_CONTAINER_API_KEY?: string;
 }
 
 export interface ExecInput {
@@ -157,6 +160,8 @@ const PROJECT_ROOT_MAX_BYTES = 20 * 1024 * 1024;
 const LEASED_KEY = "t3flare:container-leased";
 /** Where the Container's git credential helper asks this object for the repo's token (through computer's egress host). */
 export const CREDENTIAL_PATH = "/t3flare/git-credential";
+/** Where the Container's key helper asks this object for the CLI agents' model key (step 4a). */
+export const MODEL_KEY_PATH = "/t3flare/model-key";
 const WORKSPACE_ID_KEY = "t3flare:workspace-id";
 /** Step 3 (D1): linked Sessions that ran commands here, and until when each counts. */
 const LINKED_WORK_KEY = "t3flare:linked-work";
@@ -219,6 +224,10 @@ export class WorkspaceDO extends ContainerHost {
   readonly #processes: ProcessHost;
   /** This object's boot counter (review F6): the process channel's epoch, durable, never a UUID. */
   readonly #boot: number;
+  /** The key route's nonces: one per live CLI process, with its CLI and the grants it took. */
+  readonly #keyGate = new ModelKeyGate(() => crypto.randomUUID());
+  /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
+  #sandbox: Promise<boolean> | undefined;
 
   constructor(ctx: DurableObjectState, env: WorkspaceEnv) {
     super(ctx, env);
@@ -323,6 +332,7 @@ export class WorkspaceDO extends ContainerHost {
       filesMayHaveChanged: (why) => this.#terminalSync.changed(why),
       maxProcesses: MAX_CLI_PROCESSES,
       allowProbe: env.T3FLARE_FAULTS === "1",
+      beforeStart: async (input) => ({ env: { T3FLARE_MODEL_KEY_NONCE: this.#keyGate.issue(input.key, input.cli) }, sandbox: await this.#sandboxWorks() }),
       linkedWork: (thread, alive) => {
         const linked: Record<string, number> = { ...prunedLinkedWork(ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {}, Date.now()) };
         const name = `cli:${thread}`;
@@ -331,6 +341,23 @@ export class WorkspaceDO extends ContainerHost {
         ctx.storage.kv.put(LINKED_WORK_KEY, linked);
       },
     });
+  }
+
+  /** bubblewrap in the running Container (Codex's Linux sandbox needs user namespaces): once per Container start. */
+  #sandboxWorks(): Promise<boolean> {
+    this.#sandbox ??= (async () => {
+      const container = this.ctx.container;
+      if (container === undefined || !container.running) return false;
+      try {
+        const process = await container.exec(["bwrap", "--unshare-all", "--ro-bind", "/", "/", "true"], { stdout: "ignore", stderr: "ignore" });
+        const works = (await process.exitCode) === 0;
+        console.log(JSON.stringify({ t3flare: "sandbox-probe", workspace: this.#workspaceId() ?? null, works }));
+        return works;
+      } catch {
+        return false;
+      }
+    })();
+    return this.#sandbox;
   }
 
   /** Starts the Container for a terminal or a CLI process; the budget's own reason when refused. */
@@ -1275,6 +1302,7 @@ export class WorkspaceDO extends ContainerHost {
     }
     this.#terminals.containerStopped();
     this.#processes.containerStopped();
+    this.#sandbox = undefined;
     await this.#release();
   }
 
@@ -1330,6 +1358,7 @@ export class WorkspaceDO extends ContainerHost {
   override async fetch(request: Request): Promise<Response> {
     if (this.#isDestroyed()) return new Response("t3flare: this Workspace was deleted", { status: 410 });
     if (new URL(request.url).pathname === CREDENTIAL_PATH) return this.#credential(new URL(request.url));
+    if (new URL(request.url).pathname === MODEL_KEY_PATH) return this.#modelKey(request);
     return this.#container.handleFetch(request);
   }
 
@@ -1405,6 +1434,23 @@ export class WorkspaceDO extends ContainerHost {
     await this.#noteUse();
     await this.#scheduleAlarm();
     return { epoch: this.#epoch, result };
+  }
+
+  /**
+   * The key helper's request (step 4a, ADR-0016 A′): the CLI agents' model key, only for the nonce of a CLI process that
+   * lives here, Codex's at most `CODEX_KEY_GRANTS` times. Each grant is logged without the value.
+   */
+  #modelKey(request: Request): Response {
+    const refuse = (why: string) => {
+      console.warn(JSON.stringify({ t3flare: "model-key-refused", workspace: this.#workspaceId() ?? null, why }));
+      return new Response("", { status: 403, headers: { "cache-control": "no-store" } });
+    };
+    const value = this.env.COMMISSARY_CONTAINER_API_KEY;
+    if (value === undefined || value === "") return refuse("no key bound");
+    const decision = this.#keyGate.decide(request.headers.get("x-t3flare-nonce"), new Set(this.#processes.keys()));
+    if (!decision.grant) return refuse(decision.why);
+    console.log(JSON.stringify({ t3flare: "model-key", workspace: this.#workspaceId() ?? null, cli: decision.cli, key: decision.key, grants: decision.grants }));
+    return new Response(value, { status: 200, headers: { "cache-control": "no-store", "content-type": "text/plain" } });
   }
 
   /** Points the repo's git credentials at `CREDENTIAL_HELPER` (repos cloned before it existed). */

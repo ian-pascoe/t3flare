@@ -14,6 +14,7 @@ import type * as ChildProcess from "effect/process/ChildProcess";
 import { environmentServices } from "./bindings.ts";
 import { type ChannelProcess, type ChannelStart, ProcessRefused } from "./processChannel.ts";
 import { type CliName, profileLaunch } from "./cliProfiles.ts";
+import { CliSpawn } from "../provider/cli/wrapper.ts";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import * as StateStore from "../platform/stateStore.ts";
 
@@ -68,6 +69,8 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     }
     const channel = services.processes;
     const key = channel.newKey();
+    // The opening session (the wrapper's), when t3's adapter spawns inside `openSession`.
+    const session = yield* CliSpawn;
     if (services.modelProxy === undefined && name !== "t3flare-probe") return yield* refused(name, "this Environment has no model proxy");
     const launch = profileLaunch(
       {
@@ -101,7 +104,8 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       env: launch.env,
       ...(launch.files === undefined ? {} : { files: launch.files }),
       ...(launch.links === undefined ? {} : { links: launch.links }),
-      ...(launch.thread === undefined ? {} : { thread: launch.thread }),
+      ...(session !== undefined ? { thread: session.thread } : launch.thread === undefined ? {} : { thread: launch.thread }),
+      ...(session?.linked === true ? { linked: true } : {}),
     };
     const process = yield* Effect.acquireRelease(
       Effect.tryPromise({
@@ -110,6 +114,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       }),
       (running: ChannelProcess) => Effect.sync(() => running.kill()),
     );
+    if (session !== undefined) session.process = process;
     const stdin = command.options.stdin;
     const endOnDone = typeof stdin === "object" && stdin !== null && "endOnDone" in stdin ? stdin.endOnDone !== false : true;
     return handleOf(process, endOnDone);

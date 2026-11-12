@@ -79,7 +79,7 @@ export interface ProcessHostDeps {
   /** Whether `cli: "probe"` may start (test stages). */
   readonly allowProbe: boolean;
   /** Before a start: the profile's checks that need the Container (the sandbox probe, the key's nonce). */
-  readonly beforeStart?: (input: ProcessStartInput) => Promise<{ readonly env?: Readonly<Record<string, string>> } | void>;
+  readonly beforeStart?: (input: ProcessStartInput) => Promise<{ readonly env?: Readonly<Record<string, string>>; readonly sandbox?: boolean } | void>;
   /** A process of a linked thread lives, or no longer does (D1, review F8). */
   readonly linkedWork?: (thread: string, alive: boolean) => void;
 }
@@ -180,8 +180,11 @@ export class ProcessHost {
     }
     await this.#killOthers(input.environmentEpoch);
     let extraEnv: Readonly<Record<string, string>> = {};
+    let sandbox: boolean | undefined;
     try {
-      extraEnv = (await this.#deps.beforeStart?.(input))?.env ?? {};
+      const prepared = await this.#deps.beforeStart?.(input);
+      extraEnv = prepared?.env ?? {};
+      sandbox = prepared?.sandbox;
     } catch (error) {
       return refuse(String(error instanceof Error ? error.message : error).slice(0, 500));
     }
@@ -244,8 +247,8 @@ export class ProcessHost {
       return refuse(`the process did not start: ${String(error instanceof Error ? error.message : error).slice(0, 300)}`);
     }
     if (proc.killing) await this.#deps.kill([proc.key]);
-    console.log(JSON.stringify({ t3flare: "process-started", key: input.key, cli: input.cli, thread: input.thread ?? null, environmentEpoch: input.environmentEpoch }));
-    return { ok: true, epoch: this.#deps.epoch };
+    console.log(JSON.stringify({ t3flare: "process-started", key: input.key, cli: input.cli, thread: input.thread ?? null, environmentEpoch: input.environmentEpoch, sandbox: sandbox ?? null }));
+    return { ok: true, epoch: this.#deps.epoch, ...(sandbox === undefined ? {} : { sandbox }) };
   }
 
   /** Kills every process of this Workspace started under another Environment epoch, or by an earlier instance of this object. */

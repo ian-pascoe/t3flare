@@ -99,8 +99,13 @@ try {
       : await request("thread/start", threadParams);
     summary.threadId = thread.thread?.id ?? null;
     summary.threadPath = thread.thread?.path ?? null;
-    await request("turn/start", { threadId: summary.threadId, input: [{ type: "text", text: scenario.prompt, text_elements: [] }], ...scenario.turnParams });
-    await turnCompleted;
+    for (let turn = 0; turn < (scenario.turns ?? 1); turn++) {
+      const done = new Promise((resolve) => (turnDone = resolve));
+      await request("turn/start", { threadId: summary.threadId, input: [{ type: "text", text: scenario.prompt, text_elements: [] }], ...scenario.turnParams });
+      await done;
+      summary.turnsCompleted = turn + 1;
+      if (summary.exit) break;
+    }
   }
 } catch (error) {
   summary.errors.push({ probe: "request-failed", error: error.rpc ?? String(error) });

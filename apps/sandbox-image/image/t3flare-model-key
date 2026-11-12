@@ -1,0 +1,7 @@
+#!/bin/bash
+# The key helper (step 4a, ADR-0016 A′): asks the Workspace DO, through computer's egress host, for the model proxy key
+# a CLI agent uses, and prints it on stdout for the CLI (Codex's provider `auth` command, pi's `!command` apiKey).
+# It writes no file, takes no secret as an argument, and logs nothing. The route answers only while a CLI process lives
+# in this Workspace, and checks the nonce its spawn was given.
+set -u
+exec curl -fsS --max-time 30 -H "x-t3flare-nonce: ${T3FLARE_MODEL_KEY_NONCE:-}" "http://computer.internal/t3flare/model-key?cli=${1:-unknown}"

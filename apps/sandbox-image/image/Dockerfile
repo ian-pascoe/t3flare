@@ -13,6 +13,9 @@
 ARG COMPUTERD_VERSION=0.9.0
 ARG MISE_VERSION=v2026.11.2
 ARG MISE_SHA256=62cad463c1413f05398ca339168a8f655120b6f0b0b8adce3bc6758bafaf0602
+# The CLI agents (step 4a; apps/sandbox-image/src/clis.ts holds the same values, test/clis.test.ts keeps them equal).
+ARG CODEX_VERSION=0.167.2
+ARG CODEX_SHA256=8246e846c550ea21197fcc4067bc270dca895e94ea42ed6a282e6f4e0125b15f
 
 # Every base image is pinned by digest as well as by tag, so a rebuild cannot move to another computerd build or Ubuntu
 # point release. Refresh a digest together with its tag: computerd's is the manifest of
@@ -30,6 +33,18 @@ RUN apt-get update \
  && curl -fsSL -o /mise https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-x64 \
  && echo "${MISE_SHA256}  /mise" | sha256sum -c - \
  && chmod 755 /mise
+
+# Codex, the same way: the release's static binary, checked against its digest, in a stage of its own.
+FROM --platform=linux/amd64 ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c AS codex
+ARG CODEX_VERSION
+ARG CODEX_SHA256
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && curl -fsSL -o /codex.tgz https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-x86_64-unknown-linux-musl.tar.gz \
+ && echo "${CODEX_SHA256}  /codex.tgz" | sha256sum -c - \
+ && tar -xzf /codex.tgz -C / \
+ && mv /codex-x86_64-unknown-linux-musl /codex \
+ && chmod 755 /codex
 
 FROM --platform=linux/amd64 ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
 
@@ -66,6 +81,17 @@ RUN cd /usr/local/share/cloudpid \
  && mise lock --global --platform linux-x64 \
  && mise reshim --system \
  && rm -rf /root/.cache /root/.local /tmp/*
+
+# The CLI agents (step 4a, plan §6), at fixed paths the CLI profiles name absolutely, after the mise layer so a CLI bump
+# rebuilds only this: Codex's checked binary, pi from a committed lock with the image's Node (`npm ci`, no scripts), the
+# key helper. Not mise: a project's toolchains must never shadow them.
+COPY --from=codex --chown=0:0 /codex /opt/t3flare/bin/codex
+COPY cli/package.json cli/package-lock.json /opt/t3flare/pi/
+RUN cd /opt/t3flare/pi \
+ && PATH=/usr/local/share/mise/installs/node/26.13.0/bin:$PATH npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
+ && rm -rf /root/.npm
+COPY --chmod=755 t3flare-pi /opt/t3flare/bin/pi
+COPY --chmod=755 t3flare-model-key /opt/t3flare/bin/t3flare-model-key
 
 COPY --chmod=755 supervise /usr/local/bin/cloudpid-supervise
 

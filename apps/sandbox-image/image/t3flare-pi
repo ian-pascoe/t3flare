@@ -1,0 +1,4 @@
+#!/bin/sh
+# The pi CLI (step 4a): the image's locked install, run by the image's own Node (absolute paths: a project's mise
+# shims never come first).
+exec /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js "$@"

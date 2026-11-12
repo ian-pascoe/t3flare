@@ -274,7 +274,12 @@ export interface ProcessAnswer {
 }
 
 export type ProcessStartAnswer =
-  | { readonly ok: true; readonly epoch: number }
+  | {
+      readonly ok: true;
+      readonly epoch: number;
+      /** Whether bubblewrap works in this Container (probed at each Container start, review F5): Codex's sandbox. */
+      readonly sandbox?: boolean;
+    }
   | { readonly ok: false; readonly epoch: number; readonly reason: string };
 
 /** One process's output in order (`seq`, one counter per process across both streams); `exit` comes last. */
