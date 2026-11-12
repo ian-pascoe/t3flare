@@ -39,3 +39,32 @@ the device flow (`CliTokenManager.deviceAuthorizationLogin`), the publish-only l
   `connect-leak` for text such as Workers Logs; names only).
 - **Scripts**: `scripts/connect.ts` (sign-in, status, publish, relink, unlink, sign-out, import-token, probe,
   refusals) and `scripts/connect-m2.ts` (the M2 rows).
+
+## Milestones and evidence
+
+All on the throwaway stage `step3plus` (workers.dev host), linked to the owner's T3 Connect account
+(ian.g.pascoe@gmail.com). Prod was never deployed, linked or run against.
+
+### M0: the unknowns, then the real link (A1 moved here)
+
+| Probe | Result | Evidence |
+|---|---|---|
+| P1 public config | the three values from `.env.example` resolve through t3's own `relayUrlConfig` and `cloudCliOAuthConfig` | `test/connectPublicConfig.test.ts` |
+| P2 the relay and Clerk from workerd | relay `/health` 200 (1.3 s cold); Clerk's device authorization 200 with `device_code`, `user_code`, `verification_uri(_complete)`; the code dropped | `m0-reachability.json` |
+| P3 the phase mapping | every row of the plan's §4.1 table through t3's `projectThreadAwarenessV2` | `test/connectPhases.test.ts` |
+| P4 the link step against a fake relay | t3's real `CloudLink` and signing key: `manual`, scopes exactly `["agent_activity_notifications"]`, origin `127.0.0.1:443`, `managedTunnelsEnabled: false` in both requests; mint key gone; token kept (stage) or discarded (prod); relink after unlink stays publish-only; a tunnel answer is undone; sign-out | `test/connectLink.test.ts` |
+| P5 policy | t3flare's managed policy (main's ADR-0023) allows Connect; `reachability` answers 401 unauthenticated and needs a session | `test/refusingCloudLink.test.ts`, `m0-refusals.json` (`kept`) |
+| P6 the relay's own view | not needed: the account token lists environments and devices directly (200), so status codes were the evidence | `m0-link.json` (`relay`) |
+| **A1, the real link** | the owner approved a code; t3's poll got the token from the Worker (no Clerk block, so no R1 fallback); the relay lists `t3flare` with endpoint `manual` beside the laptop's `cloudflare_tunnel`; desired mode `publish_only`; no mint key, no tunnel config | `m0-link.json` |
+| **One publish** | a turn published `starting`, `running`, then `completed` after t3's 5 s hold; the relay answered `ok: true` each time | `m0-first-publish.json` |
+
+### M1: the machinery
+
+- **Refusals:** the four relay routes answer 404 at the DO for GET, POST, PUT and OPTIONS and for trailing-slash,
+  doubled-slash and percent-encoded spellings; an upper-case spelling never reaches the DO (the Worker routes `/api`
+  case-sensitively and serves the web client). Past the DO's 404, t3's own app refuses mint and health with 403 (the
+  refusing `CloudLink`), and link-proof and relay-config with 401 before any session. `m0-refusals.json`.
+- **The kept routes** (`link-state`, `preferences`, `unlink`, `reachability`) answer 401 without a session, as t3 does.
+- **Sign-in expiry:** a code left unapproved ended `CloudCliAuthorizationTimeoutError` after 10 minutes, the hold was
+  released, and the Environment then reset when idle. `m1-sign-in-expiry.json`.
+- `bun run check` passes.
