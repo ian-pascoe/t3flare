@@ -1,0 +1,191 @@
+{
+ "at": "2026-11-12T02:11:08.884Z",
+ "scenario": "resume",
+ "ok": true,
+ "failures": [],
+ "cli": "pi",
+ "workspace": "cli-pi",
+ "first": {
+  "threadId": "7df44018-4de8-46d0-9e1e-e93214bb014d",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:7df44018-4de8-46d0-9e1e-e93214bb014d:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "ok",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3A7df44018-4de8-46d0-9e1e-e93214bb014d%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-10-39-741Z_01a1cd85-7bf9-708a-98d7-59dd801b7dfb.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:7df44018-4de8-46d0-9e1e-e93214bb014d:93797113-7675-4971-82bd-4f95d95f2935",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:7df44018-4de8-46d0-9e1e-e93214bb014d:93797113-7675-4971-82bd-4f95d95f2935",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 15067
+ },
+ "container": {
+  "running": false,
+  "leased": false,
+  "lastUse": 1794449436395
+ },
+ "budget": {
+  "max": 3,
+  "leases": [
+   {
+    "holder": "fc4d44ebe5090d2c42f78ddfe52236f0e5745d62174e5af76bfb86083595eefc",
+    "until": 1794450016437,
+    "workspace": "cli-codex"
+   }
+  ]
+ },
+ "second": {
+  "threadId": "7df44018-4de8-46d0-9e1e-e93214bb014d",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:7df44018-4de8-46d0-9e1e-e93214bb014d:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:7df44018-4de8-46d0-9e1e-e93214bb014d:ordinal:2",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "reasoning",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "HERON-52",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3A7df44018-4de8-46d0-9e1e-e93214bb014d%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "pi",
+     "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T02-10-39-741Z_01a1cd85-7bf9-708a-98d7-59dd801b7dfb.jsonl",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:pi:thread:7df44018-4de8-46d0-9e1e-e93214bb014d:93797113-7675-4971-82bd-4f95d95f2935",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:7df44018-4de8-46d0-9e1e-e93214bb014d:93797113-7675-4971-82bd-4f95d95f2935",
+    "status": "ready",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 15879
+ },
+ "protocol": [
+  {
+   "at": 1794449433380,
+   "command": "pi",
+   "argv": [
+    "--mode",
+    "rpc",
+    "--extension",
+    "/t3/caches/pi-t3-mcp-extension.ts"
+   ],
+   "cwd": "/w/cli-pi",
+   "route": "process",
+   "exitCode": null,
+   "ms": 3151
+  },
+  {
+   "at": 1794449454091,
+   "command": "pi",
+   "argv": [
+    "--mode",
+    "rpc",
+    "--extension",
+    "/t3/caches/pi-t3-mcp-extension.ts"
+   ],
+   "cwd": "/w/cli-pi",
+   "route": "process",
+   "exitCode": null,
+   "ms": 3053
+  },
+  {
+   "at": 1794449457144,
+   "command": "pi",
+   "argv": [
+    "switch_session"
+   ],
+   "cwd": null,
+   "route": "protocol",
+   "exitCode": null,
+   "ms": 0,
+   "detail": "/workspace/.t3flare/pi/sessions/2026-11-12T02-10-39-741Z_01a1cd85-7bf9-708a-98d7-59dd801b7dfb.jsonl"
+  }
+ ]
+}

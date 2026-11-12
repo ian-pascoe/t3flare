@@ -198,19 +198,23 @@ switch (scenario) {
     const first = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "Remember the code word HERON-52 for later. Reply with ok only." });
     check("turn 1 completed", first.runs.at(-1)?.status === "completed", first.runs);
     await admin("POST", `/_t3flare/agents/workspace-stop?id=${workspace}`);
-    await sleep(5000);
+    let container: any = null;
+    for (let i = 0; i < 6; i++) {
+      await sleep(5000);
+      container = (await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces?.find((ws: any) => ws.id === workspace)?.container ?? null;
+      if (container?.running === false) break;
+    }
     const budget = (await admin("GET", "/_t3flare/agents/budget")).json;
-    const container = (await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces?.find((ws: any) => ws.id === workspace)?.container ?? null;
     check("the Container stopped and its lease went", container?.running === false && container?.leased === false, { container, budget });
     const second = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "What was the code word? Reply with it only.", threadId: first.threadId });
     check("turn 2 completed", second.runs.at(-1)?.status === "completed", second.runs);
     const native = (turn: typeof first) => turn.providerThreads.map((thread: any) => thread.nativeThreadRef?.nativeId ?? null);
     check("the same native thread", native(first).length === 1 && JSON.stringify(native(first)) === JSON.stringify(native(second)), { first: native(first), second: native(second) });
-    check("a new provider session (a new process)", second.providerSessions.some((session: any) => !first.providerSessions.some((old: any) => old.id === session.id)), second.providerSessions);
     const trace = ((await admin("GET", "/_t3flare/agents/router-trace")).json?.entries ?? []) as Array<any>;
     const protocol = trace.filter((entry: any) => entry.route === "protocol" || entry.route === "process");
     const resumed = protocol.filter((entry: any) => entry.route === "protocol" && (entry.detail ?? "").includes(String(native(first)[0])) && !String(entry.detail).startsWith("failed"));
     check("the protocol log shows the CLI resumed that native thread", resumed.length >= 1, protocol);
+    check("a new process for turn 2 (the first went with its Container)", protocol.filter((entry: any) => entry.route === "process").length >= 2, protocol);
     check("no context handoff", !JSON.stringify(second.items).includes("handoff"), second.items);
     finish(arg("out") ?? `m5-resume-${cli}.json`, { cli, workspace, first, container, budget, second, protocol });
     break;
