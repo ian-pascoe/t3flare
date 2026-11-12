@@ -1,0 +1,572 @@
+{
+  "probe": "P4",
+  "git": "git version 2.56.1",
+  "at": "2026-11-12T12:11:29.473Z",
+  "results": [
+    {
+      "name": "first",
+      "argv": [
+        "push",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main"
+      ],
+      "exitCode": 0,
+      "gitOutput": "ecv header, 0000000053 bytes (0x00000035)\n07:11:27.908717 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:27.908718 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:27.908720 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:27.908721 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:27.908723 http.c:953              <= Recv header: Content-Length: 50\n07:11:27.908725 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:27.908727 http.c:953              <= Recv header:\n07:11:27.908739 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n * [new branch]      HEAD -> main",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-length": "394",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 394,
+          "prefix": "MDBiNjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAgNjBmOTgyNzY1MjIyNTQyYzhlMjIwMTYyN2YzN2RiNmI5MzNjMzdiZiByZWZzL2hlYWRzL21haW4AIHJlcG9ydC1zdGF0dXMtdjIgc2lkZS1iYW5kLTY0ayBxdWlldCBvYmplY3QtZm9ybWF0PXNoYTEgYWdlbnQ9Z2l0LzIuNTYuMS1EYXJ3aW4wMDAw",
+          "prefixText": "00b60000000000000000000000000000000000000000 60f982765222542c8e2201627f37db6b933c37bf refs/heads/main\\0 report-status-v2 side-band-64k quiet object-format=sha1 agent=git/2.56.1-Darwin0000"
+        }
+      ]
+    },
+    {
+      "name": "t3-form",
+      "argv": [
+        "push",
+        "--",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/spi992/t3"
+      ],
+      "exitCode": 0,
+      "gitOutput": "eader, 0000000053 bytes (0x00000035)\n07:11:28.043797 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:28.043798 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.043800 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:28.043802 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:28.043804 http.c:953              <= Recv header: Content-Length: 55\n07:11:28.043807 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.043808 http.c:953              <= Recv header:\n07:11:28.043822 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n * [new branch]      HEAD -> spi992/t3",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-length": "451",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 451,
+          "prefix": "MDBiYjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAgMzNiNmRkNDAyYTFlMTlkZTQzYjE0Y2NlMTczNzRjMGJiMDlkYzFiYSByZWZzL2hlYWRzL3NwaTk5Mi90MwAgcmVwb3J0LXN0YXR1cy12MiBzaWRlLWJhbmQtNjRrIHF1aWV0IG9iamVjdC1mb3JtYXQ9c2hhMSBhZ2VudD1naXQvMi41Ni4xLURhcndpbjAwMDA=",
+          "prefixText": "00bb0000000000000000000000000000000000000000 33b6dd402a1e19de43b14cce17374c0bb09dc1ba refs/heads/spi992/t3\\0 report-status-v2 side-band-64k quiet object-format=sha1 agent=git/2.56.1-Darwin0000"
+        }
+      ]
+    },
+    {
+      "name": "delete",
+      "argv": [
+        "push",
+        "http://127.0.0.1:61037/remote.git",
+        "--delete",
+        "refs/heads/spi992/t3"
+      ],
+      "exitCode": 0,
+      "gitOutput": "= Recv header, 0000000053 bytes (0x00000035)\n07:11:28.115890 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:28.115892 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.115893 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:28.115895 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:28.115896 http.c:953              <= Recv header: Content-Length: 55\n07:11:28.115899 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.115900 http.c:953              <= Recv header:\n07:11:28.115914 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n - [deleted]         spi992/t3",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-length": "191",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 191,
+          "prefix": "MDBiYjMzYjZkZDQwMmExZTE5ZGU0M2IxNGNjZTE3Mzc0YzBiYjA5ZGMxYmEgMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCByZWZzL2hlYWRzL3NwaTk5Mi90MwAgcmVwb3J0LXN0YXR1cy12MiBzaWRlLWJhbmQtNjRrIHF1aWV0IG9iamVjdC1mb3JtYXQ9c2hhMSBhZ2VudD1naXQvMi41Ni4xLURhcndpbjAwMDA=",
+          "prefixText": "00bb33b6dd402a1e19de43b14cce17374c0bb09dc1ba 0000000000000000000000000000000000000000 refs/heads/spi992/t3\\0 report-status-v2 side-band-64k quiet object-format=sha1 agent=git/2.56.1-Darwin0000"
+        }
+      ]
+    },
+    {
+      "name": "atomic-two",
+      "argv": [
+        "push",
+        "--atomic",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main",
+        "HEAD:refs/heads/spi992/two"
+      ],
+      "exitCode": 0,
+      "gitOutput": ")\n07:11:28.261279 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:28.261280 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.261282 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:28.261283 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:28.261284 http.c:953              <= Recv header: Content-Length: 79\n07:11:28.261289 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.261290 http.c:953              <= Recv header:\n07:11:28.261301 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n   60f9827..cefb4a0  HEAD -> main\n * [new branch]      HEAD -> spi992/two",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-length": "765",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 765,
+          "prefix": "MDBiZDYwZjk4Mjc2NTIyMjU0MmM4ZTIyMDE2MjdmMzdkYjZiOTMzYzM3YmYgY2VmYjRhMGY2YmYzYWIxNzY5NjBmN2EzOWUxM2QyOTgyNGRkYjdiYiByZWZzL2hlYWRzL21haW4AIHJlcG9ydC1zdGF0dXMtdjIgc2lkZS1iYW5kLTY0ayBxdWlldCBhdG9taWMgb2JqZWN0LWZvcm1hdD1zaGExIGFnZW50PWdpdC8yLjU2LjEtRGFyd2luMDA2YjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAgY2VmYjRhMGY2YmYzYWIxNzY5NjBmN2EzOWUxM2QyOTgyNGRkYjdiYiByZWZzL2hlYWRzL3NwaTk5Mi90d28wMDAw",
+          "prefixText": "00bd60f982765222542c8e2201627f37db6b933c37bf cefb4a0f6bf3ab176960f7a39e13d29824ddb7bb refs/heads/main\\0 report-status-v2 side-band-64k quiet atomic object-format=sha1 agent=git/2.56.1-Darwin006b0000000000000000000000000000000000000000 cefb4a0f6bf3ab176960f7a39e13d29824ddb7bb refs/heads/spi992/two0000"
+        }
+      ]
+    },
+    {
+      "name": "push-option",
+      "argv": [
+        "-c",
+        "receive.advertisePushOptions=true",
+        "push",
+        "-o",
+        "ci.skip",
+        "-o",
+        "x=y",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main"
+      ],
+      "exitCode": 1,
+      "gitOutput": "Type: application/x-git-receive-pack-advertisement\n07:11:28.343199 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.343202 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:28.343204 http.c:941              <= Recv header, 0000000021 bytes (0x00000015)\n07:11:28.343207 http.c:953              <= Recv header: Content-Length: 290\n07:11:28.343211 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.343212 http.c:953              <= Recv header:\n07:11:28.343222 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nfatal: the receiving end does not support push options\nfatal: the remote end hung up unexpectedly\nerror: failed to push some refs to 'http://127.0.0.1:61037/remote.git'",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        }
+      ]
+    },
+    {
+      "name": "push-option-advertised",
+      "argv": [
+        "push",
+        "-o",
+        "ci.skip",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main"
+      ],
+      "exitCode": 0,
+      "gitOutput": "ecv header, 0000000053 bytes (0x00000035)\n07:11:28.500415 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:28.500417 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.500420 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:28.500422 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:28.500424 http.c:953              <= Recv header: Content-Length: 50\n07:11:28.500428 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.500431 http.c:953              <= Recv header:\n07:11:28.500444 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n   cefb4a0..9a64e45  HEAD -> main",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-length": "730",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 730,
+          "prefix": "MDBjM2NlZmI0YTBmNmJmM2FiMTc2OTYwZjdhMzllMTNkMjk4MjRkZGI3YmIgOWE2NGU0NWJlYWNhNDRmZWU5NTA5M2Y2ZjkxOTkzN2FjZjhlNmQyOCByZWZzL2hlYWRzL21haW4AIHJlcG9ydC1zdGF0dXMtdjIgc2lkZS1iYW5kLTY0ayBxdWlldCBwdXNoLW9wdGlvbnMgb2JqZWN0LWZvcm1hdD1zaGExIGFnZW50PWdpdC8yLjU2LjEtRGFyd2luMDAwMDAwMGJjaS5za2lwMDAwMA==",
+          "prefixText": "00c3cefb4a0f6bf3ab176960f7a39e13d29824ddb7bb 9a64e45beaca44fee95093f6f919937acf8e6d28 refs/heads/main\\0 report-status-v2 side-band-64k quiet push-options object-format=sha1 agent=git/2.56.1-Darwin0000000bci.skip0000"
+        }
+      ]
+    },
+    {
+      "name": "force",
+      "argv": [
+        "push",
+        "--force",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main"
+      ],
+      "exitCode": 0,
+      "gitOutput": "000053 bytes (0x00000035)\n07:11:28.621345 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:28.621347 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.621348 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:28.621350 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:28.621352 http.c:953              <= Recv header: Content-Length: 50\n07:11:28.621354 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.621355 http.c:953              <= Recv header:\n07:11:28.621366 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n + 9a64e45...a1e22da HEAD -> main (forced update)",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-length": "452",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 452,
+          "prefix": "MDBiNjlhNjRlNDViZWFjYTQ0ZmVlOTUwOTNmNmY5MTk5MzdhY2Y4ZTZkMjggYTFlMjJkYWZmYWEzYTlhMjBhZjMwYTRiYjA1Y2E1MmY3ZjM5NTc3MSByZWZzL2hlYWRzL21haW4AIHJlcG9ydC1zdGF0dXMtdjIgc2lkZS1iYW5kLTY0ayBxdWlldCBvYmplY3QtZm9ybWF0PXNoYTEgYWdlbnQ9Z2l0LzIuNTYuMS1EYXJ3aW4wMDAw",
+          "prefixText": "00b69a64e45beaca44fee95093f6f919937acf8e6d28 a1e22daffaa3a9a20af30a4bb05ca52f7f395771 refs/heads/main\\0 report-status-v2 side-band-64k quiet object-format=sha1 agent=git/2.56.1-Darwin0000"
+        }
+      ]
+    },
+    {
+      "name": "force-with-lease",
+      "argv": [
+        "push",
+        "--quiet",
+        "--force-with-lease=refs/heads/main",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main"
+      ],
+      "exitCode": 1,
+      "gitOutput": "ader: Content-Type: application/x-git-receive-pack-advertisement\n07:11:28.692219 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.692221 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:28.692223 http.c:941              <= Recv header, 0000000021 bytes (0x00000015)\n07:11:28.692224 http.c:953              <= Recv header: Content-Length: 303\n07:11:28.692227 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.692228 http.c:953              <= Recv header:\n07:11:28.692237 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n ! [rejected]        HEAD -> main (stale info)\nerror: failed to push some refs to 'http://127.0.0.1:61037/remote.git'",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        }
+      ]
+    },
+    {
+      "name": "tag",
+      "argv": [
+        "push",
+        "http://127.0.0.1:61037/remote.git",
+        "refs/tags/v1"
+      ],
+      "exitCode": 0,
+      "gitOutput": "<= Recv header, 0000000053 bytes (0x00000035)\n07:11:28.801867 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:28.801868 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.801870 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:27 GMT\n07:11:28.801872 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:28.801873 http.c:953              <= Recv header: Content-Length: 47\n07:11:28.801877 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.801878 http.c:953              <= Recv header:\n07:11:28.801890 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n * [new tag]         v1 -> v1",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-length": "447",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 447,
+          "prefix": "MDBiMzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAgMzY3NGM2ZTY4OTcxODY0OTQ3ODk4YWNjM2E3MWM0Y2UxYzQ0ZjgyMyByZWZzL3RhZ3MvdjEAIHJlcG9ydC1zdGF0dXMtdjIgc2lkZS1iYW5kLTY0ayBxdWlldCBvYmplY3QtZm9ybWF0PXNoYTEgYWdlbnQ9Z2l0LzIuNTYuMS1EYXJ3aW4wMDAw",
+          "prefixText": "00b30000000000000000000000000000000000000000 3674c6e68971864947898acc3a71c4ce1c44f823 refs/tags/v1\\0 report-status-v2 side-band-64k quiet object-format=sha1 agent=git/2.56.1-Darwin0000"
+        }
+      ]
+    },
+    {
+      "name": "signed",
+      "argv": [
+        "push",
+        "--signed",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/spi992/signed"
+      ],
+      "exitCode": 1,
+      "gitOutput": "ype: application/x-git-receive-pack-advertisement\n07:11:28.845491 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:28.845493 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:28 GMT\n07:11:28.845495 http.c:941              <= Recv header, 0000000021 bytes (0x00000015)\n07:11:28.845496 http.c:953              <= Recv header: Content-Length: 361\n07:11:28.845499 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:28.845500 http.c:953              <= Recv header:\n07:11:28.845508 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nfatal: the receiving end does not support --signed push\nfatal: the remote end hung up unexpectedly\nerror: failed to push some refs to 'http://127.0.0.1:61037/remote.git'",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        }
+      ]
+    },
+    {
+      "name": "large",
+      "argv": [
+        "push",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main"
+      ],
+      "exitCode": 0,
+      "gitOutput": "ecv header, 0000000053 bytes (0x00000035)\n07:11:29.240317 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:29.240318 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:29.240324 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:28 GMT\n07:11:29.240326 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:29.240328 http.c:953              <= Recv header: Content-Length: 50\n07:11:29.240331 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:29.240332 http.c:953              <= Recv header:\n07:11:29.240347 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n   a1e22da..0cb5595  HEAD -> main",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "content-length": "4",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 4,
+          "prefix": "MDAwMA==",
+          "prefixText": "0000"
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "transfer-encoding": "chunked",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 3147121,
+          "prefix": "MDBiNmExZTIyZGFmZmFhM2E5YTIwYWYzMGE0YmIwNWNhNTJmN2YzOTU3NzEgMGNiNTU5NTk0OTI4YTc2MDBmMzA4YTg2NTQwNDBhMTJjNTRhZTQxMSByZWZzL2hlYWRzL21haW4AIHJlcG9ydC1zdGF0dXMtdjIgc2lkZS1iYW5kLTY0ayBxdWlldCBvYmplY3QtZm9ybWF0PXNoYTEgYWdlbnQ9Z2l0LzIuNTYuMS1EYXJ3aW4wMDAw",
+          "prefixText": "00b6a1e22daffaa3a9a20af30a4bb05ca52f7f395771 0cb559594928a7600f308a8654040a12c54ae411 refs/heads/main\\0 report-status-v2 side-band-64k quiet object-format=sha1 agent=git/2.56.1-Darwin0000"
+        }
+      ]
+    },
+    {
+      "name": "large-small-buffer",
+      "argv": [
+        "-c",
+        "http.postBuffer=65536",
+        "push",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main"
+      ],
+      "exitCode": 0,
+      "gitOutput": "ecv header, 0000000053 bytes (0x00000035)\n07:11:29.417204 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-result\n07:11:29.417205 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:29.417207 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:28 GMT\n07:11:29.417209 http.c:941              <= Recv header, 0000000020 bytes (0x00000014)\n07:11:29.417210 http.c:953              <= Recv header: Content-Length: 50\n07:11:29.417213 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:29.417214 http.c:953              <= Recv header:\n07:11:29.417229 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nTo http://127.0.0.1:61037/remote.git\n   0cb5595..c515733  HEAD -> main",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "content-length": "4",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 4,
+          "prefix": "MDAwMA==",
+          "prefixText": "0000"
+        },
+        {
+          "method": "POST",
+          "path": "/remote.git/git-receive-pack",
+          "query": "",
+          "headers": {
+            "accept": "application/x-git-receive-pack-result",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "content-type": "application/x-git-receive-pack-request",
+            "host": "127.0.0.1:61037",
+            "transfer-encoding": "chunked",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 307728,
+          "prefix": "MDBiNjBjYjU1OTU5NDkyOGE3NjAwZjMwOGE4NjU0MDQwYTEyYzU0YWU0MTEgYzUxNTczM2EzMTg1MDc4YWY4MTEzYzdlMmE3ZTFlNTJmZmE0YzA3ZSByZWZzL2hlYWRzL21haW4AIHJlcG9ydC1zdGF0dXMtdjIgc2lkZS1iYW5kLTY0ayBxdWlldCBvYmplY3QtZm9ybWF0PXNoYTEgYWdlbnQ9Z2l0LzIuNTYuMS1EYXJ3aW4wMDAw",
+          "prefixText": "00b60cb559594928a7600f308a8654040a12c54ae411 c515733a3185078af8113c7e2a7e1e52ffa4c07e refs/heads/main\\0 report-status-v2 side-band-64k quiet object-format=sha1 agent=git/2.56.1-Darwin0000"
+        }
+      ]
+    },
+    {
+      "name": "up-to-date",
+      "argv": [
+        "push",
+        "http://127.0.0.1:61037/remote.git",
+        "HEAD:refs/heads/main"
+      ],
+      "exitCode": 0,
+      "gitOutput": "11:29.463616 http.c:941              <= Recv header, 0000000060 bytes (0x0000003c)\n07:11:29.463617 http.c:953              <= Recv header: Content-Type: application/x-git-receive-pack-advertisement\n07:11:29.463619 http.c:941              <= Recv header, 0000000037 bytes (0x00000025)\n07:11:29.463620 http.c:953              <= Recv header: Date: Thu, 12 Nov 2026 12:11:28 GMT\n07:11:29.463622 http.c:941              <= Recv header, 0000000021 bytes (0x00000015)\n07:11:29.463624 http.c:953              <= Recv header: Content-Length: 361\n07:11:29.463627 http.c:941              <= Recv header, 0000000002 bytes (0x00000002)\n07:11:29.463628 http.c:953              <= Recv header:\n07:11:29.463637 http.c:994              == Info: Connection #0 to host 127.0.0.1:61037 left intact\nEverything up-to-date",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/remote.git/info/refs",
+          "query": "?service=git-receive-pack",
+          "headers": {
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip, br, zstd",
+            "accept-language": "en-US, *;q=0.9",
+            "host": "127.0.0.1:61037",
+            "pragma": "no-cache",
+            "user-agent": "git/2.56.1"
+          },
+          "bodyBytes": 0,
+          "prefix": "",
+          "prefixText": ""
+        }
+      ]
+    }
+  ]
+}
