@@ -8,6 +8,7 @@ import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
 import { ApprovalStore, PLAN_MODE_REFUSAL } from "../src/extensions/permissions.ts";
+import { OTHER_MACHINES } from "../src/extensions/t3-guidance.ts";
 import { type CatalogTool, catalogOf, type McpCallAnswer, t3McpExtension, t3ToolName, T3_TOOL_ALLOWLIST } from "../src/extensions/t3-mcp.ts";
 import { context, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
@@ -176,6 +177,77 @@ describe("t3-mcp tools", () => {
 
   it("t3's orchestration instructions are a prompt section while the tools are installed", async () => {
     const section = setup().extension().sections![0]!;
-    expect(await section.render({} as never, context)).toBe("## T3 Code orchestration");
+    expect(await section.render({} as never, context)).toBe(`## T3 Code orchestration\n\n${OTHER_MACHINES}`);
+  });
+});
+
+describe("t3-mcp guidance (SPI-1060)", () => {
+  const GUIDANCE = [
+    "## T3 Code orchestration",
+    "",
+    "Ordinary coding tasks need no T3 tools.",
+    "",
+    "- Call `delegate_task` with a `task`.",
+    "- Another machine: call `t3_environment_link` with a `hint`.",
+    "- A secret: call `request_secret`,",
+    "  never a chat ask.",
+    "- Given a thread id, `t3_thread_read` it.",
+    "",
+    "### Visuals and preview",
+    "",
+    "- Show it with `html_preview`, then `html_render`.",
+    "- Never use `preview_*` unasked.",
+  ].join("\n");
+
+  const render = (instructions: string, listed: ReadonlyArray<CatalogTool> = LISTED) =>
+    t3McpExtension(catalogOf(listed), {
+      store: new ApprovalStore(memoryKv(), () => {}),
+      mode: () => "approval-required",
+      interaction: () => "default",
+      turn: () => null,
+      credential: () => "provider-session-1",
+      instructions: () => instructions,
+      call: () => Promise.resolve({ kind: "result", text: "{}", isError: false }),
+    });
+
+  it("drops each bullet naming a tool not offered, and a heading left with none, then adds our line", async () => {
+    const text = await render(GUIDANCE).sections![0]!.render({} as never, context);
+    expect(text).toBe(
+      [
+        "## T3 Code orchestration",
+        "",
+        "Ordinary coding tasks need no T3 tools.",
+        "",
+        "- Call `delegate_task` with a `task`.",
+        "- Given a thread id, `t3_thread_read` it.",
+        "",
+        OTHER_MACHINES,
+      ].join("\n"),
+    );
+  });
+
+  it("drops a bullet naming an allowlisted tool t3 did not list for this thread", async () => {
+    const text = await render(GUIDANCE, LISTED.filter((tool) => tool.name !== "t3_thread_read")).sections![0]!.render({} as never, context);
+    expect(text).not.toContain("t3_thread_read");
+    expect(text).toContain("`delegate_task`");
+  });
+
+  it("drops a bullet naming a name it has not classified, so an unknown tool is never told about", async () => {
+    const text = await render("- Call `delegate_task`.\n- Call `t3_brand_new_tool`.").sections![0]!.render({} as never, context);
+    expect(text).toBe(`- Call \`delegate_task\`.\n\n${OTHER_MACHINES}`);
+  });
+
+  it("drops each sentence of an offered tool's description that names a tool not offered", () => {
+    const listed: ReadonlyArray<CatalogTool> = [
+      {
+        name: "t3_environment_links",
+        description:
+          "List linked environments and whether each answers now. Pass one's `environmentId` to a tool; `delegate_task` takes it. Expired: link it again with `t3_environment_link`.",
+        annotations: { readOnlyHint: true },
+      },
+      ...LISTED,
+    ];
+    const tool = render("", listed).tools!.find((each) => each.name === t3ToolName("t3_environment_links"))!;
+    expect(tool.description).toBe("List linked environments and whether each answers now. Pass one's `environmentId` to a tool; `delegate_task` takes it.");
   });
 });

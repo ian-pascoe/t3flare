@@ -184,6 +184,7 @@ import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
 import { cloudCapabilities } from "./capabilities.ts";
 import { layerManagedPolicy } from "./managedPolicy.ts";
+import { layerOwnerPeerForwarding, layerOwnerPeerLinkRequests, layerOwnerPeerLinks } from "./peerLinks.ts";
 import * as ConnectService from "../connect/service.ts";
 import { makePublishRecorder } from "../connect/recorder.ts";
 import {
@@ -723,13 +724,20 @@ export const make = (options: CompositionOptions) => {
   ).pipe(
     Layer.provide(PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer))),
     Layer.provide(RemoteDelegation.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
-    Layer.provide(PeerLinkRequests.layer),
+    // t3flare: no link card, no outward link, no stored link used, and no pointer at `t3_environment_link` (SPI-1061 pre).
+    Layer.provide(layerOwnerPeerLinkRequests.pipe(Layer.provide(PeerLinkRequests.layer))),
     Layer.provide(layerPullRequestService),
     Layer.provide(
       ServerBrowser.layer.pipe(Layer.provide(Layer.merge(DesktopBrowserChannel.layer, PreviewAgentActivity.layer))),
     ),
     Layer.provide(PreviewBrowser.layer),
-    Layer.provide(PeerForwarding.layer.pipe(Layer.provideMerge(PeerMcpClient.layer), Layer.provideMerge(PeerLinks.layer))),
+    Layer.provide(
+      layerOwnerPeerForwarding.pipe(
+        Layer.provide(PeerForwarding.layer),
+        Layer.provideMerge(PeerMcpClient.layer),
+        Layer.provideMerge(layerOwnerPeerLinks.pipe(Layer.provide(PeerLinks.layer))),
+      ),
+    ),
     Layer.provide(SpeechService.layer.pipe(Layer.provide(layerServerSettings), Layer.provide(SpeechModelStore.layer))),
     Layer.provide(CloudSpeech.layer.pipe(Layer.provide(SecretResolver.layer))),
     Layer.provide(layerServerSettings),

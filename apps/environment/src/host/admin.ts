@@ -6,6 +6,7 @@
 //   POST /_t3flare/safe-mode?on=1|0             toggle safe mode by hand
 //   POST /_t3flare/fault/boot-failures?count=N  make the next N boots fail (to prove automatic safe mode)
 //   POST /_t3flare/sql                          read-only SQL: {"sql": "...", "params": [...]}
+//   GET  /_t3flare/peer-links/count             SPI-1061 pre-B: how many outward link rows t3 stores (a count only; prod-safe)
 //   POST /_t3flare/arm-bootstrap?minutes=15     seed t3's bootstrap grant for a window (restarts t3 in place)
 //   POST /_t3flare/disarm-bootstrap
 //   POST /_t3flare/restart?mode=abort|in-place  reset the object (as an eviction does), or restart t3 only
@@ -81,6 +82,16 @@ const readOnlySql = (environment: EnvironmentDO, query: string, params: Readonly
     if (!(error instanceof ReadOnlyRollback)) throw error;
   }
   return result!;
+};
+
+/**
+ * SPI-1061 pre-B: how many rows t3's `peer_environment_links` holds, without booting t3 and without a column of them
+ * (no address, label or secret name), so the owner can run it on prod. `null` before t3 has made the table.
+ */
+const peerLinkCount = (environment: EnvironmentDO): { readonly count: number | null } => {
+  const table = readOnlySql(environment, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'peer_environment_links'", []);
+  if (table.rows.length === 0) return { count: null };
+  return { count: Number(readOnlySql(environment, "SELECT COUNT(*) FROM peer_environment_links", []).rows[0]![0]) };
 };
 
 /** The health route shows an unreadable idle query (fragility U2) as its error rather than failing. */
@@ -202,6 +213,8 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         if (typeof body.sql !== "string") return json({ error: "sql is required" }, 400);
         return json(readOnlySql(environment, body.sql, body.params ?? []));
       }
+      case "GET /_t3flare/peer-links/count":
+        return json(peerLinkCount(environment));
       case "POST /_t3flare/arm-bootstrap": {
         const minutes = Number(url.searchParams.get("minutes") ?? DEFAULT_ARM_MINUTES);
         const until = await environment.arm(Number.isFinite(minutes) ? minutes : DEFAULT_ARM_MINUTES);

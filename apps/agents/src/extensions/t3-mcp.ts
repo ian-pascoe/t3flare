@@ -18,6 +18,7 @@ import type { Context } from "@earendil-works/chord";
 import { defineExtension, type Extension, section, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
 
+import { descriptionFor, guidanceFor, OTHER_MACHINES } from "./t3-guidance.ts";
 import { type ApprovalStore, askOwner, cutOffResult, MAX_SUMMARY, planRefusal, STARTED_MEMO } from "./permissions.ts";
 
 export const T3_MCP_SERVER = "t3-code";
@@ -148,14 +149,14 @@ const cut = (text: string, max = MAX_SUMMARY) => (text.length <= max ? text : `$
 const takesKey = (tool: CatalogTool) =>
   typeof tool.inputSchema?.properties === "object" && tool.inputSchema.properties !== null && "clientRequestId" in (tool.inputSchema.properties as object);
 
-/** One tool of the catalog as a pi-durable tool. */
-const toolOf = (tool: CatalogTool, host: T3McpHost): ToolRegistration => {
+/** One tool of the catalog as a pi-durable tool; its description names no tool outside `offered` (SPI-1060). */
+const toolOf = (tool: CatalogTool, host: T3McpHost, offered: ReadonlySet<string>): ToolRegistration => {
   const name = t3ToolName(tool.name);
   const readOnly = tool.annotations?.readOnlyHint === true;
   const keyed = takesKey(tool);
   return {
     name,
-    description: tool.description ?? tool.title ?? tool.name,
+    description: descriptionFor(tool.description ?? tool.title ?? tool.name, offered),
     parameters: (tool.inputSchema ?? { type: "object", properties: {} }) as object,
     // Every call may run again after a restart: an approval waits again, a keyed call is t3's same work, and the rest
     // refuse a second run below.
@@ -214,10 +215,21 @@ const waitInPieces = async (
   }
 };
 
-/** The extension for `catalog`; installed again (replaced in place) whenever the catalog's hash changes. */
-export const t3McpExtension = (catalog: T3Catalog, host: T3McpHost): Extension =>
-  defineExtension({
+/**
+ * The extension for `catalog`; installed again (replaced in place) whenever the catalog's hash changes. t3's guidance
+ * is told without what names a tool not offered, then our line on other machines (SPI-1060).
+ */
+export const t3McpExtension = (catalog: T3Catalog, host: T3McpHost): Extension => {
+  const offered: ReadonlySet<string> = new Set(catalog.tools.map((tool) => tool.name));
+  return defineExtension({
     name: "t3-mcp",
-    tools: catalog.tools.map((tool) => toolOf(tool, host)),
-    sections: [section("t3_orchestration", () => host.instructions()?.trim() || undefined)],
+    tools: catalog.tools.map((tool) => toolOf(tool, host, offered)),
+    sections: [
+      section("t3_orchestration", () => {
+        const instructions = host.instructions();
+        if (instructions === undefined) return undefined;
+        return [guidanceFor(instructions, offered), OTHER_MACHINES].filter((part) => part !== "").join("\n\n");
+      }),
+    ],
   });
+};
