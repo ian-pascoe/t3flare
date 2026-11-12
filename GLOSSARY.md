@@ -50,12 +50,13 @@ _Avoid_: laptop threads, remote threads
 
 **Outbound send**:
 A message a cloud agent sends to another Environment over an Outbound link: launching a thread, delegating a task,
-messaging a thread or answering its question. Each one waits for the owner's answer on a card of its own.
+messaging a thread, replacing a queued message or answering a question. Each one waits for the owner's answer on a
+card of its own.
 _Avoid_: forwarded call, remote prompt
 
 **Send permit**:
-The owner's approval of one Outbound send, kept by the Environment and matched when that send leaves; it covers
-that thread, that tool and those arguments, once.
+The owner's approval of one Outbound send exactly as it will leave, made by the Environment alone from the owner's
+own answer and matched when that send leaves; it covers that thread, that tool and those arguments, once.
 _Avoid_: grant (that is t3's bootstrap grant), token, Expectation (that is a push's)
 
 **Linked work**:

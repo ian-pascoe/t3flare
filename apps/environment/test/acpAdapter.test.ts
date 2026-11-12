@@ -206,8 +206,12 @@ describe("Claude Code through t3's ACP adapter", () => {
       }),
     ));
 
-  it("ends the session when the agent leaves its asking mode, before answering any request (review F4)", () =>
-    test(
+  it("ends the session when the agent leaves its asking mode, before answering any request (review F4)", async () => {
+    // Ending the session races the turn's terminal event: under load the interruption reaches the test's own fiber
+    // ("All fibers interrupted", seen in CI and in a loaded local check). Both fail closed; what must hold is that no
+    // request was answered, so the agent's log is checked either way. The message's determinism: SPI-1064.
+    let agentLog: (() => Parameters<typeof answers>[0]) | undefined;
+    const outcome = test(
       Effect.gen(function* () {
         const harness = yield* session(
           "claude",
@@ -218,8 +222,7 @@ describe("Claude Code through t3's ACP adapter", () => {
           }),
           { runtimeMode: "full-access" },
         );
-        // Ending the session races the turn's terminal event: sometimes the runtime's fibers are interrupted first (seen
-        // in CI). Both fail closed; what must hold is that no request was answered. The message's determinism: SPI-1064.
+        agentLog = harness.agentLog;
         const terminal = yield* Effect.exit(harness.terminal);
         expect(answers(harness.agentLog())).toEqual([]);
         if (terminal._tag === "Success") {
@@ -228,7 +231,15 @@ describe("Claude Code through t3's ACP adapter", () => {
           expect(event.type === "turn.terminal" && event.status === "failed" ? event.failure.message : "", JSON.stringify(event)).toContain("left its approval mode");
         }
       }),
-    ));
+    );
+    try {
+      await outcome;
+    } catch (error) {
+      if (!String(error).includes("All fibers interrupted")) throw error;
+      expect(agentLog, "interrupted before the session opened").toBeDefined();
+      expect(answers(agentLog!())).toEqual([]);
+    }
+  });
 
   it("refuses a session whose agent offers auto or bypass (managed policy not read, review F4)", () =>
     test(
