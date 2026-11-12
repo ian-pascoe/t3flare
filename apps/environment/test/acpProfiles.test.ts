@@ -67,7 +67,7 @@ describe("Claude Code's profile", () => {
     expect(CLAUDE_PROJECTS).toBe("/workspace/.t3flare/claude/projects");
   });
 
-  it("writes managed settings a repository cannot override (review F3, F5; M0 P1, P3, P4)", () => {
+  it("pins the endpoint and the key in managed settings a repository cannot override (review F3; K5; M0 P1, P3)", () => {
     const { json, mode } = fileOf(launch("claude", []), "/managed-settings.json");
     expect(mode ?? 0o600).toBe(0o600);
     expect(json).toMatchObject({
@@ -77,16 +77,13 @@ describe("Claude Code's profile", () => {
       skipWebFetchPreflight: true,
       disableClaudeAiConnectors: true,
       permissions: { defaultMode: "default", disableBypassPermissionsMode: "disable", allow: [], ask: [], deny: [] },
-      disableAutoMode: "disable",
-      allowManagedPermissionRulesOnly: true,
-      allowManagedHooksOnly: true,
-      allowManagedMcpServersOnly: true,
-      allowedMcpServers: [],
-      strictKnownMarketplaces: [],
-      disableSkillShellExecution: true,
-      strictPluginOnlyCustomization: ["hooks", "mcp", "agents"],
       sandbox: { enabled: false },
     });
+    // The repository's own `.claude/` is honoured as stock t3 honours it (owner, 2026-11-12, back to stock): its hooks,
+    // MCP servers, agents, skills, plugins, marketplaces and permission rules, and Claude's auto mode for t3's `auto`.
+    for (const key of ["disableAutoMode", "allowManagedPermissionRulesOnly", "allowManagedHooksOnly", "allowManagedMcpServersOnly", "allowedMcpServers", "strictKnownMarketplaces", "disableSkillShellExecution", "strictPluginOnlyCustomization"]) {
+      expect(json, key).not.toHaveProperty(key);
+    }
     const env = json.env as Record<string, string>;
     expect(env.ANTHROPIC_BASE_URL).toBe("https://proxy.example");
     expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("claude-haiku-5-5");
@@ -157,7 +154,7 @@ describe("OpenCode's profile", () => {
     expect(OPENCODE_SNAPSHOT_DIR).toBe("/workspace/.t3flare/opencode");
   });
 
-  it("writes system configuration with one provider, the catalog, deny-by-default policies and asking agents (M0 P2, P4)", () => {
+  it("writes system configuration with one provider, the catalog, the project's own config honoured, and asking agents (M0 P2)", () => {
     const { json } = fileOf(launch("opencode", ["acp"]), "/opencode.json");
     const provider = (json.providers as Record<string, Record<string, unknown>>).t3flare!;
     expect(Object.keys(json.providers as object)).toEqual(["t3flare"]);
@@ -173,10 +170,11 @@ describe("OpenCode's profile", () => {
     const last = (action: string, resource: string) => policies.filter((entry) => entry.action === action && matches(entry.resource, resource)).at(-1)?.effect;
     expect(last("provider.use", "openai")).toBe("deny");
     expect(last("provider.use", "t3flare")).toBe("allow");
-    expect(last("plugin.use", "/w/demo/.opencode/plugins/x.ts")).toBe("deny");
-    expect(last("plugin.use", "/opt/t3flare/share/opencode-key-plugin")).toBe("allow");
-    for (const action of ["mcp.use", "skill.use", "websearch.use", "integration.connect"]) expect(last(action, "anything"), action).toBe("deny");
-    expect(last("tool.use", "subagent:sneaky")).toBe("deny");
+    // The project's own plugins, MCP servers, skills and agents (owner, 2026-11-12, back to stock); no vendor account.
+    for (const [action, resource] of [["plugin.use", "/w/demo/.opencode/plugins/x.ts"], ["mcp.use", "repo-server"], ["skill.use", "anything"], ["tool.use", "subagent:repo-agent"]]) {
+      expect(last(action!, resource!), action).toBeUndefined();
+    }
+    for (const action of ["websearch.use", "integration.connect"]) expect(last(action, "anything"), action).toBe("deny");
     // Every agent asks for everything but reads; plan also denies edits.
     const agents = json.agents as Record<string, { permissions: Array<{ action: string; resource: string; effect: string }> }>;
     expect(Object.keys(agents).sort()).toEqual(["build", "explore", "general", "plan"]);

@@ -13,11 +13,11 @@ export const OPENCODE_CLI_DRIVER = ProviderDriverKind.make("opencode");
 
 const decodeSettings = Schema.decodeSync(OpenCodeSettings);
 
-/** OpenCode's presentation: its `plan` agent behind t3's plan toggle (no proposed plan: todos and text), no `auto`. */
+/** OpenCode's presentation: its `plan` agent behind t3's plan toggle (no proposed plan: todos and text), and t3's four modes as stock t3's OpenCode lists them (`auto` asks). */
 const PRESENTATION = {
   displayName: "OpenCode",
   showInteractionModeToggle: true,
-  supportedRuntimeModes: ["approval-required", "auto-accept-edits", "full-access"],
+  supportedRuntimeModes: ["approval-required", "auto-accept-edits", "auto", "full-access"],
   supportsConversationRollback: false,
 } as const;
 

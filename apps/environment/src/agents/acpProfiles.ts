@@ -6,7 +6,9 @@
 // override a managed key), the proxy as its only provider, the key from `apiKeyHelper` (the launcher keeps the nonce in
 // the home, not in the environment: M0 P1 found the env scrub plants decoy files in the repo).
 // OpenCode: `opencode acp` exactly, its system configuration (`/etc/opencode`, outranking user and project files) with
-// one provider and deny-by-default policies, the key set by the image's server plugin, every home on local disk.
+// one provider, the key set by the image's server plugin, every home on local disk.
+// Each honours the repository's own configuration otherwise, as stock t3's CLIs do (owner, 2026-11-12, back to stock):
+// hooks, MCP servers, agents, skills, plugins, marketplaces. What stays pinned is K5: the endpoint and the key.
 import type { CatalogModel } from "@t3flare/models";
 import { SMALL_MODEL_SLUG, DEFAULT_MODEL_SLUG } from "@t3flare/models";
 import { CLI_HOMES } from "@t3flare/sandbox-image/process";
@@ -96,15 +98,13 @@ const claudeSwitches = (proxyUrl: string): Record<string, string> => ({
 /** The relay's server names an ACP agent is given (acpDriver's session servers): the owner's third-party servers. */
 const relayNames = (context: ProfileContext): ReadonlyArray<string> => (context.relay === undefined ? [] : context.relay.servers);
 
-/** Where the MCP relay's servers are (ADR-0028): the only MCP URLs Claude Code and OpenCode admit. */
-export const RELAY_URL_PATTERN = "http://computer.internal/t3flare/mcp/*";
-
 /**
- * Claude Code's managed settings (`/etc/claude-code/managed-settings.json`). `relayServers`: the MCP relay's servers
- * (ADR-0028; the entries themselves, with the process's handle, come per session over ACP, review H2), allowed without
- * Claude's own prompt because the relay decides and asks.
+ * Claude Code's managed settings (`/etc/claude-code/managed-settings.json`): the endpoint and the key (K5), and the
+ * asking mode the flavor pins (`acpFlavor.ts`). `relayServers`: the MCP relay's servers (ADR-0028; the entries
+ * themselves, with the process's handle, come per session over ACP, review H2), allowed without Claude's own prompt
+ * because the relay decides and asks. The repository's `.claude/` is honoured for everything else.
  */
-export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = [], t3McpUrl?: string) => ({
+export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = []) => ({
   apiKeyHelper: CLAUDE_KEY_HELPER,
   // Review F3: only the endpoint the managed env pins is admitted.
   allowedProviders: ["customEndpoint"],
@@ -113,18 +113,9 @@ export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<Ca
   skipWebFetchPreflight: true,
   disableClaudeAiConnectors: true,
   cleanupPeriodDays: 60,
+  // The asking mode the flavor pins: t3 decides each request (acpFlavor.ts). Claude's `auto` mode is not disabled: t3's
+  // `auto` selects it, as stock t3's Claude adapter does.
   permissions: { defaultMode: "default", disableBypassPermissionsMode: "disable", allow: relayServers.map((server) => `mcp__${server}`), ask: [], deny: [] },
-  disableAutoMode: "disable",
-  allowManagedPermissionRulesOnly: true,
-  allowManagedHooksOnly: true,
-  allowManagedMcpServersOnly: true,
-  // t3's own server too, at its public `/mcp` with t3's bearer, as stock t3 hands it (owner, 2026-11-12, back to stock);
-  // its tools are not pre-allowed: Claude asks for them as any tool, through t3's card.
-  allowedMcpServers: [...(relayServers.length === 0 ? [] : [{ serverUrl: RELAY_URL_PATTERN }]), ...(t3McpUrl === undefined ? [] : [{ serverUrl: t3McpUrl }])],
-  // Review F5: no marketplace, no skill shell injection, no repo hooks, MCP servers or agents.
-  strictKnownMarketplaces: [],
-  disableSkillShellExecution: true,
-  strictPluginOnlyCustomization: ["hooks", "mcp", "agents"],
   // With Claude's own sandbox on, `autoAllowBashIfSandboxed` would run commands without asking t3.
   sandbox: { enabled: false },
 });
@@ -145,7 +136,7 @@ const claudeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer
       CLAUDE_CODE_API_KEY_HELPER_TTL_MS: String(24 * 3_600_000),
       ...claudeSwitches(context.proxyUrl),
     },
-    files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(context.proxyUrl, context.models, relayNames(context), context.t3McpUrl), null, 1)}\n` }],
+    files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(context.proxyUrl, context.models, relayNames(context)), null, 1)}\n` }],
     links: [{ path: `${home}/claude/projects`, target: CLAUDE_PROJECTS }],
     ...(thread === undefined ? {} : { thread }),
     droppedEnv: dropped(input.env),
@@ -191,18 +182,10 @@ export const opencodeConfig = (proxyUrl: string, models: ReadonlyArray<CatalogMo
     policies: [
       deny("provider.use"),
       allow("provider.use", "t3flare"),
+      // No vendor account (K3): OpenCode's sign-in and its hosted web search.
       deny("integration.connect"),
-      deny("mcp.use"),
-      ...[...relayServers, "t3-code"].map((server) => allow("mcp.use", server)),
-      ...[...relayServers, "t3-code"].map((server) => allow("tool.use", `${server}_*`)),
-      deny("skill.use"),
-      deny("plugin.use"),
-      allow("plugin.use", OPENCODE_KEY_PLUGIN),
       deny("websearch.use"),
-      // A repository's agents: no subagent but OpenCode's own two.
-      deny("tool.use", "subagent:*"),
-      allow("tool.use", "subagent:general"),
-      allow("tool.use", "subagent:explore"),
+      ...[...relayServers, "t3-code"].map((server) => allow("tool.use", `${server}_*`)),
     ],
     permissions: asking,
     agents: {

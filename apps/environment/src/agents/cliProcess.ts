@@ -106,7 +106,6 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
         },
         piExtensionSource: PI_T3_MCP_EXTENSION_SOURCE,
         relay: { handle: toolHandle, servers: services.relayServers() },
-        t3McpUrl: services.t3McpUrl(),
       },
     );
     if ("refused" in launch) {

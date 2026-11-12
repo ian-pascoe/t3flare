@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import type { McpView } from "../src/mcp/host.ts";
 import { relayMessage, type RelayDeps } from "../src/mcp/relay.ts";
-import { isT3Server } from "../src/provider/cli/codexGuard.ts";
 import { codexRelayOverrides, profileLaunch } from "../src/agents/cliProfiles.ts";
 
 const tool = (upstream: string, cls: "read" | "write", exposure: "direct" | "deferred" | "codemode" | "hidden" = "deferred") => ({
@@ -171,13 +170,6 @@ describe("the CLIs' relay entries (H2, M11)", () => {
     expect(launch.env.T3FLARE_TOOL_HANDLE).toBe(handle);
     expect(launch.argv.join(" ")).not.toContain(handle);
     expect(JSON.stringify(launch.files)).not.toContain(handle);
-  });
-
-  it("lets t3's own entry into Codex's thread config as stock t3 writes it: https `/mcp` with t3's bearer only", () => {
-    expect(isT3Server({ url: "https://t3.example/mcp", http_headers: { Authorization: "Bearer t3-real-token" }, tool_timeout_sec: 3900 })).toBe(true);
-    expect(isT3Server({ url: "http://t3.example/mcp", http_headers: { Authorization: "Bearer t3-real-token" } })).toBe(false);
-    expect(isT3Server({ url: "https://t3.example/other", http_headers: { Authorization: "Bearer t3-real-token" } })).toBe(false);
-    expect(isT3Server({ url: "https://t3.example/mcp", http_headers: { Authorization: "Bearer t3-real-token", "X-Extra": "1" } })).toBe(false);
   });
 });
 

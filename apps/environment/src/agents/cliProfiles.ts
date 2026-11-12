@@ -48,8 +48,6 @@ export interface ProfileContext {
    * into this process's environment (review H2: never a Container-wide file).
    */
   readonly relay?: { readonly handle: string; readonly servers: ReadonlyArray<string> };
-  /** t3's own `/mcp` as the Container reaches it (relayedMcp.ts): the one other MCP URL an ACP agent admits. */
-  readonly t3McpUrl?: string;
 }
 
 /** The relay's URL for `server` as the Container reaches it. */
@@ -117,7 +115,8 @@ export const codexOverrides = (proxyUrl: string, key: string): ReadonlyArray<str
     "features.apps=false",
     "features.tool_suggest=false",
     "features.image_generation=false",
-    "features.multi_agent=false",
+    // `features.multi_agent` is left at Codex's default, as stock t3 leaves it (owner, 2026-11-12, back to stock): it
+    // was turned off with M0 P10's batch, not for a vendor call of its own; its subagents use the thread's provider.
     "analytics.enabled=false",
     // Review F4: the nonce stays out of Codex's shells; the marker stays in them (part 2's kill script).
     `shell_environment_policy.exclude=[${tomlString(NONCE_ENV)},${tomlString(TOOL_HANDLE_ENV)}]`,

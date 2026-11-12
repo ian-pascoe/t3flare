@@ -56,6 +56,8 @@ describe("Codex's profile", () => {
         'sandbox_mode="read-only"',
       ]),
     );
+    // Codex's subagents stay on, as stock t3 leaves them (owner, 2026-11-12, back to stock).
+    expect(overrides.some((value) => value.startsWith("features.multi_agent"))).toBe(false);
     expect(answer.env).toEqual({ HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: "/var/lib/t3flare/cli/proc-1/codex", CODEX_SQLITE_HOME: "/var/lib/t3flare/cli/proc-1/sqlite" });
     expect(answer.links).toEqual([{ path: "/var/lib/t3flare/cli/proc-1/codex/sessions", target: CODEX_SESSIONS }]);
     expect(answer.thread).toBe("thread-1");

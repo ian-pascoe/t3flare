@@ -37,11 +37,11 @@ import { type CliSession, type CliSessions, sessionFor, wrapCliAdapter } from ".
 
 export const CODEX_DRIVER = ProviderDriverKind.make("codex");
 
-/** t3's Codex presentation (`CodexProvider.ts` `CODEX_PRESENTATION`) without `auto` (C1): t3 refuses an explicit auto launch. */
+/** t3's Codex presentation (`CodexProvider.ts` `CODEX_PRESENTATION`): every mode, `auto` with Codex's reviewer (back to stock, owner 2026-11-12). */
 const PRESENTATION = {
   displayName: "Codex",
   showInteractionModeToggle: true,
-  supportedRuntimeModes: ["approval-required", "auto-accept-edits", "full-access"],
+  supportedRuntimeModes: ["approval-required", "auto-accept-edits", "auto", "full-access"],
   reportsContextWindow: true,
 } as const;
 

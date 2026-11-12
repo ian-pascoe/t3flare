@@ -11,11 +11,11 @@ export const CLAUDE_CLI_DRIVER = ProviderDriverKind.make("claudeAgent");
 
 const decodeSettings = Schema.decodeSync(ClaudeSettings);
 
-/** Claude's presentation: the plan toggle (its proposed plan is recovered, review F1), no `auto`. */
+/** Claude's presentation: the plan toggle (its proposed plan is recovered, review F1), and `auto` as Claude's own auto mode (back to stock, owner 2026-11-12). */
 const PRESENTATION = {
   displayName: "Claude",
   showInteractionModeToggle: true,
-  supportedRuntimeModes: ["approval-required", "auto-accept-edits", "full-access"],
+  supportedRuntimeModes: ["approval-required", "auto-accept-edits", "auto", "full-access"],
   supportsConversationRollback: false,
 } as const;
 

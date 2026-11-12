@@ -39,7 +39,7 @@ Codex and the pi CLI run as built in step 4a (`docs/steps/step-4a.md`); Claude C
 - **Epochs** are durable boot counters (the Environment DO's and the Workspace DO's). A start from another Environment epoch first kills every process of that Workspace started under a different one; processes an earlier Workspace instance started are killed when the Environment heartbeats a key the new instance does not hold, and from the alarm. Stubs to a Workspace DO are made fresh for every call: a stub to an object that reset stays broken.
 - **Lifetime.** A process holds its Container while its thread is in a turn and for 11 minutes after; t3's own idle release ends the session at 10 minutes (Patch 0003, all providers). A stop ends the CLI processes first (they flush their session files), then pulls. When the Container budget is full, a start asks the holders to stop a Container where nothing works (idle CLI sessions included). At most 4 CLI processes per Workspace (an idle Codex app-server is about 160 MB). The Environment's own idle reset (60 s without a client, ADR-0003) ends idle CLI processes at the Workspace's 90 s lapse; the next turn resumes the native thread in a new process.
 - **Readiness wrappers.** Codex and Pi are registered by t3flare's drivers (`provider/cli/`) built from t3's `makeCodexAdapterV2` and `makePiAdapterV2`: the image's versions (`apps/sandbox-image/src/clis.ts`, checked against t3's compatibility manifest), the proxy's catalog, no spawning probe, text generation through the proxy, t3's MCP credential withheld (OD-3), and a wrapper that reports `supportsMultipleProviderThreadsPerSession: false` (one process per session, so per Workspace) and refuses forks into another Workspace.
-- **Mode table** (M0 P2: bubblewrap works in Cloudflare Containers, probed at each start): Codex's per-turn policy comes from t3flare's guard: approval-required `untrusted` + read-only, auto-accept-edits `on-request` + workspace-write, full access `never`; `auto`, unknown and plan run as approval-required, plan declines file changes; without a sandbox everything but full access is `untrusted` with full access. The process default is `on-request` + read-only (Codex 0.167.2 refuses `untrusted` at process level). pi's permission extension is t3's own, required, copied into the process's home, and its mode always set (never the extension's full-access default); a plan turn on pi is refused.
+- **Mode table** (superseded by the back-to-stock refinement below, owner 2026-11-12; M0 P2: bubblewrap works in Cloudflare Containers, probed at each start): Codex's per-turn policy comes from t3flare's guard: approval-required `untrusted` + read-only, auto-accept-edits `on-request` + workspace-write, full access `never`; `auto`, unknown and plan run as approval-required, plan declines file changes; without a sandbox everything but full access is `untrusted` with full access. The process default is `on-request` + read-only (Codex 0.167.2 refuses `untrusted` at process level). pi's permission extension is t3's own, required, copied into the process's home, and its mode always set (never the extension's full-access default); a plan turn on pi is refused.
 - Shadows 2 (`builtInDrivers`, `processGroup`), Patches 3, a new Build shim exception (pi's extension source is skipped by the `node:fs` alias: its imports are text).
 
 ## Refinement (step 4b, 2026-11-12): Claude Code and OpenCode over t3's ACP adapter
@@ -47,9 +47,9 @@ Codex and the pi CLI run as built in step 4a (`docs/steps/step-4a.md`); Claude C
 Built in step 4b (`docs/steps/step-4b.md`); owner decision OD-1 confirmed shipping over ACP, with ACP flavor parity as SPI-1037.
 
 - **Neither of t3's drivers for these CLIs speaks ACP.** t3's Claude provider runs the Claude Agent SDK in t3's process and spawns `claude` with Node's own `child_process`; t3's OpenCode provider runs `opencode serve` and talks HTTP and SSE to a local port. Both are out of reach from a Durable Object. t3flare registers **t3's own kinds** (`claudeAgent` "Claude", `opencode` "OpenCode") built on t3's generic ACP adapter (`makeAcpAdapterV2`) with flavors of ours (`apps/environment/src/provider/cli/acpDriver.ts`, `acpFlavor.ts`), spawning `claude-agent-acp` (0.106.0, Claude Code 2.1.322) and `opencode acp` (2.2.7) through 4a's process channel. The native drivers stay considered options: native Claude would put the SDK in the Worker and restate its spawn and fork worker; native OpenCode needs an HTTP/SSE tunnel to a Container port.
-- **Every mode fails closed: the agent always asks, t3 decides.** Claude is pinned to `default`, OpenCode to its `build` agent; t3flare's disposition answers what they ask: reads allowed; `approval-required` asks; `auto-accept-edits` allows an edit only when every location it names is inside the thread's cwd and outside `.git/`, `.claude/`, `.opencode/` (t3's own rule had no containment without a sandbox policy, review F2); `full-access` allows; a plan turn denies edits and Claude's request to leave plan mode; `auto` and unknown modes ask. The approval card never offers "for the session" (it would pick the agent's own "always": a saved rule, or an auto mode). A session whose agent offers `auto` or `bypassPermissions`, or moves to a mode we did not pin, is ended with a named failure.
+- **Every mode fails closed: the agent always asks, t3 decides** (the cwd containment, once-only cards, the `auto` refusal and the mode-drift ending are superseded by the back-to-stock refinement below, owner 2026-11-12). Claude is pinned to `default`, OpenCode to its `build` agent; t3flare's disposition answers what they ask: reads allowed; `approval-required` asks; `auto-accept-edits` allows an edit only when every location it names is inside the thread's cwd and outside `.git/`, `.claude/`, `.opencode/` (t3's own rule had no containment without a sandbox policy, review F2); `full-access` allows; a plan turn denies edits and Claude's request to leave plan mode; `auto` and unknown modes ask. The approval card never offers "for the session" (it would pick the agent's own "always": a saved rule, or an auto mode). A session whose agent offers `auto` or `bypassPermissions`, or moves to a mode we did not pin, is ended with a named failure.
 - **Claude's plan** becomes t3's proposed plan when Claude asks to leave plan mode (captured from the `ExitPlanMode` request, which is then denied, review F1); OpenCode's plan arrives as text and todos.
-- **Repositories cannot redirect or loosen them.** Claude Code's managed settings (`/etc/claude-code`, installed per spawn by the image's launcher) pin the endpoint (`allowedProviders: ["customEndpoint"]`, the proxy URL, the proxy, CA, provider and auth variables pinned empty), managed permission rules, hooks and MCP servers only, no marketplaces, no skill shell execution, no repo hooks, MCP or agents. OpenCode's system configuration (`/etc/opencode`) has one provider and deny-by-default policies (providers, plugins, MCP, skills, web search, `/connect`, any subagent but `general` and `explore`), with every agent's rules asking. A hostile fixture (M0 P4 locally, M5 on stage) changed nothing.
+- **Repositories cannot redirect or loosen them** (loosening is allowed again since the back-to-stock refinement below, owner 2026-11-12; redirecting is not). Claude Code's managed settings (`/etc/claude-code`, installed per spawn by the image's launcher) pin the endpoint (`allowedProviders: ["customEndpoint"]`, the proxy URL, the proxy, CA, provider and auth variables pinned empty), managed permission rules, hooks and MCP servers only, no marketplaces, no skill shell execution, no repo hooks, MCP or agents. OpenCode's system configuration (`/etc/opencode`) has one provider and deny-by-default policies (providers, plugins, MCP, skills, web search, `/connect`, any subagent but `general` and `explore`), with every agent's rules asking. A hostile fixture (M0 P4 locally, M5 on stage) changed nothing.
 - **Parity cost** (OD-1, `docs/parity.md`): no fork (both CLIs answer `session/fork`; SPI-1037), steering by interrupt and restart, rollback off, OpenCode without a structured plan; the proxy's 429 is t3's usage limit through the flavor's prompt failure. Idle compaction is not started (it would send `/compact` turns to `claudeAgent`); `/goal` reaches Claude, which declines it under managed hooks.
 - Shadows unchanged (2: `builtInDrivers` now registers four CLI drivers, `processGroup`), Patches unchanged (3).
 
@@ -63,8 +63,42 @@ Before SPI-1040 a linked CLI thread could not push at all (step 4a F8: the crede
 
 OD-3 is lifted. Each CLI gets MCP entries only in its managed or system scope: third-party servers at the MCP relay (`http://computer.internal/t3flare/mcp/<server>`, ADR-0028) with a per-process tool handle, and t3's own as stock t3 hands it, with t3's bearer at t3's public `/mcp` (owner, 2026-11-12, back to stock; ADR-0022):
 - **Codex:** `mcp_servers.<name>` on argv, approval mode `approve`, a 900 s timeout.
-- **Claude Code:** `allowManagedMcpServersOnly` and `allowedMcpServers` by the relay's URL pattern and t3's `/mcp`.
-- **OpenCode:** `mcp.use` denied but for the relay's servers and `t3-code`.
+- **Claude Code:** the relay's servers per session over ACP, pre-allowed in the managed `permissions.allow` (the admission lock by URL pattern was removed, owner 2026-11-12, back to stock).
+- **OpenCode:** the relay's servers and `t3-code` pre-allowed by `tool.use` (the `mcp.use` deny was removed, owner 2026-11-12, back to stock).
 - **pi:** t3's own tools only, through t3's pi extension. Commissary and direct servers wait for an MCP client in the image.
 
-A repo's own MCP configuration is never admitted. A write that asks raises t3's card on the CLI thread, injected by the wrapper (U37). Evidence: `docs/steps/tools/m5-cli-*.json`.
+A repo's own MCP configuration is admitted since the back-to-stock cut (owner, 2026-11-12). A write that asks raises t3's card on the CLI thread, injected by the wrapper (U37). Evidence: `docs/steps/tools/m5-cli-*.json`.
+
+## Refinement (back to stock, owner 2026-11-12): t3's own mode table, and the repository's own configuration
+
+Owner, 2026-11-12, back to stock (scope audit rows 2, 9 and 10). The CLIs behave as under stock t3; what stays is what
+the platform forces, the endpoint and key pinning (K5), and the pinned asking mode through which the ACP flavors
+implement t3's modes.
+
+- **Mode table.** Codex's per-turn policy is t3's (`CodexAdapterV2`): approval-required `untrusted` + read-only,
+  auto-accept-edits `on-request` + workspace-write, **`auto` `on-request` with Codex's `auto_review` reviewer** +
+  workspace-write, full access `never`. Kept: without a working sandbox everything but full access is `untrusted`; plan
+  runs read-only and declines file changes. Claude and OpenCode are pinned to their asking mode (`default`, `build`)
+  and t3 decides what they ask by t3's own rules: `auto-accept-edits` allows **every** edit (no cwd containment),
+  full access allows, the rest asks; **t3's `auto` puts Claude in its own `auto` mode** (stock t3's Claude adapter does
+  the same; if Claude does not offer it, the session stays in `default`) and OpenCode asks, as stock t3's OpenCode
+  does. Codex, Claude and OpenCode list `auto` again. The approval card is t3's own, "for the session" included (the
+  agent's own "always" answer). An agent that changes its own mode is no longer ended. A plan turn on the Pi CLI runs
+  as stock t3 runs it (pi has no plan mode).
+- **Repository configuration.** Claude Code honours the project's `.claude/` (hooks, MCP servers, agents, skills,
+  plugins, marketplaces, permission rules); OpenCode the project's config (plugins, MCP servers, skills, agents).
+  Removed from the managed settings: `allowManaged*Only`, `allowedMcpServers`, `strictKnownMarketplaces`,
+  `disableSkillShellExecution`, `strictPluginOnlyCustomization`, `disableAutoMode`; from OpenCode's system policies:
+  the `mcp.use`, `skill.use`, `plugin.use` and subagent denies. **Kept (K5):** fixed environment, fresh homes, the proxy
+  as the only provider (`allowedProviders`, `apiKeyHelper`, the redirect variables pinned empty in the managed `env`;
+  OpenCode's `provider.use` pin), so a repository still cannot send the proxy key elsewhere; no vendor account
+  (`disableClaudeAiConnectors`, OpenCode's `integration.connect` and hosted `websearch.use` denied, K3). OpenCode's
+  asking rules stay in its system configuration: they are the pinned asking mode, as stock t3's per-session rules are.
+- **Codex request guard.** t3's methods and thread config pass as t3 sends them. Kept: the provider pin (thread params
+  and config keys naming another provider, profile, base URL or policy are dropped), `feedback/*` and `account/*`
+  refused (a vendor upload and a vendor sign-in), and the per-turn policy above. `features.multi_agent` is no longer
+  turned off: it was in M0 P10's batch for no reason of its own.
+
+Accepted, as in stock t3: fewer prompts and more unasked actions inside the Container; a cloned repo's hooks and MCP
+servers run there as they would on a laptop.
+

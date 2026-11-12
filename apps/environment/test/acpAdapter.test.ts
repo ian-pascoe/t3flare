@@ -1,6 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off globalDate:off
 // t3's own ACP adapter (`makeAcpAdapterV2`) through our flavors (step 4b, plan §9's "Node with t3's adapter", review
-// F1, F2, F4): a scripted agent (fixtures/fake-acp-agent.mjs) answers as claude-agent-acp 0.106.0 and opencode 2.2.7
+// F1; back to stock, owner 2026-11-12): a scripted agent (fixtures/fake-acp-agent.mjs) answers as claude-agent-acp 0.106.0 and opencode 2.2.7
 // did in M0's probes. Each test asserts what the agent was answered and what t3 saw.
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -114,7 +114,7 @@ const session = (cli: AcpCli, build: (cwd: string) => Script, policy: { readonly
             ...options,
             spawn: { command: process.execPath, args: [AGENT], cwd: input.cwd, env: { PATH: process.env.PATH ?? "", FAKE_ACP_SCRIPT: scriptPath, FAKE_ACP_LOG: logPath }, extendEnv: false },
             authenticateOnAuthRequired: false,
-            // As in production (acpDriver.ts): the process group is ours, so the drift guard can end it.
+            // As in production (acpDriver.ts): the process group is ours.
             ownDetachedProcessGroup: true,
             processGroupPlatform: process.platform,
           }),
@@ -158,7 +158,7 @@ const run = <A>(effect: Effect.Effect<A, unknown, never>) => Effect.runPromise(e
 const test = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => run(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never);
 
 describe("Claude Code through t3's ACP adapter", () => {
-  it("asks the owner for an edit at approval-required, answers once, and downgrades 'for the session' (review F4)", () =>
+  it("asks the owner for an edit at approval-required, and 'for the session' picks the agent's own (stock t3)", () =>
     test(
       Effect.gen(function* () {
         const harness = yield* session(
@@ -175,8 +175,8 @@ describe("Claude Code through t3's ACP adapter", () => {
         const terminal = yield* harness.terminal;
         expect(terminal.type === "turn.terminal" && terminal.status).toBe("completed");
         const log = harness.agentLog();
-        // Never the agent's allow_always ("allow-with-updates" saves a rule into the repo).
-        expect(answers(log)).toEqual(["allow-once", "allow-once"]);
+        // "For the session" is the agent's allow_always, as stock t3 answers it; "accept" its allow_once.
+        expect(answers(log)).toEqual(["allow-with-updates", "allow-once"]);
         // Pinned to `default`, the catalog id chosen as the model.
         expect(log.find((entry) => entry.received === "session/set_config_option" && entry.params?.configId === "model")?.params?.value).toBe("claude-sonnet-5-5");
         expect(log.some((entry) => entry.received === "session/set_mode" && entry.params?.modeId !== "default")).toBe(false);
@@ -206,59 +206,66 @@ describe("Claude Code through t3's ACP adapter", () => {
       }),
     ));
 
-  it("ends the session when the agent leaves its asking mode, before answering any request (review F4)", async () => {
-    // Ending the session races the turn's terminal event: under load the interruption reaches the test's own fiber
-    // ("All fibers interrupted", seen in CI and in a loaded local check). Both fail closed; what must hold is that no
-    // request was answered, so the agent's log is checked either way. The message's determinism: SPI-1064.
-    let agentLog: (() => Parameters<typeof answers>[0]) | undefined;
-    const outcome = test(
+  it("keeps the session when the agent changes its own mode, and t3 still decides what it asks", () =>
+    test(
       Effect.gen(function* () {
         const harness = yield* session(
           "claude",
           (cwd) => ({
             initialize: CLAUDE.initialize,
             sessionNew: CLAUDE.sessionNew(),
-            prompts: [[{ update: { sessionUpdate: "current_mode_update", currentModeId: "acceptEdits" } }, permission("edit", [`${cwd}/a.txt`], CLAUDE.editOptions)]],
+            prompts: [[{ update: { sessionUpdate: "current_mode_update", currentModeId: "acceptEdits" } }, permission("execute", [cwd], CLAUDE.editOptions)]],
           }),
-          { runtimeMode: "full-access" },
+          { runtimeMode: "approval-required" },
         );
-        agentLog = harness.agentLog;
-        const terminal = yield* Effect.exit(harness.terminal);
-        expect(answers(harness.agentLog())).toEqual([]);
-        if (terminal._tag === "Success") {
-          const event = terminal.value;
-          expect(event.type === "turn.terminal" && event.status).toBe("failed");
-          expect(event.type === "turn.terminal" && event.status === "failed" ? event.failure.message : "", JSON.stringify(event)).toContain("left its approval mode");
-        }
+        const asked = yield* harness.until(pendingRequest);
+        if (asked.type !== "runtime_request.updated") throw new Error("expected a request");
+        yield* harness.runtime.respondToRuntimeRequest({ requestId: asked.runtimeRequest.id, decision: "accept" });
+        const terminal = yield* harness.terminal;
+        expect(terminal.type === "turn.terminal" && terminal.status).toBe("completed");
+        expect(answers(harness.agentLog())).toEqual(["allow-once"]);
       }),
-    );
-    try {
-      await outcome;
-    } catch (error) {
-      if (!String(error).includes("All fibers interrupted")) throw error;
-      expect(agentLog, "interrupted before the session opened").toBeDefined();
-      expect(answers(agentLog!())).toEqual([]);
-    }
-  });
+    ));
 
-  it("refuses a session whose agent offers auto or bypass (managed policy not read, review F4)", () =>
+  it("at t3's auto puts Claude in its own auto mode, and asks the owner for what Claude asks", () =>
     test(
       Effect.gen(function* () {
-        const outcome = yield* session(
+        const harness = yield* session(
           "claude",
-          () => ({ initialize: CLAUDE.initialize, sessionNew: CLAUDE.sessionNew(["default", "acceptEdits", "plan", "auto", "bypassPermissions"], "auto"), prompts: [[]] }),
-          { runtimeMode: "approval-required" },
-        ).pipe(
-          Effect.flatMap((harness) => harness.terminal),
-          Effect.match({ onFailure: () => "refused", onSuccess: (event) => (event.type === "turn.terminal" ? event.status : "other") }),
+          (cwd) => ({ initialize: CLAUDE.initialize, sessionNew: CLAUDE.sessionNew(["default", "acceptEdits", "plan", "auto"]), prompts: [[permission("execute", [cwd], CLAUDE.editOptions)]] }),
+          { runtimeMode: "auto" },
         );
-        expect(["refused", "failed"]).toContain(outcome);
+        const asked = yield* harness.until(pendingRequest);
+        if (asked.type !== "runtime_request.updated") throw new Error("expected a request");
+        yield* harness.runtime.respondToRuntimeRequest({ requestId: asked.runtimeRequest.id, decision: "accept" });
+        yield* harness.terminal;
+        const log = harness.agentLog();
+        const toAuto = (entry: (typeof log)[number]) => (entry.received === "session/set_mode" && entry.params?.modeId === "auto") || (entry.received === "session/set_config_option" && entry.params?.configId === "mode" && entry.params.value === "auto");
+        expect(log.some(toAuto)).toBe(true);
+        expect(answers(log)).toEqual(["allow-once"]);
+      }),
+    ));
+
+  it("at t3's auto stays in the asking mode when Claude does not offer auto", () =>
+    test(
+      Effect.gen(function* () {
+        const harness = yield* session(
+          "claude",
+          (cwd) => ({ initialize: CLAUDE.initialize, sessionNew: CLAUDE.sessionNew(), prompts: [[permission("execute", [cwd], CLAUDE.editOptions)]] }),
+          { runtimeMode: "auto" },
+        );
+        const asked = yield* harness.until(pendingRequest);
+        if (asked.type !== "runtime_request.updated") throw new Error("expected a request");
+        yield* harness.runtime.respondToRuntimeRequest({ requestId: asked.runtimeRequest.id, decision: "accept" });
+        const terminal = yield* harness.terminal;
+        expect(terminal.type === "turn.terminal" && terminal.status).toBe("completed");
+        expect(harness.agentLog().some((entry) => (entry.received === "session/set_mode" && entry.params?.modeId === "auto") || (entry.received === "session/set_config_option" && entry.params?.value === "auto"))).toBe(false);
       }),
     ));
 });
 
 describe("OpenCode through t3's ACP adapter", () => {
-  it("at auto-accept-edits allows an edit inside the cwd without asking, and asks for one outside (review F2)", () =>
+  it("at auto-accept-edits allows every edit without asking, wherever it points (stock t3)", () =>
     test(
       Effect.gen(function* () {
         const harness = yield* session(
@@ -270,16 +277,11 @@ describe("OpenCode through t3's ACP adapter", () => {
           }),
           { runtimeMode: "auto-accept-edits" },
         );
-        const outside = yield* harness.until(pendingRequest);
-        if (outside.type !== "runtime_request.updated") throw new Error("expected a request");
-        yield* harness.runtime.respondToRuntimeRequest({ requestId: outside.runtimeRequest.id, decision: "decline" });
-        const config = yield* harness.until(pendingRequest);
-        if (config.type !== "runtime_request.updated") throw new Error("expected a request");
-        yield* harness.runtime.respondToRuntimeRequest({ requestId: config.runtimeRequest.id, decision: "acceptForSession" });
-        yield* harness.terminal;
+        const terminal = yield* harness.terminal;
+        expect(terminal.type === "turn.terminal" && terminal.status).toBe("completed");
         const log = harness.agentLog();
-        // Inside: OpenCode's `once`, never `always` (a durable project rule, M0 P4).
-        expect(answers(log)).toEqual(["once", "reject", "once"]);
+        expect(answers(log)).toEqual(["once", "once", "once"]);
+        expect(harness.seen.some(pendingRequest)).toBe(false);
         // The catalog model is already OpenCode's current value: no other model is set.
         expect(log.filter((entry) => entry.received === "session/set_config_option" && entry.params?.configId === "model" && entry.params.value !== "t3flare/claude-sonnet-5-5")).toEqual([]);
       }),

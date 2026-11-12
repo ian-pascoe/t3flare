@@ -39,11 +39,11 @@ import { snapshotModels } from "../models.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import {
   type AcpCli,
-  cliApprovalOptions,
   cliModelId,
   cliPermissionDisposition,
   cliPromptFailure,
   cliRuntimeModeForSessionMode,
+  cliSessionModeForPolicy,
   guardedRuntime,
   guardSlots,
   PINNED_MODE,
@@ -185,18 +185,18 @@ export interface AcpFlavorOptions {
   readonly spawn?: AcpAdapterV2Flavor["makeRuntime"];
 }
 
-/** The flavor: plan §3.2's table with the review's changes. Every runtime is guarded (acpFlavor.ts `guardedRuntime`). */
+/** The flavor: plan §3.2's table, back to t3's own modes (owner, 2026-11-12). Every runtime is wrapped (`guardedRuntime`). */
 export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpFlavorOptions = {}): AcpAdapterV2Flavor => ({
   driver,
   capabilities: acpCapabilities(cli),
   makeRuntime: (input) => (options.spawn ?? spawnRuntime(cli))(input).pipe(Effect.map((runtime) => guardedRuntime(cli, runtime))),
-  // The agent is pinned to its asking mode; t3's plan handling moves it to plan for a plan turn and back (plan §5.1).
-  ...(cli === "claude" ? { sessionModeForPolicy: () => PINNED_MODE.claude } : { sessionConfigForPolicy: () => [{ id: "mode", value: PINNED_MODE.opencode }] }),
+  // The agent is pinned to its asking mode (Claude's auto for t3's auto); t3's plan handling moves it to plan for a plan
+  // turn and back (plan §5.1).
+  ...(cli === "claude" ? { sessionModeForPolicy: cliSessionModeForPolicy("claude") } : { sessionConfigForPolicy: () => [{ id: "mode", value: PINNED_MODE.opencode }] }),
   runtimeModeForSessionMode: cliRuntimeModeForSessionMode(cli),
   // Native mode choices in a model selection are never applied (plan §3.3): the generic option loop skips owned ids.
   ownedModelOptionIds: ["mode", ACP_SESSION_MODE_OPTION_ID],
   permissionDisposition: cliPermissionDisposition,
-  approvalOptions: cliApprovalOptions,
   promptFailure: (cause) => cliPromptFailure(cause),
   requiresSignIn: () => false,
   resolveModelId: (selection) => cliModelId(cli, selection.model),
