@@ -19,6 +19,8 @@ import type {
   GitRun,
   ProcessAnswer,
   ProcessInputAnswer,
+  ProcessReadAnswer,
+  ProcessReadInput,
   ProcessStartAnswer,
   ProcessStartInput,
   ProvisionInfo,
@@ -89,6 +91,7 @@ export interface WorkspaceRpc {
   processTurn(key: string, active: boolean): Promise<ProcessAnswer>;
   processSignal(key: string): Promise<ProcessAnswer>;
   processHeartbeat(keys: ReadonlyArray<string>): Promise<ProcessAnswer>;
+  processRead(input: ProcessReadInput): Promise<ProcessReadAnswer>;
   processState(): Promise<{ readonly epoch: number; readonly processes: ReadonlyArray<unknown>; readonly pushes: number }>;
   releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }>;
   /** Step 4a (plan §4.7): credentials in the DO's files (by value) and the Container (by hash); names and paths only. */

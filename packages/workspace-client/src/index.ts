@@ -295,15 +295,22 @@ export interface ProcessFrame {
   readonly code?: number;
 }
 
-export interface ProcessPush {
-  readonly workspace: string;
-  readonly epoch: number;
-  readonly frames: ReadonlyArray<ProcessFrame>;
+/**
+ * The Environment's read of a Workspace's output (a long poll; the channel pulls, it never pushes: a push answered
+ * inside the Environment's own calls nests one level deeper per round trip, up to the platform's subrequest depth
+ * limit). `keys` are the Environment's live processes there (the read is their heartbeat); `ack` is the last batch it
+ * received, so a batch whose answer was lost is sent again.
+ */
+export interface ProcessReadInput {
+  readonly keys: ReadonlyArray<string>;
+  readonly ack: number;
+  readonly waitMs: number;
 }
 
-/** The Environment's answer: keys it does not know (restarted, or the handle ended): kill them. */
-export interface ProcessPushAnswer {
-  readonly unknown: ReadonlyArray<string>;
+export interface ProcessReadAnswer extends ProcessAnswer {
+  /** 0 when no frames came. */
+  readonly batch: number;
+  readonly frames: ReadonlyArray<ProcessFrame>;
 }
 
 /** `processInput`'s answer: `gap` and `failed` end the process (a write is never skipped, review F6). */

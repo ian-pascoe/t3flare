@@ -1,11 +1,12 @@
 // @effect-diagnostics asyncFunction:off globalDate:off globalTimers:off globalConsole:off
 // The Workspace DO's CLI processes (step 4a, the process channel): `codex app-server` and `pi --mode rpc` under the
-// platform's non-PTY exec in the Workspace's Container, their stdout and stderr pushed to the Environment DO as bytes
-// in batches, their stdin, signals, turns and heartbeats from the Environment's spawner. A sibling of `TerminalHost`.
+// platform's non-PTY exec in the Workspace's Container, their stdout and stderr kept as bytes until the Environment's
+// spawner reads them (`read`, a long poll that is also the heartbeat), their stdin, signals and turns from the
+// spawner. A sibling of `TerminalHost`, but pulled rather than pushed (see `read`).
 //
 // - Input is ordered by `seq`, one write at a time: a duplicate (a retried RPC) is acknowledged, a gap or a failed write
 //   kills the process; nothing is ever skipped (review F6).
-// - Output is never dropped: a failed push goes back in front and is retried; reading pauses while 1 MiB waits.
+// - Output is never dropped: a batch stays until the next read acknowledges it; reading pauses while 1 MiB waits.
 // - Every process carries the Environment's epoch (its durable boot counter). A start from another epoch first kills
 //   every process of this Workspace started under a different one, so two copies of one native thread never write the
 //   same session file (plan §2.6). Markers are kept in storage, so orphans of an earlier instance are killed too.
@@ -18,8 +19,8 @@ import type {
   ProcessAnswer,
   ProcessFrame,
   ProcessInputAnswer,
-  ProcessPush,
-  ProcessPushAnswer,
+  ProcessReadAnswer,
+  ProcessReadInput,
   ProcessStartAnswer,
   ProcessStartInput,
 } from "@t3flare/workspace-client";
@@ -27,11 +28,12 @@ import type {
 /** A process not heartbeaten for this long is killed (the spawner beats every 30 s). */
 export const HEARTBEAT_LAPSE_MS = 90_000;
 export const BATCH_MS = 16;
-export const BULK_BATCH_MS = 100;
 export const BATCH_BYTES = 64 * 1024;
-/** Output with input in the last second is pushed sooner (a request's answer). */
+/** A read answers at most about this many bytes (one frame more when a frame is bigger). */
+export const READ_BYTES = 1024 * 1024;
+/** Output with input in the last second is answered sooner (a request's answer). */
 export const ECHO_WINDOW_MS = 1_000;
-/** Reading pauses while this much waits to be pushed. */
+/** Reading pauses while this much waits to be read. */
 export const BACKPRESSURE_BYTES = 1024 * 1024;
 /** How long after its last turn a CLI process holds the Container (review F7; t3 releases the session at 10 minutes). */
 export const CLI_IDLE_HOLD_MS = 11 * 60_000;
@@ -67,7 +69,6 @@ export interface ProcessHostDeps {
   readonly spawn: (argv: ReadonlyArray<string>, env: Record<string, string>) => Promise<CliProcess>;
   /** Part 2's kill script on markers, in the Container; nothing when it is not running. */
   readonly kill: (markers: ReadonlyArray<string>) => Promise<void>;
-  readonly push: (push: Omit<ProcessPush, "workspace">) => Promise<ProcessPushAnswer>;
   /** The image's command env without `BASH_ENV`. */
   readonly baseEnv: Readonly<Record<string, string>>;
   readonly remember: (markers: ReadonlyArray<ProcessMarker>) => void;
@@ -107,11 +108,12 @@ export class ProcessHost {
   readonly #procs = new Map<string, Proc>();
   #pending: Array<ProcessFrame> = [];
   #pendingBytes = 0;
-  #pumping = false;
-  #inFlight: Promise<void> | undefined;
+  /** The last batch read, until the next read acknowledges it. */
+  #sent: { readonly batch: number; readonly frames: ReadonlyArray<ProcessFrame> } | undefined;
+  #batch = 0;
+  #readers: Array<() => void> = [];
   #drained: Array<() => void> = [];
-  #pushFailures = 0;
-  #pushes = 0;
+  #reads = 0;
   #lastInput = 0;
 
   constructor(deps: ProcessHostDeps) {
@@ -123,8 +125,9 @@ export class ProcessHost {
     return [...this.#procs.values()].filter((proc) => !proc.exited).length;
   }
 
+  /** Batches the Environment read (its pull). */
   get pushes(): number {
-    return this.#pushes;
+    return this.#reads;
   }
 
   keys(): ReadonlyArray<string> {
@@ -247,7 +250,6 @@ export class ProcessHost {
       return refuse(`the process did not start: ${String(error instanceof Error ? error.message : error).slice(0, 300)}`);
     }
     if (proc.killing) await this.#deps.kill([proc.key]);
-    this.#startPump();
     console.log(JSON.stringify({ t3flare: "process-started", key: input.key, cli: input.cli, thread: input.thread ?? null, environmentEpoch: input.environmentEpoch, sandbox: sandbox ?? null }));
     return { ok: true, epoch: this.#deps.epoch, ...(sandbox === undefined ? {} : { sandbox }) };
   }
@@ -288,73 +290,51 @@ export class ProcessHost {
     this.#pending.push({ key: proc.key, seq: proc.outSeq++, ...frame });
     this.#pendingBytes += frame.data?.byteLength ?? 16;
     if (frame.stream !== "exit") this.#deps.filesMayHaveChanged("output");
+    for (const wake of this.#readers.splice(0)) wake();
   }
 
   /**
-   * Pushes run only from this loop, started in a start's context and continued by its own timers: never from the
-   * context of the Environment's `processInput` (a read that the input woke, review F6's channel). A push made there
-   * would answer the Environment inside a call the Environment made inside the previous push: each round trip one
-   * level deeper, until the platform's subrequest depth limit (M1 on step4a: "Subrequest depth limit exceeded").
+   * The Environment's read (pull, not push): frames since the last read it acknowledged, waiting up to `waitMs` for
+   * some. The read is also the heartbeat of `keys`. The Workspace never calls the Environment for output: on step4a a
+   * push answered inside the Environment's own input call nested each round trip one level deeper, until the
+   * platform's subrequest depth limit ("Subrequest depth limit exceeded" at the eighth round trip, M1). A batch is kept
+   * until the next read acknowledges it (`ack`), and sent again otherwise: never dropped.
    */
-  #startPump(): void {
-    if (this.#pumping) return;
-    this.#pumping = true;
-    void (async () => {
-      try {
-        while (this.size > 0 || this.#pending.length > 0) {
-          const wait = this.#pendingBytes >= BATCH_BYTES ? 0 : this.#deps.now() - this.#lastInput < ECHO_WINDOW_MS ? BATCH_MS : BULK_BATCH_MS;
-          await new Promise((resolve) => setTimeout(resolve, wait));
-          await this.#flush();
-        }
-      } finally {
-        this.#pumping = false;
+  async read(input: ProcessReadInput): Promise<ProcessReadAnswer> {
+    const answer = this.heartbeat(input.keys);
+    if (this.#sent !== undefined && input.ack !== this.#sent.batch) return { ...answer, batch: this.#sent.batch, frames: this.#sent.frames };
+    this.#sent = undefined;
+    if (this.#pending.length === 0 && input.waitMs > 0) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, input.waitMs);
+        this.#readers.push(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+      // A request's answer comes in pieces: gather them for a moment (sooner while input is recent).
+      if (this.#pending.length > 0 && this.#pendingBytes < BATCH_BYTES) {
+        await new Promise((resolve) => setTimeout(resolve, this.#deps.now() - this.#lastInput < ECHO_WINDOW_MS ? BATCH_MS : BATCH_MS * 2));
       }
-    })();
+    }
+    const frames: Array<ProcessFrame> = [];
+    let bytes = 0;
+    while (this.#pending.length > 0 && (frames.length === 0 || bytes < READ_BYTES)) {
+      const frame = this.#pending.shift()!;
+      frames.push(frame);
+      bytes += frame.data?.byteLength ?? 16;
+    }
+    this.#pendingBytes -= bytes;
+    for (const resolve of this.#drained.splice(0)) resolve();
+    if (frames.length === 0) return { ...answer, batch: 0, frames };
+    this.#reads++;
+    this.#sent = { batch: ++this.#batch, frames };
+    return { ...answer, batch: this.#batch, frames };
   }
 
-  async #flush(): Promise<void> {
-    if (this.#inFlight !== undefined || this.#pending.length === 0) return;
-    const frames = this.#pending;
-    this.#pending = [];
-    this.#pendingBytes = 0;
-    this.#inFlight = (async () => {
-      let answer: ProcessPushAnswer;
-      try {
-        answer = await this.#deps.push({ epoch: this.#deps.epoch, frames });
-        this.#pushFailures = 0;
-        this.#pushes++;
-      } catch (error) {
-        // Never dropped: the batch goes back in front, retried with backoff to 5 s; a process whose Environment is gone
-        // ends by the heartbeat's lapse.
-        this.#pushFailures++;
-        console.warn(JSON.stringify({ t3flare: "process-push-failed", attempt: this.#pushFailures, frames: frames.length, error: String(error).slice(0, 300) }));
-        this.#pending = [...frames, ...this.#pending];
-        this.#pendingBytes += frames.reduce((sum, frame) => sum + (frame.data?.byteLength ?? 16), 0);
-        await new Promise((resolve) => setTimeout(resolve, Math.min(5000, 100 * 2 ** Math.min(this.#pushFailures, 6))));
-        return;
-      }
-      for (const key of answer.unknown) {
-        const proc = this.#procs.get(key);
-        if (proc !== undefined && !proc.exited) {
-          console.log(JSON.stringify({ t3flare: "process-unknown-to-environment", key }));
-          void this.signal(key);
-        }
-      }
-    })();
-    try {
-      await this.#inFlight;
-    } finally {
-      this.#inFlight = undefined;
-      for (const resolve of this.#drained.splice(0)) resolve();
-    }
-  }
-
-  /** Waits until every frame so far was pushed (tests, and before a stop). */
-  async settled(): Promise<void> {
-    for (let i = 0; i < 50 && (this.#pending.length > 0 || this.#inFlight !== undefined); i++) {
-      if (this.#inFlight !== undefined) await this.#inFlight.catch(() => undefined);
-      await this.#flush();
-    }
+  /** Frames waiting for the Environment's next read (tests, and the stop's last look). */
+  pendingFrames(): ReadonlyArray<ProcessFrame> {
+    return [...(this.#sent?.frames ?? []), ...this.#pending];
   }
 
   /** stdin bytes number `seq` (0, 1, …); null closes stdin. */

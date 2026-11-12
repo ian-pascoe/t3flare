@@ -2,7 +2,7 @@
 // starts and refusals, ordered gap-free input that is retried but never skipped, output delivered in order with
 // duplicates dropped, backpressure on stdout, stderr that cannot stall it, and the epoch (review F6).
 // @effect-diagnostics globalTimers:off newPromise:off globalDate:off
-import type { ProcessAnswer, ProcessInputAnswer, ProcessStartAnswer, ProcessStartInput } from "@t3flare/workspace-client";
+import type { ProcessAnswer, ProcessFrame, ProcessInputAnswer, ProcessStartAnswer, ProcessStartInput } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
 
 import { ByteQueue, ProcessChannel, ProcessRefused, type ProcessRemote } from "../src/agents/processChannel.ts";
@@ -18,6 +18,8 @@ const fakeWorkspace = (options: { start?: ProcessStartAnswer; loseAnswers?: numb
   const turns: Array<[string, boolean]> = [];
   let lose = options.loseAnswers ?? 0;
   let epoch = 5;
+  const reads: Array<{ keys: ReadonlyArray<string>; ack: number }> = [];
+  const scripted: Array<Error | { batch: number; frames: ReadonlyArray<ProcessFrame>; epoch?: number }> = [];
   const answer = (unknown: ReadonlyArray<string> = []): ProcessAnswer => ({ epoch, unknown });
   const remote: ProcessRemote = {
     processStart: async (input) => {
@@ -41,8 +43,17 @@ const fakeWorkspace = (options: { start?: ProcessStartAnswer; loseAnswers?: numb
       return answer();
     },
     processHeartbeat: async (keys) => answer(keys.filter((key) => key === "gone")),
+    // The read loop's long poll: scripted answers, else a quiet read.
+    processRead: async (input) => {
+      reads.push(input);
+      const next = scripted.shift();
+      if (next instanceof Error) throw next;
+      if (next !== undefined) return { ...answer(), ...next };
+      await tick(5);
+      return { ...answer(), batch: 0, frames: [] };
+    },
   };
-  return { remote, starts, inputs, signals, turns, restart: () => void (epoch += 1) };
+  return { remote, starts, inputs, signals, turns, reads, script: (...answers: typeof scripted) => void scripted.push(...answers), restart: () => void (epoch += 1) };
 };
 
 const channel = (workspace: ReturnType<typeof fakeWorkspace>) => {
@@ -100,31 +111,24 @@ describe("ProcessChannel", () => {
     expect(ws.inputs).toHaveLength(1);
   });
 
-  it("delivers frames in order, drops duplicates, and ends with the exit code", async () => {
+  it("reads frames in order, drops duplicates, acknowledges each batch, and ends with the exit code", async () => {
     const ws = fakeWorkspace();
-    const ch = channel(ws);
-    const process = await ch.start(start);
-    const out = readAll(process.stdout);
     const frame = (seq: number, text: string) => ({ key: "proc-1", seq, stream: "stdout" as const, data: encoder.encode(text) });
-    await ch.deliver({ workspace: "demo", epoch: 5, frames: [frame(0, "a"), frame(1, "b")] });
-    await ch.deliver({ workspace: "demo", epoch: 5, frames: [frame(1, "b"), frame(2, "c"), { key: "proc-1", seq: 3, stream: "exit", code: 3 }] });
-    expect(await out).toBe("abc");
+    ws.script({ batch: 1, frames: [frame(0, "a"), frame(1, "b")] }, { batch: 2, frames: [frame(1, "b"), frame(2, "c"), { key: "proc-1", seq: 3, stream: "exit", code: 3 }] });
+    const process = await channel(ws).start(start);
+    expect(await readAll(process.stdout)).toBe("abc");
     expect(await process.exit).toBe(3);
+    expect(ws.reads.slice(0, 2)).toEqual([
+      { keys: ["proc-1"], ack: 0, waitMs: 20_000 },
+      { keys: ["proc-1"], ack: 1, waitMs: 20_000 },
+    ]);
   });
 
-  it("answers keys it does not know, and frames from another Workspace instance, as unknown", async () => {
+  it("ends a process its Workspace no longer knows, or whose Workspace answers with another epoch", async () => {
     const ws = fakeWorkspace();
-    const ch = channel(ws);
-    await ch.start(start);
-    const answer = await ch.deliver({
-      workspace: "demo",
-      epoch: 6,
-      frames: [
-        { key: "proc-1", seq: 0, stream: "stdout", data: encoder.encode("x") },
-        { key: "proc-9", seq: 0, stream: "stdout", data: encoder.encode("y") },
-      ],
-    });
-    expect(answer.unknown.toSorted()).toEqual(["proc-1", "proc-9"]);
+    ws.script({ batch: 0, frames: [], epoch: 6 });
+    const process = await channel(ws).start(start);
+    expect(await process.exit).toBe(129);
   });
 
   it("holds the Workspace's push while stdout is full, and never lets stderr stall it", async () => {
@@ -153,19 +157,12 @@ describe("ProcessChannel", () => {
     expect(ch.size).toBe(0);
   });
 
-  it("ends a Workspace's processes after three failed heartbeats in a row (its lapse killed them there)", async () => {
+  it("ends a Workspace's processes after its reads fail four times in a row", async () => {
     const ws = fakeWorkspace();
-    const ch = channel(ws);
-    const process = await ch.start(start);
-    ws.remote.processHeartbeat = async () => {
-      throw new Error("stub broken");
-    };
-    await ch.beat();
-    await ch.beat();
-    expect(process.running).toBe(true);
-    await ch.beat();
+    ws.script(new Error("stub broken"), new Error("stub broken"), new Error("stub broken"), new Error("stub broken"));
+    const process = await channel(ws).start(start);
     expect(await process.exit).toBe(129);
-  });
+  }, 15_000);
 
   it("kills through the Workspace by marker, and finds a process by its pid", async () => {
     const ws = fakeWorkspace();

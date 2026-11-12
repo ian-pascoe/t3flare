@@ -27,6 +27,8 @@ import type {
   GitRun,
   ProcessAnswer,
   ProcessInputAnswer,
+  ProcessReadAnswer,
+  ProcessReadInput,
   ProcessStartAnswer,
   ProcessStartInput,
   ProvisionInfo,
@@ -335,11 +337,6 @@ export class WorkspaceDO extends ContainerHost {
         return container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env });
       },
       kill: (markers) => this.#killMarkers(markers),
-      push: async (push) => {
-        const id = this.#workspaceId();
-        if (id === undefined) return { unknown: [...new Set(push.frames.map((frame) => frame.key))] };
-        return environmentStub(this.env.ENVIRONMENT).processOutput({ workspace: id, ...push });
-      },
       baseEnv: terminalEnv,
       remember: (markers) => ctx.storage.kv.put(PROCESS_MARKERS_KEY, [...markers]),
       remembered: () => ctx.storage.kv.get<ReadonlyArray<ProcessMarker>>(PROCESS_MARKERS_KEY) ?? [],
@@ -1220,7 +1217,6 @@ export class WorkspaceDO extends ContainerHost {
     this.#terminals.containerStopped();
     this.#processes.containerStopped();
     await this.#terminals.settled().catch(() => undefined);
-    await this.#processes.settled().catch(() => undefined);
     if (this.ctx.container?.running === true) await this.ctx.container.destroy().catch(() => undefined);
     await this.#budget().release(this.ctx.id.toString()).catch(() => undefined);
     await this.ctx.storage.deleteAlarm();
@@ -1362,6 +1358,11 @@ export class WorkspaceDO extends ContainerHost {
 
   processHeartbeat(keys: ReadonlyArray<string>): ProcessAnswer {
     return this.#processes.heartbeat(keys);
+  }
+
+  /** The Environment's long poll of this Workspace's CLI output (and their heartbeat). */
+  processRead(input: ProcessReadInput): Promise<ProcessReadAnswer> {
+    return this.#processes.read(input);
   }
 
   /** Diagnosis: the live CLI processes and this object's boot counter. */

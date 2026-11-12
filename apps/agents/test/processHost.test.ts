@@ -3,7 +3,7 @@
 // Review F6 (ordered input that never skips, bytes, never-dropped output), F7 (the hold), F8 (linked work while a
 // process lives) and plan §2.6 (epochs).
 // @effect-diagnostics globalTimers:off newPromise:off globalDate:off
-import type { ProcessFrame, ProcessPushAnswer, ProcessStartInput } from "@t3flare/workspace-client";
+import type { ProcessFrame, ProcessStartInput } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -54,10 +54,10 @@ const fakeProcess = (options: { failWrites?: boolean } = {}) => {
   };
 };
 
-const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: number; failPushes?: number; answer?: (frames: ReadonlyArray<ProcessFrame>) => ProcessPushAnswer; failWrites?: boolean } = {}) => {
+const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: number; failWrites?: boolean } = {}) => {
   let now = 1_000_000;
   let running = options.running ?? true;
-  let failPushes = options.failPushes ?? 0;
+  let ack = 0;
   const procs: Array<ReturnType<typeof fakeProcess>> = [];
   const spawned: Array<{ argv: ReadonlyArray<string>; env: Record<string, string> }> = [];
   const frames: Array<ProcessFrame> = [];
@@ -79,14 +79,6 @@ const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: n
       return proc.process;
     },
     kill: async (markers) => void killed.push(markers),
-    push: async (push) => {
-      if (failPushes > 0) {
-        failPushes--;
-        throw new Error("Environment unreachable");
-      }
-      frames.push(...push.frames);
-      return options.answer?.(push.frames) ?? { unknown: [] };
-    },
     baseEnv: { PATH: "/usr/bin", MISE_YES: "1" },
     remember: (markers) => void (remembered = markers),
     remembered: () => remembered,
@@ -96,8 +88,18 @@ const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: n
     linkedWork: (thread, alive) => void linked.push([thread, alive]),
   };
   const host = new ProcessHost(deps);
+  /** The Environment's reads until nothing is left, each acknowledged. */
+  const drain = async (keys: ReadonlyArray<string> = []) => {
+    for (let i = 0; i < 20; i++) {
+      const answer = await host.read({ keys, ack, waitMs: 0 });
+      if (answer.batch === 0) return;
+      ack = answer.batch;
+      frames.push(...answer.frames);
+    }
+  };
   return {
     host,
+    drain,
     procs,
     spawned,
     frames,
@@ -169,7 +171,7 @@ describe("ProcessHost", () => {
     proc.outBytes(new Uint8Array([0xac, 0x22, 0x7d, 0x0a]));
     proc.exit(0);
     await tick(150);
-    await h.host.settled();
+    await h.drain();
     expect(h.frames.map((frame) => frame.seq)).toEqual(h.frames.map((_, index) => index));
     expect(textOf(h.frames, "proc-a", "stdout")).toBe('{"id":1,"€"}\n');
     expect(textOf(h.frames, "proc-a", "stderr")).toBe("warn\n");
@@ -198,22 +200,28 @@ describe("ProcessHost", () => {
     expect(h.killed).toContainEqual(["proc-a"]);
   });
 
-  it("never drops output: a failed push is sent again", async () => {
-    const h = harness({ failPushes: 2 });
+  it("sends a batch again when its read's answer was lost (the next read does not acknowledge it)", async () => {
+    const h = harness();
     await h.host.start(start("proc-a"));
     h.procs[0]!.out("hello\n");
-    await tick(150);
-    for (let i = 0; i < 5 && textOf(h.frames, "proc-a", "stdout") === ""; i++) await tick(400);
-    expect(textOf(h.frames, "proc-a", "stdout")).toBe("hello\n");
+    await tick(20);
+    const first = await h.host.read({ keys: ["proc-a"], ack: 0, waitMs: 0 });
+    expect(textOf(first.frames, "proc-a", "stdout")).toBe("hello\n");
+    const again = await h.host.read({ keys: ["proc-a"], ack: 0, waitMs: 0 });
+    expect(again).toMatchObject({ batch: first.batch, frames: first.frames });
+    const next = await h.host.read({ keys: ["proc-a"], ack: first.batch, waitMs: 0 });
+    expect(next).toMatchObject({ batch: 0, frames: [] });
   });
 
-  it("kills a process the Environment answers unknown", async () => {
-    const h = harness({ answer: (frames) => ({ unknown: [...new Set(frames.map((frame) => frame.key))] }) });
+  it("waits for output in a read, and answers the keys it does not hold", async () => {
+    const h = harness();
     await h.host.start(start("proc-a"));
-    h.procs[0]!.out("x");
-    await tick(150);
-    await h.host.settled();
-    expect(h.killed).toContainEqual(["proc-a"]);
+    const reading = h.host.read({ keys: ["proc-a", "proc-gone"], ack: 0, waitMs: 5_000 });
+    await tick(30);
+    h.procs[0]!.out("late\n");
+    const answer = await reading;
+    expect(answer.unknown).toEqual(["proc-gone"]);
+    expect(textOf(answer.frames, "proc-a", "stdout")).toBe("late\n");
   });
 
   it("kills a process whose heartbeats lapsed, and answers the keys it does not hold", async () => {
@@ -270,7 +278,7 @@ describe("ProcessHost", () => {
     await h.host.start(start("proc-a"));
     h.stop();
     h.host.containerStopped();
-    await h.host.settled();
+    await h.drain();
     expect(h.frames.at(-1)).toMatchObject({ key: "proc-a", stream: "exit", code: 129 });
     expect(h.host.size).toBe(0);
   });

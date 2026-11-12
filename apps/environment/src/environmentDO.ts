@@ -9,7 +9,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
-import type { ProcessPush, ProcessPushAnswer, TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
+import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
@@ -148,6 +148,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
             processTurn: (key, active) => rpc().processTurn(key, active),
             processSignal: (key) => rpc().processSignal(key),
             processHeartbeat: (keys) => rpc().processHeartbeat(keys),
+            processRead: (input) => rpc().processRead(input),
           },
         };
       },
@@ -286,15 +287,6 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     const terminals = currentTerminals();
     if (terminals === undefined) return { unknown: [...new Set(push.frames.filter((frame) => frame.exit === undefined).map((frame) => frame.key))] };
     return terminals.deliver(push);
-  }
-
-  /**
-   * A Workspace DO's CLI process output (step 4a), RPC from the agents Worker. Never boots t3 and is not activity (an
-   * open run keeps the Environment awake during a turn anyway). Resolves once the readers took the bytes (review F6:
-   * backpressure to the Workspace); answers the processes this instance does not know, which the Workspace kills.
-   */
-  processOutput(push: ProcessPush): Promise<ProcessPushAnswer> {
-    return this.#processes.deliver(push);
   }
 
   /** Diagnosis and the reboot check: this instance's channel. */

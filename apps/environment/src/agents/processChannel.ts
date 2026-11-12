@@ -6,9 +6,10 @@
 //   `ctx.abort()` in a warm isolate. It is bound with the Environment's services and reached through them.
 // - stdin: one `processInput` in flight per process, numbered without gaps; a lost answer is retried with the same
 //   number (the host acknowledges a duplicate); a refused or failed write ends the process, never skips bytes.
-// - stdout and stderr: bounded queues of bytes. `deliver` (the Workspace's push) awaits room in stdout's queue, so a
-//   slow reader slows the Workspace's pushes, which pauses its reads (backpressure end to end). stderr is diagnostics: when
-//   nobody reads it, its oldest bytes are dropped past its bound, so it can never stall stdout.
+// - stdout and stderr: bounded queues of bytes, filled by one read loop per Workspace (a long poll, `processRead`: the
+//   Environment pulls, so every call between the two objects starts here). `deliver` awaits room in stdout's queue, so
+//   a slow reader delays the next read, and the Workspace pauses its reads of the process (backpressure end to end).
+//   stderr is diagnostics: when nobody reads it, its oldest bytes are dropped past its bound, so it never stalls stdout.
 // - The Workspace DO's epoch (its boot counter) is the one its start answered; another in any answer, or the key
 //   unknown, ends the process with 129: the Workspace restarted and its processes went with it.
 // - pids are synthetic and unique per instance (> 1: t3's `signalProcessGroup` refuses `pid <= 1`).
@@ -17,15 +18,16 @@ import type {
   ProcessCli,
   ProcessFrame,
   ProcessInputAnswer,
-  ProcessPush,
-  ProcessPushAnswer,
+  ProcessReadAnswer,
+  ProcessReadInput,
   ProcessStartAnswer,
   ProcessStartInput,
 } from "@t3flare/workspace-client";
 
-export const HEARTBEAT_EVERY_MS = 30_000;
-/** Heartbeats that fail in a row before a Workspace's processes end here (its lapse, 90 s, has killed them there). */
-export const HEARTBEAT_FAILURES = 3;
+/** A read waits this long for output; it is also the processes' heartbeat (the Workspace kills them after 90 s without). */
+export const READ_WAIT_MS = 20_000;
+/** Reads that fail in a row before a Workspace's processes end here (the Workspace's lapse kills them there). */
+export const READ_FAILURES = 4;
 /** stdin is sent in pieces of at most this many bytes (a `data:` image can be several MB). */
 export const INPUT_PIECE_BYTES = 1024 * 1024;
 /** A queue's bound: stdout waits past it; stderr drops its oldest past it. */
@@ -40,6 +42,7 @@ export interface ProcessRemote {
   processTurn(key: string, active: boolean): Promise<ProcessAnswer>;
   processSignal(key: string): Promise<ProcessAnswer>;
   processHeartbeat(keys: ReadonlyArray<string>): Promise<ProcessAnswer>;
+  processRead(input: ProcessReadInput): Promise<ProcessReadAnswer>;
 }
 
 export interface ProcessPlace {
@@ -275,15 +278,14 @@ export interface ChannelStart {
   readonly key?: string;
 }
 
-/** Every CLI process of this Environment DO instance: the spawner's state, and the push's receiver. */
+/** Every CLI process of this Environment DO instance: the spawner's state, and its Workspaces' readers. */
 export class ProcessChannel {
   readonly #deps: ProcessChannelDeps;
   readonly #byKey = new Map<string, ChannelProcess>();
   readonly #byPid = new Map<number, ChannelProcess>();
   #nextPid = 200_000;
-  #heartbeat: ReturnType<typeof setInterval> | undefined;
-  /** Consecutive failed heartbeats by Workspace: past `HEARTBEAT_FAILURES` its processes end here (the Workspace's lapse kills them there). */
-  readonly #beatFailures = new Map<string, number>();
+  /** Workspaces with a read loop running. */
+  readonly #readers = new Set<string>();
 
   constructor(deps: ProcessChannelDeps) {
     this.#deps = deps;
@@ -339,22 +341,17 @@ export class ProcessChannel {
       throw new ProcessRefused(answer.reason);
     }
     process.started(answer.epoch, answer.sandbox);
-    this.#startHeartbeat();
+    this.#ensureReader(place);
     return process;
   }
 
-  /** A Workspace's pushed output: delivered in order, awaiting the readers' room; answers the keys it does not know. */
-  async deliver(push: ProcessPush): Promise<ProcessPushAnswer> {
-    const unknown = new Set<string>();
-    for (const frame of push.frames) {
+  /** Frames a read brought: each to its process, in order, awaiting the readers' room (backpressure to the Workspace). */
+  async deliver(epoch: number, frames: ReadonlyArray<ProcessFrame>): Promise<void> {
+    for (const frame of frames) {
       const process = this.#byKey.get(frame.key);
-      if (process === undefined || (process.epoch !== undefined && process.epoch !== push.epoch)) {
-        if (frame.stream !== "exit") unknown.add(frame.key);
-        continue;
-      }
+      if (process === undefined || (process.epoch !== undefined && process.epoch !== epoch)) continue;
       await process.frame(frame);
     }
-    return { unknown: [...unknown] };
   }
 
   byPid(pid: number): ChannelProcess | undefined {
@@ -364,46 +361,55 @@ export class ProcessChannel {
   forget(process: ChannelProcess): void {
     this.#byKey.delete(process.key);
     this.#byPid.delete(process.pid);
-    if (this.#byKey.size === 0) this.#stopHeartbeat();
   }
 
-  /** Ends every process (the Environment is going away): the Workspaces kill them by the heartbeat's lapse otherwise. */
+  /** Ends every process (the Environment is going away): the Workspaces kill them when their reads (heartbeats) lapse otherwise. */
   killAll(): void {
     for (const process of this.#byKey.values()) process.kill();
   }
 
-  /** One heartbeat per Workspace for its live processes. */
-  async beat(): Promise<void> {
-    const byWorkspace = new Map<string, Array<ChannelProcess>>();
-    for (const process of this.#byKey.values()) {
-      if (process.epoch === undefined) continue;
-      const list = byWorkspace.get(process.place.workspace) ?? [];
-      list.push(process);
-      byWorkspace.set(process.place.workspace, list);
-    }
-    await Promise.all(
-      [...byWorkspace.values()].map(async (processes) => {
-        const workspace = processes[0]!.place.workspace;
-        try {
-          const answer = await processes[0]!.place.remote.processHeartbeat(processes.map((process) => process.key));
-          this.#beatFailures.delete(workspace);
-          for (const process of processes) process.checkAnswer(answer);
-        } catch (error) {
-          const failures = (this.#beatFailures.get(workspace) ?? 0) + 1;
-          this.#beatFailures.set(workspace, failures);
-          console.warn(JSON.stringify({ t3flare: "process-heartbeat-failed", workspace, failures, error: String(error).slice(0, 200) }));
-          if (failures >= HEARTBEAT_FAILURES) for (const process of processes) process.finish(129);
+  /** The processes of one Workspace here, started or starting. */
+  #inWorkspace(workspace: string): ReadonlyArray<ChannelProcess> {
+    return [...this.#byKey.values()].filter((process) => process.place.workspace === workspace);
+  }
+
+  #ensureReader(place: ProcessPlace): void {
+    if (this.#readers.has(place.workspace)) return;
+    this.#readers.add(place.workspace);
+    void this.#readLoop(place);
+  }
+
+  /**
+   * One long poll at a time per Workspace while it has processes here (`processRead`, which is also their heartbeat):
+   * the Environment pulls, so every call between the two objects starts on this side (see ProcessReadInput).
+   */
+  async #readLoop(place: ProcessPlace): Promise<void> {
+    let ack = 0;
+    let failures = 0;
+    for (;;) {
+      const processes = this.#inWorkspace(place.workspace);
+      if (processes.length === 0) {
+        this.#readers.delete(place.workspace);
+        return;
+      }
+      const started = processes.filter((process) => process.epoch !== undefined);
+      let answer: ProcessReadAnswer;
+      try {
+        answer = await place.remote.processRead({ keys: started.map((process) => process.key), ack, waitMs: READ_WAIT_MS });
+        failures = 0;
+      } catch (error) {
+        failures++;
+        console.warn(JSON.stringify({ t3flare: "process-read-failed", workspace: place.workspace, failures, error: String(error).slice(0, 200) }));
+        if (failures >= READ_FAILURES) {
+          for (const process of this.#inWorkspace(place.workspace)) process.finish(129);
+          continue;
         }
-      }),
-    );
-  }
-
-  #startHeartbeat(): void {
-    this.#heartbeat ??= setInterval(() => void this.beat(), HEARTBEAT_EVERY_MS);
-  }
-
-  #stopHeartbeat(): void {
-    if (this.#heartbeat !== undefined) clearInterval(this.#heartbeat);
-    this.#heartbeat = undefined;
+        await new Promise((resolve) => setTimeout(resolve, Math.min(5000, 250 * 2 ** failures)));
+        continue;
+      }
+      if (answer.batch !== 0) ack = answer.batch;
+      for (const process of started) process.checkAnswer(answer);
+      await this.deliver(answer.epoch, answer.frames);
+    }
   }
 }
