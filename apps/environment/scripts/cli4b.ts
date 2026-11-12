@@ -14,7 +14,7 @@ import * as path from "node:path";
 
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid } from "./lib/client.ts";
 import { CLAUDE_PINNED_EMPTY } from "../src/agents/acpProfiles.ts";
-import { changed, cliTurn, EDIT_AND_TEST, enable, ensureProject, INSTANCE, reset } from "./lib/acpTurn.ts";
+import { changed, cliTurn, EDIT_AND_TEST, enable, ensureProject, reset } from "./lib/acpTurn.ts";
 import { writeEvidence as writeAt } from "./lib/evidence.ts";
 
 const [scenario = "acp", ...args] = process.argv.slice(2);
