@@ -6,7 +6,9 @@ import { describe, expect, it } from "vitest";
 import { csrfToken } from "../src/harness/csrf.ts";
 import { escapeHtml, renderPage } from "../src/harness/page.ts";
 import { CSRF_HEADER, handleHarness, type HarnessCaller } from "../src/harness/panel.ts";
+import { harnessSecrets } from "../src/harness/secrets.ts";
 import { harnessStore } from "../src/harness/store.ts";
+import { McpHost } from "../src/mcp/host.ts";
 import { resolveHarness, EMPTY_HARNESS } from "@t3flare/harness-registry";
 
 const HOST = "t3-admin.example.dev";
@@ -15,7 +17,12 @@ const owner: HarnessCaller = { kind: "owner", subject: "owner-sub" };
 
 const memory = () => {
   const map = new Map<string, unknown>();
-  return { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)) };
+  return {
+    get: <T>(key: string) => map.get(key) as T | undefined,
+    put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)),
+    delete: (key: string) => map.delete(key),
+    keys: () => [...map.keys()],
+  };
 };
 
 const setup = (caller: HarnessCaller = owner) => {
@@ -124,5 +131,55 @@ describe("harness panel", () => {
     expect(html).not.toContain("<img");
     expect(html).toContain(escapeHtml(hostile));
     expect(escapeHtml(hostile)).toBe("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&#39;&amp;");
+  });
+
+  it("a direct server's header value is stored write-only: no answer, page or audit entry carries it (or its base64)", async () => {
+    const kv = memory();
+    const store = harnessStore(kv);
+    const secrets = harnessSecrets(kv);
+    const mcp = new McpHost({ kv, engine: undefined, commissary: { url: undefined, key: undefined }, settings: () => store.load() });
+    const deps = { caller: { kind: "service-token" } as HarnessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
+    const VALUE = "s3cr3t-header-VALUE-1234";
+    const add = await handleHarness(
+      new Request(`https://${HOST}/_t3flare/harness/api/mcp/servers`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ server: "fixture", url: "https://fixture.example.dev/mcp", auth: { kind: "header", header: "Authorization" }, value: VALUE }),
+      }),
+      deps,
+    );
+    expect(add.status).toBe(200);
+    const texts = [
+      await add.text(),
+      await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/mcp`), deps)).text(),
+      await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/audit`), deps)).text(),
+      await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/settings`), deps)).text(),
+      await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), { ...deps, caller: owner })).text(),
+    ];
+    for (const text of texts) {
+      expect(text).not.toContain(VALUE);
+      expect(text).not.toContain(btoa(VALUE));
+    }
+    expect(texts[1]).toContain('"set":true');
+    expect(secrets.read("fixture", "header")).toBe(VALUE);
+    // Removing the server deletes its secret at once.
+    await handleHarness(
+      new Request(`https://${HOST}/_t3flare/harness/api/mcp`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "remove", server: "fixture" }) }),
+      deps,
+    );
+    expect(secrets.read("fixture", "header")).toBeUndefined();
+  });
+
+  it("refuses reserved names, IP literals and plain http for a direct server", async () => {
+    const { deps } = setup({ kind: "service-token" });
+    const kv = memory();
+    const withSecrets = { ...deps, secrets: harnessSecrets(kv) };
+    for (const [server, url] of [["t3", "https://a.example/mcp"], ["x", "http://a.example/mcp"], ["y", "https://10.0.0.1/mcp"], ["z", "https://user:pw@a.example/mcp"]]) {
+      const response = await handleHarness(
+        new Request(`https://${HOST}/_t3flare/harness/api/mcp/servers`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ server, url }) }),
+        withSecrets,
+      );
+      expect(response.status).toBe(400);
+    }
   });
 });

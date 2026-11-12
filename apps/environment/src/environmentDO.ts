@@ -28,6 +28,7 @@ import * as Pairing from "./host/pairing.ts";
 import { isRefusedRelayRoute } from "./host/relayRoutes.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
 import type { HarnessCaller } from "./harness/panel.ts";
+import { harnessSecrets } from "./harness/secrets.ts";
 import { harnessStore } from "./harness/store.ts";
 import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpView } from "./mcp/host.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
@@ -335,7 +336,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    */
   async harness(request: Request, caller: HarnessCaller): Promise<Response> {
     const { handleHarness } = await import("./harness/panel.ts");
-    return handleHarness(request, { caller, host: this.env.T3FLARE_HARNESS_HOST ?? "", store: harnessStore(this.ctx.storage.kv), mcp: this.mcpHost });
+    return handleHarness(request, { caller, host: this.env.T3FLARE_HARNESS_HOST ?? "", store: harnessStore(this.ctx.storage.kv), mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv) });
   }
 
   /** The MCP host (ADR-0028), over this object's storage and the MCP Worker's engine. */
@@ -350,6 +351,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         ...(this.env.COMMISSARY_TOOLKITS === undefined ? {} : { toolkits: this.env.COMMISSARY_TOOLKITS }),
       },
       settings: () => harnessStore(this.ctx.storage.kv).load(),
+      secret: async (server, field) => harnessSecrets(this.ctx.storage.kv).read(server, field),
       background: (work) => this.ctx.waitUntil(work),
     });
     return this.#mcpHost;

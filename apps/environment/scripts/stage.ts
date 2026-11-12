@@ -40,13 +40,22 @@ const STAGE_SECRETS = ["T3_BOOTSTRAP_TOKEN", "T3FLARE_ADMIN_TOKEN"];
 const inCI = process.env.GITHUB_ACTIONS === "true";
 const stageSecrets = (): Record<string, string> => {
   if (STAGE_SECRETS.every((name) => process.env[name])) return Object.fromEntries(STAGE_SECRETS.map((name) => [name, process.env[name]!]));
-  if (fs.existsSync(secretsFile)) return JSON.parse(fs.readFileSync(secretsFile, "utf8"));
+  if (fs.existsSync(secretsFile)) {
+    const kept = JSON.parse(fs.readFileSync(secretsFile, "utf8")) as Record<string, string>;
+    // The tools step's fixture MCP server's bearer (test stages): made once, kept with the stage's tokens, destroyed with
+    // them. The owner pastes it into Commissary's panel for the `fixture` toolkit, from this file.
+    if (stage !== "prod" && kept.T3FLARE_FIXTURE_BEARER === undefined) {
+      kept.T3FLARE_FIXTURE_BEARER = token();
+      fs.writeFileSync(secretsFile, JSON.stringify(kept), { mode: 0o600 });
+    }
+    return kept;
+  }
   if (stage === "prod" && inCI) {
     // New tokens would lock the owner's clients out of prod.
     console.error(`t3flare: CI needs prod's ${STAGE_SECRETS.join(" and ")} (the GitHub environment \`prod\`)`);
     process.exit(1);
   }
-  const secrets = { T3_BOOTSTRAP_TOKEN: token(), T3FLARE_ADMIN_TOKEN: token() };
+  const secrets = { T3_BOOTSTRAP_TOKEN: token(), T3FLARE_ADMIN_TOKEN: token(), ...(stage === "prod" ? {} : { T3FLARE_FIXTURE_BEARER: token() }) };
   fs.mkdirSync(path.dirname(secretsFile), { recursive: true });
   fs.writeFileSync(secretsFile, JSON.stringify(secrets), { mode: 0o600 });
   return secrets;

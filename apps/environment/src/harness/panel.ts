@@ -13,6 +13,7 @@
 import { applyChange, applyMcpChange, EXTENSIONS, type HarnessChange, type McpChange, resolveHarness } from "@t3flare/harness-registry";
 
 import type { McpHost } from "../mcp/host.ts";
+import type { HarnessSecrets } from "./secrets.ts";
 
 import { csrfToken, csrfValid } from "./csrf.ts";
 import { pageCsp, renderPage } from "./page.ts";
@@ -31,6 +32,8 @@ export interface HarnessDeps {
   readonly store: HarnessStore;
   /** The MCP host (ADR-0028): the servers' inventories and their test. */
   readonly mcp?: Pick<McpHost, "servers" | "inventory" | "tools" | "list">;
+  /** Direct servers' write-only secrets (part 4). */
+  readonly secrets?: HarnessSecrets;
   readonly now?: () => number;
 }
 
@@ -44,6 +47,7 @@ export const mcpOverview = async (deps: HarnessDeps) => {
     rows.push({
       name,
       setting: server,
+      ...(server.auth?.kind === "header" && deps.secrets !== undefined ? { secret: deps.secrets.mark(name, "header") } : {}),
       status: inventory.status,
       listedAt: inventory.listedAt > 0 ? inventory.listedAt : null,
       error: inventory.error ?? null,
@@ -116,7 +120,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     return refused(404, "Not found");
   }
   if (request.method !== "POST") return refused(405, "Method not allowed");
-  const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`];
+  const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`, `${HARNESS_PATH}/api/mcp/servers`];
   if (!routes.includes(path)) return refused(404, "Not found");
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
@@ -125,6 +129,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   }
   if (path === `${HARNESS_PATH}/api/mcp/test`) return testServer(request, deps);
   if (path === `${HARNESS_PATH}/api/mcp`) return changeMcp(request, deps);
+  if (path === `${HARNESS_PATH}/api/mcp/servers`) return addServer(request, deps);
   let change: HarnessChange;
   try {
     const body: unknown = await request.json();
@@ -178,6 +183,8 @@ const changeMcp = async (request: Request, deps: HarnessDeps): Promise<Response>
   const applied = applyMcpChange(before, body as unknown as McpChange);
   if (!applied.ok) return refused(400, applied.error);
   deps.store.save(applied.harness);
+  // A removed server's secrets go at once (plan §6.2).
+  if (body.op === "remove") deps.secrets?.remove(body.server, ["header"]);
   deps.store.audit({
     at: deps.now?.() ?? Date.now(),
     caller: callerName(deps.caller),
@@ -187,4 +194,32 @@ const changeMcp = async (request: Request, deps: HarnessDeps): Promise<Response>
     after: applied.harness.mcp?.servers?.[body.server] ?? null,
   });
   return json({ ok: true, revision: applied.harness.revision });
+};
+
+/**
+ * Adds a direct server (Route B, decision (b)): its name, URL and sign-in, and for a header sign-in the value, stored
+ * write-only. The answer and the audit log carry `set`, `setAt` and a fingerprint, never the value.
+ */
+const addServer = async (request: Request, deps: HarnessDeps): Promise<Response> => {
+  const body = await bodyOf(request);
+  const server = typeof body?.server === "string" ? body.server : "";
+  const url = typeof body?.url === "string" ? body.url : "";
+  const auth = (body?.auth ?? { kind: "none" }) as { kind?: unknown; header?: unknown };
+  const value = typeof body?.value === "string" ? body.value : undefined;
+  if (auth.kind === "header" && (value === undefined || value === "")) return refused(400, "a header sign-in needs its value");
+  if (auth.kind === "oauth") return refused(400, "OAuth sign-ins are started from the server's entry once it is added with auth none");
+  if (deps.secrets === undefined) return refused(500, "no secret store");
+  const before = deps.store.load();
+  const applied = applyMcpChange(before, { op: "add", server, url, auth: auth.kind === "header" ? { kind: "header", header: String(auth.header) } : { kind: "none" } });
+  if (!applied.ok) return refused(400, applied.error);
+  const mark = auth.kind === "header" && value !== undefined ? await deps.secrets.put(server, "header", value) : undefined;
+  deps.store.save(applied.harness);
+  deps.store.audit({
+    at: deps.now?.() ?? Date.now(),
+    caller: callerName(deps.caller),
+    action: "mcp.add",
+    target: server,
+    after: { ...applied.harness.mcp?.servers?.[server], ...(mark === undefined ? {} : { secret: mark }) },
+  });
+  return json({ ok: true, revision: applied.harness.revision, ...(mark === undefined ? {} : { secret: mark }) });
 };

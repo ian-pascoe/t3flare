@@ -98,6 +98,9 @@ export default Alchemy.Stack(
     const codemodeName = `t3flare-codemode-${stage}`;
     const adminName = `t3flare-admin-${stage}`;
     const mcpName = `t3flare-mcp-${stage}`;
+    const fixtureName = `t3flare-mcpfixture-${stage}`;
+    // Test stages: the tools step's fixture MCP server, when the stage has its bearer (scripts/stage.ts).
+    const fixtureBearer = stage === "prod" ? "" : yield* Config.String("T3FLARE_FIXTURE_BEARER").pipe(Config.withDefault(""));
     const workersDevHost = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
     // The stage's custom domain, if it has one (unset or empty: workers.dev only).
     const domain = yield* Config.String("T3FLARE_DOMAIN").pipe(Config.withDefault(""));
@@ -193,6 +196,19 @@ export default Alchemy.Stack(
       workersDev: { enabled: false, previewsEnabled: false },
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     } as never);
+
+    if (fixtureBearer !== "") {
+      yield* Cloudflare.Worker("McpFixture", {
+        name: fixtureName,
+        main: path.join(here, "scripts/tools/fixtureMcp.ts"),
+        compatibility: COMPATIBILITY,
+        workersDev: { enabled: true, previewsEnabled: false },
+        env: {
+          FIXTURE_BEARER: Config.Redacted("T3FLARE_FIXTURE_BEARER"),
+          LOG: Cloudflare.DurableObject("FixtureLog", { className: "FixtureLog" }),
+        },
+      } as never);
+    }
 
     const agents = yield* Cloudflare.Worker("Agents", {
       name: agentsName,
