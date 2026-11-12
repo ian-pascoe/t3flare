@@ -20,6 +20,9 @@ export const T3FLARE_POLICY = {
     simlockDeviceHostsEnabled: off,
     // Custom text generators hold a vendor key typed into t3: refused for now (owner decision D5).
     textGenerators: { value: {}, locked: true },
+    // Step 4b (review F7): t3 compacts idle Claude threads with a `/compact` turn, which would start a Container;
+    // the worker is not started (composition.ts), and the setting shows as managed.
+    idleCompaction: { value: "off", locked: true },
   },
   limits: {
     // t3's product analytics (PostHog, `ingest.t3.codes`) is off in the Cloud Environment (owner decision D1, SPI-995).

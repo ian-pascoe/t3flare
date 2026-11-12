@@ -22,6 +22,7 @@
     "@t3flare/session-protocol": "workspace:*",
     "@t3flare/workspace-client": "workspace:*",
     "@t3tools/contracts": "workspace:*",
+    "@t3tools/provider-acp": "workspace:*",
     "@t3tools/provider-acp-registry": "workspace:*",
     "@t3tools/provider-core": "workspace:*",
     "@t3tools/provider-cursor": "workspace:*",
@@ -30,6 +31,7 @@
     "@t3tools/shared": "workspace:*",
     "@t3tools/source-control-core": "workspace:*",
     "effect": "catalog:",
+    "effect-acp": "workspace:*",
     "effect-codex-app-server": "workspace:*",
     "t3": "workspace:*"
   },

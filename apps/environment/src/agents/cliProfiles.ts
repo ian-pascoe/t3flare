@@ -5,8 +5,10 @@
 import { type CatalogModel } from "@t3flare/models";
 import { HARNESS_ROOT } from "@t3flare/workspace-client";
 
-/** The CLIs the channel runs; `probe` is M1's test program (stages only). */
-export type CliName = "codex" | "pi" | "probe";
+import { acpProfileLaunch } from "./acpProfiles.ts";
+
+/** The CLIs the channel runs; `probe` is M1's test program (stages only). Step 4b: Claude Code and OpenCode over ACP. */
+export type CliName = "codex" | "pi" | "probe" | "claude" | "opencode";
 
 export const CLI_BIN = "/opt/t3flare/bin";
 /** Where CLI homes live in the Container (`apps/sandbox-image/src/process.ts` `CLI_HOMES`). */
@@ -252,5 +254,8 @@ export const profileLaunch = (input: LaunchInput, context: ProfileContext): Laun
       return piLaunch(input, context);
     case "probe":
       return probeLaunch(input);
+    case "claude":
+    case "opencode":
+      return acpProfileLaunch(input.cli, input, context);
   }
 };

@@ -7,6 +7,18 @@
  */
 export const CODEX_KEY_GRANTS = 3;
 
+/**
+ * Grants per Claude Code or OpenCode process (step 4b, M0 P1, P2: each asks once, Claude with its 24 h helper TTL and
+ * OpenCode's key plugin at load; one more covers a 401's re-ask).
+ */
+export const ACP_KEY_GRANTS = 2;
+
+const LIMITED: Readonly<Record<string, { readonly grants: number; readonly name: string }>> = {
+  codex: { grants: CODEX_KEY_GRANTS, name: "Codex" },
+  claude: { grants: ACP_KEY_GRANTS, name: "Claude Code" },
+  opencode: { grants: ACP_KEY_GRANTS, name: "OpenCode" },
+};
+
 export type KeyDecision = { readonly grant: true; readonly cli: string; readonly key: string; readonly grants: number } | { readonly grant: false; readonly why: string };
 
 export class ModelKeyGate {
@@ -29,7 +41,8 @@ export class ModelKeyGate {
     for (const [known, entry] of this.#nonces) if (!live.has(entry.key)) this.#nonces.delete(known);
     const entry = nonce === null ? undefined : this.#nonces.get(nonce);
     if (entry === undefined) return { grant: false, why: live.size === 0 ? "no CLI process lives here" : "unknown nonce" };
-    if (entry.cli === "codex" && entry.grants >= CODEX_KEY_GRANTS) return { grant: false, why: "Codex's grants are used up" };
+    const limit = LIMITED[entry.cli];
+    if (limit !== undefined && entry.grants >= limit.grants) return { grant: false, why: `${limit.name}'s grants are used up` };
     entry.grants++;
     return { grant: true, cli: entry.cli, key: entry.key, grants: entry.grants };
   }

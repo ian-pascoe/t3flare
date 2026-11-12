@@ -40,6 +40,7 @@
 //   POST /_t3flare/check/terminal-close-idle?thread=<id>  step 2b: t3's own `closeIdle` for a thread's terminals (as settling runs it)
 //   /_t3flare/connect/*, POST /_t3flare/check/connect-refusals  step 3+: the T3 Connect link (connect/admin.ts)
 //   POST /_t3flare/agents/process-check           step 4a (stages only): the probe through t3's spawner and the process channel
+//   POST /_t3flare/agents/acp-check               step 4b (stages only): Claude Code or OpenCode over ACP through the channel
 //   GET  /_t3flare/agents/process-state?id=<id>   step 4a: a Workspace's CLI processes and this instance's channel
 //   POST /_t3flare/check/leak?id=<id>             step 4a: credentials in a Workspace's files (DO and Container), names and paths only
 import * as BootState from "./bootState.ts";
@@ -355,6 +356,13 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const body = (await request.json()) as { op: string; workspace: string; marker?: string; roundTrips?: number };
         if (body.op === "release") return json({ released: await releaseHeld() });
         return json(await processCheck(body));
+      }
+      case "POST /_t3flare/agents/acp-check": {
+        // Step 4b M1 (stages only): Claude Code or OpenCode through t3's spawner and the channel, driven over ACP.
+        const { environmentServices } = await import("../agents/bindings.ts");
+        if (!environmentServices().faults) return json({ error: "stages only" }, 403);
+        const { acpCheck } = await import("./acpCheck.ts");
+        return json(await acpCheck((await request.json()) as never));
       }
       case "POST /_t3flare/check/leak": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");

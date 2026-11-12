@@ -1,0 +1,14 @@
+#!/bin/sh
+# Claude Code over ACP (step 4b, plan §4.1 with M0 P1): installs the managed settings the profile wrote into this
+# process's home (/etc/claude-code is the highest settings source, so a repository's .claude/ cannot override a managed
+# key), keeps the key helper's nonce in the home instead of the environment (Claude's Bash and hooks never inherit it),
+# then becomes claude-agent-acp, run by the image's own Node. Nothing goes to stdout: it is the ACP stream.
+set -eu
+home=/var/lib/t3flare/cli/${T3FLARE_EXEC:?}
+umask 077
+printf %s "${T3FLARE_MODEL_KEY_NONCE:-}" > "$home/nonce"
+unset T3FLARE_MODEL_KEY_NONCE
+mkdir -p /etc/claude-code
+install -m 644 "$home/managed-settings.json" "/etc/claude-code/.managed-settings.$$"
+mv -f "/etc/claude-code/.managed-settings.$$" /etc/claude-code/managed-settings.json
+exec /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/claude/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js

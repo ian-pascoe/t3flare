@@ -166,7 +166,6 @@ import * as RuntimeLayer from "t3/src/orchestration-v2/runtimeLayer.ts";
 import * as ProjectStore from "t3/src/orchestration-v2/ProjectStore.ts";
 import * as ThreadSearch from "t3/src/orchestration-v2/ThreadSearch.ts";
 import * as ThreadSettlementService from "t3/src/orchestration-v2/ThreadSettlementService.ts";
-import * as IdleCompactionService from "t3/src/orchestration-v2/IdleCompactionService.ts";
 import * as ThreadPullRequestService from "t3/src/orchestration-v2/ThreadPullRequestService.ts";
 import * as RunFinalizationService from "t3/src/orchestration-v2/RunFinalizationService.ts";
 import * as ProjectionMaintenance from "t3/src/orchestration-v2/ProjectionMaintenance.ts";
@@ -524,9 +523,9 @@ export const make = (options: CompositionOptions) => {
   const layerThreadSettlementWorker = Layer.effectDiscard(
     ThreadSettlementService.make.pipe(Effect.flatMap((service) => service.start())),
   ).pipe(Layer.provide(layerPullRequestService), Layer.provide(ProjectionStoreV2.layer));
-  const layerIdleCompactionWorker = Layer.effectDiscard(
-    IdleCompactionService.make.pipe(Effect.flatMap((service) => service.start())),
-  ).pipe(Layer.provide(ProjectionStoreV2.layer));
+  // t3flare (step 4b, review F7): t3's idle compaction is not started. It sends `/compact` as a turn to `claudeAgent`
+  // instances only, which here are Claude Code in a Workspace's Container: it would start a Container for a
+  // compaction nobody asked for. Its setting is locked off by the managed policy (`managedPolicy.ts`).
   const layerThreadPullRequestWorker = Layer.effectDiscard(
     ThreadPullRequestService.make.pipe(Effect.flatMap((service) => service.start())),
   ).pipe(Layer.provide(layerPullRequestService));
@@ -570,7 +569,6 @@ export const make = (options: CompositionOptions) => {
     AgentAwarenessRelay.layer,
     HeldHooksWaker.layer,
     layerThreadSettlementWorker,
-    layerIdleCompactionWorker,
     StorageCleanup.layer.pipe(Layer.provide(ProjectionStoreV2.layer)),
     DatabaseStorage.layer.pipe(Layer.provide(ProjectionMaintenance.layer), Layer.provide(layerServerRestart)),
     layerThreadPullRequestWorker,

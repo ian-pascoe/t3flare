@@ -1,0 +1,8 @@
+{
+  "name": "t3flare-claude-agent",
+  "private": true,
+  "description": "Claude Code over ACP for the Workspace image (step 4b): claude-agent-acp and the Claude Agent SDK, whose platform package holds the claude binary; its version is apps/sandbox-image/src/clis.ts's.",
+  "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "0.106.0"
+  }
+}

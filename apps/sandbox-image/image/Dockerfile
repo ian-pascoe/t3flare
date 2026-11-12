@@ -16,6 +16,9 @@ ARG MISE_SHA256=62cad463c1413f05398ca339168a8f655120b6f0b0b8adce3bc6758bafaf0602
 # The CLI agents (step 4a; apps/sandbox-image/src/clis.ts holds the same values, apps/environment/test/cliManifest.test.ts keeps them equal).
 ARG CODEX_VERSION=0.167.2
 ARG CODEX_SHA256=8246e846c550ea21197fcc4067bc270dca895e94ea42ed6a282e6f4e0125b15f
+# Step 4b: OpenCode's release binary (one per platform; npm's package installs the musl build beside it, M0 P7).
+ARG OPENCODE_VERSION=2.2.7
+ARG OPENCODE_SHA256=89a6cee227b54bc011179c528a5e63176032462b1a5e21723b616801cddc2ca7
 
 # Every base image is pinned by digest as well as by tag, so a rebuild cannot move to another computerd build or Ubuntu
 # point release. Refresh a digest together with its tag: computerd's is the manifest of
@@ -45,6 +48,18 @@ RUN apt-get update \
  && tar -xzf /codex.tgz -C / \
  && mv /codex-x86_64-unknown-linux-musl /codex \
  && chmod 755 /codex
+
+# OpenCode (step 4b), the same way: the release's binary, checked against its digest.
+FROM --platform=linux/amd64 ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c AS opencode
+ARG OPENCODE_VERSION
+ARG OPENCODE_SHA256
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && curl -fsSL -o /opencode.tgz https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz \
+ && echo "${OPENCODE_SHA256}  /opencode.tgz" | sha256sum -c - \
+ && mkdir /out && tar -xzf /opencode.tgz -C /out \
+ && mv /out/opencode /opencode \
+ && chmod 755 /opencode
 
 FROM --platform=linux/amd64 ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
 
@@ -92,6 +107,20 @@ RUN cd /opt/t3flare/pi \
  && rm -rf /root/.npm
 COPY --chmod=755 t3flare-pi /opt/t3flare/bin/pi
 COPY --chmod=755 t3flare-model-key /opt/t3flare/bin/t3flare-model-key
+
+# Step 4b, plan §6: Claude Code over ACP (claude-agent-acp and the Claude Agent SDK, whose platform package holds the
+# claude binary) from its own committed lock, and OpenCode's checked binary, each in its own layers so a bump rebuilds
+# one; their launchers (which install the managed settings and the system configuration) and OpenCode's key plugin.
+COPY claude/package.json claude/package-lock.json /opt/t3flare/claude/
+RUN cd /opt/t3flare/claude \
+ && PATH=/usr/local/share/mise/installs/node/26.13.0/bin:$PATH npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
+ && rm -rf /root/.npm \
+ && test -x node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude
+COPY --from=opencode --chown=0:0 /opencode /opt/t3flare/opencode/opencode
+COPY --chmod=755 t3flare-claude-agent-acp /opt/t3flare/bin/claude-agent-acp
+COPY --chmod=755 t3flare-claude-key /opt/t3flare/bin/t3flare-claude-key
+COPY --chmod=755 t3flare-opencode /opt/t3flare/bin/opencode
+COPY opencode-key-plugin /opt/t3flare/share/opencode-key-plugin
 
 COPY --chmod=755 supervise /usr/local/bin/cloudpid-supervise
 

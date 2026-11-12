@@ -47,7 +47,7 @@ describe("t3flare's managed policy", () => {
     const { summary } = await policy;
     expect(summary?.organization).toBe("t3flare");
     expect(new Set(summary?.lockedSettings)).toEqual(
-      new Set(["enableAgentDeviceAccess", "enableDeviceSupport", "guestSharingEnabled", "simlockDeviceHostsEnabled", "textGenerators"]),
+      new Set(["enableAgentDeviceAccess", "enableDeviceSupport", "guestSharingEnabled", "idleCompaction", "simlockDeviceHostsEnabled", "textGenerators"]),
     );
     expect(summary?.limits).toEqual({ telemetry: false });
   });

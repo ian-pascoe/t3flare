@@ -245,7 +245,7 @@ export interface TerminalPushAnswer {
 // Data is bytes end to end (review F6): JSON lines split across frames are joined by t3's own line decoder.
 
 /** The CLI a process runs; `probe` is M1's test program, refused unless the stage allows faults. */
-export type ProcessCli = "codex" | "pi" | "probe";
+export type ProcessCli = "codex" | "pi" | "probe" | "claude" | "opencode";
 
 export interface ProcessStartInput {
   readonly key: string;

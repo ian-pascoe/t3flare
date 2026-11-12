@@ -1,0 +1,23 @@
+#!/bin/sh
+# OpenCode over ACP (step 4b, plan §4.2 with review F6 and M0 P2): installs the system configuration the profile wrote
+# into this process's home (/etc/opencode outranks user and project files), copies in the synced session snapshot, and
+# becomes `opencode acp`. OpenCode drops a configuration statement it cannot read with only a warning in its log, which
+# would fail open: a watcher ends the process on any diagnostic about t3flare's file. Nothing goes to stdout.
+set -eu
+home=/var/lib/t3flare/cli/${T3FLARE_EXEC:?}
+mkdir -p /etc/opencode "$XDG_DATA_HOME/opencode/log"
+install -m 644 "$home/opencode.json" "/etc/opencode/.opencode.$$.json"
+mv -f "/etc/opencode/.opencode.$$.json" /etc/opencode/opencode.json
+snapshot=/workspace/.t3flare/opencode/opencode.db
+[ -f "$snapshot" ] && cp "$snapshot" "$XDG_DATA_HOME/opencode/opencode.db"
+log=$XDG_DATA_HOME/opencode/log/opencode.log
+self=$$
+( while kill -0 "$self" 2>/dev/null; do
+    if grep -q 'configuration normalization diagnostic.*source=/etc/opencode' "$log" 2>/dev/null; then
+      echo "t3flare: OpenCode could not read part of t3flare's configuration; the process was ended" >&2
+      grep 'configuration normalization diagnostic.*source=/etc/opencode' "$log" | head -3 >&2
+      kill -TERM "$self"; exit 0
+    fi
+    sleep 1
+  done ) </dev/null >/dev/null &
+exec /opt/t3flare/opencode/opencode acp

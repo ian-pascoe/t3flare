@@ -20,7 +20,7 @@ import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider
 import * as StateStore from "../platform/stateStore.ts";
 
 /** The CLI binaries this route answers, by the name t3 spawns. */
-export const CLI_NAMES: ReadonlySet<string> = new Set(["codex", "pi", "t3flare-probe"]);
+export const CLI_NAMES: ReadonlySet<string> = new Set(["codex", "pi", "t3flare-probe", "claude-agent-acp", "opencode"]);
 
 const refused = (name: string, description: string) =>
   PlatformError.systemError({ _tag: "PermissionDenied", module: "ChildProcess", method: "spawn", description: `t3flare: ${description}`, pathOrDescriptor: name });
@@ -28,7 +28,9 @@ const refused = (name: string, description: string) =>
 const failedStart = (name: string, description: string) =>
   PlatformError.systemError({ _tag: "Unknown", module: "ChildProcess", method: "spawn", description: `t3flare: ${description}`, pathOrDescriptor: name });
 
-const cliOf = (name: string): CliName => (name === "t3flare-probe" ? "probe" : (name as CliName));
+const cliOf = (name: string): CliName => (name === "t3flare-probe" ? "probe" : name === "claude-agent-acp" ? "claude" : (name as CliName));
+
+const DISPLAY: Readonly<Record<string, string>> = { pi: "Pi", codex: "Codex", "claude-agent-acp": "Claude Code", opencode: "OpenCode" };
 
 /** The handle t3 reads and writes: the channel's process as Effect streams and a sink. */
 export const handleOf = (process: ChannelProcess, stdinEndOnDone: boolean): ChildProcessSpawner.ChildProcessHandle => {
@@ -76,7 +78,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     const cwd = command.options.cwd;
     const services = environmentServices();
     if (cwd === undefined || toWorkspace(cwd) === null) {
-      return yield* refused(name, `${name === "pi" ? "Pi" : "Codex"} runs in a Workspace's Container; start the thread in a project`);
+      return yield* refused(name, `${DISPLAY[name] ?? name} runs in a Workspace's Container; start the thread in a project`);
     }
     const channel = services.processes;
     const key = channel.newKey();

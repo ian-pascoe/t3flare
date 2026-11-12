@@ -1,0 +1,246 @@
+// @effect-diagnostics globalConsole:off effectFnOpportunity:off
+// Claude Code and OpenCode in the Cloud Environment (step 4b, plan §3 with the review's F1, F2, F4, F7, F9): t3's own
+// kinds (`claudeAgent` "Claude", `opencode` "OpenCode"), so the stock clients' names and icons apply, each built on
+// t3's generic ACP adapter (`makeAcpAdapterV2`) with a flavor of ours, running `claude-agent-acp` or `opencode acp` in
+// the Workspace's Container through 4a's process channel. Readiness is the image's version and the proxy's catalog,
+// never a spawning probe; t3's MCP credential is withheld (OD-3); text generation is the proxy's; 4a's wrapper runs
+// around the adapter (one process per session, the hold, the 2 h cap).
+import { type ChatAttachment, type ProviderDriverKind, type ProviderInstanceId, type ServerProvider, type ServerProviderModel } from "@t3tools/contracts";
+import { createModelCapabilities } from "@t3tools/shared/model";
+import type { Catalog } from "@t3flare/models/catalog";
+import { defaultProviderContinuationIdentity, type ProviderInstance } from "@t3tools/provider-core/server/driver";
+import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
+import { makeManualOnlyProviderMaintenanceCapabilities } from "@t3tools/provider-core/server/maintenanceResolver";
+import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
+import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+import { buildServerProvider, type ServerProviderPresentation } from "@t3tools/provider-core/server/snapshotProbe";
+import { haveProviderSnapshotSettingsChanged, makeProviderSnapshotSettingsSource } from "@t3tools/provider-core/server/snapshotSettings";
+import * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
+import { AcpProviderCapabilitiesV2, makeAcpAdapterV2, type AcpAdapterV2Flavor, type AcpAdapterV2RuntimeInput } from "@t3tools/provider-acp/server/adapter";
+import { ACP_SESSION_MODE_OPTION_ID } from "@t3tools/provider-acp/server/sessionConfig";
+import * as SecureRandom from "effect/crypto/SecureRandom";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import type * as EffectAcpSchema from "effect-acp/compat";
+
+import {
+  extractClaudeSubagentSessionEvent,
+  extractClaudeSubagentUpdate,
+  isClaudeProvisionalSubagentTool,
+} from "../../../../../t3code/packages/provider-acp-registry/src/server/claudeAcp.ts";
+import { environmentServices } from "../../agents/bindings.ts";
+import { attachmentReader, turnPrompt } from "../attachments.ts";
+import { snapshotModels } from "../models.ts";
+import { makePiDurableTextGeneration } from "../textGeneration.ts";
+import {
+  type AcpCli,
+  cliApprovalOptions,
+  cliModelId,
+  cliPermissionDisposition,
+  cliPromptFailure,
+  cliRuntimeModeForSessionMode,
+  guardedRuntime,
+  guardSlots,
+  PINNED_MODE,
+} from "./acpFlavor.ts";
+import { type CliSessions, wrapCliAdapter } from "./wrapper.ts";
+
+export type AcpCliDriverEnv =
+  | ChildProcessSpawner.ChildProcessSpawner
+  | FileSystem.FileSystem
+  | IdAllocator.IdAllocatorV2
+  | McpProviderSessions.McpProviderSessions
+  | ProviderContinuationRequests.ProviderContinuationRequests
+  | ProviderHost.ProviderHost
+  | SecureRandom.SecureRandom;
+
+/** The effort levels both agents offer as their `effort` config option (M0 P1, P2). */
+const EFFORTS = [
+  { id: "default", label: "Default", isDefault: true },
+  { id: "low", label: "Low" },
+  { id: "medium", label: "Medium" },
+  { id: "high", label: "High" },
+  { id: "xhigh", label: "Extra high" },
+  { id: "max", label: "Max" },
+] as const;
+
+/** The catalog's models, with the agents' `effort` picker for reasoning models (t3's adapter sets it by id). */
+export const acpSnapshotModels = (catalog: Catalog): ReadonlyArray<ServerProviderModel> => {
+  const reasoning = new Set(catalog.models.filter((model) => model.reasoning).map((model) => model.slug));
+  return snapshotModels(catalog).map((model) => ({
+    ...model,
+    capabilities: createModelCapabilities({
+      optionDescriptors: reasoning.has(model.slug) ? [{ id: "effort", label: "Effort", type: "select", options: EFFORTS.map((effort) => ({ ...effort })) }] : [],
+    }),
+  }));
+};
+
+/** The capabilities t3 reads (plan §1.4): t3's ACP set, rollback off (plan §3.3), Claude's proposed plan recovered (F1). */
+export const acpCapabilities = (cli: AcpCli) => ({
+  ...AcpProviderCapabilitiesV2,
+  threads: { ...AcpProviderCapabilitiesV2.threads, canRollbackThread: false },
+  checkpointing: { ...AcpProviderCapabilitiesV2.checkpointing, providerCanRollbackConversation: false },
+  planning: { ...AcpProviderCapabilitiesV2.planning, emitsProposedPlan: cli === "claude" },
+});
+
+/** Never used: only t3's MCP bridge reads it, and t3's MCP is withheld (OD-3). */
+const SELF_INVOCATION = { command: "t3flare-no-self-invocation", entrypoint: undefined } as const;
+
+/** The runtime each session runs: the CLI through t3's spawner (the process channel). */
+const spawnRuntime = (cli: AcpCli) => (input: AcpAdapterV2RuntimeInput) =>
+  Effect.gen(function* () {
+    // t3's environment, MCP servers and policy are not passed on: the profile decides the environment (4a §4.6), OD-3
+    // withholds MCP, and the flavor applies the policy.
+    const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...options } = input;
+    const context = yield* Layer.build(
+      AcpSessionRuntime.layer({
+        ...options,
+        spawn: cli === "claude" ? { command: "claude-agent-acp", args: [], cwd: input.cwd, env: {}, extendEnv: false, shell: false } : { command: "opencode", args: ["acp"], cwd: input.cwd, env: {}, extendEnv: false, shell: false },
+        ownDetachedProcessGroup: true,
+        ownDescendantProcessGroups: false,
+        linuxCgroupController: null,
+        processGroupPlatform: "linux",
+        // A sign-in is never offered (ADR-0016): an auth_required is the proxy key's failure (cliPromptFailure).
+        authenticateOnAuthRequired: false,
+      }),
+    );
+    return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
+  });
+
+export interface AcpCliDriverSpec {
+  readonly cli: AcpCli;
+  readonly driver: ProviderDriverKind;
+  readonly presentation: ServerProviderPresentation;
+  readonly version: string;
+}
+
+/** The snapshot's note on what of t3's settings form is ignored here (plan §3.1). */
+const IGNORED_SETTINGS: Readonly<Record<AcpCli, string>> = {
+  claude: "Runs Claude Code in the Workspace's Container on the model proxy; the binary, home, launch arguments and custom models settings are not used.",
+  opencode: "Runs OpenCode in the Workspace's Container on the model proxy; the binary, server URL, password and custom models settings are not used.",
+};
+
+const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
+  Effect.gen(function* () {
+    const checkedAt = DateTime.formatIso(yield* DateTime.now);
+    return buildServerProvider({
+      presentation: spec.presentation,
+      enabled,
+      checkedAt,
+      models: acpSnapshotModels(environmentServices().catalog.current()),
+      probe: { installed: true, version: spec.version, status: "ready", auth: { status: "authenticated" }, message: IGNORED_SETTINGS[spec.cli] },
+    });
+  });
+
+export interface AcpFlavorOptions {
+  readonly buildPrompt?: AcpAdapterV2Flavor["buildPrompt"];
+  /** The unguarded runtime (tests replay a recorded agent); by default the CLI through the process channel. */
+  readonly spawn?: AcpAdapterV2Flavor["makeRuntime"];
+}
+
+/** The flavor: plan §3.2's table with the review's changes. Every runtime is guarded (acpFlavor.ts `guardedRuntime`). */
+export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpFlavorOptions = {}): AcpAdapterV2Flavor => ({
+  driver,
+  capabilities: acpCapabilities(cli),
+  makeRuntime: (input) => (options.spawn ?? spawnRuntime(cli))(input).pipe(Effect.map((runtime) => guardedRuntime(cli, runtime))),
+  // The agent is pinned to its asking mode; t3's plan handling moves it to plan for a plan turn and back (plan §5.1).
+  ...(cli === "claude" ? { sessionModeForPolicy: () => PINNED_MODE.claude } : { sessionConfigForPolicy: () => [{ id: "mode", value: PINNED_MODE.opencode }] }),
+  runtimeModeForSessionMode: cliRuntimeModeForSessionMode(cli),
+  // Native mode choices in a model selection are never applied (plan §3.3): the generic option loop skips owned ids.
+  ownedModelOptionIds: ["mode", ACP_SESSION_MODE_OPTION_ID],
+  permissionDisposition: cliPermissionDisposition,
+  approvalOptions: cliApprovalOptions,
+  promptFailure: (cause) => cliPromptFailure(cause),
+  requiresSignIn: () => false,
+  resolveModelId: (selection) => cliModelId(cli, selection.model),
+  ...(options.buildPrompt === undefined ? {} : { buildPrompt: options.buildPrompt }),
+  // Review F1: the plan is captured when Claude asks to leave plan mode (guardedRuntime), not after the turn settles.
+  registerExtensions: ({ runtime, captureProposedPlan }) =>
+    Effect.sync(() => {
+      const slot = guardSlots.get(runtime);
+      if (slot !== undefined) slot.capture = captureProposedPlan;
+    }),
+  ...(cli === "claude"
+    ? {
+        // claude-agent-acp's ACP v2 work state and subagents, as t3's registry flavor maps them (reg/claudeAcp.ts).
+        followAgentWorkState: true,
+        extractSubagentUpdate: extractClaudeSubagentUpdate,
+        isProvisionalSubagentTool: isClaudeProvisionalSubagentTool,
+        extractSubagentSessionEvent: extractClaudeSubagentSessionEvent,
+      }
+    : {}),
+});
+
+/** Prompts (plan §3.5): SPI-993's rules for Durable agents, images inline when the agent takes them, text files inline. */
+const promptBuilder = (host: ProviderHost.ProviderHost["Service"], fileSystem: FileSystem.FileSystem): NonNullable<AcpAdapterV2Flavor["buildPrompt"]> => {
+  const reader = attachmentReader(host, fileSystem);
+  return (input) =>
+    turnPrompt({ text: input.text, attachments: input.attachments as ReadonlyArray<ChatAttachment> }, { acceptsImages: input.promptCapabilities?.image === true, reader }).pipe(
+      Effect.map(({ text, images }): ReadonlyArray<EffectAcpSchema.ContentBlock> => [
+        { type: "text", text },
+        ...images.map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
+      ]),
+    );
+};
+
+/** One instance of an ACP CLI driver (`ProviderDriver.create`'s body). */
+export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <Config extends { readonly enabled: boolean }>(
+  spec: AcpCliDriverSpec,
+  input: { readonly instanceId: ProviderInstanceId; readonly displayName: string | undefined; readonly accentColor?: string | undefined; readonly enabled: boolean; readonly config: Config },
+) {
+  const { instanceId, displayName, accentColor, enabled, config } = input;
+  const continuationIdentity = defaultProviderContinuationIdentity({ driverKind: spec.driver, instanceId });
+  const stamp = (draft: Omit<ServerProvider, "instanceId" | "driver">): ServerProvider => ({
+    ...draft,
+    instanceId,
+    driver: spec.driver,
+    ...(displayName ? { displayName } : {}),
+    ...(accentColor ? { accentColor } : {}),
+    continuation: { groupKey: continuationIdentity.continuationKey },
+  });
+  const effective = { ...config, enabled };
+  const { catalog } = environmentServices();
+  const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
+  const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: spec.driver, packageName: null });
+  const snapshot = yield* makeManagedServerProvider({
+    resolveMaintenance: () => Effect.succeed(maintenance),
+    getSettings: settingsSource.getSettings,
+    streamSettings: settingsSource.streamSettings,
+    haveSettingsChanged: haveProviderSnapshotSettingsChanged,
+    initialSnapshot: (settings) => snapshotOf(spec, settings.provider.enabled).pipe(Effect.map(stamp)),
+    checkProvider: Effect.promise(() => catalog.refresh()).pipe(
+      Effect.flatMap(() => snapshotOf(spec, effective.enabled)),
+      Effect.map(stamp),
+    ),
+  }).pipe(Effect.orDie);
+  yield* Effect.forkScoped(snapshot.refresh);
+  const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
+  // OD-3: t3's per-thread MCP credential never reaches a CLI (ADR-0022): the adapter reads none.
+  const noMcp = McpProviderSessions.McpProviderSessions.of({ ...realMcpSessions, read: () => Effect.void.pipe(Effect.as(undefined)) });
+  const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
+  const host = yield* ProviderHost.ProviderHost;
+  const fileSystem = yield* FileSystem.FileSystem;
+  const adapter = yield* makeAcpAdapterV2({
+    instanceId,
+    flavor: acpFlavor(spec.cli, spec.driver, { buildPrompt: promptBuilder(host, fileSystem) }),
+    selfInvocation: SELF_INVOCATION,
+    continuationRequests,
+  }).pipe(Effect.provideService(McpProviderSessions.McpProviderSessions, noMcp));
+  const sessions: CliSessions = new Map();
+  return {
+    instanceId,
+    driverKind: spec.driver,
+    continuationIdentity,
+    displayName,
+    accentColor,
+    enabled,
+    snapshot,
+    orchestrationAdapter: wrapCliAdapter(adapter, { sessions }),
+    textGeneration: makePiDurableTextGeneration(),
+  } satisfies ProviderInstance;
+});

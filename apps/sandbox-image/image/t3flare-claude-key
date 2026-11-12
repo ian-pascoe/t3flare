@@ -1,0 +1,6 @@
+#!/bin/sh
+# Claude Code's apiKeyHelper (step 4b): the key helper with the nonce of the Claude process that runs it, read from that
+# process's home by its marker (each Claude process has its own; the managed settings file is shared by all).
+set -eu
+nonce=$(cat "/var/lib/t3flare/cli/${T3FLARE_EXEC:?}/nonce")
+T3FLARE_MODEL_KEY_NONCE=$nonce exec /opt/t3flare/bin/t3flare-model-key claude

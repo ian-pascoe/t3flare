@@ -37,6 +37,21 @@ describe("the CLI manifest", () => {
     const testImage = fs.readFileSync(path.resolve(import.meta.dirname, "docker/Dockerfile"), "utf8");
     expect(testImage).toContain(`FROM node:${node}-`);
     expect(testImage).toContain(`NODE_VERSION_DIR=/usr/local/share/mise/installs/node/${node}`);
+    // Step 4b: Claude Code's launcher runs claude-agent-acp on the same Node.
+    expect(fs.readFileSync(path.join(image, "t3flare-claude-agent-acp"), "utf8")).toContain(`${bin}/node `);
+  });
+
+  it("matches the Dockerfile's ARGs and Claude's lock (step 4b)", () => {
+    const dockerfile = fs.readFileSync(path.join(image, "Dockerfile"), "utf8");
+    expect(/^ARG OPENCODE_VERSION=(.+)$/m.exec(dockerfile)?.[1]).toBe(CLIS.opencode.version);
+    expect(/^ARG OPENCODE_SHA256=(.+)$/m.exec(dockerfile)?.[1]).toBe(CLIS.opencode.sha256);
+    const lock = JSON.parse(fs.readFileSync(path.join(image, "claude/package-lock.json"), "utf8"));
+    expect(lock.packages[`node_modules/${CLIS.claude.package}`].version).toBe(CLIS.claude.packageVersion);
+    expect(lock.packages["node_modules/@anthropic-ai/claude-agent-sdk"].version).toBe(CLIS.claude.sdkVersion);
+    // The SDK's version is Claude Code's: 0.3.N ships 2.1.N.
+    expect(CLIS.claude.version).toBe(`2.1.${CLIS.claude.sdkVersion.split(".")[2]}`);
+    expect(lock.packages["node_modules/@anthropic-ai/claude-agent-sdk-linux-x64"].version).toBe(CLIS.claude.sdkVersion);
+    expect(fs.readFileSync(path.join(image, "t3flare-claude-agent-acp"), "utf8")).toContain(`node_modules/${CLIS.claude.package}/dist/index.js`);
   });
 
   it("pins a Codex t3 marks supported, and a pi at or above t3's minimum: else bump the CLI in clis.ts", () => {
@@ -44,5 +59,8 @@ describe("the CLI manifest", () => {
     const codex = resolveProviderCompatibility(manifest.compatibility as never, "codex" as never, CLIS.codex.version);
     expect(codex?.status, "bump the CLI in clis.ts").toBe("supported");
     expect(compareSemverVersions(CLIS.pi.version, MINIMUM_PI_VERSION), "bump the CLI in clis.ts").toBeGreaterThanOrEqual(0);
+    for (const [driver, version] of [["claudeAgent", CLIS.claude.version], ["opencode", CLIS.opencode.version]] as const) {
+      expect(resolveProviderCompatibility(manifest.compatibility as never, driver as never, version)?.status, `${driver}: bump the CLI in clis.ts`).toBe("supported");
+    }
   });
 });

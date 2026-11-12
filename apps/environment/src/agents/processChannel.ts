@@ -320,7 +320,7 @@ export class ProcessChannel {
   /** Starts a process; resolves once it runs in the Container, or rejects with the Workspace's reason. */
   async start(input: ChannelStart): Promise<ChannelProcess> {
     const place = this.#deps.place(input.cwd);
-    if (place === undefined) throw new ProcessRefused(`${input.cli === "pi" ? "Pi" : "Codex"} runs in a Workspace's Container, and ${input.cwd} is in none; start the thread in a project`);
+    if (place === undefined) throw new ProcessRefused(`${({ pi: "Pi", codex: "Codex", claude: "Claude Code", opencode: "OpenCode" } as Record<string, string>)[input.cli] ?? input.cli} runs in a Workspace's Container, and ${input.cwd} is in none; start the thread in a project`);
     const key = input.key ?? this.#deps.newKey();
     const process = new ChannelProcess(this, this.#nextPid++, key, place, input.cli);
     this.#byKey.set(key, process);
