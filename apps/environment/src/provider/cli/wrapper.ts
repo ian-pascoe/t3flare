@@ -236,7 +236,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => {
             unregister();
-            for (const id of [...cards.keys()]) closeCard(id, null, { approved: false, reason: "the session ended" });
+            for (const id of cards.keys()) closeCard(id, null, { approved: false, reason: "the session ended" });
           }),
         );
         /** Follows the live turn's ids; at its end, its open cards close (before t3 sees the terminal). */

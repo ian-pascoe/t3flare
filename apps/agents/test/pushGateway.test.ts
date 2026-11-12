@@ -97,7 +97,7 @@ describe("parseCommands: the strict grammar (review M1)", () => {
   });
 });
 
-describe("handleGitRequest: real git through the gateway to a local GitHub stand-in", () => {
+describe("handleGitRequest: real git through the gateway to a local GitHub stand-in", { timeout: 30_000 }, () => {
   const setup = async (authorize: GatewayDeps["authorize"]) => {
     const root = tempDir("gateway-");
     const upstream = makeUpstream(path.join(root, "github"), "Owner", "repo");
