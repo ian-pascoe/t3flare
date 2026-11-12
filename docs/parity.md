@@ -1,6 +1,6 @@
 # t3flare parity matrix (t3code `v0.1.9-nightly.20261111.4515`)
 
-The checklist for "t3code parity": everything stock t3code does on a laptop works in t3flare, or is refused by a recorded decision. First audit 2026-11-11 (read-only, code and step reports); update rows as steps land. Gaps and decisions are tracked in Linear (project ian-pascoe/t3flare).
+See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklist for "t3code parity": everything stock t3code does on a laptop works in t3flare, or is refused by a recorded decision. First audit 2026-11-11 (read-only, code and step reports); update rows as steps land. Gaps and decisions are tracked in Linear (project ian-pascoe/t3flare).
 
 **Paths:** `srv/` = `t3code/apps/server/src/`, `con/` = `t3code/packages/contracts/src/`, `env/` = `apps/environment/src/`.
 
