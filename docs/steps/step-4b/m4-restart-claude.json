@@ -1,0 +1,61 @@
+{
+ "at": "2026-11-12T02:51:56.019Z",
+ "scenario": "restart",
+ "ok": true,
+ "failures": [],
+ "cli": "claude",
+ "workspace": "restart-claude-mwcybpgz",
+ "runs": [
+  {
+   "status": "completed",
+   "failure": null
+  }
+ ],
+ "items": [
+  "user_message",
+  "command_execution",
+  "command_execution",
+  "command_execution",
+  "command_execution",
+  "assistant_message",
+  "checkpoint"
+ ],
+ "processesBefore": {
+  "channel": {
+   "live": 3,
+   "environmentEpoch": 7
+  },
+  "workspace": {
+   "epoch": 1,
+   "processes": [
+    {
+     "key": "proc-de6e9c43-cb30-434a-941b-9e158203a0b1",
+     "thread": "337f3e67-b0e1-4f52-8985-f6e98882d507",
+     "environmentEpoch": 7,
+     "inTurn": false,
+     "idleMs": 3973
+    }
+   ],
+   "pushes": 17
+  }
+ },
+ "processesAfter": {
+  "channel": {
+   "live": 0,
+   "environmentEpoch": 8
+  },
+  "workspace": {
+   "epoch": 1,
+   "processes": [
+    {
+     "key": "proc-de6e9c43-cb30-434a-941b-9e158203a0b1",
+     "thread": "337f3e67-b0e1-4f52-8985-f6e98882d507",
+     "environmentEpoch": 7,
+     "inTurn": false,
+     "idleMs": 9631
+    }
+   ],
+   "pushes": 17
+  }
+ }
+}

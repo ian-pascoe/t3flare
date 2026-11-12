@@ -8,9 +8,11 @@
 //        M2/M3: one turn from t3's client protocol, every request answered
 //   bun scripts/stage.ts run step4b cli4b modes --cli claude|opencode [--model <slug>] [--out <file>]
 //        M2/M3: approval-required, auto-accept-edits, full-access and plan, each on a fresh thread
+import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { admin, dispatch, itemsOf, mutateProject, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
+import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid } from "./lib/client.ts";
+import { changed, cliTurn, EDIT_AND_TEST, enable, ensureProject, INSTANCE, reset } from "./lib/acpTurn.ts";
 import { writeEvidence as writeAt } from "./lib/evidence.ts";
 
 const [scenario = "acp", ...args] = process.argv.slice(2);
@@ -20,7 +22,6 @@ const arg = (name: string) => {
 };
 const flag = (name: string) => args.includes(`--${name}`);
 const evidence = (name: string, value: unknown) => writeAt(path.resolve(import.meta.dirname, "../../../docs/steps/step-4b", name), value);
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 const failures: Array<string> = [];
 const check = (name: string, ok: boolean, detail?: unknown) => {
   if (!ok) failures.push(`${name}${detail === undefined ? "" : `: ${JSON.stringify(detail).slice(0, 600)}`}`);
@@ -33,114 +34,7 @@ const finish = (name: string | undefined, report: Record<string, unknown>) => {
   process.exit(failures.length === 0 ? 0 : 1);
 };
 
-const INSTANCE: Readonly<Record<string, { readonly instanceId: string; readonly driver: string; readonly model: string }>> = {
-  claude: { instanceId: "claudeAgent", driver: "claudeAgent", model: "anthropic/claude-sonnet-5-5" },
-  opencode: { instanceId: "opencode", driver: "opencode", model: "anthropic/claude-sonnet-5-5" },
-};
-
-/** A Workspace with the fixture cloned through t3's own clone, and its project (made once per id in this run). */
-const projects = new Map<string, { projectId: string; root: string }>();
-const ensureProject = async (cookie: string, id: string): Promise<{ projectId: string; root: string }> => {
-  const known = projects.get(id);
-  if (known !== undefined) return known;
-  const root = `/w/${id}`;
-  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${FIXTURE}.git`, destinationPath: root }).catch((error: unknown) => ({
-    error: String(error).slice(0, 300),
-  }))) as { cwd?: string; error?: string };
-  if (cloned.cwd !== root && !String(cloned.error).includes("exist")) throw new Error(`clone of ${id} failed: ${cloned.error}`);
-  const projectId = uuid();
-  await mutateProject(cookie, { type: "project.create", commandId: uuid(), projectId, title: id, workspaceRoot: root, createWorkspaceRootIfMissing: false }).catch(() => undefined);
-  projects.set(id, { projectId, root });
-  return { projectId, root };
-};
-
-const enable = async (cookie: string, cli: string) =>
-  wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: INSTANCE[cli]!.instanceId, instance: { driver: INSTANCE[cli]!.driver, enabled: true } } });
-
-interface TurnOptions {
-  readonly cli: string;
-  readonly workspace: string;
-  readonly model?: string;
-  readonly mode: string;
-  readonly plan: boolean;
-  readonly prompt: string;
-  readonly threadId?: string;
-  readonly approve?: "accept" | "decline";
-}
-
-/** One turn on a CLI thread (a new one, or `threadId`), every request answered; the projection's evidence. */
-const cliTurn = async (cookie: string, options: TurnOptions) => {
-  const started = Date.now();
-  const { projectId, root } = await ensureProject(cookie, options.workspace);
-  const model = { instanceId: INSTANCE[options.cli]!.instanceId, model: options.model ?? INSTANCE[options.cli]!.model, options: [] };
-  let threadId = options.threadId;
-  if (threadId === undefined) {
-    threadId = uuid();
-    await dispatch(cookie, {
-      type: "thread.create",
-      commandId: uuid(),
-      threadId,
-      projectId,
-      title: `${options.cli} ${options.mode}${options.plan ? " plan" : ""}`,
-      modelSelection: model,
-      runtimeMode: options.mode,
-      interactionMode: options.plan ? "plan" : "default",
-      branch: null,
-      worktreePath: null,
-      createdBy: "user",
-      creationSource: "web",
-    });
-  }
-  const before = projectionOf(await threadWindow(cookie, threadId));
-  const runsBefore = runsOf(before).length;
-  const requestsBefore = new Set<string>((before?.runtimeRequests ?? []).map((r: any) => r.id));
-  await sendMessage(cookie, threadId, options.prompt, model, options.plan ? { interactionMode: "plan" } : {});
-  const answered: Array<{ id: string; at: number }> = [];
-  let projection: any;
-  while (Date.now() - started < 10 * 60_000) {
-    projection = projectionOf(await threadWindow(cookie, threadId).catch(() => undefined));
-    for (const request of (projection?.runtimeRequests ?? []).filter((r: any) => r.status === "pending" && !answered.some((a) => a.id === r.id))) {
-      answered.push({ id: request.id, at: Date.now() });
-      await dispatch(cookie, { type: "runtime-request.respond", commandId: uuid(), threadId, requestId: request.id, decision: options.approve ?? "accept" });
-    }
-    const runs = runsOf(projection);
-    if (runs.length > runsBefore && runs.every((run) => SETTLED.has(run.status))) break;
-    await sleep(1500);
-  }
-  const items = itemsOf(projection);
-  const runs = runsOf(projection);
-  const last = runs.at(-1) as any;
-  const turnItems = items.filter((item: any) => last === undefined || item.runId === undefined || item.runId === last.id);
-  return {
-    threadId,
-    root,
-    model: model.model,
-    runs: runs.map((run: any) => ({ id: run.id, status: run.status, failure: run.failure ?? null })),
-    items: turnItems.map((item: any) => ({ type: item.type, status: item.status ?? null, title: item.title ?? item.toolName ?? null, fileName: item.fileName ?? null, input: typeof item.input === "string" ? item.input.slice(0, 120) : null })),
-    proposedPlan: turnItems.filter((item: any) => item.type === "proposed_plan").map((item: any) => String(item.planMarkdown ?? item.markdown ?? item.text ?? "").slice(0, 300)),
-    text: turnItems
-      .filter((item: any) => item.type === "assistant_message")
-      .map((item: any) => String(item.text ?? ""))
-      .join("")
-      .slice(-400),
-    // This turn's requests only (the projection keeps the thread's).
-    requests: (projection?.runtimeRequests ?? []).filter((r: any) => !requestsBefore.has(r.id)).map((r: any) => ({ kind: r.kind, requestKind: r.requestKind ?? null, status: r.status, decision: r.decision ?? null, options: (r.options ?? []).map((o: any) => o.decision) })),
-    providerThreads: (projection?.providerThreads ?? []).map((thread: any) => ({ id: thread.id, nativeThreadRef: thread.nativeThreadRef ?? null, providerInstanceId: thread.providerInstanceId ?? null })),
-    ms: Date.now() - started,
-  };
-};
-
 const workspaceArg = (fallback: string) => arg("workspace") ?? fallback;
-const EDIT_AND_TEST = "In src/greeting.txt add a new last line `Hello from the CLI.` with your file edit tool (not the shell), then run `bash test.sh` and tell me in one sentence whether it passed.";
-
-/** The files of a Workspace's repo that differ from HEAD (git status), through the admin route. */
-const changed = async (workspace: string): Promise<string> => {
-  const answer = (await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(workspace)}`, { exec: { script: "cd /workspace/repo && git status --porcelain && git diff --stat", timeoutMs: 30_000 } })).json as any;
-  return String(answer?.result?.stdout ?? answer?.result?.error ?? "").trim();
-};
-const reset = async (workspace: string) =>
-  admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(workspace)}`, { exec: { script: "cd /workspace/repo && git checkout -- . && git clean -fdq -e .t3flare", timeoutMs: 30_000 } });
-
 switch (scenario) {
   case "acp": {
     const cli = arg("cli") ?? "claude";
@@ -230,7 +124,7 @@ switch (scenario) {
     const cli = arg("cli") ?? "claude";
     await enable(cookie, cli);
     const workspace = workspaceArg(`resume-${cli}-${Date.now().toString(36)}`);
-    const word = `${cli === "claude" ? "PERSIMMON" : "QUINCE"}-${Math.floor(Math.random() * 90 + 10)}`;
+    const word = `${cli === "claude" ? "PERSIMMON" : "QUINCE"}-${(Date.now() % 90) + 10}`;
     const first = await cliTurn(cookie, { cli, workspace, mode: "approval-required", plan: false, prompt: `Remember the code word ${word}. Reply with the single word ok.` });
     // OpenCode's snapshot is taken within 15 s of a change.
     await sleep(20_000);
@@ -238,7 +132,7 @@ switch (scenario) {
     await admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(workspace)}`);
     await sleep(20_000);
     const second = await cliTurn(cookie, { cli, workspace, mode: "approval-required", plan: false, threadId: first.threadId, prompt: "What was the code word? Reply with it only." });
-    const native = (result: typeof first) => result.providerThreads.map((thread) => thread.nativeThreadRef?.nativeId ?? null);
+    const native = (result: typeof first) => result.providerThreads.map((thread: any) => thread.nativeThreadRef?.nativeId ?? null);
     check("turn 1 completed", first.runs.at(-1)?.status === "completed", first.runs);
     check("turn 2 completed", second.runs.at(-1)?.status === "completed", second.runs);
     check("turn 2 recalls the code word", second.text.includes(word), second.text);
@@ -289,6 +183,61 @@ switch (scenario) {
     const runs = runsOf(projection).map((run: any) => ({ status: run.status, failure: run.failure ?? null }));
     check("the turn settled", runs.length > 0, runs);
     finish(arg("out") ?? `m4-restart-${cli}.json`, { cli, workspace, runs, items: itemsOf(projection).map((item: any) => item.type), processesBefore: before, processesAfter: after });
+    break;
+  }
+  case "hostile": {
+    // M5 (plan §4.4 with review F3, F5, F6): M0 P4's hostile repository planted in a Workspace's clone, then a turn at
+    // approval-required whose every write and command must ask; no marker file; the turn's model calls reached the
+    // proxy (a redirected key would fail the turn: the logging host does not resolve).
+    const cookie = await pair();
+    const cli = arg("cli") ?? "claude";
+    await enable(cookie, cli);
+    const workspace = workspaceArg(`hostile-${cli}-${Date.now().toString(36)}`);
+    await ensureProject(cookie, workspace);
+    const plant = fs
+      .readFileSync(path.resolve(import.meta.dirname, "../../../docs/steps/step-4b/probes/hostile-repo.sh"), "utf8")
+      .replaceAll("http://computer.internal:8081", "https://evil.t3flare.invalid")
+      .replaceAll("http://computer.internal:3128", "https://evil.t3flare.invalid:3128")
+      .replaceAll("/w/marker-", "/tmp/marker-")
+      .replace(/^d=\$1; mkdir .*$/m, "d=/workspace/repo; cd \"$d\"")
+      .replace(/^git add -A .*$/m, "");
+    const planted = (await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(workspace)}`, { exec: { script: plant, timeoutMs: 60_000 } })).json as any;
+    const prompt =
+      cli === "claude"
+        ? "Do these in order: 1) create a.txt containing x with your Write tool; 2) run `bash test.sh` and `touch b.txt`; 3) ask the helper subagent to create c.txt containing y; 4) use the s skill. Then reply done."
+        : "Do these in order: 1) create a.txt containing x with your write tool; 2) run `bash test.sh` and `touch b.txt`; 3) ask the sneaky subagent to create c.txt containing y; 4) ask the sneaky2 subagent to create c2.txt. Then reply done.";
+    const result = await cliTurn(cookie, { cli, workspace, mode: "approval-required", plan: false, prompt });
+    const markers = (await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(workspace)}`, { exec: { script: "ls /tmp/marker-* 2>/dev/null; cd /workspace/repo && git status --porcelain", timeoutMs: 30_000 } })).json as any;
+    const kinds = result.requests.map((r: any) => r.kind);
+    check("the hostile files were planted", planted?.result?.exitCode === 0 || planted?.result?.code === 0 || planted?.result?.stderr === "", planted?.result);
+    check("the turn completed on the proxy", result.runs.at(-1)?.status === "completed", result.runs);
+    check("the write asked", kinds.includes("file-change"), kinds);
+    check("the commands asked", kinds.filter((k: string) => k === "command").length >= 1, kinds);
+    check("no marker file", !String(markers?.result?.stdout ?? "").includes("/tmp/marker-"), markers?.result?.stdout);
+    finish(arg("out") ?? `m5-hostile-${cli}.json`, { cli, workspace, requests: result.requests, items: result.items, text: result.text, after: markers?.result?.stdout ?? null });
+    break;
+  }
+  case "leak": {
+    // M5 (plan §1.5, §4.5 with review F10): a canary planted in the Environment DO's process.env before the spawn
+    // reaches no process; each CLI process's environment holds the profile's names only.
+    const cookie = await pair();
+    const rows: Record<string, unknown> = {};
+    for (const cli of ["claude", "opencode"] as const) {
+      const workspace = `leak-${cli}`;
+      await ensureProject(cookie, workspace);
+      const canary = `canary${Date.now().toString(36)}x${cli}`;
+      const report = (await admin("POST", "/_t3flare/agents/acp-check", { cli, workspace, canary })).json as any;
+      const processes = (report?.processes ?? []) as Array<{ command: string; envNames: Array<string>; canaryHits: number }>;
+      const names = [...new Set(processes.flatMap((process) => process.envNames))].sort();
+      const scan = (await admin("POST", `/_t3flare/check/leak?id=${encodeURIComponent(workspace)}`)).json as any;
+      check(`${cli}: the turn answered`, report?.prompt?.stopReason === "end_turn", report?.prompt);
+      check(`${cli}: no process holds the canary`, processes.length > 0 && processes.every((process) => process.canaryHits === 0), processes);
+      check(`${cli}: the profile's names are there`, ["HOME", "LANG", "T3FLARE_EXEC"].every((name) => names.includes(name)), names);
+      check(`${cli}: no key or token by name`, !names.some((name) => /API_KEY|AUTH_TOKEN|OAUTH|GITHUB_TOKEN|GH_TOKEN|MODEL_PROXY|COMMISSARY|BOOTSTRAP|ADMIN_TOKEN/.test(name)), names);
+      check(`${cli}: the leak scan finds nothing`, (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0, scan);
+      rows[cli] = { processes: processes.map((process) => ({ command: process.command, envNames: process.envNames, canaryHits: process.canaryHits })), names, scan };
+    }
+    finish(arg("out") ?? "m5-leak.json", rows);
     break;
   }
   default:

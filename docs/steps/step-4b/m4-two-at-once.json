@@ -1,0 +1,28 @@
+{
+ "at": "2026-11-12T02:51:24.624Z",
+ "scenario": "two",
+ "ok": true,
+ "failures": [],
+ "claude": {
+  "runs": [
+   {
+    "id": "run:thread:48af4d6a-7fea-4c98-a5e3-3b356bab0bcf:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "ms": 22397,
+  "text": "Yes, it passed: I added `Hello from the CLI.` as the new last line of `src/greeting.txt` with the edit tool, and `bash test.sh` printed \"all checks passed\"."
+ },
+ "opencode": {
+  "runs": [
+   {
+    "id": "run:thread:662f5475-9ca9-4489-9fac-affb0f1afca6:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "ms": 24930,
+  "text": "I added `Hello from the CLI.` as the new last line of `src/greeting.txt` using the edit tool, and `bash test.sh` passed, printing \"all checks passed\"."
+ }
+}

@@ -1,0 +1,196 @@
+{
+ "step": "4b",
+ "milestone": "M4 resume",
+ "how": "scripts/cli4b.ts resume --cli claude|opencode on step4b: turn 1 sets a code word, the Workspace's Container is stopped (admin workspace-stop), turn 2 on the same thread asks for it. Proof (review F8): the Environment's `acp-request` log lines (method and outcome only), read from Workers Logs",
+ "claude": {
+  "at": "2026-11-12T02:50:10.473Z",
+  "scenario": "resume",
+  "ok": true,
+  "failures": [],
+  "cli": "claude",
+  "workspace": "resume-claude-mwcy7k43",
+  "word": "PERSIMMON-93",
+  "stoppedAt": 1794451773332,
+  "first": {
+   "threadId": "cc16447f-4c11-4f30-bb42-a4cbaa28e640",
+   "runs": [
+    {
+     "id": "run:thread:cc16447f-4c11-4f30-bb42-a4cbaa28e640:ordinal:1",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "native": [
+    "68a3841e-351a-42c4-a7e6-1d6f71034647"
+   ]
+  },
+  "second": {
+   "runs": [
+    {
+     "id": "run:thread:cc16447f-4c11-4f30-bb42-a4cbaa28e640:ordinal:1",
+     "status": "completed",
+     "failure": null
+    },
+    {
+     "id": "run:thread:cc16447f-4c11-4f30-bb42-a4cbaa28e640:ordinal:2",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "native": [
+    "68a3841e-351a-42c4-a7e6-1d6f71034647"
+   ],
+   "text": "PERSIMMON-93",
+   "items": [
+    {
+     "type": "user_message",
+     "status": "completed",
+     "title": null,
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "assistant_message",
+     "status": "completed",
+     "title": null,
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "checkpoint",
+     "status": "completed",
+     "title": null,
+     "fileName": null,
+     "input": null
+    }
+   ]
+  }
+ },
+ "opencode": {
+  "at": "2026-11-12T02:49:59.784Z",
+  "scenario": "resume",
+  "ok": true,
+  "failures": [],
+  "cli": "opencode",
+  "workspace": "resume-opencode-mwcy7kb3",
+  "word": "QUINCE-12",
+  "stoppedAt": 1794451768910,
+  "first": {
+   "threadId": "8dd38389-057b-4946-9cb4-c0125cf0c073",
+   "runs": [
+    {
+     "id": "run:thread:8dd38389-057b-4946-9cb4-c0125cf0c073:ordinal:1",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "native": [
+    "ses_e32575c6bffe5GuTczXWHqu3g6"
+   ]
+  },
+  "second": {
+   "runs": [
+    {
+     "id": "run:thread:8dd38389-057b-4946-9cb4-c0125cf0c073:ordinal:1",
+     "status": "completed",
+     "failure": null
+    },
+    {
+     "id": "run:thread:8dd38389-057b-4946-9cb4-c0125cf0c073:ordinal:2",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "native": [
+    "ses_e32575c6bffe5GuTczXWHqu3g6"
+   ],
+   "text": "QUINCE-12",
+   "items": [
+    {
+     "type": "user_message",
+     "status": "completed",
+     "title": null,
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "assistant_message",
+     "status": "completed",
+     "title": null,
+     "fileName": null,
+     "input": null
+    },
+    {
+     "type": "checkpoint",
+     "status": "completed",
+     "title": null,
+     "fileName": null,
+     "input": null
+    }
+   ]
+  }
+ },
+ "protocolLog": [
+  {
+   "t": "02:49:00",
+   "cli": "opencode",
+   "method": "initialize",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:49:03",
+   "cli": "claude",
+   "method": "initialize",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:49:03",
+   "cli": "opencode",
+   "method": "session/new",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:49:07",
+   "cli": "claude",
+   "method": "session/new",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:49:53",
+   "cli": "opencode",
+   "method": "initialize",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:49:56",
+   "cli": "opencode",
+   "method": "session/new",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:49:57",
+   "cli": "opencode",
+   "method": "session/load",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:49:59",
+   "cli": "claude",
+   "method": "initialize",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:50:03",
+   "cli": "claude",
+   "method": "session/new",
+   "status": "succeeded"
+  },
+  {
+   "t": "02:50:06",
+   "cli": "claude",
+   "method": "session/load",
+   "status": "succeeded"
+  }
+ ],
+ "verdict": "both resumed with session/load succeeding on a fresh process after the Container stopped, the same native session id, no handoff item, and the code word recalled; t3 opens a session/new on the new process before it loads the thread's own session"
+}

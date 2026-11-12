@@ -18,6 +18,8 @@
 // 8. With `--peer` (step 3): a Peer link from the harness, the forwarded launch and the link fence (`lib/peerAcceptance.ts`).
 // 8b. With `--codex` and/or `--pi` (step 4a): a CLI agent's turn with approvals, resumed after its Container stopped,
 //     the leak check and the key route (`lib/cliAcceptance.ts`).
+// 9. With `--claude` and/or `--opencode` (step 4b): a turn with an approved edit and command, a plan turn that edits
+//    nothing, and the leak check, on Claude Code or OpenCode in a Workspace's Container (`lib/acpAcceptance.ts`).
 import { WsRpcGroup, WS_METHODS, ORCHESTRATION_V2_WS_METHODS } from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -294,6 +296,15 @@ if (peer) {
   const f11 = await bootstrapAtDecision(bootstrapToken, true);
   report.peerF11Armed = f11;
   check("F11: t3 alone refuses the bootstrap grant at /oauth/mcp/decision", f11.ok, f11);
+}
+
+// 9. Claude Code and OpenCode over ACP (step 4b).
+for (const cli of ["claude", "opencode"] as const) {
+  if (!process.argv.includes(`--${cli}`)) continue;
+  const { acpAcceptance } = await import("./lib/acpAcceptance.ts");
+  const result = await acpAcceptance(cookie, cli);
+  report[cli] = result;
+  for (const failure of result.failures) failures.push(`${cli}: ${failure}`);
 }
 
 // Disarm, and the bootstrap token is refused again.

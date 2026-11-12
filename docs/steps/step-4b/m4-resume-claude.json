@@ -1,0 +1,64 @@
+{
+ "at": "2026-11-12T02:50:10.473Z",
+ "scenario": "resume",
+ "ok": true,
+ "failures": [],
+ "cli": "claude",
+ "workspace": "resume-claude-mwcy7k43",
+ "word": "PERSIMMON-93",
+ "stoppedAt": 1794451773332,
+ "first": {
+  "threadId": "cc16447f-4c11-4f30-bb42-a4cbaa28e640",
+  "runs": [
+   {
+    "id": "run:thread:cc16447f-4c11-4f30-bb42-a4cbaa28e640:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "native": [
+   "68a3841e-351a-42c4-a7e6-1d6f71034647"
+  ]
+ },
+ "second": {
+  "runs": [
+   {
+    "id": "run:thread:cc16447f-4c11-4f30-bb42-a4cbaa28e640:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:cc16447f-4c11-4f30-bb42-a4cbaa28e640:ordinal:2",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "native": [
+   "68a3841e-351a-42c4-a7e6-1d6f71034647"
+  ],
+  "text": "PERSIMMON-93",
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "title": null,
+    "fileName": null,
+    "input": null
+   }
+  ]
+ }
+}
