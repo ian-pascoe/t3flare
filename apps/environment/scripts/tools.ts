@@ -501,6 +501,127 @@ const panel = async () => {
   writeEvidence("m3-panel-safety.json", { adminHost: new URL(HARNESS).host, cases: results, ok: results.every((r) => r.ok) });
 };
 
+// ---------------------------------------------------------------------------------------------------------------------
+// MCP on Durable threads (parts 2 and 4): the fixture server, direct (Route B) or through Commissary (Route A)
+
+const FIXTURE_URL = "https://t3flare-mcpfixture-tools.ian-g-pascoe.workers.dev";
+const fixture = async (pathname: string, method = "GET") =>
+  (await fetch(`${FIXTURE_URL}${pathname}`, { method, headers: { authorization: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` } })).json() as Promise<any>;
+const notes = async (): Promise<Array<string>> => (await fixture("/log")).lines ?? [];
+
+const mcpChange = (change: unknown) => harness("POST", "/_t3flare/harness/api/mcp", change);
+
+const directSetup = async () => {
+  const exists = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).some((server: any) => server.name === "fixture");
+  if (exists) await mcpChange({ op: "remove", server: "fixture" });
+  const added = await harness("POST", "/_t3flare/harness/api/mcp/servers", {
+    server: "fixture",
+    url: `${FIXTURE_URL}/mcp`,
+    auth: { kind: "header", header: "Authorization" },
+    value: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}`,
+  });
+  const tested = await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "fixture" });
+  const before = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((server: any) => server.name === "fixture");
+  // A direct server's tools are write until the owner marks them read (review H3): the read fixtures, as the owner would.
+  for (const tool of before?.tools ?? []) {
+    if (["fixture_echo", "fixture_inject", "fixture_slow"].includes(tool.upstream)) await mcpChange({ op: "class", server: "fixture", tool: tool.upstream, class: "read", hash: tool.hash });
+  }
+  const listed = await harness("GET", "/_t3flare/harness/api/mcp");
+  const row = (listed.json?.servers ?? []).find((server: any) => server.name === "fixture");
+  return {
+    firstListed: (before?.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`), added: { status: added.status, secret: added.json?.secret ?? null }, tested: tested.json, tools: (row?.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`) };
+};
+
+/** One script turn on a fresh thread; the cards answered by `decide`, the fixture's new notes counted. */
+const mcpScript = async (label: string, mode: string, code: string, decide: Decide, interaction = "default") => {
+  const thread = await newThread(label, mode, interaction);
+  const before = (await notes()).length;
+  const turn = await runTurn(thread.threadId, verbatim(code), decide);
+  const output = (await scriptOutputs(thread.threadId)).at(-1) ?? "";
+  const added = (await notes()).slice(before);
+  await cleanup(thread.id);
+  return { thread, status: turn.status, cards: turn.cards, output: output.slice(0, 800), notesAdded: added };
+};
+
+const durableMcp = async (server: string, file: string) => {
+  const cases: Array<Case> = [];
+  // Commissary names a toolkit's tools `<toolkit>_<tool>`: the fixture toolkit's are `fixture_fixture_*`.
+  const T = server === "commissary" ? "tools.mcp__commissary__fixture_" : `tools.mcp__${server}__`;
+  const marker = `${server}-${Date.now().toString(36)}`;
+  {
+    const run = await mcpScript("mcp-read", "approval-required", `text(await ${T}fixture_echo({ text: "hello" }));`, () => "accept");
+    cases.push({ name: "a read runs without a card (approval-required)", ...run, ok: run.cards.length === 0 && run.output.includes("hello") });
+  }
+  {
+    const run = await mcpScript("mcp-write", "approval-required", `text(await ${T}fixture_note({ line: "${marker}-approved" }));`, () => "accept");
+    cases.push({ name: "a write asks in approval-required; approved, one note", ...run, ok: run.cards.length === 1 && run.notesAdded.length === 1 });
+  }
+  {
+    const run = await mcpScript("mcp-decline", "auto-accept-edits", `text(await ${T}fixture_note({ line: "${marker}-declined" }).catch((e) => e.message));`, () => "decline");
+    cases.push({ name: "a write asks in auto-accept-edits; declined, no note", ...run, ok: run.cards.length === 1 && run.notesAdded.length === 0 });
+  }
+  {
+    const run = await mcpScript("mcp-full", "full-access", `text(await ${T}fixture_note({ line: "${marker}-full" }));`, () => "accept");
+    cases.push({ name: "a write runs in full access without a card", ...run, ok: run.cards.length === 0 && run.notesAdded.length === 1 });
+  }
+  {
+    const run = await mcpScript("mcp-plan", "full-access", `text(await ${T}fixture_note({ line: "${marker}-plan" }).catch((e) => e.message));`, () => "accept", "plan");
+    cases.push({ name: "plan mode refuses a write", ...run, ok: run.cards.length === 0 && run.notesAdded.length === 0 && /plan mode/.test(run.output) });
+  }
+  {
+    const run = await mcpScript("mcp-unknown", "approval-required", `text(await ${T}fixture_unknown({ text: "u" }).catch((e) => e.message));`, () => "decline");
+    cases.push({ name: "a tool without annotations is write: it asks", ...run, ok: run.cards.length === 1 });
+  }
+  {
+    const run = await mcpScript("mcp-inject", "approval-required", `const doc = await ${T}fixture_inject({ text: "x" });\ntext(doc);`, () => "decline");
+    cases.push({ name: "prompt injection in a read's result writes nothing without a card", ...run, ok: run.notesAdded.length === 0 && run.cards.every((card) => card.decision === "decline") });
+  }
+  writeEvidence(file, { server, cases, ok: cases.every((c) => c.ok) });
+};
+
+/** H3 on the direct server: class override stops a card; a flipped hint stays write until confirmed. */
+const classCases = async () => {
+  const cases: Array<Case> = [];
+  const listed = async () => ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((server: any) => server.name === "fixture")?.tools ?? [];
+  const unknown = (await listed()).find((tool: any) => tool.upstream === "fixture_unknown");
+  await mcpChange({ op: "class", server: "fixture", tool: "fixture_unknown", class: "read", hash: unknown?.hash });
+  {
+    const run = await mcpScript("mcp-override", "approval-required", `text(await tools.mcp__fixture__fixture_unknown({ text: "now read" }));`, () => "decline");
+    cases.push({ name: "the owner marks fixture_unknown read: no card", ...run, ok: run.cards.length === 0 && run.output.includes("unknown ran") });
+  }
+  const serverTools = async (name: string) => ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((server: any) => server.name === name)?.tools ?? [];
+  const flipOf = async (name: string) => (await serverTools(name)).find((tool: any) => tool.upstream.endsWith("fixture_flip"));
+  const before = { direct: await flipOf("fixture"), commissary: await flipOf("commissary") };
+  await fixture("/flip", "POST");
+  await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "fixture" });
+  await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" });
+  const after = { direct: await flipOf("fixture"), commissary: await flipOf("commissary") };
+  {
+    const run = await mcpScript("mcp-flip", "approval-required", `text(await tools.mcp__fixture__fixture_flip({ text: "f" }).catch((e) => e.message));`, () => "decline");
+    cases.push({
+      name: "direct: a server that starts claiming read stays write (never marked read by the owner), and asks",
+      before: before.direct,
+      after: after.direct,
+      cards: run.cards,
+      ok: after.direct?.class === "write" && after.direct?.suggested === "read" && run.cards.length === 1,
+    });
+  }
+  {
+    // Commissary pinned its first-seen hint (write); a changed definition that now claims read stays write, unconfirmed.
+    const changed = after.commissary?.hash !== before.commissary?.hash;
+    cases.push({
+      name: "Commissary: a flipped hint under a changed definition stays write until the owner confirms",
+      before: before.commissary,
+      after: after.commissary,
+      commissarySawTheChange: changed,
+      ok: changed ? after.commissary?.class === "write" && after.commissary?.unconfirmed === true : after.commissary?.class === "write",
+    });
+  }
+  await fixture("/flip", "POST");
+  await mcpChange({ op: "class", server: "fixture", tool: "fixture_unknown", class: "write", hash: unknown?.hash });
+  writeEvidence("m6-direct-classes.json", { cases, ok: cases.every((c) => c.ok) });
+};
+
 const command = process.argv[2];
 cookie = await pair();
 switch (command) {
@@ -523,6 +644,15 @@ switch (command) {
     break;
   case "panel":
     await panel();
+    break;
+  case "direct-setup":
+    writeEvidence("m6-direct-setup.json", await directSetup());
+    break;
+  case "durable-mcp":
+    await durableMcp(process.argv[3] ?? "fixture", process.argv[4] ?? "m6-direct-durable.json");
+    break;
+  case "classes":
+    await classCases();
     break;
   case "stop-all": {
     // Every Workspace's Container stopped (the stage's budget is 3 at once).

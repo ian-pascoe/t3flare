@@ -1,0 +1,35 @@
+{
+ "at": "2026-11-12T15:11:26.058Z",
+ "firstListed": [
+  "fixture_echo:write",
+  "fixture_note:write",
+  "fixture_unknown:write",
+  "fixture_inject:write",
+  "fixture_slow:write",
+  "fixture_flip:write"
+ ],
+ "added": {
+  "status": 200,
+  "secret": {
+   "set": true,
+   "setAt": 1794496285537,
+   "fingerprint": "1e8c"
+  }
+ },
+ "tested": {
+  "server": "fixture",
+  "status": "ok",
+  "error": null,
+  "tools": 6,
+  "refused": 0,
+  "ms": 49
+ },
+ "tools": [
+  "fixture_echo:read",
+  "fixture_note:write",
+  "fixture_unknown:write",
+  "fixture_inject:read",
+  "fixture_slow:read",
+  "fixture_flip:write"
+ ]
+}

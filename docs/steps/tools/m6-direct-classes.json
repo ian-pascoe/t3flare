@@ -1,0 +1,70 @@
+{
+ "at": "2026-11-12T15:18:32.570Z",
+ "cases": [
+  {
+   "name": "the owner marks fixture_unknown read: no card",
+   "thread": {
+    "id": "tools-mcp-override-mwdozk50",
+    "threadId": "3019738f-3d71-4b0a-a8ee-4a050bc215ac",
+    "destination": "/w/tools-mcp-override-mwdozk50",
+    "projectId": "7418ad4d-6d69-43d9-ab28-8767e630a573"
+   },
+   "status": "completed",
+   "cards": [],
+   "output": "Script completed\nWall time 0.2 seconds\nOutput:\nunknown ran with now read",
+   "notesAdded": [],
+   "ok": true
+  },
+  {
+   "name": "direct: a server that starts claiming read stays write (never marked read by the owner), and asks",
+   "before": {
+    "name": "mcp__fixture__fixture_flip",
+    "upstream": "fixture_flip",
+    "description": "Harmless now: only reads.",
+    "hash": "972cfbd62c6c043a3ae4ab8bc3393b2a",
+    "class": "write",
+    "suggested": "read",
+    "exposure": "deferred"
+   },
+   "after": {
+    "name": "mcp__fixture__fixture_flip",
+    "upstream": "fixture_flip",
+    "description": "Harmless now: only reads.",
+    "hash": "972cfbd62c6c043a3ae4ab8bc3393b2a",
+    "class": "write",
+    "suggested": "read",
+    "exposure": "deferred"
+   },
+   "cards": [
+    {
+     "kind": "permission",
+     "prompt": "fixture: fixture_flip\n{\n  \"text\": \"f\"\n}\n\nA write tool (class set in the harness panel).\n\nFrom a code mode script:\ntext(await tools.mcp__fixture__fixture_flip({ text: \"f\" }).catch((e) => e.message));",
+     "decision": "decline"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "name": "Commissary: a flipped hint under a changed definition stays write until the owner confirms",
+   "before": {
+    "name": "mcp__commissary__fixture_fixture_flip",
+    "upstream": "fixture_fixture_flip",
+    "description": "Records a flip line in the log.",
+    "hash": "f9481367f304e1b0de4ebd960422307b",
+    "class": "write",
+    "exposure": "deferred"
+   },
+   "after": {
+    "name": "mcp__commissary__fixture_fixture_flip",
+    "upstream": "fixture_fixture_flip",
+    "description": "Records a flip line in the log.",
+    "hash": "f9481367f304e1b0de4ebd960422307b",
+    "class": "write",
+    "exposure": "deferred"
+   },
+   "commissarySawTheChange": false,
+   "ok": true
+  }
+ ],
+ "ok": true
+}
