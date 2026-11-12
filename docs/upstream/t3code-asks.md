@@ -1,4 +1,4 @@
-# Asks for t3code (draft, not sent)
+# Asks for t3code (filed 2026-11-12)
 
 For the owner to send to t3code (pingdotgg/t3code), as issues or one discussion. Each ask removes a Patch,
 a Build shim or a piece of our composition. Pinned at `v0.1.9-nightly.20261110.4478`; paths are from that tag.
@@ -16,12 +16,16 @@ workerd forbids random values and timers while it evaluates modules, even ones l
   statically, so we stub the whole package at bundle time. **Ask:** import the Claude SDK lazily (or report it
   to Anthropic's SDK).
 
+Filed (as item 1 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+
 ## 2. Load native packages lazily
 
 `apps/server/src/workspace/WorkspaceSearchIndex.ts` (and other modules) call
 `createRequire(import.meta.url)(name)` for native packages (`@ff-labs/fff-node`, `node-pty`, …) at module scope.
 No bundler can follow it, and it runs even where the feature is never used. We alias `node:module` for t3's
 modules to a shim that returns throwing stand-ins. **Ask:** resolve native packages on first use.
+
+Filed (as item 2 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
 
 ## 3. Keep SQL within what other SQLite hosts allow
 
@@ -37,6 +41,8 @@ statement. We rewrite t3's statements in an adapter (`apps/environment/src/platf
   `EffectOutbox`, `AuthSessions`, `ProjectStore`, `ScheduledTaskService`). Most id lists already go through
   one `json_each(?)` parameter. **Ask:** the same for the rest.
 
+Filed (as item 3 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+
 ## 4. PRAGMAs that a host may refuse
 
 `persistence/Sqlite.ts`'s `layerSetup` sets six PRAGMAs, and the storage inspection
@@ -44,12 +50,16 @@ statement. We rewrite t3's statements in an adapter (`apps/environment/src/platf
 `runMigrations()` and t3 logs "Database storage inspection failed" at every boot. **Ask:** make the PRAGMAs
 optional (or tolerate refusal), and skip the inspection when its PRAGMAs are refused.
 
+Filed (as item 4 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+
 ## 5. An option not to print the startup pairing URL
 
 `serverRuntimeStartup.ts` (`announceStartupPairingUrl`) prints a fresh one-time pairing URL, token
 included, at every boot in `web` mode, and issues that token whether or not anyone reads it. In a hosted
 environment the log is a log store. We drop the line in a redacting `Console`. **Ask:** a `ServerConfig`
 option (or `startupPresentation: "none"`) that neither issues nor prints a startup pairing token.
+
+Filed (as item 5 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
 
 ## 6. A bootstrap grant with a bounded life, or one we can seed and revoke
 
@@ -59,6 +69,8 @@ means restarting t3 in place to arm and again to disarm, and we refuse the token
 the window. **Ask:** a TTL / use count for the seeded grant, or a service method to seed and revoke a
 bootstrap grant at runtime.
 
+Filed (as item 6 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+
 ## 7. Export the server's layer graph
 
 `apps/server/src/server.ts`'s layers are module-private, so our composition root
@@ -67,6 +79,8 @@ Durable Object's. Every bump risks drift. **Ask:** export a `makeServerLayer(opt
 with the platform services (file system, process spawner, PTY, HTTP server, SQL client, secret store) as
 inputs.
 
+Filed (as item 7 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+
 ## 8. One "next due time" for hosts that sleep
 
 To let the Environment sleep when idle we compute the next time t3 has work due from its tables (outbox
@@ -74,11 +88,15 @@ To let the Environment sleep when idle we compute the next time t3 has work due 
 we cannot wake for them. **Ask:** a service method returning the next due time across all of t3's schedulers
 (and persisted usage-limit resets), so a host can set one alarm and stop.
 
+Filed (as item 8 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+
 ## 9. Turns that survive a host restart
 
 At startup t3's recovery assumes every provider process died and re-prompts the agent (ADR-0004). Our agents
 run elsewhere and keep running across a restart of the Environment. **Ask:** a capability for provider
 adapters to report a live turn on recovery, so it is re-attached instead of cancelled.
+
+Filed (as item 9 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
 
 ## 10. Module-level state (for information)
 
@@ -88,6 +106,8 @@ check found two module-level values that outlive a runtime: `packages/shared/src
 `activeMcpSessionRegistry` (replaced on the next boot; between a reset and the next boot it points at the
 disposed registry). **Ask:** keep mutable state in services rather than modules, so a runtime rebuilt in the
 same process starts clean.
+
+Filed (as item 10 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
 
 ## 11. Wake the parent when a remote task's child asks (step 3)
 
@@ -106,6 +126,9 @@ starts no continuation). We raise the question again in a continuation of the cu
 waits for a pending message-capable question of its run, as the local finalizer does (`childAwaitsRestartContinuation`
 and the dismissal in `Orchestrator.ts`), would make that unnecessary.
 
+Filed (as item 11 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+Related existing issue: https://github.com/pingdotgg/t3code/issues/31707 (follow-up runs on a remote child), not a duplicate. Not filed as a bug: not reproduced on a stock setup.
+
 ## 12. A paused phase for usage limits (step 3+)
 
 A run that ends on a usage limit with auto-resume armed is a `failed` run, so `projectThreadAwarenessV2` publishes
@@ -113,11 +136,16 @@ A run that ends on a usage limit with auto-resume armed is a `failed` run, so `p
 (`apps/server/src/relay/AgentAwarenessRelay.ts`, `sanitizeRelayAgentActivityState`). **Ask:** a phase (or a flag on
 `failed`) for a run that will resume by itself at its reset, so the phone can say "Paused until 14:05" or stay quiet.
 
+Filed (as item 12 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+
 ## 13. `CloudLink.unlink` should unlink on the relay too (step 3+)
 
 `CloudLink.unlink` removes the link locally only; the relay keeps the environment linked until a client calls
 `DELETE /v1/client/environment-links/:environmentId` with the account token. **Ask:** when the server holds an account
 token (the CLI's), unlink on the relay as well, as the web client's Disconnect does.
+
+Filed (as item 13 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
+Not filed as a bug: no honest stock-install repro (the web client's Disconnect already deletes on the relay).
 
 ## 14. A supported publish-only link for a hosted server (step 3+)
 
@@ -128,3 +156,5 @@ mode a link step and a server that never answer relay-initiated routes (`/api/t3
 Related: those two routes have no scope check and rely on the stored mint key alone; and `CliState` reads an absent
 desired-link mark as `managed`, so a relink after an unlink asks for a managed tunnel unless the caller writes the
 mode first.
+
+Filed (as item 14 of an Ideas discussion): https://github.com/pingdotgg/t3code/discussions/35332
