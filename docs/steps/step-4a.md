@@ -91,7 +91,12 @@ the synced directory survives) resumes the same conversation; then no key in the
 the proxy's host. It needs Docker and the proxy key, so it runs in the bump job (which has both; timeout raised to 60
 min), not in `bun run check`. Local run: passes in about 15 s after the image build. The bump workflow itself was not
 dispatched on this branch (it would deploy the `bump` stage and may open a pin PR); the same flags ran on `step4a`:
-ACCEPTANCE_RESULT.
+`acceptance --threads 12 --runs 4 --real-turn --terminal --worktree --peer --codex --pi`
+(`spi1043-acceptance-bump-flags.json`). Everything passed except one step 3 check, `--peer` F6 "bash asks in plan".
+In it, the Durable agent sometimes runs no tool at all in plan mode. It failed in 2 of 3 runs, and the third
+`--peer` run passed (`spi1043-acceptance-peer-rerun.json`). No step 4a change touches the Durable agent, so this is a
+model-dependent check, not a regression. It is ticketed as SPI-1048, since it can fail a nightly bump, and the F6
+report now records the run's items.
 
 **The owner's desktop app** (T3 Code Nightly 0.1.10, driven with agent-desktop; `m6-desktop-1…7-*.png`). `step4a`
 added as its own environment beside prod (`-1`), a Codex thread (GPT-6 Luna, Supervised) that edits a file and runs the
@@ -122,6 +127,7 @@ Patches: 3 (0003 is new: `provider-session-idle-10-minutes`). Upstream fragility
 - SPI-1041: egress allowlist and the stage-side egress proof.
 - SPI-1042: computerd's `state.db` keeps the bytes of a quarantined file.
 - SPI-1043: the desktop demo, the bump job's new flags, M5's restart cases. Done (above) and closed.
+- SPI-1048: `acceptance --peer` F6 is model-dependent (found while running the bump's flags on `step4a`).
 
 ## Owner action: rotate the key
 

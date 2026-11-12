@@ -163,6 +163,8 @@ export const peerAcceptance = async (cookie: string, options: { readonly only?: 
         interactionMode: threadMeta(projection).interactionMode,
         write: write === undefined ? null : { status: write.status, output: String(write.output ?? write.error ?? "").slice(0, 200) },
         request: request === undefined ? null : { kind: request.kind },
+        runs: runsOf(projection).map((run: any) => run.status),
+        items: items.map((item: any) => ({ type: item.type, status: item.status ?? null, text: String(item.text ?? item.input ?? item.title ?? "").slice(0, 160) })),
       };
       check("F6: the thread runs in plan", threadMeta(projection).interactionMode === "plan", report.F6);
       check("F6: write is refused in plan", write === undefined || write.status !== "completed", report.F6);
