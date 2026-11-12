@@ -3,8 +3,8 @@
 // assets, plus the Access application that guards the admin routes. Deployed by scripts/stage.ts, which
 // builds first and supplies the stage's secrets:
 //
-//   bun scripts/stage.ts deploy <stage>      (build, web client, alchemy deploy)
-//   bun scripts/stage.ts destroy <stage>
+//   node scripts/stage.ts deploy <stage>      (build, web client, alchemy deploy)
+//   node scripts/stage.ts destroy <stage>
 //
 // The Worker is prebuilt by build.ts and uploaded with `bundle: false` (ADR-0020): alchemy 2.0.0-beta.85 drops
 // `build.input.plugins` on every update after the first deploy.

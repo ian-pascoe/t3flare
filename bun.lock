@@ -11,6 +11,7 @@
         "@types/node": "catalog:",
         "oxlint": "1.91.0",
         "typescript": "^7.0.2",
+        "yaml": "catalog:",
       },
     },
     "apps/agents": {

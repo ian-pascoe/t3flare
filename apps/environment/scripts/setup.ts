@@ -1,9 +1,9 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // Step 2b M3: setup scripts in worktree threads, through t3's own RPCs (a headless stock-protocol client):
 //
-//   bun scripts/stage.ts run <stage> setup scripts --project <project id> --command '<setup command>' [--blocking]
+//   node scripts/stage.ts run <stage> setup scripts --project <project id> --command '<setup command>' [--blocking]
 //       [--settle '<settle command>']   sets the project's scripts where t3's project settings keep them
-//   bun scripts/stage.ts run <stage> setup inspect --thread <thread id> [--out file.json]   a worktree thread launched
+//   node scripts/stage.ts run <stage> setup inspect --thread <thread id> [--out file.json]   a worktree thread launched
 //       from the web client: its setup stages (t3's WorktreeSetupTracker), the setup terminal's scrollback, its files
 import * as fs from "node:fs";
 

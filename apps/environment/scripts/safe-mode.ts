@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off nodeBuiltinImport:off globalFetch:off globalTimers:off globalDate:off
 // Evidence for the boot counter and safe mode on a deployed stage:
 //
-//   bun scripts/stage.ts run <stage> safe-mode [--out file.json]
+//   node scripts/stage.ts run <stage> safe-mode [--out file.json]
 //
 // 1. Forced by the boot counter: the admin fault route makes the next three boots fail; three requests each
 //    fail to boot t3 (500), and the fourth finds the object in safe mode (503) without trying.

@@ -3,12 +3,12 @@
 // scripts, and the harness panel's API and safety. Each case writes its evidence to docs/steps/tools/<file>.json, with
 // tokens, cookies and handles redacted.
 //
-//   bun scripts/stage.ts run tools tools m1            a script that reads, greps, edits and runs a test (m1-codemode.json)
-//   bun scripts/stage.ts run tools tools probes        P3 cost per nested call, P4 tokens per preset, P5 restarts (m0-*.json)
-//   bun scripts/stage.ts run tools tools memory        P14: concurrent memory-heavy scripts against the 16 MiB cap
-//   bun scripts/stage.ts run tools tools sandbox-loss  P14: a script waiting on approval while the sandbox is replaced
-//   bun scripts/stage.ts run tools tools hostile       M2: H1-H3, H6, H7 (m2-hostile-script.json)
-//   bun scripts/stage.ts run tools tools panel         the panel's API and safety from outside (m3-panel-safety.json)
+//   node scripts/stage.ts run tools tools m1            a script that reads, greps, edits and runs a test (m1-codemode.json)
+//   node scripts/stage.ts run tools tools probes        P3 cost per nested call, P4 tokens per preset, P5 restarts (m0-*.json)
+//   node scripts/stage.ts run tools tools memory        P14: concurrent memory-heavy scripts against the 16 MiB cap
+//   node scripts/stage.ts run tools tools sandbox-loss  P14: a script waiting on approval while the sandbox is replaced
+//   node scripts/stage.ts run tools tools hostile       M2: H1-H3, H6, H7 (m2-hostile-script.json)
+//   node scripts/stage.ts run tools tools panel         the panel's API and safety from outside (m3-panel-safety.json)
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -315,7 +315,7 @@ const sandboxLoss = async () => {
         if (redeployed || !(projection?.runtimeRequests ?? []).some((r: any) => r.status === "pending")) return;
         redeployed = true;
         // A new version of the sandbox Worker: its objects reset, as a deploy, an OOM or a runtime restart does.
-        const deployed = spawnSync("bun", ["scripts/stage.ts", "deploy", "tools"], {
+        const deployed = spawnSync(process.execPath, ["scripts/stage.ts", "deploy", "tools"], {
           cwd: path.resolve(import.meta.dirname, ".."),
           env: { ...process.env, T3FLARE_SANDBOX_GEN: String(Date.now()) },
           encoding: "utf8",

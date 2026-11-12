@@ -54,10 +54,10 @@ jobs:
         with:
           bun-version-file: package.json
 
-      # Vitest stays on Node (ADR-0019).
+      # Node runs our scripts and Vitest (ADR-0019), at t3's engines.node (26), which local runs use too.
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: t3code/package.json
 
       - run: bun install --frozen-lockfile
 

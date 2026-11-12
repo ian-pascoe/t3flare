@@ -4,7 +4,7 @@
 // asks for the colour; then sends an image past the Session's inline budget and checks the turn still completes, with
 // the agent told the image was not shown. Run against a stage:
 //
-//   bun scripts/stage.ts run <stage> attachments [--out file.json]
+//   node scripts/stage.ts run <stage> attachments [--out file.json]
 import { WS_METHODS } from "@t3tools/contracts";
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";

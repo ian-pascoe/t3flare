@@ -3,8 +3,8 @@
 // with `bundle: false` (alchemy.run.ts), because alchemy 2.0.0-beta.85 drops `build.input.plugins` on every
 // update after the first deploy.
 //
-//   bun build.ts           bundle to dist/worker/ (and dist/build-report.json)
-//   bun build.ts --check   only check that every Patch applies to the pinned t3code (`git apply --check`)
+//   node build.ts           bundle to dist/worker/ (and dist/build-report.json)
+//   node build.ts --check   only check that every Patch applies to the pinned t3code (`git apply --check`)
 //
 // Rolldown runs with the options alchemy's own Worker bundling uses (its Cloudflare plugin, minify,
 // strictExecutionOrder, lazyBarrel, inlineConst), plus t3flare's changes to t3 (ADR-0001):

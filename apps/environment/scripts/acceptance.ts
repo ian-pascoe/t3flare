@@ -2,7 +2,7 @@
 // The acceptance test (ADR-0017): a headless t3 client against a deployed stage (or local workerd).
 //
 //   T3_URL=https://… T3_BOOTSTRAP_TOKEN=… T3FLARE_ADMIN_TOKEN=… \
-//   T3FLARE_ACCESS_CLIENT_ID=… T3FLARE_ACCESS_CLIENT_SECRET=… bun scripts/acceptance.ts [--threads 12] [--runs 4] [--out file.json]
+//   T3FLARE_ACCESS_CLIENT_ID=… T3FLARE_ACCESS_CLIENT_SECRET=… node scripts/acceptance.ts [--threads 12] [--runs 4] [--out file.json]
 //
 // 1. The admin guard: refused without the admin token, admitted with Access (service token) plus the token.
 // 2. Auth: the descriptor reports `remote-reachable`; the bootstrap token is refused until pairing is armed,

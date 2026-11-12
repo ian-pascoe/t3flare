@@ -1,13 +1,13 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // Step 4b's stage evidence (plan §8 M1–M5), through the admin routes and t3's own client protocol.
 //
-//   bun scripts/stage.ts run step4b cli4b acp --cli claude|opencode [--model <id>] [--workspace <id>]
+//   node scripts/stage.ts run step4b cli4b acp --cli claude|opencode [--model <id>] [--workspace <id>]
 //        M1: the CLI through t3's spawner and the channel, over ACP, without t3's drivers
-//   bun scripts/stage.ts run step4b cli4b turn --cli claude|opencode [--model <slug>] [--mode <runtime mode>] [--plan]
+//   node scripts/stage.ts run step4b cli4b turn --cli claude|opencode [--model <slug>] [--mode <runtime mode>] [--plan]
 //        [--workspace <id>] [--prompt <text>] [--thread <id>] [--approve accept|decline] [--out <file>]
 //        M2/M3: one turn from t3's client protocol, every request answered
-//   bun scripts/stage.ts run step4b cli4b restart-turn --cli claude|opencode   M4: the Environment restarts mid-turn
-//   bun scripts/stage.ts run step4b cli4b modes --cli claude|opencode [--model <slug>] [--out <file>]
+//   node scripts/stage.ts run step4b cli4b restart-turn --cli claude|opencode   M4: the Environment restarts mid-turn
+//   node scripts/stage.ts run step4b cli4b modes --cli claude|opencode [--model <slug>] [--out <file>]
 //        M2/M3: approval-required, auto-accept-edits, full-access and plan, each on a fresh thread
 import * as fs from "node:fs";
 import * as path from "node:path";

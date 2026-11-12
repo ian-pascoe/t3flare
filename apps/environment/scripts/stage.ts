@@ -1,9 +1,9 @@
 // @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // Deploys, tests and destroys a stage of the environment Worker, with secrets made for that stage alone.
 //
-//   bun scripts/stage.ts deploy <stage> [--web]       build (and the web client with --web or when missing), alchemy deploy
-//   bun scripts/stage.ts run <stage> <script> [args]  run scripts/<script>.ts against the stage, with its secrets
-//   bun scripts/stage.ts destroy <stage>              alchemy destroy, and forget the stage's secrets
+//   node scripts/stage.ts deploy <stage> [--web]       build (and the web client with --web or when missing), alchemy deploy
+//   node scripts/stage.ts run <stage> <script> [args]  run scripts/<script>.ts against the stage, with its secrets
+//   node scripts/stage.ts destroy <stage>              alchemy destroy, and forget the stage's secrets
 //
 // The stage's bootstrap and admin tokens are random, made on its first deploy and kept in
 // `.alchemy/stages/<stage>.env.json` (gitignored, 0600); its Access service token's credentials are written next
@@ -26,10 +26,10 @@ const [command, stage, ...rest] = process.argv.slice(2);
  * The stages this repo deploys to; anything else is refused, so a typo cannot create a stray stage. `prod` is the
  * owner's long-lived Environment, deployed from `main` only; step branches use their own throwaway stages.
  */
-const STAGES = new Set(["prod", "step1", "bump", "step2a", "models", "step2a2", "step2b", "debug2b", "leftovers", "ghfix", "modefix", "costwins", "step3", "idlesafe", "attach", "truecaps", "noanalytics", "bigrepo", "step3plus", "step4a", "step4b", "spi992", "pre1061", "tools", "stock"]);
+const STAGES = new Set(["prod", "step1", "bump", "step2a", "models", "step2a2", "step2b", "debug2b", "leftovers", "ghfix", "modefix", "costwins", "step3", "idlesafe", "attach", "truecaps", "noanalytics", "bigrepo", "step3plus", "step4a", "step4b", "spi992", "pre1061", "tools", "stock", "pnpm"]);
 
 if (command === undefined || stage === undefined || !STAGES.has(stage)) {
-  console.error(`usage: bun scripts/stage.ts deploy|run|destroy <${[...STAGES].join("|")}> …`);
+  console.error(`usage: node scripts/stage.ts deploy|run|destroy <${[...STAGES].join("|")}> …`);
   process.exit(2);
 }
 
@@ -150,11 +150,11 @@ switch (command) {
   case "run": {
     const [script, ...args] = rest;
     if (script === undefined) {
-      console.error("usage: bun scripts/stage.ts run <stage> <script> [args]");
+      console.error("usage: node scripts/stage.ts run <stage> <script> [args]");
       process.exit(2);
     }
     const access = JSON.parse(fs.readFileSync(credentialsFile(stage), "utf8")) as { url: string; adminUrl?: string; clientId: string; clientSecret: string };
-    const result = spawnSync("bun", [path.join(here, "scripts", `${script}.ts`), ...args], {
+    const result = spawnSync(process.execPath, [path.join(here, "scripts", `${script}.ts`), ...args], {
       cwd: here,
       stdio: "inherit",
       env: {

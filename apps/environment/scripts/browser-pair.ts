@@ -2,7 +2,7 @@
 // Pairs an agent-browser session with a stage as the web client's /pair does, without the token or the session cookie
 // ever reaching the terminal: the cookie goes through a 0600 temp file into `agent-browser cookies set --curl`.
 //
-//   bun scripts/stage.ts run <stage> browser-pair <agent-browser session> [path]
+//   node scripts/stage.ts run <stage> browser-pair <agent-browser session> [path]
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";

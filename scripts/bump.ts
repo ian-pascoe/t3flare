@@ -132,17 +132,17 @@ const ok =
     return { ok: result.ok, detail: result.output };
   }) &&
   step("regenerate the workspace and install", () => {
-    const gen = sh("bun", ["scripts/gen-workspace.ts"], root);
+    const gen = sh(process.execPath, ["scripts/gen-workspace.ts"], root);
     if (!gen.ok) return { ok: false, detail: gen.output };
     const install = sh("bun", ["install"], root);
     return { ok: install.ok, detail: install.output.split("\n").filter((l) => !l.includes("no longer applies")).join("\n") };
   }) &&
   step("lock matches t3's, one effect", () => {
-    const result = sh("bun", ["scripts/verify-lock.ts"], root);
+    const result = sh(process.execPath, ["scripts/verify-lock.ts"], root);
     return { ok: result.ok, detail: result.output };
   }) &&
   step("patches apply (git apply --check)", () => {
-    const result = sh("bun", ["build.ts", "--check"], environment);
+    const result = sh(process.execPath, ["build.ts", "--check"], environment);
     return { ok: result.ok, detail: result.output };
   }) &&
   step("typecheck, lint, test", () => {
@@ -156,20 +156,20 @@ const ok =
     return { ok: result.ok, detail: result.output.slice(-4000) };
   }) &&
   step("deploy the bump stage (build, web client)", () => {
-    const result = sh("bun", ["scripts/stage.ts", "deploy", "bump", "--web"], environment);
+    const result = sh(process.execPath, ["scripts/stage.ts", "deploy", "bump", "--web"], environment);
     return { ok: result.ok, detail: result.output };
   }) &&
   step("acceptance test against the bump stage", () => {
     const out = path.join(environment, "dist/bump-acceptance.json");
     fs.rmSync(out, { force: true });
-    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--codex", "--pi", "--claude", "--opencode", "--out", out], environment, { quiet: true });
+    const result = sh(process.execPath, ["scripts/stage.ts", "run", "bump", "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--codex", "--pi", "--claude", "--opencode", "--out", out], environment, { quiet: true });
     return { ok: result.ok, detail: fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output };
   }) &&
   step("a stock t3 nightly from npm links to the bump stage and forwards a launch", () => {
     // stdout alone, outside the workspace (npm warns about workspaces on stderr there).
     const nightly = (spawnSync("npm", ["view", "t3", "dist-tags.nightly"], { cwd: os.tmpdir(), encoding: "utf8" }).stdout ?? "").trim();
     if (nightly === "") return { ok: false, detail: "npm has no nightly t3" };
-    const result = sh("bun", ["scripts/stage.ts", "run", "bump", "peer-laptop", "--version", nightly, "--skip-repo", "--out", path.join(environment, "dist/bump-peer-laptop.json")], environment, { quiet: true });
+    const result = sh(process.execPath, ["scripts/stage.ts", "run", "bump", "peer-laptop", "--version", nightly, "--skip-repo", "--out", path.join(environment, "dist/bump-peer-laptop.json")], environment, { quiet: true });
     return { ok: result.ok, detail: `t3@${nightly}\n${result.output.slice(-3000)}` };
   });
 
@@ -178,7 +178,7 @@ if (!ok) {
   finish(false, "pin unchanged");
 }
 
-if (flag("destroy")) step("destroy the bump stage", () => sh("bun", ["scripts/stage.ts", "destroy", "bump"], environment));
+if (flag("destroy")) step("destroy the bump stage", () => sh(process.execPath, ["scripts/stage.ts", "destroy", "bump"], environment));
 
 if (flag("commit") && to !== from) {
   step("commit the new pin", () => {

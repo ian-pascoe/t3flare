@@ -1,15 +1,15 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // Step 4a's stage evidence (plan §8 M1–M5), through the admin routes and t3's own client protocol.
 //
-//   bun scripts/stage.ts run step4a cli4a channel [--workspace <id>]          M1: the probe through t3's spawner
-//   bun scripts/stage.ts run step4a cli4a restart [--workspace <id>]          M1: Environment restart, Workspace DO abort
-//   bun scripts/stage.ts run step4a cli4a turn --cli codex|pi [--model <slug>] [--mode approval-required|full-access]
+//   node scripts/stage.ts run step4a cli4a channel [--workspace <id>]          M1: the probe through t3's spawner
+//   node scripts/stage.ts run step4a cli4a restart [--workspace <id>]          M1: Environment restart, Workspace DO abort
+//   node scripts/stage.ts run step4a cli4a turn --cli codex|pi [--model <slug>] [--mode approval-required|full-access]
 //        [--plan] [--workspace <id>] [--prompt <text>] [--thread <id>] [--out <file>]
 //                                                                             M3/M4: a CLI turn from t3's client protocol
-//   bun scripts/stage.ts run step4a cli4a two                                  M5: a Codex and a Pi turn at once, two Workspaces
-//   bun scripts/stage.ts run step4a cli4a resume --cli codex|pi                M5: a turn, the Container stopped, a turn that resumes
-//   bun scripts/stage.ts run step4a cli4a restart-turn --cli codex|pi          SPI-1043: the Environment restarts mid-turn
-//   bun scripts/stage.ts run step4a cli4a idle --cli codex|pi                  SPI-1043: an idle session with no client
+//   node scripts/stage.ts run step4a cli4a two                                  M5: a Codex and a Pi turn at once, two Workspaces
+//   node scripts/stage.ts run step4a cli4a resume --cli codex|pi                M5: a turn, the Container stopped, a turn that resumes
+//   node scripts/stage.ts run step4a cli4a restart-turn --cli codex|pi          SPI-1043: the Environment restarts mid-turn
+//   node scripts/stage.ts run step4a cli4a idle --cli codex|pi                  SPI-1043: an idle session with no client
 import * as path from "node:path";
 
 import { admin, itemsOf, pair, projectionOf, runsOf, sleep, threadWindow } from "./lib/client.ts";

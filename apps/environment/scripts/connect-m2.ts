@@ -14,7 +14,7 @@
 //   j rejected   the relay's link removed (as the T3 apps' removal), then a turn: the relay refuses (review finding 8);
 //                relinked afterwards
 //
-//   bun scripts/stage.ts run step3plus connect-m2 [--only a,b,…] [--out m2-publishes.json]
+//   node scripts/stage.ts run step3plus connect-m2 [--only a,b,…] [--out m2-publishes.json]
 import * as path from "node:path";
 
 import { admin, dispatch, mutateProject, pair, runsOf, sleep, updateSettings, uuid } from "./lib/client.ts";

@@ -3,7 +3,7 @@
 // itself and later wakes on its alarm.
 //
 //   T3_URL=… T3_BOOTSTRAP_TOKEN=… T3FLARE_ADMIN_TOKEN=… T3FLARE_ACCESS_CLIENT_ID=… T3FLARE_ACCESS_CLIENT_SECRET=… \
-//   bun scripts/idle-reset.ts [--due-in-seconds 150] [--out file.json]
+//   node scripts/idle-reset.ts [--due-in-seconds 150] [--out file.json]
 //
 // 1. Pair (arming briefly) and, over t3's own RPC, create a project and a scheduled task due once in
 //    `--due-in-seconds`: work t3 has due later, which the idle reset must set its alarm for.

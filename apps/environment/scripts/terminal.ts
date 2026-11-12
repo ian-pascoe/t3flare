@@ -1,13 +1,13 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // Step 2b's terminal evidence against a stage, through t3's own terminal RPCs (a headless stock-protocol client).
 //
-//   bun scripts/stage.ts run <stage> terminal basic [--workspace <id>] [--out file.json]
+//   node scripts/stage.ts run <stage> terminal basic [--workspace <id>] [--out file.json]
 //       open a terminal in a project of the fixture (cloned first unless --workspace names one), with the Container
 //       stopped first: the status line, the prompt, pwd, git status, stty size before and after a resize, echo latency,
 //       throughput, the sync both ways, the leak check against the Worker's binding values, close and the processes
-//   bun scripts/stage.ts run <stage> terminal restart --workspace <id>   an Environment restart with a terminal open
-//   bun scripts/stage.ts run <stage> terminal settle --workspace <id>    a running command survives t3's closeIdle
-//   bun scripts/stage.ts run <stage> terminal noproject [--cwd /t3/scratch]  a terminal in no Workspace (t3's No project)
+//   node scripts/stage.ts run <stage> terminal restart --workspace <id>   an Environment restart with a terminal open
+//   node scripts/stage.ts run <stage> terminal settle --workspace <id>    a running command survives t3's closeIdle
+//   node scripts/stage.ts run <stage> terminal noproject [--cwd /t3/scratch]  a terminal in no Workspace (t3's No project)
 //       shows why and exits within seconds; creates no project or thread (safe on prod)
 import * as fs from "node:fs";
 

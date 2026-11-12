@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off globalFetch:off
 // Prints the admin health route of a stage, or some of its fields:
 //
-//   bun scripts/stage.ts run <stage> health [field,field…]
+//   node scripts/stage.ts run <stage> health [field,field…]
 const response = await fetch(new URL("/_t3flare/health", process.env.T3_URL), {
   headers: {
     "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "",

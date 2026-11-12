@@ -2,7 +2,7 @@
 // Deletes the projects and threads a check left on a stage: those whose title is the prefix and a base-36 stamp
 // (`models k3j9x2`) and whose workspace root is under the given directory. A dry run unless `--delete` is given.
 //
-//   bun scripts/stage.ts run <stage> forget <title prefix> <workspace root prefix> [--delete]
+//   node scripts/stage.ts run <stage> forget <title prefix> <workspace root prefix> [--delete]
 import { dispatch, mutateProject, pair, uuid, wsFirst } from "./lib/client.ts";
 
 const [prefix, rootPrefix] = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));

@@ -3,7 +3,7 @@
 // that asks (`ask_user`), and the relay's delivery counts for each publish, from the recorder. The question waits for
 // the owner's answer (from the phone, if paired to this stage) for up to --wait-s seconds, then this script answers it.
 //
-//   bun scripts/stage.ts run step3plus connect-m3 [--wait-s 600]
+//   node scripts/stage.ts run step3plus connect-m3 [--wait-s 600]
 import * as path from "node:path";
 
 import { admin, dispatch, mutateProject, pair, runsOf, sleep, updateSettings, uuid } from "./lib/client.ts";

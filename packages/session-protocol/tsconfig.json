@@ -1,6 +1,7 @@
 {
   "extends": "../../t3code/tsconfig.base.json",
   "compilerOptions": {
+    "erasableSyntaxOnly": true,
     "types": ["node"],
     "lib": ["ESNext", "esnext.disposable", "DOM"]
   },

@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off
 // Step 3: prints the input schemas of t3's MCP tools on the stage (a link's view), for the acceptance test's calls.
 //
-//   bun scripts/stage.ts run step3 peer-schemas t3_thread_launch t3_thread_update …
+//   node scripts/stage.ts run step3 peer-schemas t3_thread_launch t3_thread_update …
 import { pair } from "./lib/client.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 

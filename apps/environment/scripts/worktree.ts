@@ -1,12 +1,12 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // Step 2b's worktree Workspace evidence against a stage, through t3's own RPCs (a headless stock-protocol client):
 //
-//   bun scripts/stage.ts run <stage> worktree local-commit --workspace <project id>   a branch with a local-only commit
-//   bun scripts/stage.ts run <stage> worktree no-remote                              a New project with no remote
-//   bun scripts/stage.ts run <stage> worktree two --workspace <project id>           two worktrees at once, each in its Container
-//   bun scripts/stage.ts run <stage> worktree wrong-location --workspace <project id>  Settings → Worktrees → Location elsewhere
-//   bun scripts/stage.ts run <stage> worktree stale --worktree <worktree id>         status reads after the idle stop
-//   bun scripts/stage.ts run <stage> worktree trace                                  every worktree / --git-common-dir argv t3 sent
+//   node scripts/stage.ts run <stage> worktree local-commit --workspace <project id>   a branch with a local-only commit
+//   node scripts/stage.ts run <stage> worktree no-remote                              a New project with no remote
+//   node scripts/stage.ts run <stage> worktree two --workspace <project id>           two worktrees at once, each in its Container
+//   node scripts/stage.ts run <stage> worktree wrong-location --workspace <project id>  Settings → Worktrees → Location elsewhere
+//   node scripts/stage.ts run <stage> worktree stale --worktree <worktree id>         status reads after the idle stop
+//   node scripts/stage.ts run <stage> worktree trace                                  every worktree / --git-common-dir argv t3 sent
 // Each takes --out <file>.
 import * as fs from "node:fs";
 

@@ -3,7 +3,7 @@
 // Stops runs still open (`--stop-open`), then reads the admin health route (which neither boots t3 nor counts as
 // activity) until the object has reset: t3 stopped and a new construction. Writes docs/steps/step-3/m4-idle.json.
 //
-//   bun scripts/stage.ts run step3 peer-idle [--stop-open]
+//   node scripts/stage.ts run step3 peer-idle [--stop-open]
 import { admin, dispatch, pair, sleep, uuid } from "./lib/client.ts";
 import { writeEvidence } from "./lib/evidence.ts";
 

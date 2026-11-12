@@ -3,7 +3,7 @@
 // server config (the descriptor's capabilities and the managed policy) and tries to turn guest links on, which the
 // policy refuses. Run against a stage:
 //
-//   bun scripts/stage.ts run <stage> capabilities [--out file.json]
+//   node scripts/stage.ts run <stage> capabilities [--out file.json]
 import * as fs from "node:fs";
 
 import { pair, wsCall } from "./lib/client.ts";

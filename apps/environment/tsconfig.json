@@ -1,6 +1,7 @@
 {
   "extends": "../../t3code/tsconfig.base.json",
   "compilerOptions": {
+    "erasableSyntaxOnly": true,
     // Node's types, as t3's own code is checked with; Workers types come in as a module
     // (src/cloudflare.d.ts), because their globals clash with Node's across t3's code.
     "types": ["node"],

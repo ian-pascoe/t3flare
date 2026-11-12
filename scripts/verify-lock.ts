@@ -1,9 +1,10 @@
 // Compares the versions Bun resolved (bun.lock) with t3's pnpm-lock.yaml (ADR-0019), and checks there is a
 // single copy of `effect`, which duplicate copies break (schema decoding).
 //
-//   bun scripts/verify-lock.ts      exit 1 when effect is duplicated
+//   node scripts/verify-lock.ts      exit 1 when effect is duplicated
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { parseAllDocuments } from "yaml";
 
 const root = path.resolve(import.meta.dirname, "..");
 
@@ -19,7 +20,7 @@ const versionsOf = (keys: Iterable<string>) => {
   return map;
 };
 
-const lockDocs = Bun.YAML.parse(fs.readFileSync(path.join(root, "t3code/pnpm-lock.yaml"), "utf8")) as unknown;
+const lockDocs = parseAllDocuments(fs.readFileSync(path.join(root, "t3code/pnpm-lock.yaml"), "utf8")).map((doc) => doc.toJS()) as unknown;
 const t3Lock = (Array.isArray(lockDocs) ? lockDocs : [lockDocs]).find((doc) => doc?.settings !== undefined) as {
   packages: Record<string, unknown>;
 };

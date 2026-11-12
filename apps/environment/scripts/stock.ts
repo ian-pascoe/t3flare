@@ -3,7 +3,7 @@
 // of t3flare's, under the thread's mode (Durable, Codex, and a linked thread under its link's mode); Claude Code runs a
 // repository's own `.claude/settings.json` hook; Codex's `auto` runs as t3 runs it. Evidence goes to docs/steps/stock/.
 //
-//   bun scripts/stage.ts run stock stock push|linked|hook|auto|claude-auto|all
+//   node scripts/stage.ts run stock stock push|linked|hook|auto|claude-auto|all
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";

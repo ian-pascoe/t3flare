@@ -2,7 +2,7 @@
 // M1's chat check (step 2a): a Durable agent answers in a thread, a steer joins its run, Stop interrupts a long one, and
 // the thread gets a generated title. Run against a stage:
 //
-//   bun scripts/stage.ts run step2a chat [--out file.json]
+//   node scripts/stage.ts run step2a chat [--out file.json]
 import * as fs from "node:fs";
 
 import { createProjectAndThread, dispatch, itemsOf, pair, runsOf, sendMessage, SETTLED, sleep, uuid, waitFor } from "./lib/client.ts";

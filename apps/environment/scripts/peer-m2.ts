@@ -8,7 +8,7 @@
 //             an owner's thread; the linked Session offers no `t3_environment_link`
 //   leak      no secret in the fixture Workspace's Container or in the Sessions' state (review C8)
 //
-//   bun scripts/stage.ts run step3 peer-m2 [--only delegate,restart,fence,leak]
+//   node scripts/stage.ts run step3 peer-m2 [--only delegate,restart,fence,leak]
 import { admin, pair, sleep } from "./lib/client.ts";
 import { approveAll, createThread, projection, replyOf, say, t3Calls, until } from "./lib/cloudThread.ts";
 import { writeEvidence } from "./lib/evidence.ts";

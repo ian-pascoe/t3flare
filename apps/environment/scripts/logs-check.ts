@@ -3,7 +3,7 @@
 // Worker's logs across boots. Streams the logs with `wrangler tail` while it forces two boots (a reset, then
 // an armed boot, which seeds the bootstrap grant), and scans every log line.
 //
-//   bun scripts/stage.ts run <stage> logs-check [--out file.json]
+//   node scripts/stage.ts run <stage> logs-check [--out file.json]
 //
 // wrangler authenticates with the alchemy profile's Cloudflare OAuth token ($ALCHEMY_PROFILE or `default`,
 // from ~/.alchemy), passed in its environment and never printed; or with CLOUDFLARE_API_TOKEN if set.

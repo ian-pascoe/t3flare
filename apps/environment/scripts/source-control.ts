@@ -2,7 +2,7 @@
 // Read-only: what t3's source-control discovery (Settings → Source Control) reports for a stage, and the gh commands
 // the process router answered for it. Creates no project or thread.
 //
-//   bun scripts/stage.ts run <stage> source-control
+//   node scripts/stage.ts run <stage> source-control
 import { WS_METHODS } from "@t3tools/contracts";
 
 import { admin, pair, wsCall } from "./lib/client.ts";

@@ -3,7 +3,7 @@
 // its T3 Connect secrets (the publish credential, the account token's two parts) appear in them. Names only: the
 // Environment compares, nothing secret is printed. The raw tail is kept (0600, in the temp directory) only on a leak.
 //
-//   bun scripts/stage.ts run <stage> connect-tail <seconds> [--out file.json]
+//   node scripts/stage.ts run <stage> connect-tail <seconds> [--out file.json]
 //
 // wrangler authenticates as logs-check.ts does (the alchemy profile's token, never printed).
 import { spawn } from "node:child_process";

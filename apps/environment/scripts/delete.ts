@@ -1,9 +1,9 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // Step 2b M4: deleting a worktree thread frees its Workspace. Evidence around a deletion made in the stock web client:
 //
-//   bun scripts/stage.ts run <stage> delete before --worktree <id> [--dirty]  an unpushed commit (and with --dirty an
+//   node scripts/stage.ts run <stage> delete before --worktree <id> [--dirty]  an unpushed commit (and with --dirty an
 //       uncommitted file) in the worktree, from its terminal; records the Workspace's state
-//   bun scripts/stage.ts run <stage> delete after --worktree <id> --branch <name> [--out f]  polls up to 60 s for: the
+//   node scripts/stage.ts run <stage> delete after --worktree <id> --branch <name> [--out f]  polls up to 60 s for: the
 //       registry row gone (or tombstoned), the DO's storage empty, the Container stopped and out of the budget, the
 //       branch in the project's repo
 import * as fs from "node:fs";

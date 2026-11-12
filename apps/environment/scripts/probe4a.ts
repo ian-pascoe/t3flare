@@ -1,11 +1,11 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // Step 4a M0's stage probes (plan §8 M0, with the review's P12 and P8 gate), through the admin routes.
 //
-//   bun scripts/stage.ts run step4a probe4a workspace            clone the fixture project (once); prints its Workspace id
+//   node scripts/stage.ts run step4a probe4a workspace            clone the fixture project (once); prints its Workspace id
 //   (P1, a 35-minute non-PTY exec and the Workspace DO's abort, ran on M0's stage code, since replaced by the process
 //    channel: docs/steps/step-4a/m0-p1.json, m0-p1-abort.json; the channel's own checks are scripts/cli4a.ts)
-//   bun scripts/stage.ts run step4a probe4a p2 --workspace <id>   bwrap and user namespaces in the Container
-//   bun scripts/stage.ts run step4a probe4a p8 --workspace <id>   SQLite on computer's FUSE mount; rollouts of 5, 20,
+//   node scripts/stage.ts run step4a probe4a p2 --workspace <id>   bwrap and user namespaces in the Container
+//   node scripts/stage.ts run step4a probe4a p8 --workspace <id>   SQLite on computer's FUSE mount; rollouts of 5, 20,
 //       50 MB appended in the synced dir and pulled (the DO's CPU and rows per pull, from the agents Worker's logs)
 import { admin, pair } from "./lib/client.ts";
 import { ensureCloudFixtureProject } from "./lib/fixtureProject.ts";

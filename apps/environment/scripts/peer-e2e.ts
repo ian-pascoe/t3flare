@@ -14,7 +14,7 @@
 //                    with the answer, not the cut run's reply
 //   revoked          the link is revoked in the cloud mid-task: the laptop task fails naming it
 //
-//   bun scripts/stage.ts run step3 peer-e2e --variant main [--version 0.1.9-nightly.20261111.4515] [--out m4-e2e-pinned.json]
+//   node scripts/stage.ts run step3 peer-e2e --variant main [--version 0.1.9-nightly.20261111.4515] [--out m4-e2e-pinned.json]
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";

@@ -3,7 +3,7 @@
 // calls `orchestrator_capabilities` (t3's MCP tool, through t3's own Pi bridge). Writes
 // docs/steps/step-3/m0-laptop-agent.json.
 //
-//   bun scripts/stage.ts run step3 peer-laptop-agent [--version V]
+//   node scripts/stage.ts run step3 peer-laptop-agent [--version V]
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";

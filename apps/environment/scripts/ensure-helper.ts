@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off
 // Step 3: points a Workspace's repo at the current git credential helper (repos cloned before it changed).
 //
-//   bun scripts/stage.ts run step3 ensure-helper <workspaceId>
+//   node scripts/stage.ts run step3 ensure-helper <workspaceId>
 import { admin } from "./lib/client.ts";
 
 const id = process.argv[2] ?? "";

@@ -9,7 +9,7 @@
 //                  earlier "accept for session"); a decline leaves the remote main unchanged; an approval pushes once;
 //                  a second push asks again; a fetch needs no approval. The remote main is restored afterwards.
 //
-//   bun scripts/stage.ts run step3 peer-m3 [--only question,push,…]
+//   node scripts/stage.ts run step3 peer-m3 [--only question,push,…]
 import { spawnSync } from "node:child_process";
 
 import { admin, dispatch, pair, sleep, uuid } from "./lib/client.ts";

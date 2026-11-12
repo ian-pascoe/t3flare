@@ -3,7 +3,7 @@
 // the models the proxy serves under their real ids, and a turn runs on a model that is not Claude (the proxy translates)
 // as well as on one that is. Run against a stage:
 //
-//   bun scripts/stage.ts run <stage> models [--no-turns] [--out file.json]
+//   node scripts/stage.ts run <stage> models [--no-turns] [--out file.json]
 //
 // `--no-turns` only reads the snapshot: it creates no project or thread, so it is the check to run against `prod`.
 import * as fs from "node:fs";

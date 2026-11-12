@@ -4,7 +4,7 @@
 // t3_thread_wait; the answers' shapes; a 404 and re-initialisation after an admin restart; a 403 with Linked
 // environments off. Writes docs/steps/step-3/m0-mcp.json.
 //
-//   bun scripts/stage.ts run step3 peer-m0
+//   node scripts/stage.ts run step3 peer-m0
 import { admin, createProjectAndThread, pair, sleep, updateSettings } from "./lib/client.ts";
 import { writeEvidence } from "./lib/evidence.ts";
 import { McpClient, mintPairingCode, registerPeerClient, signIn } from "./lib/peer.ts";

@@ -3,7 +3,7 @@
 // Cloudflare plugin, minify, strictExecutionOrder, lazyBarrel, inlineConst), and uploaded with `bundle: false`.
 // Unlike the environment Worker it needs no Patch, Shadow or Build shim: it imports nothing of t3.
 //
-//   bun build.ts      bundle to dist/worker/ and write dist/build-report.json
+//   node build.ts      bundle to dist/worker/ and write dist/build-report.json
 import * as fs from "node:fs";
 import * as path from "node:path";
 

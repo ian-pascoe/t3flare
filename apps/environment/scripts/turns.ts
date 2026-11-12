@@ -1,16 +1,16 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
 // Turn liveness and recovery on a deployed stage (step 2a plan, section 3):
 //
-//   bun scripts/stage.ts run step2a turns liveness   a clientless turn keeps the Environment up; it resets after
-//   bun scripts/stage.ts run step2a turns restart [--no-continue]
+//   node scripts/stage.ts run step2a turns liveness   a clientless turn keeps the Environment up; it resets after
+//   node scripts/stage.ts run step2a turns restart [--no-continue]
 //                                                    an Environment restart mid-turn continues (or, with continuation
 //                                                    off, the Session's turn is aborted as an orphan)
-//   bun scripts/stage.ts run step2a turns restart --tools [--approval]
+//   node scripts/stage.ts run step2a turns restart --tools [--approval]
 //                                                    (M5) the same with a turn that runs tools in the fixture Workspace
 //                                                    (restart while its `bash` runs); with --approval, while an approval
 //                                                    waits: no continuation, the turn aborted, the request withdrawn
-//   bun scripts/stage.ts run step2a turns deadline   (M5, stage deployed with T3FLARE_TURN_DEADLINE_MS) the turn cap
-//   bun scripts/stage.ts run step2a turns lost       a Session that loses its turn: the inverse guard ends it
+//   node scripts/stage.ts run step2a turns deadline   (M5, stage deployed with T3FLARE_TURN_DEADLINE_MS) the turn cap
+//   node scripts/stage.ts run step2a turns lost       a Session that loses its turn: the inverse guard ends it
 //   … [--model anthropic/claude-haiku-5-5] [--out file.json]
 import * as fs from "node:fs";
 

@@ -22,8 +22,8 @@ interface Task {
 }
 
 const tasks: Array<Task> = [
-  { name: "patches", cwd: environment, command: "bun", args: ["build.ts", "--check"] },
-  { name: "lock", cwd: root, command: "bun", args: ["scripts/verify-lock.ts"] },
+  { name: "patches", cwd: environment, command: process.execPath, args: ["build.ts", "--check"] },
+  { name: "lock", cwd: root, command: process.execPath, args: ["scripts/verify-lock.ts"] },
   { name: "typecheck", cwd: environment, command: "bun", args: ["run", "typecheck"] },
   { name: "lint", cwd: environment, command: "bun", args: ["run", "lint"] },
   { name: "typecheck (infra)", cwd: infra, command: "bun", args: ["run", "typecheck"] },

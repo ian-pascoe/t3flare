@@ -2,12 +2,12 @@
 // Step 2a M3's deployed checks (tools, approvals, diffs) on the fixture Workspace, through t3's own commands, as the
 // web client sends them:
 //
-//   bun scripts/stage.ts run step2a m3 approve      edit + `bash test.sh` in approval-required, every call approved
-//   bun scripts/stage.ts run step2a m3 decline      a `bash` call declined with feedback: the tool returns the decline
-//   bun scripts/stage.ts run step2a m3 question     a question-only turn with the Container stopped: it stays stopped
-//   bun scripts/stage.ts run step2a m3 edit-only    an edit-only turn (full-access), then status reads: Container stays stopped
-//   bun scripts/stage.ts run step2a m3 wait [--minutes 7]  an approval waits through a Session restart and >5 heartbeats
-//   bun scripts/stage.ts run step2a m3 agent-push   (M5) the agent commits on a branch and pushes from its bash; a push to another repo fails
+//   node scripts/stage.ts run step2a m3 approve      edit + `bash test.sh` in approval-required, every call approved
+//   node scripts/stage.ts run step2a m3 decline      a `bash` call declined with feedback: the tool returns the decline
+//   node scripts/stage.ts run step2a m3 question     a question-only turn with the Container stopped: it stays stopped
+//   node scripts/stage.ts run step2a m3 edit-only    an edit-only turn (full-access), then status reads: Container stays stopped
+//   node scripts/stage.ts run step2a m3 wait [--minutes 7]  an approval waits through a Session restart and >5 heartbeats
+//   node scripts/stage.ts run step2a m3 agent-push   (M5) the agent commits on a branch and pushes from its bash; a push to another repo fails
 //
 // Each prints a JSON report (also written to /tmp/m3-<check>.json).
 import * as fs from "node:fs";

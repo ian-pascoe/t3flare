@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off
 // Step 3 (debugging): a Session's T3 tool calls and their results, as its committed entries hold them.
 //
-//   bun scripts/stage.ts run step3 session-tools <threadId>
+//   node scripts/stage.ts run step3 session-tools <threadId>
 import { admin } from "./lib/client.ts";
 
 const thread = process.argv[2] ?? "";

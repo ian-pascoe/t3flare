@@ -1,14 +1,14 @@
 // @effect-diagnostics globalConsole:off globalFetch:off globalDate:off globalTimers:off nodeBuiltinImport:off
 // The publish-only T3 Connect link of a stage (step 3+, ADR-0025), through its admin routes (src/connect/admin.ts):
 //
-//   bun scripts/stage.ts run <stage> connect sign-in [--owner]   start t3's device flow; prints the code and URL for the
+//   node scripts/stage.ts run <stage> connect sign-in [--owner]   start t3's device flow; prints the code and URL for the
 //                                                               owner to approve, then waits until the link is made
-//   bun scripts/stage.ts run <stage> connect status [--relay]    the flow, the link, secrets held (names), recent publishes
-//   bun scripts/stage.ts run <stage> connect publish on|off      t3's publish switch
-//   bun scripts/stage.ts run <stage> connect relink|unlink|sign-out
-//   bun scripts/stage.ts run <stage> connect import-token <file> R1 fallback: a token file from `t3 connect login --headless`
-//   bun scripts/stage.ts run <stage> connect probe               P2: the relay and Clerk reached from the DO
-//   bun scripts/stage.ts run <stage> connect refusals            the relay routes: 404 at the door, refused inside t3
+//   node scripts/stage.ts run <stage> connect status [--relay]    the flow, the link, secrets held (names), recent publishes
+//   node scripts/stage.ts run <stage> connect publish on|off      t3's publish switch
+//   node scripts/stage.ts run <stage> connect relink|unlink|sign-out
+//   node scripts/stage.ts run <stage> connect import-token <file> R1 fallback: a token file from `t3 connect login --headless`
+//   node scripts/stage.ts run <stage> connect probe               P2: the relay and Clerk reached from the DO
+//   node scripts/stage.ts run <stage> connect refusals            the relay routes: 404 at the door, refused inside t3
 //
 // `--owner` (required on prod for every change, review finding 6) sends the owner's own Access token from
 // `cloudflared access token -app <url>` (after `cloudflared access login <url>`) instead of the stage's service token.

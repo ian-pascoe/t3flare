@@ -2,7 +2,7 @@
 // Step 3, M5: a one-time pairing code from the stage (a client pairing, or a link's), written to a 0600 file and not
 // printed, for typing into the desktop app.
 //
-//   bun scripts/stage.ts run step3 mint-code <file>
+//   node scripts/stage.ts run step3 mint-code <file>
 import * as fs from "node:fs";
 
 import { base, pair } from "./lib/client.ts";

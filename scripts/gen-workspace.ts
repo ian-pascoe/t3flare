@@ -2,12 +2,13 @@
 // (ADR-0001, ADR-0019): Bun reads catalogs, overrides and patchedDependencies only at the
 // root, so we derive them from the submodule instead of copying them by hand.
 //
-//   bun scripts/gen-workspace.ts
+//   node scripts/gen-workspace.ts
 //
 // Fields it owns in package.json: workspaces, overrides, patchedDependencies.
 // Everything it cannot translate is printed, so a bump shows what changed.
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { parse, parseAllDocuments } from "yaml";
 
 const root = path.resolve(import.meta.dirname, "..");
 const t3 = path.join(root, "t3code");
@@ -17,6 +18,8 @@ const PREFIX = "t3code/";
 const T3_ROOTS = ["t3", "@t3tools/web"];
 // Our own workspace globs.
 const OUR_WORKSPACES = ["apps/*", "packages/*", "infra"];
+// Vendored packages (vendor/cloudpid/README.md): workspace members, but their dependencies are pinned like t3's.
+const VENDORED = ["vendor/cloudpid/*"];
 
 type Pkg = { dir: string; json: Record<string, any> };
 const t3Packages = new Map<string, Pkg>();
@@ -43,7 +46,7 @@ while (queue.length > 0) {
   }
 }
 
-const ws = Bun.YAML.parse(fs.readFileSync(path.join(t3, "pnpm-workspace.yaml"), "utf8")) as {
+const ws = parse(fs.readFileSync(path.join(t3, "pnpm-workspace.yaml"), "utf8")) as {
   catalog: Record<string, string>;
   overrides: Record<string, string>;
   patchedDependencies: Record<string, string>;
@@ -81,7 +84,7 @@ for (const [key, raw] of Object.entries(ws.overrides)) {
 // one version is pinned to it. A package the lock holds at several versions cannot be pinned (Bun's
 // overrides are per name), nor can our own direct dependencies be, which we choose ourselves.
 const lockText = fs.readFileSync(path.join(t3, "pnpm-lock.yaml"), "utf8");
-const lockDocs = Bun.YAML.parse(lockText) as unknown;
+const lockDocs = parseAllDocuments(lockText).map((doc) => doc.toJS()) as unknown;
 const lock = (Array.isArray(lockDocs) ? lockDocs : [lockDocs]).find(
   (doc): doc is { packages: Record<string, unknown> } => doc?.settings !== undefined && doc?.packages !== undefined,
 );
@@ -150,7 +153,7 @@ if (fs.existsSync(depPatches)) {
 const pkgPath = path.join(root, "package.json");
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
 pkg.workspaces = {
-  packages: [...OUR_WORKSPACES, ...[...members].sort().map((dir) => `${PREFIX}${dir}`)],
+  packages: [...OUR_WORKSPACES.slice(0, 2), ...VENDORED, ...OUR_WORKSPACES.slice(2), ...[...members].sort().map((dir) => `${PREFIX}${dir}`)],
   catalog,
 };
 pkg.overrides = overrides;

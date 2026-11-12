@@ -4,7 +4,7 @@
 // and is not in safe mode. Prints only non-secret health fields. Retries for six minutes: an active Environment DO (an
 // open client socket) keeps its old code until it hibernates or Cloudflare's default code-update delay of 5 minutes ends.
 //
-//   bun scripts/stage.ts run <stage> smoke [<commit>]
+//   node scripts/stage.ts run <stage> smoke [<commit>]
 const expected = (process.argv[2] ?? "").slice(0, 12);
 const url = process.env.T3_URL ?? "";
 const deadline = Date.now() + 360_000;

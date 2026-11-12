@@ -2,7 +2,7 @@
 // Step 3: one owner's turn on the Durable agent with `prompt` (default: call T3's orchestrator_capabilities and
 // t3_thread_list), approvals accepted; prints the T3 tool calls and the reply.
 //
-//   bun scripts/stage.ts run step3 peer-smoke [--mode full-access] [prompt…]
+//   node scripts/stage.ts run step3 peer-smoke [--mode full-access] [prompt…]
 import { pair } from "./lib/client.ts";
 import { approveAll, createThread, replyOf, say, t3Calls } from "./lib/cloudThread.ts";
 import { ensureCloudFixtureProject } from "./lib/fixtureProject.ts";

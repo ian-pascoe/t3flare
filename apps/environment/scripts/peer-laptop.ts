@@ -5,7 +5,7 @@
 // t3_thread_launch and t3_thread_wait to the stage. R4: the stage's fixture project and the laptop's local clone of
 // the fixture report the same repository identity. Writes docs/steps/step-3/<--out>.
 //
-//   bun scripts/stage.ts run step3 peer-laptop --version 0.1.9-nightly.20261111.4515 --out m0-laptop-link.json
+//   node scripts/stage.ts run step3 peer-laptop --version 0.1.9-nightly.20261111.4515 --out m0-laptop-link.json
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";

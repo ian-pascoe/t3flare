@@ -1,20 +1,20 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
 // Step 2a part 2's checks on a deployed stage (docs/steps/step-2a-part2-plan.md):
 //
-//   bun scripts/stage.ts run step2a2 part2 setup            clone the fixture into a Workspace and open a project on it
-//   bun scripts/stage.ts run step2a2 part2 ps               the Container's processes (pid, ppid, pgid, sid, args)
-//   bun scripts/stage.ts run step2a2 part2 abort            Stop during `nice bash -c 'sleep 600 & sleep 600'`: its processes go
-//   bun scripts/stage.ts run step2a2 part2 restart [--session]
+//   node scripts/stage.ts run step2a2 part2 setup            clone the fixture into a Workspace and open a project on it
+//   node scripts/stage.ts run step2a2 part2 ps               the Container's processes (pid, ppid, pgid, sid, args)
+//   node scripts/stage.ts run step2a2 part2 abort            Stop during `nice bash -c 'sleep 600 & sleep 600'`: its processes go
+//   node scripts/stage.ts run step2a2 part2 restart [--session]
 //                                                           an Environment restart (or, with --session, a Session restart)
 //                                                           while that command runs: its processes go
-//   bun scripts/stage.ts run step2a2 part2 survivor         a background process of a completed call survives a later Stop
-//   bun scripts/stage.ts run step2a2 part2 limit [--fixture cooldown] [--reset-s 120] [--no-resume]
+//   node scripts/stage.ts run step2a2 part2 survivor         a background process of a completed call survives a later Stop
+//   node scripts/stage.ts run step2a2 part2 limit [--fixture cooldown] [--reset-s 120] [--no-resume]
 //                                                           a turn the proxy answers with a usage limit (the Session's fault
 //                                                           route): "Usage limit reached" with the reset, the requests it
 //                                                           made, the idle Environment woken at the reset, the resumed turn
-//   bun scripts/stage.ts run step2a2 part2 stopped          with the Container stopped, a kill does not start it
-//   bun scripts/stage.ts run step2a2 part2 overload         an overload (529): pi-durable retries it, then a provider error
-//   bun scripts/stage.ts run step2a2 part2 key [--live]     a turn the proxy refuses (the fault route's 401, or with --live the
+//   node scripts/stage.ts run step2a2 part2 stopped          with the Container stopped, a kill does not start it
+//   node scripts/stage.ts run step2a2 part2 overload         an overload (529): pi-durable retries it, then a provider error
+//   node scripts/stage.ts run step2a2 part2 key [--live]     a turn the proxy refuses (the fault route's 401, or with --live the
 //                                                           proxy's own, on a stage deployed with a refused key): the key error
 //                                                           after 1 request, no pause
 //   … [--out file.json]

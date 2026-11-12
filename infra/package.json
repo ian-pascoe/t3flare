@@ -3,11 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ci:setup": "bash -c 'set -a; . \"$HOME/.config/t3flare/dev.env\"; set +a; exec alchemy deploy --config github.ts --stage ci --profile admin' && bun allow-actions-prs.ts",
+    "ci:setup": "bash -c 'set -a; . \"$HOME/.config/t3flare/dev.env\"; set +a; exec alchemy deploy --config github.ts --stage ci --profile admin' && node allow-actions-prs.ts",
     "ci:destroy": "alchemy destroy --config github.ts --stage ci --profile admin",
     "typecheck": "effect-tsgo tsrs --noEmit",
     "lint": "oxlint --type-aware --deny-warnings github.ts allow-actions-prs.ts github-app-setup.ts src",
-    "github-app:setup": "bun github-app-setup.ts",
+    "github-app:setup": "node github-app-setup.ts",
     "test": "vitest run"
   },
   "dependencies": {
