@@ -298,3 +298,54 @@ The image needs nothing under OD-1's recommendation. Under the HTTPS-intercept a
 - **New finding.** The current credential helper hands a token to any host git asks about. Today it can send the write token to an attacker's `pushurl`, including right after an approved linked push. M1's host check fixes it; it is worth landing early even if the rest waits.
 - **Biggest trade-off is OD-2.** Keeping write tokens out of every Container (my recommendation) also blocks the planted-helper and owner-push capture paths. The cost is Cloudflare's 100 MiB cap on each request body through an outbound handler, which would then apply to every push, not just linked ones.
 - **SPI-1040 depends on probe P5:** whether t3 accepts an approval that our wrapper injects on a CLI thread. If it doesn't, the recommendation (OD-7) is to keep refusing linked CLI pushes and ship SPI-992 alone.
+
+---
+
+## Review changelog (Fable review, 2026-11-12; overrides the plan above)
+
+Each finding is restated, checked against the code at `66e0350` (t3code `24e7747`), and given the change it makes. Where the plan text above disagrees, this section wins. Owner decisions taken with the review: OD-1 `pushInsteadOf` via `computer.internal` **in the image's system gitconfig**; OD-2 no write token in any Container (100 MiB per-push cap accepted, P3 recorded, ticket filed to ask Cloudflare to raise it); OD-3 as planned; **OD-4 replaced by H1**; OD-5 as planned with M2; OD-6 gate all linked work and fix the glossary; OD-7 if P5 fails ship SPI-992 alone and keep the CLI refusal; OD-8 stage `spi992`, fixture branches `spi992/*`, desktop demo optional.
+
+### H1 — durable taint (replaces OD-4). **Accepted.**
+- **Finding.** The plan's taint is LINKED_WORK_MS (30 min) after a linked command, so a payload planted during linked work (a `core.fsmonitor`, a `pre-push` hook, a setup-script) runs later as the owner, after the window, with the gateway in its "no linked work → allow" row.
+- **Checked.** `linkedPush.ts` `credentialDecision` returns `token` once every entry is older than `until`; `prunedLinkedWork` drops them; nothing outlives a Container stop except that map. Worktrees: `worktreeClone` is a fresh clone (hooks and `core.*` are not copied; `worktreeBundle` copies only `branch.<ref>.*`), but `seedProjectRoot` copies the project's untracked **and gitignored** files into the worktree's project-root view (`projectRootFiles`), so a planted script payload does travel. The finding holds.
+- **Change.**
+  - The Workspace DO keeps a persistent **taint** record (`t3flare:taint`: since, by which linked threads) set by every `noteLinkedWork` and every live linked CLI process; it survives the window, Container stops and DO restarts. `worktreeClone` with a `parent` copies the parent's taint.
+  - While tainted, a gateway push whose updates do not all match an expectation **asks**: (1) on the linked thread when one is live (inside its window or its CLI process alive); else (2) on the owner's thread that is pushing, when exactly one owner thread is attributable (one Durable Session with a command running in the Workspace, or one owner CLI process alive); else (3) refused with a named message (`t3flare: this Workspace ran linked work …`).
+  - The owner clears the taint: `POST /_t3flare/agents/workspace-trust?id=<id>` (admin), or by answering an owner-thread push card with "accept for the session", which that card labels "approve and trust this Workspace again". A linked-thread card never clears it.
+  - Stopping the Container on lapse: not done (optional per review).
+  - M2 gains the hostile **persist** case: plant `core.fsmonitor`, a `pre-push` hook and a setup-script payload; let the window lapse; restart the Container; the owner runs status and Commit & push; assert no extra ref appears without an approval.
+
+### M1 — strict gateway. **Accepted.**
+- **Checked.** The plan forwards "the buffered prefix" and gunzips "a copy": the bytes GitHub parses are not the bytes we parsed (a parser differential).
+- **Change.** The gateway re-serialises the command list from the parsed updates (only `report-status`, `report-status-v2`, `side-band-64k`, `quiet`, `atomic`, `ofs-delta`, `agent=`, `object-format=`, `push-options` passed on; anything else refused); builds upstream headers from an allowlist (`content-type`, `accept`, `git-protocol` only; `user-agent` ours); refuses any `Content-Encoding` on receive-pack (P4 confirms git does not gzip receive-pack requests); answers a probe by forwarding a constant `0000`; pins the query to exactly `service=git-receive-pack`; pkt-line grammar is strict: 4 lowercase-hex lengths, 40- or 64-hex oids matching the advertised object format, `git check-ref-format`-valid `refs/…` names, a byte cap on the command prefix (64 KiB) and at most 64 updates.
+
+### M2 — t3's real push argv. **Accepted.**
+- **Checked.** At the pin t3 pushes `push -- <remote> HEAD:refs/heads/<b>` (`GitVcsDriverCore.ts:2743, 2833, 2848`) and bare `push` (`:2859`, which git resolves through `push.default`/`@{push}`), with `timeoutMs: null`; the stack rebase pushes `push --quiet --force-with-lease=refs/heads/<b>:<sha> origin <sha>:refs/heads/<b>` (`githubStackRebase.ts:139-145`). The plan's `-u <remote> <branch>` is not t3's form, and a 2-minute TTL is shorter than an unbounded push.
+- **Change.** The router parses these three forms (plus `--delete`/`:refs/heads/x` for completeness); bare `push` is resolved with `rev-parse --symbolic-full-name @{push}` and `HEAD`. Each expectation is bound to the Workspace (repo) and `{ref, new}`, registered before the git command and removed when it returns, with a 30-minute cap.
+
+### M3 — pushes from linked tool calls. **Accepted (no gap found; tests added).**
+- **Checked.** `acpDriver.ts` calls `makeAcpAdapterV2` without `clientTerminals` (so an ACP agent's shell is its own process in the Container, never t3's terminal); no allowlisted t3 MCP tool reaches `pushCurrentBranch` or the stack rebase (`t3_project_clone` → `cloneRepository`; `publishRepository` is not an MCP tool).
+- **Change.** A test pins "no `clientTerminals`"; fragility entry U39; acceptance case: a linked agent calls each allowed t3 tool and the router registers no expectation.
+
+### M4 — Container token. **Accepted, with the owner's change.**
+- **Change.** Container tokens drop `contents: write` and **keep `pull_requests: write`** (agent `gh pr create/view` keep working; a PR carries no code). The gateway token is `contents: write` (+ `workflows: write` when opted in) and `metadata: read`, nothing else. `agentsCheck.ts:77` mints the Container token through the new list. LFS pushes fail for everyone: accepted, ticket filed.
+
+### M5 — system gitconfig. **Accepted.**
+- **Checked.** The plan wrote `pushInsteadOf` into `.git/config` at every start — agent-writable, and a per-start write.
+- **Change.** `url."http://computer.internal/t3flare/git/".pushInsteadOf https://github.com/` and the credential helper live in the image's system gitconfig (conda git's `$PREFIX/etc/gitconfig`, and `/etc/gitconfig` for any other git); nothing is written per start. Removing it fails closed (the push reaches github.com with a read token). The router maps the gateway URL back to `https://github.com/` in `remote -v` / `remote get-url` / `config --get remote.*.pushurl` output for t3. M1 checks `git config --system --get-regexp pushinsteadof` in a fresh Container.
+
+### M6 — approval card. **Accepted.**
+- **Change.** The card reads each ref's real tip from GitHub (the advertisement the gateway already fetched, else the API), shows create / delete / force / default-branch / tag, labels the ancestry and the commit subject "as reported by the Workspace", and escapes non-ASCII in ref names (`\u{…}`).
+
+### M7 — in M0. **Accepted.**
+- **Change.** P2 also measures each CLI's command timeout against the 10-minute approval wait and cancels the card when the client disconnects. The Environment's idle reset counts a pending `approveLinkedPush` as open work (`Idle.requestStarted`). If P2 fails, stop and message the owner before re-planning to a single-use grant. P5 also proves nothing auto-answers an injected `command` request in full-access mode.
+
+### LOW items
+- **Host check vs hostile case.** Correct: the host check stops a token going to a foreign `pushurl`, but a hostile agent can ask the helper's endpoint directly; only read-only issuance closes that. Recorded in ADR-0013.
+- **Actions risk.** A pushed workflow (with `workflows` opted in) or a push that triggers an existing workflow runs with that workflow's `GITHUB_TOKEN`. ADR-0013 notes it and recommends read-only default workflow permissions and branch protection.
+- **Expectation race.** A linked process can push exactly the expected `{ref, new}` before t3 does; the result is what the owner clicked. Documented.
+- **Callers.** `authorizePush` is called only by the gateway (`WorkspaceProxy`, same Worker, from the Container's egress); `expectPush`/`unexpectPush` only by the Environment's process router (Environment DO → Workspace DO RPC). Neither is reachable from the Container (its egress reaches the DO only through `WorkspaceProxy`'s paths) or from a Session. Stated in code and ADR.
+
+### Existing prod Workspaces (item 10)
+- **Checked.** Repos cloned before 4468002 hold a helper without the host check in `.git/config`, which reads `T3FLARE_GIT_TOKEN` first.
+- **Change.** The router no longer passes `T3FLARE_GIT_TOKEN` at all (the helper asks the DO, which caches a read-only token); the DO's credential endpoint answers only the new helper's request (`v=2`, `protocol=https`, `host=github.com`), so an old repo helper gets nothing; the new helper is in the system gitconfig, which git asks before the repo's helper. Every token the endpoint issues is read-only.
