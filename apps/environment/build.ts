@@ -39,6 +39,12 @@ export const COMPATIBILITY = {
 const T3_MODULE = /\/t3code\/(?:apps\/server|packages\/[^/]+)\/src\//;
 const relativeToT3 = (id: string) => id.slice(id.indexOf("/t3code/") + "/t3code/".length);
 
+/**
+ * t3 modules whose `node:fs` imports are text, not imports: pi's extension source is a template literal of a program
+ * pi runs in the Container (step 4a). Aliasing those lines would ship an extension that imports this repo's shim.
+ */
+const FS_ALIAS_SKIP = new Set(["packages/provider-pi/src/server/mcpExtensionSource.ts"]);
+
 const FS_ALIASES: Record<string, string> = {
   "node:fs": shim("node-fs.ts"),
   fs: shim("node-fs.ts"),
@@ -167,6 +173,7 @@ const t3NodeFsAlias = (report: { rewritten: number; importers: Set<string>; skip
     report.importers.clear();
   },
   transform(code, id) {
+    if (T3_MODULE.test(id) && FS_ALIAS_SKIP.has(relativeToT3(id))) return null;
     if (!T3_MODULE.test(id)) {
       if (/["']node:fs["']/.test(code)) report.skippedDependencyImports++;
       return null;
