@@ -22,3 +22,7 @@ The order is a preference by default, not a rule over size: **a Patch beats a la
 ## Counts after step 4a
 
 Shadows 2: `builtInDrivers` (now registering the Codex and Pi CLI drivers too) and `processGroup` (`@t3tools/provider-core/server/processGroup`, imported by package subpath, so the Shadow plugin also resolves bare `@t3tools/*` specifiers): t3's pi adapter signals its process group with `process.kill`, which cannot reach a Container, so a process channel pid is signalled through the channel instead. Patches 3: `0003-provider-session-idle-10-minutes.patch` (one line of `runtimeLayer.ts`: `ProviderSessionManager.layerWithOptions({ idleTimeoutMs: 10 minutes })`), chosen over a Shadow of the 300-line runtime layer. Build shims: the `node:fs` alias now skips `provider-pi/src/server/mcpExtensionSource.ts`, whose `node:fs` import is the text of a program pi runs in the Container (`FS_ALIAS_SKIP`).
+
+## Counts after step 4b
+
+Unchanged: Shadows 2 (`builtInDrivers` registers Claude Code and OpenCode too; `processGroup` now also stops their process groups, through t3's `AcpSessionRuntime`), Patches 3, no new Build shim (`@t3tools/provider-acp` and `effect-acp` were already in the Worker through `AcpRegistrySupport`). Everything else is a Layer: our flavors passed to t3's exported `makeAcpAdapterV2`, a runtime wrapper around t3's `AcpSessionRuntime`, and one composition departure (t3's idle compaction worker is not started, `composition.ts`). `reg/claudeAcp.ts`'s subagent extractors are imported by source path (not a package export).

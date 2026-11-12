@@ -13,7 +13,7 @@ The proxy t3flare is built and tested against is **[Commissary](https://github.c
 | The model list: the picker's models, each one's name, thinking levels and context window; the Session's models | Both Workers, each keeping its own copy | `GET {MODEL_PROXY_URL}/v1/models`, twice (see below) |
 | The nightly bump job's real turn ([ADR-0017](adr/0017-upstream-is-tracked-by-nightly-tag-with-an-automated-bump.md)) | The `bump` stage, deployed by CI with the same two settings | A Durable agent turn and text generation, as above |
 
-Nothing else calls a model today. A Container never sees the URL or the key; they are settings of the two Workers only. The CLI agents of step 4 (Codex, Claude Code, OpenCode, pi) will call the proxy from their Containers, each through its own base-URL setting; whether the key itself enters a Container is still open ([ADR-0016](adr/0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)).
+Nothing else calls a model today. A Container never sees the URL or the key; they are settings of the two Workers only. The CLI agents of step 4 (Codex, Claude Code, OpenCode, pi) call the proxy from their Containers, each through its own base-URL setting, with `COMMISSARY_CONTAINER_API_KEY` given on demand ([CLI agents](#cli-agents-steps-4a-4b), [ADR-0016](adr/0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)).
 
 ## What the proxy must provide
 
@@ -123,12 +123,14 @@ When the proxy cannot serve a turn because a limit is reached, the turn ends as 
 
 An Environment started without them answers text generation with "The model proxy is not configured." and lists only the static models; a Session cannot run a turn.
 
-## CLI agents (step 4a)
+## CLI agents (steps 4a, 4b)
 
-Codex and the pi CLI run in the Workspaces' Containers and call the proxy themselves ([ADR-0016](adr/0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)):
+Codex, the pi CLI, Claude Code and OpenCode run in the Workspaces' Containers and call the proxy themselves ([ADR-0016](adr/0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)):
 
 - **Codex** speaks the OpenAI **Responses** API: `POST <MODEL_PROXY_URL>/v1/responses` with `Authorization: Bearer <key>`, as model provider `t3flare-proxy` (`base_url = <MODEL_PROXY_URL>/v1`, `wire_api = "responses"`). Commissary accepts a `cms_` key as a Bearer, and its Responses API drove Codex's tools on GPT, Claude and Gemini models in step 4a's probes, so Codex lists the whole catalog. The model id Codex sends is the catalog's real id.
 - **pi** speaks the Anthropic **Messages** API with `x-api-key`, as pi's `anthropic` provider with its `baseUrl` overridden; its models are the catalog's (`anthropic/<id>`), as for Pi Durable.
+- **Claude Code** (step 4b) speaks the Anthropic **Messages** API to `ANTHROPIC_BASE_URL=<MODEL_PROXY_URL>` with the key from its managed `apiKeyHelper` (sent as both `x-api-key` and `Authorization: Bearer`); Commissary accepts its `anthropic-beta` headers. The catalog's real ids are its `availableModels`, chosen with ACP's `model` config option; Commissary checks a model when it is set, so an id it refuses fails the set. Tool turns completed on Claude, GPT and DeepSeek models; Gemini 3.x was refused by Commissary's upstream accounts for every client (402, 403, 410) on 2026-11-12. Its background model is the text-generation model (`ANTHROPIC_DEFAULT_HAIKU_MODEL`).
+- **OpenCode** (step 4b) speaks the Anthropic **Messages** API as its provider `t3flare` (`@opencode/ai/providers/anthropic-compatible`, `baseURL = <MODEL_PROXY_URL>/v1`; the `/v1` is needed), the whole catalog by real id (`t3flare/<id>`), with `x-api-key` set by t3flare's key plugin.
 - **A second key.** The CLIs get `COMMISSARY_CONTAINER_API_KEY`, never `MODEL_PROXY_API_KEY`: anything in a Container that runs the key helper while a CLI process lives can read it. Create it as its own Commissary API key with an **empty tool scope** (models only), its **own spend limit**, and optionally an expiry. Put it in `~/.config/t3flare/dev.env`; `stage.ts` binds it to the agents Worker alone and refuses a stage deploy without it. CI: `bun run --cwd infra ci:setup` sets it on the `prod` environment from `dev.env`; on `bump` set it by hand: `gh secret set COMMISSARY_CONTAINER_API_KEY --env bump --repo <owner>/<repo>`.
 - **Rotate it** after a `credential-in-workspace` error in the agents Worker's logs (the sync guard found it in a Workspace and flagged it; `POST /_t3flare/check/leak?id=<workspace>` shows the flag) or on any doubt: revoke it in Commissary, update `dev.env`, run `ci:setup`, set it on `bump`, redeploy.
 

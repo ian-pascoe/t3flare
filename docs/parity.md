@@ -49,7 +49,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 |---|---|---|---|---|
 | Pi Durable | (ours) | W | `env/shadows/builtInDrivers.ts` | done |
 | Codex, Pi CLI | `srv/provider/builtInDrivers.ts:33-45` | W, on proxy models, in the Workspace's Container; no t3 tools (OD-3, below); Pi has no plan mode (a plan turn is refused) | `env/provider/cli/`; `docs/steps/step-4a.md`, `step-4a/m6-acceptance.json` | done (4a) |
-| Claude, OpenCode | same | M; Claude over ACP loses fork, live steering, structured plan (ADR-0015) | same | 4b |
+| Claude, OpenCode | same | W over ACP, on proxy models, in the Workspace's Container (t3's kinds `claudeAgent`, `opencode`); no t3 tools (OD-3). Against t3's native drivers: fork M (both CLIs answer `session/fork`; SPI-1037), live steering P (interrupt and restart), rollback M (off), OpenCode's plan P (text and todos, no proposed plan; Claude's proposed plan is W), idle compaction M (not started), provider settings P (binary, home, server URL, launch arguments ignored); usage limit W (the proxy's 429) | `env/provider/cli/acpDriver.ts`, `acpFlavor.ts`; `docs/steps/step-4b.md`, `step-4b/m5-acceptance.json` | done (4b) |
 | Cursor, Grok, Fx, Antigravity, Kiro, Muse | same | R (D3): vendor sign-in, no proxy base URL | no driver registered; ADR-0015 (D3 refinement), ADR-0012 | done (refusal) |
 | ACP registry agents | `ws.ts:2395-2453` | M | driver absent | — G13 |
 | Provider settings | `con/settings.ts:688-904` | P: Pi Durable has one hidden switch; Codex and Pi show t3's forms but binary path, home and launch arguments are ignored (the image and the CLI profile decide), Codex's managed (ChatGPT) setup is refused | `env/provider/settings.ts`, `env/provider/cli/` | 4a (CLIs), 4b |

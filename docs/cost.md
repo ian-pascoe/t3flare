@@ -58,6 +58,12 @@ What moves the total:
   11 Container-minutes beyond its last turn (about $0.006). The Environment's own idle reset (60 s without a client)
   ends idle CLI processes earlier, at the Workspace's 90 s lapse; a full budget reclaims Containers whose CLI sessions
   sit idle.
+- **Step 4b: the image and the CLIs' weight.** Claude Code and OpenCode add about 0.3 GB to the Workspace image
+  (1.05 GB against 751 MB, `docs/steps/step-4b/m1-image.json`), registry storage and a slower first pull, not a running
+  cost. A cold Claude Code session answered its first prompt 18 s after its Container was stopped. Claude Code (its
+  Node adapter and `claude`) peaked at 344 MiB and OpenCode (`opencode acp` and its `serve` child) at 439 MiB in a turn
+  running `npm ci && npm test`, so each counts twice against a Workspace's 4 CLI processes (`CLI_WEIGHT`). An
+  `acp-request` log line (Environment Worker) records each session's `initialize`, `session/new` and `session/load`.
 
 ## When to act
 

@@ -14,7 +14,7 @@ The decisions behind this plan are in [`docs/adr/`](adr/); the terms are in [`GL
 | 3. Peer links ✅ ([report](steps/step-3.md)) | Laptop-to-cloud link; t3's MCP tools in Sessions | A laptop agent delegates to the cloud, follows the task and gets the result; the cloud child can report and ask; the link fence holds. |
 | 3+. T3 Connect ✅ ([report](steps/step-3plus.md)) | Publish-only T3 Connect link | Mobile notification when a cloud run ends or waits on the owner. |
 | 4a. CLI agents, stdio: Codex and Pi | Process channel (t3's `ChildProcessSpawner` over the Workspace DO's exec), readiness wrappers, each CLI pointed at the model proxy; the proxy key's way into the Container (ADR-0016's open question: in the environment, a helper, or a Handle and an HTTPS intercept for the proxy's host only); Codex `app-server` on a proxy model provider; the pi CLI through t3's built-in Pi provider (`pi --mode rpc` over stdio, shown as "Pi") with a pi `models.json` for the proxy | A Codex turn and a Pi turn, each on a proxy model, run in two Containers at once and resume after Container sleep; neither CLI holds a vendor credential or calls a vendor host, and no credential is ever on synced disk. |
-| 4b. CLI agents, ACP | Claude Code and OpenCode over ACP, on the model proxy, with the key path 4a chose | Both run a turn with approvals on a proxy model. |
+| 4b. CLI agents, ACP | Claude Code and OpenCode over ACP, on the model proxy, with the key path 4a chose | Both run a turn with approvals on a proxy model (done: [step 4b report](steps/step-4b.md)): a Claude Code and an OpenCode turn each with an approved edit and command, a plan turn of each that edits nothing, no vendor login or host, every mode failing closed, nothing on synced disk. |
 
 ## Checks per step
 

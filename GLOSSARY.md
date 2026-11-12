@@ -135,6 +135,13 @@ _Avoid_: CLI config
 The command a CLI agent runs for its model proxy key (`t3flare-model-key`), which asks the Workspace DO only while a CLI process lives there; the key is never in an environment or on disk.
 _Avoid_: token helper (Codex's managed mode), credential helper (that is git's)
 
+**ACP flavor**:
+What t3flare passes to t3's generic ACP adapter (`makeAcpAdapterV2`) to run Claude Code or OpenCode under t3's kinds: the agent's spawn through the process channel, the pinned asking mode, t3flare's answer to each permission request, the approval card, the model ids and the proxy's failures (`provider/cli/acpDriver.ts`, `acpFlavor.ts`).
+_Avoid_: ACP driver, registry agent (t3's ACP Registry driver is another thing, refused)
+
+**Managed settings**:
+Claude Code's highest settings source, `/etc/claude-code/managed-settings.json`, written per process by the image's launcher: the proxy as the only endpoint, the key helper, and the permission, hook, MCP and plugin locks a repository's `.claude/` cannot override. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`.
+
 ## Credentials
 
 **Provider instance**:
