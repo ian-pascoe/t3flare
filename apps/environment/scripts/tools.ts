@@ -995,6 +995,7 @@ const linkedThread = async (label: string, modelSelection: unknown, message: str
   const cards: Array<any> = [];
   const started = Date.now();
   let projection: any;
+  let settledPolls = 0;
   while (Date.now() - started < 10 * 60_000) {
     projection = projectionOf(await threadWindow(cookie, threadId).catch(() => undefined)) ?? projection;
     for (const request of (projection?.runtimeRequests ?? []).filter((r: any) => r.status === "pending" && !seen.has(r.id))) {
@@ -1010,7 +1011,10 @@ const linkedThread = async (label: string, modelSelection: unknown, message: str
       cards.push({ id: String(request.id).replace(/[0-9a-f]{16,}/g, "…"), kind: request.kind, prompt: String(item?.prompt ?? "").slice(0, 600), options: item?.options ?? null, decision });
     }
     const runs = runsOf(projection);
-    if (runs.length > 0 && runs.every((run: any) => SETTLED.has(run.status)) && !(projection?.runtimeRequests ?? []).some((r: any) => r.status === "pending")) break;
+    // Settled for four polls in a row: a CLI's run can look settled between its steps.
+    const quiet = runs.length > 0 && runs.every((run: any) => SETTLED.has(run.status)) && !(projection?.runtimeRequests ?? []).some((r: any) => r.status === "pending");
+    settledPolls = quiet ? settledPolls + 1 : 0;
+    if (settledPolls >= 4) break;
     await sleep(1500);
   }
   return { threadId, workspace: project.id, projection, cards, mcp };
