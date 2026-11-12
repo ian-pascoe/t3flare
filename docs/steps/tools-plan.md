@@ -7,6 +7,52 @@
 
 **Not done (by the rules):** no credential file read, no call to prod, Commissary or Executor with a key. Every Commissary/Executor behaviour below is from their docs and code, and is re-proved in M0 on a throwaway stage.
 
+## Review changelog (2026-11-12, at implementation)
+
+The Fable review (`tools-plan-review.md`) and the owner's settled decisions override the sections below where they differ. Each finding was checked against the code; none is rebutted outright, two are narrowed (M8, H2's argv note). Build order now: part 1 (M0–M2) and part P (panel framework) first; parts 2, 3 and 4 wait for SPI-992/1040 on `main`.
+
+**Owner decisions taken at implementation (override plan and review):**
+- **Tools key:** no new secret. `MODEL_PROXY_API_KEY` (Workers-only) is the Commissary tools key for now, read through one accessor (`toolsKeyOf(env)`) so a dedicated key can replace it later; `COMMISSARY_TOOLS_API_KEY` is not added. Never `COMMISSARY_CONTAINER_API_KEY` (it enters Containers). No Commissary approval rules on the key (OD-T3). Replaces §3.1's key bullet and §9's mention.
+- **H4 panel host:** the panel is served only on a dedicated admin hostname with its own Access application and refused on the t3 host (§6.1 replaced; see H4 below).
+- **H1–H3:** applied as written (below).
+- **M13:** a per-server "offered to linked threads" switch, default **off** for every server, Commissary included; where on, linked writes still ask per call. §6.2's "link access" is this switch; §6.3's "fixed rule" text is replaced by it.
+- **M3, M5:** the MCP Worker has no bindings, sets `global_fetch_strictly_public`, makes every outbound MCP and OAuth request (token refresh included), and ports cloudpid's `scrub.ts`.
+- **M4:** OAuth on public exact paths with an Access Bypass application and an ADR-0010 refinement; an M0 probe for it (P13).
+- **ODs:** T4 code mode + core tools; T5 alchemy bundles + cloudpid's `sdk-isolation.test.ts`; T6 "call again" with the review's binding conditions; T7 later; T9 no settings tools; T10 copy `@cloudpid/mcp` and its dependencies at a pinned commit; T11 `browser`; T12 stdio refused; T13 four Workers (plus the admin forwarder, H4); T14 stage `tools`, fixture bearer fixed (LOW below), ~10 attended minutes for Executor.
+- **D5 exception (b):** MCP servers only, recorded in ADR-0012. **Skills:** placeholder only.
+
+**Findings:**
+
+| # | Verdict | Evidence checked | Applied as |
+|---|---|---|---|
+| H1 | accepted | §4's swap and §3.2's taint rule as written; reads never reach `decideCall`'s ask | parts 3/5: while a Workspace is tainted, `/t3flare/mcp/t3` refuses owner-thread handles outright; M5 case 4 gains a read through a stolen owner handle |
+| H2 | accepted; argv note narrowed | `apps/sandbox-image/image/t3flare-claude-agent-acp:11-13` and `t3flare-opencode:8-10` overwrite one Container-wide file per launch | system files stay handle-free (URL allowlist only); handles go per process (ACP `session/new` `mcpServers` from `acpDriver`, or a per-home helper like `t3flare-claude-key`, checked in P8); M5 adds two same-CLI threads in one Workspace in different modes. Codex's handle on argv is per process (root sees it anyway); §12's "never the environment" becomes "never a Container-wide file" |
+| H3 | accepted | Commissary ADR-0038 l.19 ("upstream annotations are untrusted hints"); 10-minute relist | Route B: every tool is write until the owner marks it read (hint shown as a suggestion). Both routes: class pinned by (server, exact upstream name, definition hash); a write→read hint change or a changed definition under a read override stays write until the owner confirms; colliding sanitised names refused; fixture tool `fixture_flip`; session acceptances cleared on a hash change (LOW "Renames") |
+| H4 | accepted (owner: dedicated host) | `worker.ts` serves t3's web client and the admin paths on one host (`alchemy.run.ts` `assets`, `runWorkerFirst`) | the panel is served only by the Environment Worker's named entrypoint `HarnessAdmin`, reached over a service binding from a small forwarder Worker `t3flare-admin-<stage>`. Its host: `<first label>-admin.<rest of T3FLARE_DOMAIN>` (prod: `t3-admin.ianpascoe.dev`) as a custom domain, or its workers.dev host on domain-less stages; its own Access application (owner email + the stage service token). The t3 host never serves `/_t3flare/harness*` (the default export has no such route). All server-supplied strings HTML-escaped (tested with hostile values); CSP `script-src` is the page script's SHA-256 hash, no `'self'`. ADR-0026 |
+| M1 | accepted | §3.2 vs §3.3 | the "write tools dropped for a linked caller" clause is deleted; linked callers see writes and each call asks |
+| M2 | accepted | `permissions.ts` `MAX_SUMMARY = 2_000`, `summaryOf` cuts `bash` at 2 000 and shows 3 edits at 300 characters | one rule for every card (coding, t3, MCP): the full text up to 16 KiB; past it, the head, the size, a SHA-256 prefix and an explicit "TRUNCATED" line; C0/C1 controls (but newline and tab) and format characters (bidi, zero-width) shown as `\u{…}`. Built in part 1 (`cardText.ts`) |
+| M3 | accepted | cloudpid ADR-0038 (bindings to scripts not yet deployed are refused) | `WorkspaceProxy` → `EnvironmentDO.mcpRelay(…)` over the existing binding; the Environment calls the MCP Worker's relay entrypoint with callbacks; the MCP Worker has no bindings; §12's alchemy row gains the Environment's `MCP_ENGINE` service binding |
+| M4 | accepted | CIMD under `/_t3flare` is behind Access; the callback is a state-changing GET | public exact paths on the admin host with an Access Bypass application; single-use 256-bit `state`, PKCE, `iss` check; ADR-0010 refinement; M0 P13 |
+| M5 | accepted | cloudpid `packages/mcp/src/public-fetch.ts:4-6` | MCP Worker with `global_fetch_strictly_public`, every outbound MCP/OAuth request there (test and refresh included), guard on every discovered URL and hop, `redirect: "manual"`; `scrub.ts` ported |
+| M6 | accepted | `pi-codemode/dist/runtime/remote.js:96,140,144` turn a failed remote into `kind: "sandbox"`, which `codemode.js` commits as the outcome | M0 P14 kills the sandbox mid-approval and runs concurrent memory-heavy scripts; VM memory cap 16 MiB (not 32); no patch: a lost sandbox ends the script ("script failed, completed calls listed"), the card is withdrawn, and the code mode section says so. The "patch unchanged" claim holds |
+| M7 | accepted | handles resolve to their own thread's mode | parts 2/5: the relay decides with the strictest mode among live agent threads in the Workspace |
+| M8 | accepted, narrowed | `permissions.ts` keeps all requests in one KV value (`t3flare:approval-requests`) | at most 8 pending asks per code mode call; further asks from that script wait their turn (durably: the rerun finds the queue again); with the cap, the 600-character script excerpt per request stays small, so it is not split out. H2 gains a 200-concurrent-writes case |
+| M9 | accepted | `.worktrees/spi-992/.../linkedPushAsk.ts` refuses `input.linked && !asker.linked` | part 5: a separate `perCall` flag; tool cards never carry the push card's "trust this Workspace again"; stale `t3flare-push` ids still closed; a held `mcpCall` counts as open work for the idle reset |
+| M10 | accepted | | `tools/call` refuses `hidden` and scripts-only tools; the linked per-call rule applies to t3's own write tools on both Durable and CLI threads (one rule); `decideCall` checks `linked` before `accepted` |
+| M11 | accepted | 600 s wait + 270 s call > 660 s | CLI tool timeouts 900 s |
+| M12 | accepted | | caps per server (200 tools, 256 KiB of schemas), the build stored in chunks, P3 measures Session heap with 500 tools |
+| M13 | accepted (owner: switch, default off) | | see decisions |
+| LOW reserved names | accepted | | `t3` reserved beside `t3-code` and `commissary` |
+| LOW OpenCode allow | accepted | | P9 checks a repo cannot define `commissary_*`; match on MCP origin where OpenCode allows |
+| LOW CSRF | accepted | | the token accepts the previous hour; Origin compared to the configured admin host, never the request's |
+| LOW secret hashes | accepted | | leak-scan fingerprints are HMACs with a DO key |
+| LOW fixture bearer | accepted | §7 says both "generates per run" and "owner adds it once" | the fixture's bearer is made once per stage by the harness, kept with the stage's secrets (0600, gitignored), and pasted by the owner into Commissary once; destroyed with the stage |
+| LOW plan mode | accepted | `codemode.js:434-455` writes overflow output with `env.writeFile` | noted: in plan mode a script's overflow output is written to a temp directory outside `guarded`; it holds only the script's own output, never a repo file (ADR-0027 states it) |
+| LOW evidence | accepted | | handles, the fixture bearer and every token are redacted in `docs/steps/tools/*.json` |
+| LOW renames | accepted | | with H3 |
+
+Renumbered: the code mode ADR is **0027** and the panel ADR **0026** (this step); the MCP host ADR becomes **0028** (parts 2–4).
+
 ## 0. Summary
 
 One step, five parts. Build order: part 1, then the panel (P), then parts 2, 3 and 4, which use it (milestones in §7):
