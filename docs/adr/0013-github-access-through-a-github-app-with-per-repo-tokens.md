@@ -34,3 +34,22 @@ Some features need an owner's user token, and they are missing by this decision,
 A token pasted into t3's settings still works as in stock t3, at the owner's choice. There is no owner token held by t3flare.
 
 Other hosts (GitLab, Bitbucket, Azure DevOps, Forgejo) are out of scope for now: cloning works for public repos only, and t3's discovery reports their CLIs "not found". A later decision may add an owner token or a host, each with its own ADR.
+
+## Refinement (SPI-992, SPI-1040): no write token in any Container; pushes go through the push gateway
+
+Supersedes step 3's residual risk and the write half of step 2a's Container token. Evidence in `docs/steps/spi-992/`; the report is `docs/steps/spi-992.md`.
+
+- **The Container token is read-only code** (`contents: read`, `pull_requests: write`, `metadata: read`): it clones and fetches, and lets an agent's `gh pr create`/`view` work, since a pull request carries no code. The credential helper (protocol `v=2`) answers only `https://github.com`, so it never hands a token to a `pushurl` on another host (a finding of the plan: the old helper did).
+- **Every push to github.com goes through the push gateway**: the image's system gitconfig rewrites it (`pushInsteadOf` to `http://computer.internal/t3flare/git/`), and the agents Worker's outbound handler forwards it to GitHub with a **gateway token** (`contents: write`, plus `workflows: write` for an opted-in Workspace) that never enters a Container or a Session. Before forwarding, the gateway parses the receive-pack command list strictly, re-serialises it from what it parsed (no parser differential), and asks the Workspace DO's policy (`pushDecision`) about the exact ref updates:
+  - **allow** when every update matches an **expectation** (t3's own push: the process router registers the updates of t3's push argv before the command and removes them after, review M2), or when the Workspace has no **taint**;
+  - **ask** while the Workspace is tainted: on the linked thread whose work it is (its card says which link), else on the one owner thread pushing (a Durable Session with a command running, or one owner CLI process in a turn); an owner card's "accept for the session" approves and trusts the Workspace again, a linked card never does;
+  - **refuse** otherwise, with a named message (`t3flare: this Workspace ran linked work …`).
+- **Taint** outlives the 30-minute linked-work window, Container stops and DO restarts (review H1): a planted `core.fsmonitor`, hook or detached loop that later runs as the owner still meets the ask. The owner clears it with the admin `workspace-trust` route or an owner card.
+- **CLI threads are asked too (SPI-1040)**: the Environment DO's `approvePush` reaches the thread's CLI wrapper, which raises t3's "Allow git push?" card on its live turn and answers it itself (U37). Without a live turn the push is refused.
+- **A card shows GitHub's truth** (the tips GitHub advertised, the exact refs and ids) beside what the Workspace reports (commit subjects, fast-forward), labelled as the Workspace's claim (review M6). A card whose git went away is withdrawn (review M7).
+
+Accepted costs and residual risks:
+- **100 MiB per push.** Cloudflare caps a request body through an outbound handler at 100 MiB (P3: 90 MiB landed, 110 MiB got 413). A bigger push fails; split it. A ticket asks Cloudflare to raise the cap.
+- **Git LFS** uploads go to GitHub's LFS API, not receive-pack; with a read-only token they fail. Ticketed.
+- **GitHub Actions.** An approved push can still change `.github/workflows` in an opted-in Workspace, and any pushed branch runs the repo's existing workflows with their secrets: approving a push is approving what CI will run.
+- **What the gateway cannot see.** It sees refs and object ids, not intent. Expectations are bound to `{ref, new}` for 30 minutes, so a hostile process that makes the same update t3 is about to push races t3 and wins nothing it was not getting. The host check is in the helper; a hostile Container can still send a read token anywhere, which only reads.

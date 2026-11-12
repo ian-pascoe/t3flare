@@ -31,8 +31,9 @@ _Avoid_: remote threads, foreign work
 
 **Link fence**:
 What Linked work from a link paired below full access may not do: change the owner's threads, projects, settings or
-schedules, or use that Environment's own links (t3's), exceed the modes the link hands down, or `git push` without an
-approval each time (ours). A full-access link is not fenced.
+schedules, or use that Environment's own links (t3's), exceed the modes the link hands down (t3's), or `git push`
+without an approval each time (ours, at the Push gateway). The push half applies to every link, full-access included:
+it is the Workspace's Taint, not the link's access, that makes a push ask.
 _Avoid_: sandbox, isolation
 
 **Remote task**:
@@ -156,8 +157,20 @@ The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed
 _Avoid_: Subscription login (t3flare holds none), OAuth, account
 
 **Container token**:
-A GitHub installation token for one Workspace's one repo, handed to git in its Container per command or on the credential helper's request; never stored there.
+A read-only GitHub installation token (code read, pull requests write) for one Workspace's one repo, handed to git in its Container per command or on the credential helper's request; never stored there. It cannot push (SPI-992).
 _Avoid_: repo token, deploy key
+
+**Push gateway**:
+Where every push from a Container goes (`computer.internal/t3flare/git/`, by the image's `pushInsteadOf`): the agents Worker parses the ref updates, asks the Workspace's policy (allow on an Expectation or an untainted Workspace, ask the owner on a thread, refuse) and forwards an allowed push to GitHub with a write token that never enters a Container.
+_Avoid_: git proxy, push proxy
+
+**Expectation**:
+The ref updates of a push t3 itself is about to run, registered by the process router before the command and matched by the Push gateway, so the owner's Commit & push never asks.
+_Avoid_: allowlist, pre-approval
+
+**Taint**:
+The Workspace's durable mark that it ran Linked work; while it stands, a push that matches no Expectation asks the owner. Cleared by the owner only.
+_Avoid_: dirty, compromised
 
 **Environment token**:
 The GitHub installation token t3's own PR features use, answered to `gh auth token`; it never reaches a Container or a Session.

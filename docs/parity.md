@@ -67,6 +67,7 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
 | Status, diff, commit, branch, push, pull, PR create | `ws.ts:3146-3223` | W (stale reads; automatic fetch off) | step-2a M2–M4; ADR-0009 | done |
+| Push (t3's and the agents') | same; agents' shells | W: through the push gateway; t3's pushes match an expectation, others ask while the Workspace is tainted by linked work; at most 100 MiB per push, no LFS upload | ADR-0013 (SPI-992 refinement); `docs/steps/spi-992.md` | done (SPI-992, SPI-1040) |
 | PR list, detail, checks, comment, review | `ws.ts:2787-2874` | W†/P: acts as the GitHub App, not the owner, by decision (D2) | Environment token (`packages/github-app/src/permissions.ts:39`); ADR-0013 (D2 refinement) | done (refusal of owner identity) |
 | Starred repos, publish a repo | `ws.ts:2884`, `:2951` | R for now (D2): need an owner token | ADR-0013 (D2 refinement); a token pasted into t3's settings still works | done (refusal) |
 | PR watch | `PullRequestWatchReactor` | P†: the alarm has no PR-watch source, so I infer it polls only while awake | `idle.ts` `nextDue` | *def* (webhook) G12 |

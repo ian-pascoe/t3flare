@@ -1624,7 +1624,7 @@ export class WorkspaceDO extends ContainerHost {
     const workspace = this.#workspaceId() ?? "";
     if (on.kind === "cli") {
       // SPI-1040 (M3): a CLI thread is asked through the Environment, which raises the card on that thread's live turn.
-      const card = pushCard({ updates, tips: facts.tips, defaultBranch: facts.defaultBranch, reported, linkLabel: on.linked ? "a linked environment" : null });
+      const card = pushCard({ updates, tips: facts.tips, defaultBranch: facts.defaultBranch, reported, linkLabel: on.linked ? "another environment" : null });
       const environment = environmentStub(this.env.ENVIRONMENT);
       this.#pushAsks.set(askId, () => environment.cancelPush({ askId }));
       try {

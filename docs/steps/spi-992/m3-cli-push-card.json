@@ -1,0 +1,162 @@
+{
+ "at": "2026-11-12T13:36:14.481Z",
+ "mode": "p5",
+ "stamp": "mwdlagvn",
+ "fixture": "ian-pascoe/t3flare-fixture",
+ "owner": {
+  "threadId": "7f7bf1d7-9716-462d-bdca-638b770277dd",
+  "answers": [
+   {
+    "title": "command",
+    "decision": "accept"
+   },
+   {
+    "title": "Allow git push?",
+    "decision": "acceptForSession",
+    "prompt": "create refs/heads/spi992/cli-owner-mwdlagvn → 97cb3b24\n\nThis Workspace ran work from a linked environment, so each push asks until you trust the Workspace again. Approve for the session to approve and trust this Workspace again.\nrefs/heads/spi992/cli-owner-mwdlagvn: GitHub does not have it; new 97cb3b24 — as reported by the Workspace: \"spi992 spi992/cli-owner-mwdlagvn\"",
+    "id": "runtime-request:claudeAgent:t3flare-push:a60f97b0-8c1e-41ce-80b7-65c2f2217ab8"
+   }
+  ],
+  "reply": "`* [new branch]      HEAD -> spi992/cli-owner-mwdlagvn`",
+  "head": "97cb3b24c6070641098db632e366ab54a6e7885d",
+  "remote": "97cb3b24c6070641098db632e366ab54a6e7885d",
+  "taintAfter": null
+ },
+ "linked": {
+  "threadId": "mcp:launch:01962e5b399fcba3ccd092a78f86ddbac060e29336a7b29f589d86d08eb49877",
+  "answers": [
+   {
+    "title": "",
+    "decision": "acceptForSession",
+    "at": 9958
+   },
+   {
+    "title": "Allow git push?",
+    "decision": "acceptForSession",
+    "at": 11996,
+    "summary": "create refs/heads/spi992/cli-linked-mwdlagvn → 66670744\n\nWork started from another environment through a linked environment wants to push to this project's repository. Each push asks.\nrefs/heads/spi992/cli-linked-mwdlagvn: GitHub does not have it; new 66670744 — as reported by the Workspace: \"spi992 spi992/cli-linked-mwdlagvn\""
+   }
+  ],
+  "reply": "The last output line was:\n\n` * [new branch]      HEAD -> spi992/cli-linked-mwdlagvn`",
+  "head": "666707442e4921922afb06df22d46c9fbedc2842",
+  "remote": "666707442e4921922afb06df22d46c9fbedc2842",
+  "taintAfter": {
+   "since": 1794490501018,
+   "by": [
+    "cli:mcp:launch:01962e5b399fcba3ccd092a78f86ddbac060e29336a7b29f589d86d08eb49877"
+   ]
+  }
+ },
+ "tools": {
+  "tools": [
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_environment_read",
+    "isError": false,
+    "text": "{\"environmentId\":\"22ee53bd-2bc5-4cab-9afe-94284134be79\",\"label\":\"t3flare\",\"serverVersion\":\"0.1.8\",\"platform\":{\"os\":\"linux\",\"arch\":\"x64\",\"machine\":\"cloud\"},\"preferences\":{\"newWorktreesStartFromOrigin\":"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_project_list",
+    "isError": false,
+    "text": "{\"projects\":[{\"id\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"t3flare-fixture (cloud)\",\"workspaceRoot\":\"/w/step3-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixtu"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_project_read",
+    "isError": false,
+    "text": "{\"id\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"t3flare-fixture (cloud)\",\"workspaceRoot\":\"/w/step3-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixture\",\"locator\""
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_thread_read",
+    "isError": false,
+    "text": "{\"thread\":{\"threadId\":\"mcp:launch:01962e5b399fcba3ccd092a78f86ddbac060e29336a7b29f589d86d08eb49877\",\"projectId\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"spi992 p5 mwdlagvn\",\"link\":\"[spi992 p5 m"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "list_thread_pull_requests",
+    "isError": false,
+    "text": "{\"pullRequests\":[],\"chains\":[]}"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_project_clone",
+    "isError": true,
+    "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}"
+   },
+   {
+    "link": "auto-accept-edits",
+    "tool": "t3_project_create",
+    "isError": true,
+    "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_environment_read",
+    "isError": false,
+    "text": "{\"environmentId\":\"22ee53bd-2bc5-4cab-9afe-94284134be79\",\"label\":\"t3flare\",\"serverVersion\":\"0.1.8\",\"platform\":{\"os\":\"linux\",\"arch\":\"x64\",\"machine\":\"cloud\"},\"preferences\":{\"newWorktreesStartFromOrigin\":"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_project_list",
+    "isError": false,
+    "text": "{\"projects\":[{\"id\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"t3flare-fixture (cloud)\",\"workspaceRoot\":\"/w/step3-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixtu"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_project_read",
+    "isError": false,
+    "text": "{\"id\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"t3flare-fixture (cloud)\",\"workspaceRoot\":\"/w/step3-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixture\",\"locator\""
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_thread_read",
+    "isError": false,
+    "text": "{\"thread\":{\"threadId\":\"mcp:launch:01962e5b399fcba3ccd092a78f86ddbac060e29336a7b29f589d86d08eb49877\",\"projectId\":\"2183c43d-5c70-4b54-b6a1-6f4c93453374\",\"title\":\"spi992 p5 mwdlagvn\",\"link\":\"[spi992 p5 m"
+   },
+   {
+    "link": "full-access",
+    "tool": "list_thread_pull_requests",
+    "isError": false,
+    "text": "{\"pullRequests\":[],\"chains\":[]}"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_project_clone",
+    "isError": false,
+    "text": "{\"cwd\":\"/w/p5-clone-full-access-mwdlagvn\",\"remoteUrl\":\"https://github.com/ian-pascoe/t3flare-fixture.git\",\"repository\":null}"
+   },
+   {
+    "link": "full-access",
+    "tool": "t3_project_create",
+    "isError": false,
+    "text": "{\"id\":\"6ed4c221-fa5c-45ea-a839-f68570549357\",\"title\":\"p5-made-full-access-mwdlagvn\",\"workspaceRoot\":\"/w/p5-made-full-access-mwdlagvn\",\"repositoryIdentity\":null,\"faviconPath\":null,\"projectIcon\":null,\"d"
+   }
+  ],
+  "gitCommands": [
+   "-c diff.suppressBlankEmpty=false diff --find-renames",
+   "config --get branch.spi992/cli-linked-mwdlagvn.remote",
+   "config --get remote.origin.url",
+   "clone --progress -- https://github.com/ian-pascoe/t3flare-fixture.git",
+   "config --get init.defaultBranch",
+   "init --initial-branch=main",
+   "-c core.safecrlf=false add --force",
+   "commit --message Initial commit"
+  ],
+  "pushes": [],
+  "expectations": []
+ },
+ "cleanup": [
+  {
+   "ref": "refs/heads/spi992/cli-owner-mwdlagvn",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/cli-linked-mwdlagvn",
+   "deleted": true
+  }
+ ],
+ "failures": [],
+ "ok": true
+}

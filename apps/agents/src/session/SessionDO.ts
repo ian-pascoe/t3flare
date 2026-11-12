@@ -281,7 +281,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (!input.linked && meta?.linked != null) return { approved: false, reason: "a linked thread cannot trust the Workspace" };
     if (turn === null) return { approved: false, reason: "no live turn to ask on" };
     const requestId = `push:${crypto.randomUUID()}`;
-    const card = pushCard({ updates: input.updates, tips: input.tips, defaultBranch: input.defaultBranch, reported: input.reported, linkLabel: input.linked ? (meta?.linked?.label ?? "a linked environment") : null });
+    const card = pushCard({ updates: input.updates, tips: input.tips, defaultBranch: input.defaultBranch, reported: input.reported, linkLabel: input.linked ? (meta?.linked?.label ?? "another environment") : null });
     const withdrawn = new AbortController();
     if (input.askId !== undefined) this.#pushAsks.set(input.askId, withdrawn);
     const context = withAbortSignal(AbortSignal.any([AbortSignal.timeout(PUSH_APPROVAL_MS), withdrawn.signal]), BACKGROUND_CONTEXT);

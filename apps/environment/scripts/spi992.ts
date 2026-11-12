@@ -445,29 +445,35 @@ if (mode === "p5") {
   check("p5 linked: approved, the push landed at the commit", remoteRef(linkedRef) === linkedHead && linkedHead.length === 40, out.linked);
   check("p5 linked: a linked card never trusts the Workspace (still tainted)", afterLinked?.taint !== null && afterLinked?.taint !== undefined, afterLinked);
 
-  // 3. Review M3: the link's allowed t3 tools that touch git register no push expectation.
+  // 3. Review M3: the allowed t3 tools that touch git, called by the auto-accept-edits link and by a full-access one
+  // (t3 lets only the latter change projects), register no push expectation and run no git push.
   await admin("GET", "/_t3flare/agents/router-trace?clear=1");
-  const tools: Array<{ tool: string; isError: boolean; text: string }> = [];
-  const t3 = async (tool: string, args: Record<string, unknown>) => {
-    const answer = await linked.mcp.call(tool, args).catch((error: unknown) => ({ isError: true, text: String(error), json: null }));
-    tools.push({ tool, isError: answer.isError === true, text: String(answer.text ?? "").slice(0, 200) });
+  const full = await signIn((await mintPairingCode(cookie, { label: `spi992 p5 full ${stamp}` })).code, "full-access", { clientName: `spi992 p5 full ${stamp}` });
+  const fullMcp = new McpClient(full.token, { modeLimit: "full-access/default" });
+  const tools: Array<{ link: string; tool: string; isError: boolean; text: string }> = [];
+  const t3 = async (client: McpClient, link: string, tool: string, args: Record<string, unknown>) => {
+    const answer = await client.call(tool, args).catch((error: unknown) => ({ isError: true, text: String(error), json: null }));
+    tools.push({ link, tool, isError: answer.isError === true, text: String(answer.text ?? "").slice(0, 200) });
     return answer;
   };
-  await t3("t3_environment_read", {});
-  await t3("t3_project_list", {});
-  await t3("t3_project_read", { projectId: fixture.projectId });
-  await t3("t3_project_clone", { destinationPath: `/w/p5-clone-${stamp}`, remoteUrl: `https://github.com/${FIXTURE}.git` });
-  const made = await t3("t3_project_create", { title: `p5-made-${stamp}` });
-  await t3("t3_thread_read", { threadId: linked.threadId });
-  await t3("list_thread_pull_requests", { threadId: linked.threadId });
-  const madeId = (made as any).json?.projectId ?? (made as any).json?.project?.id;
-  if (typeof madeId === "string") await t3("t3_project_delete", { projectId: madeId });
+  for (const [client, link] of [[linked.mcp, "auto-accept-edits"], [fullMcp, "full-access"]] as const) {
+    await t3(client, link, "t3_environment_read", {});
+    await t3(client, link, "t3_project_list", {});
+    await t3(client, link, "t3_project_read", { projectId: fixture.projectId });
+    await t3(client, link, "t3_thread_read", { threadId: linked.threadId });
+    await t3(client, link, "list_thread_pull_requests", { threadId: linked.threadId });
+    await t3(client, link, "t3_project_clone", { destinationPath: `/w/p5-clone-${link}-${stamp}`, remoteUrl: `https://github.com/${FIXTURE}.git` });
+    const made = await t3(client, link, "t3_project_create", { title: `p5-made-${link}-${stamp}` });
+    const madeId = (made as any).json?.projectId ?? (made as any).json?.project?.id;
+    if (typeof madeId === "string") await t3(client, link, "t3_project_delete", { projectId: madeId });
+  }
   const trace = ((await admin("GET", "/_t3flare/agents/router-trace")).json?.entries ?? []) as Array<any>;
   const pushes = trace.filter((entry) => entry.command === "git" && (entry.argv ?? []).includes("push"));
   const state = (await call({ probePush: {} }))?.result;
-  out.tools = { tools, gitCommands: trace.filter((entry) => entry.command === "git").map((entry) => (entry.argv ?? []).slice(0, 4).join(" ")).slice(0, 40), pushes, expectations: state?.expectations ?? null };
-  check("p5 tools: the link's t3 tools ran (clone and create among them)", tools.filter((t) => !t.isError).length >= 5, tools);
-  check("p5 tools: none of them ran a git push or registered a push expectation", pushes.length === 0 && Array.isArray(state?.expectations) && state.expectations.length === 0, out.tools);
+  out.tools = { tools, gitCommands: trace.filter((entry) => entry.command === "git").map((entry) => (entry.argv ?? []).slice(0, 4).join(" ")).slice(0, 60), pushes, expectations: state?.expectations ?? null };
+  const ran = (tool: string) => tools.some((t) => t.link === "full-access" && t.tool === tool && !t.isError);
+  check("p5 tools: the full-access link's clone and create ran (the git-touching tools)", ran("t3_project_clone") && ran("t3_project_create"), tools);
+  check("p5 tools: none of the tools ran a git push or registered a push expectation", pushes.length === 0 && Array.isArray(state?.expectations) && state.expectations.length === 0, out.tools);
   await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
 }
 
