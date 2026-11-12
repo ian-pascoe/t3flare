@@ -798,7 +798,7 @@ bump job's run on the branch (`gh workflow run bump.yml --ref step-4a`) with the
 | R11 | A CLI calls a vendor host by default (update checks, telemetry, ChatGPT-only features) | P10 | settings fixed in profiles and pinned by tests |
 | R12 | The adapters' bundle or boot breaks in workerd | P6 | a counted shim or Shadow |
 | R13 | t3 cannot take a request injected beside a CLI's own (D1 for CLIs) | M6 | refuse linked CLI pushes, reported |
-| R14 | t3 moves its Codex or Pi internals under our registrations | the bump's typecheck, `test:docker`, `--codex`/`--pi` | fragility entries U28–U31 (§13) |
+| R14 | t3 moves its Codex or Pi internals under our registrations | the bump's typecheck, `test:docker`, `--codex`/`--pi` | fragility entries U29–U32 (§13) |
 | R15 | A cold Container start under t3's open timeouts | P7 | spawn returns only once the process runs; if `initialize` still times out, the open is retried once by the wrapper |
 
 ## 11. Documents
@@ -810,7 +810,7 @@ bump job's run on the branch (`gh workflow run bump.yml --ref step-4a`) with the
 - **ADR-0001** counts (Shadows 2; Patches 2 or 3).
 - `docs/parity.md`: Codex and Pi CLI rows → W; provider settings for CLIs P (launch args ignored); t3's tools for CLI
   agents M (ticket).
-- `docs/upstream-fragility.md`: U28–U31 (§13), and the bump table's rows for `test:docker` and the compatibility test.
+- `docs/upstream-fragility.md`: U29–U32 (§13), and the bump table's rows for `test:docker` and the compatibility test.
 - `docs/model-proxy.md` (§M2), `docs/cost.md` (CLI holds; F3 waits for CLI data), `README.md` (status, the second
   key), `GLOSSARY.md` (**Process channel**, **CLI profile**, **Key helper**).
 - `docs/steps/step-4a.md`: the report.
@@ -838,16 +838,16 @@ Actions:
 
 ## 13. Upstream fragility, new entries
 
-- **U28. Our Codex registration and client factory.** Restates `layerAppServerClientFactory`; calls
+- **U29. Our Codex registration and client factory.** Restates `layerAppServerClientFactory`; calls
   `createCodexAdapterV2`, `codexAppServerArgs`, `codexAppServerEnvironment`; rewrites `turn/start` and `thread/*`
   params by name. Breaks on a renamed export (typecheck), a new spawn-time requirement, or new param names (silent:
   the guard must fail closed on a `turn/start` it cannot read, by refusing it). Detection: typecheck, the replay test,
   `--codex`.
-- **U29. Our Pi registration, the extension bridge and `processGroup.ts`.** Relies on `buildPiRpcLaunch`'s argv and env
+- **U30. Our Pi registration, the extension bridge and `processGroup.ts`.** Relies on `buildPiRpcLaunch`'s argv and env
   names, `PI_T3_MCP_EXTENSION_SOURCE`, the extension's mode variable, `rpc.ts` signalling through
   `signalProcessGroup`. Breaks when t3 renames them or stops importing the module (silent: the Shadow would not
   apply; T5's build report asserts it does). Detection: the content check refuses spawns; `--pi`.
-- **U30. CLI versions against t3's compatibility manifest.** A nightly raising a minimum fails the bump's test.
-- **U31. The CLIs' own configuration surfaces.** Codex `-c` keys, the provider `auth` command, pi's `models.json`
+- **U31. CLI versions against t3's compatibility manifest.** A nightly raising a minimum fails the bump's test.
+- **U32. The CLIs' own configuration surfaces.** Codex `-c` keys, the provider `auth` command, pi's `models.json`
   and environment variables move with the CLI versions in `clis.ts`, not with t3: re-run `test:docker` and P10's egress
   check on every CLI bump.

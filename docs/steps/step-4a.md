@@ -118,7 +118,7 @@ the step4a row was told apart by its URL.
 ## Counts (ADR-0001)
 
 Shadows: 2 (`shadows/processGroup.ts`, `shadows/builtInDrivers.ts` registering Codex and Pi through the wrapper).
-Patches: 3 (0003 is new: `provider-session-idle-10-minutes`). Upstream fragility entries U28–U31 added.
+Patches: 3 (0003 is new: `provider-session-idle-10-minutes`). Upstream fragility entries U29–U32 added (after main's U28, T3 Connect).
 
 ## Tickets
 

@@ -1,5 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off
-// The CLI manifest (step 4a, plan §6; fragility U30): the image installs exactly the versions `clis.ts` names, and each
+// The CLI manifest (step 4a, plan §6; fragility U31): the image installs exactly the versions `clis.ts` names, and each
 // satisfies t3's own compatibility rules at the pin. A nightly that raises a minimum fails here: bump the CLI in
 // apps/sandbox-image/src/clis.ts (and the Dockerfile, and image/cli's lock).
 import * as fs from "node:fs";
