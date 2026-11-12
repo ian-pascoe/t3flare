@@ -391,6 +391,31 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return this.#mcpHost;
   }
 
+  /**
+   * The MCP servers' secrets, for the leak checks only (`/_t3flare/check/peer-leak`, which answers names, never values):
+   * each direct server's header value, OAuth access and refresh tokens and registered client secret.
+   */
+  mcpLeakSecrets(): Array<{ readonly name: string; readonly value: string }> {
+    const secrets = harnessSecrets(this.ctx.storage.kv);
+    const found: Array<{ name: string; value: string }> = [];
+    const parsed = (text: string | undefined): Record<string, unknown> => {
+      try {
+        return text === undefined ? {} : (JSON.parse(text) as Record<string, unknown>);
+      } catch {
+        return {};
+      }
+    };
+    for (const server of Object.keys(this.mcpHost.servers())) {
+      const header = secrets.read(server, "header");
+      if (header !== undefined) found.push({ name: `mcp-header:${server}`, value: header });
+      const tokens = parsed(secrets.read(server, "oauth-tokens"));
+      for (const field of ["access", "refresh"]) if (typeof tokens[field] === "string") found.push({ name: `mcp-oauth-${field}:${server}`, value: tokens[field] });
+      const client = parsed(secrets.read(server, "oauth-client"));
+      if (typeof client.client_secret === "string") found.push({ name: `mcp-oauth-client-secret:${server}`, value: client.client_secret });
+    }
+    return found;
+  }
+
   /** The MCP tools a Session may install (ADR-0028), from kept inventories. Never boots t3. */
   async mcpView(input: { readonly linked: boolean }): Promise<McpView> {
     return this.mcpHost.view(input);

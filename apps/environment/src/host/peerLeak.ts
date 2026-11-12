@@ -15,7 +15,9 @@ const CONTAINER_DUMP = [
   "{",
   'echo "== env"; env;',
   'for f in /proc/[0-9]*/environ; do echo "== $f"; tr "\\0" "\\n" < "$f"; done;',
-  "find /workspace /tmp /root /home -xdev -type f -size -1M -not -path '*/.git/objects/*' 2>/dev/null | head -5000 |",
+  // Tools step: command lines too (a key on argv), and the CLIs' managed configuration (MCP entries).
+  'for f in /proc/[0-9]*/cmdline; do echo "== $f"; tr "\\0" " " < "$f"; echo; done;',
+  "find /workspace /tmp /root /home /etc/claude-code /etc/opencode /etc/codex -xdev -type f -size -1M -not -path '*/.git/objects/*' 2>/dev/null | head -5000 |",
   '  while read -r f; do echo "== $f"; cat "$f"; done;',
   "} 2>/dev/null | head -c 33554432",
 ].join(" ");
@@ -67,7 +69,7 @@ export const leakedIn = (text: string, secrets: ReadonlyArray<Secret>): Array<st
 
 export const peerLeakCheck = async (
   environment: EnvironmentDO,
-  input: { readonly workspace: string; readonly threads: ReadonlyArray<string>; readonly extra?: ReadonlyArray<Secret> },
+  input: { readonly workspace: string; readonly threads: ReadonlyArray<string>; readonly extra?: ReadonlyArray<Secret>; readonly text?: string },
 ) => {
   const env = (environment as unknown as { readonly env: Record<string, unknown> }).env;
   const secrets: Array<Secret> = [];
@@ -82,6 +84,8 @@ export const peerLeakCheck = async (
     credentials.push(threadId);
     secrets.push({ name: `t3-mcp-credential:${threadId}`, value: config.authorizationHeader.replace(/^Bearer\s+/i, "") });
   }
+  // Tools step (ADR-0028): the direct servers' header values, OAuth tokens and client secrets.
+  secrets.push(...environment.mcpLeakSecrets());
   for (const extra of input.extra ?? []) if (extra.value.length >= 8) secrets.push(extra);
   const dump = await workspaceRpc(input.workspace).exec({ script: CONTAINER_DUMP, timeoutMs: 120_000 });
   const sessions: Array<{ readonly thread: string; readonly bytes: number; readonly leaked: Array<string> }> = [];
@@ -91,11 +95,14 @@ export const peerLeakCheck = async (
     sessions.push({ thread: threadId, bytes: text.length, leaked: leakedIn(text, secrets) });
   }
   const container = { exitCode: dump.exitCode, bytes: dump.stdout.length, files: (dump.stdout.match(/^== \//gm) ?? []).length, leaked: leakedIn(dump.stdout, secrets) };
+  // Text the caller collected (Workers Logs from `wrangler tail`, a capture endpoint's log), compared here.
+  const text = input.text === undefined ? undefined : { bytes: input.text.length, leaked: leakedIn(input.text, secrets) };
   return {
     checked: secrets.map(({ name }) => name).toSorted(),
     credentialsFound: credentials.length,
     container,
     sessions,
-    leaked: container.leaked.length + sessions.reduce((sum, s) => sum + s.leaked.length, 0),
+    ...(text === undefined ? {} : { text }),
+    leaked: container.leaked.length + sessions.reduce((sum, s) => sum + s.leaked.length, 0) + (text?.leaked.length ?? 0),
   };
 };

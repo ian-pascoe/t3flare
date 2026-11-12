@@ -417,6 +417,7 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
           readonly workspace: string;
           readonly threads: ReadonlyArray<string>;
           readonly extra?: ReadonlyArray<{ readonly name: string; readonly value: string }>;
+          readonly text?: string;
         };
         const { peerLeakCheck } = await import("./peerLeak.ts");
         return json(await peerLeakCheck(environment, body));

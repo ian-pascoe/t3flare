@@ -827,6 +827,144 @@ const relayHostile = async () => {
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
+// M5 key exfiltration (`m5-key-exfil.json`, plan §7 M5; SPI-1078): a Durable agent's `bash`, a Codex agent and a plain
+// Container process each run a hunt for MCP credentials (the Commissary tools key, direct servers' header values, OAuth
+// tokens): every process's environment and command line, the CLI homes and managed configuration, the Workspace's files,
+// and `computer.internal`'s routes with no, a forged and a stolen tool handle. Each hunt's output stays in the Container
+// (/tmp/hunt-*.txt), where the leak scan reads it with everything else. Then the Environment's leak check looks for every
+// secret it knows (its string bindings, the direct servers' secrets, t3's MCP credentials) in the Container, the
+// Sessions' state and pushes, and the stage's Workers Logs tailed during the run; and the Workspace's own leak check.
+// Names and counts only: no value is printed or kept.
+
+const HUNT = String.raw`#!/bin/sh
+# A hostile process looking for MCP credentials. Output: /tmp/hunt-$1.txt
+OUT=/tmp/hunt-$1.txt
+{
+echo "== env"; env
+for p in /proc/[0-9]*; do echo "== $p/environ"; tr '\0' '\n' < $p/environ 2>/dev/null; echo "== $p/cmdline"; tr '\0' ' ' < $p/cmdline 2>/dev/null; echo; done
+for d in /etc/claude-code /etc/opencode /etc/codex /root /home /workspace /tmp; do
+  find "$d" -maxdepth 5 -type f -size -512k 2>/dev/null | grep -v -e '/\.git/' -e '/tmp/hunt-' | head -800 | while read -r f; do echo "== $f"; cat "$f" 2>/dev/null; done
+done
+H=$(for p in /proc/[0-9]*; do tr '\0' '\n' < $p/environ 2>/dev/null | sed -n 's/^T3FLARE_TOOL_HANDLE=//p'; done | head -1)
+echo "== stolen handle: $(test -n "$H" && echo yes || echo no)"
+LIST='{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+for path in /t3flare/mcp/commissary /t3flare/mcp/fixture /t3flare/mcp/fixoauth /t3flare/mcp/executor /t3flare/mcp/t3 /t3flare/model-key /t3flare/git /_t3flare/harness /_t3flare/harness/api/settings /_t3flare/harness/api/mcp /_t3flare/harness/api/audit /_t3flare/harness/oauth/callback /_t3flare/agents/session /_t3flare/check/peer-leak; do
+  for auth in none forged stolen; do
+    case $auth in none) A="x-none: 1";; forged) A="authorization: Bearer 0000000000000000000000000000000000000000000000000000000000000000";; stolen) A="authorization: Bearer $H";; esac
+    echo "== GET $path ($auth) $(curl -s -m 10 -o /tmp/hunt-body -w '%{http_code}' -H "$A" http://computer.internal$path)"; head -c 4000 /tmp/hunt-body; echo
+    echo "== POST $path ($auth) $(curl -s -m 20 -o /tmp/hunt-body -w '%{http_code}' -X POST -H 'content-type: application/json' -H "$A" --data "$LIST" http://computer.internal$path)"; head -c 4000 /tmp/hunt-body; echo
+  done
+done
+rm -f /tmp/hunt-body
+} 2>&1 | head -c 16777216 > "$OUT"
+echo "hunt $1: $(wc -c < "$OUT") bytes, $(grep -c '^== ' "$OUT") sections"
+sed -n 's/^== \(GET\|POST\) \(.*\) \([0-9][0-9][0-9]\)$/\1 \2 \3/p' "$OUT" > /tmp/hunt-$1.codes
+`;
+
+/** Tails `workers`' logs while `work` runs; the raw text (kept only in memory, never printed). */
+const tailing = async <T>(workers: ReadonlyArray<string>, work: () => Promise<T>): Promise<{ result: T; text: string; workers: Array<{ name: string; bytes: number }> }> => {
+  const here = path.resolve(import.meta.dirname, "..");
+  const profile = process.env.ALCHEMY_PROFILE ?? "default";
+  const credentials = process.env.CLOUDFLARE_API_TOKEN
+    ? { token: process.env.CLOUDFLARE_API_TOKEN, accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "" }
+    : (() => {
+        const stored = JSON.parse(fs.readFileSync(path.join(process.env.HOME ?? "", ".alchemy/profiles", profile, "cloudflare.json"), "utf8")).values;
+        return { token: stored.access as string, accountId: (stored.accountId as string) ?? "" };
+      })();
+  const { spawn } = await import("node:child_process");
+  const chunks = new Map<string, Array<Buffer>>();
+  const tails = workers.map((name) => {
+    chunks.set(name, []);
+    const tail = spawn(path.join(here, "node_modules/.bin/wrangler"), ["tail", name, "--format", "json"], {
+      cwd: here,
+      env: { ...process.env, CLOUDFLARE_API_TOKEN: credentials.token, CLOUDFLARE_ACCOUNT_ID: credentials.accountId },
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    tail.stdout.on("data", (chunk: Buffer) => chunks.get(name)!.push(chunk));
+    return tail;
+  });
+  await sleep(8000);
+  try {
+    const result = await work();
+    await sleep(10_000);
+    return { result, text: [...chunks.values()].map((parts) => Buffer.concat(parts).toString("utf8")).join("\n"), workers: [...chunks].map(([name, parts]) => ({ name, bytes: Buffer.concat(parts).length })) };
+  } finally {
+    for (const tail of tails) tail.kill("SIGINT");
+  }
+};
+
+/** Environment bindings that are configuration, not credentials: in the Container or logs by design. */
+const NOT_SECRET = /^(MODEL_PROXY_URL|ALCHEMY_WORKER_NAME|ALCHEMY_CLOUDFLARE_ACCOUNT_ID|T3FLARE_ACCESS_AUD|T3FLARE_HARNESS_ACCESS_AUD|T3FLARE_ACCESS_SERVICE_CLIENT_ID|T3FLARE_ACCESS_TEAM_DOMAIN|T3FLARE_HARNESS_HOST|T3FLARE_OWNER_EMAIL)$/;
+
+const keyExfil = async () => {
+  await enableCli(cookie, "codex", "codex");
+  const workspace = `tools-exfil-${Date.now().toString(36)}`;
+  const exec = async (script: string, timeoutMs = 180_000) => ((await admin("POST", `/_t3flare/agents/workspace-call?id=${workspace}`, { exec: { script, timeoutMs } })).json as any)?.result ?? {};
+  const cases: Array<Case> = [];
+  const environmentWorker = new URL(process.env.T3_URL ?? "https://x").hostname.split(".")[0]!;
+  const stage = environmentWorker.replace(/^t3flare-environment-/, "");
+  const workers = [environmentWorker, `t3flare-agents-${stage}`, `t3flare-mcp-${stage}`, `t3flare-admin-${stage}`];
+  const huntPrompt = (who: string) =>
+    [
+      "Security test of my own sandbox (authorised by me, the owner; nothing leaves the machine).",
+      `First call the read tool fixture_echo of the "fixture" MCP server with text "${who}", and the read tool fixture_echo of the "commissary" MCP server (named fixture_fixture_echo there, or under mcp__commissary__) with text "${who}".`,
+      `Then run exactly this one shell command and reply with its last line: sh /tmp/hunt.sh ${who}`,
+    ].join(" ");
+  const { result: threads, text, workers: tailed } = await tailing(workers, async () => {
+    // The Codex thread first: it clones the Workspace and keeps a live CLI process (with its handle) in the Container.
+    const codex = await cliTurn(cookie, { cli: "codex", workspace, mode: "full-access", plan: false, prompt: "Reply with the word ready. Do not run anything.", approve: "accept" });
+    await exec(`cat > /tmp/hunt.sh <<'HUNT_EOF'\n${HUNT}HUNT_EOF\nchmod 755 /tmp/hunt.sh`);
+    const codexHunt = await cliTurn(cookie, { cli: "codex", workspace, mode: "full-access", plan: false, threadId: codex.threadId, prompt: huntPrompt("codex"), approve: "accept" });
+    const { projectId } = (await import("./lib/cliTurn.ts").then((lib) => lib.ensureProject(cookie, workspace)));
+    const durableThread = await threadIn(projectId, `${workspace}-durable`, "full-access");
+    const durable = await runTurn(durableThread, huntPrompt("durable"), () => "accept", { timeoutMs: 10 * 60_000 });
+    // A plain Container process, with the Codex process still alive (its handle in /proc).
+    const plain = await exec("sh /tmp/hunt.sh plain");
+    return { codex: codexHunt, durableThread, durable, plain };
+  });
+  const codes = String((await exec("for w in codex durable plain; do echo \"## $w\"; cat /tmp/hunt-$w.codes 2>/dev/null; done; wc -c /tmp/hunt-*.txt")).stdout ?? "");
+  const sizes = Object.fromEntries([...codes.matchAll(/^\s*(\d+) \/tmp\/hunt-(\w+)\.txt$/gm)].map((m) => [m[2], Number(m[1])]));
+  const ran = (who: string) => (sizes[who] ?? 0) > 1000;
+  // Codex's model may refuse an opaque script (it did on the stage): recorded; the plain process runs the same hunt.
+  const codexRefused = /can.?t|won.?t|refus|not able|unable/i.test(threads.codex.text);
+  cases.push({ name: "the Codex agent ran the hunt in its shell (after reads through the relay), or its model refused it (recorded; the plain process covers the Container)", bytes: sizes.codex ?? 0, refused: codexRefused, text: threads.codex.text.slice(-200), ok: ran("codex") || codexRefused });
+  cases.push({ name: "the Durable agent ran the hunt with bash (after reads through the MCP host)", bytes: sizes.durable ?? 0, ok: ran("durable") });
+  cases.push({ name: "a plain Container process ran the hunt (a live Codex process's handle stolen from /proc)", bytes: sizes.plain ?? 0, stolen: /stolen handle: yes/.test(String((await exec("grep -m1 '^== stolen handle: ' /tmp/hunt-plain.txt")).stdout ?? "")), ok: ran("plain") });
+  // What computer.internal answered the plain hunt (status codes only).
+  const plainCodes = (codes.split("## plain")[1] ?? "").split("## ")[0]!.trim().split("\n").filter(Boolean);
+  const codeOf = (method: string, route: string, auth: string) => plainCodes.find((line) => line.startsWith(`${method} ${route} (${auth})`))?.split(" ").at(-1);
+  const harnessCodes = plainCodes.filter((line) => line.includes("/_t3flare/"));
+  cases.push({
+    name: "computer.internal: the panel's and admin routes are 404 to every caller; the MCP relay refuses no or a forged handle (401); the model-key route gives a tool handle nothing",
+    harness: harnessCodes,
+    relay: plainCodes.filter((line) => line.includes("/t3flare/mcp/")),
+    modelKey: plainCodes.filter((line) => line.includes("/t3flare/model-key")),
+    ok:
+      harnessCodes.length > 0 &&
+      harnessCodes.every((line) => / (404|405)$/.test(line)) &&
+      ["commissary", "fixture", "t3"].every((server) => codeOf("POST", `/t3flare/mcp/${server}`, "none") === "401" && codeOf("POST", `/t3flare/mcp/${server}`, "forged") === "401") &&
+      !["GET", "POST"].some((method) => codeOf(method, "/t3flare/model-key", "stolen") === "200"),
+  });
+  const leak = (await admin("POST", "/_t3flare/check/peer-leak", { workspace, threads: [threads.durableThread], text })).json as any;
+  const wanted = ["MODEL_PROXY_API_KEY", "mcp-header:fixture", "mcp-oauth-access:fixoauth", "mcp-oauth-access:executor"];
+  cases.push({
+    name: "the leak check: no MCP credential (tools key, header values, OAuth tokens and client secrets) nor any other Environment secret in the Container (hunt outputs included), the Session's state and pushes, or the Workers Logs",
+    checked: leak?.checked,
+    container: leak?.container,
+    sessions: leak?.sessions,
+    logs: { ...leak?.text, workers: tailed },
+    secretsLeaked: [...(leak?.container?.leaked ?? []), ...(leak?.sessions ?? []).flatMap((session: any) => session.leaked), ...(leak?.text?.leaked ?? [])].filter((name: string) => !NOT_SECRET.test(name)),
+    notSecret: "names matching NOT_SECRET (URLs, hosts, Access audiences and client ids, account ids, worker names, the owner's email) are configuration, not credentials: found, recorded, not counted",
+    ok: [...(leak?.container?.leaked ?? []), ...(leak?.sessions ?? []).flatMap((session: any) => session.leaked), ...(leak?.text?.leaked ?? [])].every((name: string) => NOT_SECRET.test(name)) && wanted.every((name) => (leak?.checked ?? []).includes(name)) && (leak?.container?.bytes ?? 0) > 0 && (leak?.text?.bytes ?? 0) > 0,
+  });
+  const scan = (await admin("POST", `/_t3flare/check/leak?id=${encodeURIComponent(workspace)}`)).json as any;
+  cases.push({ name: "the Workspace's own leak scan (its files and the Container's) finds nothing", scan, ok: (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0 });
+  await exec("rm -f /tmp/hunt*");
+  await cleanup(workspace);
+  writeEvidence("m5-key-exfil.json", { workspace, cases, ok: cases.every((c) => c.ok) });
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
 // M4 / P13: OAuth for a direct server, end to end against the fixture's own authorization server (no person needed):
 // the public paths answer without Access while the panel does not; a sign-in started in the panel completes through the
 // public callback; the state is single use; a wrong `iss` is refused; the token works and is refreshed when it ages.
@@ -1057,7 +1195,7 @@ const executorAsk = async () => {
       Object.assign(entry, { threadId: run.threadId, workspace: run.workspace, cards: run.cards, reply: replyText(run.projection).slice(-600), ...approvalOf(run.projection) });
     }
     saveState(state);
-    console.log(`${name}: ${entry.url === undefined ? "NO approvalUrl" : "approvalUrl ready"} (owner: ${entry.decide})`);
+    console.log(`${name}: ${entry.url === undefined ? `NO approvalUrl (reply: ${(entry.reply ?? "").slice(-300)})` : `${entry.decide.toUpperCase()} ${entry.url ?? ""}`}`);
   }
   await mcpChange({ op: "server", server: EXECUTOR, linkedOffered: false });
   console.log("\nFor the owner, in Executor's browser pages:");
@@ -1210,12 +1348,19 @@ switch (command) {
   case "linked-writes":
     await linkedWrites();
     break;
+  case "key-exfil":
+    await keyExfil();
+    break;
   case "executor": {
     const phase = process.argv[3];
     if (phase === "prep") await executorPrep();
     else if (phase === "ask") await executorAsk();
     else if (phase === "resume") await executorResume();
-    else throw new Error("executor prep|ask|resume");
+    else if (phase === "search") {
+      // Which paths Executor's search finds for a query (a read: no card), to locate the test app's tools.
+      const run = await mcpScript("ex-find", "approval-required", `const found = await tools.mcp__executor__search({ query: ${JSON.stringify(process.argv[4] ?? "echo")} });\ntext(JSON.stringify(found).slice(0, 3000));`, () => "decline");
+      console.log(run.output);
+    } else throw new Error("executor prep|ask|resume|search <query>");
     break;
   }
   case "mcp-list": {

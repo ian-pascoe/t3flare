@@ -1,0 +1,196 @@
+{
+ "at": "2026-11-12T19:35:31.769Z",
+ "workspace": "tools-exfil-mwdy4z1l",
+ "cases": [
+  {
+   "name": "the Codex agent ran the hunt in its shell (after reads through the relay), or its model refused it (recorded; the plain process covers the Container)",
+   "bytes": 0,
+   "text": "Both fixture echo calls returned `codex`. I can\u2019t run the opaque `/tmp/hunt.sh` script.",
+   "ok": true,
+   "refused": true
+  },
+  {
+   "name": "the Durable agent ran the hunt with bash (after reads through the MCP host)",
+   "bytes": 1675670,
+   "ok": true
+  },
+  {
+   "name": "a plain Container process ran the hunt (a live Codex process's handle stolen from /proc)",
+   "bytes": 1679705,
+   "stolen": false,
+   "ok": true,
+   "note": "no live CLI process held a handle when the plain hunt ran (stolen=false); the stolen-handle path is m5-relay-hostile.json's"
+  },
+  {
+   "name": "computer.internal: the panel's and admin routes are 404 to every caller; the MCP relay refuses no or a forged handle (401); the model-key route gives a tool handle nothing",
+   "harness": [
+    "GET /_t3flare/harness (none) 404",
+    "POST /_t3flare/harness (none) 404",
+    "GET /_t3flare/harness (forged) 404",
+    "POST /_t3flare/harness (forged) 404",
+    "GET /_t3flare/harness (stolen) 404",
+    "POST /_t3flare/harness (stolen) 404",
+    "GET /_t3flare/harness/api/settings (none) 404",
+    "POST /_t3flare/harness/api/settings (none) 404",
+    "GET /_t3flare/harness/api/settings (forged) 404",
+    "POST /_t3flare/harness/api/settings (forged) 404",
+    "GET /_t3flare/harness/api/settings (stolen) 404",
+    "POST /_t3flare/harness/api/settings (stolen) 404",
+    "GET /_t3flare/harness/api/mcp (none) 404",
+    "POST /_t3flare/harness/api/mcp (none) 404",
+    "GET /_t3flare/harness/api/mcp (forged) 404",
+    "POST /_t3flare/harness/api/mcp (forged) 404",
+    "GET /_t3flare/harness/api/mcp (stolen) 404",
+    "POST /_t3flare/harness/api/mcp (stolen) 404",
+    "GET /_t3flare/harness/api/audit (none) 404",
+    "POST /_t3flare/harness/api/audit (none) 404",
+    "GET /_t3flare/harness/api/audit (forged) 404",
+    "POST /_t3flare/harness/api/audit (forged) 404",
+    "GET /_t3flare/harness/api/audit (stolen) 404",
+    "POST /_t3flare/harness/api/audit (stolen) 404",
+    "GET /_t3flare/harness/oauth/callback (none) 404",
+    "POST /_t3flare/harness/oauth/callback (none) 404",
+    "GET /_t3flare/harness/oauth/callback (forged) 404",
+    "POST /_t3flare/harness/oauth/callback (forged) 404",
+    "GET /_t3flare/harness/oauth/callback (stolen) 404",
+    "POST /_t3flare/harness/oauth/callback (stolen) 404",
+    "GET /_t3flare/agents/session (none) 404",
+    "POST /_t3flare/agents/session (none) 404",
+    "GET /_t3flare/agents/session (forged) 404",
+    "POST /_t3flare/agents/session (forged) 404",
+    "GET /_t3flare/agents/session (stolen) 404",
+    "POST /_t3flare/agents/session (stolen) 404",
+    "GET /_t3flare/check/peer-leak (none) 404",
+    "POST /_t3flare/check/peer-leak (none) 404",
+    "GET /_t3flare/check/peer-leak (forged) 404",
+    "POST /_t3flare/check/peer-leak (forged) 404",
+    "GET /_t3flare/check/peer-leak (stolen) 404",
+    "POST /_t3flare/check/peer-leak (stolen) 404"
+   ],
+   "relay": [
+    "GET /t3flare/mcp/commissary (none) 405",
+    "POST /t3flare/mcp/commissary (none) 401",
+    "GET /t3flare/mcp/commissary (forged) 405",
+    "POST /t3flare/mcp/commissary (forged) 401",
+    "GET /t3flare/mcp/commissary (stolen) 405",
+    "POST /t3flare/mcp/commissary (stolen) 200",
+    "GET /t3flare/mcp/fixture (none) 405",
+    "POST /t3flare/mcp/fixture (none) 401",
+    "GET /t3flare/mcp/fixture (forged) 405",
+    "POST /t3flare/mcp/fixture (forged) 401",
+    "GET /t3flare/mcp/fixture (stolen) 405",
+    "POST /t3flare/mcp/fixture (stolen) 200",
+    "GET /t3flare/mcp/fixoauth (none) 405",
+    "POST /t3flare/mcp/fixoauth (none) 401",
+    "GET /t3flare/mcp/fixoauth (forged) 405",
+    "POST /t3flare/mcp/fixoauth (forged) 401",
+    "GET /t3flare/mcp/fixoauth (stolen) 405",
+    "POST /t3flare/mcp/fixoauth (stolen) 200",
+    "GET /t3flare/mcp/executor (none) 405",
+    "POST /t3flare/mcp/executor (none) 401",
+    "GET /t3flare/mcp/executor (forged) 405",
+    "POST /t3flare/mcp/executor (forged) 401",
+    "GET /t3flare/mcp/executor (stolen) 405",
+    "POST /t3flare/mcp/executor (stolen) 200",
+    "GET /t3flare/mcp/t3 (none) 405",
+    "POST /t3flare/mcp/t3 (none) 401",
+    "GET /t3flare/mcp/t3 (forged) 405",
+    "POST /t3flare/mcp/t3 (forged) 401",
+    "GET /t3flare/mcp/t3 (stolen) 405",
+    "POST /t3flare/mcp/t3 (stolen) 200"
+   ],
+   "modelKey": [
+    "GET /t3flare/model-key (none) 403",
+    "POST /t3flare/model-key (none) 403",
+    "GET /t3flare/model-key (forged) 403",
+    "POST /t3flare/model-key (forged) 403",
+    "GET /t3flare/model-key (stolen) 403",
+    "POST /t3flare/model-key (stolen) 403"
+   ],
+   "ok": true
+  },
+  {
+   "name": "the leak check: no MCP credential (tools key, header values, OAuth tokens and client secrets) nor any other Environment secret in the Container (hunt outputs included), the Session's state and pushes, or the Workers Logs",
+   "checked": [
+    "ALCHEMY_CLOUDFLARE_ACCOUNT_ID",
+    "ALCHEMY_WORKER_NAME",
+    "MODEL_PROXY_API_KEY",
+    "MODEL_PROXY_URL",
+    "T3FLARE_ACCESS_AUD",
+    "T3FLARE_ACCESS_SERVICE_CLIENT_ID",
+    "T3FLARE_ACCESS_TEAM_DOMAIN",
+    "T3FLARE_ADMIN_TOKEN",
+    "T3FLARE_GITHUB_APP_PRIVATE_KEY",
+    "T3FLARE_HARNESS_ACCESS_AUD",
+    "T3FLARE_HARNESS_HOST",
+    "T3FLARE_OWNER_EMAIL",
+    "T3_BOOTSTRAP_TOKEN",
+    "github-token-0",
+    "mcp-header:fixture",
+    "mcp-oauth-access:executor",
+    "mcp-oauth-access:fixoauth",
+    "mcp-oauth-refresh:executor",
+    "mcp-oauth-refresh:fixoauth",
+    "t3-mcp-credential:31a82913-5d56-4cfb-85fe-c20d756fb328"
+   ],
+   "container": {
+    "exitCode": 0,
+    "bytes": 28323,
+    "files": 28,
+    "leaked": [
+     "MODEL_PROXY_URL"
+    ]
+   },
+   "sessions": [
+    {
+     "thread": "31a82913-5d56-4cfb-85fe-c20d756fb328",
+     "bytes": 7665,
+     "leaked": []
+    }
+   ],
+   "logs": {
+    "bytes": 488749,
+    "leaked": [
+     "ALCHEMY_WORKER_NAME"
+    ],
+    "workers": [
+     {
+      "name": "t3flare-environment-tools",
+      "bytes": 401183
+     },
+     {
+      "name": "t3flare-agents-tools",
+      "bytes": 83073
+     },
+     {
+      "name": "t3flare-mcp-tools",
+      "bytes": 4490
+     },
+     {
+      "name": "t3flare-admin-tools",
+      "bytes": 0
+     }
+    ]
+   },
+   "secretsLeaked": [],
+   "notSecret": "[redacted]",
+   "ok": true
+  },
+  {
+   "name": "the Workspace's own leak scan (its files and the Container's) finds nothing",
+   "scan": {
+    "do": [],
+    "container": {
+     "hits": [],
+     "files": 679,
+     "bytes": 15395878,
+     "ms": 177
+    },
+    "flagged": null
+   },
+   "ok": true
+  }
+ ],
+ "ok": true,
+ "note": "case 1 re-judged after the run: Codex's model declined the opaque script (\"I can't run the opaque /tmp/hunt.sh script\") after both reads; the harness's rule now records a refusal as such"
+}
