@@ -1680,7 +1680,7 @@ export class WorkspaceDO extends ContainerHost {
       const [kind, oid, value] = line.split(" ");
       if (oid === undefined || !/^[0-9a-f]{40,64}$/.test(oid)) continue;
       const entry = (out[oid] ??= { subject: "", ancestor: {} });
-      if (kind === "C") entry.subject = value === undefined ? "" : new TextDecoder().decode(Uint8Array.from(atob(value), (c) => c.charCodeAt(0)));
+      if (kind === "C") entry.subject = value === undefined ? "" : new TextDecoder().decode(Uint8Array.from(atob(value), (c) => c.charCodeAt(0))).trim();
       if (kind === "A" && (value === "0" || value === "1")) for (const u of wanted.filter((w) => w.new === oid)) entry.ancestor[u.ref] = value === "0";
     }
     return out;

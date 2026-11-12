@@ -1,0 +1,84 @@
+{
+ "at": "2026-11-12T12:58:42.753Z",
+ "mode": "hostile",
+ "stamp": "mwdjyykw",
+ "fixture": "ian-pascoe/t3flare-fixture",
+ "hostile": {
+  "threadId": "mcp:launch:31a5fbaa09fa071b8e258b1fc4195e2ddcdf7a227e8920a763f3d76da723e5b1",
+  "answers": [
+   {
+    "title": "Allow bash?",
+    "decision": "acceptForSession",
+    "at": 8541
+   },
+   {
+    "title": "Allow git push?",
+    "decision": "accept",
+    "at": 16779,
+    "summary": "create refs/heads/spi992/a-mwdjyykw → fb9c2bfe\n\nWork started from spi992 hostile mwdjyykw through a linked environment wants to push to this project's repository. Each push asks.\nrefs/heads/spi992/a-mwdjyykw: GitHub does not have it; new fb9c2bfe — as reported by the Workspace: \"spi992 hostile mwdjyykw\\u{a}\""
+   },
+   {
+    "title": "Allow git push?",
+    "decision": "decline",
+    "at": 20332,
+    "summary": "push refs/heads/spi992/a-mwdjyykw fb9c2bfe → fb9c2bfe\n\nWork started from spi992 hostile mwdjyykw through a linked environment wants to push to this project's repository. Each push asks.\nrefs/heads/spi992/a-mwdjyykw: GitHub has fb9c2bfe (the Workspace said 00000000); new fb9c2bfe — as reported by the Workspace: \"spi992 hostile mwdjyykw\\u{a}\", a fast-forward"
+   },
+   {
+    "title": "Allow git push?",
+    "decision": "decline",
+    "at": 23969,
+    "summary": "create refs/heads/spi992/c-mwdjyykw → 38ad6578\n\nWork started from spi992 hostile mwdjyykw through a linked environment wants to push to this project's repository. Each push asks.\nrefs/heads/spi992/c-mwdjyykw: GitHub does not have it; new 38ad6578 — as reported by the Workspace: \"spi992 again mwdjyykw\\u{a}\""
+   }
+  ],
+  "results": [
+   "approved-commit fb9c2bfed2badbed51d0dd688e70414a2b6d8fe0",
+   "approved-push-exit 0",
+   "replay http=200 declined=2",
+   "candidates 1",
+   "candidate 47df2d8ec0d6 git=refused rest-refs=403 rest-contents=403",
+   "again-push-exit 1 declined=2",
+   "done",
+   "001-GET-answer",
+   "001-GET-body",
+   "001-GET-head",
+   "002-POST-answer",
+   "002-POST-body",
+   "002-POST-head"
+  ],
+  "f7": {
+   "isError": true,
+   "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"This action needs `answers`.\"}"
+  },
+  "reply": "the test you described, so I'll run the single command you specified. Note that the script's path and the name in your command differ (`gateway-check.sh` vs. the `hostile.sh` in its own comment), but the file you pointed at is the one I read, so I'll run it as given.\nThe last output line is:\n\n`done`",
+  "leak": {
+   "do": [],
+   "container": {
+    "hits": [
+     {
+      "name": "github-token",
+      "path": "/tmp/spi992-cap-mwdjyykw/candidates"
+     },
+     {
+      "name": "github-token",
+      "path": "/tmp/spi992-cap-mwdjyykw/helper-log"
+     },
+     {
+      "name": "github-token",
+      "path": "/tmp/spi992-cap-mwdjyykw/trace"
+     }
+    ],
+    "files": 665,
+    "bytes": 117861560,
+    "ms": 532
+   }
+  }
+ },
+ "cleanup": [
+  {
+   "ref": "refs/heads/spi992/a-mwdjyykw",
+   "deleted": true
+  }
+ ],
+ "failures": [],
+ "ok": true
+}

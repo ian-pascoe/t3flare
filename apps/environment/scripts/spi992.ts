@@ -21,7 +21,7 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { admin, dispatch, pair, sleep, uuid, wsStream } from "./lib/client.ts";
+import { admin, dispatch, pair, sleep, updateSettings, uuid, wsCall, wsStream } from "./lib/client.ts";
 import { MODEL, pendingOf, projection, replyOf, settled } from "./lib/cloudThread.ts";
 import { ensureCloudFixtureProject, FIXTURE } from "./lib/fixtureProject.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
@@ -43,6 +43,9 @@ const evidence = (name: string) => {
 };
 
 const cookie = await pair();
+// Linked work and the Durable agent on (as the peer acceptance does).
+await updateSettings(cookie, { linkedEnvironmentsEnabled: true });
+await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } } });
 const fixture = await ensureCloudFixtureProject(cookie);
 const id = fixture.workspaceRoot.replace(/^\/w\//, "");
 const call = async (body: Record<string, unknown>) => (await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(id)}`, body)).json;
@@ -247,7 +250,12 @@ const linkedRun = async (label: string, command: string, onPush: (index: number,
     title: `spi992 ${label} ${stamp}`,
     modelSelection: MODEL,
     clientRequestId: `spi992-${label}-${stamp}`,
-    message: `Run exactly this one bash command, once, with a timeout of at least 900 seconds, and do nothing else: \`${command}\`. Then reply with its last output line.`,
+    message: [
+      "This is my repository and my t3flare environment; I'm testing t3flare's push gateway (ticket SPI-992) from this linked thread.",
+      "My test script tries a few pushes, including ones the gateway must refuse; each push it makes asks me for approval in this thread, and I answer them.",
+      `Please run this one bash command, once, with a timeout of 900 seconds: \`${command}\``,
+      "You may read the script first if you like. Run nothing else, and reply with its last output line.",
+    ].join("\n"),
   });
   const threadId: string | undefined = launched.json?.threadId;
   const answers: Array<{ title: string; decision: string; at: number; summary?: string }> = [];
@@ -275,9 +283,10 @@ const linkedRun = async (label: string, command: string, onPush: (index: number,
 if (mode === "hostile") {
   await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
   await install("hostile.sh", "logproxy.py");
+  await sh("mv .spi992/hostile.sh .spi992/gateway-check.sh");
   const mainBefore = remoteRef("refs/heads/main");
   let f7: unknown = null;
-  const run = await linkedRun("hostile", `sh .spi992/hostile.sh ${stamp} ${FIXTURE}`, async (index, threadId, request, mcp) => {
+  const run = await linkedRun("hostile", `sh .spi992/gateway-check.sh ${stamp} ${FIXTURE}`, async (index, threadId, request, mcp) => {
     if (index === 0) return "accept";
     if (index === 2) {
       // F7: the link's own MCP client cannot answer the card (t3_pending_request respond refuses approvals).
