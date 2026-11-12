@@ -23,10 +23,12 @@ const [command, ...rest] = args.filter((arg) => !arg.startsWith("--"));
 
 const accessHeaders = (): Record<string, string> => {
   if (flag("owner")) {
-    const result = spawnSync("cloudflared", ["access", "token", "-app", base.origin], { encoding: "utf8" });
+    // Access guards only `<host>/_t3flare` (ADR-0010), so the application is named by that path, not the origin.
+    const app = new URL("/_t3flare", base).href;
+    const result = spawnSync("cloudflared", ["access", "token", "-app", app], { encoding: "utf8" });
     const token = result.stdout.trim();
     if (result.status !== 0 || token === "") {
-      console.error(`t3flare: no owner Access token; run \`cloudflared access login ${base.origin}\` first`);
+      console.error(`t3flare: no owner Access token; run \`cloudflared access login ${app}\` first`);
       process.exit(2);
     }
     return { "cf-access-token": token };

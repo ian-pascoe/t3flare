@@ -176,7 +176,7 @@ the asks).
 ## For the owner after the merge (A3, SPI-1036)
 
 1. `bun scripts/stage.ts run prod connect refusals`: expect `allDoor404` and `insideRefused` true.
-2. `cloudflared access login https://t3.ianpascoe.dev`, then `bun scripts/stage.ts run prod connect sign-in --owner`,
+2. `cloudflared access login https://t3.ianpascoe.dev/_t3flare`, then `bun scripts/stage.ts run prod connect sign-in --owner`,
    and approve the code. Prod discards the account token after the link; relink or a relay-side unlink needs a new
    sign-in (or the T3 apps).
 3. `connect status` should show `linked: true`, `mintKey: false`, `accountToken.held: false`.
