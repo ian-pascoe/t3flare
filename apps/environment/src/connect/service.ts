@@ -173,9 +173,11 @@ export const make = (policy: ConnectPolicy, recorder: PublishRecorder) =>
       }
       if (Exit.isFailure(result)) return yield* fail("link-failed", describeFailure(result.cause));
       yield* secrets.remove(CLOUD_MINT_PUBLIC_KEY).pipe(Effect.mapError((e) => fail("remove-mint-key", e.message)));
-      if (!policy.keepAccountToken) yield* tokens.clear.pipe(Effect.mapError((e) => fail("discard-account-token", e.message)));
       return { mode: "publish_only", accountTokenKept: policy.keepAccountToken, mintKeyRemoved: true } satisfies LinkOutcome;
-    });
+    }).pipe(
+      // D2: where the token is not kept, it goes whether or not the link was made, so a failed link leaves none behind.
+      Effect.ensuring(policy.keepAccountToken ? Effect.void : tokens.clear.pipe(Effect.ignore)),
+    );
     const link = lock.withPermits(1)(linkNow);
 
     const linkWith = (token: CliTokenManager.PersistedToken) =>

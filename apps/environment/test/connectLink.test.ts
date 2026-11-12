@@ -161,6 +161,13 @@ describe("the publish-only link step against a fake relay", () => {
     expect(h.secrets.get("cloud-relay-environment-credential")).toBe("environment-credential-1");
   });
 
+  it("discards the account token on prod even when the link fails", async () => {
+    const h = harness();
+    h.endpointRuntime = { providerKind: "cloudflare_tunnel", connectorToken: "tunnel-token" };
+    await run(h, PROD, (connect) => Effect.flip(connect.importToken(TOKEN)));
+    expect(h.token).toBeUndefined();
+  });
+
   it("relinks publish-only after an unlink removed the desired-link mark (review finding 2)", async () => {
     const h = harness();
     const fetches: Array<string> = [];
