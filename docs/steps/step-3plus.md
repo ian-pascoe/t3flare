@@ -151,3 +151,32 @@ APNs `queued`, the relay's answer for a push it handed on.
 | 7 LOW, public config | **Confirmed** | Inlined from `.env.example` (no executable read, no JSON file); the bump test compares them |
 | 8 LOW, 401s | **Partly rebutted**: `Cause.pretty` carries no status, only the error's name (`RelayAuthInvalidError: Relay authentication failed: invalid_bearer`) | The recorder maps the relay's declared error to its status (401) and flags `RelayAuthInvalidError` as `rejected`; seen on the stage (row j). No text is kept |
 | 9 LOW, privacy | **Confirmed** | ADR-0025 and the plan's changelog say titles reach APNs/FCM in the alert |
+
+## Deviations from the plan
+
+- **No drain** (finding 3) and **no P1 executable read** (finding 7), as above.
+- **ADR-0025, not ADR-0023:** `main` took 0023 (the managed policy) and 0024 while this step ran. ADR-0010's SPI-1005
+  refinement ("T3 Connect's routes are mounted") stays; this step's refinement follows it and supersedes it for the four
+  relay routes. The managed policy allows Connect and keeps `agentActivityPublishing` (tested).
+- **A fresh stage needs the `piDurable` instance enabled** (t3 enables only codex and claudeAgent unconfigured); the
+  M2/M3 scripts do it, as `models.ts` does.
+- **P6 skipped:** the account token lists the relay's environments and devices directly, so the DPoP exchange was not
+  needed for phone-less evidence.
+- **Screenshots:** none; the owner's confirmation and the relay's records stand in (M3).
+- **Tap-to-open (R4) not tried:** the phone is paired to prod, not the stage.
+
+## Budget and fragility
+
+Patches 2, Shadows 1, unchanged. New Layers: the Connect service, the refusing `CloudLink`, the recorder's Logger.
+New code: `src/connect/` (service, recorder, admin routes), `host/relayRoutes.ts`, idle holds, the caller header, the
+public config, `scripts/connect.ts`, `connect-m2.ts`, `connect-m3.ts`, `connect-tail.ts`. Fragility entry **U28**;
+upstream asks **12–14**. Linear: SPI-1034 (route check), SPI-1035 (a publish pending at a restart), SPI-1036 (A3 and
+the asks).
+
+## For the owner after the merge (A3, SPI-1036)
+
+1. `bun scripts/stage.ts run prod connect refusals`: expect `allDoor404` and `insideRefused` true.
+2. `cloudflared access login https://t3.ianpascoe.dev`, then `bun scripts/stage.ts run prod connect sign-in --owner`,
+   and approve the code. Prod discards the account token after the link; relink or a relay-side unlink needs a new
+   sign-in (or the T3 apps).
+3. `connect status` should show `linked: true`, `mintKey: false`, `accountToken.held: false`.
