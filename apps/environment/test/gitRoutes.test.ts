@@ -11,8 +11,6 @@ import {
   gitEnvOf,
   intoWorkspace,
   mayStartContainer,
-  gatewayUrlsToGitHub,
-  pushPlanOf,
   parseWorktreeList,
   readScopeOf,
   remoteRepoOf,
@@ -132,48 +130,6 @@ describe("readScopeOf", () => {
   });
 });
 
-
-describe("pushPlanOf: t3's own pushes, for the gateway's expectations (SPI-992, review M2)", () => {
-  it("reads t3's `push -- <remote> HEAD:refs/heads/<b>` (GitVcsDriverCore pushCurrentBranch)", () => {
-    expect(pushPlanOf(["push", "--", "origin", "HEAD:refs/heads/feature/x"])).toEqual({ kind: "refspecs", remote: "origin", refspecs: [{ src: "HEAD", dst: "refs/heads/feature/x" }] });
-  });
-
-  it("reads bare `push` as the current branch's push destination, resolved in the Workspace", () => {
-    expect(pushPlanOf(["push"])).toEqual({ kind: "current" });
-    expect(pushPlanOf(["-c", "x=y", "push"])).toEqual({ kind: "current" });
-  });
-
-  it("reads the stack rebase's `push --quiet --force-with-lease=… origin <sha>:refs/heads/<b>`", () => {
-    const sha = "a".repeat(40);
-    expect(pushPlanOf(["push", "--quiet", `--force-with-lease=refs/heads/s1:${"b".repeat(40)}`, "origin", `${sha}:refs/heads/s1`])).toEqual({ kind: "refspecs", remote: "origin", refspecs: [{ src: sha, dst: "refs/heads/s1" }] });
-  });
-
-  it("reads deletes", () => {
-    expect(pushPlanOf(["push", "origin", "--delete", "refs/heads/old"])).toEqual({ kind: "refspecs", remote: "origin", refspecs: [{ src: null, dst: "refs/heads/old" }] });
-    expect(pushPlanOf(["push", "origin", ":refs/heads/old"])).toEqual({ kind: "refspecs", remote: "origin", refspecs: [{ src: null, dst: "refs/heads/old" }] });
-  });
-
-  it("leaves anything else to the gateway's policy (no expectation): short names, options it does not know, other commands", () => {
-    expect(pushPlanOf(["push", "-u", "origin", "feature"]).kind).toBe("unparsed");
-    expect(pushPlanOf(["push", "--mirror", "origin"]).kind).toBe("unparsed");
-    expect(pushPlanOf(["push", "origin", "+HEAD:refs/heads/x"]).kind).toBe("unparsed");
-    expect(pushPlanOf(["push", "--", "origin", "HEAD:refs/heads/a", "HEAD:refs/heads/b"]).kind).toBe("refspecs");
-    expect(pushPlanOf(["fetch", "origin"]).kind).toBe("not-push");
-  });
-});
-
-describe("gatewayUrlsToGitHub (review M5)", () => {
-  it("shows t3 github.com where git shows the push gateway (`remote -v`, `remote get-url --push`, `ls-remote --get-url`)", () => {
-    const out = "origin\thttps://github.com/o/r.git (fetch)\norigin\thttp://computer.internal/t3flare/git/o/r.git (push)\n";
-    expect(gatewayUrlsToGitHub(["remote", "-v"], out)).toBe("origin\thttps://github.com/o/r.git (fetch)\norigin\thttps://github.com/o/r.git (push)\n");
-    expect(gatewayUrlsToGitHub(["remote", "get-url", "--push", "origin"], "http://computer.internal/t3flare/git/o/r.git\n")).toBe("https://github.com/o/r.git\n");
-  });
-
-  it("leaves other commands' output alone", () => {
-    const diff = "+http://computer.internal/t3flare/git/o/r.git\n";
-    expect(gatewayUrlsToGitHub(["diff"], diff)).toBe(diff);
-  });
-});
 
 describe("mayStartContainer", () => {
   it("t3's branch creation (`branch -- <name>`) may start the Container; listings do not", () => {

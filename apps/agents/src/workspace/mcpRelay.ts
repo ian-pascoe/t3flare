@@ -1,8 +1,7 @@
 // The CLI agents' MCP relay (ADR-0028, plan §3.2), in `WorkspaceProxy`: a CLI process in the Container posts MCP
 // messages to `computer.internal/t3flare/mcp/<server>` with its tool handle as the bearer. This handler checks the
 // request's shape and hands one JSON-RPC message to the Workspace DO, which resolves the handle and asks the Environment
-// DO; nothing of the request but the message goes on (no header, no key). Shaped like `pushGateway.ts`: pure, deps
-// injected.
+// DO; nothing of the request but the message goes on (no header, no key). Pure, deps injected.
 import { MCP_RELAY_PREFIX, type McpRelayAnswer } from "@t3flare/harness-registry";
 
 /** Requests from the Container are capped (plan §3.2). */

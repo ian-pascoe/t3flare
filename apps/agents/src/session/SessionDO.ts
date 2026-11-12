@@ -7,7 +7,7 @@
 // The Session pushes its committed state to the Environment DO over DO RPC (`sessionPush`), coalesced to about 100 ms
 // while streaming and at least every 60 s while a turn is live; the Environment's adapter diffs it into t3's events.
 // One alarm, computed in one place (`#arm`): the heartbeat, the turn deadline, the liveness push, a push retry.
-import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   type Conversation,
   createRegistry,
@@ -61,9 +61,6 @@ import { ApprovalStore, interactionModeSection, permissions } from "../extension
 import { projectContext } from "../extensions/project-context.ts";
 import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
-import { LINKED_WORK_MS, OWNER_COMMAND_MS, PUSH_APPROVAL_MS } from "../workspace/linkedPush.ts";
-import { pushCard, type ReportedCommit } from "../workspace/pushCard.ts";
-import type { RefUpdate } from "../workspace/pushGateway.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
@@ -143,8 +140,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
   /** Registry the tool extensions install into, before the Harness resumes work that needs them. */
   readonly #registry: RegistryReader;
   readonly #approvals: ApprovalStore;
-  /** Push questions in flight, by the gateway's ask id (SPI-992, review M7): aborted when the push's git goes away. */
-  readonly #pushAsks = new Map<string, AbortController>();
   /** The agent's questions to the owner (`ask_user`, step 3). */
   readonly #questions: QuestionStore;
   /** The proxy's model list (ADR-0012), kept in this object's storage and read again when it is old. */
@@ -189,7 +184,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
         interaction: () => interactionModeOf(this.#meta()?.interactionMode),
         turn: () => this.#liveTurn(),
         workspaceId: () => this.#meta()?.workspaceId ?? null,
-        beforeCommand: () => this.#noteLinkedWork(),
       }),
     );
     registry.install(interactionModeSection(() => interactionModeOf(this.#meta()?.interactionMode)));
@@ -255,75 +249,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
         }
       });
     });
-  }
-
-  // -------------------------------------------------------------------------------------------------------------------
-  // Pushes from linked work (step 3, owner decision D1: each push of a thread a link started asks the owner)
-
-  /**
-   * Before each command: a linked thread's Workspace counts as holding linked work for LINKED_WORK_MS (and is tainted,
-   * SPI-992 H1); an owner's thread notes that it may be the one pushing for OWNER_COMMAND_MS (the gateway's attribution).
-   */
-  async #noteLinkedWork(): Promise<void> {
-    const meta = this.#meta();
-    if (meta === undefined || meta.workspaceId === null) return;
-    // SAFETY: the Workspace DO answers `noteLinkedWork` and `noteOwnerCommand` (WorkspaceDO.ts).
-    const workspace = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(meta.workspaceId)) as unknown as {
-      noteLinkedWork(input: { readonly session: string; readonly until: number }): Promise<void>;
-      noteOwnerCommand(input: { readonly session: string; readonly until: number }): Promise<void>;
-    };
-    const session = sessionNameOf(meta.threadId);
-    if (meta.linked == null) await workspace.noteOwnerCommand({ session, until: Date.now() + OWNER_COMMAND_MS });
-    else await workspace.noteLinkedWork({ session, until: Date.now() + LINKED_WORK_MS });
-  }
-
-  /**
-   * RPC from the Workspace DO (the push gateway's policy, SPI-992): a push's exact ref updates, asked of the owner on
-   * this thread's live turn. On a linked thread, once (never accepted for the session, in any mode). On the owner's own
-   * thread in a tainted Workspace, "accept for the session" approves and trusts the Workspace again (review H1). No live
-   * turn, or no answer within PUSH_APPROVAL_MS: refused.
-   */
-  async approveGitPush(input: {
-    readonly workspace: string;
-    readonly linked: boolean;
-    readonly askId?: string;
-    readonly updates: ReadonlyArray<RefUpdate>;
-    readonly tips: Readonly<Record<string, string>>;
-    readonly defaultBranch: string | null;
-    readonly reported: Readonly<Record<string, ReportedCommit>>;
-  }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }> {
-    await this.#opening;
-    const meta = this.#meta();
-    const turn = this.#liveTurn();
-    if (input.linked && meta?.linked == null) return { approved: false, reason: "not linked work" };
-    if (!input.linked && meta?.linked != null) return { approved: false, reason: "a linked thread cannot trust the Workspace" };
-    if (turn === null) return { approved: false, reason: "no live turn to ask on" };
-    const requestId = `push:${crypto.randomUUID()}`;
-    const card = pushCard({ updates: input.updates, tips: input.tips, defaultBranch: input.defaultBranch, reported: input.reported, linkLabel: input.linked ? (meta?.linked?.label ?? "another environment") : null });
-    const withdrawn = new AbortController();
-    if (input.askId !== undefined) this.#pushAsks.set(input.askId, withdrawn);
-    const context = withAbortSignal(AbortSignal.any([AbortSignal.timeout(PUSH_APPROVAL_MS), withdrawn.signal]), BACKGROUND_CONTEXT);
-    try {
-      const answer = await this.#approvals.ask(
-        { requestId, turn, callId: "", tool: "git push", kind: "git-push", summary: card.summary, detail: card.detail, options: card.options, createdAt: Date.now() },
-        () => Promise.resolve(),
-        context,
-      );
-      const approved = answer.decision === "accept" || answer.decision === "acceptForSession";
-      const trust = !input.linked && answer.decision === "acceptForSession";
-      return approved ? { approved, trust } : { approved, reason: answer.decision };
-    } catch {
-      return { approved: false, reason: withdrawn.signal.aborted ? "git went away" : "no answer in time" };
-    } finally {
-      this.#approvals.settle(requestId);
-      if (input.askId !== undefined) this.#pushAsks.delete(input.askId);
-    }
-  }
-
-  /** RPC from the Workspace DO: the push's git went away while it was asked (review M7): its card is withdrawn. */
-  cancelGitPush(input: { readonly askId: string }): Promise<void> {
-    this.#pushAsks.get(input.askId)?.abort();
-    return Promise.resolve();
   }
 
   // -------------------------------------------------------------------------------------------------------------------

@@ -61,9 +61,6 @@ import {
 import { containerPatterns, ContainerOnlyBackend, submoduleDirsScript, submodulePaths } from "./containerOnly.ts";
 import { isomorphicFs } from "./isoFs.ts";
 import { CREDENTIAL_HELPER_VERSION } from "./credentialHelper.ts";
-import { type Asked, EXPECTATION_MAX_MS, type LinkedWork, prunedLinkedWork, pushDecision, type PushExpectation, type Taint, taintAfter } from "./linkedPush.ts";
-import { advertisedTips, pushCard, type ReportedCommit } from "./pushCard.ts";
-import type { RefUpdate } from "./pushGateway.ts";
 import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, withoutOwnGitDir } from "./gitDirReads.ts";
 import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
@@ -102,8 +99,6 @@ export interface WorkspaceEnv {
   readonly T3FLARE_CONTAINER_IDLE_MS?: string;
   /** Overrides TERMINAL_IDLE_MS (the stage's idle-hold check). */
   readonly T3FLARE_TERMINAL_IDLE_MS?: string;
-  /** This Worker's Session DOs (step 3, D1): a linked thread's Session approves each push from its Workspace. */
-  readonly SESSIONS?: DurableObjectNamespace;
   /** Test stages only: the stage-only probes and faults answer. */
   readonly T3FLARE_FAULTS?: string;
   /** Step 4a (ADR-0016 A′): the CLI agents' own model proxy key, answered by the key route only. */
@@ -169,14 +164,6 @@ export { CREDENTIAL_HELPER, CREDENTIAL_PATH };
 /** Where the Container's key helper asks this object for the CLI agents' model key (step 4a). */
 export const MODEL_KEY_PATH = "/t3flare/model-key";
 const WORKSPACE_ID_KEY = "t3flare:workspace-id";
-/** Step 3 (D1): linked Sessions that ran commands here, and until when each counts. */
-const LINKED_WORK_KEY = "t3flare:linked-work";
-/** SPI-992 (review H1): the Workspace's durable taint, set by linked work, cleared only by the owner. */
-const TAINT_KEY = "t3flare:taint";
-/** SPI-992 (review M2): t3's own pushes the router is running, by id. */
-const EXPECTATIONS_KEY = "t3flare:push-expectations";
-/** SPI-992 (review H1): the owner's Sessions that ran commands here lately, and until when each counts. */
-const OWNER_COMMANDS_KEY = "t3flare:owner-commands";
 /** A cached token is renewed this long before it expires. */
 const TOKEN_RENEW_MS = 5 * 60_000;
 /** The markers of the shells this object started (orphans after a restart are killed by them). */
@@ -197,8 +184,6 @@ const LEAK_FLAG_KEY = "t3flare:credential-leak";
 const QUARANTINE = "/var/lib/t3flare/quarantine";
 /** Directories the sync guard never reads: they stay on the Container's disk (`CONTAINER_IGNORE`). */
 const SCAN_SKIP = ["node_modules", ".venv", "target", ".cache", ".pnpm-store", "__pycache__", ".turbo", ".next", ".gradle"];
-/** Linked work held while a linked thread's CLI process lives (review F8): until it exits, not a time. */
-const LINKED_WHILE_ALIVE = Number.MAX_SAFE_INTEGER;
 /** How often terminals' heartbeats are checked while any is open. */
 const TERMINAL_EXPIRE_EVERY_MS = 15_000;
 
@@ -237,18 +222,10 @@ export class WorkspaceDO extends ContainerHost {
   #lastScan = 0;
   /** A CLI process ran since the last scan: the next pull is scanned even if none runs now. */
   #cliSinceScan = false;
-  /** Patterns of the git tokens this object handed to the Container lately, and of the gateway's write token (never handed). */
+  /** Patterns of the git tokens this object handed to the Container lately. */
   readonly #tokenPatterns: Array<CredentialPattern> = [];
-  /** The read-only token the credential helper is given (SPI-992), until shortly before it expires. */
-  #readToken: { readonly token: string; readonly expiresAt: number } | undefined;
-  /** The push gateway's write token and the repo it is for: in this object's memory only, never sent to the Container. */
-  #pushToken: { readonly token: string; readonly expiresAt: number; readonly repo: { readonly owner: string; readonly name: string } } | undefined;
-  /** The owner's questions about pushes in flight, by the gateway's ask id: how to withdraw each (review M7). */
-  readonly #pushAsks = new Map<string, () => Promise<void>>();
-  /** Ask ids withdrawn before their question was raised. */
-  readonly #withdrawnAsks = new Set<string>();
-  /** Test stages only (`probePush`): how long each gateway decision is held (P2). */
-  #probeHoldMs = 0;
+  /** The token the credential helper is given, until shortly before it expires. */
+  #token: { readonly token: string; readonly expiresAt: number } | undefined;
   /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
   #sandbox: Promise<boolean> | undefined;
 
@@ -354,15 +331,6 @@ export class WorkspaceDO extends ContainerHost {
       maxProcesses: MAX_CLI_PROCESSES,
       allowProbe: env.T3FLARE_FAULTS === "1",
       beforeStart: async (input) => ({ env: { T3FLARE_MODEL_KEY_NONCE: this.#keyGate.issue(input.key, input.cli) }, sandbox: await this.#sandboxWorks() }),
-      linkedWork: (thread, alive) => {
-        const linked: Record<string, number> = { ...prunedLinkedWork(ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {}, Date.now()) };
-        const name = `cli:${thread}`;
-        if (alive) {
-          linked[name] = LINKED_WHILE_ALIVE;
-          ctx.storage.kv.put(TAINT_KEY, taintAfter(ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null, name, Date.now()));
-        } else delete linked[name];
-        ctx.storage.kv.put(LINKED_WORK_KEY, linked);
-      },
     });
   }
 
@@ -372,8 +340,8 @@ export class WorkspaceDO extends ContainerHost {
     return [...(key === undefined || key === "" ? [] : [await patternOf("model-key", key)]), ...this.#tokenPatterns];
   }
 
-  async #rememberToken(token: string, name: "github-token" | "gateway-token" = "github-token"): Promise<void> {
-    this.#tokenPatterns.push(await patternOf(name, token));
+  async #rememberToken(token: string): Promise<void> {
+    this.#tokenPatterns.push(await patternOf("github-token", token));
     if (this.#tokenPatterns.length > 20) this.#tokenPatterns.splice(0, this.#tokenPatterns.length - 20);
   }
 
@@ -1044,9 +1012,6 @@ export class WorkspaceDO extends ContainerHost {
   async worktreeClone(input: { readonly id: string; readonly url: string | null; readonly parent?: string }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }> {
     this.#revive();
     this.#rememberId(input.id);
-    // Review H1: a worktree of a tainted project is tainted (its project-root view carries the project's untracked files).
-    const parentTaint = input.parent === undefined ? null : await this.#peer(input.parent).taint().catch(() => null);
-    if (parentTaint !== null) this.ctx.storage.kv.put(TAINT_KEY, { since: parentTaint.since, by: [...parentTaint.by] });
     // A Container left by an earlier attempt starts again: its submodules' directories are mounts that the clone's
     // `rm -rf` of the repo cannot remove.
     if (this.containerRunning()) await this.stopContainer().catch(() => undefined);
@@ -1505,106 +1470,6 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /**
-   * Step 3 (D1): a linked thread's Session notes, before each of its commands, that linked work is active here until
-   * `until`; while it is, the gateway's pushes ask that Session's owner. It also taints the Workspace (review H1).
-   */
-  noteLinkedWork(input: { readonly session: string; readonly until: number }): Promise<void> {
-    const linked = prunedLinkedWork(this.ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {}, Date.now());
-    this.ctx.storage.kv.put(LINKED_WORK_KEY, { ...linked, [input.session]: Math.max(linked[input.session] ?? 0, input.until) });
-    this.ctx.storage.kv.put(TAINT_KEY, taintAfter(this.ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null, input.session, Date.now()));
-    return Promise.resolve();
-  }
-
-  /** An owner's Session notes, before each of its commands, that it may be the one pushing (attribution, review H1). */
-  noteOwnerCommand(input: { readonly session: string; readonly until: number }): Promise<void> {
-    const owners = prunedLinkedWork(this.ctx.storage.kv.get<LinkedWork>(OWNER_COMMANDS_KEY) ?? {}, Date.now());
-    this.ctx.storage.kv.put(OWNER_COMMANDS_KEY, { ...owners, [input.session]: Math.max(owners[input.session] ?? 0, input.until) });
-    return Promise.resolve();
-  }
-
-  /** The Workspace's taint (review H1), or null. Read by a worktree made from it. */
-  taint(): Promise<Taint | null> {
-    return Promise.resolve(this.ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null);
-  }
-
-  /** The owner trusts this Workspace again (admin route `workspace-trust`, or an owner-thread card): the taint is cleared. */
-  trustAgain(input: { readonly by: string }): Promise<{ readonly cleared: Taint | null }> {
-    const cleared = this.ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null;
-    this.ctx.storage.kv.delete(TAINT_KEY);
-    console.log(JSON.stringify({ t3flare: "workspace-trusted", workspace: this.#workspaceId() ?? null, by: input.by, taint: cleared }));
-    return Promise.resolve({ cleared });
-  }
-
-  // -------------------------------------------------------------------------------------------------------------------
-  // The push gateway (SPI-992). Callers: `authorizePush` and `pushTarget` only the gateway (`WorkspaceProxy`, this
-  // Worker, on the Container's egress); `expectPush`/`unexpectPush` only the Environment's process router. Neither is
-  // reachable from the Container (its egress reaches this object only through `WorkspaceProxy`'s paths) or a Session.
-
-  /** The router is about to run t3's `git push` with these updates (review M2): allowed while the command runs. */
-  expectPush(input: { readonly id: string; readonly updates: PushExpectation["updates"]; readonly ttlMs?: number }): Promise<void> {
-    const now = Date.now();
-    const live = (this.ctx.storage.kv.get<ReadonlyArray<PushExpectation>>(EXPECTATIONS_KEY) ?? []).filter((e) => e.until > now && e.id !== input.id);
-    const until = now + Math.min(input.ttlMs ?? EXPECTATION_MAX_MS, EXPECTATION_MAX_MS);
-    this.ctx.storage.kv.put(EXPECTATIONS_KEY, [...live, { id: input.id, updates: input.updates.slice(0, 64), until }].slice(-32));
-    return Promise.resolve();
-  }
-
-  /** t3's `git push` returned: its expectation, if not used, is gone. */
-  unexpectPush(input: { readonly id: string }): Promise<void> {
-    const now = Date.now();
-    this.ctx.storage.kv.put(EXPECTATIONS_KEY, (this.ctx.storage.kv.get<ReadonlyArray<PushExpectation>>(EXPECTATIONS_KEY) ?? []).filter((e) => e.until > now && e.id !== input.id));
-    return Promise.resolve();
-  }
-
-  /** The gateway's target: the Workspace's repo (from the registry) and the write token, minted outside the Container. */
-  async pushTarget(): Promise<{ readonly repo: { readonly owner: string; readonly name: string }; readonly token: string } | null> {
-    const id = this.#workspaceId();
-    if (id === undefined) return null;
-    if (this.#pushToken === undefined || this.#pushToken.expiresAt - Date.now() < TOKEN_RENEW_MS) {
-      const minted = await environmentStub(this.env.ENVIRONMENT).workspaceToken(id, { purpose: "push" });
-      if (minted.token === null || minted.repo === undefined) return null;
-      this.#pushToken = { token: minted.token, expiresAt: minted.expiresAt ?? Date.now() + 30 * 60_000, repo: minted.repo };
-      // The leak scan looks for it too: it must never be found in the Workspace (M2's assertion).
-      await this.#rememberToken(minted.token, "gateway-token");
-    }
-    return { repo: this.#pushToken.repo, token: this.#pushToken.token };
-  }
-
-  /**
-   * The gateway's question (SPI-992): may this request's exact ref updates reach GitHub? Answered by `pushDecision`;
-   * an ask holds the request until the owner answers (PUSH_APPROVAL_MS). Every decision is logged, never a token.
-   */
-  async authorizePush(input: { readonly updates: ReadonlyArray<RefUpdate>; readonly pushOptions: ReadonlyArray<string>; readonly askId?: string }): Promise<{ readonly allow: true } | { readonly allow: false; readonly reason: string }> {
-    const id = this.#workspaceId() ?? null;
-    if (this.#probeHoldMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#probeHoldMs));
-    const now = Date.now();
-    const expectations = this.ctx.storage.kv.get<ReadonlyArray<PushExpectation>>(EXPECTATIONS_KEY) ?? [];
-    const linked = this.ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {};
-    const linkedCli = new Set(Object.keys(linked).filter((name) => name.startsWith("cli:")).map((name) => name.slice(4)));
-    const owners = {
-      sessions: Object.keys(prunedLinkedWork(this.ctx.storage.kv.get<LinkedWork>(OWNER_COMMANDS_KEY) ?? {}, now)),
-      cli: [...new Set(this.#processes.state().flatMap((proc) => (proc.thread !== null && proc.inTurn && !linkedCli.has(proc.thread) ? [proc.thread] : [])))],
-    };
-    const taint = this.ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null;
-    const decision = pushDecision({ updates: input.updates, linked, taint, expectations, owners, now });
-    const log = (outcome: string, extra: Record<string, unknown> = {}) =>
-      console.log(JSON.stringify({ t3flare: "push-gateway", workspace: id, outcome, decision: decision.kind, refs: input.updates.map((u) => u.ref).slice(0, 8), updates: input.updates.length, tainted: taint !== null, ...extra }));
-    if (decision.kind === "allow") {
-      if (decision.why === "expected") this.ctx.storage.kv.put(EXPECTATIONS_KEY, expectations.filter((e) => e.id !== decision.expectation));
-      log("allowed", { why: decision.why });
-      return { allow: true };
-    }
-    if (decision.kind === "refuse") {
-      log("refused", { reason: decision.reason });
-      return { allow: false, reason: decision.reason };
-    }
-    const answer = await this.#askPush(decision.on, input.updates, input.askId ?? crypto.randomUUID()).catch((error: unknown) => ({ approved: false, trust: false, reason: String(error).slice(0, 200) }));
-    if (answer.approved && answer.trust && !decision.on.linked) await this.trustAgain({ by: decision.on.kind === "session" ? decision.on.name : `cli:${decision.on.thread}` });
-    log(answer.approved ? "approved" : "declined", { on: decision.on, reason: answer.reason ?? null, trusted: answer.trust });
-    return answer.approved ? { allow: true } : { allow: false, reason: answer.reason === "decline" || answer.reason === undefined ? "declined by the owner" : `not approved: ${answer.reason}` };
-  }
-
-  /**
    * The CLI relay (ADR-0028), from `WorkspaceProxy`: one MCP message of a CLI process, by its tool handle. The handle
    * names a live process of this Workspace (revoked at its exit); the Environment DO decides by that process's thread's
    * own mode and calls. Never logs the handle.
@@ -1628,95 +1493,13 @@ export class WorkspaceDO extends ContainerHost {
 
   /** The relay's CLI went away while its call was asked: the card is withdrawn. */
   async cancelMcpAsk(input: { readonly askId: string }): Promise<void> {
-    await environmentStub(this.env.ENVIRONMENT).cancelPush({ askId: input.askId });
-  }
-
-  /** The gateway's git went away while its push was asked (review M7): the owner's card is withdrawn. */
-  async cancelPushAsk(input: { readonly askId: string }): Promise<void> {
-    const withdraw = this.#pushAsks.get(input.askId);
-    if (withdraw === undefined) {
-      this.#withdrawnAsks.add(input.askId);
-      if (this.#withdrawnAsks.size > 64) this.#withdrawnAsks.delete(this.#withdrawnAsks.values().next().value!);
-      return;
-    }
-    console.log(JSON.stringify({ t3flare: "push-ask-withdrawn", workspace: this.#workspaceId() ?? null }));
-    await withdraw();
-  }
-
-  /** Asks `on` about the push, with a card built from GitHub's tips and what the Workspace reports (review M6). */
-  async #askPush(on: Asked, updates: ReadonlyArray<RefUpdate>, askId: string): Promise<{ readonly approved: boolean; readonly trust: boolean; readonly reason?: string }> {
-    if (this.#withdrawnAsks.delete(askId)) return { approved: false, trust: false, reason: "git went away" };
-    const target = await this.pushTarget();
-    const facts = target === null ? { tips: {}, defaultBranch: null } : await this.#githubFacts(target);
-    const reported = await this.#reportedCommits(updates, facts.tips).catch(() => ({}));
-    const workspace = this.#workspaceId() ?? "";
-    if (on.kind === "cli") {
-      // SPI-1040 (M3): a CLI thread is asked through the Environment, which raises the card on that thread's live turn.
-      const card = pushCard({ updates, tips: facts.tips, defaultBranch: facts.defaultBranch, reported, linkLabel: on.linked ? "another environment" : null });
-      const environment = environmentStub(this.env.ENVIRONMENT);
-      this.#pushAsks.set(askId, () => environment.cancelPush({ askId }));
-      try {
-        const answer = await environment.approvePush({ thread: on.thread, workspace, linked: on.linked, askId, ...card });
-        return { approved: answer.approved, trust: answer.trust === true, ...(answer.reason === undefined ? {} : { reason: answer.reason }) };
-      } finally {
-        this.#pushAsks.delete(askId);
-      }
-    }
-    const sessions = this.env.SESSIONS;
-    if (sessions === undefined) return { approved: false, trust: false, reason: "no Session binding" };
-    // SAFETY: the Session DO answers `approveGitPush` (SessionDO.ts).
-    const session = sessions.get(sessions.idFromName(on.name)) as unknown as {
-      approveGitPush(input: { readonly workspace: string; readonly linked: boolean; readonly askId: string; readonly updates: ReadonlyArray<RefUpdate>; readonly tips: Readonly<Record<string, string>>; readonly defaultBranch: string | null; readonly reported: Readonly<Record<string, ReportedCommit>> }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }>;
-      cancelGitPush(input: { readonly askId: string }): Promise<void>;
-    };
-    this.#pushAsks.set(askId, () => session.cancelGitPush({ askId }));
-    try {
-      const answer = await session.approveGitPush({ workspace, linked: on.linked, askId, updates, tips: facts.tips, defaultBranch: facts.defaultBranch, reported });
-      return { approved: answer.approved, trust: answer.trust === true, ...(answer.reason === undefined ? {} : { reason: answer.reason }) };
-    } finally {
-      this.#pushAsks.delete(askId);
-    }
-  }
-
-  /** GitHub's tips (its receive-pack advertisement) and default branch, read with the gateway's token. Empty on failure. */
-  async #githubFacts(target: { readonly repo: { readonly owner: string; readonly name: string }; readonly token: string }): Promise<{ readonly tips: Readonly<Record<string, string>>; readonly defaultBranch: string | null }> {
-    const auth = { authorization: `Basic ${btoa(`x-access-token:${target.token}`)}`, "user-agent": "t3flare-push-gateway" };
-    const [refs, repo] = await Promise.all([
-      fetch(`https://github.com/${target.repo.owner}/${target.repo.name}.git/info/refs?service=git-receive-pack`, { headers: auth, redirect: "manual" })
-        .then(async (response) => (response.ok ? advertisedTips(new Uint8Array(await response.arrayBuffer())) : {}))
-        .catch(() => ({})),
-      fetch(`https://api.github.com/repos/${target.repo.owner}/${target.repo.name}`, { headers: { authorization: `Bearer ${target.token}`, "user-agent": "t3flare-push-gateway", accept: "application/vnd.github+json" }, redirect: "manual" })
-        .then(async (response) => (response.ok ? ((await response.json()) as { default_branch?: string }).default_branch ?? null : null))
-        .catch(() => null),
-    ]);
-    return { tips: refs, defaultBranch: repo };
-  }
-
-  /** What the Workspace's git says about each new commit: its subject, and whether it descends from GitHub's tip. */
-  async #reportedCommits(updates: ReadonlyArray<RefUpdate>, tips: Readonly<Record<string, string>>): Promise<Record<string, ReportedCommit>> {
-    const wanted = updates.filter((u) => !/^0+$/.test(u.new)).slice(0, 16);
-    if (wanted.length === 0 || !this.containerRunning()) return {};
-    const script = wanted
-      .map((u) => {
-        const tip = tips[u.ref];
-        return `printf 'C %s %s\\n' ${u.new} "$(git log -1 --format=%s ${u.new} 2>/dev/null | head -c 200 | base64 | tr -d '\\n')"` + (tip === undefined ? "" : `; git merge-base --is-ancestor ${tip} ${u.new} 2>/dev/null; printf 'A %s %s\\n' ${u.new} $?`);
-      })
-      .join("\n");
-    const result = await this.exec({ script, cwd: REPO_ROOT, passive: true, timeoutMs: 20_000 });
-    const out: Record<string, { subject: string; ancestor: Record<string, boolean> }> = {};
-    for (const line of result.stdout.split("\n")) {
-      const [kind, oid, value] = line.split(" ");
-      if (oid === undefined || !/^[0-9a-f]{40,64}$/.test(oid)) continue;
-      const entry = (out[oid] ??= { subject: "", ancestor: {} });
-      if (kind === "C") entry.subject = value === undefined ? "" : new TextDecoder().decode(Uint8Array.from(atob(value), (c) => c.charCodeAt(0))).trim();
-      if (kind === "A" && (value === "0" || value === "1")) for (const u of wanted.filter((w) => w.new === oid)) entry.ancestor[u.ref] = value === "0";
-    }
-    return out;
+    await environmentStub(this.env.ENVIRONMENT).cancelAsk({ askId: input.askId });
   }
 
   /**
-   * The credential helper's request (SPI-992): a read-only token, only for the current helper (`v=2`) asking about
-   * `https://github.com` (an older helper in a repo's `.git/config` asks without them, and gets nothing).
+   * The credential helper's request (ADR-0013): the Workspace's one-repo token (`contents: write`; `workflows` only for
+   * an opted-in Workspace), only for the current helper (`v=2`) asking about `https://github.com` (an older helper in a
+   * repo's `.git/config` asks without them, and gets nothing). Owner, 2026-11-12, back to stock: no push gateway.
    */
   async #credential(url: URL): Promise<Response> {
     const id = this.#workspaceId();
@@ -1727,37 +1510,18 @@ export class WorkspaceDO extends ContainerHost {
       return new Response("", { status: 403, headers: { "cache-control": "no-store" } });
     }
     try {
-      if (this.#readToken === undefined || this.#readToken.expiresAt - Date.now() < TOKEN_RENEW_MS) {
-        const minted = await environmentStub(this.env.ENVIRONMENT).workspaceToken(id, { purpose: "read" });
-        this.#readToken = minted.token === null ? undefined : { token: minted.token, expiresAt: minted.expiresAt ?? Date.now() + 30 * 60_000 };
+      if (this.#token === undefined || this.#token.expiresAt - Date.now() < TOKEN_RENEW_MS) {
+        const minted = await environmentStub(this.env.ENVIRONMENT).workspaceToken(id);
+        this.#token = minted.token === null ? undefined : { token: minted.token, expiresAt: minted.expiresAt ?? Date.now() + 30 * 60_000 };
         if (minted.token !== null) await this.#rememberToken(minted.token);
       }
-      const token = this.#readToken?.token ?? null;
-      console.log(JSON.stringify({ t3flare: "git-credential", workspace: id, granted: token !== null, readOnly: true }));
+      const token = this.#token?.token ?? null;
+      console.log(JSON.stringify({ t3flare: "git-credential", workspace: id, granted: token !== null }));
       return new Response(token ?? "", { status: token === null ? 404 : 200, headers: { "cache-control": "no-store" } });
     } catch (error) {
       console.warn(JSON.stringify({ t3flare: "git-credential-failed", workspace: id, error: String(error).slice(0, 300) }));
       return new Response("", { status: 503 });
     }
-  }
-
-  /**
-   * Test stages only (SPI-992 M0/M2): `holdMs` holds every gateway request's decision that long (P2, the long-held
-   * POST); `lapseLinked` ends every linked-work window now (the taint stays: H1's lapse without waiting 30 minutes);
-   * `noteLinked` notes linked work as a linked Session would; `state` answers the policy's inputs.
-   */
-  probePush(op: { readonly holdMs?: number; readonly lapseLinked?: boolean; readonly noteLinked?: { readonly session: string; readonly ms: number } }): Promise<Record<string, unknown>> {
-    if (this.env.T3FLARE_FAULTS !== "1") throw new Error("t3flare: probes answer on test stages only");
-    if (op.holdMs !== undefined) this.#probeHoldMs = Math.max(0, Math.min(op.holdMs, 20 * 60_000));
-    if (op.lapseLinked === true) this.ctx.storage.kv.put(LINKED_WORK_KEY, {});
-    if (op.noteLinked !== undefined) void this.noteLinkedWork({ session: op.noteLinked.session, until: Date.now() + op.noteLinked.ms });
-    return Promise.resolve({
-      holdMs: this.#probeHoldMs,
-      linked: this.ctx.storage.kv.get<LinkedWork>(LINKED_WORK_KEY) ?? {},
-      taint: this.ctx.storage.kv.get<Taint>(TAINT_KEY) ?? null,
-      expectations: (this.ctx.storage.kv.get<ReadonlyArray<PushExpectation>>(EXPECTATIONS_KEY) ?? []).map((e) => ({ id: e.id, refs: e.updates.map((u) => u.ref), until: e.until })),
-      owners: this.ctx.storage.kv.get<LinkedWork>(OWNER_COMMANDS_KEY) ?? {},
-    });
   }
 
   /** Test stages only (step 4a M1's restart case): this object's abort, as an eviction does. */

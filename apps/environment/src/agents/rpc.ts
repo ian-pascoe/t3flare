@@ -67,16 +67,6 @@ export interface WorkspaceRpc {
   clone(input: CloneInput): Promise<GitAnswer>;
   info(): Promise<ProvisionInfo>;
   exec(input: ExecInput): Promise<ExecResult>;
-  /** SPI-992 (review M2): t3's own push is about to run with these updates; only this router calls it. */
-  expectPush(input: { readonly id: string; readonly updates: ReadonlyArray<{ readonly ref: string; readonly new: string }>; readonly ttlMs?: number }): Promise<void>;
-  /** t3's push returned: its expectation is gone. */
-  unexpectPush(input: { readonly id: string }): Promise<void>;
-  /** SPI-992 (review H1): the owner trusts the Workspace again; its taint is cleared. */
-  trustAgain(input: { readonly by: string }): Promise<{ readonly cleared: { readonly since: number; readonly by: ReadonlyArray<string> } | null }>;
-  /** Test stages only (SPI-992): the gateway's probes. */
-  probePush(op: { readonly holdMs?: number; readonly lapseLinked?: boolean; readonly noteLinked?: { readonly session: string; readonly ms: number } }): Promise<Record<string, unknown>>;
-  /** The Workspace's taint, or null. */
-  taint(): Promise<{ readonly since: number; readonly by: ReadonlyArray<string> } | null>;
   containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }>;
   stopContainer(): Promise<void>;
   readText(path: string): Promise<string | null>;

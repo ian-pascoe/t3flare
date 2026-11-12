@@ -271,13 +271,12 @@ export interface PendingApproval {
   readonly callId: string;
   readonly tool: string;
   /**
-   * `mcp-tool` (step 3, review C4): a t3 MCP tool, accepted for the session per tool name. `git-push` (step 3, D1): a
-   * push from linked work, never accepted for the session.
+   * `mcp-tool` (step 3, review C4): a t3 MCP tool, accepted for the session per tool name.
    */
-  readonly kind: "command" | "file-change" | "mcp-tool" | "git-push";
+  readonly kind: "command" | "file-change" | "mcp-tool";
   readonly summary: string;
   readonly detail?: string;
-  /** The card's own buttons (t3's `ProviderApprovalOption`s), instead of t3's defaults (SPI-992's push card). */
+  /** The card's own buttons (t3's `ProviderApprovalOption`s), instead of t3's defaults. */
   readonly options?: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline" | "cancel"; readonly label: string; readonly warning?: string }>;
   /** A call a code mode script made (tools step, ADR-0027): the script's call and the start of its code. */
   readonly via?: { readonly parentCallId: string; readonly script: string };

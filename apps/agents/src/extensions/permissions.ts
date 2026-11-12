@@ -49,14 +49,10 @@ export type ApprovalKind = PendingApproval["kind"];
 /**
  * What "accept for the session" covers (review C4): a kind for the coding tools (every command, every file change), one
  * tool by name for t3's MCP tools (so accepting `delegate_task` never unlocks `bash` or another T3 tool, nor the
- * reverse), and nothing for a linked thread's push (owner decision D1: every push asks).
+ * reverse).
  */
 export const acceptanceKeyOf = (call: { readonly tool: string; readonly kind: ApprovalKind; readonly definition?: string }): string | null =>
-  call.kind === "git-push"
-    ? null
-    : call.kind === "mcp-tool"
-      ? `mcp-tool:${call.tool}${call.definition === undefined ? "" : `@${call.definition}`}`
-      : call.kind;
+  call.kind === "mcp-tool" ? `mcp-tool:${call.tool}${call.definition === undefined ? "" : `@${call.definition}`}` : call.kind;
 
 /** A request a tool call waits on: stored by the asking call's task, withdrawn when its turn ends. */
 export interface WaitingRequest {
@@ -249,8 +245,6 @@ export interface PermissionsHost {
   readonly turn: () => string | null;
   /** The Session's Workspace id, for path translation; null without one. */
   readonly workspaceId: () => string | null;
-  /** Runs before each command is started (step 3, D1: a linked Session notes its work in the Workspace). */
-  readonly beforeCommand?: () => Promise<void>;
 }
 
 const kindOf = (tool: string): ApprovalKind => (tool === "bash" ? "command" : "file-change");
@@ -371,7 +365,6 @@ const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T 
         if (declined !== undefined) return declined;
       }
       if (unsafe) await api.memo(STARTED_MEMO, true, context);
-      if (kind === "command") await host.beforeCommand?.();
       return tool.execute(args as never, api as never, context);
     },
   } as T;

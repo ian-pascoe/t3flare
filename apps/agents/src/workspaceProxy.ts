@@ -4,9 +4,6 @@
 //
 // - the git credential helper's token request (`CREDENTIAL_PATH`, ADR-0013) and the CLI agents' key helper
 //   (`MODEL_KEY_PATH`, step 4a), passed to the Workspace DO as a bodiless GET (only the key helper's nonce header);
-// - the push gateway (`GATEWAY_PREFIX`, SPI-992): the Container's `git push` (rerouted by `pushInsteadOf` in the image's
-//   system gitconfig), forwarded to GitHub with the write token after the Workspace DO's policy allowed its exact ref
-//   updates. The request body streams through this Worker; it never goes through the DO.
 // - the CLI agents' MCP relay (`/t3flare/mcp/<server>`, ADR-0028): one MCP message per request, with the process's
 //   tool handle, to the Workspace DO and on to the Environment DO.
 //
@@ -14,7 +11,6 @@
 import { WorkspaceProxy as ComputerWorkspaceProxy } from "@cloudflare/computer";
 
 import { handleRelayRequest, isRelayPath } from "./workspace/mcpRelay.ts";
-import { GATEWAY_PREFIX, handleGitRequest } from "./workspace/pushGateway.ts";
 import { CREDENTIAL_PATH, MODEL_KEY_PATH, type WorkspaceDO } from "./workspace/WorkspaceDO.ts";
 
 interface ProxyProps {
@@ -26,9 +22,8 @@ interface ProxyProps {
 export class WorkspaceProxy extends ComputerWorkspaceProxy {
   override async fetch(request: Request): Promise<Response> {
     const pathname = new URL(request.url).pathname;
-    const gateway = pathname.startsWith(GATEWAY_PREFIX);
     const relay = isRelayPath(pathname);
-    if (pathname !== CREDENTIAL_PATH && pathname !== MODEL_KEY_PATH && !gateway && !relay) return super.fetch(request);
+    if (pathname !== CREDENTIAL_PATH && pathname !== MODEL_KEY_PATH && !relay) return super.fetch(request);
     const { binding, id, name } = (this.ctx as unknown as { props: ProxyProps }).props;
     const namespace = (this.env as Record<string, DurableObjectNamespace | undefined>)[binding];
     if (namespace === undefined) return new Response("", { status: 500 });
@@ -45,25 +40,6 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
       }).catch((error: unknown) => {
         console.warn(JSON.stringify({ t3flare: "mcp-relay-failed", error: String(error).slice(0, 300) }));
         return new Response("t3flare: the MCP relay failed\n", { status: 502 });
-      });
-    }
-    if (gateway) {
-      // SAFETY: the Workspace DO answers `pushTarget` and `authorizePush` (WorkspaceDO.ts).
-      const rpc = workspace as unknown as Pick<WorkspaceDO, "pushTarget" | "authorizePush" | "cancelPushAsk">;
-      const pushTarget = await rpc.pushTarget().catch(() => null);
-      return handleGitRequest(request, {
-        repo: pushTarget?.repo ?? null,
-        token: () => (pushTarget === null ? Promise.reject(new Error("no push target")) : Promise.resolve(pushTarget.token)),
-        authorize: (push, signal) => {
-          // git went away while the owner was asked (review M7): the card is withdrawn.
-          const askId = crypto.randomUUID();
-          signal.addEventListener("abort", () => void rpc.cancelPushAsk({ askId }).catch(() => undefined));
-          return rpc.authorizePush({ ...push, askId });
-        },
-        fetch: (input, init) => fetch(input, init),
-      }).catch((error: unknown) => {
-        console.warn(JSON.stringify({ t3flare: "push-gateway-failed", error: String(error).slice(0, 300) }));
-        return new Response("t3flare: the push gateway failed\n", { status: 502 });
       });
     }
     const nonce = request.headers.get("x-t3flare-nonce");

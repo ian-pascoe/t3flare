@@ -126,7 +126,6 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       ...(launch.links === undefined ? {} : { links: launch.links }),
       ...(launch.prune === undefined ? {} : { prune: launch.prune }),
       ...(session !== undefined ? { thread: session.thread } : launch.thread !== undefined ? { thread: launch.thread } : {}),
-      ...(session?.linked === true ? { linked: true } : {}),
       toolHandle,
     };
     const process = yield* Effect.acquireRelease(

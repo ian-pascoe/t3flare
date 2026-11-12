@@ -12,8 +12,8 @@
 // - The turn's state reaches the Workspace (`processTurn`): the Container's hold (review F7).
 // - The 2 h turn cap (ADR-0015): a turn still running then ends its process, and with it the session.
 // - Events can be filtered (pi's "t3-code MCP unavailable" notice, review F10).
-// - A push the gateway asks about (SPI-1040) is raised as t3's approval card on the thread's live turn: the wrapper
-//   injects the request's events and answers it itself (`respondToRuntimeRequest`), never the CLI.
+// - A tool call the MCP relay asks about (ADR-0028) is raised as t3's approval card on the thread's live turn: the
+//   wrapper injects the request's events and answers it itself (`respondToRuntimeRequest`), never the CLI.
 import { toWorkspace } from "@t3flare/workspace-client";
 import {
   type NodeId,
@@ -38,8 +38,7 @@ import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 
 import type { ChannelProcess } from "../../agents/processChannel.ts";
-import { linkedWorkOf } from "../adapter.ts";
-import { type CliPushAnswer, type CliPushAsk, registerCliPushAsker } from "./linkedPushAsk.ts";
+import { type CliAnswer, type CliAsk, registerCliAsker } from "./cliAsk.ts";
 
 /** ADR-0015: a CLI turn longer than this ends its process. */
 export const TURN_CAP_MS = 2 * 60 * 60_000;
@@ -48,8 +47,6 @@ export const TURN_CAP_MS = 2 * 60 * 60_000;
 export interface CliSession {
   /** t3's thread that opened the session. */
   readonly thread: string;
-  /** The thread came through a peer link (step 3's `linkOrigin`): its pushes ask while the process lives (F8). */
-  readonly linked: boolean;
   process: ChannelProcess | undefined;
   runtimeMode: string | undefined;
   interactionMode: string | undefined;
@@ -69,14 +66,14 @@ export type CliSessions = Map<string, CliSession>;
 
 /**
  * The session whose adapter is opening now, for the spawner (`agents/cliProcess.ts`): t3's adapters spawn inside
- * `openSession`, so the spawn learns its thread, whether it is linked, and records its process on the session.
+ * `openSession`, so the spawn learns its thread and records its process on the session.
  */
 export const CliSpawn = Context.Reference<CliSession | undefined>("t3flare/CliSpawn", { defaultValue: () => undefined });
 
-export const sessionFor = (sessions: CliSessions, providerSessionId: string, cwd: string | null, thread: string, linkedOf: (thread: string) => boolean = (id) => linkedWorkOf(id) !== null): CliSession => {
+export const sessionFor = (sessions: CliSessions, providerSessionId: string, cwd: string | null, thread: string): CliSession => {
   let session = sessions.get(providerSessionId);
   if (session === undefined) {
-    session = { thread, linked: linkedOf(thread), process: undefined, runtimeMode: undefined, interactionMode: undefined, workspace: cwd === null ? null : (toWorkspace(cwd)?.id ?? null), turnActive: false, capFiber: undefined, toolHandle: newToolHandle() };
+    session = { thread, process: undefined, runtimeMode: undefined, interactionMode: undefined, workspace: cwd === null ? null : (toWorkspace(cwd)?.id ?? null), turnActive: false, capFiber: undefined, toolHandle: newToolHandle() };
     sessions.set(providerSessionId, session);
   }
   return session;
@@ -96,13 +93,9 @@ export interface WrapOptions {
   readonly sessions: CliSessions;
   /** Drops an event before t3 sees it. */
   readonly dropEvent?: (event: ProviderAdapter.ProviderAdapterV2Event) => boolean;
-  /** The CLI has no plan mode (pi): a plan turn (handed down by a link, F6) is refused rather than run unguarded. */
-  readonly refusePlan?: string;
-  /** Whether a thread came through a peer link; t3's projection by default (tests stub it). */
-  readonly linkedOf?: (thread: string) => boolean;
 }
 
-/** The live turn a push card is raised on: what `startTurn` said, and the provider turn id its events gave. */
+/** The live turn a card is raised on: what `startTurn` said, and the provider turn id its events gave. */
 interface LiveTurn {
   readonly threadId: ThreadId;
   readonly runId: RunId;
@@ -113,20 +106,19 @@ interface LiveTurn {
   ordinal: number;
 }
 
-/** A push card waiting on the owner. */
-interface OpenPushCard {
+/** A card waiting on the owner. */
+interface OpenCard {
   readonly runtimeRequest: OrchestrationV2RuntimeRequest;
   readonly node: OrchestrationV2ExecutionNode;
   readonly turnItem: OrchestrationV2TurnItem;
-  readonly answer: (answer: CliPushAnswer) => void;
+  readonly answer: (answer: CliAnswer) => void;
 }
 
-/** t3's runtime request id of a push card: never one of the CLI's own (its adapter answers those). */
-const pushRequestPrefix = (driver: string) => `runtime-request:${driver}:t3flare-push:`;
+/** t3's runtime request id of a card: never one of the CLI's own (its adapter answers those). */
+const cardRequestPrefix = (driver: string) => `runtime-request:${driver}:t3flare-ask:`;
 
-const approvedOf = (decision: ProviderApprovalDecision): CliPushAnswer =>
-  // Only the card's labelled trust answer trusts; any other approval (t3's `acceptAlways` included) is this push only.
-  decision === "acceptForSession" ? { approved: true, trust: true } : decision === "accept" || decision === "acceptAlways" ? { approved: true, trust: false } : { approved: false, reason: decision };
+const answerOf = (decision: ProviderApprovalDecision): CliAnswer =>
+  decision === "acceptForSession" ? { approved: true, forSession: true } : decision === "accept" || decision === "acceptAlways" ? { approved: true } : { approved: false, reason: decision };
 
 /** t3's adapter, as the Cloud Environment runs it. */
 export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Service"], options: WrapOptions): ProviderAdapter.ProviderAdapterV2["Service"] => {
@@ -146,17 +138,17 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
     planSelectionTransition: (input) => adapter.planSelectionTransition(input),
     openSession: (input) =>
       Effect.gen(function* () {
-        const session = sessionFor(sessions, input.providerSessionId, input.runtimePolicy.cwd, input.threadId, options.linkedOf);
+        const session = sessionFor(sessions, input.providerSessionId, input.runtimePolicy.cwd, input.threadId);
         session.runtimeMode = input.runtimePolicy.runtimeMode;
         session.interactionMode = input.runtimePolicy.interactionMode;
         const runtime = yield* adapter.openSession(input).pipe(Effect.provideService(CliSpawn, session));
         yield* Effect.addFinalizer(() => Effect.sync(() => sessions.delete(input.providerSessionId)));
         const { uploadFeedback: _feedback, mcpApps: _apps, ...rest } = runtime;
-        // SPI-1040: push cards, raised on the live turn and closed by the owner's answer, the ask's withdrawal or the turn's end.
+        // ADR-0028: the relay's cards, raised on the live turn and closed by the owner's answer, the ask's withdrawal or the turn's end.
         const injected = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
-        const cards = new Map<string, OpenPushCard>();
+        const cards = new Map<string, OpenCard>();
         let live: LiveTurn | undefined;
-        const closeCard = (id: string, decision: ProviderApprovalDecision | null, answer: CliPushAnswer): Array<ProviderAdapter.ProviderAdapterV2Event> => {
+        const closeCard = (id: string, decision: ProviderApprovalDecision | null, answer: CliAnswer): Array<ProviderAdapter.ProviderAdapterV2Event> => {
           const card = cards.get(id);
           if (card === undefined) return [];
           cards.delete(id);
@@ -172,12 +164,12 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
         const offer = (events: ReadonlyArray<ProviderAdapter.ProviderAdapterV2Event>) => {
           for (const event of events) Queue.offerUnsafe(injected, event);
         };
-        const ask = (push: CliPushAsk, signal: AbortSignal): Promise<CliPushAnswer> =>
+        const ask = (card: CliAsk, signal: AbortSignal): Promise<CliAnswer> =>
           new Promise((resolve) => {
             const turn = live;
             if (turn === undefined || turn.providerTurnId === undefined || !session.turnActive) return resolve({ approved: false, reason: "no live turn to ask on" });
             if (signal.aborted) return resolve({ approved: false, reason: "withdrawn" });
-            const id = RuntimeRequestId.make(`${pushRequestPrefix(adapter.driver)}${crypto.randomUUID()}`);
+            const id = RuntimeRequestId.make(`${cardRequestPrefix(adapter.driver)}${crypto.randomUUID()}`);
             const nodeId = IdAllocator.derive.approvalNode({ requestId: id });
             const nativeItemRef = { driver: adapter.driver, nativeId: id, strength: "weak" as const };
             const now = DateTime.nowUnsafe();
@@ -187,7 +179,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               nodeId,
               providerTurnId: turn.providerTurnId,
               nativeRequestRef: nativeItemRef,
-              kind: push.requestKind ?? "command",
+              kind: card.requestKind,
               status: "pending",
               responseCapability: { type: "live", providerSessionId: input.providerSessionId, supportsFeedback: false },
               createdAt: now,
@@ -221,18 +213,18 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               parentItemId: null,
               ordinal: turn.ordinal,
               status: "waiting",
-              title: push.title ?? "Allow git push?",
+              title: card.title,
               startedAt: now,
               completedAt: null,
               updatedAt: now,
               type: "approval_request",
               requestId: id,
-              requestKind: push.requestKind ?? "command",
-              prompt: `${push.summary}\n\n${push.detail}`,
-              ...(push.options.length === 0 ? {} : { options: push.options }),
+              requestKind: card.requestKind,
+              prompt: `${card.summary}\n\n${card.detail}`,
+              ...(card.options.length === 0 ? {} : { options: card.options }),
             };
             const onAbort = () => offer(closeCard(id, null, { approved: false, reason: "withdrawn" }));
-            const answer = (value: CliPushAnswer) => {
+            const answer = (value: CliAnswer) => {
               signal.removeEventListener("abort", onAbort);
               resolve(value);
             };
@@ -244,8 +236,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               { type: "turn_item.updated", driver: adapter.driver, turnItem },
             ]);
           });
-        const unregister = registerCliPushAsker(session.thread, {
-          linked: session.linked,
+        const unregister = registerCliAsker(session.thread, {
           ask,
           state: () => ({ runtimeMode: session.runtimeMode, interactionMode: session.interactionMode, workspace: session.workspace }),
         });
@@ -277,15 +268,6 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
           events,
           startTurn: (turn) =>
             Effect.gen(function* () {
-              if (options.refusePlan !== undefined && turn.runtimePolicy.interactionMode !== "default") {
-                return yield* new ProviderAdapter.ProviderAdapterTurnStartError({
-                  driver: adapter.driver,
-                  threadId: turn.threadId,
-                  providerThreadId: turn.providerThread.id,
-                  runId: turn.runId,
-                  cause: options.refusePlan,
-                });
-              }
               session.runtimeMode = turn.runtimePolicy.runtimeMode;
               session.interactionMode = turn.runtimePolicy.interactionMode;
               session.turnActive = true;
@@ -305,10 +287,10 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               yield* runtime.startTurn(turn).pipe(Effect.onError(() => turnEnded(session)));
             }),
           respondToRuntimeRequest: (response) => {
-            if (!response.requestId.startsWith(pushRequestPrefix(adapter.driver))) return runtime.respondToRuntimeRequest(response);
+            if (!response.requestId.startsWith(cardRequestPrefix(adapter.driver))) return runtime.respondToRuntimeRequest(response);
             if (!cards.has(response.requestId)) return Effect.fail(new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({ driver: adapter.driver, requestId: response.requestId }));
             const decision = response.decision ?? "cancel";
-            return Effect.sync(() => offer(closeCard(response.requestId, decision, approvedOf(decision))));
+            return Effect.sync(() => offer(closeCard(response.requestId, decision, answerOf(decision))));
           },
           forkThread: (fork) => {
             const target = workspaceOf(fork.runtimePolicy?.cwd);

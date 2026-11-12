@@ -189,7 +189,7 @@ describe("differ", () => {
     expect((withdrawn[0] as { runtimeRequest: { status: string } }).runtimeRequest.status).toBe("cancelled");
   });
 
-  it("opens a T3 tool's approval as a permission request, and a linked push's as a command (step 3)", () => {
+  it("opens a T3 tool's approval as a permission request, and a command's as a command (step 3)", () => {
     const turnId = Object.keys(state.turns)[0]!;
     const differ = withTurns();
     const running = { ...state, entries: [], turns: { [turnId]: { ...state.turns[turnId]!, status: "running" as const } } };
@@ -198,13 +198,13 @@ describe("differ", () => {
       ...running,
       approvals: [
         { ...base, requestId: "m", tool: "mcp__t3-code__delegate_task", kind: "mcp-tool" as const },
-        { ...base, requestId: "p", tool: "git push", kind: "git-push" as const },
+        { ...base, requestId: "p", tool: "bash", kind: "command" as const },
       ],
     }, now);
     const kinds = opened.flatMap((event) => (event.type === "runtime_request.updated" ? [event.runtimeRequest.kind] : []));
     expect(kinds).toEqual(["permission", "command"]);
     const titles = opened.flatMap((event) => (event.type === "turn_item.updated" ? [event.turnItem.title] : []));
-    expect(titles).toEqual(["Allow mcp__t3-code__delegate_task?", "Allow git push?"]);
+    expect(titles).toEqual(["Allow mcp__t3-code__delegate_task?", "Allow bash?"]);
   });
 
   it("opens an ask_user question as t3's user_input request, resolves it with the answer, cancels it when withdrawn (step 3)", () => {

@@ -112,7 +112,7 @@ export interface McpRelayInput {
   readonly server: string;
   /** One JSON-RPC message (a request or a notification). */
   readonly message: unknown;
-  /** Withdraws the call's card when the CLI goes away (`cancelPush`). */
+  /** Withdraws the call's card when the CLI goes away (`cancelAsk`). */
   readonly askId: string;
 }
 

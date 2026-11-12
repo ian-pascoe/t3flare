@@ -158,9 +158,9 @@ describe("permissions", () => {
     expect(await render("plan")).toContain("do not edit files");
   });
 
-  it("accepting for the session covers one MCP tool by name, never bash or another tool, and never a push", () => {
+  it("accepting for the session covers one MCP tool by name, and never bash or another tool", () => {
     const store = new ApprovalStore(memoryKv(), () => {});
-    const ask = (requestId: string, tool: string, kind: "command" | "mcp-tool" | "git-push") =>
+    const ask = (requestId: string, tool: string, kind: "command" | "mcp-tool") =>
       void store.ask({ requestId, turn: "t", callId: "c", tool, kind, summary: tool, createdAt: 0 }, async () => {}, context);
     ask("1", "mcp__t3-code__delegate_task", "mcp-tool");
     store.answer("1", "acceptForSession");
@@ -171,9 +171,6 @@ describe("permissions", () => {
     store.answer("2", "acceptForSession");
     expect(store.acceptedFor({ tool: "bash", kind: "command" })).toBe(true);
     expect(store.acceptedFor({ tool: "mcp__t3-code__t3_thread_send", kind: "mcp-tool" })).toBe(false);
-    ask("3", "git push", "git-push");
-    store.answer("3", "acceptForSession");
-    expect(store.acceptedFor({ tool: "git push", kind: "git-push" })).toBe(false);
   });
 
   it("the modes, acceptForSession, and the path translation", () => {

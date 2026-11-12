@@ -73,7 +73,7 @@ text(out.join("\\n"));`;
 const setup = async (
   mode: RuntimeMode,
   responses: ReadonlyArray<AssistantMessage>,
-  options: { interaction?: InteractionMode; hold?: Promise<void>; beforeCommand?: () => Promise<void> } = {},
+  options: { interaction?: InteractionMode; hold?: Promise<void> } = {},
 ) => {
   const kv = memoryKv();
   let store = new ApprovalStore(kv, () => {});
@@ -91,7 +91,6 @@ const setup = async (
         interaction: () => options.interaction ?? "default",
         turn: () => "turn-1",
         workspaceId: () => "fixture",
-        ...(options.beforeCommand === undefined ? {} : { beforeCommand: options.beforeCommand }),
       }),
       codemodeExtension(sandbox, { inlineBudget: 2000 }),
     ],
@@ -198,23 +197,6 @@ describe("code mode: nested calls are judged like direct ones", () => {
     for (const card of run.store().pending()) run.store().answer(card.requestId, "accept");
     expect(textOf(await run.result())).toContain("all ran");
     expect(run.ran.toSorted()).toEqual(["bash a", "bash b", "bash c"]);
-  }, 30_000);
-
-  it("a linked thread's nested commands each note linked work before they run, and a failing note runs nothing", async () => {
-    const notes: Array<number> = [];
-    let fail = false;
-    const run = await setup("full-access", [script(reporting(`[["one", () => tools.bash({ command: "one" })], ["two", () => tools.bash({ command: "two" })]]`)), fauxAssistantMessage("done")], {
-      beforeCommand: async () => {
-        notes.push(notes.length);
-        if (fail) throw new Error("the Workspace refused the note");
-        fail = true;
-      },
-    });
-    const output = textOf(await run.result());
-    expect(notes).toHaveLength(2);
-    expect(output).toContain("one: ran one");
-    expect(output).toContain("two threw: the Workspace refused the note");
-    expect(run.ran).toEqual(["bash one"]);
   }, 30_000);
 
   it("a script's concurrent asks wait their turn past 8 pending (review M8), and every one is asked", async () => {

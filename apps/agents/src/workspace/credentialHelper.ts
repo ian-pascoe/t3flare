@@ -7,11 +7,11 @@ export const CREDENTIAL_PATH = "/t3flare/git-credential";
 export const CREDENTIAL_HELPER_VERSION = "2";
 
 /**
- * git's credential helper in the Container (ADR-0013; SPI-992): a **read-only** token for the Workspace's one repo,
- * asked of the Workspace DO at that moment, which asks the Environment DO. Nothing is kept in a file or the shell, and
- * no token is read from the environment. It answers only `protocol=https host=github.com`: a `pushurl` or remote on any
- * other host gets nothing. Pushes never use it: they go through t3flare's push gateway (`pushInsteadOf` in the image's
- * system gitconfig), which adds the write token outside the Container.
+ * git's credential helper in the Container (ADR-0013): the Workspace's one-repo token (`contents: write`, `workflows`
+ * only for an opted-in Workspace), asked of the Workspace DO at that moment, which asks the Environment DO. Nothing is
+ * kept in a file or the shell, and no token is read from the environment. It answers only `protocol=https
+ * host=github.com` (SPI-992's early fix, kept): a `pushurl` or remote on any other host gets nothing. Pushes use it as
+ * fetches do (owner, 2026-11-12, back to stock: no push gateway).
  */
 export const CREDENTIAL_HELPER =
   '!f() { test "$1" = get || exit 0; pr=; h=; ' +

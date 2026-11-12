@@ -18,6 +18,8 @@ How part 1 implements it, with evidence in `docs/steps/step-2a/` (`m4-pr.json`, 
 
 ## Refinement (step 3: pushes from linked work, owner decision D1)
 
+**Superseded** by the back-to-stock refinement below (owner, 2026-11-12, back to stock).
+
 Work started over a Peer link may `git push` the project's repo, but **every push needs its own approval**, which "accept for the session" never covers, in any mode. The gate is where the token is handed out, since a remote task runs in the project's shared checkout and the Container token is per Workspace: a Session whose thread carries a `linkOrigin` notes, before each of its commands, that linked work is active in its Workspace (for 30 minutes). While it is, the credential helper says what git is doing (its git ancestor: push, fetch or unknown). A fetch gets a **read-only token** (`contents: read`), so claiming "fetch" for a push only makes the push fail; anything else asks the owner on the linked thread (an approval titled "Allow git push?", showing the command) and gets the write token only if approved; with no live linked turn to ask, or no answer in 10 minutes, no token. Proved on the fixture (`docs/steps/step-3/m3-push.json`): the fetch asked nothing, a declined `git push origin HEAD:main` left the remote `main` unchanged, an approved one pushed once, the next asked again although the one before was accepted "for the session".
 
 **Residual risk, accepted for step 3:** an approved push hands git a write token that a hostile agent could capture (by wrapping the helper) and reuse until it expires (at most an hour). The fix is filed as a high-priority ticket, "Link-started pushes: keep the write token out of the Container": the Workspace DO's egress adds the auth header per approved push, so the token never enters the Container. Also residual: a detached process a linked thread started more than 30 minutes before its push is not counted as linked work.
@@ -37,6 +39,8 @@ Other hosts (GitLab, Bitbucket, Azure DevOps, Forgejo) are out of scope for now:
 
 ## Refinement (SPI-992, SPI-1040): no write token in any Container; pushes go through the push gateway
 
+**Superseded** by the back-to-stock refinement below (owner, 2026-11-12, back to stock). Kept as the record of what was built.
+
 Supersedes step 3's residual risk and the write half of step 2a's Container token. Evidence in `docs/steps/spi-992/`; the report is `docs/steps/spi-992.md`.
 
 - **The Container token is read-only code** (`contents: read`, `pull_requests: write`, `metadata: read`): it clones and fetches, and lets an agent's `gh pr create`/`view` work, since a pull request carries no code. The credential helper (protocol `v=2`) answers only `https://github.com`, so it never hands a token to a `pushurl` on another host (a finding of the plan: the old helper did).
@@ -54,3 +58,24 @@ Accepted costs and residual risks:
 - **Git LFS** uploads go to GitHub's LFS API, not receive-pack; with a read-only token they fail. Ticketed.
 - **GitHub Actions.** An approved push can still change `.github/workflows` in an opted-in Workspace, and any pushed branch runs the repo's existing workflows with their secrets: approving a push is approving what CI will run. Recommended for the owner's repos: default workflow permissions read-only (`GITHUB_TOKEN`), and branch protection on the default branch.
 - **What the gateway cannot see.** It sees refs and object ids, not intent. Expectations are bound to `{ref, new}` for 30 minutes, so a hostile process that makes the same update t3 is about to push races t3 and wins nothing it was not getting. The helper's host check keeps git from sending a token to a foreign `pushurl`, but it does not stop a hostile process, which can ask the helper's endpoint itself: what closes that is that every token the endpoint issues is read-only.
+
+## Refinement (back to stock, owner 2026-11-12): the agent's git pushes with the Workspace's token; the mode is the gate
+
+Owner, 2026-11-12, back to stock (scope audit row 1). Supersedes step 3's D1 refinement and the SPI-992/SPI-1040
+refinement. t3flare behaves like stock t3: the agent's shell pushes with the repo's credential, and the thread's mode
+is the only gate.
+
+- **The Container token writes code again**, as in step 2a: the Workspace's one repo, `contents: write`,
+  `pull_requests: write`, `metadata: read`, and `workflows: write` only for a Workspace the owner opted in (kept, K7).
+  The credential helper hands it to any git in the Container that asks about `https://github.com`; it still answers no
+  other protocol or host (SPI-992's early fix, kept as leak hygiene).
+- **Removed**: the push gateway and its `pushInsteadOf` rewrite in the image's system gitconfig, Expectations, Taint
+  (and the `workspace-trust` admin route), linked-work tracking, and the push cards on Durable and CLI threads
+  (`SessionDO.approveGitPush`, the CLI wrapper's push half; its injected cards remain for the MCP relay's tool cards).
+- **Linked work** pushes under its link's mode, with no card of its own.
+- **Gone with the gateway**: its 100 MiB cap per push and its Git LFS gap. A push goes straight to GitHub.
+
+Accepted, as in stock t3: a one-repo write token (at most an hour) is readable in the Container while an agent works;
+an approved command, or any command at full access, can push. The leak scan (K6) still looks for the token in the
+Workspace's files; finding it in the Container's memory or environment during work is stock behaviour, not a leak.
+

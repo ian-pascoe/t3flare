@@ -13,25 +13,19 @@ export interface EnvironmentRpc {
   /** The Session's committed state (ADR-0005). */
   sessionPush(push: SessionPush): Promise<SessionPushAnswer>;
   /**
-   * A Workspace's token for its one repo (ADR-0013; SPI-992): `read` for the git credential helper in its Container
-   * (and `pull_requests: write` for `gh`), `push` for the push gateway only (`contents: write`; never in a Container).
-   * With the repo it is for and when it expires.
+   * A Workspace's token for its one repo (ADR-0013), for the git credential helper in its Container: `contents: write`
+   * (`workflows` only for an opted-in Workspace) and `pull_requests: write` for `gh`. With the repo and its expiry.
    */
-  workspaceToken(id: string, options: { readonly purpose: "read" | "push" }): Promise<{ readonly token: string | null; readonly expiresAt?: number; readonly repo?: { readonly owner: string; readonly name: string } }>;
-  /**
-   * SPI-1040: asks the owner about a push on a CLI thread's live turn (the card the CLI wrapper raises). Refused with
-   * no live turn, or no answer within the push approval wait. `trust`: the owner also trusted the Workspace again.
-   */
-  approvePush(input: { readonly thread: string; readonly workspace: string; readonly linked: boolean; readonly askId: string; readonly summary: string; readonly detail: string; readonly options: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline"; readonly label: string; readonly warning?: string }> }): Promise<{ readonly approved: boolean; readonly trust?: boolean; readonly reason?: string }>;
-  /** The push's git went away (review M7): the card `approvePush` raised is withdrawn. */
-  cancelPush(input: { readonly askId: string }): Promise<void>;
+  workspaceToken(id: string): Promise<{ readonly token: string | null; readonly expiresAt?: number; readonly repo?: { readonly owner: string; readonly name: string } }>;
+  /** The CLI relay's card for a call whose CLI went away (ADR-0028) is withdrawn. */
+  cancelAsk(input: { readonly askId: string }): Promise<void>;
   /** A Session's call of t3's `/mcp` (step 3, ADR-0022): t3's HTTP app answers it, never over the public host. */
   mcp(input: McpRpcRequest): Promise<McpRpcAnswer>;
   /** A Workspace's terminal output (step 2b): never boots t3, and is not activity (ADR-0003). */
   terminalOutput(push: TerminalPush): Promise<TerminalPushAnswer>;
   /** The harness settings, resolved and secret-free (ADR-0026): read at a turn's start. Never boots t3. */
   harnessSettings(input: { readonly projectId?: string }): Promise<ResolvedHarness>;
-  /** The MCP tools this Session may install (ADR-0028); a linked thread sees only servers offered to linked threads. */
+  /** The MCP tools this Session may install (ADR-0028). */
   mcpView(): Promise<McpView>;
   /** An MCP call the Session's tool has judged (`decideCall`). */
   mcpCall(input: {

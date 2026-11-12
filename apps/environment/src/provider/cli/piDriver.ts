@@ -118,7 +118,6 @@ export const PiCliDriver: ProviderDriver<PiSettings, PiCliDriverEnv> = {
       orchestrationAdapter: wrapCliAdapter(adapter, {
         sessions,
         dropEvent: (event) => JSON.stringify(event).includes(MCP_UNAVAILABLE_NOTICE),
-        refusePlan: "Plan mode is not available for the Pi CLI; use Codex or Pi Durable",
       }),
       textGeneration: makePiDurableTextGeneration(),
     } satisfies ProviderInstance;

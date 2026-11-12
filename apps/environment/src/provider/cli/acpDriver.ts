@@ -231,8 +231,8 @@ const promptBuilder = (host: ProviderHost.ProviderHost["Service"], fileSystem: F
 };
 
 /**
- * The options t3's ACP adapter runs with here. Never `clientTerminals` (SPI-992 U39): with it the adapter would run the
- * agent's terminal commands itself, in t3's process, outside the Workspace and around the push gateway's policy.
+ * The options t3's ACP adapter runs with here. Never `clientTerminals`: with it the adapter would run the agent's
+ * terminal commands itself, in t3's process (the Environment DO, which runs no processes), outside the Workspace.
  */
 export const acpAdapterOptions = (
   instanceId: ProviderInstanceId,

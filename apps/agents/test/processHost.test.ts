@@ -1,7 +1,6 @@
 // The Workspace DO's CLI processes (step 4a, the process channel) at their seam, `ProcessHost`, over a fake non-PTY
 // exec: what the Environment's spawner sees pushed, what reaches the process's stdin, and what the kill script gets.
-// Review F6 (ordered input that never skips, bytes, never-dropped output), F7 (the hold), F8 (linked work while a
-// process lives) and plan §2.6 (epochs).
+// Review F6 (ordered input that never skips, bytes, never-dropped output), F7 (the hold) and plan §2.6 (epochs).
 // @effect-diagnostics globalTimers:off newPromise:off globalDate:off
 import type { ProcessFrame, ProcessStartInput } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
@@ -62,7 +61,6 @@ const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: n
   const spawned: Array<{ argv: ReadonlyArray<string>; env: Record<string, string> }> = [];
   const frames: Array<ProcessFrame> = [];
   const killed: Array<ReadonlyArray<string>> = [];
-  const linked: Array<[string, boolean]> = [];
   let remembered: ReadonlyArray<ProcessMarker> = [];
   const deps: ProcessHostDeps = {
     now: () => now,
@@ -85,7 +83,6 @@ const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: n
     filesMayHaveChanged: () => undefined,
     maxProcesses: options.maxProcesses ?? 4,
     allowProbe: true,
-    linkedWork: (thread, alive) => void linked.push([thread, alive]),
   };
   const host = new ProcessHost(deps);
   /** The Environment's reads until nothing is left, each acknowledged. */
@@ -104,7 +101,6 @@ const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: n
     spawned,
     frames,
     killed,
-    linked,
     advance: (ms: number) => void (now += ms),
     setRemembered: (markers: ReadonlyArray<ProcessMarker>) => void (remembered = markers),
     remembered: () => remembered,
@@ -246,11 +242,10 @@ describe("ProcessHost", () => {
 
   it("kills an earlier instance's process when the Environment heartbeats a key this instance does not hold", async () => {
     const h = harness();
-    h.setRemembered([{ key: "proc-orphan", environmentEpoch: 3, thread: "t", linked: true }]);
+    h.setRemembered([{ key: "proc-orphan", environmentEpoch: 3, thread: "t" }]);
     h.host.heartbeat(["proc-orphan"]);
     await tick(20);
     expect(h.killed).toEqual([["proc-orphan"]]);
-    expect(h.linked).toEqual([["t", false]]);
     expect(h.remembered()).toEqual([]);
   });
 
@@ -268,18 +263,6 @@ describe("ProcessHost", () => {
     expect(h.host.holdsContainer()).toBe(true);
     h.advance(1);
     expect(h.host.holdsContainer()).toBe(false);
-  });
-
-  it("holds linked work while a linked thread's process lives, and releases it at the exit (review F8)", async () => {
-    const h = harness();
-    await h.host.start(start("proc-a", { linked: true, thread: "thread-9" }));
-    expect(h.linked).toEqual([["thread-9", true]]);
-    h.procs[0]!.exit(0);
-    await tick(50);
-    expect(h.linked).toEqual([
-      ["thread-9", true],
-      ["thread-9", false],
-    ]);
   });
 
   it("ends every process by marker before a stop and waits for their exits", async () => {
@@ -313,10 +296,10 @@ describe("ProcessHost", () => {
 
 describe("tool handles (ADR-0028)", () => {
   const HANDLE = "c".repeat(64);
-  it("resolve to their live process's thread and link, and are revoked when it exits", async () => {
+  it("resolve to their live process's thread, and are revoked when it exits", async () => {
     const h = harness();
-    await h.host.start(start("proc-a", { toolHandle: HANDLE, linked: true }));
-    expect(h.host.toolCaller(HANDLE)).toEqual({ key: "proc-a", cli: "codex", thread: "thread-1", linked: true });
+    await h.host.start(start("proc-a", { toolHandle: HANDLE }));
+    expect(h.host.toolCaller(HANDLE)).toEqual({ key: "proc-a", cli: "codex", thread: "thread-1" });
     expect(h.host.toolCaller("d".repeat(64))).toBeNull();
     expect(h.host.toolCaller(null)).toBeNull();
     h.procs[0]!.exit(0);

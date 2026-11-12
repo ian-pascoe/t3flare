@@ -319,27 +319,25 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 - **Where**: `apps/sandbox-image/src/clis.ts` (`claude` 2.1.322 through claude-agent-acp 0.106.0 and the SDK 0.3.322; `opencode` 2.2.7 and its tarball digest), the Dockerfile's `OPENCODE_*` ARGs and `image/claude/package-lock.json`; `cliManifest.test.ts` checks them against `model-manifest.json` for `claudeAgent` and `opencode`.
 - **Breaks when**: a nightly raises a minimum. **Detection**: tests ("bump the CLI in clis.ts"). **Fix**: bump the version, the lock or digest together; re-run U35's checks.
 
-### U37. Push cards injected by the CLI wrapper (SPI-1040)
+### U37. Cards injected by the CLI wrapper (SPI-1040; the MCP relay's tool cards since the back-to-stock cut)
 
-- **Where**: `apps/environment/src/provider/cli/wrapper.ts` raises the push gateway's "Allow git push?" card on a CLI thread's live turn: it emits `runtime_request.updated`, `node.updated` and `turn_item.updated` with an `approval_request` item (`t3code/packages/provider-core/src/server/ProviderAdapter.ts` `ProviderAdapterV2Event`) that the native agent never sent, with ids from `IdAllocator.derive.approvalNode`/`approvalTurnItem` and a runtime request id of its own prefix (`runtime-request:<driver>:t3flare-push:`), and answers t3's `respondToRuntimeRequest` for that prefix itself. It learns the turn's `providerTurnId` from the adapter's `provider_turn.updated` whose `nodeId` is the turn's `rootNodeId` (as the ACP, Pi and Codex adapters emit it), numbers the card's turn item after the highest ordinal seen, and closes open cards before passing on `turn.terminal`.
+- **Where**: `apps/environment/src/provider/cli/wrapper.ts` raises the MCP relay's tool card (`cliAsk.ts`
+  `approveCliTool`, ADR-0028) on a CLI thread's live turn: it emits `runtime_request.updated`, `node.updated` and `turn_item.updated` with an `approval_request` item (`t3code/packages/provider-core/src/server/ProviderAdapter.ts` `ProviderAdapterV2Event`) that the native agent never sent, with ids from `IdAllocator.derive.approvalNode`/`approvalTurnItem` and a runtime request id of its own prefix (`runtime-request:<driver>:t3flare-ask:`), and answers t3's `respondToRuntimeRequest` for that prefix itself. It learns the turn's `providerTurnId` from the adapter's `provider_turn.updated` whose `nodeId` is the turn's `rootNodeId` (as the ACP, Pi and Codex adapters emit it), numbers the card's turn item after the highest ordinal seen, and closes open cards before passing on `turn.terminal`. (Until the back-to-stock cut, owner 2026-11-12, it raised the push gateway's "Allow git push?" card too.)
 - **Breaks when**: the event schema changes (typecheck); t3 validates a runtime request against the adapter's own state or snapshot (`readThreadSnapshot`) and drops ours; an adapter stops emitting its root `provider_turn.updated` before asking (the card is refused: "no live turn to ask on"); ordinals become unique per turn.
-- **Detection**: typecheck; `test/cliPushCard.test.ts` (t3's ACP adapter wrapped, a scripted agent: the card's shape, the answers, withdrawal, the turn's end); `scripts/spi992.ts p5` on a stage (an owner and a linked Claude thread push through the card). **Silent**: t3 dropping the card without an error (the push is then refused after 10 minutes).
-- **Blast radius**: pushes from CLI threads in a tainted Workspace, and from linked CLI threads, are refused (fail closed).
+- **Detection**: typecheck; `test/cliCard.test.ts` (t3's ACP adapter wrapped, a scripted agent: the card's shape, the answers, withdrawal, the turn's end); `scripts/tools.ts` relay cases on a stage. **Silent**: t3 dropping the card without an error (the call is then refused after 10 minutes).
+- **Blast radius**: relayed MCP writes from CLI threads that need a card are refused (fail closed).
 - **Fix**: `git -C t3code diff <old>..<new> -- packages/provider-core/src/server/ProviderAdapter.ts apps/server/src/orchestration-v2/RunExecutionService.ts`; follow how t3 accepts and routes runtime requests.
 
-### U38. t3's push argv, turned into expectations (SPI-992)
+### U38. Retired: t3's push argv, turned into expectations (SPI-992)
 
-- **Where**: `apps/environment/src/agents/gitRoutes.ts` parses the pushes t3's git layer sends into the ref updates it expects (`push -- <remote> HEAD:refs/heads/<b>`, bare `push` through `@{push}`, the stack rebase's `push --quiet --force-with-lease=… origin <sha>:refs/heads/<b>`, `--delete`); `processRouter.ts` registers them on the Workspace DO before the command runs (`push-expected` in the log), and the gateway allows a push whose updates all match one.
-- **Breaks when**: t3 pushes another form (`t3code/apps/server/src/git/GitVcsDriverCore.ts`, `githubStackRebase.ts`).
-- **Detection**: `test/gitRoutes.test.ts`; `scripts/spi992.ts m1` and `repro` (t3's Commit & push while the Workspace is tainted). An unparsed form registers nothing: the push then asks or is refused with a named message, loud rather than unsafe.
-- **Fix**: add the form to the parser and its test.
+Retired with the push gateway (owner, 2026-11-12, back to stock): no Expectation is registered, and t3's own push goes
+to GitHub as the agent's does.
 
-### U39. No t3 path pushes for a linked agent (SPI-992)
+### U39. Retired: no t3 path pushes for a linked agent (SPI-992)
 
-- **Where**: `acpDriver.ts` `acpAdapterOptions` gives t3's ACP adapter no `clientTerminals`, so an ACP agent's commands run as its own process in the Container (through the gateway's policy), never in t3's process; the t3 MCP tools a link or a Durable agent may call (`apps/agents/src/extensions/t3-mcp.ts` `T3_TOOL_ALLOWLIST`) reach no push (`t3_project_clone` clones; `publishRepository` and `t3_worktree_*` are not allowed).
-- **Breaks when**: the driver starts passing `clientTerminals`; t3 adds a push to an allowed tool (a project create that publishes, a PR tool that pushes its branch); the allowlist gains a tool that pushes. Each would register an owner's expectation for a linked agent's push.
-- **Detection**: `test/cliPushCard.test.ts` ("never gives t3's adapter client terminals"); `scripts/spi992.ts p5` (the allowed git-touching tools from an auto-accept-edits and a full-access link: no `git push` in the router trace, no expectation). **Silent** for a new tool until T13 lists it.
-- **Fix**: keep the option out; deny the tool in `t3-mcp.ts`, or mark its pushes as the caller's (linked) work.
+Retired with the push gateway (owner, 2026-11-12, back to stock): a linked thread pushes under its own mode. Still
+true and kept for another reason: `acpAdapterOptions` gives t3's ACP adapter no `clientTerminals`, since the
+Environment DO runs no processes and an agent's commands belong in its Workspace (`test/cliCard.test.ts`).
 
 ### U40. Code mode and pi-codemode (tools step)
 

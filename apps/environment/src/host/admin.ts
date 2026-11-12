@@ -32,8 +32,6 @@
 //   GET  /_t3flare/agents/sweep[?dry=1]           step 2b: the Workspace sweep (dry: what it would do, with reasons)
 //   POST /_t3flare/agents/workspace-probe?id=<id>  the repo revision moves on a write and a delete (read cache check)
 //   POST /_t3flare/agents/workspace-workflows?id=<id>&on=1|0  the owner's opt-in to `workflows: write` on the Workspace's Container tokens
-//   GET  /_t3flare/agents/workspace-taint?id=<id>  SPI-992: the Workspace's taint from linked work (every push asks while set)
-//   POST /_t3flare/agents/workspace-trust?id=<id>  SPI-992: the owner trusts the Workspace again (clears the taint)
 //   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec"|"credentialHelper"|"killExecs": input} on the Workspace DO
 //   GET  /_t3flare/agents/checkpoint-trace?clear=1 the checkpoint operations the Workspace DOs answered, and by which side
 //   POST /_t3flare/check/connect-leak            step 3+: T3 Connect's secrets (names only) found in {"text"} (Workers Logs)
@@ -333,16 +331,6 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         environmentServices().workspaces.setWorkflows(id, url.searchParams.get("on") === "1");
         return json(environmentServices().workspaces.get(id) ?? { error: "no such Workspace" });
       }
-      case "GET /_t3flare/agents/workspace-taint":
-      case "POST /_t3flare/agents/workspace-trust": {
-        // SPI-992 (review H1): a Workspace's taint from linked work; POST clears it (the owner trusts it again).
-        const { environmentServices } = await import("../agents/bindings.ts");
-        const { workspaceRpc } = await import("../agents/workspaceClient.ts");
-        const id = url.searchParams.get("id") ?? "";
-        if (environmentServices().workspaces.get(id) === undefined) return json({ error: "no such Workspace" }, 404);
-        if (request.method === "GET") return json({ id, taint: await workspaceRpc(id).taint() });
-        return json({ id, ...(await workspaceRpc(id).trustAgain({ by: "admin" })) });
-      }
       case "POST /_t3flare/agents/workspace-call": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");
         const rpc = workspaceRpc(url.searchParams.get("id") ?? "");
@@ -363,9 +351,7 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                       ? await rpc.killExecs(body.killExecs as never)
                       : "probeProcess" in body
                         ? await rpc.probeProcess(body.probeProcess as never)
-                        : "probePush" in body
-                          ? await rpc.probePush(body.probePush as never)
-                          : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess, probePush" };
+                        : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
       }
       case "POST /_t3flare/check/connect-leak": {

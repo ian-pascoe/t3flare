@@ -20,31 +20,24 @@ export const GITHUB_APP_PERMISSIONS = {
 } as const satisfies GitHubPermissions;
 
 /**
- * A Workspace's Container token (git and gh there; the agent can read it, SPI-992): one repo, **read-only code**. It
- * fetches and clones, and keeps `pull_requests: write` (owner's decision, review M4) so an agent's `gh pr create`/`view`
- * work: a pull request carries no code, its branch must already be on GitHub. No token that can write code ever enters
- * a Container; pushes go through the push gateway (`PUSH_GATEWAY_PERMISSIONS`).
+ * A Workspace's Container token (git and gh there; the agent can read it): one repo, code and pull requests writable,
+ * as before SPI-992 (owner, 2026-11-12, back to stock: no push gateway). No `workflows` unless the Workspace is opted
+ * in (`CONTAINER_WORKFLOWS_PERMISSIONS`).
  */
 export const CONTAINER_GITHUB_PERMISSIONS = {
-  contents: "read",
+  contents: "write",
   pull_requests: "write",
   metadata: "read",
 } as const satisfies GitHubPermissions;
 
-/**
- * The push gateway's token (SPI-992): `contents: write` on the Workspace's one repo, added by the agents Worker to a
- * push the gateway's policy allowed. Never reaches a Container or a Session.
- */
-export const PUSH_GATEWAY_PERMISSIONS = {
-  contents: "write",
-  metadata: "read",
-} as const satisfies GitHubPermissions;
-
-/** The push gateway's token for a Workspace the owner opted in to changing CI. */
-export const PUSH_GATEWAY_WORKFLOWS_PERMISSIONS = {
-  ...PUSH_GATEWAY_PERMISSIONS,
+/** A Container token for a Workspace the owner opted in to changing CI. */
+export const CONTAINER_WORKFLOWS_PERMISSIONS = {
+  ...CONTAINER_GITHUB_PERMISSIONS,
   workflows: "write",
 } as const satisfies GitHubPermissions;
+
+/** The Container token's permissions for a Workspace, by its `workflows` opt-in. */
+export const containerGitHubPermissions = (workflows: boolean): GitHubPermissions => (workflows ? CONTAINER_WORKFLOWS_PERMISSIONS : CONTAINER_GITHUB_PERMISSIONS);
 
 /** The Environment DO's own token for t3's PR features: never reaches a Container or a Session. */
 export const ENVIRONMENT_GITHUB_PERMISSIONS = {

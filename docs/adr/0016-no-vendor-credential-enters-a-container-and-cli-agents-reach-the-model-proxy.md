@@ -61,6 +61,8 @@ Revised on 2026-11-11 by the text above. The original:
 
 ## Refinement (SPI-992)
 
+**Superseded** (owner, 2026-11-12, back to stock): the Container token writes code again and pushes go straight to GitHub (ADR-0013's back-to-stock refinement). Model and vendor credentials stay out of Containers as above.
+
 The same holds for GitHub write access: no token that can write code enters a Container. The Container token is read-only; pushes are authorised outside, at the push gateway (ADR-0013's SPI-992 refinement).
 
 ## Refinement (tools step): tool handles, and no MCP credential in a Container

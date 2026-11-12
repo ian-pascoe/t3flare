@@ -150,7 +150,7 @@ export type GitAnswer =
 export interface CloneInput {
   /** The Workspace's id, which the object keeps (the credential helper asks for its repo's token by it). */
   readonly id?: string;
-  /** An https URL with no credentials; the credential helper asks the Workspace DO for a read-only token (SPI-992). */
+  /** An https URL with no credentials; the credential helper asks the Workspace DO for the repo's token (ADR-0013). */
   readonly url: string;
   readonly timeoutMs?: number;
 }
@@ -264,10 +264,8 @@ export interface ProcessStartInput {
   readonly links?: ReadonlyArray<{ readonly path: string; readonly target: string }>;
   /** Session retention: files under `dir` untouched for `days` are removed before the start. */
   readonly prune?: ReadonlyArray<{ readonly dir: string; readonly days: number }>;
-  /** t3's thread, for linked work (D1) and the logs. */
+  /** t3's thread, for the MCP relay and the logs. */
   readonly thread?: string;
-  /** The thread came through a peer link: its pushes ask, while the process lives (review F8). */
-  readonly linked?: boolean;
   /**
    * The process's tool handle (ADR-0028): what the CLI sends the MCP relay (`/t3flare/mcp/*`) as its bearer. Kept only
    * while the process lives; never logged.

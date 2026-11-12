@@ -55,7 +55,6 @@ export interface ProcessMarker {
   readonly key: string;
   readonly environmentEpoch: number;
   readonly thread?: string;
-  readonly linked?: boolean;
 }
 
 export interface ProcessHostDeps {
@@ -81,8 +80,6 @@ export interface ProcessHostDeps {
   readonly allowProbe: boolean;
   /** Before a start: the profile's checks that need the Container (the sandbox probe, the key's nonce). */
   readonly beforeStart?: (input: ProcessStartInput) => Promise<{ readonly env?: Readonly<Record<string, string>>; readonly sandbox?: boolean } | void>;
-  /** A process of a linked thread lives, or no longer does (D1, review F8). */
-  readonly linkedWork?: (thread: string, alive: boolean) => void;
 }
 
 /**
@@ -117,7 +114,6 @@ export interface ToolCaller {
   readonly key: string;
   readonly cli: string;
   readonly thread: string | null;
-  readonly linked: boolean;
 }
 
 const encoder = new TextEncoder();
@@ -163,7 +159,7 @@ export class ProcessHost {
     if (handle === null || handle.length < 32) return null;
     for (const proc of this.#procs.values()) {
       if (proc.exited || proc.toolHandle === undefined || proc.toolHandle !== handle) continue;
-      return { key: proc.key, cli: proc.cli, thread: proc.marker.thread ?? null, linked: proc.marker.linked === true };
+      return { key: proc.key, cli: proc.cli, thread: proc.marker.thread ?? null };
     }
     return null;
   }
@@ -246,7 +242,6 @@ export class ProcessHost {
         key: input.key,
         environmentEpoch: input.environmentEpoch,
         ...(input.thread === undefined ? {} : { thread: input.thread }),
-        ...(input.linked === true ? { linked: true } : {}),
       },
       process: undefined,
       writer: undefined,
@@ -263,7 +258,6 @@ export class ProcessHost {
     };
     this.#procs.set(input.key, proc);
     this.#save();
-    if (proc.marker.linked === true && proc.marker.thread !== undefined) this.#deps.linkedWork?.(proc.marker.thread, true);
     try {
       const process = await this.#deps.spawn(["bash", "-c", command], { ...this.#deps.baseEnv, ...input.env, ...extraEnv, T3FLARE_EXEC: input.key });
       proc.process = process;
@@ -282,7 +276,6 @@ export class ProcessHost {
     } catch (error) {
       this.#procs.delete(input.key);
       this.#save();
-      if (proc.marker.linked === true && proc.marker.thread !== undefined) this.#deps.linkedWork?.(proc.marker.thread, false);
       return refuse(`the process did not start: ${String(error instanceof Error ? error.message : error).slice(0, 300)}`);
     }
     if (proc.killing) await this.#deps.kill([proc.key]);
@@ -299,7 +292,6 @@ export class ProcessHost {
     for (const marker of stale) {
       const proc = this.#procs.get(marker.key);
       if (proc !== undefined) this.#exited(proc, 129);
-      else if (marker.linked === true && marker.thread !== undefined) this.#deps.linkedWork?.(marker.thread, false);
     }
     this.#save();
   }
@@ -459,7 +451,6 @@ export class ProcessHost {
     if (orphans.length === 0) return 0;
     console.log(JSON.stringify({ t3flare: "process-orphans-killed", count: orphans.length }));
     await this.#deps.kill(orphans.map((marker) => marker.key));
-    for (const marker of orphans) if (marker.linked === true && marker.thread !== undefined) this.#deps.linkedWork?.(marker.thread, false);
     this.#save();
     return orphans.length;
   }
@@ -488,7 +479,6 @@ export class ProcessHost {
     this.#frame(proc, { stream: "exit", code });
     this.#procs.delete(proc.key);
     this.#save();
-    if (proc.marker.linked === true && proc.marker.thread !== undefined) this.#deps.linkedWork?.(proc.marker.thread, false);
     this.#deps.filesMayHaveChanged("exit");
     console.log(JSON.stringify({ t3flare: "process-exited", key: proc.key, code }));
     // What the CLI left in its session (a background server): part 2's kill script, never `ExecProcess.kill()`.

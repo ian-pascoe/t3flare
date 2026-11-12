@@ -408,9 +408,8 @@ const emitNested = (
   }
 };
 
-/** t3's request kind for a Session approval: a T3 tool's is a permission (as t3's Pi bridge asks), a push a command. */
-const requestKindOf = (kind: PendingApproval["kind"]): "command" | "file-change" | "permission" =>
-  kind === "mcp-tool" ? "permission" : kind === "git-push" ? "command" : kind;
+/** t3's request kind for a Session approval: a T3 tool's is a permission (as t3's Pi bridge asks). */
+const requestKindOf = (kind: PendingApproval["kind"]): "command" | "file-change" | "permission" => (kind === "mcp-tool" ? "permission" : kind);
 
 /** A Session request (an approval, or step 3's question) as t3 shows it: its kinds and its turn item's own fields. */
 interface RequestView {
