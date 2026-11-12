@@ -42,7 +42,7 @@ describe("t3's guidance and tool descriptions, classified (U40)", () => {
   it("classifies every backticked name in the guidance and in the offered tools' descriptions", () => {
     const names = toolLikeNamesIn([T3_CODE_ORCHESTRATION_INSTRUCTIONS, ...offeredDescriptions()].join("\n"));
     const unclassified = names.filter((name) => !T3_TOOL_ALLOWLIST.has(name) && !WITHHELD_T3_TOOLS.has(name) && !NOT_T3_TOOLS.has(name));
-    expect(unclassified, "classify these in apps/agents/src/extensions/t3-guidance.ts").toEqual([]);
+    expect(unclassified, "classify these in packages/harness-registry/src/t3Guidance.ts").toEqual([]);
   });
 
   it("classifies honestly: withheld names are t3 tools not offered, and the rest name no t3 tool", () => {

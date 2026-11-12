@@ -170,7 +170,7 @@ describe("the relay's MCP server", () => {
   });
 });
 
-const t3Harness = (tools: ReadonlyArray<{ name: string; annotations?: { readOnlyHint?: boolean } }>, credential: string | null = "Bearer real-t3") => {
+const t3Harness = (tools: ReadonlyArray<{ name: string; description?: string; annotations?: { readOnlyHint?: boolean } }>, credential: string | null = "Bearer real-t3") => {
   const posts: Array<McpRpcRequest> = [];
   const asks: Array<{ perCall: boolean }> = [];
   const deps: T3RelayDeps = {
@@ -204,6 +204,12 @@ describe("t3's tools through the relay (SPI-1039)", () => {
     const tools = resultOf(await relayT3Message(input({ jsonrpc: "2.0", id: 3, method: "tools/list" }, { server: "t3" }), t.deps)).tools!;
     expect(tools.map((entry) => entry.name)).toEqual(["t3_thread_list", "delegate_task"]);
     expect(new Set(t.posts.map((post) => post.authorization))).toEqual(new Set(["Bearer real-t3"]));
+  });
+
+  it("drops a description's sentence naming a t3 tool not offered (SPI-1060's rule)", async () => {
+    const t = t3Harness([{ name: "t3_thread_list", description: "Lists threads. Link one first with `t3_environment_link`.", annotations: { readOnlyHint: true } }]);
+    const tools = resultOf(await relayT3Message(input({ jsonrpc: "2.0", id: 3, method: "tools/list" }, { server: "t3" }), t.deps)).tools! as ReadonlyArray<{ description?: string }>;
+    expect(tools[0]!.description).toBe("Lists threads.");
   });
 
   it("runs a read-only tool, asks for a write in approval-required, refuses a tool outside the allowlist", async () => {

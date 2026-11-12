@@ -4,7 +4,7 @@
 // own auth, link fence and mode ceiling run unchanged; the relay adds the allowlist (fails closed), the same
 // `decideCall` as every other tool (t3's annotation as the class; review M10), and review H1: while the Workspace is
 // tainted, an owner thread's handle is refused outright (linked work in the same checkout could have read it).
-import { cardText, decideCall, type McpRelayAnswer, type McpRelayInput, strictestMode, T3_TOOL_ALLOWLIST } from "@t3flare/harness-registry";
+import { cardText, decideCall, descriptionFor, type McpRelayAnswer, type McpRelayInput, strictestMode, T3_TOOL_ALLOWLIST } from "@t3flare/harness-registry";
 import type { McpRpcAnswer, McpRpcRequest } from "@t3flare/session-protocol";
 
 import type { RelayDeps } from "./relay.ts";
@@ -92,7 +92,10 @@ const toolsOf = async (deps: T3RelayDeps, authorization: string, fresh: boolean)
   if (!fresh && entry?.tools !== undefined && deps.now() - (entry.listedAt ?? 0) < LIST_TTL_MS) return entry.tools;
   const answer = await request(deps, authorization, "tools/list", {});
   if (answer.status !== 200) return undefined;
-  const tools = (messageOf(answer)?.result?.tools ?? []).filter((tool) => typeof tool.name === "string" && T3_TOOL_ALLOWLIST.has(tool.name));
+  const listed = (messageOf(answer)?.result?.tools ?? []).filter((tool) => typeof tool.name === "string" && T3_TOOL_ALLOWLIST.has(tool.name));
+  // SPI-1060's rule for CLI agents too: a description never names a t3 tool this thread is not offered.
+  const offered: ReadonlySet<string> = new Set(listed.map((tool) => tool.name));
+  const tools = listed.map((tool) => (typeof tool["description"] === "string" ? { ...tool, description: descriptionFor(tool["description"], offered) } : tool));
   const kept = deps.cache.get(authorization) ?? {};
   kept.tools = tools;
   kept.listedAt = deps.now();
