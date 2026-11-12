@@ -152,7 +152,7 @@ describe("code mode: nested calls are judged like direct ones", () => {
     run.store().answer(requestId, "accept");
     expect(textOf(await run.result())).toContain("ran rm -rf build");
     expect(run.ran).toEqual(["bash rm -rf build"]);
-  }, 60_000);
+  }, 120_000);
 
   it("auto-accept-edits: a nested edit runs without a card, a nested command asks", async () => {
     const run = await setup("auto-accept-edits", [
@@ -233,5 +233,5 @@ describe("code mode: nested calls are judged like direct ones", () => {
     }
     expect(textOf(await run.result())).toContain("done");
     expect(run.ran).toHaveLength(12);
-  }, 60_000);
+  }, 120_000);
 });

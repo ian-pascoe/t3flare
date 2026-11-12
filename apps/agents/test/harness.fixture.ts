@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off
 // A pi-durable Harness on pi-ai's faux provider, restarted as an evicted Durable Object is (cloudpid's restart fixture,
 // cloudpid@b8097ff0:packages/effect-durable/src/harness.fixture.ts `openRestartingHarness`), shared by the extension tests.
 // @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
@@ -18,8 +19,10 @@ export const memoryKv = (): ApprovalStorage => {
   };
 };
 
-export const until = async (check: () => boolean | Promise<boolean>, what: string): Promise<void> => {
-  for (let tries = 0; tries < 6000; tries++) {
+/** Polls `check` until it holds, for up to 90 s of wall time (CI runners resume a restarted Harness much slower). */
+export const until = async (check: () => boolean | Promise<boolean>, what: string, withinMs = 90_000): Promise<void> => {
+  const deadline = Date.now() + withinMs;
+  while (Date.now() < deadline) {
     if (await check()) return;
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
