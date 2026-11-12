@@ -179,7 +179,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               nodeId,
               providerTurnId: turn.providerTurnId,
               nativeRequestRef: nativeItemRef,
-              kind: card.requestKind,
+              kind: "permission",
               status: "pending",
               responseCapability: { type: "live", providerSessionId: input.providerSessionId, supportsFeedback: false },
               createdAt: now,
@@ -219,7 +219,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               updatedAt: now,
               type: "approval_request",
               requestId: id,
-              requestKind: card.requestKind,
+              requestKind: "permission",
               prompt: `${card.summary}\n\n${card.detail}`,
               ...(card.options.length === 0 ? {} : { options: card.options }),
             };

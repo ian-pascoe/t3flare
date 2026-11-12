@@ -1,0 +1,71 @@
+{
+ "at": "2026-11-12T22:27:41.338Z",
+ "cases": [
+  {
+   "name": "Durable at approval-required: the push lands from the agent's shell, no push card; the command's own card",
+   "branch": "stock-durable-ar-mwe4aask",
+   "landed": true,
+   "cards": [
+    {
+     "kind": "command",
+     "title": "Allow bash?",
+     "prompt": "git -c user.name=t3flare -c user.email=t3flare@example.invalid commit --allow-empty -m \"stock push stock-durable-ar-mwe4aask\" && git push origin HEAD:refs/heads/stock-durable-ar-mwe4aask 2>&1 | tail -3",
+     "options": null
+    }
+   ],
+   "status": "completed",
+   "text": "`* [new branch]      HEAD -> stock-durable-ar-mwe4aask`",
+   "ms": 13092,
+   "ok": true
+  },
+  {
+   "name": "Durable at full-access: the push lands from the agent's shell, no push card, no card at all",
+   "branch": "stock-durable-fa-mwe4aask",
+   "landed": true,
+   "cards": [],
+   "status": "completed",
+   "text": " * [new branch]      HEAD -> stock-durable-fa-mwe4aask",
+   "ms": 12790,
+   "ok": true
+  },
+  {
+   "name": "Codex at full-access: the push lands with no push card, no card at all",
+   "branch": "stock-codex-fa-mwe4aask",
+   "landed": true,
+   "runs": [
+    {
+     "id": "run:thread:2d9b70cd-b328-4251-899c-caaf415441ac:ordinal:1",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "requests": [],
+   "text": " * [new branch]      HEAD -> stock-codex-fa-mwe4aask",
+   "ok": true
+  },
+  {
+   "name": "Codex at approval-required: the push lands with no push card; Codex's own command cards",
+   "branch": "stock-codex-ar-mwe4aask",
+   "landed": true,
+   "runs": [
+    {
+     "id": "run:thread:cd38af04-a6e2-4149-9a7a-b82a06a12c98:ordinal:1",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "requests": [
+    {
+     "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d1df-8230-7543-b26f-caef6349ad9a:native-request:call_S5DXKKgdSx87kcK3UJSkY8VA:ba620e6c-8e41-4dbe-98d8-5ac5d52ad18a",
+     "kind": "command",
+     "requestKind": null,
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "text": " * [new branch]      HEAD -> stock-codex-ar-mwe4aask",
+   "ok": true
+  }
+ ],
+ "ok": true
+}

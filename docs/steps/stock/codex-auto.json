@@ -1,0 +1,42 @@
+{
+ "at": "2026-11-12T22:40:30.243Z",
+ "workspace": "stock-auto-mwe4rzll",
+ "cases": [
+  {
+   "name": "Codex auto: a write inside the Workspace runs without a card",
+   "runs": [
+    {
+     "id": "run:thread:143d9797-e573-4f49-89eb-78896156fdf0:ordinal:1",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "requests": [],
+   "text": "I’ll run that command in the workspace and return its output.auto-mwe4rzll",
+   "file": "auto-mwe4rzll",
+   "ok": true
+  },
+  {
+   "name": "Codex auto: an escalation goes to Codex's reviewer (auto_review), not to the owner (cards declined if any appear)",
+   "runs": [
+    {
+     "id": "run:thread:3968df7a-bd64-4682-802b-d92902a3a3e0:ordinal:1",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "requests": [],
+   "items": [
+    "user_message",
+    "assistant_message",
+    "command_execution",
+    "assistant_message",
+    "checkpoint"
+   ],
+   "text": "I’ll run the requested command with the elevated access needed to write under `/var/tmp`.```text\noutside-mwe4rzll\n```",
+   "outsideFile": "outside-mwe4rzll",
+   "ok": true
+  }
+ ],
+ "ok": true
+}

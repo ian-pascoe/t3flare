@@ -1,0 +1,571 @@
+{
+  "url": "https://t3flare-environment-stock.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-12T22:22:17.212Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.9",
+      "commit": "4fde6dd49654",
+      "builtAt": "2026-11-12T21:57:25.925Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-12T22:32:17.795Z",
+    "paired": 200,
+    "ms": 1675,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "59e08f02-56b5-48d5-b0f7-dbeab0126c6e",
+    "threads": 12,
+    "ms": 2737
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 568,
+    "bytes": 107647,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 259,
+    "maxBytes": 46535
+  },
+  "subscribeThread": {
+    "ms": 57,
+    "bytes": 46475,
+    "items": 20
+  },
+  "search": {
+    "ms": 47,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1537
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 9,
+    "maxParameters": 300,
+    "compoundsRewritten": 226,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "rowsWritten": 46826,
+    "rowsRead": 144560,
+    "databaseSize": 12435456,
+    "refusedStatements": 0,
+    "pragmaRefusals": 0
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 193,
+      "modules": 109
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 17,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:1db2e351-42f2-4c6a-a989-f6f6ad71d97c"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": [],
+    "processChannelOnInstance": true
+  },
+  "codex": {
+    "ok": true,
+    "failures": [],
+    "cli": "codex",
+    "workspace": "acceptance-codex-mwe45i7d",
+    "first": {
+      "threadId": "529abbf8-382d-403e-84d7-5218606f0ca9",
+      "root": "/w/acceptance-codex-mwe45i7d",
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:529abbf8-382d-403e-84d7-5218606f0ca9:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c \"cat src/greeting.txt && printf '\\\\n--- test.sh ---\\\\n' && sed -n '1,200p' test.sh\"",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "reasoning",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c \"printf '%s\\\\n' 'Hello from the CLI acceptance.' >> src/greeting.txt && bash test.sh\"",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "I’ll inspect the target file, append the requested line, then run the required check script.`src/greeting.txt` now ends with the requested line, and `bash test.sh` passed.",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d1db-1654-78b1-a3c0-91af6e845c92:native-request:call_VKYgeABzthlOU6yf939OpmWa:6a3590b3-84b0-4702-a9ea-2cbed644f0b7",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d1db-1654-78b1-a3c0-91af6e845c92:native-request:call_yJW3SF9fh7Q53les6EZ6Avnu:0ab1aae8-3bcc-40c0-9b81-10209673b35a",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A529abbf8-382d-403e-84d7-5218606f0ca9%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "codex",
+            "nativeId": "01a1d1db-0c41-7681-8ceb-57322d3a0d52",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:codex:thread:529abbf8-382d-403e-84d7-5218606f0ca9:2567ca7e-0326-4aa1-8c95-9b5178690850",
+          "providerInstanceId": "codex"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:codex:thread:529abbf8-382d-403e-84d7-5218606f0ca9:2567ca7e-0326-4aa1-8c95-9b5178690850",
+          "status": "ready",
+          "cwd": "/w/acceptance-codex-mwe45i7d"
+        }
+      ],
+      "ms": 25467
+    },
+    "stopped": {
+      "running": false,
+      "leased": false,
+      "lastUse": 1794522155007
+    },
+    "second": {
+      "threadId": "529abbf8-382d-403e-84d7-5218606f0ca9",
+      "root": "/w/acceptance-codex-mwe45i7d",
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:529abbf8-382d-403e-84d7-5218606f0ca9:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:529abbf8-382d-403e-84d7-5218606f0ca9:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "`Hello from the CLI acceptance.`",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d1db-1654-78b1-a3c0-91af6e845c92:native-request:call_VKYgeABzthlOU6yf939OpmWa:6a3590b3-84b0-4702-a9ea-2cbed644f0b7",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d1db-1654-78b1-a3c0-91af6e845c92:native-request:call_yJW3SF9fh7Q53les6EZ6Avnu:0ab1aae8-3bcc-40c0-9b81-10209673b35a",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A529abbf8-382d-403e-84d7-5218606f0ca9%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "codex",
+            "nativeId": "01a1d1db-0c41-7681-8ceb-57322d3a0d52",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:codex:thread:529abbf8-382d-403e-84d7-5218606f0ca9:2567ca7e-0326-4aa1-8c95-9b5178690850",
+          "providerInstanceId": "codex"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:codex:thread:529abbf8-382d-403e-84d7-5218606f0ca9:2567ca7e-0326-4aa1-8c95-9b5178690850",
+          "status": "ready",
+          "cwd": "/w/acceptance-codex-mwe45i7d"
+        }
+      ],
+      "ms": 9414
+    },
+    "protocol": [
+      {
+        "at": 1794522183905,
+        "command": "codex",
+        "argv": [
+          "thread/resume"
+        ],
+        "cwd": null,
+        "route": "protocol",
+        "exitCode": null,
+        "ms": 0,
+        "detail": "ok 01a1d1db-0c41-7681-8ceb-57322d3a0d52"
+      }
+    ],
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 671,
+        "bytes": 7905482,
+        "ms": 345
+      },
+      "flagged": null
+    },
+    "keyRouteWithoutCli": "403"
+  },
+  "pi": {
+    "ok": true,
+    "failures": [],
+    "cli": "pi",
+    "workspace": "acceptance-pi-mwe46h3s",
+    "first": {
+      "threadId": "b3cf537d-81a0-44ad-820c-136084186c28",
+      "root": "/w/acceptance-pi-mwe46h3s",
+      "model": "anthropic/claude-haiku-5-5",
+      "runs": [
+        {
+          "id": "run:thread:b3cf537d-81a0-44ad-820c-136084186c28:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "reasoning",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "file_change",
+          "status": "completed",
+          "fileName": "src/greeting.txt",
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "bash test.sh",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "Yes, it passed: `bash test.sh` printed \"all checks passed\" after I added `Hello from the CLI acceptance.` as the last line of `src/greeting.txt`.",
+      "requests": [
+        {
+          "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Ab3cf537d-81a0-44ad-820c-136084186c28%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Ab3cf537d-81a0-44ad-820c-136084186c28%25253Aordinal%25253A1%253Aattempt%253A1:native-request:6a6bffb7-3736-4342-9a77-83b5d4111dad:3ad57e88-ff4a-45cc-b278-2a5f34cdb6d7",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": null
+        },
+        {
+          "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Ab3cf537d-81a0-44ad-820c-136084186c28%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Ab3cf537d-81a0-44ad-820c-136084186c28%25253Aordinal%25253A1%253Aattempt%253A1:native-request:49b5117a-8957-4db7-a897-ca6e6fd7c2d2:deed1093-7918-4fba-a16b-431edf52149f",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": null
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Ab3cf537d-81a0-44ad-820c-136084186c28%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "pi",
+            "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T22-23-23-114Z_01a1d1db-c3e8-73a6-86a7-2a1a0733c41c.jsonl",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:pi:thread:b3cf537d-81a0-44ad-820c-136084186c28:bdbff24c-5049-43f8-9951-4d51aa955e7c",
+          "providerInstanceId": "pi"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:pi:thread:b3cf537d-81a0-44ad-820c-136084186c28:bdbff24c-5049-43f8-9951-4d51aa955e7c",
+          "status": "ready",
+          "cwd": "/w/acceptance-pi-mwe46h3s"
+        }
+      ],
+      "ms": 25630
+    },
+    "stopped": {
+      "running": false,
+      "leased": false,
+      "lastUse": 1794522201279
+    },
+    "second": {
+      "threadId": "b3cf537d-81a0-44ad-820c-136084186c28",
+      "root": "/w/acceptance-pi-mwe46h3s",
+      "model": "anthropic/claude-haiku-5-5",
+      "runs": [
+        {
+          "id": "run:thread:b3cf537d-81a0-44ad-820c-136084186c28:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:b3cf537d-81a0-44ad-820c-136084186c28:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "Hello from the CLI acceptance.",
+      "requests": [
+        {
+          "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Ab3cf537d-81a0-44ad-820c-136084186c28%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Ab3cf537d-81a0-44ad-820c-136084186c28%25253Aordinal%25253A1%253Aattempt%253A1:native-request:6a6bffb7-3736-4342-9a77-83b5d4111dad:3ad57e88-ff4a-45cc-b278-2a5f34cdb6d7",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": null
+        },
+        {
+          "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Ab3cf537d-81a0-44ad-820c-136084186c28%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Ab3cf537d-81a0-44ad-820c-136084186c28%25253Aordinal%25253A1%253Aattempt%253A1:native-request:49b5117a-8957-4db7-a897-ca6e6fd7c2d2:deed1093-7918-4fba-a16b-431edf52149f",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": null
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Ab3cf537d-81a0-44ad-820c-136084186c28%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "pi",
+            "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-12T22-23-23-114Z_01a1d1db-c3e8-73a6-86a7-2a1a0733c41c.jsonl",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:pi:thread:b3cf537d-81a0-44ad-820c-136084186c28:bdbff24c-5049-43f8-9951-4d51aa955e7c",
+          "providerInstanceId": "pi"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:pi:thread:b3cf537d-81a0-44ad-820c-136084186c28:bdbff24c-5049-43f8-9951-4d51aa955e7c",
+          "status": "ready",
+          "cwd": "/w/acceptance-pi-mwe46h3s"
+        }
+      ],
+      "ms": 11561
+    },
+    "protocol": [
+      {
+        "at": 1794522227190,
+        "command": "pi",
+        "argv": [
+          "switch_session"
+        ],
+        "cwd": null,
+        "route": "protocol",
+        "exitCode": null,
+        "ms": 0,
+        "detail": "/workspace/.t3flare/pi/sessions/2026-11-12T22-23-23-114Z_01a1d1db-c3e8-73a6-86a7-2a1a0733c41c.jsonl"
+      }
+    ],
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 602,
+        "bytes": 3330917,
+        "ms": 246
+      },
+      "flagged": null
+    },
+    "keyRouteWithoutCli": "403"
+  },
+  "totalMs": 102733,
+  "failures": [],
+  "ok": true
+}

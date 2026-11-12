@@ -1,0 +1,33 @@
+{
+ "at": "2026-11-12T22:39:20.562Z",
+ "cases": [
+  {
+   "name": "linked thread at a full-access link: the push follows the link's mode, no push card, no card at all",
+   "branch": "stock-linked-fa-mwe4q4n0",
+   "landed": true,
+   "cards": [],
+   "status": "completed",
+   "text": "To https://github.com/ian-pascoe/t3flare-fixture.git\n * [new branch]      HEAD -> stock-linked-fa-mwe4q4n0",
+   "ms": 14820,
+   "ok": true
+  },
+  {
+   "name": "linked thread at an approval-required link: the push follows the link's mode, no push card; the command's own card",
+   "branch": "stock-linked-ar-mwe4q4n0",
+   "landed": true,
+   "cards": [
+    {
+     "kind": "command",
+     "title": "Allow bash?",
+     "prompt": "git -c user.name=t3flare -c user.email=t3flare@example.invalid commit --allow-empty -m \"stock push stock-linked-ar-mwe4q4n0\" && git push origin HEAD:refs/heads/stock-linked-ar-mwe4q4n0 2>&1 | tail -3",
+     "options": null
+    }
+   ],
+   "status": "completed",
+   "text": "* [new branch]      HEAD -> stock-linked-ar-mwe4q4n0",
+   "ms": 18801,
+   "ok": true
+  }
+ ],
+ "ok": true
+}

@@ -3,14 +3,13 @@
 // when the owner does. A thread with no live turn is refused. (Before the back-to-stock cut, owner 2026-11-12, the
 // push gateway's cards came this way too; pushes no longer ask.)
 
-/** What the relay asks: the card's text, its buttons, its title and t3's request kind, and the ask's id. */
+/** What the relay asks: the card's text, its buttons and title, and the ask's id. A tool card is t3's `permission` kind. */
 export interface CliAsk {
   readonly askId: string;
   readonly summary: string;
   readonly detail: string;
   readonly options: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline"; readonly label: string; readonly warning?: string }>;
   readonly title: string;
-  readonly requestKind: "command" | "permission";
 }
 
 export interface CliAnswer {
@@ -63,7 +62,7 @@ export const approveCliTool = async (input: { readonly thread: string; readonly 
   withdrawals.set(input.askId, withdrawn);
   try {
     const answer = await asker.ask(
-      { askId: input.askId, summary: input.summary, detail: input.detail, options, title: input.title, requestKind: "permission" },
+      { askId: input.askId, summary: input.summary, detail: input.detail, options, title: input.title },
       AbortSignal.any([AbortSignal.timeout(CLI_ASK_MS), withdrawn.signal]),
     );
     if (answer.reason === "withdrawn") return { approved: false, reason: withdrawn.signal.aborted ? "the agent went away" : "no answer in time" };

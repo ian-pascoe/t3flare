@@ -23,7 +23,7 @@ describe("tool cards on a CLI thread", () => {
   it("raise a permission card titled for the tool; 'for the session' is offered and kept", async () => {
     const r = register("t-owner", "acceptForSession");
     expect(await ask("t-owner")).toEqual({ approved: true, forSession: true });
-    expect(r.asked[0]).toMatchObject({ title: "Allow commissary: fixture_note?", requestKind: "permission" });
+    expect(r.asked[0]).toMatchObject({ title: "Allow commissary: fixture_note?" });
     expect(r.asked[0]!.options.map((option) => option.decision)).toEqual(["accept", "acceptForSession", "decline"]);
     r.unregister();
   });

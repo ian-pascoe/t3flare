@@ -1,0 +1,21 @@
+{
+ "at": "2026-11-12T22:39:49.815Z",
+ "workspace": "stock-hook-mwe4rhbd",
+ "cases": [
+  {
+   "name": "Claude Code runs the repository's own UserPromptSubmit hook",
+   "planted": "{\"hooks\":{\"UserPromptSubmit\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"echo hook-ran-mwe4rhbd > /tmp/t3flare-stock-hook\"}]}]}}",
+   "runs": [
+    {
+     "id": "run:thread:70cf120f-1239-49d6-a316-a0bdc586f789:ordinal:1",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "text": "OK",
+   "hookOutput": "hook-ran-mwe4rhbd",
+   "ok": true
+  }
+ ],
+ "ok": true
+}

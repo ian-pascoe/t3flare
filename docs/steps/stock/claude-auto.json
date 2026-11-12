@@ -1,0 +1,21 @@
+{
+ "at": "2026-11-12T22:41:20.556Z",
+ "workspace": "stock-claude-auto-mwe4tchv",
+ "cases": [
+  {
+   "name": "Claude at t3's auto: the turn runs (Claude's auto mode decides what to ask; any card is accepted)",
+   "runs": [
+    {
+     "id": "run:thread:7cd2aacd-f309-4faf-878c-d9cd5e520ef3:ordinal:1",
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "requests": [],
+   "text": "Output:\n\n```\nclaude-auto-mwe4tchv\n```\n\nI also ran `bash test.sh` as the project instructions require, and it printed \"all checks passed\".",
+   "file": "claude-auto-mwe4tchv",
+   "ok": true
+  }
+ ],
+ "ok": true
+}

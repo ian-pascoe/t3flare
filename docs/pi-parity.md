@@ -33,7 +33,7 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 | pi-lsp, pi-dap | D | owner, 2026-11-12: not for now (need servers and debuggers in the image) | — |
 | pi-autoresearch | D | owner, 2026-11-12: not for now | — |
 | pi-fff (`fffind`, `ffgrep`) | D | owner, 2026-11-12: not for now (native library, Container only) | — |
-| pi-secret (`secret_ask` and the rest) | R | D5: typed keys refused for now; credentials stay in the Environment (ADR-0012) | — |
+| pi-secret (`secret_ask` and the rest) | M | D5 lifted (owner, 2026-11-12, back to stock): t3's own `request_secret` covers it for Durable agents (ADR-0022); a port is not needed | — |
 | plannotator | R | needs a local browser; t3's plan mode replaces it (parity G5) | — |
 | pi-git-checkpoints | C | t3 checkpoints every turn (rollback: parity G6) | — |
 | pi-command-deck, pi-tps-tracker, pi-issues-selector, pi-bible-verses | R | terminal UI; t3's app is the UI | — |

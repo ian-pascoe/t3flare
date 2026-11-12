@@ -1,0 +1,242 @@
+{
+  "url": "https://t3flare-environment-stock.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-12T22:24:12.750Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.9",
+      "commit": "4fde6dd49654",
+      "builtAt": "2026-11-12T21:57:25.925Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-12T22:34:14.124Z",
+    "paired": 200,
+    "ms": 2140,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "d4a7c996-443d-45f1-b568-ccca48abde2e",
+    "threads": 12,
+    "ms": 3356
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 994,
+    "bytes": 133261,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 240,
+    "maxBytes": 46535
+  },
+  "subscribeThread": {
+    "ms": 57,
+    "bytes": 46475,
+    "items": 20
+  },
+  "search": {
+    "ms": 56,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1537
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 11,
+    "maxParameters": 300,
+    "compoundsRewritten": 293,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "rowsWritten": 60105,
+    "rowsRead": 208284,
+    "databaseSize": 14962688,
+    "refusedStatements": 0,
+    "pragmaRefusals": 0
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 193,
+      "modules": 109
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 21,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:1db2e351-42f2-4c6a-a989-f6f6ad71d97c"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": [],
+    "processChannelOnInstance": true
+  },
+  "claude": {
+    "ok": true,
+    "failures": [],
+    "cli": "claude",
+    "workspace": "acceptance-claude-mwe4803i",
+    "turn": {
+      "runs": [
+        {
+          "id": "run:thread:c7789f08-aae4-4143-accf-fa025bcb7609:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "requests": [
+        {
+          "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A1fed04bd-bf27-414d-8288-02b66b52bab5%253Aturn%253A1:native-request:toolu_01Y5J8Dd9bNfW4bcXN8FjpTM:b0b6a48d-15cf-4825-badf-4271a742cd80",
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A1fed04bd-bf27-414d-8288-02b66b52bab5%253Aturn%253A1:native-request:toolu_015obNEZnTAj3tJ68W3t5L9f:16c1da27-9e10-40cb-9a57-18a41130d92e",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+      "ms": 24867
+    },
+    "plan": {
+      "runs": [
+        {
+          "id": "run:thread:c7789f08-aae4-4143-accf-fa025bcb7609:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:c7789f08-aae4-4143-accf-fa025bcb7609:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "proposedPlan": [
+        "# Plan: add a greeting line\n\n## Context\n`src/greeting.txt` currently holds one line: `Hello from the t3flare fixture.` The task is to add `Hello from the CLI.` as the new last line. AGENTS.md requires `bash test.sh` after a change, and it must print \"all checks passed\".\n\n## Steps\n1. Read `/w/accepta"
+      ],
+      "diff": ""
+    },
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 608,
+        "bytes": 7853022,
+        "ms": 172
+      },
+      "flagged": null
+    }
+  },
+  "opencode": {
+    "ok": true,
+    "failures": [],
+    "cli": "opencode",
+    "workspace": "acceptance-opencode-mwe48s99",
+    "turn": {
+      "runs": [
+        {
+          "id": "run:thread:81441c3d-b084-4094-b427-0287e17a64af:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "requests": [
+        {
+          "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e2e22739effevgVrpoLRDDYYAc%253Aturn%253A1:native-request:toolu_01XY6ZqMpTFhmzZxX6GdY5P9:3168f1c2-7cd0-48ef-8074-a79c1b4209f4",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e2e22739effevgVrpoLRDDYYAc%253Aturn%253A1:native-request:toolu_01Dsuh5SdbosWuT5MoHeqixq:c9940922-76dc-4164-a3f2-277c08e75d10",
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e2e22739effevgVrpoLRDDYYAc%253Aturn%253A1:native-request:toolu_01A6sHd4Z3fkw1nQEj1ten6d:f0569762-2c95-4895-a23d-b1545ca4989d",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+      "ms": 39120
+    },
+    "plan": {
+      "runs": [
+        {
+          "id": "run:thread:81441c3d-b084-4094-b427-0287e17a64af:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:81441c3d-b084-4094-b427-0287e17a64af:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "proposedPlan": [],
+      "diff": ""
+    },
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 606,
+        "bytes": 30530333,
+        "ms": 693
+      },
+      "flagged": null
+    }
+  },
+  "totalMs": 101001,
+  "failures": [],
+  "ok": true
+}
