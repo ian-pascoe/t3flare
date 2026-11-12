@@ -118,6 +118,22 @@ APNs `queued`, the relay's answer for a push it handed on.
   (`apps/environment`), so a changed value in t3's `.env.example` fails the bump; the fake-relay link test runs there
   too. The bump job never signs in. A changed value means prod's link was made against other values: sign in again.
 - **Workers Logs** over the M2 and M3 window (45 minutes, 1371 events, 149 publish lines): none of the publish
-  credential or the token's two parts (`m2-leak-logs.json`). The check compares the secrets held at its end; the
-  credential the row-j relink replaced was held during most of the window and was covered by the in-DO check.
+  credential or the token's two parts (`m2-leak-logs.json`). The check compares the secrets held at its end: the
+  credentials that row j's relinks replaced earlier in the window were not compared (a gap in the evidence, not a
+  known leak; the redacting Console redacts bearer values in every line).
 - **`step3plus` destroyed.**
+
+## Exit criteria
+
+| Criterion | Result |
+|---|---|
+| **The owner's phone gets a notification when a cloud run ends** | ✅ "Agent finished", confirmed by the owner; relay `ok`, one push delivery (`m3-deliveries.json`) |
+| **…and when one waits on them** | ✅ "Waiting for input", confirmed by the owner; relay `ok`, one push delivery. "Approval needed" was published and accepted in M2 row b (the phone's notifications were off then) |
+| Every row of the plan's §4.1 table, against the real relay | ✅ M2 rows a–g |
+| Restart while an approval or a question waits (finding 4) | ✅ rows h, i |
+| A refused publish is recorded as such, by status (finding 8) | ✅ row j: 401, `rejected` |
+| The relay routes refused at the door and inside t3 (finding 1) | ✅ on the stage; **on prod: before A3** |
+| No managed tunnel, ever (finding 2) | ✅ unit (relink after unlink; a tunnel answer is undone); the relay lists `manual` |
+| No secret in a Container, a Session or Workers Logs | ✅ (see the M4 note on replaced credentials) |
+| `bun run check` | ✅ |
+| Patches and Shadows | 2 and 1, unchanged; the submodule untouched |
