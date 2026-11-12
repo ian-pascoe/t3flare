@@ -137,3 +137,17 @@ APNs `queued`, the relay's answer for a push it handed on.
 | No secret in a Container, a Session or Workers Logs | ✅ (see the M4 note on replaced credentials) |
 | `bun run check` | ✅ |
 | Patches and Shadows | 2 and 1, unchanged; the submodule untouched |
+
+## The review findings: verified, built, or rebutted
+
+| # | Verdict | What happened |
+|---|---|---|
+| 1 HIGH, mint and health unscoped | **Confirmed** (`cloud/http.ts`, `CloudLink.ts`); and our first-pairing sessions are `desktop-bootstrap`, the subject t3 lets sign a link proof from a public host | Built all four parts: the refusing `CloudLink`, the mint key deleted after every link, the DO's 404 for any method and spelling (tested), the ADR reasons corrected (ADR-0010's refinement). Prod verification is part of A3 |
+| 2 HIGH, relink falls back to managed | **Confirmed**: an absent mark reads `managed` | Every link writes `publish_only`, asserts the returned mode, unlinks on a stored tunnel config; tested relink after unlink and a tunnel answer |
+| 3 MEDIUM, drain does not cover retries | **Confirmed** | No drain: the recorder's capped hold (120 s) on in-flight, deferred and retrying publishes. Nothing awaited between `setAlarm` and `abort`. A deploy's loss accepted (SPI-1035) |
+| 4 MEDIUM, restart mapping | **Confirmed** in M2: an approval cut by a restart is `cancelled` with no continuation | Built the tombstone rather than accepting the gap: after each boot, threads the recorder last saw live are published again (row h clears the card). A completion inside the 5 s hold at a restart is still lost (SPI-1035). Arming is refused during a sign-in, and a sign-in while armed |
+| 5 MEDIUM, the token is a whole-account credential | **Confirmed**: with it we read every environment and device on the account | Prod discards it right after the link, failed links included; stated in ADR-0025 as the first account credential in the DO, single holder |
+| 6 MEDIUM-LOW, admin exposure | **Agreed** | The Worker passes the admitted caller to the DO; prod's Connect mutations need the owner's own Access identity (`connect.ts --owner`, `cloudflared access token`), never the service token CI holds. A separate owner secret was not needed: Access already proves the owner, and the service token is the only other admitted caller |
+| 7 LOW, public config | **Confirmed** | Inlined from `.env.example` (no executable read, no JSON file); the bump test compares them |
+| 8 LOW, 401s | **Partly rebutted**: `Cause.pretty` carries no status, only the error's name (`RelayAuthInvalidError: Relay authentication failed: invalid_bearer`) | The recorder maps the relay's declared error to its status (401) and flags `RelayAuthInvalidError` as `rejected`; seen on the stage (row j). No text is kept |
+| 9 LOW, privacy | **Confirmed** | ADR-0025 and the plan's changelog say titles reach APNs/FCM in the alert |
