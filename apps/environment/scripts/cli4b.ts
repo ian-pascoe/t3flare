@@ -171,7 +171,7 @@ switch (scenario) {
       Number(((await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(workspace)}`, { exec: { script: `grep -l -a 'T3FLARE_EXEC=${key.replace(/[^A-Za-z0-9-]/g, "")}' /proc/[0-9]*/environ 2>/dev/null | wc -l`, timeoutMs: 20_000 } })).json as any)?.result?.stdout ?? "-1");
     const first = await cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "Remember the code word OSPREY-17 for later. Reply with ok only." });
     check("turn 1 completed", first.runs.at(-1)?.status === "completed", first.runs);
-    const long = cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: "Run the shell command `sleep 120 && echo slept` and then reply with the single word done.", threadId: first.threadId });
+    const long = cliTurn(cookie, { cli, workspace, mode: "full-access", plan: false, prompt: `Run the shell command \`${cli === "claude" ? "node -e \"setTimeout(() => console.log('slept'), 90000)\"" : "sleep 120 && echo slept"}\` in the foreground (never in the background), wait for it to finish, and then reply with the single word done.`, threadId: first.threadId });
     let key: string | undefined;
     for (let i = 0; i < 40 && key === undefined; i++) {
       await sleep(3000);

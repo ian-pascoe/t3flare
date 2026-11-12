@@ -1,0 +1,79 @@
+{
+ "at": "2026-11-12T03:29:16.588Z",
+ "scenario": "restart-turn",
+ "ok": true,
+ "failures": [],
+ "cli": "opencode",
+ "workspace": "restart-opencode-mwczkt6i",
+ "key": "proc-77564a73-e751-4513-bcaf-0bb8bd5c4859",
+ "markersBefore": 9,
+ "markersAfter": 0,
+ "interrupted": {
+  "runs": [
+   {
+    "id": "run:thread:d90ef07d-85ea-4d61-9b31-0c239825d05c:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:d90ef07d-85ea-4d61-9b31-0c239825d05c:ordinal:2",
+    "status": "cancelled",
+    "failure": null
+   }
+  ],
+  "text": ""
+ },
+ "settledAfterMs": 827,
+ "oldProcessGoneMs": 6200,
+ "runs": [
+  {
+   "ordinal": 1,
+   "status": "completed",
+   "failure": null,
+   "restartContinuationOfRunId": null
+  },
+  {
+   "ordinal": 2,
+   "status": "cancelled",
+   "failure": null,
+   "restartContinuationOfRunId": null
+  },
+  {
+   "ordinal": 3,
+   "status": "completed",
+   "failure": null,
+   "restartContinuationOfRunId": "run:thread:d90ef07d-85ea-4d61-9b31-0c239825d05c:ordinal:2"
+  },
+  {
+   "ordinal": 4,
+   "status": "completed",
+   "failure": null,
+   "restartContinuationOfRunId": null
+  }
+ ],
+ "third": {
+  "runs": [
+   {
+    "id": "run:thread:d90ef07d-85ea-4d61-9b31-0c239825d05c:ordinal:1",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:d90ef07d-85ea-4d61-9b31-0c239825d05c:ordinal:2",
+    "status": "cancelled",
+    "failure": null
+   },
+   {
+    "id": "run:thread:d90ef07d-85ea-4d61-9b31-0c239825d05c:ordinal:3",
+    "status": "completed",
+    "failure": null
+   },
+   {
+    "id": "run:thread:d90ef07d-85ea-4d61-9b31-0c239825d05c:ordinal:4",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "text": "OSPREY-17"
+ }
+}
