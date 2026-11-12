@@ -1,0 +1,443 @@
+{
+  "url": "https://t3flare-environment-step4b.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-12T03:34:20.704Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.9",
+      "commit": "342a6eebdf4f",
+      "builtAt": "2026-11-12T03:23:39.955Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-12T03:44:21.500Z",
+    "paired": 200,
+    "ms": 2222,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "7fa524ea-9dd3-4529-9248-906d75b74f46",
+    "threads": 12,
+    "ms": 3015
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 828,
+    "bytes": 31412,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 144,
+    "maxBytes": 46535
+  },
+  "subscribeThread": {
+    "ms": 56,
+    "bytes": 46474,
+    "items": 20
+  },
+  "search": {
+    "ms": 52,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1536
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 3,
+    "maxParameters": 300,
+    "compoundsRewritten": 275,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "rowsWritten": 20417,
+    "rowsRead": 130542,
+    "databaseSize": 6619136,
+    "refusedStatements": 0,
+    "pragmaRefusals": 0
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 193,
+      "modules": 109
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 9,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:8e49ac16-5fab-4e57-91fe-8ad9cfce6831"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": [],
+    "processChannelOnInstance": true
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwczuwuf",
+      "ms": 4221,
+      "cwd": "/w/acceptance-mwczuwuf",
+      "error": null
+    },
+    "turn": {
+      "threadId": "f23af2d3-2901-466f-b9f3-1ee12118d55d",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwczuwuf/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwczuwuf && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 21756
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "ms": 22373
+  },
+  "peer": {
+    "ok": true,
+    "failures": [],
+    "fixture": {
+      "projectId": "234fd36e-4457-45c9-b65c-2742400efdd6",
+      "workspaceRoot": "/w/step3-fixture",
+      "cloned": true
+    },
+    "link": {
+      "scope": "orchestration:read orchestration:operate"
+    },
+    "cap": {
+      "fullAccess": {
+        "status": 400,
+        "body": {
+          "_tag": "AuthMcpApprovalError",
+          "message": "That pairing code cannot grant this access. It has not been used, so choose an access level it grants, or create a code with the standard scopes."
+        }
+      },
+      "autoAcceptEdits": 200
+    },
+    "launch": {
+      "isError": false,
+      "threadId": "mcp:launch:fed4b6cb7239c82c3ab01d35e787c4b13129331b1c7b7e5b6b6c7adae1137ad1"
+    },
+    "launchResult": {
+      "status": "completed",
+      "pieces": 1,
+      "reply": true,
+      "runtimeMode": "auto-accept-edits",
+      "interactionMode": "default",
+      "linkOrigin": {
+        "sessionId": "9ec3180b-1095-4039-ac48-22ce45621966",
+        "label": "t3flare acceptance mwczve4d",
+        "access": "auto-accept-edits"
+      },
+      "delegatedFrom": {
+        "environmentId": "00000000-0000-4000-8000-000000000001",
+        "threadId": "laptop-mwczve4d",
+        "title": "laptop parent"
+      }
+    },
+    "F5": {
+      "runtimeMode": "auto-accept-edits",
+      "request": {
+        "kind": "command"
+      }
+    },
+    "waitHold": {
+      "ms": 49982,
+      "timedOut": true,
+      "status": "running"
+    },
+    "F7": {
+      "link": {
+        "isError": true,
+        "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"The pending user-input request was not found.\"}"
+      },
+      "stillPending": true,
+      "owner": {
+        "runs": [
+          "completed"
+        ],
+        "output": true
+      }
+    },
+    "F6": {
+      "runtimeMode": "approval-required",
+      "interactionMode": "plan",
+      "write": null,
+      "request": {
+        "kind": "command"
+      },
+      "runs": [
+        "running"
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "text": "First use the write tool to create the file plan-check.txt containing `x`. Then run the bash command `ls`. Then reply DONE."
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "text": "Preparing workspace"
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "text": "I'm in Plan mode, which means I can't edit files. Creating `plan-check.txt` is a file edit, so I won't write it. I can still run the read-only `ls` and report t"
+        },
+        {
+          "type": "command_execution",
+          "status": "running",
+          "text": "cd /w/step3-fixture && ls"
+        },
+        {
+          "type": "approval_request",
+          "status": "waiting",
+          "text": "Allow bash?"
+        }
+      ]
+    },
+    "F1": {
+      "send": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwczve4d through a linked environment, so it may change only threads that link star",
+      "interrupt": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwczve4d through a linked environment, so it may change only threads that link star",
+      "rename": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwczve4d through a linked environment, so it may change only threads that link star"
+    },
+    "F2": {
+      "create": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}",
+      "clone": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}",
+      "prefs": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwczve4d through a linked environment, so it cannot change projects or environment ",
+      "schedule": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwczve4d through a linked environment, so it cannot schedule tasks in this environm"
+    },
+    "F4": {
+      "stages": [
+        "fetch:skipped",
+        "checkout:done",
+        "setup-script:skipped",
+        "agent:done"
+      ],
+      "worktreePath": "/w/.wt/step3-fixture/link-mwczve4d-a9ae9716efa68a79",
+      "phase": "done"
+    },
+    "F12": {
+      "scope": "orchestration:read orchestration:operate settings:write source-control:write",
+      "rename": "{\"threadId\":\"f9b8a800-8df4-426c-a017-75b8de1a4204\",\"action\":\"rename\",\"commandId\":\"command:mcp:client%3Aee3c5373-4501-466b-866f-6a20605ff85f:thread-update:f9b8a800-8df4-426c-a017-75b8de1a4204:rename:re",
+      "interrupt": "{\"threadId\":\"f9b8a800-8df4-426c-a017-75b8de1a4204\",\"runId\":null,\"status\":\"no_active_run\"}"
+    },
+    "F10": {
+      "off": 403,
+      "on": 200
+    },
+    "F9": {
+      "found": true,
+      "revoke": 200,
+      "after": 401
+    }
+  },
+  "peerF11Armed": {
+    "ok": true,
+    "status": 400,
+    "body": {
+      "_tag": "AuthMcpApprovalError",
+      "message": "That is not a one-time pairing code."
+    }
+  },
+  "claude": {
+    "ok": true,
+    "failures": [],
+    "cli": "claude",
+    "workspace": "acceptance-claude-mwczxd6v",
+    "turn": {
+      "runs": [
+        {
+          "id": "run:thread:0145a3ba-8d4b-4829-b41c-7233beb78dd7:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "requests": [
+        {
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+      "ms": 19627
+    },
+    "plan": {
+      "runs": [
+        {
+          "id": "run:thread:0145a3ba-8d4b-4829-b41c-7233beb78dd7:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:0145a3ba-8d4b-4829-b41c-7233beb78dd7:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "proposedPlan": [
+        "# Plan: add a closing line to src/greeting.txt\n\n## Context\nThe user wants `Hello from the CLI.` added as the new last line of `src/greeting.txt`. The file currently contains only `Hello from the t3flare fixture.` (line 1), so an earlier edit is no longer present.\n\n## Steps\n1. Read `/w/acceptance-cla"
+      ],
+      "diff": ""
+    },
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 606,
+        "bytes": 7955457,
+        "ms": 203
+      },
+      "flagged": null
+    }
+  },
+  "opencode": {
+    "ok": true,
+    "failures": [],
+    "cli": "opencode",
+    "workspace": "acceptance-opencode-mwczxzx3",
+    "turn": {
+      "runs": [
+        {
+          "id": "run:thread:c495876b-f960-4110-ac68-3fd0f684c8e7:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "requests": [
+        {
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+      "ms": 60766
+    },
+    "plan": {
+      "runs": [
+        {
+          "id": "run:thread:c495876b-f960-4110-ac68-3fd0f684c8e7:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:c495876b-f960-4110-ac68-3fd0f684c8e7:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "proposedPlan": [],
+      "diff": ""
+    },
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 605,
+        "bytes": 30220290,
+        "ms": 382
+      },
+      "flagged": null
+    }
+  },
+  "peerF11Disarmed": {
+    "ok": true,
+    "status": 401,
+    "body": {
+      "error": "pairing is not armed"
+    }
+  },
+  "totalMs": 224674,
+  "failures": [],
+  "ok": true
+}

@@ -1,0 +1,66 @@
+{
+ "door": {
+  "GET /api/connect/link-proof": 404,
+  "POST /api/connect/link-proof": 404,
+  "PUT /api/connect/link-proof": 404,
+  "OPTIONS /api/connect/link-proof": 404,
+  "GET /api/connect/relay-config": 404,
+  "POST /api/connect/relay-config": 404,
+  "PUT /api/connect/relay-config": 404,
+  "OPTIONS /api/connect/relay-config": 404,
+  "GET /api/t3-connect/health": 404,
+  "POST /api/t3-connect/health": 404,
+  "PUT /api/t3-connect/health": 404,
+  "OPTIONS /api/t3-connect/health": 404,
+  "GET /api/t3-connect/mint-credential": 404,
+  "POST /api/t3-connect/mint-credential": 404,
+  "PUT /api/t3-connect/mint-credential": 404,
+  "OPTIONS /api/t3-connect/mint-credential": 404,
+  "GET /api/t3-connect/mint-credential/": 404,
+  "POST /api/t3-connect/mint-credential/": 404,
+  "PUT /api/t3-connect/mint-credential/": 404,
+  "OPTIONS /api/t3-connect/mint-credential/": 404,
+  "GET /API/T3-CONNECT/MINT-CREDENTIAL": "assets 200",
+  "POST /API/T3-CONNECT/MINT-CREDENTIAL": "assets 405",
+  "PUT /API/T3-CONNECT/MINT-CREDENTIAL": "assets 405",
+  "OPTIONS /API/T3-CONNECT/MINT-CREDENTIAL": "assets 405",
+  "GET /api/t3-connect/mint%2Dcredential": 404,
+  "POST /api/t3-connect/mint%2Dcredential": 404,
+  "PUT /api/t3-connect/mint%2Dcredential": 404,
+  "OPTIONS /api/t3-connect/mint%2Dcredential": 404,
+  "GET /api/t3%2Dconnect/health": 404,
+  "POST /api/t3%2Dconnect/health": 404,
+  "PUT /api/t3%2Dconnect/health": 404,
+  "OPTIONS /api/t3%2Dconnect/health": 404,
+  "GET //api/connect//link-proof": 404,
+  "POST //api/connect//link-proof": 404,
+  "PUT //api/connect//link-proof": 404,
+  "OPTIONS //api/connect//link-proof": 404
+ },
+ "allDoor404": true,
+ "kept": {
+  "GET /api/connect/link-state": 401,
+  "POST /api/connect/preferences": 401,
+  "POST /api/connect/unlink": 401,
+  "POST /api/connect/reachability": 401
+ },
+ "inside": {
+  "/api/connect/link-proof": {
+   "status": 401,
+   "body": "{\"_tag\":\"EnvironmentAuthInvalidError\",\"code\":\"auth_invalid\",\"reason\":\"missing_credential\",\"traceId\":\"43a085f3db401326a11035b6749cf72c\"}"
+  },
+  "/api/connect/relay-config": {
+   "status": 401,
+   "body": "{\"_tag\":\"EnvironmentAuthInvalidError\",\"code\":\"auth_invalid\",\"reason\":\"missing_credential\",\"traceId\":\"0f1699755c3d3e518807ec1b5361312d\"}"
+  },
+  "/api/t3-connect/health": {
+   "status": 403,
+   "body": "{\"_tag\":\"EnvironmentHttpForbiddenError\",\"message\":\"t3flare's policy does not allow T3 Connect's relay routes, this Environment links outward only, from its admin routes (ADR-0010, ADR-0025).\"}"
+  },
+  "/api/t3-connect/mint-credential": {
+   "status": 403,
+   "body": "{\"_tag\":\"EnvironmentHttpForbiddenError\",\"message\":\"t3flare's policy does not allow T3 Connect's relay routes, this Environment links outward only, from its admin routes (ADR-0010, ADR-0025).\"}"
+  }
+ },
+ "insideRefused": true
+}
