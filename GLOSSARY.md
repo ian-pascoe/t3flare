@@ -46,9 +46,9 @@ _Avoid_: remote threads, foreign work
 **Link fence**:
 What Linked work from a link paired below full access may not do: change the owner's threads, projects, settings or
 schedules, or use that Environment's own links (t3's), exceed the modes the link hands down (t3's), or `git push`
-without an approval each time (ours, at the Push gateway), or call a write Tool without an approval each time (ours,
-at the MCP host). The push and tool halves apply to every link, full-access included: for pushes it is the Workspace's
-Taint, not the link's access, that makes a push ask.
+without an approval each time (ours, at the Push gateway). The push half applies to every link, full-access included:
+it is the Workspace's Taint, not the link's access, that makes a push ask. MCP tools follow the linked thread's own
+mode (owner, 2026-11-12, back to stock).
 _Avoid_: sandbox, isolation
 
 **Remote task**:
@@ -231,7 +231,7 @@ The ref updates of a push t3 itself is about to run, registered by the process r
 _Avoid_: allowlist, pre-approval
 
 **Taint**:
-The Workspace's durable mark that it ran Linked work; while it stands, a push that matches no Expectation asks the owner, every write Tool call from a CLI agent there asks, and t3's own tools refuse an owner thread's Tool handle. Cleared by the owner only.
+The Workspace's durable mark that it ran Linked work; while it stands, a push that matches no Expectation asks the owner. Cleared by the owner only.
 _Avoid_: dirty, compromised
 
 **Environment token**:

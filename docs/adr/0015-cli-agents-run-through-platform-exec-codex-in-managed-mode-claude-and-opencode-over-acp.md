@@ -59,10 +59,10 @@ Before SPI-1040 a linked CLI thread could not push at all (step 4a F8: the crede
 
 ## Refinement (tools step): CLI agents get MCP tools through the relay
 
-OD-3 is lifted. Each CLI gets MCP entries only in its managed or system scope, all pointing at the MCP relay (`http://computer.internal/t3flare/mcp/<server>`, ADR-0028) with a per-process tool handle:
+OD-3 is lifted. Each CLI gets MCP entries only in its managed or system scope: third-party servers at the MCP relay (`http://computer.internal/t3flare/mcp/<server>`, ADR-0028) with a per-process tool handle, and t3's own as stock t3 hands it, with t3's bearer at t3's public `/mcp` (owner, 2026-11-12, back to stock; ADR-0022):
 - **Codex:** `mcp_servers.<name>` on argv, approval mode `approve`, a 900 s timeout.
-- **Claude Code:** `allowManagedMcpServersOnly` and `allowedMcpServers` by the relay's URL pattern.
-- **OpenCode:** `mcp.use` denied but for the relay's servers.
-- **pi:** t3's own tools only, through t3's pi extension pointed at the relay. Commissary and direct servers wait for an MCP client in the image.
+- **Claude Code:** `allowManagedMcpServersOnly` and `allowedMcpServers` by the relay's URL pattern and t3's `/mcp`.
+- **OpenCode:** `mcp.use` denied but for the relay's servers and `t3-code`.
+- **pi:** t3's own tools only, through t3's pi extension. Commissary and direct servers wait for an MCP client in the image.
 
 A repo's own MCP configuration is never admitted. A write that asks raises t3's card on the CLI thread, injected by the wrapper as for pushes (SPI-1040). Evidence: `docs/steps/tools/m5-cli-*.json`.
