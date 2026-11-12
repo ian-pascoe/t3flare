@@ -3,6 +3,7 @@
 // (`lib/peer.ts`, t3's `PeerLinks.signIn` and `PeerMcpClient` in TypeScript) against the stage, and proves the link
 // contract and the link fence at the MCP level (plan section 5.3):
 //
+//   - SPI-1061 Pre-B (`outbound`): the stage refuses to link out to another machine, and lists no outbound link;
 //   - a link with a plain pairing code; the cap a code's scopes put on the access a link may take (review C5);
 //   - a forwarded `t3_thread_launch` on the Durable agent, followed in 50 s waits, its last reply read back;
 //   - F5: a link at auto-accept-edits caps a full-access caller: the cloud thread's `bash` waits for approval, and a
@@ -45,6 +46,24 @@ export const peerAcceptance = async (cookie: string, options: { readonly only?: 
     patch: {},
     providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } },
   });
+  // SPI-1061 Pre-B: the stock client's "link" (t3's `peerLinks.link`) is refused by our Layer before t3 dials out. The
+  // address cannot resolve, so a fetch would fail with t3's own unreachable reason; only our refusal proves none left.
+  if (wants("outbound")) {
+    const started = Date.now();
+    const refused = await wsCall(cookie, "peerLinks.link", { url: `https://outbound-${stamp}.invalid`, pairingCode: "ABCD-EFGH", access: "auto-accept-edits" }).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error: JSON.parse(JSON.stringify(error ?? null)) as Record<string, unknown> | null }),
+    );
+    const listed = (await wsCall(cookie, "peerLinks.list", {})) as { links?: ReadonlyArray<unknown> };
+    report.outbound = { refused, listed, ms: Date.now() - started };
+    check(
+      "Pre-B: a stock client's outbound link is refused, no machine registered",
+      !refused.ok && refused.error?.reason === "disabled" && /No machine is registered/.test(String(refused.error?.message)),
+      refused,
+    );
+    check("Pre-B: no outbound link is listed", Array.isArray(listed.links) && listed.links.length === 0, listed);
+  }
+
   const fixture = await ensureCloudFixtureProject(cookie);
   report.fixture = fixture;
 
