@@ -1,0 +1,67 @@
+{
+ "at": "2026-11-12T01:50:14.986Z",
+ "scenario": "turn",
+ "ok": false,
+ "failures": [
+  "the turn completed: [{\"id\":\"run:thread:ab160e57-a809-4f0d-beb3-69e630a0a639:ordinal:1\",\"status\":\"failed\",\"failure\":null}]"
+ ],
+ "cli": "pi",
+ "result": {
+  "threadId": "ab160e57-a809-4f0d-beb3-69e630a0a639",
+  "root": "/w/cli-pi",
+  "model": "anthropic/claude-haiku-5-5",
+  "runs": [
+   {
+    "id": "run:thread:ab160e57-a809-4f0d-beb3-69e630a0a639:ordinal:1",
+    "status": "failed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "error",
+    "status": "failed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null,
+    "detail": "{\"id\":\"turn-item:run:run%3Athread%3Aab160e57-a809-4f0d-beb3-69e630a0a639%3Aordinal%3A1:signal:provider-thread-load-failure\",\"threadId\":\"ab160e57-a809-4f0d-beb3-69e630a0a639\",\"runId\":\"run:thread:ab160e57-a809-4f0d-beb3-69e630a0a639:ordinal:1\",\"nodeId\":\"node:run:run%3Athread%3Aab160e57-a809-4f0d-beb3-69e630a0a639%3Aordinal%3A1:root\",\"providerThreadId\":\"provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Aab160e57-a809-4f0d-beb3-69e630a0a639%3Aordinal%3A1\",\"providerTurnId\":null,\"nativeItemRef\":null,\"parentItemId\":null,\"ordinal\":1000002,\"status\":\"failed\",\"title\":\"Provider turn failed to start\",\"startedAt\":\"2026-11-12T01:50:14.304Z\",\"completedAt\":\"2026-11-12T01:50:14.304Z\",\"updatedAt\":\"2026-11-12T01:50:14.304Z\",\"type\":\"error\",\"failure\":{\"class\":\"provider_error\",\"message\":\"Pi RPC r"
+   }
+  ],
+  "text": "",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Aab160e57-a809-4f0d-beb3-69e630a0a639%3Aordinal%3A1",
+    "nativeThreadRef": null,
+    "providerSessionId": "provider-session:provider-instance:pi:thread:ab160e57-a809-4f0d-beb3-69e630a0a639:534d438b-bfd0-4a11-a4ed-97c1a7715077",
+    "providerInstanceId": "pi"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:pi:thread:ab160e57-a809-4f0d-beb3-69e630a0a639:534d438b-bfd0-4a11-a4ed-97c1a7715077",
+    "status": "error",
+    "cwd": "/w/cli-pi"
+   }
+  ],
+  "ms": 28964
+ },
+ "processes": {
+  "channel": {
+   "live": 0,
+   "environmentEpoch": 16
+  },
+  "workspace": {
+   "epoch": 1,
+   "processes": [],
+   "pushes": 5
+  }
+ }
+}

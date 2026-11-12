@@ -124,6 +124,8 @@ export class ByteQueue {
 }
 
 const encoder = new TextEncoder();
+/** How much of a CLI's stderr is kept for the log when it exits with an error. */
+const STDERR_TAIL = 2000;
 
 /** One CLI process in a Workspace's Container, as t3's handle sees it. */
 export class ChannelProcess {
@@ -141,6 +143,8 @@ export class ChannelProcess {
   #nextInput = 0;
   #writes: Promise<void> = Promise.resolve();
   #killSent = false;
+  #stderrTail = "";
+  readonly #decoder = new TextDecoder();
   exitCode: number | undefined;
 
   constructor(channel: ProcessChannel, pid: number, key: string, place: ProcessPlace, cli: ProcessCli) {
@@ -242,13 +246,18 @@ export class ChannelProcess {
     if (this.exitCode !== undefined || frame.seq < this.#nextFrame) return;
     this.#nextFrame = frame.seq + 1;
     if (frame.stream === "stdout" && frame.data !== undefined) await this.stdout.offer(frame.data);
-    else if (frame.stream === "stderr" && frame.data !== undefined) await this.stderr.offer(frame.data);
+    else if (frame.stream === "stderr" && frame.data !== undefined) {
+      this.#stderrTail = (this.#stderrTail + this.#decoder.decode(frame.data, { stream: true })).slice(-STDERR_TAIL);
+      await this.stderr.offer(frame.data);
+    }
     else if (frame.stream === "exit") this.finish(frame.code ?? 129);
   }
 
   finish(code: number): void {
     if (this.exitCode !== undefined) return;
     this.exitCode = code;
+    // A CLI that ends on its own with an error: its last words, for diagnosis (t3 shows only that it exited).
+    if (code !== 0 && code !== 143 && code !== 137) console.warn(JSON.stringify({ t3flare: "cli-exited", key: this.key, cli: this.cli, code, stderrTail: this.#stderrTail }));
     this.stdout.end();
     this.stderr.end();
     this.#channel.forget(this);
