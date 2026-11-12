@@ -230,6 +230,30 @@ if (mode === "p3") {
   check("P3: the ~110 MiB push was made (a pack over 100 MiB) and its outcome recorded", p110.commit !== null && p110.packBytes > 105 * 1024 * 1024, p110);
 }
 
+if (mode === "repro") {
+  // The owner's Commit & push right after a Container stop, tainted and not, a few times (the persist run's one failure).
+  const rows: Array<unknown> = [];
+  for (let i = 0; i < Number(process.argv[3] ?? 4); i++) {
+    const tainted = i % 2 === 1;
+    await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+    if (tainted) await call({ probePush: { noteLinked: { session: `thread:repro-${stamp}`, ms: 1 } } });
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(id)}`);
+    await sleep(5_000);
+    const branch = `spi992/repro-${stamp}-${i}`;
+    created.push(`refs/heads/${branch}`);
+    await sh(`git checkout -q -B ${branch} origin/main && echo "repro ${i}" > repro-${stamp}-${i}.txt`);
+    const events = (await wsStream(cookie, "git.runStackedAction", { actionId: uuid(), cwd: fixture.workspaceRoot, action: "commit_push", featureBranch: false, commitMessage: `spi992 repro ${stamp} ${i}` }).catch((error: unknown) => [{ kind: "action_failed", error: String(error).slice(0, 300) }])) as Array<any>;
+    const head = (await sh("git rev-parse HEAD")).stdout.trim();
+    const trace = ((await admin("GET", "/_t3flare/agents/router-trace?clear=1")).json?.entries ?? []).filter((entry: any) => JSON.stringify(entry).includes("push")).slice(-2);
+    const row = { i, tainted, landed: remoteRef(`refs/heads/${branch}`) === head, failed: events.find((event) => event.kind === "action_failed") ?? null, trace };
+    rows.push(row);
+    console.log(JSON.stringify(row).slice(0, 400));
+  }
+  out.repro = rows;
+  check("repro: every Commit & push after a Container stop landed", rows.every((row: any) => row.landed), rows);
+  await admin("POST", `/_t3flare/agents/workspace-trust?id=${encodeURIComponent(id)}`);
+}
+
 /** Copies scripts/spi992/<name> into the Workspace's `.spi992/` (untracked, excluded from git). */
 const install = async (...names: Array<string>) => {
   for (const name of names) {
@@ -361,5 +385,5 @@ if (mode === "persist") {
 // The fixture's refs this run made are deleted (the owner's gh).
 out.cleanup = created.filter((ref) => remoteRef(ref) !== null).map((ref) => ({ ref, deleted: deleteRef(ref) }));
 await sh("git checkout -q --detach origin/main 2>/dev/null; true");
-evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : `m0-${mode}`}.json`);
+evidence(`${mode === "m1" ? "m1-gateway" : mode === "hostile" ? "m2-hostile-durable" : mode === "persist" ? "m2-hostile-persist" : mode === "repro" ? "m2-repro-owner-push" : `m0-${mode}`}.json`);
 process.exit(failures.length === 0 ? 0 : 1);

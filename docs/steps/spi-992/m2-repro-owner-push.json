@@ -1,0 +1,258 @@
+{
+ "at": "2026-11-12T13:19:40.181Z",
+ "mode": "repro",
+ "stamp": "mwdkn7ni",
+ "fixture": "ian-pascoe/t3flare-fixture",
+ "repro": [
+  {
+   "i": 0,
+   "tainted": false,
+   "landed": true,
+   "failed": null,
+   "trace": [
+    {
+     "at": 1794489402953,
+     "command": "git",
+     "argv": [
+      "config",
+      "--get",
+      "remote.pushDefault"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 1,
+     "ms": 125,
+     "detail": "passive 77ms"
+    },
+    {
+     "at": 1794489403849,
+     "command": "git",
+     "argv": [
+      "push",
+      "--",
+      "origin",
+      "HEAD:refs/heads/spi992/repro-mwdkn7ni-0"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 0,
+     "ms": 2210,
+     "detail": "action 1818ms"
+    }
+   ]
+  },
+  {
+   "i": 1,
+   "tainted": true,
+   "landed": true,
+   "failed": null,
+   "trace": [
+    {
+     "at": 1794489430526,
+     "command": "git",
+     "argv": [
+      "config",
+      "--get",
+      "remote.pushDefault"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 1,
+     "ms": 161,
+     "detail": "passive 82ms"
+    },
+    {
+     "at": 1794489431472,
+     "command": "git",
+     "argv": [
+      "push",
+      "--",
+      "origin",
+      "HEAD:refs/heads/spi992/repro-mwdkn7ni-1"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 0,
+     "ms": 2045,
+     "detail": "action 1675ms"
+    }
+   ]
+  },
+  {
+   "i": 2,
+   "tainted": false,
+   "landed": true,
+   "failed": null,
+   "trace": [
+    {
+     "at": 1794489457796,
+     "command": "git",
+     "argv": [
+      "config",
+      "--get",
+      "remote.pushDefault"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 1,
+     "ms": 129,
+     "detail": "passive 82ms"
+    },
+    {
+     "at": 1794489458813,
+     "command": "git",
+     "argv": [
+      "push",
+      "--",
+      "origin",
+      "HEAD:refs/heads/spi992/repro-mwdkn7ni-2"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 0,
+     "ms": 2095,
+     "detail": "action 1702ms"
+    }
+   ]
+  },
+  {
+   "i": 3,
+   "tainted": true,
+   "landed": true,
+   "failed": null,
+   "trace": [
+    {
+     "at": 1794489487156,
+     "command": "git",
+     "argv": [
+      "config",
+      "--get",
+      "remote.pushDefault"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 1,
+     "ms": 138,
+     "detail": "passive 86ms"
+    },
+    {
+     "at": 1794489488139,
+     "command": "git",
+     "argv": [
+      "push",
+      "--",
+      "origin",
+      "HEAD:refs/heads/spi992/repro-mwdkn7ni-3"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 0,
+     "ms": 2253,
+     "detail": "action 1833ms"
+    }
+   ]
+  },
+  {
+   "i": 4,
+   "tainted": false,
+   "landed": true,
+   "failed": null,
+   "trace": [
+    {
+     "at": 1794489521306,
+     "command": "git",
+     "argv": [
+      "config",
+      "--get",
+      "remote.pushDefault"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 1,
+     "ms": 185,
+     "detail": "passive 142ms"
+    },
+    {
+     "at": 1794489522320,
+     "command": "git",
+     "argv": [
+      "push",
+      "--",
+      "origin",
+      "HEAD:refs/heads/spi992/repro-mwdkn7ni-4"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 0,
+     "ms": 2332,
+     "detail": "action 1934ms"
+    }
+   ]
+  },
+  {
+   "i": 5,
+   "tainted": true,
+   "landed": true,
+   "failed": null,
+   "trace": [
+    {
+     "at": 1794489556141,
+     "command": "git",
+     "argv": [
+      "config",
+      "--get",
+      "remote.pushDefault"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 1,
+     "ms": 199,
+     "detail": "passive 156ms"
+    },
+    {
+     "at": 1794489557184,
+     "command": "git",
+     "argv": [
+      "push",
+      "--",
+      "origin",
+      "HEAD:refs/heads/spi992/repro-mwdkn7ni-5"
+     ],
+     "cwd": "/w/step3-fixture",
+     "route": "container",
+     "exitCode": 0,
+     "ms": 2213,
+     "detail": "action 1803ms"
+    }
+   ]
+  }
+ ],
+ "cleanup": [
+  {
+   "ref": "refs/heads/spi992/repro-mwdkn7ni-0",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/repro-mwdkn7ni-1",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/repro-mwdkn7ni-2",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/repro-mwdkn7ni-3",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/repro-mwdkn7ni-4",
+   "deleted": true
+  },
+  {
+   "ref": "refs/heads/spi992/repro-mwdkn7ni-5",
+   "deleted": true
+  }
+ ],
+ "failures": [],
+ "ok": true
+}
