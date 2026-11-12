@@ -3,6 +3,7 @@
 // container never holds it. Every grant and every CONNECT is logged as one JSON line on stdout, never the key.
 import http from "node:http";
 import net from "node:net";
+import dgram from "node:dgram";
 
 const KEY = process.env.PROBE_MODEL_KEY ?? "";
 let grants = 0;
@@ -41,4 +42,20 @@ proxy.on("connect", (req, socket, head) => {
   socket.on("error", () => upstream.destroy());
 });
 proxy.listen(3128);
+// A logging resolver: every DNS name asked is logged, and answered NXDOMAIN (the CLI network has no route out anyway).
+const dns = dgram.createSocket("udp4");
+dns.on("message", (msg, rinfo) => {
+  let at = 12;
+  const labels = [];
+  while (msg[at] !== 0 && at < msg.length) {
+    labels.push(msg.subarray(at + 1, at + 1 + msg[at]).toString());
+    at += msg[at] + 1;
+  }
+  log({ event: "dns", name: labels.join(".") });
+  const reply = Buffer.from(msg);
+  reply[2] = 0x81;
+  reply[3] = 0x83;
+  dns.send(reply, rinfo.port, rinfo.address);
+});
+dns.bind(53);
 log({ event: "ready" });

@@ -65,7 +65,6 @@ import { readCache, readKey } from "./readCache.ts";
 import { ModelKeyGate } from "./modelKey.ts";
 import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
-import { ProcessProbe, type ProbeOp } from "./processProbe.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
@@ -229,7 +228,6 @@ export class WorkspaceDO extends ContainerHost {
   readonly #terminals: TerminalHost;
   readonly #terminalSync: TerminalSync;
   #expireTimer: ReturnType<typeof setInterval> | undefined;
-  readonly #probe = new ProcessProbe();
   /** The CLI processes (step 4a). */
   readonly #processes: ProcessHost;
   /** This object's boot counter (review F6): the process channel's epoch, durable, never a UUID. */
@@ -1385,7 +1383,6 @@ export class WorkspaceDO extends ContainerHost {
     const reclaimable = this.#processes.reclaimable();
     const busy =
       this.#running > 0 ||
-      this.#probe.live > 0 ||
       this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() }) ||
       reclaimable.length < this.#processes.size;
     if (busy) return { released: false, reason: "in use" };
@@ -1459,7 +1456,7 @@ export class WorkspaceDO extends ContainerHost {
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
     // Terminals hold the Container until their last input is older than the hold (review F10: output is not use).
     const held = this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() }) || this.#processes.holdsContainer();
-    if (this.#running === 0 && this.#probe.live === 0 && !held && Date.now() - lastUse >= this.#idleMs()) {
+    if (this.#running === 0 && !held && Date.now() - lastUse >= this.#idleMs()) {
       console.log(JSON.stringify({ t3flare: "container-idle-stop", workspace: this.ctx.id.toString(), ...(await this.#usage()) }));
       await this.stopContainer();
       return;
@@ -1542,24 +1539,12 @@ export class WorkspaceDO extends ContainerHost {
     }
   }
 
-  /** Step 4a M0 P1 (test stages only): a long-lived non-PTY exec, or this object's abort (`{op: "abort"}`). */
-  async probeProcess(op: ProbeOp | { readonly op: "abort" } | { readonly op: "ps" }): Promise<unknown> {
+  /** Test stages only (step 4a M1's restart case): this object's abort, as an eviction does. */
+  probeProcess(op: { readonly op: "abort" }): { readonly aborting: boolean; readonly epoch: number } {
     if (this.env.T3FLARE_FAULTS !== "1") throw new Error("t3flare: probes answer on test stages only");
-    this.#alive();
-    if (op.op === "abort") {
-      setTimeout(() => this.ctx.abort("t3flare: probe abort"), 0);
-      return { aborting: true, epoch: this.#epoch };
-    }
-    if (op.op === "ps") return this.exec({ script: "ps -eo pid,pgid,sid,etimes,args --sort=pid | grep -v ' ps -eo' | tail -40", passive: true, timeoutMs: 20_000 });
-    if (op.op === "start" && !this.containerRunning()) await this.exec({ script: "true", timeoutMs: 180_000 });
-    const result = await this.#probe.run(op, async (argv, env) => {
-      const container = this.ctx.container;
-      if (container === undefined) throw new Error("no Container binding");
-      return container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...COMMAND_ENV, ...env } });
-    });
-    await this.#noteUse();
-    await this.#scheduleAlarm();
-    return { epoch: this.#epoch, result };
+    if (op.op !== "abort") throw new Error("t3flare: the only probe is abort");
+    setTimeout(() => this.ctx.abort("t3flare: probe abort"), 0);
+    return { aborting: true, epoch: this.#boot };
   }
 
   /**

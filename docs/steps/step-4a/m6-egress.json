@@ -1,0 +1,14 @@
+{
+ "at": "2026-11-12T02:25:00Z",
+ "definition": "plan §4.8: a CLI process and its children reach, for model traffic, only the model proxy's host and computer.internal (the key helper). An agent's own commands are its work and stay allowed (egress is direct; an allowlist is deferred).",
+ "how": "local Docker (docs/steps/step-4a/probes: run.sh with PROBE_INTERNAL=1, p10.sh, p10b.sh): the CLI runs on an --internal Docker network whose only peer is `keyhost` (computer.internal: the key route, a CONNECT-logging proxy at :3128 and a logging DNS resolver at :53); HTTPS_PROXY/NODE_USE_ENV_PROXY send all traffic through the logger, which logs each tunnel's host.",
+ "results": {
+  "codexDefaults": ["github.com", "chatgpt.com", "<proxy host>"],
+  "codexWithT3flareProfile": ["<proxy host>"],
+  "piDefaults": ["<proxy host>", "pi.dev"],
+  "piWithT3flareProfile": ["<proxy host>"],
+  "dnsQueriesToTheLoggingResolver": [],
+  "settings": "codex: features.plugins, plugin_discovery_prefetch, remote_plugin, plugin_sharing, apps, tool_suggest, image_generation, multi_agent = false; analytics.enabled=false; check_for_update_on_startup=false (cliProfiles.ts `codexOverrides`, pinned by test/cliProfiles.test.ts). pi: PI_OFFLINE=1, PI_SKIP_VERSION_CHECK=1, PI_TELEMETRY=0."
+ },
+ "notOnStage": "The stage-side egress log (T3FLARE_EGRESS_LOG with a logger in the image) was not built: the Container's egress is direct, and the profiles' settings are the ones proved here. Ticketed with the egress allowlist."
+}

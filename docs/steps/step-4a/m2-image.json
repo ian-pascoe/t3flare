@@ -1,0 +1,16 @@
+{
+ "at": "2026-11-12T02:26:00Z",
+ "image": {
+  "clis": { "codex": "0.167.2 (release tarball, SHA-256 checked, /opt/t3flare/bin/codex, 320 MB)", "pi": "1.5.2 (npm ci from image/cli/package-lock.json, /opt/t3flare/pi, 170 MB layer)" },
+  "addedBytes": "about 490 MB uncompressed over the step 3 image (docker history of the local amd64 build; compressed image 751 MB)",
+  "build": "the CLI layers after the mise layer: a cached rebuild after a CLI change took 55 s locally under amd64 emulation; the stage's image push and deploy took about 1 min 7 s",
+  "firstCommandColdStart": "46 s for the first Container start after the new image rolled out (m1-channel's startMs), 2–7 s for later cold starts on the stage"
+ },
+ "onStage": "`codex --version` = codex-cli 0.167.2, `pi --version` = 1.5.2, bwrap works (the sandbox probe logs works:true at each Container start)",
+ "keyRoute": {
+  "withoutCli": "403 (no CLI process lives in the Workspace)",
+  "latencyFromTheContainer": "30 calls of the route through computer's egress host: p50 17 ms, p95 26 ms, max 68 ms (P5's bar was 200 ms p95: pi's helper per request needs no cache)",
+  "grants": "Codex asks twice at start and keeps the key (M0); pi asks once per model request; each grant logged as `model-key` without the value"
+ },
+ "secret": "COMMISSARY_CONTAINER_API_KEY: in stage.ts DEPLOY_SECRETS (from dev.env, never printed), bound to the agents Worker only (alchemy.run.ts), in deploy-prod.yml and bump.yml env, and in infra/github.ts's prod secrets"
+}

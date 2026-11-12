@@ -20,6 +20,8 @@ if [ -n "${PROBE_INTERNAL:-}" ]; then
   docker network inspect t3flare-probe-int >/dev/null 2>&1 || docker network create --internal t3flare-probe-int >/dev/null
   docker network connect --alias computer.internal t3flare-probe-int t3flare-keyhost 2>/dev/null || true
   net=t3flare-probe-int
+  ip=$(docker inspect -f '{{(index .NetworkSettings.Networks "t3flare-probe-int").IPAddress}}' t3flare-keyhost)
+  PROBE_DOCKER_ARGS="${PROBE_DOCKER_ARGS:-} --dns $ip"
 fi
 url=$( set -a; . "$HOME/.config/t3flare/dev.env"; set +a; printf %s "$MODEL_PROXY_URL" )
 exec docker run --rm -i --network "$net" -e MODEL_PROXY_URL="$url" ${PROBE_DOCKER_ARGS:-} \

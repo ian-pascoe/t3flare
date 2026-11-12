@@ -2,14 +2,12 @@
 // Step 4a M0's stage probes (plan §8 M0, with the review's P12 and P8 gate), through the admin routes.
 //
 //   bun scripts/stage.ts run step4a probe4a workspace            clone the fixture project (once); prints its Workspace id
-//   bun scripts/stage.ts run step4a probe4a p1 --workspace <id> [--minutes 35] [--gap 10]
-//       a long-lived non-PTY exec: stdin echoed to stdout and stderr, written at each gap, silent between, an exit code
-//   bun scripts/stage.ts run step4a probe4a p1-abort --workspace <id>
-//       a process, then the Workspace DO aborted: does the process outlive the object, and does the new one know it
+//   (P1, a 35-minute non-PTY exec and the Workspace DO's abort, ran on M0's stage code, since replaced by the process
+//    channel: docs/steps/step-4a/m0-p1.json, m0-p1-abort.json; the channel's own checks are scripts/cli4a.ts)
 //   bun scripts/stage.ts run step4a probe4a p2 --workspace <id>   bwrap and user namespaces in the Container
 //   bun scripts/stage.ts run step4a probe4a p8 --workspace <id>   SQLite on computer's FUSE mount; rollouts of 5, 20,
 //       50 MB appended in the synced dir and pulled (the DO's CPU and rows per pull, from the agents Worker's logs)
-import { admin, pair, sleep } from "./lib/client.ts";
+import { admin, pair } from "./lib/client.ts";
 import { ensureCloudFixtureProject } from "./lib/fixtureProject.ts";
 import * as path from "node:path";
 
@@ -24,55 +22,12 @@ const arg = (name: string) => {
 };
 const workspace = arg("workspace") ?? "step3-fixture";
 const call = async (body: unknown) => (await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(workspace)}`, body)).json;
-const probe = (op: unknown) => call({ probeProcess: op });
 const exec = async (script: string, timeoutMs = 120_000) => (await call({ exec: { script, timeoutMs } }))?.result;
 
 switch (scenario) {
   case "workspace": {
     const cookie = await pair();
     console.log(JSON.stringify(await ensureCloudFixtureProject(cookie)));
-    break;
-  }
-  case "p1": {
-    const minutes = Number(arg("minutes") ?? 35);
-    const gap = Number(arg("gap") ?? 10);
-    const key = `p1-${Date.now()}`;
-    const script = 'while IFS= read -r l; do echo "out:$l"; echo "err:$l" >&2; [ "$l" = exit ] && exit 7; done; exit 3';
-    const started = Date.now();
-    console.log(JSON.stringify(await probe({ op: "start", key, argv: ["bash", "-c", script] })));
-    const writes: Array<{ at: number; text: string }> = [];
-    const write = async (text: string) => {
-      writes.push({ at: Date.now() - started, text });
-      return probe({ op: "write", key, text: `${text}\n` });
-    };
-    await write("hello");
-    for (let at = gap; at < minutes; at += gap) {
-      await sleep(gap * 60_000);
-      console.log(JSON.stringify({ minute: at, write: await write(`ping-${at}`) }));
-    }
-    await sleep(Math.max(0, minutes * 60_000 - (Date.now() - started)));
-    await write("exit");
-    await sleep(3000);
-    const state = await probe({ op: "state", key });
-    const result = { scenario, minutes, gap, writes, state: state?.result, epoch: state?.epoch, ps: (await probe({ op: "ps" }))?.stdout };
-    writeEvidence("m0-p1.json", result);
-    console.log(JSON.stringify(result).slice(0, 3000));
-    break;
-  }
-  case "p1-abort": {
-    const key = `p1a-${Date.now()}`;
-    const marker = `T3FLARE_PROBE=${key}`;
-    const before = await probe({ op: "start", key, argv: ["bash", "-c", "while IFS= read -r l; do echo \"out:$l\"; done"], env: { T3FLARE_PROBE: key } });
-    await probe({ op: "write", key, text: "one\n" });
-    await sleep(1000);
-    const aborting = await probe({ op: "abort" });
-    await sleep(3000);
-    const after = await probe({ op: "state", key });
-    const alive = await exec(`grep -l -a '${marker}' /proc/[0-9]*/environ 2>/dev/null | wc -l`);
-    const container = await admin("GET", "/_t3flare/agents/workspaces");
-    const result = { scenario, before, aborting, afterState: after, processesWithMarker: Number(String(alive?.stdout ?? "").trim()), workspaces: container.json };
-    writeEvidence("m0-p1-abort.json", result);
-    console.log(JSON.stringify(result).slice(0, 3000));
     break;
   }
   case "p2": {
