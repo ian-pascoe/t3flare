@@ -48,11 +48,11 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
 | Pi Durable | (ours) | W | `env/shadows/builtInDrivers.ts` | done |
-| Codex, Pi CLI | `srv/provider/builtInDrivers.ts:33-45` | M | Shadow lists Pi Durable only | 4a |
+| Codex, Pi CLI | `srv/provider/builtInDrivers.ts:33-45` | W, on proxy models, in the Workspace's Container; no t3 tools (OD-3, below); Pi has no plan mode (a plan turn is refused) | `env/provider/cli/`; `docs/steps/step-4a.md`, `step-4a/m6-acceptance.json` | done (4a) |
 | Claude, OpenCode | same | M; Claude over ACP loses fork, live steering, structured plan (ADR-0015) | same | 4b |
 | Cursor, Grok, Fx, Antigravity, Kiro, Muse | same | R (D3): vendor sign-in, no proxy base URL | no driver registered; ADR-0015 (D3 refinement), ADR-0012 | done (refusal) |
 | ACP registry agents | `ws.ts:2395-2453` | M | driver absent | — G13 |
-| Provider settings | `con/settings.ts:688-904` | P: Pi Durable has one hidden switch | `env/provider/settings.ts` | 4a/4b for CLIs |
+| Provider settings | `con/settings.ts:688-904` | P: Pi Durable has one hidden switch; Codex and Pi show t3's forms but binary path, home and launch arguments are ignored (the image and the CLI profile decide), Codex's managed (ChatGPT) setup is refused | `env/provider/settings.ts`, `env/provider/cli/` | 4a (CLIs), 4b |
 | Install or update a provider | `ws.ts:2631`, `:2681` | R (image-pinned) | ADR-0024, ADR-0015 | done (refusal) |
 | Account sign-in | `provider.auth.*` `ws.ts:2665-2679` | R | ADR-0012 | — |
 | Limit errors and resume | — | W | `docs/model-proxy.md` | done |
@@ -98,6 +98,7 @@ The checklist for "t3code parity": everything stock t3code does on a laptop work
 |---|---|---|---|---|
 | `/mcp` and OAuth for outside agents | `con/environmentHttp.ts:633-674` | W† | mounted; step-3 M0 probes it | 3 |
 | t3's tools in Sessions | `srv/mcp/toolkits/` | M today | `supportsMcpTools: false` on main | 3 |
+| t3's tools for CLI agents (Codex, Pi) | t3 hands its per-thread MCP bearer to the CLI's process | M by decision (OD-3): no `delegate_task`, thread tools, `t3_thread_wait`, browser or device tools from a CLI agent; Pi's extension warns of no MCP, filtered | `env/provider/cli/wrapper.ts` (`supportsMcpTools: false`), the `McpProviderSessions` stub | after 4b, SPI-1039 |
 | Agent's own MCP servers | each CLI's config | M | — | — G10 |
 | Secret store | — | W | `env/platform/secretStore.ts`; step 1 | done |
 | 1Password provider | `t3code/packages/secret-provider-onepassword` (`op` CLI) | M; possibly later through the broker pattern (D5) | `op` "not found"; ADR-0012 (D5 refinement) | — |

@@ -52,10 +52,18 @@ What moves the total:
 - **`GET /_t3flare/agents/workspaces` → `terminals.pushes`**: terminal output batches each Workspace DO pushed since it
   started.
 
+- **`process-started`, `process-exited`, `model-key`, `container-stop-cli`** (agents Worker logs, step 4a): CLI
+  agent processes and the key helper's grants. A CLI process holds its Container while its thread is in a turn and
+  for 11 minutes after (t3 releases the session at 10, Patch 0003), so an idle CLI session costs at most about
+  11 Container-minutes beyond its last turn (about $0.006). The Environment's own idle reset (60 s without a client)
+  ends idle CLI processes earlier, at the Workspace's 90 s lapse; a full budget reclaims Containers whose CLI sessions
+  sit idle.
+
 ## When to act
 
 - **Right-size the Container from 3 GiB to 2 GiB (audit F3)** once at least ~20 idle stops are logged and the p95 of
-  `memoryPeakBytes` is under 1.4 GiB. Saves $0.54 a month at moderate use, $3.24 at heavy. The `durable_object`
+  `memoryPeakBytes` is under 1.4 GiB, counting CLI-agent turns (an idle Codex app-server is about 160 MB; up to 4
+  CLI processes per Workspace). Saves $0.54 a month at moderate use, $3.24 at heavy. The `durable_object`
   scheduling policy allows any size above 1/16 vCPU, 256 MiB and 2 GB.
 - **Hibernatable client sockets for the Environment DO (audit F5, ADR-0002)** when a month's DO duration goes over
   400k GB-s (start the plan at about 350k). Saves $12.50 a month, at heavy use only; effort L.

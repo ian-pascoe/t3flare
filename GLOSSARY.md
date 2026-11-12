@@ -123,6 +123,18 @@ _Avoid_: Mode 1, container agent
 The stock pi coding agent CLI as a CLI agent, through t3's built-in Pi provider, which shows it as "Pi". Not a Durable agent.
 _Avoid_: Pi Durable (that is the Durable agent provider), pi CLI agent
 
+**Process channel**:
+How a CLI agent's process, spawned by t3 in the Environment, runs in its Workspace's Container: the Workspace DO starts it under the platform's exec, the Environment writes its stdin and reads its output with a long poll.
+_Avoid_: process bridge, remote spawn
+
+**CLI profile**:
+What a CLI agent's process gets whatever t3 asked: the image's binary, an allowlisted environment, the model proxy as its only provider, and a home built fresh on the Container's disk with only its session directory synced.
+_Avoid_: CLI config
+
+**Key helper**:
+The command a CLI agent runs for its model proxy key (`t3flare-model-key`), which asks the Workspace DO only while a CLI process lives there; the key is never in an environment or on disk.
+_Avoid_: token helper (Codex's managed mode), credential helper (that is git's)
+
 ## Credentials
 
 **Provider instance**:

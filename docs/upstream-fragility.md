@@ -266,6 +266,32 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 - **Blast radius**: no phone notification (silent), or a relay route answered by t3.
 - **Fix**: `git -C t3code diff <old>..<new> -- apps/server/src/cloud apps/server/src/relay/AgentAwarenessRelay.ts packages/contracts/src/relay.ts .env.example`; rerun `scripts/connect-m2.ts` on a linked stage.
 
+### U28. Our Codex registration, client factory and request guard (step 4a)
+
+- **Where**: `apps/environment/src/provider/cli/codexDriver.ts` calls t3's `makeCodexAdapterV2` (`t3code/apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts`) with our `CodexAppServerClientFactoryShape` (t3's `layerAppServerClientFactory` restated without port discovery, spawning with the thread's cwd) and `CodexClient.layerChildProcess`; `provider/cli/codexGuard.ts` allowlists app-server methods (the ones t3's adapter sends today) and thread config keys (`CODEX_THREAD_CONFIG` plus `shell_environment_policy.set.T3CODE_THREAD_ID`), and rewrites `turn/start`'s `approvalPolicy`/`approvalsReviewer`/`sandboxPolicy` from its mode table, reading `collaborationMode.mode`. `provider/cli/wrapper.ts` overrides `supportsMultipleProviderThreadsPerSession` (read by `Orchestrator.ts` `providerSessionIdFor` and `ProviderSessionManager.open`), and the fork error shape.
+- **Breaks when**: t3 renames these exports or the factory's input; sends a new app-server method (refused: the adapter fails where it calls it); renames a `turn/start` field; adds a thread config key it relies on (dropped silently); stops reading the session capability for attaching threads.
+- **Detection**: typecheck (exports, factory shape); `acceptance --codex` (a turn with approvals and a resume); a refused method logs `codex-request-refused` with its name. **Silent**: a dropped config key, a new policy field.
+- **Blast radius**: Codex threads fail to start or turn; a mode runs with t3's own policy; a second project's thread could run in the first one's Container (F1) if the attach logic moved.
+- **Fix**: diff `CodexAdapterV2.ts` between tags for `client.request(`, `codexThreadRuntimeParams`, `buildCodexTurnStartParams`; update the allowlists.
+
+### U29. Our Pi registration, the extension copy and `processGroup.ts` (step 4a)
+
+- **Where**: `provider/cli/piDriver.ts` calls `makePiAdapterV2` and imports `PiSettings` by path (`t3code/packages/provider-pi/src/…`, not exported); `agents/cliProfiles.ts` accepts only the flags `buildPiRpcLaunch` sends (`PI_FLAGS`), copies t3's extension from the State directory after checking it equals `PI_T3_MCP_EXTENSION_SOURCE`, and sets `T3_PI_RUNTIME_MODE`; `shadows/processGroup.ts` replaces `signalProcessGroup` (`rpc.ts`'s stop path); `build.ts` `FS_ALIAS_SKIP` keeps the `node:fs` alias out of the extension source's text; the wrapper drops events naming "t3-code MCP unavailable".
+- **Breaks when**: t3 adds a pi flag (refused: `cli-spawn-refused` names it), renames the extension's variables or file, moves the source module (the skip no longer applies: pi exits 1 "Cannot find module …/shims/node-fs-promises.ts", logged as `cli-exited` with its stderr), stops importing `processGroup`, or changes the notice.
+- **Detection**: `acceptance --pi`; `dist/build-report.json`'s `shadows` lists `processGroup.ts` (T5). **Silent**: a renamed mode variable (the extension would fall back to full access: `cliProfiles.test.ts` pins the name we set, not t3's).
+- **Fix**: `git -C t3code diff <old>..<new> -- packages/provider-pi/src/server/mcpInjection.ts packages/provider-pi/src/server/mcpExtensionSource.ts packages/provider-pi/src/server/rpc.ts`.
+
+### U30. CLI versions against t3's compatibility manifest (step 4a)
+
+- **Where**: `apps/sandbox-image/src/clis.ts` (Codex 0.167.2, pi 1.5.2), the Dockerfile's `ARG`s and `image/cli/package-lock.json`; `apps/environment/test/cliManifest.test.ts` checks them against `model-manifest.json` (`resolveProviderCompatibility`) and `MINIMUM_PI_VERSION`.
+- **Breaks when**: a nightly raises a minimum. **Detection**: tests ("bump the CLI in clis.ts"). **Fix**: bump the version, the digest and the lock together; re-run U31's checks.
+
+### U31. The CLIs' own configuration surfaces (step 4a)
+
+- **Where**: Codex's `-c` keys (`cliProfiles.ts` `codexOverrides`: the provider's `auth` command, `allow_login_shell`, the `features.*` that reach github.com and chatgpt.com, `shell_environment_policy.*`), pi's `models.json`/`settings.json` shape and its `PI_*` variables (`PI_CODING_AGENT_SESSION_DIR`, `PI_OFFLINE`).
+- **Breaks when**: a CLI bump renames a key (Codex 0.167.2 already refuses a process-level `approval_policy="untrusted"`) or adds a default network call. These move with `clis.ts`, not with t3.
+- **Detection**: **silent** for a new default network call. Re-run M0's local probes (`docs/steps/step-4a/probes`: `p10.sh`/`p10b.sh` on an internal network, `p3.sh`, `p8.sh`) on every CLI bump; `acceptance --codex --pi` for the rest.
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).
