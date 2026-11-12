@@ -196,12 +196,31 @@ export interface ToolSlotSlim {
   readonly status: "pending" | "running" | "done";
 }
 
+/**
+ * A code mode script's nested call while its run lives (`pi.live.nestedTools`, ADR-0027): the differ shows it as a child
+ * item of the script's call. Arguments cut to NESTED_ARGS_BYTES, running output to its tail.
+ */
+export interface NestedToolSlim {
+  readonly callId: string;
+  readonly parentCallId: string;
+  readonly name: string;
+  readonly args: Readonly<Record<string, unknown>>;
+  readonly status: "pending" | "running" | "done";
+  readonly isError?: boolean;
+  readonly output?: string;
+}
+
+export const NESTED_ARGS_BYTES = 4 * 1024;
+export const NESTED_OUTPUT_BYTES = 2 * 1024;
+
 export interface LiveSlim {
   /** The run in progress, if any: its generation task, and the turn it serves. */
   readonly run: { readonly taskId: string; readonly turn: string | null } | null;
   /** The in-flight response's committed partial: its generation task and its blocks. */
   readonly generation: { readonly taskId: string; readonly attempt: number; readonly content: ReadonlyArray<ContentBlock> } | null;
   readonly tools: ReadonlyArray<ToolSlotSlim>;
+  /** Code mode's nested calls (tools step); absent in pushes from before it. */
+  readonly nestedTools?: ReadonlyArray<NestedToolSlim>;
   readonly runFailure: { readonly reason: string; readonly detail?: string; readonly taskId: string } | null;
 }
 

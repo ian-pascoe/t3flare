@@ -64,7 +64,19 @@ export interface DifferState {
   /** When each item was first seen. */
   readonly startedAt: Map<string, DateTime.Utc>;
   /** Each item's last emitted shape, to close it when its turn settles. */
-  readonly items: Map<string, { readonly turn: string; readonly kind: OrchestrationV2ExecutionNode["kind"]; readonly status: ItemStatus; readonly title: string | null; readonly body: ItemBody }>;
+  readonly items: Map<
+    string,
+    {
+      readonly turn: string;
+      readonly kind: OrchestrationV2ExecutionNode["kind"];
+      readonly status: ItemStatus;
+      readonly title: string | null;
+      readonly body: ItemBody;
+      readonly parentKey?: string;
+    }
+  >;
+  /** Code mode's nested calls' arguments as last seen live (the committed list cuts them to 200 characters). */
+  readonly nestedArgs: Map<string, Readonly<Record<string, unknown>>>;
   /** Tool calls seen in committed responses of turns still open, and their results once seen (pushes split them). */
   readonly toolCalls: Map<string, { readonly call: ToolCallInfo; readonly turn: string }>;
   readonly toolResults: Map<string, PushedEntry>;
@@ -94,6 +106,7 @@ export const makeDifferState = (sessionName: string): DifferState => ({
   toolResults: new Map(),
   approvals: new Map(),
   decisions: new Map(),
+  nestedArgs: new Map(),
 });
 
 /** t3's runtime request id for the Session's approval request `requestId` (stable across re-diffs and restarts). */
@@ -146,9 +159,12 @@ const emitItem = (
   title: string | null,
   body: ItemBody,
   now: DateTime.Utc,
+  /** A child's parent item (code mode's nested calls, as t3's Pi provider nests them). */
+  parentKey?: string,
 ) => {
   const nativeItemId = `${state.sessionName}:${key}`;
-  state.items.set(key, { turn: turn.providerTurnId, kind, status, title, body });
+  const parentNativeId = parentKey === undefined ? undefined : `${state.sessionName}:${parentKey}`;
+  state.items.set(key, { turn: turn.providerTurnId, kind, status, title, body, ...(parentKey === undefined ? {} : { parentKey }) });
   const startedAt = startedAtOf(state, key, now);
   const completedAt = status === "running" ? null : now;
   const nodeId = derive.nodeFromProviderItem({ driver, nativeItemId });
@@ -164,7 +180,7 @@ const emitItem = (
         id: nodeId,
         threadId: turn.threadId,
         runId: turn.runId,
-        parentNodeId: turn.rootNodeId,
+        parentNodeId: parentNativeId === undefined ? turn.rootNodeId : derive.nodeFromProviderItem({ driver, nativeItemId: parentNativeId }),
         rootNodeId: turn.rootNodeId,
         kind,
         status,
@@ -195,7 +211,7 @@ const emitItem = (
         providerThreadId: turn.providerThreadId,
         providerTurnId: turn.providerTurnId,
         nativeItemRef: ref(nativeItemId),
-        parentItemId: null,
+        parentItemId: parentNativeId === undefined ? null : derive.turnItemFromProviderItem({ driver, nativeItemId: parentNativeId }),
         ordinal,
         startedAt,
         updatedAt: now,
@@ -290,6 +306,7 @@ const emitTool = (
   pathOut: PathOut,
   textOut: (text: string) => string,
   now: DateTime.Utc,
+  parentKey?: string,
 ) => {
   const key = `call:${call.id}`;
   const output = result === undefined ? "" : text(result.content);
@@ -301,7 +318,7 @@ const emitTool = (
       input: textOut(str(call.arguments.command) ?? ""),
       ...(output.length > 0 ? { output } : {}),
       ...(exitCode === undefined ? {} : { exitCode }),
-    }, now);
+    }, now, parentKey);
     return;
   }
   if (call.name === "edit" || call.name === "write") {
@@ -315,21 +332,80 @@ const emitTool = (
         fileName: pathOut(fileName),
         ...(diffStr === undefined ? {} : { diffStr }),
         ...(newStr === undefined ? {} : { newStr }),
-      }, now);
+      }, now, parentKey);
       return;
     }
   }
   const input = Object.fromEntries(
     Object.entries(call.arguments).map(([name, value]) => [name, name === "path" && typeof value === "string" ? pathOut(value) : value]),
   );
-  emitItem(state, out, turn, key, "tool_call", status, call.name, {
+  emitItem(state, out, turn, key, "tool_call", status, call.name === "codemode" ? "Code mode" : call.name, {
     type: "dynamic_tool",
     // t3's own tools (`mcp__t3-code__…`, step 3) show as t3 shows them for its Pi provider.
     ...mcpToolPresentation({ toolName: call.name }),
     toolName: call.name,
     input,
     ...(result === undefined ? {} : { output: { content: result.content.filter((block) => block.type === "text") } }),
-  }, now);
+  }, now, parentKey);
+};
+
+/** A nested call's status as committed in the code mode result's `details.calls`. */
+const nestedStatus = (status: unknown): ItemStatus =>
+  status === "ok" ? "completed" : status === "error" ? "failed" : status === "cancelled" ? "interrupted" : "running";
+
+const parseArgs = (text: unknown): Readonly<Record<string, unknown>> => {
+  if (typeof text !== "string") return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return { args: text };
+  }
+};
+
+/**
+ * Code mode's nested calls (ADR-0027, plan §2.5) as children of the script's item: live from `nestedTools`, settled from
+ * the result's `details.calls` (ids `<call>/c<id>` both ways, so the upserts match), omitted calls as one more child.
+ */
+const emitNested = (
+  state: DifferState,
+  out: Array<ProviderAdapterV2Event>,
+  turn: TurnContext,
+  parent: ToolCallInfo,
+  result: PushedEntry | undefined,
+  live: ReadonlyArray<NonNullable<SessionState["live"]["nestedTools"]>[number]>,
+  pathOut: PathOut,
+  textOut: (text: string) => string,
+  now: DateTime.Utc,
+) => {
+  const parentKey = `call:${parent.id}`;
+  const details = (result?.details ?? {}) as { calls?: ReadonlyArray<Record<string, unknown>>; omittedCalls?: { count?: unknown; failed?: unknown } };
+  if (result === undefined || !Array.isArray(details.calls)) {
+    for (const slot of live) {
+      if (slot.parentCallId !== parent.id) continue;
+      state.nestedArgs.set(slot.callId, slot.args);
+      const status: ItemStatus = slot.status === "done" ? (slot.isError === true ? "failed" : "completed") : "running";
+      const shown = slot.output === undefined ? undefined : ({ content: [{ type: "text", text: slot.output }] } as unknown as PushedEntry);
+      emitTool(state, out, turn, { id: slot.callId, name: slot.name, arguments: slot.args }, status, slot.name === "bash" ? shown : undefined, pathOut, textOut, now, parentKey);
+    }
+    return;
+  }
+  for (const nested of details.calls) {
+    const id = `${parent.id}/c${String(nested.id)}`;
+    const name = typeof nested.name === "string" ? nested.name : "tool";
+    const args = state.nestedArgs.get(id) ?? parseArgs(nested.args);
+    emitTool(state, out, turn, { id, name, arguments: args }, nestedStatus(nested.status), undefined, pathOut, textOut, now, parentKey);
+  }
+  const omitted = details.omittedCalls;
+  if (typeof omitted?.count === "number" && omitted.count > 0) {
+    const failed = typeof omitted.failed === "number" ? omitted.failed : 0;
+    emitItem(state, out, turn, `call:${parent.id}/omitted`, "tool_call", failed > 0 ? "failed" : "completed", `${omitted.count} more calls (${failed} failed)`, {
+      type: "dynamic_tool",
+      ...mcpToolPresentation({ toolName: "codemode" }),
+      toolName: "codemode",
+      input: {},
+    }, now, parentKey);
+  }
 };
 
 /** t3's request kind for a Session approval: a T3 tool's is a permission (as t3's Pi bridge asks), a push a command. */
@@ -569,6 +645,7 @@ export const diff = (
     const status: ItemStatus =
       result !== undefined ? (result.isError === true ? "failed" : "completed") : slot?.status === "done" ? "completed" : "running";
     emitTool(state, out, turn, call, status, result, pathOut, textOut, now);
+    if (call.name === "codemode") emitNested(state, out, turn, call, result, pushed.live.nestedTools ?? [], pathOut, textOut, now);
   }
 
   emitRequests(state, out, [...pushed.approvals.map((approval) => approvalView(approval, textOut)), ...(pushed.questions ?? []).map(questionView)], now);
@@ -614,13 +691,14 @@ export const diff = (
       if (item.turn !== providerTurnId || item.status !== "running") continue;
       const closed: ItemStatus = settledStatus === "completed" ? "completed" : "interrupted";
       const body = "streaming" in item.body ? { ...item.body, streaming: false } : item.body;
-      emitItem(state, out, turn, key, item.kind, closed, item.title, body, now);
+      emitItem(state, out, turn, key, item.kind, closed, item.title, body, now, item.parentKey);
     }
     state.terminated.add(providerTurnId);
     for (const [id, { turn: callTurn }] of state.toolCalls) {
       if (callTurn !== providerTurnId) continue;
       state.toolCalls.delete(id);
       state.toolResults.delete(id);
+      for (const nested of state.nestedArgs.keys()) if (nested.startsWith(`${id}/`)) state.nestedArgs.delete(nested);
     }
     const failure = turnState.status === "failed" ? failureOf(turnState, now) : null;
     out.push({

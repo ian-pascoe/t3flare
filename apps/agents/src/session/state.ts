@@ -3,12 +3,13 @@
 import type {
   ContentBlock,
   LiveSlim,
+  NestedToolSlim,
   PushedEntry,
   ToolSlotSlim,
   TurnState,
   UsageSlim,
 } from "@t3flare/session-protocol";
-import { TOOL_OUTPUT_BYTES } from "@t3flare/session-protocol";
+import { NESTED_ARGS_BYTES, NESTED_OUTPUT_BYTES, TOOL_OUTPUT_BYTES } from "@t3flare/session-protocol";
 
 type Json = unknown;
 const record = (value: Json): Record<string, Json> =>
@@ -116,7 +117,14 @@ const boundedDetails = (details: Json): Json => {
   return encoder.encode(text).length <= 64 * 1024 ? details : undefined;
 };
 
-/** pi.live, slimmed: no tool output, no nested tools, the partial's blocks only. */
+/** A nested call's arguments, whole when small, else each string field cut (so a command still shows its start). */
+const nestedArgs = (raw: unknown): Readonly<Record<string, unknown>> => {
+  const args = record(raw);
+  if (encoder.encode(JSON.stringify(args) ?? "").length <= NESTED_ARGS_BYTES) return args;
+  return Object.fromEntries(Object.entries(args).map(([key, value]) => [key, typeof value === "string" ? cut(value, NESTED_ARGS_BYTES / 2) : "…"]));
+};
+
+/** pi.live, slimmed: no tool output, nested tools with cut arguments and an output tail, the partial's blocks only. */
 export const liveOf = (doc: Json, turnOfTask: (taskId: string) => string | null): LiveSlim => {
   const live = record(doc);
   const run = record(live.run);
@@ -132,6 +140,26 @@ export const liveOf = (doc: Json, turnOfTask: (taskId: string) => string | null)
       status: status === "running" || status === "done" ? status : "pending",
     };
   });
+  const nestedTools: Array<NestedToolSlim> = (Array.isArray(live.nestedTools) ? live.nestedTools : []).flatMap((raw) => {
+    const slot = record(raw);
+    const callId = str(slot.callId);
+    const parentCallId = str(slot.parentCallId);
+    if (callId === undefined || parentCallId === undefined) return [];
+    const status = str(slot.status);
+    const summary = record(slot.summary);
+    const output = str(slot.output);
+    return [
+      {
+        callId,
+        parentCallId,
+        name: str(slot.name) ?? "tool",
+        args: nestedArgs(slot.arguments),
+        status: status === "running" || status === "done" ? status : "pending",
+        ...(summary.isError === true ? { isError: true } : {}),
+        ...(output === undefined || output === "" ? {} : { output: output.slice(-NESTED_OUTPUT_BYTES) }),
+      },
+    ];
+  });
   const runTask = idText(run.taskId);
   return {
     run: runTask === undefined ? null : { taskId: runTask, turn: turnOfTask(runTask) },
@@ -140,6 +168,7 @@ export const liveOf = (doc: Json, turnOfTask: (taskId: string) => string | null)
         ? null
         : { taskId: runTask, attempt: num(generation.attempt), content: slimContent(message.content) },
     tools,
+    ...(nestedTools.length === 0 ? {} : { nestedTools }),
     runFailure:
       failure.reason === undefined
         ? null
