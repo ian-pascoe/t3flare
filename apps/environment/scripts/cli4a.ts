@@ -12,6 +12,7 @@ import * as path from "node:path";
 
 import { admin, dispatch, itemsOf, mutateProject, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
 import { writeEvidence as writeAt } from "./lib/evidence.ts";
+import { cloudProjects } from "./lib/fixtureProject.ts";
 
 const [scenario = "channel", ...args] = process.argv.slice(2);
 const arg = (name: string) => {
@@ -38,12 +39,14 @@ const processState = async (workspace: string) => (await admin("GET", `/_t3flare
 /** A Workspace with the fixture cloned through t3's own clone, and its project (made once per id). */
 const ensureProject = async (cookie: string, id: string): Promise<{ projectId: string; root: string }> => {
   const root = `/w/${id}`;
+  const existing = (await cloudProjects(cookie)).find((project) => project.workspaceRoot === root);
+  if (existing !== undefined) return { projectId: existing.id, root };
   const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${FIXTURE}.git`, destinationPath: root }).catch((error: unknown) => ({
     error: String(error).slice(0, 300),
   }))) as { cwd?: string; error?: string };
   if (cloned.cwd !== root && !String(cloned.error).includes("exist")) throw new Error(`clone of ${id} failed: ${cloned.error}`);
   const projectId = uuid();
-  await mutateProject(cookie, { type: "project.create", commandId: uuid(), projectId, title: id, workspaceRoot: root, createWorkspaceRootIfMissing: false }).catch(() => undefined);
+  await mutateProject(cookie, { type: "project.create", commandId: uuid(), projectId, title: id, workspaceRoot: root, createWorkspaceRootIfMissing: false });
   return { projectId, root };
 };
 
@@ -110,7 +113,7 @@ const cliTurn = async (cookie: string, options: TurnOptions) => {
     root,
     model: model.model,
     runs: runs.map((run: any) => ({ id: run.id, status: run.status, failure: run.failure ?? null })),
-    items: turnItems.map((item: any) => ({ type: item.type, status: item.status ?? null, fileName: item.fileName ?? null, input: typeof item.input === "string" ? item.input.slice(0, 120) : null, exitCode: item.exitCode ?? null })),
+    items: turnItems.map((item: any) => ({ type: item.type, status: item.status ?? null, fileName: item.fileName ?? null, input: typeof item.input === "string" ? item.input.slice(0, 120) : null, exitCode: item.exitCode ?? null, ...(item.type === "error" || item.type === "proposed_plan" ? { detail: JSON.stringify(item).slice(0, 800) } : {}) })),
     text: turnItems
       .filter((item: any) => item.type === "assistant_message")
       .map((item: any) => String(item.text ?? ""))

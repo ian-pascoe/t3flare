@@ -1,0 +1,10 @@
+{
+ "at": "2026-11-12T01:50:00Z",
+ "what": "RSS of the Workspace Container's processes after two Codex turns (two idle app-servers) on step4a, `ps -eo rss,args` and `free -m`",
+ "codexAppServerRssKiB": [160260, 157052],
+ "computerdRssKiB": 101060,
+ "memTotalMiB": 3214,
+ "memUsedMiB": 280,
+ "decision": "MAX_CLI_PROCESSES = 4 per Workspace (about 0.65 GB of CLI processes at rest); a fifth start is refused with the cap's reason",
+ "note": "The 2-process cap refused a third Codex session in one Workspace (run failed: 'Provider session failed to open'), which is how this was found"
+}

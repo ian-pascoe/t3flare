@@ -1,0 +1,75 @@
+{
+ "at": "2026-11-12T01:48:49.460Z",
+ "scenario": "turn",
+ "ok": false,
+ "failures": [
+  "the turn completed: [{\"id\":\"run:thread:5735f0b8-42b7-4fd1-8295-752667642415:ordinal:1\",\"status\":\"failed\",\"failure\":null}]"
+ ],
+ "cli": "codex",
+ "result": {
+  "threadId": "5735f0b8-42b7-4fd1-8295-752667642415",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:5735f0b8-42b7-4fd1-8295-752667642415:ordinal:1",
+    "status": "failed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "error",
+    "status": "failed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "",
+  "requests": [],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A5735f0b8-42b7-4fd1-8295-752667642415%3Aordinal%3A1",
+    "nativeThreadRef": null,
+    "providerSessionId": "provider-session:provider-instance:codex:thread:5735f0b8-42b7-4fd1-8295-752667642415:f13580c6-1cd5-4f26-bd97-a46fe6b96afe",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [],
+  "ms": 5033
+ },
+ "processes": {
+  "channel": {
+   "live": 2,
+   "environmentEpoch": 15
+  },
+  "workspace": {
+   "epoch": 1,
+   "processes": [
+    {
+     "key": "proc-da6eedcc-54c7-43b3-9c64-418810f56123",
+     "thread": "3e43dcb1-6cd6-4f33-a1f0-7fd4287b65a1",
+     "environmentEpoch": 15,
+     "inTurn": false,
+     "idleMs": 80677
+    },
+    {
+     "key": "proc-c564a625-defd-4de9-b892-d1ed610c145b",
+     "thread": "bf1aa681-16a1-4ce5-9e55-dd57a4fab0bc",
+     "environmentEpoch": 15,
+     "inTurn": false,
+     "idleMs": 15225
+    }
+   ],
+   "pushes": 156
+  }
+ }
+}

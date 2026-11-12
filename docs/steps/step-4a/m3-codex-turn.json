@@ -1,0 +1,179 @@
+{
+ "at": "2026-11-12T01:48:35.981Z",
+ "scenario": "turn",
+ "ok": true,
+ "failures": [],
+ "cli": "codex",
+ "result": {
+  "threadId": "bf1aa681-16a1-4ce5-9e55-dd57a4fab0bc",
+  "root": "/w/cli-codex",
+  "model": "gpt-6-luna",
+  "runs": [
+   {
+    "id": "run:thread:bf1aa681-16a1-4ce5-9e55-dd57a4fab0bc:ordinal:1",
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "items": [
+   {
+    "type": "user_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "reasoning",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "reasoning",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "failed",
+    "fileName": null,
+    "input": "/bin/bash -c \"python3 -c 'from pathlib import Path; p=Path(\\\"src/greeting.txt\\\"); text=p.read_text(); p.write_text(text ",
+    "exitCode": 1
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "/bin/bash -c \"python3 -c 'from pathlib import Path; p=Path(\\\"src/greeting.txt\\\"); text=p.read_text(); p.write_text(text ",
+    "exitCode": 0
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "command_execution",
+    "status": "completed",
+    "fileName": null,
+    "input": "/bin/bash -c 'bash test.sh'",
+    "exitCode": 0
+   },
+   {
+    "type": "approval_request",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "assistant_message",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   },
+   {
+    "type": "checkpoint",
+    "status": "completed",
+    "fileName": null,
+    "input": null,
+    "exitCode": null
+   }
+  ],
+  "text": "I’ll add the requested final line, then run `bash test.sh`.The workspace is mounted read-only for the default command, so the edit was blocked. I’m retrying with the workspace write permission needed for your requested edit; then I’ll run the test.Added `Hello from the CLI.` as the last line of [src/greeting.txt](/w/cli-codex/src/greeting.txt); `bash test.sh` passed.",
+  "requests": [
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept"
+   },
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept"
+   },
+   {
+    "kind": "command",
+    "requestKind": null,
+    "status": "resolved",
+    "decision": "accept"
+   }
+  ],
+  "providerThreads": [
+   {
+    "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3Abf1aa681-16a1-4ce5-9e55-dd57a4fab0bc%3Aordinal%3A1",
+    "nativeThreadRef": {
+     "driver": "codex",
+     "nativeId": "01a1cd70-f021-7771-b9dc-686e0b580f97",
+     "strength": "strong"
+    },
+    "providerSessionId": "provider-session:provider-instance:codex:thread:bf1aa681-16a1-4ce5-9e55-dd57a4fab0bc:7642dec0-b571-4549-acc1-e59de75d2ec0",
+    "providerInstanceId": "codex"
+   }
+  ],
+  "providerSessions": [
+   {
+    "id": "provider-session:provider-instance:codex:thread:bf1aa681-16a1-4ce5-9e55-dd57a4fab0bc:7642dec0-b571-4549-acc1-e59de75d2ec0",
+    "status": "ready",
+    "cwd": "/w/cli-codex"
+   }
+  ],
+  "ms": 25037
+ },
+ "processes": {
+  "channel": {
+   "live": 2,
+   "environmentEpoch": 15
+  },
+  "workspace": {
+   "epoch": 1,
+   "processes": [
+    {
+     "key": "proc-da6eedcc-54c7-43b3-9c64-418810f56123",
+     "thread": "3e43dcb1-6cd6-4f33-a1f0-7fd4287b65a1",
+     "environmentEpoch": 15,
+     "inTurn": false,
+     "idleMs": 67132
+    },
+    {
+     "key": "proc-c564a625-defd-4de9-b892-d1ed610c145b",
+     "thread": "bf1aa681-16a1-4ce5-9e55-dd57a4fab0bc",
+     "environmentEpoch": 15,
+     "inTurn": false,
+     "idleMs": 1680
+    }
+   ],
+   "pushes": 156
+  }
+ }
+}
