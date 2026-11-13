@@ -4,6 +4,7 @@
 import * as NodeFs from "node:fs";
 
 import { T3_CODE_ORCHESTRATION_INSTRUCTIONS } from "@t3tools/provider-core/server/orchestrationInstructions";
+import { TOOL_SEARCH } from "t3/src/mcp/McpToolExposure.ts";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { T3_TOOL_DENYLIST } from "../../agents/src/extensions/t3-guidance.ts";
@@ -11,7 +12,10 @@ import { type CatalogTool, catalogOf, t3McpExtension } from "../../agents/src/ex
 
 const TOOLKITS = new URL("../../../t3code/apps/server/src/mcp/toolkits/", import.meta.url);
 
-/** Every tool t3's MCP server defines, as it lists them: name and description. */
+/**
+ * Every tool t3's MCP server defines, as it lists them to a client that does not defer its tools (the Session sends no
+ * `t3-tool-exposure: deferred`): name and description, without `tool_search` (t3's `layerDeferredListing`).
+ */
 let t3Tools: ReadonlyArray<CatalogTool> = [];
 
 beforeAll(async () => {
@@ -22,7 +26,7 @@ beforeAll(async () => {
     const tools = (exported as { tools?: unknown } | null)?.tools;
     if (tools === null || typeof tools !== "object") continue;
     for (const tool of Object.values(tools as Record<string, { name: string; description?: string }>)) {
-      if (typeof tool?.name === "string") byName.set(tool.name, { name: tool.name, description: tool.description });
+      if (typeof tool?.name === "string" && tool.name !== TOOL_SEARCH) byName.set(tool.name, { name: tool.name, description: tool.description });
     }
   }
   t3Tools = [...byName.values()];

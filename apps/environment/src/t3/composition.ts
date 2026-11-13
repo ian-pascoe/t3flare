@@ -100,6 +100,7 @@ import * as NativeAppIconResolver from "t3/src/assets/NativeAppIconResolver.ts";
 import * as AntigravityInstallation from "t3/src/provider/AntigravityInstallation.ts";
 import * as ProviderInstallation from "t3/src/provider/providerInstallation.ts";
 import * as CodexInstallation from "t3/src/provider/CodexInstallation.ts";
+import * as ProviderInstallationGate from "t3/src/provider/ProviderInstallationGate.ts";
 import * as ProviderInstanceRegistry from "t3/src/provider/ProviderInstanceRegistry.ts";
 import * as ProviderAdapterRegistry from "t3/src/orchestration-v2/ProviderAdapterRegistry.ts";
 import * as ProviderRegistry from "t3/src/provider/ProviderRegistry.ts";
@@ -625,10 +626,15 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(layerPersistence),
     Layer.provideMerge(Layer.mergeAll(Keybindings.layer, EnvironmentTheme.layer, UsageLimitSources.layer)),
     Layer.provideMerge(ProviderRegistry.layer),
-    Layer.provideMerge(ProviderInstanceRegistryHydration.layer),
+    Layer.provideMerge(ProviderInstanceRegistryHydration.layer.pipe(Layer.provide(layerPersistence))),
+    // One gate for the server, below hydration, as t3's server.ts: layers memoize by reference.
+    Layer.provideMerge(ProviderInstallationGate.layer),
     Layer.provideMerge(layerPortScanner),
     Layer.provideMerge(
-      Layer.mergeAll(AntigravityInstallation.AntigravityInstallation.layer, CodexInstallation.CodexInstallation.layer),
+      Layer.mergeAll(
+        AntigravityInstallation.AntigravityInstallation.layer.pipe(Layer.provide(layerServerSettings)),
+        CodexInstallation.CodexInstallation.layer,
+      ),
     ),
   );
 
@@ -682,7 +688,7 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(AnalyticsService.layer.pipe(Layer.provide(layerManagedPolicy))),
     Layer.provideMerge(ExternalLauncher.layer),
     Layer.provideMerge(RemoteOpenTargets.layer),
-    Layer.provideMerge(DirectEndpoints.layer),
+    Layer.provideMerge(DirectEndpoints.layer.pipe(Layer.provide(layerServerEnvironment))),
     Layer.provideMerge(ServerLifecycleEvents.layer),
     Layer.provide(NetService.layer),
   );

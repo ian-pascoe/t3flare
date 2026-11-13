@@ -85,6 +85,9 @@ export const CAPABILITIES = {
   voiceTranscription: strip("speech models on the host's CPU"),
   // A vendor key typed into t3's settings, called over fetch (D5 lifted, owner 2026-11-12, back to stock).
   cloudVoiceTranscription: keep,
+  // The thread shell's families and older settled threads: t3's own `/ws` reads over its own SQL.
+  shellThreadFamilies: keep,
+  shellOlderSettled: keep,
 } as const satisfies Record<keyof ExecutionEnvironmentCapabilities, Classification>;
 
 /** The capabilities the Cloud Environment advertises: t3's, without the stripped ones. */
