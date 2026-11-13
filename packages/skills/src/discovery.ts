@@ -5,6 +5,7 @@
 //
 // Unlike cloudpid, an Environment skill beats a Repo skill of the same name (SPI-1001's shared decisions), and what is
 // not taken is reported in `skipped` with its reason, so a skill that does not show can be explained.
+import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
 import { parse } from "yaml";
 
 /** A Skill: a directory with a `SKILL.md` whose frontmatter names and describes it. */
@@ -53,8 +54,11 @@ export const MAX_DESCRIPTION_LENGTH = 1024;
 /** The most Repo skills kept, nearest first. */
 export const MAX_REPO_SKILLS = 100;
 
-/** A name t3's composer can mention (`matchInlineSkills`' token) within the Agent Skills' 64 characters. */
-const MENTIONABLE = /^(?=[a-zA-Z0-9:_-]*[a-zA-Z])[a-zA-Z0-9:_-]{1,64}$/;
+/**
+ * Whether `$name` is a mention t3 recognises, within the Agent Skills' 64 characters: t3's own `matchInlineSkills` is
+ * asked, so its token rule (an alphanumeric first character, a letter, no number-like name) is the one applied.
+ */
+export const isMentionable = (name: string): boolean => name.length <= 64 && [...matchInlineSkills(`$${name}`, [{ name }])].length === 1;
 
 /** The most entries listed in one skills directory: far above any real one, below a walk of a whole tree. */
 const MAX_ROOT_ENTRIES = 5000;
@@ -91,7 +95,7 @@ export const parseSkill = (filePath: string, text: string): Skill | { readonly r
   if (typeof description !== "string" || description.trim() === "") return { reason: "no description" };
   const declared = fields.name;
   const name = typeof declared === "string" && declared !== "" ? declared : (filePath.split("/").at(-2) ?? "");
-  if (!MENTIONABLE.test(name)) return { reason: `"${name.slice(0, 80)}" is not a name t3 can mention` };
+  if (!isMentionable(name)) return { reason: `"${name.slice(0, 80)}" is not a name t3 can mention` };
   return {
     name,
     description: description.slice(0, MAX_DESCRIPTION_LENGTH),

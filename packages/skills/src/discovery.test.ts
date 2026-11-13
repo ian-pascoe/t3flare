@@ -67,10 +67,10 @@ describe("the rules, the same for the agent and the composer", () => {
     expect(await one(skillMd({ name: "declared", description: "d" }), "folder-name")).toMatchObject({ skill: { name: "declared" }, skipped: [] });
   });
 
-  it("skips a name t3 cannot mention: over 64 characters, a character outside [a-zA-Z0-9:_-], or no letter", async () => {
+  it("skips a name t3 cannot mention: over 64 characters, a character outside [a-zA-Z0-9:_-], no letter, a non-alphanumeric first character, or number-like", async () => {
     expect((await one(skillMd({ name: "a".repeat(64), description: "d" }))).skill?.name).toBe("a".repeat(64));
     expect((await one(skillMd({ name: "ns:tool_x-1", description: "d" }))).skill?.name).toBe("ns:tool_x-1");
-    for (const name of ["a".repeat(65), "has space", "dotted.name", "émoji", "123", "-_:"]) {
+    for (const name of ["a".repeat(65), "has space", "dotted.name", "émoji", "123", "-_:", "_private", "-x", ":ns", "5k", "2e5"]) {
       const { skill, skipped } = await one(skillMd({ name, description: "d" }));
       expect(skill, name).toBeUndefined();
       expect(skipped[0], name).toMatch(/is not a name t3 can mention$/);

@@ -2,8 +2,19 @@
   "name": "@t3flare/skills",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "effect-tsgo tsrs --noEmit", "test": "vitest run" },
-  "dependencies": { "yaml": "catalog:" },
-  "devDependencies": { "@types/node": "catalog:", "vitest": "5.0.5" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@t3tools/shared": "workspace:*",
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vitest": "5.0.5"
+  }
 }
