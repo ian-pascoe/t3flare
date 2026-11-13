@@ -438,3 +438,5 @@ export const containerPreviewHost = (port: number): string => `${port}.${CONTAIN
 /** Where the carried sockets' endpoints are on every Container preview host, and the header their requests carry. */
 export const CONTAINER_PREVIEW_SOCKET_PATH = "/__t3flare/ws/";
 export const CONTAINER_PREVIEW_HEADER = "x-t3flare-preview";
+
+export { describeFailure, startRefusal } from "./startRefusal.ts";

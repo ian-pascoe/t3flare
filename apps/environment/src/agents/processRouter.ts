@@ -3,7 +3,7 @@
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is
 // a missing binary, as in step 1. Every routed command is kept in a short trace (admin `GET /_t3flare/agents/router-trace`).
-import { fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, REPO_ROOT, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
+import { fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, REPO_ROOT, startRefusal, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
 import { containerGitHubPermissions, ENVIRONMENT_GITHUB_PERMISSIONS } from "@t3flare/github-app/permissions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -299,8 +299,8 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
     }
   };
   const failed = (raw: string): Answer => {
-    // The budget's own reason, out of computer's connect-retry wrapping.
-    const budget = /the Container cannot start: (.+?)(?:"|$)/s.exec(raw)?.[1];
+    // The budget's own reason, whole (the Workspace DO answers it from the cause chain, `startRefusal`).
+    const budget = startRefusal(raw);
     const reason = budget === undefined ? raw : `the Container cannot start: ${budget}`;
     services.workspaces.setState(id, "failed", { lastError: raw });
     console.warn(JSON.stringify({ t3flare: "worktree-failed", id, reason: redactTokens(reason).slice(0, 500), timings }));

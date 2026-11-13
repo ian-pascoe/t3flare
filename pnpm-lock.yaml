@@ -1007,6 +1007,9 @@ importers:
       '@platformatic/vfs':
         specifier: 0.5.0
         version: 0.5.0
+      '@t3flare/workspace-client':
+        specifier: workspace:*
+        version: link:../workspace-client
       ignore:
         specifier: 7.0.14
         version: 7.0.14
@@ -2629,7 +2632,7 @@ importers:
         version: 4.1.2
       tldts:
         specifier: ^7.4.19
-        version: 7.4.28
+        version: 7.5.0
     devDependencies:
       '@cloudpid/config':
         specifier: workspace:*
@@ -9798,15 +9801,15 @@ packages:
   tldts-core@7.4.2:
     resolution: {integrity: sha512-nwEyF4vl4RSJjwSjBUmOSxc3BFPoIFdlRthJ6e+5v9P3bHNsoD06UjuqMUspqp7vsEZ1beaHi1km+optiE17yA==}
 
-  tldts-core@7.4.28:
-    resolution: {integrity: sha512-6qKNYXYQfPNmAcmBpT/MrYPia3X2uBKxduTBSG0gLE9aN8FJTcS1ILsnJ6sqOvR/NZxkORzwGiSUVtnu3HUSqg==}
+  tldts-core@7.5.0:
+    resolution: {integrity: sha512-1kVus7QxknwQLIyAVIziz32NkXyENMsBFOSEe3oB4MoUPyCKnzPgkrNLc03PZwzKFb3+GbuKbzoEkT94W3CO5w==}
 
   tldts@7.4.2:
     resolution: {integrity: sha512-kCwffuaH8ntKtygnWe1b4BJKWiCUH30n5KfoTr6IchcXOwR7chAOFJxFrH3vjANafUYrIA4a7SDL+nn7SiR4Sw==}
     hasBin: true
 
-  tldts@7.4.28:
-    resolution: {integrity: sha512-zbyA+C3nBymq7u4gZnKShj7RcyxJuQy66VRF9V9Zx8g1Jl8ui+9DVbV6knlRKaqKX6nSvhhy7D7KM75A6uVf6g==}
+  tldts@7.5.0:
+    resolution: {integrity: sha512-qHpu8BE4S/si6A0hUBO8TWQ9C7cY69WGSFww5QM20YNnOssXfHS9Vu/Cm0+lkesSLULY/wa0NUg8zONQrnzyWA==}
     hasBin: true
 
   to-buffer@1.2.2:
@@ -18652,16 +18655,16 @@ snapshots:
   tldts-core@7.4.2:
     optional: true
 
-  tldts-core@7.4.28: {}
+  tldts-core@7.5.0: {}
 
   tldts@7.4.2:
     dependencies:
       tldts-core: 7.4.2
     optional: true
 
-  tldts@7.4.28:
+  tldts@7.5.0:
     dependencies:
-      tldts-core: 7.4.28
+      tldts-core: 7.5.0
 
   to-buffer@1.2.2:
     dependencies:

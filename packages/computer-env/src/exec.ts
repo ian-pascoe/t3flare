@@ -27,6 +27,7 @@ import {
 } from "@earendil-works/pi-durable/env";
 import type { BackendTarget } from "./env.ts";
 import { resolve } from "./paths.ts";
+import { describeFailure } from "@t3flare/workspace-client";
 
 /** How long a killed command may take to stop before `exec` returns without it. */
 const KILL_GRACE_MS = 500;
@@ -251,7 +252,8 @@ export const exec = async (
     if (first !== undefined && stopped === undefined) {
       // `spawn_error` tells the caller the command never started, so it may try another form of it.
       if (!first.ok) {
-        return err(new ExecutionError(started ? "unknown" : "spawn_error", String(first.cause)));
+        // A refused Container start is shown whole: computer cuts its own message around the budget's reason.
+        return err(new ExecutionError(started ? "unknown" : "spawn_error", describeFailure(first.cause)));
       }
 
       if (missing) {

@@ -38,7 +38,7 @@ import type {
   TerminalOpenInput,
 } from "@t3flare/workspace-client";
 import type { PromptTemplate, Skill, SkillDiscovery } from "@t3flare/skills";
-import { HARNESS_ROOT, REPO_ROOT } from "@t3flare/workspace-client";
+import { describeFailure, HARNESS_ROOT, REPO_ROOT, startRefusal } from "@t3flare/workspace-client";
 
 import * as git from "isomorphic-git";
 
@@ -49,7 +49,6 @@ import { EMPTY_ENVIRONMENT, type McpRelayAnswer, type ResolvedEnvironment, resol
 import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, takeEnvironment } from "./containerLaunch.ts";
 import { reclaimFor } from "./reclaim.ts";
-import { startRefusal } from "./startRefusal.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { ContainerPreview } from "./containerPreview.ts";
 import { type PortProbe, probeRunningPort, scanRunningContainer, stopGroupInRunningContainer } from "./ports.ts";
@@ -668,8 +667,8 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /**
-   * The budget is full (review F7): asks each holder to stop its Container if nothing there works, idle CLI sessions
-   * included; answers whether one did.
+   * The budget is full: asks idle holders to stop by ADR-0032 §7's reclaim rule (`reclaim.ts`); answers whether enough
+   * did for this start to fit.
    */
   async #reclaimFrom(holders: ReadonlyArray<string>, max: number): Promise<boolean> {
     // SAFETY: a holder is a Workspace DO's id (`#budgeted`); `reclaimable` and `releaseIfIdle` are its RPC.
@@ -900,7 +899,7 @@ export class WorkspaceDO extends ContainerHost {
       if (!passive || startedBy !== undefined) this.ctx.waitUntil(this.#prime().catch(() => undefined));
       return { ran: true, ...answer, ms: result.ms, ...(startedBy === undefined ? {} : { startedContainer: startedBy }) };
     } catch (error) {
-      return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
+      return { ran: false, reason: "container_refused", detail: describeFailure(error).slice(0, 1000) };
     }
   }
 
@@ -1036,7 +1035,7 @@ export class WorkspaceDO extends ContainerHost {
       }
     } catch (error) {
       console.warn(JSON.stringify({ t3flare: "checkpoint-failed", op: op.op, error: String(error).slice(0, 500) }));
-      return { ok: false, error: String(error).slice(0, 1000) };
+      return { ok: false, error: describeFailure(error).slice(0, 1000) };
     }
   }
 
@@ -1159,7 +1158,7 @@ export class WorkspaceDO extends ContainerHost {
       if (result.exitCode === 0) await this.#prime().catch(() => undefined);
       return { ran: true, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, ms: result.ms };
     } catch (error) {
-      return { ran: false, reason: "container_refused", detail: String(error).slice(0, 1000) };
+      return { ran: false, reason: "container_refused", detail: describeFailure(error).slice(0, 1000) };
     }
   }
 
@@ -1190,7 +1189,7 @@ export class WorkspaceDO extends ContainerHost {
       if (result.exitCode !== 0) return { ok: false, tips: [], error: result.stderr.slice(-1000) };
       return { ok: true, tips: parseTips(result.stdout) };
     } catch (error) {
-      return { ok: false, tips: [], error: String(error).slice(0, 1000) };
+      return { ok: false, tips: [], error: describeFailure(error).slice(0, 1000) };
     }
   }
 
@@ -1210,7 +1209,7 @@ export class WorkspaceDO extends ContainerHost {
       if (answer.commit === null) return { ok: false, error: `no commit for ${input.ref}` };
       return { ok: true, commit: answer.commit, bundle: answer.bundled ? bundle : null, config: answer.config };
     } catch (error) {
-      return { ok: false, error: String(error).slice(0, 1000) };
+      return { ok: false, error: describeFailure(error).slice(0, 1000) };
     }
   }
 
@@ -1266,7 +1265,7 @@ export class WorkspaceDO extends ContainerHost {
       this.ctx.storage.kv.delete(SUBMODULE_HINT_KEY);
       return { ok: true, head };
     } catch (error) {
-      return { ok: false, error: String(error).slice(0, 1000) };
+      return { ok: false, error: describeFailure(error).slice(0, 1000) };
     }
   }
 
@@ -1527,7 +1526,7 @@ export class WorkspaceDO extends ContainerHost {
     return { epoch: this.#boot, processes: this.#processes.state(), pushes: this.#processes.pushes };
   }
 
-  /** Why the running Container may not give its slot up now, or undefined when it may (review F7). */
+  /** Why the running Container may not give its lease up now, or undefined when it may (ADR-0032 §7's reclaim). */
   async #notReclaimable(): Promise<string | undefined> {
     if (!this.containerRunning()) return "not running";
     const busy = this.#running > 0 || this.#terminalsHold() || this.#processes.reclaimable().length < this.#processes.size;
@@ -1543,8 +1542,9 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /**
-   * The budget is full and another Workspace asks for a Container (review F7): if nothing here works (no command, no
-   * terminal holding, no CLI process in a turn or recently used), the CLI processes end and the Container stops.
+   * The budget is full and another Workspace asks for a Container (ADR-0032 §7's reclaim): if nothing here works (no
+   * command, no terminal holding, no CLI process in a turn or recently used), the CLI processes end and the Container
+   * stops.
    */
   async releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }> {
     const why = await this.#notReclaimable();
@@ -1634,7 +1634,7 @@ export class WorkspaceDO extends ContainerHost {
     };
   }
 
-  /** Stops the Container now and frees its slot. */
+  /** Stops the Container now and releases its lease. */
   async stopContainer(): Promise<void> {
     if (this.ctx.container?.running === true) {
       // CLI processes end first (they flush their session files), then the writes not yet pulled come into the DO.
