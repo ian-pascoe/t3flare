@@ -269,7 +269,7 @@ ${ADD_SERVER}</div>
 
 const SKILLS = `<section id="skills" aria-labelledby="skills-title">
 <div class="section-head"><h2 id="skills-title">${icon("skills")}Skills</h2></div>
-<div class="group"><div class="empty"><span class="empty-icon">${icon("skills")}</span><h3>Skills aren't here yet</h3><p>Pi Durable's skills get their switches in this section once SPI-1001 lands.</p></div></div>
+<div class="group"><div class="empty"><span class="empty-icon">${icon("skills")}</span><h3>Environment skills aren't here yet</h3><p>Repo skills load from each Workspace's own files, switched by the Skills extension above. Environment skills, installed here for every Project, come with SPI-1148.</p></div></div>
 </section>`;
 
 /** A status value; an ISO time reads as a time. */

@@ -13,6 +13,7 @@ import {
   haveProviderSnapshotSettingsChanged,
   makeProviderSnapshotSettingsSource,
 } from "@t3tools/provider-core/server/snapshotSettings";
+import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as DateTime from "effect/DateTime";
@@ -26,6 +27,7 @@ import { attachmentReader } from "./attachments.ts";
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
 import { snapshotModels } from "./models.ts";
 import { PiDurableSettings } from "./settings.ts";
+import { environmentSkillsAccess, piDurableSnapshotForCwd } from "./skills.ts";
 import { makePiDurableTextGeneration } from "./textGeneration.ts";
 
 export const PRESENTATION = {
@@ -93,6 +95,8 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
     const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
     // t3's attachment store (SPI-993): the adapter turns a message's attachments into the Session's images and text.
     const attachments = attachmentReader(yield* ProviderHost.ProviderHost, yield* FileSystem.FileSystem);
+    // SPI-1147: the Workspaces' Repo skills and Prompt templates, behind the Harness `skills` switch.
+    const skills = environmentSkillsAccess();
     return {
       instanceId,
       driverKind: PI_DURABLE_DRIVER,
@@ -101,7 +105,13 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       accentColor,
       enabled,
       snapshot,
-      orchestrationAdapter: makePiDurableAdapter(instanceId, mcpSessions, attachments),
+      // SPI-1147: the thread's Repo skills and Prompt templates for t3's composer; t3's TTL keeps it fresh.
+      snapshotForCwd: (cwd) =>
+        snapshot.getSnapshot.pipe(
+          Effect.flatMap((machine) => piDurableSnapshotForCwd(machine, cwd, skills)),
+          Effect.mapError((cause) => new ProviderDriverError({ driver: PI_DURABLE_DRIVER, instanceId, detail: "Failed to read the Workspace's skills.", cause })),
+        ),
+      orchestrationAdapter: makePiDurableAdapter(instanceId, mcpSessions, attachments, skills),
       textGeneration,
     } satisfies ProviderInstance;
   }),

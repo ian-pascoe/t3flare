@@ -61,7 +61,7 @@ export const fixturePage = (overrides: Partial<PageInput> = {}): PageInput => ({
     "settings revision": changed.harness.revision,
     "last taken by a Session (revision)": 5,
     "last taken by a Session (at)": new Date(minutes(7)).toISOString(),
-    Skills: "deferred (SPI-1001)",
+    Skills: "Repo skills on (SPI-1147); Environment skills deferred (SPI-1148)",
   },
   ...overrides,
 });

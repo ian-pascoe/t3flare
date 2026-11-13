@@ -12,6 +12,8 @@ import type { ImageInput } from "@t3flare/session-protocol";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 
+import { expandMessage, mayExpand, type MessageSkills } from "./skills.ts";
+
 /** The base64 a message's images may take inline (0.9 MB of image bytes). */
 export const INLINE_IMAGE_BUDGET_CHARS = 1_200_000;
 
@@ -60,11 +62,18 @@ const asText = (bytes: Uint8Array): string | null => {
   }
 };
 
-/** The prompt text and inline images of one message (`startTurn`'s or `steerTurn`'s). */
+/**
+ * The prompt text and inline images of one message (`startTurn`'s or `steerTurn`'s). With `skills` (the Pi Durable
+ * adapter's; SPI-1147), its Skill mentions and a leading Slash command expand first, within the same text budget; the
+ * ACP flavors pass none, so their agents get the message as typed.
+ */
 export const turnPrompt = Effect.fn("PiDurable.turnPrompt")(function* (
-  message: { readonly text: string; readonly attachments: ReadonlyArray<ChatAttachment> },
-  options: { readonly acceptsImages: boolean; readonly reader: AttachmentReader },
+  typed: { readonly text: string; readonly attachments: ReadonlyArray<ChatAttachment> },
+  options: { readonly acceptsImages: boolean; readonly reader: AttachmentReader; readonly skills?: MessageSkills },
 ) {
+  const budget = PROVIDER_SEND_TURN_MAX_INPUT_CHARS - 200 * typed.attachments.length;
+  const catalog = options.skills !== undefined && mayExpand(typed.text) ? yield* options.skills.load() : undefined;
+  const message = catalog === undefined ? typed : { ...typed, text: yield* expandMessage(typed.text, catalog, budget) };
   const notes: Array<string> = [];
   const images: Array<ImageInput> = [];
   let imageChars = 0;

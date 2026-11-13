@@ -1,6 +1,7 @@
 // The environment Worker's view of the agents Worker's Durable Objects (ADR-0014): their RPC methods, typed here so
 // this Worker never imports the agents Worker's code (which is typed against the Workers globals, not Node's).
 import type { PortScan } from "@t3flare/sandbox-image/ports";
+import type { PromptTemplate, SkillDiscovery } from "@t3flare/skills";
 import type {
   AbortInput,
   AnswerInput,
@@ -81,6 +82,9 @@ export interface WorkspaceRpc {
   containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }>;
   stopContainer(): Promise<void>;
   readText(path: string): Promise<string | null>;
+  /** SPI-1147: the Repo skills and Prompt templates of a thread in `cwd`, from the Workspace's own files. */
+  skills(cwd: string): Promise<SkillDiscovery>;
+  prompts(cwd: string): Promise<ReadonlyArray<PromptTemplate>>;
   writeText(path: string, text: string): Promise<void>;
   worktreeClone(input: { readonly id: string; readonly url: string | null; readonly parent?: string }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }>;
   worktreeBundle(input: { readonly ref: string; readonly tips: ReadonlyArray<string>; readonly name: string }): Promise<{ readonly ok: boolean; readonly commit?: string; readonly bundle?: string | null; readonly config?: ReadonlyArray<string>; readonly error?: string }>;

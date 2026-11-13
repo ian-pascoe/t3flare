@@ -47,6 +47,7 @@ import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "./capabilities.ts";
 import { type AttachmentReader, turnPrompt } from "./attachments.ts";
+import { messageSkillsFor, type SkillsAccess } from "./skills.ts";
 import { approvalIdOf, diff, forgetProposedPlan, makeDifferState, type DifferState, type TurnContext } from "./differ.ts";
 
 const driver = PI_DURABLE_DRIVER;
@@ -102,6 +103,7 @@ export const makePiDurableAdapter = (
   instanceId: ProviderInstanceId,
   mcpSessions: McpProviderSessions.McpProviderSessions["Service"],
   attachments: AttachmentReader,
+  skills: SkillsAccess,
 ) =>
   ProviderAdapter.ProviderAdapterV2.of({
     instanceId,
@@ -124,6 +126,8 @@ export const makePiDurableAdapter = (
       );
       const workspaceId = workspaceOfCwd(input.runtimePolicy.cwd);
       const workspaceInnerCwd = input.runtimePolicy.cwd ? (toWorkspace(input.runtimePolicy.cwd)?.inner ?? null) : null;
+      // SPI-1147: the thread's Repo skills and Prompt templates, which a message's `$name` or leading `/` expands with.
+      const threadSkills = messageSkillsFor(input.runtimePolicy.cwd, skills);
       const now = yield* DateTime.now;
       let session: OrchestrationV2ProviderSession = {
         id: input.providerSessionId,
@@ -402,7 +406,7 @@ export const makePiDurableAdapter = (
             const catalogModel = environmentServices().catalog.find(`${model.provider}/${model.modelId}`);
             // A model the catalog does not list yet gets the images: pi-durable shows a text-only model a placeholder.
             const acceptsImages = catalogModel === undefined || catalogModel.input.includes("image");
-            const prompt = yield* turnPrompt(turnInput.message, { acceptsImages, reader: attachments });
+            const prompt = yield* turnPrompt(turnInput.message, { acceptsImages, reader: attachments, skills: threadSkills });
             const context: TurnContext = {
               providerTurnId: providerTurn.id,
               threadId: turnInput.threadId,
@@ -471,7 +475,7 @@ export const makePiDurableAdapter = (
         ),
         steerTurn: Effect.fn("PiDurableAdapter.steerTurn")(function* (steerInput) {
           const acceptsImages = differ.turns.get(steerInput.providerTurnId)?.acceptsImages ?? true;
-          const prompt = yield* turnPrompt(steerInput.message, { acceptsImages, reader: attachments });
+          const prompt = yield* turnPrompt(steerInput.message, { acceptsImages, reader: attachments, skills: threadSkills });
           yield* call("steer", () =>
             client().steer({
               providerTurnId: steerInput.providerTurnId,

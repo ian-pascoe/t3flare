@@ -10,7 +10,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
-import { type McpRelayAnswer, type McpRelayInput, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
+import { extensionOf, type McpRelayAnswer, type McpRelayInput, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
@@ -227,6 +227,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
           .filter(([, server]) => server.enabled)
           .map(([name]) => name)
           .sort(),
+      skillsEnabled: () => extensionOf(resolveHarness(harnessStore(ctx.storage.kv).load()), "skills").enabled,
       // t3's own `/mcp` as a Container reaches it (public, behind t3's bearer, ADR-0010): what a CLI is given in place of
       // t3's in-isolate address (owner, 2026-11-12, back to stock: t3's bearer goes to the CLI as stock t3 hands it).
       t3McpUrl: () => `https://${this.#configuredHost()}/mcp`,

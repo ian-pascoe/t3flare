@@ -141,10 +141,10 @@ describe("harness page", () => {
   });
 
   it("draws the extension forms from the registry's schemas: switches, settings, locked core extensions", () => {
-    expect(tags.filter((tag) => tag.name === "form" && tag.attrs["data-extension"] !== undefined).map((tag) => tag.attrs["data-extension"])).toEqual(["codemode", "tool-search", "offered-tools", "web", "todo", "context", "termctrl", "guardian", "advisor"]);
+    expect(tags.filter((tag) => tag.name === "form" && tag.attrs["data-extension"] !== undefined).map((tag) => tag.attrs["data-extension"])).toEqual(["codemode", "tool-search", "offered-tools", "web", "todo", "context", "termctrl", "guardian", "advisor", "skills"]);
     expect(tags.find((tag) => tag.attrs["data-setting"] === "inlineBudget")).toMatchObject({ attrs: { type: "number", min: "500", max: "20000", value: "3000" } });
     expect(tags.find((tag) => tag.attrs["data-setting"] === "preset")?.name).toBe("select");
-    expect(tags.filter((tag) => tag.attrs["data-enabled"] !== undefined)).toHaveLength(8);
+    expect(tags.filter((tag) => tag.attrs["data-enabled"] !== undefined)).toHaveLength(9);
     expect(html).toContain("locked: the thread&#39;s modes and the link fence depend on it");
   });
 
@@ -152,7 +152,7 @@ describe("harness page", () => {
     const empty = renderPage(fixturePage({ mcp: [], audit: [] }));
     expect(empty).toContain("No MCP servers");
     expect(empty).toContain("No changes yet");
-    expect(empty).toContain("Skills aren't here yet");
+    expect(empty).toContain("Environment skills aren't here yet");
     expect(empty).toContain("data-mcp-add");
     expect(balance(tagsOf(empty))).toBe("balanced");
   });

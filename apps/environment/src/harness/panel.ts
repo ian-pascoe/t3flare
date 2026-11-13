@@ -85,7 +85,7 @@ const statusOf = (deps: HarnessDeps) => {
     "settings revision": stored.revision,
     "last taken by a Session (revision)": read?.revision ?? null,
     "last taken by a Session (at)": read === undefined ? null : new Date(read.at).toISOString(),
-    Skills: "deferred (SPI-1001)",
+    Skills: "Repo skills on (SPI-1147); Environment skills deferred (SPI-1148)",
   };
 };
 

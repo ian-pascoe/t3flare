@@ -31,6 +31,8 @@ export interface EnvironmentServices {
   readonly faults: boolean;
   /** The MCP servers a CLI process gets relay entries for (ADR-0028), at its spawn; a linked thread's are M13's. */
   readonly relayServers: () => ReadonlyArray<string>;
+  /** SPI-1147: the Harness `skills` switch, as the stored settings resolve it now. */
+  readonly skillsEnabled: () => boolean;
   /** t3's `/mcp` at the public host, as a CLI in a Container reaches it with t3's per-thread bearer. */
   readonly t3McpUrl: () => string;
   /** t3's public origin (`https://<t3 host>`), or null where no host is configured (local workerd): task webhooks' base (parity G12). */
