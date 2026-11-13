@@ -13,27 +13,15 @@ import {
   type ToolClass,
 } from "./mcp.ts";
 
+import { fieldProblem, type SettingEntry, type SettingValue } from "./fields.ts";
+
 export * from "./mcp.ts";
+export * from "./fields.ts";
+export * from "./environment.ts";
 
 // Settings are Global (the Cloud Environment) now; the stored shape has per-Project `overrides`, empty, resolved with
 // cloudpid ADR-0027's merge (an Override's keyed settings merge over Global's key by key; lists are replaced whole) so a
 // later step only adds a scope picker.
-
-/** A setting's schema: the JSON Schema subset the panel renders as a form and the API validates against. */
-export type FieldSchema =
-  | { readonly type: "boolean"; readonly default: boolean }
-  | { readonly type: "integer"; readonly minimum: number; readonly maximum: number; readonly default: number }
-  | { readonly type: "enum"; readonly values: ReadonlyArray<string>; readonly default: string }
-  /** Free text (SPI-1058: guardian's rules and policy, typed as pi-guardian's menu takes them); `multiline` is a text area. */
-  | { readonly type: "text"; readonly maxLength: number; readonly default: string; readonly multiline?: boolean };
-
-export type SettingValue = boolean | number | string;
-
-export interface SettingEntry {
-  readonly title: string;
-  readonly description: string;
-  readonly schema: FieldSchema;
-}
 
 export interface ExtensionEntry {
   readonly id: string;
@@ -396,22 +384,6 @@ export const resolveHarness = (stored: StoredHarness, scope: { readonly projectI
   };
 };
 
-/** Why `value` does not fit `schema`, or undefined. */
-const invalid = (schema: FieldSchema, value: unknown): string | undefined => {
-  switch (schema.type) {
-    case "boolean":
-      return typeof value === "boolean" ? undefined : "true or false";
-    case "integer":
-      if (typeof value !== "number" || !Number.isInteger(value)) return "an integer";
-      if (value < schema.minimum) return `at least ${schema.minimum}`;
-      return value > schema.maximum ? `at most ${schema.maximum}` : undefined;
-    case "enum":
-      return typeof value === "string" && schema.values.includes(value) ? undefined : `one of ${schema.values.join(", ")}`;
-    case "text":
-      return typeof value === "string" && value.length <= schema.maxLength ? undefined : `text of at most ${schema.maxLength} characters`;
-  }
-};
-
 /** One change from the panel or a script: an extension's switch, or some of its settings. */
 export interface HarnessChange {
   readonly extension: string;
@@ -431,7 +403,7 @@ export const applyChange = (
   for (const [key, value] of Object.entries(change.settings ?? {})) {
     const setting = entry.settings[key];
     if (setting === undefined) return { ok: false, error: `${entry.id}.${key}: no such setting` };
-    const why = invalid(setting.schema, value);
+    const why = fieldProblem(setting.schema, value);
     if (why !== undefined) return { ok: false, error: `${entry.id}.${key}: ${why}` };
   }
   const before = stored.global.extensions?.[entry.id];
