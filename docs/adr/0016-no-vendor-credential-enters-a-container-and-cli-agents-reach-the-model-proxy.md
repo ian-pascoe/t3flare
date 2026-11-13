@@ -72,3 +72,12 @@ CLI agents reach MCP tools with a **tool handle**: an opaque per-process bearer 
 ## Refinement (parity batch 2, G13): ACP registry agents
 
 t3's ACP registry offers 45 agents. The rule above admits one that takes the proxy's base URL through its own setting **and** its key from a helper on demand (A′). Four do, and each is already a built-in provider of t3's own kind: Claude Agent, Codex, OpenCode and pi. The others either sign in with their vendor (refused, parity D3) or read their key only from their environment or a settings file (Gemini CLI, Qwen Code, goose, Mistral Vibe and most of the rest), which would put the Container key in the agent's environment, readable by every command it runs, with no grant count. They are listed with that reason and refused (`apps/environment/src/provider/acpRegistry.ts`); nothing is installed, at runtime or in the image. Admitting them is the owner's call (`docs/steps/parity-batch-2.md`, "For the owner").
+
+## Refinement (SPI-1152): Variables are never credentials
+
+The owner's Variables (ADR-0032's Variables refinement) reach every command in a Workspace, CLI agent processes
+included, so any agent can read them. A Variable is therefore never a credential: a name with a `KEY`, `TOKEN`,
+`SECRET`, `PASSWORD` or `CREDENTIAL` segment, the `GIT_`, `GH_`, `GITHUB_` and `SSH_` prefixes, and a value that looks
+like a credential are refused. So is every name t3flare sets or pins for a CLI agent, such as `ANTHROPIC_BASE_URL` and
+`HTTPS_PROXY`, so a Variable cannot move a CLI's endpoint or route its requests elsewhere; those also win over any
+Variable. These are guard rails for the owner, not a boundary against him.

@@ -177,8 +177,13 @@ _Avoid_: harness config, settings (alone)
 
 **Environment settings**:
 What the Cloud Environment gives every Workspace and its Container: the Container size, idle time and budget, the Global
-mise config and the Environment skills. t3flare's own, not t3's server settings.
+mise config, the Environment skills and the Variables. t3flare's own, not t3's server settings.
 _Avoid_: environment config, server settings, Container settings
+
+**Variable**:
+A plain `NAME=value` every command in a Workspace starts with, kept in the Environment settings. Agents can read it; it
+is never a credential.
+_Avoid_: env var, environment variable (it reads as the Environment's own), secret
 
 **Container size**:
 The vCPU, memory and disk a Workspace's Container starts with, picked by name.

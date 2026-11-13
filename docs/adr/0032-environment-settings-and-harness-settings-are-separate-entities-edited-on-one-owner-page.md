@@ -71,3 +71,50 @@ configuration. Both are edited on the one page at `/_t3flare/harness`, the Envir
 - The cost shown is a worst case (every vCPU busy); memory and disk are billed while a Container runs, CPU only while it
   works.
 - A Workspace DO whose read gets no answer starts with its kept copy, which may be one revision behind.
+
+## Refinement (SPI-1152): Variables
+
+Report: [`docs/steps/spi-1152.md`](../steps/spi-1152.md). The Environment settings gain **Variables**: plain
+`NAME=value` pairs every command in a Workspace starts with. mise's `[env]` (the Global mise config, SPI-1150) does not
+do this: it reaches a tool run through a shim or `mise exec`, not a plain shell line, an apt-installed tool, or a CLI
+agent's own process, which are fixed-path binaries outside mise.
+
+1. **Shape.** One setting, `variables`, of the schema's own `variables` type: at most 50, each name one a shell can
+   export (up to 128 characters), each value up to 4,096 characters without a NUL (cloudpid's limits). The panel shows
+   them as a list in the Environment section, behind the same guards.
+2. **Refused names**, checked by the API and again when read:
+   - the names t3flare already sets or pins: every name `COMMAND_ENV`, a CLI profile's environment or the managed
+     settings' `env` sets, listed in `SET_BY_T3FLARE` where no rule below covers it. A unit test derives the names from
+     the code and fails when the list misses one or keeps one nothing sets;
+   - `PATH`, `HOME`, `PWD`, `SHELL`, `USER`;
+   - the prefixes `T3`, `MISE_`, `GIT_`, `GH_`, `GITHUB_`, `SSH_`, `LD_`;
+   - the loader hooks `NODE_OPTIONS`, `BASH_ENV`, `ENV`, `PROMPT_COMMAND`;
+   - a name with a `KEY`, `TOKEN`, `SECRET`, `PASSWORD` or `CREDENTIAL` segment, in any case, singular or plural.
+3. **Refused values**: cloudpid's credential patterns, without its two local-path patterns. A Variable is
+   agent-readable, so it is never a credential (ADR-0016 A′). These refusals are guard rails for the owner, not a
+   boundary against him.
+4. **A stored Variable a later rule refuses is dropped alone**, not the whole set: §2's "a value that no longer fits
+   reads as its default" applies per Variable.
+5. **Where they apply.** One function, `commandEnv`, puts the Variables under a command's own environment, at every
+   point a command starts in a Workspace:
+   - every command computer runs on the Container or the Worker Shell: a Durable agent's, and the Workspace DO's own.
+     Each of the two backends is wrapped (`VariablesBackend`), which reads the Variables as the command is sent, after
+     the Container has started for it;
+   - Terminals, the agent's Terminals and CLI agent processes, at spawn, so a CLI agent's commands inherit them.
+
+   A Session does not add them: it cannot know which Variables a command's Container will start with before the
+   command starts it.
+6. **When.** A Container start takes them with the rest of its launch and keeps them while it runs; a change applies
+   at the Workspace's next start. The Worker Shell has the last start's.
+7. **Precedence.** Variables are the lowest layer: `COMMAND_ENV`, a CLI profile's environment, t3's own variables,
+   mise's `[env]` and whatever a command exports all win over them.
+8. **Audit.** The audit log records the Variables' names and values before and after, as the page shows them to the
+   owner anyway; the Workers Logs line of a change carries neither.
+
+Considered and rejected:
+
+- **Evaluating `mise env` in `BASH_ENV`.** It would switch on every repository's `[env]`, and Terminals and CLI
+  processes do not read `BASH_ENV`.
+- **Keeping Variables out of CLI agent processes.** A CLI agent's commands would get none.
+- **Adding them in the Session**, beside `COMMAND_ENV`. The Session's command can be the one that starts the Container,
+  with Variables the Session has not seen.
