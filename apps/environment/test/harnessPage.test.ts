@@ -70,7 +70,7 @@ describe("harness page", () => {
 
   it("links every section from the navigation, in order, each with its heading", () => {
     const nav = tags.filter((tag) => tag.name === "a" && tag.attrs.href?.startsWith("#") && tag.attrs.href !== "#main" && tag.attrs.href !== "#add-server");
-    expect(nav.map((tag) => tag.attrs.href)).toEqual(["#extensions", "#mcp", "#skills", "#status", "#audit"]);
+    expect(nav.map((tag) => tag.attrs.href)).toEqual(["#extensions", "#mcp", "#environment", "#skills", "#status", "#audit"]);
     for (const link of nav) {
       const section = tags.find((tag) => tag.name === "section" && tag.attrs.id === link.attrs.href!.slice(1));
       expect(section?.attrs["aria-labelledby"]).toBeDefined();

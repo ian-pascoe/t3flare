@@ -10,7 +10,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
-import { extensionOf, type McpRelayAnswer, type McpRelayInput, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
+import { extensionOf, type McpRelayAnswer, type McpRelayInput, resolveEnvironment, type ResolvedEnvironment, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
@@ -395,7 +395,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       secrets: harnessSecrets(this.ctx.storage.kv),
       engine: this.env.MCP_OAUTH,
       host: () => this.#configuredHost(),
-      audit: (entry) => store.audit({ at: Date.now(), caller: "oauth", ...entry }),
+      audit: (entry) => store.audit({ at: Date.now(), entity: "harness", caller: "oauth", ...entry }),
     });
     return this.#harnessOAuth;
   }
@@ -509,6 +509,14 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     const stored = store.load();
     store.noteRead(stored.revision, Date.now());
     return resolveHarness(stored, input);
+  }
+
+  /** The Environment settings for a Workspace's Container start (ADR-0032), resolved. Never boots t3. */
+  async environmentSettings(): Promise<ResolvedEnvironment> {
+    const store = harnessStore(this.ctx.storage.kv);
+    const stored = store.loadEnvironment();
+    store.noteEnvironmentRead(stored.revision, Date.now());
+    return resolveEnvironment(stored);
   }
 
   /** Diagnosis and the reboot check: this instance's channel. */

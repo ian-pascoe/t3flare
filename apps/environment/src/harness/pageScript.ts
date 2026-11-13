@@ -108,16 +108,37 @@ if (adding !== null) {
     if (response !== undefined) done();
   });
 }
-for (const form of document.querySelectorAll("form[data-extension]")) {
+const settingsOf = (form) => {
+  const settings = {};
+  for (const input of form.querySelectorAll("[data-setting]")) {
+    const kind = input.dataset.kind;
+    settings[input.dataset.setting] = kind === "boolean" ? input.checked : kind === "integer" ? Number(input.value) : input.value;
+  }
+  return settings;
+};
+const watchUnsaved = (form) => {
   const save = form.querySelector("[data-save]");
   const note = form.querySelector("[data-save-note]");
+  for (const input of form.querySelectorAll("[data-setting]")) {
+    input.addEventListener("input", () => {
+      if (save !== null) save.disabled = false;
+      if (note !== null) note.textContent = "Unsaved changes";
+    });
+  }
+};
+for (const form of document.querySelectorAll("form[data-environment]")) {
+  const save = form.querySelector("[data-save]");
+  watchUnsaved(form);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (form.reportValidity() && (await post("/_t3flare/harness/api/environment", { settings: settingsOf(form) }, save))) done();
+  });
+}
+for (const form of document.querySelectorAll("form[data-extension]")) {
+  const save = form.querySelector("[data-save]");
   const send = async (control) => {
     const change = { extension: form.dataset.extension };
-    const settings = {};
-    for (const input of form.querySelectorAll("[data-setting]")) {
-      const kind = input.dataset.kind;
-      settings[input.dataset.setting] = kind === "boolean" ? input.checked : kind === "integer" ? Number(input.value) : input.value;
-    }
+    const settings = settingsOf(form);
     if (Object.keys(settings).length > 0) change.settings = settings;
     const enabled = form.querySelector("[data-enabled]");
     if (enabled !== null) change.enabled = enabled.checked;
@@ -126,12 +147,7 @@ for (const form of document.querySelectorAll("form[data-extension]")) {
   };
   const switched = form.querySelector("[data-enabled]");
   if (switched !== null) switched.addEventListener("change", () => send(switched));
-  for (const input of form.querySelectorAll("[data-setting]")) {
-    input.addEventListener("input", () => {
-      if (save !== null) save.disabled = false;
-      if (note !== null) note.textContent = "Unsaved changes";
-    });
-  }
+  watchUnsaved(form);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     if (form.reportValidity()) send(save);

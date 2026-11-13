@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@cloudflare/playwright": "1.4.0",
+    "@cloudpid/config": "workspace:*",
     "@cloudpid/mcp": "workspace:*",
     "@effect/platform-node": "catalog:",
     "@effect/sql-sqlite-do": "catalog:",

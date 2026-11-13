@@ -7,8 +7,18 @@
 //
 // Layout (SPI-1086), after T3 Code's settings: a quiet sidebar of sections (a sticky row of tabs on a phone), then each
 // section as a 16px title over grouped, divided rows.
-import { EXTENSIONS, type ExtensionEntry, type ResolvedHarness, type SettingEntry } from "@t3flare/harness-registry";
+import {
+  EMPTY_ENVIRONMENT,
+  ENVIRONMENT_SETTINGS,
+  type ExtensionEntry,
+  EXTENSIONS,
+  type ResolvedEnvironment,
+  type ResolvedHarness,
+  resolveEnvironment,
+  type SettingEntry,
+} from "@t3flare/harness-registry";
 
+import { type ContainerCostTable, containerCostTable } from "./containerCost.ts";
 import type { AuditEntry } from "./store.ts";
 
 import { ICON_SPRITE, icon, type IconName } from "./pageIcons.ts";
@@ -106,6 +116,41 @@ const extensionsSection = (resolved: ResolvedHarness): string => {
 <div class="group">${adjustable.map((entry) => extensionRow(resolved, entry)).join("\n")}</div>
 <h3 class="sub-head">Core, always on</h3>
 <div class="group core">${core.map((entry) => extensionRow(resolved, entry)).join("\n")}</div>
+</section>`;
+};
+
+// ── Environment ──────────────────────────────────────────────────────────────────────────────────────────────────
+
+const dollars = (amount: number, digits: number) => `$${amount.toFixed(digits)}`;
+
+const gib = (mib: number) => `${mib / 1024} GiB`;
+
+const costTable = (costs: ContainerCostTable): string => {
+  const rows = costs.rows
+    .map(
+      (row) =>
+        `<tr><td data-label="Size"><div><code>${escapeHtml(row.size)}</code>${row.default ? ' <span class="tag">default</span>' : ""}</div></td><td data-label="vCPU"><div>${row.resources.vcpu}</div></td><td data-label="Memory"><div>${gib(row.resources.memoryMib)}</div></td><td data-label="Disk"><div>${row.resources.diskMb / 1000} GB</div></td><td data-label="One Container, an hour"><div>${dollars(row.perContainerHour, 3)}</div></td><td data-label="${costs.budget} Containers, an hour"><div>${dollars(row.budgetHour, 2)}</div></td></tr>`,
+    )
+    .join("");
+  return `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">Size</th><th scope="col">vCPU</th><th scope="col">Memory</th><th scope="col">Disk</th><th scope="col">One Container, an hour</th><th scope="col">${costs.budget} Containers, an hour</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+};
+
+/**
+ * The Environment settings (ADR-0032): one form rendered from their schema, the read-only budget, and each size's cost.
+ * A later setting (SPI-1150, SPI-1152) is a schema entry, rendered here without page work.
+ */
+const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCostTable): string => {
+  const values: Readonly<Record<string, unknown>> = { ...environment };
+  const fields = Object.entries(ENVIRONMENT_SETTINGS as Readonly<Record<string, SettingEntry>>).map(([key, setting]) => field("environment", key, setting, values[key]));
+  return `<section id="environment" aria-labelledby="environment-title">
+<div class="section-head"><h2 id="environment-title">${icon("container")}Environment</h2></div>
+<p class="section-desc">What every Workspace's Container gets. A change applies at each Workspace's next Container start; a running Container keeps its size and idle time.</p>
+<form class="group" data-environment aria-labelledby="environment-title" novalidate><div class="row"><div><div class="row-title"><h3>Container</h3><span class="ident">revision ${environment.revision}</span></div><p class="desc">Its size and how long it may sit idle.</p></div>
+<div class="row-extra"><div class="fields">${fields.join("")}</div><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div></div></div></form>
+<dl class="group kv"><div><dt>Container budget</dt><dd>${costs.budget} Containers at once, a deploy constant</dd></div></dl>
+<h3 class="sub-head">Cost at worst</h3>
+<p class="section-desc">Cloudflare's Workers Paid list prices, every vCPU busy the whole hour. Memory and disk are billed while a Container runs, CPU only while it works, so a real hour costs less.</p>
+<div class="group">${costTable(costs)}</div>
 </section>`;
 };
 
@@ -293,10 +338,10 @@ const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
   const body =
     audit.length === 0
       ? `<div class="empty"><span class="empty-icon">${icon("audit")}</span><h3>No changes yet</h3><p>Every change, here or from a script, is logged with who made it. Secrets are never logged.</p></div>`
-      : `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Change</th></tr></thead><tbody>${audit
+      : `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Settings</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Change</th></tr></thead><tbody>${audit
           .map(
             (entry) =>
-              `<tr><td class="when" data-label="When"><div>${time(entry.at)}</div></td><td class="who" data-label="Who"><div>${escapeHtml(entry.caller)}</div></td><td data-label="Action"><div><code>${escapeHtml(entry.action)}</code></div></td><td data-label="Target"><div>${escapeHtml(entry.target)}</div></td><td data-label="Change"><div><code class="change">${escapeHtml(JSON.stringify(entry.after ?? null))}</code></div></td></tr>`,
+              `<tr><td class="when" data-label="When"><div>${time(entry.at)}</div></td><td class="who" data-label="Who"><div>${escapeHtml(entry.caller)}</div></td><td data-label="Settings"><div>${entry.entity === "environment" ? "Environment" : "Harness"}</div></td><td data-label="Action"><div><code>${escapeHtml(entry.action)}</code></div></td><td data-label="Target"><div>${escapeHtml(entry.target)}</div></td><td data-label="Change"><div><code class="change">${escapeHtml(JSON.stringify(entry.after ?? null))}</code></div></td></tr>`,
           )
           .join("")}</tbody></table></div>`;
   return `<section id="audit" aria-labelledby="audit-title">
@@ -309,6 +354,9 @@ const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
 export interface PageInput {
   readonly mcp?: ReadonlyArray<McpRow>;
   readonly resolved: ResolvedHarness;
+  /** The Environment settings (ADR-0032); the defaults when not given. */
+  readonly environment?: ResolvedEnvironment;
+  readonly costs?: ContainerCostTable;
   readonly csrf: string;
   readonly audit: ReadonlyArray<AuditEntry>;
   readonly status: Readonly<Record<string, string | number | null>>;
@@ -321,6 +369,7 @@ export const renderPage = (input: PageInput): string => {
   const rows = input.mcp ?? [];
   const failing = rows.filter((row) => row.setting.enabled && row.status === "failed").length;
   const revision = String(input.resolved.revision);
+  const environment = input.environment ?? resolveEnvironment(EMPTY_ENVIRONMENT);
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
@@ -334,17 +383,19 @@ export const renderPage = (input: PageInput): string => {
 <nav class="nav" aria-label="Sections">
 ${navItem("extensions", "Extensions", "extensions", `<span class="count">${EXTENSIONS.length}</span>`)}
 ${navItem("mcp", "MCP servers", "server", failing > 0 ? `<span class="flag" role="img" aria-label="${plural(failing, "server", "servers")} failing"></span>` : `<span class="count">${rows.length}</span>`)}
+${navItem("environment", "Environment", "container")}
 ${navItem("skills", "Skills", "skills")}
 ${navItem("status", "Status", "status")}
 ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.length}</span>`)}
 </nav>
-<p class="side-foot">Settings revision <strong>${revision}</strong>. Changes apply at each thread's next turn.</p>
+<p class="side-foot">Harness revision <strong>${revision}</strong>, applied at each thread's next turn. Environment revision <strong>${environment.revision}</strong>, applied at each Container's next start.</p>
 </aside>
 <main id="main" tabindex="-1"><div class="content">
-<header class="page-head"><div><h1>Harness</h1><p>Pi Durable's extensions and MCP servers for this Cloud Environment. Changes apply at each thread's next turn.</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
+<header class="page-head"><div><h1>Harness</h1><p>t3flare's own settings for this Cloud Environment: the Harness settings (Pi Durable's extensions and MCP servers, applied at each thread's next turn) and the Environment settings (what every Container gets, applied at its next start).</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
 <div id="result" class="notice" role="status" aria-live="polite" hidden><span class="notice-ico-ok">${icon("check")}</span><span class="notice-ico-err">${icon("alert")}</span><p class="msg"></p><button type="button" class="btn btn-ghost btn-sm" data-dismiss aria-label="Dismiss">${icon("x")}</button></div>
 ${extensionsSection(input.resolved)}
 ${mcpSection(rows)}
+${environmentSection(environment, input.costs ?? containerCostTable())}
 ${SKILLS}
 ${statusSection(input.status)}
 ${auditSection(input.audit)}

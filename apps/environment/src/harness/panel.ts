@@ -9,13 +9,25 @@
 // - The owner in a browser (Access assertion, no admin token) must also send the page's CSRF token (csrf.ts). A script
 //   (the stage's service token plus the admin token, checked by worker.ts) sends no cookie a page could ride, so it
 //   needs none.
-// - Every change is validated against the registry, bumps the revision, and is written to the audit log.
-import { applyChange, applyMcpChange, EXTENSIONS, type HarnessChange, type McpChange, resolveHarness } from "@t3flare/harness-registry";
+// - Every change is validated against the registry, bumps its entity's revision (the Harness settings' or the
+//   Environment settings', ADR-0032), and is written to the audit log with its entity.
+import {
+  applyChange,
+  applyEnvironmentChange,
+  applyMcpChange,
+  ENVIRONMENT_SETTINGS,
+  EXTENSIONS,
+  type HarnessChange,
+  type McpChange,
+  resolveEnvironment,
+  resolveHarness,
+} from "@t3flare/harness-registry";
 
 import type { McpHost } from "../mcp/host.ts";
 import type { HarnessOAuth } from "./oauth.ts";
 import type { HarnessSecrets } from "./secrets.ts";
 
+import { containerCostTable } from "./containerCost.ts";
 import { csrfToken, csrfValid } from "./csrf.ts";
 import { pageCsp, renderPage } from "./page.ts";
 import type { HarnessStore } from "./store.ts";
@@ -81,10 +93,14 @@ const callerName = (caller: HarnessCaller) => (caller.kind === "owner" ? `owner:
 const statusOf = (deps: HarnessDeps) => {
   const stored = deps.store.load();
   const read = deps.store.lastRead();
+  const environmentRead = deps.store.lastEnvironmentRead();
   return {
     "settings revision": stored.revision,
     "last taken by a Session (revision)": read?.revision ?? null,
     "last taken by a Session (at)": read === undefined ? null : new Date(read.at).toISOString(),
+    "Environment settings revision": deps.store.loadEnvironment().revision,
+    "last taken by a Workspace (revision)": environmentRead?.revision ?? null,
+    "last taken by a Workspace (at)": environmentRead === undefined ? null : new Date(environmentRead.at).toISOString(),
     Skills: "Repo skills on (SPI-1147); Environment skills deferred (SPI-1148)",
   };
 };
@@ -113,12 +129,24 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === HARNESS_PATH || path === `${HARNESS_PATH}/`) {
       const subject = deps.caller.kind === "owner" ? deps.caller.subject : "";
       const csrf = subject === "" ? "" : await csrfToken(deps.store.csrfKey(), subject, deps.now?.() ?? Date.now());
-      const html = renderPage({ resolved: resolveHarness(deps.store.load()), csrf, audit: deps.store.auditLog(50), status: statusOf(deps), mcp: await mcpOverview(deps) });
+      const html = renderPage({
+        resolved: resolveHarness(deps.store.load()),
+        environment: resolveEnvironment(deps.store.loadEnvironment()),
+        costs: containerCostTable(),
+        csrf,
+        audit: deps.store.auditLog(50),
+        status: statusOf(deps),
+        mcp: await mcpOverview(deps),
+      });
       return new Response(html, { headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp() } });
     }
     if (path === `${HARNESS_PATH}/api/settings`) {
       const stored = deps.store.load();
       return json({ revision: stored.revision, resolved: resolveHarness(stored), registry: EXTENSIONS, stored });
+    }
+    if (path === `${HARNESS_PATH}/api/environment`) {
+      const stored = deps.store.loadEnvironment();
+      return json({ revision: stored.revision, resolved: resolveEnvironment(stored), schema: ENVIRONMENT_SETTINGS, costs: containerCostTable(), stored });
     }
     if (path === `${HARNESS_PATH}/api/status`) return json(statusOf(deps));
     if (path === `${HARNESS_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });
@@ -126,13 +154,14 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     return refused(404, "Not found");
   }
   if (request.method !== "POST") return refused(405, "Method not allowed");
-  const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`, `${HARNESS_PATH}/api/mcp/servers`, `${HARNESS_PATH}/api/mcp/oauth`];
+  const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/environment`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`, `${HARNESS_PATH}/api/mcp/servers`, `${HARNESS_PATH}/api/mcp/oauth`];
   if (!routes.includes(path)) return refused(404, "Not found");
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
     console.log(JSON.stringify({ t3flare: "harness-refused", reason: why, caller: deps.caller.kind }));
     return refused(403, why);
   }
+  if (path === `${HARNESS_PATH}/api/environment`) return changeEnvironment(request, deps);
   if (path === `${HARNESS_PATH}/api/mcp/test`) return testServer(request, deps);
   if (path === `${HARNESS_PATH}/api/mcp`) return changeMcp(request, deps);
   if (path === `${HARNESS_PATH}/api/mcp/servers`) return addServer(request, deps);
@@ -150,6 +179,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   if (!applied.ok) return refused(400, applied.error);
   deps.store.save(applied.harness);
   deps.store.audit({
+    entity: "harness",
     at: deps.now?.() ?? Date.now(),
     caller: callerName(deps.caller),
     action: "extension.change",
@@ -169,6 +199,34 @@ const bodyOf = async (request: Request): Promise<Record<string, unknown> | undef
   }
 };
 
+/**
+ * One change to the Environment settings (ADR-0032): validated against their schema, it bumps only their revision, and
+ * the audit entry has the changed settings as they resolved before and after. Applies at each Workspace's next
+ * Container start.
+ */
+const changeEnvironment = async (request: Request, deps: HarnessDeps): Promise<Response> => {
+  const body = await bodyOf(request);
+  const settings = body?.settings;
+  if (settings === null || typeof settings !== "object" || Array.isArray(settings)) return refused(400, "the body is one change: { settings: { … } }");
+  const before = deps.store.loadEnvironment();
+  const applied = applyEnvironmentChange(before, { settings: settings as Record<string, unknown> });
+  if (!applied.ok) return refused(400, applied.error);
+  deps.store.saveEnvironment(applied.environment);
+  const keys = Object.keys(settings);
+  const pick = (resolved: ReturnType<typeof resolveEnvironment>) => Object.fromEntries(keys.map((key) => [key, resolved[key as keyof typeof resolved]]));
+  const resolved = resolveEnvironment(applied.environment);
+  deps.store.audit({
+    entity: "environment",
+    at: deps.now?.() ?? Date.now(),
+    caller: callerName(deps.caller),
+    action: "environment.change",
+    target: keys.join(", "),
+    before: pick(resolveEnvironment(before)),
+    after: pick(resolved),
+  });
+  return json({ ok: true, revision: applied.environment.revision, resolved });
+};
+
 /** The panel's "test": lists the server now, from the MCP Worker, and shows what came back. */
 const testServer = async (request: Request, deps: HarnessDeps): Promise<Response> => {
   const body = await bodyOf(request);
@@ -176,7 +234,7 @@ const testServer = async (request: Request, deps: HarnessDeps): Promise<Response
   if (deps.mcp === undefined || deps.mcp.servers()[server] === undefined) return refused(404, "no such server");
   const started = deps.now?.() ?? Date.now();
   const inventory = await deps.mcp.list(server);
-  deps.store.audit({ at: started, caller: callerName(deps.caller), action: "mcp.test", target: server, after: { status: inventory.status } });
+  deps.store.audit({ entity: "harness", at: started, caller: callerName(deps.caller), action: "mcp.test", target: server, after: { status: inventory.status } });
   return json({ server, status: inventory.status, error: inventory.error ?? null, tools: Object.keys(inventory.definitions).length, refused: inventory.refused.length, ms: (deps.now?.() ?? Date.now()) - started });
 };
 
@@ -204,6 +262,7 @@ const changeMcp = async (request: Request, deps: HarnessDeps): Promise<Response>
     deps.oauth?.forget(body.server);
   }
   deps.store.audit({
+    entity: "harness",
     at: deps.now?.() ?? Date.now(),
     caller: callerName(deps.caller),
     action: `mcp.${body.op}`,
@@ -234,6 +293,7 @@ const addServer = async (request: Request, deps: HarnessDeps): Promise<Response>
   const mark = auth.kind === "header" && value !== undefined ? await deps.secrets.put(server, "header", value) : undefined;
   deps.store.save(applied.harness);
   deps.store.audit({
+    entity: "harness",
     at: deps.now?.() ?? Date.now(),
     caller: callerName(deps.caller),
     action: "mcp.add",
@@ -256,6 +316,6 @@ const beginOAuth = async (request: Request, deps: HarnessDeps): Promise<Response
   if (deps.oauth === undefined) return refused(500, "no OAuth");
   const begun = await deps.oauth.begin(server, setting.url);
   if (!begun.ok) return refused(502, `the sign-in could not start: ${begun.error}`);
-  deps.store.audit({ at: deps.now?.() ?? Date.now(), caller: callerName(deps.caller), action: "mcp.oauth.start", target: server, after: { registration: begun.value.registration } });
+  deps.store.audit({ entity: "harness", at: deps.now?.() ?? Date.now(), caller: callerName(deps.caller), action: "mcp.oauth.start", target: server, after: { registration: begun.value.registration } });
   return json({ ok: true, authorizationUrl: begun.value.authorizationUrl });
 };

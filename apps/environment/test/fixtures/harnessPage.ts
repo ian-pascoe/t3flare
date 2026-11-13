@@ -45,11 +45,11 @@ export const FIXTURE_MCP: ReadonlyArray<McpRow> = [
 ];
 
 export const FIXTURE_AUDIT: ReadonlyArray<AuditEntry> = [
-  { at: minutes(2), caller: "owner:7f3c9a", action: "mcp.class", target: "fixture/fixture_echo", after: { classes: { fixture_echo: "write" } } },
-  { at: minutes(3), caller: "service-token", action: "mcp.test", target: "fixture", after: { status: "ok" } },
-  { at: minutes(5), caller: "service-token", action: "mcp.test", target: "docs", after: { status: "failed" } },
-  { at: minutes(9), caller: "owner:7f3c9a", action: "extension.change", target: "codemode", after: { settings: { inlineBudget: 3000 } } },
-  { at: minutes(40), caller: "owner:7f3c9a", action: "mcp.add", target: "docs", after: { kind: "direct", url: "https://mcp.docs-fixture.invalid/mcp", auth: { kind: "header", header: "Authorization" }, secret: { set: true, fingerprint: "232d" } } },
+  { at: minutes(2), entity: "harness", caller: "owner:7f3c9a", action: "mcp.class", target: "fixture/fixture_echo", after: { classes: { fixture_echo: "write" } } },
+  { at: minutes(3), entity: "harness", caller: "service-token", action: "mcp.test", target: "fixture", after: { status: "ok" } },
+  { at: minutes(5), entity: "harness", caller: "service-token", action: "mcp.test", target: "docs", after: { status: "failed" } },
+  { at: minutes(9), entity: "harness", caller: "owner:7f3c9a", action: "extension.change", target: "codemode", after: { settings: { inlineBudget: 3000 } } },
+  { at: minutes(40), entity: "harness", caller: "owner:7f3c9a", action: "mcp.add", target: "docs", after: { kind: "direct", url: "https://mcp.docs-fixture.invalid/mcp", auth: { kind: "header", header: "Authorization" }, secret: { set: true, fingerprint: "232d" } } },
 ];
 
 export const fixturePage = (overrides: Partial<PageInput> = {}): PageInput => ({
