@@ -106,6 +106,7 @@ import * as ProviderRegistry from "t3/src/provider/ProviderRegistry.ts";
 import * as ProviderUsageLimitsIngestion from "t3/src/provider/ProviderUsageLimitsIngestion.ts";
 import * as CommissaryLimitSources from "../usage/limitSources.ts";
 import { layerAcpRegistry } from "../provider/acpRegistry.ts";
+import * as DurableObjectDatabaseStorage from "./databaseStorage.ts";
 import * as ProjectFaviconResolver from "t3/src/project/ProjectFaviconResolver.ts";
 import * as T3ProjectFileLoader from "t3/src/project/T3ProjectFileLoader.ts";
 import * as RepositoryIdentityResolver from "t3/src/project/RepositoryIdentityResolver.ts";
@@ -578,7 +579,11 @@ export const make = (options: CompositionOptions) => {
     HeldHooksWaker.layer,
     layerThreadSettlementWorker,
     StorageCleanup.layer.pipe(Layer.provide(ProjectionStoreV2.layer)),
-    DatabaseStorage.layer.pipe(Layer.provide(ProjectionMaintenance.layer), Layer.provide(layerServerRestart)),
+    // t3flare: the size from Durable Object storage, no repair (DO SQLite refuses the storage PRAGMAs).
+    DurableObjectDatabaseStorage.layer(
+      DatabaseStorage.layer.pipe(Layer.provide(ProjectionMaintenance.layer), Layer.provide(layerServerRestart)),
+      () => environmentServices().sql.databaseSize,
+    ),
     layerThreadPullRequestWorker,
     DelegatedTaskAnalytics.layer,
     Layer.effectDiscard(
