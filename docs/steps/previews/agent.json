@@ -1,0 +1,109 @@
+{
+ "at": "2026-11-13T13:11:14.038Z",
+ "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+ "ok": false,
+ "threadId": "be71ad4c-225a-4045-ad8b-72f9af42b697",
+ "lines": [
+  {
+   "name": "the turn settled",
+   "ok": true,
+   "ms": 0,
+   "detail": {
+    "calls": [
+     "html_preview:completed",
+     "html_render:completed",
+     "preview_open:completed",
+     "preview_snapshot:completed",
+     "preview_act:completed",
+     "preview_evaluate:completed",
+     "preview_evaluate:completed"
+    ]
+   }
+  },
+  {
+   "name": "html_preview ran and the agent saw its screenshot (R6)",
+   "ok": true,
+   "ms": 1,
+   "detail": {
+    "reply": "I'll start with step 1 and the html_preview call.\nThe screenshot's dominant background is red (#cc0000). The page text still reads \"pending\", so the async probe hadn't finished when the screenshot was taken.\n\nStep 2: html_render with the same HTML.\nStep 3: create the test page and start the server.\nStep 4: open the preview on port 3000.\n\nNote: the instructions specify `target {\"kind\":\"port\",\"port\":3000}`, but the tool schema only accepts `kind: \"environment-port\"`. I'll use that kind, which is the same port target.\nThe snapshot shows the Go button at ref `t3-e978a2a6-2-e3`. Clicking it now.\nSt"
+   }
+  },
+  {
+   "name": "html_render published the page (M1)",
+   "ok": true,
+   "ms": 0,
+   "detail": {
+    "attachmentId": "be71ad4c-225a-4045-ad8b-72f9af42b697-90f03ea5-9232-4715-9c95-c4bf77a773bf-html",
+    "output": "{\"htmlRender\":{\"attachmentId\":\"be71ad4c-225a-4045-ad8b-72f9af42b697-90f03ea5-9232-4715-9c95-c4bf77a773bf-html\",\"title\":\"Probe\",\"height\":225}}"
+   }
+  },
+  {
+   "name": "preview_open/snapshot/act/evaluate drove the agent's tab over its server (M4)",
+   "ok": true,
+   "ms": 0,
+   "detail": {
+    "calls": [
+     {
+      "tool": "preview_open",
+      "status": "completed",
+      "output": "null"
+     },
+     {
+      "tool": "preview_snapshot",
+      "status": "completed",
+      "output": "null"
+     },
+     {
+      "tool": "preview_act",
+      "status": "completed",
+      "output": "null"
+     },
+     {
+      "tool": "preview_evaluate",
+      "status": "completed",
+      "output": "null"
+     },
+     {
+      "tool": "preview_evaluate",
+      "status": "completed",
+      "output": "null"
+     }
+    ]
+   }
+  },
+  {
+   "name": "preview_evaluate against t3's API gets nothing (M4 hostile)",
+   "ok": true,
+   "ms": 0,
+   "detail": [
+    "1. **html_preview** — `{\"width\":728,\"contentHeight\":225,\"capturedHeight\":225,\"consoleMessages\":[{\"level\":\"error\",\"text\":\"Failed to load resource: net::ERR_ACCESS_DENIED http://t3-page.localhost/favicon.ico\"}],\"screenshot\":{\"mimeType\":\"image/png\",\"width\":728,\"height\":225}}`",
+    " **preview_snapshot** — `{\"url\":\"http://3000.t3flare.internal/\",\"title\":\"\",\"loading\":false,\"visibleText\":\"Agent Heading\\nGo\",\"interactiveElements\":[],\"consoleEntries\":[{\"level\":\"error\",\"text\":\"Failed to load resource: the server responded with a status of 404 (File not found)\",\"timestamp\":\"2026-11-13T13:10:52.313Z\"}],\"networkEntries\":[{\"url\":\"http://3000.t3flare.internal/\",\"method\":\"GET\",\"status\":200,\"failed\":false,\"timestamp\":\"2026-11-13T13:10:52.241Z\"}],\"actionTimeline\":[{\"id\":\"ef8508fe-9dd9-4dcb-bfce-d220556d2aec\",\"action\":\"navigate\",\"status\":\"succeeded\",\"startedAt\":\"2026-11-13T13:10:51.051Z\",\"completedAt\":\"2026-11-13T13:10:52.268Z\"}],\"screenshot\":{\"mimeType\":\"image/png\",\"width\":640,\"height\":400},\"accessibilityTree\":\"- generic [active] [ref=t3-e978a2a6-2-e1] [box=8,8,1264,784]:\\n  - heading \\\"Agent Heading\\\" [level=1] [ref=t3-e978a2a6-2-e2] [box=8,8,1264,37]\\n  - button \\\"Go\\\" [ref=t3-e978a2a6-2-e3] [box=8,66,34,21]\"}`",
+    "5. **preview_evaluate** (session fetch) — `{\"toolIcon\":{\"_tag\":\"website\",\"pageUrl\":\"http://3000.t3flare.internal/\"},\"value\":\"error TypeError\"}`"
+   ]
+  },
+  {
+   "name": "the published page's asset is served sandboxed, inline (L2)",
+   "ok": true,
+   "ms": 1023,
+   "detail": {
+    "status": 200,
+    "csp": "sandbox allow-scripts allow-forms allow-popups allow-downloads",
+    "nosniff": "nosniff",
+    "type": "text/html; charset=utf-8",
+    "disposition": null
+   }
+  },
+  {
+   "name": "the published page's asset is served sandboxed, attachment (L2)",
+   "ok": false,
+   "ms": 857,
+   "detail": {
+    "status": 200,
+    "csp": "default-src 'none'; sandbox",
+    "nosniff": "nosniff",
+    "type": "application/octet-stream",
+    "disposition": "attachment; filename=\"probe.html\""
+   }
+  }
+ ]
+}

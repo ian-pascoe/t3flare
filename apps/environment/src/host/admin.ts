@@ -401,7 +401,8 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const idle = await import("./idle.ts");
         idle.requestStarted();
         try {
-          return json(await runSpike(url.searchParams.get("op") ?? "", storage, environment));
+          const body = request.method === "POST" ? ((await request.json().catch(() => ({}))) as { match?: string; expression?: string }) : {};
+          return json(await runSpike(url.searchParams.get("op") ?? "", storage, environment, body));
         } finally {
           idle.requestEnded();
         }

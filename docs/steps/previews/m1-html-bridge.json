@@ -1,0 +1,208 @@
+{
+ "at": "2026-11-13",
+ "stage": "previews",
+ "what": "M1: stock headlessChrome.ts through the CDP bridge, and what a render's page reaches (L3)",
+ "lines": [
+  {
+   "name": "launch route-less + CDP socket",
+   "ok": true,
+   "ms": 269,
+   "detail": {
+    "sessionId": "93b1a6a9-b60e-4eb3-b92e-c41c4e51b9cb",
+    "socket": {}
+   }
+  },
+  {
+   "name": "Target.createBrowserContext",
+   "ok": true,
+   "ms": 43,
+   "detail": {
+    "browserContextId": "B871F7C15B30D823F8B682A42746606A"
+   }
+  },
+  {
+   "name": "Target.createTarget",
+   "ok": true,
+   "ms": 62,
+   "detail": {
+    "targetId": "5137FD947FE26746B0212C7DC830722D"
+   }
+  },
+  {
+   "name": "Target.attachToTarget flatten",
+   "ok": true,
+   "ms": 36,
+   "detail": {
+    "sessionId": "8869FDD7703AD8A688A6499094E48E2D"
+   }
+  },
+  {
+   "name": "Page.enable / Runtime.enable / Log.enable / addScriptToEvaluateOnNewDocument",
+   "ok": true,
+   "ms": 182,
+   "detail": null
+  },
+  {
+   "name": "Fetch.enable (t3-page.localhost + every Document)",
+   "ok": true,
+   "ms": 36,
+   "detail": {}
+  },
+  {
+   "name": "Page.navigate https://t3-page.t3flare.internal/page.html, then the probe's answers (Q3, L3)",
+   "ok": true,
+   "ms": 6260,
+   "detail": {
+    "probe": {
+     "http://metadata.google.internal/": "TypeError 2ms",
+     "http://5173.t3flare.internal/": "TypeError 2ms",
+     "http://computer.internal/": "TypeError 2ms",
+     "http://127.0.0.1:8080/": "answered opaque 37ms",
+     "http://127.1/": "answered opaque 38ms",
+     "http://[::1]/": "answered opaque 44ms",
+     "http://0.0.0.0/": "answered opaque 45ms",
+     "http://10.0.0.1/": "answered opaque 50ms",
+     "http://169.254.169.254/latest/meta-data/": "answered opaque 52ms",
+     "http://spike.localhost/": "TypeError 53ms",
+     "secure": true,
+     "origin": "https://t3-page.t3flare.internal",
+     "cdn": "undefined"
+    },
+    "network": {
+     "https://t3-page.t3flare.internal/page.html": "200 from  server=",
+     "http://metadata.google.internal/": "failed  (mixed-content)",
+     "http://5173.t3flare.internal/": "failed  (mixed-content)",
+     "http://computer.internal/": "failed  (mixed-content)",
+     "http://127.0.0.1:8080/": "403 from [::1] server=",
+     "http://127.0.0.1/": "403 from [::1] server=",
+     "http://[::1]/": "403 from [::1] server=",
+     "http://0.0.0.0/": "403 from [::1] server=",
+     "http://10.0.0.1/": "403 from [::1] server=",
+     "http://169.254.169.254/latest/meta-data/": "403 from [::1] server=",
+     "http://spike.localhost/": "failed net::ERR_CONNECTION_RESET",
+     "https://cdn.jsdelivr.net/npm/d3@7": "200 from [::1] server=cloudflare",
+     "https://t3-page.t3flare.internal/favicon.ico": "failed net::ERR_ACCESS_DENIED"
+    },
+    "paused": [
+     "Document:https://t3-page.t3flare.internal/page.html",
+     "Other:https://t3-page.t3flare.internal/favicon.ico"
+    ]
+   }
+  },
+  {
+   "name": "Page.captureScreenshot",
+   "ok": true,
+   "ms": 67,
+   "detail": 10692
+  },
+  {
+   "name": "Target.closeTarget + Browser.close",
+   "ok": true,
+   "ms": 70,
+   "detail": null
+  },
+  {
+   "name": "launch route-less + CDP socket",
+   "ok": true,
+   "ms": 330,
+   "detail": {
+    "sessionId": "9ff3db38-015e-45eb-86c1-6b5469dae295",
+    "socket": {}
+   }
+  },
+  {
+   "name": "Target.createBrowserContext",
+   "ok": true,
+   "ms": 47,
+   "detail": {
+    "browserContextId": "F58409A7776AED88EED32AD57E2B788A"
+   }
+  },
+  {
+   "name": "Target.createTarget",
+   "ok": true,
+   "ms": 85,
+   "detail": {
+    "targetId": "232DF71855A93D2D047D5C339DB1ADF9"
+   }
+  },
+  {
+   "name": "Target.attachToTarget flatten",
+   "ok": true,
+   "ms": 42,
+   "detail": {
+    "sessionId": "FA3D62E3EBC24785BEDBA123DCEE9066"
+   }
+  },
+  {
+   "name": "Page.enable / Runtime.enable / Log.enable / addScriptToEvaluateOnNewDocument",
+   "ok": true,
+   "ms": 189,
+   "detail": null
+  },
+  {
+   "name": "Fetch.enable (t3-page.localhost + every Document)",
+   "ok": true,
+   "ms": 35,
+   "detail": {}
+  },
+  {
+   "name": "Page.navigate http://t3-page.t3flare.internal/page.html, then the probe's answers (Q3, L3)",
+   "ok": true,
+   "ms": 6340,
+   "detail": {
+    "probe": {
+     "http://127.0.0.1:8080/": "answered opaque 53ms",
+     "http://127.1/": "answered opaque 52ms",
+     "http://[::1]/": "answered opaque 100ms",
+     "http://0.0.0.0/": "answered opaque 103ms",
+     "http://10.0.0.1/": "answered opaque 115ms",
+     "http://169.254.169.254/latest/meta-data/": "answered opaque 116ms",
+     "http://spike.localhost/": "TypeError 129ms",
+     "http://metadata.google.internal/": "TypeError 139ms",
+     "http://5173.t3flare.internal/": "TypeError 142ms",
+     "http://computer.internal/": "TypeError 143ms",
+     "secure": false,
+     "origin": "http://t3-page.t3flare.internal",
+     "cdn": "undefined"
+    },
+    "network": {
+     "http://t3-page.t3flare.internal/page.html": "200 from  server=",
+     "http://127.0.0.1:8080/": "403 from [::1] server=",
+     "http://127.0.0.1/": "403 from [::1] server=",
+     "http://[::1]/": "403 from [::1] server=",
+     "http://0.0.0.0/": "403 from [::1] server=",
+     "http://10.0.0.1/": "403 from [::1] server=",
+     "http://169.254.169.254/latest/meta-data/": "403 from [::1] server=",
+     "http://spike.localhost/": "failed net::ERR_CONNECTION_RESET",
+     "http://metadata.google.internal/": "failed net::ERR_CONNECTION_RESET",
+     "http://5173.t3flare.internal/": "failed net::ERR_CONNECTION_RESET",
+     "http://computer.internal/": "failed net::ERR_CONNECTION_RESET",
+     "https://cdn.jsdelivr.net/npm/d3@7": "200 from [::1] server=cloudflare",
+     "http://t3-page.t3flare.internal/favicon.ico": "failed net::ERR_ACCESS_DENIED"
+    },
+    "paused": [
+     "Document:http://t3-page.t3flare.internal/page.html",
+     "Other:http://t3-page.t3flare.internal/favicon.ico"
+    ]
+   }
+  },
+  {
+   "name": "Page.captureScreenshot",
+   "ok": true,
+   "ms": 70,
+   "detail": 11080
+  },
+  {
+   "name": "Target.closeTarget + Browser.close",
+   "ok": true,
+   "ms": 69,
+   "detail": null
+  }
+ ],
+ "capture": {
+  "captureHtmlScreenshot": "ok 3781 ms, pngBase64 4316, contentHeight 354; console: favicon ERR_ACCESS_DENIED (stock's own Fetch guard)",
+  "measureHtmlHeights": "ok 1667 ms [[360,320],[720,320],[1280,320]]"
+ },
+ "reading": "Browser Run's egress proxy ([::1]) answers 403 for loopback and private IPs (127.0.0.1:8080, 127.1, [::1], 0.0.0.0, 10.0.0.1, 169.254.169.254); *.localhost, *.internal and metadata.google.internal do not resolve (reset); from the https page every http probe is mixed content. No Container and no private service was reached. The https page is a secure context."
+}

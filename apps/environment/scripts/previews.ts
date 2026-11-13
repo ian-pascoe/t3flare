@@ -4,11 +4,20 @@
 // harness's own is written.
 //
 //   node scripts/stage.ts run previews previews <part>
-//   parts: spike | routes | close
+//   parts: spike | routes | op <spike op> | browser | close
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { admin, base, sleep } from "./lib/client.ts";
+import { admin, base, pair, sleep, updateSettings, wsCall } from "./lib/client.ts";
+import { createThread, replyOf, say, settled, t3Calls, until } from "./lib/cloudThread.ts";
+import { ensureCloudFixtureProject } from "./lib/fixtureProject.ts";
+import { type Line as StageLine, openTab, step, streamStatus, tabEval, VITE_APP, waitFor, watchStream, wsFind } from "./lib/previewStage.ts";
+// A run's whole budget: a hung step fails the run rather than holding the stage.
+setTimeout(() => {
+  console.error("previews: the run took longer than 20 minutes");
+  process.exit(1);
+}, 20 * 60_000).unref();
+import { attachTerminal } from "./lib/terminal.ts";
 
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/previews");
 
@@ -33,7 +42,48 @@ const spike = async (op: string): Promise<ReadonlyArray<Line>> => {
 };
 
 const print = (lines: ReadonlyArray<Line>) => {
-  for (const line of lines) console.log(`${line.ok ? "ok  " : "FAIL"} ${String(line.ms).padStart(6)} ms  ${line.name}  ${line.detail === undefined ? "" : JSON.stringify(line.detail).slice(0, 400)}`);
+  for (const line of lines) console.log(`${line.ok ? "ok  " : "FAIL"} ${String(line.ms).padStart(6)} ms  ${line.name}  ${line.detail === undefined ? "" : JSON.stringify(line.detail).slice(0, process.env.FULL === "1" ? 20_000 : 400)}`);
+};
+
+
+/**
+ * The published page's own probe (M1 hostile, L1): what an agent's HTML can reach from t3's asset route, reported to its
+ * parent (t3's web client frames it), and only then a top navigation, which the sandbox must refuse.
+ */
+const probePage = (origin: string) => `<!doctype html><html><head><title>Probe</title></head><body style="margin:0;background:#cc0000;color:#fff"><div style="height:160px"></div><pre id="out">pending</pre><script>
+(async () => {
+  const t = (p) => Promise.race([p, new Promise((r) => setTimeout(() => r("timeout"), 5000))]);
+  const out = { origin: String(location.origin) };
+  try { out.cookie = document.cookie; } catch (e) { out.cookie = "throws " + e.name; }
+  try { localStorage.setItem("x", "1"); out.localStorage = "works"; } catch (e) { out.localStorage = "throws " + e.name; }
+  try { out.parentDocument = typeof parent.document; } catch (e) { out.parentDocument = "throws " + e.name; }
+  out.session = await t(fetch("${origin}/api/auth/session", { credentials: "include" }).then((r) => "status " + r.status, (e) => "error " + e.name));
+  out.panel = await t(fetch("${origin}/_t3flare/harness/api/mcp/servers", { method: "POST", credentials: "include", body: "{}" }).then((r) => "status " + r.status, (e) => "error " + e.name));
+  document.getElementById("out").textContent = JSON.stringify(out);
+  parent.postMessage({ probe: out }, "*");
+  try { window.top.location.href = "https://example.com/"; } catch (e) { parent.postMessage({ topNavigation: "throws " + e.name }, "*"); }
+})();
+</script></body></html>`;
+
+/** Review L2: the published page's asset, fetched directly, is served as an opaque-origin document (inline) or a download. */
+const assetChecks = async (cookie: string, attachmentId: string): Promise<Array<StageLine>> => {
+  const lines: Array<StageLine> = [];
+  for (const disposition of ["inline", "attachment"] as const) {
+    await step(lines, `the published page's asset is served sandboxed, ${disposition} (L2)`, async () => {
+      const created = (await wsCall(cookie, "assets.createUrl", { resource: { _tag: "attachment", attachmentId, fileName: "probe.html", mimeType: "text/html", disposition } })) as { relativeUrl: string };
+      const url = new URL(created.relativeUrl, base);
+      const response = await fetch(url);
+      await response.body?.cancel();
+      const csp = response.headers.get("content-security-policy") ?? "";
+      const headers = { status: response.status, csp, nosniff: response.headers.get("x-content-type-options"), type: response.headers.get("content-type"), disposition: response.headers.get("content-disposition") };
+      // The capability URL goes to a 0600 file for the browser check, never into the evidence.
+      if (disposition === "inline") fs.writeFileSync("/tmp/previews-asset-url", url.toString(), { mode: 0o600 });
+      const sandboxed = /(^|;\s*)sandbox\b/.test(csp) && !/allow-same-origin/.test(csp) && headers.nosniff === "nosniff";
+      const asDocument = disposition === "inline" ? headers.type?.startsWith("text/html") === true : headers.disposition?.startsWith("attachment") === true && headers.type === "application/octet-stream";
+      return { ok: response.status === 200 && sandboxed && asDocument, detail: headers };
+    });
+  }
+  return lines;
 };
 
 const [part] = process.argv.slice(2);
@@ -64,10 +114,190 @@ switch (part) {
   case "routes":
     print(await spike("routes"));
     break;
+  case "op":
+    // Any spike op, printed: `op html-capture`, `op html-page`.
+    print(await spike(process.argv[3] ?? ""));
+    break;
   case "close":
     print(await spike("close"));
     break;
+  case "browser": {
+    // M2 + M3 (+ review M7, L9, H1): a Vite dev server in a thread's terminal, listed, opened, watched, edited, attacked.
+    const lines: Array<StageLine> = [];
+    const cookie = await pair();
+    const { projectId, workspaceRoot } = await ensureCloudFixtureProject(cookie);
+    const threadId = await createThread(cookie, projectId, { title: "previews: browser" });
+    const term = await attachTerminal(cookie, { threadId, terminalId: "default", cwd: workspaceRoot });
+    // The Container starts for the shell (a terminal's open is use, ADR-0021).
+    await term.until(/[$#] $/, 180_000);
+    const files = VITE_APP(base.origin);
+    const write = Object.entries(files)
+      .map(([name, text]) => `echo ${Buffer.from(text).toString("base64")} | base64 -d > ${name}`)
+      .join(" && ");
+    await step(lines, "a Vite app in the Container (/tmp/vapp)", async () => {
+      const out = await term.run(`mkdir -p /tmp/vapp && cd /tmp/vapp && ${write} && (test -d node_modules/vite || (npm init -y >/dev/null && npm i --silent vite@6 >/dev/null 2>&1)) && echo vite-ready`, 240_000);
+      return { ok: out.text.includes("vite-ready"), detail: { ms: out.ms } };
+    });
+    await term.write("npx vite --host 0.0.0.0 --port 5173 --strictPort\n");
+    await step(lines, "vite listens on 0.0.0.0:5173", async () => ({ ok: true, detail: { ms: (await term.until(/Network:|ready in/i, 90_000)).ms } }));
+    const listed = await wsFind(cookie, "subscribeDiscoveredLocalServers", {}, (list: any) => list.servers.some((server: any) => server.port === 5173), 45_000).then((list: any) => list?.servers as Array<any> | undefined);
+    const vite = listed?.find((server) => server.port === 5173);
+    await step(lines, "port discovery lists 5173 as the terminal's (M2)", async () => ({
+      ok: vite?.terminal?.threadId === threadId && vite?.terminal?.terminalId === "default" && vite?.url === "http://localhost:5173",
+      detail: listed,
+    }));
+    await step(lines, "computerd's 8080 is never listed (M2)", async () => ({ ok: !listed?.some((server) => server.port === 8080), detail: listed?.map((server) => server.port) }));
+    const tab = await openTab(cookie, threadId, "http://localhost:5173/");
+    await step(lines, "preview.open http://localhost:5173/ in the thread's browser (M3)", async () => ({ ok: typeof tab.tabId === "string", detail: { tabId: tab.tabId } }));
+    const loaded = await step(lines, "the page loaded through the Container preview, its module ran", async () => {
+      const text = await waitFor("the app's text", async () => {
+        const value = await tabEval("5173.t3flare.internal", "document.getElementById('app')?.textContent");
+        return value === "version-1" ? value : undefined;
+      }, 60_000);
+      return { ok: text === "version-1", detail: text };
+    });
+    const query = { threadId, tabId: tab.tabId };
+    await step(lines, "frames arrive over /api/preview-stream/ws, as JPEG, acked one at a time (M3, H1)", async () => {
+      const watched = await watchStream(cookie, { ...query, maxWidth: "640", maxHeight: "400" }, 6_000);
+      return { ok: watched.frames > 0 && watched.jpeg, detail: watched };
+    });
+    await step(lines, "a stream request without a session is refused (M3)", async () => {
+      const status = await streamStatus(null, query);
+      return { ok: status === 401 || status === 403, detail: { status } };
+    });
+    await step(lines, "a read-only watcher's input is ignored, an operator's click reaches the page", async () => {
+      await tabEval("5173.t3flare.internal", "(window.__clicks = 0, document.addEventListener('mousedown', () => window.__clicks++), 0)");
+      const click = (send: (message: unknown) => void) => {
+        for (const action of ["down", "up"]) send({ type: "mouse", action, x: 50, y: 50, button: "left", buttons: action === "down" ? 1 : 0, clickCount: 1 });
+      };
+      await watchStream(cookie, { ...query, interactive: "false" }, 2_500, click);
+      const afterReadOnly = await tabEval("5173.t3flare.internal", "window.__clicks");
+      const operated = await watchStream(cookie, query, 3_000, (send) => {
+        send({ type: "takeControl" });
+        setTimeout(() => click(send), 500);
+      });
+      const afterOperate = await tabEval("5173.t3flare.internal", "window.__clicks");
+      return { ok: afterReadOnly === 0 && Number(afterOperate) > 0, detail: { afterReadOnly, afterOperate, operatorMessages: operated.messages.slice(0, 6) } };
+    });
+    if (loaded) {
+      await step(lines, "an edit applies by HMR, without a reload (C4, M3)", async () => {
+        await tabEval("5173.t3flare.internal", "(window.__marker = 'kept', 1)");
+        const edit = await attachTerminal(cookie, { threadId, terminalId: "edit", cwd: workspaceRoot });
+        await edit.until(/[$#] $/, 60_000);
+        const started = Date.now();
+        await edit.run(`cd /tmp/vapp && echo ${Buffer.from(files["main.js"].replace("version-1", "version-2")).toString("base64")} | base64 -d > main.js && echo edited`, 30_000);
+        const text = await waitFor("the HMR update", async () => {
+          const value = await tabEval("5173.t3flare.internal", "document.getElementById('app')?.textContent");
+          return value === "version-2" ? value : undefined;
+        }, 30_000);
+        const marker = await tabEval("5173.t3flare.internal", "window.__marker");
+        await edit.close(true).catch(() => undefined);
+        return { ok: text === "version-2" && marker === "kept", detail: { text, marker, ms: Date.now() - started } };
+      });
+    }
+    const hostile = await openTab(cookie, threadId, "http://localhost:5173/hostile.html");
+    await step(lines, "hostile preview JS gets nothing of t3's, and cannot reach computerd or forge a socket (M3 hostile, L1)", async () => {
+      const out = await waitFor("the hostile page's report", async () => {
+        const value = await tabEval("hostile.html", "document.getElementById('out')?.textContent");
+        return typeof value === "string" && value !== "pending" ? (JSON.parse(value) as Record<string, string>) : undefined;
+      }, 60_000);
+      const refused = (value: string | undefined) => value === undefined || !/status 2\d\d/.test(value) || value === "status 204";
+      const ok =
+        out.cookie === "" &&
+        refused(out.session) &&
+        out.ws !== "open" &&
+        refused(out.mcp) &&
+        refused(out.panel) &&
+        /status 404|error/.test(out.computerd ?? "") &&
+        /status 404/.test(out.sendForged ?? "") &&
+        /status 403/.test(out.sendNoHeader ?? "");
+      return { ok, detail: out };
+    });
+    await wsCall(cookie, "preview.close", { threadId, tabId: hostile.tabId }).catch(() => undefined);
+    // Stop the listed server by its pid (stock's stop), then the list no longer has it.
+    await step(lines, "preview.stopLocalServer stops vite's group (M2)", async () => {
+      if (vite === undefined) return { ok: false, detail: "not listed" };
+      await wsCall(cookie, "preview.stopLocalServer", { pid: vite.pid, port: 5173 });
+      const gone = await wsFind(cookie, "subscribeDiscoveredLocalServers", {}, (list: any) => !list.servers.some((server: any) => server.port === 5173), 30_000);
+      return { ok: gone !== undefined, detail: { stopped: vite.pid } };
+    });
+    await step(lines, "a pid nobody lists is not-found (M2)", async () => {
+      const answer = await wsCall(cookie, "preview.stopLocalServer", { pid: 999_999, port: 5173 }).then(
+        () => "stopped",
+        (error: unknown) => JSON.stringify(error).slice(0, 300),
+      );
+      return { ok: answer.includes("not-found"), detail: answer };
+    });
+    await term.close(true).catch(() => undefined);
+    await wsCall(cookie, "preview.close", { threadId, tabId: tab.tabId }).catch(() => undefined);
+    writeEvidence("browser", { ok: lines.every((line) => line.ok), threadId, lines });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "agent": {
+    // M1 + M4 (R6): a Pi Durable agent checks and publishes HTML, then drives t3's browser over a server it starts.
+    const lines: Array<StageLine> = [];
+    const cookie = await pair();
+    const { projectId } = await ensureCloudFixtureProject(cookie);
+    await updateSettings(cookie, { enableAgentBrowserAccess: true, providerInstances: { piDurable: { driver: "piDurable", enabled: true } } });
+    const threadId = await createThread(cookie, projectId, { title: "previews: agent", runtimeMode: "full-access" });
+    const origin = base.origin;
+    const probe = probePage(origin);
+    const prompt = [
+      "Do these steps in order with T3's tools, then reply with a short report.",
+      `1. Call html_preview with this exact html and tell me the dominant background colour you see in the screenshot:\n${probe}`,
+      "2. Call html_render with the same html and the title Probe.",
+      "3. In bash run: mkdir -p /tmp/agentapp && cd /tmp/agentapp && printf '<h1>Agent Heading</h1><button id=go onclick=\"document.body.dataset.clicked=1\">Go</button>' > index.html && (nohup python3 -m http.server 3000 --bind 0.0.0.0 >/dev/null 2>&1 &) && sleep 1",
+      '4. Call preview_open with target {"kind":"port","port":3000}, then preview_snapshot, then preview_act to click the Go button, then preview_evaluate with expression: document.body.dataset.clicked + "|" + document.querySelector("h1").textContent',
+      `5. Call preview_evaluate with expression: fetch("${origin}/api/auth/session", { credentials: "include" }).then((r) => "status " + r.status, (e) => "error " + e.name)`,
+      "Report each tool result verbatim on its own line, and the colour.",
+    ].join("\n");
+    await say(cookie, threadId, prompt);
+    const p = await until(cookie, threadId, settled, 900_000);
+    const calls = t3Calls(p);
+    const reply = replyOf(p);
+    const items = (p?.turnItems ?? []) as Array<any>;
+    const tool = (name: string) => calls.filter((call: any) => call.tool === name);
+    await step(lines, "the turn settled", async () => ({ ok: settled(p), detail: { calls: calls.map((call: any) => `${call.tool}:${call.status}`) } }));
+    await step(lines, "html_preview ran and the agent saw its screenshot (R6)", async () => ({
+      ok: tool("html_preview").some((call: any) => call.status === "completed") && /red/i.test(reply),
+      detail: { reply: reply.slice(0, 600) },
+    }));
+    const rendered = items.find((item) => item.type === "dynamic_tool" && String(item.toolName).endsWith("html_render"));
+    const attachmentId = /"attachmentId"\s*:\s*"([^"]+)"/.exec(JSON.stringify(rendered?.output ?? null))?.[1];
+    await step(lines, "html_render published the page (M1)", async () => ({ ok: attachmentId !== undefined, detail: { attachmentId: attachmentId ?? null, output: JSON.stringify(rendered?.output ?? null).slice(0, 300) } }));
+    await step(lines, "preview_open/snapshot/act/evaluate drove the agent's tab over its server (M4)", async () => ({
+      ok: ["preview_open", "preview_snapshot", "preview_act", "preview_evaluate"].every((name) => tool(name).some((call: any) => call.status === "completed")) && reply.includes("1|Agent Heading"),
+      detail: { calls: calls.filter((call: any) => call.tool.startsWith("preview_")) },
+    }));
+    await step(lines, "preview_evaluate against t3's API gets nothing (M4 hostile)", async () => ({ ok: !/status 200/.test(reply), detail: reply.split("\n").filter((line) => /status|error/.test(line)).slice(0, 4) }));
+    if (attachmentId !== undefined) lines.push(...(await assetChecks(cookie, attachmentId)));
+    writeEvidence("agent", { ok: lines.every((line) => line.ok), threadId, lines });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "publish": {
+    // M1: the Durable agent publishes the probe page alone; its capability URL goes to a 0600 file (`assetChecks`).
+    const cookie = await pair();
+    const { projectId } = await ensureCloudFixtureProject(cookie);
+    const threadId = await createThread(cookie, projectId, { title: "previews: publish", runtimeMode: "full-access" });
+    await say(cookie, threadId, `Call html_render with the title Probe and this exact html, then stop:\n${probePage(base.origin)}`);
+    const p = await until(cookie, threadId, settled, 600_000);
+    const rendered = ((p?.turnItems ?? []) as Array<any>).find((item) => item.type === "dynamic_tool" && String(item.toolName).endsWith("html_render"));
+    const attachmentId = /"attachmentId"\s*:\s*"([^"]+)"/.exec(JSON.stringify(rendered?.output ?? null))?.[1];
+    const lines = attachmentId === undefined ? [] : await assetChecks(cookie, attachmentId);
+    writeEvidence("asset-headers", { ok: attachmentId !== undefined && lines.every((line) => line.ok), threadId, lines });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "l2": {
+    const cookie = await pair();
+    const lines = await assetChecks(cookie, process.argv[3] ?? "");
+    writeEvidence("asset-headers", { ok: lines.every((line) => line.ok), lines });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
   default:
-    console.error("usage: node scripts/stage.ts run previews previews spike|routes|close");
+    console.error("usage: node scripts/stage.ts run previews previews spike|routes|op|browser|close");
     process.exit(2);
 }

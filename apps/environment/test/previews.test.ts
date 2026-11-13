@@ -270,14 +270,19 @@ describe("t3's HTML-render Chrome, bridged to Browser Run (review M3)", () => {
 });
 
 describe("the preview stream's socket (review H1)", () => {
-  it("gives t3 the headers and a socket whose destroy closes the WebSocket", () => {
+  it("is the request as Effect reads it, with a socket whose destroy closes the WebSocket", async () => {
     let destroyed = 0;
-    const shim = nodeSocketShim(new Request("https://t3.example/api/preview-stream/ws", { headers: { "sec-websocket-extensions": "permessage-deflate" } }), () => {
+    const request = new Request("https://t3.example/api/preview-stream/ws?threadId=t", { headers: { "sec-websocket-extensions": "permessage-deflate" } });
+    const shim = nodeSocketShim(request, () => {
       destroyed++;
       throw new Error("already closed");
     });
-    expect(shim.headers["sec-websocket-extensions"]).toBe("permessage-deflate");
-    delete (shim.headers as Record<string, string>)["sec-websocket-extensions"];
+    expect(shim.url).toBe(request.url);
+    expect(shim.method).toBe("GET");
+    expect(shim.headers.get("sec-websocket-extensions")).toBe("permessage-deflate");
+    // t3 deletes the extensions key off `incoming.headers`: harmless here.
+    expect(() => delete (shim.headers as unknown as Record<string, string>)["sec-websocket-extensions"]).not.toThrow();
+    expect(await shim.clone().text()).toBe("");
     expect(shim.socket.writableLength).toBe(0);
     expect(() => shim.socket.destroy()).not.toThrow();
     expect(destroyed).toBe(1);

@@ -1,0 +1,32 @@
+{
+ "at": "2026-11-13T13:13:43.370Z",
+ "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "threadId": "bc8a3d09-8171-4e68-bc79-81adcb3d4b96",
+ "lines": [
+  {
+   "name": "the published page's asset is served sandboxed, inline (L2)",
+   "ok": true,
+   "ms": 1340,
+   "detail": {
+    "status": 200,
+    "csp": "sandbox allow-scripts allow-forms allow-popups allow-downloads",
+    "nosniff": "nosniff",
+    "type": "text/html; charset=utf-8",
+    "disposition": null
+   }
+  },
+  {
+   "name": "the published page's asset is served sandboxed, attachment (L2)",
+   "ok": true,
+   "ms": 1047,
+   "detail": {
+    "status": 200,
+    "csp": "default-src 'none'; sandbox",
+    "nosniff": "nosniff",
+    "type": "application/octet-stream",
+    "disposition": "attachment; filename=\"probe.html\""
+   }
+  }
+ ]
+}

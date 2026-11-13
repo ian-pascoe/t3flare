@@ -346,9 +346,25 @@ const htmlPageCheck = async (pageOrigin: string): Promise<Array<Line>> => {
       sessionId: string;
     };
     const paused: Array<string> = [];
+    // What the network did with each request the probe made: status and remote address, or the failure.
+    const urls = new Map<string, string>();
+    const network: Record<string, string> = {};
     const loaded = new Promise<void>((resolve) => {
       cdp.on((method, params, from) => {
         if (from !== sessionId) return;
+        if (method === "Network.requestWillBeSent") {
+          const event = params as { requestId: string; request: { url: string } };
+          urls.set(event.requestId, event.request.url);
+        }
+        if (method === "Network.responseReceived") {
+          const event = params as { requestId: string; response: { status: number; remoteIPAddress?: string; headers?: Record<string, string> } };
+          const url = urls.get(event.requestId) ?? "?";
+          network[url] = `${event.response.status} from ${event.response.remoteIPAddress ?? "?"} server=${event.response.headers?.server ?? event.response.headers?.Server ?? ""}`;
+        }
+        if (method === "Network.loadingFailed") {
+          const event = params as { requestId: string; errorText: string; blockedReason?: string };
+          network[urls.get(event.requestId) ?? "?"] = `failed ${event.errorText}${event.blockedReason ? ` (${event.blockedReason})` : ""}`;
+        }
         if (method === "Page.loadEventFired") resolve();
         if (method === "Fetch.requestPaused") {
           const event = params as { requestId: string; request: { url: string }; resourceType?: string };
@@ -364,6 +380,7 @@ const htmlPageCheck = async (pageOrigin: string): Promise<Array<Line>> => {
     });
     await step(lines, "Page.enable / Runtime.enable / Log.enable / addScriptToEvaluateOnNewDocument", async () => {
       await cdp.send("Page.enable", {}, sessionId);
+      await cdp.send("Network.enable", {}, sessionId);
       await cdp.send("Runtime.enable", {}, sessionId);
       await cdp.send("Log.enable", {}, sessionId);
       await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: "delete window.RTCPeerConnection;", runImmediately: true }, sessionId);
@@ -377,7 +394,7 @@ const htmlPageCheck = async (pageOrigin: string): Promise<Array<Line>> => {
       await Promise.race([loaded, new Promise((_, reject) => setTimeout(() => reject(new Error("no load in 10 s")), 10_000))]);
       await new Promise((resolve) => setTimeout(resolve, 6_000));
       const out = (await cdp.send("Runtime.evaluate", { expression: "document.getElementById('out').textContent", returnByValue: true }, sessionId)) as { result: { value: string } };
-      return { probe: JSON.parse(out.result.value) as unknown, paused: paused.slice(0, 12) };
+      return { probe: JSON.parse(out.result.value) as unknown, network, paused: paused.slice(0, 12) };
     });
     await step(lines, "Page.captureScreenshot", async () => ((await cdp.send("Page.captureScreenshot", { format: "png" }, sessionId)) as { data: string }).data.length);
     await step(lines, "Target.closeTarget + Browser.close", async () => {
@@ -448,12 +465,59 @@ const htmlCapture = async (environment: { boot(trigger: string): Promise<{ run<A
   return lines;
 };
 
+/** The Environment's preview sessions as Browser Run sees them now (stage checks of review M5). */
+const sessionsNow = async (): Promise<Array<Line>> => {
+  const lines: Array<Line> = [];
+  for (const session of environmentServices().previewStore.sessions()) {
+    await step(lines, `session ${session.kind} ${session.workspace ?? "-"}`, async () => {
+      const seen = (await binding().getSession(session.id)) as { closeReason?: string; endTime?: number } | null;
+      return { id: session.id, ageMs: Date.now() - session.openedAt, browserRun: seen === null ? null : { closed: seen.endTime !== undefined && seen.endTime !== null, closeReason: seen.closeReason ?? null } };
+    });
+  }
+  return lines;
+};
+
+/**
+ * Stage checks only: evaluates `expression` in the open tab whose URL contains `match`, over a second connection to the
+ * Workspace browser's session (the Environment's own stays as it is).
+ */
+const tabEval = async (match: string, expression: string): Promise<Array<Line>> => {
+  const lines: Array<Line> = [];
+  for (const session of environmentServices().previewStore.sessions().filter((entry) => entry.kind === "workspace")) {
+    await step(lines, `tab in ${session.workspace}`, async () => {
+      const connection = await binding().connectSession(session.id);
+      const response = await connection.webSocket.fetch("https://browser-binding.invalid", { headers: { Upgrade: "websocket" } });
+      const socket = (response as unknown as { webSocket: import("./cdpSocket.ts").CdpWebSocket }).webSocket;
+      socket.accept();
+      const cdp = new CdpClient(socket);
+      try {
+        const { targetInfos } = await cdp.send<{ targetInfos: Array<{ targetId: string; type: string; url: string }> }>("Target.getTargets");
+        const pages = targetInfos.filter((target) => target.type === "page");
+        const page = pages.find((target) => target.url.includes(match));
+        if (page === undefined) return { urls: pages.map((target) => target.url) };
+        const { sessionId } = await cdp.send<{ sessionId: string }>("Target.attachToTarget", { targetId: page.targetId, flatten: true });
+        const result = await cdp.send<{ result: { value?: unknown }; exceptionDetails?: { text: string } }>("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }, sessionId);
+        await cdp.send("Target.detachFromTarget", { sessionId }).catch(() => undefined);
+        return { url: page.url, value: result.exceptionDetails === undefined ? (result.result.value ?? null) : `exception: ${result.exceptionDetails.text}` };
+      } finally {
+        cdp.close();
+      }
+    });
+  }
+  return lines;
+};
+
 export const runSpike = async (
   op: string,
   storage: DurableObjectStorage,
   environment?: { boot(trigger: string): Promise<{ run<A, E, R>(effect: import("effect/Effect").Effect<A, E, R>): Promise<A> }> },
+  options: { readonly match?: string; readonly expression?: string } = {},
 ): Promise<{ readonly op: string; readonly lines: ReadonlyArray<Line> }> => {
   switch (op) {
+    case "sessions":
+      return { op, lines: await sessionsNow() };
+    case "tab-eval":
+      return { op, lines: await tabEval(options.match ?? "", options.expression ?? "document.title") };
     case "html-capture":
       if (environment === undefined) throw new Error("html-capture needs the Environment");
       return { op, lines: await htmlCapture(environment) };

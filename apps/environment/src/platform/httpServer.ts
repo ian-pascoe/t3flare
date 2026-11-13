@@ -37,10 +37,12 @@ const RESOLVE = Symbol.for("t3flare/http/resolve");
 const PREVIEW_STREAM_PREFIX = "/api/preview-stream/";
 const isPreviewStream = (request: Request) => new URL(request.url).pathname.startsWith(PREVIEW_STREAM_PREFIX);
 
-/** What t3's preview stream reads of a Node `IncomingMessage`: its headers, and its socket (H1). */
-export const nodeSocketShim = (request: Request, destroy: () => void) => ({
-  headers: Object.fromEntries(request.headers),
-  socket: {
+/**
+ * What t3's preview stream reads of a Node `IncomingMessage` (H1): the web request itself, as Effect's own fields read it
+ * (`url`, `method`, `headers`), with a `socket`. t3 deletes a key off `headers`, which on a web `Headers` is a no-op.
+ */
+export const nodeSocketShim = (request: Request, destroy: () => void): Request & { readonly socket: { readonly writableLength: number; destroy(): void } } => {
+  const socket = {
     writableLength: 0,
     destroy: () => {
       try {
@@ -49,8 +51,15 @@ export const nodeSocketShim = (request: Request, destroy: () => void) => ({
         // Already closed.
       }
     },
-  },
-});
+  };
+  return new Proxy(request, {
+    get: (target, key) => {
+      if (key === "socket") return socket;
+      const value = Reflect.get(target, key, target) as unknown;
+      return typeof value === "function" ? (value as (...args: Array<unknown>) => unknown).bind(target) : value;
+    },
+  }) as Request & { readonly socket: typeof socket };
+};
 
 export const make = () => {
   let handler: Handler | undefined;

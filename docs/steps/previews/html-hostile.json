@@ -1,0 +1,32 @@
+{
+ "at": "2026-11-13",
+ "stage": "previews",
+ "what": "M1 hostile and L1: the published probe page (html_render by a Pi Durable agent), framed as t3's web client frames it (sandbox=\"allow-scripts allow-forms\") on the t3 host, in a local Chrome (agent-browser) holding a valid t3 session",
+ "control": "the same browser's same-origin fetch('/api/auth/session') answered 200",
+ "framed": {
+  "topStayed": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+  "msgs": [
+   {
+    "origin": "null",
+    "data": {
+     "probe": {
+      "origin": "https://t3flare-environment-previews.ian-g-pascoe.workers.dev",
+      "cookie": "throws SecurityError",
+      "localStorage": "throws SecurityError",
+      "parentDocument": "throws SecurityError",
+      "session": "error TypeError",
+      "panel": "error TypeError"
+     }
+    }
+   },
+   {
+    "origin": "null",
+    "data": {
+     "topNavigation": "throws SecurityError"
+    }
+   }
+  ]
+ },
+ "reading": "The page runs in an opaque origin (its messages come from origin \"null\"): document.cookie, localStorage and parent.document throw SecurityError; a credentialed fetch of t3's /api/auth/session and a POST to the harness panel's /_t3flare/harness/api/mcp/servers fail (TypeError: a cross-origin request from an opaque origin, no Lax cookie); a top navigation throws, and the parent stayed on the t3 host. A top-level open of the same capability URL can navigate itself (it is its own top), as on stock.",
+ "ok": true
+}

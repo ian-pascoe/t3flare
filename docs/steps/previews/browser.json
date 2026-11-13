@@ -1,0 +1,143 @@
+{
+ "at": "2026-11-13T12:49:54.603Z",
+ "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "threadId": "267b54aa-cceb-4548-a25d-909cce3792fa",
+ "lines": [
+  {
+   "name": "a Vite app in the Container (/tmp/vapp)",
+   "ok": true,
+   "ms": 8679,
+   "detail": {
+    "ms": 8657
+   }
+  },
+  {
+   "name": "vite listens on 0.0.0.0:5173",
+   "ok": true,
+   "ms": 810,
+   "detail": {
+    "ms": 810
+   }
+  },
+  {
+   "name": "port discovery lists 5173 as the terminal's (M2)",
+   "ok": true,
+   "ms": 0,
+   "detail": [
+    {
+     "host": "localhost",
+     "port": 5173,
+     "url": "http://localhost:5173",
+     "processName": "node-MainThread",
+     "pid": 138,
+     "terminal": {
+      "threadId": "267b54aa-cceb-4548-a25d-909cce3792fa",
+      "terminalId": "default"
+     },
+     "agent": null
+    }
+   ]
+  },
+  {
+   "name": "computerd's 8080 is never listed (M2)",
+   "ok": true,
+   "ms": 0,
+   "detail": [
+    5173
+   ]
+  },
+  {
+   "name": "preview.open http://localhost:5173/ in the thread's browser (M3)",
+   "ok": true,
+   "ms": 0,
+   "detail": {
+    "tabId": "tab_1_7f7abcb6-c59e-467d-888a-9b44fbce4fad"
+   }
+  },
+  {
+   "name": "the page loaded through the Container preview, its module ran",
+   "ok": true,
+   "ms": 4925,
+   "detail": "version-1"
+  },
+  {
+   "name": "frames arrive over /api/preview-stream/ws, as JPEG, acked one at a time (M3, H1)",
+   "ok": true,
+   "ms": 6307,
+   "detail": {
+    "frames": 4,
+    "jpeg": true,
+    "messages": [
+     "{\"type\":\"control\",\"canOperate\":true,\"controller\":\"you\",\"generation\":1,\"dialog\":null}",
+     "{\"type\":\"viewport\",\"width\":1280,\"height\":800}"
+    ],
+    "closeCode": 1005,
+    "openError": null
+   }
+  },
+  {
+   "name": "a stream request without a session is refused (M3)",
+   "ok": true,
+   "ms": 520,
+   "detail": {
+    "status": 401
+   }
+  },
+  {
+   "name": "a read-only watcher's input is ignored, an operator's click reaches the page",
+   "ok": true,
+   "ms": 7907,
+   "detail": {
+    "afterReadOnly": 0,
+    "afterOperate": 1,
+    "operatorMessages": [
+     "{\"type\":\"control\",\"canOperate\":true,\"controller\":\"you\",\"generation\":3,\"dialog\":null}",
+     "{\"type\":\"viewport\",\"width\":1280,\"height\":800}",
+     "{\"type\":\"control\",\"canOperate\":true,\"controller\":\"you\",\"generation\":3,\"dialog\":null}"
+    ]
+   }
+  },
+  {
+   "name": "an edit applies by HMR, without a reload (C4, M3)",
+   "ok": true,
+   "ms": 2739,
+   "detail": {
+    "text": "version-2",
+    "marker": "kept",
+    "ms": 1297
+   }
+  },
+  {
+   "name": "hostile preview JS gets nothing of t3's, and cannot reach computerd or forge a socket (M3 hostile, L1)",
+   "ok": true,
+   "ms": 2191,
+   "detail": {
+    "cookie": "",
+    "session": "error TypeError",
+    "mcp": "error TypeError",
+    "ws": "error",
+    "panel": "error TypeError",
+    "otherWorkspace": "answered opaque",
+    "computerd": "error TypeError",
+    "forgedHost": "status 200",
+    "sendForged": "status 404",
+    "sendNoHeader": "status 403"
+   }
+  },
+  {
+   "name": "preview.stopLocalServer stops vite's group (M2)",
+   "ok": true,
+   "ms": 1665,
+   "detail": {
+    "stopped": 138
+   }
+  },
+  {
+   "name": "a pid nobody lists is not-found (M2)",
+   "ok": true,
+   "ms": 695,
+   "detail": "{\"_tag\":\"PreviewStopLocalServerError\",\"reason\":\"not-found\"}"
+  }
+ ]
+}
