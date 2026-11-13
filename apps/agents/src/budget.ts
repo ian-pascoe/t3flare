@@ -75,7 +75,9 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
     if (others.length >= max && others.length === live.length) {
       return {
         ok: false,
-        reason: `${others.length} Containers are running and the Container budget is ${max}; try again when one stops, or raise the budget in the Harness panel's Environment section (/_t3flare/harness#environment).`,
+        // Short: computer keeps only the first 240 characters of a failed start's message, its own prefix included, and
+        // the Workspace DO shows that message to terminals and CLI agents.
+        reason: `Container budget (${max}) reached: raise it at /_t3flare/harness#environment`,
         running: others.map((lease) => lease.holder),
       };
     }

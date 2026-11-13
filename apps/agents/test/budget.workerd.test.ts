@@ -72,8 +72,7 @@ describe("ContainerBudget", () => {
     expect((await b.acquire("a", 1)).ok).toBe(true);
     const refused = await b.acquire("b", 1);
     expect(refused.ok).toBe(false);
-    expect(refused.ok ? "" : refused.reason).toContain("the Container budget is 1");
-    expect(refused.ok ? "" : refused.reason).toContain("Environment section");
+    expect(refused.ok ? "" : refused.reason).toBe("Container budget (1) reached: raise it at /_t3flare/harness#environment");
     expect((await b.state()).max).toBe(1);
     // Raised: the next request starts.
     expect((await b.acquire("b", 2)).ok).toBe(true);

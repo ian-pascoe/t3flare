@@ -100,9 +100,15 @@ const ready = async () => {
   await ensureProject(cookie, WORKSPACE);
 };
 
+/** One Workspace call, its whole answer kept (a refused start answers 500 with the budget's reason in its text). */
 const callOn = async (id: string, body: unknown) => {
-  const answer = await admin("POST", `/_t3flare/agents/workspace-call?id=${id}`, body);
-  return { status: answer.status, ...(typeof answer.json === "object" && answer.json !== null ? answer.json : { text: answer.json }) } as { status: number; result: any; container: any; text?: string };
+  const response = await fetch(new URL(`/_t3flare/agents/workspace-call?id=${id}`, T3), { method: "POST", redirect: "manual", headers: { ...scriptHeaders, "content-type": "application/json" }, body: JSON.stringify(body) });
+  const text = await response.text();
+  try {
+    return { status: response.status, ...JSON.parse(text) } as { status: number; result: any; container: any; text?: string };
+  } catch {
+    return { status: response.status, result: undefined, container: undefined, text } as { status: number; result: any; container: any; text?: string };
+  }
 };
 const call = (body: unknown) => callOn(WORKSPACE, body);
 const stopOn = (id: string) => admin("POST", `/_t3flare/agents/workspace-stop?id=${id}`);
@@ -253,7 +259,7 @@ const budget = async () => {
   const start = async (id: string) => {
     const answer = await callOn(id, { exec: { script: "true", timeoutMs: 180_000 } });
     const text = JSON.stringify(answer);
-    return { ok: answer.status === 200 && answer.result?.exitCode === 0, status: answer.status, running: answer.container?.running ?? null, budget: answer.container?.launch?.budget ?? null, refusal: /the Container cannot start: ([^"\\]+)/.exec(text)?.[1] ?? (answer.status === 200 ? null : text.slice(0, 400)) };
+    return { ok: answer.status === 200 && answer.result?.exitCode === 0, status: answer.status, running: answer.container?.running ?? null, budget: answer.container?.launch?.budget ?? null, refusal: /the Container cannot start: ([^"\\]+)/.exec(text)?.[1] ?? (answer.status === 200 ? null : text.slice(0, 400)), raw: answer.status === 200 ? undefined : text.slice(0, 2000) };
   };
   // A holder busy with a command is never asked to give its slot up (review F7 asks idle holders only).
   const busy = (id: string, seconds: number) => void callOn(id, { exec: { script: `sleep ${seconds}`, timeoutMs: (seconds + 30) * 1000 } }).catch(() => undefined);
@@ -264,7 +270,7 @@ const budget = async () => {
   busy("penv-b1", 60);
   await sleep(2_000);
   const second = await start("penv-b2");
-  cases.push({ name: "at a budget of 1, a second Workspace's start is refused, and the message names the budget", first, second, ok: first.ok && !second.ok && /Container budget is 1/.test(String(second.refusal)) && /Environment section/.test(String(second.refusal)) });
+  cases.push({ name: "at a budget of 1, a second Workspace's start is refused, and the message names the budget", first, second, ok: first.ok && !second.ok && /Container budget \(1\)/.test(String(second.refusal)) && /harness#environment/.test(String(second.refusal)) });
 
   await setEnvironment({ containerBudget: 2 });
   const raised = await start("penv-b2");
@@ -276,7 +282,7 @@ const budget = async () => {
   await sleep(2_000);
   const third = await start("penv-b3");
   const running = [await stateOf("penv-b1"), await stateOf("penv-b2")].map((row) => row?.running);
-  cases.push({ name: "lowered to 1 with two running: neither stops, and a third start is refused", third, running, leases: await leases(), ok: !third.ok && /Container budget is 1/.test(String(third.refusal)) && running.every((value) => value === true) });
+  cases.push({ name: "lowered to 1 with two running: neither stops, and a third start is refused", third, running, leases: await leases(), ok: !third.ok && /Container budget \(1\)/.test(String(third.refusal)) && /harness#environment/.test(String(third.refusal)) && running.every((value) => value === true) });
 
   await stopOn("penv-b1");
   const afterOne = await start("penv-b3");
@@ -357,7 +363,10 @@ const browser = (...args: Array<string>) => {
   return result.stdout;
 };
 
-const shoot = () => {
+const shoot = async () => {
+  // One Container running, so the section shows a holder beside the budget.
+  await ready();
+  await call({ exec: { script: "true", timeoutMs: 180_000 } });
   fs.mkdirSync(OUT, { recursive: true });
   const page = new URL("/_t3flare/harness", HARNESS).toString();
   for (const scheme of ["light", "dark"]) {
