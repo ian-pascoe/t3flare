@@ -48,6 +48,7 @@ import { environmentStub } from "../environment.ts";
 import { EMPTY_ENVIRONMENT, type McpRelayAnswer, type ResolvedEnvironment, resolveEnvironment } from "@t3flare/harness-registry";
 import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, takeEnvironment } from "./containerLaunch.ts";
+import { reclaimFor } from "./reclaim.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { ContainerPreview } from "./containerPreview.ts";
 import { type PortProbe, probeRunningPort, scanRunningContainer, stopGroupInRunningContainer } from "./ports.ts";
@@ -289,7 +290,7 @@ export class WorkspaceDO extends ContainerHost {
           workspace: ref,
           name: WORKSPACE_CONTAINER,
           // Each start's own size replaces it (`#budgeted`); a start never omits it (an omitted one starts `lite`).
-          instance: launchOf(resolveEnvironment(EMPTY_ENVIRONMENT)).instance,
+          instance: launchOf({ settings: resolveEnvironment(EMPTY_ENVIRONMENT), source: "default" }).instance,
           // Unrestricted direct egress in part 1, as cloudpid's v1 (an allowlist is deferred, docs/plan.md).
           egress: { mode: "direct" },
           ignore: [...patterns],
@@ -635,7 +636,7 @@ export class WorkspaceDO extends ContainerHost {
     // renews the lease it holds, so a kept launch's budget never overwrites a newer one (ADR-0032).
     const lease = async (budget: number | undefined) => {
       let answer = await this.#budget().acquire(this.ctx.id.toString(), budget);
-      if (!answer.ok && (await this.#reclaimFrom(answer.running))) answer = await this.#budget().acquire(this.ctx.id.toString(), budget);
+      if (!answer.ok && (await this.#reclaimFrom(answer.running, answer.max ?? answer.running.length))) answer = await this.#budget().acquire(this.ctx.id.toString(), budget);
       if (!answer.ok) throw new Error(`t3flare: the Container cannot start: ${answer.reason}`);
       await this.ctx.storage.put(LEASED_KEY, true);
       if ((await this.ctx.storage.get<number>(STARTED_AT_KEY)) === undefined) await this.ctx.storage.put(STARTED_AT_KEY, Date.now());
@@ -669,22 +670,30 @@ export class WorkspaceDO extends ContainerHost {
    * The budget is full (review F7): asks each holder to stop its Container if nothing there works, idle CLI sessions
    * included; answers whether one did.
    */
-  async #reclaimFrom(holders: ReadonlyArray<string>): Promise<boolean> {
-    for (const holder of holders) {
-      if (holder === this.ctx.id.toString()) continue;
-      try {
-        // SAFETY: a holder is a Workspace DO's id (`#budgeted`); `releaseIfIdle` is its RPC.
-        const stub = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromString(holder)) as unknown as { releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }> };
-        const answer = await stub.releaseIfIdle();
-        if (answer.released) {
-          console.log(JSON.stringify({ t3flare: "container-reclaimed", from: holder, for: this.#workspaceId() ?? null }));
-          return true;
-        }
-      } catch (error) {
-        console.warn(JSON.stringify({ t3flare: "container-reclaim-failed", from: holder, error: String(error).slice(0, 200) }));
-      }
-    }
-    return false;
+  async #reclaimFrom(holders: ReadonlyArray<string>, max: number): Promise<boolean> {
+    // SAFETY: a holder is a Workspace DO's id (`#budgeted`); `reclaimable` and `releaseIfIdle` are its RPC.
+    const stub = (holder: string) =>
+      this.env.WORKSPACES.get(this.env.WORKSPACES.idFromString(holder)) as unknown as {
+        reclaimable(): Promise<boolean>;
+        releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }>;
+      };
+    const failed = (holder: string) => (error: unknown) => {
+      console.warn(JSON.stringify({ t3flare: "container-reclaim-failed", from: holder, error: String(error).slice(0, 200) }));
+      return false;
+    };
+    const { released, enough } = await reclaimFor({
+      self: this.ctx.id.toString(),
+      running: holders,
+      max,
+      idle: (holder) => stub(holder).reclaimable().catch(failed(holder)),
+      release: (holder) =>
+        stub(holder)
+          .releaseIfIdle()
+          .then((answer) => answer.released)
+          .catch(failed(holder)),
+    });
+    for (const holder of released) console.log(JSON.stringify({ t3flare: "container-reclaimed", from: holder, for: this.#workspaceId() ?? null }));
+    return enough;
   }
 
   #budget() {
@@ -700,14 +709,14 @@ export class WorkspaceDO extends ContainerHost {
     const kv = this.ctx.storage.kv;
     const running = kv.get<ContainerLaunch>(LAUNCH_KEY);
     // Before the first recorded launch, a running Container started with the default (today's custom size).
-    if (this.containerRunning()) return running ?? launchOf(resolveEnvironment(EMPTY_ENVIRONMENT));
+    if (this.containerRunning()) return running ?? launchOf({ settings: resolveEnvironment(EMPTY_ENVIRONMENT), source: "default" });
     const taken = await takeEnvironment({
       read: () => environmentStub(this.env.ENVIRONMENT).environmentSettings(),
       kept: () => kv.get<ResolvedEnvironment>(ENVIRONMENT_KEY),
       keep: (settings) => kv.put(ENVIRONMENT_KEY, settings),
       waitMs: ENVIRONMENT_READ_MS,
     });
-    const launch = launchOf(taken.settings);
+    const launch = launchOf(taken);
     kv.put(LAUNCH_KEY, launch);
     console.log(JSON.stringify({ t3flare: "container-launch", workspace: this.#workspaceId() ?? null, source: taken.source, revision: launch.revision, size: launch.size, idleMs: launch.idleMs, budget: launch.budget }));
     return launch;
@@ -715,7 +724,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** The idle time the running Container started with (ADR-0032). */
   #idleMs(): number {
-    return this.ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY)?.idleMs ?? launchOf(resolveEnvironment(EMPTY_ENVIRONMENT)).idleMs;
+    return this.ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY)?.idleMs ?? launchOf({ settings: resolveEnvironment(EMPTY_ENVIRONMENT), source: "default" }).idleMs;
   }
 
   async #scheduleAlarm(): Promise<void> {
@@ -1521,16 +1530,25 @@ export class WorkspaceDO extends ContainerHost {
    * The budget is full and another Workspace asks for a Container (review F7): if nothing here works (no command, no
    * terminal holding, no CLI process in a turn or recently used), the CLI processes end and the Container stops.
    */
-  async releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }> {
-    if (!this.containerRunning()) return { released: false, reason: "not running" };
-    const reclaimable = this.#processes.reclaimable();
-    const busy =
-      this.#running > 0 ||
-      this.#terminalsHold() ||
-      reclaimable.length < this.#processes.size;
-    if (busy) return { released: false, reason: "in use" };
+  /** Why the running Container may not give its slot up now, or undefined when it may (review F7). */
+  async #notReclaimable(): Promise<string | undefined> {
+    if (!this.containerRunning()) return "not running";
+    const busy = this.#running > 0 || this.#terminalsHold() || this.#processes.reclaimable().length < this.#processes.size;
+    if (busy) return "in use";
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
-    if (this.#processes.size === 0 && Date.now() - lastUse < 30_000) return { released: false, reason: "used in the last 30 s" };
+    if (this.#processes.size === 0 && Date.now() - lastUse < 30_000) return "used in the last 30 s";
+    return undefined;
+  }
+
+  /** Whether `releaseIfIdle` would stop the Container now; stops nothing (a reclaim counts idle holders first). */
+  async reclaimable(): Promise<boolean> {
+    return (await this.#notReclaimable()) === undefined;
+  }
+
+  async releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }> {
+    const why = await this.#notReclaimable();
+    if (why !== undefined) return { released: false, reason: why };
+    const reclaimable = this.#processes.reclaimable();
     console.log(JSON.stringify({ t3flare: "container-released-for-budget", workspace: this.#workspaceId() ?? null, processes: reclaimable.length, ...(await this.#usage()) }));
     await this.stopContainer();
     return { released: true, reason: "idle" };

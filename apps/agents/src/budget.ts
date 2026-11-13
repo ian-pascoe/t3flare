@@ -1,12 +1,13 @@
 // @effect-diagnostics globalDate:off
 // The Container budget (step 2a plan, cost guardrails): at most the budget's Containers run at once across the
-// deploy. The budget is an Environment setting (ADR-0032): each Workspace DO carries it with its lease request, this
-// object judges the request by it and keeps the last one for renewals and status reads (MAX_CONTAINERS before any).
-// Lowering it stops nothing: a holder's own lease is always renewed, and only new starts wait until fewer run. `max_instances` does not apply under `schedulingPolicy: "durable_object"`, so a singleton DO leases the slots.
+// deploy. `max_instances` does not apply under `schedulingPolicy: "durable_object"`, so a singleton DO leases the slots.
+// The budget is an Environment setting (ADR-0032): a Workspace DO carries it with a fresh start's lease request, and
+// this object judges the request by it and keeps the last one for renewals and status reads (MAX_CONTAINERS before
+// any). Lowering it stops nothing: a holder's own lease is always renewed, and only new starts wait until fewer run.
 // A Workspace DO takes a lease before it starts its Container, renews it from its alarm while the Container runs, and
 // releases it when the Container stops. A lease expires LEASE_MS after its last renewal, so a lost release frees its
 // slot within that time and a running Container never loses its slot while it is renewed.
-import { DEFAULT_CONTAINER_BUDGET, MAX_CONTAINER_BUDGET } from "@t3flare/harness-registry";
+import { DEFAULT_CONTAINER_BUDGET, fitsEnvironmentSetting } from "@t3flare/harness-registry";
 import { DurableObject } from "cloudflare:workers";
 
 /** The budget before any request carried one (the Environment settings' default). */
@@ -26,7 +27,8 @@ interface Lease {
 
 export type LeaseAnswer =
   | { readonly ok: true; readonly until: number; readonly running: ReadonlyArray<string> }
-  | { readonly ok: false; readonly reason: string; readonly running: ReadonlyArray<string> };
+  /** `max`: the budget the request was judged by (a reclaim frees enough slots to get under it, or none). */
+  | { readonly ok: false; readonly reason: string; readonly running: ReadonlyArray<string>; readonly max?: number };
 
 export interface BudgetEnv {
   /** Overrides MAX_CONTAINERS and every carried budget (tests). */
@@ -47,7 +49,7 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
 
   /** The budget: the override, else `carried` when valid (kept for later), else the last kept, else the default. */
   #max(carried?: number): number {
-    if (carried !== undefined && Number.isInteger(carried) && carried >= 1 && carried <= MAX_CONTAINER_BUDGET) this.ctx.storage.kv.put(BUDGET_KEY, carried);
+    if (carried !== undefined && fitsEnvironmentSetting("containerBudget", carried)) this.ctx.storage.kv.put(BUDGET_KEY, carried);
     return this.maxOverride() ?? this.ctx.storage.kv.get<number>(BUDGET_KEY) ?? MAX_CONTAINERS;
   }
 
@@ -79,6 +81,7 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
         // the Workspace DO shows that message to terminals and CLI agents.
         reason: `Container budget (${max}) reached: raise it at /_t3flare/harness#environment`,
         running: others.map((lease) => lease.holder),
+        max,
       };
     }
     const until = now + this.#leaseMs();

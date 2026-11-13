@@ -93,7 +93,8 @@ describe("ContainerBudget", () => {
     expect((await b.acquire("a", 2)).ok).toBe(true);
     expect((await b.acquire("b", 2)).ok).toBe(true);
     // Lowered to 1 by a third Workspace's request: refused, and both running leases stay.
-    expect((await b.acquire("c", 1)).ok).toBe(false);
+    // The refusal names the budget it was judged by: a reclaim needs two idle holders to stop, not one.
+    expect(await b.acquire("c", 1)).toMatchObject({ ok: false, running: ["a", "b"], max: 1 });
     expect((await b.state()).leases.map((lease) => lease.holder)).toEqual(["a", "b"]);
     expect((await b.renew("a")).ok).toBe(true);
     expect((await b.renew("b")).ok).toBe(true);

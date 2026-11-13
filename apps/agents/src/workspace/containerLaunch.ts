@@ -7,7 +7,6 @@ import {
   type ContainerInstance,
   containerInstance,
   type ContainerSize,
-  containerSizeOf,
   EMPTY_ENVIRONMENT,
   type ResolvedEnvironment,
   resolveEnvironment,
@@ -24,8 +23,18 @@ export interface TakeEnvironmentDeps {
   readonly waitMs: number;
 }
 
-/** The settings for the next Container start, and where they came from. Never fails. */
-export const takeEnvironment = async (deps: TakeEnvironmentDeps): Promise<{ readonly settings: ResolvedEnvironment; readonly source: "environment" | "kept" | "default" }> => {
+/** Settings for a start and where they came from: only an `environment` read is fresh. */
+export interface TakenEnvironment {
+  readonly settings: ResolvedEnvironment;
+  readonly source: "environment" | "kept" | "default";
+}
+
+/**
+ * The settings for the next Container start, and where they came from. Never fails. The Environment's answer is read
+ * against this Worker's schema (an Environment newer or older than this Worker may answer a value it does not know, which
+ * reads as its default), then kept.
+ */
+export const takeEnvironment = async (deps: TakeEnvironmentDeps): Promise<TakenEnvironment> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const answer = await Promise.race([
@@ -35,8 +44,9 @@ export const takeEnvironment = async (deps: TakeEnvironmentDeps): Promise<{ read
       }),
     ]);
     if (answer !== undefined) {
-      deps.keep(answer);
-      return { settings: answer, source: "environment" };
+      const settings = resolveEnvironment({ revision: answer.revision, settings: answer });
+      deps.keep(settings);
+      return { settings, source: "environment" };
     }
   } catch {
     // The Environment DO failed: the kept copy below.
@@ -52,23 +62,20 @@ export interface ContainerLaunch {
   readonly size: ContainerSize;
   readonly instance: ContainerInstance;
   readonly idleMs: number;
-  /** The Container budget carried with this start's lease request (the budget DO judges it, ADR-0032). */
-  readonly budget: number;
+  /**
+   * The Container budget carried with this start's lease request (the budget DO judges it, ADR-0032): only from a fresh
+   * read, so a kept copy or the defaults never overwrite the owner's newer budget in the budget DO.
+   */
+  readonly budget?: number;
   /** The Environment settings' revision it came from. */
   readonly revision: number;
 }
 
-/**
- * The launch for `settings`, resolved again against this Worker's schema: an Environment newer or older than this Worker
- * may answer a size or an idle time it does not know, which starts as the default.
- */
-export const launchOf = (settings: ResolvedEnvironment): ContainerLaunch => {
-  const resolved = resolveEnvironment({ revision: settings.revision, settings: { containerSize: settings.containerSize, containerIdleMinutes: settings.containerIdleMinutes, containerBudget: settings.containerBudget } });
-  return {
-    size: containerSizeOf(resolved.containerSize),
-    instance: containerInstance(resolved.containerSize),
-    idleMs: resolved.containerIdleMinutes * 60_000,
-    budget: resolved.containerBudget,
-    revision: resolved.revision,
-  };
-};
+/** The launch for the settings `taken` (`takeEnvironment`'s, already read against this Worker's schema). */
+export const launchOf = ({ settings, source }: TakenEnvironment): ContainerLaunch => ({
+  size: settings.containerSize,
+  instance: containerInstance(settings.containerSize),
+  idleMs: settings.containerIdleMinutes * 60_000,
+  ...(source === "environment" ? { budget: settings.containerBudget } : {}),
+  revision: settings.revision,
+});
