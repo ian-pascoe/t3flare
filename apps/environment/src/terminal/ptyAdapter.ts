@@ -3,7 +3,7 @@
 // here a shell is a bash the Workspace DO of the cwd starts under the platform's PTY exec in its Container. Input,
 // size and close go to that DO over RPC; output comes back pushed (`EnvironmentDO.terminalOutput` → `deliver`).
 //
-// - The cwd names the Workspace (`/w/<id>/…`). A cwd in no Workspace (t3's "No project" folder, `/t3/scratch`) gets a
+// - The cwd names the Workspace (`/w/<id>/…`). A cwd in no Workspace (t3's "No project" folder was `/t3/scratch` before parity G4) gets a
 //   shell that prints why and exits 1: a failed spawn would leave the client a blank terminal, because t3 sends its
 //   spawn error as an event before `terminal.attach` subscribes, and the snapshot carries only the "error" status.
 //   Only bash and sh are shells here (zsh, fish: "not found", so t3 tries its next shell).

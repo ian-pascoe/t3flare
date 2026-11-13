@@ -87,6 +87,11 @@ export interface ImageInput {
 export interface OpenInput {
   readonly threadId: string;
   readonly workspaceId: string | null;
+  /**
+   * The agent's working directory inside the Workspace (`/workspace/repo[/…]`): a scratch thread's own folder in the No
+   * project Workspace (parity G4). Absent: the repo's root.
+   */
+  readonly cwd?: string;
   readonly runtimeMode: RuntimeMode;
   /** Step 3: absent from an adapter before it (the default). */
   readonly interactionMode?: InteractionMode;

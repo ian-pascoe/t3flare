@@ -48,7 +48,8 @@ export const CAPABILITIES = {
   threadPinReorder: keep,
   threadActiveReorder: keep,
   threadAutoSettleOptOut: keep,
-  threadProjectFromScratch: strip("scratch threads are not built: the scratch root is not a Workspace (parity G4)"),
+  // The No project folder is the Workspace `/w/t3-scratch` (Patch 0004, parity G4), so its threads can become projects.
+  threadProjectFromScratch: keep,
   threadTitleRegeneration: keep,
   threadVisitedTracking: keep,
   threadPullRequestLinking: keep,

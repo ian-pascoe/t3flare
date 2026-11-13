@@ -34,7 +34,7 @@ describe("the descriptor's capabilities", () => {
     } as ExecutionEnvironmentCapabilities);
     // Cloud voice transcription is kept: t3 calls the vendor over fetch with the key typed into its settings (D5 lifted,
     // owner 2026-11-12, back to stock).
-    expect(advertised).toEqual({ repositoryIdentity: true, pullRequests: true, peerLinks: true, cloudVoiceTranscription: true });
+    expect(advertised).toEqual({ repositoryIdentity: true, pullRequests: true, peerLinks: true, threadProjectFromScratch: true, cloudVoiceTranscription: true });
   });
 });
 

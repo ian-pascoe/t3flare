@@ -719,8 +719,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
     } satisfies Meta);
     await this.#takeT3Mcp(input.t3Mcp);
     const conversation = await this.#conversation(input.model, input.thinking);
-    // The agent works in its Workspace's repo (t3's `/w/<id>`), or nowhere without one.
-    if (input.workspaceId !== null) await conversation.configure({ cwd: REPO_ROOT }, context);
+    // The agent works in its Workspace's repo (t3's `/w/<id>`), or a folder in it (a scratch thread's), or nowhere without one.
+    const cwd = input.cwd !== undefined && (input.cwd === REPO_ROOT || (input.cwd.startsWith(`${REPO_ROOT}/`) && !input.cwd.split("/").includes(".."))) ? input.cwd : REPO_ROOT;
+    if (input.workspaceId !== null) await conversation.configure({ cwd }, context);
     const turns = this.#turnsWithProxy();
     return { epoch, busy: Object.values(turns).some(isLive), turns };
   }

@@ -123,6 +123,7 @@ export const makePiDurableAdapter = (
           : { authorization: config.authorizationHeader, providerSessionId: config.providerSessionId, instructions: T3_CODE_ORCHESTRATION_INSTRUCTIONS },
       );
       const workspaceId = workspaceOfCwd(input.runtimePolicy.cwd);
+      const workspaceInnerCwd = input.runtimePolicy.cwd ? (toWorkspace(input.runtimePolicy.cwd)?.inner ?? null) : null;
       const now = yield* DateTime.now;
       let session: OrchestrationV2ProviderSession = {
         id: input.providerSessionId,
@@ -300,6 +301,8 @@ export const makePiDurableAdapter = (
           client().open({
             threadId: registerInput.threadId,
             workspaceId,
+            // A scratch thread's own folder in the No project Workspace (parity G4); the repo's root otherwise.
+            ...(workspaceInnerCwd === null ? {} : { cwd: workspaceInnerCwd }),
             runtimeMode: runtimeModeOf(registerInput.runtimeMode),
             interactionMode: interactionModeOf(registerInput.interactionMode),
             model,
