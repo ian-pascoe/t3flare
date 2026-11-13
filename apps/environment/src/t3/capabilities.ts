@@ -55,7 +55,8 @@ export const CAPABILITIES = {
   threadPullRequestLinking: keep,
   serverResolvedCommandContext: keep,
   threadStop: keep,
-  localServerStop: strip("stops a server on the client's machine; the Environment is not one"),
+  // G11 (ADR-0031): a listed server in a Workspace's Container, stopped by its process group (`preview/portDiscovery.ts`).
+  localServerStop: keep,
   threadPullRequests: keep,
   threadPullRequestWatch: keep,
   pullRequestStackActions: keep,
@@ -73,7 +74,8 @@ export const CAPABILITIES = {
   desktopAppUpdate: strip("the desktop app's own updater, on a desktop host"),
   desktopAppChannelSwitch: strip("the desktop app's own updater, on a desktop host"),
   commandOutputStreaming: keep,
-  serverBrowser: strip("headless Chromium on the host; previews come later (SPI-1002)"),
+  // G11 (ADR-0031): t3's server browser runs in Browser Run, with `localhost` routed to the thread's Container.
+  serverBrowser: keep,
   peerLinks: keep,
   mcpModeLimitHeader: keep,
   linkFence: keep,

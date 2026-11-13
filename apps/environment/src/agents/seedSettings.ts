@@ -59,16 +59,3 @@ export const layerSeedLinkedEnvironmentsOn = Layer.effectDiscard(
     marks.set(LINKED_ENVIRONMENTS_SEEDED);
   }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: Linked environments was not seeded", cause))),
 );
-
-/**
- * Step 3 (L3): the Cloud Environment has no browser, so agent browser access (which adds `preview` to every agent's
- * MCP credential and offers `preview_*`) is off at each boot, as the fast worktree checkout is.
- */
-export const layerPinAgentBrowserAccessOff = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const settings = yield* ServerSettings.ServerSettingsService;
-    if (!(yield* settings.getSettings).enableAgentBrowserAccess) return;
-    yield* settings.updateSettings({ enableAgentBrowserAccess: false });
-    yield* Effect.logInfo("t3flare: agent browser access turned off");
-  }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: agent browser access was not pinned off", cause))),
-);

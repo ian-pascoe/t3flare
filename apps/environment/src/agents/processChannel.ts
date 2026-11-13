@@ -296,6 +296,8 @@ export class ProcessChannel {
   #nextPid = 200_000;
   /** Workspaces with a read loop running. */
   readonly #readers = new Set<string>();
+  /** G11: the thread each process was started for, by key (port discovery attributes its servers to it). */
+  readonly #threads = new Map<string, string>();
 
   constructor(deps: ProcessChannelDeps) {
     this.#deps = deps;
@@ -313,6 +315,12 @@ export class ProcessChannel {
     return this.#deps.newKey();
   }
 
+  /** G11: a live process's Workspace and thread, by its key (its `T3FLARE_EXEC` in the Container). */
+  ownerOf(key: string): { readonly workspace: string; readonly thread: string | undefined } | undefined {
+    const process = this.#byKey.get(key);
+    return process === undefined ? undefined : { workspace: process.place.workspace, thread: this.#threads.get(key) };
+  }
+
   /** Where `cwd` runs, or undefined (no Workspace: the caller refuses). */
   placeOf(cwd: string): ProcessPlace | undefined {
     return this.#deps.place(cwd);
@@ -325,6 +333,7 @@ export class ProcessChannel {
     const key = input.key ?? this.#deps.newKey();
     const process = new ChannelProcess(this, this.#nextPid++, key, place, input.cli);
     this.#byKey.set(key, process);
+    if (input.thread !== undefined) this.#threads.set(key, input.thread);
     this.#byPid.set(process.pid, process);
     let answer: ProcessStartAnswer;
     try {

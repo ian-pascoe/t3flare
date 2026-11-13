@@ -34,6 +34,7 @@ import {
 import { bindScratchCheckout, isScratchDir, scratchProjectOf } from "./scratch.ts";
 import { workspaceRpc } from "./workspaceClient.ts";
 import { CLI_NAMES, spawnCli } from "./cliProcess.ts";
+import { HTML_BROWSER_EXECUTABLE, spawnHtmlBrowser } from "../preview/htmlBrowser.ts";
 
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
@@ -480,6 +481,10 @@ export const spawn = (command: ChildProcess.Command) =>
     if (command._tag !== "StandardCommand") {
       spawnAttempts.set("pipeline", (spawnAttempts.get("pipeline") ?? 0) + 1);
       return yield* notFound("pipeline");
+    }
+    // G11 (ADR-0031): t3's HTML renders' Chrome is a bridge to Browser Run (`preview/htmlBrowser.ts`).
+    if (command.command === HTML_BROWSER_EXECUTABLE) {
+      return yield* spawnHtmlBrowser(command, { binding: () => environmentServices().browserRun, store: () => environmentServices().previewStore });
     }
     const name = command.command.replace(/^.*\//, "");
     const args = command.args.map((word) => (typeof word === "string" ? word : Redacted.value(word)));

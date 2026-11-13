@@ -1,0 +1,12 @@
+diff --git a/apps/server/src/preview/ServerBrowser.ts b/apps/server/src/preview/ServerBrowser.ts
+index 53d2a01e6f..758f7b5b0c 100644
+--- a/apps/server/src/preview/ServerBrowser.ts
++++ b/apps/server/src/preview/ServerBrowser.ts
+@@ -906,6 +906,7 @@ const make = Effect.gen(function* () {
+       (await contexts.contextFor(
+         snapshot.profileId ?? "default",
+         isolatedContext ? tabKey(snapshot.threadId, snapshot.tabId) : undefined,
++        snapshot.threadId,
+       ));
+     if (isolatedContext) opened.push(() => context.close());
+     if (adopted?.page.isClosed()) throw new Error("The popup closed before it opened.");

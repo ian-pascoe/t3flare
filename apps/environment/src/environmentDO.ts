@@ -37,6 +37,8 @@ import type { Runtime } from "./runtime.ts";
 import { commissaryManagementOf } from "./usage/commissary.ts";
 import type { BrowserRunBinding, BrowserRunFetcher } from "./preview/browserRun.ts";
 import type { ContainerPreviewProps } from "./preview/containerPreviews.ts";
+import { closeLeftoverSessions } from "./preview/sessions.ts";
+import { previewStore } from "./preview/store.ts";
 
 /** The loopback bindings of this Worker's entry (`worker.ts`) the Environment DO hands Browser Run (G11). */
 interface EnvironmentExports {
@@ -233,7 +235,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       browserRun: env.BROWSER,
       // SAFETY: the Worker's entry (`worker.ts`) exports `ContainerPreviews`; `ctx.exports` is untyped here.
       containerPreviews: (workspace) => (ctx.exports as unknown as EnvironmentExports).ContainerPreviews({ props: { workspace } }),
+      previewStore: previewStore(ctx.storage.sql),
     });
+    // G11 (review M5): the browsers an earlier instance of this object acquired went with its sockets; Browser Run would
+    // keep them until their keep-alive. Closed now, from this object's own list (never Browser Run's account-wide one).
+    if (env.BROWSER !== undefined) ctx.waitUntil(closeLeftoverSessions(env.BROWSER, previewStore(ctx.storage.sql)));
   }
 
   get ctxStorage(): DurableObjectState["storage"] {
@@ -477,6 +483,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       return await relayMessage(input, {
         view: () => this.mcpHost.view(),
         call: (call) => this.mcpHost.call(call),
+        readAppResource: (read) => this.mcpHost.readAppResource(read),
         state: cliThreadState,
         ask: approveCliTool,
         asker: cliQuestionAsker,

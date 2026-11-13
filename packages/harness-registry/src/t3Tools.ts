@@ -4,18 +4,16 @@
  * The T3 tools that cannot work for a Durable agent here; every other tool t3 lists for the thread is offered, as stock
  * t3 offers it (owner, 2026-11-12, back to stock: a short denylist instead of an allowlist). `prefix_*` is a family.
  * - `t3_attachment_*` and `t3_thread_send_attachments`: an upload URL for a shell's `curl`, and sending what it uploaded.
- * - `html_*`, `preview_*`, `t3_preview_*`: headless Chromium on the host (`serverBrowser` is stripped, ADR-0023).
- * - `device_*`: the device hub is host-bound and locked off (ADR-0023).
+ * - `device_*`: the device hub is host-bound and locked off (ADR-0023, ADR-0024).
  * - `t3_worktree_*`: t3's worktree handoff runs git the process router has not been audited for.
+ * `html_*`, `preview_*` and `t3_preview_*` are offered: t3's renders and server browser run in Browser Run (G11,
+ * ADR-0031), and t3 itself offers `preview_*` only while the owner's agent browser access setting is on.
  * The link tools (`t3_environment_link`, `t3_environment_unlink`) are offered: the Outbound link is t3's own (SPI-1061,
  * ADR-0029).
  */
 export const T3_TOOL_DENYLIST: ReadonlySet<string> = new Set([
   "t3_attachment_*",
   "t3_thread_send_attachments",
-  "html_*",
-  "preview_*",
-  "t3_preview_*",
   "device_*",
   "t3_worktree_*",
 ]);

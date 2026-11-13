@@ -8,6 +8,8 @@ export { WorkspaceProxy } from "./workspaceProxy.ts";
 export { ContainerBudget } from "./budget.ts";
 export { SessionDO } from "./session/SessionDO.ts";
 export { WorkspaceDO } from "./workspace/WorkspaceDO.ts";
+// G11 (ADR-0031): Container previews, reached only by the Environment Worker's service binding.
+export { WorkspaceContainerPreviews } from "./workspacePreviews.ts";
 
 export default {
   fetch(): Response {

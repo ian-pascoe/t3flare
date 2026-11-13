@@ -12,7 +12,7 @@ export const MCP_PROTOCOL_VERSION = "2025-06-18";
 export const UNAVAILABLE = "T3's tools are unavailable until the next turn (T3 restarted or ended this provider session). Do not retry now.";
 
 interface JsonRpcMessage {
-  readonly result?: { readonly content?: ReadonlyArray<{ readonly type?: string; readonly text?: string }>; readonly isError?: boolean; readonly tools?: ReadonlyArray<CatalogTool>; readonly structuredContent?: unknown };
+  readonly result?: { readonly content?: ReadonlyArray<{ readonly type?: string; readonly text?: string; readonly data?: string; readonly mimeType?: string }>; readonly isError?: boolean; readonly tools?: ReadonlyArray<CatalogTool>; readonly structuredContent?: unknown };
   readonly error?: { readonly code: number; readonly message: string };
 }
 
@@ -33,6 +33,19 @@ export const messageOf = (answer: McpRpcAnswer): JsonRpcMessage | undefined => {
     return undefined;
   }
 };
+
+/** G11 (R6): the image types a model reads, and how many and how large a tool result may carry, as pi's `read` bounds one. */
+const IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+export const MAX_RESULT_IMAGES = 4;
+/** Base64 characters of one image: 5 MiB, the most a provider takes. */
+export const MAX_IMAGE_BASE64 = 5 * 1024 * 1024;
+
+/** The MCP `image` parts of a tool result a model can see: t3's `html_preview` and `preview_snapshot` screenshots. */
+export const imagesOf = (content: ReadonlyArray<{ readonly type?: string; readonly text?: string; readonly data?: string; readonly mimeType?: string }>): ReadonlyArray<{ readonly data: string; readonly mimeType: string }> =>
+  content
+    .filter((part) => part.type === "image" && typeof part.data === "string" && part.data.length <= MAX_IMAGE_BASE64 && IMAGE_TYPES.has(part.mimeType ?? ""))
+    .slice(0, MAX_RESULT_IMAGES)
+    .map((part) => ({ data: part.data!, mimeType: part.mimeType! }));
 
 export class T3McpClient {
   readonly #post: (input: McpRpcRequest) => Promise<McpRpcAnswer>;
@@ -111,7 +124,9 @@ export class T3McpClient {
     if (answer.status !== 200) return { kind: "result", text: `T3 answered HTTP ${answer.status}.`, isError: true };
     const message = messageOf(answer);
     if (message?.error !== undefined) return { kind: "result", text: message.error.message, isError: true };
-    const text = (message?.result?.content ?? []).map((part) => part.text ?? "").join("");
-    return { kind: "result", text, isError: message?.result?.isError === true };
+    const content = message?.result?.content ?? [];
+    const text = content.map((part) => part.text ?? "").join("");
+    const images = imagesOf(content);
+    return { kind: "result", text, isError: message?.result?.isError === true, ...(images.length === 0 ? {} : { images }) };
   }
 }

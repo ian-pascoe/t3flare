@@ -66,6 +66,11 @@ export const SHADOWS: Record<string, string> = {
   // channel's pids are signalled through it instead. Imported by package subpath, so the redirect resolves bare
   // `@t3tools/*` specifiers too.
   "packages/provider-core/src/server/processGroup.ts": path.join(here, "src/shadows/processGroup.ts"),
+  // G11 (ADR-0031): the HTML-render Chrome is Browser Run, whose egress stands in for stock's SOCKS guard; workerd has no
+  // `node:net` server to run it on.
+  "apps/server/src/htmlRender/publicProxy.ts": path.join(here, "src/shadows/publicProxy.ts"),
+  // G11 (ADR-0031): t3's server browser is Browser Run, one browser per Workspace with its Container preview routes.
+  "apps/server/src/preview/ServerBrowserContexts.ts": path.join(here, "src/shadows/serverBrowserContexts.ts"),
 };
 
 /** Node builtins workerd lacks, replaced for every importer. */

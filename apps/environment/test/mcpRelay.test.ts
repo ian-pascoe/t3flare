@@ -191,3 +191,41 @@ describe("pi's t3 entry (SPI-1039, as stock t3 hands it)", () => {
     expect(other.env.T3_MCP_BEARER_TOKEN).toBeUndefined();
   });
 });
+
+describe("the relay and MCP apps (G11, review L10)", () => {
+  const appView: McpView = {
+    version: "v",
+    servers: [{ ...VIEW.servers[0]!, tools: [{ ...tool("get_time", "read"), ui: { resourceUri: "ui://time/app.html" } }] }],
+  };
+  const deps = (reads: Array<string>): RelayDeps => ({
+    ...harness().deps,
+    view: async () => appView,
+    call: async () => ({ kind: "result", isError: false, text: "12:00", structured: { time: "12:00" } }),
+    readAppResource: async ({ uri }) => {
+      reads.push(uri);
+      return uri === "ui://time/app.html" ? { kind: "result", value: { contents: [{ uri, text: "<p>t</p>" }] } } : { kind: "refused", message: "no App there" };
+    },
+  });
+
+  it("lists a tool's `_meta.ui`, offers resources, and passes structuredContent", async () => {
+    const reads: Array<string> = [];
+    const init = await relayMessage(input({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }), deps(reads));
+    expect(init).toMatchObject({ body: { result: { capabilities: { resources: {} } } } });
+    const listed = await relayMessage(input({ jsonrpc: "2.0", id: 2, method: "tools/list" }), deps(reads));
+    expect(listed).toMatchObject({ body: { result: { tools: [{ name: "get_time", _meta: { ui: { resourceUri: "ui://time/app.html" } } }] } } });
+    const called = await relayMessage(input(call("get_time")), deps(reads));
+    expect(called).toMatchObject({ body: { result: { structuredContent: { time: "12:00" } } } });
+  });
+
+  it("reads a ui:// resource through the host, and refuses any other URI before it", async () => {
+    const reads: Array<string> = [];
+    expect(await relayMessage(input({ jsonrpc: "2.0", id: 3, method: "resources/read", params: { uri: "ui://time/app.html" } }), deps(reads))).toMatchObject({
+      body: { result: { contents: [{ text: "<p>t</p>" }] } },
+    });
+    expect(await relayMessage(input({ jsonrpc: "2.0", id: 4, method: "resources/read", params: { uri: "file:///etc/passwd" } }), deps(reads))).toMatchObject({ body: { error: { code: -32602 } } });
+    expect(await relayMessage(input({ jsonrpc: "2.0", id: 5, method: "resources/read", params: { uri: "ui://other/app.html" } }), deps(reads))).toMatchObject({ body: { error: { code: -32002 } } });
+    expect(reads).toEqual(["ui://time/app.html", "ui://other/app.html"]);
+    // Without the host's reader (a relay built before G11), resources are not offered at all.
+    expect(await relayMessage(input({ jsonrpc: "2.0", id: 6, method: "resources/read", params: { uri: "ui://time/app.html" } }), harness().deps)).toMatchObject({ body: { error: { code: -32601 } } });
+  });
+});

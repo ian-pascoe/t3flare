@@ -332,7 +332,7 @@ const routeCheck = async (storage: DurableObjectStorage): Promise<Array<Line>> =
 };
 
 /** Question 3 (review M3): stock `headlessChrome.ts`'s sequence over a raw browser-level CDP socket to a route-less browser. */
-const htmlPageCheck = async (): Promise<Array<Line>> => {
+const htmlPageCheck = async (pageOrigin: string): Promise<Array<Line>> => {
   const lines: Array<Line> = [];
   const opened = (await step(lines, "launch route-less + CDP socket", () => openCdpSocket(binding(), { keepAliveMs: 60_000 }))) as
     | Awaited<ReturnType<typeof openCdpSocket>>
@@ -353,8 +353,8 @@ const htmlPageCheck = async (): Promise<Array<Line>> => {
         if (method === "Fetch.requestPaused") {
           const event = params as { requestId: string; request: { url: string }; resourceType?: string };
           paused.push(`${event.resourceType}:${event.request.url}`);
-          if (event.request.url.startsWith("http://t3-page.localhost/page.html")) {
-            const body = btoa("<!doctype html><html><body><h1 id=x>t3-page</h1><script>document.title='ok:'+location.origin+':'+isSecureContext</script></body></html>");
+          if (event.request.url.startsWith(`${pageOrigin}/page.html`)) {
+            const body = btoa(probePage(""));
             void cdp.send("Fetch.fulfillRequest", { requestId: event.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }], body }, sessionId);
           } else {
             void cdp.send("Fetch.failRequest", { requestId: event.requestId, errorReason: "AccessDenied" }, sessionId);
@@ -369,14 +369,15 @@ const htmlPageCheck = async (): Promise<Array<Line>> => {
       await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: "delete window.RTCPeerConnection;", runImmediately: true }, sessionId);
     });
     await step(lines, "Fetch.enable (t3-page.localhost + every Document)", () =>
-      cdp.send("Fetch.enable", { patterns: [{ urlPattern: "http://t3-page.localhost/*" }, { urlPattern: "*", resourceType: "Document" }] }, sessionId),
+      cdp.send("Fetch.enable", { patterns: [{ urlPattern: `${pageOrigin}/*` }, { urlPattern: "*", resourceType: "Document" }] }, sessionId),
     );
-    await step(lines, "Page.navigate http://t3-page.localhost/page.html (Q3)", async () => {
-      const navigation = (await cdp.send("Page.navigate", { url: "http://t3-page.localhost/page.html#theme" }, sessionId)) as { errorText?: string };
+    await step(lines, `Page.navigate ${pageOrigin}/page.html, then the probe's answers (Q3, L3)`, async () => {
+      const navigation = (await cdp.send("Page.navigate", { url: `${pageOrigin}/page.html#theme` }, sessionId)) as { errorText?: string };
       if (navigation.errorText) return { errorText: navigation.errorText, paused };
       await Promise.race([loaded, new Promise((_, reject) => setTimeout(() => reject(new Error("no load in 10 s")), 10_000))]);
-      const title = (await cdp.send("Runtime.evaluate", { expression: "document.title", returnByValue: true }, sessionId)) as { result: { value: string } };
-      return { title: title.result.value, paused };
+      await new Promise((resolve) => setTimeout(resolve, 6_000));
+      const out = (await cdp.send("Runtime.evaluate", { expression: "document.getElementById('out').textContent", returnByValue: true }, sessionId)) as { result: { value: string } };
+      return { probe: JSON.parse(out.result.value) as unknown, paused: paused.slice(0, 12) };
     });
     await step(lines, "Page.captureScreenshot", async () => ((await cdp.send("Page.captureScreenshot", { format: "png" }, sessionId)) as { data: string }).data.length);
     await step(lines, "Target.closeTarget + Browser.close", async () => {
@@ -400,14 +401,68 @@ const closeAll = async (storage: DurableObjectStorage): Promise<Array<Line>> => 
   return lines;
 };
 
-export const runSpike = async (op: string, storage: DurableObjectStorage): Promise<{ readonly op: string; readonly lines: ReadonlyArray<Line> }> => {
+/** A page that tries to reach private and Container addresses and reports what each `fetch` did (L3, M1 hostile). */
+const PROBE_TARGETS = [
+  "http://127.0.0.1:8080/",
+  "http://127.1/",
+  "http://[::1]/",
+  "http://0.0.0.0/",
+  "http://spike.localhost/",
+  "http://10.0.0.1/",
+  "http://169.254.169.254/latest/meta-data/",
+  "http://metadata.google.internal/",
+  "http://5173.t3flare.internal/",
+  "http://computer.internal/",
+];
+const probePage = (extra: string) =>
+  `<!doctype html><html><head><title>probe</title></head><body><pre id="out">pending</pre><script>
+(async () => {
+  const out = {};
+  await Promise.all(${JSON.stringify(PROBE_TARGETS)}.map(async (url) => {
+    const started = Date.now();
+    try { const r = await fetch(url, { mode: "no-cors", signal: AbortSignal.timeout(4000) }); out[url] = "answered " + r.type + " " + (Date.now() - started) + "ms"; }
+    catch (e) { out[url] = String(e && e.name || e) + " " + (Date.now() - started) + "ms"; }
+  }));
+  out.secure = isSecureContext; out.origin = location.origin; out.cdn = typeof window.d3; ${extra}
+  console.log("probe:" + JSON.stringify(out));
+  document.getElementById("out").textContent = JSON.stringify(out);
+})();
+</script><script src="https://cdn.jsdelivr.net/npm/d3@7"></script></body></html>`;
+
+/** M1: stock `headlessChrome.ts`, unchanged, through the bridge (`htmlBrowser.ts`): a capture, heights, and the probe. */
+const htmlCapture = async (environment: { boot(trigger: string): Promise<{ run<A, E, R>(effect: import("effect/Effect").Effect<A, E, R>): Promise<A> }> }): Promise<Array<Line>> => {
+  const lines: Array<Line> = [];
+  const runtime = await environment.boot("previews-spike");
+  const HeadlessChrome = await import("t3/src/htmlRender/headlessChrome.ts");
+  const { HTML_BROWSER_EXECUTABLE } = await import("./htmlBrowser.ts");
+  const chart = `<!doctype html><html><head><title>chart</title></head><body style="margin:0"><svg width="400" height="300"><rect width="400" height="300" fill="steelblue"/></svg><p id="theme"></p><script>document.getElementById("theme").textContent = location.hash</script></body></html>`;
+  await step(lines, "captureHtmlScreenshot (stock, bridged)", async () => {
+    const shot = await runtime.run(
+      HeadlessChrome.captureHtmlScreenshot({ executable: HTML_BROWSER_EXECUTABLE, noSandbox: false, html: chart, width: 640, urlFragment: "#t3-theme=dark", appearance: "dark" }),
+    );
+    return { pngBase64: shot.png.length, contentHeight: shot.contentHeight, console: shot.consoleMessages };
+  });
+  await step(lines, "measureHtmlHeights (stock, bridged)", () =>
+    runtime.run(HeadlessChrome.measureHtmlHeights({ executable: HTML_BROWSER_EXECUTABLE, noSandbox: false, html: chart, widths: [360, 720, 1280], urlFragment: "" })),
+  );
+  return lines;
+};
+
+export const runSpike = async (
+  op: string,
+  storage: DurableObjectStorage,
+  environment?: { boot(trigger: string): Promise<{ run<A, E, R>(effect: import("effect/Effect").Effect<A, E, R>): Promise<A> }> },
+): Promise<{ readonly op: string; readonly lines: ReadonlyArray<Line> }> => {
   switch (op) {
+    case "html-capture":
+      if (environment === undefined) throw new Error("html-capture needs the Environment");
+      return { op, lines: await htmlCapture(environment) };
     case "playwright":
       return { op, lines: await playwrightCalls(storage) };
     case "routes":
       return { op, lines: await routeCheck(storage) };
     case "html-page":
-      return { op, lines: await htmlPageCheck() };
+      return { op, lines: [...(await htmlPageCheck("https://t3-page.t3flare.internal")), ...(await htmlPageCheck("http://t3-page.t3flare.internal"))] };
     case "close":
       return { op, lines: await closeAll(storage) };
     default:

@@ -73,7 +73,14 @@ export const catalogOf = (listed: ReadonlyArray<CatalogTool>): T3Catalog => {
 
 /** One tool call's answer from t3's `/mcp`, or why t3's tools could not be reached. */
 export type McpCallAnswer =
-  | { readonly kind: "result"; readonly text: string; readonly isError: boolean; readonly structured?: unknown }
+  | {
+      readonly kind: "result";
+      readonly text: string;
+      readonly isError: boolean;
+      readonly structured?: unknown;
+      /** G11 (R6): the result's MCP `image` parts, as the model sees them. */
+      readonly images?: ReadonlyArray<{ readonly data: string; readonly mimeType: string }>;
+    }
   | { readonly kind: "unavailable"; readonly message: string };
 
 export interface T3McpHost {
@@ -90,8 +97,8 @@ export interface T3McpHost {
 
 const CREDENTIAL_MEMO = "t3flare.t3-mcp.credential";
 
-const textResult = (text: string, isError: boolean, tool: string) => ({
-  output: [{ type: "text" as const, text }],
+const textResult = (text: string, isError: boolean, tool: string, images: ReadonlyArray<{ readonly data: string; readonly mimeType: string }> = []) => ({
+  output: [{ type: "text" as const, text }, ...images.map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType }))],
   isError,
   details: { server: T3_MCP_SERVER, tool },
 });
@@ -137,7 +144,7 @@ const toolOf = (tool: CatalogTool, host: T3McpHost): ToolRegistration => {
       const args = keyed && typeof input.clientRequestId !== "string" ? { ...input, clientRequestId: `pi-durable:${String(api.taskId)}` } : input;
       const answer = WAIT_TOOLS.has(tool.name) ? await waitInPieces(host, tool.name, args, api, context) : await host.call(tool.name, args);
       if (answer.kind === "unavailable") return textResult(answer.message, true, tool.name);
-      return textResult(answer.text, answer.isError, tool.name);
+      return textResult(answer.text, answer.isError, tool.name, answer.images);
     },
   } as ToolRegistration;
 };

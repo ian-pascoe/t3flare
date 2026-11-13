@@ -9,7 +9,8 @@
 //
 // Hand-written rather than the SDK's server (plan §3.2 named `McpRelayServer` in the MCP Worker): stateless, tools
 // only, never an elicitation, so `initialize`, `ping`, `tools/list` and `tools/call` are the whole surface, and the MCP
-// Worker keeps no inbound entrypoint.
+// Worker keeps no inbound entrypoint. G11 (MCP apps, review L10) adds a tool's `_meta.ui` to `tools/list`, a result's
+// `structuredContent`, and `resources/read` of a `ui://` resource one of this server's offered tools declares.
 import { cardText, decideCall, type McpRelayAnswer, type McpRelayInput, type ToolClass } from "@t3flare/harness-registry";
 
 import type { McpAsker } from "@t3flare/session-protocol";
@@ -22,6 +23,8 @@ export const RELAY_PROTOCOL_VERSIONS: ReadonlyArray<string> = ["2025-11-25", "20
 export interface RelayDeps {
   readonly view: () => Promise<McpView>;
   readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly judged: ToolClass; readonly asker?: McpAsker }) => Promise<McpCallAnswer>;
+  /** G11 (MCP apps): an App's `ui://` resource of `server` (`McpHost.readAppResource`); absent, no resource is read. */
+  readonly readAppResource?: (input: { readonly server: string; readonly uri: string }) => Promise<{ readonly kind: "result"; readonly value: unknown } | { readonly kind: "refused"; readonly message: string }>;
   /** The cards for a server's questions on the calling thread (SPI-1079). */
   readonly asker?: (thread: string) => McpAsker;
   /** The calling thread's modes: the call follows them (owner, 2026-11-12, back to stock: no strictest-mode rule). */
@@ -55,7 +58,7 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
       const protocolVersion = typeof asked === "string" && RELAY_PROTOCOL_VERSIONS.includes(asked) ? asked : RELAY_PROTOCOL_VERSIONS[1]!;
       return ok(id, {
         protocolVersion,
-        capabilities: { tools: { listChanged: false } },
+        capabilities: { tools: { listChanged: false }, ...(deps.readAppResource === undefined ? {} : { resources: {} }) },
         serverInfo: { name: `t3flare-${input.server}`, version: "1" },
         instructions: `Tools of the MCP server "${input.server}" through t3flare. Write tools may wait for the owner's approval on this thread.`,
       });
@@ -71,6 +74,7 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
           description: tool.description,
           inputSchema: tool.inputSchema,
           annotations: { readOnlyHint: tool.class === "read" },
+          ...(tool.ui === undefined ? {} : { _meta: { ui: tool.ui } }),
         })),
       });
     }
@@ -112,7 +116,15 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
       const asker = deps.asker?.(input.thread);
       const result = await deps.call({ server: input.server, tool: tool.upstream, args: args as Record<string, unknown>, judged: tool.class, ...(asker === undefined ? {} : { asker }) });
       if (result.kind === "unavailable") return toolError(id, result.message);
-      return ok(id, { content: [{ type: "text", text: result.text }], isError: result.isError });
+      return ok(id, { content: [{ type: "text", text: result.text }], isError: result.isError, ...(result.structured === undefined ? {} : { structuredContent: result.structured }) });
+    }
+    case "resources/read": {
+      const uri = (message.params as { uri?: unknown } | undefined)?.uri;
+      if (deps.readAppResource === undefined) return fail(id, -32601, "resources/read is not offered by the relay");
+      if (typeof uri !== "string" || !uri.startsWith("ui://")) return fail(id, -32602, "the relay reads only an App's ui:// resource");
+      const read = await deps.readAppResource({ server: input.server, uri });
+      deps.log({ t3flare: "mcp-relay-app-read", workspace: input.workspace, thread: input.thread, cli: input.cli, server: input.server, outcome: read.kind });
+      return read.kind === "result" ? ok(id, read.value) : fail(id, -32002, read.message);
     }
     default:
       return fail(id, -32601, `method ${method} is not offered by the relay`);

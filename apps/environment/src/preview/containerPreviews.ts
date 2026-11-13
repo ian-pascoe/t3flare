@@ -5,6 +5,8 @@
 // The props are the browser's identity: nothing in the request (Host, headers, path) can name another Workspace.
 import { WorkerEntrypoint } from "cloudflare:workers";
 
+import { isAnyWorkspaceId } from "@t3flare/workspace-client";
+
 import { containerPreviewPortOf } from "./browserRun.ts";
 import { spikePage } from "./spikePages.ts";
 
@@ -18,13 +20,11 @@ export interface ContainerPreviewsEnv {
   readonly T3FLARE_FAULTS?: string;
 }
 
-/** What a browser's routes are made with: its Workspace DO's id. */
+/** What a browser's routes are made with: its Workspace's id (`/w/<id>`, a worktree's `.wt/…` included). */
 export interface ContainerPreviewProps {
   readonly workspace: string;
 }
 
-/** A Workspace DO's id: what the agents Worker's entrypoint accepts (`ws:` names are its own). */
-const WORKSPACE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** M0's spike Workspaces (test stages only): answered here, never by a Container. */
 const SPIKE_WORKSPACE = /^spike-[a-z0-9-]{1,32}$/;
 
@@ -38,7 +38,7 @@ export class ContainerPreviews extends WorkerEntrypoint<ContainerPreviewsEnv, Co
     const workspace = this.ctx.props.workspace;
     if (this.env.T3FLARE_FAULTS === "1" && SPIKE_WORKSPACE.test(workspace)) return spikePage(request, workspace, port);
     const previews = this.env.WORKSPACE_PREVIEWS;
-    if (previews === undefined || !WORKSPACE_ID.test(workspace)) return text(502, "The Workspace could not be reached.");
+    if (previews === undefined || !isAnyWorkspaceId(workspace)) return text(502, "The Workspace could not be reached.");
     try {
       return await previews.containerPreview(workspace, request, port);
     } catch (cause) {

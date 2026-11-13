@@ -136,3 +136,33 @@ describe("McpHost", () => {
     expect(view.servers[0]?.tools).toHaveLength(1);
   });
 });
+
+describe("McpHost and MCP apps (G11, review L10)", () => {
+  const appTool = { ...tool("get_time", true), _meta: { ui: { resourceUri: "ui://time/app.html", visibility: ["model", "app"], csp: { connect: ["*"] } }, secret: "x" } };
+
+  it("keeps a tool's `_meta.ui` (its App and visibility) and nothing else of its `_meta`", async () => {
+    const run = setup(() => [appTool, tool("plain", true)]);
+    await run.host.list("commissary");
+    const tools = (await run.host.view()).servers[0]!.tools;
+    expect(tools.find((t) => t.upstream === "get_time")?.ui).toEqual({ resourceUri: "ui://time/app.html", visibility: ["model", "app"] });
+    expect(tools.find((t) => t.upstream === "plain")?.ui).toBeUndefined();
+  });
+
+  it("reads only a ui:// resource one of the server's own tools declares, as an App read", async () => {
+    const run = setup(() => [appTool], () => ({ contents: [{ uri: "ui://time/app.html", mimeType: "text/html;profile=mcp-app", text: "<p>t</p>" }] }));
+    await run.host.list("commissary");
+    expect(await run.host.readAppResource({ server: "commissary", uri: "ui://time/app.html" })).toMatchObject({ kind: "result", value: { contents: [{ text: "<p>t</p>" }] } });
+    expect(run.seen.at(-1).request).toMatchObject({ op: "resources/read", uri: "ui://time/app.html", app: true });
+    const before = run.seen.length;
+    expect((await run.host.readAppResource({ server: "commissary", uri: "ui://other/app.html" })).kind).toBe("refused");
+    expect((await run.host.readAppResource({ server: "commissary", uri: "file:///etc/passwd" })).kind).toBe("refused");
+    expect((await run.host.readAppResource({ server: "nope", uri: "ui://time/app.html" })).kind).toBe("refused");
+    expect(run.seen.length).toBe(before);
+  });
+
+  it("passes a result's structuredContent beside its text", async () => {
+    const run = setup(() => [appTool], () => ({ content: [{ type: "text", text: "12:00" }], structuredContent: { time: "12:00" } }));
+    await run.host.list("commissary");
+    expect(await run.host.call({ server: "commissary", tool: "get_time", args: {}, judged: "read" })).toEqual({ kind: "result", isError: false, text: "12:00", structured: { time: "12:00" } });
+  });
+});

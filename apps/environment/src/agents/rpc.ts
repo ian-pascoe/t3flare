@@ -1,5 +1,6 @@
 // The environment Worker's view of the agents Worker's Durable Objects (ADR-0014): their RPC methods, typed here so
 // this Worker never imports the agents Worker's code (which is typed against the Workers globals, not Node's).
+import type { PortScan } from "@t3flare/sandbox-image/ports";
 import type {
   AbortInput,
   AnswerInput,
@@ -68,6 +69,12 @@ export interface WorkspaceRpc {
   checkpoint(op: CheckpointOp): Promise<CheckpointAnswer>;
   ensureCredentialHelper(id?: string): Promise<ExecResult>;
   killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }>;
+  /** G11: the Container's listeners; never starts it, not use. */
+  listeners(): Promise<{ readonly running: boolean; readonly scan: PortScan | null }>;
+  /** G11: stops one process group in the Container (TERM, then KILL); false when gone or not running. */
+  stopProcessGroup(pgid: number, members: ReadonlyArray<number>): Promise<boolean>;
+  /** G11: a configured `localhost` preview URL's web probe on the Container's port; never starts it, not use. */
+  probePort(port: number, path: string): Promise<{ readonly status: number; readonly contentType: string | null; readonly location: string | null } | null>;
   clone(input: CloneInput): Promise<GitAnswer>;
   info(): Promise<ProvisionInfo>;
   exec(input: ExecInput): Promise<ExecResult>;

@@ -9,7 +9,8 @@
     "./terminal": "./src/terminal.ts",
     "./process": "./src/process.ts",
     "./clis": "./src/clis.ts",
-    "./leakscan": "./src/leakscan.ts"
+    "./leakscan": "./src/leakscan.ts",
+    "./ports": "./src/ports.ts"
   },
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit"

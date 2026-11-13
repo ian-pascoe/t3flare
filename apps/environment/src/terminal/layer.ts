@@ -10,8 +10,10 @@
 // - `subprocessInspector`: the rc file's markers (review F1), so t3 never spawns `ps` and `closeIdle` keeps a terminal
 //   that runs `npm run dev`;
 // - `historyByteLimit` 1 MiB and `maxRetainedInactiveSessions` 16, for the 128 MB isolate;
-// - no `registerTerminalProcesses` (synthetic pids would feed port discovery) and no
-//   `resolveProviderInstanceEnvironment` (a provider instance's env can carry credentials, ADR-0016; review F10).
+// - `registerTerminalProcesses` and `unregisterTerminal` name each shell's thread and terminal for our port discovery
+//   (G11, `preview/portDiscovery.ts`), which attributes a listener by its shell's key: the inspector reports the shell's
+//   own (synthetic) pid for that, and nothing else reads it;
+// - no `resolveProviderInstanceEnvironment` (a provider instance's env can carry credentials, ADR-0016; review F10).
 import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -64,7 +66,10 @@ export const terminalManagerOptions = (processes: TerminalProcesses, logsDir: st
         catch: (cause) => new PtyAdapter.PtySpawnError({ adapter: "t3flare", shell: input.shell, cause }),
       }),
   },
-  subprocessInspector: (pid: number) => Effect.succeed({ hasRunningSubprocess: processes.busy(pid), childCommand: null, processIds: [] }),
+  subprocessInspector: (pid: number) => Effect.succeed({ hasRunningSubprocess: processes.busy(pid), childCommand: null, processIds: [pid] }),
+  registerTerminalProcesses: (input: { readonly threadId: string; readonly terminalId: string; readonly processIds: ReadonlyArray<number> }) =>
+    Effect.sync(() => processes.registerOwner(input)),
+  unregisterTerminal: (input: { readonly threadId: string; readonly terminalId: string }) => Effect.sync(() => processes.unregisterOwner(input)),
 });
 
 export const layer = Layer.effect(

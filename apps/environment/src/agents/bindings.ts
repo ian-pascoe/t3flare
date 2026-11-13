@@ -11,6 +11,7 @@ import type { WorkspaceRegistry } from "./workspaces.ts";
 import type { ProcessChannel } from "./processChannel.ts";
 import type { CommissaryManagement } from "../usage/commissary.ts";
 import type { BrowserRunBinding, BrowserRunFetcher } from "../preview/browserRun.ts";
+import type { PreviewStore } from "../preview/store.ts";
 
 export interface EnvironmentServices {
   readonly agents: AgentsBindings;
@@ -40,6 +41,8 @@ export interface EnvironmentServices {
   readonly browserRun: BrowserRunBinding | undefined;
   /** G11: the `ContainerPreviews` entrypoint made for one Workspace, as a preview browser's `outboundByHost` target. */
   readonly containerPreviews: (workspace: string) => BrowserRunFetcher;
+  /** G11: the Browser Run sessions this Environment holds, and the server browser's profiles (`preview/store.ts`). */
+  readonly previewStore: PreviewStore;
 }
 
 let current: EnvironmentServices | undefined;

@@ -34,6 +34,24 @@ export interface DurableObjectHttp {
 
 const RESOLVE = Symbol.for("t3flare/http/resolve");
 
+const PREVIEW_STREAM_PREFIX = "/api/preview-stream/";
+const isPreviewStream = (request: Request) => new URL(request.url).pathname.startsWith(PREVIEW_STREAM_PREFIX);
+
+/** What t3's preview stream reads of a Node `IncomingMessage`: its headers, and its socket (H1). */
+export const nodeSocketShim = (request: Request, destroy: () => void) => ({
+  headers: Object.fromEntries(request.headers),
+  socket: {
+    writableLength: 0,
+    destroy: () => {
+      try {
+        destroy();
+      } catch {
+        // Already closed.
+      }
+    },
+  },
+});
+
 export const make = () => {
   let handler: Handler | undefined;
   let markReady!: () => void;
@@ -99,6 +117,14 @@ export const make = () => {
         serverRequest = Object.create(serverRequest, {
           upgrade: { value: upgrade },
           upgradeWith: { value: () => upgrade },
+          // G11 (review H1): t3's preview stream reads the Node request behind its upgrade
+          // (`NodeHttpServerRequest.toIncomingMessage`): its headers, and its socket's `writableLength` before each frame
+          // and `destroy()` for a slow viewer. Here that socket is the WebSocketPair: workerd has no buffered-bytes figure
+          // (no `bufferedAmount`, M0), so `writableLength` reads 0 and the 8 MiB slow-viewer guard never fires (R7); one
+          // frame in flight, acked by the viewer, still bounds what waits.
+          ...(isPreviewStream(request)
+            ? { source: { value: nodeSocketShim(request, () => socket.close(1011, "slow viewer")) } }
+            : {}),
         });
       }
       (serverRequest as any)[RESOLVE] = settle;

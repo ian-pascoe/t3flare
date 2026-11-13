@@ -64,8 +64,9 @@ const setup = (options: Setup = {}) => {
 describe("t3-mcp catalog", () => {
   it("offers every listed tool but the denied ones under t3's names, and reports what it left out", () => {
     const catalog = catalogOf([...LISTED, { name: "t3_brand_new_tool" }, { name: "t3_attachment_prepare_upload" }, { name: "t3_worktree_handoff" }]);
-    expect(catalog.tools.map((tool) => tool.name)).toEqual(["delegate_task", "request_secret", "t3_brand_new_tool", "t3_environment_link", "t3_thread_read", "t3_thread_update", "t3_thread_wait"]);
-    expect(catalog.left).toEqual(["preview_open", "t3_attachment_prepare_upload", "t3_worktree_handoff"]);
+    expect(catalog.tools.map((tool) => tool.name)).toEqual(["delegate_task", "preview_open", "request_secret", "t3_brand_new_tool", "t3_environment_link", "t3_thread_read", "t3_thread_update", "t3_thread_wait"]);
+    // G11 (ADR-0031): t3's server browser runs in Browser Run, so `preview_*` is offered.
+    expect(catalog.left).toEqual(["t3_attachment_prepare_upload", "t3_worktree_handoff"]);
     expect(t3ToolName("delegate_task")).toBe("mcp__t3-code__delegate_task");
     const extension = setup().extension();
     expect(extension.tools?.map((tool) => tool.name)).toContain("mcp__t3-code__t3_thread_read");
@@ -80,7 +81,7 @@ describe("t3-mcp catalog", () => {
     const first = catalogOf(LISTED);
     expect(catalogOf([...LISTED].reverse()).hash).toBe(first.hash);
     expect(catalogOf(LISTED.map((tool) => (tool.name === "delegate_task" ? { ...tool, description: "new" } : tool))).hash).not.toBe(first.hash);
-    expect(catalogOf([...LISTED, { name: "html_render" }]).hash).toBe(first.hash);
+    expect(catalogOf([...LISTED, { name: "device_screenshot" }]).hash).toBe(first.hash);
   });
 });
 
@@ -196,10 +197,10 @@ describe("t3-mcp guidance (SPI-1060)", () => {
     "  never a chat ask.",
     "- Given a thread id, `t3_thread_read` it.",
     "",
-    "### Visuals and preview",
+    "### Devices",
     "",
-    "- Show it with `html_preview`, then `html_render`.",
-    "- Never use `preview_*` unasked.",
+    "- Show it with `device_screenshot`, then `device_tap`.",
+    "- Never use `device_*` unasked.",
   ].join("\n");
 
   const render = (instructions: string, listed: ReadonlyArray<CatalogTool> = LISTED) =>
@@ -240,7 +241,7 @@ describe("t3-mcp guidance (SPI-1060)", () => {
       {
         name: "t3_environment_links",
         description:
-          "List linked environments and whether each answers now. Pass one's `environmentId` to a tool; `delegate_task` takes it. Show it with `html_preview`.",
+          "List linked environments and whether each answers now. Pass one's `environmentId` to a tool; `delegate_task` takes it. Show it with `device_screenshot`.",
         annotations: { readOnlyHint: true },
       },
       ...LISTED,

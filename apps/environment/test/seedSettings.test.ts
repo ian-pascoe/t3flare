@@ -8,7 +8,7 @@ import * as Layer from "effect/Layer";
 import * as ServerSettings from "t3/src/serverSettings.ts";
 
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
-import { layerPinAgentBrowserAccessOff, layerSeedLinkedEnvironmentsOn } from "../src/agents/seedSettings.ts";
+import { layerSeedLinkedEnvironmentsOn } from "../src/agents/seedSettings.ts";
 
 const bindMarks = () => {
   const marks = new Map<string, number>();
@@ -38,11 +38,5 @@ describe("seeded settings (step 3)", () => {
     await boot(ServerSettings.layerTest({ linkedEnvironmentsEnabled: false }), layerSeedLinkedEnvironmentsOn);
     const later = await boot(ServerSettings.layerTest({ linkedEnvironmentsEnabled: false }), layerSeedLinkedEnvironmentsOn);
     expect(later.linkedEnvironmentsEnabled).toBe(false);
-  });
-
-  it("pins agent browser access off at every boot", async () => {
-    bindMarks();
-    const settings = await boot(ServerSettings.layerTest({ enableAgentBrowserAccess: true }), layerPinAgentBrowserAccessOff);
-    expect(settings.enableAgentBrowserAccess).toBe(false);
   });
 });

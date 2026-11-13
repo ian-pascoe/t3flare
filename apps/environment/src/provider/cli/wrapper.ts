@@ -149,7 +149,8 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
         session.interactionMode = input.runtimePolicy.interactionMode;
         const runtime = yield* adapter.openSession(input).pipe(Effect.provideService(CliSpawn, session));
         yield* Effect.addFinalizer(() => Effect.sync(() => sessions.delete(input.providerSessionId)));
-        const { uploadFeedback: _feedback, mcpApps: _apps, ...rest } = runtime;
+        // G11: `mcpApps` passes through (Codex's App rendering, MCP apps through the relay); upload feedback stays off.
+        const { uploadFeedback: _feedback, ...rest } = runtime;
         // ADR-0028: the relay's cards, raised on the live turn and closed by the owner's answer, the ask's withdrawal or the turn's end.
         const injected = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
         const cards = new Map<string, OpenCard>();

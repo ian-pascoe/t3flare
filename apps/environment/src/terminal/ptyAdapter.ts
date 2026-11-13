@@ -113,6 +113,8 @@ export class TerminalProcess {
   readonly pid: number;
   readonly key: string;
   readonly place: TerminalPlace;
+  /** G11: t3's thread and terminal for this shell, as t3's `registerTerminalProcesses` named them. */
+  owner: { readonly threadId: string; readonly terminalId: string } | undefined;
   readonly #processes: TerminalProcesses;
   readonly #data = new Set<Listener<string>>();
   readonly #exit = new Set<Listener<Exit>>();
@@ -274,6 +276,26 @@ export class TerminalProcesses {
 
   get size(): number {
     return this.#byKey.size;
+  }
+
+  /** G11: a live shell by its key (its `T3FLARE_EXEC` in the Container), for port discovery's attribution. */
+  byKey(key: string): TerminalProcess | undefined {
+    return this.#byKey.get(key);
+  }
+
+  /** G11: t3 named the thread and terminal of these shells (`registerTerminalProcesses`, from the inspector's pid). */
+  registerOwner(input: { readonly threadId: string; readonly terminalId: string; readonly processIds: ReadonlyArray<number> }): void {
+    for (const pid of input.processIds) {
+      const process = this.#byPid.get(pid);
+      if (process !== undefined) process.owner = { threadId: input.threadId, terminalId: input.terminalId };
+    }
+  }
+
+  /** G11: t3 closed that terminal. */
+  unregisterOwner(input: { readonly threadId: string; readonly terminalId: string }): void {
+    for (const process of this.#byPid.values()) {
+      if (process.owner?.threadId === input.threadId && process.owner.terminalId === input.terminalId) process.owner = undefined;
+    }
   }
 
   /** Starts a shell (the open runs in the background; t3 gets the process at once). */

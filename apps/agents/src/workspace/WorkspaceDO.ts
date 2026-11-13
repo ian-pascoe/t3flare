@@ -47,6 +47,9 @@ import { environmentStub } from "../environment.ts";
 import type { McpRelayAnswer } from "@t3flare/harness-registry";
 import { changedBetween, currentRevision } from "./changeLog.ts";
 import { killInRunningContainer } from "./containerKill.ts";
+import { ContainerPreview } from "./containerPreview.ts";
+import { type PortProbe, probeRunningPort, scanRunningContainer, stopGroupInRunningContainer } from "./ports.ts";
+import type { PortScan } from "@t3flare/sandbox-image/ports";
 import { authoredScript, captureScript, restoreScript, shellWord } from "./checkpointScripts.ts";
 import { captureTurn, type LastCapture } from "./checkpointCapture.ts";
 import { fileOps } from "./files.ts";
@@ -237,6 +240,36 @@ export class WorkspaceDO extends ContainerHost {
   #token: { readonly token: string; readonly expiresAt: number } | undefined;
   /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
   #sandbox: Promise<boolean> | undefined;
+  /** G11: when a command of the Workspace's last ran (not t3's passive reads): someone works here. */
+  #lastCommandAt = 0;
+  /** G11: open carried sockets of Container previews; each holds the Container within the cap (`#previewHolds`). */
+  #previewHolds = 0;
+  /** G11 (ADR-0031): the Container previews' server, ported from cloudpid's ADR-0023. */
+  readonly #preview = new ContainerPreview({
+    running: () => this.containerRunning(),
+    port: (port) => this.ctx.container!.getTcpPort(port),
+    used: async () => {
+      if (!this.#someoneWorks()) return;
+      await this.#noteUse();
+      await this.#scheduleAlarm();
+    },
+    hold: () => {
+      this.#previewHolds++;
+      void this.#scheduleAlarm().catch(() => undefined);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        this.#previewHolds--;
+      };
+    },
+    newId: () => {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    },
+    keepAliveMs: () => 15_000,
+    warn: (message) => console.warn(JSON.stringify({ t3flare: "container-preview", message: message.slice(0, 300) })),
+  });
 
   constructor(ctx: DurableObjectState, env: WorkspaceEnv) {
     super(ctx, env);
@@ -639,7 +672,7 @@ export class WorkspaceDO extends ContainerHost {
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? Date.now();
     let at = Math.min(lastUse + this.#idleMs(), Date.now() + RENEW_EVERY_MS);
     // Open terminals: their heartbeats are checked and their hold measured at least every 30 s.
-    if (this.#terminals.size > 0 || this.#agentHost.size > 0 || this.#processes.size > 0) at = Math.min(at, Date.now() + 30_000);
+    if (this.#terminals.size > 0 || this.#agentHost.size > 0 || this.#processes.size > 0 || this.#previewHolds > 0) at = Math.min(at, Date.now() + 30_000);
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > at) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000));
   }
@@ -687,6 +720,7 @@ export class WorkspaceDO extends ContainerHost {
     } finally {
       this.#running--;
       if (backend === CONTAINER_BACKEND && input.passive !== true) {
+        this.#lastCommandAt = Date.now();
         await this.#noteUse();
         await this.#scheduleAlarm();
       }
@@ -1433,6 +1467,52 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /** Whether t3's or the agent's terminals hold the Container: input within the hold (ADR-0021, review F10). */
+  /**
+   * G11 (review M5): whether someone works in the Workspace now: a command runs, or a terminal, an agent's Terminal or a
+   * CLI process had input (or a CLI is in a turn) within the cap of a foreground terminal (ADR-0021, 30 minutes). A
+   * Container preview's requests and carried sockets keep the Container only while this holds.
+   */
+  #someoneWorks(): boolean {
+    const cap = this.#terminalIdleMs();
+    const lastInput = Math.max(this.#terminals.lastInput, this.#agentHost.lastInput, this.#processes.lastInput, this.#lastCommandAt);
+    return this.#running > 0 || Date.now() - lastInput < cap || this.#processes.holdsContainer(cap);
+  }
+
+  #previewHold(): boolean {
+    return this.#previewHolds > 0 && this.#someoneWorks();
+  }
+
+  /**
+   * G11 (ADR-0031): a request a preview browser's page made to `http://<port>.t3flare.internal/`, from the Environment
+   * Worker's `ContainerPreviews` entrypoint for this Workspace (`containerPreview.ts`). Never starts the Container.
+   */
+  containerPreview(request: Request, port: number): Promise<Response> {
+    if (this.#isDestroyed()) return Promise.resolve(new Response("t3flare: this Workspace was deleted", { status: 410 }));
+    return this.#preview.serve(request, port);
+  }
+
+  /**
+   * G11's port discovery: the Container's listeners (`@t3flare/sandbox-image/ports`), or `running: false` when it is
+   * stopped. Never starts the Container and is not use: a client watching the list does not keep it up (review L9).
+   */
+  async listeners(): Promise<{ readonly running: boolean; readonly scan: PortScan | null }> {
+    if (this.#isDestroyed()) return { running: false, scan: null };
+    const scan = await scanRunningContainer(this.ctx.container);
+    return { running: scan !== undefined, scan: scan ?? null };
+  }
+
+  /** G11: stops process group `pgid` (stock's TERM, then KILL after 3 s); false when it was gone or nothing runs. */
+  async stopProcessGroup(pgid: number, members: ReadonlyArray<number>): Promise<boolean> {
+    if (this.#isDestroyed()) return false;
+    return stopGroupInRunningContainer(this.ctx.container, pgid, members);
+  }
+
+  /** G11 (review M4): a configured `localhost` preview URL's web probe, on this Container only while it runs; not use. */
+  async probePort(port: number, path: string): Promise<PortProbe | null> {
+    if (this.#isDestroyed()) return null;
+    return (await probeRunningPort(this.ctx.container, port, path)) ?? null;
+  }
+
   #terminalsHold(): boolean {
     const hold = { promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() };
     return this.#terminals.holdsContainer(hold) || this.#agentHost.holdsContainer(hold);
@@ -1502,7 +1582,7 @@ export class WorkspaceDO extends ContainerHost {
     await this.#processes.killOrphans().catch(() => undefined);
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
     // Terminals hold the Container until their last input is older than the hold (review F10: output is not use).
-    const held = this.#terminalsHold() || this.#processes.holdsContainer();
+    const held = this.#terminalsHold() || this.#processes.holdsContainer() || this.#previewHold();
     if (this.#running === 0 && !held && Date.now() - lastUse >= this.#idleMs()) {
       console.log(JSON.stringify({ t3flare: "container-idle-stop", workspace: this.ctx.id.toString(), ...(await this.#usage()) }));
       await this.stopContainer();

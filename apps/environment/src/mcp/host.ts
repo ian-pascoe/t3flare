@@ -22,6 +22,8 @@ import {
   toolNamesOf,
 } from "@t3flare/harness-registry";
 import {
+  appUriOfMeta,
+  MCP_APP_HTML_MAX_BYTES,
   MCP_ELICITATION_WAIT_MS,
   type McpEngineDiscoverResult,
   type McpEngineHooks,
@@ -68,6 +70,11 @@ export interface InventoryTool {
   /** What the tool's own hint says, shown beside an owner's override. */
   readonly hinted: ToolClass;
   readonly exposure: Exposure;
+  /**
+   * G11 (MCP apps, review L10): the tool's `_meta.ui` alone (its App's `ui://` resource and who the tool is for), passed
+   * on in the relay's `tools/list`; nothing else of a tool's `_meta`.
+   */
+  readonly ui?: Readonly<Record<string, unknown>>;
 }
 
 export interface Inventory {
@@ -95,7 +102,7 @@ export interface McpView {
 }
 
 export type McpCallAnswer =
-  | { readonly kind: "result"; readonly isError: boolean; readonly text: string }
+  | { readonly kind: "result"; readonly isError: boolean; readonly text: string; readonly structured?: unknown }
   | { readonly kind: "unavailable"; readonly message: string; readonly mayHaveRun: boolean };
 
 const inventoryKey = (server: string) => `t3flare:mcp:inventory:${server}`;
@@ -278,6 +285,7 @@ export class McpHost {
         class: classOf(annotations === undefined ? {} : { annotations }, overrideOf(server.classes?.[upstream])),
         hinted: classOf(annotations === undefined ? {} : { annotations }, undefined),
         exposure: server.toolExposure?.[upstream] ?? server.exposure,
+        ...uiOf(definition),
       });
     }
     return { tools, refused: [...inventory.refused, ...named.refused] };
@@ -346,8 +354,40 @@ export class McpHost {
     if (typeof target === "string") return { kind: "unavailable", message: target, mayHaveRun: false };
     const context: QuestionContext = { server: input.server, tool: input.tool, args: input.args, isOwnHost: (host) => host === this.#deps.ownHost?.()?.toLowerCase() };
     const first = await this.#request(input.server, server, target, definition, input.args, input.signal, input.asker, context);
-    if (first.kind === "unavailable" || !pausing) return first.kind === "unavailable" ? first : { kind: "result", ...resultText(first.value) };
+    if (first.kind === "unavailable" || !pausing) return first.kind === "unavailable" ? first : { kind: "result", ...resultText(first.value), ...structuredOf(first.value) };
     return this.#answerPauses(input.server, server, target, first.value, input.signal, input.asker, context);
+  }
+
+  /**
+   * G11 (MCP apps, review L10): an App's `ui://` resource, read for a CLI through the relay: only a URI one of `server`'s
+   * own offered tools declares (`_meta.ui.resourceUri`), at most MCP_APP_HTML_MAX_BYTES of contents, the server's
+   * `ReadResourceResult` as it is otherwise.
+   */
+  async readAppResource(input: { readonly server: string; readonly uri: string }): Promise<{ readonly kind: "result"; readonly value: unknown } | { readonly kind: "refused"; readonly message: string }> {
+    const server = this.servers()[input.server];
+    if (server === undefined || !server.enabled) return { kind: "refused", message: `${input.server} is not enabled.` };
+    const { tools } = await this.tools(input.server, server, this.inventory(input.server));
+    const declared = tools.some((tool) => tool.exposure !== "hidden" && tool.exposure !== "codemode" && tool.ui?.resourceUri === input.uri);
+    if (!input.uri.startsWith("ui://") || !declared) return { kind: "refused", message: `${input.server} declares no App at ${input.uri.slice(0, 200)}.` };
+    if (this.#deps.engine === undefined) return { kind: "refused", message: "The MCP engine is not bound." };
+    const target = await this.#target(input.server, server);
+    if (typeof target === "string") return { kind: "refused", message: target };
+    let result: typeof McpEngineRequestResult.Encoded;
+    try {
+      result = await this.#deps.engine.request(
+        target,
+        this.#prior(input.server),
+        { op: "resources/read", uri: input.uri, app: true, ctx: { origin: "agent" } } as never,
+        this.#authHooks(input.server, server),
+      );
+    } catch (error) {
+      return { kind: "refused", message: `The read failed: ${String(error).slice(0, 300)}` };
+    }
+    this.#keepState(input.server, result.state as never);
+    if (result.kind !== "complete") return { kind: "refused", message: `The read failed (${result.kind === "failed" ? errorText(result.error) : result.kind}).` };
+    const value = result.result.kind === "inline" ? result.result.value : await readStream(result.result.body as ReadableStream<Uint8Array>, MCP_APP_HTML_MAX_BYTES * 2);
+    if (JSON.stringify(value).length > MCP_APP_HTML_MAX_BYTES * 2) return { kind: "refused", message: "The App is larger than t3flare passes on." };
+    return { kind: "result", value };
   }
 
   /** One `tools/call` through the engine, its questions answered from the caller's cards: the result's value, or why not. */
@@ -492,7 +532,7 @@ const redactedResult = (value: unknown): { readonly isError: boolean; readonly t
   return { isError: (value as { isError?: unknown }).isError === true, text: typeof content.message === "string" ? content.message.replaceAll(content.requestId, "[request]") : "The server is still answering an earlier request for this call; try the call again." };
 };
 
-const readStream = async (body: ReadableStream<Uint8Array>): Promise<unknown> => {
+const readStream = async (body: ReadableStream<Uint8Array>, max = MAX_RESULT_BYTES): Promise<unknown> => {
   const reader = body.getReader();
   const chunks: Array<Uint8Array> = [];
   let size = 0;
@@ -500,9 +540,9 @@ const readStream = async (body: ReadableStream<Uint8Array>): Promise<unknown> =>
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > MAX_RESULT_BYTES) {
+    if (size > max) {
       await reader.cancel();
-      return { isError: true, content: [{ type: "text", text: `The tool's result was larger than ${MAX_RESULT_BYTES} bytes.` }] };
+      return { isError: true, content: [{ type: "text", text: `The tool's result was larger than ${max} bytes.` }] };
     }
     chunks.push(value);
   }
@@ -522,4 +562,25 @@ export const resultText = (value: unknown): { readonly isError: boolean; readonl
   const texts = blocks.flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : typeof block.type === "string" ? [`[${block.type} content]`] : []));
   const text = texts.length > 0 ? texts.join("\n") : result.structuredContent !== undefined ? JSON.stringify(result.structuredContent) : JSON.stringify(value);
   return { isError: result.isError === true, text: text.slice(0, MAX_RESULT_BYTES) };
+};
+
+/** G11 (review L10): a tool definition's `_meta.ui`, and nothing else of its `_meta`, when it declares one. */
+const uiOf = (definition: Readonly<Record<string, unknown>>): { readonly ui?: Readonly<Record<string, unknown>> } => {
+  const meta = definition._meta as Record<string, unknown> | undefined;
+  const ui = meta?.ui;
+  if (ui === null || typeof ui !== "object" || Array.isArray(ui)) return {};
+  const uri = appUriOfMeta(meta as never);
+  const visibility = (ui as { visibility?: unknown }).visibility;
+  return {
+    ui: {
+      ...(uri === undefined ? {} : { resourceUri: uri }),
+      ...(Array.isArray(visibility) && visibility.every((entry) => typeof entry === "string") ? { visibility } : {}),
+    },
+  };
+};
+
+/** G11: a result's `structuredContent`, which an App reads, passed on beside its text (bounded with the result). */
+const structuredOf = (value: unknown): { readonly structured?: unknown } => {
+  const structured = (value as { structuredContent?: unknown } | null)?.structuredContent;
+  return structured === undefined || JSON.stringify(structured).length > MAX_RESULT_BYTES ? {} : { structured };
 };

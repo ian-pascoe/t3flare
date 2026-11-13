@@ -72,6 +72,8 @@ import * as SecretResolver from "t3/src/secrets/SecretResolver.ts";
 import * as ProviderInstanceRegistryHydration from "t3/src/provider/ProviderInstanceRegistryHydration.ts";
 import * as ProjectSettingsOverrideSweep from "t3/src/provider/ProjectSettingsOverrideSweep.ts";
 import * as TerminalLayer from "../terminal/layer.ts";
+import * as PreviewBrowserLayer from "../preview/previewBrowser.ts";
+import * as PortDiscoveryLayer from "../preview/portDiscovery.ts";
 import * as McpHttpServer from "t3/src/mcp/McpHttpServer.ts";
 import * as PeerForwarding from "t3/src/peer/PeerForwarding.ts";
 import * as RemoteDelegation from "t3/src/peer/RemoteDelegation.ts";
@@ -82,11 +84,10 @@ import * as McpSessionRegistry from "t3/src/mcp/McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "t3/src/mcp/PreviewAutomationBroker.ts";
 import * as DeviceService from "t3/src/device/DeviceService.ts";
 import * as PreviewManager from "t3/src/preview/Manager.ts";
-import * as PortScanner from "t3/src/preview/PortScanner.ts";
 import * as ServerBrowser from "t3/src/preview/ServerBrowser.ts";
+import * as ServerBrowserStream from "t3/src/preview/ServerBrowserStream.ts";
 import * as PreviewAgentActivity from "t3/src/preview/PreviewAgentActivity.ts";
 import * as DesktopBrowserChannel from "t3/src/preview/DesktopBrowserChannel.ts";
-import * as PreviewBrowser from "t3/src/preview/PreviewBrowser.ts";
 import * as ProcessRunner from "t3/src/processRunner.ts";
 import * as GitManager from "t3/src/git/GitManager.ts";
 import * as EnvironmentTheme from "t3/src/environmentTheme.ts";
@@ -193,7 +194,6 @@ import { layerPeerLinksWithoutCause } from "./peerLinks.ts";
 import * as ConnectService from "../connect/service.ts";
 import { makePublishRecorder } from "../connect/recorder.ts";
 import {
-  layerPinAgentBrowserAccessOff,
   layerPinFastWorktreeCheckoutOff,
   layerSeedLinkedEnvironmentsOn,
   layerSeedTextGenerationModel,
@@ -443,7 +443,8 @@ export const make = (options: CompositionOptions) => {
   );
 
   const layerCheckpointStore = CheckpointStore.layer.pipe(Layer.provide(layerVcsDriverRegistry));
-  const layerPortScanner = PortScanner.layer.pipe(Layer.provide(ProcessRunner.layer));
+  // t3flare (G11, ADR-0031): listeners come from each running Container's own `/proc`, through its Workspace DO.
+  const layerPortScanner = PortDiscoveryLayer.layer;
   // t3flare: t3's TerminalManager over our PTY adapter: shells in the Workspace's Container (step 2b, ADR-0021).
   const layerTerminal = TerminalLayer.layer;
   const layerPreview = Layer.empty.pipe(Layer.provideMerge(PreviewManager.layer), Layer.provideMerge(layerPortScanner));
@@ -619,9 +620,9 @@ export const make = (options: CompositionOptions) => {
     layerSeedTextGenerationModel,
     // t3flare: every worktree is a Workspace of its own (step 2b): no fast checkout cache.
     layerPinFastWorktreeCheckoutOff,
-    // t3flare: the laptop links to the cloud (step 3, L1, once), and the cloud has no browser (L3).
+    // t3flare: the laptop links to the cloud (step 3, L1, once). Agent browser access is the owner's setting, with
+    // stock's default (G11: the pin that held it off is gone).
     layerSeedLinkedEnvironmentsOn,
-    layerPinAgentBrowserAccessOff,
   ).pipe(
     Layer.provideMerge(layerOrchestrationApplication),
     Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),
@@ -712,8 +713,8 @@ export const make = (options: CompositionOptions) => {
   );
 
   // t3flare: only the routes a paired client needs (ADR-0010): no guest links,
-  // device hub, server browser stream, speech stream or static files (assets serve the
-  // web client). The HttpApi groups stay whole, because HttpApiBuilder needs every group.
+  // device hub, speech stream or static files (assets serve the web client). The server
+  // browser stream is mounted since G11 (ADR-0031). The HttpApi groups stay whole, because HttpApiBuilder needs every group.
   const layerMakeRoutes = Layer.mergeAll(
     Layer.mergeAll(
       HttpApiBuilder.layer(EnvironmentHttpApi).pipe(
@@ -732,6 +733,8 @@ export const make = (options: CompositionOptions) => {
       ServerHttp.layerAttachmentUploadRoute,
       // t3flare: t3's browser-trace forwarder, as stock mounts it (answers 204 unless a traces endpoint is saved).
       ServerHttp.layerOtlpTracesProxyRoute,
+      // t3flare (G11, ADR-0031): t3's server browser stream, as stock mounts it (`server.ts` `layerMakeRoutes`).
+      ServerBrowserStream.routeLayer,
       Ws.layer,
     ),
     McpHttpServer.layer.pipe(
@@ -747,7 +750,8 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(
       ServerBrowser.layer.pipe(Layer.provide(Layer.merge(DesktopBrowserChannel.layer, PreviewAgentActivity.layer))),
     ),
-    Layer.provide(PreviewBrowser.layer),
+    // t3flare (G11, ADR-0031): Chrome is never downloaded; its executable is the bridge to Browser Run.
+    Layer.provide(PreviewBrowserLayer.layer),
     Layer.provide(
       PeerForwarding.layer.pipe(
         Layer.provideMerge(PeerMcpClient.layer),

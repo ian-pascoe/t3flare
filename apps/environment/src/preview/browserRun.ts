@@ -5,12 +5,9 @@ import type { BrowserRun, Fetcher } from "@cloudflare/workers-types/index.ts";
 export type BrowserRunBinding = BrowserRun;
 export type BrowserRunFetcher = Fetcher;
 
-/** The Container preview hosts (`http://<port>.t3flare.internal/`): Browser Run routes at most eight, HTTP on port 80. */
-export const CONTAINER_PREVIEW_PORTS: ReadonlyArray<number> = [3000, 3001, 4173, 4321, 5173, 5174, 8000, 8787];
+import { CONTAINER_PREVIEW_PORTS } from "@t3flare/workspace-client";
 
-export const CONTAINER_PREVIEW_DOMAIN = "t3flare.internal";
-
-export const containerPreviewHost = (port: number): string => `${port}.${CONTAINER_PREVIEW_DOMAIN}`;
+export { CONTAINER_PREVIEW_DOMAIN, CONTAINER_PREVIEW_PORTS, containerPreviewHost } from "@t3flare/workspace-client";
 
 const CONTAINER_PREVIEW_HOST = /^(\d{1,5})\.t3flare\.internal$/;
 

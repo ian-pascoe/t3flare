@@ -70,7 +70,8 @@ describe("the Durable agent's prompt and tools (SPI-1060)", () => {
     const notOffered = t3Tools.map((tool) => tool.name).filter((name) => !offered.has(name));
     const named = notOffered.filter((name) => texts.some((text) => new RegExp(`\\b${name}\\b`).test(text)));
     expect(named).toEqual([]);
-    for (const family of ["preview_", "t3_preview_", "html_", "device_", "t3_attachment_", "t3_worktree_"]) {
+    // G11 (ADR-0031): `html_*`, `preview_*` and `t3_preview_*` are offered, so t3's guidance may name them.
+    for (const family of ["device_", "t3_attachment_", "t3_worktree_"]) {
       expect(texts.filter((text) => new RegExp(`\\b${family}`).test(text))).toEqual([]);
     }
     // What survives is t3's own guidance, its lines on linking included (SPI-1061), and no line of ours.
@@ -79,6 +80,6 @@ describe("the Durable agent's prompt and tools (SPI-1060)", () => {
     expect(prompt).toContain("`t3_environment_links`");
     expect(prompt).toContain("`t3_environment_link`");
     expect(prompt).not.toMatch(/this Environment cannot link to another machine/);
-    expect(prompt).not.toContain("### Visuals and preview");
+    expect(prompt).toContain("### Visuals and preview");
   });
 });

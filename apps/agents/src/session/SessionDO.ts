@@ -597,12 +597,15 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const workspace = this.#workspaceStub();
     const id = this.#meta()?.workspaceId;
     if (workspace === undefined || id === undefined || id === null) return undefined;
+    const threadId = this.#meta()?.threadId;
     return new ComputerExecutionEnv({
       workspace,
       id: `computer:${id}`,
       cwd: cwd ?? REPO_ROOT,
       reachContainer: true,
-      containerEnv: COMMAND_ENV,
+      // G11: the thread its commands belong to, as stock t3 launches agents with it (`AGENT_THREAD_ENV`): t3's port
+      // discovery attributes a server the agent starts to its thread by it.
+      containerEnv: threadId === undefined ? COMMAND_ENV : { ...COMMAND_ENV, T3CODE_THREAD_ID: threadId },
       ledger: {
         started: (execId) => this.#execs.started(execId),
         ended: (execId) => this.#execs.ended(execId),

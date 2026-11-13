@@ -135,6 +135,11 @@ export class ProcessHost {
     this.#deps = deps;
   }
 
+  /** When any process here last had input (G11: a Container preview's hold is capped from the Workspace's last input). */
+  get lastInput(): number {
+    return this.#lastInput;
+  }
+
   /** The live processes' weight against the cap (`CLI_WEIGHT`). */
   get weight(): number {
     return [...this.#procs.values()].filter((proc) => !proc.exited).reduce((sum, proc) => sum + weightOf(proc.cli), 0);

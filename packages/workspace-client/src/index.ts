@@ -426,3 +426,15 @@ export interface AgentTerminalAnswers {
 
 /** A request's answer, or why it failed (an unknown id, the cap, a refused Container start). */
 export type AgentTerminalResult<Op extends AgentTerminalRequest["op"]> = { readonly ok: true; readonly value: AgentTerminalAnswers[Op] } | { readonly ok: false; readonly error: string };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Container previews (G11, ADR-0031): Browser Run routes at most eight hosts, HTTP on port 80, each to the Workspace the
+// browser was acquired for. computerd's port (8080) is never one of them.
+
+/** The Container ports a preview browser reaches, as `http://<port>.t3flare.internal/`. */
+export const CONTAINER_PREVIEW_PORTS: ReadonlyArray<number> = [3000, 3001, 4173, 4321, 5173, 5174, 8000, 8787];
+export const CONTAINER_PREVIEW_DOMAIN = "t3flare.internal";
+export const containerPreviewHost = (port: number): string => `${port}.${CONTAINER_PREVIEW_DOMAIN}`;
+/** Where the carried sockets' endpoints are on every Container preview host, and the header their requests carry. */
+export const CONTAINER_PREVIEW_SOCKET_PATH = "/__t3flare/ws/";
+export const CONTAINER_PREVIEW_HEADER = "x-t3flare-preview";
