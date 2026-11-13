@@ -45,9 +45,10 @@ import * as git from "isomorphic-git";
 import { CREDENTIAL_HELPER, CREDENTIAL_PATH } from "./credentialHelper.ts";
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
 import { environmentStub } from "../environment.ts";
-import { EMPTY_ENVIRONMENT, type McpRelayAnswer, type ResolvedEnvironment, resolveEnvironment } from "@t3flare/harness-registry";
+import { EMPTY_ENVIRONMENT, fitVariables, type McpRelayAnswer, type ResolvedEnvironment, resolveEnvironment } from "@t3flare/harness-registry";
 import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, takeEnvironment } from "./containerLaunch.ts";
+import { commandEnv, VariablesBackend } from "./variables.ts";
 import { reclaimFor } from "./reclaim.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { ContainerPreview } from "./containerPreview.ts";
@@ -312,7 +313,8 @@ export class WorkspaceDO extends ContainerHost {
     this.#reads = readCache(ctx.storage.sql);
     this.#workspace = new ComputerWorkspace({
       storage: ctx.storage,
-      backends: [new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx }), this.#container],
+      // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
+      backends: [new VariablesBackend(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx }), () => this.#variables()), new VariablesBackend(this.#container, () => this.#variables())],
     });
     // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
     this.#host = new WorkspaceEnvHost(this.#workspace, {
@@ -351,7 +353,7 @@ export class WorkspaceDO extends ContainerHost {
       spawn: async (argv, options) => {
         const container = this.ctx.container;
         if (container === undefined) throw new Error("no Container binding");
-        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: options.env });
+        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: commandEnv(this.#variables(), options.env) });
       },
       kill: (markers) => this.#killMarkers(markers),
       push: async (push) => {
@@ -378,7 +380,7 @@ export class WorkspaceDO extends ContainerHost {
       spawn: async (argv, options) => {
         const container = this.ctx.container;
         if (container === undefined) throw new Error("no Container binding");
-        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: options.env });
+        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: commandEnv(this.#variables(), options.env) });
       },
       kill: (markers) => this.#killMarkers(markers),
       push: (push) => Promise.resolve({ unknown: this.#agentTerminals.frames(push.frames) }),
@@ -416,7 +418,7 @@ export class WorkspaceDO extends ContainerHost {
       spawn: async (argv, env) => {
         const container = this.ctx.container;
         if (container === undefined) throw new Error("no Container binding");
-        return container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env });
+        return container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: commandEnv(this.#variables(), env) });
       },
       kill: (markers) => this.#killMarkers(markers),
       baseEnv: terminalEnv,
@@ -729,6 +731,14 @@ export class WorkspaceDO extends ContainerHost {
     kv.put(LAUNCH_KEY, launch);
     console.log(JSON.stringify({ t3flare: "container-launch", workspace: this.#workspaceId() ?? null, source: taken.source, revision: launch.revision, size: launch.size, idleMs: launch.idleMs, budget: launch.budget }));
     return launch;
+  }
+
+  /**
+   * The Variables the last Container start took (SPI-1152): every command in the Workspace starts with them, on the
+   * Container and on the Worker Shell, until the next start. Read against this Worker's rules, as the settings are.
+   */
+  #variables(): Readonly<Record<string, string>> {
+    return fitVariables(this.ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY)?.variables);
   }
 
   /** The idle time the running Container started with (ADR-0032). */

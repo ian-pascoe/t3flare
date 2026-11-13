@@ -73,6 +73,11 @@ export interface ContainerLaunch {
   readonly budget?: number;
   /** The Environment settings' revision it came from. */
   readonly revision: number;
+  /**
+   * The Variables every command in the Workspace starts with until the next start (SPI-1152, `variables.ts`). A launch
+   * recorded before them has none.
+   */
+  readonly variables?: Readonly<Record<string, string>>;
 }
 
 /** The launch for the settings `taken` (`takeEnvironment`'s, already read against this Worker's schema). */
@@ -82,4 +87,5 @@ export const launchOf = ({ settings, source }: TakenEnvironment): ContainerLaunc
   idleMs: settings.containerIdleMinutes * 60_000,
   ...(source === "environment" ? { budget: settings.containerBudget } : {}),
   revision: settings.revision,
+  variables: settings.variables,
 });
