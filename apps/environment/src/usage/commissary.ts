@@ -287,7 +287,8 @@ const failure = async (response: Response): Promise<CommissaryError> => {
   } catch {
     // Not JSON (Access's login page, for one).
   }
-  if (response.status === 401 || response.status === 403 || response.redirected)
+  // A 3xx is Access sending an unadmitted caller to its sign-in page.
+  if (response.status === 401 || response.status === 403 || (response.status >= 300 && response.status < 400))
     return new CommissaryError(`Commissary refused t3flare's management key${code}: it needs an org admin's key, and the Access service token on a self-hosted Commissary.`);
   return new CommissaryError(`Commissary's management API answered HTTP ${response.status}${code}.`);
 };

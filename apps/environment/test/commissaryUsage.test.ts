@@ -173,6 +173,11 @@ describe("the management API client", () => {
     await expect(readCredentials(fetcher, config)).rejects.toThrow(/org admin's key/);
     await expect(readCredentials(fetcher, config)).rejects.not.toThrow(/cmsm_/);
   });
+
+  it("reads Access's redirect to its sign-in page as a refusal", async () => {
+    const { fetcher } = recorder(() => new Response(null, { status: 302, headers: { location: "https://team.cloudflareaccess.com/cdn-cgi/access/login" } }));
+    await expect(readCredentials(fetcher, config)).rejects.toThrow(/Access service token/);
+  });
 });
 
 describe("t3's usage readers over Commissary", () => {

@@ -40,6 +40,7 @@ import { MCP_WORKER_COMPATIBILITY } from "../mcp-worker/src/engine/compatibility
 
 import { COMPATIBILITY } from "./build.ts";
 import { credentialsFile, standinFile } from "./stage-files.ts";
+import { principalOfApiKey } from "./src/usage/commissary.ts";
 
 const here = import.meta.dirname;
 
@@ -217,7 +218,7 @@ export default Alchemy.Stack(
     }
     // Parity G8: Commissary's management API for t3's Usage page and limit meters, the Environment Worker's alone and
     // optional (unset: no meters, no usage, as before). The principal of the Containers' key is not secret: its key id.
-    const containerKeyId = (yield* Config.String("COMMISSARY_CONTAINER_API_KEY").pipe(Config.withDefault(""))).split("_")[2] ?? "";
+    const containerPrincipal = principalOfApiKey(yield* Config.String("COMMISSARY_CONTAINER_API_KEY").pipe(Config.withDefault("")));
     const commissaryManagement = probe
       ? {
           COMMISSARY_MANAGEMENT_URL: `https://${probeName}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`,
@@ -299,7 +300,7 @@ export default Alchemy.Stack(
         MODEL_PROXY_URL: modelProxyUrl,
         MODEL_PROXY_API_KEY: modelProxyKey,
         ...commissaryManagement,
-        ...(containerKeyId === "" ? {} : { COMMISSARY_USAGE_PRINCIPALS: `key:${containerKeyId}` }),
+        ...(containerPrincipal === undefined ? {} : { COMMISSARY_USAGE_PRINCIPALS: containerPrincipal }),
         ...(idleAfterMs === "" ? {} : { T3FLARE_IDLE_AFTER_MS: idleAfterMs }),
         // Step 2b (review F3): the Workspace sweep purges on test stages; prod's reports what it would do until the owner
         // sets T3FLARE_SWEEP_PURGE=1 for it (the `prod` environment's variable, passed by deploy-prod.yml; on 2026-11-12, SPI-974).
