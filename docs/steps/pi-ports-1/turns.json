@@ -1,0 +1,541 @@
+{
+ "at": "2026-11-13T04:09:33.976Z",
+ "model": "anthropic/claude-sonnet-5-5",
+ "threadId": "35d0022a-ab76-45aa-967b-f3359523cdbf",
+ "ok": true,
+ "steps": {
+  "web": {
+   "ok": true,
+   "prompt": "Use the web_search tool once to find the Cloudflare Durable Objects documentation, then use web_fetch on https://developers.cloudflare.com/durable-objects/ and reply with the page's title in one line.",
+   "status": "completed",
+   "ms": 14700,
+   "items": [
+    {
+     "type": "user_message",
+     "status": "completed",
+     "title": null
+    },
+    {
+     "type": "web_search",
+     "status": "completed",
+     "title": null,
+     "patterns": [
+      "Cloudflare Durable Objects documentation"
+     ],
+     "results": [
+      {
+       "title": "Cloudflare Durable Objects",
+       "url": "https://www.cloudflare.com/en-ca/developer-platform/products/durable-objects/"
+      },
+      {
+       "title": "Reference · Cloudflare Durable Objects docs",
+       "url": "https://developers.cloudflare.com/durable-objects/reference/"
+      },
+      {
+       "title": "Durable Objects llms-full.txt",
+       "url": "https://developers.cloudflare.com/durable-objects/llms-full.txt"
+      },
+      {
+       "title": "What are Durable Objects? · Cloudflare Durable Objects docs",
+       "url": "https://developers.cloudflare.com/durable-objects/concepts/what-are-durable-objects/",
+       "snippet": "Like a Worker, a Durable Object is automatically provisioned geographically close to where it is first requested, starts up quickly when needed…\n\nDura..."
+      },
+      {
+       "title": "Durable Object Namespace · Cloudflare Durable Objects docs",
+       "url": "https://developers.cloudflare.com/durable-objects/api/namespace/",
+       "snippet": "getByName obtains a DurableObjectStub from a provided name, which can be used to invoke methods on a Durable Object.\n\n"
+      }
+     ]
+    },
+    {
+     "type": "web_search",
+     "status": "completed",
+     "title": "Fetched a page",
+     "patterns": [
+      "https://developers.cloudflare.com/durable-objects/"
+     ],
+     "results": [
+      {
+       "title": "Cloudflare Durable Objects",
+       "url": "https://developers.cloudflare.com/durable-objects/",
+       "snippet": "---\ndescription: Build stateful serverless applications with Durable Objects, including AI agents, real-time chat, and collaborative apps.\ntitle: Cloudflare Durable Objects\nimage: https://developers.cloudflare.com/durable-objects/og.png?v=42dcc327de648b4d\n---\n\n[Skip to content](#main-content)\n\n> Doc"
+      }
+     ]
+    },
+    {
+     "type": "assistant_message",
+     "status": "completed",
+     "title": null,
+     "text": "Cloudflare Durable Objects"
+    },
+    {
+     "type": "checkpoint",
+     "status": "completed",
+     "title": null
+    }
+   ],
+   "reply": "Cloudflare Durable Objects",
+   "plans": []
+  },
+  "todo": {
+   "ok": true,
+   "prompt": "Use the todo tool to plan three tasks: 'Inspect', 'Change', 'Verify' (one add call with all three). Then call todo to mark 'Inspect' active, then call todo again to mark it completed and 'Change' active, then once more to mark every task completed. Reply 'done'.",
+   "status": "completed",
+   "ms": 12641,
+   "items": [
+    {
+     "type": "user_message",
+     "status": "completed",
+     "title": null
+    },
+    {
+     "type": "todo_list",
+     "status": "completed",
+     "title": "Todo list",
+     "planId": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "pending"
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "pending"
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "pending"
+      }
+     ]
+    },
+    {
+     "type": "todo_list",
+     "status": "completed",
+     "title": "Todo list",
+     "planId": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "running"
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "pending"
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "pending"
+      }
+     ]
+    },
+    {
+     "type": "todo_list",
+     "status": "completed",
+     "title": "Todo list",
+     "planId": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "completed"
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "running"
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "pending"
+      }
+     ]
+    },
+    {
+     "type": "todo_list",
+     "status": "completed",
+     "title": "Todo list",
+     "planId": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "completed"
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "completed"
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "completed"
+      }
+     ]
+    },
+    {
+     "type": "assistant_message",
+     "status": "completed",
+     "title": null,
+     "text": "done"
+    },
+    {
+     "type": "checkpoint",
+     "status": "completed",
+     "title": null
+    }
+   ],
+   "reply": "done",
+   "plans": [
+    {
+     "id": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "kind": "todo_list",
+     "status": "completed",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "completed",
+       "durationMs": 1968
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "completed",
+       "durationMs": 1961
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "completed"
+      }
+     ]
+    }
+   ]
+  },
+  "note-save": {
+   "ok": true,
+   "prompt": "Save a Note with context_notes: action write, name \"codeword\", content \"The codeword is ostrich-4279\". Do not repeat the codeword in your reply; reply 'saved'.",
+   "status": "completed",
+   "ms": 6389,
+   "items": [
+    {
+     "type": "user_message",
+     "status": "completed",
+     "title": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Notes: write \"codeword\"",
+     "toolName": "context_notes",
+     "output": "null"
+    },
+    {
+     "type": "assistant_message",
+     "status": "completed",
+     "title": null,
+     "text": "saved"
+    },
+    {
+     "type": "checkpoint",
+     "status": "completed",
+     "title": null
+    }
+   ],
+   "reply": "saved",
+   "plans": [
+    {
+     "id": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "kind": "todo_list",
+     "status": "completed",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "completed",
+       "durationMs": 1968
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "completed",
+       "durationMs": 1961
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "completed"
+      }
+     ]
+    }
+   ]
+  },
+  "note-read": {
+   "ok": true,
+   "prompt": "Read your Note named codeword with context_notes (action read) and reply with the codeword only.",
+   "status": "completed",
+   "ms": 6309,
+   "items": [
+    {
+     "type": "user_message",
+     "status": "completed",
+     "title": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Notes: read \"codeword\"",
+     "toolName": "context_notes",
+     "output": "null"
+    },
+    {
+     "type": "assistant_message",
+     "status": "completed",
+     "title": null,
+     "text": "ostrich-4279"
+    },
+    {
+     "type": "checkpoint",
+     "status": "completed",
+     "title": null
+    }
+   ],
+   "reply": "ostrich-4279",
+   "plans": [
+    {
+     "id": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "kind": "todo_list",
+     "status": "completed",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "completed",
+       "durationMs": 1968
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "completed",
+       "durationMs": 1961
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "completed"
+      }
+     ]
+    }
+   ]
+  },
+  "rollover": {
+   "ok": true,
+   "prompt": "Call context_rollover now, as the only tool call of its round, with a Handoff that says: 'Objective: answer the owner. The codeword is in Note codeword.' After the rollover, read the Note with context_notes and reply with the codeword only.",
+   "status": "completed",
+   "ms": 8395,
+   "items": [
+    {
+     "type": "user_message",
+     "status": "completed",
+     "title": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Context rollover: the agent hands off to a fresh context",
+     "toolName": "context_rollover",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "Notes: read \"codeword\"",
+     "toolName": "context_notes",
+     "output": "null"
+    },
+    {
+     "type": "assistant_message",
+     "status": "completed",
+     "title": null,
+     "text": "The codeword is **ostrich-4279**."
+    },
+    {
+     "type": "checkpoint",
+     "status": "completed",
+     "title": null
+    }
+   ],
+   "reply": "The codeword is **ostrich-4279**.",
+   "plans": [
+    {
+     "id": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "kind": "todo_list",
+     "status": "completed",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "completed",
+       "durationMs": 1968
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "completed",
+       "durationMs": 1961
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "completed"
+      }
+     ]
+    }
+   ]
+  },
+  "after-rollover": {
+   "ok": true,
+   "prompt": "Use context_history (action search, query \"Cloudflare Durable Objects\") to check what you searched earlier in this thread, then reply 'history ok' and the number of matches.",
+   "status": "completed",
+   "ms": 6376,
+   "items": [
+    {
+     "type": "user_message",
+     "status": "completed",
+     "title": null
+    },
+    {
+     "type": "dynamic_tool",
+     "status": "completed",
+     "title": "History: search",
+     "toolName": "context_history",
+     "output": "null"
+    },
+    {
+     "type": "assistant_message",
+     "status": "completed",
+     "title": null,
+     "text": "history ok. The search returned 20 matches on this page. It also reported `next_offset` 20, so there may be more matches on a later page."
+    },
+    {
+     "type": "checkpoint",
+     "status": "completed",
+     "title": null
+    }
+   ],
+   "reply": "history ok. The search returned 20 matches on this page. It also reported `next_offset` 20, so there may be more matches on a later page.",
+   "plans": [
+    {
+     "id": "plan:piDurable:thread:35d0022a-ab76-45aa-967b-f3359523cdbf:todo:provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253A35d0022a-ab76-45aa-967b-f3359523cdbf%253Aordinal%253A2%3Aattempt%3A1",
+     "kind": "todo_list",
+     "status": "completed",
+     "steps": [
+      {
+       "id": "todo:1",
+       "text": "Inspect",
+       "status": "completed",
+       "durationMs": 1968
+      },
+      {
+       "id": "todo:2",
+       "text": "Change",
+       "status": "completed",
+       "durationMs": 1961
+      },
+      {
+       "id": "todo:3",
+       "text": "Verify",
+       "status": "completed"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "session": {
+  "kinds": [
+   "pi.user",
+   "pi.system",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.user",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.user",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.user",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.user",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.reset",
+   "t3flare.context-continue",
+   "pi.system",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant",
+   "pi.user",
+   "pi.assistant",
+   "pi.tool-result",
+   "pi.assistant"
+  ],
+  "tools": [
+   "web_search",
+   "web_fetch",
+   "todo",
+   "todo",
+   "todo",
+   "todo",
+   "context_notes",
+   "context_notes",
+   "context_rollover",
+   "context_notes",
+   "context_history"
+  ],
+  "todo": {
+   "rev": 4,
+   "tasks": [
+    {
+     "id": 1,
+     "title": "Inspect",
+     "status": "completed"
+    },
+    {
+     "id": 2,
+     "title": "Change",
+     "status": "completed"
+    },
+    {
+     "id": 3,
+     "title": "Verify",
+     "status": "completed"
+    }
+   ]
+  },
+  "resets": [
+   "[{\"type\":\"text\",\"text\":\"Context Window Handoff\\n\\nAgent-written Handoff:\\n\\nObjective: answer the owner. The codeword is in Note codeword.\\n\\nNotes: 1. Read them with context_notes.\\n\\\"codeword\\\" context:1:note:codeword\\n\\nEarlier History, from before this Handoff, stays readable with context_history (windows, list, search, read).\"}]"
+  ]
+ }
+}

@@ -1,0 +1,44 @@
+{
+ "at": "2026-11-13T04:08:14.128Z",
+ "model": "anthropic/claude-sonnet-5-5",
+ "before": {
+  "web": {
+   "enabled": true,
+   "settings": {
+    "search": true,
+    "searchModel": "claude-haiku-5-5"
+   }
+  },
+  "todo": {
+   "enabled": true,
+   "settings": {}
+  },
+  "context": {
+   "enabled": true,
+   "settings": {
+    "rolloverOnCompaction": true
+   }
+  }
+ },
+ "changed": 200,
+ "after": {
+  "web": {
+   "enabled": true,
+   "settings": {
+    "search": true,
+    "searchModel": "claude-haiku-5-5"
+   }
+  },
+  "todo": {
+   "enabled": true,
+   "settings": {}
+  },
+  "context": {
+   "enabled": true,
+   "settings": {
+    "rolloverOnCompaction": true
+   }
+  }
+ },
+ "ok": true
+}

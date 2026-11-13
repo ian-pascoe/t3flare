@@ -22,9 +22,9 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 | `codemode`, `tool_search` | W | `extensions/codemode.ts`, sandbox Worker `t3flare-codemode-<stage>` (ADR-0027); switchable in the Harness panel | — |
 | MCP servers (pi-mcp-selector, `mcp.json`: Executor, REA, Superlogical) | W | `extensions/mcp.ts` over the Environment's MCP host (ADR-0028): Commissary toolkits, and Direct servers added in the Harness panel (Executor, in browser mode); REA and Superlogical once served over HTTP (stdio refused); `t3` is covered by t3's tools | — |
 | Harness settings | W | the Harness panel (ADR-0026): extensions, offered tools, MCP servers; later ports register in its extension registry | — |
-| pi-web-tools (`web_search`, `web_fetch`) | M | port cloudpid `web` | SPI-1054 |
-| pi-todo | M | port cloudpid `todo`, shown as t3's todos (parity G5) | SPI-1055 |
-| pi-context-management (notes, history, rollover) | M | port cloudpid `context` | SPI-1056 |
+| pi-web-tools (`web_search`, `web_fetch`) | W | `extensions/web.ts` (cloudpid `web`): `web_fetch` through the SSRF guard, on by default; `web_search` asks a search-capable model through the model proxy (Commissary, no new key), off until switched on in the Harness panel (a model request per search). Both show as t3's web search items | SPI-1054 |
+| pi-todo | W | `extensions/todo.ts` (cloudpid `todo`): the list in the Session's storage, shown as t3's `todo_list` rows and plan (parity G5) | SPI-1055 |
+| pi-context-management (notes, history, rollover) | W | `extensions/context.ts` (cloudpid `context`): bounded Notes and stored History in the Session's storage, `context_rollover`, and automatic compaction as a Rollover (switchable); t3's idle compaction stays off (K9) | SPI-1056 |
 | pi-termctrl (terminals, background jobs) | M | Container PTYs through t3flare's terminal host | SPI-1057 |
 | pi-guardian | M | model-reviewed gating on a Commissary model | SPI-1058 |
 | pi-advisor | M | background advice on a Commissary model | SPI-1059 |
@@ -42,4 +42,4 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 
 ## Order
 
-Next: web tools (SPI-1054), todo (SPI-1055), context management (SPI-1056), terminals (SPI-1057), guardian (SPI-1058), advisor (SPI-1059).
+Done: web tools (SPI-1054), todo (SPI-1055), context management (SPI-1056), on branch `ports` ([`docs/steps/pi-ports-1.md`](steps/pi-ports-1.md)). Next: terminals (SPI-1057), guardian (SPI-1058), advisor (SPI-1059).

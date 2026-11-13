@@ -456,6 +456,18 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
   nothing is approved, but the call stalls. SPI-1092 runs it live.
 - **Fix**: follow Executor's new shape in `pauseOf` and `isPausingServer`.
 
+### U53. The pi-harness ports in t3's thread, and web search through the proxy (SPI-1054, SPI-1055, SPI-1056)
+
+- **Where**: `apps/environment/src/provider/differ.ts`:
+  - `emitTool` shows `web_search` and `web_fetch` as t3's `web_search` turn item (`patterns`, `results`), as t3's ACP adapter shows a fetch (`t3code/packages/provider-acp/src/server/adapter.ts`, `case "fetch"`);
+  - `emitTodo` shows the Session's Todo document as `todo_list` rows and a `plan.updated` artifact of kind `todo_list`, in OpenCode v2's shape (`t3code/packages/provider-opencode/src/server/v2/adapter.ts` `emitTodo`); step ids are `todo:<task id>`, which t3's ingestor uses for step durations (`ProviderEventIngestor.ts` `withPlanStepDurations`);
+  - `toolTitle` titles the context tools' items. `provider/capabilities.ts` turns on `emitsTodoList` and `emitsPlanUpdated`.
+  `apps/agents/src/extensions/web/search.ts` sends an Anthropic Messages request with the server tool `web_search_20250305` to the model proxy and reads `web_search_tool_result` blocks; Commissary translates it for Codex upstreams (`commissary/packages/translation/src/translator/codex/claude/request.ts`). The ports' documents (`t3flare.todo`, `t3flare.context`) and hooks (`beforeRequest`, `afterTool`, `beforeCompact`, `control.handoff`) lean on pi-durable 1.5.0 (U24).
+- **Breaks when**: t3 changes the `todo_list` or `web_search` item shapes, the plan artifact, or how its web client groups todo rows (`MessagesTimeline.logic.ts`); Commissary or its upstream drops the web search server tool, or Anthropic retires `web_search_20250305`; a pi-durable bump changes the compaction hook, `ToolControl.handoff`, or `Tx.scanEntries`.
+- **Detection**: typecheck; `test/differPorts.test.ts` decodes every item and the plan with t3's own schemas (closes T10 for these items); `apps/agents/test/{web/tools,todo,context}.test.ts`; `scripts/ports.ts turns` on a stage. **Silent**: a proxy that stops searching answers `web_search` with an error naming the HTTP status, only when a thread searches.
+- **Blast radius**: the web, todo and context tools' items render wrongly or not at all; `web_search` errors; the tools themselves keep working.
+- **Fix**: follow the shapes t3's OpenCode and ACP adapters use; for search, check the proxy's answer with `scripts/ports.ts turns` and switch `web.searchModel`.
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).
