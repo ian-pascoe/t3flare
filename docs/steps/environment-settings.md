@@ -180,4 +180,4 @@ before and after.
   (`surfaces.json`). t3's `GitCommandError` keeps only stderr's length, so t3's setup error reads "git worktree add
   failed" without the reason. The same holds for any git failure t3 reports this way. Showing it there needs a change
   to t3 (a Shadow or a Patch, ADR-0001); not done here.
-- **Checks.** `pnpm run check` passes at CHECKED_COMMIT.
+- **Checks.** `pnpm run check` passes at `b3ff5ad` (34/34); the commit after it changes only this line.
