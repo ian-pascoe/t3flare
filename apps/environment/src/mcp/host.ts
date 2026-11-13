@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off
+// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off
 // The MCP host (ADR-0028; cloudpid's McpHost, plan §3.0): the Environment DO's part that holds the MCP server set's
 // inventory, each server's protocol state and its credentials, and makes every MCP list and call through the MCP
 // Worker's engine (`MCP_ENGINE`), the one place the SDK runs. No credential leaves the Environment Worker except inside
@@ -30,7 +30,14 @@ import type {
   McpEngineTargetEncoded,
 } from "@cloudpid/mcp/types";
 
+import { MCP_ELICITATION_WAIT_MS } from "@cloudpid/mcp/types";
+import type { McpAsker, McpQuestionAnswer } from "@t3flare/session-protocol";
+
 import type { KvStorage } from "../harness/store.ts";
+import { type ElicitAnswer, type ElicitResultOrCancel, isPausingServer, pauseOf, planPause, planQuestion, type QuestionContext, type QuestionPlan } from "./elicitation.ts";
+
+/** How long a server's question waits for the owner: cloudpid's Legacy wait, and the CLI card's (`CLI_ASK_MS`). */
+export const QUESTION_WAIT_MS = MCP_ELICITATION_WAIT_MS;
 
 /** The MCP Worker's `McpEngine`, as the Environment binds it. */
 export interface McpEngineBinding {
@@ -133,6 +140,8 @@ export interface McpHostDeps {
   readonly now?: () => number;
   /** Keeps background work alive past the request (`ctx.waitUntil`). */
   readonly background?: (work: Promise<unknown>) => void;
+  /** The t3 host as deployed: a page question that sends the owner there is declined (SPI-1079). */
+  readonly ownHost?: () => string | undefined;
 }
 
 export class McpHost {
@@ -289,20 +298,26 @@ export class McpHost {
         this.#deps.background?.(refresh);
       }
       const { tools } = await this.tools(name, server, inventory);
+      const pausing = isPausingServer(inventory.definitions);
       servers.push({
         name,
         kind: server.kind,
         state: inventory.status === "ok" ? "available" : inventory.listedAt > 0 ? "stale" : "unavailable",
         listedAt: inventory.listedAt > 0 ? inventory.listedAt : null,
         exposure: server.exposure,
-        tools: tools.filter((tool) => tool.exposure !== "hidden"),
+        // SPI-1079: a pausing server's `resume` is t3flare's to call (with the owner's answer), so no agent is offered it.
+        tools: tools.filter((tool) => tool.exposure !== "hidden" && !(pausing && tool.upstream === RESUME_TOOL)),
       });
     }
     const version = await definitionHash({ name: "view", inputSchema: servers.map((server) => [server.name, server.tools.map((tool) => [tool.name, tool.hash, tool.class, tool.exposure])]) });
     return { version, servers };
   }
 
-  /** Calls `tool` (the upstream name) of `name` with `args`, for a caller already judged. */
+  /**
+   * Calls `tool` (the upstream name) of `name` with `args`, for a caller already judged. With an `asker` (an agent's call,
+   * SPI-1079) the call declares elicitation and every question the server asks, and every pause of a pausing server
+   * (Executor's model mode), becomes a card the caller shows; only the owner's answer goes back.
+   */
   async call(input: {
     readonly server: string;
     readonly tool: string;
@@ -310,37 +325,82 @@ export class McpHost {
     /** The class the caller judged the call by: a read whose class is write now is refused, to be asked again. */
     readonly judged?: ToolClass;
     readonly signal?: AbortSignal;
+    /** The caller's cards for the server's questions (SPI-1079); without one, every question is cancelled. */
+    readonly asker?: McpAsker;
   }): Promise<McpCallAnswer> {
     const server = this.servers()[input.server];
     if (server === undefined || !server.enabled) return { kind: "unavailable", message: `The owner removed or disabled the MCP server ${input.server}; its tools are gone from the next turn.`, mayHaveRun: false };
-    const definition = this.inventory(input.server).definitions[input.tool];
+    const inventory = this.inventory(input.server);
+    const definition = inventory.definitions[input.tool];
     if (definition === undefined) return { kind: "unavailable", message: `${input.server} has no tool ${input.tool} (any more).`, mayHaveRun: false };
     if (server.toolExposure?.[input.tool] === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
+    const pausing = isPausingServer(inventory.definitions);
+    // SPI-1079: a pausing server's `resume` is t3flare's to call, with the owner's answer, never the agent's.
+    if (pausing && input.tool === RESUME_TOOL) return { kind: "unavailable", message: RESUME_REFUSAL(input.server), mayHaveRun: false };
     if (input.judged !== "write") {
       // A class change applies to the next call (plan §6.2): a read the owner (or a new hint) made write asks.
-      const now = (await this.tools(input.server, server, this.inventory(input.server))).tools.find((tool) => tool.upstream === input.tool);
+      const now = (await this.tools(input.server, server, inventory)).tools.find((tool) => tool.upstream === input.tool);
       if (now?.class !== "read") return { kind: "unavailable", message: `${input.tool} is now a write tool; call it again and it asks the owner.`, mayHaveRun: false };
     }
     if (this.#deps.engine === undefined) return { kind: "unavailable", message: "The MCP engine is not bound.", mayHaveRun: false };
     const target = await this.#target(input.server, server);
     if (typeof target === "string") return { kind: "unavailable", message: target, mayHaveRun: false };
+    const context: QuestionContext = { server: input.server, tool: input.tool, args: input.args, isOwnHost: (host) => host === this.#deps.ownHost?.()?.toLowerCase() };
+    const first = await this.#request(input.server, server, target, definition, input.args, input.signal, input.asker, context);
+    if (first.kind === "unavailable" || !pausing) return first.kind === "unavailable" ? first : { kind: "result", ...resultText(first.value) };
+    return this.#answerPauses(input.server, server, target, first.value, input.signal, input.asker, context);
+  }
+
+  /** One `tools/call` through the engine, its questions answered from the caller's cards: the result's value, or why not. */
+  async #request(
+    name: string,
+    server: McpServerSetting,
+    target: McpEngineTargetEncoded,
+    definition: Readonly<Record<string, unknown>>,
+    args: Readonly<Record<string, unknown>>,
+    signal: AbortSignal | undefined,
+    asker: McpAsker | undefined,
+    context: QuestionContext,
+  ): Promise<{ readonly kind: "value"; readonly value: unknown } | Extract<McpCallAnswer, { kind: "unavailable" }>> {
+    const engine = this.#deps.engine!;
     const aborted = new Promise<void>((resolve) => {
-      if (input.signal === undefined) return;
-      if (input.signal.aborted) resolve();
-      input.signal.addEventListener("abort", () => resolve(), { once: true });
+      if (signal === undefined) return;
+      if (signal.aborted) resolve();
+      signal.addEventListener("abort", () => resolve(), { once: true });
     });
+    const cards = new Map<string, string>();
+    const questionHooks: McpEngineHooks =
+      asker === undefined
+        ? {}
+        : {
+            onInput: async (request) => {
+              const plan = planQuestion(request, context);
+              const answer = await this.#answer(plan, asker, context, "question");
+              if (plan.kind === "card") cards.set(request.key, plan.card.id);
+              return answer.kind === "now" ? answer.answer : { kind: "answered", result: answer.result };
+            },
+            onInputEnded: async (key) => {
+              const id = cards.get(key);
+              if (id !== undefined) await asker.withdraw(id);
+            },
+          };
     let result: typeof McpEngineRequestResult.Encoded;
     try {
-      result = await this.#deps.engine.request(
+      result = await engine.request(
         target,
-        this.#prior(input.server),
-        { op: "tools/call", tool: definition as never, arguments: input.args as never, ctx: { origin: "agent" } },
-        { ...this.#authHooks(input.server, server), ...(input.signal === undefined ? {} : { untilAborted: () => aborted }) },
+        this.#prior(name),
+        {
+          op: "tools/call",
+          tool: definition as never,
+          arguments: args as never,
+          ctx: { origin: "agent", ...(asker === undefined ? {} : { answers: { elicitation: true, inputWaitMs: QUESTION_WAIT_MS } }) },
+        },
+        { ...this.#authHooks(name, server), ...(signal === undefined ? {} : { untilAborted: () => aborted }), ...questionHooks },
       );
     } catch (error) {
       return { kind: "unavailable", message: `The MCP call failed; it may have run: ${String(error).slice(0, 300)}`, mayHaveRun: true };
     }
-    this.#keepState(input.server, result.state as never);
+    this.#keepState(name, result.state as never);
     if (result.kind === "failed") {
       const tag = (result.error as { _tag?: string })._tag;
       const unauthorized = tag === "SignInRequired" || /\b40[13]\b/.test(errorText(result.error));
@@ -348,14 +408,89 @@ export class McpHost {
         unauthorized && server.kind === "commissary"
           ? `Commissary refused the tools key (MODEL_PROXY_API_KEY): ${errorText(result.error)}`
           : `The MCP call failed (${errorText(result.error)}). It may have run upstream; do not repeat a change without checking.`;
-      if (tag === "NotFound") this.#deps.background?.(this.list(input.server).catch(() => undefined));
+      if (tag === "NotFound") this.#deps.background?.(this.list(name).catch(() => undefined));
       return { kind: "unavailable", message, mayHaveRun: true };
     }
     if (result.kind !== "complete") return { kind: "unavailable", message: `The MCP server answered ${result.kind}, which t3flare does not take yet.`, mayHaveRun: true };
     const value = result.result.kind === "inline" ? result.result.value : await readStream(result.result.body as ReadableStream<Uint8Array>);
-    return { kind: "result", ...resultText(value) };
+    return { kind: "value", value };
+  }
+
+  /**
+   * A plan's answer: at once (declined unseen, or refused), or the owner's on the caller's card, which closes after
+   * QUESTION_WAIT_MS unanswered. Logged with the fields answered, never a value.
+   */
+  async #answer(plan: QuestionPlan, asker: McpAsker, context: QuestionContext, what: "question" | "pause"): Promise<Answered> {
+    const log = (event: Record<string, unknown>) => console.log(JSON.stringify({ t3flare: "mcp-question", what, server: context.server, tool: context.tool, ...event }));
+    if (plan.kind === "now") {
+      log({ outcome: "answered-unseen", why: plan.why });
+      return { kind: "now", answer: plan.answer };
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<McpQuestionAnswer>((resolve) => {
+      timer = setTimeout(() => resolve({ decision: "cancel", reason: "no answer in time" }), QUESTION_WAIT_MS);
+    });
+    let answer: McpQuestionAnswer;
+    try {
+      answer = await Promise.race([asker.ask(plan.card), timedOut]);
+    } catch (error) {
+      answer = { decision: "cancel", reason: `the card could not be shown: ${String(error).slice(0, 200)}` };
+    } finally {
+      clearTimeout(timer);
+    }
+    if (answer.reason === "no answer in time") await Promise.resolve(asker.withdraw(plan.card.id)).catch(() => undefined);
+    const sent = plan.answerOf(answer);
+    log({ card: plan.card.kind, outcome: sent.result.action, fields: Object.keys(sent.result.content ?? {}), ...(answer.reason === undefined ? {} : { reason: answer.reason }), ...(sent.note === undefined ? {} : { note: sent.note }) });
+    return { kind: "card", ...sent };
+  }
+
+  /**
+   * A pausing server's result (Executor's model mode, SPI-1079): each pause becomes a card and t3flare calls `resume`
+   * with the owner's answer, at most MAX_PAUSES times; the agent gets the last result, never a `requestId`. An approval
+   * is resumed with `accept` only when the owner accepted; a decline is sent as `decline`, an unanswered card as `cancel`.
+   */
+  async #answerPauses(
+    name: string,
+    server: McpServerSetting,
+    target: McpEngineTargetEncoded,
+    value: unknown,
+    signal: AbortSignal | undefined,
+    asker: McpAsker | undefined,
+    context: QuestionContext,
+  ): Promise<McpCallAnswer> {
+    const resume = this.inventory(name).definitions[RESUME_TOOL]!;
+    let current = value;
+    for (let round = 0; ; round++) {
+      const pause = pauseOf(current);
+      if (pause === undefined) return { kind: "result", ...redactedResult(current) };
+      if (asker === undefined) return { kind: "result", isError: true, text: `${name} paused this call for the owner's ${pause.status === "approval-required" ? "approval" : "input"}, which this caller cannot ask for. It did not run.` };
+      if (round === MAX_PAUSES) return { kind: "unavailable", message: `${name} paused this call more than ${MAX_PAUSES} times; t3flare stopped answering. Some of its steps may have run.`, mayHaveRun: true };
+      const answer = await this.#answer(planPause(pause, context), asker, context, "pause");
+      // Declined unseen or refused (a credential form, a malformed one): the server is told `decline`.
+      const response = answer.kind === "card" ? answer.result : answer.answer.kind === "answered" ? answer.answer.result : { action: "decline" };
+      const next = await this.#request(name, server, target, resume, { requestId: pause.requestId, response }, signal, asker, context);
+      if (next.kind === "unavailable") return { ...next, message: `Resuming ${name}'s paused call failed: ${next.message}` };
+      current = next.value;
+    }
   }
 }
+
+/** A question's answer: at once, or from the owner's card. */
+type Answered = { readonly kind: "now"; readonly answer: ElicitAnswer } | ({ readonly kind: "card" } & ElicitResultOrCancel);
+
+/** The tool a pausing server resumes a paused call with (Executor's). */
+const RESUME_TOOL = "resume";
+const RESUME_REFUSAL = (server: string) =>
+  `t3flare answers ${server}'s approval and input requests itself, from the owner's card, and resumes the paused call; resume is not yours to call. If the call is still needed, call the original tool again.`;
+/** Most pauses of one call t3flare answers. */
+const MAX_PAUSES = 16;
+
+/** A result as text, without a pause's `requestId` (an expired or busy outcome still carries one). */
+const redactedResult = (value: unknown): { readonly isError: boolean; readonly text: string } => {
+  const content = (value as { structuredContent?: unknown } | null)?.structuredContent as { requestId?: unknown; message?: unknown } | undefined;
+  if (content === undefined || content === null || typeof content.requestId !== "string") return resultText(value);
+  return { isError: (value as { isError?: unknown }).isError === true, text: typeof content.message === "string" ? content.message.replaceAll(content.requestId, "[request]") : "The server is still answering an earlier request for this call; try the call again." };
+};
 
 const readStream = async (body: ReadableStream<Uint8Array>): Promise<unknown> => {
   const reader = body.getReader();

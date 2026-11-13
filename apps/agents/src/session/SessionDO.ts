@@ -57,6 +57,7 @@ import { mcpExtension, mcpNamespaces, type McpView } from "../extensions/mcp.ts"
 import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
 import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
+import { McpQuestions } from "../extensions/mcpQuestions.ts";
 import { ApprovalStore, interactionModeSection, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
 import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
@@ -142,6 +143,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #approvals: ApprovalStore;
   /** The agent's questions to the owner (`ask_user`, step 3). */
   readonly #questions: QuestionStore;
+  /** MCP servers' questions during the Session's calls (SPI-1079): in memory, never stored. */
+  readonly #mcpQuestions: McpQuestions;
   /** The proxy's model list (ADR-0012), kept in this object's storage and read again when it is old. */
   readonly #catalog: ModelCatalog;
   /** Every model request's fetch: the proxy's answers recorded, a test fault answered (`proxyLimits.ts`). */
@@ -162,6 +165,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     });
     this.#approvals = new ApprovalStore(ctx.storage.kv, () => this.#schedulePush(0));
     this.#questions = new QuestionStore(ctx.storage.kv, () => this.#schedulePush(0));
+    this.#mcpQuestions = new McpQuestions(() => this.#schedulePush(0));
     const recorder = recordingFetch({
       fetch: (input, init) => fetch(input, init),
       fault: () => ctx.storage.kv.get<Fault>(FAULT_KEY),
@@ -333,6 +337,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       interaction: () => interactionModeOf(this.#meta()?.interactionMode),
       turn: () => this.#liveTurn(),
       call: (input) => environmentStub(this.env.ENVIRONMENT).mcpCall(input),
+      asker: (callId, signal) => this.#mcpQuestions.asker(this.#liveTurn(), callId, signal),
     });
   }
 
@@ -651,6 +656,12 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   /** Answers a pending approval (the waiting call runs or returns the decline) or question (step 3: its answer is the result). */
   answer(input: AnswerInput): Promise<{ readonly applied: boolean }> {
+    if (this.#mcpQuestions.has(input.requestId)) {
+      const applied = this.#mcpQuestions.answer(input);
+      // The decision only: an MCP form's answers are never logged or kept (SPI-1079).
+      console.log(JSON.stringify({ t3flare: "mcp-question-answer", requestId: input.requestId, decision: input.decision, answered: input.answers !== undefined, applied }));
+      return Promise.resolve({ applied });
+    }
     if (this.#questions.pending().some((question) => question.requestId === input.requestId)) {
       const given = Object.values(input.answers ?? {}).map(answerText).find((text) => text !== undefined && text.trim() !== "");
       const text = given ?? (input.decision === "decline" || input.decision === "cancel" ? "(no answer: the owner dismissed the question)" : "(no answer)");
@@ -795,6 +806,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const live = new Set(Object.entries(this.#turns()).filter(([, turn]) => isLive(turn)).map(([id]) => id));
     this.#approvals.dropAbandoned(live);
     this.#questions.dropAbandoned(live);
+    this.#mcpQuestions.dropAbandoned(live);
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -842,8 +854,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
       agent: { model: agentDoc.model ?? null, thinking: agentDoc.thinkingLevel ?? null },
       usage: usageOf((view?.docs["pi.usage"] as { total?: unknown } | undefined)?.total ?? view?.docs["pi.usage"]) ?? null,
       inbox: { pending: inbox.items?.length ?? 0 },
-      approvals: this.#approvals.pending(),
-      questions: this.#questions.pending(),
+      approvals: [...this.#approvals.pending(), ...this.#mcpQuestions.approvals()],
+      questions: [...this.#questions.pending(), ...this.#mcpQuestions.questions()],
       turns,
       lastEntry,
     };

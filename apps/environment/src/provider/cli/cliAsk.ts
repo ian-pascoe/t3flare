@@ -1,15 +1,21 @@
 // The MCP relay's tool cards on a CLI thread (ADR-0028, review M9). The CLI wrapper (`wrapper.ts`) registers an asker
 // for each thread while its session lives; the asker raises t3's approval card on the thread's live turn and answers
 // when the owner does. A thread with no live turn is refused. (Before the back-to-stock cut, owner 2026-11-12, the
-// push gateway's cards came this way too; pushes no longer ask.)
+// push gateway's cards came this way too; pushes no longer ask.) Since SPI-1079 an MCP server's question comes this way
+// too (`cliQuestionAsker`): an `mcp-elicitation` approval card, or a `user_input` card for a form.
+import type { ApprovalDecision, McpAsker, McpCardQuestion } from "@t3flare/session-protocol";
 
 /** What the relay asks: the card's text, its buttons and title, and the ask's id. A tool card is t3's `permission` kind. */
 export interface CliAsk {
   readonly askId: string;
   readonly summary: string;
   readonly detail: string;
-  readonly options: ReadonlyArray<{ readonly decision: "accept" | "acceptForSession" | "decline"; readonly label: string; readonly warning?: string }>;
+  readonly options: ReadonlyArray<{ readonly decision: ApprovalDecision; readonly label: string; readonly warning?: string }>;
   readonly title: string;
+  /** t3's request kind of an approval card: `permission` (a tool) unless set (`mcp-elicitation`, SPI-1079). */
+  readonly requestKind?: "permission" | "mcp-elicitation";
+  /** A form's questions (SPI-1079): the card is t3's `user_input` request, answered with `answers`. */
+  readonly questions?: ReadonlyArray<McpCardQuestion>;
 }
 
 export interface CliAnswer {
@@ -17,6 +23,9 @@ export interface CliAnswer {
   /** The owner chose the card's "for the session" answer. */
   readonly forSession?: boolean;
   readonly reason?: string;
+  /** The owner's decision as t3 gave it, and a `user_input` card's answers (SPI-1079). */
+  readonly decision?: ApprovalDecision;
+  readonly answers?: Readonly<Record<string, unknown>>;
 }
 
 /** A live turn's way to ask: resolves with the owner's answer, or a refusal when the turn ends or the ask is withdrawn. */
@@ -72,3 +81,36 @@ export const approveCliTool = async (input: { readonly thread: string; readonly 
     withdrawals.delete(input.askId);
   }
 };
+
+/**
+ * The cards of an MCP server's questions on `thread`'s live turn (SPI-1079): the MCP host makes each card, this raises it
+ * as the relay's tool cards are raised, and hands back the owner's answer. No live turn: cancelled, nothing shown.
+ */
+export const cliQuestionAsker = (thread: string): McpAsker => ({
+  ask: async (card) => {
+    const asker = askers.get(thread);
+    if (asker === undefined) return { decision: "cancel", reason: `no live turn to ask on (thread ${thread})` };
+    const withdrawn = new AbortController();
+    withdrawals.set(card.id, withdrawn);
+    try {
+      const answer = await asker.ask(
+        {
+          askId: card.id,
+          title: card.title,
+          summary: card.prompt,
+          detail: "",
+          options: card.options ?? [],
+          requestKind: "mcp-elicitation",
+          ...(card.kind === "form" && card.questions !== undefined ? { questions: card.questions } : {}),
+        },
+        AbortSignal.any([AbortSignal.timeout(CLI_ASK_MS), withdrawn.signal]),
+      );
+      if (answer.reason === "withdrawn") return { decision: "cancel", reason: withdrawn.signal.aborted ? "withdrawn" : "no answer in time" };
+      const decision = answer.decision ?? (answer.approved ? "accept" : "decline");
+      return { decision, ...(answer.answers === undefined ? {} : { answers: answer.answers }), ...(answer.approved || answer.reason === undefined ? {} : { reason: answer.reason }) };
+    } finally {
+      withdrawals.delete(card.id);
+    }
+  },
+  withdraw: (cardId) => cancelCliAsk(cardId),
+});

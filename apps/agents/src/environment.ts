@@ -3,7 +3,7 @@
 export { ENVIRONMENT_NAME } from "@t3flare/session-protocol";
 import { ENVIRONMENT_NAME } from "@t3flare/session-protocol";
 
-import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
+import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 import type { McpRelayAnswer, McpRelayInput, ResolvedHarness } from "@t3flare/harness-registry";
 import type { McpCallAnswer, McpView } from "./extensions/mcp.ts";
@@ -27,12 +27,13 @@ export interface EnvironmentRpc {
   harnessSettings(input: { readonly projectId?: string }): Promise<ResolvedHarness>;
   /** The MCP tools this Session may install (ADR-0028). */
   mcpView(): Promise<McpView>;
-  /** An MCP call the Session's tool has judged (`decideCall`). */
+  /** An MCP call the Session's tool has judged (`decideCall`); the server's questions come back through `asker` (SPI-1079). */
   mcpCall(input: {
     readonly server: string;
     readonly tool: string;
     readonly args: Readonly<Record<string, unknown>>;
     readonly judged: "read" | "write";
+    readonly asker?: McpAsker;
   }): Promise<McpCallAnswer>;
   /** A CLI process's MCP message through the relay (ADR-0028), its caller resolved by the Workspace DO. */
   mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer>;

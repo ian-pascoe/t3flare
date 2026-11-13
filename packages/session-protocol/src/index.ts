@@ -271,9 +271,12 @@ export interface PendingApproval {
   readonly callId: string;
   readonly tool: string;
   /**
-   * `mcp-tool` (step 3, review C4): a t3 MCP tool, accepted for the session per tool name.
+   * `mcp-tool` (step 3, review C4): a t3 MCP tool, accepted for the session per tool name. `mcp-elicitation` (SPI-1079):
+   * an MCP server's confirmation or page, shown as t3's own `mcp-elicitation` card; never accepted for the session.
    */
-  readonly kind: "command" | "file-change" | "mcp-tool";
+  readonly kind: "command" | "file-change" | "mcp-tool" | "mcp-elicitation";
+  /** The card's title, instead of "Allow <tool>?" (SPI-1079). */
+  readonly title?: string;
   readonly summary: string;
   readonly detail?: string;
   /** The card's own buttons (t3's `ProviderApprovalOption`s), instead of t3's defaults. */
@@ -296,7 +299,56 @@ export interface PendingQuestion {
   readonly question: string;
   readonly options: ReadonlyArray<string>;
   readonly allowFreeText: boolean;
+  /** An MCP server's form (SPI-1079): its questions, by field, instead of the one `question`. */
+  readonly questions?: ReadonlyArray<McpCardQuestion>;
   readonly createdAt: number;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// MCP servers' questions (SPI-1079, ADR-0028's elicitation refinement): the Environment's MCP host makes a card of each
+// question a server asks during an agent's call, and the caller (the Session, or the CLI relay) only shows it and hands
+// back the owner's answer. Never the agent's to answer.
+
+/** The marker in every MCP question card's request id: the Environment refuses `t3_pending_request` on such ids. */
+export const MCP_QUESTION_MARKER = "t3flare-elicit";
+
+/** One question of a form card, in t3's `user_input` question shape. */
+export interface McpCardQuestion {
+  readonly id: string;
+  readonly header: string;
+  readonly question: string;
+  readonly options: ReadonlyArray<{ readonly label: string; readonly description: string; readonly value?: string }>;
+  readonly multiSelect?: boolean;
+  readonly allowCustomAnswer?: boolean;
+  readonly required?: boolean;
+}
+
+/** A card for an MCP server's question: an `mcp-elicitation` approval card, or a `user_input` form card. */
+export interface McpQuestionCard {
+  /** The card's id, `t3flare-elicit-…`: the Session's request id, and part of a CLI card's runtime request id. */
+  readonly id: string;
+  readonly kind: "approval" | "form";
+  readonly server: string;
+  readonly title: string;
+  /** The whole text the owner reads, through `cardText`. */
+  readonly prompt: string;
+  readonly options?: ReadonlyArray<{ readonly decision: ApprovalDecision; readonly label: string }>;
+  readonly questions?: ReadonlyArray<McpCardQuestion>;
+}
+
+/** The owner's answer to a card: a decision, and a form's answers by question id. */
+export interface McpQuestionAnswer {
+  readonly decision: ApprovalDecision;
+  readonly answers?: Readonly<Record<string, unknown>>;
+  /** Why no owner answered (no live turn, withdrawn, timed out). */
+  readonly reason?: string;
+}
+
+/** The caller's side of an MCP call's questions, passed with the call (Workers RPC carries the functions). */
+export interface McpAsker {
+  readonly ask: (card: McpQuestionCard) => Promise<McpQuestionAnswer>;
+  /** The server stopped waiting, or the wait timed out: the card closes. */
+  readonly withdraw: (cardId: string) => void | Promise<void>;
 }
 
 export interface SessionState {

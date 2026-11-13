@@ -8,7 +8,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
 import { modelCatalog } from "@t3flare/models/catalog";
-import type { McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
+import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 import { type McpRelayAnswer, type McpRelayInput, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
@@ -251,6 +251,10 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async mcp(input: McpRpcRequest): Promise<McpRpcAnswer> {
     Idle.requestStarted();
     try {
+      // SPI-1079: an MCP server's question is the owner's; an agent's `t3_pending_request` on its card never reaches t3.
+      const { refuseOwnerOnly } = await import("./mcp/ownerOnly.ts");
+      const refused = refuseOwnerOnly(input.body);
+      if (refused !== undefined) return { status: 200, contentType: "application/json", ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), body: refused };
       const runtime = await this.boot("mcp");
       await runtime.commandReady();
       const host = await this.#publicHost();
@@ -375,6 +379,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       secret: async (server, field) => harnessSecrets(this.ctx.storage.kv).read(server, field),
       oauthToken: (server, stale) => this.harnessOAuth.accessToken(server, stale),
       background: (work) => this.ctx.waitUntil(work),
+      ownHost: () => this.env.T3FLARE_HOST ?? this.#host,
     });
     return this.#mcpHost;
   }
@@ -409,12 +414,16 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return this.mcpHost.view();
   }
 
-  /** A Session's MCP call, already judged by `decideCall` in its tool. Open work while it runs (the idle reset waits). */
+  /**
+   * A Session's MCP call, already judged by `decideCall` in its tool. Open work while it runs (the idle reset waits). The
+   * Session's `asker` (Workers RPC carries its functions) shows the server's questions as cards (SPI-1079).
+   */
   async mcpCall(input: {
     readonly server: string;
     readonly tool: string;
     readonly args: Readonly<Record<string, unknown>>;
     readonly judged?: "read" | "write";
+    readonly asker?: McpAsker;
   }): Promise<McpCallAnswer> {
     Idle.requestStarted();
     try {
@@ -434,13 +443,14 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer> {
     Idle.requestStarted();
     try {
-      const [{ relayMessage }, { approveCliTool, cliThreadState }] = await Promise.all([import("./mcp/relay.ts"), import("./provider/cli/cliAsk.ts")]);
+      const [{ relayMessage }, { approveCliTool, cliQuestionAsker, cliThreadState }] = await Promise.all([import("./mcp/relay.ts"), import("./provider/cli/cliAsk.ts")]);
       const accepted = this.#relayAccepted;
       return await relayMessage(input, {
         view: () => this.mcpHost.view(),
         call: (call) => this.mcpHost.call(call),
         state: cliThreadState,
         ask: approveCliTool,
+        asker: cliQuestionAsker,
         accepted: {
           has: (thread: string, key: string) => accepted.get(thread)?.has(key) === true,
           add: (thread: string, key: string) => {
@@ -767,6 +777,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       if (Pairing.BOOTSTRAP_EXCHANGE_PATHS.has(url.pathname) && request.method === "POST") {
         const refused = await this.#refuseDisarmedBootstrap(request);
         if (refused !== undefined) return refused;
+      }
+      if (url.pathname === "/mcp" && request.method === "POST") {
+        // SPI-1079: an MCP server's question is the owner's; an agent's `t3_pending_request` on its card never reaches t3.
+        const { refuseOwnerOnly } = await import("./mcp/ownerOnly.ts");
+        const refused = refuseOwnerOnly(await request.clone().text());
+        if (refused !== undefined) return new Response(refused, { status: 200, headers: { "content-type": "application/json" } });
       }
       const runtime = await this.boot("request", request);
       if (url.pathname === "/mcp") await this.#reraised;

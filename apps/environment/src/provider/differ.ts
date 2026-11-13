@@ -409,7 +409,7 @@ const emitNested = (
 };
 
 /** t3's request kind for a Session approval: a T3 tool's is a permission (as t3's Pi bridge asks). */
-const requestKindOf = (kind: PendingApproval["kind"]): "command" | "file-change" | "permission" => (kind === "mcp-tool" ? "permission" : kind);
+const requestKindOf = (kind: PendingApproval["kind"]): "command" | "file-change" | "permission" | "mcp-elicitation" => (kind === "mcp-tool" ? "permission" : kind);
 
 /** A Session request (an approval, or step 3's question) as t3 shows it: its kinds and its turn item's own fields. */
 interface RequestView {
@@ -428,7 +428,7 @@ const approvalView = (approval: PendingApproval, textOut: (text: string) => stri
   createdAt: approval.createdAt,
   runtimeKind: requestKindOf(approval.kind),
   nodeKind: "approval_request",
-  title: `Allow ${approval.tool}?`,
+  title: approval.title ?? `Allow ${approval.tool}?`,
   item: {
     type: "approval_request",
     requestKind: requestKindOf(approval.kind),
@@ -448,10 +448,11 @@ const questionView = (question: PendingQuestion): RequestView => ({
   createdAt: question.createdAt,
   runtimeKind: "user_input",
   nodeKind: "user_input_request",
-  title: "Question",
+  title: question.questions === undefined ? "Question" : question.question,
   item: {
     type: "user_input_request",
-    questions: [
+    // An MCP server's form (SPI-1079): one question per field, as the MCP host made them.
+    questions: question.questions?.map((asked) => ({ ...asked, options: [...asked.options] })) ?? [
       {
         id: question.requestId,
         header: "Question",

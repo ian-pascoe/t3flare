@@ -112,13 +112,19 @@ interface OpenCard {
   readonly node: OrchestrationV2ExecutionNode;
   readonly turnItem: OrchestrationV2TurnItem;
   readonly answer: (answer: CliAnswer) => void;
+  /** A `user_input` card (an MCP server's form, SPI-1079): answered with `answers`. */
+  readonly form: boolean;
 }
 
 /** t3's runtime request id of a card: never one of the CLI's own (its adapter answers those). */
 const cardRequestPrefix = (driver: string) => `runtime-request:${driver}:t3flare-ask:`;
 
 const answerOf = (decision: ProviderApprovalDecision): CliAnswer =>
-  decision === "acceptForSession" ? { approved: true, forSession: true } : decision === "accept" || decision === "acceptAlways" ? { approved: true } : { approved: false, reason: decision };
+  decision === "acceptForSession"
+    ? { approved: true, forSession: true, decision }
+    : decision === "accept" || decision === "acceptAlways"
+      ? { approved: true, decision: "accept" }
+      : { approved: false, reason: decision, decision: decision === "decline" ? "decline" : "cancel" };
 
 /** t3's adapter, as the Cloud Environment runs it. */
 export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Service"], options: WrapOptions): ProviderAdapter.ProviderAdapterV2["Service"] => {
@@ -169,7 +175,11 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
             const turn = live;
             if (turn === undefined || turn.providerTurnId === undefined || !session.turnActive) return resolve({ approved: false, reason: "no live turn to ask on" });
             if (signal.aborted) return resolve({ approved: false, reason: "withdrawn" });
-            const id = RuntimeRequestId.make(`${cardRequestPrefix(adapter.driver)}${crypto.randomUUID()}`);
+            // An MCP question's card keeps its id (`t3flare-elicit-…`, SPI-1079): the Environment refuses an agent's
+            // `t3_pending_request` on it. A tool card's id is new.
+            const id = RuntimeRequestId.make(`${cardRequestPrefix(adapter.driver)}${card.requestKind === "mcp-elicitation" ? card.askId : crypto.randomUUID()}`);
+            const form = card.questions !== undefined && card.questions.length > 0;
+            const requestKind = card.requestKind ?? "permission";
             const nodeId = IdAllocator.derive.approvalNode({ requestId: id });
             const nativeItemRef = { driver: adapter.driver, nativeId: id, strength: "weak" as const };
             const now = DateTime.nowUnsafe();
@@ -179,7 +189,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               nodeId,
               providerTurnId: turn.providerTurnId,
               nativeRequestRef: nativeItemRef,
-              kind: "permission",
+              kind: form ? "user_input" : requestKind,
               status: "pending",
               responseCapability: { type: "live", providerSessionId: input.providerSessionId, supportsFeedback: false },
               createdAt: now,
@@ -191,7 +201,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               runId: turn.runId,
               parentNodeId: turn.rootNodeId,
               rootNodeId: turn.rootNodeId,
-              kind: "approval_request",
+              kind: form ? "user_input_request" : "approval_request",
               status: "waiting",
               countsForRun: false,
               providerThreadId: turn.providerThreadId,
@@ -217,18 +227,22 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               startedAt: now,
               completedAt: null,
               updatedAt: now,
-              type: "approval_request",
-              requestId: id,
-              requestKind: "permission",
-              prompt: `${card.summary}\n\n${card.detail}`,
-              ...(card.options.length === 0 ? {} : { options: card.options }),
-            };
+              ...(form
+                ? { type: "user_input_request" as const, requestId: id, questions: card.questions!.map((question) => ({ ...question, options: [...question.options] })) }
+                : {
+                    type: "approval_request" as const,
+                    requestId: id,
+                    requestKind,
+                    prompt: card.detail === "" ? card.summary : `${card.summary}\n\n${card.detail}`,
+                    ...(card.options.length === 0 ? {} : { options: card.options }),
+                  }),
+            } as OrchestrationV2TurnItem;
             const onAbort = () => offer(closeCard(id, null, { approved: false, reason: "withdrawn" }));
             const answer = (value: CliAnswer) => {
               signal.removeEventListener("abort", onAbort);
               resolve(value);
             };
-            cards.set(id, { runtimeRequest, node, turnItem, answer });
+            cards.set(id, { runtimeRequest, node, turnItem, answer, form });
             signal.addEventListener("abort", onAbort, { once: true });
             offer([
               { type: "runtime_request.updated", driver: adapter.driver, threadId: turn.threadId, runtimeRequest },
@@ -289,6 +303,11 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
           respondToRuntimeRequest: (response) => {
             if (!response.requestId.startsWith(cardRequestPrefix(adapter.driver))) return runtime.respondToRuntimeRequest(response);
             if (!cards.has(response.requestId)) return Effect.fail(new ProviderAdapter.ProviderAdapterRuntimeRequestResponseError({ driver: adapter.driver, requestId: response.requestId }));
+            // A form's card (SPI-1079) is answered with `answers`; t3 sends no decision with them.
+            if (cards.get(response.requestId)?.form === true && response.answers !== undefined) {
+              const answers = response.answers;
+              return Effect.sync(() => offer(closeCard(response.requestId, "accept", { approved: true, decision: "accept", answers })));
+            }
             const decision = response.decision ?? "cancel";
             return Effect.sync(() => offer(closeCard(response.requestId, decision, answerOf(decision))));
           },

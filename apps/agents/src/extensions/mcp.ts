@@ -12,7 +12,7 @@ import type { Context } from "@earendil-works/chord";
 import { defineExtension, type Extension, section, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import type { CodemodeNamespace } from "@earendil-works/pi-durable/codemode";
 import { decideCall, type ToolClass } from "@t3flare/harness-registry/mcp";
-import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
+import type { InteractionMode, McpAsker, RuntimeMode } from "@t3flare/session-protocol";
 
 import { cardText } from "./cardText.ts";
 import { type ApprovalStore, askOwner, cutOffResult, STARTED_MEMO } from "./permissions.ts";
@@ -50,7 +50,9 @@ export interface McpHostOfSession {
   readonly mode: () => RuntimeMode;
   readonly interaction: () => InteractionMode;
   readonly turn: () => string | null;
-  readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly judged: ToolClass }) => Promise<McpCallAnswer>;
+  readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly judged: ToolClass; readonly asker?: McpAsker }) => Promise<McpCallAnswer>;
+  /** The cards for the server's questions during this call (SPI-1079); closed when the call is stopped. */
+  readonly asker?: (callId: string, signal: AbortSignal | undefined) => McpAsker;
 }
 
 const result = (text: string, isError: boolean, details: Record<string, string>) => ({ output: [{ type: "text" as const, text }], isError, details });
@@ -90,7 +92,9 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
         if (declined !== undefined) return declined;
       }
       if (tool.class === "write") await api.memo(STARTED_MEMO, true, context);
-      const answer = await host.call({ server: server.name, tool: tool.upstream, args, judged: tool.class });
+      // A server's question during the call is shown to the owner as a card; only the owner's answer goes back (SPI-1079).
+      const asker = host.asker?.(api.callId, context.abortSignal);
+      const answer = await host.call({ server: server.name, tool: tool.upstream, args, judged: tool.class, ...(asker === undefined ? {} : { asker }) });
       if (answer.kind === "unavailable") return result(answer.message, true, details);
       return result(answer.text, answer.isError, details);
     },
