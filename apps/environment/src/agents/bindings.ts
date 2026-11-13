@@ -9,6 +9,7 @@ import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import type { SweepSettings } from "./deletion.ts";
 import type { WorkspaceRegistry } from "./workspaces.ts";
 import type { ProcessChannel } from "./processChannel.ts";
+import type { CommissaryManagement } from "../usage/commissary.ts";
 
 export interface EnvironmentServices {
   readonly agents: AgentsBindings;
@@ -32,6 +33,8 @@ export interface EnvironmentServices {
   readonly t3McpUrl: () => string;
   /** t3's public origin (`https://<t3 host>`), or null where no host is configured (local workerd): task webhooks' base (parity G12). */
   readonly publicOrigin: () => string | null;
+  /** Commissary's management API for t3's Usage page and limit meters (parity G8), or undefined when not set. */
+  readonly commissary: CommissaryManagement | undefined;
 }
 
 let current: EnvironmentServices | undefined;

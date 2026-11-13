@@ -105,7 +105,7 @@ import * as ProviderInstanceRegistry from "t3/src/provider/ProviderInstanceRegis
 import * as ProviderAdapterRegistry from "t3/src/orchestration-v2/ProviderAdapterRegistry.ts";
 import * as ProviderRegistry from "t3/src/provider/ProviderRegistry.ts";
 import * as ProviderUsageLimitsIngestion from "t3/src/provider/ProviderUsageLimitsIngestion.ts";
-import * as UsageLimitSources from "t3/src/usage/UsageLimitSources.ts";
+import * as CommissaryLimitSources from "../usage/limitSources.ts";
 import * as ProjectFaviconResolver from "t3/src/project/ProjectFaviconResolver.ts";
 import * as T3ProjectFileLoader from "t3/src/project/T3ProjectFileLoader.ts";
 import * as RepositoryIdentityResolver from "t3/src/project/RepositoryIdentityResolver.ts";
@@ -330,6 +330,9 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(layerHostPowerMonitor),
     Layer.provideMerge(layerServerSettings),
   );
+
+  // t3flare: t3's usage-limit sources plus Commissary's accounts when its management API is set (parity G8).
+  const layerUsageLimitSources = CommissaryLimitSources.layer(() => environmentServices().commissary);
 
   const layerUsage = UsageService.layer.pipe(
     Layer.provide(
@@ -627,7 +630,7 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(layerVcs),
     Layer.provideMerge(Layer.mergeAll(layerTerminal, layerPreview, layerDevice)),
     Layer.provideMerge(layerPersistence),
-    Layer.provideMerge(Layer.mergeAll(Keybindings.layer, EnvironmentTheme.layer, UsageLimitSources.layer)),
+    Layer.provideMerge(Layer.mergeAll(Keybindings.layer, EnvironmentTheme.layer, layerUsageLimitSources)),
     Layer.provideMerge(ProviderRegistry.layer),
     Layer.provideMerge(ProviderInstanceRegistryHydration.layer.pipe(Layer.provide(layerPersistence))),
     // One gate for the server, below hydration, as t3's server.ts: layers memoize by reference.

@@ -34,6 +34,7 @@ import { HarnessOAuth, type McpOAuthBinding, OAUTH_CALLBACK_PATH, OAUTH_CLIENT_P
 import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpView } from "./mcp/host.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
+import { commissaryManagementOf } from "./usage/commissary.ts";
 
 export interface EnvironmentEnv extends AgentsBindings {
   readonly T3_BOOTSTRAP_TOKEN?: string;
@@ -43,6 +44,17 @@ export interface EnvironmentEnv extends AgentsBindings {
   /** The model proxy (ADR-0012), for text generation. */
   readonly MODEL_PROXY_URL?: string;
   readonly MODEL_PROXY_API_KEY?: string;
+  /**
+   * Parity G8: Commissary's management API, for t3's Usage page and limit meters (`usage/commissary.ts`). Optional, and
+   * this Worker's alone: the app host's URL, an org admin's management key, the org's slug, the Access service token of a
+   * self-hosted Commissary, and the principals (`key:<id>`) of t3flare's other API keys (the Containers').
+   */
+  readonly COMMISSARY_MANAGEMENT_URL?: string;
+  readonly COMMISSARY_MANAGEMENT_ORG?: string;
+  readonly COMMISSARY_MANAGEMENT_KEY?: string;
+  readonly COMMISSARY_ACCESS_CLIENT_ID?: string;
+  readonly COMMISSARY_ACCESS_CLIENT_SECRET?: string;
+  readonly COMMISSARY_USAGE_PRINCIPALS?: string;
   /** Overrides IDLE_AFTER_MS (tests and the acceptance stage). */
   readonly T3FLARE_IDLE_AFTER_MS?: string;
   /** Step 2b: the sweep purges only when this is "1" (stages); prod's sweep reports what it would do (review F3). */
@@ -208,6 +220,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       // t3's in-isolate address (owner, 2026-11-12, back to stock: t3's bearer goes to the CLI as stock t3 hands it).
       t3McpUrl: () => `https://${this.#configuredHost()}/mcp`,
       publicOrigin: () => (this.env.T3FLARE_HOST === undefined ? null : `https://${this.env.T3FLARE_HOST}`),
+      commissary: commissaryManagementOf(env),
     });
   }
 
