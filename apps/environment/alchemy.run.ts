@@ -39,7 +39,7 @@ import { sandboxImageContext } from "@t3flare/sandbox-image";
 import { MCP_WORKER_COMPATIBILITY } from "../mcp-worker/src/engine/compatibility.ts";
 
 import { COMPATIBILITY } from "./build.ts";
-import { credentialsFile } from "./stage-files.ts";
+import { credentialsFile, standinFile } from "./stage-files.ts";
 
 const here = import.meta.dirname;
 
@@ -81,6 +81,10 @@ const AUTH_PATHS = ["/oauth/token", "/api/auth/browser-session", "/oauth/mcp/reg
  * off the Environment DO, which every auth request wakes.
  */
 const AUTH_RATE_LIMIT = { requestsPerPeriod: 10, period: 10, mitigationTimeout: 10 };
+
+/** SPI-1061: the zone a test stage's stand-in hostname is made in, and the port its t3 listens on in its container. */
+const STANDIN_ZONE = "ianpascoe.dev";
+const STANDIN_PORT = 3773;
 
 export default Alchemy.Stack(
   "t3flare",
@@ -293,6 +297,39 @@ export default Alchemy.Stack(
       });
     }
 
+    // SPI-1061 (plan §8, D21): a test stage's stand-in laptop, a stock t3 in Docker on the machine running the stage
+    // scripts, is exposed by a named Cloudflare Tunnel at one open hostname with no Access in front, as every real Route
+    // is. Made only when the stage asks (`T3FLARE_STANDIN=1`), never for prod. Its token goes to a 0600 file for the
+    // container's `cloudflared` (scripts/lib/standin.ts), never printed; the tunnel and its record go with the stage.
+    const standin = stage !== "prod" && (yield* Config.String("T3FLARE_STANDIN").pipe(Config.withDefault(""))) === "1";
+    let standinHost: string | undefined;
+    let standinCredentials: unknown;
+    if (standin) {
+      standinHost = `t3flare-${stage}-standin.${STANDIN_ZONE}`;
+      const tunnel = yield* Cloudflare.Tunnel.Tunnel("StandinTunnel", {
+        name: `t3flare-${stage}-standin`,
+        // cloudflared runs in the stand-in's container, beside t3; `Host` is passed as it is, which t3 needs.
+        ingress: [{ hostname: standinHost, service: `http://localhost:${STANDIN_PORT}` }, { service: "http_status:404" }],
+      });
+      const { accountId } = yield* yield* Cloudflare.CloudflareEnvironment;
+      const zoneId = yield* Cloudflare.Zone.resolveZoneId({ accountId, zone: undefined, hostname: standinHost }).pipe(Effect.orDie);
+      yield* Cloudflare.DNS.Record("StandinDns", {
+        zoneId,
+        name: standinHost,
+        type: "CNAME",
+        content: Output.map(tunnel.tunnelId, (id) => `${id}.cfargotunnel.com`),
+        proxied: true,
+        comment: `t3flare ${stage} stand-in (SPI-1061); destroyed with the stage`,
+      } as never);
+      const host = standinHost;
+      standinCredentials = Output.map(tunnel.token, (token) => {
+        const file = standinFile(stage);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({ host, port: STANDIN_PORT, token: Redacted.value(token as Redacted.Redacted<string>) }), { mode: 0o600 });
+        return path.relative(here, file);
+      });
+    }
+
     // The stage's service-token credentials and URL (its custom domain when it has one), for the stage scripts; never
     // printed.
     const credentials = Output.map(
@@ -311,6 +348,13 @@ export default Alchemy.Stack(
         return path.relative(here, file);
       },
     );
-    return { url: environment.url, host, accessAud: admin.aud, credentials, agents: agents.workerName };
+    return {
+      url: environment.url,
+      host,
+      accessAud: admin.aud,
+      credentials,
+      agents: agents.workerName,
+      ...(standin ? { standin: standinCredentials as never, standinHost } : {}),
+    };
   }),
 );
