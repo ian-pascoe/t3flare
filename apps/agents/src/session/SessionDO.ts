@@ -75,6 +75,7 @@ import { ADVISOR_EXTENSION, AdvisorObserver, type AdvisorSettings, advisorExtens
 import { GUARDIAN_EXTENSION, guardianExtension } from "../extensions/guardian.ts";
 import type { GuardianThinkingLevel } from "../extensions/guardian/review.ts";
 import { backgroundJobs, TERMCTRL_EXTENSION, TERMCTRL_NAMESPACE, type TermctrlHost, termctrlExtension } from "../extensions/termctrl.ts";
+import { SKILLS_EXTENSION, skillsExtension } from "../extensions/skills.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
@@ -358,6 +359,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     if (extensionOf(harness, TODO_EXTENSION).enabled) registry.install(todoExtension(() => this.#opening));
     else registry.uninstall({ name: TODO_EXTENSION });
+    // SPI-1147: the Repo skills' listing, frozen per context window.
+    if (extensionOf(harness, SKILLS_EXTENSION).enabled) registry.install(skillsExtension());
+    else registry.uninstall({ name: SKILLS_EXTENSION });
     const termctrl = extensionOf(harness, TERMCTRL_EXTENSION);
     if (termctrl.enabled) {
       const host = this.#termctrlHost({ cols: Number(termctrl.settings.cols), rows: Number(termctrl.settings.rows) });

@@ -38,6 +38,13 @@ export type WireSkill = {
   readonly disableModelInvocation: boolean;
 };
 
+/** The Workspace DO's answer to `skills` (SPI-1147): the skills found, those skipped and why, and how many the cap left out. */
+export type WireSkillDiscovery = {
+  readonly skills: ReadonlyArray<WireSkill>;
+  readonly skipped: ReadonlyArray<{ readonly path: string; readonly reason: string }>;
+  readonly omitted: number;
+};
+
 /**
  * A Prompt template the Workspace DO found (the extensions package's `PromptTemplate`, which this package does not
  * import): the answer to `prompts`.

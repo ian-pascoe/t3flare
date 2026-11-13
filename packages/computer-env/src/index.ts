@@ -32,4 +32,5 @@ export type {
   WireInstructionFile,
   WirePrompt,
   WireSkill,
+  WireSkillDiscovery,
 } from "./wire.ts";

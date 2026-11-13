@@ -208,6 +208,14 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
       },
     },
   },
+  {
+    id: "skills",
+    title: "Skills",
+    description:
+      "Repo skills (.pi/skills, .agents/skills, .claude/skills from the thread's directory up to the repo root) listed in the prompt for the agent to read, offered in t3's composer as $name, and Prompt templates (.pi/prompts) as Slash commands; a picked skill or template expands into the message. Off: no listing, no composer entries, no expansion (SPI-1147).",
+    default: "on",
+    settings: {},
+  },
   { id: "coding-tools", title: "Coding tools", description: "read, write, edit and bash (Worker Shell or Container).", default: "always", settings: {}, locked: CORE_LOCK },
   { id: "files", title: "File tools", description: "ls, find and grep.", default: "always", settings: {}, locked: CORE_LOCK },
   {

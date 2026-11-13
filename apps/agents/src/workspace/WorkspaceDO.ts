@@ -37,6 +37,7 @@ import type {
   TerminalAnswer,
   TerminalOpenInput,
 } from "@t3flare/workspace-client";
+import type { PromptTemplate, Skill, SkillDiscovery } from "@t3flare/skills";
 import { HARNESS_ROOT, REPO_ROOT } from "@t3flare/workspace-client";
 
 import * as git from "isomorphic-git";
@@ -74,6 +75,7 @@ import { ModelKeyGate } from "./modelKey.ts";
 import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { AgentTerminals } from "./agentTerminals.ts";
+import { workspacePrompts, workspaceSkills } from "./skills.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
@@ -595,15 +597,29 @@ export class WorkspaceDO extends ContainerHost {
     return this.#host.handle(request);
   }
 
-  /** No skills, prompt templates or nested instruction files in part 1 (the Session reads AGENTS.md itself). */
-  skills(_cwd: string): Promise<ReadonlyArray<never>> {
-    return Promise.resolve([]);
+  /**
+   * The Repo skills of a thread in `cwd` (inside the Workspace), found in its own files (SPI-1147): never the Container.
+   * `environmentSkills` is the Environment skill set's slot, empty until SPI-1148.
+   */
+  async skills(cwd: string): Promise<SkillDiscovery> {
+    this.#alive();
+    await this.#workspace.ready();
+    return workspaceSkills(this.#host.readEnv(cwd), REPO_ROOT, this.#environmentSkills());
   }
 
-  prompts(_cwd: string): Promise<ReadonlyArray<never>> {
-    return Promise.resolve([]);
+  /** The Environment skill set (SPI-1148); none yet. */
+  #environmentSkills(): ReadonlyArray<Skill> {
+    return [];
   }
 
+  /** The Prompt templates of a thread in `cwd`: its `.pi/prompts` (SPI-1147). */
+  async prompts(cwd: string): Promise<ReadonlyArray<PromptTemplate>> {
+    this.#alive();
+    await this.#workspace.ready();
+    return workspacePrompts(this.#host.readEnv(cwd));
+  }
+
+  /** No nested instruction files (the Session reads AGENTS.md itself). */
   instructions(_directory: string): Promise<ReadonlyArray<never>> {
     return Promise.resolve([]);
   }
