@@ -51,9 +51,10 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
     renewals and status, and ignores a value out of bounds. `T3FLARE_MAX_CONTAINERS` still wins.
   - A holder is always renewed. Before this change, a renewal was refused once the other holders reached the max,
     which a lower budget would have triggered.
-  - The refusal is `Container budget (N) reached: raise it at /_t3flare/harness#environment`. It is short because
-    computer keeps only the first 240 characters of a failed start's message, its own ~120-character prefix included,
-    and that message is what terminals and CLI agents see.
+  - The refusal is `Container budget (N) reached: raise it at /_t3flare/harness#environment`. computer wraps it in its
+    connect errors and keeps only the first 240 characters of each message, its own ~120-character prefix included,
+    and fewer after a `priorExit=` (a Container that exited before). The reason is kept short, and the Workspace DO
+    reads it whole from the deepest error in the cause chain (`startRefusal.ts`) for terminals and CLI processes.
 - **Docs.** ADR-0032; the ADR-0026 note; `GLOSSARY.md`: Harness panel (revised), Harness settings, Environment
   settings, Container size, and Container budget (new with the scope change). No t3 lean, so no
   `upstream-fragility.md` entry.
@@ -67,21 +68,33 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
 | The Workspace DO's read, kept-copy fallback, launch (size, idle; a budget only from a fresh read) | `apps/agents/test/containerLaunch.test.ts` |
 | The budget carried on `acquire`, env override winning, lowering below the running count | `apps/agents/test/budget.workerd.test.ts` |
 | Reclaiming enough idle holders or none (two running at a budget of 1) | `apps/agents/test/reclaim.test.ts` |
+| A refused start's whole reason from the cause chain | `apps/agents/test/startRefusal.test.ts` |
 | Separate revisions, audit `entity`, validation, CSRF/Origin/form guards, the section | `apps/environment/test/environmentSettings.test.ts` |
 | The cost table | `apps/environment/test/containerCost.test.ts` (figures from the research's worked example) |
 
 ## Evidence (stage `penv`)
 
-| File | Shows |
-| -- | -- |
-| `sizes.json` | Each size set through the API, then a fresh start, then its limits read in the Container. |
-| `running.json` | A size and idle-time change made while the Container runs, and the next start after its idle stop. |
-| `idle.json` | The idle stop at 1 and 3 minutes. |
-| `budget.json` | The budget at 1, raised to 2, and lowered to 1 with two Containers running. |
-| `revisions.json` | Each entity's revision moving alone. |
-| `audit.json` | Environment entries and an entry written by main's code. |
-| `safety.json` | The new routes refused from outside. |
-| `environment-*.png` | The section, desktop and phone, light and dark, with one Container running. |
+Each file came from a deploy of the commit named. The files from `f165c87` carry it in their `commit` field (the
+deployed build's, from `/_t3flare/health`); the older ones predate that field, and their commit is matched from the
+deploy logs and their `at`.
+
+| File | Shows | Commit deployed |
+| -- | -- | -- |
+| `sizes.json` | Each size set through the API, then a fresh start, then its limits read in the Container. | `fb98003` |
+| `running.json` | A size and idle-time change made while the Container runs, and the next start after its idle stop. | `fb98003` |
+| `idle.json` | The idle stop at 1 and 3 minutes. | `fb98003` |
+| `safety.json` | The new routes refused from outside. | `fb98003` |
+| `revisions.json` | Each entity's revision moving alone. | `8163dcd` |
+| `budget.json` | The budget at 1, raised to 2, and lowered to 1 with two Containers running. | `f165c87` |
+| `audit.json` | Environment entries and an entry written by main's code (`penv` deployed from `main` first). | `f165c87` |
+| `cost-live.json` | The section's script on the stage's page: size and budget changed in the form, not saved; the cost follows. | `f165c87` |
+| `environment-*.png` | The section, desktop and phone, light and dark, with one Container running. | `f165c87` |
+| `environment-live-*.png` | The same after the inputs changed: 5 Containers of `standard-4`, the row marked, at most $2.01 an hour. | `f165c87` |
+
+The `fb98003` files predate the review rounds. Those rounds changed how a launch is built (`launchOf`,
+`containerInstance`, the kept copy read through the schema), not what a start passes or what a running Container keeps;
+the unit tests cover the new paths. `budget.json`, `audit.json` and the screenshots were taken again at `f165c87`
+because the rewritten reclaim, the new `reclaimable()` RPC and the live cost script run only there.
 
 **`sizes.json`.** The limits read in each Container:
 
@@ -144,5 +157,7 @@ before and after.
   that window to one RPC.
 - **A fallback budget is not sent.** A start whose read of the Environment settings timed out carries no budget, and the
   budget DO keeps the owner's last one.
-- **The 240-character cap.** If the Container exited before (`priorExit=` in computer's message), the reason may still
-  be cut in the top message. The full reason is always in the error's causes.
+- **The 240-character cap.** On the `5334eb9` deploy, `budget.json`'s first case met it: that Workspace's Container had
+  exited before, computer added `priorExit=…`, and the top message ended at `Container budget (1`. `f165c87` reads the
+  reason from the cause chain (`startRefusal.ts`), and the harness reads the longest reason in the answer; the case
+  passes there.

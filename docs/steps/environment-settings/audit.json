@@ -1,35 +1,49 @@
 {
- "at": "2026-11-13T21:01:48.982Z",
+ "at": "2026-11-13T21:46:00.753Z",
  "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
- "entries": 5,
+ "commit": "f165c87c59aa",
+ "entries": 9,
  "cases": [
   {
    "name": "Environment changes carry entity environment, with the changed settings before and after",
    "sample": [
     {
      "entity": "environment",
-     "at": 1794603699471,
+     "at": 1794606358761,
      "caller": "service-token",
      "action": "environment.change",
-     "target": "containerIdleMinutes",
+     "target": "containerBudget",
      "before": {
-      "containerIdleMinutes": 4
+      "containerBudget": 1
      },
      "after": {
-      "containerIdleMinutes": 2
+      "containerBudget": 3
      }
     },
     {
      "entity": "environment",
-     "at": 1794603698424,
+     "at": 1794606352320,
      "caller": "service-token",
      "action": "environment.change",
-     "target": "containerIdleMinutes",
+     "target": "containerBudget",
      "before": {
-      "containerIdleMinutes": 2
+      "containerBudget": 2
      },
      "after": {
-      "containerIdleMinutes": 4
+      "containerBudget": 1
+     }
+    },
+    {
+     "entity": "environment",
+     "at": 1794606349895,
+     "caller": "service-token",
+     "action": "environment.change",
+     "target": "containerBudget",
+     "before": {
+      "containerBudget": 1
+     },
+     "after": {
+      "containerBudget": 2
      }
     }
    ],
@@ -39,7 +53,7 @@
    "name": "the entry written on main's deploy, without entity, reads as harness",
    "entries": [
     {
-     "at": 1794603637819,
+     "at": 1794605992239,
      "caller": "service-token",
      "action": "extension.change",
      "target": "codemode",

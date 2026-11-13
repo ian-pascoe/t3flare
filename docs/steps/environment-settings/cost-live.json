@@ -1,0 +1,65 @@
+{
+ "at": "2026-11-13T21:47:14.732Z",
+ "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "commit": "f165c87c59aa",
+ "note": "The Environment section's script on the stage's page (its CSP, its hashes): the size set to standard-4 and the budget to 5 in the form, not saved.",
+ "before": [
+  {
+   "now": "With these settings, at most $0.31 an hour: 3 Containers of cpu-1, every vCPU busy.",
+   "head": "3 Containers, an hour",
+   "current": "cpu-1",
+   "cell": "$0.31"
+  },
+  {
+   "now": "With these settings, at most $0.31 an hour: 3 Containers of cpu-1, every vCPU busy.",
+   "head": "3 Containers, an hour",
+   "current": "cpu-1",
+   "cell": "$0.31"
+  },
+  {
+   "now": "With these settings, at most $0.31 an hour: 3 Containers of cpu-1, every vCPU busy.",
+   "head": "3 Containers, an hour",
+   "current": "cpu-1",
+   "cell": "$0.31"
+  },
+  {
+   "now": "With these settings, at most $0.31 an hour: 3 Containers of cpu-1, every vCPU busy.",
+   "head": "3 Containers, an hour",
+   "current": "cpu-1",
+   "cell": "$0.31"
+  }
+ ],
+ "after": [
+  {
+   "now": "With these settings, at most $2.01 an hour: 5 Containers of standard-4, every vCPU busy.",
+   "head": "5 Containers, an hour",
+   "current": "standard-4",
+   "cell": "$2.01"
+  },
+  {
+   "now": "With these settings, at most $2.01 an hour: 5 Containers of standard-4, every vCPU busy.",
+   "head": "5 Containers, an hour",
+   "current": "standard-4",
+   "cell": "$2.01"
+  },
+  {
+   "now": "With these settings, at most $2.01 an hour: 5 Containers of standard-4, every vCPU busy.",
+   "head": "5 Containers, an hour",
+   "current": "standard-4",
+   "cell": "$2.01"
+  },
+  {
+   "now": "With these settings, at most $2.01 an hour: 5 Containers of standard-4, every vCPU busy.",
+   "head": "5 Containers, an hour",
+   "current": "standard-4",
+   "cell": "$2.01"
+  }
+ ],
+ "expected": {
+  "now": "With these settings, at most $2.01 an hour: 5 Containers of standard-4, every vCPU busy.",
+  "head": "5 Containers, an hour",
+  "current": "standard-4",
+  "cell": "$2.01"
+ },
+ "ok": true
+}
