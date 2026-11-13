@@ -174,6 +174,7 @@ export const guardianExtension = (host: GuardianHost, settings: GuardianSettings
             const known = await api.memo<Decision>(memo, context);
             decision = known ?? (await api.memo<Decision>(memo, await review(api, call, settings, host, policy.detail, securityPolicy, context), context));
           }
+          console.log(JSON.stringify({ t3flare: "guardian-decision", tool: call.name, policy: policy.policy, source: policy.source, result: decision.result }));
           if (decision.result === "allowed") return undefined;
           await audit(host, api, call, decision, context);
           return { block: decision.reason };

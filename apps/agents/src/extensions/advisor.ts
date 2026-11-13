@@ -31,6 +31,8 @@ import { type EvidenceMessage, evidenceRefs, projectEntry, selectContextSeed } f
 export const ADVISOR_EXTENSION = "advisor";
 /** A finding's entry: its model message is "Advisor <severity>: <message>"; t3 shows it as a notice. */
 export const ADVICE_ENTRY = "t3flare.advice";
+/** A Review's record (what it was given, what it reported, what was kept): data only. */
+export const REVIEW_ENTRY = "t3flare.advisor-review";
 
 /** pi-advisor's defaults. */
 export const REVIEW_TIMEOUT_MS = 120_000;
@@ -319,6 +321,10 @@ export class AdvisorObserver {
     if (reported === undefined) throw new Error("the Advisor's answer held no JSON report");
     const known = new Set(refs);
     const findings = reported.flatMap((raw) => validFinding(raw, known) ?? []).slice(0, MAX_FINDINGS);
+    const summary = { mode, fresh, messages: seed.messages.length, reported: reported.length, kept: findings.length };
+    console.log(JSON.stringify({ t3flare: "advisor-review", ...summary }));
+    // pi-advisor's status entry: data only, so neither the agent nor t3 shows it; the Session's History keeps it.
+    await observed.submit({ type: "write", entry: { kind: REVIEW_ENTRY, data: { ...summary, findings: reported.slice(0, MAX_FINDINGS * 2) as JsonObject[] } } }, context).catch(() => undefined);
     await this.#deliver(findings, mode, observed, context);
   }
 
