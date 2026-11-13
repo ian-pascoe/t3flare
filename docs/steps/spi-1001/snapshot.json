@@ -1,0 +1,72 @@
+{
+ "at": "2026-11-13T20:58:54.761Z",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "projectId": "352c6e2b-e40e-4931-98d5-6e76310b97ab",
+ "root": "/w/p1001b",
+ "written": [
+  ".agents/skills/fruit-code/reference/code.md",
+  ".agents/skills/fruit-code/SKILL.md",
+  ".agents/skills/owner-only/SKILL.md",
+  ".claude/skills/fruit-code/SKILL.md",
+  ".pi/prompts/echo.md"
+ ],
+ "container": {
+  "before": {
+   "running": false,
+   "leased": false
+  },
+  "after": {
+   "running": false,
+   "leased": false
+  }
+ },
+ "project": {
+  "error": null,
+  "snapshotCwd": "/w/p1001b",
+  "skills": [
+   {
+    "name": "fruit-code",
+    "description": "How to find the fruit code. Use whenever anyone asks for the fruit code.",
+    "path": "/w/p1001b/.agents/skills/fruit-code/SKILL.md",
+    "scope": "project",
+    "enabled": true,
+    "userInvocationOnly": false
+   },
+   {
+    "name": "owner-only",
+    "description": "A skill only the owner names; the agent's listing leaves it out.",
+    "path": "/w/p1001b/.agents/skills/owner-only/SKILL.md",
+    "scope": "project",
+    "enabled": true,
+    "userInvocationOnly": true
+   }
+  ],
+  "slashCommands": [
+   {
+    "name": "echo",
+    "description": "Reply with exactly: ECHO $1 ${2:-none}"
+   }
+  ],
+  "slashCommandsPending": null
+ },
+ "m0": {
+  "project": "/w/p1001b",
+  "worktree": {
+   "path": "/w/.wt/p1001b/p1001-mwfgkde9-cc85fecf5d344615",
+   "error": null,
+   "snapshotCwd": "/w/.wt/p1001b/p1001-mwfgkde9-cc85fecf5d344615",
+   "skills": [],
+   "slashCommands": [],
+   "slashCommandsPending": null
+  },
+  "scratch": {
+   "root": "/w/t3-scratch",
+   "error": null,
+   "snapshotCwd": "/w/t3-scratch",
+   "skills": [],
+   "slashCommands": [],
+   "slashCommandsPending": null
+  }
+ }
+}

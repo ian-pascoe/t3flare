@@ -1,0 +1,45 @@
+{
+ "at": "2026-11-13T21:02:24.532Z",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "off": {
+  "status": 200
+ },
+ "checks": {
+  "snapshotEmpty": true,
+  "noListing": true,
+  "noExpansion": true,
+  "noTemplate": true
+ },
+ "snapshotOff": {
+  "error": null,
+  "snapshotCwd": "/w/p1001b",
+  "skills": [],
+  "slashCommands": [],
+  "slashCommandsPending": null
+ },
+ "threadId": "9728f30e-778b-4a1c-a8e3-7dd33d453241",
+ "steps": {
+  "listing": {
+   "sent": "Without reading any file or running any command: does your system prompt hold an <available_skills> list? Reply YES or NO, then the skill names if YES.",
+   "status": "completed",
+   "typed": "Without reading any file or running any command: does your system prompt hold an <available_skills> list? Reply YES or NO, then the skill names if YES.",
+   "answer": "NO. My system prompt has no `<available_skills>` list.",
+   "tools": []
+  },
+  "mention": {
+   "sent": "Without reading any file or running any command, reply with exactly the text after the colon, unchanged: $fruit-code",
+   "status": "completed",
+   "typed": "Without reading any file or running any command, reply with exactly the text after the colon, unchanged: $fruit-code",
+   "answer": "$fruit-code",
+   "tools": []
+  },
+  "template": {
+   "sent": "/echo a",
+   "status": "completed",
+   "typed": "/echo a",
+   "answer": "a",
+   "tools": []
+  }
+ }
+}

@@ -1,0 +1,56 @@
+{
+ "at": "2026-11-13T21:01:50.389Z",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "threadId": "036c9837-675a-4216-a842-dc85af21074e",
+ "checks": {
+  "listedReadsSkill": true,
+  "mentionAnswers": true,
+  "templateAnswers": true,
+  "unknownUntouched": true,
+  "lateExpands": true
+ },
+ "steps": {
+  "listed": {
+   "sent": "What is the fruit code? Reply with the code alone.",
+   "status": "completed",
+   "typed": "What is the fruit code? Reply with the code alone.",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"nativeItemRef\":{\"driver\":\"piDurable\",\"nativeId\":\"thread:036c9837-675a-4216-a842-dc85af21074e:call:toolu_013Sb4JmHxbEbj5rf5BeFEzb\",\"strength\":\"strong\"},\"parentItemId\":null,\"ordinal\":1000002,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/w/p1001b/.agents/skills/fruit-code/SKILL.md\"},\"outputOmitted\":true}",
+    "{\"nativeItemRef\":{\"driver\":\"piDurable\",\"nativeId\":\"thread:036c9837-675a-4216-a842-dc85af21074e:call:toolu_017LMCVDDeh4nDf2553dZw9U\",\"strength\":\"strong\"},\"parentItemId\":null,\"ordinal\":1000003,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/w/p1001b/.agents/skills/fruit-code/reference/code.md\"},\"outputOmitted\":true}"
+   ]
+  },
+  "mention": {
+   "sent": "$fruit-code",
+   "status": "completed",
+   "typed": "$fruit-code",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"nativeItemRef\":{\"driver\":\"piDurable\",\"nativeId\":\"thread:036c9837-675a-4216-a842-dc85af21074e:call:toolu_01PgobsT7y7pU7RpWvxRbeu4\",\"strength\":\"strong\"},\"parentItemId\":null,\"ordinal\":2000002,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/w/p1001b/.agents/skills/fruit-code/reference/code.md\"},\"outputOmitted\":true}"
+   ]
+  },
+  "template": {
+   "sent": "/echo a",
+   "status": "completed",
+   "typed": "/echo a",
+   "answer": "ECHO a none",
+   "tools": []
+  },
+  "unknown": {
+   "sent": "Reply with exactly the text after the colon, unchanged: $nope",
+   "status": "completed",
+   "typed": "Reply with exactly the text after the colon, unchanged: $nope",
+   "answer": "$nope",
+   "tools": []
+  },
+  "late": {
+   "sent": "$late-mwfgpjak",
+   "status": "completed",
+   "typed": "$late-mwfgpjak",
+   "answer": "LATE-5",
+   "tools": [],
+   "listedBefore": false
+  }
+ }
+}
