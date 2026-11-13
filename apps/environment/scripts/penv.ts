@@ -34,9 +34,12 @@ interface Case {
   readonly [key: string]: unknown;
 }
 
-const writeEvidence = (name: string, value: Record<string, unknown>) => {
+/** The deployed build's commit (the Worker's `/_t3flare/health`), so each evidence file names the code it ran against. */
+const deployedCommit = async (): Promise<string | null> => (await admin("GET", "/_t3flare/health")).json?.build?.commit ?? null;
+
+const writeEvidence = async (name: string, value: Record<string, unknown>) => {
   fs.mkdirSync(OUT, { recursive: true });
-  fs.writeFileSync(path.join(OUT, name), `${JSON.stringify({ at: new Date().toISOString(), host: new URL(T3).host, ...value }, null, 1)}\n`);
+  fs.writeFileSync(path.join(OUT, name), `${JSON.stringify({ at: new Date().toISOString(), host: new URL(T3).host, commit: await deployedCommit(), ...value }, null, 1)}\n`);
   console.log(`wrote docs/steps/environment-settings/${name} (ok: ${String(value.ok)})`);
 };
 
@@ -190,7 +193,7 @@ const sizes = async () => {
   }
   await stop();
   await setEnvironment({ containerSize: "cpu-1", containerIdleMinutes: 2 });
-  writeEvidence("sizes.json", { workspace: WORKSPACE, sizes: rows, ok: rows.every((row) => row.ok) });
+  await writeEvidence("sizes.json", { workspace: WORKSPACE, sizes: rows, ok: rows.every((row) => row.ok) });
 };
 
 const running = async () => {
@@ -230,7 +233,7 @@ const running = async () => {
   });
   await stop();
   await setEnvironment({ containerSize: "cpu-1", containerIdleMinutes: 2 });
-  writeEvidence("running.json", { workspace: WORKSPACE, cases, ok: cases.every((entry) => entry.ok) });
+  await writeEvidence("running.json", { workspace: WORKSPACE, cases, ok: cases.every((entry) => entry.ok) });
 };
 
 const idle = async () => {
@@ -247,8 +250,12 @@ const idle = async () => {
     cases.push({ name: `idle ${minutes} minute(s)`, launch: started.container?.launch, lastUse, stoppedSeenAt: stopped.stoppedSeenAt, idleSeenMs: seen, ok: started.container?.launch?.idleMs === minutes * 60_000 && seen !== null && seen >= minutes * 60_000 && seen < minutes * 60_000 + 75_000 });
   }
   await setEnvironment({ containerIdleMinutes: 2 });
-  writeEvidence("idle.json", { workspace: WORKSPACE, note: "idleSeenMs: from the last command to the first poll (every 5 s) that saw the Container stopped", cases, ok: cases.every((entry) => entry.ok) });
+  await writeEvidence("idle.json", { workspace: WORKSPACE, note: "idleSeenMs: from the last command to the first poll (every 5 s) that saw the Container stopped", cases, ok: cases.every((entry) => entry.ok) });
 };
+
+/** The longest refusal reason in a refused start's answer: computer cuts its own messages, the causes keep it whole. */
+const refusalIn = (text: string): string | undefined =>
+  [...text.matchAll(/the Container cannot start: ([^"\\]+)/g)].map((match) => match[1]!).sort((a, b) => b.length - a.length)[0];
 
 const budget = async () => {
   cookie ||= await pair();
@@ -259,7 +266,7 @@ const budget = async () => {
   const start = async (id: string) => {
     const answer = await callOn(id, { exec: { script: "true", timeoutMs: 180_000 } });
     const text = JSON.stringify(answer);
-    return { ok: answer.status === 200 && answer.result?.exitCode === 0, status: answer.status, running: answer.container?.running ?? null, budget: answer.container?.launch?.budget ?? null, refusal: /the Container cannot start: ([^"\\]+)/.exec(text)?.[1] ?? (answer.status === 200 ? null : text.slice(0, 400)), raw: answer.status === 200 ? undefined : text.slice(0, 2000) };
+    return { ok: answer.status === 200 && answer.result?.exitCode === 0, status: answer.status, running: answer.container?.running ?? null, budget: answer.container?.launch?.budget ?? null, refusal: refusalIn(text) ?? (answer.status === 200 ? null : text.slice(0, 400)), raw: answer.status === 200 ? undefined : text.slice(0, 2000) };
   };
   // A holder busy with a command is never asked to give its slot up (review F7 asks idle holders only).
   const busy = (id: string, seconds: number) => void callOn(id, { exec: { script: `sleep ${seconds}`, timeoutMs: (seconds + 30) * 1000 } }).catch(() => undefined);
@@ -293,7 +300,7 @@ const budget = async () => {
 
   for (const id of ids) await stopOn(id);
   await setEnvironment({ containerBudget: 3 });
-  writeEvidence("budget.json", { workspaces: ids, cases, ok: cases.every((entry) => entry.ok) });
+  await writeEvidence("budget.json", { workspaces: ids, cases, ok: cases.every((entry) => entry.ok) });
 };
 
 const revisionsCase = async () => {
@@ -309,7 +316,7 @@ const revisionsCase = async () => {
   cases.push({ name: "Status shows both revisions and when a Workspace last took the Environment settings", status, ok: typeof status?.["Environment settings revision"] === "number" && typeof status?.["settings revision"] === "number" });
   await harness("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 } });
   await setEnvironment({ containerIdleMinutes: 2 });
-  writeEvidence("revisions.json", { cases, ok: cases.every((entry) => entry.ok) });
+  await writeEvidence("revisions.json", { cases, ok: cases.every((entry) => entry.ok) });
 };
 
 const audit = async () => {
@@ -325,7 +332,7 @@ const audit = async () => {
     { name: "the entry written on main's deploy, without entity, reads as harness", entries: old, ok: old.length === 1 && old[0].entity === "harness" },
     { name: "every entry has an entity", entities: [...new Set(entries.map((entry) => entry.entity))], ok: entries.every((entry) => entry.entity === "harness" || entry.entity === "environment") },
   ];
-  writeEvidence("audit.json", { entries: entries.length, cases, ok: cases.every((entry) => entry.ok) });
+  await writeEvidence("audit.json", { entries: entries.length, cases, ok: cases.every((entry) => entry.ok) });
 };
 
 const safety = async () => {
@@ -350,7 +357,7 @@ const safety = async () => {
   cases.push({ name: "a size not offered: refused with the setting named", status: invalid.status, answer: invalid.json, ok: invalid.status === 400 });
   const after = (await harness("GET", "/_t3flare/harness/api/environment")).json?.revision;
   cases.push({ name: "nothing refused was stored", before, after, ok: before === after });
-  writeEvidence("safety.json", {
+  await writeEvidence("safety.json", {
     note: "The CSRF token binds the owner's Access subject; a script's service token needs none (ADR-0026 §2) and the owner's assertion cannot be made from a script. The CSRF refusals are the unit tests' (apps/environment/test/environmentSettings.test.ts), as for m3-panel-safety.json.",
     cases,
     ok: cases.every((entry) => entry.ok),

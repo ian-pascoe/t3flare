@@ -49,6 +49,7 @@ import { EMPTY_ENVIRONMENT, type McpRelayAnswer, type ResolvedEnvironment, resol
 import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, takeEnvironment } from "./containerLaunch.ts";
 import { reclaimFor } from "./reclaim.ts";
+import { startRefusal } from "./startRefusal.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { ContainerPreview } from "./containerPreview.ts";
 import { type PortProbe, probeRunningPort, scanRunningContainer, stopGroupInRunningContainer } from "./ports.ts";
@@ -337,8 +338,8 @@ export class WorkspaceDO extends ContainerHost {
         try {
           await this.exec({ script: "true", timeoutMs: 180_000 });
         } catch (error) {
-          // The budget's own reason, out of computer's connect-retry wrapping.
-          const reason = /the Container cannot start: (.+?)(?:"|$)/s.exec(String(error))?.[1];
+          // The budget's own reason, whole, out of computer's connect-retry wrapping (`startRefusal`).
+          const reason = startRefusal(error);
           throw new Error(reason === undefined ? String(error).slice(0, 300) : `the Container cannot start: ${reason}`);
         }
       },
@@ -541,8 +542,8 @@ export class WorkspaceDO extends ContainerHost {
     try {
       await this.exec({ script: "true", timeoutMs: 180_000 });
     } catch (error) {
-      // The budget's own reason, out of computer's connect-retry wrapping.
-      const reason = /the Container cannot start: (.+?)(?:"|$)/s.exec(String(error))?.[1];
+      // The budget's own reason, whole, out of computer's connect-retry wrapping (`startRefusal`).
+      const reason = startRefusal(error);
       throw new Error(reason === undefined ? String(error).slice(0, 300) : `the Container cannot start: ${reason}`);
     }
   }
