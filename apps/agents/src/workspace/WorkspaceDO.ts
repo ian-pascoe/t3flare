@@ -45,7 +45,7 @@ import { CREDENTIAL_HELPER, CREDENTIAL_PATH } from "./credentialHelper.ts";
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
 import { environmentStub } from "../environment.ts";
 import type { McpRelayAnswer } from "@t3flare/harness-registry";
-import { changedBetween, currentRevision } from "./changeLog.ts";
+import { changedBetween, currentRevision, largestFileUnder } from "./changeLog.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { ContainerPreview } from "./containerPreview.ts";
 import { type PortProbe, probeRunningPort, scanRunningContainer, stopGroupInRunningContainer } from "./ports.ts";
@@ -942,7 +942,7 @@ export class WorkspaceDO extends ContainerHost {
   async #repo(): Promise<Repo> {
     await this.#workspace.ready();
     this.#gitFs ??= isomorphicFs(this.#workspace);
-    return { fs: this.#gitFs, dir: REPO_ROOT, cache: {} };
+    return { fs: this.#gitFs, dir: REPO_ROOT, cache: {}, largestFile: () => largestFileUnder(this.ctx.storage.sql, REPO_ROOT) };
   }
 
   // -------------------------------------------------------------------------------------------------------------------

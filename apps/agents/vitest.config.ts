@@ -22,6 +22,7 @@ export default defineConfig({
                 // The fake-clock subclass for lease timing; the real class (wall clock) for the one test of the default.
                 CONTAINER_BUDGET: { className: "FakeClockContainerBudget", useSQLite: true },
                 WALL_CLOCK_BUDGET: { className: "ContainerBudget", useSQLite: true },
+                VFS_PROBE: { className: "VfsProbe", useSQLite: true },
               },
             },
           }),

@@ -17,12 +17,23 @@ export interface Repo {
   readonly fs: GitFs;
   readonly dir: string;
   readonly cache: GitCache;
+  /**
+   * The size of the largest file under `dir`, `.git` included (the Workspace DO reads it from computer's VFS in one
+   * query). Absent, the guard does not check file sizes.
+   */
+  readonly largestFile?: () => number;
 }
 
 /** The most tracked files the DO handles itself (cloudpid's guard); past it, a capture needs the Container's git. */
 export const MAX_TRACKED_FILES = 2_000;
 /** The most bytes of packs the DO reads itself. */
 export const MAX_PACK_BYTES = 16 * 1024 * 1024;
+/**
+ * The largest file the DO's git reads itself (SPI-1050). isomorphic-git holds a whole file, and a capture a few copies of
+ * it, so peak memory runs at 5–8 times the file: about 33 MiB for 4 MiB, against the isolate's 128 MB (a 100 MiB file
+ * took 400+ MiB). Past it, a capture uses the Container's git and a stale read gets its last answer.
+ */
+export const MAX_FILE_BYTES = 4 * 1024 * 1024;
 
 /** t3's checkpoint commit identity (`GitVcsDriver.checkpoints.captureCheckpoint`). */
 const CHECKPOINT_AUTHOR = { name: "T3 Code", email: "t3code@users.noreply.github.com" } as const;
@@ -85,8 +96,9 @@ export const indexEntries = async (repo: Repo, gitlinks?: Set<string>): Promise<
   return out;
 };
 
-/** Whether the repo is within the guard: few enough tracked files and packs small enough for the DO. */
+/** Whether the repo is within the guard: few enough tracked files, and packs and every file small enough for the DO. */
 export const withinGuard = async (repo: Repo): Promise<boolean> => {
+  if (repo.largestFile !== undefined && repo.largestFile() > MAX_FILE_BYTES) return false;
   const tracked = await git.listFiles({ fs: repo.fs, dir: repo.dir, cache: repo.cache });
   if (tracked.length > MAX_TRACKED_FILES) return false;
   const packDir = `${repo.dir}/.git/objects/pack`;

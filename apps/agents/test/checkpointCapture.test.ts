@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { captureTurn, type CaptureDeps, type LastCapture } from "../src/workspace/checkpointCapture.ts";
-import { MAX_TRACKED_FILES } from "../src/workspace/gitRepo.ts";
+import { MAX_FILE_BYTES, MAX_TRACKED_FILES } from "../src/workspace/gitRepo.ts";
 
 const root = mkdtempSync(join(tmpdir(), "t3flare-capture-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -95,6 +95,17 @@ describe("captureTurn (SPI-1100)", () => {
     expect(ws.show("refs/t3/checkpoints/t/turn/2", "notes.txt")).toBe("two\n");
     expect(ws.containerCaptures).toEqual(["refs/t3/checkpoints/t/turn/0", "refs/t3/checkpoints/t/turn/2"]);
   }, 60_000);
+
+  it("a file past MAX_FILE_BYTES puts a small repo above the guard (SPI-1050)", async () => {
+    const ws = workspace("big-file");
+    let largest = MAX_FILE_BYTES;
+    const deps: CaptureDeps = { ...ws.deps, repo: async () => ({ fs, dir: ws.dir, cache: {}, largestFile: () => largest }) };
+    expect(await captureTurn(deps, "refs/t3/checkpoints/t/turn/0")).toMatchObject({ ok: true, by: "do" });
+    largest = MAX_FILE_BYTES + 1;
+    ws.containerWrites("data.bin", "big\n");
+    expect(await captureTurn(deps, "refs/t3/checkpoints/t/turn/1")).toMatchObject({ ok: true, by: "container" });
+    expect(ws.containerCaptures).toEqual(["refs/t3/checkpoints/t/turn/1"]);
+  });
 
   it("fails the capture, writing no ref, when the pull fails", async () => {
     const ws = workspace("pull-fails");

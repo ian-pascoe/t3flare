@@ -221,9 +221,9 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 
 ### U23. `@cloudflare/computer` 0.11.2's private VFS tables
 
-- **Where**: the Workspace DO reads computer's SQLite VFS tables directly: `vfs_meta` (`k = 'rev'`), `vfs_nodes`, `vfs_dirents`, `vfs_changes`, `_vfs_push_cursor`, `_vfs_watermark` (`apps/agents/src/workspace/changeLog.ts:33-113`, `readCache.ts:56-84`). The read cache's revisions and the stale reads' write journal (U13) come from them. Their SQL is unchanged from 0.9.0 to 0.11.2 (SPI-1141); 0.11 adds its own `computer_pending_sync_*` tables, which we do not read.
+- **Where**: the Workspace DO reads computer's SQLite VFS tables directly: `vfs_meta` (`k = 'rev'`), `vfs_nodes`, `vfs_dirents`, `vfs_changes`, `_vfs_push_cursor`, `_vfs_watermark` (`apps/agents/src/workspace/changeLog.ts:33-113`, `readCache.ts:56-84`). The read cache's revisions and the stale reads' write journal (U13) come from them. The in-DO git guard's largest-file check (`largestFileUnder`, SPI-1050) walks `vfs_dirents` and reads `vfs_nodes.size`; `test/largestFile.workerd.test.ts` runs it against a real computer Workspace. Their SQL is unchanged from 0.9.0 to 0.11.2 (SPI-1141); 0.11 adds its own `computer_pending_sync_*` tables, which we do not read.
 - **Breaks when**: we bump computer and it changes its schema (a t3 bump does not move computer itself).
-- **Detection**: **silent**: no test asserts the schema. Cheapest check: [T4](#gaps-in-detection).
+- **Detection**: mostly **silent**: only `largestFile.workerd.test.ts` exercises the schema (`vfs_dirents`, `vfs_nodes.size`). Cheapest check for the rest: [T4](#gaps-in-detection).
 - **Blast radius**: wrong cached git answers (status and diffs that do not change), or a Workspace DO that throws on every read.
 - **Fix**: the computer release's schema; pin computer until the reads are ported.
 

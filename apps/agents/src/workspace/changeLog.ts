@@ -123,6 +123,37 @@ export const changedBetween = (
   return [...changed.values()];
 };
 
+/**
+ * The size in bytes of the largest file under directory `dir` (absolute, in the Workspace's files), at any depth; 0 when
+ * there is none or `dir` is missing. SPI-1050: the in-DO git guard reads it, so one large file sends git work to the
+ * Container instead of the DO's isolate. Hard links count once per path; symlinks are not followed.
+ */
+export const largestFileUnder = (sql: ChangeLogSql, dir: string): number => {
+  const parts = dir.split("/").filter(Boolean);
+  let inode = ROOT_INODE;
+  for (const name of parts) {
+    const [row] = sql
+      .exec<{ child: number }>("SELECT child_inode AS child FROM vfs_dirents WHERE parent_inode = ? AND name = ?", inode, name)
+      .toArray();
+    if (row === undefined) return 0;
+    inode = row.child;
+  }
+
+  const [row] = sql
+    .exec<{ biggest: number | null }>(
+      `WITH RECURSIVE tree(inode) AS (
+         SELECT ?
+         UNION ALL
+         SELECT d.child_inode FROM vfs_dirents d JOIN tree t ON d.parent_inode = t.inode
+       )
+       SELECT MAX(n.size) AS biggest FROM tree t JOIN vfs_nodes n ON n.inode = t.inode WHERE n.type = 'file'`,
+      inode,
+    )
+    .toArray();
+
+  return row?.biggest ?? 0;
+};
+
 /** What the file-change signal reads of the change log, for one backend. */
 export type ChangeLog = {
   /** The revision the backend has been sent everything through. */
