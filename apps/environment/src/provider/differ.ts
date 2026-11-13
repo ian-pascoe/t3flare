@@ -342,6 +342,22 @@ const emitTool = (
       return;
     }
   }
+  // The agent's Terminals (SPI-1057) as commands, as t3 shows a command: what started or what was typed, and the screen.
+  if (call.name === "terminal_start" || (call.name === "terminal_send" && (str(call.arguments.text) !== undefined || Array.isArray(call.arguments.keys)))) {
+    const keys = Array.isArray(call.arguments.keys) ? call.arguments.keys.filter((key): key is string => typeof key === "string") : [];
+    const input =
+      call.name === "terminal_start"
+        ? (str(call.arguments.command) ?? "")
+        : `${str(call.arguments.id) ?? "?"} ⟵ ${JSON.stringify(str(call.arguments.text) ?? "")}${keys.length === 0 ? "" : ` [${keys.join(", ")}]`}`;
+    const exitCode = typeof details.exit_code === "number" ? details.exit_code : undefined;
+    emitItem(state, out, turn, key, "tool_call", status, call.name === "terminal_start" ? `Terminal ${str(details.id) ?? ""}`.trim() : `Typed into ${str(call.arguments.id) ?? "a Terminal"}`, {
+      type: "command_execution",
+      input: textOut(input),
+      ...(output.length > 0 ? { output } : {}),
+      ...(exitCode === undefined ? {} : { exitCode }),
+    }, now, parentKey);
+    return;
+  }
   // The web tools (SPI-1054) as t3's own web search item, as t3's ACP adapter shows a fetch; a failed call stays a tool
   // item, whose output says why.
   if ((call.name === "web_search" || call.name === "web_fetch") && result?.isError !== true) {
@@ -402,6 +418,33 @@ const emitTodo = (state: DifferState, out: Array<ProviderAdapterV2Event>, pushed
   });
 };
 
+/**
+ * The ports' notices (SPI-1057, SPI-1058, SPI-1059) as t3's `system_notice`, as t3's Pi provider shows its own: an
+ * Advisor's finding, a Guardian's rejection, a Terminal's exit. Their entries carry the text in `data` (`details` here).
+ */
+const NOTICES: Readonly<Record<string, (details: Record<string, unknown>) => { readonly title: string; readonly message: string } | undefined>> = {
+  "t3flare.advice": (details) => {
+    const severity = str(details.severity);
+    const message = str(details.message);
+    return severity === undefined || message === undefined ? undefined : { title: `Advisor ${severity}`, message };
+  },
+  "t3flare.guardian": (details) => {
+    const tool = str(details.tool);
+    const reason = str(details.reason);
+    return tool === undefined || reason === undefined ? undefined : { title: `Guardian ${str(details.result) === "failed" ? "could not review" : "blocked"} ${tool}`, message: reason };
+  },
+  "t3flare.terminal-exit": (details) => {
+    const text = str(details.text);
+    return text === undefined ? undefined : { title: text.split("\n", 1)[0]!.slice(0, 200), message: text };
+  },
+};
+
+const emitNotice = (state: DifferState, out: Array<ProviderAdapterV2Event>, turn: TurnContext, entry: PushedEntry, now: DateTime.Utc) => {
+  const notice = NOTICES[entry.kind]?.((entry.details ?? {}) as Record<string, unknown>);
+  if (notice === undefined) return;
+  emitItem(state, out, turn, `notice:${entry.id}`, "system", "completed", notice.title, { type: "system_notice", message: notice.message }, now);
+};
+
 /** A tool item's title: code mode's, and the context tools' by what they did (SPI-1056); else the tool's name. */
 const toolTitle = (call: ToolCallInfo): string => {
   const action = str(call.arguments.action);
@@ -415,6 +458,14 @@ const toolTitle = (call: ToolCallInfo): string => {
       return `History: ${action ?? "?"}`;
     case "context_rollover":
       return "Context rollover: the agent hands off to a fresh context";
+    case "terminal_send":
+      return `Read ${str(call.arguments.id) ?? "a Terminal"}`;
+    case "terminal_stop":
+      return `Stopped ${str(call.arguments.id) ?? "a Terminal"}`;
+    case "terminal_list":
+      return "Terminals and Background jobs";
+    case "terminal_wait":
+      return "Waited for Terminals and Background jobs";
     default:
       return call.name;
   }
@@ -713,6 +764,8 @@ export const diff = (
       }
     } else if (entry.role === "toolResult" && entry.toolCallId !== undefined) {
       results.set(entry.toolCallId, entry);
+    } else if (NOTICES[entry.kind] !== undefined && !state.terminated.has(turn.providerTurnId)) {
+      emitNotice(state, out, turn, entry, now);
     }
   }
 

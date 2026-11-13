@@ -35,6 +35,11 @@ export interface TerminalCommandInput {
   readonly cwd: string;
   /** A worktree's project-root view: `/w/<project>` linked to this directory in the Container. */
   readonly projectRoot?: { readonly t3Path: string; readonly view: string };
+  /**
+   * An agent's Terminal or Background job (SPI-1057, pi-termctrl's `terminal_start`): run this under `bash -c` instead of
+   * becoming an interactive bash. The repo's own path (`/workspace/repo`) as `t3Path` links nothing.
+   */
+  readonly command?: string;
 }
 
 /** The rc file: no `BASH_ENV`, mise, history, a short prompt and the two markers. */
@@ -64,6 +69,13 @@ export const terminalCommand = (input: TerminalCommandInput): string => {
       "fi",
     ].join("\n");
   const rc = `/tmp/t3flare-rc-${input.marker}`;
+  if (input.command !== undefined) {
+    return [
+      ...(input.t3Path === "/workspace/repo" ? [] : [link(input.t3Path, "/workspace/repo")]),
+      `cd -- ${quote(input.cwd)} 2>/dev/null || cd -- ${quote(input.t3Path)}`,
+      `exec bash -c ${quote(input.command)}`,
+    ].join("\n");
+  }
   return [
     "set -u",
     `mkdir -p "$(dirname ${TERMINAL_HISTORY})"`,

@@ -3,13 +3,13 @@
 // the command needs a real binary, so the Container (the costly backend) starts only when a command needs it. Dropped
 // from cloudpid's: the Images binding (`read` keeps pi-durable's own image checks), the Call diff of `write` and of
 // codemode's nested calls (`edit` records its patch itself; a script's edits show as its children, ADR-0027). Added: `bash`'s exit code in its result's
-// `details`, which the Environment's differ shows on the command item.
+// `details`, which the Environment's differ shows on the command item, and (SPI-1057) pi-termctrl's `background`.
 // @effect-diagnostics asyncFunction:off preferEffectArray:off
 import type { Context } from "@earendil-works/chord";
-import { defineExtension, defineTool, type Extension, section, type ToolRegistration } from "@earendil-works/pi-durable";
+import { defineExtension, defineTool, type Extension, section, type ToolExecutionApi, type ToolExecutionResult, type ToolRegistration } from "@earendil-works/pi-durable";
 import type { ExecutionEnv, FileError, Result, ShellOutputInfo } from "@earendil-works/pi-durable/env";
 import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-durable/tools";
-import { num, obj, oneOf, opt, str } from "@earendil-works/pi-schema";
+import { bool, num, obj, oneOf, opt, str } from "@earendil-works/pi-schema";
 
 import {
   type BashRoute,
@@ -69,11 +69,24 @@ const backendDescription = [
   'Override `backend` with `"container"` only when the worker ran a command and its output was wrong.',
 ].join("\n");
 
+const commandField = str({ description: "Bash command to execute" });
+const timeoutField = opt(num({ description: "Timeout in seconds (optional, no default timeout)" }));
+const backendField = opt(oneOf(["worker", "container"], { description: "Where to run the command (default: chosen from the command)" }));
+
 const parameters = obj({
-  command: str({ description: "Bash command to execute" }),
-  timeout: opt(num({ description: "Timeout in seconds (optional, no default timeout)" })),
-  backend: opt(oneOf(["worker", "container"], { description: "Where to run the command (default: chosen from the command)" })),
+  command: commandField,
+  timeout: timeoutField,
+  backend: backendField,
+  background: opt(bool({ description: "Run in the background if still running after 2 seconds; returns a Background job id and log path" })),
 });
+
+/**
+ * Background jobs (SPI-1057, pi-termctrl's `bash` replacement): with `background: true` a command runs as a Background job
+ * in the Workspace's container; one that finishes within 2 s answers as `bash` does, else the call returns its id.
+ */
+export interface BackgroundJobs {
+  run(command: string, cwd: string, api: ToolExecutionApi, context: Context): Promise<ToolExecutionResult>;
+}
 
 // @effect-diagnostics-next-line extendsNativeError:off -- caught by `bash` itself.
 class RunOnContainer extends Error {}
@@ -132,13 +145,16 @@ const withExitCode = <R extends { readonly structuredOutput?: unknown; readonly 
   return typeof exitCode === "number" ? { ...result, details: { ...(result.details as object | undefined), exitCode } } : result;
 };
 
-const bashTool = (known: Map<string, boolean>): ToolRegistration<typeof parameters> =>
+const bashTool = (known: Map<string, boolean>, jobs: BackgroundJobs | undefined): ToolRegistration =>
   defineTool({
     ...bashBase,
     description: `${base.description}\n\n${backendDescription}`,
-    parameters,
-    async execute({ backend, ...args }, api, context) {
+    // Without Background jobs (termctrl off), `background` is not offered, as with pi-termctrl's `replaceBash: false`.
+    // SAFETY: the same fields but `background`, which is then never present.
+    parameters: (jobs === undefined ? withoutBackground : parameters) as typeof parameters,
+    async execute({ backend, background, ...args }, api, context) {
       const env = api.env;
+      if (background === true && jobs !== undefined) return jobs.run(args.command, env?.cwd ?? "/workspace/repo", api, context);
       const runOn = async (on: ExecutionEnv) => withExitCode(await base.execute(args, { ...api, env: on }, context));
       if (!hasBackends(env)) {
         if (backend !== "container") return withExitCode(await base.execute(args, api, context));
@@ -193,11 +209,17 @@ const Guidelines = section("coding_tools", (input) => {
   return lines.length === 0 ? undefined : lines.join("\n");
 });
 
-/** `read`, `write`, `edit`, and `bash` with a `backend` argument, and the `coding_tools` section. */
-export const codingTools = (): Extension =>
+/** `bash`'s parameters without `background`. */
+const withoutBackground = obj({ command: commandField, timeout: timeoutField, backend: backendField });
+
+/**
+ * `read`, `write`, `edit`, and `bash` with a `backend` argument (and `background` with `jobs`), and the `coding_tools`
+ * section. Installed again with the same name when the jobs change, in place, so the permissions' wraps stay outside it.
+ */
+export const codingTools = (options: { readonly jobs?: BackgroundJobs } = {}): Extension =>
   defineExtension({
     name: "coding-tools",
     // `read` is replay-safe (tools step, plan §2.6): it has no effect, so a script's read cut off by a restart reruns.
-    tools: [throughContainer({ ...createReadTool(), replay: "safe" as const }), throughContainer(createWriteTool()), throughContainer(createEditTool()), bashTool(new Map())],
+    tools: [throughContainer({ ...createReadTool(), replay: "safe" as const }), throughContainer(createWriteTool()), throughContainer(createEditTool()), bashTool(new Map(), options.jobs)],
     sections: [Guidelines],
   });

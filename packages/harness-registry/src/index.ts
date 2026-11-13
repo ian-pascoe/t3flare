@@ -23,7 +23,9 @@ export * from "./mcp.ts";
 export type FieldSchema =
   | { readonly type: "boolean"; readonly default: boolean }
   | { readonly type: "integer"; readonly minimum: number; readonly maximum: number; readonly default: number }
-  | { readonly type: "enum"; readonly values: ReadonlyArray<string>; readonly default: string };
+  | { readonly type: "enum"; readonly values: ReadonlyArray<string>; readonly default: string }
+  /** Free text (SPI-1058: guardian's rules and policy, typed as pi-guardian's menu takes them); `multiline` is a text area. */
+  | { readonly type: "text"; readonly maxLength: number; readonly default: string; readonly multiline?: boolean };
 
 export type SettingValue = boolean | number | string;
 
@@ -47,7 +49,7 @@ export interface ExtensionEntry {
 /** The offered-tools presets (plan §2.2, OD-T4): which non-MCP tools the model is offered without a search. */
 export const OFFERED_PRESETS = {
   /** B, the default: the core coding tools, `ask_user`, code mode, tool search and t3's own tools. */
-  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo", "context_notes", "context_history", "context_rollover"],
+  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo", "context_notes", "context_history", "context_rollover", "terminal_start", "terminal_send", "terminal_stop", "terminal_list", "terminal_wait"],
   /** A: code mode and tool search; every other tool through a script or a search. */
   "codemode-only": ["codemode", "tool_search"],
   /** C: everything direct. */
@@ -58,8 +60,10 @@ export type OfferedPreset = keyof typeof OFFERED_PRESETS;
 
 const CORE_LOCK = "a core extension: always on";
 
-/** The models `web_search` may ask (the proxy's Claude models; models.json). */
-export const SEARCH_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"] as const;
+/** The proxy's Claude models (models.json): what `web_search`, the guardian and the advisor may ask. */
+export const PROXY_CLAUDE_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"] as const;
+/** The models `web_search` may ask. */
+export const SEARCH_MODELS = PROXY_CLAUDE_MODELS;
 
 export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
   {
@@ -137,6 +141,22 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
           "When the context nears full, ask the agent to roll over with its own Handoff instead of a generated summary; a compaction that cannot wait uses the last saved Handoff. Off: pi-durable's own summary.",
         schema: { type: "boolean", default: true },
       },
+    },
+  },
+  {
+    id: "termctrl",
+    title: "Terminals and Background jobs",
+    description:
+      "terminal_start, terminal_send, terminal_stop, terminal_list and terminal_wait: interactive programs (REPLs, TUIs, prompts) as PTYs in the Workspace's container, and bash's background: true. Approvals follow the thread's mode as bash's do; nothing starts a container until a Terminal or a job starts. At most 8 run at once in a Workspace, and they end with its container (SPI-1057).",
+    default: "on",
+    settings: {
+      backgroundBash: {
+        title: "Background jobs from bash",
+        description: "Offer bash's background parameter: a command still running after 2 s becomes a Background job.",
+        schema: { type: "boolean", default: true },
+      },
+      cols: { title: "Columns", description: "A Terminal's width.", schema: { type: "integer", minimum: 40, maximum: 400, default: 120 } },
+      rows: { title: "Rows", description: "A Terminal's height.", schema: { type: "integer", minimum: 10, maximum: 200, default: 40 } },
     },
   },
   { id: "coding-tools", title: "Coding tools", description: "read, write, edit and bash (Worker Shell or Container).", default: "always", settings: {}, locked: CORE_LOCK },
@@ -330,6 +350,8 @@ const invalid = (schema: FieldSchema, value: unknown): string | undefined => {
       return value > schema.maximum ? `at most ${schema.maximum}` : undefined;
     case "enum":
       return typeof value === "string" && schema.values.includes(value) ? undefined : `one of ${schema.values.join(", ")}`;
+    case "text":
+      return typeof value === "string" && value.length <= schema.maxLength ? undefined : `text of at most ${schema.maxLength} characters`;
   }
 };
 

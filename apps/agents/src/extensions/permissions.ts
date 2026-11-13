@@ -247,7 +247,14 @@ export interface PermissionsHost {
   readonly workspaceId: () => string | null;
 }
 
-const kindOf = (tool: string): ApprovalKind => (tool === "bash" ? "command" : "file-change");
+/** The tools that run commands (SPI-1057: the agent's Terminals type into programs as `bash` runs them). */
+const COMMAND_TOOLS = new Set(["bash", "terminal_start", "terminal_send"]);
+
+const kindOf = (tool: string): ApprovalKind => (COMMAND_TOOLS.has(tool) ? "command" : "file-change");
+
+/** A `terminal_send` that only polls types nothing: it never asks. */
+const typesNothing = (tool: string, args: Readonly<Record<string, unknown>>): boolean =>
+  tool === "terminal_send" && (typeof args.text !== "string" || args.text === "") && (!Array.isArray(args.keys) || args.keys.length === 0);
 
 /** Whether `mode` asks before a call of `kind`. */
 export const asks = (mode: RuntimeMode, kind: ApprovalKind): boolean =>
@@ -260,7 +267,12 @@ const textOf = (value: unknown): string => (typeof value === "string" ? value : 
  * the card's cap, with any cut said.
  */
 export const summaryOf = (tool: string, args: Readonly<Record<string, unknown>>): { readonly summary: string; readonly detail?: string } => {
-  if (tool === "bash") return { summary: cardText(textOf(args.command)) };
+  if (tool === "bash") return { summary: cardText(`${textOf(args.command)}${args.background === true ? "  (in the background)" : ""}`) };
+  if (tool === "terminal_start") return { summary: cardText(`Terminal: ${textOf(args.command)}`) };
+  if (tool === "terminal_send") {
+    const keys = Array.isArray(args.keys) ? ` [${args.keys.filter((key): key is string => typeof key === "string").join(", ")}]` : "";
+    return { summary: cardText(`Type into ${textOf(args.id)}: ${JSON.stringify(textOf(args.text))}${keys}`) };
+  }
   const path = cardText(textOf(args.path), 1_000);
   if (tool === "edit") {
     const edits = Array.isArray(args.edits) ? (args.edits as ReadonlyArray<{ oldText?: unknown; newText?: unknown }>) : [];
@@ -356,6 +368,7 @@ const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T 
     replay: "safe",
     async execute(args: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
       if (unsafe && (await api.memo<boolean>(STARTED_MEMO, context)) === true) return cutOffResult();
+      if (typesNothing(tool.name, args)) return tool.execute(args as never, api as never, context);
       const kind = kindOf(tool.name);
       const plan = host.interaction() === "plan";
       // Plan mode is read-only: no file change runs, and every command asks (a command cannot be classified as reading).
@@ -407,7 +420,7 @@ export const permissions = (host: PermissionsHost): Extension =>
     wraps: [
       ...PATH_TOOLS.map((name) => wrap(name, (tool) => translated(host, tool, "path"))),
       wrap("bash", (tool) => translated(host, tool, "command")),
-      ...["bash", "edit", "write"].map((name) => wrap(name, (tool) => guarded(host, tool))),
+      ...["bash", "edit", "write", "terminal_start", "terminal_send"].map((name) => wrap(name, (tool) => guarded(host, tool))),
       // Code mode is never guarded (a dispatcher: what it calls is), only noted, so a card its script raises names it.
       wrap("codemode", (tool) => noted(host, tool)),
     ],

@@ -765,6 +765,9 @@ importers:
       '@t3flare/workspace-client':
         specifier: workspace:*
         version: link:../../packages/workspace-client
+      '@xterm/headless':
+        specifier: 6.0.0
+        version: 6.0.0
       diff:
         specifier: 9.0.0
         version: 9.0.0
@@ -6694,6 +6697,9 @@ packages:
 
   '@webgpu/types@0.1.74':
     resolution: {integrity: sha512-lgiI4hbuLcI9unnm2cL/tvCaQU45dp0xcLWJh5uB/9MBGvIA4F8XIk7nSiBeg+K4xWGYwgZKn80LmERI5CxoTA==}
+
+  '@xterm/headless@6.0.0':
+    resolution: {integrity: sha512-5Yj1QINYCyzrZtf8OFIHi47iQtI+0qYFPHmouEfG8dHNxbZ9Tb9YGSuLcsEwj9Z+OL75GJqPyJbyoFer80a2Hw==}
 
   '@yuku-core/binding-android-arm64@0.19.0':
     resolution: {integrity: sha512-wdL2XmTiZixAOaHk9Z0JJZ8u9Qm8d333Zjpc6gaxXFX+UR5BlsfxZ7a2+2Rm71pamppsPYGUGFq2oVLbh6DISw==}
@@ -14333,6 +14339,8 @@ snapshots:
   '@vue/shared@3.5.45': {}
 
   '@webgpu/types@0.1.74': {}
+
+  '@xterm/headless@6.0.0': {}
 
   '@yuku-core/binding-android-arm64@0.19.0':
     optional: true

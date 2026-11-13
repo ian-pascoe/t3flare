@@ -62,6 +62,11 @@ export interface TerminalHostDeps {
   readonly beforeSpawn: () => Promise<void>;
   /** Where a worktree's project-root view is, in the Workspace. */
   readonly projectRootView: string;
+  /**
+   * Whether input typed before the shell's first prompt waits for it (t3's shells). An agent's Terminal runs a command,
+   * not the rc file's prompt, so its input goes at once (SPI-1057).
+   */
+  readonly holdFirstInput?: boolean;
 }
 
 interface Terminal {
@@ -183,6 +188,7 @@ export class TerminalHost {
         t3Path: input.t3Path,
         cwd: input.cwd,
         ...(input.projectRoot === undefined ? {} : { projectRoot: { t3Path: input.projectRoot, view: this.#deps.projectRootView } }),
+        ...(input.command === undefined ? {} : { command: input.command }),
       });
       const process = await this.#deps.spawn(["bash", "-c", command], {
         cols: input.cols,
@@ -340,7 +346,7 @@ export class TerminalHost {
     const terminal = this.#terminals.get(key);
     if (terminal === undefined || terminal.exited) return this.#answer([key]);
     this.#lastInput = this.#deps.now();
-    if (!terminal.prompted && this.#deps.now() - terminal.heldSince < FIRST_PROMPT_WAIT_MS) {
+    if (this.#deps.holdFirstInput !== false && !terminal.prompted && this.#deps.now() - terminal.heldSince < FIRST_PROMPT_WAIT_MS) {
       terminal.held.push(data);
       return this.#answer([]);
     }

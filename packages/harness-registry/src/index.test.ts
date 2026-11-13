@@ -24,6 +24,11 @@ describe("resolveHarness", () => {
     expect(applyChange(EMPTY_HARNESS, { extension: "web", settings: { searchModel: "gpt-9" } })).toMatchObject({ ok: false });
   });
 
+  it("has Terminals on with bash's background jobs and a 120x40 viewport (SPI-1057): nothing starts a container until used", () => {
+    expect(resolveHarness(EMPTY_HARNESS).extensions.termctrl).toEqual({ enabled: true, settings: { backgroundBash: true, cols: 120, rows: 40 } });
+    expect(applyChange(EMPTY_HARNESS, { extension: "termctrl", settings: { cols: 10 } })).toMatchObject({ ok: false });
+  });
+
   it("gives an extension's defaults to a Session whose resolved view predates the entry", () => {
     const { web: _web, ...older } = resolveHarness(EMPTY_HARNESS).extensions;
     const taken = { ...resolveHarness(EMPTY_HARNESS), extensions: older };

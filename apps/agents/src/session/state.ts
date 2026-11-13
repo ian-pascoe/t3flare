@@ -73,7 +73,7 @@ export const usageOf = (value: Json): UsageSlim | undefined => {
 
 /** One committed entry as pushed. `turn` is the turn the Session attributes it to. */
 export const pushedEntry = (
-  entry: { readonly id: number | string; readonly kind: string; readonly model?: ReadonlyArray<Json>; readonly byTaskId?: number | string },
+  entry: { readonly id: number | string; readonly kind: string; readonly model?: ReadonlyArray<Json>; readonly byTaskId?: number | string; readonly data?: Json },
   turn: string | null,
 ): PushedEntry => {
   const message = record(entry.model?.[entry.model.length - 1]);
@@ -84,6 +84,8 @@ export const pushedEntry = (
     byTaskId: entry.byTaskId === undefined ? null : String(entry.byTaskId),
     turn,
     ...(typeof message.timestamp === "number" ? { timestamp: message.timestamp } : {}),
+    // The ports' own entries (an Advisor finding, a Guardian rejection, a Terminal's exit) carry what t3 shows in `data`.
+    ...(entry.kind.startsWith("t3flare.") && entry.data !== undefined ? { details: boundedDetails(entry.data) } : {}),
   };
   if (role === "assistant") {
     const usage = usageOf(message.usage);

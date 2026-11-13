@@ -85,12 +85,14 @@ section{display:flex;flex-direction:column;gap:.625rem;scroll-margin-top:1.5rem}
 .inline-field label{font-size:.8125rem;font-weight:500}
 input[type=text],input[type=url],input[type=password],input[type=number],select{height:2.25rem;padding:0 .625rem;border:1px solid var(--input);border-radius:var(--radius);background:var(--card);color:var(--fg);font:inherit;font-size:.875rem;transition:border-color .15s,box-shadow .15s}
 input[type=number]{width:7.5rem;font-variant-numeric:tabular-nums}
+textarea{min-height:5rem;width:100%;padding:.5rem .625rem;border:1px solid var(--input);border-radius:var(--radius);background:var(--card);color:var(--fg);font:inherit;font-size:.875rem;resize:vertical}
+.field input[type=text]{width:100%}
 select{padding-right:2rem;appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted-fg) 50%),linear-gradient(135deg,var(--muted-fg) 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px;background-repeat:no-repeat;min-width:10rem}
 input::placeholder{color:color-mix(in oklab,var(--muted-fg) 80%,transparent)}
-input:hover,select:hover{border-color:color-mix(in oklab,var(--input) 60%,var(--muted-fg))}
-input:focus-visible,select:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 28%,transparent)}
+input:hover,select:hover,textarea:hover{border-color:color-mix(in oklab,var(--input) 60%,var(--muted-fg))}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 28%,transparent)}
 input:user-invalid{border-color:var(--err)}
-input:disabled,select:disabled{opacity:.64;cursor:not-allowed}
+input:disabled,select:disabled,textarea:disabled{opacity:.64;cursor:not-allowed}
 .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:.375rem;height:2rem;padding:0 .75rem;border:1px solid var(--input);border-radius:var(--radius);background:var(--card);color:var(--fg);font:inherit;font-size:.8125rem;font-weight:500;white-space:nowrap;cursor:pointer;text-decoration:none;box-shadow:0 1px 1px rgb(0 0 0/4%);transition:background-color .15s,border-color .15s,color .15s,transform .1s}
 .btn:hover{background:var(--hover)}
 .btn:active{transform:scale(.97)}

@@ -207,6 +207,8 @@ export interface TerminalOpenInput {
   readonly env: Readonly<Record<string, string>>;
   /** A worktree's project (`/w/<project>`): linked to the worktree's project-root view in its Container (step 2b). */
   readonly projectRoot?: string;
+  /** An agent's Terminal or Background job (SPI-1057): this command under `bash -c`, not an interactive bash. */
+  readonly command?: string;
 }
 
 /** Every answer names the Workspace DO instance (its epoch): a new epoch means the old one's terminals are gone. */
@@ -318,3 +320,109 @@ export interface ProcessReadAnswer extends ProcessAnswer {
 /** `processInput`'s answer: `gap` and `failed` end the process (a write is never skipped, review F6). */
 export type ProcessInputAnswer = ProcessAnswer & { readonly accepted: "written" | "duplicate" | "gap" | "failed" | "unknown" };
 
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The agent's Terminals and Background jobs (SPI-1057, pi-termctrl): PTYs in the Workspace's Container that a Durable
+// agent's tools drive, beside t3's own terminals and under the same host (ADR-0021). The Workspace DO renders each one's
+// screen; the Session's tools ask for it. Ids are the owner Session's (`t1`, `b1`, …), never reused for that Session.
+
+export type AgentEntryKind = "terminal" | "background_job";
+
+/** How an entry's process ended: an exit code, or the signal or reason that ended it. */
+export interface AgentExit {
+  readonly code: number | null;
+  readonly signal: string | null;
+}
+
+/** A zero-based screen position. */
+export interface AgentCursor {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** One entry as `list` and `wait` report it. */
+export interface AgentEntryInfo {
+  readonly id: string;
+  readonly kind: AgentEntryKind;
+  readonly command: string;
+  readonly cwd: string;
+  readonly state: "running" | "exited";
+  readonly exit: AgentExit | null;
+  readonly startedAt: number;
+  readonly endedAt: number | null;
+  /** A Background job's log in the Container. */
+  readonly logPath?: string;
+}
+
+/** Why a settle wait ended (pi-termctrl's `settle_reason`); `chunk`: the Workspace's slice of the wait ran out, ask again. */
+export type AgentSettleReason = "matched" | "timeout" | "quiet" | "exited" | "chunk";
+
+/**
+ * A Terminal's screen and what scrolled off it since the owner's previous view, with that previous view (the rows it
+ * showed and its cursor row) so the tool can show only what changed.
+ */
+export interface AgentView {
+  readonly id: string;
+  readonly state: "running" | "exited";
+  readonly exit: AgentExit | null;
+  /** The visible rows, trailing blank rows trimmed. */
+  readonly screen: string;
+  readonly cursor: AgentCursor | null;
+  /** Lines that scrolled off the screen since the previous view, oldest first. */
+  readonly scrolledOff: ReadonlyArray<string>;
+  /** Lines the owner never saw were dropped from the scrollback, or the screen was cleared. */
+  readonly outputMissing: boolean;
+  readonly previous: { readonly screen: string; readonly cursorRow: number | null } | null;
+  /** How many rows the screen scrolled since the previous view; null when unknown (no previous view, or a gap). */
+  readonly shift: number | null;
+  /** A Background job's recent output (its last lines). */
+  readonly output?: string;
+  readonly logPath?: string;
+}
+
+export type AgentTerminalRequest =
+  | {
+      readonly op: "start";
+      readonly owner: string;
+      readonly kind: AgentEntryKind;
+      readonly command: string;
+      readonly cwd: string;
+      readonly cols: number;
+      readonly rows: number;
+      readonly notify: boolean;
+    }
+  | {
+      readonly op: "settle";
+      readonly owner: string;
+      readonly id: string;
+      /** Typed before the wait: text, then termctrl key names. */
+      readonly text?: string;
+      readonly keys?: ReadonlyArray<string>;
+      readonly mode: "start" | "input" | "poll";
+      /** The whole wait's deadline (epoch ms); the Workspace answers `chunk` after at most `chunkMs`. */
+      readonly deadline: number;
+      readonly chunkMs: number;
+      readonly pattern?: string;
+      /** The screen at the wait's start, when an earlier chunk began it. */
+      readonly since?: string;
+      /** Record this answer as the owner's view (a final answer); a chunk is not. */
+      readonly view: boolean;
+    }
+  | { readonly op: "stop"; readonly owner: string; readonly id: string }
+  | { readonly op: "list"; readonly owner: string }
+  | { readonly op: "wait"; readonly owner: string; readonly ids: ReadonlyArray<string> | null; readonly deadline: number; readonly chunkMs: number }
+  /** Exits the owner has not seen in a result, with their last lines; taken ones are not reported again. */
+  | { readonly op: "exits"; readonly owner: string; readonly tailLines: number };
+
+/** What each request answers. */
+export interface AgentTerminalAnswers {
+  readonly start: { readonly entry: AgentEntryInfo };
+  readonly settle: { readonly view: AgentView; readonly reason: AgentSettleReason; readonly startScreen: string };
+  readonly stop: { readonly stopped: AgentEntryInfo; readonly view: AgentView };
+  readonly list: { readonly entries: ReadonlyArray<AgentEntryInfo> };
+  readonly wait: { readonly exited: ReadonlyArray<AgentEntryInfo>; readonly running: ReadonlyArray<AgentEntryInfo>; readonly timedOut: boolean };
+  readonly exits: { readonly exits: ReadonlyArray<AgentEntryInfo & { readonly tail: string }> };
+}
+
+/** A request's answer, or why it failed (an unknown id, the cap, a refused Container start). */
+export type AgentTerminalResult<Op extends AgentTerminalRequest["op"]> = { readonly ok: true; readonly value: AgentTerminalAnswers[Op] } | { readonly ok: false; readonly error: string };

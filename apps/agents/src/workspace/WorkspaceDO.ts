@@ -19,6 +19,8 @@ import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { DurableObject } from "cloudflare:workers";
 
 import type {
+  AgentTerminalRequest,
+  AgentTerminalResult,
   CheckpointAnswer,
   CheckpointOp,
   CloneInput,
@@ -67,6 +69,7 @@ import { readCache, readKey } from "./readCache.ts";
 import { ModelKeyGate } from "./modelKey.ts";
 import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
+import { AgentTerminals } from "./agentTerminals.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
@@ -168,6 +171,9 @@ const WORKSPACE_ID_KEY = "t3flare:workspace-id";
 const TOKEN_RENEW_MS = 5 * 60_000;
 /** The markers of the shells this object started (orphans after a restart are killed by them). */
 const TERMINAL_MARKERS_KEY = "t3flare:terminal-markers";
+/** The agent's Terminals' markers (SPI-1057), and the last id of each kind per owner Session. */
+const AGENT_TERMINAL_MARKERS_KEY = "t3flare:agent-terminal-markers";
+const AGENT_TERMINAL_IDS_KEY = "t3flare:agent-terminal-ids";
 /** Step 4a: the markers of the CLI processes this object started, with their Environment epoch. */
 const PROCESS_MARKERS_KEY = "t3flare:process-markers";
 /** Step 4a (review F6): this object's boot counter, the process channel's epoch. */
@@ -210,6 +216,9 @@ export class WorkspaceDO extends ContainerHost {
   /** This instance (review F11): the adapter learns from a new epoch that the old instance's terminals are gone. */
   readonly #epoch = crypto.randomUUID();
   readonly #terminals: TerminalHost;
+  /** The agent's Terminals and Background jobs (SPI-1057): a second host, its output rendered here. */
+  readonly #agentHost: TerminalHost;
+  readonly #agentTerminals: AgentTerminals;
   readonly #terminalSync: TerminalSync;
   #expireTimer: ReturnType<typeof setInterval> | undefined;
   /** The CLI processes (step 4a). */
@@ -276,7 +285,7 @@ export class WorkspaceDO extends ContainerHost {
       },
       push: () => this.#syncEntries("push"),
       revision: () => currentRevision(ctx.storage.sql),
-      active: () => this.#terminals.size > 0 || this.#processes.size > 0,
+      active: () => this.#terminals.size > 0 || this.#agentHost.size > 0 || this.#processes.size > 0,
     });
     this.#terminals = new TerminalHost({
       now: () => Date.now(),
@@ -310,6 +319,44 @@ export class WorkspaceDO extends ContainerHost {
         if (this.containerRunning()) await this.#syncEntries("push");
       },
       projectRootView: PROJECT_ROOT_VIEW,
+    });
+    // The agent's Terminals (SPI-1057): the same host and limits, never heartbeaten (they end with the Container or a
+    // stop), their output rendered by `AgentTerminals` instead of pushed to t3's terminal adapter.
+    this.#agentHost = new TerminalHost({
+      now: () => Date.now(),
+      epoch: this.#epoch,
+      running: () => this.containerRunning(),
+      startContainer: () => this.#startContainerFor("terminal"),
+      spawn: async (argv, options) => {
+        const container = this.ctx.container;
+        if (container === undefined) throw new Error("no Container binding");
+        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: options.env });
+      },
+      kill: (markers) => this.#killMarkers(markers),
+      push: (push) => Promise.resolve({ unknown: this.#agentTerminals.frames(push.frames) }),
+      baseEnv: terminalEnv,
+      filesMayHaveChanged: (why) => this.#terminalSync.changed(why),
+      remember: (markers) => ctx.storage.kv.put(AGENT_TERMINAL_MARKERS_KEY, [...markers]),
+      remembered: () => ctx.storage.kv.get<ReadonlyArray<string>>(AGENT_TERMINAL_MARKERS_KEY) ?? [],
+      beforeSpawn: async () => {
+        if (this.containerRunning()) await this.#syncEntries("push");
+      },
+      projectRootView: PROJECT_ROOT_VIEW,
+      holdFirstInput: false,
+    });
+    this.#agentTerminals = new AgentTerminals({
+      host: this.#agentHost,
+      now: () => Date.now(),
+      nextId: (owner, kind) => {
+        const ids = ctx.storage.kv.get<Record<string, number>>(AGENT_TERMINAL_IDS_KEY) ?? {};
+        const key = `${kind}:${owner}`;
+        const next = (ids[key] ?? 0) + 1;
+        ctx.storage.kv.put(AGENT_TERMINAL_IDS_KEY, { ...ids, [key]: next });
+        return next;
+      },
+      // A command, not an interactive shell: mise through `BASH_ENV`, as the agent's `bash` has it.
+      env: COMMAND_ENV.BASH_ENV === undefined ? {} : { BASH_ENV: COMMAND_ENV.BASH_ENV },
+      repo: REPO_ROOT,
     });
     this.#boot = (ctx.storage.kv.get<number>(BOOT_COUNT_KEY) ?? 0) + 1;
     ctx.storage.kv.put(BOOT_COUNT_KEY, this.#boot);
@@ -482,7 +529,7 @@ export class WorkspaceDO extends ContainerHost {
    */
   async #restartForSubmodules(): Promise<void> {
     // Never under a running command or an open terminal: the restart waits for the next quiet command.
-    if (!this.containerRunning() || this.#running > 0 || this.#terminals.size > 0) return;
+    if (!this.containerRunning() || this.#running > 0 || this.#terminals.size > 0 || this.#agentHost.size > 0) return;
     const needed = await this.#containerPatterns();
     if (needed.every((pattern) => this.#container.patterns.includes(pattern))) return;
     console.log(JSON.stringify({ t3flare: "container-restart-for-submodules", workspace: this.#workspaceId() ?? null, patterns: needed }));
@@ -592,7 +639,7 @@ export class WorkspaceDO extends ContainerHost {
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? Date.now();
     let at = Math.min(lastUse + this.#idleMs(), Date.now() + RENEW_EVERY_MS);
     // Open terminals: their heartbeats are checked and their hold measured at least every 30 s.
-    if (this.#terminals.size > 0 || this.#processes.size > 0) at = Math.min(at, Date.now() + 30_000);
+    if (this.#terminals.size > 0 || this.#agentHost.size > 0 || this.#processes.size > 0) at = Math.min(at, Date.now() + 30_000);
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > at) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000));
   }
@@ -1194,6 +1241,8 @@ export class WorkspaceDO extends ContainerHost {
    */
   async destroy(): Promise<{ readonly destroyed: true }> {
     this.#terminals.containerStopped();
+    this.#agentHost.containerStopped();
+    this.#agentTerminals.containerStopped();
     this.#processes.containerStopped();
     await this.#terminals.settled().catch(() => undefined);
     if (this.ctx.container?.running === true) await this.ctx.container.destroy().catch(() => undefined);
@@ -1295,6 +1344,21 @@ export class WorkspaceDO extends ContainerHost {
     return { epoch: this.#epoch, keys: this.#terminals.keys(), lastInput: this.#terminals.lastInput, pushes: this.#terminals.pushes, sync: { ...this.#terminalSync.stats } };
   }
 
+  /**
+   * The agent's Terminals and Background jobs (SPI-1057): a Session's `terminal_*` tools and `bash`'s background jobs
+   * call this. A start is use (the Container's idle stop); typing is input, which holds it as t3's terminals' does.
+   */
+  async agentTerminal<R extends AgentTerminalRequest>(request: R): Promise<AgentTerminalResult<R["op"]>> {
+    this.#alive();
+    const answer = await this.#agentTerminals.handle(request);
+    if (request.op === "start") {
+      await this.#noteUse();
+      this.#terminalSync.startPushing();
+      await this.#scheduleAlarm();
+    }
+    return answer;
+  }
+
   // -------------------------------------------------------------------------------------------------------------------
   // CLI processes (step 4a, the process channel): the Environment's spawner calls these; output goes back by push.
 
@@ -1359,7 +1423,7 @@ export class WorkspaceDO extends ContainerHost {
     const reclaimable = this.#processes.reclaimable();
     const busy =
       this.#running > 0 ||
-      this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() }) ||
+      this.#terminalsHold() ||
       reclaimable.length < this.#processes.size;
     if (busy) return { released: false, reason: "in use" };
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
@@ -1367,6 +1431,12 @@ export class WorkspaceDO extends ContainerHost {
     console.log(JSON.stringify({ t3flare: "container-released-for-budget", workspace: this.#workspaceId() ?? null, processes: reclaimable.length, ...(await this.#usage()) }));
     await this.stopContainer();
     return { released: true, reason: "idle" };
+  }
+
+  /** Whether t3's or the agent's terminals hold the Container: input within the hold (ADR-0021, review F10). */
+  #terminalsHold(): boolean {
+    const hold = { promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() };
+    return this.#terminals.holdsContainer(hold) || this.#agentHost.holdsContainer(hold);
   }
 
   #terminalIdleMs(): number {
@@ -1398,6 +1468,8 @@ export class WorkspaceDO extends ContainerHost {
       await this.ctx.container.destroy();
     }
     this.#terminals.containerStopped();
+    this.#agentHost.containerStopped();
+    this.#agentTerminals.containerStopped();
     this.#processes.containerStopped();
     this.#sandbox = undefined;
     await this.#release();
@@ -1431,7 +1503,7 @@ export class WorkspaceDO extends ContainerHost {
     await this.#processes.killOrphans().catch(() => undefined);
     const lastUse = (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? 0;
     // Terminals hold the Container until their last input is older than the hold (review F10: output is not use).
-    const held = this.#terminals.holdsContainer({ promptMs: this.#terminalPromptIdleMs(), busyMs: this.#terminalIdleMs() }) || this.#processes.holdsContainer();
+    const held = this.#terminalsHold() || this.#processes.holdsContainer();
     if (this.#running === 0 && !held && Date.now() - lastUse >= this.#idleMs()) {
       console.log(JSON.stringify({ t3flare: "container-idle-stop", workspace: this.ctx.id.toString(), ...(await this.#usage()) }));
       await this.stopContainer();

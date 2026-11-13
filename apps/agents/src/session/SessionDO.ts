@@ -60,9 +60,10 @@ import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
 import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
 import { McpQuestions } from "../extensions/mcpQuestions.ts";
-import { ApprovalStore, interactionModeSection, permissions } from "../extensions/permissions.ts";
+import { ApprovalStore, interactionModeSection, permissions, toToolPath } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
 import { CONTEXT_EXTENSION, CONTEXT_NAMESPACE, contextExtension } from "../extensions/context.ts";
+import { backgroundJobs, TERMCTRL_EXTENSION, TERMCTRL_NAMESPACE, type TermctrlHost, termctrlExtension } from "../extensions/termctrl.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
@@ -111,6 +112,8 @@ const HARNESS_KEY = "t3flare:harness";
 /** The MCP tools the Session last installed (ADR-0028), in chunks (review M12): a restart installs the same first. */
 const MCP_BUILD_KEY = "t3flare:mcp-build";
 const MCP_CHUNK_CHARS = 100_000;
+/** This Session started a Terminal or Background job once (SPI-1057): exits are asked for after each tool round. */
+const TERMCTRL_USED_KEY = "t3flare:termctrl-used";
 /** How long a turn's start waits for the Environment's harness settings before it keeps the ones it has. */
 const HARNESS_READ_MS = 5_000;
 /** A test's model proxy fault (stages only). */
@@ -328,6 +331,16 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     if (extensionOf(harness, TODO_EXTENSION).enabled) registry.install(todoExtension(() => this.#opening));
     else registry.uninstall({ name: TODO_EXTENSION });
+    const termctrl = extensionOf(harness, TERMCTRL_EXTENSION);
+    if (termctrl.enabled) {
+      const host = this.#termctrlHost({ cols: Number(termctrl.settings.cols), rows: Number(termctrl.settings.rows) });
+      registry.install(termctrlExtension(() => this.#opening, { host, used: () => this.ctx.storage.kv.get(TERMCTRL_USED_KEY) === true }));
+      namespaces.push(TERMCTRL_NAMESPACE);
+    } else {
+      registry.uninstall({ name: TERMCTRL_EXTENSION });
+    }
+    // `bash`'s `background` with Background jobs on; installed again in place, so the permissions' wraps stay outside it.
+    registry.install(codingTools(termctrl.enabled && termctrl.settings.backgroundBash !== false ? { jobs: backgroundJobs(this.#termctrlHost({ cols: Number(termctrl.settings.cols), rows: Number(termctrl.settings.rows) })) } : {}));
     const contextManagement = extensionOf(harness, CONTEXT_EXTENSION);
     if (contextManagement.enabled) {
       registry.install(contextExtension(() => this.#opening, { rolloverOnCompaction: contextManagement.settings.rolloverOnCompaction !== false }));
@@ -357,6 +370,25 @@ export class SessionDO extends DurableObject<SessionEnv> {
     } else {
       registry.uninstall({ name: "tool-search" });
     }
+  }
+
+  /** The agent's Terminals in the thread's Workspace (SPI-1057), owned by this Session. */
+  #termctrlHost(viewport: { readonly cols: number; readonly rows: number }): TermctrlHost {
+    const sessionName = this.ctx.id.name ?? this.ctx.id.toString();
+    return {
+      owner: () => sessionName,
+      viewport: () => viewport,
+      toToolPath: (text) => toToolPath(text, this.#meta()?.workspaceId ?? null),
+      call: async (request) => {
+        const id = this.#meta()?.workspaceId;
+        if (id === undefined || id === null) return { ok: false, error: "This thread has no Workspace, so it has no container to run a Terminal in." };
+        // SAFETY: the Workspace DO answers `agentTerminal` (WorkspaceDO.ts); a stub's RPC types only rewrite its declared type.
+        const workspace = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as { agentTerminal(request: unknown): Promise<unknown> };
+        const answer = (await workspace.agentTerminal(request)) as Awaited<ReturnType<TermctrlHost["call"]>>;
+        if (request.op === "start" && answer.ok) this.ctx.storage.kv.put(TERMCTRL_USED_KEY, true);
+        return answer as never;
+      },
+    };
   }
 
   // MCP tools (ADR-0028)
