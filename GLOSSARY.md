@@ -226,6 +226,28 @@ _Avoid_: pending interaction
 An MCP server that lists a `resume` taking a `requestId` and a `response` (Executor's "Through your agent" mode). Its
 `resume` is t3flare's to call, never an agent's.
 
+## Skills
+
+**Skill**:
+A directory with a `SKILL.md` (name, description, instructions) and supporting files, which an agent reads when a task matches its description or the owner names it.
+_Avoid_: plugin, command, extension
+
+**Repo skill**:
+A Skill kept in a repository's own files; each Workspace has those of its checkout. It is instructions only and grants no permission.
+_Avoid_: project skill, workspace skill
+
+**Skill mention**:
+A `$name` in the owner's message that names a Skill; t3's composer writes one when a Skill is picked.
+_Avoid_: skill chip, invocation
+
+**Slash command**:
+A `/name` starting a message that runs an action or starts the message from a Prompt template. Used in t3's sense.
+_Avoid_: command (alone)
+
+**Prompt template**:
+A Markdown file in a repository whose Slash command expands into a message with its arguments filled in. Used in pi's sense.
+_Avoid_: prompt, snippet, MCP prompt
+
 ## Credentials
 
 **Provider instance**:

@@ -574,6 +574,14 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Blast radius**: apps show as ordinary tool rows.
 - **Fix**: diff `mcpApps/`, `CodexAdapterV2.ts`'s `mcpApps`, and the ext-apps spec version t3 pins.
 
+### U64. Skills and Prompt templates for the Durable agent (SPI-1001)
+
+- **Where**: `apps/environment/src/provider/driver.ts` (`snapshotForCwd`), `provider/attachments.ts` (`turnPrompt` expands Skill mentions and Prompt templates). t3: `ProviderInstance.snapshotForCwd` and `ProviderRegistry.refreshWorkspaceSnapshot`; `matchInlineSkills`; the composer's `$name` insertion (`ChatComposer.tsx`); `ServerProviderSkill`.
+- **Breaks when**: t3 renames or re-types the hook or the snapshot's fields; changes the mention grammar or what the composer inserts for a picked skill; passes the hook another directory.
+- **Detection**: typecheck for the hook and fields. `test/skillsSnapshot.test.ts` and `test/skillExpansion.test.ts` for the grammar and the inserted text. **Silent**: a client that sends skills another way leaves `$name` unexpanded; cheapest check: the source-text test.
+- **Blast radius**: the composer lists no skills or commands for Pi Durable, or a picked skill reaches the agent as plain `$name`. Turns still run.
+- **Fix**: compare with t3's Pi provider (`packages/provider-pi/src/server/driver.ts` `snapshotForCwd`, `mcpExtensionSource.ts`).
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).
