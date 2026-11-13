@@ -27,4 +27,4 @@ The decisions behind this plan are in [`docs/adr/`](adr/); the terms are in [`GL
 
 ## Deferred, each on its own trigger
 
-Hibernatable sockets (a month over 400k GB-s), spare Workspaces, PR watch by webhook, cloud-to-laptop links, moving threads between Environments, subagents for Durable agents (rollback and fork done: SPI-987, SPI-997), more pi-durable extensions, an egress allowlist (`enableInternet: false` plus an allowlisting intercept), GitHub tokens through the intercept, the proxy's account usage shown in t3's usage meters, traces over OTLP.
+Hibernatable sockets (a month over 400k GB-s), spare Workspaces, PR watch by webhook, cloud-to-laptop links, moving threads between Environments, subagents for Durable agents (rollback and fork done: SPI-987, SPI-997), more pi-durable extensions, an egress allowlist (`enableInternet: false` plus an allowlisting intercept), GitHub tokens through the intercept, the proxy's account usage shown in t3's usage meters (done, optional: parity batch 2), traces over OTLP (done: parity batch 2).

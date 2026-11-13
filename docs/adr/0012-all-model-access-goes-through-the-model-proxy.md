@@ -70,3 +70,6 @@ The rest of this ADR stands: every model call of t3flare's own (Durable agents, 
 default) still goes to the Model proxy, and no Subscription login is held. A text generator the owner adds is his
 choice of a second path, as in stock t3.
 
+## Refinement (parity batch 2, G8): reading usage and limits from the proxy
+
+t3's Usage page and limit meters read Commissary's management API from the Environment Worker (`apps/environment/src/usage/`), with an org-admin management key and, on a self-hosted Commissary, an Access service token: Worker secrets, optional, never in a Container. Nothing is read from a vendor. See `docs/model-proxy.md`, "Usage and limits".

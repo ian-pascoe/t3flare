@@ -30,3 +30,7 @@ Unchanged: Shadows 2 (`builtInDrivers` registers Claude Code and OpenCode too; `
 ## Counts after the parity batch (G7, G4, G12)
 
 Shadows 2 (unchanged), Patches 4: `0004-scratch-root-is-a-workspace.patch` (parity G4) changes one line of `ManagedProjectFolders`, the No project folder, to `/w/t3-scratch`, so scratch threads run in a Workspace. A Layer could not do it: `ManagedProjectFolders` is built inside t3's private runtime graph (`orchestration-v2/runtimeLayer.ts`) from the one `ServerConfig`, whose `baseDir` everything else reads too, and the Shadow would copy 515 lines. The review guide's scratch checkout (G7) and the webhook origin and PR-watch wake (G12) are Layers and our own code. Evidence: `docs/steps/parity-batch.md`.
+
+## Counts after parity batch 2 (G8, G13, the Storage page, OTLP)
+
+Shadows 2 (unchanged; `builtInDrivers` now also lists usage readers in `BUILT_IN_USAGE_DRIVERS`), Patches 4 (unchanged). The rest are Layers over t3's services (`UsageLimitSources`, `AcpRegistryCatalog`, `DatabaseStorage`) and `ServerConfig` fields built from t3's own settings parser. Evidence: `docs/steps/parity-batch-2.md`.
