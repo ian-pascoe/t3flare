@@ -338,6 +338,9 @@ const statusSection = (status: Readonly<Record<string, string | number | null>>)
 </section>`;
 };
 
+/** Each entity's name in the audit log; one this page does not know shows as stored. */
+const ENTITY_LABELS: Readonly<Record<string, string>> = { harness: "Harness", environment: "Environment" };
+
 const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
   const body =
     audit.length === 0
@@ -345,7 +348,7 @@ const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
       : `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Settings</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Change</th></tr></thead><tbody>${audit
           .map(
             (entry) =>
-              `<tr><td class="when" data-label="When"><div>${time(entry.at)}</div></td><td class="who" data-label="Who"><div>${escapeHtml(entry.caller)}</div></td><td data-label="Settings"><div>${entry.entity === "environment" ? "Environment" : "Harness"}</div></td><td data-label="Action"><div><code>${escapeHtml(entry.action)}</code></div></td><td data-label="Target"><div>${escapeHtml(entry.target)}</div></td><td data-label="Change"><div><code class="change">${escapeHtml(JSON.stringify(entry.after ?? null))}</code></div></td></tr>`,
+              `<tr><td class="when" data-label="When"><div>${time(entry.at)}</div></td><td class="who" data-label="Who"><div>${escapeHtml(entry.caller)}</div></td><td data-label="Settings"><div>${escapeHtml(ENTITY_LABELS[entry.entity] ?? String(entry.entity))}</div></td><td data-label="Action"><div><code>${escapeHtml(entry.action)}</code></div></td><td data-label="Target"><div>${escapeHtml(entry.target)}</div></td><td data-label="Change"><div><code class="change">${escapeHtml(JSON.stringify(entry.after ?? null))}</code></div></td></tr>`,
           )
           .join("")}</tbody></table></div>`;
   return `<section id="audit" aria-labelledby="audit-title">
