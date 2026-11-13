@@ -704,6 +704,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     if (options.force) Idle.activity.unreadableUntil = 0;
     const verdict = Idle.idleVerdict(this.ctx.storage.sql, now, options.force ? 0 : this.#idleAfterMs());
     if (!verdict.reset) {
+      if (verdict.work !== undefined) await this.#keepRemoteTasksAlarm(verdict.work, now.getTime());
       // Fail safe (fragility U2): the Environment stays up. Logged once per back-off, as an error.
       if (verdict.unreadable !== undefined) {
         console.error(
@@ -713,18 +714,39 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       return verdict;
     }
     // A pending arm window needs no alarm: the next boot reads it, and seeds the grant only if still armed.
-    // The sweep's due time joins t3's (step 2b).
-    const due = Math.min(verdict.due.at?.getTime() ?? Number.POSITIVE_INFINITY, this.#nextSweep(now.getTime()));
-    await this.ctx.storage.setAlarm(Math.max(due, now.getTime() + 1000));
+    // The sweep's due time joins t3's (step 2b), and so does the retry of Remote tasks whose machine does not answer
+    // (SPI-1061 D7), kept in storage across the reset.
+    const planned = Idle.planReset(
+      verdict.work,
+      {
+        t3Due: verdict.due.at?.getTime() ?? null,
+        sweep: this.#nextSweep(now.getTime()),
+        retry: this.ctx.storage.kv.get<Idle.RemoteRetry>(Idle.REMOTE_RETRY_KEY),
+      },
+      now.getTime(),
+    );
+    if (planned.retry === undefined) this.ctx.storage.kv.delete(Idle.REMOTE_RETRY_KEY);
+    else this.ctx.storage.kv.put(Idle.REMOTE_RETRY_KEY, planned.retry);
+    await this.ctx.storage.setAlarm(planned.alarm);
     // `ctx.abort()` discards writes not yet durable: on production the alarm was lost without this.
     await this.ctx.storage.sync();
     const stored = await this.ctx.storage.getAlarm();
     const alarm = stored === null ? null : new Date(stored).toISOString();
-    console.log(JSON.stringify({ t3flare: "idle-reset", alarm, work: verdict.work, sources: verdict.due.sources }));
+    console.log(JSON.stringify({ t3flare: "idle-reset", alarm, work: verdict.work, sources: verdict.due.sources, remoteRetry: planned.retry ?? null }));
     this.#stopIdleChecks();
     // Reset outside this call, so the caller's I/O completes first.
     setTimeout(() => this.ctx.abort("t3flare: idle reset"), 0);
     return { ...verdict, alarm };
+  }
+
+  /**
+   * SPI-1061 D7, while t3 is up: a Remote task whose machine answers is work, so its retry state ends; and while any is
+   * open, an alarm stands no later than REMOTE_STANDING_ALARM_MS ahead, so a deploy or an eviction cannot strand it.
+   */
+  async #keepRemoteTasksAlarm(work: Idle.OpenWork, now: number): Promise<void> {
+    if (work.remoteTasksUnanswered === 0) this.ctx.storage.kv.delete(Idle.REMOTE_RETRY_KEY);
+    const at = Idle.standingAlarm(await this.ctx.storage.getAlarm(), work.remoteTasksAnswering + work.remoteTasksUnanswered, now);
+    if (at !== undefined) await this.ctx.storage.setAlarm(at);
   }
 
   override async alarm(): Promise<void> {
@@ -739,9 +761,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     if (runtime === undefined) {
       // A wake for the sweep alone does not boot t3: it is armed again for t3's own due work, if any.
       // If t3's tables cannot be read, the due work is unknown: boot t3 rather than miss a wake (fragility U2).
+      // Remote tasks (SPI-1061 D7): their retry, or at once for one left open by a deploy or an eviction.
       let due: Date | null;
       try {
-        due = Idle.nextDue(this.ctx.storage.sql).at;
+        const t3Due = Idle.nextDue(this.ctx.storage.sql).at;
+        const remote = Idle.remoteWakeAt(this.ctx.storage.kv.get<Idle.RemoteRetry>(Idle.REMOTE_RETRY_KEY), Idle.openRemoteTaskCount(this.ctx.storage.sql));
+        due = remote === null ? t3Due : new Date(Math.min(remote, t3Due?.getTime() ?? Number.POSITIVE_INFINITY));
       } catch (error) {
         if (!(error instanceof Idle.UnreadableTables)) throw error;
         console.error(JSON.stringify({ t3flare: "alarm-due-unreadable", error: error.message }));
@@ -752,7 +777,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000));
         return;
       }
-      console.log(JSON.stringify({ t3flare: "alarm-wake" }));
+      console.log(JSON.stringify({ t3flare: "alarm-wake", remoteRetry: this.ctx.storage.kv.get<Idle.RemoteRetry>(Idle.REMOTE_RETRY_KEY) ?? null }));
       try {
         await this.boot("alarm");
       } catch (error) {

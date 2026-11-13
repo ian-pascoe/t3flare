@@ -4,6 +4,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import type { ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as SqlClient from "effect/sql/SqlClient";
 import * as ServerSecretStore from "t3/src/auth/ServerSecretStore.ts";
 
 import { byName } from "../agents/rpc.ts";
@@ -64,6 +65,24 @@ export const connectSecrets = Effect.gen(function* () {
   return found;
 });
 
+/**
+ * SPI-1061 (plan §5.4): each Outbound link's bearer, which t3 keeps in its secret store under the name its row in
+ * `peer_environment_links` gives (`peer-link-*`). Only t3's peer services read it; this is the canary that keeps it so.
+ */
+export const peerLinkSecrets = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const store = yield* ServerSecretStore.ServerSecretStore;
+  const rows = yield* sql<{ environment_id: string; secret_name: string }>`
+    SELECT environment_id, secret_name FROM peer_environment_links
+  `.pipe(Effect.orElseSucceed(() => []));
+  const found: Array<Secret> = [];
+  for (const row of rows) {
+    const value = yield* store.get(row.secret_name).pipe(Effect.orElseSucceed(() => Option.none<Uint8Array>()));
+    if (Option.isSome(value)) found.push({ name: `peer-link:${row.environment_id}`, value: new TextDecoder().decode(value.value) });
+  }
+  return found;
+});
+
 export const leakedIn = (text: string, secrets: ReadonlyArray<Secret>): Array<string> =>
   secrets.filter(({ value }) => text.includes(value) || value.split("\n").some((line) => line.length >= 16 && text.includes(line))).map(({ name }) => name);
 
@@ -77,6 +96,7 @@ export const peerLeakCheck = async (
   environment.github.live().forEach((value, at) => secrets.push({ name: `github-token-${at}`, value }));
   const runtime = await environment.boot("check-peer-leak");
   secrets.push(...(await runtime.run(connectSecrets)));
+  secrets.push(...(await runtime.run(peerLinkSecrets)));
   const credentials: Array<string> = [];
   for (const threadId of input.threads) {
     const config = await runtime.run(Effect.flatMap(McpProviderSessions.McpProviderSessions, (sessions) => sessions.read(threadId as ThreadId)));

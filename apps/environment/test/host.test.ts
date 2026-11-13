@@ -87,6 +87,8 @@ describe("idle queries", () => {
     sql.exec("CREATE TABLE orchestration_v2_effect_outbox (effect_id TEXT, status TEXT, available_at TEXT)");
     sql.exec("CREATE TABLE scheduled_tasks (task_id TEXT, enabled INTEGER, next_run_at TEXT)");
     sql.exec("CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT, payload_json TEXT, deleted_at TEXT)");
+    sql.exec("CREATE TABLE orchestration_v2_projection_subagents (thread_id TEXT, subagent_id TEXT, origin TEXT, child_thread_id TEXT, payload_json TEXT)");
+    sql.exec("CREATE TABLE peer_environment_links (environment_id TEXT PRIMARY KEY, last_error TEXT)");
     return sql;
   };
   const now = new Date("2026-11-10T12:00:00.000Z");
@@ -96,7 +98,7 @@ describe("idle queries", () => {
     expect(Idle.hasOpenWork(Idle.openWork(sql, now))).toBe(false);
     sql.exec("INSERT INTO orchestration_v2_projection_runs VALUES ('r1', 'completed'), ('r2', 'waiting')");
     sql.exec("INSERT INTO orchestration_v2_effect_outbox VALUES ('e1', 'pending', '2026-11-10T11:00:00.000Z'), ('e2', 'pending', '2026-11-10T13:00:00.000Z')");
-    expect(Idle.openWork(sql, now)).toEqual({ openRuns: 1, openProviderSessions: 0, claimableEffects: 1 });
+    expect(Idle.openWork(sql, now)).toEqual({ openRuns: 1, openProviderSessions: 0, claimableEffects: 1, remoteTasksAnswering: 0, remoteTasksUnanswered: 0 });
   });
 
   it("takes the next due time from the outbox and scheduled tasks", () => {
@@ -122,7 +124,7 @@ describe("idle queries", () => {
     const sql = t3Tables();
     sql.exec("INSERT INTO orchestration_v2_projection_runs VALUES ('r1', 'rolled_back'), ('r2', 'awaiting_input')");
     sql.exec("INSERT INTO orchestration_v2_projection_provider_sessions VALUES ('s1', 'ready'), ('s2', 'stopped'), ('s3', 'paused')");
-    expect(Idle.openWork(sql, now)).toEqual({ openRuns: 1, openProviderSessions: 1, claimableEffects: 0 });
+    expect(Idle.openWork(sql, now)).toEqual({ openRuns: 1, openProviderSessions: 1, claimableEffects: 0, remoteTasksAnswering: 0, remoteTasksUnanswered: 0 });
   });
 
   it("refuses to read a missing table as empty", () => {

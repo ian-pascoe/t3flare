@@ -308,4 +308,4 @@ export const applyChange = (
 };
 export { CARD_TEXT_MAX, cardText, visible } from "./cardText.ts";
 export { isDeniedT3Tool, T3_TOOL_DENYLIST } from "./t3Tools.ts";
-export { descriptionFor, guidanceFor, OTHER_MACHINES, toolLikeNamesIn } from "./t3Guidance.ts";
+export { descriptionFor, guidanceFor, toolLikeNamesIn } from "./t3Guidance.ts";

@@ -21,7 +21,7 @@ import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
 
 import { cardText } from "./cardText.ts";
 import { type ApprovalStore, askOwner, cutOffResult, planRefusal, STARTED_MEMO } from "./permissions.ts";
-import { descriptionFor, guidanceFor, OTHER_MACHINES } from "./t3-guidance.ts";
+import { descriptionFor, guidanceFor } from "./t3-guidance.ts";
 
 export const T3_MCP_SERVER = "t3-code";
 export const t3ToolName = (name: string): string => `mcp__${T3_MCP_SERVER}__${name}`;
@@ -170,7 +170,8 @@ const waitInPieces = async (
 
 /**
  * The extension for `catalog`; installed again (replaced in place) whenever the catalog's hash changes. t3's guidance
- * is told without what names a denied tool, then our line on other machines (SPI-1060).
+ * is told without what names a denied tool (SPI-1060); with the link tools offered again (SPI-1061), its own lines on
+ * other machines pass the filter, and no line of ours is added.
  */
 export const t3McpExtension = (catalog: T3Catalog, host: T3McpHost): Extension =>
   defineExtension({
@@ -180,7 +181,8 @@ export const t3McpExtension = (catalog: T3Catalog, host: T3McpHost): Extension =
       section("t3_orchestration", () => {
         const instructions = host.instructions();
         if (instructions === undefined) return undefined;
-        return [guidanceFor(instructions), OTHER_MACHINES].filter((part) => part !== "").join("\n\n");
+        const guidance = guidanceFor(instructions);
+        return guidance === "" ? undefined : guidance;
       }),
     ],
   });

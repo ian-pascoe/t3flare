@@ -7,7 +7,8 @@
  * - `html_*`, `preview_*`, `t3_preview_*`: headless Chromium on the host (`serverBrowser` is stripped, ADR-0023).
  * - `device_*`: the device hub is host-bound and locked off (ADR-0023).
  * - `t3_worktree_*`: t3's worktree handoff runs git the process router has not been audited for.
- * - `t3_environment_link`, `t3_environment_unlink`: cloud-to-elsewhere links wait for SPI-1061 M1 (ADR-0011).
+ * The link tools (`t3_environment_link`, `t3_environment_unlink`) are offered: the Outbound link is t3's own (SPI-1061,
+ * ADR-0029).
  */
 export const T3_TOOL_DENYLIST: ReadonlySet<string> = new Set([
   "t3_attachment_*",
@@ -17,8 +18,6 @@ export const T3_TOOL_DENYLIST: ReadonlySet<string> = new Set([
   "t3_preview_*",
   "device_*",
   "t3_worktree_*",
-  "t3_environment_link",
-  "t3_environment_unlink",
 ]);
 
 const prefixOf = (pattern: string) => pattern.slice(0, -1);

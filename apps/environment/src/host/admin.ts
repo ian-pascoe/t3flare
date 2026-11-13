@@ -120,6 +120,8 @@ const health = async (environment: EnvironmentDO) => {
     alarm: alarm === null ? null : new Date(alarm).toISOString(),
     openWork: unreadableAsError(() => Idle.openWork(storage.sql, new Date())),
     nextDue: unreadableAsError(() => Idle.nextDue(storage.sql)),
+    // SPI-1061 D7: the retry of Remote tasks whose machine does not answer, if one is pending.
+    remoteRetry: storage.kv.get<Idle.RemoteRetry>(Idle.REMOTE_RETRY_KEY) ?? null,
     // The rows are t3's statements through the adapter since `isolate.startedAt` (cost audit F2).
     sql: { ...sqlStats, databaseSize: storage.sql.databaseSize },
     stateDirectory: StateStore.usage(),
@@ -355,11 +357,12 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
       }
       case "POST /_t3flare/check/connect-leak": {
-        // Step 3+: which T3 Connect secrets (names only) appear in text the caller collected, such as Workers Logs.
-        const { connectSecrets, leakedIn } = await import("./peerLeak.ts");
+        // Step 3+: which T3 Connect secrets (names only) appear in text the caller collected, such as Workers Logs; and,
+        // SPI-1061, which Outbound link bearers.
+        const { connectSecrets, leakedIn, peerLinkSecrets } = await import("./peerLeak.ts");
         const body = (await request.json()) as { text?: string };
         const runtime = await environment.boot("check-connect-leak", request);
-        const secrets = await runtime.run(connectSecrets);
+        const secrets = [...(await runtime.run(connectSecrets)), ...(await runtime.run(peerLinkSecrets))];
         return json({ checked: secrets.map(({ name }) => name), bytes: (body.text ?? "").length, leaked: leakedIn(body.text ?? "", secrets) });
       }
       case "POST /_t3flare/agents/process-check": {

@@ -46,6 +46,9 @@ describe("the denylist (U49)", () => {
     expect(offered).toContain("request_secret");
     expect(offered).toContain("delegate_task");
     expect(offered).toContain("t3_environment_links");
+    // SPI-1061 (ADR-0029): the link tools are offered again.
+    expect(offered).toContain("t3_environment_link");
+    expect(offered).toContain("t3_environment_unlink");
   });
 });
 
@@ -70,11 +73,12 @@ describe("the Durable agent's prompt and tools (SPI-1060)", () => {
     for (const family of ["preview_", "t3_preview_", "html_", "device_", "t3_attachment_", "t3_worktree_"]) {
       expect(texts.filter((text) => new RegExp(`\\b${family}`).test(text))).toEqual([]);
     }
-    // What survives is still t3's guidance, with our line on other machines.
+    // What survives is t3's own guidance, its lines on linking included (SPI-1061), and no line of ours.
     expect(prompt).toContain("## T3 Code orchestration");
     expect(prompt).toContain("`delegate_task`");
     expect(prompt).toContain("`t3_environment_links`");
-    expect(prompt).toMatch(/this Environment cannot link to another machine/);
+    expect(prompt).toContain("`t3_environment_link`");
+    expect(prompt).not.toMatch(/this Environment cannot link to another machine/);
     expect(prompt).not.toContain("### Visuals and preview");
   });
 });

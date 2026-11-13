@@ -5,13 +5,6 @@
 // (owner, 2026-11-12, back to stock: filtered by the denylist, no longer fail-closed on unclassified names; U49).
 import { isDeniedT3Tool } from "./t3Tools.ts";
 
-/**
- * Our own line, after t3's guidance (§11.1). True before the Outbound link exists: nothing here can make a link.
- * Once it does (SPI-1061 M2), it says that every message to another machine asks the owner first, as a fact.
- */
-export const OTHER_MACHINES =
-  "- Other machines: links to them are made by the owner, never by an agent, and this Environment cannot link to another machine yet. `t3_environment_links` lists what is linked; with nothing linked, say you cannot work on another machine from here. When it can link, every message to another machine will ask the owner first.";
-
 /** A backticked name that could be a tool: an identifier, or `prefix_*` for a family. */
 const TOOL_LIKE = /^[A-Za-z_][A-Za-z0-9_]*\*?$/;
 
