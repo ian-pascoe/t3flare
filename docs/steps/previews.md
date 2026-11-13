@@ -13,7 +13,7 @@ t3code is untouched (pinned at d8f3feff, `v0.1.10-nightly.20261112.4606`). **Cou
 ## For the owner
 
 1. **Nothing owner-only is needed.** OS1 turned out unnecessary: the CI token's permission groups are the same ones cloudpid deploys a Browser Run binding with (C2). Merge `previews` when you are ready; prod's deploy creates the `BROWSER` binding, the `ContainerPreviews` export and the `WORKSPACE_PREVIEWS` service binding by itself.
-2. **Cost (SPI-1123).** An open server-browser tab keeps its Browser Run session while anything keeps the Environment awake, an open web client included. Browser Run's 10-minute keep-alive never fires, because the profile is saved every 60 s over CDP. With no client, the Environment resets about 60 s after the last request, and the reset closes the sessions. The rate is about $0.09/h past the 10 included hours a month. Pick one of SPI-1123's three options: save on change only, retire unwatched tabs after 30 minutes as stock does for agent tabs, or accept the cost.
+2. **Cost (SPI-1123): fixed by option 1, save on change only** (branch `profile-save`, stage `profilesave`). The profile used to be saved every 60 s over CDP, and Browser Run counts commands it receives (not the events it sends) as activity, so an open tab kept its session, at about $0.09/h, while anything kept the Environment awake. Now the Shadow reads the state only after a page opened, a frame navigated, a response came back or operator input went out, at most every 60 s, and writes only a changed state. An unwatched tab with a client connected now ends at the 10-minute keep-alive (`keepalive.json`: Browser Run closed it `BrowserIdle` after 668 s). Known limit: a page that changes its storage from timers alone (no request, navigation or input) is saved at close or idle-retire, not while open.
 3. **Agent browser access is yours again,** with stock's default (on). The pin that held it off is gone.
 4. **Not stage-checked (tickets):** Codex's HTML and browser tools and MCP apps end to end (SPI-1124); Workspace A against B on one port (SPI-1125).
 5. SPI-1002 is In Review. SPI-1104 can close once this merges (`preview_*` and `html_*` now work for outside agents).
@@ -48,7 +48,7 @@ None of this changed the plan materially, so M1–M6 proceeded. The parent was m
   - Configured URLs are taken only on loopback, as stock takes them, and are probed only on a running Container. Review M4's public-URL probe does not arise (rebutted).
 - **M3, browser.**
   - Shadow `ServerBrowserContexts`: one Browser Run browser per Workspace, routed with `ctx.exports.ContainerPreviews({ props: { workspace } })` for the eight ports. Thread-less contexts use a route-less browser.
-    - Profiles are `storageState` in their own table (8 MiB a profile, in rows under DO SQLite's 2 MB; L4), saved every 60 s and before close.
+    - Profiles are `storageState` in their own table (8 MiB a profile, in rows under DO SQLite's 2 MB; L4), saved before close and, while open, at most every 60 s after a change (a page opened, a navigation, a response, operator input; SPI-1123).
     - Session ids are recorded, closed at the next instance's boot and at idle reset (M5).
     - `disconnected` drops the tabs.
     - Download and upload are fixed as above. Patch 0005 passes the thread.
@@ -95,11 +95,11 @@ Stage `previews` unless noted. PASS means the check's own criterion held.
 | M3 hostile preview JS against t3: cookie, `/api/auth/session`, `/mcp`, `wss:/ws`, the panel POST; computerd through the route; a forged socket id; a send without the header | PASS | `browser.json` |
 | M3 route reach: the t3 host's `/__t3flare/ws/*` is the asset fallback, never a Container | PASS | `route-reach.json` |
 | M3 / M2 download offered to the viewer and served; upload through the file chooser | PASS | `transfer.json` |
-| M3 / L4 a cookie survives the profile context's close; `clearProfile` removes it | PASS | `profile.json` |
+| M3 / L4 a cookie survives the profile context's close; `clearProfile` removes it | PASS; re-run after SPI-1123's save-on-change on stage `profilesave` (navigation, cookie set, close, idle-retire): PASS | `profile.json` |
 | M3 / M5 an open page holds the Container while someone works, lets go at the cap, then answers 503 without a start | PASS (cap 3 min on the stage; stopped at 286 s) | `hold.json` |
 | M5 a new instance closes the sessions the last one left | PASS | `boot-close.json` |
 | M5 a hidden panel left open 30 minutes | PASS as a measurement: the session was up at 10 minutes and gone by 15 | `hidden-panel.json` |
-| M5 an unwatched tab ends at keep-alive | **FAIL**: it lives while a client keeps the Environment awake (SPI-1123) | `keepalive.json` |
+| M5 an unwatched tab ends at keep-alive | PASS after SPI-1123 (stage `profilesave`): with a client connected, the session was gone by the 12-minute sample; Browser Run closed it `BrowserIdle` after 668 s, 10 minutes after the one save that followed the tab's load. Before the fix it lived all 14 minutes | `keepalive.json` |
 | M3 popup as its own tab | Spike only (the `popup` event works) | `m0-spike.json` |
 | M4 Pi Durable: `preview_open` `{kind:"port"}`, snapshot, act, evaluate over its own server | PASS | `agent.json` |
 | M4 hostile: `preview_evaluate` against t3's API | PASS (TypeError) | `agent.json` |
@@ -140,7 +140,7 @@ Against the plan as overridden by the review changelog.
   - the `shared-group` answer on a stage;
   - a read-only *scope* session (the check used `interactive=false`);
   - a popup on a stage.
-- **Wrong against the plan's expectation:** keep-alive does not end an unwatched tab (M5's exit line). The Shadow's 60 s profile save is CDP traffic (SPI-1123).
+- **Wrong against the plan's expectation:** keep-alive did not end an unwatched tab (M5's exit line). The Shadow's 60 s profile save was CDP traffic. Fixed in SPI-1123 by saving only after a change; see the M5 row.
 - **Departures, each recorded:**
   - no `headlessChrome.ts` Shadow (the bridge, review M3);
   - no image bump (the scan ships with the Worker, as `kill.ts` does);
@@ -161,5 +161,4 @@ Against the plan as overridden by the review changelog.
 ## Not done here
 
 - Rows marked NOT RUN above; their tickets are SPI-1124 and SPI-1125.
-- The cost decision (SPI-1123).
 - Merging to `main` (the owner merges).

@@ -1,6 +1,6 @@
 {
- "at": "2026-11-13T14:40:47.951Z",
- "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+ "at": "2026-11-13T15:40:09.471Z",
+ "host": "t3flare-environment-profilesave.ian-g-pascoe.workers.dev",
  "ok": true,
  "lines": [
   {
@@ -15,7 +15,7 @@
   {
    "name": "clearProfile removes it",
    "ok": true,
-   "ms": 1,
+   "ms": 0,
    "detail": {
     "cookie": ""
    }
