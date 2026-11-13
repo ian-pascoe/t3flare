@@ -21,10 +21,10 @@ const ENVIRONMENT_READ_KEY = "t3flare:environment:last-read";
 export const AUDIT_KEPT = 1_000;
 
 /**
- * Which entity on the panel's page a change was to; an entry written before SPI-1149 has none and was to the Harness
- * settings. An open set: a later entity adds its name here (the Model endpoints, SPI-1162).
+ * Which entity on the panel's page a change was to: an open set, `"harness"` and `"environment"` today (the Model
+ * endpoints, SPI-1162, add theirs). An entry written before SPI-1149 has none and was to the Harness settings.
  */
-export type AuditEntity = "harness" | "environment";
+export type AuditEntity = "harness" | "environment" | (string & {});
 
 export interface AuditEntry {
   readonly at: number;

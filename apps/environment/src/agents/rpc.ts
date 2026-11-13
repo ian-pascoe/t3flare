@@ -86,7 +86,7 @@ export interface WorkspaceRpc {
     readonly leased: boolean;
     readonly lastUse: number | null;
     readonly startedAt: number | null;
-    readonly launch: { readonly size: string; readonly instance: ContainerInstance; readonly idleMs: number; readonly revision: number } | null;
+    readonly launch: { readonly size: string; readonly instance: ContainerInstance; readonly idleMs: number; readonly budget?: number; readonly revision: number } | null;
   }>;
   stopContainer(): Promise<void>;
   readText(path: string): Promise<string | null>;

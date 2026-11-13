@@ -125,18 +125,30 @@ const dollars = (amount: number, digits: number) => `$${amount.toFixed(digits)}`
 
 const gib = (mib: number) => `${mib / 1024} GiB`;
 
-const costTable = (costs: ContainerCostTable): string => {
-  const rows = costs.rows
-    .map(
-      (row) =>
-        `<tr><td data-label="Size"><div><code>${escapeHtml(row.size)}</code>${row.default ? ' <span class="tag">default</span>' : ""}</div></td><td data-label="vCPU"><div>${row.resources.vcpu}</div></td><td data-label="Memory"><div>${gib(row.resources.memoryMib)}</div></td><td data-label="Disk"><div>${row.resources.diskMb / 1000} GB</div></td><td data-label="One Container, an hour"><div>${dollars(row.perContainerHour, 3)}</div></td><td data-label="${costs.budget} Containers, an hour"><div>${dollars(row.budgetHour, 2)}</div></td></tr>`,
-    )
-    .join("");
-  return `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">Size</th><th scope="col">vCPU</th><th scope="col">Memory</th><th scope="col">Disk</th><th scope="col">One Container, an hour</th><th scope="col">${costs.budget} Containers, an hour</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+const containers = (count: number) => `${count} ${count === 1 ? "Container" : "Containers"}`;
+
+/** The worst case for the settings as they stand; the page's script rewrites it as the size or budget inputs change. */
+const costNow = (costs: ContainerCostTable, size: string): string => {
+  const row = costs.rows.find((entry) => entry.size === size);
+  return row === undefined ? "" : `With these settings, at most ${dollars(row.budgetHour, 2)} an hour: ${containers(costs.budget)} of ${row.size}, every vCPU busy.`;
 };
 
 /**
- * The Environment settings (ADR-0032): one form rendered from their schema, the read-only budget, and each size's cost.
+ * Each size's resources and worst-case hour, one Container and the budget's. Each row carries its one-Container hour, so
+ * the page's script recomputes the budget column, the current row and the summary as the inputs change.
+ */
+const costTable = (costs: ContainerCostTable, size: string): string => {
+  const rows = costs.rows
+    .map(
+      (row) =>
+        `<tr data-size="${escapeHtml(row.size)}" data-per-hour="${Number(row.perContainerHour.toFixed(6))}"${row.size === size ? ' aria-current="true"' : ""}><td data-label="Size"><div><code>${escapeHtml(row.size)}</code>${row.default ? ' <span class="tag">default</span>' : ""}</div></td><td data-label="vCPU"><div>${row.resources.vcpu}</div></td><td data-label="Memory"><div>${gib(row.resources.memoryMib)}</div></td><td data-label="Disk"><div>${row.resources.diskMb / 1000} GB</div></td><td data-label="One Container, an hour"><div>${dollars(row.perContainerHour, 3)}</div></td><td data-label="${containers(costs.budget)}, an hour" data-budget-cell><div data-budget-hour>${dollars(row.budgetHour, 2)}</div></td></tr>`,
+    )
+    .join("");
+  return `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">Size</th><th scope="col">vCPU</th><th scope="col">Memory</th><th scope="col">Disk</th><th scope="col">One Container, an hour</th><th scope="col" data-budget-head>${containers(costs.budget)}, an hour</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+};
+
+/**
+ * The Environment settings (ADR-0032): one form rendered from their schema, the running Containers, and each size's cost.
  * A later setting (SPI-1150, SPI-1152) is a schema entry, rendered here without page work.
  */
 const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCostTable, running: PageInput["running"]): string => {
@@ -154,7 +166,8 @@ const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCo
   }</dd></div></dl>
 <h3 class="sub-head">Cost at worst</h3>
 <p class="section-desc">Cloudflare's Workers Paid list prices, every vCPU busy the whole hour. Memory and disk are billed while a Container runs, CPU only while it works, so a real hour costs less.</p>
-<div class="group">${costTable(costs)}</div>
+<p class="section-desc" data-cost-now aria-live="polite">${escapeHtml(costNow(costs, environment.containerSize))}</p>
+<div class="group">${costTable(costs, environment.containerSize)}</div>
 </section>`;
 };
 

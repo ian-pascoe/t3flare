@@ -81,6 +81,25 @@ describe("Environment settings in the panel", () => {
     expect((await getJson(deps, "audit")).entries[3].entity).toBe("harness");
   });
 
+  it("audits only the settings a save moved; a save that moves none stores, bumps and audits nothing", async () => {
+    const { store, deps } = setup({ kind: "service-token" });
+    const all = { containerSize: "standard-2", containerIdleMinutes: 2, containerBudget: 3 };
+    await post(deps, "environment", { settings: all }, {});
+    expect(store.auditLog(5)).toMatchObject([{ target: "containerSize", before: { containerSize: "cpu-1" }, after: { containerSize: "standard-2" } }]);
+    expect(store.auditLog(5)[0]?.after).toEqual({ containerSize: "standard-2" });
+    const same = await post(deps, "environment", { settings: all }, {});
+    expect(await same.json()).toMatchObject({ ok: true, unchanged: true, revision: 1 });
+    expect(store.loadEnvironment().revision).toBe(1);
+    expect(store.auditLog(5)).toHaveLength(1);
+  });
+
+  it("labels an audit entity the page does not know by its stored name (the audit entity is an open set)", async () => {
+    const { kv, deps } = setup();
+    kv.put(AUDIT_KEY, [{ at: NOW, entity: "models", caller: "owner:owner-sub", action: "models.change", target: "openai" }]);
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    expect(html).toContain('<td data-label="Settings"><div>models</div></td>');
+  });
+
   it("refuses an invalid change with the setting named, and stores and audits nothing", async () => {
     const { store, deps } = setup({ kind: "service-token" });
     for (const body of [{ settings: { containerSize: "lite" } }, { settings: { containerIdleMinutes: 0 } }, { settings: { secrets: "x" } }, { containerSize: "standard-1" }, "[]"]) {
@@ -132,6 +151,10 @@ describe("Environment settings in the panel", () => {
     expect(html).toContain('data-setting="containerBudget"');
     expect(html).toContain("$1.20");
     expect(html).toMatch(/Running now<\/dt><dd>2 of 3/);
+    // The current size's row and the summary; each row carries its one-Container hour for the script's live update.
+    expect(html).toMatch(/<tr data-size="standard-1" data-per-hour="0\.074016" aria-current="true">/);
+    expect(html).toContain("With these settings, at most $0.22 an hour: 3 Containers of standard-1, every vCPU busy.");
+    expect(html).toContain("data-budget-head>3 Containers, an hour<");
     expect(html).toContain("web-app");
   });
 });

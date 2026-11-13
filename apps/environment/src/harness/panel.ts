@@ -227,10 +227,12 @@ const changeEnvironment = async (request: Request, deps: HarnessDeps): Promise<R
   const before = deps.store.loadEnvironment();
   const applied = applyEnvironmentChange(before, { settings: settings as Record<string, unknown> });
   if (!applied.ok) return refused(400, applied.error);
-  deps.store.saveEnvironment(applied.environment);
-  const keys = Object.keys(settings);
-  const pick = (resolved: ReturnType<typeof resolveEnvironment>) => Object.fromEntries(keys.map((key) => [key, resolved[key as keyof typeof resolved]]));
   const resolved = resolveEnvironment(applied.environment);
+  // The form posts every setting on each save: one that moves nothing is stored, bumped and audited as nothing.
+  if (applied.changed.length === 0) return json({ ok: true, unchanged: true, revision: applied.environment.revision, resolved });
+  deps.store.saveEnvironment(applied.environment);
+  const keys = applied.changed;
+  const pick = (from: ReturnType<typeof resolveEnvironment>) => Object.fromEntries(keys.map((key) => [key, from[key]]));
   deps.store.audit({
     entity: "environment",
     at: deps.now?.() ?? Date.now(),

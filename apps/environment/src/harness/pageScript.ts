@@ -129,6 +129,27 @@ const watchUnsaved = (form) => {
 for (const form of document.querySelectorAll("form[data-environment]")) {
   const save = form.querySelector("[data-save]");
   watchUnsaved(form);
+  // The cost table follows the size and budget inputs before a save: the budget column, the current row, the summary.
+  const size = form.querySelector('[data-setting="containerSize"]');
+  const budget = form.querySelector('[data-setting="containerBudget"]');
+  const cost = () => {
+    const count = Number(budget === null ? NaN : budget.value);
+    if (!Number.isInteger(count) || count < 1) return;
+    const containers = count + (count === 1 ? " Container" : " Containers");
+    const head = document.querySelector("[data-budget-head]");
+    if (head !== null) head.textContent = containers + ", an hour";
+    let current = null;
+    for (const row of document.querySelectorAll("tr[data-per-hour]")) {
+      const per = Number(row.dataset.perHour);
+      row.querySelector("[data-budget-hour]").textContent = "$" + (per * count).toFixed(2);
+      row.querySelector("[data-budget-cell]").dataset.label = containers + ", an hour";
+      if (size !== null && row.dataset.size === size.value) { row.setAttribute("aria-current", "true"); current = row; }
+      else row.removeAttribute("aria-current");
+    }
+    const now = document.querySelector("[data-cost-now]");
+    if (now !== null && current !== null) now.textContent = "With these settings, at most $" + (Number(current.dataset.perHour) * count).toFixed(2) + " an hour: " + containers + " of " + current.dataset.size + ", every vCPU busy.";
+  };
+  for (const input of [size, budget]) if (input !== null) { input.addEventListener("input", cost); input.addEventListener("change", cost); }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (form.reportValidity() && (await post("/_t3flare/harness/api/environment", { settings: settingsOf(form) }, save))) done();
