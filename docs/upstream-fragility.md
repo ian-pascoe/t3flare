@@ -14,7 +14,8 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
    | find the newest nightly tag (`:98`) | t3 changed its tag format: `NIGHTLY` at `bump.ts:80` |
    | regenerate the workspace and install (`:157`) | t3 added a workspace setting ("classify it") or changed its lock's layout: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); a patch no longer applies or matches nothing, or t3's lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
    | lock matches t3's, one effect (`:161`) | a t3 importer installs other versions than in t3's lock, a second `effect`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030), [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
-   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds) |
+   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds) |
+   | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)) |
    | deploy the bump stage (`:176`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
    | acceptance test (`:180`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
    | stock t3 nightly links and forwards (step 3) | the laptop half of [U7](#u7-client-version-skew-desktop-mobile-laptop) |
@@ -587,7 +588,7 @@ and field shapes it leans on fail typecheck rather than silently.
     `matchInlineSkills` (`@t3tools/shared/inlineSkills`) and embeds the `<skill name location>` block mirrored from t3's
     Pi provider (`t3code/packages/provider-pi/src/server/mcpExtensionSource.ts`, its `input` hook).
   - `apps/environment/src/provider/attachments.ts`: `turnPrompt` runs the expansion when its caller passes the thread's
-    skills (the Pi Durable adapter; not the ACP builder).
+    skills (the Pi Durable adapter; of the ACP builders, OpenCode's since SPI-1151, [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)).
   - `packages/skills/src/discovery.ts`: `SKILL_TOKEN_REGEX`, a copy of t3's mention token
     (`t3code/packages/shared/src/inlineSkills.ts`), which `isMentionable` applies to decide which names t3 can mention.
     Copied, not imported: the agents Worker loads no t3 code (`apps/agents/build.ts`).
@@ -608,6 +609,50 @@ and field shapes it leans on fail typecheck rather than silently.
   skips a name t3 cannot mention. Turns still run.
 - **Fix**: compare with t3's Pi provider (`packages/provider-pi/src/server/driver.ts` `snapshotForCwd`,
   `mcpExtensionSource.ts`).
+
+### U65. The CLI agents' Skills and Slash commands in t3's composer (SPI-1151)
+
+Ranked last with U64: every break here leaves turns running. A moved root or a changed hook fails a check; a changed
+CLI behaviour over ACP is the silent part.
+
+- **Where**:
+  - `packages/skills/src/cliRoots.ts`: `CLI_ROOTS`, each CLI's repo Skill roots and command directories as the M0
+    probe found them for the pins in `apps/sandbox-image/src/clis.ts` (Codex 0.167.2, pi 1.5.2, Claude Code 2.1.322 with
+    `claude-agent-acp` 0.106.0, OpenCode 2.2.7); discovery and `discoverPrompts` take them.
+  - `apps/environment/src/provider/skills.ts` (`cliSnapshotForCwd`, `cliSnapshotForCwdOf`) and the four drivers
+    (`provider/cli/codexDriver.ts`, `piDriver.ts`, `acpDriver.ts`): `snapshotForCwd` on t3's `codex`, `pi`,
+    `claudeAgent` and `opencode` instances, as on Pi Durable's (U64); the machine snapshots carry
+    `provider/cli/builtInCommands.ts`: provider-core's `COMPACT_SLASH_COMMAND`, provider-pi's
+    `withPiBuiltinSlashCommands` (`packages/provider-pi/src/server/commands.ts`, by path) and a restated copy of
+    Codex's `/goal` entry (`apps/server/src/provider/CodexProvider.ts`).
+  - `provider/cli/claudeSkills.ts`: `planClaudeSkillDispatch`, imported from t3's server by path
+    (`apps/server/src/provider/Drivers/ClaudeSkillDispatch.ts`), and a copy of its note; applied in
+    `wrapCliAdapter`'s `startTurn` (`rewriteTurnText`). It leans on the ACP adapter's native-slash rule
+    (`packages/provider-acp/src/server/adapter.ts` `isNativeSlashCommand`, and `t3AcpPromptWithInstructions` leaving a
+    leading `/` unwrapped): a leading `/name` goes alone, without t3's instructions or runtime block.
+  - `provider/cli/acpDriver.ts` `acpPromptBuilder`: OpenCode's Skill embed in the flavor's `buildPrompt` (the ACP
+    adapter's hook, given the text after t3's instructions), with the turn's cwd from the wrapper (`CliTurn`); its block
+    mirrors OpenCode 2.2.7's `Skill.toModelOutput` (`packages/core/src/skill.ts`).
+  - pi: the profile's `--skill` and `--prompt-template` (`agents/cliProfiles.ts` `piRepoResourceArgs`; pi 1.5.2
+    `dist/cli/args.js`, loaded whatever the trust), and t3's pi extension's `$name` input hook
+    (`packages/provider-pi/src/server/mcpExtensionSource.ts`), which embeds a picked Skill from what pi loaded.
+  - Codex parses `$name` itself (`makeCodexAdapterV2` passes the text through).
+- **Breaks when**: a CLI bump moves a root or changes a same-named pair's winner; t3 changes the hook, the
+  native-slash rule, `buildPrompt`'s input, `planClaudeSkillDispatch`'s shape or note, the pi extension's hook, or
+  its static command entries; `claude-agent-acp` stops expanding a leading `/name`; OpenCode changes its skill
+  tool's output, or starts returning a command's reply over ACP (its repo commands would then be worth listing).
+- **Detection**: the bump's check step: typecheck for the hook and the imports; `apps/environment/test/cliSkills.test.ts`
+  (discovery with `CLI_ROOTS` against the recorded `docs/steps/spi-1151/m0-roots.json`; the built-ins and the `/goal`
+  pin), `skillsSnapshot.test.ts`, `cliSkillDispatch.test.ts` (the rewrite and the embed through t3's real ACP adapter
+  against the scripted agent; the note pinned to `ClaudeSkillDispatch.ts`), `cliProfiles.test.ts` (pi's flags). The
+  bump's `test:docker` step: `test/docker/skills.docker.test.ts` re-runs the probe on the pinned CLIs and holds
+  `CLI_ROOTS` to it, failing with "moved a skill root: update CLI_ROOTS". **Silent**: R6 (Claude's native expansion)
+  and OpenCode's command reply are stage facts; cheapest check: `scripts/pcli.ts` on a stage after a CLI bump.
+- **Blast radius**: the composer lists a CLI's Skills or commands wrongly or not at all, or a picked Skill reaches the
+  CLI as plain `$name` (Claude Code, OpenCode). Turns still run, and the CLIs still load their own Skills.
+- **Fix**: re-run the probe (`T3FLARE_SKILLS_PROBE_OUT=… pnpm run test:docker`) and update `CLI_ROOTS` and
+  `m0-roots.json`; diff `ClaudeSkillDispatch.ts`, the ACP adapter's `resolvePromptParts`, `mcpExtensionSource.ts` and
+  `CodexProvider.ts`'s slash commands between tags.
 
 ## Gaps in detection
 

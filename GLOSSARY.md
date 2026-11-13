@@ -253,6 +253,10 @@ _Avoid_: plugin, command, extension
 A Skill kept in a repository's own files; each Workspace has those of its checkout. It is instructions only and grants no permission.
 _Avoid_: project skill, workspace skill
 
+**Skill root**:
+A directory in which an agent looks for Skills, such as a repository's `.agents/skills`. Each CLI agent has its own, and a Repo skill outside them is not that agent's.
+_Avoid_: skills folder, skill path
+
 **Environment skill**:
 A Skill the owner installed into the Cloud Environment, offered to Durable agents in every Project.
 _Avoid_: global skill (the owner's informal word, and cloudpid's Global), owner skill, personal skill
