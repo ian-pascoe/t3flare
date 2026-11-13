@@ -1,5 +1,5 @@
-// Reclaiming slots for a refused start (review F7, SPI-1149): idle holders are asked to stop only when enough of them
-// are idle to bring the running count under the budget; otherwise none is, so a lowered budget stops nothing for nothing.
+// Reclaiming room under the Container budget for a refused start (ADR-0032 §7); the rule and its race are in
+// `src/workspace/reclaim.ts`'s header.
 import { describe, expect, it } from "vitest";
 
 import { reclaimFor } from "../src/workspace/reclaim.ts";

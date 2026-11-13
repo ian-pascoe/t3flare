@@ -7,6 +7,7 @@
 //   node scripts/stage.ts run penv penv running         a change while a Container runs, then its next start (running.json)
 //   node scripts/stage.ts run penv penv idle            the idle stop at two values (idle.json)
 //   node scripts/stage.ts run penv penv budget          the budget at 1, raised to 2, lowered to 1 with two running (budget.json)
+//   node scripts/stage.ts run penv penv surfaces        the refusal a Durable agent's command and a worktree's creation show (surfaces.json)
 //   node scripts/stage.ts run penv penv revisions       each entity's revision moves alone (revisions.json)
 //   node scripts/stage.ts run penv penv audit           entries with `entity`, before and after; old ones as harness (audit.json)
 //   node scripts/stage.ts run penv penv safety          the new routes refused from outside (safety.json)
@@ -18,7 +19,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { ensureProject } from "./lib/cliTurn.ts";
-import { admin, pair, sleep } from "./lib/client.ts";
+import { admin, DEFAULT_MODEL, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, SETTLED, sleep, threadWindow, uuid, wsCall, wsFirst } from "./lib/client.ts";
 
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const T3 = process.env.T3_URL ?? "";
@@ -253,22 +254,20 @@ const idle = async () => {
   await writeEvidence("idle.json", { workspace: WORKSPACE, note: "idleSeenMs: from the last command to the first poll (every 5 s) that saw the Container stopped", cases, ok: cases.every((entry) => entry.ok) });
 };
 
-/** The longest refusal reason in a refused start's answer: computer cuts its own messages, the causes keep it whole. */
-const refusalIn = (text: string): string | undefined =>
-  [...text.matchAll(/the Container cannot start: ([^"\\]+)/g)].map((match) => match[1]!).sort((a, b) => b.length - a.length)[0];
-
 const budget = async () => {
   cookie ||= await pair();
   const ids = ["penv-b1", "penv-b2", "penv-b3"];
   for (const id of ids) await ensureProject(cookie, id);
   for (const id of [...ids, WORKSPACE]) await stopOn(id);
   const cases: Array<Case> = [];
+  // A start through a git action (`startContainer`, as t3's git actions run): a refusal is the answer's `detail`, the
+  // text t3 shows, never the admin route's error causes.
   const start = async (id: string) => {
-    const answer = await callOn(id, { exec: { script: "true", timeoutMs: 180_000 } });
-    const text = JSON.stringify(answer);
-    return { ok: answer.status === 200 && answer.result?.exitCode === 0, status: answer.status, running: answer.container?.running ?? null, budget: answer.container?.launch?.budget ?? null, refusal: refusalIn(text) ?? (answer.status === 200 ? null : text.slice(0, 400)), raw: answer.status === 200 ? undefined : text.slice(0, 2000) };
+    const answer = await callOn(id, { git: { argv: ["--version"], cwd: "/workspace/repo", startContainer: true } });
+    const ran = answer.result?.ran === true && answer.result?.exitCode === 0;
+    return { ok: ran, running: answer.container?.running ?? null, budget: answer.container?.launch?.budget ?? null, refusal: ran ? null : (answer.result?.detail ?? answer.text ?? null) };
   };
-  // A holder busy with a command is never asked to give its slot up (review F7 asks idle holders only).
+  // A holder busy with a command is never asked to give its lease up (ADR-0032 §7: a reclaim asks idle holders only).
   const busy = (id: string, seconds: number) => void callOn(id, { exec: { script: `sleep ${seconds}`, timeoutMs: (seconds + 30) * 1000 } }).catch(() => undefined);
   const leases = async () => ((await admin("GET", "/_t3flare/agents/budget")).json?.leases ?? []).map((lease: any) => lease.workspace ?? lease.holder);
 
@@ -301,6 +300,99 @@ const budget = async () => {
   for (const id of ids) await stopOn(id);
   await setEnvironment({ containerBudget: 3 });
   await writeEvidence("budget.json", { workspaces: ids, cases, ok: cases.every((entry) => entry.ok) });
+};
+
+/** The whole refusal a product surface must show (ADR-0032 §7): the budget, and where to change it. */
+const WHOLE_REFUSAL = "the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment";
+
+/**
+ * At a budget of 1 with another Workspace's Container busy, what the product shows when a start is refused: a Durable
+ * agent's `bash` on the Container (the tool result the agent and t3 get), and a worktree thread's creation (t3's setup
+ * error). Read from those surfaces themselves, never from the admin route's error causes.
+ */
+const surfaces = async () => {
+  cookie ||= await pair();
+  const holder = "penv-b1";
+  const agentWorkspace = "penv-agent";
+  const { projectId: holderProject } = await ensureProject(cookie, holder);
+  const { projectId } = await ensureProject(cookie, agentWorkspace);
+  void holderProject;
+  for (const id of [holder, agentWorkspace, WORKSPACE, "penv-b2", "penv-b3"]) await stopOn(id);
+  await setEnvironment({ containerBudget: 1 });
+  const busyFor = 240;
+  void callOn(holder, { exec: { script: `sleep ${busyFor}`, timeoutMs: (busyFor + 30) * 1000 } }).catch(() => undefined);
+  await sleep(3_000);
+  const cases: Array<Case> = [];
+
+  // 1. A Durable agent's command on the Container.
+  await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } } });
+  const threadId = uuid();
+  await dispatch(cookie, {
+    type: "thread.create",
+    commandId: uuid(),
+    threadId,
+    projectId,
+    title: "penv refusal",
+    modelSelection: DEFAULT_MODEL,
+    runtimeMode: "full-access",
+    interactionMode: "default",
+    branch: null,
+    worktreePath: null,
+    createdBy: "user",
+    creationSource: "web",
+  });
+  await sendMessage(cookie, threadId, "Call the bash tool once with command `python3 --version` and backend `container`. Do not retry or try anything else. Then reply with the tool's error text, quoted exactly.", DEFAULT_MODEL);
+  const started = Date.now();
+  let projection: any;
+  while (Date.now() - started < 5 * 60_000) {
+    projection = projectionOf(await threadWindow(cookie, threadId));
+    const runs = runsOf(projection);
+    if (runs.length > 0 && runs.every((run) => SETTLED.has(run.status))) break;
+    await sleep(2_000);
+  }
+  const commands = itemsOf(projection).filter((item: any) => item.type === "command_execution");
+  const shown = JSON.stringify(commands);
+  cases.push({
+    name: "a Durable agent's command on the Container shows the whole refusal",
+    threadId,
+    runs: runsOf(projection).map((run) => run.status),
+    commands,
+    ok: commands.length > 0 && shown.includes(WHOLE_REFUSAL),
+  });
+
+  // 2. A worktree thread's creation (t3's "New worktree").
+  const worktreeThread = uuid();
+  await wsCall(cookie, "orchestration.launchThread", {
+    commandId: uuid(),
+    creationSource: "web",
+    threadId: worktreeThread,
+    projectId,
+    title: "penv worktree refusal",
+    generateTitle: false,
+    modelSelection: DEFAULT_MODEL,
+    runtimeMode: "full-access",
+    interactionMode: "default",
+    workspaceStrategy: { type: "worktree", baseRef: "main" },
+    initialMessage: { messageId: uuid(), text: "Reply with the single word done.", attachments: [] },
+  });
+  const worktreeStarted = Date.now();
+  let setup: any;
+  while (Date.now() - worktreeStarted < 4 * 60_000) {
+    setup = await wsFirst(cookie, "subscribeWorktreeSetup", { threadId: worktreeThread }).catch(() => undefined);
+    if (setup?.phase === "failed" || setup?.phase === "ready" || setup?.worktreePath) break;
+    await sleep(3_000);
+  }
+  cases.push({
+    name: "a worktree thread's creation shows the whole refusal",
+    threadId: worktreeThread,
+    phase: setup?.phase ?? null,
+    error: setup?.error ?? null,
+    ok: setup?.phase === "failed" && JSON.stringify(setup?.error ?? "").includes(WHOLE_REFUSAL),
+  });
+
+  for (const id of [holder, agentWorkspace]) await stopOn(id);
+  await setEnvironment({ containerBudget: 3 });
+  await writeEvidence("surfaces.json", { holder, workspace: agentWorkspace, expected: WHOLE_REFUSAL, cases, ok: cases.every((entry) => entry.ok) });
 };
 
 const revisionsCase = async () => {
@@ -428,7 +520,7 @@ const shoot = async () => {
   });
 };
 
-const commands: Record<string, () => Promise<void> | void> = { "seed-old": seedOld, sizes, running, idle, budget, revisions: revisionsCase, audit, safety, shoot };
+const commands: Record<string, () => Promise<void> | void> = { "seed-old": seedOld, sizes, running, idle, budget, surfaces, revisions: revisionsCase, audit, safety, shoot };
 const command = commands[process.argv[2] ?? ""];
 if (command === undefined) {
   console.error(`usage: penv.ts ${Object.keys(commands).join(" | ")}`);

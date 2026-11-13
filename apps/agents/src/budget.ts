@@ -1,12 +1,12 @@
 // @effect-diagnostics globalDate:off
 // The Container budget (step 2a plan, cost guardrails): at most the budget's Containers run at once across the
-// deploy. `max_instances` does not apply under `schedulingPolicy: "durable_object"`, so a singleton DO leases the slots.
+// deploy. `max_instances` does not apply under `schedulingPolicy: "durable_object"`, so a singleton DO holds the leases.
 // The budget is an Environment setting (ADR-0032): a Workspace DO carries it with a fresh start's lease request, and
 // this object judges the request by it and keeps the last one for renewals and status reads (MAX_CONTAINERS before
 // any). Lowering it stops nothing: a holder's own lease is always renewed, and only new starts wait until fewer run.
 // A Workspace DO takes a lease before it starts its Container, renews it from its alarm while the Container runs, and
 // releases it when the Container stops. A lease expires LEASE_MS after its last renewal, so a lost release frees its
-// slot within that time and a running Container never loses its slot while it is renewed.
+// room under the Container budget within that time, and a running Container never loses its lease while it is renewed.
 import { DEFAULT_CONTAINER_BUDGET, fitsEnvironmentSetting } from "@t3flare/harness-registry";
 import { DurableObject } from "cloudflare:workers";
 
@@ -27,7 +27,7 @@ interface Lease {
 
 export type LeaseAnswer =
   | { readonly ok: true; readonly until: number; readonly running: ReadonlyArray<string> }
-  /** `max`: the budget the request was judged by (a reclaim frees enough slots to get under it, or none). */
+  /** `max`: the budget the request was judged by (a reclaim stops enough idle holders to get under it, or none: `workspace/reclaim.ts`). */
   | { readonly ok: false; readonly reason: string; readonly running: ReadonlyArray<string>; readonly max?: number };
 
 export interface BudgetEnv {
@@ -66,7 +66,7 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
   }
 
   /**
-   * Takes `holder`'s lease if a slot is free under `budget` (the Environment settings' Container budget, carried by the
+   * Takes `holder`'s lease if there is room under `budget` (the Environment settings' Container budget, carried by the
    * Workspace DO; absent, the last one carried), or renews the lease it holds: a holder is never refused its own.
    */
   acquire(holder: string, budget?: number): LeaseAnswer {
@@ -90,7 +90,7 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
     return { ok: true, until, running: next.map((lease) => lease.holder) };
   }
 
-  /** Renews `holder`'s lease; refused when it has none (it expired and its slot went to another). */
+  /** Renews `holder`'s lease; refused when it has none (it expired and another Workspace took the room). */
   renew(holder: string): LeaseAnswer {
     const now = this.now();
     const live = this.#live(now);

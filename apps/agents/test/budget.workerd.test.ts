@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// The Container budget (step 2a cost guardrails): at most N leases; renewal keeps one; an expired one frees its slot.
+// The Container budget (step 2a cost guardrails): at most N leases; renewal keeps one; an expired one frees its room under the budget.
 // Lease timing runs on a fake clock (FakeClockContainerBudget) that only `advance` moves, so no test sleeps or races a
 // real 300 ms lease: a loaded machine cannot expire a lease early or late.
 import { env } from "cloudflare:workers";
@@ -21,7 +21,7 @@ const settingBudget = () => bindings.SETTING_BUDGET.get(bindings.SETTING_BUDGET.
 const budget = () => bindings.CONTAINER_BUDGET.get(bindings.CONTAINER_BUDGET.newUniqueId());
 
 describe("ContainerBudget", () => {
-  it("refuses a start past the limit, and frees a slot at release", async () => {
+  it("refuses a start past the limit, and frees room at release", async () => {
     const b = budget();
     expect((await b.acquire("a")).ok).toBe(true);
     expect((await b.acquire("b")).ok).toBe(true);
@@ -42,7 +42,7 @@ describe("ContainerBudget", () => {
       await b.advance(LEASE_MS / 2);
       expect((await b.renew("running")).ok).toBe(true);
     }
-    // "lost" (never renewed) has expired, so its slot is free; "running" still holds.
+    // "lost" (never renewed) has expired, so its room is free; "running" still holds.
     const state = await b.state();
     expect(state.leases.map((lease) => lease.holder)).toEqual(["running"]);
     expect((await b.renew("lost")).ok).toBe(false);

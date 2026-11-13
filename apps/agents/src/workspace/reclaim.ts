@@ -1,5 +1,5 @@
-// Reclaiming slots for a refused Container start (review F7; SPI-1149, ADR-0032). The budget may have been lowered below
-// the running count, so one released slot may not be enough: idle holders are asked to stop only when enough of them are
+// Reclaiming room under the Container budget for a refused Container start (ADR-0032 §7). The budget may have been
+// lowered below the running count, so one released lease may not be enough: idle holders are asked to stop only when enough of them are
 // idle to bring the count under the budget, and otherwise none is. The idle ones are asked together, so a holder can turn
 // busy between its check and its release only within one RPC; if one does, the others still stop and the start is
 // refused (`enough: false`).
@@ -11,7 +11,7 @@ export interface ReclaimInput {
   readonly running: ReadonlyArray<string>;
   /** The budget the refusal was judged by. */
   readonly max: number;
-  /** Whether a holder would give its slot up now (nothing runs there; `WorkspaceDO.reclaimable`). */
+  /** Whether a holder would give its lease up now (nothing runs there; `WorkspaceDO.reclaimable`). */
   readonly idle: (holder: string) => Promise<boolean>;
   /** Asks a holder to stop if it is still idle; whether it did (`WorkspaceDO.releaseIfIdle`). */
   readonly release: (holder: string) => Promise<boolean>;
