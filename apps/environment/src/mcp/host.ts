@@ -21,16 +21,15 @@ import {
   type ToolClass,
   toolNamesOf,
 } from "@t3flare/harness-registry";
-import type {
-  McpEngineDiscoverResult,
-  McpEngineHooks,
-  McpEnginePriorEncoded,
-  McpEngineRequestEncoded,
-  McpEngineRequestResult,
-  McpEngineTargetEncoded,
+import {
+  MCP_ELICITATION_WAIT_MS,
+  type McpEngineDiscoverResult,
+  type McpEngineHooks,
+  type McpEnginePriorEncoded,
+  type McpEngineRequestEncoded,
+  type McpEngineRequestResult,
+  type McpEngineTargetEncoded,
 } from "@cloudpid/mcp/types";
-
-import { MCP_ELICITATION_WAIT_MS } from "@cloudpid/mcp/types";
 import type { McpAsker, McpQuestionAnswer } from "@t3flare/session-protocol";
 
 import type { KvStorage } from "../harness/store.ts";
@@ -375,8 +374,9 @@ export class McpHost {
         : {
             onInput: async (request) => {
               const plan = planQuestion(request, context);
-              const answer = await this.#answer(plan, asker, context, "question");
+              // Kept before the wait, so the server's own withdrawal (`onInputEnded`) can close the card meanwhile.
               if (plan.kind === "card") cards.set(request.key, plan.card.id);
+              const answer = await this.#answer(plan, asker, context, "question");
               return answer.kind === "now" ? answer.answer : { kind: "answered", result: answer.result };
             },
             onInputEnded: async (key) => {

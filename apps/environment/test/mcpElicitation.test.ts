@@ -161,6 +161,28 @@ describe("McpHost questions", () => {
     expect(JSON.parse((answer as { text: string }).text)).toEqual({ kind: "answered", result: { action: "accept", content: { colour: "red" } } });
   });
 
+  it("the server's own withdrawal closes the card that waits", async () => {
+    let release: () => void = () => undefined;
+    const { host } = await hostOver([tool("fixture_confirm")], async (_request, hooks) => {
+      const answer = hooks.onInput({ key: "k1", kind: "elicitation", params: { message: "Sure?", requestedSchema: { type: "object", properties: {} } }, mode: "live", era: "legacy" });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await hooks.onInputEnded("k1");
+      return text(JSON.stringify(await answer));
+    });
+    const withdrawn: Array<string> = [];
+    const asker: McpAsker = {
+      ask: (card) => new Promise((resolve) => (release = () => resolve({ decision: "cancel", reason: `withdrawn ${card.id}` }))),
+      withdraw: (id) => {
+        withdrawn.push(id);
+        release();
+      },
+    };
+    const answer = await host.call({ server: "fixture", tool: "fixture_confirm", args: {}, judged: "write", asker });
+    expect(withdrawn).toHaveLength(1);
+    expect(withdrawn[0]).toMatch(/^t3flare-elicit-/);
+    expect(JSON.parse((answer as { text: string }).text)).toEqual({ kind: "answered", result: { action: "cancel" } });
+  });
+
   it("without an asker nothing is declared", async () => {
     const { host, requests } = await hostOver([tool("fixture_echo", {}, true)], async () => text("ok"));
     await host.call({ server: "fixture", tool: "fixture_echo", args: {}, judged: "read" });
