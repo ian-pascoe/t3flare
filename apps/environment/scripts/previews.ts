@@ -491,6 +491,71 @@ switch (part) {
     process.exit(process.exitCode ?? 0);
     break;
   }
+  case "transfer": {
+    // Review M2: a download reaches the controlling viewer and t3's download route (the fork cannot copy the artifact off
+    // Browser Run's disk; the Shadow fetches it from the page), and an upload through the page's file chooser reaches it.
+    const lines: Array<StageLine> = [];
+    const cookie = await pair();
+    const { projectId, workspaceRoot } = await ensureCloudFixtureProject(cookie);
+    const threadId = await createThread(cookie, projectId, { title: "previews: transfer" });
+    const term = await attachTerminal(cookie, { threadId, terminalId: "default", cwd: workspaceRoot });
+    await term.until(/[$#] $/, 180_000);
+    const page = `<!doctype html><html><body><a id="d" href="/dl.txt" download="dl.txt">download</a><input type="file" id="f"><pre id="out">none</pre><script>document.getElementById("f").addEventListener("change", async (e) => { const f = e.target.files[0]; document.getElementById("out").textContent = f.name + ":" + (await f.text()); });</script></body></html>`;
+    const files = VITE_APP(base.origin);
+    const write = Object.entries(files).map(([name, text]) => `echo ${Buffer.from(text).toString("base64")} | base64 -d > ${name}`).join(" && ");
+    await term.run(`pkill -f 'vite --host' ; mkdir -p /tmp/vapp && cd /tmp/vapp && ${write} && (test -d node_modules/vite || (npm init -y >/dev/null && npm i --silent vite@6 >/dev/null 2>&1)) && echo ${Buffer.from(page).toString("base64")} | base64 -d > transfer.html && mkdir -p public && echo download-ok > public/dl.txt && (nohup npx vite --host 0.0.0.0 --port 5173 --strictPort >/tmp/vite.log 2>&1 &) && sleep 4 && echo started`, 240_000);
+    const tab = await openTab(cookie, threadId, "http://localhost:5173/transfer.html");
+    await waitFor("the page", async () => ((await tabEval("transfer.html", "document.getElementById('out')?.textContent").catch(() => undefined)) === "none" ? true : undefined), 60_000);
+    const url = new URL("/api/preview-stream/ws", base);
+    url.protocol = "wss:";
+    url.searchParams.set("threadId", threadId);
+    url.searchParams.set("tabId", tab.tabId);
+    const socket = new WebSocket(url, { headers: { cookie, origin: base.origin } } as never);
+    socket.binaryType = "arraybuffer";
+    const messages: Array<any> = [];
+    socket.addEventListener("message", (event) => {
+      if (typeof event.data === "string") messages.push(JSON.parse(event.data));
+      else socket.send(JSON.stringify({ type: "ack" }));
+    });
+    await new Promise((resolve) => socket.addEventListener("open", resolve));
+    socket.send(JSON.stringify({ type: "takeControl" }));
+    await sleep(1_500);
+    await step(lines, "a download is offered to the controlling viewer and served by t3's download route (M2)", async () => {
+      await tabEval("transfer.html", "(document.getElementById('d').click(), 1)");
+      const offered = await waitFor("the download message", async () => messages.find((message) => message.type === "download"), 30_000).catch((error: unknown) => {
+        throw new Error(`${String(error)}; messages: ${JSON.stringify(messages.map((message) => message.type))}`);
+      });
+      const download = new URL("/api/preview-stream/download", base);
+      download.searchParams.set("threadId", threadId);
+      download.searchParams.set("tabId", tab.tabId);
+      download.searchParams.set("id", offered.id);
+      const response = await fetch(download, { headers: { cookie } });
+      const body = await response.text();
+      return { ok: response.status === 200 && body.trim() === "download-ok", detail: { offered: { fileName: offered.fileName, sizeBytes: offered.sizeBytes }, status: response.status, body: body.slice(0, 40) } };
+    });
+    await step(lines, "an upload through the page's file chooser reaches the page (M2)", async () => {
+      await tabEval("transfer.html", "(document.getElementById('f').click(), 1)");
+      const chooser = await waitFor("the file chooser message", async () => messages.find((message) => message.type === "fileChooser"), 30_000);
+      const form = new FormData();
+      form.append("file", new Blob(["upload-ok"], { type: "text/plain" }), "up.txt");
+      const upload = new URL("/api/preview-stream/upload", base);
+      upload.searchParams.set("threadId", threadId);
+      upload.searchParams.set("tabId", tab.tabId);
+      upload.searchParams.set("chooser", chooser.id);
+      const response = await fetch(upload, { method: "POST", body: form, headers: { cookie } });
+      const text = await waitFor("the page's answer", async () => {
+        const value = await tabEval("transfer.html", "document.getElementById('out')?.textContent");
+        return value !== "none" ? value : undefined;
+      }, 30_000);
+      return { ok: response.status === 204 && text === "up.txt:upload-ok", detail: { status: response.status, page: text } };
+    });
+    socket.close();
+    await term.close(true).catch(() => undefined);
+    await wsCall(cookie, "preview.close", { threadId, tabId: tab.tabId }).catch(() => undefined);
+    writeEvidence("transfer", { ok: lines.every((line) => line.ok), threadId, lines });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
   case "tabtrace": {
     // Diagnosis: one unwatched tab, its list entry and the Environment's sessions every 20 s for `minutes`.
     const cookie = await pair();

@@ -162,14 +162,20 @@ const filesFrom = async (workspace: string | undefined, files: FileInput | Reado
 
 const patched = new WeakSet<object>();
 
+/**
+ * The Workspace of each context and page of this module's browsers. Module state, not an instance's: the upload patch is
+ * installed once per prototype, and must see the contexts of the instance a restart makes.
+ */
+const workspaceOf = new WeakMap<object, string | undefined>();
+
 /** Installs the translations on one prototype the fork's pages, choosers and locators share (once). */
-const patchUploads = (target: object, method: string, workspaceOf: (self: object) => string | undefined) => {
+const patchUploads = (target: object, method: string, workspaceFor: (self: object) => string | undefined) => {
   const prototype = Object.getPrototypeOf(target) as Record<string, unknown> | null;
   if (prototype === null || patched.has(prototype) || typeof prototype[method] !== "function") return;
   patched.add(prototype);
   const original = prototype[method] as (this: object, files: FileInput | ReadonlyArray<FileInput>, options?: unknown) => Promise<void>;
   prototype[method] = async function (this: object, files: FileInput | ReadonlyArray<FileInput>, options?: unknown) {
-    return original.call(this, await filesFrom(workspaceOf(this), files), options);
+    return original.call(this, await filesFrom(workspaceFor(this), files), options);
   };
 };
 
@@ -186,8 +192,6 @@ export class ServerBrowserContexts {
   private readonly contexts = new Map<string, Promise<BrowserContext>>();
   private readonly clearing = new Map<string, Promise<void>>();
   private readonly browsers = new Map<string, WorkspaceBrowser>();
-  /** The Workspace each context's tabs are in (undefined: the route-less browser). */
-  private readonly workspaceOfContext = new WeakMap<object, string | undefined>();
   private closing: Promise<void> | undefined;
 
   constructor(options: Options) {
@@ -268,9 +272,9 @@ export class ServerBrowserContexts {
 
   /** Every page of `context` gets the `localhost` translation and the download fix before t3's listeners run. */
   private preparePages(context: BrowserContext, workspace: string | undefined) {
-    this.workspaceOfContext.set(context, workspace);
+    workspaceOf.set(context, workspace);
     const prepare = (page: Page) => {
-      this.workspaceOfContext.set(page, workspace);
+      workspaceOf.set(page, workspace);
       const goto = page.goto.bind(page);
       page.goto = ((url: string, options?: Parameters<Page["goto"]>[1]) => goto(translatePreviewUrl(url), options)) as Page["goto"];
       page.on("download", (download: Download) => {
@@ -282,8 +286,8 @@ export class ServerBrowserContexts {
           await StateFs.writeFile(path, bytes);
         };
       });
-      page.on("filechooser", (chooser) => patchUploads(chooser, "setFiles", (self) => this.workspaceOfContext.get((self as { page(): Page }).page())));
-      patchUploads(page.locator("html"), "setInputFiles", (self) => this.workspaceOfContext.get((self as { page(): Page }).page()));
+      page.on("filechooser", (chooser) => patchUploads(chooser, "setFiles", (self) => workspaceOf.get((self as { page(): Page }).page())));
+      patchUploads(page.locator("html"), "setInputFiles", (self) => workspaceOf.get((self as { page(): Page }).page()));
     };
     for (const page of context.pages()) prepare(page);
     context.on("page", prepare);

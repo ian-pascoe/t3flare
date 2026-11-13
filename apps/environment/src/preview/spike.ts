@@ -496,7 +496,7 @@ const tabEval = async (match: string, expression: string): Promise<Array<Line>> 
         const page = pages.find((target) => target.url.includes(match));
         if (page === undefined) return { urls: pages.map((target) => target.url) };
         const { sessionId } = await cdp.send<{ sessionId: string }>("Target.attachToTarget", { targetId: page.targetId, flatten: true });
-        const result = await cdp.send<{ result: { value?: unknown }; exceptionDetails?: { text: string } }>("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }, sessionId);
+        const result = await cdp.send<{ result: { value?: unknown }; exceptionDetails?: { text: string } }>("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true, userGesture: true }, sessionId);
         await cdp.send("Target.detachFromTarget", { sessionId }).catch(() => undefined);
         return { url: page.url, value: result.exceptionDetails === undefined ? (result.result.value ?? null) : `exception: ${result.exceptionDetails.text}` };
       } finally {
