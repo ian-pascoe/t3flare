@@ -14,8 +14,9 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
   - `applyEnvironmentChange` validates a change and stores only the settings it moves. A save that moves none is not
     stored, bumped or audited.
   - `ResolvedEnvironment` is derived from the schema, so `containerSize` is typed `ContainerSize`.
-  - `containerInstance` maps a stored name to the `instance` a start takes: the default's for a name not offered,
-    never undefined.
+  - `containerInstance` maps a `ContainerSize` to the `instance` a start takes (`cpu-1`'s resources, a named type's
+    name), never undefined. A stored name t3flare does not offer never reaches it: `resolveEnvironment` reads it as the
+    default first, for the stored settings, the Environment's answer and the Workspace DO's kept copy alike.
   - The field schema and its validation moved to `fields.ts`, shared with the Harness settings' registry.
   - A later setting (SPI-1150's mise config, SPI-1152's Variables) is one entry in `ENVIRONMENT_SETTINGS`. The panel's
     section and the API pick it up without page work; `resolveEnvironment` and `ResolvedEnvironment` gain a field.
@@ -137,6 +138,10 @@ before and after.
 - **Reclaiming idle holders (review F7)** still applies at a lower budget, but only when enough holders are idle to
   bring the count under the budget (`reclaim.ts`); otherwise none is asked. In `budget.json` both holders run a command
   while the third start is tried, so neither is idle.
+- **The reclaim race.** The idle check and the stop are two RPCs to each holder. A holder found idle can get a command
+  between them; its `releaseIfIdle` then refuses, while the other idle holders, asked at the same time, stop. The start
+  is still refused, so up to `needed - 1` Containers can stop without letting it through. Asking them together keeps
+  that window to one RPC.
 - **A fallback budget is not sent.** A start whose read of the Environment settings timed out carries no budget, and the
   budget DO keeps the owner's last one.
 - **The 240-character cap.** If the Container exited before (`priorExit=` in computer's message), the reason may still
