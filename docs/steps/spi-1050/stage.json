@@ -1,0 +1,247 @@
+{
+  "ok": true,
+  "failures": [],
+  "repo": "octocat/Hello-World",
+  "mib": 100,
+  "at": "2026-11-13T18:10:58.961Z",
+  "clone": {
+    "cwd": "/w/s1050-mwfam21w",
+    "remoteUrl": "https://github.com/octocat/Hello-World.git",
+    "repository": null
+  },
+  "steps": {
+    "baseline": {
+      "ms": 476,
+      "http": 200,
+      "ok": true,
+      "by": "do",
+      "stale": null,
+      "error": null,
+      "stdout": null,
+      "running": true
+    },
+    "statusRunning": {
+      "ms": 499,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": null,
+      "error": null,
+      "stdout": "# branch.oid 7fd1a60b01f91b314f59955a4e4d4e80d8edf11d\\0# branch.head master\\0# branch.upstream origin/master\\0# branch.ab +0 -0\\0",
+      "running": true
+    },
+    "write": {
+      "ms": 5900,
+      "http": 200,
+      "exitCode": 0,
+      "stale": null,
+      "error": null,
+      "stdout": "-rw-r--r-- 1 root root 104857600 Nov 13 18:11 big.bin\n",
+      "running": true
+    },
+    "captureRunning": {
+      "ms": 12578,
+      "http": 200,
+      "ok": true,
+      "by": "container",
+      "stale": null,
+      "error": null,
+      "stdout": null,
+      "running": true
+    },
+    "statusStopped": {
+      "ms": 116,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": "last-answer",
+      "error": null,
+      "stdout": "# branch.oid 7fd1a60b01f91b314f59955a4e4d4e80d8edf11d\\0# branch.head master\\0# branch.upstream origin/master\\0# branch.ab +0 -0\\0",
+      "running": false
+    },
+    "captureStopped": {
+      "ms": 140,
+      "http": 200,
+      "ok": true,
+      "by": "alias",
+      "stale": null,
+      "error": null,
+      "stdout": null,
+      "running": false
+    },
+    "commit": {
+      "ms": 41310,
+      "http": 500,
+      "stale": null,
+      "error": "\"<!DOCTYPE html>\\n<!--[if lt IE 7]> <html class=\\\"no-js ie6 oldie\\\" lang=\\\"en-US\\\"> <![endif]-->\\n<!--[if IE 7]>    <html class=\\\"no-js ie7 oldie\\\" lang=\\\"en-US\\\"> <![endif]-->\\n<!--[if IE 8]>    <html class=\\\"no-js ie8 oldie\\\" lang=\\\"en-US\\\"> <![endif]-->\\n<!--[if gt IE 8]><!--> <html class=\\\"no-js\\\" lang=\\\"en-US\\\"> <!--<![endif]-->\\n<head>\\n<title>Worker threw exception | t3flare-environment-spi",
+      "stdout": null
+    },
+    "captureCommitted": {
+      "ms": 107057,
+      "http": 200,
+      "ok": true,
+      "by": "container",
+      "stale": null,
+      "error": null,
+      "stdout": null,
+      "running": true
+    },
+    "statusCommittedStopped": {
+      "ms": 109,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": "last-answer",
+      "error": null,
+      "stdout": "# branch.oid 7fd1a60b01f91b314f59955a4e4d4e80d8edf11d\\0# branch.head master\\0# branch.upstream origin/master\\0# branch.ab +0 -0\\0",
+      "running": false
+    },
+    "cleanup": {
+      "ms": 114651,
+      "http": 200,
+      "exitCode": 0,
+      "stale": null,
+      "error": null,
+      "stdout": "total 0\ndrwxr-xr-x 1 root root  0 Nov 13 18:11 .\ndrwxr-xr-x 1 root root  0 Nov 13 18:13 ..\ndrwxr-xr-x 1 root root  0 Nov 13 18:11 .git\n-rw-r--r-- 1 root root 13 Nov 13 18:15 README\ncount: 0\nsize: 0 bytes\nin-pack: 13\npacks: 1\nsize-pack: 2.95 KiB\nprune-packable: 0\ngarbage: 0\nsize-garbage: 0 bytes\n",
+      "running": true
+    },
+    "captureClean": {
+      "ms": 244,
+      "http": 200,
+      "ok": true,
+      "by": "do",
+      "stale": null,
+      "error": null,
+      "stdout": null,
+      "running": true
+    },
+    "statusClean": {
+      "ms": 201,
+      "http": 200,
+      "ran": true,
+      "exitCode": 0,
+      "stale": "patched",
+      "error": null,
+      "stdout": "# branch.oid 7fd1a60b01f91b314f59955a4e4d4e80d8edf11d\\0# branch.head master\\0# branch.upstream origin/master\\0# branch.ab +0 -0\\0",
+      "running": false
+    },
+    "fsRead": {
+      "ms": 152,
+      "http": 200,
+      "ok": {
+        "kind": "file",
+        "size": 13,
+        "mtimeMs": 1794593467646,
+        "mode": 420
+      },
+      "stale": null,
+      "error": null,
+      "stdout": null,
+      "running": false
+    },
+    "workspaceErrors": null
+  },
+  "logs": [
+    {
+      "script": "t3flare-environment-spi1050",
+      "outcome": "ok",
+      "at": 1794593460194,
+      "exceptions": [],
+      "logs": [
+        "{\"t3flare\":\"bootstrap-armed\",\"until\":\"2026-11-13T18:26:00.194Z\"}"
+      ]
+    },
+    {
+      "script": "t3flare-environment-spi1050",
+      "outcome": "ok",
+      "at": 1794593460507,
+      "exceptions": [],
+      "logs": [
+        "{\"t3flare\":\"booted\",\"at\":\"2026-11-13T18:11:00.507Z\",\"trigger\":\"request\",\"wallMs\":5,\"bootstrapSeeded\":true,\"isolateBoot\":1,\"constructions\":1}"
+      ]
+    },
+    {
+      "script": "t3flare-environment-spi1050",
+      "outcome": "aborted",
+      "at": 1794593489295,
+      "exceptions": [
+        "Error: t3flare: idle reset",
+        "Error: t3flare: idle reset"
+      ],
+      "logs": [
+        "{\"t3flare\":\"idle-reset\",\"alarm\":\"2026-11-13T19:00:47.982Z\",\"work\":{\"openRuns\":0,\"openProviderSessions\":0,\"claimableEffects\":0,\"remoteTasksAnswering\":0,\"remoteTasksUnanswered\":0},\"sources\":{\"outbox\":null,\"scheduledTasks\":null,\"usageLimitResets\":null,\"pullRequestWatch\":null},\"remoteRetry\":null}"
+      ]
+    },
+    {
+      "script": "t3flare-environment-spi1050",
+      "outcome": "exception",
+      "at": 1794593489280,
+      "exceptions": [
+        "Error: t3flare: idle reset"
+      ],
+      "logs": []
+    },
+    {
+      "script": "t3flare-environment-spi1050",
+      "outcome": "ok",
+      "at": 1794593754509,
+      "exceptions": [],
+      "logs": [
+        "{\"t3flare\":\"workspace-purged\",\"id\":\"s1050-mwfam21w\",\"sessions\":0}"
+      ]
+    },
+    {
+      "script": "t3flare-agents-spi1050",
+      "outcome": "responseStreamDisconnected",
+      "at": 1794593466323,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "script": "t3flare-agents-spi1050",
+      "outcome": "responseStreamDisconnected",
+      "at": 1794593466372,
+      "exceptions": [],
+      "logs": [
+        "{\"t3flare\":\"git-reads-primed\",\"reads\":7}"
+      ]
+    },
+    {
+      "script": "t3flare-agents-spi1050",
+      "outcome": "ok",
+      "at": 1794593488958,
+      "exceptions": [],
+      "logs": [
+        "{\"t3flare\":\"stale-read-last-answer\",\"argv\":[\"status\",\"--porcelain=2\",\"--branch\"],\"why\":\"above the guard\"}"
+      ]
+    },
+    {
+      "script": "t3flare-agents-spi1050",
+      "outcome": "canceled",
+      "at": 1794593489235,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "script": "t3flare-agents-spi1050",
+      "outcome": "responseStreamDisconnected",
+      "at": 1794593490523,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "script": "t3flare-agents-spi1050",
+      "outcome": "responseStreamDisconnected",
+      "at": 1794593641184,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "script": "t3flare-agents-spi1050",
+      "outcome": "responseStreamDisconnected",
+      "at": 1794593641189,
+      "exceptions": [],
+      "logs": []
+    }
+  ]
+}
