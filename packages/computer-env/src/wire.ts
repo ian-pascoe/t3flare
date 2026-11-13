@@ -38,7 +38,11 @@ export type WireSkill = {
   readonly disableModelInvocation: boolean;
 };
 
-/** The Workspace DO's answer to `skills` (SPI-1147): the skills found, those skipped and why, and how many the cap left out. */
+/**
+ * The Workspace DO's answer to `skills` (SPI-1147): the skills found, those skipped and why, and how many the cap left
+ * out. It restates `@t3flare/skills`' `SkillDiscovery` rather than importing it, as `WireSkill` does, so this package
+ * keeps no dependency on the discovery code (and its YAML parser).
+ */
 export type WireSkillDiscovery = {
   readonly skills: ReadonlyArray<WireSkill>;
   readonly skipped: ReadonlyArray<{ readonly path: string; readonly reason: string }>;
