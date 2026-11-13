@@ -163,8 +163,10 @@ const probeCli = async (cli: Cli, projectId: string, root: string, id: string) =
     // end with the Container; the mention thread resumes for its later turns.
     await stopContainer(id);
     const inline = await newThread(cli, projectId, `spi-1151 ${cli}: inline mention`);
-    steps.inlineMention = await turn(cli, inline, 1, "Tell me the fruit code, following $fruit-code. Reply with the code alone.");
-    checks.inlineMentionAnswers = steps.inlineMention.answer.includes("KIWI-7") && steps.inlineMention.typed === "Tell me the fruit code, following $fruit-code. Reply with the code alone.";
+    // A mention t3's grammar matches needs whitespace or the end after its name (no full stop), else nothing rewrites it.
+    const inlineText = "Tell me the fruit code, following $fruit-code and replying with the code alone.";
+    steps.inlineMention = await turn(cli, inline, 1, inlineText);
+    checks.inlineMentionAnswers = steps.inlineMention.answer.includes("KIWI-7") && steps.inlineMention.typed === inlineText;
   }
   if (spec.echo !== null) {
     steps.command = await turn(cli, mentioned, ++ordinal, "/echo a");
