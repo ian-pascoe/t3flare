@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { admin, base, pair, sleep, updateSettings, wsCall } from "./lib/client.ts";
 import { createThread, replyOf, say, settled, t3Calls, until } from "./lib/cloudThread.ts";
 import { ensureCloudFixtureProject } from "./lib/fixtureProject.ts";
-import { type Line as StageLine, openTab, step, streamStatus, tabEval, VITE_APP, waitFor, watchStream, wsFind } from "./lib/previewStage.ts";
+import { type Line as StageLine, openTab, step, streamStatus, tabEval, VITE_APP, viteAppCommand, viteStartCommand, waitFor, watchStream, wsFind } from "./lib/previewStage.ts";
 // A run's whole budget: a hung step fails the run rather than holding the stage.
 setTimeout(() => {
   console.error("previews: the run took longer than 20 minutes");
@@ -132,11 +132,8 @@ switch (part) {
     // The Container starts for the shell (a terminal's open is use, ADR-0021).
     await term.until(/[$#] $/, 180_000);
     const files = VITE_APP(base.origin);
-    const write = Object.entries(files)
-      .map(([name, text]) => `echo ${Buffer.from(text).toString("base64")} | base64 -d > ${name}`)
-      .join(" && ");
     await step(lines, "a Vite app in the Container (/tmp/vapp)", async () => {
-      const out = await term.run(`mkdir -p /tmp/vapp && cd /tmp/vapp && ${write} && (test -d node_modules/vite || (npm init -y >/dev/null && npm i --silent vite@6 >/dev/null 2>&1)) && echo vite-ready`, 240_000);
+      const out = await term.run(`${viteAppCommand(base.origin)} && echo vite-ready`, 240_000);
       return { ok: out.text.includes("vite-ready"), detail: { ms: out.ms } };
     });
     await term.write("npx vite --host 0.0.0.0 --port 5173 --strictPort\n");
@@ -393,9 +390,7 @@ switch (part) {
     const threadId = await createThread(cookie, projectId, { title: "previews: hold" });
     const term = await attachTerminal(cookie, { threadId, terminalId: "default", cwd: workspaceRoot });
     await term.until(/[$#] $/, 180_000);
-    const files = VITE_APP(base.origin);
-    const write = Object.entries(files).map(([name, text]) => `echo ${Buffer.from(text).toString("base64")} | base64 -d > ${name}`).join(" && ");
-    await term.run(`pkill -f 'vite --host' ; mkdir -p /tmp/vapp && cd /tmp/vapp && ${write} && (test -d node_modules/vite || (npm init -y >/dev/null && npm i --silent vite@6 >/dev/null 2>&1)) && (env -u T3FLARE_EXEC setsid nohup npx vite --host 0.0.0.0 --port 5173 --strictPort >/tmp/vite.log 2>&1 &) && sleep 4 && echo started`, 240_000);
+    await term.run(`${viteAppCommand(base.origin)} && ${viteStartCommand(true)}`, 240_000);
     // Started outside the terminal's marker, so closing the terminal (which kills by it) leaves the dev server running.
     await term.close(true);
     const lastInput = Date.now();
@@ -501,9 +496,7 @@ switch (part) {
     const term = await attachTerminal(cookie, { threadId, terminalId: "default", cwd: workspaceRoot });
     await term.until(/[$#] $/, 180_000);
     const page = `<!doctype html><html><body><a id="d" href="/dl.txt" download="dl.txt">download</a><input type="file" id="f"><pre id="out">none</pre><script>document.getElementById("f").addEventListener("change", async (e) => { const f = e.target.files[0]; document.getElementById("out").textContent = f.name + ":" + (await f.text()); });</script></body></html>`;
-    const files = VITE_APP(base.origin);
-    const write = Object.entries(files).map(([name, text]) => `echo ${Buffer.from(text).toString("base64")} | base64 -d > ${name}`).join(" && ");
-    await term.run(`pkill -f 'vite --host' ; mkdir -p /tmp/vapp && cd /tmp/vapp && ${write} && (test -d node_modules/vite || (npm init -y >/dev/null && npm i --silent vite@6 >/dev/null 2>&1)) && echo ${Buffer.from(page).toString("base64")} | base64 -d > transfer.html && mkdir -p public && echo download-ok > public/dl.txt && (nohup npx vite --host 0.0.0.0 --port 5173 --strictPort >/tmp/vite.log 2>&1 &) && sleep 4 && echo started`, 240_000);
+    await term.run(`${viteAppCommand(base.origin, { "transfer.html": page, "public/dl.txt": "download-ok\n" })} && ${viteStartCommand(false)}`, 240_000);
     const tab = await openTab(cookie, threadId, "http://localhost:5173/transfer.html");
     await waitFor("the page", async () => ((await tabEval("transfer.html", "document.getElementById('out')?.textContent").catch(() => undefined)) === "none" ? true : undefined), 60_000);
     const url = new URL("/api/preview-stream/ws", base);

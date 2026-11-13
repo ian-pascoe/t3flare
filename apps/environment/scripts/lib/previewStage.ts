@@ -160,3 +160,18 @@ export const VITE_APP = (t3Origin: string) => ({
 })();
 </script></body></html>`,
 });
+
+/**
+ * The shell command that lays out the Vite app in `/tmp/vapp` (the Container's own disk, gone when it stops), with
+ * `extra` files, and installs Vite when it is not there yet.
+ */
+export const viteAppCommand = (t3Origin: string, extra: Record<string, string> = {}): string => {
+  const write = Object.entries({ ...VITE_APP(t3Origin), ...extra })
+    .map(([name, text]) => `mkdir -p "$(dirname ${name})" && echo ${Buffer.from(text).toString("base64")} | base64 -d > ${name}`)
+    .join(" && ");
+  return `pkill -f 'vite --host' ; mkdir -p /tmp/vapp && cd /tmp/vapp && ${write} && (test -d node_modules/vite || (npm init -y >/dev/null && npm i --silent vite@6 >/dev/null 2>&1))`;
+};
+
+/** Starts Vite on 0.0.0.0:5173 in the background; `detached` runs it outside the terminal's marker (it outlives the terminal). */
+export const viteStartCommand = (detached: boolean): string =>
+  `(${detached ? "env -u T3FLARE_EXEC setsid " : ""}nohup npx vite --host 0.0.0.0 --port 5173 --strictPort >/tmp/vite.log 2>&1 &) && sleep 4 && echo started`;

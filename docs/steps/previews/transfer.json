@@ -1,13 +1,13 @@
 {
- "at": "2026-11-13T14:47:34.613Z",
+ "at": "2026-11-13T14:49:03.175Z",
  "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
  "ok": true,
- "threadId": "bc52ba71-76be-4d98-a89d-99373b2d6f7a",
+ "threadId": "d80cb7d4-2d9a-40f0-8291-a37658efc7a9",
  "lines": [
   {
    "name": "a download is offered to the controlling viewer and served by t3's download route (M2)",
    "ok": true,
-   "ms": 2074,
+   "ms": 1886,
    "detail": {
     "offered": {
      "fileName": "dl.txt",
@@ -20,7 +20,7 @@
   {
    "name": "an upload through the page's file chooser reaches the page (M2)",
    "ok": true,
-   "ms": 2351,
+   "ms": 2330,
    "detail": {
     "status": 204,
     "page": "up.txt:upload-ok"
