@@ -196,7 +196,7 @@ const BOOT_COUNT_KEY = "t3flare:boot-count";
  */
 /** An RPC's CLI agent argument (SPI-1151): absent (the Durable agent's) or one of `CLI_AGENTS`, else refused. */
 const cliAgentArgument = (agent: unknown): void => {
-  if (agent !== undefined && !isCliAgent(agent)) throw new Error(`t3flare: no CLI agent ${String(agent)}`);
+  if (agent !== undefined && !isCliAgent(agent)) throw new Error(`t3flare: no CLI agent ${JSON.stringify(agent)}`);
 };
 
 export const MAX_CLI_PROCESSES = 4;
