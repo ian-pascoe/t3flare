@@ -336,6 +336,19 @@ const emitTool = (
       return;
     }
   }
+  // The web tools (SPI-1054) as t3's own web search item, as t3's ACP adapter shows a fetch; a failed call stays a tool
+  // item, whose output says why.
+  if ((call.name === "web_search" || call.name === "web_fetch") && result?.isError !== true) {
+    const search = call.name === "web_search";
+    const pattern = str(search ? call.arguments.query : call.arguments.url)?.trim();
+    const results = webResults(search ? details.results : [details], textOut);
+    emitItem(state, out, turn, key, "tool_call", status, search ? null : "Fetched a page", {
+      type: "web_search",
+      ...(pattern === undefined || pattern === "" ? {} : { patterns: [textOut(pattern)] }),
+      ...(results.length === 0 ? {} : { results }),
+    }, now, parentKey);
+    return;
+  }
   const input = Object.fromEntries(
     Object.entries(call.arguments).map(([name, value]) => [name, name === "path" && typeof value === "string" ? pathOut(value) : value]),
   );
@@ -348,6 +361,17 @@ const emitTool = (
     ...(result === undefined ? {} : { output: { content: result.content.filter((block) => block.type === "text") } }),
   }, now, parentKey);
 };
+
+/** A web tool's pages (`details.results` of `web_search`, `details` of `web_fetch`) as t3's web search results. */
+const webResults = (raw: unknown, textOut: (text: string) => string): Array<{ readonly url: string; readonly title?: string; readonly snippet?: string }> =>
+  (Array.isArray(raw) ? raw : []).slice(0, 20).flatMap((page: unknown) => {
+    const fields = (typeof page === "object" && page !== null ? page : {}) as Record<string, unknown>;
+    const url = str(fields.url)?.trim();
+    if (url === undefined || url === "") return [];
+    const title = str(fields.title);
+    const snippet = str(fields.snippet);
+    return [{ url, ...(title === undefined ? {} : { title }), ...(snippet === undefined ? {} : { snippet: textOut(snippet) }) }];
+  });
 
 /** A nested call's status as committed in the code mode result's `details.calls`. */
 const nestedStatus = (status: unknown): ItemStatus =>

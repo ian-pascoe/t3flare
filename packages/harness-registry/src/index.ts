@@ -47,7 +47,7 @@ export interface ExtensionEntry {
 /** The offered-tools presets (plan §2.2, OD-T4): which non-MCP tools the model is offered without a search. */
 export const OFFERED_PRESETS = {
   /** B, the default: the core coding tools, `ask_user`, code mode, tool search and t3's own tools. */
-  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*"],
+  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search"],
   /** A: code mode and tool search; every other tool through a script or a search. */
   "codemode-only": ["codemode", "tool_search"],
   /** C: everything direct. */
@@ -57,6 +57,9 @@ export const OFFERED_PRESETS = {
 export type OfferedPreset = keyof typeof OFFERED_PRESETS;
 
 const CORE_LOCK = "a core extension: always on";
+
+/** The models `web_search` may ask (the proxy's Claude models; models.json). */
+export const SEARCH_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"] as const;
 
 export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
   {
@@ -94,6 +97,25 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
       },
     },
   },
+  {
+    id: "web",
+    title: "Web tools",
+    description:
+      "web_fetch: one public page as Markdown, text or HTML, through an SSRF guard. web_search, when switched on below: a search-capable model behind the model proxy searches and cites its sources (no new key). Both are reads, allowed in every mode (SPI-1054).",
+    default: "on",
+    settings: {
+      search: {
+        title: "Web search",
+        description: "Offer web_search. Off by default: each search is a model request on the proxy's spend.",
+        schema: { type: "boolean", default: false },
+      },
+      searchModel: {
+        title: "Search model",
+        description: "The model that runs web_search's searches through the proxy (Commissary passes its web search tool to Claude, or to Codex as its own).",
+        schema: { type: "enum", values: SEARCH_MODELS, default: "claude-haiku-5-5" },
+      },
+    },
+  },
   { id: "coding-tools", title: "Coding tools", description: "read, write, edit and bash (Worker Shell or Container).", default: "always", settings: {}, locked: CORE_LOCK },
   { id: "files", title: "File tools", description: "ls, find and grep.", default: "always", settings: {}, locked: CORE_LOCK },
   {
@@ -110,6 +132,21 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
 ];
 
 const entryOf = (id: string) => EXTENSIONS.find((entry) => entry.id === id);
+
+/**
+ * Extension `id` as `resolved` has it, or its defaults when `resolved` predates the entry (a Session keeps the view it
+ * last took, and a deploy can add an entry before the Session's next turn reads the settings again).
+ */
+export const extensionOf = (
+  resolved: ResolvedHarness,
+  id: string,
+): { readonly enabled: boolean; readonly settings: Readonly<Record<string, SettingValue>> } => {
+  const taken = resolved.extensions[id];
+  const entry = entryOf(id);
+  if (entry === undefined) return taken ?? { enabled: false, settings: {} };
+  const defaults = Object.fromEntries(Object.entries(entry.settings).map(([key, setting]) => [key, setting.schema.default]));
+  return { enabled: taken?.enabled ?? entry.default !== "off", settings: { ...defaults, ...taken?.settings } };
+};
 
 /** One scope's stored choices: per extension, its switch and the settings set explicitly. */
 export interface HarnessLayer {

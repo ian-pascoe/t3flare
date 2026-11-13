@@ -3,7 +3,7 @@
 // cloudpid ADR-0027's merge (keyed settings merged key by key, lists replaced whole) for the later per-Project overrides.
 import { describe, expect, it } from "vitest";
 
-import { applyChange, EMPTY_HARNESS, EXTENSIONS, resolveHarness } from "./index.ts";
+import { applyChange, EMPTY_HARNESS, extensionOf, EXTENSIONS, resolveHarness } from "./index.ts";
 
 describe("resolveHarness", () => {
   it("gives the defaults for empty settings: code mode on, tool search on, the core preset offered", () => {
@@ -11,7 +11,24 @@ describe("resolveHarness", () => {
     expect(resolved.revision).toBe(0);
     expect(resolved.codemode).toEqual({ enabled: true, inlineBudget: 2000 });
     expect(resolved.toolSearch).toEqual({ enabled: true });
-    expect(resolved.offered).toEqual(["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*"]);
+    expect(resolved.offered).toEqual([
+      "read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search",
+    ]);
+  });
+
+  it("has the web tools on with web_search off (a search costs a model request), and the search model switchable (SPI-1054)", () => {
+    expect(resolveHarness(EMPTY_HARNESS).extensions.web).toEqual({ enabled: true, settings: { search: false, searchModel: "claude-haiku-5-5" } });
+    const on = applyChange(EMPTY_HARNESS, { extension: "web", settings: { search: true, searchModel: "claude-sonnet-5-5" } });
+    if (!on.ok) throw new Error(on.error);
+    expect(resolveHarness(on.harness).extensions.web).toEqual({ enabled: true, settings: { search: true, searchModel: "claude-sonnet-5-5" } });
+    expect(applyChange(EMPTY_HARNESS, { extension: "web", settings: { searchModel: "gpt-9" } })).toMatchObject({ ok: false });
+  });
+
+  it("gives an extension's defaults to a Session whose resolved view predates the entry", () => {
+    const { web: _web, ...older } = resolveHarness(EMPTY_HARNESS).extensions;
+    const taken = { ...resolveHarness(EMPTY_HARNESS), extensions: older };
+    expect(extensionOf(taken, "web")).toEqual({ enabled: true, settings: { search: false, searchModel: "claude-haiku-5-5" } });
+    expect(extensionOf(taken, "nope")).toEqual({ enabled: false, settings: {} });
   });
 
   it("offers everything when tool search is off, since nothing could load a deferred tool", () => {

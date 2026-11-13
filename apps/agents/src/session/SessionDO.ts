@@ -14,6 +14,7 @@ import {
   Harness,
   type RegistryReader,
 } from "@earendil-works/pi-durable";
+import type { CodemodeNamespace } from "@earendil-works/pi-durable/codemode";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
 import {
   type AbortInput,
@@ -49,7 +50,7 @@ import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
 
-import { EMPTY_HARNESS, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
+import { EMPTY_HARNESS, extensionOf, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { environmentStub } from "../environment.ts";
 import { type CodemodeSandboxNamespace, codemodeExtension, remoteSandbox, toolSearchExtension } from "../extensions/codemode.ts";
@@ -60,6 +61,7 @@ import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
 import { McpQuestions } from "../extensions/mcpQuestions.ts";
 import { ApprovalStore, interactionModeSection, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
+import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
@@ -301,9 +303,26 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // -------------------------------------------------------------------------------------------------------------------
   // Harness settings (ADR-0026): code mode, tool search and the offered tools, taken at a turn's start
 
-  /** Installs (or removes) code mode and tool search as `harness` says. pi-durable applies it from the next phase. */
+  /**
+   * Installs (or removes) the switchable extensions (web, SPI-1054), then code mode and tool search, as `harness` says:
+   * code mode's namespaces and tool search's deferral cover the tools installed before them. pi-durable applies it from
+   * the next phase.
+   */
   #installHarness(harness: ResolvedHarness): void {
     const registry = this.#registryWriter;
+    const namespaces: Array<CodemodeNamespace> = [];
+    const web = extensionOf(harness, WEB_EXTENSION);
+    if (web.enabled) {
+      const searchModel = String(web.settings.searchModel);
+      registry.install(
+        webExtension(
+          web.settings.search === true ? { search: { url: this.env.MODEL_PROXY_URL, apiKey: this.env.MODEL_PROXY_API_KEY, model: () => searchModel } } : {},
+        ),
+      );
+      namespaces.push(WEB_NAMESPACE);
+    } else {
+      registry.uninstall({ name: WEB_EXTENSION });
+    }
     const sandbox = this.env.CODEMODE_SANDBOX;
     const sessionName = this.ctx.id.name ?? this.ctx.id.toString();
     if (harness.codemode.enabled && sandbox !== undefined) {
@@ -311,7 +330,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       registry.install(
         codemodeExtension(remoteSandbox(sandbox, sessionName), {
           inlineBudget: harness.codemode.inlineBudget,
-          ...(view === undefined ? {} : { namespaces: mcpNamespaces(view) }),
+          namespaces: [...namespaces, ...(view === undefined ? [] : mcpNamespaces(view))],
         }),
       );
     } else {
