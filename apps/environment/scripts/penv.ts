@@ -370,7 +370,30 @@ const browser = (...args: Array<string>) => {
   return result.stdout;
 };
 
+/** Sets the form's size to standard-4 and budget to 5 as a person would (input events), without saving. */
+const LIVE_INPUTS = `(() => { const b = document.querySelector('[data-setting="containerBudget"]'); b.value = '5'; b.dispatchEvent(new Event('input', { bubbles: true })); const s = document.querySelector('[data-setting="containerSize"]'); s.value = 'standard-4'; s.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-cost-now]').scrollIntoView({ block: 'center' }); })()`;
+
+/** The cost summary, the budget column's head, the current row and its budget cell, as the page shows them now. */
+const costText = () =>
+  JSON.parse(
+    JSON.parse(
+      browser(
+        "eval",
+        `JSON.stringify({ now: document.querySelector('[data-cost-now]').textContent, head: document.querySelector('[data-budget-head]').textContent, current: document.querySelector('tr[aria-current]')?.dataset.size ?? null, cell: document.querySelector('tr[aria-current] [data-budget-hour]')?.textContent ?? null })`,
+      ).trim(),
+    ),
+  ) as Record<string, unknown>;
+
 const shoot = async () => {
+  const before: Array<Record<string, unknown>> = [];
+  const after: Array<Record<string, unknown>> = [];
+  const save = (name: string) => {
+    const file = path.join(OUT, name);
+    browser("screenshot", file);
+    const widthOf = () => Number(/pixelWidth: (\d+)/.exec(spawnSync("sips", ["-g", "pixelWidth", file], { encoding: "utf8" }).stdout)?.[1]);
+    if (widthOf() > 1400) spawnSync("sips", ["--resampleWidth", "1400", file], { stdio: "ignore" });
+    console.log(`wrote ${path.relative(process.cwd(), file)}`);
+  };
   // One Container running, so the section shows a holder beside the budget.
   await ready();
   await call({ exec: { script: "true", timeoutMs: 180_000 } });
@@ -385,14 +408,24 @@ const shoot = async () => {
       browser("wait", "--load", "networkidle");
       browser("eval", `document.getElementById('environment').scrollIntoView()`);
       spawnSync("sleep", ["0.5"]);
-      const file = path.join(OUT, `environment-${name}-${scheme}.png`);
-      browser("screenshot", file);
-      const widthOf = () => Number(/pixelWidth: (\d+)/.exec(spawnSync("sips", ["-g", "pixelWidth", file], { encoding: "utf8" }).stdout)?.[1]);
-      if (widthOf() > 1400) spawnSync("sips", ["--resampleWidth", "1400", file], { stdio: "ignore" });
-      console.log(`wrote ${path.relative(process.cwd(), file)}`);
+      save(`environment-${name}-${scheme}.png`);
+      // The page's own script under the page's CSP: size and budget changed in the form, not saved; the cost follows.
+      before.push(costText());
+      browser("eval", LIVE_INPUTS);
+      spawnSync("sleep", ["0.3"]);
+      after.push(costText());
+      save(`environment-live-${name}-${scheme}.png`);
       browser("close");
     }
   }
+  const expected = { now: "With these settings, at most $2.01 an hour: 5 Containers of standard-4, every vCPU busy.", head: "5 Containers, an hour", current: "standard-4", cell: "$2.01" };
+  await writeEvidence("cost-live.json", {
+    note: "The Environment section's script on the stage's page (its CSP, its hashes): the size set to standard-4 and the budget to 5 in the form, not saved.",
+    before,
+    after,
+    expected,
+    ok: after.length === 4 && after.every((entry) => JSON.stringify(entry) === JSON.stringify(expected)),
+  });
 };
 
 const commands: Record<string, () => Promise<void> | void> = { "seed-old": seedOld, sizes, running, idle, budget, revisions: revisionsCase, audit, safety, shoot };
