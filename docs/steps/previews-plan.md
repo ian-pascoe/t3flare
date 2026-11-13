@@ -1,6 +1,47 @@
 # Previews (parity G11, SPI-1002): plan
 
-Status: plan, not started. Owner decision D4 (2026-11-11): previews are part of parity, built last. Ticket: SPI-1002 (Backlog). Pinned t3: `t3code` at `d8f3feff0c`. Anchors drift; grep the symbol.
+Status: in implementation on branch `previews` (2026-11-13). Owner decision D4 (2026-11-11): previews are part of parity, built last. Ticket: SPI-1002. Pinned t3: `t3code` at `d8f3feff0c`. Anchors drift; grep the symbol.
+
+## Review changelog (2026-11-13, implementation)
+
+Fable's review (`previews-plan-review.md`) overrides this plan. Each finding is folded in below; where a section further
+down disagrees with this changelog, the changelog wins. The owner accepted O1–O5 as recommended, with the review's two
+conditions on O3. Findings that M0 had to settle are marked **(M0)**; their answers are in the M0 section of
+`docs/steps/previews.md` and in the rows below once known.
+
+**Findings.**
+
+| # | Change to the plan |
+|---|---|
+| H1 | Accepted (read `ServerBrowserStream.ts`: `NodeHttpServerRequest.toIncomingMessage(request).socket` is the transport, `writableLength` read per write, `destroy()` on a slow viewer, and `incoming.headers[...]` deleted). Our `platform/httpServer.ts` gives an upgrade request a `source` of `{ headers, socket: { writableLength, destroy } }` backed by the `WebSocketPair`: our code, no Shadow or Patch. `writableLength` is the socket's `bufferedAmount` if workerd has one **(M0)**, else 0, and the 8 MiB slow-viewer guard is recorded as lost under R7. |
+| M1 | Accepted: the docs (updated 2026-11-10) say routing lasts until the session closes and applies to later `connectSession()` calls. R3 is rewritten: the question is whether a `ctx.exports.ContainerPreviews({ props })` Fetcher is accepted in `outboundByHost` and keeps its props for a page loaded 5 minutes and 3 Environment invocations after acquisition **(M0 question 2)**. If not, there is no per-Workspace identity and the plan goes to O3. |
+| M2 | Accepted. M0 question 1 adds `download.saveAs` + `stat` and `chooser.setFiles(paths)`. The Shadow wraps `Download.saveAs` (the fork's stream written through t3's `node:fs` alias) and `setFiles` with paths (read through t3's `FileSystem`, passed as buffers). |
+| M3 | Accepted. M0 question 3 adds `http://t3-page.localhost` under `Fetch.enable`. If it is served, **Shadow 4 shrinks**: there is no Shadow of `headlessChrome.ts`; our process router (already our `ChildProcessSpawner` Layer) answers `PreviewBrowser`'s constant executable with a CDP bridge to a route-less Browser Run browser (fd 3 in, fd 4 out, NUL-delimited, as `--remote-debugging-pipe`), so stock's 638 lines of guards (main frame pinned, other documents failed, WebRTC deleted) keep tracking upstream. Shadow 4 becomes `htmlRender/publicProxy.ts` (224 lines; workerd has no `node:net` server), and Browser Run's own egress replaces its SOCKS guard, which M0 tests against the widened private list (L3). |
+| M4 | Accepted. A configured preview URL on `localhost` is probed through the Workspace DO, which never starts the Container and does not count it as use. Any other URL is probed through the MCP Worker, which has `global_fetch_strictly_public`, never from the Environment Worker. The M2 hostile list gets the blind-SSRF probe. |
+| M5 | Accepted; R5 becomes Medium. The Shadow keeps its own Browser Run session ids in Environment DO storage, closes any left at boot (never `listSessions`, which is account-wide), and handles `disconnected` (contexts dropped, `onContextClose` fired, `storageState` already saved). The 30-minute cap applies to request-driven use too. M3 gets exit lines for a hidden panel left 30 minutes (browser-seconds recorded) and a tab left past `keepAlive`. |
+| M6 | Accepted. `m0-playwright.json` records the bundle's gzipped size before and after and the Worker's startup; `@cloudflare/playwright` is loaded by dynamic import, off the startup path. Question 1's call list was rebuilt by grep (`grantPermissions(['clipboard-write'])`, `emulateMedia`, `newCDPSession(frame)`, `saveAs`, `setFiles`, `ariaSnapshot({ mode: 'ai', boxes: true })`, `exposeFunction`, locator actions). |
+| M7 | Accepted. The scan script JSON-encodes every field; the Layer schema-decodes each line, drops a `T3CODE_THREAD_ID` or `term-<key>` marker that names a thread or terminal outside the Workspace, and clips `comm`. |
+| L1 | Accepted: M1 and M5 hostile lists get a POST to `/_t3flare/harness/api/mcp/servers` from the opaque-origin page. |
+| L2 | Accepted: the stage asserts `Content-Security-Policy: sandbox …` and `X-Content-Type-Options: nosniff` on an HTML asset fetched directly, top-level and with `download`. |
+| L3 | Accepted: the private list is `127.0.0.1`, `[::1]`, `0.0.0.0`, `127.1`, `*.localhost`, `10.0.0.1`, `169.254.169.254`, `metadata.google.internal`, the `*.t3flare.internal` names and the t3 host's `/_t3flare`. |
+| L4 | Accepted: profile state lives in its own DO SQLite table (`t3flare_preview_profiles`), outside t3's `FileSystem`, saved with `storageState({ indexedDB: true })` and refused over 8 MB a row. |
+| L5 | Accepted: `recording` is never set, no Live View URL is minted, and no preview request URL or cookie is logged; a unit test asserts the acquire options and the log lines. |
+| L6 | Accepted, checked: `ServerBrowser.ts` navigates only through `page.goto` (`:1111`, `:1789`, `:2646`) and `page.reload`. If R1 holds, the Shadow wraps `goto` on every page of its contexts to translate `localhost:N`; Patch 0005 carries only the thread. |
+| L7 | Accepted: R9 adds `crypto.randomUUID` and cross-port `localhost` calls. |
+| L8 | Accepted: the shim is also served at `/__t3flare/ws/shim.js`. |
+| L9 | Accepted: M2 exit line, a running idle Container still stops at 2 minutes with the panel open and polling. |
+| L10 | Accepted: the relay passes `resources/read` only for a `ui://` URI of the calling tool's own server, caps its size, and passes only `_meta.ui` of a tool's `_meta`. |
+| O3 | Accepted with both conditions: Chrome in the Container never loads an owner profile, and an R1-only failure is fixed by URL translation (L6), not by O3. |
+
+**Corrections from re-reading stock and the account (not in the review).**
+
+| # | Change to the plan |
+|---|---|
+| C1 | Stock lists only attributed listeners: `probeWebServers` returns `servers.filter(isOwned)` (`PortScanner.ts`, "Owned listeners are listed as plain HTTP without a request"), plus configured URLs that probe as web. §2.1 and M2 are corrected to stock: an unattributed listener (a `nohup` server) is **not** listed. |
+| C2 | **OS1 is not needed.** cloudpid's CI deploy token holds exactly our account permission groups (Workers Scripts Write, Workers Containers Write, Secrets Store Write, Account Settings Read, Access Apps and Policies Write; `~/src/cloudpid/infra/github.ts`) and deploys a Worker with `BROWSER: Cloudflare.Browser()` (`apps/browser/src/resource.ts`) to prod from CI (run 43093747070, "Deploy prod", 2026-11-11, success). No `infra/github.ts` change and no `ci:setup` re-run. |
+| C3 | One throwaway stage, `previews`, replaces `prev0`–`prev5` (owner instruction), deployed as few times as possible and destroyed at the end. Nothing lands on `main` from this branch; the owner merges. |
+| C4 | M0 question 5 (HMR through the shim) moves to M3's exit: it needs the Container preview that M3 builds, and does not decide the design (cloudpid measured it in production). |
+| C5 | `@cloudflare/playwright` 1.4.0 is a port of Playwright **1.62.1**, not 1.64 (`lib/playwright-core/package.json.js`). t3's `import type` of `playwright-core` 1.64.1 is satisfied by casting at the Shadow's boundary; U59 watches the gap. |
 
 The parity rows covered here (`docs/parity.md` § Previews): port discovery, the server browser and dev-server preview, the agent browser tools, HTML visual replies, and MCP apps. The device hub stays refused (ADR-0024).
 
