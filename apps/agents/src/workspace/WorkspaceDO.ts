@@ -45,8 +45,9 @@ import * as git from "isomorphic-git";
 import { CREDENTIAL_HELPER, CREDENTIAL_PATH } from "./credentialHelper.ts";
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
 import { environmentStub } from "../environment.ts";
-import type { McpRelayAnswer } from "@t3flare/harness-registry";
+import { EMPTY_ENVIRONMENT, type McpRelayAnswer, type ResolvedEnvironment, resolveEnvironment } from "@t3flare/harness-registry";
 import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
+import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, takeEnvironment } from "./containerLaunch.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { ContainerPreview } from "./containerPreview.ts";
 import { type PortProbe, probeRunningPort, scanRunningContainer, stopGroupInRunningContainer } from "./ports.ts";
@@ -81,9 +82,7 @@ import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
 import {
   CONTAINER_BACKEND,
-  CONTAINER_IDLE_MS,
   CONTAINER_IGNORE,
-  CONTAINER_INSTANCE,
   TERMINAL_IDLE_MS,
   TERMINAL_PROMPT_IDLE_MS,
   WORKER_SHELL_BACKEND,
@@ -104,8 +103,6 @@ export interface WorkspaceEnv {
   readonly CONTAINER_BUDGET: DurableObjectNamespace<ContainerBudget>;
   /** Overrides TERMINAL_PROMPT_IDLE_MS (the stage's idle-hold check). */
   readonly T3FLARE_TERMINAL_PROMPT_IDLE_MS?: string;
-  /** Overrides CONTAINER_IDLE_MS (tests). */
-  readonly T3FLARE_CONTAINER_IDLE_MS?: string;
   /** Overrides TERMINAL_IDLE_MS (the stage's idle-hold check). */
   readonly T3FLARE_TERMINAL_IDLE_MS?: string;
   /** Test stages only: the stage-only probes and faults answer. */
@@ -152,6 +149,13 @@ export type FsOp =
 const LAST_USE_KEY = "t3flare:container-last-use";
 /** When the Container started (its lease taken): the idle stop logs its lifetime (cost audit F2). */
 const STARTED_AT_KEY = "t3flare:container-started-at";
+/**
+ * The Environment settings this object last took (ADR-0032): a Container start whose read of the Environment's gets no
+ * answer in time starts with these.
+ */
+const ENVIRONMENT_KEY = "t3flare:environment";
+/** What the Container last started with (size, `instance`, idle time): a running Container keeps them until it stops. */
+const LAUNCH_KEY = "t3flare:container-launch";
 /**
  * Prints the memory peak (`peak <bytes>`) and CPU time (`usage_usec <µs>`) of the cgroup v2 the Container's commands run
  * in (`/cloudchamber` on the platform's microVM; the root cgroup has no `memory.peak`).
@@ -284,7 +288,8 @@ export class WorkspaceDO extends ContainerHost {
           container: () => ({ getWorkspaceContainer: () => this.#budgeted(this.getWorkspaceContainer()) }),
           workspace: ref,
           name: WORKSPACE_CONTAINER,
-          instance: CONTAINER_INSTANCE,
+          // Each start's own size replaces it (`#budgeted`); a start never omits it (an omitted one starts `lite`).
+          instance: launchOf(resolveEnvironment(EMPTY_ENVIRONMENT)).instance,
           // Unrestricted direct egress in part 1, as cloudpid's v1 (an allowlist is deferred, docs/plan.md).
           egress: { mode: "direct" },
           ignore: [...patterns],
@@ -637,12 +642,14 @@ export class WorkspaceDO extends ContainerHost {
     };
     return {
       start: async (spec: ContainerLaunchSpec) => {
+        const launch = await this.#launch();
         await lease();
-        return api.start(spec);
+        return api.start({ ...spec, instance: launch.instance });
       },
       restart: async (spec: ContainerLaunchSpec) => {
+        const launch = await this.#launch();
         await lease();
-        return api.restart(spec);
+        return api.restart({ ...spec, instance: launch.instance });
       },
       interceptOutboundHttp: (host, workspace) => api.interceptOutboundHttp(host, workspace),
       interceptAllOutboundHttp: (workspace, token) => api.interceptAllOutboundHttp(workspace, token),
@@ -680,9 +687,31 @@ export class WorkspaceDO extends ContainerHost {
     return this.env.CONTAINER_BUDGET.get(this.env.CONTAINER_BUDGET.idFromName(BUDGET_NAME));
   }
 
+  /**
+   * What this start launches with (ADR-0032). A running Container keeps what it started with: computer's start adopts it
+   * only with the same `instance`, and relaunches it otherwise, so a settings change never resizes or restarts it. A
+   * stopped one takes the Environment's settings now, waiting at most ENVIRONMENT_READ_MS, else the copy kept.
+   */
+  async #launch(): Promise<ContainerLaunch> {
+    const kv = this.ctx.storage.kv;
+    const running = kv.get<ContainerLaunch>(LAUNCH_KEY);
+    // Before the first recorded launch, a running Container started with the default (today's custom size).
+    if (this.containerRunning()) return running ?? launchOf(resolveEnvironment(EMPTY_ENVIRONMENT));
+    const taken = await takeEnvironment({
+      read: () => environmentStub(this.env.ENVIRONMENT).environmentSettings(),
+      kept: () => kv.get<ResolvedEnvironment>(ENVIRONMENT_KEY),
+      keep: (settings) => kv.put(ENVIRONMENT_KEY, settings),
+      waitMs: ENVIRONMENT_READ_MS,
+    });
+    const launch = launchOf(taken.settings);
+    kv.put(LAUNCH_KEY, launch);
+    console.log(JSON.stringify({ t3flare: "container-launch", workspace: this.#workspaceId() ?? null, source: taken.source, revision: launch.revision, size: launch.size, idleMs: launch.idleMs }));
+    return launch;
+  }
+
+  /** The idle time the running Container started with (ADR-0032). */
   #idleMs(): number {
-    const value = Number(this.env.T3FLARE_CONTAINER_IDLE_MS);
-    return Number.isFinite(value) && value > 0 ? value : CONTAINER_IDLE_MS;
+    return this.ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY)?.idleMs ?? launchOf(resolveEnvironment(EMPTY_ENVIRONMENT)).idleMs;
   }
 
   async #scheduleAlarm(): Promise<void> {
@@ -1566,11 +1595,19 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /** Whether the Container runs, and the budget's view. */
-  async containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }> {
+  async containerState(): Promise<{
+    readonly running: boolean;
+    readonly leased: boolean;
+    readonly lastUse: number | null;
+    readonly startedAt: number | null;
+    readonly launch: ContainerLaunch | null;
+  }> {
     return {
       running: this.containerRunning(),
       leased: (await this.ctx.storage.get<boolean>(LEASED_KEY)) === true,
       lastUse: (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? null,
+      startedAt: (await this.ctx.storage.get<number>(STARTED_AT_KEY)) ?? null,
+      launch: this.ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY) ?? null,
     };
   }
 

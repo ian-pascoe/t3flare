@@ -4,9 +4,11 @@
 // A Workspace DO takes a lease before it starts its Container, renews it from its alarm while the Container runs, and
 // releases it when the Container stops. A lease expires LEASE_MS after its last renewal, so a lost release frees its
 // slot within that time and a running Container never loses its slot while it is renewed.
+import { CONTAINER_BUDGET } from "@t3flare/harness-registry";
 import { DurableObject } from "cloudflare:workers";
 
-export const MAX_CONTAINERS = 3;
+/** The budget is a deploy constant (ADR-0032), shown read-only in the panel's Environment section. */
+export const MAX_CONTAINERS = CONTAINER_BUDGET;
 export const LEASE_MS = 10 * 60_000;
 export const RENEW_EVERY_MS = 5 * 60_000;
 

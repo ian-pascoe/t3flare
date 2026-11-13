@@ -5,7 +5,7 @@ import { ENVIRONMENT_NAME } from "@t3flare/session-protocol";
 
 import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
-import type { McpRelayAnswer, McpRelayInput, ResolvedHarness } from "@t3flare/harness-registry";
+import type { McpRelayAnswer, McpRelayInput, ResolvedEnvironment, ResolvedHarness } from "@t3flare/harness-registry";
 import type { McpCallAnswer, McpView } from "./extensions/mcp.ts";
 
 export interface EnvironmentRpc {
@@ -25,6 +25,8 @@ export interface EnvironmentRpc {
   terminalOutput(push: TerminalPush): Promise<TerminalPushAnswer>;
   /** The harness settings, resolved and secret-free (ADR-0026): read at a turn's start. Never boots t3. */
   harnessSettings(input: { readonly projectId?: string }): Promise<ResolvedHarness>;
+  /** The Environment settings, resolved (ADR-0032): read before a Container start. Never boots t3. */
+  environmentSettings(): Promise<ResolvedEnvironment>;
   /** The MCP tools this Session may install (ADR-0028). */
   mcpView(): Promise<McpView>;
   /** An MCP call the Session's tool has judged (`decideCall`); the server's questions come back through `asker` (SPI-1079). */

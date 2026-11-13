@@ -21,14 +21,8 @@ export const CONTAINER_BACKEND = "container-shell";
 /** computer's default id of the Worker Shell backend. */
 export const WORKER_SHELL_BACKEND = "worker-shell";
 
-/**
- * The Container size (cloudpid's `cpu-1`): 1 vCPU, 3 GiB, 12 GB of disk. Memory is most of what a running Container
- * costs; this is the smallest custom size with the most vCPU for its memory.
- */
-export const CONTAINER_INSTANCE = { vcpu: 1, memoryMib: 3072, diskMb: 12000 } as const;
-
-/** A Container stops after this long without a command. */
-export const CONTAINER_IDLE_MS = 2 * 60_000;
+// The Container's size and idle time are Environment settings (ADR-0032, `@t3flare/harness-registry`'s
+// `ENVIRONMENT_SETTINGS`), taken at each start (`containerLaunch.ts`).
 
 /**
  * While a terminal runs a foreground command, open terminals hold the Container until their last input is this old (step
