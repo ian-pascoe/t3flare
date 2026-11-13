@@ -8,6 +8,7 @@ Issues and specs for this repo live in **Linear**: workspace `spiritledsoftware`
 
 1. **Executor (default).** Executor's Linear app, through its MCP tools `call` / `execute`, under `tools.linear.*` with account `acc_0c3d8286-c8a7-491e-ae0c-e433e1367c79`.
    - Every tool takes `{ accountId, input: { arguments: { … }, select: "<GraphQL selection>" } }`.
+   - A mutation returns a payload, not the object: select inside it (`success issue { identifier url }` for an issue create or update, `success` for a comment or relation). Selecting the object's fields at the top level fails with a bare HTTP 400.
    - Issue ids accept identifiers (`SPI-123`).
    - A call may pause for the user's approval. Show the request and resume it; never repeat the call.
 2. **The `linear` CLI (fallback)**, `@schpet/linear-cli`, installed globally through mise and signed in with `linear auth login`. Use it when:
@@ -34,7 +35,7 @@ Label ids are in `docs/agents/triage-labels.md`. For any other label: `tools.lin
 ## Conventions
 
 - **Create an issue**:
-  - Executor: `tools.linear.mutation_issueCreate`, `arguments: { input: { teamId, projectId, title, description, labelIds?, parentId? } }`, `select: "identifier url"`.
+  - Executor: `tools.linear.mutation_issueCreate`, `arguments: { input: { teamId, projectId, title, description, labelIds?, parentId? } }`, `select: "success issue { identifier url }"`.
   - CLI: `linear issue create --team SPI --project ian-pascoe/t3flare --title "…" --description-file body.md [--label <name>] [--parent SPI-1] --no-input`.
 - **Read an issue**:
   - Executor: `tools.linear.query_issue`, `arguments: { id: "SPI-123" }`, `select: "identifier title description url state { name type } labels { nodes { name } } assignee { name } parent { identifier } children { nodes { identifier title state { type } } } comments { nodes { body createdAt user { name } } } attachments { nodes { url } }"`.
