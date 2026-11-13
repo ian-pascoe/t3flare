@@ -576,11 +576,35 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 
 ### U64. Skills and Prompt templates for the Durable agent (SPI-1001)
 
-- **Where**: `apps/environment/src/provider/driver.ts` (`snapshotForCwd`), `provider/attachments.ts` (`turnPrompt` expands Skill mentions and Prompt templates). t3: `ProviderInstance.snapshotForCwd` and `ProviderRegistry.refreshWorkspaceSnapshot`; `matchInlineSkills`; the composer's `$name` insertion (`ChatComposer.tsx`); `ServerProviderSkill`.
-- **Breaks when**: t3 renames or re-types the hook or the snapshot's fields; changes the mention grammar or what the composer inserts for a picked skill; passes the hook another directory.
-- **Detection**: typecheck for the hook and fields. `test/skillsSnapshot.test.ts` and `test/skillExpansion.test.ts` for the grammar and the inserted text. **Silent**: a client that sends skills another way leaves `$name` unexpanded; cheapest check: the source-text test.
-- **Blast radius**: the composer lists no skills or commands for Pi Durable, or a picked skill reaches the agent as plain `$name`. Turns still run.
-- **Fix**: compare with t3's Pi provider (`packages/provider-pi/src/server/driver.ts` `snapshotForCwd`, `mcpExtensionSource.ts`).
+Ranked last on its merits, not only by date: every break here leaves turns running (low blast radius), and the hook
+and field shapes it leans on fail typecheck rather than silently.
+
+- **Where**:
+  - `apps/environment/src/provider/driver.ts`: `snapshotForCwd` on the Pi Durable instance, failing with
+    `ProviderDriverError` (imported from `@t3tools/provider-core/server/errors`).
+  - `apps/environment/src/provider/skills.ts`: the snapshot's entries as `ServerProviderSkill` and
+    `ServerProviderSlashCommand` (`t3code/packages/contracts/src/server.ts`); the expansion, which matches mentions with
+    `matchInlineSkills` (`@t3tools/shared/inlineSkills`) and embeds the `<skill name location>` block mirrored from t3's
+    Pi provider (`t3code/packages/provider-pi/src/server/mcpExtensionSource.ts`, its `input` hook).
+  - `apps/environment/src/provider/attachments.ts`: `turnPrompt` runs the expansion when its caller passes the thread's
+    skills (the Pi Durable adapter; not the ACP builder).
+  - `packages/skills/src/discovery.ts`: `isMentionable` asks `matchInlineSkills` which names t3 can mention.
+  - t3: `ProviderInstance.snapshotForCwd` (`provider-core/src/server/driver.ts`) and
+    `ProviderRegistry.refreshWorkspaceSnapshot`, with the directory `ProjectService.workspaceScanDirectory` passes; the
+    composer's `$name` insertion (`apps/web/src/components/chat/ChatComposer.tsx`).
+- **Breaks when**: t3 renames or re-types the hook, `ProviderDriverError` or the snapshot's fields; changes the mention
+  grammar or what the composer inserts for a picked skill; changes its Pi provider's skill block; passes the hook
+  another directory.
+- **Detection**: the bump's check step (`pnpm run check`): typecheck for the hook, the error and the fields; the tests
+  `apps/environment/test/skillsSnapshot.test.ts`, `apps/environment/test/skillExpansion.test.ts` (with the pins on
+  `matchInlineSkills` and the composer's inserted text) and `packages/skills/src/discovery.test.ts` (the mentionable
+  names). Stage: `scripts/p1001.ts`, outside the bump. **Silent**: a client that sends skills another way leaves
+  `$name` unexpanded, and a changed Pi provider block goes unnoticed (ours stays as it was); cheapest check: the
+  source-text test, and a diff of `mcpExtensionSource.ts` in the bump PR.
+- **Blast radius**: the composer lists no skills or commands for Pi Durable, or a picked skill reaches the agent as
+  plain `$name`. Turns still run.
+- **Fix**: compare with t3's Pi provider (`packages/provider-pi/src/server/driver.ts` `snapshotForCwd`,
+  `mcpExtensionSource.ts`).
 
 ## Gaps in detection
 

@@ -236,6 +236,10 @@ _Avoid_: plugin, command, extension
 A Skill kept in a repository's own files; each Workspace has those of its checkout. It is instructions only and grants no permission.
 _Avoid_: project skill, workspace skill
 
+**Environment skill**:
+A Skill the owner installed into the Cloud Environment, offered to Durable agents in every Project.
+_Avoid_: global skill, owner skill, personal skill
+
 **Skill mention**:
 A `$name` in the owner's message that names a Skill; t3's composer writes one when a Skill is picked.
 _Avoid_: skill chip, invocation
