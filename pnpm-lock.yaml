@@ -815,6 +815,9 @@ importers:
 
   apps/environment:
     dependencies:
+      '@cloudflare/playwright':
+        specifier: 1.4.0
+        version: 1.4.0(playwright-core@1.64.1)
       '@cloudpid/mcp':
         specifier: workspace:*
         version: link:../../vendor/cloudpid/mcp
@@ -903,6 +906,9 @@ importers:
       alchemy:
         specifier: 2.0.0-beta.85
         version: 2.0.0-beta.85(patch_hash=07cc8c7e14b3b9af143ddd40a059f117c27e55139fbf20bd5dde2eb30509cedd)(@effect/platform-node@4.1.2(bufferutil@4.1.0)(effect@4.1.2)(redis@6.2.1)(utf-8-validate@6.0.6))(@types/node@24.12.4)(@types/react@19.3.0)(@volar/typescript@2.4.28(typescript@5.9.3))(effect@4.1.2)(esbuild@0.28.2)(jiti@2.7.0)(react-devtools-core@6.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(ws@8.22.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      playwright-core:
+        specifier: 1.64.1
+        version: 1.64.1
       rolldown:
         specifier: 1.2.13
         version: 1.2.13
@@ -3386,6 +3392,14 @@ packages:
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
+
+  '@cloudflare/playwright@1.4.0':
+    resolution: {integrity: sha512-VQa2JawivLEsKutCzY7ctwx/ZeAgorjpr3rLZ3mxnaBJWQawDYGTcUwBi2c24z24/UtKrJrWnrwYqlAfQaYwvw==}
+    peerDependencies:
+      playwright-core: '*'
+    peerDependenciesMeta:
+      playwright-core:
+        optional: true
 
   '@cloudflare/unenv-preset@2.16.2':
     resolution: {integrity: sha512-JBP1+Z7ZSNG/d4mRP+y8VC5dka3tZVMLEZRvS+rzQ4DGV1EoxRFQckcJTTkXbHSQiTj0DtNI01Zwb/V2fX0mvQ==}
@@ -11290,6 +11304,10 @@ snapshots:
       - yaml
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
+
+  '@cloudflare/playwright@1.4.0(playwright-core@1.64.1)':
+    optionalDependencies:
+      playwright-core: 1.64.1
 
   '@cloudflare/unenv-preset@2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261026.1)':
     dependencies:
