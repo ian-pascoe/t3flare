@@ -1,0 +1,29 @@
+{
+ "at": "2026-11-13T08:14:39.219Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "threadId": "a2558ed2-47e3-4b85-96c6-99848f41c2e5",
+ "watched": "ok",
+ "watchedBefore": {
+  "wake": null,
+  "watched": 1
+ },
+ "idle": {
+  "reset": true,
+  "alarm": "2026-11-13T08:24:36.021Z",
+  "sources": {
+   "outbox": null,
+   "scheduledTasks": null,
+   "usageLimitResets": null,
+   "pullRequestWatch": "2026-11-13T08:24:36.021Z"
+  }
+ },
+ "after": {
+  "runtime": "stopped",
+  "alarm": "2026-11-13T08:24:36.021Z",
+  "prWatch": {
+   "wake": "2026-11-13T08:24:36.021Z",
+   "watched": 1
+  }
+ }
+}

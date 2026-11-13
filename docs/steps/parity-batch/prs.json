@@ -1,0 +1,21 @@
+{
+ "at": "2026-11-13T08:52:26.922Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "listed": true,
+ "detail": {
+  "title": "Add sub.sh (pbatch stage fixture)",
+  "state": "open",
+  "headSha": "9d5d683e65fa5b189119d64300bf6009a794d9fd"
+ },
+ "checks": "{\"observedAt\":1794559940571,\"state\":\"open\",\"checks\":[]}",
+ "comment": "ok",
+ "review": "ok",
+ "authors": [
+  "ian-pascoe",
+  "t3flare",
+  "t3flare-agent",
+  "t3code"
+ ],
+ "marker": "pbatch mweqnkv0"
+}

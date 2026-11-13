@@ -1,0 +1,87 @@
+{
+ "at": "2026-11-13T08:13:19.751Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "runAt": "2026-11-13T08:13:08.394Z",
+ "timeline": [
+  {
+   "label": "idle-check",
+   "verdict": {
+    "reset": true,
+    "alarm": "2026-11-13T08:13:08.394Z"
+   }
+  },
+  {
+   "label": "after reset",
+   "at": "2026-11-13T08:11:17.231Z",
+   "runtime": "stopped",
+   "alarm": "2026-11-13T08:13:08.394Z",
+   "lastBoot": null,
+   "constructedAt": "2026-11-13T08:11:17.168Z",
+   "nextDue": {
+    "at": "2026-11-13T08:13:08.394Z",
+    "sources": {
+     "outbox": null,
+     "scheduledTasks": "2026-11-13T08:13:08.394Z",
+     "usageLimitResets": null,
+     "pullRequestWatch": null
+    }
+   }
+  },
+  {
+   "label": "after alarm",
+   "at": "2026-11-13T08:13:19.291Z",
+   "runtime": "running",
+   "alarm": null,
+   "lastBoot": {
+    "at": "2026-11-13T08:13:08.394Z",
+    "trigger": "alarm",
+    "wallMs": 5,
+    "bootstrapSeeded": false,
+    "isolateBoot": 5
+   },
+   "constructedAt": "2026-11-13T08:13:03.612Z",
+   "nextDue": {
+    "at": null,
+    "sources": {
+     "outbox": null,
+     "scheduledTasks": null,
+     "usageLimitResets": null,
+     "pullRequestWatch": null
+    }
+   }
+  }
+ ],
+ "task": {
+  "id": "scheduled-task:12d2c073-26ef-4719-bbc3-423704b55b1a",
+  "title": "pbatch alarm",
+  "prompt": "Reply with the single word ALARMED.",
+  "enabled": true,
+  "schedule": {
+   "type": "once",
+   "runAt": "2026-11-13T08:13:08.394Z"
+  },
+  "projectId": "764f437c-dc9a-4992-b27b-fa756c926489",
+  "threadId": null,
+  "threadMode": "new_thread",
+  "workspaceStrategy": {
+   "type": "root"
+  },
+  "modelSelection": {
+   "instanceId": "piDurable",
+   "model": "anthropic/claude-haiku-5-5",
+   "options": []
+  },
+  "runtimeMode": "full-access",
+  "interactionMode": "default",
+  "createdBy": "user",
+  "creationSource": "web",
+  "createdAt": "2026-11-13T08:10:08.747Z",
+  "updatedAt": "2026-11-13T08:13:08.674Z",
+  "nextRunAt": null,
+  "lastRunAt": "2026-11-13T08:13:08.399Z",
+  "lastRunStatus": "succeeded",
+  "lastRunError": null,
+  "runCount": 1
+ }
+}

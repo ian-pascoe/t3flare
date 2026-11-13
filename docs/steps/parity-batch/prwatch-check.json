@@ -1,0 +1,50 @@
+{
+ "at": "2026-11-13T08:52:05.923Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "resetAt": "2026-11-13T08:14:39.219Z",
+ "firstWake": "2026-11-13T08:50:33.026Z",
+ "readAfterWake": true,
+ "runs": [
+  {
+   "ordinal": 1,
+   "status": "completed",
+   "requestedAt": "2026-11-13T08:50:35.766Z"
+  }
+ ],
+ "wokeAgentWith": [],
+ "nextWake": "2026-11-13T08:50:33.026Z",
+ "health": {
+  "runtime": "running",
+  "alarm": null,
+  "constructedAt": "2026-11-13T08:50:33.053Z",
+  "prWatch": {
+   "wake": "2026-11-13T08:50:33.026Z",
+   "watched": 0
+  }
+ },
+ "link": {
+  "snapshot": {
+   "state": "open",
+   "title": "Add sub.sh (pbatch stage fixture)",
+   "headBranch": "pbatch/review-guide",
+   "baseBranch": "main",
+   "isDraft": false,
+   "updatedAt": "2026-11-13T08:51:15Z",
+   "syncedAt": "2026-11-13T08:51:34.900Z",
+   "closedAt": null,
+   "mergedAt": null,
+   "author": {
+    "login": "ian-pascoe",
+    "name": "Ian Pascoe",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/122142608?u=79f14bc6ae97d554535054d97a2c21e0c81a0483&v=4"
+   },
+   "additions": 6,
+   "deletions": 0,
+   "changedFiles": 3,
+   "reviewDecision": null,
+   "checksState": null,
+   "mergeability": "mergeable"
+  }
+ }
+}

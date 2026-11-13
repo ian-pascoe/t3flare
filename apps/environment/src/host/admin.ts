@@ -119,7 +119,8 @@ const health = async (environment: EnvironmentDO) => {
     holds: Object.fromEntries([...Idle.holds].map(([name, { until, capped }]) => [name, { until: new Date(until).toISOString(), capped }])),
     alarm: alarm === null ? null : new Date(alarm).toISOString(),
     openWork: unreadableAsError(() => Idle.openWork(storage.sql, new Date())),
-    nextDue: unreadableAsError(() => Idle.nextDue(storage.sql)),
+    // As the alarm reads it: the PR watch's wake is the one the last reset stored (parity G12).
+    nextDue: unreadableAsError(() => Idle.nextDue(storage.sql, new Date(), storage.kv.get<number>(Idle.PR_WATCH_WAKE_KEY) ?? Date.now())),
     // SPI-1061 D7: the retry of Remote tasks whose machine does not answer, if one is pending.
     remoteRetry: storage.kv.get<Idle.RemoteRetry>(Idle.REMOTE_RETRY_KEY) ?? null,
     // Parity G12: the PR watch's wake the last reset set, and the watches now.

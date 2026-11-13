@@ -38,6 +38,21 @@ const writeEvidence = (name: string, value: Record<string, unknown>) => {
 };
 
 const [part, ...args] = process.argv.slice(2);
+// prwatch-check waits, with no client, for the idle reset and then for one PR-watch wake to pass; the health route
+// neither boots t3 nor counts as activity. Read before pairing, which reaches t3.
+let waitedWake: string | undefined;
+if (part === "prwatch-check") {
+  const deadline = Date.now() + 15 * 60_000;
+  let h = (await admin("GET", "/_t3flare/health")).json;
+  while (!(h.runtime === "stopped" && typeof h.prWatch?.wake === "string") && Date.now() < deadline) {
+    await sleep(15_000);
+    h = (await admin("GET", "/_t3flare/health")).json;
+  }
+  waitedWake = h.prWatch?.wake;
+  console.log(`reset; the PR watch's wake is ${waitedWake}`);
+  if (waitedWake !== undefined) await sleep(Math.max(0, Date.parse(waitedWake) - Date.now()) + 90_000);
+}
+const healthBeforePairing = (await admin("GET", "/_t3flare/health")).json;
 const cookie = await pair();
 await admin("POST", "/_t3flare/disarm-bootstrap");
 // The Durable agent provider, enabled as the owner does in Settings (p1100's `enableAgent`).
@@ -303,18 +318,60 @@ switch (part) {
     break;
   }
 
-  // G12: after the wake, t3 was booted by the alarm (with no client) and the reactor read the PR.
+  // G12: after the wake, with no client, t3 came up on the alarm, its reactor read the PR (the watch moved after the
+  // reset), and it went down again with the next wake 10 minutes on. The health read comes before any client call.
   case "prwatch-check": {
     const state = JSON.parse(fs.readFileSync(path.join(EVIDENCE, "prwatch-state.json"), "utf8"));
-    // The admin health read neither boots t3 nor counts as activity; it is read before any client call.
-    const h = await health();
+    const firstWake: string = waitedWake ?? "";
+    const h = healthBeforePairing;
     const thread = await threadInShell(state.threadId);
     const link = (thread?.pullRequests ?? []).find((pr: any) => pr.number === state.number);
+    const touched = [link?.watch?.checksAwaitedSince, link?.watch?.remarksThrough, link?.snapshot?.syncedAt].filter((v): v is string => typeof v === "string");
+    // The reactor writes a watch only when the PR changed: a remark posted while asleep moves it, and wakes the agent.
+    const view = await projection(state.threadId);
+    const runs = runsOf(view).map((r: any) => ({ ordinal: r.ordinal, status: r.status, requestedAt: r.requestedAt ?? r.createdAt ?? null }));
+    const readAfterWake = touched.some((at) => Date.parse(at) >= Date.parse(firstWake)) || runs.length > 0;
+    const nextWake: string | null = h.prWatch?.wake ?? null;
     writeEvidence("prwatch-check", {
-      ok: h.lastBoot?.trigger === "alarm" && Date.parse(h.lastBoot?.at ?? h.lastBoot?.startedAt ?? "0") > Date.parse(state.resetAt) && link?.watch !== undefined,
+      ok: readAfterWake && firstWake !== "",
       resetAt: state.resetAt,
-      health: { runtime: h.runtime, alarm: h.alarm, lastBoot: h.lastBoot, prWatch: h.prWatch, nextDue: h.nextDue },
+      firstWake,
+      readAfterWake,
+      runs,
+      wokeAgentWith: itemsOf(view).filter((item: any) => item.type === "user_message" || item.type === "system_message").map((item: any) => String(item.text ?? "").slice(0, 300)),
+      nextWake,
+      health: { runtime: h.runtime, alarm: h.alarm, constructedAt: h.object?.constructedAt, prWatch: h.prWatch },
       link: link === undefined ? null : { watch: link.watch, snapshot: link.snapshot },
+    });
+    break;
+  }
+
+  // W†/P: t3's PR features on the fixture PR, as the GitHub App (D2): list, detail, checks, activity, a comment and a
+  // comment-only review, read back.
+  case "prs": {
+    const number = Number(args[0] ?? "4");
+    const { projectId } = await ensureProject(cookie, PROJECT);
+    const ref = { projectId, repository: FIXTURE, number };
+    const call = (method: string, payload: unknown) => wsCall(cookie, method, payload).then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error: String(error).slice(0, 400) }));
+    const list = await call("pullRequests.list", { state: "open", projectId });
+    const detail = await call("pullRequests.detail", ref);
+    const checks = await call("pullRequests.checks", ref);
+    const marker = `pbatch ${Date.now().toString(36)}`;
+    const comment = await call("pullRequests.comment", { ...ref, body: `t3flare stage check (${marker}): a comment from t3's PR panel.` });
+    const review = await call("pullRequests.submitReview", { ...ref, verdict: "comment", body: `t3flare stage check (${marker}): a comment-only review.`, comments: [] });
+    await call("pullRequests.invalidate", { reference: ref });
+    const activity = await call("pullRequests.activity", ref);
+    const text = JSON.stringify(activity);
+    const listed = JSON.stringify(list).includes(`"number":${number}`);
+    writeEvidence("prs", {
+      ok: list.ok && listed && detail.ok && checks.ok && comment.ok && review.ok && activity.ok && text.includes(`${marker}): a comment from`) && text.includes(`${marker}): a comment-only review`),
+      listed,
+      detail: detail.ok ? { title: (detail.value as any)?.title, state: (detail.value as any)?.state, headSha: (detail.value as any)?.headSha } : detail,
+      checks: checks.ok ? JSON.stringify(checks.value).slice(0, 600) : checks,
+      comment: comment.ok ? "ok" : comment,
+      review: review.ok ? "ok" : review,
+      authors: [...new Set([...text.matchAll(/"login":"([^"]+)"/g)].map((m) => m[1]))],
+      marker,
     });
     break;
   }

@@ -26,3 +26,7 @@ Shadows 2: `builtInDrivers` (now registering the Codex and Pi CLI drivers too) a
 ## Counts after step 4b
 
 Unchanged: Shadows 2 (`builtInDrivers` registers Claude Code and OpenCode too; `processGroup` now also stops their process groups, through t3's `AcpSessionRuntime`), Patches 3, no new Build shim (`@t3tools/provider-acp` and `effect-acp` were already in the Worker through `AcpRegistrySupport`). Everything else is a Layer: our flavors passed to t3's exported `makeAcpAdapterV2`, a runtime wrapper around t3's `AcpSessionRuntime`, and one composition departure (t3's idle compaction worker is not started, `composition.ts`). `reg/claudeAcp.ts`'s subagent extractors are imported by source path (not a package export).
+
+## Counts after the parity batch (G7, G4, G12)
+
+Shadows 2 (unchanged), Patches 4: `0004-scratch-root-is-a-workspace.patch` (parity G4) changes one line of `ManagedProjectFolders`, the No project folder, to `/w/t3-scratch`, so scratch threads run in a Workspace. A Layer could not do it: `ManagedProjectFolders` is built inside t3's private runtime graph (`orchestration-v2/runtimeLayer.ts`) from the one `ServerConfig`, whose `baseDir` everything else reads too, and the Shadow would copy 515 lines. The review guide's scratch checkout (G7) and the webhook origin and PR-watch wake (G12) are Layers and our own code. Evidence: `docs/steps/parity-batch.md`.
