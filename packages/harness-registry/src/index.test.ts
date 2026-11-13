@@ -38,6 +38,12 @@ describe("resolveHarness", () => {
     expect(applyChange(EMPTY_HARNESS, { extension: "guardian", settings: { commands: 3 } })).toMatchObject({ ok: false });
   });
 
+  it("has the Advisor off (each review is a model request), inheriting the model, reviewing every turn (SPI-1059)", () => {
+    expect(resolveHarness(EMPTY_HARNESS).extensions.advisor).toEqual({ enabled: false, settings: { model: "inherit", reviewEvery: "turn", thinkingLevel: "high", correctiveTurns: 1 } });
+    expect(applyChange(EMPTY_HARNESS, { extension: "advisor", enabled: true, settings: { reviewEvery: "3", model: "claude-sonnet-5-5" } })).toMatchObject({ ok: true });
+    expect(applyChange(EMPTY_HARNESS, { extension: "advisor", settings: { reviewEvery: "7" } })).toMatchObject({ ok: false });
+  });
+
   it("gives an extension's defaults to a Session whose resolved view predates the entry", () => {
     const { web: _web, ...older } = resolveHarness(EMPTY_HARNESS).extensions;
     const taken = { ...resolveHarness(EMPTY_HARNESS), extensions: older };

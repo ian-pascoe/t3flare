@@ -63,6 +63,7 @@ import { McpQuestions } from "../extensions/mcpQuestions.ts";
 import { ApprovalStore, interactionModeSection, permissions, toToolPath } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
 import { CONTEXT_EXTENSION, CONTEXT_NAMESPACE, contextExtension } from "../extensions/context.ts";
+import { ADVISOR_EXTENSION, AdvisorObserver, type AdvisorSettings, advisorExtension } from "../extensions/advisor.ts";
 import { GUARDIAN_EXTENSION, guardianExtension } from "../extensions/guardian.ts";
 import type { GuardianThinkingLevel } from "../extensions/guardian/review.ts";
 import { backgroundJobs, TERMCTRL_EXTENSION, TERMCTRL_NAMESPACE, type TermctrlHost, termctrlExtension } from "../extensions/termctrl.ts";
@@ -166,6 +167,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   /** t3's `/mcp`, through the Environment DO (step 3). */
   readonly #t3: T3McpClient;
   readonly #registryWriter: ReturnType<typeof createRegistry>;
+  /** The Advisor (SPI-1059), while the harness settings turn it on; one per object, so a Review under way survives a settings read. */
+  #advisor: AdvisorObserver | undefined;
 
   constructor(ctx: DurableObjectState, env: SessionEnv) {
     super(ctx, env);
@@ -365,6 +368,21 @@ export class SessionDO extends DurableObject<SessionEnv> {
       );
     } else {
       registry.uninstall({ name: GUARDIAN_EXTENSION });
+    }
+    const advisor = extensionOf(harness, ADVISOR_EXTENSION);
+    if (advisor.enabled) {
+      const every = String(advisor.settings.reviewEvery);
+      const settings: AdvisorSettings = {
+        model: String(advisor.settings.model),
+        reviewEvery: every === "turn" || every === "request" ? every : Math.max(1, Number(every) || 1),
+        thinkingLevel: String(advisor.settings.thinkingLevel) as AdvisorSettings["thinkingLevel"],
+        correctiveTurns: Number(advisor.settings.correctiveTurns),
+      };
+      if (this.#advisor === undefined) this.#advisor = new AdvisorObserver(() => this.#opening, this.ctx.storage.kv, settings);
+      else this.#advisor.configure(settings);
+      registry.install(advisorExtension(this.#advisor));
+    } else {
+      registry.uninstall({ name: ADVISOR_EXTENSION });
     }
     const contextManagement = extensionOf(harness, CONTEXT_EXTENSION);
     if (contextManagement.enabled) {

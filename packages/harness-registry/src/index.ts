@@ -187,6 +187,27 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
       },
     },
   },
+  {
+    id: "advisor",
+    title: "Advisor",
+    description:
+      "A reviewer model reads the thread's completed work in the background and gives attributed advice (nit, concern, blocker), shown in t3 as Advisor notices. It never starts a turn t3 did not start. Off by default: each review is a model request (SPI-1059).",
+    default: "off",
+    settings: {
+      model: { title: "Model", description: "The Advisor model, through the proxy; inherit follows the thread's model.", schema: { type: "enum", values: ["inherit", ...PROXY_CLAUDE_MODELS], default: "inherit" } },
+      reviewEvery: {
+        title: "Review cadence",
+        description: "turn: after every tool round that is not read-only; a number: every that many rounds and at the end; request: once, when the agent answers.",
+        schema: { type: "enum", values: ["turn", "2", "3", "5", "request"], default: "turn" },
+      },
+      thinkingLevel: { title: "Thinking", description: "The Advisor's thinking level.", schema: { type: "enum", values: THINKING_LEVELS, default: "high" } },
+      correctiveTurns: {
+        title: "Corrective continuations",
+        description: "How often a blocker found as the agent answers continues the same turn to address it (0: never); later blockers wait for the next turn.",
+        schema: { type: "integer", minimum: 0, maximum: 3, default: 1 },
+      },
+    },
+  },
   { id: "coding-tools", title: "Coding tools", description: "read, write, edit and bash (Worker Shell or Container).", default: "always", settings: {}, locked: CORE_LOCK },
   { id: "files", title: "File tools", description: "ls, find and grep.", default: "always", settings: {}, locked: CORE_LOCK },
   {
