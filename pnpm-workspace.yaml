@@ -562,6 +562,7 @@ patchedDependencies:
   alchemy@2.0.0-beta.85: t3code/patches/alchemy@2.0.0-beta.85.patch
   "@legendapp/list@3.7.2": t3code/patches/@legendapp__list@3.7.2.patch
   "@alchemy.run/cloudflare@2.0.0-beta.85": patches/deps/@alchemy.run__cloudflare@2.0.0-beta.85.patch
+  "@cloudflare/computer@0.11.2": patches/deps/@cloudflare__computer@0.11.2.patch
   "@earendil-works/pi-durable@1.5.0": patches/deps/@earendil-works__pi-durable@1.5.0.patch
 strictPeerDependencies: true
 peerDependencyRules:

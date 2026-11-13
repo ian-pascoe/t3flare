@@ -10,6 +10,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
+import { EMPTY_SKILL_SET, type SkillSet } from "@t3flare/skills";
 import { extensionOf, type McpRelayAnswer, type McpRelayInput, resolveEnvironment, type ResolvedEnvironment, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
@@ -533,6 +534,14 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     const stored = store.loadEnvironment();
     store.noteEnvironmentRead(stored.revision, Date.now());
     return resolveEnvironment(stored);
+  }
+
+  /** SPI-1148's M0 probe: the set `environmentSkillSet` answers until the store exists (memory only). */
+  probeSkillSet: SkillSet | undefined;
+
+  /** The Environment skill set (SPI-1148), RPC from a Workspace DO taking it. Never boots t3. */
+  async environmentSkillSet(): Promise<SkillSet> {
+    return this.probeSkillSet ?? EMPTY_SKILL_SET;
   }
 
   /** Diagnosis and the reboot check: this instance's channel. */

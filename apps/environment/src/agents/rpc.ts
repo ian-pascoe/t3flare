@@ -96,6 +96,10 @@ export interface WorkspaceRpc {
    */
   skills(cwd: string, agent?: CliAgent): Promise<SkillDiscovery>;
   prompts(cwd: string, agent?: CliAgent): Promise<ReadonlyArray<PromptTemplate>>;
+  /** SPI-1148: the hash of the Environment skill set the Workspace serves at `/workspace/.agents/skills`. */
+  skillSetHash(): Promise<string>;
+  /** SPI-1148: takes the Environment skill set from the Environment DO when `hash` differs from the one held. */
+  takeEnvironmentSkills(hash: string): Promise<{ readonly taken: boolean; readonly hash: string; readonly bytes?: number; readonly readMs?: number; readonly mountMs?: number; readonly error?: string }>;
   writeText(path: string, text: string): Promise<void>;
   worktreeClone(input: { readonly id: string; readonly url: string | null; readonly parent?: string }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }>;
   worktreeBundle(input: { readonly ref: string; readonly tips: ReadonlyArray<string>; readonly name: string }): Promise<{ readonly ok: boolean; readonly commit?: string; readonly bundle?: string | null; readonly config?: ReadonlyArray<string>; readonly error?: string }>;

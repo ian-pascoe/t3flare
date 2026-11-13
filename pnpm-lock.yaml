@@ -677,6 +677,7 @@ packageExtensionsChecksum: sha256-18pwcgTDbqYFYAzCw8OfBYuC2btyq6aJSLhE/gjTJb4=
 
 patchedDependencies:
   '@alchemy.run/cloudflare@2.0.0-beta.85': 42560d88385a37a4a65b7d0f3d0f4746d76477154fea680e52ae463e3f9f326c
+  '@cloudflare/computer@0.11.2': bea4ab1c26977487ad50841088d4362d67841ecc8f749cbf33189fd606fb9346
   '@cursor/sdk@1.2.0': 57f502128bf6accd976963b126e227c86a45d815a53a8dc450461beae3bed4a4
   '@earendil-works/pi-durable@1.5.0': cf5be4efd5246e2d6fb10e160bd094303571bb45667c054b1f3fdf656f57d2e8
   '@effect/vitest@4.1.2': 299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7
@@ -725,7 +726,7 @@ importers:
     dependencies:
       '@cloudflare/computer':
         specifier: 0.11.2
-        version: 0.11.2(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)
+        version: 0.11.2(patch_hash=bea4ab1c26977487ad50841088d4362d67841ecc8f749cbf33189fd606fb9346)(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)
       '@earendil-works/chord':
         specifier: 1.5.0
         version: 1.5.0(esbuild@0.28.2)(ws@8.22.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
@@ -997,7 +998,7 @@ importers:
     dependencies:
       '@cloudflare/computer':
         specifier: 0.11.2
-        version: 0.11.2(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)
+        version: 0.11.2(patch_hash=bea4ab1c26977487ad50841088d4362d67841ecc8f749cbf33189fd606fb9346)(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)
       '@earendil-works/chord':
         specifier: 1.5.0
         version: 1.5.0(esbuild@0.28.2)(ws@8.22.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
@@ -11261,7 +11262,7 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@cloudflare/computer@0.11.2(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)':
+  '@cloudflare/computer@0.11.2(patch_hash=bea4ab1c26977487ad50841088d4362d67841ecc8f749cbf33189fd606fb9346)(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)':
     dependencies:
       capnweb: 0.12.0
       vite: '@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)'
@@ -11293,7 +11294,7 @@ snapshots:
       - vue-tsc
       - yaml
 
-  '@cloudflare/computer@0.11.2(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)':
+  '@cloudflare/computer@0.11.2(patch_hash=bea4ab1c26977487ad50841088d4362d67841ecc8f749cbf33189fd606fb9346)(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)':
     dependencies:
       capnweb: 0.12.0
       vite: '@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)'

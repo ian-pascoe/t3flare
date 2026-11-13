@@ -5,3 +5,4 @@ export * from "./cliRoots.ts";
 export * from "./discovery.ts";
 export * from "./listing.ts";
 export * from "./templates.ts";
+export * from "./skillSet.ts";

@@ -37,7 +37,7 @@ import type {
   TerminalAnswer,
   TerminalOpenInput,
 } from "@t3flare/workspace-client";
-import { type CliAgent, isCliAgent, type PromptTemplate, type Skill, type SkillDiscovery } from "@t3flare/skills";
+import { type CliAgent, isCliAgent, type PromptTemplate, type Skill, type SkillDiscovery, type SkillSet, SKILLS_MOUNT, skillSetProblem } from "@t3flare/skills";
 import { describeFailure, HARNESS_ROOT, REPO_ROOT, startRefusal } from "@t3flare/workspace-client";
 
 import * as git from "isomorphic-git";
@@ -79,6 +79,7 @@ import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakSc
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { AgentTerminals } from "./agentTerminals.ts";
 import { workspacePrompts, workspaceSkills } from "./skills.ts";
+import { skillSetMount, skillSetStore } from "./skillSet.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
@@ -224,6 +225,8 @@ const ContainerHost = withWorkspaceContainer(class extends DurableObject<Workspa
 
 export class WorkspaceDO extends ContainerHost {
   readonly #workspace: ComputerWorkspace;
+  /** The Environment skill set the mount at `SKILLS_MOUNT` serves (SPI-1148): empty until one is handed over. */
+  readonly #skillSet: ReturnType<typeof skillSetStore>;
   readonly #reads: ReturnType<typeof readCache>;
   readonly #container: ContainerOnlyBackend;
   /** The Session's `ComputerExecutionEnv` file operations (the agent's tools), answered here. */
@@ -311,9 +314,14 @@ export class WorkspaceDO extends ContainerHost {
       log: (event) => console.log(JSON.stringify({ ...event, workspace: this.#workspaceId() ?? null })),
     });
     this.#reads = readCache(ctx.storage.sql);
+    this.#skillSet = skillSetStore({ kv: ctx.storage.kv, transactionSync: <T>(closure: () => T): T => ctx.storage.transactionSync(closure) });
+    const skillSet = this.#skillSet;
     this.#workspace = new ComputerWorkspace({
       storage: ctx.storage,
-      // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
+      // The Environment skill set appears read-only: a write under the mount fails with EROFS, and a set of another
+      // hash replaces the copy (`takeEnvironmentSkills`).
+      mounts: { [SKILLS_MOUNT]: skillSetMount(() => skillSet.current()) },
+            // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
       backends: [this.#withVariables(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx })), this.#withVariables(this.#container)],
     });
     // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
@@ -626,6 +634,50 @@ export class WorkspaceDO extends ContainerHost {
   /** The Environment skill set (SPI-1148); none yet. */
   #environmentSkills(): ReadonlyArray<Skill> {
     return [];
+  }
+
+  /** The hash of the Environment skill set this Workspace holds. */
+  skillSetHash(): string {
+    return this.#skillSet.current().hash;
+  }
+
+  /**
+   * Takes the Environment skill set from the Environment DO when `hash` differs from the one held, and serves it at
+   * `SKILLS_MOUNT`: computer clears the mount and writes the set. A set that cannot be mounted leaves the one held.
+   * M0 probe shape (SPI-1148); the Session calls it at a turn's start from M3.
+   */
+  async takeEnvironmentSkills(hash: string): Promise<{ readonly taken: boolean; readonly hash: string; readonly bytes?: number; readonly readMs?: number; readonly mountMs?: number; readonly error?: string }> {
+    this.#alive();
+    await this.#workspace.ready();
+    if (hash === this.#skillSet.current().hash) return { taken: false, hash };
+    const started = Date.now();
+    const set = await environmentStub(this.env.ENVIRONMENT).environmentSkillSet();
+    const readMs = Date.now() - started;
+    const problem = skillSetProblem(set);
+    if (problem !== undefined) return { taken: false, hash: this.#skillSet.current().hash, error: problem };
+    const bytes = Object.values(set.files).reduce((sum, text) => sum + new TextEncoder().encode(text).byteLength, 0);
+    const mounted = Date.now();
+    const answer = await this.ctx.blockConcurrencyWhile(() => this.#mountSkills(set));
+    return { ...answer, bytes, readMs, mountMs: Date.now() - mounted };
+  }
+
+  /** Keeps and mounts `set`; on failure the set held before is kept and mounted again. Never throws. */
+  async #mountSkills(set: SkillSet): Promise<{ readonly taken: boolean; readonly hash: string; readonly error?: string }> {
+    const previous = this.#skillSet.current();
+    if (set.hash === previous.hash) return { taken: false, hash: set.hash };
+    try {
+      this.#skillSet.replace(set);
+      await this.#workspace.remount();
+      return { taken: true, hash: set.hash };
+    } catch (cause) {
+      try {
+        this.#skillSet.replace(previous);
+        await this.#workspace.remount();
+      } catch (again) {
+        console.warn(JSON.stringify({ t3flare: "skills-remount-failed", error: String(again).slice(0, 300) }));
+      }
+      return { taken: false, hash: previous.hash, error: `The Environment skill set could not be mounted, and the Workspace keeps the one it held: ${String(cause).slice(0, 300)}` };
+    }
   }
 
   /** The Prompt templates of a thread in `cwd`: its `.pi/prompts` (SPI-1147); with `agent`, that CLI's repo commands (SPI-1151). */
