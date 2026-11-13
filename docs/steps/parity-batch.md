@@ -152,4 +152,4 @@ Summary: Standards 2 judgement calls, no hard violations; Spec 1 partial (G7's m
 | Browser notifications | PASS (server side; client prompt not driven) |
 | PR list/detail/checks/comment/review | PASS (as the App) |
 | `pnpm run check` | PASS at the branch head |
-| Stage `pbatch` destroyed, fixture PR #4 closed | see the last commit |
+| Stage `pbatch` destroyed, fixture PR #4 closed and its branch deleted | done (`stage.ts destroy pbatch` exit 0) |
