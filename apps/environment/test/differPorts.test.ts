@@ -138,3 +138,25 @@ describe("the Todo List in t3's thread (SPI-1055)", () => {
     expect(diff(differ(), settled, now)).toEqual([]);
   });
 });
+
+describe("context management in t3's thread (SPI-1056)", () => {
+  it("shows Notes, History and a Rollover as tool items titled by what they did", () => {
+    const events = diff(
+      differ(),
+      sessionWith([
+        call("c1", "context_notes", { action: "write", name: "plan", content: "step 1" }, "1"),
+        result("c1", "context_notes", '{"action":"write","name":"plan","saved":true}', undefined, "2"),
+        call("c2", "context_history", { action: "search", query: "plan" }, "3"),
+        result("c2", "context_history", '{"matches":[],"next_offset":null}', undefined, "4"),
+        call("c3", "context_rollover", { handoff: "Continue with step 2" }, "5"),
+        result("c3", "context_rollover", "Handoff saved. The new context starts from it after this tool round.", { handoffCharacters: 20, notes: 1 }, "6"),
+      ]),
+      now,
+    );
+    expect(items(events).map((item) => [item.type, item.title])).toEqual([
+      ["dynamic_tool", 'Notes: write "plan"'],
+      ["dynamic_tool", "History: search"],
+      ["dynamic_tool", "Context rollover: the agent hands off to a fresh context"],
+    ]);
+  });
+});

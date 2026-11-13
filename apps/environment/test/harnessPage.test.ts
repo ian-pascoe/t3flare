@@ -120,10 +120,10 @@ describe("harness page", () => {
   });
 
   it("draws the extension forms from the registry's schemas: switches, settings, locked core extensions", () => {
-    expect(tags.filter((tag) => tag.name === "form" && tag.attrs["data-extension"] !== undefined).map((tag) => tag.attrs["data-extension"])).toEqual(["codemode", "tool-search", "offered-tools", "web", "todo"]);
+    expect(tags.filter((tag) => tag.name === "form" && tag.attrs["data-extension"] !== undefined).map((tag) => tag.attrs["data-extension"])).toEqual(["codemode", "tool-search", "offered-tools", "web", "todo", "context"]);
     expect(tags.find((tag) => tag.attrs["data-setting"] === "inlineBudget")).toMatchObject({ attrs: { type: "number", min: "500", max: "20000", value: "3000" } });
     expect(tags.find((tag) => tag.attrs["data-setting"] === "preset")?.name).toBe("select");
-    expect(tags.filter((tag) => tag.attrs["data-enabled"] !== undefined)).toHaveLength(4);
+    expect(tags.filter((tag) => tag.attrs["data-enabled"] !== undefined)).toHaveLength(5);
     expect(html).toContain("locked: the thread&#39;s modes and the link fence depend on it");
   });
 

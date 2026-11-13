@@ -47,7 +47,7 @@ export interface ExtensionEntry {
 /** The offered-tools presets (plan §2.2, OD-T4): which non-MCP tools the model is offered without a search. */
 export const OFFERED_PRESETS = {
   /** B, the default: the core coding tools, `ask_user`, code mode, tool search and t3's own tools. */
-  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo"],
+  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo", "context_notes", "context_history", "context_rollover"],
   /** A: code mode and tool search; every other tool through a script or a search. */
   "codemode-only": ["codemode", "tool_search"],
   /** C: everything direct. */
@@ -123,6 +123,21 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
       "todo: the agent's Task list for the thread, kept in the Session and shown as t3's todo list. It survives compaction and rollover, and plan mode allows it (SPI-1055).",
     default: "on",
     settings: {},
+  },
+  {
+    id: "context",
+    title: "Context management",
+    description:
+      "context_notes (named Notes kept across compaction and rollover), context_history (the thread's stored History, from before a Handoff too) and context_rollover (the agent hands off to a fresh context it writes itself). Notes and History stay in the Session's storage (SPI-1056).",
+    default: "on",
+    settings: {
+      rolloverOnCompaction: {
+        title: "Rollover on compaction",
+        description:
+          "When the context nears full, ask the agent to roll over with its own Handoff instead of a generated summary; a compaction that cannot wait uses the last saved Handoff. Off: pi-durable's own summary.",
+        schema: { type: "boolean", default: true },
+      },
+    },
   },
   { id: "coding-tools", title: "Coding tools", description: "read, write, edit and bash (Worker Shell or Container).", default: "always", settings: {}, locked: CORE_LOCK },
   { id: "files", title: "File tools", description: "ls, find and grep.", default: "always", settings: {}, locked: CORE_LOCK },

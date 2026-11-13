@@ -62,6 +62,7 @@ import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
 import { McpQuestions } from "../extensions/mcpQuestions.ts";
 import { ApprovalStore, interactionModeSection, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
+import { CONTEXT_EXTENSION, CONTEXT_NAMESPACE, contextExtension } from "../extensions/context.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
@@ -306,7 +307,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // Harness settings (ADR-0026): code mode, tool search and the offered tools, taken at a turn's start
 
   /**
-   * Installs (or removes) the switchable extensions (web, SPI-1054; todo, SPI-1055), then code mode and tool search, as `harness` says:
+   * Installs (or removes) the switchable extensions (web, SPI-1054; todo, SPI-1055; context, SPI-1056), then code mode and tool search, as `harness` says:
    * code mode's namespaces and tool search's deferral cover the tools installed before them. pi-durable applies it from
    * the next phase.
    */
@@ -327,6 +328,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     if (extensionOf(harness, TODO_EXTENSION).enabled) registry.install(todoExtension(() => this.#opening));
     else registry.uninstall({ name: TODO_EXTENSION });
+    const contextManagement = extensionOf(harness, CONTEXT_EXTENSION);
+    if (contextManagement.enabled) {
+      registry.install(contextExtension(() => this.#opening, { rolloverOnCompaction: contextManagement.settings.rolloverOnCompaction !== false }));
+      namespaces.push(CONTEXT_NAMESPACE);
+    } else {
+      registry.uninstall({ name: CONTEXT_EXTENSION });
+    }
     const sandbox = this.env.CODEMODE_SANDBOX;
     const sessionName = this.ctx.id.name ?? this.ctx.id.toString();
     if (harness.codemode.enabled && sandbox !== undefined) {

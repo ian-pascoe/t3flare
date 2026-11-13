@@ -358,7 +358,7 @@ const emitTool = (
   const input = Object.fromEntries(
     Object.entries(call.arguments).map(([name, value]) => [name, name === "path" && typeof value === "string" ? pathOut(value) : value]),
   );
-  emitItem(state, out, turn, key, "tool_call", status, call.name === "codemode" ? "Code mode" : call.name, {
+  emitItem(state, out, turn, key, "tool_call", status, toolTitle(call), {
     type: "dynamic_tool",
     // t3's own tools (`mcp__t3-code__…`, step 3) show as t3 shows them for its Pi provider.
     ...mcpToolPresentation({ toolName: call.name }),
@@ -400,6 +400,24 @@ const emitTodo = (state: DifferState, out: Array<ProviderAdapterV2Event>, pushed
       steps,
     },
   });
+};
+
+/** A tool item's title: code mode's, and the context tools' by what they did (SPI-1056); else the tool's name. */
+const toolTitle = (call: ToolCallInfo): string => {
+  const action = str(call.arguments.action);
+  const name = str(call.arguments.name);
+  switch (call.name) {
+    case "codemode":
+      return "Code mode";
+    case "context_notes":
+      return `Notes: ${action ?? "?"}${name === undefined ? "" : ` ${JSON.stringify(name.slice(0, 64))}`}`;
+    case "context_history":
+      return `History: ${action ?? "?"}`;
+    case "context_rollover":
+      return "Context rollover: the agent hands off to a fresh context";
+    default:
+      return call.name;
+  }
 };
 
 /** A web tool's pages (`details.results` of `web_search`, `details` of `web_fetch`) as t3's web search results. */
