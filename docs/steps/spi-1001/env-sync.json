@@ -1,0 +1,285 @@
+{
+ "at": "2026-11-13T23:48:24.709Z",
+ "host": "t3flare-environment-penvsk.ian-g-pascoe.workers.dev",
+ "commit": "1fdd38997a43",
+ "workspace": "penvsk-mount",
+ "note": "sha256 of every file under the mount in the running Container, polled every 2 s, against the set the Workspace took",
+ "modes": {
+  "noBind": {
+   "first": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "",
+    "running": true
+   },
+   "fresh": {
+    "matched": true,
+    "afterMs": 276,
+    "polls": 1,
+    "seen": [
+     {
+      "afterMs": 276,
+      "match": true,
+      "stale": [],
+      "missing": [],
+      "extra": []
+     }
+    ]
+   },
+   "steps": [
+    {
+     "mib": 0.03,
+     "taken": true,
+     "hash": "3c715105517e9e1e583ead9ad2ce7d09bce196c23c468eddbf49ef0e8596c570",
+     "poll": {
+      "matched": true,
+      "afterMs": 2457,
+      "polls": 2,
+      "seen": [
+       {
+        "afterMs": 276,
+        "match": false,
+        "stale": [
+         "probe-0/data.txt"
+        ],
+        "missing": [],
+        "extra": []
+       },
+       {
+        "afterMs": 2457,
+        "match": true,
+        "stale": [],
+        "missing": [],
+        "extra": []
+       }
+      ]
+     }
+    },
+    {
+     "mib": 8,
+     "taken": true,
+     "hash": "014c64c3747f3e939c162825e9d2ee7ac3d82b4b49c813f556ef9758e59f8c33",
+     "poll": {
+      "matched": true,
+      "afterMs": 746,
+      "polls": 1,
+      "seen": [
+       {
+        "afterMs": 746,
+        "match": true,
+        "stale": [],
+        "missing": [],
+        "extra": []
+       }
+      ]
+     }
+    },
+    {
+     "mib": 0.01,
+     "taken": true,
+     "hash": "95fa5e0930774e5c8ab086f713f77ee28dd97507936a6f344f2d691a22befe31",
+     "poll": {
+      "matched": true,
+      "afterMs": 325,
+      "polls": 1,
+      "seen": [
+       {
+        "afterMs": 325,
+        "match": true,
+        "stale": [],
+        "missing": [],
+        "extra": []
+       }
+      ]
+     }
+    },
+    {
+     "mib": 0,
+     "taken": true,
+     "hash": "5ad824f7363f2e1ba01dec079a1badbf555e221bf493919e927073fb2f9ad7c8",
+     "poll": {
+      "matched": true,
+      "afterMs": 235,
+      "polls": 1,
+      "seen": [
+       {
+        "afterMs": 235,
+        "match": true,
+        "stale": [],
+        "missing": [],
+        "extra": []
+       }
+      ]
+     }
+    }
+   ],
+   "restarted": 0,
+   "afterRestart": {
+    "matched": true,
+    "afterMs": 245,
+    "polls": 1,
+    "seen": [
+     {
+      "afterMs": 244,
+      "match": true,
+      "stale": [],
+      "missing": [],
+      "extra": []
+     }
+    ]
+   }
+  },
+  "bind": {
+   "first": {
+    "exitCode": 0,
+    "stdout": "lock=0\n1\n",
+    "stderr": "",
+    "running": true
+   },
+   "fresh": {
+    "matched": true,
+    "afterMs": 245,
+    "polls": 1,
+    "seen": [
+     {
+      "afterMs": 245,
+      "match": true,
+      "stale": [],
+      "missing": [],
+      "extra": []
+     }
+    ]
+   },
+   "steps": [
+    {
+     "mib": 0.03,
+     "taken": true,
+     "hash": "3c715105517e9e1e583ead9ad2ce7d09bce196c23c468eddbf49ef0e8596c570",
+     "poll": {
+      "matched": true,
+      "afterMs": 2530,
+      "polls": 2,
+      "seen": [
+       {
+        "afterMs": 316,
+        "match": false,
+        "stale": [
+         "probe-0/data.txt"
+        ],
+        "missing": [],
+        "extra": []
+       },
+       {
+        "afterMs": 2530,
+        "match": true,
+        "stale": [],
+        "missing": [],
+        "extra": []
+       }
+      ]
+     }
+    },
+    {
+     "mib": 8,
+     "taken": true,
+     "hash": "014c64c3747f3e939c162825e9d2ee7ac3d82b4b49c813f556ef9758e59f8c33",
+     "poll": {
+      "matched": true,
+      "afterMs": 786,
+      "polls": 1,
+      "seen": [
+       {
+        "afterMs": 786,
+        "match": true,
+        "stale": [],
+        "missing": [],
+        "extra": []
+       }
+      ]
+     }
+    },
+    {
+     "mib": 0.01,
+     "taken": true,
+     "hash": "95fa5e0930774e5c8ab086f713f77ee28dd97507936a6f344f2d691a22befe31",
+     "poll": {
+      "matched": true,
+      "afterMs": 388,
+      "polls": 1,
+      "seen": [
+       {
+        "afterMs": 388,
+        "match": true,
+        "stale": [],
+        "missing": [],
+        "extra": []
+       }
+      ]
+     }
+    },
+    {
+     "mib": 0,
+     "taken": true,
+     "hash": "5ad824f7363f2e1ba01dec079a1badbf555e221bf493919e927073fb2f9ad7c8",
+     "poll": {
+      "matched": true,
+      "afterMs": 215,
+      "polls": 1,
+      "seen": [
+       {
+        "afterMs": 215,
+        "match": true,
+        "stale": [],
+        "missing": [],
+        "extra": []
+       }
+      ]
+     }
+    }
+   ],
+   "writeRefused": {
+    "exitCode": 0,
+    "stdout": "write=2\n",
+    "stderr": "/bin/sh: 1: cannot create /workspace/.agents/skills/x: Read-only file system\n",
+    "running": true
+   },
+   "restarted": 0,
+   "afterRestart": {
+    "matched": true,
+    "afterMs": 200,
+    "polls": 1,
+    "seen": [
+     {
+      "afterMs": 200,
+      "match": true,
+      "stale": [],
+      "missing": [],
+      "extra": []
+     }
+    ]
+   }
+  }
+ },
+ "concurrentFirstCommands": {
+  "answers": [
+   {
+    "exitCode": 0,
+    "stdout": "rc=0\n",
+    "stderr": "",
+    "running": true
+   },
+   {
+    "exitCode": 0,
+    "stdout": "rc=0\n",
+    "stderr": "",
+    "running": true
+   }
+  ],
+  "binds": {
+   "exitCode": 0,
+   "stdout": "1\n/usr/bin/flock\n",
+   "stderr": "",
+   "running": true
+  }
+ }
+}

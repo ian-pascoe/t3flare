@@ -1,8 +1,10 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
+// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // SPI-1148's stage evidence (stage `penvsk`): Environment skills. Run through the stage's `run`, which sets the stage's
 // service token and admin token (never printed):
 //
 //   node scripts/stage.ts run penvsk penvsk probe     M0: R1 (GitHub), the read-only mount on both sides, set sizes (env-probe.json)
+//   node scripts/stage.ts run penvsk penvsk sync      M0 (review): a running Container's copy after each set change, with
+//                                                    and without the bind, by sha256, polled until it matches (env-sync.json)
 //
 // Evidence goes to docs/steps/spi-1001/.
 import * as fs from "node:fs";
@@ -10,6 +12,7 @@ import * as path from "node:path";
 
 import { ensureProject } from "./lib/cliTurn.ts";
 import { admin, pair } from "./lib/client.ts";
+import { probeSkillSet } from "../src/host/envSkillsProbe.ts";
 
 const T3 = process.env.T3_URL ?? "";
 const OUT = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1001");
@@ -89,8 +92,95 @@ const probe = async () => {
   await writeEvidence("env-probe.json", { workspace: WORKSPACE, github: { ...github, uninstalledOwnerMint: uninstalled }, mount, sizes });
 };
 
+/** The bind as the build would run it before a launch's first command: idempotent, one attempt at a time (flock). */
+const LOCK = [
+  `D=${MOUNT}`,
+  `if ! grep -qs " $D " /proc/self/mountinfo; then`,
+  `  exec 9>/tmp/t3flare-skills.lock; flock 9`,
+  `  grep -qs " $D " /proc/self/mountinfo || { mkdir -p "$D" && mount --bind "$D" "$D" && mount -o remount,bind,ro "$D"; }`,
+  `  exec 9>&-`,
+  `fi`,
+].join("\n");
+
+const sha256 = async (text: string) => Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))).toString("hex");
+const expectedOf = async (mib: number) => {
+  const set = mib === 0 ? { files: {} } : await probeSkillSet(mib);
+  const out: Record<string, string> = {};
+  for (const [file, text] of Object.entries(set.files)) out[file] = await sha256(text);
+  return out;
+};
+const LIST = `cd ${MOUNT} 2>/dev/null && find . -type f | sed 's|^./||' | sort | while read -r f; do printf '%s %s\\n' "$(sha256sum "$f" | cut -d' ' -f1)" "$f"; done`;
+const containerFiles = async () => {
+  const answer = await sh(LIST);
+  return Object.fromEntries(
+    answer.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, ...rest] = line.split(" ");
+        return [rest.join(" "), hash];
+      }),
+  ) as Record<string, string>;
+};
+const compare = (want: Record<string, string>, got: Record<string, string>) => {
+  const stale = Object.keys(want).filter((file) => got[file] !== undefined && got[file] !== want[file]);
+  const missing = Object.keys(want).filter((file) => got[file] === undefined);
+  const extra = Object.keys(got).filter((file) => want[file] === undefined);
+  return { match: stale.length + missing.length + extra.length === 0, stale, missing, extra };
+};
+/** Polls the running Container's copy every 2 s for up to `limitMs`, until it matches `mib`'s set. */
+const pollUntil = async (mib: number, limitMs = 90_000) => {
+  const want = await expectedOf(mib);
+  const started = Date.now();
+  const seen: Array<unknown> = [];
+  for (;;) {
+    const got = await containerFiles();
+    const verdict = compare(want, got);
+    seen.push({ afterMs: Date.now() - started, ...verdict, stale: verdict.stale.slice(0, 5), missing: verdict.missing.slice(0, 5), extra: verdict.extra.slice(0, 5) });
+    if (verdict.match) return { matched: true, afterMs: Date.now() - started, polls: seen.length, seen: seen.slice(-3) };
+    if (Date.now() - started > limitMs) return { matched: false, afterMs: Date.now() - started, polls: seen.length, seen: seen.slice(-3) };
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+};
+/** Takes `mib`'s set while the Container runs (each file read first, so any cache is warm), then polls. */
+const change = async (mib: number) => {
+  await sh(`cat ${MOUNT}/*/* > /dev/null 2>&1; true`);
+  const taken = await setOf(mib);
+  return { mib, taken: taken?.answer?.taken, hash: taken?.hash, poll: await pollUntil(mib) };
+};
+
+const sync = async () => {
+  const cookie = await pair();
+  await ensureProject(cookie, WORKSPACE);
+  const modes: Record<string, unknown> = {};
+  for (const bind of [false, true]) {
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${WORKSPACE}`);
+    await setOf(0.02);
+    const first = await sh(bind ? `${LOCK}\necho "lock=$?"; grep -c ' ${MOUNT} ' /proc/self/mountinfo` : "true");
+    const fresh = await pollUntil(0.02, 30_000);
+    const steps = [];
+    // In place (sizes change), grown to 8 MiB (new files, one path in both), shrunk (files removed), emptied.
+    for (const mib of [0.03, 8, 0.01, 0]) steps.push(await change(mib));
+    const writeRefused = bind ? await sh(`echo x > ${MOUNT}/x 2>&1; echo "write=$?"`) : undefined;
+    // A fresh Container after the changes gets the Workspace's files.
+    await setOf(0.03);
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${WORKSPACE}`);
+    const restarted = await sh(bind ? `${LOCK}` : "true");
+    const afterRestart = await pollUntil(0.03, 30_000);
+    modes[bind ? "bind" : "noBind"] = { first, fresh, steps, writeRefused, restarted: restarted.exitCode, afterRestart };
+  }
+  // Two first commands at once on a fresh Container: one bind.
+  await admin("POST", `/_t3flare/agents/workspace-stop?id=${WORKSPACE}`);
+  const both = await Promise.all([sh(`${LOCK}\necho "rc=$?"`), sh(`${LOCK}\necho "rc=$?"`)]);
+  const binds = await sh(`grep -c ' ${MOUNT} ' /proc/self/mountinfo; command -v flock`);
+  await setOf(0);
+  await admin("POST", `/_t3flare/agents/workspace-stop?id=${WORKSPACE}`);
+  await writeEvidence("env-sync.json", { workspace: WORKSPACE, note: "sha256 of every file under the mount in the running Container, polled every 2 s, against the set the Workspace took", modes, concurrentFirstCommands: { answers: both, binds } });
+};
+
 const [command] = process.argv.slice(2);
 if (command === "probe") await probe();
+else if (command === "sync") await sync();
 else {
   console.error("usage: node scripts/stage.ts run penvsk penvsk probe");
   process.exit(2);
