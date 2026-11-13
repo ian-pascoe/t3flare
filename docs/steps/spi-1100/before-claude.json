@@ -1,0 +1,174 @@
+{
+ "at": "2026-11-13T06:53:55.859Z",
+ "ok": false,
+ "results": {
+  "claude": {
+   "ok": false,
+   "agent": "claude",
+   "model": "anthropic/claude-sonnet-5-5",
+   "threadId": "938d439c-8015-43a9-9f1b-814cf6ca9315",
+   "worktreePath": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+   "notes": [
+    "one",
+    "two"
+   ],
+   "diffs": [
+    "",
+    "diff --git a/notes.txt b/notes.txt\nnew file mode 100644\nindex 0000000..5626abf\n--- /dev/null\n+++ b/notes.txt\n@@ -0,0 +1 @@\n+one\n"
+   ],
+   "diffsOk": false,
+   "runs": [
+    {
+     "ordinal": 1,
+     "status": "completed"
+    },
+    {
+     "ordinal": 2,
+     "status": "completed"
+    }
+   ],
+   "answers": [
+    "OK",
+    "OK"
+   ],
+   "checkpoints": [
+    {
+     "id": "checkpoint:scope:checkpoint-scope%3Athread%3A938d439c-8015-43a9-9f1b-814cf6ca9315%3Aname%3Aroot:name:0",
+     "scopeId": "checkpoint-scope:thread:938d439c-8015-43a9-9f1b-814cf6ca9315:name:root",
+     "appRunOrdinal": null,
+     "status": "ready"
+    },
+    {
+     "id": "checkpoint:scope:checkpoint-scope%3Athread%3A938d439c-8015-43a9-9f1b-814cf6ca9315%3Aname%3Aroot:name:1",
+     "scopeId": "checkpoint-scope:thread:938d439c-8015-43a9-9f1b-814cf6ca9315:name:root",
+     "appRunOrdinal": 1,
+     "status": "ready"
+    },
+    {
+     "id": "checkpoint:scope:checkpoint-scope%3Athread%3A938d439c-8015-43a9-9f1b-814cf6ca9315%3Aname%3Aroot:name:2",
+     "scopeId": "checkpoint-scope:thread:938d439c-8015-43a9-9f1b-814cf6ca9315:name:root",
+     "appRunOrdinal": 2,
+     "status": "ready"
+    }
+   ],
+   "checkpointTrace": [
+    {
+     "at": 1794552822115,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 28
+    },
+    {
+     "at": 1794552822223,
+     "op": "capture",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 110
+    },
+    {
+     "at": 1794552825254,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 53
+    },
+    {
+     "at": 1794552825486,
+     "op": "capture",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 59
+    },
+    {
+     "at": 1794552825651,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 43
+    },
+    {
+     "at": 1794552825776,
+     "op": "diff",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "container",
+     "ms": 185
+    },
+    {
+     "at": 1794552826050,
+     "op": "authored",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 38
+    },
+    {
+     "at": 1794552828109,
+     "op": "authored",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 26
+    },
+    {
+     "at": 1794552828257,
+     "op": "diff",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "container",
+     "ms": 132
+    },
+    {
+     "at": 1794552829930,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 22
+    },
+    {
+     "at": 1794552832401,
+     "op": "capture",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 96
+    },
+    {
+     "at": 1794552832587,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 28
+    },
+    {
+     "at": 1794552832724,
+     "op": "diff",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "container",
+     "ms": 270
+    },
+    {
+     "at": 1794552833117,
+     "op": "authored",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 25
+    },
+    {
+     "at": 1794552835396,
+     "op": "authored",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "do",
+     "ms": 25
+    },
+    {
+     "at": 1794552835534,
+     "op": "diff",
+     "cwd": "/w/.wt/p1100-mwemedrl/t3-47162a2e-8da2305e505f0139",
+     "by": "container",
+     "ms": 144
+    }
+   ],
+   "rollback": {
+    "skipped": true
+   },
+   "ms": 33993
+  }
+ }
+}

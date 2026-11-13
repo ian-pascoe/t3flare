@@ -1,0 +1,479 @@
+{
+  "url": "https://t3flare-environment-p1100.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-13T07:04:00.615Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.10-nightly.20261112.4606",
+      "commit": "decaa1fc8b33",
+      "builtAt": "2026-11-13T06:58:58.611Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-13T07:14:01.127Z",
+    "paired": 200,
+    "ms": 1497,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "079732b9-3ba0-4378-ac5c-567a51ea6381",
+    "threads": 12,
+    "ms": 2330
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 474,
+    "bytes": 48911,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 176,
+    "maxBytes": 46535
+  },
+  "subscribeThread": {
+    "ms": 39,
+    "bytes": 46475,
+    "items": 20
+  },
+  "search": {
+    "ms": 44,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1537
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 2,
+    "maxParameters": 300,
+    "compoundsRewritten": 265,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "rowsWritten": 22537,
+    "rowsRead": 94289,
+    "databaseSize": 9330688,
+    "refusedStatements": 0,
+    "pragmaRefusals": 0
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 204,
+      "modules": 113
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 5,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:eca0b674-18f5-4493-a1f4-b1a157acd9ec"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": [],
+    "processChannelOnInstance": true
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwemscvc",
+      "ms": 6497,
+      "cwd": "/w/acceptance-mwemscvc",
+      "error": null
+    },
+    "turn": {
+      "threadId": "c4b0d633-beb8-49f9-b6eb-b206d5e3bd90",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwemscvc/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwemscvc && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 19378
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "ms": 20280
+  },
+  "codex": {
+    "ok": true,
+    "failures": [],
+    "cli": "codex",
+    "workspace": "acceptance-codex-mwemssiw",
+    "first": {
+      "threadId": "11c5edbb-09fa-44f5-8a33-e346deef3fa2",
+      "root": "/w/acceptance-codex-mwemssiw",
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:11c5edbb-09fa-44f5-8a33-e346deef3fa2:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c 'cat src/greeting.txt'",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c \"printf '%s\\\\n' 'Hello from the CLI acceptance.' >> src/greeting.txt\"",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c 'bash test.sh'",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "I’ll append the requested line, then run the repository’s required check script.Updated [src/greeting.txt](/w/acceptance-codex-mwemssiw/src/greeting.txt) with the requested last line, and `bash test.sh` passed.",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d3b8-f0f4-7c61-9aca-e877f6ec1505:native-request:call_2xEKvzvqEzJdDzENlUCmtvxu:b13eef63-de5a-4fd3-837a-c2b448d4ae7f",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d3b8-f0f4-7c61-9aca-e877f6ec1505:native-request:call_xLYmIaPmNOhXY19infBqM4L7:3315168a-607e-4fb7-a52e-4c218d78321e",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d3b8-f0f4-7c61-9aca-e877f6ec1505:native-request:call_tDNxKX4TNrdJUPpROJjz7aYi:0175868d-b6d7-4041-acd5-c7cbe18ca3eb",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A11c5edbb-09fa-44f5-8a33-e346deef3fa2%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "codex",
+            "nativeId": "01a1d3b8-eb06-7c70-bce8-28a0d007fffb",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:codex:thread:11c5edbb-09fa-44f5-8a33-e346deef3fa2:c02b6969-4024-489b-9362-6b3eb8bbd861",
+          "providerInstanceId": "codex"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:codex:thread:11c5edbb-09fa-44f5-8a33-e346deef3fa2:c02b6969-4024-489b-9362-6b3eb8bbd861",
+          "status": "ready",
+          "cwd": "/w/acceptance-codex-mwemssiw"
+        }
+      ],
+      "ms": 26471
+    },
+    "stopped": {
+      "running": false,
+      "leased": false,
+      "lastUse": 1794553472825
+    },
+    "second": {
+      "threadId": "11c5edbb-09fa-44f5-8a33-e346deef3fa2",
+      "root": "/w/acceptance-codex-mwemssiw",
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:11c5edbb-09fa-44f5-8a33-e346deef3fa2:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:11c5edbb-09fa-44f5-8a33-e346deef3fa2:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "`Hello from the CLI acceptance.`",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d3b8-f0f4-7c61-9aca-e877f6ec1505:native-request:call_2xEKvzvqEzJdDzENlUCmtvxu:b13eef63-de5a-4fd3-837a-c2b448d4ae7f",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d3b8-f0f4-7c61-9aca-e877f6ec1505:native-request:call_xLYmIaPmNOhXY19infBqM4L7:3315168a-607e-4fb7-a52e-4c218d78321e",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d3b8-f0f4-7c61-9aca-e877f6ec1505:native-request:call_tDNxKX4TNrdJUPpROJjz7aYi:0175868d-b6d7-4041-acd5-c7cbe18ca3eb",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A11c5edbb-09fa-44f5-8a33-e346deef3fa2%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "codex",
+            "nativeId": "01a1d3b8-eb06-7c70-bce8-28a0d007fffb",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:codex:thread:11c5edbb-09fa-44f5-8a33-e346deef3fa2:c02b6969-4024-489b-9362-6b3eb8bbd861",
+          "providerInstanceId": "codex"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:codex:thread:11c5edbb-09fa-44f5-8a33-e346deef3fa2:c02b6969-4024-489b-9362-6b3eb8bbd861",
+          "status": "ready",
+          "cwd": "/w/acceptance-codex-mwemssiw"
+        }
+      ],
+      "ms": 9194
+    },
+    "protocol": [
+      {
+        "at": 1794553504068,
+        "command": "codex",
+        "argv": [
+          "thread/resume"
+        ],
+        "cwd": null,
+        "route": "protocol",
+        "exitCode": null,
+        "ms": 0,
+        "detail": "ok 01a1d3b8-eb06-7c70-bce8-28a0d007fffb"
+      }
+    ],
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 671,
+        "bytes": 8020967,
+        "ms": 220
+      },
+      "flagged": null
+    },
+    "keyRouteWithoutCli": "403"
+  },
+  "claude": {
+    "ok": true,
+    "failures": [],
+    "cli": "claude",
+    "workspace": "acceptance-claude-mwemtrud",
+    "turn": {
+      "runs": [
+        {
+          "id": "run:thread:b3478d9b-4303-45ac-b5e7-c7a7f129824a:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "requests": [
+        {
+          "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253Adf91260a-8bc7-4007-adfb-0363ad79eb59%253Aturn%253A1:native-request:toolu_01WC4rvk32Lbk48SoZA8UNnB:449685e9-5773-4199-900f-692316a528e5",
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253Adf91260a-8bc7-4007-adfb-0363ad79eb59%253Aturn%253A1:native-request:toolu_017wrzSvqt6JYmDuhQVrpdpf:bba77762-b435-4794-8430-fe8c2483e293",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+      "ms": 26249
+    },
+    "plan": {
+      "runs": [
+        {
+          "id": "run:thread:b3478d9b-4303-45ac-b5e7-c7a7f129824a:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:b3478d9b-4303-45ac-b5e7-c7a7f129824a:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "proposedPlan": [
+        "# Plan: add greeting line\n\n## Context\n`src/greeting.txt` currently holds one line (`Hello from the t3flare fixture.`). The request is to append `Hello from the CLI.` as the new last line, then confirm the repo check passes (AGENTS.md: `bash test.sh` must print \"all checks passed\").\n\n## Steps\n1. Use "
+      ],
+      "diff": ""
+    },
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 608,
+        "bytes": 7958217,
+        "ms": 230
+      },
+      "flagged": null
+    }
+  },
+  "totalMs": 109648,
+  "failures": [],
+  "ok": true
+}

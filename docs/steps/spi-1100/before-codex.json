@@ -1,0 +1,187 @@
+{
+ "at": "2026-11-13T06:52:55.524Z",
+ "ok": false,
+ "results": {
+  "codex": {
+   "ok": false,
+   "agent": "codex",
+   "model": "gpt-6-luna",
+   "threadId": "f22f85c6-693e-4588-8f9e-f7f904dc26b8",
+   "worktreePath": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+   "notes": [
+    "one",
+    "two"
+   ],
+   "diffs": [
+    "diff --git a/notes.txt b/notes.txt\nnew file mode 100644\nindex 0000000..5626abf\n--- /dev/null\n+++ b/notes.txt\n@@ -0,0 +1 @@\n+one\n",
+    ""
+   ],
+   "diffsOk": false,
+   "runs": [
+    {
+     "ordinal": 1,
+     "status": "completed"
+    },
+    {
+     "ordinal": 2,
+     "status": "completed"
+    }
+   ],
+   "answers": [
+    "I’m writing `notes.txt` now.",
+    "OK",
+    "OK"
+   ],
+   "checkpoints": [
+    {
+     "id": "checkpoint:scope:checkpoint-scope%3Athread%3Af22f85c6-693e-4588-8f9e-f7f904dc26b8%3Aname%3Aroot:name:0",
+     "scopeId": "checkpoint-scope:thread:f22f85c6-693e-4588-8f9e-f7f904dc26b8:name:root",
+     "appRunOrdinal": null,
+     "status": "ready"
+    },
+    {
+     "id": "checkpoint:scope:checkpoint-scope%3Athread%3Af22f85c6-693e-4588-8f9e-f7f904dc26b8%3Aname%3Aroot:name:1",
+     "scopeId": "checkpoint-scope:thread:f22f85c6-693e-4588-8f9e-f7f904dc26b8:name:root",
+     "appRunOrdinal": 1,
+     "status": "ready"
+    },
+    {
+     "id": "checkpoint:scope:checkpoint-scope%3Athread%3Af22f85c6-693e-4588-8f9e-f7f904dc26b8%3Aname%3Aroot:name:2",
+     "scopeId": "checkpoint-scope:thread:f22f85c6-693e-4588-8f9e-f7f904dc26b8:name:root",
+     "appRunOrdinal": 2,
+     "status": "ready"
+    }
+   ],
+   "checkpointTrace": [
+    {
+     "at": 1794552752138,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 9
+    },
+    {
+     "at": 1794552752164,
+     "op": "capture",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 114
+    },
+    {
+     "at": 1794552759586,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 9
+    },
+    {
+     "at": 1794552759632,
+     "op": "capture",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 159
+    },
+    {
+     "at": 1794552759812,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 6
+    },
+    {
+     "at": 1794552759837,
+     "op": "diff",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "container",
+     "ms": 278
+    },
+    {
+     "at": 1794552760210,
+     "op": "authored",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 9
+    },
+    {
+     "at": 1794552762176,
+     "op": "authored",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 38
+    },
+    {
+     "at": 1794552762261,
+     "op": "diff",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "container",
+     "ms": 218
+    },
+    {
+     "at": 1794552764392,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 6
+    },
+    {
+     "at": 1794552769342,
+     "op": "capture",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 52
+    },
+    {
+     "at": 1794552769413,
+     "op": "has",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 5
+    },
+    {
+     "at": 1794552769434,
+     "op": "diff",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "container",
+     "ms": 239
+    },
+    {
+     "at": 1794552769725,
+     "op": "authored",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 32
+    },
+    {
+     "at": 1794552771590,
+     "op": "authored",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "do",
+     "ms": 7
+    },
+    {
+     "at": 1794552771703,
+     "op": "diff",
+     "cwd": "/w/.wt/p1100-mwemcy8r/t3-b57f7fa3-8832afd1e769ec32",
+     "by": "container",
+     "ms": 280
+    }
+   ],
+   "rollback": {
+    "ok": true,
+    "dispatch": {
+     "ok": true,
+     "value": {
+      "sequence": 80
+     }
+    },
+    "rolledBack": true,
+    "restored": "one",
+    "target": {
+     "id": "checkpoint:scope:checkpoint-scope%3Athread%3Af22f85c6-693e-4588-8f9e-f7f904dc26b8%3Aname%3Aroot:name:1",
+     "appRunOrdinal": 1
+    }
+   },
+   "ms": 39861
+  }
+ }
+}
