@@ -238,7 +238,7 @@ _Avoid_: project skill, workspace skill
 
 **Environment skill**:
 A Skill the owner installed into the Cloud Environment, offered to Durable agents in every Project.
-_Avoid_: global skill, owner skill, personal skill
+_Avoid_: global skill (the owner's informal word, and cloudpid's Global), owner skill, personal skill
 
 **Skill mention**:
 A `$name` in the owner's message that names a Skill; t3's composer writes one when a Skill is picked.
