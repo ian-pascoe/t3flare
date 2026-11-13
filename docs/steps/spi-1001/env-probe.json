@@ -1,0 +1,492 @@
+{
+ "at": "2026-11-13T23:26:11.983Z",
+ "host": "t3flare-environment-penvsk.ian-g-pascoe.workers.dev",
+ "commit": "f64889ad2946",
+ "workspace": "penvsk-mount",
+ "github": {
+  "unauthenticated": {
+   "rateLimit": {
+    "path": "/rate_limit",
+    "status": 200,
+    "ms": 91,
+    "headers": {
+     "x-ratelimit-limit": "60",
+     "x-ratelimit-remaining": "47",
+     "x-ratelimit-used": "13",
+     "x-ratelimit-reset": "1794615414",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": null,
+     "x-github-api-version-selected": null
+    },
+    "body": {
+     "limit": 60,
+     "remaining": 47,
+     "reset": 1794615414,
+     "used": 13
+    }
+   },
+   "outsideCommit": {
+    "path": "/repos/mattpocock/skills/commits/HEAD",
+    "status": 200,
+    "ms": 166,
+    "headers": {
+     "x-ratelimit-limit": "60",
+     "x-ratelimit-remaining": "46",
+     "x-ratelimit-used": "14",
+     "x-ratelimit-reset": "1794615414",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": null,
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": "5863806dd4e15c63174bee4e7515a4256792ecfa"
+   },
+   "privateRepoCommit": {
+    "path": "/repos/ian-pascoe/t3flare-fixture/commits/HEAD",
+    "status": 404,
+    "ms": 110,
+    "headers": {
+     "x-ratelimit-limit": "60",
+     "x-ratelimit-remaining": "45",
+     "x-ratelimit-used": "15",
+     "x-ratelimit-reset": "1794615414",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": null,
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/commits/commits#get-a-commit\",\"status\":\"404\"}"
+   }
+  },
+  "scoped": {
+   "rateLimit": {
+    "path": "/rate_limit",
+    "status": 200,
+    "ms": 208,
+    "headers": {
+     "x-ratelimit-limit": "5300",
+     "x-ratelimit-remaining": "5300",
+     "x-ratelimit-used": "0",
+     "x-ratelimit-reset": "1794615957",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": "allows_permissionless_access=true",
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": {
+     "limit": 5300,
+     "used": 0,
+     "remaining": 5300,
+     "reset": 1794615957
+    }
+   },
+   "outsideCommit": {
+    "path": "/repos/mattpocock/skills/commits/HEAD",
+    "status": 200,
+    "ms": 211,
+    "headers": {
+     "x-ratelimit-limit": "5300",
+     "x-ratelimit-remaining": "5299",
+     "x-ratelimit-used": "1",
+     "x-ratelimit-reset": "1794615957",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": "contents=read",
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": "5863806dd4e15c63174bee4e7515a4256792ecfa"
+   },
+   "outsideTree": {
+    "path": "/repos/mattpocock/skills/git/trees/5863806dd4e15c63174bee4e7515a4256792ecfa?recursive=1",
+    "status": 200,
+    "ms": 240,
+    "headers": {
+     "x-ratelimit-limit": "5300",
+     "x-ratelimit-remaining": "5298",
+     "x-ratelimit-used": "2",
+     "x-ratelimit-reset": "1794615957",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": "contents=read",
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": {
+     "truncated": false,
+     "entries": 282,
+     "skillMd": 39
+    }
+   },
+   "outsideBlob": {
+    "path": "/repos/mattpocock/skills/git/blobs/4bfeeb61dae548b8b7754c4fba7bd40ab3926099",
+    "status": 200,
+    "ms": 271,
+    "headers": {
+     "x-ratelimit-limit": "5300",
+     "x-ratelimit-remaining": "5297",
+     "x-ratelimit-used": "3",
+     "x-ratelimit-reset": "1794615957",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": "contents=read",
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": {
+     "path": "skills/engineering/ask-matt/SKILL.md",
+     "bytes": 12580,
+     "starts": "---\nname: ask-matt\ndescription: Ask whic"
+    }
+   },
+   "ownRepoCommit": {
+    "path": "/repos/ian-pascoe/t3flare-fixture/commits/HEAD",
+    "status": 200,
+    "ms": 330,
+    "headers": {
+     "x-ratelimit-limit": "5300",
+     "x-ratelimit-remaining": "5296",
+     "x-ratelimit-used": "4",
+     "x-ratelimit-reset": "1794615957",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": "contents=read",
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": "dd72898c7c0fea39a34492c8d60204bfc7506a7a"
+   },
+   "privateOutsideScope": {
+    "path": "/repos/ian-pascoe/cloudpid-scratch/commits/HEAD",
+    "status": 404,
+    "ms": 194,
+    "headers": {
+     "x-ratelimit-limit": "5300",
+     "x-ratelimit-remaining": "5295",
+     "x-ratelimit-used": "5",
+     "x-ratelimit-reset": "1794615957",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": "contents=read",
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/commits/commits#get-a-commit\",\"status\":\"404\"}"
+   },
+   "rateLimitAfter": {
+    "path": "/rate_limit",
+    "status": 200,
+    "ms": 222,
+    "headers": {
+     "x-ratelimit-limit": "5300",
+     "x-ratelimit-remaining": "5295",
+     "x-ratelimit-used": "5",
+     "x-ratelimit-reset": "1794615958",
+     "x-ratelimit-resource": "core",
+     "x-accepted-github-permissions": "allows_permissionless_access=true",
+     "x-github-api-version-selected": "2022-11-28"
+    },
+    "body": {
+     "limit": 5300,
+     "used": 5,
+     "remaining": 5295,
+     "reset": 1794615958
+    }
+   }
+  },
+  "privateOutsideMint": {
+   "minted": true
+  },
+  "uninstalledOwnerMint": {
+   "minted": false,
+   "error": "Error: The GitHub App is not installed on octocat: install it there, on all repositories"
+  }
+ },
+ "mount": {
+  "emptyStat": {
+   "ok": {
+    "kind": "directory",
+    "size": 0,
+    "mtimeMs": 1794612300265,
+    "mode": 493
+   }
+  },
+  "small": {
+   "mib": 0.01,
+   "files": 3,
+   "hash": "95fa5e0930774e5c8ab086f713f77ee28dd97507936a6f344f2d691a22befe31",
+   "makeMs": 0,
+   "callMs": 71,
+   "answer": {
+    "taken": true,
+    "hash": "95fa5e0930774e5c8ab086f713f77ee28dd97507936a6f344f2d691a22befe31",
+    "bytes": 10567,
+    "readMs": 12,
+    "mountMs": 0
+   },
+   "held": "95fa5e0930774e5c8ab086f713f77ee28dd97507936a6f344f2d691a22befe31"
+  },
+  "read": {
+   "ok": {
+    "0": 45,
+    "1": 45,
+    "2": 45,
+    "3": 10,
+    "4": 110,
+    "5": 97,
+    "6": 109,
+    "7": 101,
+    "8": 58,
+    "9": 32,
+    "10": 112,
+    "11": 114,
+    "12": 111,
+    "13": 98,
+    "14": 101,
+    "15": 45,
+    "16": 117,
+    "17": 116,
+    "18": 102,
+    "19": 56,
+    "20": 10,
+    "21": 100,
+    "22": 101,
+    "23": 115,
+    "24": 99,
+    "25": 114,
+    "26": 105,
+    "27": 112,
+    "28": 116,
+    "29": 105,
+    "30": 111,
+    "31": 110,
+    "32": 58,
+    "33": 32,
+    "34": 77,
+    "35": 117,
+    "36": 108,
+    "37": 116,
+    "38": 105,
+    "39": 45,
+    "40": 98,
+    "41": 121,
+    "42": 116,
+    "43": 101,
+    "44": 32,
+    "45": 116,
+    "46": 101,
+    "47": 120,
+    "48": 116,
+    "49": 44,
+    "50": 32,
+    "51": 195,
+    "52": 169,
+    "53": 32,
+    "54": 195,
+    "55": 188,
+    "56": 32,
+    "57": 230,
+    "58": 188,
+    "59": 162,
+    "60": 229,
+    "61": 173,
+    "62": 151,
+    "63": 46,
+    "64": 10,
+    "65": 45,
+    "66": 45,
+    "67": 45,
+    "68": 10,
+    "69": 10,
+    "70": 80,
+    "71": 76,
+    "72": 85,
+    "73": 77,
+    "74": 45,
+    "75": 57,
+    "76": 32,
+    "77": 226,
+    "78": 156,
+    "79": 147,
+    "80": 10
+   }
+  },
+  "doWrite": {
+   "error": "EIO",
+   "message": "read-only mount at /workspace/.agents/skills: cannot modify: /workspace/.agents/skills/probe-utf8"
+  },
+  "doWriteNewSkill": {
+   "error": "EIO",
+   "message": "read-only mount at /workspace/.agents/skills: cannot modify: /workspace/.agents/skills/mine"
+  },
+  "doRemove": {
+   "error": "EIO",
+   "message": "read-only mount at /workspace/.agents/skills: cannot modify: /workspace/.agents/skills/probe-utf8"
+  },
+  "doRemoveParent": {
+   "error": "EIO",
+   "message": "read-only mount at /workspace/.agents/skills: cannot modify: /workspace/.agents"
+  },
+  "doRename": {
+   "error": "EIO",
+   "message": "read-only mount at /workspace/.agents/skills: cannot modify: /workspace/.agents/skills/probe-utf8"
+  },
+  "doMkdir": {
+   "error": "EIO",
+   "message": "read-only mount at /workspace/.agents/skills: cannot modify: /workspace/.agents/skills/made"
+  },
+  "stateBefore": {
+   "running": false,
+   "leased": false,
+   "lastUse": 1794612297671,
+   "startedAt": null,
+   "launch": {
+    "size": "cpu-1",
+    "instance": {
+     "vcpu": 1,
+     "memoryMib": 3072,
+     "diskMb": 12000
+    },
+    "idleMs": 120000,
+    "budget": 3,
+    "revision": 0
+   }
+  },
+  "containerView": {
+   "exitCode": 0,
+   "stdout": "uid=0(root) gid=0(root) groups=0(root)\n/workspace/.agents/skills:\ntotal 0\ndrwxr-xr-x 1 root root 0 Nov 13 23:26 .\ndrwxr-xr-x 1 root root 0 Nov 13 23:24 ..\ndrwxr-xr-x 1 root root 0 Nov 13 23:26 probe-0\ndrwxr-xr-x 1 root root 0 Nov 13 23:26 probe-utf8\n\n/workspace/.agents/skills/probe-utf8:\ntotal 0\ndrwxr-xr-x 1 root root  0 Nov 13 23:26 .\ndrwxr-xr-x 1 root root  0 Nov 13 23:26 ..\n-rw-r--r-- 1 root root 81 Nov 13 23:26 SKILL.md\n---\nname: probe-utf8\ndescription: Multi-byte text, é ü 漢字.\n---\n\nPLUM-9 ✓\n48 38 0:29 / /workspace rw,nosuid,nodev,relatime - fuse /dev/fuse rw,user_id=0,group_id=0,max_read=524288\n",
+   "stderr": "",
+   "running": true
+  },
+  "containerWrite": {
+   "exitCode": 0,
+   "stdout": "exit=0\nSKILL.md\nplanted.txt\n",
+   "stderr": "",
+   "running": true
+  },
+  "containerWriteNewDir": {
+   "exitCode": 0,
+   "stdout": "exit=0\n",
+   "stderr": "",
+   "running": true
+  },
+  "containerRemove": {
+   "exitCode": 0,
+   "stdout": "exit=0\nagent-made\nprobe-utf8\n",
+   "stderr": "",
+   "running": true
+  },
+  "afterContainerWriteInWorkspace": {
+   "planted": {
+    "error": "ENOENT",
+    "message": "no such path: /workspace/.agents/skills/probe-utf8/planted.txt"
+   },
+   "agentMade": {
+    "error": "ENOENT",
+    "message": "no such path: /workspace/.agents/skills/agent-made/SKILL.md"
+   },
+   "removedSkill": {
+    "ok": {
+     "kind": "file",
+     "size": 69,
+     "mtimeMs": 1794612363449,
+     "mode": 420
+    }
+   }
+  },
+  "containerAfterSync": {
+   "exitCode": 0,
+   "stdout": "/workspace/.agents/skills:\ntotal 0\ndrwxr-xr-x 1 root root 0 Nov 13 23:26 .\ndrwxr-xr-x 1 root root 0 Nov 13 23:24 ..\ndrwxr-xr-x 1 root root 0 Nov 13 23:26 agent-made\ndrwxr-xr-x 1 root root 0 Nov 13 23:26 probe-utf8\n\n/workspace/.agents/skills/probe-utf8:\ntotal 0\ndrwxr-xr-x 1 root root  0 Nov 13 23:26 .\ndrwxr-xr-x 1 root root  0 Nov 13 23:26 ..\n-rw-r--r-- 1 root root 81 Nov 13 23:26 SKILL.md\n-rw-r--r-- 1 root root  8 Nov 13 23:26 planted.txt\n",
+   "stderr": "",
+   "running": true
+  },
+  "bindReadOnly": {
+   "exitCode": 0,
+   "stdout": "mount=0\nwrite=2\n48 38 0:29 / /workspace rw,nosuid,nodev,relatime - fuse /dev/fuse rw,user_id=0,group_id=0,max_read=524288\n69 48 0:29 /.agents/skills /workspace/.agents/skills ro,nosuid,nodev,relatime - fuse /dev/fuse rw,user_id=0,group_id=0,max_read=524288\n",
+   "stderr": "/bin/sh: 1: cannot create /workspace/.agents/skills/probe-utf8/again.txt: Read-only file system\n",
+   "running": true
+  },
+  "bindPersists": {
+   "exitCode": 0,
+   "stdout": "48 38 0:29 / /workspace rw,nosuid,nodev,relatime - fuse /dev/fuse rw,user_id=0,group_id=0,max_read=524288\n69 48 0:29 /.agents/skills /workspace/.agents/skills ro,nosuid,nodev,relatime - fuse /dev/fuse rw,user_id=0,group_id=0,max_read=524288\nwrite=2\n",
+   "stderr": "/bin/sh: 1: cannot create /workspace/.agents/skills/probe-utf8/z.txt: Read-only file system\n",
+   "running": true
+  },
+  "changeWhileRunning": {
+   "mib": 0.02,
+   "files": 3,
+   "hash": "a95e91138c88967112901ae85309f1f548034909d5d21b0fe9ddd7ae2dbd9be0",
+   "makeMs": 0,
+   "callMs": 75,
+   "answer": {
+    "taken": true,
+    "hash": "a95e91138c88967112901ae85309f1f548034909d5d21b0fe9ddd7ae2dbd9be0",
+    "bytes": 21053,
+    "readMs": 14,
+    "mountMs": 0
+   },
+   "held": "a95e91138c88967112901ae85309f1f548034909d5d21b0fe9ddd7ae2dbd9be0"
+  },
+  "containerSeesChange": {
+   "exitCode": 0,
+   "stdout": "agent-made\nprobe-0\nprobe-utf8\nls: cannot access '/workspace/.agents/skills/probe-1': No such file or directory\n20903 /workspace/.agents/skills/probe-0/data.txt\n/workspace/.agents/skills/agent-made:\nSKILL.md\n\n/workspace/.agents/skills/probe-utf8:\nSKILL.md\nplanted.txt\n",
+   "stderr": "",
+   "running": true
+  }
+ },
+ "sizes": {
+  "8MiB": {
+   "mib": 8,
+   "files": 13,
+   "hash": "014c64c3747f3e939c162825e9d2ee7ac3d82b4b49c813f556ef9758e59f8c33",
+   "makeMs": 0,
+   "callMs": 430,
+   "answer": {
+    "taken": true,
+    "hash": "014c64c3747f3e939c162825e9d2ee7ac3d82b4b49c813f556ef9758e59f8c33",
+    "bytes": 8388689,
+    "readMs": 136,
+    "mountMs": 0
+   },
+   "held": "014c64c3747f3e939c162825e9d2ee7ac3d82b4b49c813f556ef9758e59f8c33"
+  },
+  "containerAfter8": {
+   "exitCode": 0,
+   "stdout": "6840835\t/workspace/.agents/skills\n8\n",
+   "stderr": "",
+   "running": true
+  },
+  "16MiB": {
+   "mib": 16,
+   "files": 23,
+   "hash": "9af45dd6ba05f7fb9ac76ff3c59eb8b548234410c43476592ae4fc6082477769",
+   "makeMs": 0,
+   "callMs": 800,
+   "answer": {
+    "taken": true,
+    "hash": "9af45dd6ba05f7fb9ac76ff3c59eb8b548234410c43476592ae4fc6082477769",
+    "bytes": 16777297,
+    "readMs": 283,
+    "mountMs": 0
+   },
+   "held": "9af45dd6ba05f7fb9ac76ff3c59eb8b548234410c43476592ae4fc6082477769"
+  },
+  "24MiB": {
+   "mib": 24,
+   "files": 35,
+   "hash": "d06e616106036947aaf465c66062097780c5cde097e6174c214c9a275f1529a0",
+   "makeMs": 0,
+   "callMs": 1297,
+   "answer": {
+    "taken": true,
+    "hash": "d06e616106036947aaf465c66062097780c5cde097e6174c214c9a275f1529a0",
+    "bytes": 25165905,
+    "readMs": 623,
+    "mountMs": 0
+   },
+   "held": "d06e616106036947aaf465c66062097780c5cde097e6174c214c9a275f1529a0"
+  },
+  "reset": {
+   "mib": 0,
+   "files": 1,
+   "hash": "5ad824f7363f2e1ba01dec079a1badbf555e221bf493919e927073fb2f9ad7c8",
+   "makeMs": 0,
+   "callMs": 448,
+   "answer": {
+    "taken": true,
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "readMs": 11,
+    "mountMs": 0
+   },
+   "held": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+ }
+}
