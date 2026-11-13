@@ -1,0 +1,134 @@
+{
+ "at": "2026-11-13T22:38:00.923Z",
+ "project": {
+  "id": "pcli-b",
+  "root": "/w/pcli-b",
+  "written": [
+   ".agents/skills/fruit-code/reference/code.md",
+   ".agents/skills/fruit-code/SKILL.md",
+   ".claude/commands/echo.md",
+   ".claude/skills/fruit-code/reference/code.md",
+   ".claude/skills/fruit-code/SKILL.md",
+   ".opencode/commands/echo.md",
+   ".pi/prompts/echo.md"
+  ]
+ },
+ "ok": true,
+ "cli": "pi",
+ "model": "anthropic/claude-sonnet-5-5",
+ "checks": {
+  "snapshotSkill": true,
+  "snapshotCommands": true,
+  "noContainerForSnapshot": true,
+  "describedReadsSkill": true,
+  "mentionAnswers": true,
+  "commandAnswers": true,
+  "compactAsListed": true
+ },
+ "snapshot": {
+  "container": {
+   "before": {
+    "running": false,
+    "leased": false
+   },
+   "after": {
+    "running": false,
+    "leased": false
+   }
+  },
+  "error": null,
+  "snapshotCwd": "/w/pcli-b",
+  "skills": [
+   {
+    "name": "fruit-code",
+    "description": "How to find the fruit code. Use whenever anyone asks for the fruit code.",
+    "path": "/w/pcli-b/.agents/skills/fruit-code/SKILL.md",
+    "scope": "project",
+    "enabled": true,
+    "userInvocationOnly": false
+   }
+  ],
+  "slashCommands": [
+   {
+    "name": "compact",
+    "description": "Summarize the conversation and reduce context usage",
+    "input": {
+     "hint": "Optional instructions"
+    }
+   },
+   {
+    "name": "echo",
+    "description": "Reply with exactly: ECHO $1 ${2:-none}"
+   }
+  ],
+  "slashCommandsPending": null
+ },
+ "threads": {
+  "described": "763317c3-21b3-4532-aa7d-258ce2f3b658",
+  "mentioned": "58bfd608-2ff2-4ff6-afa3-f4eda3258a4c"
+ },
+ "steps": {
+  "described": {
+   "sent": "What is the fruit code? Reply with the code alone.",
+   "status": "completed",
+   "failure": null,
+   "typed": "What is the fruit code? Reply with the code alone.",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"ordinal\":1000002,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/w/pcli-b/.agents/skills/fruit-code/SKILL.md\"},\"outputOmitted\":true}",
+    "{\"ordinal\":1000003,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/w/pcli-b/.agents/skills/fruit-code/reference/code.md\"},\"outputOmitted\":true}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "dynamic_tool:completed",
+    "dynamic_tool:completed",
+    "assistant_message:completed:6",
+    "checkpoint:completed"
+   ]
+  },
+  "mention": {
+   "sent": "$fruit-code",
+   "status": "completed",
+   "failure": null,
+   "typed": "$fruit-code",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"ordinal\":1000002,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/w/pcli-b/.agents/skills/fruit-code/reference/code.md\"},\"outputOmitted\":true}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "dynamic_tool:completed",
+    "assistant_message:completed:6",
+    "checkpoint:completed"
+   ]
+  },
+  "command": {
+   "sent": "/echo a",
+   "status": "completed",
+   "failure": null,
+   "typed": "/echo a",
+   "answer": "ECHO a none",
+   "tools": [],
+   "kinds": [
+    "user_message:completed",
+    "assistant_message:completed:11",
+    "checkpoint:completed"
+   ]
+  },
+  "compact": {
+   "sent": "/compact",
+   "status": "completed",
+   "failure": null,
+   "typed": "/compact",
+   "answer": "",
+   "tools": [
+    "{\"ordinal\":3000002,\"status\":\"failed\",\"title\":\"Context compaction failed\",\"type\":\"compaction\",\"driver\":\"pi\",\"summary\":\"Compaction failed: Nothing to compact (session too small)\"}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "compaction:failed",
+    "checkpoint:completed"
+   ]
+  }
+ }
+}

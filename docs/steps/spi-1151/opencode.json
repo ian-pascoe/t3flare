@@ -1,0 +1,121 @@
+{
+ "at": "2026-11-13T22:41:08.698Z",
+ "project": {
+  "id": "pcli-b",
+  "root": "/w/pcli-b",
+  "written": [
+   ".agents/skills/fruit-code/reference/code.md",
+   ".agents/skills/fruit-code/SKILL.md",
+   ".claude/commands/echo.md",
+   ".claude/skills/fruit-code/reference/code.md",
+   ".claude/skills/fruit-code/SKILL.md",
+   ".opencode/commands/echo.md",
+   ".pi/prompts/echo.md"
+  ]
+ },
+ "ok": true,
+ "cli": "opencode",
+ "model": "anthropic/claude-sonnet-5-5",
+ "checks": {
+  "snapshotSkill": true,
+  "snapshotCommands": true,
+  "noContainerForSnapshot": true,
+  "describedReadsSkill": true,
+  "mentionAnswers": true,
+  "compactAsListed": true
+ },
+ "snapshot": {
+  "container": {
+   "before": {
+    "running": false,
+    "leased": false
+   },
+   "after": {
+    "running": false,
+    "leased": false
+   }
+  },
+  "error": null,
+  "snapshotCwd": "/w/pcli-b",
+  "skills": [
+   {
+    "name": "fruit-code",
+    "description": "How to find the fruit code. Use whenever anyone asks for the fruit code.",
+    "path": "/w/pcli-b/.agents/skills/fruit-code/SKILL.md",
+    "scope": "project",
+    "enabled": true,
+    "userInvocationOnly": false
+   }
+  ],
+  "slashCommands": [],
+  "slashCommandsPending": null
+ },
+ "threads": {
+  "described": "854c675b-7cc8-4ae7-99de-73e90035f869",
+  "mentioned": "98b77830-9ccb-4052-9607-cc4b63c590eb"
+ },
+ "steps": {
+  "described": {
+   "sent": "What is the fruit code? Reply with the code alone.",
+   "status": "completed",
+   "failure": null,
+   "typed": "What is the fruit code? Reply with the code alone.",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"ordinal\":1000002,\"status\":\"completed\",\"title\":\"Tool\",\"type\":\"dynamic_tool\",\"toolName\":\"Tool\",\"input\":{\"id\":\"fruit-code\"},\"outputOmitted\":true}",
+    "{\"ordinal\":1000003,\"status\":\"completed\",\"title\":\"Read /w/pcli-b/.agents/skills/fruit-code/reference/code.md\",\"type\":\"dynamic_tool\",\"toolName\":\"Read\",\"input\":{\"path\":\"/w/pcli-b/.agents/skills/fruit-code/reference/code.md\"},\"outputOmitted\":true}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "dynamic_tool:completed",
+    "dynamic_tool:completed",
+    "assistant_message:completed:6",
+    "checkpoint:completed"
+   ]
+  },
+  "mention": {
+   "sent": "$fruit-code",
+   "status": "completed",
+   "failure": null,
+   "typed": "$fruit-code",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"ordinal\":1000002,\"status\":\"completed\",\"title\":\"Read /w/pcli-b/.agents/skills/fruit-code/reference/code.md\",\"type\":\"dynamic_tool\",\"toolName\":\"Read\",\"input\":{\"path\":\"/w/pcli-b/.agents/skills/fruit-code/reference/code.md\"},\"outputOmitted\":true}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "dynamic_tool:completed",
+    "assistant_message:completed:6",
+    "checkpoint:completed"
+   ]
+  },
+  "command": {
+   "sent": "/echo a",
+   "status": "completed",
+   "failure": null,
+   "typed": "/echo a",
+   "answer": "",
+   "tools": [],
+   "kinds": [
+    "user_message:completed",
+    "checkpoint:completed"
+   ],
+   "expectedUnseen": true
+  },
+  "commandLateReply": [],
+  "compact": {
+   "sent": "/compact",
+   "status": "failed",
+   "failure": null,
+   "typed": "/compact",
+   "answer": "",
+   "tools": [
+    "{\"ordinal\":3000002,\"status\":\"failed\",\"title\":\"Provider error\",\"type\":\"error\",\"failure\":{\"class\":\"provider_error\",\"message\":\"This provider does not support /compact. Start a new thread to continue with a fresh context.\",\"code\":null,\"retryable\":null}}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "error:failed"
+   ]
+  }
+ }
+}

@@ -1,0 +1,150 @@
+{
+ "at": "2026-11-13T22:36:57.734Z",
+ "project": {
+  "id": "pcli-b",
+  "root": "/w/pcli-b",
+  "written": [
+   ".agents/skills/fruit-code/reference/code.md",
+   ".agents/skills/fruit-code/SKILL.md",
+   ".claude/commands/echo.md",
+   ".claude/skills/fruit-code/reference/code.md",
+   ".claude/skills/fruit-code/SKILL.md",
+   ".opencode/commands/echo.md",
+   ".pi/prompts/echo.md"
+  ]
+ },
+ "ok": true,
+ "cli": "codex",
+ "model": "gpt-6-luna",
+ "checks": {
+  "snapshotSkill": true,
+  "snapshotCommands": true,
+  "noContainerForSnapshot": true,
+  "describedReadsSkill": true,
+  "mentionAnswers": true,
+  "compactAsListed": true,
+  "goalRuns": true
+ },
+ "snapshot": {
+  "container": {
+   "before": {
+    "running": false,
+    "leased": false
+   },
+   "after": {
+    "running": false,
+    "leased": false
+   }
+  },
+  "error": null,
+  "snapshotCwd": "/w/pcli-b",
+  "skills": [
+   {
+    "name": "fruit-code",
+    "description": "How to find the fruit code. Use whenever anyone asks for the fruit code.",
+    "path": "/w/pcli-b/.agents/skills/fruit-code/SKILL.md",
+    "scope": "project",
+    "enabled": true,
+    "userInvocationOnly": false
+   }
+  ],
+  "slashCommands": [
+   {
+    "name": "compact",
+    "description": "Summarize the conversation and reduce context usage"
+   },
+   {
+    "name": "goal",
+    "description": "Set a goal Codex keeps working toward until it is done",
+    "input": {
+     "hint": "Objective, or pause, resume, clear"
+    }
+   }
+  ],
+  "slashCommandsPending": null
+ },
+ "threads": {
+  "described": "332cbdfe-a5b3-43e4-b0f5-9b210a30ddb2",
+  "mentioned": "92c4670d-63e3-4df0-b77f-478e929f47ec"
+ },
+ "steps": {
+  "described": {
+   "sent": "What is the fruit code? Reply with the code alone.",
+   "status": "completed",
+   "failure": null,
+   "typed": "What is the fruit code? Reply with the code alone.",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"ordinal\":1000004,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat .agents/skills/fruit-code/SKILL.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}",
+    "{\"ordinal\":1000005,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat .agents/skills/fruit-code/reference/code.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "reasoning:completed",
+    "assistant_message:completed:41",
+    "command_execution:completed",
+    "command_execution:completed",
+    "assistant_message:completed:6",
+    "checkpoint:completed"
+   ]
+  },
+  "mention": {
+   "sent": "$fruit-code",
+   "status": "completed",
+   "failure": null,
+   "typed": "$fruit-code",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"ordinal\":1000003,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat .agents/skills/fruit-code/reference/code.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "assistant_message:completed:61",
+    "command_execution:completed",
+    "assistant_message:completed:6",
+    "checkpoint:completed"
+   ]
+  },
+  "compact": {
+   "sent": "/compact",
+   "status": "completed",
+   "failure": null,
+   "typed": "/compact",
+   "answer": "",
+   "tools": [
+    "{\"ordinal\":2000002,\"status\":\"completed\",\"title\":\"Context compacted\",\"type\":\"compaction\",\"driver\":\"codex\"}"
+   ],
+   "kinds": [
+    "user_message:completed",
+    "compaction:completed",
+    "checkpoint:completed"
+   ]
+  },
+  "goal": {
+   "sent": "/goal Reply with the single word DONE.",
+   "status": "completed",
+   "failure": null,
+   "typed": "/goal Reply with the single word DONE.",
+   "answer": "DONE",
+   "tools": [],
+   "kinds": [
+    "user_message:completed",
+    "assistant_message:completed:4",
+    "assistant_message:completed:4",
+    "checkpoint:completed"
+   ]
+  },
+  "goalClear": {
+   "sent": "/goal clear",
+   "status": "completed",
+   "failure": null,
+   "typed": "/goal clear",
+   "answer": "",
+   "tools": [],
+   "kinds": [
+    "user_message:completed",
+    "checkpoint:completed"
+   ]
+  }
+ }
+}
