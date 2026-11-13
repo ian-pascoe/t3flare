@@ -702,15 +702,15 @@ importers:
       '@effect/tsgo':
         specifier: 0.67.1
         version: 0.67.1
-      '@maschwenk/tsrslint':
-        specifier: 0.1.6
-        version: 0.1.6
       '@types/node':
         specifier: 24.12.4
         version: 24.12.4
       oxlint:
         specifier: 1.91.0
         version: 1.91.0(oxlint-tsgolint@7.0.2004)(vite-plus@1.4.0(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@7.0.2))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0))
+      tsrs:
+        specifier: 0.24.0-ts7.1.0-beta
+        version: 0.24.0-ts7.1.0-beta
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -2601,7 +2601,7 @@ importers:
         version: 4.1.2
       tldts:
         specifier: ^7.4.19
-        version: 7.4.22
+        version: 7.4.26
     devDependencies:
       '@cloudpid/config':
         specifier: workspace:*
@@ -4363,28 +4363,6 @@ packages:
         optional: true
       react-native:
         optional: true
-
-  '@maschwenk/tsrslint-darwin-arm64@0.1.6':
-    resolution: {integrity: sha512-4cd/YRhspvIUxfr6xx2oWv3+WTeKLxfOe4tW49zPdo80X6rp4mxkWQg3C9vkm+1ugeAakoQgtOHNP9SnH5raLA==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@maschwenk/tsrslint-linux-arm64@0.1.6':
-    resolution: {integrity: sha512-f2G8zGWoXHTHGegUdrqiX5EjyYDGFtk/vq0JeEAHlcjl3LtDD2cIl8kkuCypA69CohAqxm49yf2gtVyMSF/EMg==}
-    cpu: [arm64]
-    os: [linux]
-    libc: [glibc]
-
-  '@maschwenk/tsrslint-linux-x64@0.1.6':
-    resolution: {integrity: sha512-e1XeesEMB+m3LocBzjzUxZ+F0CpSZodC/Cp8EynPGA6Buz4l0rDx1bPHHZAgcq2bcKN2Mgk+ep3KY75P8UuRFA==}
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
-  '@maschwenk/tsrslint@0.1.6':
-    resolution: {integrity: sha512-s/dMOF/F5gINLYMpcZpLAFVH5hWcSc4N/I8uaOkD8nMUWSFVSN/R+Jx7/rMbj5hX+ej4rthgfVhx0ZZb7/pNSg==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -6227,6 +6205,52 @@ packages:
 
   '@transcribe-cpp/win32-x64-cpu-vulkan@0.4.1':
     resolution: {integrity: sha512-0W8yQ6SgmPKgVaLHVGkj5gr2uzMS9mAVHMCJKZCFdhvQxeQlUbrvN/8ooyYD7S5qmLsLNEHt0ecMMVgsoWUu9A==}
+    cpu: [x64]
+    os: [win32]
+
+  '@tsrs/darwin-arm64@0.24.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-GxGPRieCGIXevJgGlbne9pRqkfAN+VmBQvBHWWcF8rXLNX9yCxYo78/a7Auqjf723b4eFTlM5mgkclUit/Fu9w==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@tsrs/darwin-x64@0.24.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-TrXdOyEq++blyYp6KphoHGmsGxAn1flYzjm0peLEI3c88z1UQa+pKkcuPgZ6FOxTW6fSaT9572n21kz+0bWi/g==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@tsrs/linux-arm64-gnu@0.24.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-Ph5NK0vnaR4gnBW2LgrZsUPx4mKF+9tCQUYZFOHmny6SMojSsm/5GCiBu0sHZEZhmyIqq8UbineUEA7T0QImnw==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@tsrs/linux-arm64-musl@0.24.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-vjgx8wGuAVSOPLlb2eVQpQVolImZa7vsH/1kvYOaokcP/KZXVUmHzgroxK0t9gxJ0SXvT4VKNjWZ+t+4tDNu1A==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@tsrs/linux-x64-gnu@0.24.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-tj1SNWBnJoBUzU2zrD18tUu3h6o36FXQGPpmIXsADHSfU5H9pVQdK/QzPIO76rb72P7foXHluE+xGTXXf8nNaA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@tsrs/linux-x64-musl@0.24.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-sizu0EdGw9ITqEaZKg60TDhDk5PXT9RzVkCdesBjk/BZhS0BVU2cRhvoRBmDbk+2vCUgW14j+Otg3tl+002qNQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@tsrs/win32-x64@0.24.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-WAbzgd5JBOauQ/oL6DTdGEh09tM/q8tlGAcRORskhPK7eIQVVa8Js2pc7DVW0XokWTSADeD9v6HKtU2Ge0r/fQ==}
+    engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
 
@@ -9741,15 +9765,15 @@ packages:
   tldts-core@7.4.2:
     resolution: {integrity: sha512-nwEyF4vl4RSJjwSjBUmOSxc3BFPoIFdlRthJ6e+5v9P3bHNsoD06UjuqMUspqp7vsEZ1beaHi1km+optiE17yA==}
 
-  tldts-core@7.4.22:
-    resolution: {integrity: sha512-NRyhrlvJcTwvoRibE0dEZvp6C5RwV4RxpsX1zbkI1k7Fk2pzIhmQ+MvswJEd5KKl3VRFRMDTipXse/ejh/ld/w==}
+  tldts-core@7.4.26:
+    resolution: {integrity: sha512-fMNX6ToAFZa2pWrKUd95hhwzx4f6tc+TLtjAstkj6L20FCmbsQ7SCciD3tAJQ/er+SmAlanZ8x0qFkNDZaftIg==}
 
   tldts@7.4.2:
     resolution: {integrity: sha512-kCwffuaH8ntKtygnWe1b4BJKWiCUH30n5KfoTr6IchcXOwR7chAOFJxFrH3vjANafUYrIA4a7SDL+nn7SiR4Sw==}
     hasBin: true
 
-  tldts@7.4.22:
-    resolution: {integrity: sha512-TmLwkCZ1GFMxGkKfg2ooQhPF8rDMuuXvJHSxFiOU1fofh27L6NaO5T9KSlQXCJX2eoSt14I8F4saSMILOmXmaQ==}
+  tldts@7.4.26:
+    resolution: {integrity: sha512-ImrRMX8xrz7KZKdINMHBTsEWNlPxzI/CdDXEXmV3Fp0jAU31x1ZD4YmrAPGCz325aXYSuBPG5k6v2wRmWbm2QQ==}
     hasBin: true
 
   to-buffer@1.2.2:
@@ -9802,6 +9826,11 @@ packages:
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
+
+  tsrs@0.24.0-ts7.1.0-beta:
+    resolution: {integrity: sha512-Iy7q93qfRHcI0Y31IKx6fCsDQCsSjtrT01PIgOVolBXPJTMdm84oH1pEYyAMPQ/SnRqWDSWI8wEUHbv6e9TmHA==}
+    engines: {node: '>=16.20.0'}
+    hasBin: true
 
   tunnel-agent@0.6.0:
     resolution: {integrity: sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==}
@@ -12195,21 +12224,6 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
       react-native: 0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(bufferutil@4.1.0)(supports-color@10.2.2)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@10.2.2)(utf-8-validate@6.0.6)
 
-  '@maschwenk/tsrslint-darwin-arm64@0.1.6':
-    optional: true
-
-  '@maschwenk/tsrslint-linux-arm64@0.1.6':
-    optional: true
-
-  '@maschwenk/tsrslint-linux-x64@0.1.6':
-    optional: true
-
-  '@maschwenk/tsrslint@0.1.6':
-    optionalDependencies:
-      '@maschwenk/tsrslint-darwin-arm64': 0.1.6
-      '@maschwenk/tsrslint-linux-arm64': 0.1.6
-      '@maschwenk/tsrslint-linux-x64': 0.1.6
-
   '@mixmark-io/domino@2.2.0': {}
 
   '@modelcontextprotocol/client@2.4.0':
@@ -13688,6 +13702,27 @@ snapshots:
     optional: true
 
   '@transcribe-cpp/win32-x64-cpu-vulkan@0.4.1':
+    optional: true
+
+  '@tsrs/darwin-arm64@0.24.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/darwin-x64@0.24.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/linux-arm64-gnu@0.24.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/linux-arm64-musl@0.24.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/linux-x64-gnu@0.24.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/linux-x64-musl@0.24.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/win32-x64@0.24.0-ts7.1.0-beta':
     optional: true
 
   '@tweenjs/tween.js@23.1.3': {}
@@ -18582,16 +18617,16 @@ snapshots:
   tldts-core@7.4.2:
     optional: true
 
-  tldts-core@7.4.22: {}
+  tldts-core@7.4.26: {}
 
   tldts@7.4.2:
     dependencies:
       tldts-core: 7.4.2
     optional: true
 
-  tldts@7.4.22:
+  tldts@7.4.26:
     dependencies:
-      tldts-core: 7.4.22
+      tldts-core: 7.4.26
 
   to-buffer@1.2.2:
     dependencies:
@@ -18648,6 +18683,16 @@ snapshots:
       strip-bom: 3.0.0
 
   tslib@2.8.1: {}
+
+  tsrs@0.24.0-ts7.1.0-beta:
+    optionalDependencies:
+      '@tsrs/darwin-arm64': 0.24.0-ts7.1.0-beta
+      '@tsrs/darwin-x64': 0.24.0-ts7.1.0-beta
+      '@tsrs/linux-arm64-gnu': 0.24.0-ts7.1.0-beta
+      '@tsrs/linux-arm64-musl': 0.24.0-ts7.1.0-beta
+      '@tsrs/linux-x64-gnu': 0.24.0-ts7.1.0-beta
+      '@tsrs/linux-x64-musl': 0.24.0-ts7.1.0-beta
+      '@tsrs/win32-x64': 0.24.0-ts7.1.0-beta
 
   tunnel-agent@0.6.0:
     dependencies:

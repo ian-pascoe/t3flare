@@ -6,7 +6,7 @@
     "ci:setup": "bash -c 'set -a; . \"$HOME/.config/t3flare/dev.env\"; set +a; exec alchemy deploy --config github.ts --stage ci --profile admin' && node allow-actions-prs.ts",
     "ci:destroy": "alchemy destroy --config github.ts --stage ci --profile admin",
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "lint": "oxlint --type-aware --deny-warnings github.ts allow-actions-prs.ts github-app-setup.ts src",
+    "lint": "OXLINT_TSGOLINT_PATH=../node_modules/.bin/tsrs-lint oxlint --type-aware --deny-warnings github.ts allow-actions-prs.ts github-app-setup.ts src",
     "github-app:setup": "node github-app-setup.ts",
     "test": "vitest run"
   },

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "lint": "oxlint --type-aware --deny-warnings src test build.ts",
+    "lint": "OXLINT_TSGOLINT_PATH=../../node_modules/.bin/tsrs-lint oxlint --type-aware --deny-warnings src test build.ts",
     "test": "vitest run",
     "build": "node build.ts"
   },

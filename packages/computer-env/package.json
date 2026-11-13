@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "lint": "oxlint --type-aware src",
+    "lint": "OXLINT_TSGOLINT_PATH=../../node_modules/.bin/tsrs-lint oxlint --type-aware src",
     "test": "vitest run"
   },
   "dependencies": {

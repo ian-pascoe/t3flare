@@ -50,7 +50,7 @@ const OUR_OVERRIDES: Record<string, string> = {
 // Ours, merged into t3's peerDependencyRules.allowedVersions (t3's strictPeerDependencies covers our packages too).
 const OUR_ALLOWED_PEERS: Record<string, string> = {
   // Our oxlint (1.91.0) is newer than vite-plus's oxlint-tsgolint. Our lint never uses that backend: oxlint
-  // --type-aware runs tsrslint's, linked as node_modules/.bin/tsgolint by scripts/link-tsrslint.sh.
+  // --type-aware runs tsrs-lint, through OXLINT_TSGOLINT_PATH in each lint script (ADR-0030).
   "oxlint>oxlint-tsgolint": "7.0.2004",
 };
 

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "lint": "oxlint --type-aware --deny-warnings src test scripts build.ts alchemy.run.ts stage-files.ts vitest.config.ts",
+    "lint": "OXLINT_TSGOLINT_PATH=../../node_modules/.bin/tsrs-lint oxlint --type-aware --deny-warnings src test scripts build.ts alchemy.run.ts stage-files.ts vitest.config.ts",
     "test": "vitest run",
     "test:docker": "vitest run --config vitest.docker.config.ts",
     "build": "node build.ts",
