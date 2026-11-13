@@ -36,6 +36,9 @@ import {
 import { environmentServices } from "../../agents/bindings.ts";
 import { attachmentReader, turnPrompt } from "../attachments.ts";
 import { snapshotModels } from "../models.ts";
+import { cliSnapshotForCwdOf, environmentSkillsAccess, messageSkillsFor, type SkillsAccess } from "../skills.ts";
+import { claudeMentionRewrite } from "./claudeSkills.ts";
+import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import {
   type AcpCli,
@@ -49,7 +52,7 @@ import {
   PINNED_MODE,
 } from "./acpFlavor.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
-import { CliSpawn, type CliSessions, wrapCliAdapter } from "./wrapper.ts";
+import { CliSpawn, CliTurn, type CliSessions, wrapCliAdapter } from "./wrapper.ts";
 import { relayUrl } from "../../agents/cliProfiles.ts";
 
 export type AcpCliDriverEnv =
@@ -176,6 +179,8 @@ const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
       enabled,
       checkedAt,
       models: acpSnapshotModels(environmentServices().catalog.current()),
+      // SPI-1151: stock's `/compact`, which the agent runs as its own command.
+      slashCommands: CLI_BUILT_IN_COMMANDS[spec.cli],
       probe: { installed: true, version: spec.version, status: "ready", auth: { status: "authenticated" }, message: IGNORED_SETTINGS[spec.cli] },
     });
   });
@@ -219,11 +224,26 @@ export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpF
     : {}),
 });
 
-/** Prompts (plan §3.5): SPI-993's rules for Durable agents, images inline when the agent takes them, text files inline. */
-const promptBuilder = (host: ProviderHost.ProviderHost["Service"], fileSystem: FileSystem.FileSystem): NonNullable<AcpAdapterV2Flavor["buildPrompt"]> => {
+/**
+ * Prompts (plan §3.5): SPI-993's rules for Durable agents, images inline when the agent takes them, text files inline.
+ * SPI-1151: with `skills` (OpenCode's), a message's Skill mentions embed as OpenCode's skill tool returns them, read for
+ * the turn's thread (`CliTurn`: t3's adapter gives the builder no cwd).
+ */
+export const acpPromptBuilder = (
+  host: ProviderHost.ProviderHost["Service"],
+  fileSystem: FileSystem.FileSystem,
+  skills?: { readonly access: SkillsAccess; readonly agent: "opencode" },
+): NonNullable<AcpAdapterV2Flavor["buildPrompt"]> => {
   const reader = attachmentReader(host, fileSystem);
   return (input) =>
-    turnPrompt({ text: input.text, attachments: input.attachments as ReadonlyArray<ChatAttachment> }, { acceptsImages: input.promptCapabilities?.image === true, reader }).pipe(
+    Effect.gen(function* () {
+      const turn = yield* CliTurn;
+      const threadSkills = skills === undefined || turn === undefined ? undefined : messageSkillsFor(turn.cwd, skills.access, skills.agent);
+      return yield* turnPrompt(
+        { text: input.text, attachments: input.attachments as ReadonlyArray<ChatAttachment> },
+        { acceptsImages: input.promptCapabilities?.image === true, reader, ...(threadSkills === undefined ? {} : { skills: threadSkills }) },
+      );
+    }).pipe(
       Effect.map(({ text, images }): ReadonlyArray<EffectAcpSchema.ContentBlock> => [
         { type: "text", text },
         ...images.map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
@@ -280,9 +300,12 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
   const host = yield* ProviderHost.ProviderHost;
   const fileSystem = yield* FileSystem.FileSystem;
-  const adapter = yield* makeAcpAdapterV2(
-    acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { buildPrompt: promptBuilder(host, fileSystem) }), continuationRequests),
-  ).pipe(Effect.provideService(McpProviderSessions.McpProviderSessions, relayed));
+  // SPI-1151: a picked Skill reaches the CLI as its own: Claude Code's mention rewritten (the wrapper), OpenCode's embedded.
+  const skillsAccess = environmentSkillsAccess();
+  const buildPrompt = acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? { access: skillsAccess, agent: "opencode" } : undefined);
+  const adapter = yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { buildPrompt }), continuationRequests)).pipe(
+    Effect.provideService(McpProviderSessions.McpProviderSessions, relayed),
+  );
   return {
     instanceId,
     driverKind: spec.driver,
@@ -291,7 +314,9 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
     accentColor,
     enabled,
     snapshot,
-    orchestrationAdapter: wrapCliAdapter(adapter, { sessions }),
+    // SPI-1151: the Workspace's Repo skills and commands at the CLI's roots, from the Workspace DO (never a spawn).
+    snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: spec.driver, instanceId, agent: spec.cli, access: skillsAccess }),
+    orchestrationAdapter: wrapCliAdapter(adapter, { sessions, ...(spec.cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(skillsAccess) } : {}) }),
     textGeneration: makePiDurableTextGeneration(),
   } satisfies ProviderInstance;
 });

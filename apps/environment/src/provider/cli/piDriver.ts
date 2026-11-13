@@ -25,6 +25,8 @@ import { PiSettings } from "../../../../../t3code/packages/provider-pi/src/setti
 import { environmentServices } from "../../agents/bindings.ts";
 import { snapshotModels } from "../models.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
+import { cliSnapshotForCwdOf } from "../skills.ts";
+import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSessions, wrapCliAdapter } from "./wrapper.ts";
 
@@ -59,6 +61,8 @@ const snapshotOf = (enabled: boolean) =>
       enabled,
       checkedAt,
       models: snapshotModels(environmentServices().catalog.current()),
+      // SPI-1151: stock's `/compact` (t3's Pi adapter runs it as pi's RPC compaction).
+      slashCommands: CLI_BUILT_IN_COMMANDS.pi,
       probe: { installed: true, version: CLIS.pi.version, status: "ready", auth: { status: "authenticated" } },
     });
   });
@@ -115,6 +119,8 @@ export const PiCliDriver: ProviderDriver<PiSettings, PiCliDriverEnv> = {
       accentColor,
       enabled,
       snapshot,
+      // SPI-1151: the Workspace's Repo skills and Prompt templates at pi's roots (the ones its profile names by flag).
+      snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: PI_CLI_DRIVER, instanceId, agent: "pi" }),
       orchestrationAdapter: wrapCliAdapter(adapter, {
         sessions,
         dropEvent: (event) => JSON.stringify(event).includes(MCP_UNAVAILABLE_NOTICE),

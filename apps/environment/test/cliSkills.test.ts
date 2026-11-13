@@ -1,12 +1,14 @@
 // The CLI agents' roots table (SPI-1151 §1, M1): discovery with each CLI's roots finds, in the probe's fixture, the
 // repo Skills and commands that CLI itself loaded (`docs/steps/spi-1151/m0-roots.json`, recorded by
-// `test/docker/skills.docker.test.ts` from the pinned CLIs), with its winner of a same-named pair.
+// `test/docker/skills.docker.test.ts` from the pinned CLIs), with its winner of a same-named pair; and their built-in
+// commands.
 import * as NodeFs from "node:fs";
 
 import { CLI_AGENTS, CLI_ROOTS, discoverPrompts, discoverSkills, type SkillFiles } from "@t3flare/skills";
 import { memoryFiles } from "@t3flare/skills/testing";
 import { describe, expect, it } from "vitest";
 
+import { CLI_BUILT_IN_COMMANDS } from "../src/provider/cli/builtInCommands.ts";
 import { type Loaded, PROBED, repoFixture, repoView } from "./docker/skillsProbe.ts";
 
 const ROOT = "/workspace/repo";
@@ -24,4 +26,21 @@ describe("the CLI agents' roots table", () => {
       expect(commands.map((command) => command.name).sort()).toEqual(loaded.commands);
     });
   }
+});
+
+describe("the CLI agents' built-in commands (SPI-1151 §2)", () => {
+  it("are stock's static entries: /compact for all four, Codex's /goal, and never /feedback", () => {
+    expect(Object.fromEntries(CLI_AGENTS.map((cli) => [cli, CLI_BUILT_IN_COMMANDS[cli].map((command) => command.name)]))).toEqual({
+      codex: ["compact", "goal"],
+      pi: ["compact"],
+      claude: ["compact"],
+      opencode: ["compact"],
+    });
+  });
+
+  it("restate stock's Codex /goal entry (CodexProvider.ts)", () => {
+    const source = NodeFs.readFileSync(new URL("../../../t3code/apps/server/src/provider/CodexProvider.ts", import.meta.url), "utf8");
+    const goal = CLI_BUILT_IN_COMMANDS.codex.find((command) => command.name === "goal")!;
+    expect(source, "t3 changed Codex's /goal entry; re-read U65").toContain(`name: "goal",\n        description: ${JSON.stringify(goal.description)},\n        input: { hint: ${JSON.stringify(goal.input?.hint)} },`);
+  });
 });

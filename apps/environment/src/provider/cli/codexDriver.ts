@@ -34,6 +34,8 @@ import * as TextGenerationOperations from "@t3tools/provider-core/server/textGen
 import { runText } from "../textGeneration.ts";
 import { withCodexInvestigation } from "./codexInvestigation.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
+import { cliSnapshotForCwdOf } from "../skills.ts";
+import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSession, type CliSessions, sessionFor, wrapCliAdapter } from "./wrapper.ts";
 
@@ -125,6 +127,8 @@ const snapshotOf = (enabled: boolean, setupMode: string | undefined) =>
       enabled,
       checkedAt,
       models: codexModels(),
+      // SPI-1151: stock's static commands, without `/feedback`.
+      slashCommands: CLI_BUILT_IN_COMMANDS.codex,
       probe: managed
         ? { installed: true, version: CLIS.codex.version, status: "error", auth: { status: "unauthenticated" }, message: "ChatGPT sign-in is not offered; t3flare uses the model proxy (set Codex's setup mode back)." }
         : { installed: true, version: CLIS.codex.version, status: "ready", auth: { status: "authenticated" } },
@@ -191,6 +195,8 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       accentColor,
       enabled: enabled && config.setupMode !== "managed",
       snapshot,
+      // SPI-1151: the Workspace's Repo skills at Codex's roots, from the Workspace DO (never a spawn in the project).
+      snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: CODEX_DRIVER, instanceId, agent: "codex" }),
       orchestrationAdapter: wrapCliAdapter(adapter, { sessions }),
       // The proxy's text generation; a review guide's investigation runs `codex exec` read-only in the checkout (G7).
       textGeneration: TextGenerationOperations.fromRunner("CodexTextGeneration", withCodexInvestigation(spawner, fileSystem, runText)),

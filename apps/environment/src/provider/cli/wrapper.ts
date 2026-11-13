@@ -93,7 +93,15 @@ export interface WrapOptions {
   readonly sessions: CliSessions;
   /** Drops an event before t3 sees it. */
   readonly dropEvent?: (event: ProviderAdapter.ProviderAdapterV2Event) => boolean;
+  /** SPI-1151: the turn's text as the CLI gets it, from the text and the thread's cwd (Claude Code's Skill mentions). */
+  readonly rewriteTurnText?: (text: string, cwd: string | null) => Effect.Effect<string>;
 }
+
+/**
+ * The turn t3's adapter is starting now (SPI-1151): its thread's cwd, for a prompt builder that t3's adapter gives no
+ * cwd (the ACP flavors' `buildPrompt`, OpenCode's Skill embed). Set around the adapter's `startTurn`.
+ */
+export const CliTurn = Context.Reference<{ readonly cwd: string | null } | undefined>("t3flare/CliTurn", { defaultValue: () => undefined });
 
 /** The live turn a card is raised on: what `startTurn` said, and the provider turn id its events gave. */
 interface LiveTurn {
@@ -298,8 +306,11 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
                 ),
                 Effect.forkDetach,
               );
+              const cwd = turn.runtimePolicy.cwd ?? null;
+              const text = options.rewriteTurnText === undefined ? turn.message.text : yield* options.rewriteTurnText(turn.message.text, cwd);
+              const sent = text === turn.message.text ? turn : { ...turn, message: { ...turn.message, text } };
               // A turn that never started ends here: no `turn.terminal` follows, and the hold and the cap would stay.
-              yield* runtime.startTurn(turn).pipe(Effect.onError(() => turnEnded(session)));
+              yield* runtime.startTurn(sent).pipe(Effect.provideService(CliTurn, { cwd }), Effect.onError(() => turnEnded(session)));
             }),
           respondToRuntimeRequest: (response) => {
             if (!response.requestId.startsWith(cardRequestPrefix(adapter.driver))) return runtime.respondToRuntimeRequest(response);

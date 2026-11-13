@@ -1,11 +1,12 @@
 // The composer's Skills and Slash commands for Pi Durable (SPI-1147 §3): `snapshotForCwd` answers a Workspace's Repo
-// skills and Prompt templates, in t3 paths; nothing for a path that is no Workspace, or with the switch off.
+// skills and Prompt templates, in t3 paths; nothing for a path that is no Workspace, or with the switch off. SPI-1151:
+// a CLI agent's, at its own roots, after its built-in commands.
 import type { ServerProvider } from "@t3tools/contracts";
-import type { PromptTemplate, SkillDiscovery } from "@t3flare/skills";
+import type { CliAgent, PromptTemplate, SkillDiscovery } from "@t3flare/skills";
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 
-import { piDurableSnapshotForCwd, type SkillsAccess } from "../src/provider/skills.ts";
+import { cliSnapshotForCwd, piDurableSnapshotForCwd, type SkillsAccess } from "../src/provider/skills.ts";
 
 const machine = { instanceId: "piDurable", skills: [], slashCommands: [], models: [] } as unknown as ServerProvider;
 const discovery: SkillDiscovery = {
@@ -33,8 +34,8 @@ const access = (options: { enabled?: boolean } = {}): SkillsAccess & { asked: Ar
         id: match[1]!,
         inner: `/workspace/repo${match[2] ?? ""}`,
         workspace: {
-          skills: (inner) => (asked.push(`skills ${inner}`), Promise.resolve(discovery)),
-          prompts: (inner) => (asked.push(`prompts ${inner}`), Promise.resolve(templates)),
+          skills: (inner, agent) => (asked.push(`skills ${inner}${agent === undefined ? "" : ` ${agent}`}`), Promise.resolve(discovery)),
+          prompts: (inner, agent) => (asked.push(`prompts ${inner}${agent === undefined ? "" : ` ${agent}`}`), Promise.resolve(templates)),
           readText: () => Promise.resolve(null),
         },
       };
@@ -75,5 +76,40 @@ describe("Pi Durable's snapshotForCwd", () => {
       expect(answer.slashCommands).toEqual([]);
       expect(skills.asked).toEqual([]);
     }
+  });
+});
+
+describe("a CLI agent's snapshotForCwd (SPI-1151)", () => {
+  const builtIns = { ...machine, slashCommands: [{ name: "compact", description: "Compact" }] } as ServerProvider;
+  const cli = (cwd: string, skills: SkillsAccess, agent: CliAgent = "claude") => Effect.runPromise(cliSnapshotForCwd(builtIns, cwd, skills, agent));
+
+  it("asks the Workspace for that CLI's roots, and answers its Skills in t3 paths and its commands after the built-ins", async () => {
+    const skills = access();
+    const answer = await cli("/w/proj", skills, "opencode");
+    expect(skills.asked).toEqual(["skills /workspace/repo opencode", "prompts /workspace/repo opencode"]);
+    expect(answer.skills.map((skill) => [skill.name, skill.path, skill.scope])).toEqual([
+      ["fruit-code", "/w/proj/.agents/skills/fruit-code/SKILL.md", "project"],
+      ["owner-only", "/w/proj/.claude/skills/owner-only/SKILL.md", "project"],
+    ]);
+    expect(answer.slashCommands.map((command) => command.name)).toEqual(["compact", "echo", "review"]);
+    expect(answer.slashCommandsPending).toBe(false);
+  });
+
+  it("is not behind the Harness switch, which is Pi Durable's: the CLI loads its Skills either way", async () => {
+    const answer = await cli("/w/proj", access({ enabled: false }));
+    expect(answer.skills.map((skill) => skill.name)).toEqual(["fruit-code", "owner-only"]);
+  });
+
+  it("keeps a built-in over a repo command of the same name", async () => {
+    const answer = await Effect.runPromise(cliSnapshotForCwd({ ...machine, slashCommands: [{ name: "echo", description: "built in" }] } as ServerProvider, "/w/proj", access(), "pi"));
+    expect(answer.slashCommands).toEqual([{ name: "echo", description: "built in" }, { name: "review", input: { hint: "<file> [focus]" } }]);
+  });
+
+  it("is the built-ins alone outside a Workspace", async () => {
+    const skills = access();
+    const answer = await cli("/elsewhere", skills);
+    expect(answer.skills).toEqual([]);
+    expect(answer.slashCommands).toEqual([{ name: "compact", description: "Compact" }]);
+    expect(skills.asked).toEqual([]);
   });
 });

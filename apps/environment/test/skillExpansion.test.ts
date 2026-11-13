@@ -98,11 +98,9 @@ describe("the caller's switch", () => {
     expect(await expand("/skill:fruit-code x $veg", null)).toBe("/skill:fruit-code x $veg");
   });
 
-  it("the ACP flavors build their prompts without skills", () => {
+  it("of the ACP flavors, only OpenCode's builds its prompts with skills (SPI-1151; cliSkillDispatch.test.ts runs both)", () => {
     const source = NodeFs.readFileSync(new URL("../src/provider/cli/acpDriver.ts", import.meta.url), "utf8");
-    const call = /turnPrompt\(([\s\S]*?)\)\.pipe/.exec(source)?.[1];
-    expect(call).toBeDefined();
-    expect(call).not.toMatch(/skills/);
+    expect(source).toContain('acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? { access: skillsAccess, agent: "opencode" } : undefined)');
   });
 
   it("the Pi Durable adapter passes the thread's skills for a new turn and for a steer", () => {
