@@ -1,0 +1,17 @@
+{
+ "ok": true,
+ "commit": "bc949c0",
+ "image": "sha256:1562d6fb6a2b684bf127d2b8f2628a08a0e0dba1351895b9c366171c840f455a",
+ "at": "2026-11-13T23:50:14.770Z",
+ "pinned": "v2026.11.2",
+ "ran": "2026.11.2 linux-x64 (2026-11-05)",
+ "layeringOnIt": {
+  "configFiles": [
+   "/usr/local/share/cloudpid/mise.toml  conda:git, bun, gh, node, pnpm, python, uv",
+   "/var/lib/t3flare/mise/config.toml    node",
+   "/workspace/repo/mise.toml            python"
+  ],
+  "note": "mise config ls in /workspace/repo with the design's variables, an owner's global and a repo's mise.toml: system, then global, then the repo (lowest first)"
+ },
+ "researchedOn": "2026.11.7 (local) and 2026.11.8 (source); the image pins 2026.11.2: every finding below is from the image's own binary"
+}

@@ -1,0 +1,186 @@
+{
+ "ok": true,
+ "commit": "bc949c0",
+ "image": "sha256:1562d6fb6a2b684bf127d2b8f2628a08a0e0dba1351895b9c366171c840f455a",
+ "at": "2026-11-13T23:50:14.770Z",
+ "config": "[tools]\nnode = \"24.11.1\"\n\"github:junegunn/fzf\" = \"0.56.3\"\n",
+ "default": {
+  "layDown": {
+   "laid": true,
+   "install": 0,
+   "ms": 5999
+  },
+  "byHost": {
+   "mise-versions.jdx.dev": 4,
+   "nodejs.org": 3,
+   "github.com": 3,
+   "release-assets.githubusercontent.com": 3
+  },
+  "apiGithub": 0,
+  "withAuthorization": 0,
+  "requests": [
+   {
+    "method": "GET",
+    "host": "mise-versions.jdx.dev",
+    "path": "/data/node.toml",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "mise-versions.jdx.dev",
+    "path": "/api/github/repos/junegunn/fzf/releases/v0.56.3",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "mise-versions.jdx.dev",
+    "path": "/t",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "nodejs.org",
+    "path": "/dist/v24.11.1/node-v24.11.1-linux-x64.tar.gz",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "github.com",
+    "path": "/junegunn/fzf/releases/download/v0.56.3/fzf_0.56.3_checksums.txt",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "release-assets.githubusercontent.com",
+    "path": "/github-production-release-asset/13807606/aaf6d5f7-a6e6-48f2-8b9e-1e13c89d2925",
+    "authorization": ""
+   },
+   {
+    "method": "HEAD",
+    "host": "github.com",
+    "path": "/junegunn/fzf/releases/download/v0.56.3/fzf-0.56.3-linux_amd64.tar.gz",
+    "authorization": ""
+   },
+   {
+    "method": "HEAD",
+    "host": "release-assets.githubusercontent.com",
+    "path": "/github-production-release-asset/13807606/c7f9e4e9-9ad1-4d64-98f5-13cc1d844717",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "github.com",
+    "path": "/junegunn/fzf/releases/download/v0.56.3/fzf-0.56.3-linux_amd64.tar.gz",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "release-assets.githubusercontent.com",
+    "path": "/github-production-release-asset/13807606/c7f9e4e9-9ad1-4d64-98f5-13cc1d844717",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "mise-versions.jdx.dev",
+    "path": "/api/github/repos/junegunn/fzf/attestations/sha256:78e96a88cecfbdb3ff65df89cc47c02573407aee0edd08c87e18a8033d498fef",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "nodejs.org",
+    "path": "/dist/v24.11.1/SHASUMS256.txt",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "nodejs.org",
+    "path": "/dist/v24.11.1/SHASUMS256.txt.sig",
+    "authorization": ""
+   }
+  ]
+ },
+ "versionsHostOff": {
+  "note": "MISE_USE_VERSIONS_HOST=false, for comparison",
+  "byHost": {
+   "nodejs.org": 4,
+   "api.github.com": 2,
+   "github.com": 3,
+   "release-assets.githubusercontent.com": 3
+  },
+  "apiGithub": 2,
+  "requests": [
+   {
+    "method": "GET",
+    "host": "nodejs.org",
+    "path": "/dist/index.json",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "api.github.com",
+    "path": "/repos/junegunn/fzf/releases/tags/v0.56.3",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "nodejs.org",
+    "path": "/dist/v24.11.1/node-v24.11.1-linux-x64.tar.gz",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "github.com",
+    "path": "/junegunn/fzf/releases/download/v0.56.3/fzf_0.56.3_checksums.txt",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "release-assets.githubusercontent.com",
+    "path": "/github-production-release-asset/13807606/aaf6d5f7-a6e6-48f2-8b9e-1e13c89d2925",
+    "authorization": ""
+   },
+   {
+    "method": "HEAD",
+    "host": "github.com",
+    "path": "/junegunn/fzf/releases/download/v0.56.3/fzf-0.56.3-linux_amd64.tar.gz",
+    "authorization": ""
+   },
+   {
+    "method": "HEAD",
+    "host": "release-assets.githubusercontent.com",
+    "path": "/github-production-release-asset/13807606/c7f9e4e9-9ad1-4d64-98f5-13cc1d844717",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "github.com",
+    "path": "/junegunn/fzf/releases/download/v0.56.3/fzf-0.56.3-linux_amd64.tar.gz",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "release-assets.githubusercontent.com",
+    "path": "/github-production-release-asset/13807606/c7f9e4e9-9ad1-4d64-98f5-13cc1d844717",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "api.github.com",
+    "path": "/repos/junegunn/fzf/attestations/sha256:78e96a88cecfbdb3ff65df89cc47c02573407aee0edd08c87e18a8033d498fef",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "nodejs.org",
+    "path": "/dist/v24.11.1/SHASUMS256.txt",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "nodejs.org",
+    "path": "/dist/v24.11.1/SHASUMS256.txt.sig",
+    "authorization": ""
+   }
+  ]
+ }
+}

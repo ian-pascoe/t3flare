@@ -1,0 +1,417 @@
+{
+ "ok": true,
+ "commit": "bc949c0",
+ "image": "sha256:1562d6fb6a2b684bf127d2b8f2628a08a0e0dba1351895b9c366171c840f455a",
+ "at": "2026-11-13T23:50:14.770Z",
+ "variables": {
+  "today": {
+   "MISE_GLOBAL_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+   "MISE_TRUSTED_CONFIG_PATHS": "/usr/local/share/cloudpid:/workspace",
+   "MISE_YES": "1",
+   "GIT_TERMINAL_PROMPT": "0"
+  },
+  "design": {
+   "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+   "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+   "MISE_TRUSTED_CONFIG_PATHS": "/usr/local/share/cloudpid:/workspace",
+   "MISE_YES": "1",
+   "GIT_TERMINAL_PROMPT": "0",
+   "MISE_GITHUB_GH_CLI_TOKENS": "false",
+   "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+   "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+   "MISE_DISABLE_TOOLS": "",
+   "MISE_DISABLE_BACKENDS": ""
+  }
+ },
+ "today": {
+  "git": "git version 2.56.0",
+  "gitOk": true,
+  "gh": "gh version 2.103.3 (2026-10-26)",
+  "ghOk": true,
+  "tools": {
+   "bun": {
+    "version": "1.4.4",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "conda:git": {
+    "version": "2.56.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "gh": {
+    "version": "2.103.3",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "node": {
+    "version": "26.13.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "pnpm": {
+    "version": "12.17.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "python": {
+    "version": "3.14.10",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "uv": {
+    "version": "0.13.7",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   }
+  },
+  "configFiles": [
+   "/usr/local/share/cloudpid/mise.toml"
+  ]
+ },
+ "absentGlobal": {
+  "git": "git version 2.56.0",
+  "gitOk": true,
+  "gh": "gh version 2.103.3 (2026-10-26)",
+  "ghOk": true,
+  "tools": {
+   "bun": {
+    "version": "1.4.4",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "conda:git": {
+    "version": "2.56.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "gh": {
+    "version": "2.103.3",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "node": {
+    "version": "26.13.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "pnpm": {
+    "version": "12.17.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "python": {
+    "version": "3.14.10",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "uv": {
+    "version": "0.13.7",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   }
+  },
+  "configFiles": [
+   "/usr/local/share/cloudpid/mise.toml"
+  ]
+ },
+ "emptyGlobal": {
+  "git": "git version 2.56.0",
+  "gitOk": true,
+  "gh": "gh version 2.103.3 (2026-10-26)",
+  "ghOk": true,
+  "tools": {
+   "bun": {
+    "version": "1.4.4",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "conda:git": {
+    "version": "2.56.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "gh": {
+    "version": "2.103.3",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "node": {
+    "version": "26.13.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "pnpm": {
+    "version": "12.17.0",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "python": {
+    "version": "3.14.10",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   },
+   "uv": {
+    "version": "0.13.7",
+    "source": "/usr/local/share/cloudpid/mise.toml",
+    "installed": true
+   }
+  },
+  "configFiles": [
+   "/usr/local/share/cloudpid/mise.toml",
+   "/var/lib/t3flare/mise/config.toml"
+  ]
+ },
+ "typicalOwnerFile": {
+  "text": "[settings]\nexperimental = true\njobs = 8\n\n[tools]\nnode = \"24.11.1\"\npython = \"3.13.1\"\ngo = \"1.25.4\"\n\"github:junegunn/fzf\" = \"0.56.3\"\n\n[env]\nOWNER_VAR = \"from the global config\"\n",
+  "probe": {
+   "git": "git version 2.56.0",
+   "gitOk": true,
+   "gh": "gh version 2.103.3 (2026-10-26)",
+   "ghOk": true,
+   "tools": {
+    "bun": {
+     "version": "1.4.4",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    },
+    "conda:git": {
+     "version": "2.56.0",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    },
+    "gh": {
+     "version": "2.103.3",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    },
+    "github:junegunn/fzf": {
+     "version": "0.56.3",
+     "source": "/var/lib/t3flare/mise/config.toml",
+     "installed": false
+    },
+    "go": {
+     "version": "1.25.4",
+     "source": "/var/lib/t3flare/mise/config.toml",
+     "installed": false
+    },
+    "node": {
+     "version": "24.11.1",
+     "source": "/var/lib/t3flare/mise/config.toml",
+     "installed": false
+    },
+    "pnpm": {
+     "version": "12.17.0",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    },
+    "python": {
+     "version": "3.13.1",
+     "source": "/var/lib/t3flare/mise/config.toml",
+     "installed": false
+    },
+    "uv": {
+     "version": "0.13.7",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    }
+   },
+   "configFiles": [
+    "/usr/local/share/cloudpid/mise.toml",
+    "/var/lib/t3flare/mise/config.toml"
+   ]
+  },
+  "ownerEnv": {
+   "OWNER_VAR": "from the global config"
+  }
+ },
+ "repoOverride": {
+  "repo": "[tools]\nnode = \"22.12.0\"\n",
+  "probe": {
+   "git": "git version 2.56.0",
+   "gitOk": true,
+   "gh": "gh version 2.103.3 (2026-10-26)",
+   "ghOk": true,
+   "tools": {
+    "bun": {
+     "version": "1.4.4",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    },
+    "conda:git": {
+     "version": "2.56.0",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    },
+    "gh": {
+     "version": "2.103.3",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    },
+    "github:junegunn/fzf": {
+     "version": "0.56.3",
+     "source": "/var/lib/t3flare/mise/config.toml",
+     "installed": false
+    },
+    "go": {
+     "version": "1.25.4",
+     "source": "/var/lib/t3flare/mise/config.toml",
+     "installed": false
+    },
+    "node": {
+     "version": "22.12.0",
+     "source": "/workspace/repo/mise.toml",
+     "installed": false
+    },
+    "pnpm": {
+     "version": "12.17.0",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    },
+    "python": {
+     "version": "3.13.1",
+     "source": "/var/lib/t3flare/mise/config.toml",
+     "installed": false
+    },
+    "uv": {
+     "version": "0.13.7",
+     "source": "/usr/local/share/cloudpid/mise.toml",
+     "installed": true
+    }
+   },
+   "configFiles": [
+    "/usr/local/share/cloudpid/mise.toml",
+    "/var/lib/t3flare/mise/config.toml",
+    "/workspace/repo/mise.toml"
+   ]
+  }
+ },
+ "removers": [
+  {
+   "name": "disable_tools",
+   "text": "[settings]\ndisable_tools = [\"gh\", \"conda:git\"]\n",
+   "withoutGuards": {
+    "git": false,
+    "gh": false
+   },
+   "withGuardVariables": {
+    "git": true,
+    "gh": true
+   },
+   "layDown": {
+    "laid": true,
+    "install": 0,
+    "gitAfter": true,
+    "ghAfter": true
+   }
+  },
+  {
+   "name": "disable_backends",
+   "text": "[settings]\ndisable_backends = [\"conda\", \"aqua\"]\n",
+   "withoutGuards": {
+    "git": true,
+    "gh": false
+   },
+   "withGuardVariables": {
+    "git": true,
+    "gh": true
+   },
+   "layDown": {
+    "laid": true,
+    "install": 0,
+    "gitAfter": true,
+    "ghAfter": true
+   }
+  },
+  {
+   "name": "enable_tools",
+   "text": "[settings]\nenable_tools = [\"node\"]\n",
+   "withoutGuards": {
+    "git": false,
+    "gh": false
+   },
+   "withGuardVariables": {
+    "git": false,
+    "gh": false
+   },
+   "layDown": {
+    "laid": false,
+    "install": 0,
+    "gitAfter": true,
+    "ghAfter": true
+   }
+  },
+  {
+   "name": "invalid TOML",
+   "text": "this is = = not toml\n",
+   "withoutGuards": {
+    "git": false,
+    "gh": false
+   },
+   "withGuardVariables": {
+    "git": false,
+    "gh": false
+   },
+   "layDown": {
+    "laid": false,
+    "install": 1,
+    "gitAfter": true,
+    "ghAfter": true
+   }
+  },
+  {
+   "name": "gh pinned to a version that does not install",
+   "text": "[tools]\ngh = \"0.0.1\"\n",
+   "withoutGuards": {
+    "git": true,
+    "gh": false
+   },
+   "withGuardVariables": {
+    "git": true,
+    "gh": false
+   },
+   "layDown": {
+    "laid": false,
+    "install": 1,
+    "gitAfter": true,
+    "ghAfter": true
+   }
+  },
+  {
+   "name": "git named by a key mise does not know",
+   "text": "[tools]\ngit = \"2.40.0\"\n",
+   "withoutGuards": {
+    "git": true,
+    "gh": true
+   },
+   "withGuardVariables": {
+    "git": true,
+    "gh": true
+   },
+   "layDown": {
+    "laid": true,
+    "install": 1,
+    "gitAfter": true,
+    "ghAfter": true
+   }
+  },
+  {
+   "name": "[env] PATH replaced",
+   "text": "[env]\nPATH = \"/nowhere\"\n",
+   "withoutGuards": {
+    "git": true,
+    "gh": true
+   },
+   "withGuardVariables": {
+    "git": true,
+    "gh": true
+   },
+   "layDown": {
+    "laid": true,
+    "install": 0,
+    "gitAfter": true,
+    "ghAfter": true
+   }
+  }
+ ]
+}

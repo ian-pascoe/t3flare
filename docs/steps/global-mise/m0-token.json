@@ -1,0 +1,144 @@
+{
+ "ok": true,
+ "commit": "bc949c0",
+ "image": "sha256:1562d6fb6a2b684bf127d2b8f2628a08a0e0dba1351895b9c366171c840f455a",
+ "at": "2026-11-13T23:50:14.770Z",
+ "variables": {
+  "MISE_GITHUB_GH_CLI_TOKENS": "false",
+  "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+  "MISE_GITHUB_CREDENTIAL_COMMAND": ""
+ },
+ "precedence": "MISE_GITHUB_TOKEN > GITHUB_API_TOKEN > GITHUB_TOKEN > github.credential_command > OAuth > github_tokens.toml > gh hosts.yml (github.gh_cli_tokens) > git credential fill (github.use_git_credentials)",
+ "cases": [
+  {
+   "name": "control: hosts.yml, no guard",
+   "sources": {
+    "hostsYml": true,
+    "gitHelper": true
+   },
+   "guards": [],
+   "miseToken": "github.com: ghp_…0000 (source: gh CLI (hosts.yml))",
+   "miseWarnings": [],
+   "fzf": "/usr/bin/bash: line 11: fzf: command not found",
+   "apiGithubRequests": 12,
+   "withAuthorization": 12,
+   "authorizationKinds": [
+    "Bearer ghp_m0"
+   ]
+  },
+  {
+   "name": "control: the image's git helper (git outside the shims), owner turns git credentials on, no guard",
+   "sources": {
+    "gitHelper": true,
+    "plainGit": true
+   },
+   "guards": [],
+   "miseToken": "github.com: ghs_…0000 (source: git credential fill)",
+   "miseWarnings": [],
+   "fzf": "/usr/bin/bash: line 11: fzf: command not found",
+   "apiGithubRequests": 12,
+   "withAuthorization": 12,
+   "authorizationKinds": [
+    "Bearer ghs_m0"
+   ]
+  },
+  {
+   "name": "control: the image's git helper, owner turns git credentials on, no guard, the image's PATH",
+   "sources": {
+    "gitHelper": true
+   },
+   "guards": [],
+   "miseToken": "github.com: (none)",
+   "miseWarnings": [],
+   "fzf": "0.56.3 (add1aec)",
+   "apiGithubRequests": 2,
+   "withAuthorization": 0,
+   "authorizationKinds": []
+  },
+  {
+   "name": "control: owner's credential_command, no guard",
+   "sources": {},
+   "guards": [],
+   "miseToken": "github.com: ghp_…0000 (source: credential_command)",
+   "miseWarnings": [],
+   "fzf": "/usr/bin/bash: line 9: fzf: command not found",
+   "apiGithubRequests": 12,
+   "withAuthorization": 12,
+   "authorizationKinds": [
+    "Bearer ghp_m0"
+   ]
+  },
+  {
+   "name": "design: every source present",
+   "sources": {
+    "hostsYml": true,
+    "gitHelper": true,
+    "plainGit": true
+   },
+   "guards": [
+    "MISE_GITHUB_GH_CLI_TOKENS",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS",
+    "MISE_GITHUB_CREDENTIAL_COMMAND"
+   ],
+   "miseToken": "github.com: (none)",
+   "miseWarnings": [],
+   "fzf": "0.56.3 (add1aec)",
+   "apiGithubRequests": 2,
+   "withAuthorization": 0,
+   "authorizationKinds": []
+  },
+  {
+   "name": "design: every source present, the owner's file turns each on",
+   "sources": {
+    "hostsYml": true,
+    "gitHelper": true,
+    "plainGit": true
+   },
+   "guards": [
+    "MISE_GITHUB_GH_CLI_TOKENS",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS",
+    "MISE_GITHUB_CREDENTIAL_COMMAND"
+   ],
+   "miseToken": "github.com: (none)",
+   "miseWarnings": [],
+   "fzf": "0.56.3 (add1aec)",
+   "apiGithubRequests": 2,
+   "withAuthorization": 0,
+   "authorizationKinds": []
+  },
+  {
+   "name": "design: every source present, a repo's file turns each on",
+   "sources": {
+    "hostsYml": true,
+    "gitHelper": true,
+    "plainGit": true
+   },
+   "guards": [
+    "MISE_GITHUB_GH_CLI_TOKENS",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS",
+    "MISE_GITHUB_CREDENTIAL_COMMAND"
+   ],
+   "miseToken": "github.com: (none)",
+   "miseWarnings": [
+    "mise WARN  github.credential_command in non-global config /workspace/repo/mise.toml is ignored for security reasons"
+   ],
+   "fzf": "0.56.3 (add1aec)",
+   "apiGithubRequests": 2,
+   "withAuthorization": 0,
+   "authorizationKinds": []
+  }
+ ],
+ "imagePath": {
+  "name": "control: the image's git helper, owner turns git credentials on, no guard, the image's PATH",
+  "sources": {
+   "gitHelper": true
+  },
+  "guards": [],
+  "miseToken": "github.com: (none)",
+  "miseWarnings": [],
+  "fzf": "0.56.3 (add1aec)",
+  "apiGithubRequests": 2,
+  "withAuthorization": 0,
+  "authorizationKinds": []
+ }
+}
