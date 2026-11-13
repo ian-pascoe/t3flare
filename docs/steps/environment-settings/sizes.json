@@ -1,11 +1,12 @@
 {
- "at": "2026-11-13T21:02:58.117Z",
+ "at": "2026-11-13T21:54:59.160Z",
  "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "commit": "dd622c9c8904",
  "workspace": "penv-sizes",
  "sizes": [
   {
    "name": "cpu-1",
-   "revision": 3,
+   "revision": 1,
    "launch": {
     "size": "cpu-1",
     "instance": {
@@ -15,7 +16,7 @@
     },
     "idleMs": 300000,
     "budget": 3,
-    "revision": 3
+    "revision": 1
    },
    "limits": {
     "cgroup": "/sys/fs/cgroup/",
@@ -45,13 +46,13 @@
   },
   {
    "name": "standard-1",
-   "revision": 4,
+   "revision": 2,
    "launch": {
     "size": "standard-1",
     "instance": "standard-1",
     "idleMs": 300000,
     "budget": 3,
-    "revision": 4
+    "revision": 2
    },
    "limits": {
     "cgroup": "/sys/fs/cgroup/",
@@ -81,13 +82,13 @@
   },
   {
    "name": "standard-2",
-   "revision": 5,
+   "revision": 3,
    "launch": {
     "size": "standard-2",
     "instance": "standard-2",
     "idleMs": 300000,
     "budget": 3,
-    "revision": 5
+    "revision": 3
    },
    "limits": {
     "cgroup": "/sys/fs/cgroup/",
@@ -117,13 +118,13 @@
   },
   {
    "name": "standard-3",
-   "revision": 6,
+   "revision": 4,
    "launch": {
     "size": "standard-3",
     "instance": "standard-3",
     "idleMs": 300000,
     "budget": 3,
-    "revision": 6
+    "revision": 4
    },
    "limits": {
     "cgroup": "/sys/fs/cgroup/",
@@ -153,13 +154,13 @@
   },
   {
    "name": "standard-4",
-   "revision": 7,
+   "revision": 5,
    "launch": {
     "size": "standard-4",
     "instance": "standard-4",
     "idleMs": 300000,
     "budget": 3,
-    "revision": 7
+    "revision": 5
    },
    "limits": {
     "cgroup": "/sys/fs/cgroup/",

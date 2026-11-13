@@ -1,6 +1,7 @@
 {
- "at": "2026-11-13T21:09:49.465Z",
+ "at": "2026-11-13T22:01:21.796Z",
  "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "commit": "dd622c9c8904",
  "workspace": "penv-sizes",
  "note": "idleSeenMs: from the last command to the first poll (every 5 s) that saw the Container stopped",
  "cases": [
@@ -15,11 +16,11 @@
     },
     "idleMs": 60000,
     "budget": 3,
-    "revision": 12
+    "revision": 10
    },
-   "lastUse": 1794603941548,
-   "stoppedSeenAt": 1794604004028,
-   "idleSeenMs": 62480,
+   "lastUse": 1794607033732,
+   "stoppedSeenAt": 1794607096179,
+   "idleSeenMs": 62447,
    "ok": true
   },
   {
@@ -33,11 +34,11 @@
     },
     "idleMs": 180000,
     "budget": 3,
-    "revision": 13
+    "revision": 11
    },
-   "lastUse": 1794604005812,
-   "stoppedSeenAt": 1794604189324,
-   "idleSeenMs": 183512,
+   "lastUse": 1794607098526,
+   "stoppedSeenAt": 1794607281636,
+   "idleSeenMs": 183110,
    "ok": true
   }
  ],

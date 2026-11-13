@@ -74,27 +74,29 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
 
 ## Evidence (stage `penv`)
 
-Each file came from a deploy of the commit named. The files from `f165c87` carry it in their `commit` field (the
-deployed build's, from `/_t3flare/health`); the older ones predate that field, and their commit is matched from the
-deploy logs and their `at`.
+Each file came from a deploy of the commit named. Files with a `commit` field carry the deployed build's own (from
+`/_t3flare/health`); the older ones predate that field, and their commit is matched from the deploy logs and their
+`at`. The branch was rebased onto `main` at `6dc4df1` (SPI-1147) after the earlier runs, so those carry pre-rebase
+hashes; the rebased commit with the same change is given beside each.
 
 | File | Shows | Commit deployed |
 | -- | -- | -- |
-| `sizes.json` | Each size set through the API, then a fresh start, then its limits read in the Container. | `fb98003` |
-| `running.json` | A size and idle-time change made while the Container runs, and the next start after its idle stop. | `fb98003` |
-| `idle.json` | The idle stop at 1 and 3 minutes. | `fb98003` |
-| `safety.json` | The new routes refused from outside. | `fb98003` |
-| `revisions.json` | Each entity's revision moving alone. | `8163dcd` |
-| `budget.json` | The budget at 1, raised to 2, and lowered to 1 with two Containers running. | `f165c87` |
-| `audit.json` | Environment entries and an entry written by main's code (`penv` deployed from `main` first). | `f165c87` |
-| `cost-live.json` | The section's script on the stage's page: size and budget changed in the form, not saved; the cost follows. | `f165c87` |
-| `environment-*.png` | The section, desktop and phone, light and dark, with one Container running. | `f165c87` |
-| `environment-live-*.png` | The same after the inputs changed: 5 Containers of `standard-4`, the row marked, at most $2.01 an hour. | `f165c87` |
+| `sizes.json` | Each size set through the API, then a fresh start, then its limits read in the Container. | `dd622c9` (rebased head) |
+| `running.json` | A size and idle-time change made while the Container runs, and the next start after its idle stop. | `dd622c9` (rebased head) |
+| `idle.json` | The idle stop at 1 and 3 minutes. | `dd622c9` (rebased head) |
+| `budget.json` | The budget at 1, raised to 2, and lowered to 1 with two Containers running. | `dd622c9` (rebased head) |
+| `audit.json` | Environment entries and an entry written by main's code (`penv` deployed from `main` first). | `f165c87`, rebased `63d645c` |
+| `cost-live.json` | The section's script on the stage's page: size and budget changed in the form, not saved; the cost follows. | `f165c87`, rebased `63d645c` |
+| `environment-*.png` | The section, desktop and phone, light and dark, with one Container running. | `f165c87`, rebased `63d645c` |
+| `environment-live-*.png` | The same after the inputs changed: 5 Containers of `standard-4`, the row marked, at most $2.01 an hour. | `f165c87`, rebased `63d645c` |
+| `revisions.json` | Each entity's revision moving alone. | `8163dcd`, rebased `88ac53c` |
+| `safety.json` | The new routes refused from outside. | `fb98003`, rebased `fa50d8f` |
 
-The `fb98003` files predate the review rounds. Those rounds changed how a launch is built (`launchOf`,
-`containerInstance`, the kept copy read through the schema), not what a start passes or what a running Container keeps;
-the unit tests cover the new paths. `budget.json`, `audit.json` and the screenshots were taken again at `f165c87`
-because the rewritten reclaim, the new `reclaimable()` RPC and the live cost script run only there.
+`sizes.json`, `running.json` and `idle.json` were first taken before the review rounds and were taken again on the
+rebased head, with one `budget.json` run to prove that build too. The panel's routes, revisions and guards behind
+`revisions.json` and `safety.json` did not change after their runs, except that a save which moves no setting is no
+longer stored (unit-tested). The worker code of `f165c87` and of the rebased head differ only by `main`'s SPI-1147
+changes.
 
 **`sizes.json`.** The limits read in each Container:
 
@@ -115,10 +117,10 @@ because the rewritten reclaim, the new `reclaimable()` RPC and the live cost scr
 - The Container started on `standard-1` with a 2-minute idle time.
 - The settings were then changed to `standard-3` and 1 minute while it ran. Its start time, launch and limits were
   unchanged.
-- It stopped 124 s after its last use, on the idle time it started with.
+- It stopped 123 s after its last use, on the idle time it started with.
 - The next start had `standard-3` (8 GiB, 2 CPUs) and a 1-minute idle time.
 
-**`idle.json`.** Stops were first seen 62 s and 184 s after the last command. The poll runs every 5 s.
+**`idle.json`.** Stops were first seen 62 s and 183 s after the last command. The poll runs every 5 s.
 
 **`budget.json`.**
 
@@ -157,7 +159,7 @@ before and after.
   that window to one RPC.
 - **A fallback budget is not sent.** A start whose read of the Environment settings timed out carries no budget, and the
   budget DO keeps the owner's last one.
-- **The 240-character cap.** On the `5334eb9` deploy, `budget.json`'s first case met it: that Workspace's Container had
-  exited before, computer added `priorExit=…`, and the top message ended at `Container budget (1`. `f165c87` reads the
-  reason from the cause chain (`startRefusal.ts`), and the harness reads the longest reason in the answer; the case
+- **The 240-character cap.** On the `5334eb9` deploy (pre-rebase), `budget.json`'s first case met it: that Workspace's Container had
+  exited before, computer added `priorExit=…`, and the top message ended at `Container budget (1`. `f165c87` (rebased `63d645c`) reads
+  the reason from the cause chain (`startRefusal.ts`), and the harness reads the longest reason in the answer; the case
   passes there.

@@ -1,17 +1,18 @@
 {
- "at": "2026-11-13T21:05:20.826Z",
+ "at": "2026-11-13T21:57:08.982Z",
  "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "commit": "dd622c9c8904",
  "workspace": "penv-sizes",
  "cases": [
   {
    "name": "started on standard-1 with a 2-minute idle time",
-   "startedAt": 1794603789695,
+   "startedAt": 1794606901349,
    "launch": {
     "size": "standard-1",
     "instance": "standard-1",
     "idleMs": 120000,
     "budget": 3,
-    "revision": 9
+    "revision": 7
    },
    "limits": {
     "cgroup": "/sys/fs/cgroup/",
@@ -27,14 +28,14 @@
   },
   {
    "name": "a change to standard-3 and 1 minute while it runs leaves its start time, size, idle time and limits as they were",
-   "revision": 10,
-   "startedAt": 1794603789695,
+   "revision": 8,
+   "startedAt": 1794606901349,
    "launch": {
     "size": "standard-1",
     "instance": "standard-1",
     "idleMs": 120000,
     "budget": 3,
-    "revision": 9
+    "revision": 7
    },
    "limits": {
     "cgroup": "/sys/fs/cgroup/",
@@ -50,20 +51,20 @@
   },
   {
    "name": "it stops after the idle time it started with (2 minutes), not the new one",
-   "lastUse": 1794603791315,
-   "stoppedSeenAt": 1794603915036,
-   "idleSeenMs": 123721,
+   "lastUse": 1794606903262,
+   "stoppedSeenAt": 1794607026117,
+   "idleSeenMs": 122855,
    "ok": true
   },
   {
    "name": "the next start has the new size and idle time",
-   "startedAt": 1794603915459,
+   "startedAt": 1794607026285,
    "launch": {
     "size": "standard-3",
     "instance": "standard-3",
     "idleMs": 60000,
     "budget": 3,
-    "revision": 10
+    "revision": 8
    },
    "limits": {
     "cgroup": "/sys/fs/cgroup/",
