@@ -178,9 +178,17 @@ const probeCli = async (cli: Cli, projectId: string, root: string, id: string) =
       steps.commandLateReply = late.map((item: any) => ({ runId: item.runId, text: String(item.text).slice(0, 200) }));
     }
   }
+  if (cli === "pi") {
+    // pi compacts only what lies beyond its 20,000 most recent tokens (`keepRecentTokens`): a turn of about 30,000.
+    const filler = Array.from({ length: 12_000 }, (_, at) => `w${at}`).join(" ");
+    steps.filler = await turn(cli, mentioned, ++ordinal, `Reply with the single word OK. The rest is filler: ${filler}`);
+    steps.filler.sent = `${steps.filler.sent.slice(0, 80)}… (${steps.filler.sent.length} characters)`;
+    steps.filler.typed = `${String(steps.filler.typed ?? "").slice(0, 80)}…`;
+  }
   steps.compact = await turn(cli, mentioned, ++ordinal, "/compact");
-  // Listed for Codex and pi only: t3's ACP adapter refuses it for Claude Code and OpenCode (recorded, not listed).
-  checks.compactAsListed = builtIns.includes("compact") ? steps.compact.status === "completed" : steps.compact.status === "failed";
+  // Listed for Codex and pi only, where the compaction itself completes; t3's ACP adapter refuses it for Claude Code
+  // and OpenCode (recorded, not listed).
+  checks.compactAsListed = builtIns.includes("compact") ? steps.compact.kinds.includes("compaction:completed") : steps.compact.status === "failed";
   if (cli === "codex") {
     steps.goal = await turn(cli, mentioned, ++ordinal, "/goal Reply with the single word DONE.");
     checks.goalRuns = steps.goal.status === "completed";
