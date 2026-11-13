@@ -350,15 +350,31 @@ const surfaces = async () => {
     if (runs.length > 0 && runs.every((run) => SETTLED.has(run.status))) break;
     await sleep(2_000);
   }
-  const commands = itemsOf(projection).filter((item: any) => item.type === "command_execution");
-  const shown = JSON.stringify(commands);
+  // t3's thread window omits a command's output (`outputOmitted`); its client expands a row through
+  // `subscribeCommandOutput`, the text the owner sees, which is also the tool result the agent got.
+  const commands = await Promise.all(
+    itemsOf(projection)
+      .filter((item: any) => item.type === "command_execution")
+      .map(async (item: any) => ({
+        input: item.input,
+        status: item.status,
+        output: await wsFirst(cookie, "orchestration.subscribeCommandOutput", { threadId, itemId: item.id }).catch((error: unknown) => ({ error: String(error).slice(0, 300) })),
+      })),
+  );
   cases.push({
     name: "a Durable agent's command on the Container shows the whole refusal",
     threadId,
     runs: runsOf(projection).map((run) => run.status),
     commands,
-    ok: commands.length > 0 && shown.includes(WHOLE_REFUSAL),
+    ok: commands.length > 0 && JSON.stringify(commands).includes(WHOLE_REFUSAL),
   });
+
+  // The project's own Container takes the one lease, so t3's `git branch` in the project runs, and the worktree
+  // Workspace's clone is the start the budget refuses (t3flare's worktree creation).
+  await stopOn(holder);
+  await sleep(2_000);
+  void callOn(agentWorkspace, { exec: { script: `sleep ${busyFor}`, timeoutMs: (busyFor + 30) * 1000 } }).catch(() => undefined);
+  await sleep(20_000);
 
   // 2. A worktree thread's creation (t3's "New worktree").
   const worktreeThread = uuid();
@@ -382,12 +398,20 @@ const surfaces = async () => {
     if (setup?.phase === "failed" || setup?.phase === "ready" || setup?.worktreePath) break;
     await sleep(3_000);
   }
+  // t3flare's worktree creation answers t3's `git worktree add` with the whole reason on stderr, and keeps it as the
+  // worktree Workspace's `lastError`. t3's GitCommandError keeps only stderr's length (`stderrLength`), so t3's setup
+  // error names the command, not the reason: recorded here as t3's text, a limit of t3's surface.
+  const worktreeRow = ((await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces as Array<any> | undefined)?.find(
+    (row) => String(row.id).startsWith(`.wt/${agentWorkspace}/`) && row.state === "failed",
+  );
   cases.push({
-    name: "a worktree thread's creation shows the whole refusal",
+    name: "a worktree thread's creation: t3flare's answer carries the whole refusal (t3's own setup error drops git's stderr)",
     threadId: worktreeThread,
     phase: setup?.phase ?? null,
-    error: setup?.error ?? null,
-    ok: setup?.phase === "failed" && JSON.stringify(setup?.error ?? "").includes(WHOLE_REFUSAL),
+    t3flareAnswer: worktreeRow?.lastError ?? null,
+    t3Shows: setup?.error ?? null,
+    t3ShowsWholeRefusal: JSON.stringify(setup?.error ?? "").includes(WHOLE_REFUSAL),
+    ok: setup?.phase === "failed" && String(worktreeRow?.lastError ?? "").includes(WHOLE_REFUSAL),
   });
 
   for (const id of [holder, agentWorkspace]) await stopOn(id);

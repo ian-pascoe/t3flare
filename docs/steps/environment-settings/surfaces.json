@@ -1,0 +1,40 @@
+{
+ "at": "2026-11-13T22:23:55.429Z",
+ "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "commit": "eac8a7de18d4",
+ "holder": "penv-b1",
+ "workspace": "penv-agent",
+ "expected": "the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment",
+ "cases": [
+  {
+   "name": "a Durable agent's command on the Container shows the whole refusal",
+   "threadId": "4b618347-98d7-4f27-b148-83fb3129d057",
+   "runs": [
+    "completed"
+   ],
+   "commands": [
+    {
+     "input": "python3 --version",
+     "status": "failed",
+     "output": {
+      "kind": "replace",
+      "text": "<harness>\n[error] t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\n</harness>",
+      "truncated": false,
+      "running": false
+     }
+    }
+   ],
+   "ok": true
+  },
+  {
+   "name": "a worktree thread's creation: t3flare's answer carries the whole refusal (t3's own setup error drops git's stderr)",
+   "threadId": "1086e9d3-0c29-4149-80f1-2932deb8b120",
+   "phase": "failed",
+   "t3flareAnswer": "clone: t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment",
+   "t3Shows": "Workspace preparation failed during provision worktree: Git command failed in GitVcsDriver.createWorktree (/w/penv-agent): git worktree add failed",
+   "t3ShowsWholeRefusal": false,
+   "ok": true
+  }
+ ],
+ "ok": true
+}

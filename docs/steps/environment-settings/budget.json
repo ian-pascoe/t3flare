@@ -1,7 +1,7 @@
 {
- "at": "2026-11-13T22:02:02.475Z",
+ "at": "2026-11-13T22:19:47.484Z",
  "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
- "commit": "dd622c9c8904",
+ "commit": "eac8a7de18d4",
  "workspaces": [
   "penv-b1",
   "penv-b2",
@@ -12,18 +12,15 @@
    "name": "at a budget of 1, a second Workspace's start is refused, and the message names the budget",
    "first": {
     "ok": true,
-    "status": 200,
     "running": true,
     "budget": 1,
     "refusal": null
    },
    "second": {
     "ok": false,
-    "status": 500,
-    "running": null,
-    "budget": null,
-    "refusal": "Container budget (1) reached: raise it at /_t3flare/harness#environment",
-    "raw": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected ex; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1\",\"causes\":[\"ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\"],\"stack\":[\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected ex; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1\",\"    at async handleAdmin (admin-BHZ0I1Gf.js:1:9408)\"]}"
+    "running": false,
+    "budget": 1,
+    "refusal": "t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment"
    },
    "ok": true
   },
@@ -31,7 +28,6 @@
    "name": "raised to 2, it starts",
    "raised": {
     "ok": true,
-    "status": 200,
     "running": true,
     "budget": 2,
     "refusal": null
@@ -46,11 +42,9 @@
    "name": "lowered to 1 with two running: neither stops, and a third start is refused",
    "third": {
     "ok": false,
-    "status": 500,
-    "running": null,
-    "budget": null,
-    "refusal": "Container budget (1) reached: raise it at /_t3flare/harness#environment",
-    "raw": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected ex; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1\",\"causes\":[\"ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\"],\"stack\":[\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected ex; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1\",\"    at async handleAdmin (admin-BHZ0I1Gf.js:1:9408)\"]}"
+    "running": false,
+    "budget": 1,
+    "refusal": "t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment"
    },
    "running": [
     true,
@@ -66,11 +60,9 @@
    "name": "one stopped: one still runs at a budget of 1, so the third is still refused",
    "afterOne": {
     "ok": false,
-    "status": 500,
-    "running": null,
-    "budget": null,
-    "refusal": "Container budget (1) reached: raise it at /_t3flare/harness#environment",
-    "raw": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected ex; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1\",\"causes\":[\"ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\"],\"stack\":[\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected ex; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1\",\"    at async handleAdmin (admin-BHZ0I1Gf.js:1:9408)\"]}"
+    "running": false,
+    "budget": 1,
+    "refusal": "t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment"
    },
    "leases": [
     "penv-b2"
@@ -81,7 +73,6 @@
    "name": "under the budget again: the third starts",
    "afterBoth": {
     "ok": true,
-    "status": 200,
     "running": true,
     "budget": 1,
     "refusal": null

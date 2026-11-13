@@ -45,9 +45,10 @@ configuration. Both are edited on the one page at `/_t3flare/harness`, the Envir
    then: a kept copy or the defaults carry none, so they never overwrite the owner's newer budget. The budget DO judges
    the request by it and keeps the last one for renewals and status reads. `T3FLARE_MAX_CONTAINERS` still wins (tests).
    Raising it applies at the next lease request. **Lowering it stops nothing**: a holder is always renewed, and a new
-   start is refused until fewer run than the budget. A refused start asks idle holders to stop (review F7) only when
-   enough of them are idle to bring the count under the budget, and otherwise asks none. A refusal names the budget and the
-   panel section that changes it. The panel shows the budget beside the Containers running now and their Workspaces, and
+   start is refused until fewer run than the budget. A refused start asks idle holders to stop only when enough of them
+   are idle to bring the count under the budget, and otherwise asks none. A refusal names the budget and the panel
+   section that changes it, whole on every t3flare surface (read from the error's cause chain, since computer cuts its
+   own messages); t3's own git error text keeps only stderr's length, so its worktree setup error does not show it. The panel shows the budget beside the Containers running now and their Workspaces, and
    prices each size at the budget's Containers.
 
 ## Considered options

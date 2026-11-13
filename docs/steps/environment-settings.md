@@ -53,8 +53,11 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
     which a lower budget would have triggered.
   - The refusal is `Container budget (N) reached: raise it at /_t3flare/harness#environment`. computer wraps it in its
     connect errors and keeps only the first 240 characters of each message, its own ~120-character prefix included,
-    and fewer after a `priorExit=` (a Container that exited before). The reason is kept short, and the Workspace DO
-    reads it whole from the deepest error in the cause chain (`startRefusal.ts`) for terminals and CLI processes.
+    and fewer after a `priorExit=` (a Container that exited before). The reason is kept short, and every surface that
+    turns a start error into text reads it whole from the deepest error in the cause chain, through one helper in
+    `@t3flare/workspace-client` (`startRefusal`, `describeFailure`). That covers a Durable agent's command (computer-env's
+    `exec`), terminals, CLI processes, the Workspace DO's git, checkpoint and worktree answers, and the Environment's
+    worktree creation. Workers RPC keeps an error's `cause`, so the chain reaches the Session and the Environment.
 - **Docs.** ADR-0032; the ADR-0026 note; `GLOSSARY.md`: Harness panel (revised), Harness settings, Environment
   settings, Container size, and Container budget (new with the scope change). No t3 lean, so no
   `upstream-fragility.md` entry.
@@ -68,7 +71,8 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
 | The Workspace DO's read, kept-copy fallback, launch (size, idle; a budget only from a fresh read) | `apps/agents/test/containerLaunch.test.ts` |
 | The budget carried on `acquire`, env override winning, lowering below the running count | `apps/agents/test/budget.workerd.test.ts` |
 | Reclaiming enough idle holders or none (two running at a budget of 1) | `apps/agents/test/reclaim.test.ts` |
-| A refused start's whole reason from the cause chain | `apps/agents/test/startRefusal.test.ts` |
+| A refused start's whole reason from the cause chain | `packages/workspace-client/src/startRefusal.test.ts` |
+| A Durable agent's command shows the whole refusal | `packages/computer-env/src/exec.test.ts` |
 | Separate revisions, audit `entity`, validation, CSRF/Origin/form guards, the section | `apps/environment/test/environmentSettings.test.ts` |
 | The cost table | `apps/environment/test/containerCost.test.ts` (figures from the research's worked example) |
 
@@ -84,7 +88,8 @@ hashes; the rebased commit with the same change is given beside each.
 | `sizes.json` | Each size set through the API, then a fresh start, then its limits read in the Container. | `dd622c9` (rebased head) |
 | `running.json` | A size and idle-time change made while the Container runs, and the next start after its idle stop. | `dd622c9` (rebased head) |
 | `idle.json` | The idle stop at 1 and 3 minutes. | `dd622c9` (rebased head) |
-| `budget.json` | The budget at 1, raised to 2, and lowered to 1 with two Containers running. | `dd622c9` (rebased head) |
+| `budget.json` | The budget at 1, raised to 2, and lowered to 1 with two Containers running; starts through a git action, the refusal read from its answer. | `eac8a7d` |
+| `surfaces.json` | At a budget of 1, the refusal a Durable agent's command shows (t3's expanded command output) and what a worktree's creation answers. | `eac8a7d` |
 | `audit.json` | Environment entries and an entry written by main's code (`penv` deployed from `main` first). | `f165c87`, rebased `63d645c` |
 | `cost-live.json` | The section's script on the stage's page: size and budget changed in the form, not saved; the cost follows. | `f165c87`, rebased `63d645c` |
 | `environment-*.png` | The section, desktop and phone, light and dark, with one Container running. | `f165c87`, rebased `63d645c` |
@@ -93,7 +98,8 @@ hashes; the rebased commit with the same change is given beside each.
 | `safety.json` | The new routes refused from outside. | `fb98003`, rebased `fa50d8f` |
 
 `sizes.json`, `running.json` and `idle.json` were first taken before the review rounds and were taken again on the
-rebased head, with one `budget.json` run to prove that build too. The panel's routes, revisions and guards behind
+rebased head. `budget.json` and `surfaces.json` come from `eac8a7d`, the head with the refusal read on every surface;
+the code between `dd622c9` and `eac8a7d` changed only how a refusal is turned into text and the comments. The panel's routes, revisions and guards behind
 `revisions.json` and `safety.json` did not change after their runs, except that a save which moves no setting is no
 longer stored (unit-tested). The worker code of `f165c87` and of the rebased head differ only by `main`'s SPI-1147
 changes.
@@ -146,11 +152,10 @@ before and after.
 
 ## Readings and limits
 
-- **The rule for a new start** is: it is refused while as many Containers run as the budget allows. "Refused until one
-  stops" holds when the count is one over the budget. At a budget of 1 with two running, stopping one leaves one
-  running, which is still at the budget. The evidence records the third start refused after one stop and started after
-  both.
-- **Reclaiming idle holders (review F7)** still applies at a lower budget, but only when enough holders are idle to
+- **The rule for a new start** is: it is refused while as many Containers run as the budget allows. At a budget of 1
+  with two running, a third start succeeds only after both stop: stopping one leaves one running, which is still at the
+  budget. The ticket's "refused until one stops" holds only when the count is one over the budget.
+- **Reclaiming idle holders** (ADR-0032 §7) still applies at a lower budget, but only when enough holders are idle to
   bring the count under the budget (`reclaim.ts`); otherwise none is asked. In `budget.json` both holders run a command
   while the third start is tried, so neither is idle.
 - **The reclaim race.** The idle check and the stop are two RPCs to each holder. A holder found idle can get a command
@@ -160,6 +165,13 @@ before and after.
 - **A fallback budget is not sent.** A start whose read of the Environment settings timed out carries no budget, and the
   budget DO keeps the owner's last one.
 - **The 240-character cap.** On the `5334eb9` deploy (pre-rebase), `budget.json`'s first case met it: that Workspace's
-  Container had exited before, computer added `priorExit=…`, and the top message ended at `Container budget (1`.
-  `f165c87` (rebased `63d645c`) reads the reason from the cause chain (`startRefusal.ts`), and the harness reads the
-  longest reason in the answer; the case passes there.
+  Container had exited before, computer added `priorExit=…`, and the top message ended at `Container budget (1`. Since
+  `eac8a7d` every surface reads the reason from the cause chain, and the evidence reads it where the product shows it:
+  a git action's answer (`budget.json`), and a Durable agent's command output as t3's client expands it
+  (`surfaces.json`), never the admin route's error causes.
+- **t3's worktree setup error drops the reason.** At a budget of 1, t3flare's worktree creation answers t3's
+  `git worktree add` with the whole refusal on stderr and keeps it as the worktree Workspace's `lastError`
+  (`surfaces.json`). t3's `GitCommandError` keeps only stderr's length, so t3's setup error reads "git worktree add
+  failed" without the reason. The same holds for any git failure t3 reports this way. Showing it there needs a change
+  to t3 (a Shadow or a Patch, ADR-0001); not done here.
+- **Checks.** `pnpm run check` passes at the head that carries this report.
