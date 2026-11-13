@@ -4,7 +4,7 @@
 // approvals the thread's mode asks for (`terminal_start` and typing ask, a poll does not).
 // @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off globalDate:off
 import { type AssistantMessage, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, type ToolResultMessage } from "@earendil-works/pi-ai";
-import { createRegistry, defineExtension, defineTool, type Extension, Harness, MemoryStorage } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension, defineTool, type Extension, Harness, MemoryStorage, type ToolExecutionResult } from "@earendil-works/pi-durable";
 import { obj } from "@earendil-works/pi-schema";
 import type { AgentTerminalRequest, AgentTerminalResult } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
@@ -73,7 +73,7 @@ const workspace = () => {
 /** A tool that takes 600 ms and sees nothing. */
 const nap = defineExtension({
   name: "nap",
-  tools: [defineTool({ name: "nap", description: "wait", parameters: obj({}), execute: () => new Promise((resolve) => setTimeout(() => resolve({ output: [{ type: "text" as const, text: "rested" }] }), 600)) })],
+  tools: [defineTool({ name: "nap", description: "wait", parameters: obj({}), execute: () => new Promise<ToolExecutionResult>((resolve) => setTimeout(() => resolve({ output: [{ type: "text" as const, text: "rested" }] }), 600)) })],
 });
 
 const run = async (extensions: (harness: () => Promise<Harness>) => ReadonlyArray<Extension>, responses: ReadonlyArray<AssistantMessage>, more: ReadonlyArray<Extension> = []) => {

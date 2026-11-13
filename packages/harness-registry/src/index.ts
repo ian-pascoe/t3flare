@@ -64,6 +64,7 @@ const CORE_LOCK = "a core extension: always on";
 export const PROXY_CLAUDE_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"] as const;
 /** The models `web_search` may ask. */
 export const SEARCH_MODELS = PROXY_CLAUDE_MODELS;
+const THINKING_LEVELS = ["off", "low", "medium", "high"] as const;
 
 export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
   {
@@ -157,6 +158,33 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
       },
       cols: { title: "Columns", description: "A Terminal's width.", schema: { type: "integer", minimum: 40, maximum: 400, default: 120 } },
       rows: { title: "Rows", description: "A Terminal's height.", schema: { type: "integer", minimum: 10, maximum: 200, default: 40 } },
+    },
+  },
+  {
+    id: "guardian",
+    title: "Guardian",
+    description:
+      "A reviewer model judges risky tool calls (code mode's nested calls too) before they run and blocks the ones whose risk the owner did not authorize; t3 shows the reason. Beside the thread's approvals, never instead of them. Off by default: each review is a model request (SPI-1058).",
+    default: "off",
+    settings: {
+      model: { title: "Model", description: "The Guardian model, through the proxy. A small, fast one: every reviewed call waits for it.", schema: { type: "enum", values: PROXY_CLAUDE_MODELS, default: "claude-haiku-5-5" } },
+      thinkingLevel: { title: "Thinking", description: "The first pass's thinking; a would-be rejection is checked again at low or above.", schema: { type: "enum", values: THINKING_LEVELS, default: "off" } },
+      tools: {
+        title: "Tool Policies",
+        description:
+          "Which tools are reviewed, as name=allow|review|deny pairs separated by commas (bash=review, mcp__github__create_issue=allow). Unlisted tools keep the built-in default: bash reviewed unless a Safe Command, edits to Sensitive Paths and terminals reviewed, read-only tools allowed.",
+        schema: { type: "text", maxLength: 4_000, default: "" },
+      },
+      commands: {
+        title: "Command Rules",
+        description: "Literal command prefixes as prefix=allow|review|deny pairs separated by commas (git push=deny, npm test=allow). deny blocks without a review.",
+        schema: { type: "text", maxLength: 4_000, default: "" },
+      },
+      policy: {
+        title: "Security Policy",
+        description: "Trusted destinations and forbidden actions, added to the built-in policy the Guardian judges by.",
+        schema: { type: "text", maxLength: 8_000, default: "", multiline: true },
+      },
     },
   },
   { id: "coding-tools", title: "Coding tools", description: "read, write, edit and bash (Worker Shell or Container).", default: "always", settings: {}, locked: CORE_LOCK },

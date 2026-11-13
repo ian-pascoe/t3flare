@@ -63,10 +63,12 @@ import { McpQuestions } from "../extensions/mcpQuestions.ts";
 import { ApprovalStore, interactionModeSection, permissions, toToolPath } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
 import { CONTEXT_EXTENSION, CONTEXT_NAMESPACE, contextExtension } from "../extensions/context.ts";
+import { GUARDIAN_EXTENSION, guardianExtension } from "../extensions/guardian.ts";
+import type { GuardianThinkingLevel } from "../extensions/guardian/review.ts";
 import { backgroundJobs, TERMCTRL_EXTENSION, TERMCTRL_NAMESPACE, type TermctrlHost, termctrlExtension } from "../extensions/termctrl.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
-import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
+import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
@@ -341,6 +343,29 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     // `bash`'s `background` with Background jobs on; installed again in place, so the permissions' wraps stay outside it.
     registry.install(codingTools(termctrl.enabled && termctrl.settings.backgroundBash !== false ? { jobs: backgroundJobs(this.#termctrlHost({ cols: Number(termctrl.settings.cols), rows: Number(termctrl.settings.rows) })) } : {}));
+    const guardian = extensionOf(harness, GUARDIAN_EXTENSION);
+    if (guardian.enabled) {
+      registry.install(
+        guardianExtension(
+          {
+            harness: () => this.#opening,
+            trustUser: () => (this.#meta()?.linked ?? null) === null,
+            toToolPath: (text) => toToolPath(text, this.#meta()?.workspaceId ?? null),
+            readOnly: (name) => this.#readOnlyTool(name),
+            sessionId: () => this.ctx.id.name ?? this.ctx.id.toString(),
+          },
+          {
+            model: String(guardian.settings.model),
+            thinkingLevel: String(guardian.settings.thinkingLevel) as GuardianThinkingLevel,
+            tools: String(guardian.settings.tools ?? ""),
+            commands: String(guardian.settings.commands ?? ""),
+            policy: String(guardian.settings.policy ?? ""),
+          },
+        ),
+      );
+    } else {
+      registry.uninstall({ name: GUARDIAN_EXTENSION });
+    }
     const contextManagement = extensionOf(harness, CONTEXT_EXTENSION);
     if (contextManagement.enabled) {
       registry.install(contextExtension(() => this.#opening, { rolloverOnCompaction: contextManagement.settings.rolloverOnCompaction !== false }));
@@ -370,6 +395,19 @@ export class SessionDO extends DurableObject<SessionEnv> {
     } else {
       registry.uninstall({ name: "tool-search" });
     }
+  }
+
+  /**
+   * Whether a tool only reads (the Guardian's annotation step, SPI-1058): an MCP tool by its class (its hint, or the
+   * owner's override in the panel), one of t3's by its `readOnlyHint`; undefined for any other.
+   */
+  #readOnlyTool(name: string): boolean | undefined {
+    for (const server of this.#mcpBuild()?.servers ?? []) {
+      const tool = server.tools.find((candidate) => candidate.name === name);
+      if (tool !== undefined) return tool.class === "read";
+    }
+    const t3 = this.ctx.storage.kv.get<T3Catalog>(T3_CATALOG_KEY)?.tools.find((tool) => t3ToolName(tool.name) === name);
+    return t3 === undefined ? undefined : t3.annotations?.readOnlyHint === true;
   }
 
   /** The agent's Terminals in the thread's Workspace (SPI-1057), owned by this Session. */

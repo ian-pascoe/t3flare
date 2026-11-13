@@ -12,7 +12,7 @@ describe("resolveHarness", () => {
     expect(resolved.codemode).toEqual({ enabled: true, inlineBudget: 2000 });
     expect(resolved.toolSearch).toEqual({ enabled: true });
     expect(resolved.offered).toEqual([
-      "read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo", "context_notes", "context_history", "context_rollover",
+      "read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo", "context_notes", "context_history", "context_rollover", "terminal_start", "terminal_send", "terminal_stop", "terminal_list", "terminal_wait",
     ]);
   });
 
@@ -27,6 +27,15 @@ describe("resolveHarness", () => {
   it("has Terminals on with bash's background jobs and a 120x40 viewport (SPI-1057): nothing starts a container until used", () => {
     expect(resolveHarness(EMPTY_HARNESS).extensions.termctrl).toEqual({ enabled: true, settings: { backgroundBash: true, cols: 120, rows: 40 } });
     expect(applyChange(EMPTY_HARNESS, { extension: "termctrl", settings: { cols: 10 } })).toMatchObject({ ok: false });
+  });
+
+  it("has the Guardian off (each review is a model request), with Haiku, no thinking, and text rules (SPI-1058)", () => {
+    expect(resolveHarness(EMPTY_HARNESS).extensions.guardian).toEqual({ enabled: false, settings: { model: "claude-haiku-5-5", thinkingLevel: "off", tools: "", commands: "", policy: "" } });
+    const on = applyChange(EMPTY_HARNESS, { extension: "guardian", enabled: true, settings: { tools: "bash=review", policy: "Never touch prod." } });
+    if (!on.ok) throw new Error(on.error);
+    expect(resolveHarness(on.harness).extensions.guardian).toMatchObject({ enabled: true, settings: { tools: "bash=review", policy: "Never touch prod." } });
+    expect(applyChange(EMPTY_HARNESS, { extension: "guardian", settings: { commands: "x".repeat(4_001) } })).toMatchObject({ ok: false });
+    expect(applyChange(EMPTY_HARNESS, { extension: "guardian", settings: { commands: 3 } })).toMatchObject({ ok: false });
   });
 
   it("gives an extension's defaults to a Session whose resolved view predates the entry", () => {
