@@ -1,0 +1,157 @@
+{
+ "at": "2026-11-13T02:46:37.508Z",
+ "phase": "link",
+ "stage": "link",
+ "cloud": {
+  "environmentId": "5c21b0aa-8247-4d5d-8456-16d183e6f251",
+  "label": "t3flare"
+ },
+ "standin": {
+  "environmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+  "label": "standin-laptop",
+  "route": "https://t3flare-link-standin.ianpascoe.dev",
+  "version": "0.1.10-nightly.20261112.4606"
+ },
+ "checks": [
+  {
+   "name": "G1: the stand-in's descriptor answers at the Route (https, no Access)",
+   "ok": true,
+   "detail": {
+    "environmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e"
+   }
+  },
+  {
+   "name": "G1: /mcp without a bearer is 401 at the Route",
+   "ok": true,
+   "detail": {
+    "status": 401
+   }
+  },
+  {
+   "name": "G1: a sign-in and a tool call over the Route (issuer from Host and X-Forwarded-Proto)",
+   "ok": true,
+   "detail": {
+    "status": 200,
+    "contentType": "application/json"
+   }
+  },
+  {
+   "name": "C1/G1: the stock dialog's link to the stand-in is made, at the access picked (Supervised)",
+   "ok": true,
+   "detail": {
+    "ok": true,
+    "ms": 821,
+    "value": {
+     "environmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+     "label": "standin-laptop",
+     "access": "approval-required",
+     "urls": [
+      "https://t3flare-link-standin.ianpascoe.dev"
+     ],
+     "expiresAt": "2026-12-13T02:45:27.027Z"
+    }
+   }
+  },
+  {
+   "name": "G1: t3's list shows it reachable",
+   "ok": true,
+   "detail": {
+    "status": "reachable",
+    "urls": [
+     "https://t3flare-link-standin.ianpascoe.dev"
+    ],
+    "lastError": null
+   }
+  },
+  {
+   "name": "the stand-in's Sharing & access lists the link's session",
+   "ok": true
+  },
+  {
+   "name": "G1: a forwarded call answers (t3_project_list there)",
+   "ok": true,
+   "detail": "{\"projects\":[{\"id\":\"bc840c2e-95cf-4ab3-b0bd-4dd2e309e397\",\"title\":\"scratch\",\"workspaceRoot\":\"/work/scratch\",\"repositoryIdentity\":null,\"faviconPath\":null,\"projectIcon\":null,\"defaultModelSelection\":null,\"defaultThreadEnvMode\":null,\"autoPull\":false,\"scripts\":[],\"pinnedAt\":null,\"archivedAt\":null,\"create"
+  },
+  {
+   "name": "G1: a forwarded launch starts a thread on the stand-in",
+   "ok": true,
+   "detail": "{\"threadId\":\"mcp:launch:85b51e7b863c3bea1495142d6d6077a9fef91ef0eed859b0dd6d4352a34df50d\",\"link\":\"[wait piece mwedjkz1](t3-thread://v2/e058d35e-9ef4-47c7-b2d7-29d1eb01396e/mcp:launch:85b51e7b863c3bea1495142d6d6077a9fef91ef0eed859b0dd6d4352a34df50d)\",\"projectId\":\"bc840c2e-95cf-4ab3-b0bd-4dd2e309e397\""
+  },
+  {
+   "name": "the stand-in's agent asks there for its bash (the link's Supervised access)",
+   "ok": true
+  },
+  {
+   "name": "G1: a 50 s wait piece survives the Route and times out as a wait",
+   "ok": true,
+   "detail": {
+    "ms": 50324,
+    "timedOut": true,
+    "isError": false
+   }
+  },
+  {
+   "name": "approved there, the thread completes and reads back here",
+   "ok": true,
+   "detail": {
+    "wait": "completed",
+    "read": "{\"thread\":{\"threadId\":\"mcp:launch:85b51e7b863c3bea1495142d6d6077a9fef91ef0eed859b0dd6d4352a34df50d\",\"projectId\":\"bc840c2e-95cf-4ab3-b0bd-4dd2e309e397\",\"title\":\"wait piece mwedjkz1\",\"link\":\"[wait piece"
+   }
+  },
+  {
+   "name": "G1: a stopped connector reads as unreachable (530 at the Route)",
+   "ok": true,
+   "detail": {
+    "route": {
+     "ms": 2173,
+     "status": 530
+    },
+    "listed": "unreachable",
+    "call": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"orchestration_error\",\"message\":\"standin-laptop did not answer at https://t3flare-link-standin.ianpascoe.dev.\"}",
+    "lastError": "standin-laptop did not answer at https://t3flare-link-standin.ianpascoe.dev."
+   }
+  },
+  {
+   "name": "the connector back, t3 lists it reachable again",
+   "ok": true
+  }
+ ],
+ "routeAnswer": {
+  "status": 200,
+  "contentType": "application/json"
+ },
+ "link": {
+  "ok": true,
+  "ms": 821,
+  "value": {
+   "environmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+   "label": "standin-laptop",
+   "access": "approval-required",
+   "urls": [
+    "https://t3flare-link-standin.ianpascoe.dev"
+   ],
+   "expiresAt": "2026-12-13T02:45:27.027Z"
+  }
+ },
+ "waitPiece": {
+  "ms": 50324,
+  "timedOut": true,
+  "isError": false
+ },
+ "asleep": {
+  "route": {
+   "ms": 2173,
+   "status": 530
+  },
+  "listed": "unreachable",
+  "call": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"orchestration_error\",\"message\":\"standin-laptop did not answer at https://t3flare-link-standin.ianpascoe.dev.\"}",
+  "lastError": "standin-laptop did not answer at https://t3flare-link-standin.ianpascoe.dev."
+ },
+ "awake": {
+  "ms": 2384,
+  "status": 200
+ },
+ "ok": true,
+ "failures": [],
+ "seconds": 78
+}

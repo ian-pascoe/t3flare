@@ -121,13 +121,16 @@ export class Standin {
     docker(["exec", this.name, "pkill", "-f", "cloudflared"], { allowFailure: true });
   }
 
-  /** Waits until the Route answers as this t3 (`up`) or stops answering (`down`). */
+  /**
+   * Waits until the Route answers as this t3 (`up`), or answers Cloudflare's 530 for a tunnel with no connector (`down`;
+   * a 502 comes first while the connector's connections drain).
+   */
   async awaitRoute(state: "up" | "down", timeoutMs = 120_000): Promise<{ readonly ms: number; readonly status: number | string }> {
     const started = Date.now();
     let status: number | string = "none";
     while (Date.now() - started < timeoutMs) {
       status = await fetch(new URL("/.well-known/t3/environment", this.publicUrl)).then((r) => r.status, (e: Error) => e.message);
-      if ((state === "up") === (status === 200)) return { ms: Date.now() - started, status };
+      if (state === "up" ? status === 200 : status === 530) return { ms: Date.now() - started, status };
       await sleep(2000);
     }
     throw new Error(`the Route did not go ${state} within ${timeoutMs} ms (last: ${status})`);

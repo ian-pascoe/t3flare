@@ -68,9 +68,9 @@ thread, as stock t3 offers it, but those that cannot work here (`T3_TOOL_DENYLIS
 - `html_*`, `preview_*`, `t3_preview_*`: headless Chromium on the host (`serverBrowser` stripped, ADR-0023).
 - `device_*`: host-bound, locked off (ADR-0023).
 - `t3_worktree_*`: its git is not routed through the process router yet.
-- `t3_environment_link`/`unlink`: until SPI-1061 M1, with `peerLinks.ts`'s Layers (left to SPI-1061).
 
-`request_secret` and `t3_environment_preferences_update` are offered again (D5 lifted, ADR-0012). A tool a nightly adds
+`t3_environment_link` and `t3_environment_unlink` are offered since SPI-1061 (ADR-0029): the Outbound link is t3's own, and an
+agent asks for one with t3's link card. `request_secret` and `t3_environment_preferences_update` are offered again (D5 lifted, ADR-0012). A tool a nightly adds
 is offered at once, as in stock t3. t3's guidance and the offered tools' descriptions are filtered only by the denylist:
 a bullet or sentence naming a denied tool is dropped, everything else is t3's own text (U49). The classification test
 is now "every denied name is still a real t3 tool" (`apps/environment/test/t3Guidance.test.ts`).

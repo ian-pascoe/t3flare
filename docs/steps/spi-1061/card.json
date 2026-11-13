@@ -1,0 +1,163 @@
+{
+ "at": "2026-11-13T02:51:43.947Z",
+ "phase": "card",
+ "stage": "link",
+ "cloud": {
+  "environmentId": "5c21b0aa-8247-4d5d-8456-16d183e6f251",
+  "label": "t3flare"
+ },
+ "standin": {
+  "environmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+  "label": "standin-laptop",
+  "route": "https://t3flare-link-standin.ianpascoe.dev",
+  "version": "0.1.10-nightly.20261112.4606"
+ },
+ "threadId": "df8c6250-60d7-49f0-8cd3-7854862023a1",
+ "offered": {
+  "link": true,
+  "unlink": true,
+  "left": [
+   "device_close",
+   "device_list",
+   "device_open",
+   "device_screenshot",
+   "html_preview",
+   "html_render",
+   "preview_act",
+   "preview_dialog",
+   "preview_evaluate",
+   "preview_navigate",
+   "preview_open",
+   "preview_recording_start",
+   "preview_recording_stop",
+   "preview_resize",
+   "preview_set_appearance",
+   "preview_snapshot",
+   "preview_status",
+   "preview_wait_for",
+   "t3_attachment_discard",
+   "t3_attachment_prepare_upload",
+   "t3_preview_close",
+   "t3_preview_list",
+   "t3_thread_send_attachments",
+   "t3_worktree_handoff",
+   "t3_worktree_list",
+   "t3_worktree_status"
+  ]
+ },
+ "checks": [
+  {
+   "name": "C2: the Durable agent is offered t3_environment_link and t3_environment_unlink",
+   "ok": true,
+   "detail": {
+    "link": true,
+    "unlink": true,
+    "left": [
+     "device_close",
+     "device_list",
+     "device_open",
+     "device_screenshot",
+     "html_preview",
+     "html_render",
+     "preview_act",
+     "preview_dialog",
+     "preview_evaluate",
+     "preview_navigate",
+     "preview_open",
+     "preview_recording_start",
+     "preview_recording_stop",
+     "preview_resize",
+     "preview_set_appearance",
+     "preview_snapshot",
+     "preview_status",
+     "preview_wait_for",
+     "t3_attachment_discard",
+     "t3_attachment_prepare_upload",
+     "t3_preview_close",
+     "t3_preview_list",
+     "t3_thread_send_attachments",
+     "t3_worktree_handoff",
+     "t3_worktree_list",
+     "t3_worktree_status"
+    ]
+   }
+  },
+  {
+   "name": "G2/C2: t3's link card is raised in the agent's thread",
+   "ok": true,
+   "detail": {
+    "card": {
+     "id": "turn-item:link-request:df8c6250-60d7-49f0-8cd3-7854862023a1:e9183a4f-088a-4d25-bb57-01e3befa1683:pi-durable%3A16",
+     "linkStatus": "pending",
+     "hint": "standin-laptop",
+     "reason": "To run a task on your laptop."
+    },
+    "calls": [
+     {
+      "tool": "t3_environment_link",
+      "status": "completed",
+      "output": "null"
+     }
+    ]
+   }
+  },
+  {
+   "name": "G2/C2: the owner's answer makes the link",
+   "ok": true,
+   "detail": {
+    "linkStatus": "linked",
+    "linkedEnvironmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+    "linkedAccess": "approval-required",
+    "runs": [
+     "completed",
+     "completed"
+    ],
+    "reply": "I'll load the link tool first, since it may be deferred.\nThe search returned nothing, but the tool was already in my list. I'll call it directly.\nWAITING\nLINK-OUTCOME linked standin-laptop with approval-required access (environmentId e058d35e-9ef4-47c7-b2d7-29d1eb01396e)."
+   }
+  },
+  {
+   "name": "G2/C2: the agent is woken with the outcome",
+   "ok": true,
+   "detail": {
+    "linkStatus": "linked",
+    "linkedEnvironmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+    "linkedAccess": "approval-required",
+    "runs": [
+     "completed",
+     "completed"
+    ],
+    "reply": "I'll load the link tool first, since it may be deferred.\nThe search returned nothing, but the tool was already in my list. I'll call it directly.\nWAITING\nLINK-OUTCOME linked standin-laptop with approval-required access (environmentId e058d35e-9ef4-47c7-b2d7-29d1eb01396e)."
+   }
+  },
+  {
+   "name": "C2: the pairing code is in no transcript",
+   "ok": true,
+   "detail": {
+    "bytes": 54738
+   }
+  },
+  {
+   "name": "the link is t3's, listed reachable",
+   "ok": true
+  }
+ ],
+ "card": {
+  "id": "turn-item:link-request:df8c6250-60d7-49f0-8cd3-7854862023a1:e9183a4f-088a-4d25-bb57-01e3befa1683:pi-durable%3A16",
+  "linkStatus": "pending",
+  "hint": "standin-laptop",
+  "reason": "To run a task on your laptop."
+ },
+ "answered": {
+  "linkStatus": "linked",
+  "linkedEnvironmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+  "linkedAccess": "approval-required",
+  "runs": [
+   "completed",
+   "completed"
+  ],
+  "reply": "I'll load the link tool first, since it may be deferred.\nThe search returned nothing, but the tool was already in my list. I'll call it directly.\nWAITING\nLINK-OUTCOME linked standin-laptop with approval-required access (environmentId e058d35e-9ef4-47c7-b2d7-29d1eb01396e)."
+ },
+ "ok": true,
+ "failures": [],
+ "seconds": 22
+}

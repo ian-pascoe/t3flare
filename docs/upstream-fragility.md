@@ -377,19 +377,40 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Detection**: the vendored core's tests and `apps/mcp-worker/test/sdk-isolation.test.ts` in `pnpm run check`; `test/mcpHost.test.ts`; the stage's `durable-mcp commissary` and `oauth`. **Silent**: a hint flip from write to read on a tool the owner never overrode (classes trust `readOnlyHint` since the back-to-stock cut, owner 2026-11-12, so the tool then runs without a card).
 - **Fix**: sync from cloudpid as a copy (its README names the commit); re-run the stage cases.
 
-### U45. Outbound-link policy Layers over t3's peer services (SPI-1061)
+### U45. The `cause`-stripping Layer over t3's `PeerLinks` (SPI-1061)
 
-- **Where**: `apps/environment/src/t3/peerLinks.ts`, provided in `composition.ts` over t3's `PeerLinks`, `PeerForwarding` and `PeerLinkRequests` (`t3code/apps/server/src/peer/*`). Until a machine is registered (SPI-1061's M1), `link` is refused, `resolve` fails as `expired` (final: `PeerMcpClient` maps it to `capability_denied`, which `RemoteDelegation.isFinal` stops on), `list` is empty and probes nothing, `request` raises no link card, and no `PeerLinkError` carries a `cause`. Numbers U40–U44 belong to the tools step.
-- **Breaks when**: a bump adds a method or a second path to a peer (a new service, a WS RPC that bypasses `PeerLinks`), renames or reshapes these services, or changes which failure reasons are final.
-- **Detection**: typecheck (each wrapper spreads and overrides the whole service type); `test/peerLinks.test.ts` on t3's real layers (seeded row cannot be resolved, list empty, link refused, no cause); `acceptance --peer` check `outbound` (a web-client link attempt refused before any request; `GET /_t3flare/peer-links/count` is 0).
-- **Fix**: wrap the new method or path in the same Layer; keep refusals on final reasons.
+- **Where**: `apps/environment/src/t3/peerLinks.ts` (`layerPeerLinksWithoutCause`), provided in `composition.ts` over t3's `PeerLinks` (`t3code/apps/server/src/peer/PeerLinks.ts`). Every method is t3's; `link`, `list`, `get`, `unlink` and `resolve` answer their `PeerLinkError` with t3's reason and message and no `cause`, which can hold the transport error of a sign-in or a call and with it the request (an address, the pairing code, the bearer), and would go back over the WS RPC. Leak hygiene, not a gate (ADR-0029). Pre-B's refusals (`link` refused, stored links `expired`, an empty list, no link card, our `notListed`) were removed in SPI-1061; `PeerForwarding` and `PeerLinkRequests` are t3's own again. Numbers U40–U44 belong to the tools step.
+- **Breaks when**: t3 adds a `PeerLinks` method that fails with a `PeerLinkError` (it would pass through with its `cause`), adds a second path that answers a `PeerLinkError` to a client without `PeerLinks`, or starts reading `cause` for something other than diagnostics.
+- **Detection**: typecheck (the Layer spreads and overrides the service type); `test/peerLinks.test.ts` (t3's real `PeerLinks` links, lists, resolves and unlinks through the Layer; every method's error has no `cause`); `acceptance --peer` check `outbound` (a stock client's link reaches t3's own dial-out and its error has no `cause`); `scripts/outbound.ts --phase leak` (C6).
+- **Fix**: wrap the new method the same way.
+
+### U46. t3's link card on a Durable agent's thread (SPI-1061)
+
+- **Where**: `t3_environment_link` (offered to Durable agents since SPI-1061) raises t3's `link_request` turn item through `PeerLinkRequests.request`; the owner's client answers with `peerLinks.answerRequest`, and the outcome reaches the agent as a notification that starts a new run. Both pass through our Pi Durable provider adapter and differ like any turn item.
+- **Breaks when**: t3 changes the `link_request` item's shape, how the outcome is delivered (a notification, a wake), or the answer's input.
+- **Detection**: `scripts/outbound.ts --phase card` (C2: the card is raised, the answer links, the agent wakes, the code is in no transcript).
+- **Fix**: follow t3's new item in the differ, if it stops showing; the card itself is t3's.
+
+### U47. Routes from a Worker (SPI-1061)
+
+- **Where**: an Outbound link's Route is a plain https address (T3 Connect's tunnel hostname, a Tailscale Funnel, or the owner's own Cloudflare Tunnel); t3's `PeerLinks` and `PeerMcpClient` fetch it from the Environment DO by workerd's `fetch`. It leans on: t3 deriving its MCP OAuth issuer and `resource` from `Host` and `X-Forwarded-Proto` (`t3code/docs/internals/environment-auth.md`), which every Route's proxy must pass; one bearer serving every address of a link (t3 checks the resource at sign-in only); `redirect: "manual"` on t3's peer client; and, on prod only, a same-zone fetch to a tunnel hostname in `ianpascoe.dev` reaching the tunnel (D23).
+- **Breaks when**: t3 binds a session to the address it signed in at, stops deriving the issuer from forwarded headers, or Cloudflare changes same-zone routing or answers a Worker's fetch with a challenge.
+- **Detection**: `scripts/outbound.ts --phase link` (G1, against the stage stand-in over a named tunnel); the owner's prod round trip (`docs/outbound-link.md`). Nothing a stage runs proves the same-zone path.
+- **Fix**: per kind; a Route that cannot work from a Worker becomes a ticket, not a supported kind.
+
+### U48. The idle check reads open Remote tasks and `peer_environment_links` (SPI-1061, extends U2)
+
+- **Where**: `apps/environment/src/host/idle.ts` (`openRemoteTasks`) reads t3's `orchestration_v2_projection_subagents` with `ProjectionStoreV2.getOpenRemoteDelegatedTasks`' predicate (`origin`, `child_thread_id`, `payload_json`'s `$.remoteChild`, `$.result`, `$.status`, `$.remoteChild.stoppedThere`, `$.remoteChild.environmentId`), joined to `peer_environment_links.last_error` (NULL after `PeerMcpClient` recorded an answer). An open task whose machine answered holds the Environment up; one whose machine did not lets it reset, and `environmentDO.ts` keeps the retry (`t3flare:remote-task-retry`: 5, 15, then every 30 minutes) in DO storage, merged into the one alarm, with an alarm standing at most 5 minutes ahead while any task is open.
+- **Breaks when**: a bump reshapes these tables or that predicate, or `PeerMcpClient` stops recording an outcome per call.
+- **Detection**: fail-safe as U2: an unreadable table means "don't know", never "no work" (`test/idleRemoteTasks.test.ts`); `scripts/outbound.ts --phase long` (C4). **Silent**: a changed predicate that reads fewer tasks as open lets the Environment reset under a task whose machine answers; the alarm still brings it back.
+- **Fix**: copy t3's new predicate into `openRemoteTasks`.
 
 ### U49. t3's orchestration guidance, filtered by the denylist (SPI-1060)
 
-- **Where**: `packages/harness-registry/src/t3Guidance.ts` (re-exported by `apps/agents/src/extensions/t3-guidance.ts`) drops each bullet of t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` and each sentence of an offered tool's description that names a denied tool (`T3_TOOL_DENYLIST`, `t3Tools.ts`), before the `t3_orchestration` section is rendered (`t3-mcp.ts`), for Durable agents (CLI agents get t3's full list and guidance, as stock t3 gives them); `peerLinks.ts` replaces `t3_environment_links`' `notListed` pointer at `t3_environment_link`. Since the back-to-stock cut (owner, 2026-11-12) it no longer fails closed on names it has not classified.
+- **Where**: `packages/harness-registry/src/t3Guidance.ts` (re-exported by `apps/agents/src/extensions/t3-guidance.ts`) drops each bullet of t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` and each sentence of an offered tool's description that names a denied tool (`T3_TOOL_DENYLIST`, `t3Tools.ts`), before the `t3_orchestration` section is rendered (`t3-mcp.ts`), for Durable agents (CLI agents get t3's full list and guidance, as stock t3 gives them); Since SPI-1061 the link tools are offered, so t3's own lines on linking pass, and `t3_environment_links`' `notListed` is t3's own. Since the back-to-stock cut (owner, 2026-11-12) it no longer fails closed on names it has not classified.
 - **Breaks when**: t3 renames or drops a denied tool, restructures the instructions so a bullet no longer holds one tool's guidance, or names a denied tool in a tool result.
-- **Detection**: `test/t3Guidance.test.ts` (every denied name, and each family's prefix, is still a t3 tool; the rendered prompt and descriptions name no denied tool) and `test/t3Mcp.test.ts`; `test/peerLinks.test.ts` for `notListed`. **Silent** for a denied tool named only in a result other than `t3_environment_links`.
-- **Fix**: rename the entry in `t3Tools.ts`; extend the filter or the result rewrite.
+- **Detection**: `test/t3Guidance.test.ts` (every denied name, and each family's prefix, is still a t3 tool; the rendered prompt and descriptions name no denied tool) and `test/t3Mcp.test.ts`; `test/peerLinks.test.ts` (t3's `notListed` names no denied tool). **Silent** for a denied tool named only in a tool result.
+- **Fix**: rename the entry in `t3Tools.ts`; extend the filter.
 
 ### U50. The root workspace and lock are generated from t3's (ADR-0030)
 

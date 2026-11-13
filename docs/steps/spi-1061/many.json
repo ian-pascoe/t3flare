@@ -1,0 +1,73 @@
+{
+ "at": "2026-11-13T02:54:06.394Z",
+ "phase": "many",
+ "stage": "link",
+ "cloud": {
+  "environmentId": "5c21b0aa-8247-4d5d-8456-16d183e6f251",
+  "label": "t3flare"
+ },
+ "standin": {
+  "environmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+  "label": "standin-laptop",
+  "route": "https://t3flare-link-standin.ianpascoe.dev",
+  "version": "0.1.10-nightly.20261112.4606"
+ },
+ "delegated": 8,
+ "checks": [
+  {
+   "name": "G4: 8 Remote tasks are open at once",
+   "ok": true,
+   "detail": {
+    "delegated": 8,
+    "calls": 8
+   }
+  },
+  {
+   "name": "G4: with 8 Remote tasks waiting, a model call still goes through",
+   "ok": true,
+   "detail": {
+    "ms": 8040,
+    "runs": [
+     "completed"
+    ],
+    "reply": "PONG"
+   }
+  },
+  {
+   "name": "G4: all 8 complete once approved there",
+   "ok": true,
+   "detail": [
+    "completed",
+    "completed",
+    "completed",
+    "completed",
+    "completed",
+    "completed",
+    "completed",
+    "completed"
+   ]
+  }
+ ],
+ "modelCall": {
+  "ms": 8040,
+  "runs": [
+   "completed"
+  ],
+  "reply": "PONG"
+ },
+ "statuses": [
+  "completed",
+  "completed",
+  "completed",
+  "completed",
+  "completed",
+  "completed",
+  "completed",
+  "completed"
+ ],
+ "releaseMs": 11796,
+ "publish": "not measured: a stage has no T3 Connect link (step 3+ links prod only)",
+ "ok": true,
+ "failures": [],
+ "seconds": 104
+}

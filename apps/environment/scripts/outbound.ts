@@ -300,7 +300,7 @@ if (phase === "card") {
   await say(
     cookie,
     threadId,
-    `I want you to work on my laptop "${sLabel}", which is not linked yet. Call the tool mcp__t3-code__t3_environment_link once with {"hint": "${sLabel}", "reason": "To run a task on your laptop."}, then reply WAITING and stop. When you hear the outcome, reply exactly LINK-OUTCOME followed by the outcome in a few words.`,
+    `I want you to work on my laptop "${sLabel}", which is not linked yet. Call the T3 tool t3_environment_link (if it is deferred, load it with tool_search first) once with {"hint": "${sLabel}", "reason": "To run a task on your laptop."}, then reply WAITING and stop. When you hear the outcome, reply exactly LINK-OUTCOME followed by the outcome in a few words.`,
   );
   const asked = await until(cookie, threadId, (p) => itemsOf(p).some((item: any) => item.type === "link_request") && settled(p), 240_000);
   const card = itemsOf(asked).find((item: any) => item.type === "link_request");
@@ -341,7 +341,7 @@ if (phase === "delegate") {
   await say(
     cookie,
     threadId,
-    `Call the tool mcp__t3-code__delegate_task exactly once with these arguments: ${delegateArgs(`Reply with exactly ${nonce} and nothing else. Use no tools.`)}. Then reply DELEGATED and stop. When the task's result arrives, reply exactly RESULT followed by the task's reply.`,
+    `Call the T3 tool delegate_task (if it is deferred, load it with tool_search first) exactly once with these arguments: ${delegateArgs(`Reply with exactly ${nonce} and nothing else. Use no tools.`)}. Then reply DELEGATED and stop. When the task's result arrives, reply exactly RESULT followed by the task's reply.`,
   );
   const done = await until(cookie, threadId, (p) => remoteTask(p)?.status === "completed" && runsOf(p).length >= 2 && settled(p), 360_000);
   const task = remoteTask(done);
@@ -377,7 +377,7 @@ if (phase === "long") {
   await say(
     cookie,
     threadId,
-    `Call the tool mcp__t3-code__delegate_task exactly once with these arguments: ${delegateArgs(`Run the bash command \`sleep ${minutes * 60}; echo ${nonce}\` once, with no timeout, and reply with exactly its output.`)}. Then reply DELEGATED and stop. When the task's result arrives, reply exactly RESULT followed by the task's reply.`,
+    `Call the T3 tool delegate_task (if it is deferred, load it with tool_search first) exactly once with these arguments: ${delegateArgs(`Run the bash command \`sleep ${minutes * 60}; echo ${nonce}\` once, with no timeout, and reply with exactly its output.`)}. Then reply DELEGATED and stop. When the task's result arrives, reply exactly RESULT followed by the task's reply.`,
   );
   const delegated = await until(cookie, threadId, (p) => remoteTask(p) !== undefined && settled(p), 240_000);
   const there = remoteTask(delegated)?.remoteChild?.threadId as string | undefined;
@@ -408,7 +408,7 @@ if (phase === "long") {
   if (process.argv.includes("--deploy")) {
     const before = held.constructedAt;
     log("deploying");
-    const deployed = spawnSync(process.execPath, [path.join(import.meta.dirname, "stage.ts"), "deploy", stage], { stdio: "inherit", env: process.env });
+    const deployed = spawnSync(process.execPath, [path.join(import.meta.dirname, "stage.ts"), "deploy", stage], { stdio: "inherit", env: { ...process.env, T3FLARE_STANDIN: "1" } });
     check("the deploy succeeds", deployed.status === 0);
     const back = await watch(480, "after deploy", (entry) => entry.constructedAt !== before && entry.runtime === "running");
     check("C4: after a deploy, the standing alarm boots t3 again with no client", back.constructedAt !== before && back.runtime === "running", back);
@@ -446,7 +446,7 @@ if (phase === "many") {
   const count = Number(arg("count", "8"));
   const threadId = await cloudThread(`many ${stamp}`);
   const tasks = Array.from({ length: count }, (_, i) => delegateArgs(`Run the bash command \`echo many-${i}\` and reply with its output.`, { title: `many ${i} ${stamp}`, clientRequestId: `many-${i}-${stamp}` }));
-  await say(cookie, threadId, `Call the tool mcp__t3-code__delegate_task ${count} times, once with each of these argument objects:\n${tasks.join("\n")}\nThen reply DELEGATED and stop. Do not reply again until all ${count} results have arrived; then reply ALL-DONE.`);
+  await say(cookie, threadId, `Call the T3 tool delegate_task (if it is deferred, load it with tool_search first) ${count} times, once with each of these argument objects:\n${tasks.join("\n")}\nThen reply DELEGATED and stop. Do not reply again until all ${count} results have arrived; then reply ALL-DONE.`);
   const delegated = await until(cookie, threadId, (p) => itemsOf(p).filter((item: any) => item.type === "subagent" && item.remoteChild !== undefined).length >= count && settled(p), 600_000);
   const remote = itemsOf(delegated).filter((item: any) => item.type === "subagent" && item.remoteChild !== undefined);
   out.delegated = remote.length;
@@ -528,7 +528,7 @@ if (phase === "revoke") {
   await say(
     cookie,
     threadId,
-    `Call the tool mcp__t3-code__delegate_task exactly once with these arguments: ${delegateArgs("Run the bash command `sleep 600; echo late` and reply with its output.")}. Then reply DELEGATED and stop. When the task's outcome arrives, reply exactly OUTCOME followed by it in a few words.`,
+    `Call the T3 tool delegate_task (if it is deferred, load it with tool_search first) exactly once with these arguments: ${delegateArgs("Run the bash command `sleep 600; echo late` and reply with its output.")}. Then reply DELEGATED and stop. When the task's outcome arrives, reply exactly OUTCOME followed by it in a few words.`,
   );
   const delegated = await until(cookie, threadId, (p) => remoteTask(p) !== undefined && settled(p), 240_000);
   check("C7: a task is open on the stand-in", remoteTask(delegated) !== undefined);
