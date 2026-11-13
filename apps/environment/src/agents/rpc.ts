@@ -149,7 +149,8 @@ export interface SessionRpc {
 
 export type LeaseAnswer =
   | { readonly ok: true; readonly until: number; readonly running: ReadonlyArray<string> }
-  | { readonly ok: false; readonly reason: string; readonly running: ReadonlyArray<string> };
+  /** `max`: the budget the request was judged by (ADR-0032). */
+  | { readonly ok: false; readonly reason: string; readonly running: ReadonlyArray<string>; readonly max?: number };
 
 export interface BudgetRpc {
   /** `budget`: the Environment settings' Container budget, carried by a fresh start (ADR-0032). */

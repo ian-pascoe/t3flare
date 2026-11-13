@@ -1526,10 +1526,6 @@ export class WorkspaceDO extends ContainerHost {
     return { epoch: this.#boot, processes: this.#processes.state(), pushes: this.#processes.pushes };
   }
 
-  /**
-   * The budget is full and another Workspace asks for a Container (review F7): if nothing here works (no command, no
-   * terminal holding, no CLI process in a turn or recently used), the CLI processes end and the Container stops.
-   */
   /** Why the running Container may not give its slot up now, or undefined when it may (review F7). */
   async #notReclaimable(): Promise<string | undefined> {
     if (!this.containerRunning()) return "not running";
@@ -1545,6 +1541,10 @@ export class WorkspaceDO extends ContainerHost {
     return (await this.#notReclaimable()) === undefined;
   }
 
+  /**
+   * The budget is full and another Workspace asks for a Container (review F7): if nothing here works (no command, no
+   * terminal holding, no CLI process in a turn or recently used), the CLI processes end and the Container stops.
+   */
   async releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }> {
     const why = await this.#notReclaimable();
     if (why !== undefined) return { released: false, reason: why };

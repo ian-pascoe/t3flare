@@ -173,7 +173,6 @@ _Avoid_: settings page, dashboard, admin UI
 
 **Harness settings**:
 What agents are offered and how Pi Durable's loop runs: its extensions with their options, and the MCP server set.
-They apply at a thread's next turn.
 _Avoid_: harness config, settings (alone)
 
 **Environment settings**:
@@ -186,7 +185,7 @@ The vCPU, memory and disk a Workspace's Container starts with, picked by name.
 _Avoid_: instance type, plan
 
 **Container budget**:
-How many Containers may run at once across the Cloud Environment. Lowering it stops none that run.
+How many Containers may run at once across the Cloud Environment.
 _Avoid_: max instances, slots
 
 **Code mode**:

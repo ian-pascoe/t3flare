@@ -30,9 +30,9 @@ export interface TakenEnvironment {
 }
 
 /**
- * The settings for the next Container start, and where they came from. Never fails. The Environment's answer is read
- * against this Worker's schema (an Environment newer or older than this Worker may answer a value it does not know, which
- * reads as its default), then kept.
+ * The settings for the next Container start, and where they came from. Never fails. The Environment's answer and the
+ * kept copy are both read against this Worker's schema (a newer or older version may hold a value this one does not
+ * know, which reads as its default, or lack a setting, which gets its default); the answer is then kept.
  */
 export const takeEnvironment = async (deps: TakeEnvironmentDeps): Promise<TakenEnvironment> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -53,8 +53,12 @@ export const takeEnvironment = async (deps: TakeEnvironmentDeps): Promise<TakenE
   } finally {
     clearTimeout(timer);
   }
+  // The kept copy is read against this Worker's schema too: another version may have kept a size this one does not
+  // offer, or lack a setting this one has.
   const kept = deps.kept();
-  return kept === undefined ? { settings: resolveEnvironment(EMPTY_ENVIRONMENT), source: "default" } : { settings: kept, source: "kept" };
+  return kept === undefined
+    ? { settings: resolveEnvironment(EMPTY_ENVIRONMENT), source: "default" }
+    : { settings: resolveEnvironment({ revision: kept.revision, settings: kept }), source: "kept" };
 };
 
 /** What one Container start launches with, kept while it runs: a running Container keeps its size and idle time. */

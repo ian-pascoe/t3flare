@@ -41,6 +41,27 @@ describe("reclaimFor", () => {
     expect(await reclaimFor({ self: "me", running: ["me", "a", "b"], max: 2, ...h.deps })).toEqual({ released: ["a"], enough: true });
   });
 
+  it("asks the idle holders to stop together, not one after another", async () => {
+    let inFlight = 0;
+    let most = 0;
+    const result = await reclaimFor({
+      self: "me",
+      running: ["a", "b", "c"],
+      max: 1,
+      idle: async () => true,
+      release: async () => {
+        inFlight++;
+        most = Math.max(most, inFlight);
+        // A few turns of the microtask queue: sequential releases would never overlap here.
+        for (let turn = 0; turn < 5; turn++) await Promise.resolve();
+        inFlight--;
+        return true;
+      },
+    });
+    expect(result).toEqual({ released: ["a", "b", "c"], enough: true });
+    expect(most).toBe(3);
+  });
+
   it("reports not enough when a holder found idle was no longer idle at its release", async () => {
     const released: Array<string> = [];
     const result = await reclaimFor({

@@ -1,6 +1,8 @@
 // Reclaiming slots for a refused Container start (review F7; SPI-1149, ADR-0032). The budget may have been lowered below
 // the running count, so one released slot may not be enough: idle holders are asked to stop only when enough of them are
-// idle to bring the count under the budget, and otherwise none is. A lowered budget never stops a Container for nothing.
+// idle to bring the count under the budget, and otherwise none is. The idle ones are asked together, so a holder can turn
+// busy between its check and its release only within one RPC; if one does, the others still stop and the start is
+// refused (`enough: false`).
 
 export interface ReclaimInput {
   /** The starting Workspace's own holder id: never counted or asked. */
@@ -26,7 +28,7 @@ export const reclaimFor = async (input: ReclaimInput): Promise<{ readonly releas
     if (await input.idle(holder)) idle.push(holder);
   }
   if (idle.length < needed) return { released: [], enough: false };
-  const released: Array<string> = [];
-  for (const holder of idle) if (await input.release(holder)) released.push(holder);
+  const outcomes = await Promise.all(idle.map(async (holder) => ((await input.release(holder)) ? [holder] : [])));
+  const released = outcomes.flat();
   return { released, enough: released.length >= needed };
 };

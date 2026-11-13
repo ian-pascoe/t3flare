@@ -40,6 +40,15 @@ describe("takeEnvironment", () => {
     expect(await takeEnvironment({ read: never, kept: store.kept, keep: store.keep, waitMs: 20 })).toEqual({ settings: DEFAULTS, source: "default" });
   });
 
+  it("reads its kept copy against this Worker's schema: an unknown size starts the default, a missing setting its default", async () => {
+    // SAFETY: deliberately outside the type: a copy kept by another Worker's version.
+    const odd = { revision: 6, containerSize: "standard-9", containerBudget: 2 } as unknown as ResolvedEnvironment;
+    const store = keeper(odd);
+    const taken = await takeEnvironment({ read: never, kept: store.kept, keep: store.keep, waitMs: 20 });
+    expect(taken).toEqual({ settings: { revision: 6, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 2 }, source: "kept" });
+    expect(launchOf(taken).instance).toEqual(CPU_1);
+  });
+
   it("reads an answer from an Environment newer or older than this Worker against this Worker's schema", async () => {
     const store = keeper();
     // SAFETY: deliberately outside the type, as another Worker's version may answer.
