@@ -179,8 +179,9 @@ const probeCli = async (cli: Cli, projectId: string, root: string, id: string) =
     }
   }
   if (cli === "pi") {
-    // pi compacts only what lies beyond its 20,000 most recent tokens (`keepRecentTokens`): a turn of about 30,000.
-    const filler = Array.from({ length: 12_000 }, (_, at) => `w${at}`).join(" ");
+    // pi compacts only what lies beyond its 20,000 most recent tokens (`keepRecentTokens`), estimated at four characters
+    // a token: a turn of about 160,000 characters.
+    const filler = Array.from({ length: 24_000 }, (_, at) => `w${at}`).join(" ");
     steps.filler = await turn(cli, mentioned, ++ordinal, `Reply with the single word OK. The rest is filler: ${filler}`);
     steps.filler.sent = `${steps.filler.sent.slice(0, 80)}… (${steps.filler.sent.length} characters)`;
     steps.filler.typed = `${String(steps.filler.typed ?? "").slice(0, 80)}…`;
