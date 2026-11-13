@@ -11,7 +11,9 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
   - `ENVIRONMENT_SETTINGS` holds the Container size (`cpu-1` default, `standard-1` to `standard-4`), the idle time
     (1 to 60 minutes, default 2) and the Container budget (1 to 10, default 3).
   - `resolveEnvironment` reads a stored value that no longer fits as its default.
-  - `applyEnvironmentChange` validates a change and bumps the revision.
+  - `applyEnvironmentChange` validates a change and stores only the settings it moves. A save that moves none is not
+    stored, bumped or audited.
+  - `ResolvedEnvironment` is derived from the schema, so `containerSize` is typed `ContainerSize`.
   - `containerInstance` maps a stored name to the `instance` a start takes: the default's for a name not offered,
     never undefined.
   - The field schema and its validation moved to `fields.ts`, shared with the Harness settings' registry.
@@ -26,7 +28,8 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
   - Routes: `GET`/`POST /_t3flare/harness/api/environment`, behind the existing JSON, Origin, `Sec-Fetch-Site` and CSRF
     checks.
   - An Environment section: one form rendered from the schema, "Running now" (the budget's live leases and their
-    Workspaces), and the cost table.
+    Workspaces), and the cost table. The table's budget column, current row and summary follow the size and budget
+    inputs before a save.
   - Status shows the Environment revision and when a Workspace last took it.
   - The audit table gains a Settings column.
 - **The cost table** (`containerCost.ts`) uses the vendored `@cloudpid/config` prices: each size's resources, one
@@ -60,8 +63,9 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
 | -- | -- |
 | Schema and defaults, an unknown stored size, idle and budget bounds | `packages/harness-registry/src/environment.test.ts` |
 | Size name → `instance` (unknown → default, never omitted) | same |
-| The Workspace DO's read, kept-copy fallback, launch (size, idle, budget) | `apps/agents/test/containerLaunch.test.ts` |
+| The Workspace DO's read, kept-copy fallback, launch (size, idle; a budget only from a fresh read) | `apps/agents/test/containerLaunch.test.ts` |
 | The budget carried on `acquire`, env override winning, lowering below the running count | `apps/agents/test/budget.workerd.test.ts` |
+| Reclaiming enough idle holders or none (two running at a budget of 1) | `apps/agents/test/reclaim.test.ts` |
 | Separate revisions, audit `entity`, validation, CSRF/Origin/form guards, the section | `apps/environment/test/environmentSettings.test.ts` |
 | The cost table | `apps/environment/test/containerCost.test.ts` (figures from the research's worked example) |
 
@@ -126,9 +130,14 @@ before and after.
 
 ## Readings and limits
 
-- **"A third start is refused until one stops".** At a budget of 1 with two running, stopping one leaves one running,
-  which is still at the budget. The evidence records the third start refused after one stop and started after both.
-- **Reclaiming idle holders (review F7)** still applies at a lower budget. In `budget.json` both holders run a command
-  while the third start is tried, so neither is asked to stop.
+- **The rule for a new start** is: it is refused while as many Containers run as the budget allows. "Refused until one
+  stops" holds when the count is one over the budget. At a budget of 1 with two running, stopping one leaves one
+  running, which is still at the budget. The evidence records the third start refused after one stop and started after
+  both.
+- **Reclaiming idle holders (review F7)** still applies at a lower budget, but only when enough holders are idle to
+  bring the count under the budget (`reclaim.ts`); otherwise none is asked. In `budget.json` both holders run a command
+  while the third start is tried, so neither is idle.
+- **A fallback budget is not sent.** A start whose read of the Environment settings timed out carries no budget, and the
+  budget DO keeps the owner's last one.
 - **The 240-character cap.** If the Container exited before (`priorExit=` in computer's message), the reason may still
   be cut in the top message. The full reason is always in the error's causes.

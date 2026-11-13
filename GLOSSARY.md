@@ -178,7 +178,7 @@ _Avoid_: harness config, settings (alone)
 
 **Environment settings**:
 What the Cloud Environment gives every Workspace and its Container: the Container size, idle time and budget, the Global
-mise config and the Environment skills. t3flare's own, not t3's server settings. They apply at a Container's next start.
+mise config and the Environment skills. t3flare's own, not t3's server settings.
 _Avoid_: environment config, server settings, Container settings
 
 **Container size**:

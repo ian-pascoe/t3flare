@@ -25,8 +25,10 @@ configuration. Both are edited on the one page at `/_t3flare/harness`, the Envir
    panel renders its section from it, the API validates against it, and `resolveEnvironment` gives every reader the
    resolved view, reading a stored value that no longer fits as its default. A later setting (SPI-1150, SPI-1152) is an
    entry there. Secrets are not offered (ADR-0016 A′).
-3. **One audit log.** Every entry carries `entity`, `"harness"` or `"environment"`; an entry written before this has
-   none and reads as harness. An Environment change records the settings it changed, as resolved before and after.
+3. **One audit log.** Every entry carries `entity`, an open field naming the entity changed: `"harness"` and
+   `"environment"` today, and a later entity on the page adds its own name. An entry written before this has none and
+   reads as harness. An Environment change records only the settings it moved, as resolved before and after; a save
+   that moves none is not stored, bumped or logged.
 4. **The Container size is chosen per start**, from five names: `cpu-1` (the default, the custom size t3flare ran
    before: 1 vCPU, 3 GiB, 12 GB) and Cloudflare's `standard-1` to `standard-4`. The class runs under
    `schedulingPolicy: "durable_object"`, which takes an `instance` per `start()`. Every start passes one: an omitted
@@ -39,10 +41,12 @@ configuration. Both are edited on the one page at `/_t3flare/harness`, the Envir
 6. **The idle time** (1 to 60 minutes, default 2) replaces the `CONTAINER_IDLE_MS` constant.
 7. **The Container budget is a setting** (1 to 10, default 3, today's value; a cost guard, far below the account's
    concurrent limits). It replaces `MAX_CONTAINERS` as a constant. The budget DO is a singleton in the agents Worker, so
-   a Workspace DO carries the budget it read with each fresh start's lease request; the budget DO judges that request by
-   it and keeps the last one for renewals and status reads. `T3FLARE_MAX_CONTAINERS` still wins (tests). Raising it
-   applies at the next lease request. **Lowering it stops nothing**: a holder is always renewed, and new starts are
-   refused, or ask idle holders to stop (review F7), until fewer run than the budget. A refusal names the budget and the
+   a Workspace DO carries the budget with a fresh start's lease request, and only when it read it from the Environment
+   then: a kept copy or the defaults carry none, so they never overwrite the owner's newer budget. The budget DO judges
+   the request by it and keeps the last one for renewals and status reads. `T3FLARE_MAX_CONTAINERS` still wins (tests).
+   Raising it applies at the next lease request. **Lowering it stops nothing**: a holder is always renewed, and a new
+   start is refused until fewer run than the budget. A refused start asks idle holders to stop (review F7) only when
+   enough of them are idle to bring the count under the budget, and otherwise asks none. A refusal names the budget and the
    panel section that changes it. The panel shows the budget beside the Containers running now and their Workspaces, and
    prices each size at the budget's Containers.
 
