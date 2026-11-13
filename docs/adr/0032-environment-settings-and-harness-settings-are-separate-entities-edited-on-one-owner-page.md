@@ -40,15 +40,16 @@ configuration. Both are edited on the one page at `/_t3flare/harness`, the Envir
    differs). A change never resizes or restarts it; its idle stop follows the idle time it started with.
 6. **The idle time** (1 to 60 minutes, default 2) replaces the `CONTAINER_IDLE_MS` constant.
 7. **The Container budget is a setting** (1 to 10, default 3, today's value; a cost guard, far below the account's
-   concurrent limits). It replaces `MAX_CONTAINERS` as a constant. The budget DO is a singleton in the agents Worker, so
-   a Workspace DO carries the budget with a fresh start's lease request, and only when it read it from the Environment
-   then: a kept copy or the defaults carry none, so they never overwrite the owner's newer budget. The budget DO judges
-   the request by it and keeps the last one for renewals and status reads. `T3FLARE_MAX_CONTAINERS` still wins (tests).
-   Raising it applies at the next lease request. **Lowering it stops nothing**: a holder is always renewed, and a new
-   start is refused until fewer run than the budget. A refused start asks idle holders to stop only when enough of them
-   are idle to bring the count under the budget, and otherwise asks none. A refusal names the budget and the panel
-   section that changes it, whole on every t3flare surface (read from the error's cause chain, since computer cuts its
-   own messages); t3's own git error text keeps only stderr's length, so its worktree setup error does not show it. The panel shows the budget beside the Containers running now and their Workspaces, and
+   concurrent limits). It replaces `MAX_CONTAINERS` as a constant. The budget DO is a singleton in the agents Worker,
+   so a Workspace DO carries the budget with a fresh start's lease request, and only when it read it from the
+   Environment then: a kept copy or the defaults carry none, so they never overwrite the owner's newer budget. The
+   budget DO judges the request by it and keeps the last one for renewals and status reads. `T3FLARE_MAX_CONTAINERS`
+   still wins (tests). Raising it applies at the next lease request. **Lowering it stops nothing**: a holder is always
+   renewed, and a new start is refused until fewer run than the budget. A refused start asks idle holders to stop only
+   when enough of them are idle to bring the count under the budget, and otherwise asks none. A refusal names the
+   budget and the panel section that changes it, whole on every t3flare surface (read from the error's cause chain,
+   since computer cuts its own messages); t3's own git error text keeps only stderr's length, so its worktree setup
+   error does not show it. The panel shows the budget beside the Containers running now and their Workspaces, and
    prices each size at the budget's Containers.
 
 ## Considered options

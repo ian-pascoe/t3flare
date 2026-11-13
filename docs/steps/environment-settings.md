@@ -36,6 +36,9 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
 - **The cost table** (`containerCost.ts`) uses the vendored `@cloudpid/config` prices: each size's resources, one
   Container's worst-case hour, and that hour times the budget set.
   - `@cloudpid/config` is a new dependency of `apps/environment`, added through `pnpm run relock` (3 lock lines).
+  - `@t3flare/workspace-client` is a new dependency of `@t3flare/computer-env` (the refusal helper, below), added
+    through the relock script. That relock also moved `tldts` from 7.4.28 to 7.5.0, within its `^7.4.19` range: the
+    script's own re-resolve, not an edit.
 - **The Workspace DO** (`apps/agents/src/workspace/containerLaunch.ts`, `WorkspaceDO.ts`).
   - Before a fresh start it reads `environmentSettings()` from the Environment DO, waiting at most 5 s. Without an
     answer it uses its kept copy (`t3flare:environment`), else the defaults.
@@ -55,9 +58,11 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
     connect errors and keeps only the first 240 characters of each message, its own ~120-character prefix included,
     and fewer after a `priorExit=` (a Container that exited before). The reason is kept short, and every surface that
     turns a start error into text reads it whole from the deepest error in the cause chain, through one helper in
-    `@t3flare/workspace-client` (`startRefusal`, `describeFailure`). That covers a Durable agent's command (computer-env's
-    `exec`), terminals, CLI processes, the Workspace DO's git, checkpoint and worktree answers, and the Environment's
-    worktree creation. Workers RPC keeps an error's `cause`, so the chain reaches the Session and the Environment.
+    `@t3flare/workspace-client` (`startRefusal`, `describeFailure`, `failureMessage`). That covers a Durable agent's
+    command (computer-env's `exec`) and its file tools on Container-only paths (`container-files.ts`, the file client,
+    `toWireError`), terminals, CLI processes, the Workspace DO's git, checkpoint and worktree answers, and the
+    Environment's worktree creation. Workers RPC keeps an error's `cause`, so the chain reaches the Session and the
+    Environment.
 - **Docs.** ADR-0032; the ADR-0026 note; `GLOSSARY.md`: Harness panel (revised), Harness settings, Environment
   settings, Container size, and Container budget (new with the scope change). No t3 lean, so no
   `upstream-fragility.md` entry.
@@ -73,6 +78,7 @@ with a refinement note in ADR-0026. Evidence: [`environment-settings/`](environm
 | Reclaiming enough idle holders or none (two running at a budget of 1) | `apps/agents/test/reclaim.test.ts` |
 | A refused start's whole reason from the cause chain | `packages/workspace-client/src/startRefusal.test.ts` |
 | A Durable agent's command shows the whole refusal | `packages/computer-env/src/exec.test.ts` |
+| A Durable agent's file tool on a Container-only path shows the whole refusal | `packages/computer-env/src/container-files.test.ts` |
 | Separate revisions, audit `entity`, validation, CSRF/Origin/form guards, the section | `apps/environment/test/environmentSettings.test.ts` |
 | The cost table | `apps/environment/test/containerCost.test.ts` (figures from the research's worked example) |
 
@@ -99,10 +105,10 @@ hashes; the rebased commit with the same change is given beside each.
 
 `sizes.json`, `running.json` and `idle.json` were first taken before the review rounds and were taken again on the
 rebased head. `budget.json` and `surfaces.json` come from `eac8a7d`, the head with the refusal read on every surface;
-the code between `dd622c9` and `eac8a7d` changed only how a refusal is turned into text and the comments. The panel's routes, revisions and guards behind
-`revisions.json` and `safety.json` did not change after their runs, except that a save which moves no setting is no
-longer stored (unit-tested). The worker code of `f165c87` and of the rebased head differ only by `main`'s SPI-1147
-changes.
+the code between `dd622c9` and `eac8a7d` changed only how a refusal is turned into text and the comments. The panel's
+routes, revisions and guards behind `revisions.json` and `safety.json` did not change after their runs, except that a
+save which moves no setting is no longer stored (unit-tested). The worker code of `f165c87` and of the rebased head
+differ only by `main`'s SPI-1147 changes.
 
 **`sizes.json`.** The limits read in each Container:
 
@@ -174,4 +180,4 @@ before and after.
   (`surfaces.json`). t3's `GitCommandError` keeps only stderr's length, so t3's setup error reads "git worktree add
   failed" without the reason. The same holds for any git failure t3 reports this way. Showing it there needs a change
   to t3 (a Shadow or a Patch, ADR-0001); not done here.
-- **Checks.** `pnpm run check` passes at the head that carries this report.
+- **Checks.** `pnpm run check` passes at CHECKED_COMMIT.

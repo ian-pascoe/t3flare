@@ -314,9 +314,8 @@ const surfaces = async () => {
   cookie ||= await pair();
   const holder = "penv-b1";
   const agentWorkspace = "penv-agent";
-  const { projectId: holderProject } = await ensureProject(cookie, holder);
+  await ensureProject(cookie, holder);
   const { projectId } = await ensureProject(cookie, agentWorkspace);
-  void holderProject;
   for (const id of [holder, agentWorkspace, WORKSPACE, "penv-b2", "penv-b3"]) await stopOn(id);
   await setEnvironment({ containerBudget: 1 });
   const busyFor = 240;
