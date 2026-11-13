@@ -6,7 +6,7 @@
  * `admin` alchemy profile (a Cloudflare key that may create API tokens, and `gh`), and again to rotate the token or
  * change its permissions:
  *
- *   bun run --cwd infra ci:setup
+ *   pnpm --filter @t3flare/infra run ci:setup
  *
  * `ci:setup` also allows GitHub Actions to create pull requests on the repository (the job proposes each new pin as
  * `bump/<tag>`), which no alchemy resource covers.
@@ -21,7 +21,7 @@
  *
  * Run ci:setup again after rotating any of those (prod's tokens, the proxy key, the GitHub App's key).
  *
- * Rotate the token: `bun run --cwd infra ci:destroy`, then `ci:setup` again. The `bump` environment is retained on
+ * Rotate the token: `pnpm --filter @t3flare/infra run ci:destroy`, then `ci:setup` again. The `bump` environment is retained on
  * destroy, so anything set on it by hand survives.
  */
 import * as Alchemy from "alchemy";
@@ -93,7 +93,7 @@ export default Alchemy.Stack(
       Alchemy.RemovalPolicy.retain(),
     );
 
-    // Everything `bun run bump` deploys and destroys on the `bump` stage.
+    // Everything `pnpm run bump` deploys and destroys on the `bump` stage.
     const token = yield* Cloudflare.ApiToken.AccountApiToken("BumpToken", {
       name: "t3flare-ci-bump",
       accountId,

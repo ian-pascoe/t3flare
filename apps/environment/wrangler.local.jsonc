@@ -1,4 +1,4 @@
-// Local workerd only (`bun run dev`, iteration and local checks); every deploy is alchemy.run.ts.
+// Local workerd only (`pnpm run dev`, iteration and local checks); every deploy is alchemy.run.ts.
 // There is no Access in front of localhost: T3FLARE_LOCAL_MODE lets the admin routes through on a loopback
 // host with the admin token alone. alchemy.run.ts never sets it.
 {

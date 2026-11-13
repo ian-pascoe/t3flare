@@ -1,0 +1,19 @@
+name: Set up the workspace
+description: >-
+  Node, pnpm and Vite+ at the versions package.json pins (gen-workspace.ts copies them from t3code), the pnpm store
+  from cache, then a frozen install. After t3's own setup-ci-deps, without its maintainer task cache (ADR-0030).
+runs:
+  using: composite
+  steps:
+    # vp installs the Node of engines.node and the pnpm of packageManager. Its dependency cache (the pnpm store)
+    # is keyed on the lock.
+    - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1
+      with:
+        node-version-file: package.json
+        cache: true
+        run-install: false
+
+    - shell: bash
+      run: |
+        echo "node $(node --version), pnpm $(pnpm --version), vp $(vp --version | head -1)"
+        vp install --frozen-lockfile

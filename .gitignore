@@ -3,7 +3,6 @@ dist/
 .alchemy/
 .wrangler/
 *.log
-.bun/
 .env.spike
 /bump-report.json
 .worktrees/

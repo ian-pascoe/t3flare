@@ -1,4 +1,4 @@
-// `bun run test:docker` (step 4a, plan §9): the real CLIs in Docker against the model proxy. Not in `bun run check`
+// `pnpm run test:docker` (step 4a, plan §9): the real CLIs in Docker against the model proxy. Not in `pnpm run check`
 // (it needs Docker, the network and the proxy's key); the nightly bump job runs it.
 import { defineConfig } from "vitest/config";
 

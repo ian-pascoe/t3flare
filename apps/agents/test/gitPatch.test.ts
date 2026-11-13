@@ -93,7 +93,7 @@ const check = (dir: string, from: string, to: string) => {
 };
 
 // Each case forks a dozen real `git` processes, ~0.3 s idle but 4 s+ on a CPU-saturated CI runner or a parallel
-// `bun run check`: vitest's 5 s default timed out there. Real git cannot be faked (it is what the DO is compared with),
+// `pnpm run check`: vitest's 5 s default timed out there. Real git cannot be faked (it is what the DO is compared with),
 // so the timeout is a ceiling, not a wait: 60 s costs nothing when git is fast and only fails a genuine hang.
 const GIT_TEST_TIMEOUT_MS = 60_000;
 

@@ -3,7 +3,7 @@
  * cloudpid@ae5a7b73:infra/github-app-setup.ts and adapted. Run from a workstation with `gh` signed in as the owner, and a
  * browser:
  *
- *   bun run --cwd infra github-app:setup [--name t3flare] [--repo owner/name]
+ *   pnpm --filter @t3flare/infra run github-app:setup [--name t3flare] [--repo owner/name]
  *
  * 1. It serves a page on 127.0.0.1 that posts the manifest (`githubAppManifest`) to GitHub; you confirm the app's name
  *    there, and GitHub sends you back with a code the app's ID and private key are fetched with. GitHub shows the key

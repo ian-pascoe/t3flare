@@ -11,17 +11,16 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
 
    | Failed step (`bump.ts`) | Usual causes |
    | --- | --- |
-   | find the newest nightly tag (`:82`) | t3 changed its tag format: `NIGHTLY` at `bump.ts:66` |
-   | regenerate the workspace and install (`:129`) | t3's `pnpm-workspace.yaml` or lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
-   | lock matches t3's, one effect (`:135`) | a second `effect`: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
-   | patches apply (`:139`) | [U10](#u10-patches) |
-   | typecheck, lint, test (`:143`) | by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds) |
-   | deploy the bump stage (`:149`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
-   | acceptance test (`:153`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
+   | find the newest nightly tag (`:98`) | t3 changed its tag format: `NIGHTLY` at `bump.ts:80` |
+   | regenerate the workspace and install (`:157`) | t3 added a workspace setting ("classify it") or changed its lock's layout: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); a patch no longer applies or matches nothing, or t3's lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
+   | lock matches t3's, one effect (`:161`) | a t3 importer installs other versions than in t3's lock, a second `effect`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030), [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
+   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds) |
+   | deploy the bump stage (`:176`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
+   | acceptance test (`:180`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
    | stock t3 nightly links and forwards (step 3) | the laptop half of [U7](#u7-client-version-skew-desktop-mobile-laptop) |
 
-3. **Reproduce on your machine.** In a worktree: `git -C t3code checkout <tag> && bun scripts/gen-workspace.ts && bun install && bun run check`. That covers every step through tests; deploy and acceptance need the job's credentials (or a throwaway stage of your own, `apps/environment/scripts/stage.ts`). Restore with `git -C t3code checkout - && git checkout -- package.json bunfig.toml bun.lock scripts/lock-pins.report.md && bun install`.
-4. **Land the fix with the pin.** A fix that needs the new tag cannot pass `bun run check` on the old pin. Push the fix on a branch and run the job there: `gh workflow run bump.yml --ref <branch> -f tag=<tag>` (if the `bump` environment admits the branch). On a pass it pushes `bump/<tag>` (your branch plus the pin commit) and opens the PR for the owner. A fix that works on both pins lands on `main` first and the next nightly picks it up.
+3. **Reproduce on your machine.** In a worktree: `git -C t3code checkout <tag> && pnpm run relock && pnpm run check` (relock: gen-workspace, seed-lock, `pnpm install --no-frozen-lockfile`, verify-lock). That covers every step through tests; deploy and acceptance need the job's credentials (or a throwaway stage of your own, `apps/environment/scripts/stage.ts`). Restore with `git -C t3code checkout - && git checkout -- package.json pnpm-workspace.yaml pnpm-lock.yaml mise.toml && pnpm install --frozen-lockfile`. Run pnpm from the repo, never inside `t3code/` (AGENTS.md).
+4. **Land the fix with the pin.** A fix that needs the new tag cannot pass `pnpm run check` on the old pin. Push the fix on a branch and run the job there: `gh workflow run bump.yml --ref <branch> -f tag=<tag>` (if the `bump` environment admits the branch). On a pass it pushes `bump/<tag>` (your branch plus the pin commit) and opens the PR for the owner. A fix that works on both pins lands on `main` first and the next nightly picks it up. Until two nightlies have passed on pnpm and prod has deployed once more after the move to pnpm, hold bump PRs unmerged (ADR-0030, Rollback).
 5. **Before closing:** if the break was silent until something else tripped over it, add the check to [Gaps in detection](#gaps-in-detection).
 
 ## How to read an entry
@@ -32,7 +31,7 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
 - **Blast radius**: what a user sees.
 - **Fix**: where to look first.
 
-The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of `apps/environment` only ([U27](#u27-the-bump-job-checks-less-than-bun-run-check)); a deploy of the `bump` stage; then `acceptance --real-turn --terminal --worktree` (and `--peer` plus a stock npm t3 nightly as the laptop, step 3; `--codex --pi`, step 4a). Before the deploy, `test:docker` (step 4a): the pinned Codex and pi in Docker, launched by our profiles and request guard against the new t3, on the model proxy.
+The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, the workspace and lock checks, typecheck, lint and tests of every package); a deploy of the `bump` stage; then `acceptance --real-turn --terminal --worktree` (and `--peer` plus a stock npm t3 nightly as the laptop, step 3; `--codex --pi`, step 4a). Before the deploy, `test:docker` (step 4a): the pinned Codex and pi in Docker, launched by our profiles and request guard against the new t3, on the model proxy.
 
 ## The register, ranked
 
@@ -112,7 +111,7 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 - **Breaks when**: t3 reads or writes its State directory through an import form the regex misses (a dynamic `import()` without `await`, or a module outside `src/`), adds a native package loaded through `createRequire`, adds module-scope randomness or I/O (workerd forbids it at global scope, as Patch 0001 works around), or adds module-level state that survives an abort.
 - **Detection**: deploy catches module-scope I/O and randomness (workerd refuses the upload) and an unstubbed native `require` at module load; acceptance's reboot check catches new module state that differs after a second boot. **Silent**: a State-directory write the alias missed lands on workerd's in-memory file system and is lost on the next reset; a stub that exports no names. Cheapest check: [T5](#gaps-in-detection), asserting the build report (importers, skipped dependency imports, stub names) against the pin's.
 - **Blast radius**: from a setting or key that forgets itself after an idle reset, to an Environment that does not deploy.
-- **Fix**: `bun build.ts` and read `dist/build-report.json`; diff its `fsAlias` numbers against the last good build.
+- **Fix**: `node build.ts` and read `dist/build-report.json`; diff its `fsAlias` numbers against the last good build.
 
 ### U10. Patches
 
@@ -196,11 +195,11 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 
 ### U20. Dependencies that ride t3's lock: alchemy beta, `patches/deps`, transitive pins
 
-- **Where**: `scripts/gen-workspace.ts` takes t3's catalog, overrides and patched dependencies, and pins every package t3's lock holds at one version (`:76-96`), so a t3 bump moves alchemy (`t3code/pnpm-workspace.yaml:70`, `2.0.0-beta.85`), effect, zod and others under our own code too. Our own dependency patches are keyed by exact version (`patches/deps/@alchemy.run__cloudflare@2.0.0-beta.85.patch`, `patches/deps/@earendil-works__pi-durable@1.5.0.patch`; wired at `gen-workspace.ts:139-148`). `@alchemy.run/cloudflare-runtime` is pinned at `2.0.0-beta.85` by hand in `apps/environment/package.json`, and `build.ts:2-4` works around beta.85 dropping `build.input.plugins` (ADR-0020). `@earendil-works/pi-durable` (1.5.0) and `@cloudflare/computer` (0.9.0) are ours alone, but their dependencies (`diff`, `zod`, `ai`, `vite`, `capnweb`) can be pinned to t3's versions.
+- **Where**: the root workspace and lock follow t3's ([U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030)): t3's catalog, overrides and patches apply as they are and t3's packages resolve as in its lock, so a t3 bump moves alchemy (`t3code/pnpm-workspace.yaml:70`, `2.0.0-beta.85`), effect, zod and others under our own code too. Our own dependency patches are keyed by exact version (`patches/deps/@alchemy.run__cloudflare@2.0.0-beta.85.patch`, `patches/deps/@earendil-works__pi-durable@1.5.0.patch`; wired into `pnpm-workspace.yaml`'s `patchedDependencies` by `gen-workspace.ts`). `OUR_OVERRIDES` there holds a few of our core packages where Bun's pins held them (`workerd`, `@cloudflare/workers-types`, `@effect/sql-d1`). `@alchemy.run/cloudflare-runtime` is pinned at `2.0.0-beta.85` by hand in `apps/environment/package.json`, and `build.ts:2-4` works around beta.85 dropping `build.input.plugins` (ADR-0020). `@earendil-works/pi-durable` (1.5.0) and `@cloudflare/computer` (0.9.0) are ours alone, and their dependencies resolve within their own ranges (pnpm, unlike Bun's per-name pins, gives each package its declared version).
 - **Breaks when**: t3 bumps alchemy; t3's lock moves a package pi-durable or computer depends on; `effect` resolves twice.
-- **Detection**: install and `verify-lock` catch a second `effect`; deploy catches an alchemy that cannot deploy. **Silent**: when alchemy moves, the `patches/deps` patch keyed to beta.85 names a version nothing resolves, so it is simply not applied; nothing checks the key resolves, and `bump.ts:133` filters lines saying "no longer applies" out of the install step's detail. The bugs it fixed come back as flaky deploys. Cheapest check: [T9](#gaps-in-detection).
+- **Detection**: when alchemy moves, the install fails on the `patches/deps` patch keyed to beta.85 (`ERR_PNPM_UNUSED_PATCH`), and on a patch that no longer applies; `verify-lock` fails on a second `effect` and on any t3-patched version installed unpatched; deploy catches an alchemy that cannot deploy.
 - **Blast radius**: flaky or failed deploys of prod; agent runtime errors after a transitive move.
-- **Fix**: re-cut the patch for the new version (`bun patch`), move `cloudflare-runtime` with alchemy, re-check ADR-0020's workaround.
+- **Fix**: re-cut the patch for the new version (`pnpm patch <pkg>@<version>`, edit, `pnpm patch-commit <dir> --patches-dir patches/deps`, then `pnpm run relock`), move `cloudflare-runtime` with alchemy, re-check ADR-0020's workaround.
 
 ### U21. Cloudflare compatibility date and flags
 
@@ -230,7 +229,7 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 
 - **Where**: `@earendil-works/pi-durable` 1.5.0 (`apps/agents/package.json`, `packages/computer-env`, `packages/effect-durable`), patched by `patches/deps/@earendil-works__pi-durable@1.5.0.patch` (codemode's details capped to 64 KiB, `dist/codemode/codemode.js`, `dist/harness/scheduler.js`, `dist/harness/tool.js`). Its runtime events reach t3 through the Session's pushes and the differ (U3).
 - **Breaks when**: we bump pi-durable (the patch is keyed to 1.5.0), or a t3 bump moves one of its dependencies (U20).
-- **Detection**: a pi-durable bump is our own change and runs `bun run check`; `--real-turn` runs one turn. A lost patch is silent (U20).
+- **Detection**: a pi-durable bump is our own change and runs `pnpm run check`; `--real-turn` runs one turn. A lost patch fails the install (U20).
 - **Blast radius**: every Durable agent turn.
 - **Fix**: re-cut the patch against the new `dist/`; re-run `--real-turn`.
 
@@ -250,13 +249,9 @@ The bump runs: `git apply --check` of the Patches; typecheck, lint and tests of 
 - **Blast radius**: none in production.
 - **Fix**: update the fixtures alongside the differ.
 
-### U27. The bump job checks less than `bun run check`
+### U27. The bump job checks less than `bun run check` (fixed)
 
-- **Where**: `scripts/bump.ts:143-147` runs typecheck, lint and tests of `apps/environment` only; `scripts/check.ts:24-41` also covers `apps/agents`, `infra` and the packages.
-- **Breaks when**: a t3 bump moves a dependency the agents Worker or a package uses (effect, zod, alchemy).
-- **Detection**: the agents Worker's deploy and `--real-turn` catch a runtime break. A type or lint error passes the bump, and the owner's merge of its PR then fails prod's own `bun run check` (`.github/workflows/deploy-prod.yml:76`). Cheapest check: [T1](#gaps-in-detection).
-- **Blast radius**: `main` holds a pin prod never deployed, and every later push to `main` fails its deploy until someone fixes it.
-- **Fix**: run `bun run check` in the bump.
+Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's deploy does.
 
 ### U28. T3 Connect: the publish-only link and the publisher (step 3+)
 
@@ -372,7 +367,7 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 
 - **Where**: `vendor/cloudpid/mcp` (`@cloudpid/mcp`, copied at cloudpid `93ba45a3`, OD-T10) on `@modelcontextprotocol/{client,core,server}` 2.4.0, run in `apps/mcp-worker` (no bindings, `global_fetch_strictly_public`); its OAuth helpers (`discoverOAuthServerInfo`, `selectResource`, `registerClient`, `startAuthorization`) for direct servers' sign-ins. Commissary's endpoint: its eras, `readOnlyHint` on read tools, its `<toolkit>_<tool>` names, its text fallbacks for pending approvals and connect links (like U25 for models).
 - **Breaks when**: an SDK bump changes the client, the OAuth discovery or resource selection; a cloudpid sync changes `scrub.ts` or the call budget; Commissary changes its hints, fallbacks or name rule.
-- **Detection**: the vendored core's tests and `apps/mcp-worker/test/sdk-isolation.test.ts` in `bun run check`; `test/mcpHost.test.ts`; the stage's `durable-mcp commissary` and `oauth`. **Silent**: a hint flip from write to read on a tool the owner never overrode (classes trust `readOnlyHint` since the back-to-stock cut, owner 2026-11-12, so the tool then runs without a card).
+- **Detection**: the vendored core's tests and `apps/mcp-worker/test/sdk-isolation.test.ts` in `pnpm run check`; `test/mcpHost.test.ts`; the stage's `durable-mcp commissary` and `oauth`. **Silent**: a hint flip from write to read on a tool the owner never overrode (classes trust `readOnlyHint` since the back-to-stock cut, owner 2026-11-12, so the tool then runs without a card).
 - **Fix**: sync from cloudpid as a copy (its README names the commit); re-run the stage cases.
 
 ### U45. Outbound-link policy Layers over t3's peer services (SPI-1061)
@@ -389,13 +384,21 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Detection**: `test/t3Guidance.test.ts` (every denied name, and each family's prefix, is still a t3 tool; the rendered prompt and descriptions name no denied tool) and `test/t3Mcp.test.ts`; `test/peerLinks.test.ts` for `notListed`. **Silent** for a denied tool named only in a result other than `t3_environment_links`.
 - **Fix**: rename the entry in `t3Tools.ts`; extend the filter or the result rewrite.
 
+### U50. The root workspace and lock are generated from t3's (ADR-0030)
+
+- **Where**: `scripts/gen-workspace.ts` writes `pnpm-workspace.yaml` (our packages plus the t3 closure of `T3_ROOTS`; t3's settings by the `COPIED`/`ADJUSTED` allowlist; t3's patches only for packages we install; `OUR_OVERRIDES`, `OUR_ALLOWED_PEERS`, every build denied), `package.json`'s `packageManager`/`engines.node` and `mise.toml` from `t3code/pnpm-workspace.yaml` and `t3code/package.json`. `scripts/seed-lock.ts` copies t3's lock (both YAML documents; t3's importers re-keyed under `t3code/`) and `scripts/relock.ts` installs until the workspace settles. `scripts/verify-lock.ts` compares each t3 importer's transitive closure with t3's (`PEER_DRIFT` lists the three explained exceptions). t3's `.pnpmfile.cjs` does not run at our root (its hook guards mobile tarballs and Windows architectures only).
+- **Breaks when**: t3 adds a top-level workspace setting; renames, splits or adds a package in the closure; changes its lock's document layout; moves a peer that our packages also bring (a new `PEER_DRIFT` case); bumps pnpm or Node (both follow t3's).
+- **Detection**: the install step ("classify it" for a new setting; a missing importer); `verify-lock` (a moved version, with the importer and the keys); `check:workspace` (a stale generated file, or `t3code/node_modules/.pnpm` from a pnpm command run inside `t3code/`).
+- **Blast radius**: the bump fails; nothing reaches prod.
+- **Fix**: classify the new key in `gen-workspace.ts`; for a drift, find which of our packages pulls the other version (`pnpm why <name>`), and either pin it in `OUR_OVERRIDES` or list it in `PEER_DRIFT` with its reason.
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).
 
 | # | Check | Covers | Ticket |
 | --- | --- | --- | --- |
-| T1 | The bump runs the whole `bun run check` | U27, U20 | [SPI-1010](https://linear.app/spiritledsoftware/issue/SPI-1010) |
+| T1 | ~~The bump runs the whole `bun run check`~~ Done (ADR-0030): it runs `pnpm run check` | U27, U20 | [SPI-1010](https://linear.app/spiritledsoftware/issue/SPI-1010) |
 | T2 | Fingerprint the t3 code we restate or emulate (the `server.ts` layer graph and routes, `TerminalManager.make`, `ServerEnvironment.make`'s capabilities, the git argv and `gh` schema literals); the bump fails on any change until the matching file of ours is reviewed | U1, U12, U13, U15 | [SPI-1011](https://linear.app/spiritledsoftware/issue/SPI-1011) |
 | T3 | ~~A test of the descriptor's capability keys against a classified list (kept, stripped), failing on a new key~~ Done: `test/capabilities.test.ts` and typecheck | U4 | [SPI-1012](https://linear.app/spiritledsoftware/issue/SPI-1012) |
 | T4 | A workerd test that runs t3's migrations, then each private-table query of `idle.ts` (and step 3's) and expects no `UnreadableTables`, and compares the status lists with t3's; the same for computer's VFS tables | U2, U23 | [SPI-1013](https://linear.app/spiritledsoftware/issue/SPI-1013) |
@@ -403,7 +406,7 @@ Checks worth adding, each closing a silent or late path above. Each has a ticket
 | T6 | Acceptance asserts from the router trace that t3's polls started no stopped Container and that patched read shapes were not answered `last-answer` | U6, U13 | [SPI-1015](https://linear.app/spiritledsoftware/issue/SPI-1015) |
 | T7 | Acceptance asserts t3's source-control discovery shows GitHub signed in through the `gh` emulation | U15 | [SPI-1016](https://linear.app/spiritledsoftware/issue/SPI-1016) |
 | T8 | Acceptance `--faults`: a usage limit through the stage's proxy fault arms and resumes; an Environment restart mid-turn continues the turn | U3, U14 | [SPI-1017](https://linear.app/spiritledsoftware/issue/SPI-1017) |
-| T9 | Fail install when a `patches/deps` patch names a version `bun.lock` does not resolve, and stop filtering "no longer applies" | U20, U24 | [SPI-1018](https://linear.app/spiritledsoftware/issue/SPI-1018) |
+| T9 | ~~Fail install when a `patches/deps` patch names a version `bun.lock` does not resolve, and stop filtering "no longer applies"~~ Done (ADR-0030): pnpm fails on an unused or unappliable patch, and verify-lock on a t3-patched version left unpatched | U20, U24 | [SPI-1018](https://linear.app/spiritledsoftware/issue/SPI-1018) |
 | T10 | The differ builds turn items with `satisfies`, not `as`, so a new required field fails typecheck | U3, U26 | [SPI-1019](https://linear.app/spiritledsoftware/issue/SPI-1019) |
 | T11 | Run the acceptance `/ws` client built from the newest nightly's contracts against the bump stage | U7 | [SPI-1020](https://linear.app/spiritledsoftware/issue/SPI-1020) |
 | T12 | A test that walks `EnvironmentHttpApi` for endpoints taking a credential and for path prefixes, against `BOOTSTRAP_EXCHANGE_PATHS` and `SERVER_PREFIXES` | U16 | [SPI-1021](https://linear.app/spiritledsoftware/issue/SPI-1021) |

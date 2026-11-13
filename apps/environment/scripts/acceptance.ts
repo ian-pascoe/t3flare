@@ -124,7 +124,7 @@ const layerProtocol = Layer.effect(RpcClient.Protocol, RpcClient.makeProtocolSoc
       Socket.layerWebSocket(socketUrl.toString()).pipe(
         Layer.provide(
           Layer.succeed(Socket.WebSocketConstructor, (url) =>
-            // Bun's WebSocket takes handshake headers: the session cookie and the page origin.
+            // Node's WebSocket (undici) takes handshake headers: the session cookie and the page origin.
             new WebSocket(url, { headers: { cookie, origin: base.origin } } as never),
           ),
         ),

@@ -13,7 +13,6 @@
   "dependencies": {
     "@alchemy.run/cloudflare": "catalog:",
     "@alchemy.run/github": "2.0.0-beta.85",
-    "@effect/platform-bun": "catalog:",
     "alchemy": "catalog:",
     "effect": "catalog:",
     "@t3flare/github-app": "workspace:*"

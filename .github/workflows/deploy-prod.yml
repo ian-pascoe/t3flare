@@ -1,11 +1,11 @@
 name: Deploy prod
 
-# Every push to main deploys the `prod` stage (the owner's Environment): `bun run check`, then
+# Every push to main deploys the `prod` stage (the owner's Environment): `pnpm run check`, then
 # `apps/environment/scripts/stage.ts deploy prod`, then a smoke check that leaves nothing behind (scripts/smoke.ts: the
 # web client and the read-only admin health route, which must report this commit; no t3 boot, no Container).
 # Docs-only pushes are skipped. A manual run may deploy the `bump` stage instead, to try the job without touching prod.
 #
-# Needs, made by `bun run --cwd infra ci:setup` (infra/github.ts) on the GitHub environment `prod` (main only):
+# Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts) on the GitHub environment `prod` (main only):
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-prod`
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
 #   vars.T3FLARE_DOMAIN            prod's custom domain (unset on `bump`, which stays on workers.dev)
@@ -14,6 +14,8 @@ name: Deploy prod
 #   secrets.T3_BOOTSTRAP_TOKEN, secrets.T3FLARE_ADMIN_TOKEN   prod's own tokens, the same as the laptop's
 #     (apps/environment/.alchemy/stages/prod.env.json); stage.ts refuses to make new ones for prod in CI.
 # The Access service token's credentials come from alchemy's state on every deploy, so nothing else is stored.
+# The secrets reach only the Deploy and Smoke steps, never the install or the check, where dependency code runs
+# (review H4; dependency build scripts are denied too, pnpm-workspace.yaml's allowBuilds).
 
 on:
   push:
@@ -45,19 +47,12 @@ jobs:
       url: ${{ vars.T3FLARE_DOMAIN && format('https://{0}', vars.T3FLARE_DOMAIN) || format('https://t3flare-environment-{0}.ian-g-pascoe.workers.dev', inputs.stage || 'prod') }}
     env:
       STAGE: ${{ inputs.stage || 'prod' }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       T3FLARE_DOMAIN: ${{ vars.T3FLARE_DOMAIN }}
       # The Workspace sweep's real purge (SPI-974): `1` on prod once the owner turned it on.
       T3FLARE_SWEEP_PURGE: ${{ vars.T3FLARE_SWEEP_PURGE }}
       MODEL_PROXY_URL: ${{ vars.MODEL_PROXY_URL }}
-      MODEL_PROXY_API_KEY: ${{ secrets.MODEL_PROXY_API_KEY }}
-      COMMISSARY_CONTAINER_API_KEY: ${{ secrets.COMMISSARY_CONTAINER_API_KEY }}
-      T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
-      T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
-      # Unset on `bump`, whose tokens the job makes fresh.
-      T3_BOOTSTRAP_TOKEN: ${{ secrets.T3_BOOTSTRAP_TOKEN }}
-      T3FLARE_ADMIN_TOKEN: ${{ secrets.T3FLARE_ADMIN_TOKEN }}
+      NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
     steps:
       # The submodule is fetched by hand, not by the action (see bump.yml).
       - uses: actions/checkout@v4
@@ -66,23 +61,34 @@ jobs:
 
       - run: git submodule update --init t3code
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
+      # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030).
+      - uses: ./.github/actions/setup
 
-      # Node runs our scripts and Vitest (ADR-0019), at t3's engines.node (26), which local runs use too.
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: t3code/package.json
-
-      - run: bun install --frozen-lockfile
-
-      - run: bun run check
+      - run: pnpm run check
 
       - name: Deploy
         working-directory: apps/environment
         run: node scripts/stage.ts deploy "$STAGE" --web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MODEL_PROXY_API_KEY: ${{ secrets.MODEL_PROXY_API_KEY }}
+          COMMISSARY_CONTAINER_API_KEY: ${{ secrets.COMMISSARY_CONTAINER_API_KEY }}
+          T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
+          T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
+          # Unset on `bump`, whose tokens the job makes fresh.
+          T3_BOOTSTRAP_TOKEN: ${{ secrets.T3_BOOTSTRAP_TOKEN }}
+          T3FLARE_ADMIN_TOKEN: ${{ secrets.T3FLARE_ADMIN_TOKEN }}
 
       - name: Smoke check
         working-directory: apps/environment
         run: node scripts/stage.ts run "$STAGE" smoke "$GITHUB_SHA"
+        # The same secrets as Deploy.
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MODEL_PROXY_API_KEY: ${{ secrets.MODEL_PROXY_API_KEY }}
+          COMMISSARY_CONTAINER_API_KEY: ${{ secrets.COMMISSARY_CONTAINER_API_KEY }}
+          T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
+          T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
+          # Unset on `bump`, whose tokens the job makes fresh.
+          T3_BOOTSTRAP_TOKEN: ${{ secrets.T3_BOOTSTRAP_TOKEN }}
+          T3FLARE_ADMIN_TOKEN: ${{ secrets.T3FLARE_ADMIN_TOKEN }}

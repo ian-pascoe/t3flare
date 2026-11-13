@@ -1,192 +1,204 @@
-// Generates the root package.json's workspace fields from t3code's pnpm-workspace.yaml
-// (ADR-0001, ADR-0019): Bun reads catalogs, overrides and patchedDependencies only at the
-// root, so we derive them from the submodule instead of copying them by hand.
+// Generates the root pnpm-workspace.yaml from t3code's (ADR-0001, ADR-0030): our packages plus the t3 packages we
+// import, and t3's settings copied as they are, so the root resolves t3's packages the way t3 does.
 //
-//   node scripts/gen-workspace.ts
+//   node scripts/gen-workspace.ts            write pnpm-workspace.yaml, package.json's packageManager and
+//                                            engines.node, and mise.toml's node and pnpm
+//   node scripts/gen-workspace.ts --check    exit 1 when any of them differs from what the pinned t3code gives
 //
-// Fields it owns in package.json: workspaces, overrides, patchedDependencies.
-// Everything it cannot translate is printed, so a bump shows what changed.
+// A t3 setting this script has not classified fails it ("classify it"), so a new key never lands unread in a bump.
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parse, parseAllDocuments } from "yaml";
+import { parse, stringify } from "yaml";
+import { bareKey, closure, depPatchKey, readLock, versionsByName } from "./lock.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const t3 = path.join(root, "t3code");
 const PREFIX = "t3code/";
+const check = process.argv.includes("--check");
 
 // The t3 packages we import; their workspace dependencies are added transitively.
 const T3_ROOTS = ["t3", "@t3tools/web"];
-// Our own workspace globs.
-const OUR_WORKSPACES = ["apps/*", "packages/*", "infra"];
-// Vendored packages (vendor/cloudpid/README.md): workspace members, but their dependencies are pinned like t3's.
-const VENDORED = ["vendor/cloudpid/*"];
+// Our own workspace globs, vendored packages included (vendor/cloudpid/README.md).
+const OUR_WORKSPACES = ["apps/*", "packages/*", "vendor/cloudpid/*", "infra"];
 
-type Pkg = { dir: string; json: Record<string, any> };
-const t3Packages = new Map<string, Pkg>();
+// t3's top-level settings, by how they reach our root. Anything else fails the script.
+const COPIED = [
+  "catalog",
+  "overrides",
+  "packageExtensions",
+  "strictPeerDependencies",
+  "peerDependencyRules",
+  "permissions",
+  "publicHoistPattern",
+  "minimumReleaseAgeExclude",
+] as const;
+const ADJUSTED = ["packages", "patchedDependencies", "allowBuilds"] as const;
+
+// Ours, merged into t3's overrides.
+const OUR_OVERRIDES: Record<string, string> = {
+  // The vendored packages ask for each other as "*" (vendor/ is not edited); pnpm would fetch those from the registry.
+  "@cloudpid/protocol": "workspace:*",
+  "@cloudpid/config": "workspace:*",
+  // Our core packages stay where Bun's per-name pins held them (plan §2.6's no-move rule; docs/steps/pnpm/lock-diff.ts).
+  // wrangler and miniflare (tests only) ask for a newer workerd; the deploy uses @alchemy.run/cloudflare-runtime's.
+  workerd: "1.20261026.1",
+  "@cloudflare/workers-types@^5.20261104.1": "5.20261108.1",
+  // @alchemy.run/cloudflare's `^4.1.0`; t3 does not install it.
+  "@effect/sql-d1": "4.1.1",
+};
+
+// Ours, merged into t3's peerDependencyRules.allowedVersions (t3's strictPeerDependencies covers our packages too).
+const OUR_ALLOWED_PEERS: Record<string, string> = {
+  // Our oxlint (1.91.0) is newer than vite-plus's oxlint-tsgolint. Our lint never uses that backend: oxlint
+  // --type-aware runs tsrslint's, linked as node_modules/.bin/tsgolint by scripts/link-tsrslint.sh.
+  "oxlint>oxlint-tsgolint": "7.0.2004",
+};
+
+// Dependency build scripts are denied (review H4): nothing in the Worker needs a native build, and CI's deploy step
+// carries secrets. t3's `true`s become `false`; ours with install scripts are listed so pnpm does not fail on them.
+// Allow one only when proven needed, with the reason beside it.
+const OUR_DENIED_BUILDS = ["@google/genai", "@mongodb-js/zstd", "node-liblzma", "protobufjs"];
+
+type Json = Record<string, any>;
+const readJson = (file: string): Json => JSON.parse(fs.readFileSync(file, "utf8"));
+
+const t3Packages = new Map<string, { dir: string; json: Json }>();
 for (const group of ["apps", "packages", "infra"]) {
   for (const name of fs.readdirSync(path.join(t3, group))) {
     const file = path.join(t3, group, name, "package.json");
-    if (!fs.existsSync(file)) continue;
-    const json = JSON.parse(fs.readFileSync(file, "utf8"));
-    t3Packages.set(json.name, { dir: `${group}/${name}`, json });
+    if (fs.existsSync(file)) t3Packages.set(readJson(file).name, { dir: `${group}/${name}`, json: readJson(file) });
   }
 }
-
 const members = new Set<string>();
 const queue = [...T3_ROOTS];
 while (queue.length > 0) {
-  const name = queue.pop()!;
-  const pkg = t3Packages.get(name);
+  const pkg = t3Packages.get(queue.pop()!);
   if (pkg === undefined || members.has(pkg.dir)) continue;
   members.add(pkg.dir);
   for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
-    for (const [dep, spec] of Object.entries<string>(pkg.json[field] ?? {})) {
-      if (spec.startsWith("workspace:")) queue.push(dep);
+    for (const [dep, spec] of Object.entries<string>(pkg.json[field] ?? {})) if (spec.startsWith("workspace:")) queue.push(dep);
+  }
+}
+
+const ws = parse(fs.readFileSync(path.join(t3, "pnpm-workspace.yaml"), "utf8")) as Json;
+const unknown = Object.keys(ws).filter((key) => !(COPIED as ReadonlyArray<string>).includes(key) && !(ADJUSTED as ReadonlyArray<string>).includes(key));
+if (unknown.length > 0) {
+  console.error(`t3code/pnpm-workspace.yaml has settings gen-workspace.ts has not classified: ${unknown.join(", ")}.`);
+  console.error("Classify each in COPIED or ADJUSTED (or drop it on purpose), then rerun.");
+  process.exit(1);
+}
+
+// t3's patches for packages our install contains (review H1): pnpm fails on a patch that matches nothing, so a key is
+// kept only when its name@version is installed by our t3 importers in t3's lock, or by any importer in our own lock
+// (our packages' own dependencies, such as alchemy). A first install without a root lock can miss the latter;
+// `--check` then reports the file stale, and verify-lock.ts fails on any t3-patched version left unpatched.
+const t3Lock = readLock(path.join(t3, "pnpm-lock.yaml")).main;
+const installed = new Set([...closure(t3Lock, members)].map(bareKey));
+const rootLockFile = path.join(root, "pnpm-lock.yaml");
+if (fs.existsSync(rootLockFile)) {
+  const rootLock = readLock(rootLockFile).main;
+  for (const key of closure(rootLock, Object.keys(rootLock.importers))) installed.add(bareKey(key));
+}
+
+// t3's edges into names its lock holds at several versions, pinned as t3 resolved them. A snapshot's key carries only
+// its peers, so when one of our packages also installs `parent@v`, pnpm resolves the parent's dependencies afresh and
+// takes the highest version already in the lock, for t3's importers too (measured in M3: the MCP SDK's jose moved).
+// Single-version names need no pin: the seeded lock already holds them.
+const t3Versions = versionsByName(Object.keys(t3Lock.packages ?? {}));
+const T3_EDGE_PINS: Record<string, string> = {};
+for (const key of closure(t3Lock, members)) {
+  const snapshot = t3Lock.snapshots?.[key] as Json | undefined;
+  // A snapshot lists its resolved peers among its dependencies; those follow the parent's context, not a pin.
+  const peers = (t3Lock.packages?.[bareKey(key)] as Json | undefined)?.peerDependencies ?? {};
+  for (const field of ["dependencies", "optionalDependencies"]) {
+    for (const [name, raw] of Object.entries<string>(snapshot?.[field] ?? {})) {
+      const version = String(raw).replace(/\(.*$/, "");
+      if (!/^\d/.test(version) || (t3Versions.get(name)?.size ?? 0) < 2 || name in peers) continue;
+      T3_EDGE_PINS[`${bareKey(key)}>${name}`] = version;
     }
   }
 }
-
-const ws = parse(fs.readFileSync(path.join(t3, "pnpm-workspace.yaml"), "utf8")) as {
-  catalog: Record<string, string>;
-  overrides: Record<string, string>;
-  patchedDependencies: Record<string, string>;
-};
-
-const skipped: string[] = [];
-const catalog = ws.catalog;
-
-// pnpm overrides → Bun overrides. Bun supports only top-level package names, so a
-// `parent>child` edge becomes a plain override of `child` when it pins a version, a
-// `pkg@^8` selector becomes `pkg`, and removals ("-") have no Bun equivalent.
-const overrides: Record<string, string> = {};
-for (const [key, raw] of Object.entries(ws.overrides)) {
-  const value = raw === "catalog:" ? undefined : String(raw);
-  const leaf = key.includes(">") ? key.slice(key.lastIndexOf(">") + 1) : key;
-  const name = leaf.replace(/(.)@[^@]*$/, "$1");
-  if (raw === "-") {
-    skipped.push(`override ${key}: "-" (dependency removal; Bun has none)`);
-    continue;
-  }
-  const version = value ?? catalog[name] ?? catalog[leaf];
-  if (version === undefined) {
-    skipped.push(`override ${key}: catalog has no ${name}`);
-    continue;
-  }
-  if (key.includes(">") || leaf !== name) skipped.push(`override ${key} → ${name} (edge/selector flattened)`);
-  if (overrides[name] !== undefined && overrides[name] !== version) {
-    skipped.push(`override ${key}: conflicts with ${name}@${overrides[name]}`);
-    continue;
-  }
-  overrides[name] = version;
-}
-// Bun does not read t3's pnpm-lock.yaml and resolves afresh, so some packages would land on releases t3
-// never tested (209 of 993 at the spike; two broke the build). Every package t3's lock resolves to exactly
-// one version is pinned to it. A package the lock holds at several versions cannot be pinned (Bun's
-// overrides are per name), nor can our own direct dependencies be, which we choose ourselves.
-const lockText = fs.readFileSync(path.join(t3, "pnpm-lock.yaml"), "utf8");
-const lockDocs = parseAllDocuments(lockText).map((doc) => doc.toJS()) as unknown;
-const lock = (Array.isArray(lockDocs) ? lockDocs : [lockDocs]).find(
-  (doc): doc is { packages: Record<string, unknown> } => doc?.settings !== undefined && doc?.packages !== undefined,
-);
-if (lock === undefined) throw new Error("t3code/pnpm-lock.yaml: no lockfile document with packages");
-const lockVersions = new Map<string, Set<string>>();
-for (const key of Object.keys(lock.packages)) {
-  const match = /^(@?[^@]+)@(.+)$/.exec(key);
-  if (match === null) continue;
-  const [, name, version] = match as unknown as [string, string, string];
-  if (!lockVersions.has(name)) lockVersions.set(name, new Set());
-  lockVersions.get(name)!.add(version);
-}
-const ourDirect = new Set<string>();
-for (const file of [path.join(root, "package.json"), ...OUR_WORKSPACES.flatMap((glob) => {
-  if (!glob.endsWith("/*")) return [path.join(root, glob, "package.json")];
-  const dir = path.join(root, glob.slice(0, -2));
-  return fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => path.join(dir, name, "package.json")) : [];
-})]) {
-  if (!fs.existsSync(file)) continue;
-  const json = JSON.parse(fs.readFileSync(file, "utf8"));
-  for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
-    for (const [dep, spec] of Object.entries<string>(json[field] ?? {})) {
-      if (!spec.startsWith("catalog:") && !spec.startsWith("workspace:")) ourDirect.add(dep);
-    }
-  }
-}
-const lockPins: Record<string, string> = {};
-const multiVersion: Array<string> = [];
-const notPinned: Array<string> = [];
-for (const [name, versions] of [...lockVersions].sort(([a], [b]) => a.localeCompare(b))) {
-  const [version] = versions;
-  if (versions.size > 1) {
-    multiVersion.push(`${name} (${[...versions].join(", ")})`);
-    continue;
-  }
-  if (!/^\d/.test(version!)) {
-    notPinned.push(`${name}@${version} (not a registry version)`);
-    continue;
-  }
-  if (overrides[name] !== undefined) continue; // t3's own override wins
-  if (ourDirect.has(name)) {
-    notPinned.push(`${name}@${version} (our direct dependency)`);
-    continue;
-  }
-  lockPins[name] = version!;
-}
-Object.assign(overrides, lockPins);
-// Held at the effect version, as in cloudpid (ADR-0028): @effect/platform-bun pulls it in.
-overrides["@effect/platform-node-shared"] = catalog["effect"]!;
 
 const patchedDependencies: Record<string, string> = {};
-for (const [key, file] of Object.entries(ws.patchedDependencies)) {
-  patchedDependencies[key] = `${PREFIX}${file}`;
+for (const [key, file] of Object.entries<string>(ws.patchedDependencies ?? {})) {
+  if (installed.has(key)) patchedDependencies[key] = `${PREFIX}${file}`;
 }
-// Our own dependency patches (`patches/deps/<scope>__<name>@<version>.patch`, step 2a): bun patchedDependencies, not
-// t3 Patches (ADR-0001 counts those apart).
+// Our own dependency patches (`patches/deps/<scope>__<name>@<version>.patch`): not t3 Patches (ADR-0001 counts those).
 const depPatches = path.join(root, "patches/deps");
-if (fs.existsSync(depPatches)) {
-  for (const file of fs.readdirSync(depPatches).filter((name) => name.endsWith(".patch")).sort()) {
-    const key = file.slice(0, -".patch".length).replace(/^@([^_]+)__/, "@$1/");
-    if (patchedDependencies[key] !== undefined) throw new Error(`patches/deps/${file}: t3 already patches ${key}`);
-    patchedDependencies[key] = `patches/deps/${file}`;
-  }
+for (const file of fs.readdirSync(depPatches).filter((name) => name.endsWith(".patch")).sort()) {
+  const key = depPatchKey(file);
+  if (ws.patchedDependencies?.[key] !== undefined) throw new Error(`patches/deps/${file}: t3 already patches ${key}`);
+  patchedDependencies[key] = `patches/deps/${file}`;
 }
 
-const pkgPath = path.join(root, "package.json");
-const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-pkg.workspaces = {
-  packages: [...OUR_WORKSPACES.slice(0, 2), ...VENDORED, ...OUR_WORKSPACES.slice(2), ...[...members].sort().map((dir) => `${PREFIX}${dir}`)],
-  catalog,
-};
-pkg.overrides = overrides;
-pkg.patchedDependencies = patchedDependencies;
-fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+const allowBuilds: Record<string, boolean> = {};
+for (const key of Object.keys(ws.allowBuilds ?? {})) {
+  if (key.includes("@file:")) continue; // a tarball only t3's mobile app installs
+  allowBuilds[key] = false;
+}
+for (const name of OUR_DENIED_BUILDS) allowBuilds[name] = false;
 
-// t3's exemptions from the minimum release age (versions it vetted younger than a day).
-const bunfigPath = path.join(root, "bunfig.toml");
-const excludes = (ws as { minimumReleaseAgeExclude?: string[] }).minimumReleaseAgeExclude ?? [];
-fs.writeFileSync(
-  bunfigPath,
-  fs
-    .readFileSync(bunfigPath, "utf8")
-    .replace(/^minimumReleaseAgeExcludes = .*$/m, `minimumReleaseAgeExcludes = ${JSON.stringify(excludes)}`),
+const out: Json = {
+  packages: [...OUR_WORKSPACES, ...[...members].sort().map((dir) => `${PREFIX}${dir}`)],
+};
+for (const key of Object.keys(ws)) {
+  if (key === "packages") continue;
+  if (key === "patchedDependencies") out.patchedDependencies = patchedDependencies;
+  else if (key === "allowBuilds") out.allowBuilds = Object.fromEntries(Object.entries(allowBuilds).sort(([a], [b]) => a.localeCompare(b)));
+  else if (key === "overrides") {
+    const pins = Object.fromEntries(Object.entries(T3_EDGE_PINS).filter(([pin]) => ws.overrides[pin] === undefined).sort(([a], [b]) => a.localeCompare(b)));
+    out.overrides = { ...ws.overrides, ...OUR_OVERRIDES, ...pins };
+  }
+  else if (key === "peerDependencyRules") {
+    out.peerDependencyRules = { ...ws.peerDependencyRules, allowedVersions: { ...ws.peerDependencyRules.allowedVersions, ...OUR_ALLOWED_PEERS } };
+  }
+  else out[key] = ws[key];
+}
+// A `pnpm run` with missing or stale dependencies fails instead of installing (review M3).
+out.verifyDepsBeforeRun = "error";
+
+const t3Manifest = readJson(path.join(t3, "package.json"));
+const pnpmVersion = /^pnpm@(\d+\.\d+\.\d+)/.exec(t3Manifest.packageManager ?? "")?.[1];
+const nodeVersion = t3Manifest.engines?.node as string | undefined;
+if (pnpmVersion === undefined || nodeVersion === undefined || !/^\d+\.\d+\.\d+$/.test(nodeVersion)) {
+  throw new Error(`t3code/package.json: expected packageManager pnpm@x.y.z and an exact engines.node, got ${t3Manifest.packageManager} / ${nodeVersion}`);
+}
+
+const files = new Map<string, string>();
+files.set(
+  "pnpm-workspace.yaml",
+  `# Generated by scripts/gen-workspace.ts from t3code/pnpm-workspace.yaml; do not edit. t3's comments are in its file.\n${stringify(out, { lineWidth: 0 })}`,
+);
+const manifest = readJson(path.join(root, "package.json"));
+manifest.packageManager = `pnpm@${pnpmVersion}`;
+manifest.engines = { ...manifest.engines, node: nodeVersion };
+files.set("package.json", `${JSON.stringify(manifest, null, 2)}\n`);
+files.set(
+  "mise.toml",
+  [
+    "# Generated by scripts/gen-workspace.ts from t3code/package.json (packageManager, engines.node); do not edit.",
+    "[tools]",
+    `node = "${nodeVersion}"`,
+    `pnpm = "${pnpmVersion}"`,
+    "",
+    "# A pnpm or vp command run inside t3code/ would otherwise install it as its own workspace (AGENTS.md).",
+    "[env]",
+    'NPM_CONFIG_WORKSPACE_DIR = "{{config_root}}"',
+    "",
+  ].join("\n"),
 );
 
-// What the lock pinning could not express, for the bump report (ADR-0019).
-const report = [
-  `# Generated by scripts/gen-workspace.ts from t3code/pnpm-lock.yaml; do not edit.`,
-  `lock packages: ${lockVersions.size}; pinned: ${Object.keys(lockPins).length}; at several versions (not pinnable): ${multiVersion.length}; not pinned otherwise: ${notPinned.length}`,
-  "",
-  "## Untranslated pnpm settings",
-  ...skipped.map((line) => `- ${line}`),
-  "",
-  "## At several versions in t3's lock (Bun overrides are per name)",
-  ...multiVersion.map((line) => `- ${line}`),
-  "",
-  "## Not pinned",
-  ...notPinned.map((line) => `- ${line}`),
-  "",
-];
-fs.writeFileSync(path.join(root, "scripts/lock-pins.report.md"), report.join("\n"));
-
-console.log(`workspaces: ${members.size} t3 packages`);
-console.log(report[1]);
-for (const line of skipped) console.log(`untranslated: ${line}`);
+if (check) {
+  const stale = [...files].filter(([file, text]) => !fs.existsSync(path.join(root, file)) || fs.readFileSync(path.join(root, file), "utf8") !== text);
+  // A pnpm command run inside t3code/ installs it as its own workspace (AGENTS.md).
+  const nested = fs.existsSync(path.join(t3, "node_modules/.pnpm"));
+  for (const [file] of stale) console.error(`${file} is stale: run \`pnpm run gen:workspace\``);
+  if (nested) console.error("t3code/node_modules/.pnpm exists: a pnpm or vp command ran inside t3code/. Remove t3code/node_modules and reinstall.");
+  if (stale.length > 0 || nested) process.exit(1);
+  console.log(`workspace ok: ${members.size} t3 packages, ${Object.keys(patchedDependencies).length} patches`);
+} else {
+  for (const [file, text] of files) fs.writeFileSync(path.join(root, file), text);
+  const dropped = Object.keys(ws.patchedDependencies ?? {}).filter((key) => patchedDependencies[key] === undefined);
+  console.log(`workspace: ${members.size} t3 packages; pnpm ${pnpmVersion}, node ${nodeVersion}`);
+  console.log(`patches: ${Object.keys(patchedDependencies).length} kept; ${dropped.length} of t3's outside our install`);
+}

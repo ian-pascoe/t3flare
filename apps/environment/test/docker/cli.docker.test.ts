@@ -1,14 +1,14 @@
 // @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off globalTimers:off
-// `bun run test:docker` (step 4a, plan §9; SPI-1043): the pinned Codex and pi, launched exactly as the Workspace DO
+// `pnpm run test:docker` (step 4a, plan §9; SPI-1043): the pinned Codex and pi, launched exactly as the Workspace DO
 // launches them (`profileLaunch` → `processCommand`, the request guard's turn policy), in a container with the image's
-// CLI layer (test/docker/Dockerfile), against the real model proxy. Not part of `bun run check`: it needs Docker,
+// CLI layer (test/docker/Dockerfile), against the real model proxy. Not part of `pnpm run check`: it needs Docker,
 // network, MODEL_PROXY_URL and COMMISSARY_CONTAINER_API_KEY; the nightly bump job runs it.
 //
 // Per CLI: a tool turn with an approval answered, then a fresh container (a Container that slept: only the synced
 // directory survives) resumes the same native conversation. Then: the key is nowhere in the synced directory, and the
 // CLI network (internal, its only peer the stand-in `computer.internal`) tunnelled only to the proxy's host.
 //
-//   bun run test:docker            (vitest.docker.config.ts; T3FLARE_TEST_DOCKER_OUT=<file> writes the report)
+//   pnpm run test:docker            (vitest.docker.config.ts; T3FLARE_TEST_DOCKER_OUT=<file> writes the report)
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";

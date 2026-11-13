@@ -1,16 +1,18 @@
 name: Nightly bump
 
 # ADR-0017: pin t3code's newest nightly tag, prove it on the `bump` stage, and propose it as a pull request.
-# `bun run bump` (scripts/bump.ts) does the work and leaves the pin unchanged when any step fails.
+# `pnpm run bump` (scripts/bump.ts) does the work and leaves the pin unchanged when any step fails.
 #
-# Needs, made by `bun run --cwd infra ci:setup` (infra/github.ts):
+# Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts):
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-bump`
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
 #   vars.MODEL_PROXY_URL, secrets.MODEL_PROXY_API_KEY   the model proxy (ADR-0012), for the agents and the real turn
 #   secrets.COMMISSARY_CONTAINER_API_KEY   the CLI agents' own proxy key (step 4a, ADR-0016 A′), set by hand on `bump`
-# and by `bun run --cwd infra github-app:setup`: secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY.
+# and by `pnpm --filter @t3flare/infra run github-app:setup`: secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY.
 # and the repository setting that lets Actions create pull requests (infra/allow-actions-prs.ts).
 # The stage's own bootstrap and admin tokens are made fresh by the job; nothing else is stored.
+# The secrets reach only the Bump step. Its install runs no dependency build script (pnpm-workspace.yaml's allowBuilds,
+# review H4), but its check and deploy run dependency code, as they must.
 
 on:
   schedule:
@@ -23,6 +25,10 @@ on:
         required: false
       force:
         description: "Deploy and test even when the pin is already the newest nightly"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Do not commit or propose the pin"
         type: boolean
         default: false
 
@@ -40,6 +46,8 @@ jobs:
     # 60: step 4a added test:docker (an image build and four CLI turns) and the acceptance test's --codex --pi.
     timeout-minutes: 60
     environment: bump
+    env:
+      NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
     steps:
       # The submodule is fetched by hand, not by the action: the action walks t3code's nested gitlinks recursively,
       # and one of them (.repos/alchemy-effect/submodules/distilled) has no URL, which fails the checkout.
@@ -50,29 +58,24 @@ jobs:
 
       - run: git submodule update --init t3code
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-
-      # Node runs our scripts and Vitest (ADR-0019), at t3's engines.node (26), which local runs use too.
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: t3code/package.json
-
-      - run: bun install --frozen-lockfile
+      # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030). bump.ts's own install is not
+      # frozen: a new pin's lock must change (review H3).
+      - uses: ./.github/actions/setup
 
       - name: Bump
         id: bump
         run: |
-          args=(--commit --report bump-report.json)
+          args=(--report bump-report.json)
+          if [ "$DRY_RUN" != "true" ]; then args+=(--commit); fi
           if [ -n "$TAG" ]; then args+=(--tag "$TAG"); fi
           if [ "$FORCE" != "true" ]; then args+=(--skip-if-current); fi
           git config user.name "t3flare-bump"
           git config user.email "t3flare-bump@users.noreply.github.com"
-          bun run bump "${args[@]}"
+          pnpm run bump "${args[@]}"
         env:
           TAG: ${{ inputs.tag }}
           FORCE: ${{ inputs.force }}
+          DRY_RUN: ${{ inputs.dry_run }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           MODEL_PROXY_URL: ${{ vars.MODEL_PROXY_URL }}
@@ -88,7 +91,7 @@ jobs:
             {
               echo "## t3code bump"
               echo '```json'
-              jq '{ok, from, to, changed, note, steps: [.steps[] | {name, ok, seconds}], acceptance: (.acceptance | if . then {ok, failures, sqlAdapter, threadWindow, search, realTurn: (.realTurn | if . then {ok, failures, clone, turn, checkpointOps} else null end)} else null end), lockPins}' bump-report.json
+              jq '{ok, from, to, changed, note, steps: [.steps[] | {name, ok, seconds}], acceptance: (.acceptance | if . then {ok, failures, sqlAdapter, threadWindow, search, realTurn: (.realTurn | if . then {ok, failures, clone, turn, checkpointOps} else null end)} else null end), lock, rollback}' bump-report.json
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -102,7 +105,7 @@ jobs:
 
       # A new pin that passed: push it on its own branch and propose it. The owner merges.
       - name: Propose the new pin
-        if: success()
+        if: success() && inputs.dry_run != true
         run: |
           to=$(jq -r .to bump-report.json)
           changed=$(jq -r .changed bump-report.json)

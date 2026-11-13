@@ -20,6 +20,9 @@ import { buildAgentsWorker } from "../../agents/build.ts";
 import { isDurableObjectClassNotFound } from "./deploy-retry.ts";
 
 const here = path.resolve(import.meta.dirname, "..");
+const repoRoot = path.resolve(here, "../..");
+// Every pnpm command this script starts belongs to the root workspace, never t3code's (AGENTS.md; ADR-0030).
+process.env.NPM_CONFIG_WORKSPACE_DIR = repoRoot;
 const [command, stage, ...rest] = process.argv.slice(2);
 
 /**
@@ -119,8 +122,13 @@ switch (command) {
         process.exit(2);
       }
     }
+    // A pnpm or vp command run inside t3code/ installs it as its own workspace and repoints t3's packages.
+    if (fs.existsSync(path.join(repoRoot, "t3code/node_modules/.pnpm"))) {
+      console.error("t3flare: t3code/node_modules/.pnpm exists (a pnpm command ran inside t3code/); remove t3code/node_modules and run `pnpm install`");
+      process.exit(2);
+    }
     if (rest.includes("--web") || !fs.existsSync(path.join(here, "dist/web/index.html"))) {
-      const web = spawnSync("bun", ["run", "prepare:web"], { cwd: here, stdio: "inherit" });
+      const web = spawnSync("pnpm", ["run", "prepare:web"], { cwd: here, stdio: "inherit" });
       if (web.status !== 0) process.exit(web.status ?? 1);
     }
     await buildWorker();

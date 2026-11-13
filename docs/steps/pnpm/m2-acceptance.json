@@ -1,0 +1,557 @@
+{
+  "url": "https://t3flare-environment-pnpm.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-13T00:19:01.286Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.9",
+      "commit": "8b19b85729c9",
+      "builtAt": "2026-11-13T00:17:32.386Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-13T00:29:04.316Z",
+    "paired": 200,
+    "ms": 4260,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "cb140007-f30a-4f34-abcd-a2ccd10561ce",
+    "threads": 12,
+    "ms": 5305
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 1002,
+    "bytes": 20955,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 203,
+    "maxBytes": 46534
+  },
+  "subscribeThread": {
+    "ms": 55,
+    "bytes": 46473,
+    "items": 20
+  },
+  "search": {
+    "ms": 72,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1535
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 3,
+    "maxParameters": 300,
+    "compoundsRewritten": 17,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "rowsWritten": 10175,
+    "rowsRead": 33415,
+    "databaseSize": 4800512,
+    "refusedStatements": 0,
+    "pragmaRefusals": 0
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 193,
+      "modules": 109
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 4,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:17e34eb3-ccdb-4604-9065-6f27f518d942"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": [],
+    "processChannelOnInstance": true
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwe8bn8w",
+      "ms": 54387,
+      "cwd": "/w/acceptance-mwe8bn8w",
+      "error": null
+    },
+    "turn": {
+      "threadId": "ce4e0a38-835a-4700-8342-5ab7b74d18f0",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwe8bn8w/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwe8bn8w && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 74169
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "ms": 74688
+  },
+  "codex": {
+    "ok": true,
+    "failures": [],
+    "cli": "codex",
+    "workspace": "acceptance-codex-mwe8d8vp",
+    "first": {
+      "threadId": "29b39024-484c-482e-baae-483fdf66cf3b",
+      "root": "/w/acceptance-codex-mwe8d8vp",
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:29b39024-484c-482e-baae-483fdf66cf3b:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c \"cat src/greeting.txt && printf '\\\\n--- test.sh ---\\\\n' && sed -n '1,200p' test.sh\"",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c \"printf '%s\\\\n' 'Hello from the CLI acceptance.' >> src/greeting.txt && bash test.sh\"",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "I’ll append the requested line, then run the repository’s check script.`src/greeting.txt` now ends with the requested line, and `bash test.sh` passed.",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d247-19fc-7f83-bafc-76d45cf57586:native-request:call_iVrOmfToB9VNf7UXqCEs3y9z:be83050c-66f2-47c7-a155-25b6d84fbf23",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d247-19fc-7f83-bafc-76d45cf57586:native-request:call_4Z4T9BdCgRqaZoebObkJ3z20:ee31b2d0-d092-4461-a7e9-e12e3336d39a",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A29b39024-484c-482e-baae-483fdf66cf3b%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "codex",
+            "nativeId": "01a1d247-14b5-7870-9b53-32dcf563bcaa",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:codex:thread:29b39024-484c-482e-baae-483fdf66cf3b:53ad84df-840c-4950-a94b-859b1838dff2",
+          "providerInstanceId": "codex"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:codex:thread:29b39024-484c-482e-baae-483fdf66cf3b:53ad84df-840c-4950-a94b-859b1838dff2",
+          "status": "ready",
+          "cwd": "/w/acceptance-codex-mwe8d8vp"
+        }
+      ],
+      "ms": 23774
+    },
+    "stopped": {
+      "running": false,
+      "leased": false,
+      "lastUse": 1794529235068
+    },
+    "second": {
+      "threadId": "29b39024-484c-482e-baae-483fdf66cf3b",
+      "root": "/w/acceptance-codex-mwe8d8vp",
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:29b39024-484c-482e-baae-483fdf66cf3b:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:29b39024-484c-482e-baae-483fdf66cf3b:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "`Hello from the CLI acceptance.`",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d247-19fc-7f83-bafc-76d45cf57586:native-request:call_iVrOmfToB9VNf7UXqCEs3y9z:be83050c-66f2-47c7-a155-25b6d84fbf23",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d247-19fc-7f83-bafc-76d45cf57586:native-request:call_4Z4T9BdCgRqaZoebObkJ3z20:ee31b2d0-d092-4461-a7e9-e12e3336d39a",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A29b39024-484c-482e-baae-483fdf66cf3b%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "codex",
+            "nativeId": "01a1d247-14b5-7870-9b53-32dcf563bcaa",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:codex:thread:29b39024-484c-482e-baae-483fdf66cf3b:53ad84df-840c-4950-a94b-859b1838dff2",
+          "providerInstanceId": "codex"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:codex:thread:29b39024-484c-482e-baae-483fdf66cf3b:53ad84df-840c-4950-a94b-859b1838dff2",
+          "status": "ready",
+          "cwd": "/w/acceptance-codex-mwe8d8vp"
+        }
+      ],
+      "ms": 7900
+    },
+    "protocol": [
+      {
+        "at": 1794529261380,
+        "command": "codex",
+        "argv": [
+          "thread/resume"
+        ],
+        "cwd": null,
+        "route": "protocol",
+        "exitCode": null,
+        "ms": 0,
+        "detail": "ok 01a1d247-14b5-7870-9b53-32dcf563bcaa"
+      }
+    ],
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 671,
+        "bytes": 7924059,
+        "ms": 371
+      },
+      "flagged": null
+    },
+    "keyRouteWithoutCli": "403"
+  },
+  "peer": {
+    "ok": true,
+    "failures": [],
+    "outbound": {
+      "refused": {
+        "ok": false,
+        "error": {
+          "_tag": "PeerLinkError",
+          "reason": "disabled",
+          "message": "No machine is registered; Outbound links are made from the harness panel (SPI-1061)."
+        }
+      },
+      "listed": {
+        "links": []
+      },
+      "ms": 1455
+    },
+    "fixture": {
+      "projectId": "b086f709-cf74-4674-9d76-a8b7a396dd02",
+      "workspaceRoot": "/w/step3-fixture",
+      "cloned": true
+    },
+    "link": {
+      "scope": "orchestration:read orchestration:operate"
+    },
+    "cap": {
+      "fullAccess": {
+        "status": 400,
+        "body": {
+          "_tag": "AuthMcpApprovalError",
+          "message": "That pairing code cannot grant this access. It has not been used, so choose an access level it grants, or create a code with the standard scopes."
+        }
+      },
+      "autoAcceptEdits": 200
+    },
+    "launch": {
+      "isError": false,
+      "threadId": "mcp:launch:32e75c4b9f484d36f718fc252524eaab8706436478aa1a1ac775eff4cae5fd5c"
+    },
+    "launchResult": {
+      "status": "completed",
+      "pieces": 1,
+      "reply": true,
+      "runtimeMode": "auto-accept-edits",
+      "interactionMode": "default",
+      "linkOrigin": {
+        "sessionId": "edd96eaf-053b-477f-98d8-047d003459d8",
+        "label": "t3flare acceptance mwe8e57i",
+        "access": "auto-accept-edits"
+      },
+      "delegatedFrom": {
+        "environmentId": "00000000-0000-4000-8000-000000000001",
+        "threadId": "laptop-mwe8e57i",
+        "title": "laptop parent"
+      }
+    },
+    "F5": {
+      "runtimeMode": "auto-accept-edits",
+      "request": {
+        "kind": "command"
+      }
+    },
+    "waitHold": {
+      "ms": 50031,
+      "timedOut": true,
+      "status": "running"
+    },
+    "F7": {
+      "link": {
+        "isError": true,
+        "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"The pending user-input request was not found.\"}"
+      },
+      "stillPending": true,
+      "owner": {
+        "runs": [
+          "completed"
+        ],
+        "output": true
+      }
+    },
+    "F6": {
+      "runtimeMode": "approval-required",
+      "interactionMode": "plan",
+      "write": null,
+      "request": {
+        "kind": "command"
+      },
+      "runs": [
+        "running"
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "text": "First use the write tool to create the file plan-check.txt containing `x`. Then run the bash command `ls`. Then reply DONE."
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "text": "Preparing workspace"
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "text": "I'm in Plan mode, which means I shouldn't edit files. Creating `plan-check.txt` is a file write, so I can't do that step here. I can still run the read-only `ls"
+        },
+        {
+          "type": "command_execution",
+          "status": "running",
+          "text": "ls"
+        },
+        {
+          "type": "approval_request",
+          "status": "waiting",
+          "text": "Allow bash?"
+        }
+      ]
+    },
+    "F1": {
+      "send": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe8e57i through a linked environment, so it may change only threads that link star",
+      "interrupt": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe8e57i through a linked environment, so it may change only threads that link star",
+      "rename": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe8e57i through a linked environment, so it may change only threads that link star"
+    },
+    "F2": {
+      "create": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}",
+      "clone": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}",
+      "prefs": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe8e57i through a linked environment, so it cannot change projects or environment ",
+      "schedule": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe8e57i through a linked environment, so it cannot schedule tasks in this environm"
+    },
+    "F4": {
+      "stages": [
+        "fetch:skipped",
+        "checkout:done",
+        "setup-script:skipped",
+        "agent:done"
+      ],
+      "worktreePath": "/w/.wt/step3-fixture/link-mwe8e57i-22622d7bcc79e595",
+      "phase": "done"
+    },
+    "F12": {
+      "scope": "orchestration:read orchestration:operate settings:write source-control:write",
+      "rename": "{\"threadId\":\"d8e1885d-abd6-4db8-abfd-b36f91f320c9\",\"action\":\"rename\",\"commandId\":\"command:mcp:client%3A4cbe1e3a-0d06-4c85-a9f5-4896aa0b144a:thread-update:d8e1885d-abd6-4db8-abfd-b36f91f320c9:rename:re",
+      "interrupt": "{\"threadId\":\"d8e1885d-abd6-4db8-abfd-b36f91f320c9\",\"runId\":null,\"status\":\"no_active_run\"}"
+    },
+    "F10": {
+      "off": 403,
+      "on": 200
+    },
+    "F9": {
+      "found": true,
+      "revoke": 200,
+      "after": 401
+    }
+  },
+  "peerF11Armed": {
+    "ok": true,
+    "status": 400,
+    "body": {
+      "_tag": "AuthMcpApprovalError",
+      "message": "That is not a one-time pairing code."
+    }
+  },
+  "peerF11Disarmed": {
+    "ok": true,
+    "status": 401,
+    "body": {
+      "error": "pairing is not armed"
+    }
+  },
+  "totalMs": 269250,
+  "failures": [],
+  "ok": true
+}

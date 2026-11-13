@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Links tsrslint's native binary as `node_modules/.bin/tsgolint`, where oxlint looks for its type-aware backend, so
-# package scripts, lint-staged and editors all run tsrslint instead of tsgolint (docs/adr/0028-bun-for-installs-and-
-# scripts-and-tsrs-for-typecheck.md → Consequences). Run by `prepare`, after every `bun install`. Once tsrs ships its
+# package scripts, lint-staged and editors all run tsrslint instead of tsgolint (cloudpid's ADR-0028; here ADR-0019's
+# tsrs half). Run by `prepare`, after every `pnpm install`. Once tsrs ships its
 # own linter (oxc-project/tsrs#378), remove this script, its `prepare` step, `@maschwenk/tsrslint`, and the link.
 set -euo pipefail
 

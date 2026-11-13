@@ -1,0 +1,108 @@
+{
+  "at": "2026-11-13T00:07:13.954Z",
+  "commitBase": "4cf4c72",
+  "t3code": "24e77473ec",
+  "pnpm": "12.14.0",
+  "node": "v26.13.1",
+  "relock": "node scripts/relock.ts: gen, seed, install twice (second round adds t3 patches our own packages bring: alchemy, micromark-extension-llm-math); rerun gives a byte-identical lock",
+  "verifyLock": {
+    "t3Importers": 33,
+    "t3ClosureEntries": 9543,
+    "effectCopies": [
+      "4.1.2"
+    ],
+    "patches": 14,
+    "vendoredLinks": 4,
+    "sharedNamesAtOtherVersions": 80,
+    "failures": 0
+  },
+  "lockDiff": {
+    "counts": {
+      "a": 35,
+      "b": 86,
+      "c": 251
+    },
+    "coreMoves": []
+  },
+  "patchMarkers": [
+    {
+      "patch": "mdast-util-math@3.0.0",
+      "applied": true,
+      "marker": "    const source = this.sliceSerialize(token)"
+    },
+    {
+      "patch": "micromark-extension-llm-math@3.1.0",
+      "applied": true,
+      "marker": "import {markdownLineEnding, markdownSpace} from 'micromark-util-charac"
+    },
+    {
+      "patch": "micromark-extension-gfm-table@2.1.1",
+      "applied": true,
+      "marker": "    const construct = (self.parser.constructs.text[code] || []).find("
+    },
+    {
+      "patch": "micromark@4.0.2",
+      "applied": true,
+      "marker": "const combined = new WeakMap()"
+    },
+    {
+      "patch": "mdast-util-to-hast@13.2.1",
+      "applied": true,
+      "marker": "  collectDefinitions(tree)"
+    },
+    {
+      "patch": "@effect/vitest@4.1.2",
+      "applied": true,
+      "marker": "import type * as V from \"vite-plus/test\";"
+    },
+    {
+      "patch": "@ff-labs/fff-node@0.11.0",
+      "applied": true,
+      "marker": "      \"require\": \"./dist/index.js\","
+    },
+    {
+      "patch": "@pierre/diffs@1.7.0-beta.3",
+      "applied": true,
+      "marker": "  onRevealSearchMatch?(item: CodeViewItem<LAnnotation>): void;"
+    },
+    {
+      "patch": "node-pty@1.2.0-beta.15",
+      "applied": true,
+      "marker": "        var workerEnv = Object.assign({}, process.env);"
+    },
+    {
+      "patch": "@muse-code/sdk@1.4.6",
+      "applied": true,
+      "marker": "    readonly onProcessExit?: (exit: ProcessExit) => void;"
+    },
+    {
+      "patch": "alchemy@2.0.0-beta.85",
+      "applied": true,
+      "marker": "    const result = yield* eff.pipe(Effect.onExit((exit) => Deferred.do"
+    },
+    {
+      "patch": "@legendapp/list@3.7.2",
+      "applied": true,
+      "marker": "function shouldHoldEndOnSizeChange(ctx, dataChanged) {"
+    },
+    {
+      "patch": "@alchemy.run/cloudflare@2.0.0-beta.85",
+      "applied": true,
+      "marker": "export declare const retryContainerEnablement: <A, E extends {"
+    },
+    {
+      "patch": "@earendil-works/pi-durable@1.5.0",
+      "applied": true,
+      "marker": "const MAX_DETAILS_CALLS_BYTES = 64 * 1024;"
+    }
+  ],
+  "vendoredLinks": "@cloudpid/protocol and @cloudpid/config resolve as link: in all 4 importers that use them (verify-lock vendoredLinks: 4)",
+  "t3codeClean": "git -C t3code status --porcelain empty; t3code/node_modules/.pnpm absent",
+  "installSeconds": {
+    "pnpmColdEmptyStore": 19.52,
+    "pnpmWarmNoNodeModules": 6.64,
+    "pnpmNoop": 0.1,
+    "bunWarmNoNodeModules": 3.25,
+    "bunNoop": 0.33
+  }
+}
