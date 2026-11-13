@@ -105,6 +105,12 @@ describe("a CLI agent's snapshotForCwd (SPI-1151)", () => {
     expect(answer.slashCommands).toEqual([{ name: "echo", description: "built in" }, { name: "review", input: { hint: "<file> [focus]" } }]);
   });
 
+  it("lists no repo commands when told not to (OpenCode's), its Skills still", async () => {
+    const answer = await Effect.runPromise(cliSnapshotForCwd(builtIns, "/w/proj", access(), "opencode", false));
+    expect(answer.slashCommands).toEqual([{ name: "compact", description: "Compact" }]);
+    expect(answer.skills.map((skill) => skill.name)).toEqual(["fruit-code", "owner-only"]);
+  });
+
   it("is the built-ins alone outside a Workspace", async () => {
     const skills = access();
     const answer = await cli("/elsewhere", skills);

@@ -29,12 +29,12 @@ describe("the CLI agents' roots table", () => {
 });
 
 describe("the CLI agents' built-in commands (SPI-1151 §2)", () => {
-  it("are stock's static entries: /compact for all four, Codex's /goal, and never /feedback", () => {
+  it("are stock's static entries that run on t3flare's path: /compact for Codex and pi, Codex's /goal, never /feedback", () => {
     expect(Object.fromEntries(CLI_AGENTS.map((cli) => [cli, CLI_BUILT_IN_COMMANDS[cli].map((command) => command.name)]))).toEqual({
       codex: ["compact", "goal"],
       pi: ["compact"],
-      claude: ["compact"],
-      opencode: ["compact"],
+      claude: [],
+      opencode: [],
     });
   });
 

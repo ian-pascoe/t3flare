@@ -86,26 +86,35 @@ export const piDurableSnapshotForCwd = (machine: ServerProvider, cwd: string, ac
 
 /**
  * A CLI agent's `snapshotForCwd` (SPI-1151): the machine snapshot with `cwd`'s Repo skills, and its repo commands after
- * the machine's built-ins (a built-in keeps its name). Read from the Workspace DO, never the Container.
+ * the machine's built-ins (a built-in keeps its name). Read from the Workspace DO, never the Container. `repoCommands`
+ * false lists none: OpenCode 2.2.7 over ACP ends a command's turn on submitting it, and its reply never reaches t3
+ * (stage `pcli`, docs/steps/spi-1151.md).
  */
-export const cliSnapshotForCwd = (machine: ServerProvider, cwd: string, access: SkillsAccess, agent: CliAgent) =>
+export const cliSnapshotForCwd = (machine: ServerProvider, cwd: string, access: SkillsAccess, agent: CliAgent, repoCommands = true) =>
   Effect.map(workspaceComposerEntries(cwd, access, agent), (entries): ProviderWorkspaceSnapshot => {
     const builtIn = new Set(machine.slashCommands.map((command) => command.name));
     return {
       ...machine,
       skills: entries.skills,
-      slashCommands: [...machine.slashCommands, ...entries.slashCommands.filter((command) => !builtIn.has(command.name))],
+      slashCommands: [...machine.slashCommands, ...(repoCommands ? entries.slashCommands.filter((command) => !builtIn.has(command.name)) : [])],
       slashCommandsPending: false,
     };
   });
 
 /** A CLI driver instance's `snapshotForCwd` over its machine snapshot (SPI-1151), failing as Pi Durable's does. */
 export const cliSnapshotForCwdOf =
-  (input: { readonly machine: Effect.Effect<ServerProvider>; readonly driver: ProviderDriverKind; readonly instanceId: ProviderInstanceId; readonly agent: CliAgent; readonly access?: SkillsAccess }) =>
+  (input: {
+    readonly machine: Effect.Effect<ServerProvider>;
+    readonly driver: ProviderDriverKind;
+    readonly instanceId: ProviderInstanceId;
+    readonly agent: CliAgent;
+    readonly access?: SkillsAccess;
+    readonly repoCommands?: boolean;
+  }) =>
   (cwd: string): Effect.Effect<ProviderWorkspaceSnapshot, ProviderDriverError> => {
     const access = input.access ?? environmentSkillsAccess();
     return input.machine.pipe(
-      Effect.flatMap((machine) => cliSnapshotForCwd(machine, cwd, access, input.agent)),
+      Effect.flatMap((machine) => cliSnapshotForCwd(machine, cwd, access, input.agent, input.repoCommands ?? true)),
       Effect.mapError((cause) => new ProviderDriverError({ driver: input.driver, instanceId: input.instanceId, detail: "Failed to read the Workspace's skills.", cause })),
     );
   };

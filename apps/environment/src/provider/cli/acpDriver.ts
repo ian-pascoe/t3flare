@@ -179,7 +179,7 @@ const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
       enabled,
       checkedAt,
       models: acpSnapshotModels(environmentServices().catalog.current()),
-      // SPI-1151: stock's `/compact`, which the agent runs as its own command.
+      // SPI-1151: the built-ins that run here (none: t3's ACP adapter refuses `/compact` without a compacting flavor).
       slashCommands: CLI_BUILT_IN_COMMANDS[spec.cli],
       probe: { installed: true, version: spec.version, status: "ready", auth: { status: "authenticated" }, message: IGNORED_SETTINGS[spec.cli] },
     });
@@ -315,7 +315,8 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
     enabled,
     snapshot,
     // SPI-1151: the Workspace's Repo skills and commands at the CLI's roots, from the Workspace DO (never a spawn).
-    snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: spec.driver, instanceId, agent: spec.cli, access: skillsAccess }),
+    // OpenCode's repo commands are not listed: over ACP their reply never reaches t3 (stage pcli).
+    snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: spec.driver, instanceId, agent: spec.cli, access: skillsAccess, repoCommands: spec.cli !== "opencode" }),
     orchestrationAdapter: wrapCliAdapter(adapter, { sessions, ...(spec.cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(skillsAccess) } : {}) }),
     textGeneration: makePiDurableTextGeneration(),
   } satisfies ProviderInstance;
