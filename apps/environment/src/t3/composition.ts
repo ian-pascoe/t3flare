@@ -6,7 +6,7 @@
 import type { DurableObjectStorage } from "@cloudflare/workers-types";
 import type { RepositoryIdentity } from "@t3tools/contracts";
 import { EnvironmentHttpApi } from "@t3tools/contracts";
-import { DEFAULT_SIGNAL_EXPORT } from "@t3tools/shared/observability";
+import * as Option from "effect/Option";
 import * as OtelEnvironment from "@t3tools/shared/otelEnvironment";
 import * as NetService from "@t3tools/shared/Net";
 import * as RelayClient from "@t3tools/shared/relayClient";
@@ -107,6 +107,7 @@ import * as ProviderUsageLimitsIngestion from "t3/src/provider/ProviderUsageLimi
 import * as CommissaryLimitSources from "../usage/limitSources.ts";
 import { layerAcpRegistry } from "../provider/acpRegistry.ts";
 import * as DurableObjectDatabaseStorage from "./databaseStorage.ts";
+import { otlpConfigFromSettings } from "./otlp.ts";
 import * as ProjectFaviconResolver from "t3/src/project/ProjectFaviconResolver.ts";
 import * as T3ProjectFileLoader from "t3/src/project/T3ProjectFileLoader.ts";
 import * as RepositoryIdentityResolver from "t3/src/project/RepositoryIdentityResolver.ts";
@@ -247,6 +248,7 @@ export const make = (options: CompositionOptions) => {
       yield* (yield* FileSystem.FileSystem).makeDirectory(derived.secretsDir, { recursive: true });
       // The home directory t3 offers when browsing for a project folder (HostProcess.HomeDirectory).
       yield* (yield* FileSystem.FileSystem).makeDirectory(`${BASE_DIR}/home`, { recursive: true });
+      const savedSettings = yield* (yield* FileSystem.FileSystem).readFileString(derived.settingsPath).pipe(Effect.option, Effect.map(Option.getOrUndefined));
       return ServerConfig.ServerConfig.of({
         logLevel: "Info",
         traceMinLevel: "Info",
@@ -254,12 +256,8 @@ export const make = (options: CompositionOptions) => {
         traceBatchWindowMs: 200,
         traceMaxBytes: 1024 * 1024,
         traceMaxFiles: 1,
-        otlpTracesUrl: undefined,
-        otlpMetricsUrl: undefined,
-        otlpLogsUrl: undefined,
-        otlpTracesExport: DEFAULT_SIGNAL_EXPORT,
-        otlpMetricsExport: DEFAULT_SIGNAL_EXPORT,
-        otlpLogsExport: DEFAULT_SIGNAL_EXPORT,
+        // t3flare: the OTLP endpoints the owner saved in t3's settings, read at boot as t3 reads them (`otlp.ts`).
+        ...otlpConfigFromSettings(savedSettings),
         otelEnvironment: OtelEnvironment.none,
         cwd: BASE_DIR,
         baseDir: BASE_DIR,
@@ -713,7 +711,7 @@ export const make = (options: CompositionOptions) => {
     { global: true },
   );
 
-  // t3flare: only the routes a paired client needs (ADR-0010): no guest links, OTLP proxy,
+  // t3flare: only the routes a paired client needs (ADR-0010): no guest links,
   // device hub, server browser stream, speech stream or static files (assets serve the
   // web client). The HttpApi groups stay whole, because HttpApiBuilder needs every group.
   const layerMakeRoutes = Layer.mergeAll(
@@ -732,6 +730,8 @@ export const make = (options: CompositionOptions) => {
       ),
       ServerHttp.layerAssetRoute,
       ServerHttp.layerAttachmentUploadRoute,
+      // t3flare: t3's browser-trace forwarder, as stock mounts it (answers 204 unless a traces endpoint is saved).
+      ServerHttp.layerOtlpTracesProxyRoute,
       Ws.layer,
     ),
     McpHttpServer.layer.pipe(
