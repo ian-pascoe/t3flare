@@ -1,0 +1,67 @@
+{
+ "at": "2026-11-13T07:51:19.156Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "url": "https://t3flare-environment-pbatch.ian-g-pascoe.workers.dev/api/hooks/scheduled-task%3A70dff9d6-f61e-4362-abcd-fc6c79d3b39b/[token]",
+ "path": "/api/hooks/scheduled-task%3A70dff9d6-f61e-4362-abcd-fc6c79d3b39b/[token]",
+ "post": {
+  "status": 202,
+  "body": "{\"deliveryId\":\"delivery:008e94d0-9400-446c-ac59-4e71a38f597c\"}"
+ },
+ "task": {
+  "id": "scheduled-task:70dff9d6-f61e-4362-abcd-fc6c79d3b39b",
+  "title": "pbatch webhook",
+  "prompt": "Reply with the single word HOOKED.",
+  "enabled": true,
+  "schedule": {
+   "type": "webhook",
+   "signature": null,
+   "maxDeliveryAgeMinutes": null
+  },
+  "projectId": "764f437c-dc9a-4992-b27b-fa756c926489",
+  "threadId": null,
+  "threadMode": "new_thread",
+  "workspaceStrategy": {
+   "type": "root"
+  },
+  "modelSelection": {
+   "instanceId": "piDurable",
+   "model": "anthropic/claude-haiku-5-5",
+   "options": []
+  },
+  "runtimeMode": "full-access",
+  "interactionMode": "default",
+  "createdBy": "user",
+  "creationSource": "web",
+  "createdAt": "2026-11-13T07:51:17.121Z",
+  "updatedAt": "2026-11-13T07:51:17.285Z",
+  "nextRunAt": null,
+  "lastRunAt": "2026-11-13T07:51:17.209Z",
+  "lastRunStatus": "succeeded",
+  "lastRunError": null,
+  "runCount": 1,
+  "webhook": {
+   "path": "/api/hooks/scheduled-task%3A70dff9d6-f61e-4362-abcd-fc6c79d3b39b/[token]",
+   "url": "https://t3flare-environment-pbatch.ian-g-pascoe.workers.dev/api/hooks/scheduled-task%3A70dff9d6-f61e-4362-abcd-fc6c79d3b39b/[token]",
+   "hasSecret": false
+  }
+ },
+ "deliveries": {
+  "deliveries": [
+   {
+    "id": "delivery:008e94d0-9400-446c-ac59-4e71a38f597c",
+    "taskId": "scheduled-task:70dff9d6-f61e-4362-abcd-fc6c79d3b39b",
+    "receivedAt": "2026-11-13T07:51:17.209Z",
+    "method": "POST",
+    "contentType": "application/json",
+    "bodyBytes": 18,
+    "outcome": "accepted",
+    "signatureVerified": false,
+    "pendingWindow": false,
+    "missingFields": [],
+    "error": null
+   }
+  ]
+ },
+ "answer": null
+}

@@ -1,0 +1,89 @@
+{
+ "at": "2026-11-13T07:51:41.505Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "scratchProject": {
+  "id": "cd456a75-4b9b-4a88-86ea-52851ef1c72e",
+  "workspaceRoot": "/w/t3-scratch",
+  "title": "No project"
+ },
+ "scratchWorkspaceRoot": "/w/t3-scratch",
+ "results": {
+  "durable": {
+   "threadId": "e65cd794-0371-4d98-8a76-b17c7812895a",
+   "folder": "/w/t3-scratch/2026-11-13-create-a-file-named-hello-7812895a",
+   "contents": "scratch-durable-ok",
+   "ok": true,
+   "answer": "/workspace/repo/2026-11-13-create-a-file-named-hello-7812895a",
+   "runs": [
+    "completed"
+   ]
+  },
+  "codex": {
+   "threadId": "92bee656-0524-49fe-a793-f775b74af621",
+   "folder": "/w/t3-scratch/2026-11-13-create-a-file-named-hello-b74af621",
+   "contents": "scratch-codex-ok",
+   "ok": true,
+   "answer": "/w/t3-scratch/2026-11-13-create-a-file-named-hello-b74af621",
+   "runs": [
+    "completed"
+   ]
+  }
+ },
+ "promotion": {
+  "promoted": {
+   "projectId": "1b01cc9b-c08f-48b4-bf69-98f07d0b289b"
+  },
+  "workspaceRoot": "/w/t3-scratch/2026-11-13-create-a-file-named-hello-7812895a",
+  "threadProject": "1b01cc9b-c08f-48b4-bf69-98f07d0b289b"
+ },
+ "workspace": {
+  "id": "t3-scratch",
+  "host": null,
+  "owner": null,
+  "name": null,
+  "cloneUrl": null,
+  "createdAt": 1794556243452,
+  "state": "ready",
+  "workflows": false,
+  "kind": "project",
+  "parent": null,
+  "branch": null,
+  "unreferencedSince": null,
+  "deletedAt": null,
+  "purgeAfter": null,
+  "lastError": null,
+  "references": [
+   "project cd456a75-4b9b-4a88-86ea-52851ef1c72e",
+   "project 1b01cc9b-c08f-48b4-bf69-98f07d0b289b",
+   "thread e65cd794-0371-4d98-8a76-b17c7812895a",
+   "thread 92bee656-0524-49fe-a793-f775b74af621"
+  ],
+  "container": {
+   "running": true,
+   "leased": true,
+   "lastUse": 1794556291379
+  },
+  "info": {
+   "provisioned": true,
+   "repo": false,
+   "containerRunning": true,
+   "revision": 16,
+   "gitRevision": 0,
+   "cachedReads": 4,
+   "id": "t3-scratch"
+  },
+  "terminals": {
+   "epoch": "17ac861a-7081-4330-9e32-488845a75059",
+   "keys": [],
+   "lastInput": 0,
+   "pushes": 0,
+   "sync": {
+    "pulls": 3,
+    "pushes": 1,
+    "emptyPulls": 1,
+    "failures": 0
+   }
+  }
+ }
+}

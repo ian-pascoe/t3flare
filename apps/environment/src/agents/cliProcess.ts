@@ -138,5 +138,9 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     if (session !== undefined) session.process = process;
     const stdin = command.options.stdin;
     const endOnDone = typeof stdin === "object" && stdin !== null && "endOnDone" in stdin ? stdin.endOnDone !== false : true;
-    return handleOf(process, endOnDone);
+    const handle = handleOf(process, endOnDone);
+    // A stdin given as a Stream is piped in, as Node's spawner does (t3's `codex exec` prompt, parity G7).
+    const input = typeof stdin === "object" && stdin !== null && "stream" in stdin ? stdin.stream : stdin;
+    if (Stream.isStream(input)) yield* Effect.forkScoped(Stream.run(input as Stream.Stream<Uint8Array, PlatformError.PlatformError>, handle.stdin).pipe(Effect.ignore));
+    return handle;
   });

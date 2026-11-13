@@ -1,0 +1,67 @@
+{
+ "at": "2026-11-13T07:53:09.910Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "secureContext": true,
+ "notificationApiInBundle": true,
+ "sounds": [
+  {
+   "asset": "/assets/notification-completion-vyCCbYsz.mp3",
+   "status": 200,
+   "type": "audio/mpeg"
+  },
+  {
+   "asset": "/assets/notification-input-BJS4voY1.mp3",
+   "status": 200,
+   "type": "audio/mpeg"
+  }
+ ],
+ "run": [
+  "completed"
+ ],
+ "shellThread": {
+  "latestRunStatus": "completed",
+  "keys": [
+   "createdBy",
+   "creationSource",
+   "id",
+   "projectId",
+   "title",
+   "providerInstanceId",
+   "modelSelection",
+   "runtimeMode",
+   "interactionMode",
+   "branch",
+   "worktreePath",
+   "pullRequests",
+   "lineage",
+   "forkedFrom",
+   "activeProviderThreadId",
+   "latestRunId",
+   "latestRunRequestedAt",
+   "latestRunStartedAt",
+   "latestRunCompletedAt",
+   "latestRunStopRequested",
+   "latestRunBackgroundWake",
+   "activeRunId",
+   "activityRunStartedAt",
+   "activityRunStatus",
+   "blockedOnThreadWait",
+   "status",
+   "lastError",
+   "lastErrorClass",
+   "lastErrorCode",
+   "usageLimitResetAt",
+   "pendingRuntimeRequest",
+   "pendingGuestMessageCount",
+   "latestVisibleMessage",
+   "latestUserMessageAt",
+   "latestUserAuthoredMessageAt",
+   "hasActionableProposedPlan",
+   "pendingBackgroundTasks",
+   "providerInstanceHistory",
+   "goal",
+   "itemCount"
+  ]
+ }
+}

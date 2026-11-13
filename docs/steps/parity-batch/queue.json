@@ -1,0 +1,65 @@
+{
+ "at": "2026-11-13T07:52:39.733Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "threadId": "aa833389-681f-433e-942b-d5225f77ea15",
+ "queuedSeen": [
+  {
+   "ordinal": 1,
+   "status": "running"
+  },
+  {
+   "ordinal": 2,
+   "status": "queued"
+  }
+ ],
+ "answersAfterQueue": [
+  "I'll run the command now.",
+  "first-done",
+  "SECOND"
+ ],
+ "pausedRuns": [
+  {
+   "ordinal": 1,
+   "status": "completed"
+  },
+  {
+   "ordinal": 2,
+   "status": "completed"
+  },
+  {
+   "ordinal": 3,
+   "status": "interrupted"
+  },
+  {
+   "ordinal": 4,
+   "status": "queued"
+  }
+ ],
+ "queueState": null,
+ "resumed": "ok",
+ "runs": [
+  {
+   "ordinal": 1,
+   "status": "completed"
+  },
+  {
+   "ordinal": 2,
+   "status": "completed"
+  },
+  {
+   "ordinal": 3,
+   "status": "interrupted"
+  },
+  {
+   "ordinal": 4,
+   "status": "completed"
+  }
+ ],
+ "answers": [
+  "I'll run the command now.",
+  "first-done",
+  "SECOND",
+  "THIRD"
+ ]
+}

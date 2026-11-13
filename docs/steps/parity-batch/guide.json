@@ -1,0 +1,133 @@
+{
+ "at": "2026-11-13T08:09:13.214Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "project": "/w/pbatch-fixture",
+ "pullRequest": "ian-pascoe/t3flare-fixture#4",
+ "model": {
+  "instanceId": "codex",
+  "model": "claude-sonnet-5-5",
+  "options": []
+ },
+ "ms": 23570,
+ "generated": {
+  "guide": null,
+  "run": {
+   "_tag": "Running",
+   "headSha": "5e1293ec9e4b0fa61b62ced0df857c3c4da5e070",
+   "startedAt": "2026-11-13T08:08:51.128Z"
+  },
+  "currentHeadSha": "5e1293ec9e4b0fa61b62ced0df857c3c4da5e070"
+ },
+ "run": null,
+ "error": null,
+ "guide": "{\"headSha\":\"5e1293ec9e4b0fa61b62ced0df857c3c4da5e070\",\"generatedAt\":\"2026-11-13T08:09:07.211Z\",\"modelSelection\":{\"instanceId\":\"codex\",\"model\":\"claude-sonnet-5-5\",\"options\":[]},\"stops\":[{\"title\":\"Add sub.sh next to add.sh, plus a greeting line\",\"summary\":\"This adds `src/sub.sh`, an executable script that prints the difference of its two integer arguments. It mirrors the existing `add.sh`. The change also appends a line to `src/greeting.txt` announcing subtraction. `test.sh` is unchanged, so it checks `add.sh` and that the greeting is non-empty, and nothing exercises `sub.sh`.\",\"attention\":null,\"excerpts\":[{\"path\":\"src/sub.sh\",\"side\":\"new\",\"start\":1,\"end\":4,\"caption\":\"The whole script: subtract $2 from $1 using bash arithmetic\"}],\"files\":[{\"path\":\"src/greeting.txt\",\"note\":\"Appends the line 'Now with subtraction.'\"}],\"notes\":[],\"questions\":[\"Why does the change add no `sub.sh` check to `test.sh`, given that it adds a sibling of `add.sh`, which is tested?\"]}]}",
+ "guideBytes": 970,
+ "trace": [
+  {
+   "at": 1794557336767,
+   "command": "git",
+   "argv": [
+    "-c",
+    "core.hooksPath=/dev/null",
+    "worktree",
+    "add",
+    "--detach",
+    "--quiet",
+    "/w/.wt/review-guide-656f7565c253effb/checkout",
+    "5e1293ec9e4b0fa61b62ced0df857c3c4da5e070"
+   ],
+   "cwd": "/w/pbatch-fixture",
+   "route": "scratch",
+   "exitCode": 0,
+   "ms": 323,
+   "detail": "action 254ms"
+  },
+  {
+   "at": 1794557337090,
+   "command": "git",
+   "argv": [
+    "merge-base",
+    "dd72898c7c0fea39a34492c8d60204bfc7506a7a",
+    "HEAD"
+   ],
+   "cwd": "/w/.wt/review-guide-656f7565c253effb/checkout",
+   "route": "scratch",
+   "exitCode": 0,
+   "ms": 142,
+   "detail": "action 107ms"
+  },
+  {
+   "at": 1794557337232,
+   "command": "codex",
+   "argv": [
+    "exec",
+    "--json",
+    "--ephemeral",
+    "--skip-git-repo-check"
+   ],
+   "cwd": "/w/.wt/review-guide-656f7565c253effb/checkout",
+   "route": "process",
+   "exitCode": null,
+   "ms": 78
+  },
+  {
+   "at": 1794557337232,
+   "command": "git",
+   "argv": [
+    "-c",
+    "core.quotePath=false",
+    "diff",
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+    "--name-only",
+    "-z",
+    "dd72898c7c0fea39a34492c8d60204bfc7506a7a...HEAD"
+   ],
+   "cwd": "/w/.wt/review-guide-656f7565c253effb/checkout",
+   "route": "scratch",
+   "exitCode": 0,
+   "ms": 464,
+   "detail": "action 405ms"
+  },
+  {
+   "at": 1794557337232,
+   "command": "git",
+   "argv": [
+    "-c",
+    "core.quotePath=false",
+    "diff",
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+    "--unified=0",
+    "--no-color",
+    "--no-ext-diff",
+    "--no-textconv",
+    "dd72898c7c0fea39a34492c8d60204bfc7506a7a...HEAD"
+   ],
+   "cwd": "/w/.wt/review-guide-656f7565c253effb/checkout",
+   "route": "scratch",
+   "exitCode": 0,
+   "ms": 484,
+   "detail": "action 424ms"
+  },
+  {
+   "at": 1794557346593,
+   "command": "git",
+   "argv": [
+    "-c",
+    "status.showUntrackedFiles=normal",
+    "worktree",
+    "remove",
+    "--force",
+    "--",
+    "/w/.wt/review-guide-656f7565c253effb/checkout"
+   ],
+   "cwd": "/w/pbatch-fixture",
+   "route": "scratch",
+   "exitCode": 0,
+   "ms": 146,
+   "detail": "action 110ms"
+  }
+ ]
+}

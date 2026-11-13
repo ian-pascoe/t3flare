@@ -1,0 +1,84 @@
+{
+ "at": "2026-11-13T07:50:00.877Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "threadId": "cd3c2b9f-708b-49fd-929a-3507d5ae93f4",
+ "steps": {
+  "pin": {
+   "ok": true,
+   "thread": {
+    "pinnedAt": {
+     "epochMilliseconds": 1794556194689
+    },
+    "tags": null,
+    "snoozedUntil": null,
+    "deletedAt": null
+   }
+  },
+  "tag": {
+   "ok": true,
+   "thread": {
+    "pinnedAt": {
+     "epochMilliseconds": 1794556194689
+    },
+    "tags": [
+     "pbatch"
+    ],
+    "snoozedUntil": null,
+    "deletedAt": null
+   }
+  },
+  "snooze": {
+   "ok": true,
+   "thread": {
+    "pinnedAt": {
+     "epochMilliseconds": 1794556194689
+    },
+    "tags": [
+     "pbatch"
+    ],
+    "snoozedUntil": {
+     "epochMilliseconds": 1794559796195
+    },
+    "deletedAt": null
+   }
+  },
+  "unsnooze": {
+   "ok": true,
+   "thread": {
+    "pinnedAt": {
+     "epochMilliseconds": 1794556194689
+    },
+    "tags": [
+     "pbatch"
+    ],
+    "snoozedUntil": null,
+    "deletedAt": null
+   }
+  },
+  "untag": {
+   "ok": true,
+   "thread": {
+    "pinnedAt": {
+     "epochMilliseconds": 1794556194689
+    },
+    "tags": null,
+    "snoozedUntil": null,
+    "deletedAt": null
+   }
+  },
+  "unpin": {
+   "ok": true,
+   "thread": {
+    "pinnedAt": null,
+    "tags": null,
+    "snoozedUntil": null,
+    "deletedAt": null
+   }
+  },
+  "delete": {
+   "ok": true,
+   "thread": null
+  }
+ }
+}

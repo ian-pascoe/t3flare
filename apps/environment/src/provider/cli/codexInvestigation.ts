@@ -25,6 +25,7 @@ const fail = (operation: TextGenerationOperations.Operation, detail: string, cau
 export const execOutcome = (jsonl: string): { readonly message: string } | { readonly error: string } => {
   let message: string | undefined;
   let error: string | undefined;
+  const seen = new Map<string, number>();
   for (const line of jsonl.split("\n")) {
     if (!line.startsWith("{")) continue;
     let event: { type?: string; item?: { type?: string; text?: string }; error?: { message?: string }; message?: string };
@@ -33,12 +34,15 @@ export const execOutcome = (jsonl: string): { readonly message: string } | { rea
     } catch {
       continue;
     }
-    if (event.type === "item.completed" && event.item?.type === "agent_message" && typeof event.item.text === "string") message = event.item.text;
+    const kind = `${event.type ?? "?"}${event.item?.type === undefined ? "" : `:${event.item.type}`}`;
+    seen.set(kind, (seen.get(kind) ?? 0) + 1);
+    if (event.type === "item.completed" && (event.item?.type === "agent_message" || event.item?.type === "assistant_message") && typeof event.item.text === "string") message = event.item.text;
     else if (event.type === "turn.failed") error = event.error?.message ?? "the turn failed";
     else if (event.type === "error" && typeof event.message === "string") error = event.message;
   }
   if (message !== undefined && message.trim() !== "") return { message };
-  return { error: error ?? "Codex gave no answer" };
+  const events = [...seen].map(([kind, count]) => `${kind}\u00d7${count}`).join(", ");
+  return { error: error ?? `Codex gave no answer (events: ${events === "" ? "none" : events})` };
 };
 
 const text = <E>(stream: Stream.Stream<Uint8Array, E>) =>
@@ -76,7 +80,7 @@ export const withCodexInvestigation =
         );
         const outcome = execOutcome(stdout);
         if ("error" in outcome) {
-          const detail = exitCode !== 0 && stderr.trim() !== "" ? stderr.trim().slice(-2000) : outcome.error;
+          const detail = `${outcome.error}; exit ${exitCode}${stderr.trim() === "" ? "" : `; stderr: ${stderr.trim().slice(-1500)}`}`;
           return yield* fail(operation, `Codex CLI command failed: ${detail}`);
         }
         return outcome.message;

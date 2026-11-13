@@ -146,6 +146,7 @@ describe("Codex's investigation (`codex exec`)", () => {
     ];
     expect(execOutcome(events.map((event) => JSON.stringify(event)).join("\n"))).toEqual({ message: '{"summary":"x"}' });
     expect(execOutcome(`${JSON.stringify({ type: "turn.failed", error: { message: "quota" } })}\n`)).toEqual({ error: "quota" });
-    expect(execOutcome("")).toEqual({ error: "Codex gave no answer" });
+    expect(execOutcome("")).toEqual({ error: "Codex gave no answer (events: none)" });
+    expect(execOutcome(`${JSON.stringify({ type: "turn.started" })}\n`)).toEqual({ error: "Codex gave no answer (events: turn.started\u00d71)" });
   });
 });

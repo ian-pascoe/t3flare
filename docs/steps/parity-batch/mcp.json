@@ -1,0 +1,118 @@
+{
+ "at": "2026-11-13T07:50:37.303Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "discovery": {
+  "status": 200,
+  "json": {
+   "resource": "https://t3flare-environment-pbatch.ian-g-pascoe.workers.dev/mcp",
+   "authorization_servers": [
+    "https://t3flare-environment-pbatch.ian-g-pascoe.workers.dev"
+   ],
+   "scopes_supported": [
+    "orchestration:read",
+    "orchestration:operate"
+   ],
+   "bearer_methods_supported": [
+    "header"
+   ],
+   "resource_name": "T3 Code"
+  }
+ },
+ "authorizationServer": {
+  "status": 200,
+  "issuer": "https://t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+  "endpoints": [
+   "https://t3flare-environment-pbatch.ian-g-pascoe.workers.dev/oauth/mcp/authorize",
+   "https://t3flare-environment-pbatch.ian-g-pascoe.workers.dev/oauth/mcp/token",
+   "https://t3flare-environment-pbatch.ian-g-pascoe.workers.dev/oauth/mcp/register"
+  ]
+ },
+ "unauthenticated": 401,
+ "scope": "orchestration:read orchestration:operate",
+ "initialize": 200,
+ "tools": [
+  "preview_dialog",
+  "preview_status",
+  "preview_open",
+  "preview_navigate",
+  "preview_resize",
+  "preview_set_appearance",
+  "preview_act",
+  "preview_evaluate",
+  "preview_wait_for",
+  "preview_recording_start",
+  "preview_recording_stop",
+  "preview_snapshot",
+  "orchestrator_capabilities",
+  "delegate_task",
+  "task_status",
+  "task_cancel",
+  "t3_workflow_stop",
+  "t3_background_wait",
+  "schedule_task",
+  "list_scheduled_tasks",
+  "delete_scheduled_task",
+  "request_secret",
+  "create_threads",
+  "t3_thread_list",
+  "t3_thread_read",
+  "t3_thread_update",
+  "t3_thread_send",
+  "t3_thread_wait",
+  "t3_thread_interrupt",
+  "t3_environment_links",
+  "t3_environment_link",
+  "t3_environment_unlink",
+  "run_scheduled_task_now",
+  "t3_thread_search",
+  "t3_thread_configure",
+  "t3_thread_transfer",
+  "t3_thread_organize",
+  "t3_pending_request",
+  "t3_queue",
+  "t3_attachment_prepare_upload",
+  "t3_attachment_discard",
+  "t3_thread_send_attachments",
+  "t3_thread_launch",
+  "t3_project_list",
+  "t3_project_read",
+  "t3_project_create",
+  "t3_project_update",
+  "t3_project_delete",
+  "t3_project_clone",
+  "t3_environment_read",
+  "t3_environment_preferences_update",
+  "t3_preview_list",
+  "t3_preview_close",
+  "t3_worktree_handoff",
+  "t3_worktree_status",
+  "t3_worktree_list",
+  "link_pull_request",
+  "link_pull_requests",
+  "unlink_pull_request",
+  "unlink_pull_requests",
+  "list_thread_pull_requests",
+  "watch_pull_request",
+  "unwatch_pull_request",
+  "write_pull_request_guides",
+  "read_pull_request_guide",
+  "device_list",
+  "device_open",
+  "device_close",
+  "device_screenshot",
+  "html_render",
+  "html_preview"
+ ],
+ "call": {
+  "status": 200,
+  "isError": false,
+  "text": "{\"projects\":[{\"id\":\"764f437c-dc9a-4992-b27b-fa756c926489\",\"title\":\"pbatch-fixture\",\"workspaceRoot\":\"/w/pbatch-fixture\",\"repositoryIdentity\":{\"canonicalKey\":\"github.com/ian-pascoe/t3flare-fixture\",\"locator\":{\"source\":\"git-remote\",\"remoteName\":\"origin\",\"remoteUrl\":\"https://github.com/ian-pascoe/t3flare-fixture.git\"},\"rootPath\":\"/w/pbatch-fixture\",\"displayName\":\"ian-pascoe/t3flare-fixture\",\"provider\""
+ },
+ "listedSession": {
+  "label": null,
+  "method": "bearer-access-token"
+ },
+ "revoke": 200,
+ "afterRevoke": 401
+}

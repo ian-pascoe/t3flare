@@ -1,0 +1,16 @@
+{
+ "at": "2026-11-13T07:50:15.757Z",
+ "host": "t3flare-environment-pbatch.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "pairStatus": 200,
+ "secondAuthenticated": true,
+ "secondWs": "ok",
+ "listed": {
+  "label": null,
+  "method": "browser-session-cookie"
+ },
+ "sessionCount": 6,
+ "revoke": 200,
+ "secondAfterRevoke": false,
+ "firstStillAuthenticated": true
+}
