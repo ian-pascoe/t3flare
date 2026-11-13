@@ -39,6 +39,8 @@ export default defineConfig({
           "test:cloudpid-mcp",
           ...each("@t3flare/mcp-worker", "typecheck", "test"),
           ...each("@t3flare/codemode-sandbox", "typecheck"),
+          // check.ts never typechecked these three (plan D8); they have no tests.
+          ...["sandbox-image", "models", "session-protocol"].flatMap((name) => each(`@t3flare/${name}`, "typecheck")),
           ...["effect-durable", "computer-env", "github-app", "workspace-client", "harness-registry"].flatMap((name) =>
             each(`@t3flare/${name}`, "typecheck", "test"),
           ),
