@@ -36,7 +36,6 @@ import {
 import { environmentServices } from "../../agents/bindings.ts";
 import { attachmentReader, turnPrompt } from "../attachments.ts";
 import { snapshotModels } from "../models.ts";
-import type { CliAgent } from "@t3flare/skills";
 import { cliSnapshotForCwdOf, environmentSkillsAccess, messageSkillsFor, type SkillsAccess } from "../skills.ts";
 import { claudeMentionRewrite } from "./claudeSkills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
@@ -227,19 +226,19 @@ export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpF
 
 /**
  * Prompts (plan §3.5): SPI-993's rules for Durable agents, images inline when the agent takes them, text files inline.
- * SPI-1151: with `skills` (OpenCode's), a message's Skill mentions embed as OpenCode's skill tool returns them, read for
- * the turn's thread (`CliTurn`: t3's adapter gives the builder no cwd).
+ * SPI-1151: with `opencodeSkills` (OpenCode's flavor only), a message's Skill mentions embed as OpenCode's skill tool
+ * returns them, read for the turn's thread (`CliTurn`: t3's adapter gives the builder no cwd).
  */
 export const acpPromptBuilder = (
   host: ProviderHost.ProviderHost["Service"],
   fileSystem: FileSystem.FileSystem,
-  skills?: { readonly access: SkillsAccess; readonly agent: CliAgent },
+  opencodeSkills?: SkillsAccess,
 ): NonNullable<AcpAdapterV2Flavor["buildPrompt"]> => {
   const reader = attachmentReader(host, fileSystem);
   return (input) =>
     Effect.gen(function* () {
       const turn = yield* CliTurn;
-      const threadSkills = skills === undefined || turn === undefined ? undefined : messageSkillsFor(turn.cwd, skills.access, skills.agent);
+      const threadSkills = opencodeSkills === undefined || turn === undefined ? undefined : messageSkillsFor(turn.cwd, opencodeSkills, true);
       return yield* turnPrompt(
         { text: input.text, attachments: input.attachments as ReadonlyArray<ChatAttachment> },
         { acceptsImages: input.promptCapabilities?.image === true, reader, ...(threadSkills === undefined ? {} : { skills: threadSkills }) },
@@ -303,7 +302,7 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   const fileSystem = yield* FileSystem.FileSystem;
   // SPI-1151: a picked Skill reaches the CLI as its own: Claude Code's mention rewritten (the wrapper), OpenCode's embedded.
   const skillsAccess = environmentSkillsAccess();
-  const buildPrompt = acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? { access: skillsAccess, agent: "opencode" } : undefined);
+  const buildPrompt = acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? skillsAccess : undefined);
   const adapter = yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { buildPrompt }), continuationRequests)).pipe(
     Effect.provideService(McpProviderSessions.McpProviderSessions, relayed),
   );

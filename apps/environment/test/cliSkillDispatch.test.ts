@@ -56,6 +56,10 @@ describe("Claude Code's rewrite of a Skill mention (stock's planClaudeSkillDispa
     expect(claudeSkillText("  $fruit-code then $veg", skills)).toBe(`/fruit-code then /veg${note("veg")}`);
   });
 
+  it("changes nothing but the mentions in a message with leading spaces and no opening mention", () => {
+    expect(claudeSkillText("  hi $veg", skills)).toBe(`  hi /veg${note("veg")}`);
+  });
+
   it("leaves a message with no known mention as typed", () => {
     for (const text of ["say $nope", "costs $5", "plain", "x$fruit-code"]) expect(claudeSkillText(text, skills)).toBe(text);
   });
@@ -167,7 +171,7 @@ const promptFor = (cli: "claude" | "opencode", text: string, files: Record<strin
       });
     const driver = ProviderDriverKind.make(cli === "claude" ? "claudeAgent" : "opencode");
     const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
-    const buildPrompt = acpPromptBuilder(yield* ProviderHost.ProviderHost, fileSystem, cli === "opencode" ? { access, agent: "opencode" } : undefined);
+    const buildPrompt = acpPromptBuilder(yield* ProviderHost.ProviderHost, fileSystem, cli === "opencode" ? access : undefined);
     const adapter = yield* makeAcpAdapterV2({ instanceId, flavor: acpFlavor(cli, driver, { spawn, buildPrompt }), selfInvocation: { command: "none", entrypoint: undefined } });
     const wrapped = wrapCliAdapter(adapter, { sessions: new Map(), ...(cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(access) } : {}) });
     const threadId = ThreadId.make(`thread-${cli}`);

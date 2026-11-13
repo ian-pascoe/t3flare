@@ -28,6 +28,9 @@ export interface CliRoots {
   readonly commands: ReadonlyArray<CommandSource>;
 }
 
+/** A root that walks from the cwd up to the repo root. */
+const up = (directory: string): SkillRoot => ({ directory, cwdOnly: false });
+
 /**
  * Each CLI's roots (M0, 2026-11-13). Codex 0.167.2: `.agents/skills` and `.codex/skills`, which it lists both of a
  * same-named pair from; no repo commands. pi 1.5.2: `.pi/skills` at the cwd, then `.agents/skills` up to the repo root
@@ -37,8 +40,6 @@ export interface CliRoots {
  * `.claude/commands` with its subdirectories. OpenCode 2.2.7: `.opencode/skills`, `.opencode/skill`, `.agents/skills`
  * (`.claude/` is off: `OPENCODE_DISABLE_CLAUDE_CODE`), and `.opencode/command` and `.opencode/commands`.
  */
-const up = (directory: string): SkillRoot => ({ directory, cwdOnly: false });
-
 export const CLI_ROOTS: Readonly<Record<CliAgent, CliRoots>> = {
   codex: { skills: [up(".agents/skills"), up(".codex/skills")], commands: [] },
   pi: { skills: [{ directory: ".pi/skills", cwdOnly: true }, up(".agents/skills")], commands: [{ directory: ".pi/prompts", nested: false }] },

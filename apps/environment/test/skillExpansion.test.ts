@@ -100,7 +100,7 @@ describe("the caller's switch", () => {
 
   it("of the ACP flavors, only OpenCode's builds its prompts with skills (SPI-1151; cliSkillDispatch.test.ts runs both)", () => {
     const source = NodeFs.readFileSync(new URL("../src/provider/cli/acpDriver.ts", import.meta.url), "utf8");
-    expect(source).toContain('acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? { access: skillsAccess, agent: "opencode" } : undefined)');
+    expect(source).toContain('acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? skillsAccess : undefined)');
   });
 
   it("the Pi Durable adapter passes the thread's skills for a new turn and for a steer", () => {

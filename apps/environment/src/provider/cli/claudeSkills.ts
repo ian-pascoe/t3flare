@@ -33,20 +33,23 @@ export const claudeSkillText = (text: string, skills: ReadonlyArray<ClaudeSkill>
   // The only mention opens the message: stock's native form.
   if (plan.leadingText === undefined) return plan.commandText;
   const noted = new Set<string>();
-  const body = text.trimStart();
-  return body
-    .replace(SKILL_TOKEN_REGEX, (match, lead: string, name: string, offset: number) => {
-      const skill = known.get(name);
-      if (skill === undefined) return match;
-      // The opening mention expands natively: a note would only repeat it.
-      if (offset === 0 || noted.has(name)) {
-        noted.add(name);
-        return `${lead}/${name}`;
-      }
-      noted.add(name);
-      return `${lead}/${name} ${CLAUDE_SKILL_NOTE}${skill.path}]`;
-    })
-    .trimEnd();
+  // Where an opening mention's sigil would be: after the message's leading whitespace.
+  const opening = text.length - text.trimStart().length;
+  let opened = false;
+  const rewritten = text.replace(SKILL_TOKEN_REGEX, (match, lead: string, name: string, offset: number) => {
+    const skill = known.get(name);
+    if (skill === undefined) return match;
+    const first = !noted.has(name);
+    noted.add(name);
+    // The opening mention expands natively: a note would only repeat it.
+    if (offset + lead.length === opening) {
+      opened = true;
+      return `${lead}/${name}`;
+    }
+    return first ? `${lead}/${name} ${CLAUDE_SKILL_NOTE}${skill.path}]` : `${lead}/${name}`;
+  });
+  // Only a native Slash command needs the message to start with it; any other text keeps its leading whitespace.
+  return (opened ? rewritten.trimStart() : rewritten).trimEnd();
 };
 
 /**

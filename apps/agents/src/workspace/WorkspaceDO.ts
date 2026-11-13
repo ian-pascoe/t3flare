@@ -189,16 +189,17 @@ const AGENT_TERMINAL_IDS_KEY = "t3flare:agent-terminal-ids";
 const PROCESS_MARKERS_KEY = "t3flare:process-markers";
 /** Step 4a (review F6): this object's boot counter, the process channel's epoch. */
 const BOOT_COUNT_KEY = "t3flare:boot-count";
-/**
- * CLI processes per Workspace (plan §2.1, review F7): an idle Codex app-server measured 157–160 MB RSS on step4a
- * (docs/steps/step-4a/m3-memory.json), so four take about 0.65 GB of 3 GiB, beside computerd (~100 MB) and the agents'
- * own commands (an `npm ci` and its tests peak at 1–1.5 GB). A fifth start is refused with this reason.
- */
+
 /** An RPC's CLI agent argument (SPI-1151): absent (the Durable agent's) or one of `CLI_AGENTS`, else refused. */
 const cliAgentArgument = (agent: unknown): void => {
   if (agent !== undefined && !isCliAgent(agent)) throw new Error(`t3flare: no CLI agent ${JSON.stringify(agent)}`);
 };
 
+/**
+ * CLI processes per Workspace (plan §2.1, review F7): an idle Codex app-server measured 157–160 MB RSS on step4a
+ * (docs/steps/step-4a/m3-memory.json), so four take about 0.65 GB of 3 GiB, beside computerd (~100 MB) and the agents'
+ * own commands (an `npm ci` and its tests peak at 1–1.5 GB). A fifth start is refused with this reason.
+ */
 export const MAX_CLI_PROCESSES = 4;
 /** Set when the sync guard found a credential in the Workspace: the key is to be rotated (review F3). */
 const LEAK_FLAG_KEY = "t3flare:credential-leak";

@@ -232,6 +232,18 @@ export const piModelsJson = (proxyUrl: string, models: ReadonlyArray<CatalogMode
 export const PI_SETTINGS = `${JSON.stringify({ defaultProjectTrust: "never", retry: { maxRetries: 1 } }, null, 1)}\n`;
 
 /**
+ * The t3 path of the repo root that normalized t3 path `path` is in: its Workspace's `/w/<id>` (a project) or
+ * `/w/.wt/<project>/<dir>` (a worktree), or `path` itself outside a Workspace.
+ */
+export const repoRootOf = (path: string): string => {
+  const workspace = toWorkspace(path);
+  if (workspace === null) return path;
+  // `path` is the root followed by what `inner` holds after REPO_ROOT.
+  const below = workspace.inner.slice(REPO_ROOT.length);
+  return below === "" ? path : path.slice(0, -below.length);
+};
+
+/**
  * SPI-1151: the repo's Skill roots and Prompt templates (`CLI_ROOTS.pi`), named to pi by flag as pi would find them
  * trusted: `.pi/skills` at the cwd, `.agents/skills` in each directory from the cwd up to the Workspace's repo root
  * (a project may sit below it), nearest first; `.pi/prompts` at the cwd. pi loads what a flag names whatever the
@@ -240,8 +252,7 @@ export const PI_SETTINGS = `${JSON.stringify({ defaultProjectTrust: "never", ret
  */
 export const piRepoResourceArgs = (cwd: string): ReadonlyArray<string> => {
   const base = normalize(cwd);
-  const workspace = toWorkspace(base);
-  const root = workspace === null ? base : base.slice(0, base.length - (workspace.inner.length - REPO_ROOT.length));
+  const root = repoRootOf(base);
   return [
     ...directoriesUp(base, root).flatMap((directory, depth) =>
       CLI_ROOTS.pi.skills.filter((skillRoot) => depth === 0 || !skillRoot.cwdOnly).flatMap((skillRoot) => ["--skill", `${directory}/${skillRoot.directory}`]),

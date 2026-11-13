@@ -137,30 +137,30 @@ export interface MessageSkills {
 }
 
 /**
- * The thread in t3 path `cwd`'s skills, through `access`; read only when a message asks. With `agent` (a CLI agent's,
- * SPI-1151; OpenCode's is the one that embeds): its Skills at its roots, not behind the Harness switch (Pi Durable's),
- * with no Prompt templates (the CLI's own commands reach it as typed), in t3 paths (the Container's), and OpenCode's
- * block for OpenCode.
+ * The thread in t3 path `cwd`'s skills, through `access`; read only when a message asks. With `opencode` (SPI-1151:
+ * OpenCode is the one CLI agent whose adapter lacks an embed; Claude Code's is rejected): its Skills at OpenCode's
+ * roots, not behind the Harness switch (Pi Durable's), with no Prompt templates (OpenCode's own commands reach it as
+ * typed), in t3 paths (the Container's), as OpenCode's skill tool returns them.
  */
-export const messageSkillsFor = (cwd: string | null | undefined, access: SkillsAccess, agent?: CliAgent): MessageSkills => ({
+export const messageSkillsFor = (cwd: string | null | undefined, access: SkillsAccess, opencode = false): MessageSkills => ({
   load: Effect.fn("PiDurable.loadMessageSkills")(function* () {
-    if (cwd === null || cwd === undefined || (agent === undefined && !access.enabled())) return undefined;
+    if (cwd === null || cwd === undefined || (!opencode && !access.enabled())) return undefined;
     const at = access.locate(cwd);
     if (at === undefined) return undefined;
     const workspace = at.workspace;
-    const found = yield* ask("skills", () => Promise.all([workspace.skills(at.inner, agent), agent === undefined ? workspace.prompts(at.inner) : Promise.resolve([])])).pipe(
+    const found = yield* ask("skills", () => (opencode ? Promise.all([workspace.skills(at.inner, "opencode"), Promise.resolve([])]) : Promise.all([workspace.skills(at.inner), workspace.prompts(at.inner)]))).pipe(
       Effect.tapError((error) => Effect.logWarning("t3flare: the Workspace's skills could not be read; the message goes as typed", error)),
       Effect.option,
     );
     if (found._tag === "None") return undefined;
     const [discovery, templates] = found.value;
     const readInner = (path: string) => ask(path, () => workspace.readText(path)).pipe(Effect.orElseSucceed(() => null));
-    if (agent === undefined) return { skills: discovery.skills, templates, read: readInner };
+    if (!opencode) return { skills: discovery.skills, templates, read: readInner };
     return {
       skills: discovery.skills.map((skill) => ({ ...skill, filePath: fromWorkspace(at.id, skill.filePath) })),
       templates: [],
       read: (path: string) => readInner(toWorkspace(path)?.inner ?? path),
-      block: agent === "opencode" ? opencodeSkillBlock : skillBlock,
+      block: opencodeSkillBlock,
     };
   }),
 });
