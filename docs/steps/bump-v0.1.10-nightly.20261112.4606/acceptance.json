@@ -1,0 +1,693 @@
+{
+  "url": "https://t3flare-environment-bump1.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-13T00:47:12.918Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.10-nightly.20261112.4606",
+      "commit": "acc2f2fd579f",
+      "builtAt": "2026-11-13T00:46:11.777Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-13T00:57:16.413Z",
+    "paired": 200,
+    "ms": 4953,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "7662f665-c8f1-4174-aff3-767d0a28500a",
+    "threads": 12,
+    "ms": 6368
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 607,
+    "bytes": 21303,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 139,
+    "maxBytes": 46534
+  },
+  "subscribeThread": {
+    "ms": 49,
+    "bytes": 46473,
+    "items": 20
+  },
+  "search": {
+    "ms": 71,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1535
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 2,
+    "maxParameters": 300,
+    "compoundsRewritten": 17,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "rowsWritten": 10669,
+    "rowsRead": 41429,
+    "databaseSize": 4231168,
+    "refusedStatements": 0,
+    "pragmaRefusals": 0
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 204,
+      "modules": 113
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 4,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:b7db5f6a-2011-4a7f-83e4-f7f982b39e2b"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": [],
+    "processChannelOnInstance": true
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwe9bwx5",
+      "ms": 7763,
+      "cwd": "/w/acceptance-mwe9bwx5",
+      "error": null
+    },
+    "turn": {
+      "threadId": "47f45326-9881-46d7-b7c9-eb7f0791a195",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwe9bwx5/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwe9bwx5 && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 30596
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "ms": 31523
+  },
+  "step2b": {
+    "ok": true,
+    "failures": [],
+    "terminal": {
+      "ms": 1049,
+      "echoed": true
+    },
+    "worktree": {
+      "ms": 15469,
+      "path": "/w/.wt/acc2b-mwe9cl8w/t3-5a3810bd-c72493b2219e6e40",
+      "stages": [
+        "fetch:skipped",
+        "checkout:done",
+        "setup-script:done",
+        "agent:done"
+      ],
+      "error": null
+    },
+    "removal": {
+      "removed": "removed",
+      "inRegistry": true,
+      "leased": false
+    },
+    "sweepDry": {
+      "ok": true,
+      "error": null,
+      "actions": 2
+    }
+  },
+  "codex": {
+    "ok": true,
+    "failures": [],
+    "cli": "codex",
+    "workspace": "acceptance-codex-mwe9d73u",
+    "first": {
+      "threadId": "091dc486-4a36-4cb1-a0c7-a0432928b653",
+      "root": "/w/acceptance-codex-mwe9d73u",
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:091dc486-4a36-4cb1-a0c7-a0432928b653:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c \"pwd && sed -n '1,120p' src/greeting.txt && sed -n '1,160p' test.sh\"",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "reasoning",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c \"cat >> src/greeting.txt <<'EOF'\nHello from the CLI acceptance.\nEOF\nbash test.sh\"",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c \"cat >> src/greeting.txt <<'EOF'\nHello from the CLI acceptance.\nEOF\nbash test.sh\"",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "I’ll inspect the file and test script, append the requested line, then run the required check.The workspace is mounted read-only, so the append did not happen; the test command ran against the unchanged file and passed. I’m requesting write access to make the authorized edit and rerun the check.I added the requested last line to `src/greeting.txt`, and `bash test.sh` passed.",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d260-bc72-77b0-ac28-a5a3ca41799a:native-request:call_MIIJdJOduSkJP0wq6IXYrSrI:3327dca7-ae4c-4fdd-8b2a-4767efe5ff30",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d260-bc72-77b0-ac28-a5a3ca41799a:native-request:call_gBFlzva8bQclvMIiLhsCU1bG:fc58101d-09ec-4ea4-bff4-6ff42066d681",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d260-bc72-77b0-ac28-a5a3ca41799a:native-request:call_5Xs60SgNGDks1JZWJmNXBmZB:cd1fc73d-8266-4bca-aa70-b868eb52385b",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A091dc486-4a36-4cb1-a0c7-a0432928b653%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "codex",
+            "nativeId": "01a1d260-b45e-7491-853a-c12bc8b52090",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:codex:thread:091dc486-4a36-4cb1-a0c7-a0432928b653:746c6649-037c-42ba-93dc-ce3b875d7cc9",
+          "providerInstanceId": "codex"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:codex:thread:091dc486-4a36-4cb1-a0c7-a0432928b653:746c6649-037c-42ba-93dc-ce3b875d7cc9",
+          "status": "ready",
+          "cwd": "/w/acceptance-codex-mwe9d73u"
+        }
+      ],
+      "ms": 32415
+    },
+    "stopped": {
+      "running": false,
+      "leased": false,
+      "lastUse": 1794530914303
+    },
+    "second": {
+      "threadId": "091dc486-4a36-4cb1-a0c7-a0432928b653",
+      "root": "/w/acceptance-codex-mwe9d73u",
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:091dc486-4a36-4cb1-a0c7-a0432928b653:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:091dc486-4a36-4cb1-a0c7-a0432928b653:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "`Hello from the CLI acceptance.`",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d260-bc72-77b0-ac28-a5a3ca41799a:native-request:call_MIIJdJOduSkJP0wq6IXYrSrI:3327dca7-ae4c-4fdd-8b2a-4767efe5ff30",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d260-bc72-77b0-ac28-a5a3ca41799a:native-request:call_gBFlzva8bQclvMIiLhsCU1bG:fc58101d-09ec-4ea4-bff4-6ff42066d681",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1d260-bc72-77b0-ac28-a5a3ca41799a:native-request:call_5Xs60SgNGDks1JZWJmNXBmZB:cd1fc73d-8266-4bca-aa70-b868eb52385b",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "providerThreads": [
+        {
+          "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3A091dc486-4a36-4cb1-a0c7-a0432928b653%3Aordinal%3A1",
+          "nativeThreadRef": {
+            "driver": "codex",
+            "nativeId": "01a1d260-b45e-7491-853a-c12bc8b52090",
+            "strength": "strong"
+          },
+          "providerSessionId": "provider-session:provider-instance:codex:thread:091dc486-4a36-4cb1-a0c7-a0432928b653:746c6649-037c-42ba-93dc-ce3b875d7cc9",
+          "providerInstanceId": "codex"
+        }
+      ],
+      "providerSessions": [
+        {
+          "id": "provider-session:provider-instance:codex:thread:091dc486-4a36-4cb1-a0c7-a0432928b653:746c6649-037c-42ba-93dc-ce3b875d7cc9",
+          "status": "ready",
+          "cwd": "/w/acceptance-codex-mwe9d73u"
+        }
+      ],
+      "ms": 8962
+    },
+    "protocol": [
+      {
+        "at": 1794530948838,
+        "command": "codex",
+        "argv": [
+          "thread/resume"
+        ],
+        "cwd": null,
+        "route": "protocol",
+        "exitCode": null,
+        "ms": 0,
+        "detail": "ok 01a1d260-b45e-7491-853a-c12bc8b52090"
+      }
+    ],
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 671,
+        "bytes": 7866645,
+        "ms": 286
+      },
+      "flagged": null
+    },
+    "keyRouteWithoutCli": "403"
+  },
+  "peer": {
+    "ok": false,
+    "failures": [
+      "F6: bash asks in plan: {\"runtimeMode\":\"approval-required\",\"interactionMode\":\"plan\",\"write\":null,\"request\":null,\"runs\":[\"completed\"],\"items\":[{\"type\":\"user_message\",\"status\":\"completed\",\"text\":\"First use the write tool to create the file plan-check.txt containing `x`. Then run the bash command `ls`. Then reply DONE.\"},{\"type\":\"command_execution\",\"status\":\"completed\",\"text\":\"Preparing workspace\"},{\"type\":\"assistant_message\",\"status\":\"completed\",\"text\":\"I can't create the file or run the command in this session: the interaction mode is Plan, which rules out edits and command execution. I haven't run either step\"},{\"typ"
+    ],
+    "outbound": {
+      "refused": {
+        "ok": false,
+        "error": {
+          "_tag": "PeerLinkError",
+          "reason": "disabled",
+          "message": "No machine is registered; Outbound links are made from the harness panel (SPI-1061)."
+        }
+      },
+      "listed": {
+        "links": []
+      },
+      "ms": 1574
+    },
+    "fixture": {
+      "projectId": "75e4f321-916e-4615-b1ce-7f9f669bbc37",
+      "workspaceRoot": "/w/step3-fixture",
+      "cloned": true
+    },
+    "link": {
+      "scope": "orchestration:read orchestration:operate"
+    },
+    "cap": {
+      "fullAccess": {
+        "status": 400,
+        "body": {
+          "_tag": "AuthMcpApprovalError",
+          "message": "That pairing code cannot grant this access. It has not been used, so choose an access level it grants, or create a code with the standard scopes."
+        }
+      },
+      "autoAcceptEdits": 200
+    },
+    "launch": {
+      "isError": false,
+      "threadId": "mcp:launch:b692b99e4eaf0de5920fb2f1c251e93baaa5c41787e31d64f2f05e8058aa30fd"
+    },
+    "launchResult": {
+      "status": "completed",
+      "pieces": 1,
+      "reply": true,
+      "runtimeMode": "auto-accept-edits",
+      "interactionMode": "default",
+      "linkOrigin": {
+        "sessionId": "ec67656d-d933-4045-8bc6-b74df61f4b1d",
+        "label": "t3flare acceptance mwe9ebsy",
+        "access": "auto-accept-edits"
+      },
+      "delegatedFrom": {
+        "environmentId": "00000000-0000-4000-8000-000000000001",
+        "threadId": "laptop-mwe9ebsy",
+        "title": "laptop parent"
+      }
+    },
+    "F5": {
+      "runtimeMode": "auto-accept-edits",
+      "request": {
+        "kind": "command"
+      }
+    },
+    "waitHold": {
+      "ms": 50068,
+      "timedOut": true,
+      "status": "running"
+    },
+    "F7": {
+      "link": {
+        "isError": true,
+        "text": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"The pending user-input request was not found.\"}"
+      },
+      "stillPending": true,
+      "owner": {
+        "runs": [
+          "completed"
+        ],
+        "output": true
+      }
+    },
+    "F6": {
+      "runtimeMode": "approval-required",
+      "interactionMode": "plan",
+      "write": null,
+      "request": null,
+      "runs": [
+        "completed"
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "text": "First use the write tool to create the file plan-check.txt containing `x`. Then run the bash command `ls`. Then reply DONE."
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "text": "Preparing workspace"
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "text": "I can't create the file or run the command in this session: the interaction mode is Plan, which rules out edits and command execution. I haven't run either step"
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "text": ""
+        }
+      ]
+    },
+    "F1": {
+      "send": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe9ebsy through a linked environment, so it may change only threads that link star",
+      "interrupt": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe9ebsy through a linked environment, so it may change only threads that link star",
+      "rename": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe9ebsy through a linked environment, so it may change only threads that link star"
+    },
+    "F2": {
+      "create": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}",
+      "clone": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"Changing projects or environment settings needs a live full-access/default calling thread or a full-access client.\"}",
+      "prefs": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe9ebsy through a linked environment, so it cannot change projects or environment ",
+      "schedule": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"This work was started from t3flare acceptance mwe9ebsy through a linked environment, so it cannot schedule tasks in this environm"
+    },
+    "F4": {
+      "stages": [
+        "fetch:skipped",
+        "checkout:done",
+        "setup-script:skipped",
+        "agent:done"
+      ],
+      "worktreePath": "/w/.wt/step3-fixture/link-mwe9ebsy-15910cac8c7f4b2c",
+      "phase": "done"
+    },
+    "F12": {
+      "scope": "orchestration:read orchestration:operate settings:write source-control:write",
+      "rename": "{\"threadId\":\"1745ea79-350e-4933-983d-abda2b770a6c\",\"action\":\"rename\",\"commandId\":\"command:mcp:client%3A9c31969e-b122-44ce-bf32-32ab5cb10a0a:thread-update:1745ea79-350e-4933-983d-abda2b770a6c:rename:re",
+      "interrupt": "{\"threadId\":\"1745ea79-350e-4933-983d-abda2b770a6c\",\"runId\":null,\"status\":\"no_active_run\"}"
+    },
+    "F10": {
+      "off": 403,
+      "on": 200
+    },
+    "F9": {
+      "found": true,
+      "revoke": 200,
+      "after": 401
+    }
+  },
+  "peerF11Armed": {
+    "ok": true,
+    "status": 400,
+    "body": {
+      "_tag": "AuthMcpApprovalError",
+      "message": "That is not a one-time pairing code."
+    }
+  },
+  "claude": {
+    "ok": true,
+    "failures": [],
+    "cli": "claude",
+    "workspace": "acceptance-claude-mwe9gh39",
+    "turn": {
+      "runs": [
+        {
+          "id": "run:thread:1f2ab493-0326-4b84-9ca6-ffc1c0257161:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "requests": [
+        {
+          "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A0c0dbfb1-cff9-47ad-926c-db0873b64cec%253Aturn%253A1:native-request:toolu_01Ev8oyAHzd9jqCQ62pyLw5c:b39bd896-921d-42e2-a486-3ecb2397bf71",
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A0c0dbfb1-cff9-47ad-926c-db0873b64cec%253Aturn%253A1:native-request:toolu_019uershwdFjcANJYzfSdGCh:9f9247b2-1233-407d-93cd-517e86f2475c",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "diff": "M src/greeting.txt\n src/greeting.txt | 1 +\n 1 file changed, 1 insertion(+)",
+      "ms": 21862
+    },
+    "plan": {
+      "runs": [
+        {
+          "id": "run:thread:1f2ab493-0326-4b84-9ca6-ffc1c0257161:ordinal:1",
+          "status": "completed",
+          "failure": null
+        },
+        {
+          "id": "run:thread:1f2ab493-0326-4b84-9ca6-ffc1c0257161:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "proposedPlan": [
+        "# Plan: add a closing greeting line\n\n## Context\n`src/greeting.txt` currently holds one line: `Hello from the t3flare fixture.` (an earlier edit is no longer on disk). The request is to append `Hello from the CLI.` as the new last line, then run the project check.\n\n## Steps\n1. Use the Edit tool (not "
+      ],
+      "diff": ""
+    },
+    "leak": {
+      "do": [],
+      "container": {
+        "hits": [],
+        "files": 608,
+        "bytes": 7840923,
+        "ms": 200
+      },
+      "flagged": null
+    }
+  },
+  "peerF11Disarmed": {
+    "ok": true,
+    "status": 401,
+    "body": {
+      "error": "pairing is not armed"
+    }
+  },
+  "totalMs": 257007,
+  "failures": [
+    "peer: F6: bash asks in plan: {\"runtimeMode\":\"approval-required\",\"interactionMode\":\"plan\",\"write\":null,\"request\":null,\"runs\":[\"completed\"],\"items\":[{\"type\":\"user_message\",\"status\":\"completed\",\"text\":\"First use the write tool to create the file plan-check.txt containing `x`. Then run the bash command `ls`. Then reply DONE.\"},{\"type\":\"command_execution\",\"status\":\"completed\",\"text\":\"Preparing workspace\"},{\"type\":\"assistant_message\",\"status\":\"completed\",\"text\":\"I can't create the file or run the command in this session: the interaction mode is Plan, which rules out edits and command execution. I haven't run either step\"},{\"typ"
+  ],
+  "ok": false
+}
