@@ -1,103 +1,23 @@
 // @effect-diagnostics globalDate:off
 // The harness panel's page (ADR-0026): server-rendered HTML, no framework, no third-party script or font. Every string
 // that is not a literal here is HTML-escaped (review H4: tool names, descriptions, errors and settings may be hostile).
-// The one script and the one stylesheet are constants, allowed by their SHA-256 hashes in the CSP, never by `'self'`.
-// The script only turns the forms into JSON API calls with the CSRF token from the page's meta tag.
-import { EXTENSIONS, type ResolvedHarness, type SettingEntry } from "@t3flare/harness-registry";
+// The one script (pageScript.ts) and the one stylesheet (pageStyle.ts) are constants, allowed by their SHA-256 hashes in
+// the CSP, never by `'self'`; the icons are an inline SVG sprite (pageIcons.ts). The script only turns the controls into
+// JSON API calls with the CSRF token from the page's meta tag.
+//
+// Layout (SPI-1086), after T3 Code's settings: a quiet sidebar of sections (a sticky row of tabs on a phone), then each
+// section as a 16px title over grouped, divided rows.
+import { EXTENSIONS, type ExtensionEntry, type ResolvedHarness, type SettingEntry } from "@t3flare/harness-registry";
 
 import type { AuditEntry } from "./store.ts";
+
+import { ICON_SPRITE, icon, type IconName } from "./pageIcons.ts";
+import { SCRIPT } from "./pageScript.ts";
+import { STYLE } from "./pageStyle.ts";
 
 /** `text` safe in HTML text and in a double-quoted attribute. */
 export const escapeHtml = (text: string): string =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
-
-const STYLE = `body{font:14px/1.45 system-ui,sans-serif;margin:0 auto;max-width:960px;padding:24px;color:#1b1b1b;background:#fafafa}
-h1{font-size:20px}h2{font-size:16px;margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:4px}
-.ext{background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;margin:10px 0}
-.ext h3{margin:0 0 4px;font-size:14px}.muted{color:#666}.locked{color:#8a5a00}
-label{display:block;margin:6px 0}input[type=number]{width:8em}input[type=url]{width:36em;max-width:100%}
-button{margin-top:6px}#result{white-space:pre-wrap;color:#8a0000}
-table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #eee;padding:4px 6px;text-align:left;font-size:12px}`;
-
-const SCRIPT = `"use strict";
-const csrf = document.querySelector('meta[name="t3flare-csrf"]').getAttribute("content");
-const result = document.getElementById("result");
-const post = async (path, body) => {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-t3flare-csrf": csrf },
-    body: JSON.stringify(body),
-    credentials: "same-origin",
-  });
-  if (response.ok) return response;
-  result.textContent = "Refused: " + (await response.text());
-  return undefined;
-};
-for (const button of document.querySelectorAll("button[data-mcp]")) {
-  button.addEventListener("click", async () => {
-    const change = JSON.parse(button.dataset.mcp);
-    if (change.op === "remove" && !confirm("Remove " + change.server + " and its sign-in?")) return;
-    const response = await post("/_t3flare/harness/api/mcp", change);
-    if (response !== undefined) location.reload();
-  });
-}
-for (const button of document.querySelectorAll("button[data-mcp-test]")) {
-  button.addEventListener("click", async () => {
-    const response = await post("/_t3flare/harness/api/mcp/test", { server: button.dataset.mcpTest });
-    if (response !== undefined) result.textContent = JSON.stringify(await response.json());
-  });
-}
-for (const button of document.querySelectorAll("button[data-mcp-oauth]")) {
-  button.addEventListener("click", async () => {
-    const response = await post("/_t3flare/harness/api/mcp/oauth", { server: button.dataset.mcpOauth });
-    if (response === undefined) return;
-    const answer = await response.json();
-    const target = new URL(answer.authorizationUrl);
-    if (target.protocol === "https:") window.open(target.toString(), "_blank", "noopener,noreferrer");
-  });
-}
-const adding = document.querySelector("form[data-mcp-add]");
-if (adding !== null) {
-  const auth = adding.querySelector("[name=auth]");
-  const headerFields = adding.querySelector("[data-header-fields]");
-  const showHeader = () => { headerFields.hidden = auth.value !== "header"; };
-  auth.addEventListener("change", showHeader);
-  showHeader();
-  adding.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const field = (name) => adding.querySelector("[name=" + name + "]").value.trim();
-    const body = { server: field("server"), url: field("url"), auth: { kind: auth.value } };
-    if (auth.value === "header") {
-      body.auth.header = field("header");
-      body.value = adding.querySelector("[name=value]").value;
-    }
-    const response = await post("/_t3flare/harness/api/mcp/servers", body);
-    adding.querySelector("[name=value]").value = "";
-    if (response !== undefined) location.reload();
-  });
-}
-for (const form of document.querySelectorAll("form[data-extension]")) {
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const change = { extension: form.dataset.extension };
-    const settings = {};
-    for (const input of form.querySelectorAll("[data-setting]")) {
-      const kind = input.dataset.kind;
-      settings[input.dataset.setting] = kind === "boolean" ? input.checked : kind === "integer" ? Number(input.value) : input.value;
-    }
-    if (Object.keys(settings).length > 0) change.settings = settings;
-    const enabled = form.querySelector("[data-enabled]");
-    if (enabled !== null) change.enabled = enabled.checked;
-    const response = await fetch("/_t3flare/harness/api/extensions", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-t3flare-csrf": csrf },
-      body: JSON.stringify(change),
-      credentials: "same-origin",
-    });
-    if (response.ok) location.reload();
-    else result.textContent = "Refused: " + (await response.text());
-  });
-}`;
 
 const sha256 = async (text: string): Promise<string> =>
   btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))));
@@ -120,40 +40,74 @@ export const pageCsp = async (): Promise<string> => {
   ].join("; ");
 };
 
-const field = (extension: string, key: string, setting: SettingEntry, value: unknown, locked: boolean): string => {
+/** A UTC time the script rewrites into the reader's own zone; readable as is without it. */
+const time = (at: number): string => {
+  const iso = new Date(at).toISOString();
+  return `<time datetime="${iso}" data-local>${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC</time>`;
+};
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+// ── Extensions ──────────────────────────────────────────────────────────────────────────────────────────────────
+
+const field = (extension: string, key: string, setting: SettingEntry, value: unknown): string => {
   const id = escapeHtml(`${extension}-${key}`);
-  const attrs = `id="${id}" data-setting="${escapeHtml(key)}" data-kind="${setting.schema.type}"${locked ? " disabled" : ""}`;
-  const label = `<span title="${escapeHtml(setting.description)}">${escapeHtml(setting.title)}</span>`;
+  const hint = `<p class="hint" id="${id}-hint">${escapeHtml(setting.description)}</p>`;
+  const attrs = `id="${id}" data-setting="${escapeHtml(key)}" data-kind="${setting.schema.type}" aria-describedby="${id}-hint"`;
   switch (setting.schema.type) {
     case "boolean":
-      return `<label for="${id}"><input type="checkbox" ${attrs}${value === true ? " checked" : ""}> ${label}</label>`;
+      return `<div class="field"><div class="inline-field"><input type="checkbox" ${attrs}${value === true ? " checked" : ""}><label for="${id}">${escapeHtml(setting.title)}</label></div>${hint}</div>`;
     case "integer":
-      return `<label for="${id}">${label} <input type="number" ${attrs} min="${setting.schema.minimum}" max="${setting.schema.maximum}" value="${escapeHtml(String(value))}"></label>`;
+      return `<div class="field"><label for="${id}">${escapeHtml(setting.title)}</label><input type="number" inputmode="numeric" required ${attrs} min="${setting.schema.minimum}" max="${setting.schema.maximum}" step="1" value="${escapeHtml(String(value))}">${hint}</div>`;
     case "enum":
-      return `<label for="${id}">${label} <select ${attrs}>${setting.schema.values
+      return `<div class="field"><label for="${id}">${escapeHtml(setting.title)}</label><select ${attrs}>${setting.schema.values
         .map((option) => `<option value="${escapeHtml(option)}"${option === value ? " selected" : ""}>${escapeHtml(option)}</option>`)
-        .join("")}</select></label>`;
+        .join("")}</select>${hint}</div>`;
   }
 };
 
-const extensionCard = (resolved: ResolvedHarness, entry: (typeof EXTENSIONS)[number]): string => {
+const extensionRow = (resolved: ResolvedHarness, entry: ExtensionEntry): string => {
   const current = resolved.extensions[entry.id];
-  const locked = entry.locked !== undefined;
-  const settings = Object.entries(entry.settings).map(([key, setting]) => field(entry.id, key, setting, current?.settings[key], locked));
-  const toggle =
+  const titleId = escapeHtml(`ext-${entry.id}-title`);
+  const head = `<div><div class="row-title"><h3 id="${titleId}">${escapeHtml(entry.title)}</h3><span class="ident">${escapeHtml(entry.id)}</span></div>
+<p class="desc">${escapeHtml(entry.description)}</p></div>`;
+  if (entry.locked !== undefined) {
+    return `<div class="row"><div><div class="row-title"><h3>${escapeHtml(entry.title)}</h3><span class="ident">${escapeHtml(entry.id)}</span></div>
+<p class="desc">${escapeHtml(entry.description)}</p></div><div class="row-control"><span class="state" title="Locked: ${escapeHtml(entry.locked)}">${icon("lock")}Always on<span class="sr">, locked: ${escapeHtml(entry.locked)}</span></span></div></div>`;
+  }
+  const control =
     entry.default === "always"
-      ? `<div class="muted">${locked ? `<span class="locked">Locked: ${escapeHtml(entry.locked ?? "")}</span>` : "Always on"}</div>`
-      : `<label><input type="checkbox" data-enabled${current?.enabled === true ? " checked" : ""}> On</label>`;
-  const editable = !locked && (entry.default !== "always" || settings.length > 0);
-  return `<form class="ext" data-extension="${escapeHtml(entry.id)}"><h3>${escapeHtml(entry.title)} <span class="muted">(${escapeHtml(entry.id)})</span></h3>
-<div class="muted">${escapeHtml(entry.description)}</div>${toggle}${settings.join("")}${editable ? "<button type=\"submit\">Save</button>" : ""}</form>`;
+      ? `<span class="state">${icon("check")}Always on</span>`
+      : `<input type="checkbox" class="switch" role="switch" data-enabled aria-labelledby="${titleId}"${current?.enabled === true ? " checked" : ""}>`;
+  const settings = Object.entries(entry.settings).map(([key, setting]) => field(entry.id, key, setting, current?.settings[key]));
+  const extra =
+    settings.length === 0
+      ? ""
+      : `<div class="row-extra"><div class="fields">${settings.join("")}</div><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div></div>`;
+  return `<form class="row" data-extension="${escapeHtml(entry.id)}" aria-labelledby="${titleId}" novalidate>${head}<div class="row-control">${control}</div>${extra}</form>`;
 };
+
+const extensionsSection = (resolved: ResolvedHarness): string => {
+  const adjustable = EXTENSIONS.filter((entry) => entry.locked === undefined);
+  const core = EXTENSIONS.filter((entry) => entry.locked !== undefined);
+  return `<section id="extensions" aria-labelledby="extensions-title">
+<div class="section-head"><h2 id="extensions-title">${icon("extensions")}Extensions</h2></div>
+<p class="section-desc">What Pi Durable's harness offers the model. A switch saves at once; a setting saves with its Save button.</p>
+<div class="group">${adjustable.map((entry) => extensionRow(resolved, entry)).join("\n")}</div>
+<h3 class="sub-head">Core, always on</h3>
+<div class="group core">${core.map((entry) => extensionRow(resolved, entry)).join("\n")}</div>
+</section>`;
+};
+
+// ── MCP servers ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** One server of the panel's MCP section (panel.ts `mcpOverview`). */
 export interface McpRow {
   readonly name: string;
-  readonly setting: { readonly kind: string; readonly enabled: boolean; readonly exposure: string; readonly url?: string; readonly auth?: { readonly kind: string } };
+  readonly setting: { readonly kind: string; readonly enabled: boolean; readonly exposure: string; readonly url?: string; readonly auth?: { readonly kind: string; readonly header?: string } };
   readonly oauth?: { readonly signedIn: boolean };
+  /** A header sign-in's value: whether it is set, when, and its fingerprint (never the value). */
+  readonly secret?: { readonly set: boolean; readonly setAt: number | null; readonly fingerprint: string | null };
   readonly status: string;
   readonly listedAt: number | null;
   readonly error: string | null;
@@ -163,48 +117,164 @@ export interface McpRow {
   readonly refused: ReadonlyArray<{ readonly tool: string; readonly reason: string }>;
 }
 
-const action = (label: string, change: unknown) => `<button type="button" data-mcp="${escapeHtml(JSON.stringify(change))}">${escapeHtml(label)}</button>`;
+const action = (label: string, change: unknown, options: { readonly className?: string; readonly ariaLabel?: string; readonly icon?: IconName } = {}) =>
+  `<button type="button" class="btn ${options.className ?? "btn-sm"}" data-mcp="${escapeHtml(JSON.stringify(change))}"${
+    options.ariaLabel === undefined ? "" : ` aria-label="${escapeHtml(options.ariaLabel)}"`
+  }>${options.icon === undefined ? "" : icon(options.icon)}${escapeHtml(label)}</button>`;
 
-const mcpSection = (rows: ReadonlyArray<McpRow>): string =>
-  rows
-    .map((row) => {
-      const tools = row.tools
-        .map((tool) => {
-          const other = tool.class === "read" ? "write" : "read";
-          const overridden = row.overrides?.[tool.upstream] !== undefined;
-          const note = overridden ? ` <span class="muted">(set by you; the tool's hint says ${escapeHtml(tool.hinted)})</span>` : ' <span class="muted">(the tool\'s hint)</span>';
-          return `<tr><td>${escapeHtml(tool.upstream)}</td><td>${escapeHtml(tool.class)}${note}</td><td>${escapeHtml(tool.exposure)}</td><td>${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other })}${
-            overridden ? action("Use the tool's hint", { op: "class", server: row.name, tool: tool.upstream, class: null }) : ""
-          }</td></tr>`;
-        })
-        .join("");
-      const refused = row.refused.map((r) => `<li>${escapeHtml(r.tool)}: ${escapeHtml(r.reason)}</li>`).join("");
-      return `<div class="ext"><h3>${escapeHtml(row.name)} <span class="muted">(${escapeHtml(row.setting.kind)}${row.setting.url === undefined ? "" : `, ${escapeHtml(row.setting.url)}`})</span></h3>
-<div class="muted">${row.setting.enabled ? "Enabled" : "Disabled"} · Exposure ${escapeHtml(row.setting.exposure)} · ${escapeHtml(row.status)}${
-        row.listedAt === null ? "" : `, listed ${escapeHtml(new Date(row.listedAt).toISOString())}`
-      }${row.error === null ? "" : ` · <span class="locked">${escapeHtml(row.error)}</span>`}</div>
-<div>${action(row.setting.enabled ? "Disable" : "Enable", { op: "server", server: row.name, enabled: !row.setting.enabled })}<button type="button" data-mcp-test="${escapeHtml(row.name)}">Test</button>${
-        row.setting.auth?.kind === "oauth"
-          ? `<button type="button" data-mcp-oauth="${escapeHtml(row.name)}">${row.oauth?.signedIn === true ? "Sign in again" : "Sign in"}</button> <span class="muted">${row.oauth?.signedIn === true ? "signed in" : "not signed in"}</span>`
-          : ""
-      }${row.setting.kind === "direct" ? action("Remove", { op: "remove", server: row.name }) : ""}</div>
-<table><tr><th>Tool</th><th>Class</th><th>Exposure</th><th></th></tr>${tools}</table>${refused === "" ? "" : `<ul>${refused}</ul>`}</div>`;
+/** The server's state as one pill: off, listed, failing, or not listed yet. */
+const statusPill = (row: McpRow): string => {
+  if (!row.setting.enabled) return '<span class="pill">Disabled</span>';
+  if (row.status === "ok") return '<span class="pill pill-ok">Connected</span>';
+  if (row.status === "failed") return '<span class="pill pill-err">Error</span>';
+  if (row.status === "never") return '<span class="pill">Not listed yet</span>';
+  return `<span class="pill">${escapeHtml(row.status)}</span>`;
+};
+
+const signIn = (row: McpRow): string | undefined => {
+  const auth = row.setting.auth;
+  if (row.setting.kind !== "direct" || auth === undefined) return undefined;
+  if (auth.kind === "none") return "None";
+  if (auth.kind === "oauth") return row.oauth?.signedIn === true ? '<span class="pill pill-ok">OAuth, signed in</span>' : '<span class="pill pill-warn">OAuth, signed out</span>';
+  if (auth.kind === "header") {
+    const name = `<code>${escapeHtml(auth.header ?? "header")}</code>`;
+    if (row.secret === undefined) return `Header ${name}`;
+    return row.secret.set
+      ? `Header ${name}, set${row.secret.fingerprint === null ? "" : ` <span class="ident" title="Fingerprint: an HMAC of the value, never the value">#${escapeHtml(row.secret.fingerprint)}</span>`}`
+      : `Header ${name}, <span class="pill pill-warn">no value</span>`;
+  }
+  return escapeHtml(auth.kind);
+};
+
+const toolsTable = (row: McpRow): string => {
+  if (row.tools.length === 0) {
+    const why = row.status === "never" ? "Not listed yet: Test lists its tools." : row.status === "failed" ? "No tools: the last listing failed." : "This server offers no tools.";
+    return `<p class="empty-tools">${why}</p>`;
+  }
+  const reads = row.tools.filter((tool) => tool.class === "read").length;
+  const rows = row.tools
+    .map((tool) => {
+      const other = tool.class === "read" ? "write" : "read";
+      const overridden = row.overrides?.[tool.upstream] !== undefined;
+      const source = overridden ? `Set by you; its hint says ${escapeHtml(tool.hinted)}` : "The tool's own hint";
+      return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(tool.upstream)}</code></td><td class="cls" data-label="Class"><div><span class="tag tag-${tool.class === "read" ? "read" : "write"}">${escapeHtml(tool.class)}</span><span class="src">${source}</span></div></td><td class="exp" data-label="Exposure"><div>${escapeHtml(tool.exposure)}</div></td><td class="actions" data-label="Change"><div>${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other }, { ariaLabel: `Mark ${tool.upstream} as ${other}` })}${
+        overridden ? ` ${action("Use its hint", { op: "class", server: row.name, tool: tool.upstream, class: null }, { className: "btn-sm btn-ghost", ariaLabel: `Use ${tool.upstream}'s own hint` })}` : ""
+      }</div></td></tr>`;
     })
-    .join("\n");
+    .join("");
+  return `<details class="tools"${row.tools.length <= 12 ? " open" : ""}><summary>${icon("chevron")}Tools <span>${plural(row.tools.length, "tool", "tools")}: ${reads} read, ${row.tools.length - reads} write</span></summary>
+<div class="table-wrap"><table class="stacked tools-table"><thead><tr><th scope="col">Tool</th><th scope="col">Class</th><th scope="col">Exposure</th><th scope="col"><span class="sr">Change</span></th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
+};
+
+const serverCard = (row: McpRow): string => {
+  const id = escapeHtml(`srv-${row.name}`);
+  const name = escapeHtml(row.name);
+  const facts = [
+    ["Tools", row.status === "never" ? "—" : String(row.tools.length)],
+    ["Exposure", escapeHtml(row.setting.exposure)],
+    ["Listed", row.listedAt === null ? "Never" : time(row.listedAt)],
+    ...(signIn(row) === undefined ? [] : [["Sign-in", signIn(row)!]]),
+  ]
+    .map(([term, value]) => `<div><dt>${term}</dt><dd>${value}</dd></div>`)
+    .join("");
+  const error =
+    row.error === null
+      ? ""
+      : `<div class="callout" role="note">${icon("alert")}<div><strong>Last error</strong><p class="mono">${escapeHtml(row.error)}</p></div></div>`;
+  const refused =
+    row.refused.length === 0
+      ? ""
+      : `<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>${plural(row.refused.length, "tool", "tools")} refused</strong><ul>${row.refused
+          .map((r) => `<li><code>${escapeHtml(r.tool)}</code>: ${escapeHtml(r.reason)}</li>`)
+          .join("")}</ul></div></div>`;
+  const oauth =
+    row.setting.auth?.kind === "oauth"
+      ? `<button type="button" class="btn btn-sm${row.oauth?.signedIn === true ? "" : " btn-primary"}" data-mcp-oauth="${name}">${icon("login")}${row.oauth?.signedIn === true ? "Sign in again" : "Sign in"}</button>`
+      : "";
+  const remove = row.setting.kind === "direct" ? action("Remove", { op: "remove", server: row.name }, { className: "btn-sm btn-danger", ariaLabel: `Remove ${row.name}`, icon: "trash" }) : "";
+  return `<article class="group server" aria-labelledby="${id}">
+<div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3><span class="tag">${row.setting.kind === "commissary" ? "Commissary" : "Direct"}</span>${statusPill(row)}</div>${
+    row.setting.url === undefined ? "" : `<p class="server-url">${escapeHtml(row.setting.url)}</p>`
+  }</div>
+<button type="button" class="switch" role="switch" aria-checked="${row.setting.enabled}" aria-label="${name} enabled" data-mcp="${escapeHtml(JSON.stringify({ op: "server", server: row.name, enabled: !row.setting.enabled }))}"></button>
+<dl class="facts">${facts}</dl></div>${error}${refused}
+<div class="server-actions"><button type="button" class="btn btn-sm" data-mcp-test="${name}">${icon("play")}Test</button>${oauth}<p class="test-result" data-test-result="${name}" role="status" aria-live="polite"></p><span class="spacer"></span>${remove}</div>
+${toolsTable(row)}</article>`;
+};
 
 /**
  * The form that adds a direct server (Route B). Each tool's class is its own `readOnlyHint` until the owner overrides it
  * (owner, 2026-11-12, back to stock); an OAuth server is signed in with its Sign in button once added. A header value
  * goes to the write-only secret store.
  */
-const ADD_SERVER = `<form class="ext" data-mcp-add autocomplete="off"><h3>Add a server</h3>
-<div class="muted">A remote MCP server over streamable HTTP (https only). Each tool's class is its own read-only hint until you change it; write tools follow the thread's mode.</div>
-<label>Name <input name="server" required pattern="[a-z0-9-]{1,20}" placeholder="executor"></label>
-<label>URL <input name="url" type="url" required placeholder="https://mcp.example.com/mcp"></label>
-<label>Sign-in <select name="auth"><option value="oauth">OAuth (sign in after adding)</option><option value="header">A header</option><option value="none">None</option></select></label>
-<div data-header-fields><label>Header name <input name="header" value="Authorization" pattern="[A-Za-z0-9-]{1,64}"></label>
-<label>Header value <input name="value" type="password" autocomplete="new-password"> <span class="muted">stored write-only; never shown again</span></label></div>
-<button type="submit">Add</button></form>`;
+const ADD_SERVER = `<form class="group add" id="add-server" data-mcp-add autocomplete="off" aria-labelledby="add-title">
+<div class="row"><div><div class="row-title"><h3 id="add-title">Add a server</h3></div><p class="desc">A remote MCP server over streamable HTTP. Each tool's class is its own read-only hint until you change it; write tools follow the thread's mode.</p></div></div>
+<div class="form-body">
+<div class="field"><label for="add-server-name">Name</label><input id="add-server-name" name="server" type="text" required pattern="[a-z0-9\\-]{1,20}" placeholder="executor" autocapitalize="none" spellcheck="false" aria-describedby="add-server-name-hint"><p class="hint" id="add-server-name-hint">1–20 of a–z, 0–9 and -. Tools are named mcp__name__tool.</p></div>
+<div class="field"><label for="add-server-url">URL</label><input id="add-server-url" name="url" type="url" required placeholder="https://mcp.example.com/mcp" autocapitalize="none" spellcheck="false" aria-describedby="add-server-url-hint"><p class="hint" id="add-server-url-hint">https only, on a public host name.</p></div>
+<fieldset class="wide"><legend>Sign-in</legend><div class="choices">
+<label class="choice"><input type="radio" name="auth" value="oauth" checked><div><strong>OAuth</strong><span>Sign in after adding</span></div></label>
+<label class="choice"><input type="radio" name="auth" value="header"><div><strong>Header</strong><span>A token sent with each call</span></div></label>
+<label class="choice"><input type="radio" name="auth" value="none"><div><strong>None</strong><span>A public server</span></div></label>
+</div></fieldset>
+<div class="wide pair" data-header-fields hidden>
+<div class="field"><label for="add-server-header">Header name</label><input id="add-server-header" name="header" type="text" value="Authorization" pattern="[A-Za-z0-9\\-]{1,64}" autocapitalize="none" spellcheck="false"></div>
+<div class="field"><label for="add-server-value">Header value</label><input id="add-server-value" name="value" type="password" autocomplete="new-password" aria-describedby="add-server-value-hint"><p class="hint" id="add-server-value-hint">Stored write-only: never shown again, only its fingerprint.</p></div>
+</div></div>
+<div class="form-foot"><p>${icon("key")}Secrets go to the Environment's secret store.</p><button type="submit" class="btn btn-primary">${icon("plus")}Add server</button></div>
+</form>`;
+
+const mcpSection = (rows: ReadonlyArray<McpRow>): string => `<section id="mcp" aria-labelledby="mcp-title">
+<div class="section-head"><h2 id="mcp-title">${icon("server")}MCP servers</h2><a class="btn btn-sm" href="#add-server">${icon("plus")}Add server</a></div>
+<p class="section-desc">Servers whose tools agents get, read at each call. Test lists a server's tools now.</p>
+<div class="stack">${
+  rows.length === 0
+    ? `<div class="group"><div class="empty"><span class="empty-icon">${icon("server")}</span><h3>No MCP servers</h3><p>Add a remote server below. Agents get its tools at their next turn.</p></div></div>`
+    : rows.map(serverCard).join("\n")
+}
+${ADD_SERVER}</div>
+</section>`;
+
+// ── Skills, Status, Audit ───────────────────────────────────────────────────────────────────────────────────────
+
+const SKILLS = `<section id="skills" aria-labelledby="skills-title">
+<div class="section-head"><h2 id="skills-title">${icon("skills")}Skills</h2></div>
+<div class="group"><div class="empty"><span class="empty-icon">${icon("skills")}</span><h3>Skills aren't here yet</h3><p>Pi Durable's skills get their switches in this section once SPI-1001 lands.</p></div></div>
+</section>`;
+
+/** A status value; an ISO time reads as a time. */
+const statusValue = (value: string | number | null): string => {
+  if (value === null) return "—";
+  if (typeof value === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/.test(value)) return time(Date.parse(value));
+  return escapeHtml(String(value));
+};
+
+const statusSection = (status: Readonly<Record<string, string | number | null>>): string => {
+  const rows = Object.entries(status)
+    .map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${statusValue(value)}</dd></div>`)
+    .join("");
+  return `<section id="status" aria-labelledby="status-title">
+<div class="section-head"><h2 id="status-title">${icon("status")}Status</h2></div>
+<dl class="group kv">${rows}</dl>
+</section>`;
+};
+
+const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
+  const body =
+    audit.length === 0
+      ? `<div class="empty"><span class="empty-icon">${icon("audit")}</span><h3>No changes yet</h3><p>Every change, here or from a script, is logged with who made it. Secrets are never logged.</p></div>`
+      : `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Change</th></tr></thead><tbody>${audit
+          .map(
+            (entry) =>
+              `<tr><td class="when" data-label="When"><div>${time(entry.at)}</div></td><td data-label="Who"><div>${escapeHtml(entry.caller)}</div></td><td data-label="Action"><div><code>${escapeHtml(entry.action)}</code></div></td><td data-label="Target"><div>${escapeHtml(entry.target)}</div></td><td data-label="Change"><div><code class="change">${escapeHtml(JSON.stringify(entry.after ?? null))}</code></div></td></tr>`,
+          )
+          .join("")}</tbody></table></div>`;
+  return `<section id="audit" aria-labelledby="audit-title">
+<div class="section-head"><h2 id="audit-title">${icon("audit")}Audit log</h2></div>
+<p class="section-desc">The latest ${audit.length === 0 ? "" : `${audit.length} `}changes, newest first.</p>
+<div class="group">${body}</div>
+</section>`;
+};
 
 export interface PageInput {
   readonly mcp?: ReadonlyArray<McpRow>;
@@ -214,35 +284,42 @@ export interface PageInput {
   readonly status: Readonly<Record<string, string | number | null>>;
 }
 
+const navItem = (id: string, label: string, name: IconName, after = "") => `<a href="#${id}">${icon(name)}${label}${after}</a>`;
+
 /** The whole page. */
 export const renderPage = (input: PageInput): string => {
-  const status = Object.entries(input.status)
-    .map(([key, value]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(value === null ? "—" : String(value))}</td></tr>`)
-    .join("");
-  const audit = input.audit
-    .map(
-      (entry) =>
-        `<tr><td>${escapeHtml(new Date(entry.at).toISOString())}</td><td>${escapeHtml(entry.caller)}</td><td>${escapeHtml(entry.action)}</td><td>${escapeHtml(entry.target)}</td><td>${escapeHtml(JSON.stringify(entry.after ?? null))}</td></tr>`,
-    )
-    .join("");
+  const rows = input.mcp ?? [];
+  const failing = rows.filter((row) => row.setting.enabled && row.status === "failed").length;
+  const revision = String(input.resolved.revision);
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <meta name="t3flare-csrf" content="${escapeHtml(input.csrf)}">
-<title>t3flare harness</title><style>${STYLE}</style></head>
-<body><h1>Pi Durable harness</h1>
-<p class="muted">Settings revision ${input.resolved.revision}. Changes apply at a thread's next turn.</p>
-<div id="result"></div>
-<h2>Extensions</h2>
-${EXTENSIONS.map((entry) => extensionCard(input.resolved, entry)).join("\n")}
-<h2>MCP servers</h2>
-${input.mcp === undefined || input.mcp.length === 0 ? '<p class="muted">No MCP server.</p>' : mcpSection(input.mcp)}
-${ADD_SERVER}
-<h2>Skills</h2>
-<p class="muted">Deferred (SPI-1001).</p>
-<h2>Status</h2>
-<table>${status}</table>
-<h2>Audit log</h2>
-<table><tr><th>At</th><th>Caller</th><th>Action</th><th>Target</th><th>After</th></tr>${audit}</table>
+<title>Harness · t3flare</title><style>${STYLE}</style></head>
+<body>${ICON_SPRITE}
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+<aside class="side">
+<div class="brand"><span class="brand-mark">${icon("logo")}</span><div><strong>Harness</strong><span>t3flare · Pi Durable</span></div></div>
+<nav class="nav" aria-label="Sections">
+${navItem("extensions", "Extensions", "extensions", `<span class="count">${EXTENSIONS.length}</span>`)}
+${navItem("mcp", "MCP servers", "server", failing > 0 ? `<span class="flag" role="img" aria-label="${plural(failing, "server", "servers")} failing"></span>` : `<span class="count">${rows.length}</span>`)}
+${navItem("skills", "Skills", "skills")}
+${navItem("status", "Status", "status")}
+${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.length}</span>`)}
+</nav>
+<p class="side-foot">Settings revision <strong>${revision}</strong>. Changes apply at each thread's next turn.</p>
+</aside>
+<main id="main" tabindex="-1"><div class="content">
+<header class="page-head"><div><h1>Harness</h1><p>Pi Durable's extensions and MCP servers for this Cloud Environment. Changes apply at each thread's next turn.</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
+<div id="result" class="notice" role="status" aria-live="polite" hidden><span class="notice-ico-ok">${icon("check")}</span><span class="notice-ico-err">${icon("alert")}</span><p class="msg"></p><button type="button" class="btn btn-ghost btn-sm" data-dismiss aria-label="Dismiss">${icon("x")}</button></div>
+${extensionsSection(input.resolved)}
+${mcpSection(rows)}
+${SKILLS}
+${statusSection(input.status)}
+${auditSection(input.audit)}
+</div></main>
+</div>
 <script>${SCRIPT}</script>
 </body></html>`;
 };
