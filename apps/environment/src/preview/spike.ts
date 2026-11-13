@@ -528,23 +528,6 @@ export const runSpike = async (
       return { op, lines };
     }
     case "session-state": {
-      // Browser Run's view of one session by id (a session this Environment no longer lists).
-      const lines: Array<Line> = [];
-      await step(lines, "getSession", async () => (await binding().getSession(options.match ?? "")) as unknown);
-      return { op, lines };
-    }
-    case "history": {
-      // Browser Run's recent sessions with these ids (comma-separated): when each closed, and why.
-      const ids = new Set((options.match ?? "").split(","));
-      const lines: Array<Line> = [];
-      await step(lines, "history", async () =>
-        ((await binding().history({ limit: 100 })) as Array<{ sessionId: string; startTime?: number; endTime?: number; closeReasonText?: string }>)
-          .filter((session) => ids.has(session.sessionId))
-          .map((session) => ({ id: session.sessionId, lifeS: session.endTime && session.startTime ? Math.round((session.endTime - session.startTime) / 1000) : null, closeReason: session.closeReasonText ?? null })),
-      );
-      return { op, lines };
-    }
-    case "session-state": {
       // Stage checks: Browser Run's own view of one session (review M5's close at boot).
       const lines: Array<Line> = [];
       await step(lines, `session ${options.match ?? ""}`, async () => {

@@ -481,7 +481,7 @@ switch (part) {
       states.push((json as { lines: Array<Line> }).lines[0]?.detail ?? null);
     }
     // Browser Run answers a closed session as closed, or no longer knows it (404).
-    const ok = after.length === 0 && states.every((state) => (state as { closed?: boolean } | null)?.closed === true || /not found|404/i.test(String(state)));
+    const ok = after.length === 0 && states.every((state) => (state as { closed?: boolean } | null)?.closed === true || /not found|404/i.test(JSON.stringify(state)));
     writeEvidence("boot-close", { ok, reset: reset.json, before: ids.length, after: after.length, browserRun: states });
     process.exit(process.exitCode ?? 0);
     break;
