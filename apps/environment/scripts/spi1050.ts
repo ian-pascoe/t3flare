@@ -74,7 +74,15 @@ const call = async (body: unknown) => {
   }));
   return { ms: Date.now() - started, http: answer.status, result: answer.json?.result, raw: answer.json as unknown, running: answer.json?.container?.running };
 };
-const exec = (script: string) => call({ exec: { script, cwd: "/workspace/repo", timeoutMs: 120_000 } });
+// An idle reset of the Environment DO can end an admin call in flight with a 500 (the command may be cut short too):
+// each script here is safe to run twice, and runs again once on a 500.
+const exec = async (script: string) => {
+  const first = await call({ exec: { script, cwd: "/workspace/repo", timeoutMs: 120_000 } });
+  if (first.http !== 500) return first;
+  // The first run may still be going in the Container: wait for its git to end, and drop a lock it left.
+  const again = `while pgrep -x git >/dev/null; do sleep 1; done; rm -f .git/index.lock\n${script}`;
+  return { ...(await call({ exec: { script: again, cwd: "/workspace/repo", timeoutMs: 300_000 } })), retried: true };
+};
 const capture = (n: number) => call({ checkpoint: { op: "capture", ref: `refs/t3/checkpoints/spi1050/turn/${n}` } });
 const status = (startContainer = false) => call({ git: { argv: ["status", "--porcelain=2", "--branch", "-z", "--no-ahead-behind"], cwd: "/workspace/repo", startContainer } });
 const stop = () => admin("POST", `/_t3flare/agents/workspace-stop?id=${encodeURIComponent(id)}`);
@@ -82,6 +90,8 @@ const brief = (a: Awaited<ReturnType<typeof call>>) => ({
   ms: a.ms,
   http: a.http,
   ok: a.result?.ok,
+  value: Array.isArray(a.result?.value) || typeof a.result?.value === "boolean" ? a.result.value : undefined,
+  retried: (a as { retried?: boolean }).retried,
   by: a.result?.by,
   ran: a.result?.ran,
   exitCode: a.result?.exitCode,
@@ -117,13 +127,36 @@ check("status answers while stopped", (steps.statusStopped as any).exitCode === 
 steps.captureStopped = brief(await capture(2));
 check("a capture while stopped succeeds", (steps.captureStopped as any).ok === true, steps.captureStopped);
 
-// 2. The file committed: a big loose object in .git.
-steps.commit = brief(await exec(`git -c user.name=t -c user.email=t@x add big.bin && git -c user.name=t -c user.email=t@x commit -qm big && git count-objects -vH`));
+// 2. The file committed: a big loose object in .git. (The exec's HTTP answer can be lost to an idle reset of the
+// Environment DO; the commit is checked by reading it back.)
+steps.commit = brief(await exec(`git -c user.name=t -c user.email=t@x add big.bin && (git diff --cached --quiet || git -c user.name=t -c user.email=t@x commit -qm big) && git count-objects -vH`));
+steps.commitCheck = brief(await exec("git log -1 --format=%s"));
+check("the big file was committed", String((steps.commitCheck as any).stdout ?? "").trim() === "big", { commit: steps.commit, check: steps.commitCheck });
 steps.captureCommitted = brief(await capture(3));
 check("after the commit, the capture succeeds", (steps.captureCommitted as any).ok === true, steps.captureCommitted);
 await stop();
 steps.statusCommittedStopped = brief(await status());
 check("status answers while stopped, after the commit", (steps.statusCommittedStopped as any).exitCode === 0, steps.statusCommittedStopped);
+const diffStopped = (from: number, to: number) => call({ checkpoint: { op: "diff", from: `refs/t3/checkpoints/spi1050/turn/${from}`, to: `refs/t3/checkpoints/spi1050/turn/${to}`, format: "numstat", fallbackFromToHead: false } });
+steps.diffStopped = brief(await diffStopped(0, 3));
+check("a checkpoint diff with the Container stopped is the Container's", (steps.diffStopped as any).ok === true && (steps.diffStopped as any).by === "container", steps.diffStopped);
+
+// 2b. The same file packed (`git gc`) and kept: a 100 MiB pack. Every checkpoint op with the Container stopped.
+steps.pack = brief(await exec("git gc -q && git count-objects -vH"));
+await stop();
+steps.hasPacked = brief(await call({ checkpoint: { op: "has", ref: "refs/t3/checkpoints/spi1050/turn/3" } }));
+check("has, with a big pack, while stopped", (steps.hasPacked as any).ok === true && (steps.hasPacked as any).value === true, steps.hasPacked);
+steps.statusPackedStopped = brief(await status());
+check("status answers while stopped, with a big pack", (steps.statusPackedStopped as any).exitCode === 0, steps.statusPackedStopped);
+await stop();
+steps.capturePacked = brief(await capture(5));
+check("a capture with a big pack succeeds", (steps.capturePacked as any).ok === true, steps.capturePacked);
+await stop();
+steps.diffPacked = brief(await diffStopped(3, 5));
+check("a checkpoint diff with a big pack succeeds", (steps.diffPacked as any).ok === true, steps.diffPacked);
+await stop();
+steps.authoredPacked = brief(await call({ checkpoint: { op: "authored", from: "refs/t3/checkpoints/spi1050/turn/0", to: "refs/t3/checkpoints/spi1050/turn/5" } }));
+check("authored paths with a big pack succeed", (steps.authoredPacked as any).ok === true, steps.authoredPacked);
 
 // 3. Gone again: the DO's own git takes over.
 steps.cleanup = brief(

@@ -4,7 +4,7 @@ import { Workspace } from "@cloudflare/computer";
 import { DurableObject } from "cloudflare:workers";
 
 import { ContainerBudget } from "../src/budget.ts";
-import { largestFileUnder } from "../src/workspace/changeLog.ts";
+import { repoFileSizes } from "../src/workspace/changeLog.ts";
 
 export { ContainerBudget };
 
@@ -35,8 +35,14 @@ export class VfsProbe extends DurableObject {
     await this.#workspace.fs.rm(path);
   }
 
-  async largest(dir: string): Promise<number> {
+  async symlink(target: string, path: string): Promise<void> {
     await this.#workspace.ready();
-    return largestFileUnder(this.ctx.storage.sql, dir);
+    await this.#workspace.fs.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
+    await this.#workspace.fs.symlink(target, path);
+  }
+
+  async sizes(dir: string): Promise<{ largest: number; worktreeBytes: number }> {
+    await this.#workspace.ready();
+    return repoFileSizes(this.ctx.storage.sql, dir);
   }
 }

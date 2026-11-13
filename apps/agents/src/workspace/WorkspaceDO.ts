@@ -45,7 +45,7 @@ import { CREDENTIAL_HELPER, CREDENTIAL_PATH } from "./credentialHelper.ts";
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
 import { environmentStub } from "../environment.ts";
 import type { McpRelayAnswer } from "@t3flare/harness-registry";
-import { changedBetween, currentRevision, largestFileUnder } from "./changeLog.ts";
+import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { ContainerPreview } from "./containerPreview.ts";
 import { type PortProbe, probeRunningPort, scanRunningContainer, stopGroupInRunningContainer } from "./ports.ts";
@@ -58,9 +58,10 @@ import {
   diffCommits,
   type GitFs,
   parentsOf,
+  resolveRefOnly,
+  resolverFor,
   type Repo,
   repoFacts,
-  resolveCommit,
   withinGuard,
 } from "./gitRepo.ts";
 import { containerPatterns, ContainerOnlyBackend, submoduleDirsScript, submodulePaths } from "./containerOnly.ts";
@@ -942,7 +943,7 @@ export class WorkspaceDO extends ContainerHost {
   async #repo(): Promise<Repo> {
     await this.#workspace.ready();
     this.#gitFs ??= isomorphicFs(this.#workspace);
-    return { fs: this.#gitFs, dir: REPO_ROOT, cache: {}, largestFile: () => largestFileUnder(this.ctx.storage.sql, REPO_ROOT) };
+    return { fs: this.#gitFs, dir: REPO_ROOT, cache: {}, fileSizes: () => repoFileSizes(this.ctx.storage.sql, REPO_ROOT) };
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -961,7 +962,7 @@ export class WorkspaceDO extends ContainerHost {
       const repo = await this.#repo();
       switch (op.op) {
         case "has":
-          return { ok: true, value: (await resolveCommit(repo, op.ref)) !== null, by: "do" };
+          return { ok: true, value: (await resolverFor(repo, await withinGuard(repo))(op.ref)) !== null, by: "do" };
         case "delete":
           for (const ref of op.refs) await deleteRef(repo, ref);
           return { ok: true, value: null, by: "do" };
@@ -1003,11 +1004,14 @@ export class WorkspaceDO extends ContainerHost {
 
   async #diff(repo: Repo, op: Extract<CheckpointOp, { op: "diff" }>): Promise<CheckpointAnswer> {
     if (op.filePaths?.length === 0) return { ok: true, value: "", by: "do" };
-    let from = await resolveCommit(repo, op.from);
-    if (from === null && op.fallbackFromToHead) from = await resolveCommit(repo, "HEAD");
-    const to = await resolveCommit(repo, op.to);
+    // Above the guard the DO reads no object (SPI-1050 review): the Container's git answers, started if need be.
+    const within = await withinGuard(repo);
+    const resolve = resolverFor(repo, within);
+    let from = await resolve(op.from);
+    if (from === null && op.fallbackFromToHead) from = await resolve("HEAD");
+    const to = await resolve(op.to);
     if (from === null || to === null) return { ok: false, error: "Checkpoint ref is unavailable for diff operation." };
-    if (this.containerRunning()) {
+    if (this.containerRunning() || !within) {
       const argv = [
         "-c", "diff.relative=false", "-c", "diff.suppressBlankEmpty=false", "diff",
         ...(op.format === "numstat" ? ["--numstat", "-z"] : ["--patch"]),
@@ -1016,20 +1020,35 @@ export class WorkspaceDO extends ContainerHost {
         `${from}^{commit}`, `${to}^{commit}`,
         ...(op.filePaths === undefined ? [] : ["--", ...op.filePaths.map((path) => `:(top,literal)${path}`)]),
       ];
-      const result = await this.exec({ script: `exec git ${argv.map(shellWord).join(" ")}`, cwd: REPO_ROOT, passive: true });
+      // Above the guard the Container may be starting cold, its files pushed first: as long as a capture may take.
+      const result = await this.exec({ script: `exec git ${argv.map(shellWord).join(" ")}`, cwd: REPO_ROOT, passive: true, ...(within ? {} : { timeoutMs: 10 * 60_000 }) });
       if (result.exitCode === 0) return { ok: true, value: result.stdout, by: "container" };
+      if (!within) return { ok: false, error: `git diff failed: ${result.stderr.slice(0, 1000)}` };
     }
     const value = await diffCommits(repo, from, to, { format: op.format, filePaths: op.filePaths, maxOutputBytes: op.maxOutputBytes });
     return { ok: true, value, by: "do" };
   }
 
   async #authored(repo: Repo, fromRef: string, toRef: string): Promise<CheckpointAnswer> {
-    const from = await resolveCommit(repo, fromRef);
-    const to = await resolveCommit(repo, toRef);
+    const within = await withinGuard(repo);
+    const resolve = resolverFor(repo, within);
+    const from = await resolve(fromRef);
+    const to = await resolve(toRef);
     if (from === null || to === null) return { ok: false, error: "Checkpoint ref is unavailable." };
-    const [startHead] = await parentsOf(repo, from);
-    const [endHead] = await parentsOf(repo, to);
-    if (startHead === undefined || endHead === undefined || startHead === endHead) return { ok: true, value: null, by: "do" };
+    let startHead: string | undefined;
+    let endHead: string | undefined;
+    if (within) {
+      [startHead] = await parentsOf(repo, from);
+      [endHead] = await parentsOf(repo, to);
+    } else {
+      // Above the guard the parents come from the Container's git: one line of parents per commit, in order.
+      const parents = await this.exec({ script: `exec git log --no-walk=unsorted --format=%P ${shellWord(from)} ${shellWord(to)}`, cwd: REPO_ROOT, passive: true, timeoutMs: 10 * 60_000 });
+      if (parents.exitCode !== 0) return { ok: false, error: parents.stderr.slice(0, 1000) };
+      const lines = parents.stdout.split("\n");
+      startHead = lines[0]?.split(" ")[0] || undefined;
+      endHead = lines[1]?.split(" ")[0] || undefined;
+    }
+    if (startHead === undefined || endHead === undefined || startHead === endHead) return { ok: true, value: null, by: within ? "do" : "container" };
     // HEAD moved between the checkpoints (a commit, in the Container): its git lists the paths, as t3's driver does.
     const result = await this.exec({ script: authoredScript(from, to, startHead, endHead), cwd: REPO_ROOT, timeoutMs: 120_000 });
     if (result.exitCode !== 0) return { ok: false, error: result.stderr.slice(0, 1000) };
@@ -1037,8 +1056,9 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   async #restore(repo: Repo, ref: string, fallbackToHead: boolean): Promise<CheckpointAnswer> {
-    let commit = await resolveCommit(repo, ref);
-    if (commit === null && fallbackToHead) commit = await resolveCommit(repo, "HEAD");
+    const resolve = resolverFor(repo, await withinGuard(repo));
+    let commit = await resolve(ref);
+    if (commit === null && fallbackToHead) commit = await resolve("HEAD");
     if (commit === null) return { ok: true, value: false, by: "do" };
     const result = await this.exec({ script: restoreScript(commit), cwd: REPO_ROOT, timeoutMs: 10 * 60_000 });
     if (result.exitCode !== 0) return { ok: false, error: result.stderr.slice(0, 1000) };
@@ -1241,7 +1261,8 @@ export class WorkspaceDO extends ContainerHost {
   async worktreeHead(): Promise<{ readonly head: string | null; readonly branch: string | null }> {
     try {
       const repo = await this.#repo();
-      const head = await resolveCommit(repo, "HEAD");
+      // Refs only: reading the commit could load a whole pack (SPI-1050 review).
+      const head = await resolveRefOnly(repo, "HEAD");
       const branch = (await git.currentBranch({ fs: repo.fs, dir: repo.dir, fullname: true })) ?? null;
       return { head, branch: typeof branch === "string" ? branch : null };
     } catch {

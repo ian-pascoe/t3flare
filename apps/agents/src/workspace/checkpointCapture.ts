@@ -10,7 +10,7 @@
 import type { CheckpointAnswer } from "@t3flare/workspace-client";
 import * as git from "isomorphic-git";
 
-import { captureCheckpoint, type Repo, resolveCommit, withinGuard } from "./gitRepo.ts";
+import { captureCheckpoint, type Repo, resolverFor, withinGuard } from "./gitRepo.ts";
 
 /** The last checkpoint captured: its commit, the change log's revision then, and HEAD then. */
 export interface LastCapture {
@@ -40,9 +40,12 @@ export const captureTurn = async (deps: CaptureDeps, ref: string): Promise<Check
   await deps.pull();
   const repo = await deps.repo();
   const global = deps.revision();
-  const head = await resolveCommit(repo, "HEAD");
+  // The guard first: above it, no object is read in the DO (SPI-1050 review: a big pack is read whole).
+  const within = await withinGuard(repo);
+  const resolve = resolverFor(repo, within);
+  const head = await resolve("HEAD");
   let answer: CheckpointAnswer;
-  if (await withinGuard(repo)) {
+  if (within) {
     await captureCheckpoint(repo, ref, deps.nowSeconds());
     answer = { ok: true, value: null, by: "do" };
   } else {
@@ -56,7 +59,7 @@ export const captureTurn = async (deps: CaptureDeps, ref: string): Promise<Check
       answer = { ok: true, value: null, by: "container" };
     }
   }
-  const commit = await resolveCommit(repo, ref);
+  const commit = await resolve(ref);
   if (commit !== null) deps.remember({ commit, rev: global, head });
   return answer;
 };

@@ -18,10 +18,10 @@ export interface Repo {
   readonly dir: string;
   readonly cache: GitCache;
   /**
-   * The size of the largest file under `dir`, `.git` included (the Workspace DO reads it from computer's VFS in one
-   * query). Absent, the guard does not check file sizes.
+   * The sizes of the files under `dir` (the Workspace DO reads them from computer's VFS in one query). Absent, the guard
+   * does not check file sizes.
    */
-  readonly largestFile?: () => number;
+  readonly fileSizes?: () => { readonly largest: number; readonly worktreeBytes: number };
 }
 
 /** The most tracked files the DO handles itself (cloudpid's guard); past it, a capture needs the Container's git. */
@@ -34,6 +34,12 @@ export const MAX_PACK_BYTES = 16 * 1024 * 1024;
  * took 400+ MiB). Past it, a capture uses the Container's git and a stale read gets its last answer.
  */
 export const MAX_FILE_BYTES = 4 * 1024 * 1024;
+/**
+ * The most bytes of working-tree files the DO's git reads itself (SPI-1050 review): `statusMatrix` walks concurrently
+ * and holds the files it hashes at once (30 modified 4 MiB files peaked at 84 MiB), and a capture may hash every
+ * tracked file whose stat the index does not match.
+ */
+export const MAX_WORKTREE_BYTES = 32 * 1024 * 1024;
 
 /** t3's checkpoint commit identity (`GitVcsDriver.checkpoints.captureCheckpoint`). */
 const CHECKPOINT_AUTHOR = { name: "T3 Code", email: "t3code@users.noreply.github.com" } as const;
@@ -57,6 +63,27 @@ export const resolveCommit = async (repo: Repo, ref: string): Promise<string | n
     throw cause;
   }
 };
+
+/**
+ * The id `ref` names (a ref, `HEAD`, or an id; `^{commit}` allowed), or null when there is none, reading refs only and
+ * no object: unlike `resolveCommit`, it does not check that the id is a commit, nor peel a tag.
+ */
+export const resolveRefOnly = async (repo: Repo, ref: string): Promise<string | null> => {
+  const name = ref.endsWith("^{commit}") ? ref.slice(0, -"^{commit}".length) : ref;
+  if (/^[0-9a-f]{40}$/.test(name)) return name;
+  try {
+    return await git.resolveRef({ fs: repo.fs, dir: repo.dir, ref: name });
+  } catch (cause) {
+    if (isNotFound(cause)) return null;
+    throw cause;
+  }
+};
+
+/** The resolver for a repo within the guard (`resolveCommit`) or above it (`resolveRefOnly`). */
+export const resolverFor =
+  (repo: Repo, within: boolean) =>
+  (ref: string): Promise<string | null> =>
+    within ? resolveCommit(repo, ref) : resolveRefOnly(repo, ref);
 
 /** Every file of commit `oid`'s tree, by path. */
 export const flatTree = async (repo: Repo, commit: string | null): Promise<Map<string, TreeEntry>> => {
@@ -96,9 +123,16 @@ export const indexEntries = async (repo: Repo, gitlinks?: Set<string>): Promise<
   return out;
 };
 
-/** Whether the repo is within the guard: few enough tracked files, and packs and every file small enough for the DO. */
+/**
+ * Whether the repo is within the guard: few enough tracked files, and its packs, its working tree and every file small
+ * enough for the DO. Above it, read no object in the DO (`resolveRef`, not `resolveCommit`): isomorphic-git loads a whole
+ * pack to read one object from it.
+ */
 export const withinGuard = async (repo: Repo): Promise<boolean> => {
-  if (repo.largestFile !== undefined && repo.largestFile() > MAX_FILE_BYTES) return false;
+  if (repo.fileSizes !== undefined) {
+    const sizes = repo.fileSizes();
+    if (sizes.largest > MAX_FILE_BYTES || sizes.worktreeBytes > MAX_WORKTREE_BYTES) return false;
+  }
   const tracked = await git.listFiles({ fs: repo.fs, dir: repo.dir, cache: repo.cache });
   if (tracked.length > MAX_TRACKED_FILES) return false;
   const packDir = `${repo.dir}/.git/objects/pack`;

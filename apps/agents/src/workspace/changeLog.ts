@@ -123,35 +123,44 @@ export const changedBetween = (
   return [...changed.values()];
 };
 
+/** What the in-DO git guard reads of a repo's files (SPI-1050). */
+export type RepoFileSizes = {
+  /** The largest file under the repo, `.git` included (a loose object is a file there). */
+  readonly largest: number;
+  /** The bytes of every file under the repo outside its top-level `.git`. */
+  readonly worktreeBytes: number;
+};
+
 /**
- * The size in bytes of the largest file under directory `dir` (absolute, in the Workspace's files), at any depth; 0 when
- * there is none or `dir` is missing. SPI-1050: the in-DO git guard reads it, so one large file sends git work to the
- * Container instead of the DO's isolate. Hard links count once per path; symlinks are not followed.
+ * The sizes of the files under directory `dir` (absolute, in the Workspace's files), at any depth; zeros when `dir` is
+ * missing. One recursive query over dofs' `vfs_dirents` and `vfs_nodes`; symlinks are not followed, a hard link counts
+ * once per path, and `UNION` (not `UNION ALL`) ends the walk on a dirent cycle.
  */
-export const largestFileUnder = (sql: ChangeLogSql, dir: string): number => {
-  const parts = dir.split("/").filter(Boolean);
+export const repoFileSizes = (sql: ChangeLogSql, dir: string): RepoFileSizes => {
   let inode = ROOT_INODE;
-  for (const name of parts) {
+  for (const name of dir.split("/").filter(Boolean)) {
     const [row] = sql
       .exec<{ child: number }>("SELECT child_inode AS child FROM vfs_dirents WHERE parent_inode = ? AND name = ?", inode, name)
       .toArray();
-    if (row === undefined) return 0;
+    if (row === undefined) return { largest: 0, worktreeBytes: 0 };
     inode = row.child;
   }
 
   const [row] = sql
-    .exec<{ biggest: number | null }>(
-      `WITH RECURSIVE tree(inode) AS (
-         SELECT ?
-         UNION ALL
-         SELECT d.child_inode FROM vfs_dirents d JOIN tree t ON d.parent_inode = t.inode
+    .exec<{ largest: number | null; worktree: number | null }>(
+      `WITH RECURSIVE tree(inode, in_git) AS (
+         SELECT child_inode, name = '.git' FROM vfs_dirents WHERE parent_inode = ?
+         UNION
+         SELECT d.child_inode, t.in_git FROM vfs_dirents d JOIN tree t ON d.parent_inode = t.inode
        )
-       SELECT MAX(n.size) AS biggest FROM tree t JOIN vfs_nodes n ON n.inode = t.inode WHERE n.type = 'file'`,
+       SELECT MAX(n.size) AS largest, SUM(CASE WHEN t.in_git THEN 0 ELSE n.size END) AS worktree
+         FROM tree t JOIN vfs_nodes n ON n.inode = t.inode
+        WHERE n.type = 'file'`,
       inode,
     )
     .toArray();
 
-  return row?.biggest ?? 0;
+  return { largest: row?.largest ?? 0, worktreeBytes: row?.worktree ?? 0 };
 };
 
 /** What the file-change signal reads of the change log, for one backend. */
