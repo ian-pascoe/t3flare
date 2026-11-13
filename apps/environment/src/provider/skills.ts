@@ -115,20 +115,26 @@ export const messageSkillsFor = (cwd: string | null | undefined, access: SkillsA
   }),
 });
 
-/** Whether `text` may hold a Skill mention or a Slash command at all, so a plain message costs no lookup. */
-export const mayExpand = (text: string): boolean => text.startsWith("/") || /\p{Sc}/u.test(text);
+/**
+ * Whether `text` starts with a Slash command or holds a currency sigil (t3's mention token takes any `\p{Sc}`, not only
+ * `$`): only then can it expand, so a plain message costs no lookup.
+ */
+export const hasCommandOrSigil = (text: string): boolean => text.startsWith("/") || /\p{Sc}/u.test(text);
 
 /** `text` with its code (fenced blocks and inline spans) blanked, so a `$name` shown as code is not a mention. */
 const withoutCode = (text: string): string => text.replace(/```[\s\S]*?(```|$)|`[^`\n]*`/g, (code) => " ".repeat(code.length));
 
 const directoryOf = (path: string): string => path.slice(0, path.lastIndexOf("/")) || "/";
 
-/** The block a Skill is embedded as, pi's and t3's Pi provider's (`mcpExtensionSource.ts`). */
-export const skillBlock = (skill: Pick<Skill, "name" | "filePath">, body: string): string =>
-  `<skill name="${skill.name}" location="${skill.filePath}">\nReferences are relative to ${directoryOf(skill.filePath)}.\n\n${body}\n</skill>`;
+/** The block a Skill is embedded as, pi's and t3's Pi provider's (`mcpExtensionSource.ts`), from its `SKILL.md`'s text. */
+export const skillBlock = (skill: Pick<Skill, "name" | "filePath">, fileText: string): string =>
+  `<skill name="${skill.name}" location="${skill.filePath}">\nReferences are relative to ${directoryOf(skill.filePath)}.\n\n${stripFrontmatter(fileText).trim()}\n</skill>`;
 
-const overBudget = (what: string, path: string, budget: number): string =>
-  `[${what} is not embedded: it does not fit the message's ${budget.toLocaleString("en-US")}-character budget. Its file is ${path}.]`;
+/** `text` when it fits in `room` characters; else the bracketed note naming what was not embedded and its file. */
+const fitOrNote = (text: string, room: number, budget: number, what: string, path: string): { readonly fits: string } | { readonly note: string } =>
+  text.length <= room
+    ? { fits: text }
+    : { note: `[${what} is not embedded: it does not fit the message's ${budget.toLocaleString("en-US")}-character budget. Its file is ${path}.]` };
 
 /**
  * `text` as the model gets it, within `budget` characters: a leading `/skill:name args` becomes the Skill's block and
@@ -142,27 +148,27 @@ export const expandMessage = Effect.fn("PiDurable.expandMessage")(function* (tex
   const notes: Array<string> = [];
   const seen = new Set<string>();
   const used = () => [base, ...blocks, ...notes].join("\n\n").length;
-  const lead = /^\/skill:(\S+)(?:\s+([\s\S]*))?$/.exec(text);
-  const leading = lead === null ? undefined : catalog.skills.find((skill) => skill.name === lead[1]);
+  /** The leading command's expansion as the message, or a note when it does not fit. */
+  const lead = (expanded: string, what: string, path: string) => {
+    const fit = fitOrNote(expanded, budget, budget, what, path);
+    if ("fits" in fit) base = fit.fits;
+    else notes.push(fit.note);
+  };
+  const command = /^\/skill:(\S+)(?:\s+([\s\S]*))?$/.exec(text);
+  const leading = command === null ? undefined : catalog.skills.find((skill) => skill.name === command[1]);
   if (leading !== undefined) {
     const read = yield* catalog.read(leading.filePath);
     if (read !== null) {
       seen.add(leading.name);
-      const args = (lead?.[2] ?? "").trim();
-      const block = skillBlock(leading, stripFrontmatter(read).trim());
-      const expanded = args === "" ? block : `${block}\n\n${args}`;
-      if (expanded.length <= budget) base = expanded;
-      else notes.push(overBudget(`Skill "${leading.name}"`, leading.filePath, budget));
+      const args = (command?.[2] ?? "").trim();
+      const block = skillBlock(leading, read);
+      lead(args === "" ? block : `${block}\n\n${args}`, `Skill "${leading.name}"`, leading.filePath);
     }
   } else {
     const call = templateCall(text, catalog.templates);
     if (call !== undefined) {
       const read = yield* catalog.read(call.template.filePath);
-      if (read !== null) {
-        const expanded = substituteArgs(stripFrontmatter(read), call.args);
-        if (expanded.length <= budget) base = expanded;
-        else notes.push(overBudget(`Template "/${call.template.name}"`, call.template.filePath, budget));
-      }
+      if (read !== null) lead(substituteArgs(stripFrontmatter(read), call.args), `Template "/${call.template.name}"`, call.template.filePath);
     }
   }
   for (const match of matchInlineSkills(withoutCode(text), catalog.skills)) {
@@ -171,9 +177,9 @@ export const expandMessage = Effect.fn("PiDurable.expandMessage")(function* (tex
     seen.add(skill.name);
     const read = yield* catalog.read(skill.filePath);
     if (read === null) continue;
-    const block = skillBlock(skill, stripFrontmatter(read).trim());
-    if (used() + 2 + block.length <= budget) blocks.push(block);
-    else notes.push(overBudget(`Skill "${skill.name}"`, skill.filePath, budget));
+    const fit = fitOrNote(skillBlock(skill, read), budget - used() - 2, budget, `Skill "${skill.name}"`, skill.filePath);
+    if ("fits" in fit) blocks.push(fit.fits);
+    else notes.push(fit.note);
   }
   return [base, ...blocks, ...notes].join("\n\n");
 });

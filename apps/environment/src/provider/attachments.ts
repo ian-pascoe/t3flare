@@ -12,7 +12,7 @@ import type { ImageInput } from "@t3flare/session-protocol";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 
-import { expandMessage, mayExpand, type MessageSkills } from "./skills.ts";
+import { expandMessage, hasCommandOrSigil, type MessageSkills } from "./skills.ts";
 
 /** The base64 a message's images may take inline (0.9 MB of image bytes). */
 export const INLINE_IMAGE_BUDGET_CHARS = 1_200_000;
@@ -68,17 +68,17 @@ const asText = (bytes: Uint8Array): string | null => {
  * ACP flavors pass none, so their agents get the message as typed.
  */
 export const turnPrompt = Effect.fn("PiDurable.turnPrompt")(function* (
-  typed: { readonly text: string; readonly attachments: ReadonlyArray<ChatAttachment> },
+  message: { readonly text: string; readonly attachments: ReadonlyArray<ChatAttachment> },
   options: { readonly acceptsImages: boolean; readonly reader: AttachmentReader; readonly skills?: MessageSkills },
 ) {
-  const budget = PROVIDER_SEND_TURN_MAX_INPUT_CHARS - 200 * typed.attachments.length;
-  const catalog = options.skills !== undefined && mayExpand(typed.text) ? yield* options.skills.load() : undefined;
-  const message = catalog === undefined ? typed : { ...typed, text: yield* expandMessage(typed.text, catalog, budget) };
+  const budget = PROVIDER_SEND_TURN_MAX_INPUT_CHARS - 200 * message.attachments.length;
+  const catalog = options.skills !== undefined && hasCommandOrSigil(message.text) ? yield* options.skills.load() : undefined;
+  const messageText = catalog === undefined ? message.text : yield* expandMessage(message.text, catalog, budget);
   const notes: Array<string> = [];
   const images: Array<ImageInput> = [];
   let imageChars = 0;
   // Each file's text is cut to what is left of the input budget after the message and every attachment's note.
-  let textLeft = PROVIDER_SEND_TURN_MAX_INPUT_CHARS - message.text.length - 200 * message.attachments.length;
+  let textLeft = PROVIDER_SEND_TURN_MAX_INPUT_CHARS - messageText.length - 200 * message.attachments.length;
   for (const attachment of message.attachments) {
     const label = `${attachment.type} "${attachment.name}"`;
     const inlineImage = attachment.type === "image" && isProviderSendTurnSupportedImageMimeType(attachment.mimeType);
@@ -124,6 +124,6 @@ export const turnPrompt = Effect.fn("PiDurable.turnPrompt")(function* (
     const how = cut ? ", cut to fit the prompt" : extracted === null ? "" : ", as extracted text";
     notes.push(`[Attached ${label} (${attachment.mimeType})${how}:]\n${kept}\n[End of "${attachment.name}"${cut ? ": cut" : ""}.]`);
   }
-  const text = [message.text, ...notes].filter((part) => part.length > 0).join("\n\n");
+  const text = [messageText, ...notes].filter((part) => part.length > 0).join("\n\n");
   return { text, images } satisfies TurnPrompt;
 });
