@@ -40,7 +40,7 @@ svg.i{width:1rem;height:1rem;flex:none;fill:none;stroke:currentColor;stroke-widt
 .brand-mark{display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:var(--radius);background:var(--primary);color:var(--primary-fg)}
 .brand-mark svg.i{width:1rem;height:1rem}
 .brand strong{display:block;font-size:.875rem;font-weight:600;line-height:1.25}
-.brand span{display:block;font-size:.75rem;color:var(--muted-fg);line-height:1.25}
+.brand div span{display:block;font-size:.75rem;color:var(--muted-fg);line-height:1.25}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav a{display:flex;align-items:center;gap:.625rem;min-height:2rem;padding:.375rem .625rem;border-radius:var(--radius);color:var(--fg);text-decoration:none;font-weight:450;transition:background-color .15s}
 .nav a svg.i{color:var(--muted-fg)}
@@ -164,6 +164,7 @@ td .src{display:block;margin-top:.125rem;font-size:.6875rem;color:var(--muted-fg
 td.actions{text-align:right;white-space:nowrap}
 .change{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:.6875rem;color:var(--muted-fg);overflow-wrap:anywhere;max-width:22rem}
 .when{white-space:nowrap;color:var(--muted-fg);font-variant-numeric:tabular-nums}
+.who{white-space:nowrap}
 form.add{display:flex;flex-direction:column}
 .form-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;padding:1rem}
 .form-body .wide{grid-column:1/-1}
@@ -198,6 +199,7 @@ dl.kv dd{text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhe
 .notice-ico-ok,.notice-ico-err{display:none}
 .notice[data-tone=ok] .notice-ico-ok,.notice[data-tone=err] .notice-ico-err{display:inline}
 .save-note{font-size:.75rem;color:var(--muted-fg)}
+.save-note:empty{display:none}
 @media (max-width:860px){
 .shell{grid-template-columns:minmax(0,1fr);background:none}
 .side{position:sticky;top:0;z-index:10;height:auto;flex-direction:column;gap:.5rem;padding:.625rem .75rem .5rem;border-right:0;border-bottom:1px solid var(--border);background:color-mix(in oklab,var(--sidebar) 94%,transparent);backdrop-filter:saturate(1.1) blur(12px)}

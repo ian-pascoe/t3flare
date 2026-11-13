@@ -50,10 +50,10 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
 
 // ── Extensions ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-const field = (extension: string, key: string, setting: SettingEntry, value: unknown): string => {
+const field = (extension: string, key: string, setting: SettingEntry, value: unknown, locked = false): string => {
   const id = escapeHtml(`${extension}-${key}`);
   const hint = `<p class="hint" id="${id}-hint">${escapeHtml(setting.description)}</p>`;
-  const attrs = `id="${id}" data-setting="${escapeHtml(key)}" data-kind="${setting.schema.type}" aria-describedby="${id}-hint"`;
+  const attrs = `id="${id}" data-setting="${escapeHtml(key)}" data-kind="${setting.schema.type}" aria-describedby="${id}-hint"${locked ? " disabled" : ""}`;
   switch (setting.schema.type) {
     case "boolean":
       return `<div class="field"><div class="inline-field"><input type="checkbox" ${attrs}${value === true ? " checked" : ""}><label for="${id}">${escapeHtml(setting.title)}</label></div>${hint}</div>`;
@@ -66,6 +66,12 @@ const field = (extension: string, key: string, setting: SettingEntry, value: unk
   }
 };
 
+/** A locked extension's settings, shown and not editable. */
+const lockedSettings = (entry: ExtensionEntry, current: ResolvedHarness["extensions"][string] | undefined): string => {
+  const fields = Object.entries(entry.settings).map(([key, setting]) => field(entry.id, key, setting, current?.settings[key], true));
+  return fields.length === 0 ? "" : `<div class="row-extra"><div class="fields">${fields.join("")}</div></div>`;
+};
+
 const extensionRow = (resolved: ResolvedHarness, entry: ExtensionEntry): string => {
   const current = resolved.extensions[entry.id];
   const titleId = escapeHtml(`ext-${entry.id}-title`);
@@ -73,7 +79,7 @@ const extensionRow = (resolved: ResolvedHarness, entry: ExtensionEntry): string 
 <p class="desc">${escapeHtml(entry.description)}</p></div>`;
   if (entry.locked !== undefined) {
     return `<div class="row"><div><div class="row-title"><h3>${escapeHtml(entry.title)}</h3><span class="ident">${escapeHtml(entry.id)}</span></div>
-<p class="desc">${escapeHtml(entry.description)}</p></div><div class="row-control"><span class="state" title="Locked: ${escapeHtml(entry.locked)}">${icon("lock")}Always on<span class="sr">, locked: ${escapeHtml(entry.locked)}</span></span></div></div>`;
+<p class="desc">${escapeHtml(entry.description)}</p></div><div class="row-control"><span class="state" title="Locked: ${escapeHtml(entry.locked)}">${icon("lock")}Always on<span class="sr">, locked: ${escapeHtml(entry.locked)}</span></span></div>${lockedSettings(entry, current)}</div>`;
   }
   const control =
     entry.default === "always"
@@ -196,7 +202,7 @@ const serverCard = (row: McpRow): string => {
 <div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3><span class="tag">${row.setting.kind === "commissary" ? "Commissary" : "Direct"}</span>${statusPill(row)}</div>${
     row.setting.url === undefined ? "" : `<p class="server-url">${escapeHtml(row.setting.url)}</p>`
   }</div>
-<button type="button" class="switch" role="switch" aria-checked="${row.setting.enabled}" aria-label="${name} enabled" data-mcp="${escapeHtml(JSON.stringify({ op: "server", server: row.name, enabled: !row.setting.enabled }))}"></button>
+<button type="button" class="switch" role="switch" aria-checked="${row.setting.enabled === true}" aria-label="${name} enabled" data-mcp="${escapeHtml(JSON.stringify({ op: "server", server: row.name, enabled: !row.setting.enabled }))}"></button>
 <dl class="facts">${facts}</dl></div>${error}${refused}
 <div class="server-actions"><button type="button" class="btn btn-sm" data-mcp-test="${name}">${icon("play")}Test</button>${oauth}<p class="test-result" data-test-result="${name}" role="status" aria-live="polite"></p><span class="spacer"></span>${remove}</div>
 ${toolsTable(row)}</article>`;
@@ -266,7 +272,7 @@ const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
       : `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Change</th></tr></thead><tbody>${audit
           .map(
             (entry) =>
-              `<tr><td class="when" data-label="When"><div>${time(entry.at)}</div></td><td data-label="Who"><div>${escapeHtml(entry.caller)}</div></td><td data-label="Action"><div><code>${escapeHtml(entry.action)}</code></div></td><td data-label="Target"><div>${escapeHtml(entry.target)}</div></td><td data-label="Change"><div><code class="change">${escapeHtml(JSON.stringify(entry.after ?? null))}</code></div></td></tr>`,
+              `<tr><td class="when" data-label="When"><div>${time(entry.at)}</div></td><td class="who" data-label="Who"><div>${escapeHtml(entry.caller)}</div></td><td data-label="Action"><div><code>${escapeHtml(entry.action)}</code></div></td><td data-label="Target"><div>${escapeHtml(entry.target)}</div></td><td data-label="Change"><div><code class="change">${escapeHtml(JSON.stringify(entry.after ?? null))}</code></div></td></tr>`,
           )
           .join("")}</tbody></table></div>`;
   return `<section id="audit" aria-labelledby="audit-title">

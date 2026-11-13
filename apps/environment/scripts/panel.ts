@@ -5,6 +5,7 @@
 //
 //   node scripts/stage.ts run panel panel seed              # MCP servers (one failing), a class override, an extension change
 //   node scripts/stage.ts run panel panel shoot <label>     # docs/steps/panel/<label>-<desktop|phone>-<light|dark>.png
+//   node scripts/stage.ts run panel panel states            # docs/steps/panel/states-<state>-…png (tests, a refusal, the form)
 //
 // Screenshots are resized to at most 1400 px wide (sips).
 import { spawnSync } from "node:child_process";
@@ -76,10 +77,56 @@ const shoot = (label: string) => {
   }
 };
 
+const pause = (ms: number) => spawnSync("sleep", [String(ms / 1000)]);
+
+/**
+ * The states the page reaches by acting: a test running (its button held busy for the shot), test results (one listed,
+ * one failed), a refused add (the notice), and the add form with the header sign-in chosen.
+ */
+const states = () => {
+  fs.mkdirSync(OUT, { recursive: true });
+  const url = new URL("/_t3flare/harness", HARNESS).toString();
+  for (const [scheme, name, width, height, scale] of [["dark", "desktop", 1280, 860, 1], ["light", "phone", 390, 844, 2]] as const) {
+    const save = (shot: string) => {
+      const file = path.join(OUT, `states-${shot}-${name}-${scheme}.png`);
+      browser("screenshot", file);
+      console.log(`wrote ${path.relative(process.cwd(), file)}`);
+    };
+    browser("--headers", JSON.stringify(headers), "--color-scheme", scheme, "open", url);
+    browser("set", "viewport", String(width), String(height), String(scale));
+    browser("set", "media", scheme);
+    browser("open", url);
+    browser("wait", "--load", "networkidle");
+    // Tests: the docs server fails, the fixture lists its tools; then the commissary test is caught mid-flight.
+    browser("eval", `document.querySelector('[data-mcp-test="docs"]').click(); document.querySelector('[data-mcp-test="fixture"]').click();`);
+    pause(3000);
+    browser("eval", `(() => { const b = document.querySelector('[data-mcp-test="commissary"]'); b.setAttribute('aria-busy', 'true'); b.disabled = true; document.querySelector('[data-test-result="commissary"]').textContent = 'Testing…'; document.getElementById('mcp').scrollIntoView(); })()`);
+    pause(500);
+    save("tests");
+    browser("eval", `document.querySelector('[data-test-result="docs"]').closest('article').scrollIntoView()`);
+    pause(300);
+    save("tests-failed");
+    browser("eval", `document.querySelector('[data-test-result="fixture"]').closest('article').scrollIntoView()`);
+    pause(300);
+    save("tests-ok");
+    // A refused add (a reserved name), shown in the page's notice; then the header sign-in's fields.
+    browser("eval", `(() => { const f = document.querySelector('form[data-mcp-add]'); f.querySelector('[name=server]').value = 't3'; f.querySelector('[name=url]').value = 'https://mcp.example.com/mcp'; f.querySelector('[name=auth][value=none]').checked = true; f.requestSubmit(); })()`);
+    pause(2000);
+    browser("eval", `window.scrollTo(0, 0)`);
+    pause(300);
+    save("refused");
+    browser("eval", `(() => { const f = document.querySelector('form[data-mcp-add]'); f.querySelector('[name=server]').value = 'executor'; const r = f.querySelector('[name=auth][value=header]'); r.checked = true; r.dispatchEvent(new Event('change')); f.scrollIntoView(); })()`);
+    pause(300);
+    save("add-header");
+    browser("close");
+  }
+};
+
 const [command, label] = process.argv.slice(2);
 if (command === "seed") await seed();
 else if (command === "shoot" && label !== undefined) shoot(label);
+else if (command === "states") states();
 else {
-  console.error("usage: panel.ts seed | shoot <label>");
+  console.error("usage: panel.ts seed | shoot <label> | states");
   process.exit(2);
 }
