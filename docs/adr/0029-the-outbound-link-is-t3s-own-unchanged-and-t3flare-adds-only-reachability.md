@@ -33,3 +33,10 @@ These follow from t3's design and are accepted with it.
 - **The bearer in the Environment DO is worth what the link's access is worth,** for about 30 days or until the owner revokes it on the laptop. t3 has no refresh grant, and Unlink here does not revoke there.
 - **Every Route is public, behind t3's own auth, and is trusted by who controls its hostname.** t3's descriptor is unauthenticated; its environment-id check catches a wrong answerer, not an impostor at the right address.
 - **One Layer of ours stays on t3's `PeerLinks`:** it strips `cause` from the errors, which can hold a request with the pairing code or the bearer. It is a leak fix, not a gate.
+
+## As built (SPI-1061)
+
+- **Pre-B is gone.** `apps/environment/src/t3/peerLinks.ts` keeps one Layer, `layerPeerLinksWithoutCause`: every `PeerLinks` method is t3's, and its errors carry t3's reason and message without `cause`. `PeerForwarding` and `PeerLinkRequests` are t3's own layers again; `t3_environment_link` and `t3_environment_unlink` left `T3_TOOL_DENYLIST`; our "cannot link" guidance line is deleted.
+- **Remote tasks** (`host/idle.ts`): the idle check reads t3's open Remote tasks with `getOpenRemoteDelegatedTasks`' predicate, joined to `peer_environment_links.last_error`. A task whose machine answered t3's last call is work; one whose machine did not lets the Environment reset, with the retry (`t3flare:remote-task-retry`, 5, 15, then every 30 minutes) in DO storage and merged into the one alarm. While any task is open and t3 is up, an alarm stands at most 5 minutes ahead, so a deploy or an eviction brings t3 back to follow it. Reads fail safe (U2, U48).
+- **Leak hygiene:** the link's bearers (`peer-link-*`) are canaries of `/_t3flare/check/peer-leak` and `/_t3flare/check/connect-leak`. Forced transport errors showed nothing for the console redaction to add.
+- **Proved** on a stage against a stock t3 in Docker behind a named Cloudflare Tunnel the stage's stack makes (`T3FLARE_STANDIN=1`): `docs/steps/spi-1061.md`. T3 Connect, Tailscale Funnel and the same-zone path wait for the owner's proof (`docs/outbound-link.md`).

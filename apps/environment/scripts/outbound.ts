@@ -25,6 +25,7 @@ import { admin, base, createProjectAndThread, dispatch, itemsOf, pair, runsOf, s
 import { MODEL, pendingOf, projection, replyOf, say, settled, t3Calls, until } from "./lib/cloudThread.ts";
 import { writeEvidence } from "./lib/evidence.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
+import { findSession } from "./lib/peerAcceptance.ts";
 import { Standin, STANDIN_MODEL } from "./lib/standin.ts";
 import { tailing } from "./lib/tail.ts";
 
@@ -195,24 +196,6 @@ const finish = (): never => {
   out.seconds = Math.round((Date.now() - started) / 1000);
   writeEvidence(path.join(evidenceDir, `${phase}.json`), out);
   process.exit(failures.length === 0 ? 0 : 1);
-};
-
-/** The client session whose JSON names `label`, wherever the access snapshot nests it. */
-const findSession = (value: unknown, label: string): any => {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findSession(item, label);
-      if (found !== undefined) return found;
-    }
-  } else if (value !== null && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    if (typeof record.sessionId === "string" && JSON.stringify(record).includes(label)) return record;
-    for (const child of Object.values(record)) {
-      const found = findSession(child, label);
-      if (found !== undefined) return found;
-    }
-  }
-  return undefined;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -434,8 +417,9 @@ if (phase === "long") {
   out.reply = replyOf(done).slice(-300);
   check("C4: the task completes after the outage", task?.status === "completed" && JSON.stringify(task).includes(nonce), { task: out.task, finished });
   check("C4: the parent wakes with its result", replyOf(done).includes(nonce), out.reply);
-  const after = await health();
-  check("the retry state is gone once nothing remote is open", after?.remoteRetry === null, after?.remoteRetry);
+  // Read the thread above (a client's request), so the next reset is at least the idle delay away; it clears the retry.
+  const after = await watch(180, "after the task", (entry) => entry.remoteRetry === null);
+  check("the retry state is gone by the next reset once nothing remote is open", after.remoteRetry === null, after);
   finish();
 }
 

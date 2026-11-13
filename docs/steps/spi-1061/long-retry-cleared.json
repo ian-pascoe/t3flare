@@ -1,0 +1,7 @@
+{
+ "note": "After long.json's last check (which read the health route 0 s after the task completed, before any idle check could run), the health route read by hand: the retry state stays until the next reset, which deletes it (planReset with no unanswered task). outbound.ts now waits for that reset.",
+ "samples": [
+  {"at":"2026-11-13T03:20:53.200Z","runtime":"running","alarm":null,"remoteRetry":{"attempt":1,"at":1794540029234},"openWork":{"openRuns":0,"openProviderSessions":0,"claimableEffects":0,"remoteTasksAnswering":0,"remoteTasksUnanswered":0}},
+  {"at":"2026-11-13T03:22:40.022Z","runtime":"stopped","alarm":"2026-11-13T03:43:38.203Z","remoteRetry":null,"openWork":{"openRuns":0,"openProviderSessions":0,"claimableEffects":0,"remoteTasksAnswering":0,"remoteTasksUnanswered":0}}
+ ]
+}

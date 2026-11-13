@@ -14,7 +14,7 @@ import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { credentialsFile, secretsFile as secretsFileOf } from "../stage-files.ts";
+import { credentialsFile, secretsFile as secretsFileOf, standinFile } from "../stage-files.ts";
 import { buildWorker } from "../build.ts";
 import { buildAgentsWorker } from "../../agents/build.ts";
 import { isDurableObjectClassNotFound } from "./deploy-retry.ts";
@@ -186,6 +186,7 @@ switch (command) {
     if (status === 0) {
       fs.rmSync(secretsFile, { force: true });
       fs.rmSync(credentialsFile(stage), { force: true });
+      fs.rmSync(standinFile(stage), { force: true });
     }
     process.exit(status);
   }

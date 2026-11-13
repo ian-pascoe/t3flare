@@ -116,7 +116,7 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | Browser notifications | `t3code/apps/web/src/threadNotifications.ts` | W† (client-side) | client-side | — |
 | Mobile push | `srv/relay/AgentAwarenessRelay.ts:56` | W (publish-only T3 Connect link; prod after its sign-in, A3) | `docs/steps/step-3plus.md`; ADR-0025 | 3+ |
 | Laptop-to-cloud link | `srv/peer/PeerLinks.ts:89` | in progress | `.worktrees/step-3/docs/steps/step-3/` (m0–m3 evidence) | 3 |
-| Cloud-to-laptop link | — | R for now | ADR-0011 | *def* |
+| Cloud-to-laptop link | `srv/peer/PeerLinks.ts:89`; `PeerLinkRequests.ts` | W: t3's own Outbound link, made in the Link dialog or on t3's link card, over a Route (T3 Connect, Tailscale Funnel, an own Cloudflare Tunnel); a Remote task survives the idle reset and the laptop's sleep. Stage-proved against a stand-in; owner proof open | ADR-0029, ADR-0011; `docs/outbound-link.md`; `docs/steps/spi-1061.md` | SPI-1061 |
 | First pairing | `/api/auth/browser-session` | W (armed window) | ADR-0010 | done |
 | More devices, sessions, revoke | `con/environmentHttp.ts:600-624` | W† | used by step 3; later devices pair by pairing link, never the bootstrap token (ADR-0010, README; SPI-1006) | 3 |
 | Guest links | `srv/guest/http.ts:140`; `ws.ts:2372` | R; `guestSharingEnabled` locked off by the managed policy, so no client offers a link (SPI-994) | ADR-0010, ADR-0023; stage `truecaps`: the write is refused ("managed by t3flare") | done |
@@ -160,7 +160,7 @@ Already documented, no action:
 - Open folder, fast checkout, git worktrees (ADR-0008).
 - Stale reads (ADR-0009).
 - Terminal lifetime (ADR-0021).
-- Cloud-to-laptop links and thread transfer (ADR-0011).
+- Thread transfer (ADR-0011). Cloud-to-laptop links are built (SPI-1061, ADR-0029).
 
 Written down (SPI-1004, SPI-1006):
 1. **Host-bound features**: [ADR-0024](adr/0024-host-bound-features-are-refused.md) (device hub and simulators, local voice, open in editor, host diagnostics and power, triage, jj, agent-session import, server self-update, provider install and update).

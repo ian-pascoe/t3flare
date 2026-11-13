@@ -1,0 +1,57 @@
+{
+ "at": "2026-11-13T03:25:01.988Z",
+ "phase": "revoke",
+ "stage": "link",
+ "cloud": {
+  "environmentId": "5c21b0aa-8247-4d5d-8456-16d183e6f251",
+  "label": "t3flare"
+ },
+ "standin": {
+  "environmentId": "e058d35e-9ef4-47c7-b2d7-29d1eb01396e",
+  "label": "standin-laptop",
+  "route": "https://t3flare-link-standin.ianpascoe.dev",
+  "version": "0.1.10-nightly.20261112.4606"
+ },
+ "checks": [
+  {
+   "name": "C7: a task is open on the stand-in",
+   "ok": true
+  },
+  {
+   "name": "the owner revokes the link's session in the stand-in's Sharing & access",
+   "ok": true,
+   "detail": {
+    "found": true,
+    "status": 200
+   }
+  },
+  {
+   "name": "C7: a tool call names it (t3's own answer)",
+   "ok": true,
+   "detail": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"The linked environment no longer accepts this link. It may have been revoked there; link it again.\"}"
+  },
+  {
+   "name": "C7: the open task fails with that reason",
+   "ok": true,
+   "detail": {
+    "status": "failed",
+    "result": "\"The linked environment no longer accepts this link. It may have been revoked there; link it again.\""
+   }
+  },
+  {
+   "name": "C7: after Unlink, t3's own answer names the missing link",
+   "ok": true,
+   "detail": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"This environment is not linked to e058d35e-9ef4-47c7-b2d7-29d1eb01396e. t3_environment_links lists the linked ones.\"}"
+  }
+ ],
+ "call": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"capability_denied\",\"message\":\"The linked environment no longer accepts this link. It may have been revoked there; link it again.\"}",
+ "task": {
+  "status": "failed",
+  "result": "\"The linked environment no longer accepts this link. It may have been revoked there; link it again.\""
+ },
+ "reply": " first, since it may be deferred.\nThe search returned nothing, but `delegate_task` is already listed in my available functions, so I'll call it directly.\nDELEGATED\nOUTCOME failed: the linked environment revoked the link, so the task didn't run. It needs to be linked again before this can be retried.",
+ "unlinked": "{\"_tag\":\"OrchestratorMcpFailure\",\"code\":\"invalid_request\",\"message\":\"This environment is not linked to e058d35e-9ef4-47c7-b2d7-29d1eb01396e. t3_environment_links lists the linked ones.\"}",
+ "ok": true,
+ "failures": [],
+ "seconds": 68
+}

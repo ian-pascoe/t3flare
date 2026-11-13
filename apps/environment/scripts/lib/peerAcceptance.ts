@@ -303,7 +303,7 @@ export const peerAcceptance = async (cookie: string, options: { readonly only?: 
 };
 
 /** The client session labelled `label` in the access snapshot, wherever the snapshot nests it. */
-const findSession = (value: unknown, label: string): any => {
+export const findSession = (value: unknown, label: string): any => {
   if (Array.isArray(value)) {
     for (const item of value) {
       const found = findSession(item, label);

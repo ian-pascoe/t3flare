@@ -17,6 +17,7 @@ import { cliTurn as acpTurn, enable as enableAcp } from "./lib/acpTurn.ts";
 import { cliTurn, enable as enableCli } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, mutateProject, pair, projectionOf, readDoText, runsOf, SETTLED, sendMessage, sleep, threadWindow, updateSettings, uuid, wsCall } from "./lib/client.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
+import { tailing } from "./lib/tail.ts";
 
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 const SLUG = process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5";
@@ -893,38 +894,6 @@ rm -f /tmp/hunt-body
 echo "hunt $1: $(wc -c < "$OUT") bytes, $(grep -c '^== ' "$OUT") sections"
 sed -n 's/^== \(GET\|POST\) \(.*\) \([0-9][0-9][0-9]\)$/\1 \2 \3/p' "$OUT" > /tmp/hunt-$1.codes
 `;
-
-/** Tails `workers`' logs while `work` runs; the raw text (kept only in memory, never printed). */
-const tailing = async <T>(workers: ReadonlyArray<string>, work: () => Promise<T>): Promise<{ result: T; text: string; workers: Array<{ name: string; bytes: number }> }> => {
-  const here = path.resolve(import.meta.dirname, "..");
-  const profile = process.env.ALCHEMY_PROFILE ?? "default";
-  const credentials = process.env.CLOUDFLARE_API_TOKEN
-    ? { token: process.env.CLOUDFLARE_API_TOKEN, accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "" }
-    : (() => {
-        const stored = JSON.parse(fs.readFileSync(path.join(process.env.HOME ?? "", ".alchemy/profiles", profile, "cloudflare.json"), "utf8")).values;
-        return { token: stored.access as string, accountId: (stored.accountId as string) ?? "" };
-      })();
-  const { spawn } = await import("node:child_process");
-  const chunks = new Map<string, Array<Buffer>>();
-  const tails = workers.map((name) => {
-    chunks.set(name, []);
-    const tail = spawn(path.join(here, "node_modules/.bin/wrangler"), ["tail", name, "--format", "json"], {
-      cwd: here,
-      env: { ...process.env, CLOUDFLARE_API_TOKEN: credentials.token, CLOUDFLARE_ACCOUNT_ID: credentials.accountId },
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    tail.stdout.on("data", (chunk: Buffer) => chunks.get(name)!.push(chunk));
-    return tail;
-  });
-  await sleep(8000);
-  try {
-    const result = await work();
-    await sleep(10_000);
-    return { result, text: [...chunks.values()].map((parts) => Buffer.concat(parts).toString("utf8")).join("\n"), workers: [...chunks].map(([name, parts]) => ({ name, bytes: Buffer.concat(parts).length })) };
-  } finally {
-    for (const tail of tails) tail.kill("SIGINT");
-  }
-};
 
 /** Environment bindings that are configuration, not credentials: in the Container or logs by design. */
 const NOT_SECRET = /^(MODEL_PROXY_URL|ALCHEMY_WORKER_NAME|ALCHEMY_CLOUDFLARE_ACCOUNT_ID|T3FLARE_ACCESS_AUD|T3FLARE_HARNESS_ACCESS_AUD|T3FLARE_HOST|T3FLARE_ACCESS_SERVICE_CLIENT_ID|T3FLARE_ACCESS_TEAM_DOMAIN|T3FLARE_HARNESS_HOST|T3FLARE_OWNER_EMAIL)$/;

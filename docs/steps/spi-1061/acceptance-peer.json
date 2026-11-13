@@ -1,0 +1,48 @@
+{
+ "at": "2026-11-13T03:25:42.824Z",
+ "ok": true,
+ "failures": [],
+ "outbound": {
+  "answered": {
+   "ok": false,
+   "error": {
+    "_tag": "PeerLinkError",
+    "reason": "not_a_t3_environment",
+    "message": "Nothing at https://outbound-mweeyyfw.invalid answered as a T3 Code environment."
+   }
+  },
+  "listed": {
+   "links": []
+  },
+  "ms": 2313
+ },
+ "fixture": {
+  "projectId": "c164103d-f52c-4051-b458-19f147104400",
+  "workspaceRoot": "/w/step3-fixture",
+  "cloned": true
+ },
+ "link": {
+  "scope": "orchestration:read orchestration:operate"
+ },
+ "launch": {
+  "isError": false,
+  "threadId": "mcp:launch:2efea2761069f3f4fdfd9955e5b7c5e7315c4fa4cad8770d626679161d211e34"
+ },
+ "launchResult": {
+  "status": "completed",
+  "pieces": 1,
+  "reply": true,
+  "runtimeMode": "auto-accept-edits",
+  "interactionMode": "default",
+  "linkOrigin": {
+   "sessionId": "727b1a8b-ec7b-44d5-84a1-083edaffeac3",
+   "label": "t3flare acceptance mweeyyfw",
+   "access": "auto-accept-edits"
+  },
+  "delegatedFrom": {
+   "environmentId": "00000000-0000-4000-8000-000000000001",
+   "threadId": "laptop-mweeyyfw",
+   "title": "laptop parent"
+  }
+ }
+}

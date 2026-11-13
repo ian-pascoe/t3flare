@@ -77,4 +77,4 @@ Unlink in a client connected to the cloud (it forgets the bearer there), and rev
 
 ## Concurrency
 
-Measured on a stage (SPI-1061 G4, `docs/steps/spi-1061/many.json`): see the report for how many Remote tasks waited at once while a model call still went through.
+Measured on a stage (SPI-1061 G4, `docs/steps/spi-1061/many.json`): with eight Remote tasks waiting on the laptop at once, a cloud model call still answered in 8 s, and all eight completed once approved there. Whether a T3 Connect phone notification still goes out at that load is not measured yet (SPI-1094).

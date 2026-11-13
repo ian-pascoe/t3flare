@@ -156,7 +156,8 @@ export class Standin {
   }
 
   logs(): string {
-    return docker(["logs", "--tail", "400", this.name], { allowFailure: true }).stdout + docker(["logs", "--tail", "400", this.name], { allowFailure: true }).stderr;
+    const logs = docker(["logs", "--tail", "400", this.name], { allowFailure: true });
+    return logs.stdout + logs.stderr;
   }
 
   /** A command's output in the container (the leak scan reads its files and processes). */
