@@ -1,0 +1,37 @@
+{
+ "at": "2026-11-13T06:45:00Z",
+ "stage": "previews",
+ "evidence": "m0-spike.json (every line, as the stage answered it)",
+ "q1_playwright": {
+  "answer": "pass, except download content",
+  "passed": ["launch with outboundByHost + keep_alive", "newContext", "newPage", "newCDPSession(page)", "Browser.getVersion + setUserAgentOverride", "grantPermissions(clipboard-write)", "emulateMedia", "addInitScript", "exposeFunction", "setViewportSize", "goto", "ariaSnapshot({mode:'ai',boxes:true})", "locator fill/click/hover/selectOption/boundingBox/scrollIntoViewIfNeeded/count", "keyboard insertText/press", "mouse move/click", "screenshot", "Page.startScreencast + ack", "dialog", "popup", "filechooser setFiles(buffer)", "filechooser setFiles(native /tmp path)", "locator.setInputFiles(buffer)", "storageState({indexedDB:true}) + restore", "goBack/goForward/reload/title"],
+  "expected": {"newCDPSession(same-process frame)": "refused with Playwright's own 'part of the parent frame's session', as locally"},
+  "failed": {"download.saveAs": "no such file or directory, copy '/tmp/playwright-artifacts-0/…': the artifact is on Browser Run's disk (cloudflare/playwright#93, open)"},
+  "plan": "the Shadow replaces Download.saveAs with a fetch from the download's page (same-origin, blob: and CORS-permitted downloads); others fail as 'not available' (P row)"
+ },
+ "q2_routes_props": {
+  "answer": "yes",
+  "detail": "ctx.exports.ContainerPreviews({props:{workspace:'spike-a'}}) accepted in outboundByHost; three later invocations at 81 s, 207 s and 330 s reached it with props intact, through the browser kept in the isolate and through a fresh connect(sessionId)"
+ },
+ "q3_localhost": {
+  "answer": "R1 holds: http://localhost:5173/ is ERR_BLOCKED_BY_ADMINISTRATOR before a context route fires (fired 0)",
+  "plan": "L6: the Shadow translates localhost:N / 127.0.0.1:N to N.t3flare.internal in page.goto; no O3"
+ },
+ "q3_t3_page_localhost": {
+  "answer": "blocked: Page.navigate http://t3-page.localhost/page.html is ERR_BLOCKED_BY_ADMINISTRATOR with Fetch.enable on; no requestPaused",
+  "plan": "the CDP bridge rewrites t3's page origin to https://t3-page.t3flare.internal both ways; stock headlessChrome.ts stays unshadowed"
+ },
+ "q4_os1": {"answer": "not needed", "detail": "the stage deployed with the binding; cloudpid's CI token (same groups as ours) deploys a Browser binding to prod (run 43093747070)"},
+ "h1_bufferedAmount": {"answer": "absent in workerd (has:false)", "plan": "writableLength reads 0; the 8 MiB slow-viewer guard is lost (R7); one frame in flight bounds the buffer"},
+ "l3_private_targets": {
+  "blocked_by_policy": ["127.0.0.1:8080", "127.1", "[::1]", "0.0.0.0", "*.localhost"],
+  "connection_reset": ["metadata.google.internal", "computer.internal", "8080.t3flare.internal (route-less)"],
+  "inconclusive": ["10.0.0.1", "169.254.169.254: sequential navigations interrupted each other; re-probed in M1's hostile run"]
+ },
+ "m6_bundle": {
+  "before": {"rawMiB": 9.54, "gzipBytes": 2641734},
+  "after": {"rawMiB": 12.22, "gzipBytes": 3348897, "limitGzipBytes": 10485760},
+  "startup": "@cloudflare/playwright is a lazy chunk (dist/worker/lib-*.js), loaded by dynamic import only; the deploy passed Cloudflare's startup check"
+ },
+ "timings": {"launchMs": 2035, "routeLessLaunchMs": 551, "firstGotoMs": 987}
+}

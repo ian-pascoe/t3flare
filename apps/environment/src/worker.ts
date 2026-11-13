@@ -8,6 +8,8 @@ import type { EnvironmentEnv } from "./environmentDO.ts";
 import { type HarnessCaller, isHarnessPath } from "./harness/panel.ts";
 
 export { EnvironmentDO } from "./environmentDO.ts";
+// G11 (ADR-0031): Browser Run's `outboundByHost` target for the Container preview hosts; no public route reaches it.
+export { ContainerPreviews } from "./preview/containerPreviews.ts";
 
 export interface Env extends EnvironmentEnv {
   readonly ENVIRONMENT: {

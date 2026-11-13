@@ -15,6 +15,8 @@
     "acceptance": "node scripts/acceptance.ts"
   },
   "dependencies": {
+    "@cloudflare/playwright": "1.4.0",
+    "@cloudpid/mcp": "workspace:*",
     "@effect/platform-node": "catalog:",
     "@effect/sql-sqlite-do": "catalog:",
     "@t3flare/github-app": "workspace:*",
@@ -34,8 +36,7 @@
     "effect": "catalog:",
     "effect-acp": "workspace:*",
     "effect-codex-app-server": "workspace:*",
-    "t3": "workspace:*",
-    "@cloudpid/mcp": "workspace:*"
+    "t3": "workspace:*"
   },
   "devDependencies": {
     "@alchemy.run/cloudflare": "catalog:",
@@ -43,11 +44,12 @@
     "@cloudflare/vitest-plugin": "1.5.1",
     "@cloudflare/workers-types": "^5.20261104.1",
     "@distilled.cloud/cloudflare": "catalog:",
+    "@t3flare/sandbox-image": "workspace:*",
     "@types/node": "catalog:",
     "alchemy": "catalog:",
+    "playwright-core": "1.64.1",
     "rolldown": "1.2.13",
     "vitest": "5.0.5",
-    "wrangler": "4.157.0",
-    "@t3flare/sandbox-image": "workspace:*"
+    "wrangler": "4.157.0"
   }
 }

@@ -288,6 +288,8 @@ export default Alchemy.Stack(
         T3FLARE_ACCESS_SERVICE_CLIENT_ID: serviceToken.clientId,
         MCP_ENGINE: Cloudflare.WorkerEntrypoint(mcpWorker as never, "McpEngine"),
         MCP_OAUTH: Cloudflare.WorkerEntrypoint(mcpWorker as never, "McpOAuth"),
+        // G11 (ADR-0031): Browser Run, t3's server browser and HTML renders. No recording, no Live View (src/preview).
+        BROWSER: Cloudflare.Browser(),
         ...(bootstrapPass
           ? {}
           : {

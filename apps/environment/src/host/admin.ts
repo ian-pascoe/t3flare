@@ -393,6 +393,19 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
           idle.requestEnded();
         }
       }
+      case "POST /_t3flare/previews/spike": {
+        // G11 (stages only): Browser Run under t3's Playwright calls, the Container preview routes, and what a page reaches.
+        const { environmentServices } = await import("../agents/bindings.ts");
+        if (!environmentServices().faults) return json({ error: "stages only" }, 403);
+        const { runSpike } = await import("../preview/spike.ts");
+        const idle = await import("./idle.ts");
+        idle.requestStarted();
+        try {
+          return json(await runSpike(url.searchParams.get("op") ?? "", storage));
+        } finally {
+          idle.requestEnded();
+        }
+      }
       case "POST /_t3flare/check/leak": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");
         return json(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck());

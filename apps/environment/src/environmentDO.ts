@@ -35,6 +35,13 @@ import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpView } from
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
 import { commissaryManagementOf } from "./usage/commissary.ts";
+import type { BrowserRunBinding, BrowserRunFetcher } from "./preview/browserRun.ts";
+import type { ContainerPreviewProps } from "./preview/containerPreviews.ts";
+
+/** The loopback bindings of this Worker's entry (`worker.ts`) the Environment DO hands Browser Run (G11). */
+interface EnvironmentExports {
+  readonly ContainerPreviews: (options: { readonly props: ContainerPreviewProps }) => BrowserRunFetcher;
+}
 
 export interface EnvironmentEnv extends AgentsBindings {
   readonly T3_BOOTSTRAP_TOKEN?: string;
@@ -84,6 +91,8 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly COMMISSARY_TOOLS_URL?: string;
   /** `?toolkits=` narrowing of Commissary's tools. */
   readonly COMMISSARY_TOOLKITS?: string;
+  /** G11 (ADR-0031): Browser Run, t3's server browser and HTML renders. */
+  readonly BROWSER?: BrowserRunBinding;
 }
 
 /** Module state that outlives `ctx.abort()` in a warm isolate (ADR-0003); reported by the health route. */
@@ -221,6 +230,9 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       t3McpUrl: () => `https://${this.#configuredHost()}/mcp`,
       publicOrigin: () => (this.env.T3FLARE_HOST === undefined ? null : `https://${this.env.T3FLARE_HOST}`),
       commissary: commissaryManagementOf(env),
+      browserRun: env.BROWSER,
+      // SAFETY: the Worker's entry (`worker.ts`) exports `ContainerPreviews`; `ctx.exports` is untyped here.
+      containerPreviews: (workspace) => (ctx.exports as unknown as EnvironmentExports).ContainerPreviews({ props: { workspace } }),
     });
   }
 
