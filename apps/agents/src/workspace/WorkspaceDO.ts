@@ -48,9 +48,9 @@ import type { McpRelayAnswer } from "@t3flare/harness-registry";
 import { changedBetween, currentRevision } from "./changeLog.ts";
 import { killInRunningContainer } from "./containerKill.ts";
 import { authoredScript, captureScript, restoreScript, shellWord } from "./checkpointScripts.ts";
+import { captureTurn, type LastCapture } from "./checkpointCapture.ts";
 import { fileOps } from "./files.ts";
 import {
-  captureCheckpoint,
   deleteRef,
   diffCommits,
   type GitFs,
@@ -916,9 +916,10 @@ export class WorkspaceDO extends ContainerHost {
 
   /**
    * One of t3's checkpoint operations. Captures, diffs, ref checks and deletes run here with isomorphic-git and never
-   * start the Container; a diff runs on the Container's git while it is running anyway (git's own text). A capture of a
-   * repo above the guard makes the new ref an alias of the previous capture when nothing was written since, and runs
-   * the Container's git otherwise. A restore, and the authored paths of a range where HEAD moved, run the Container's git.
+   * start the Container; a diff runs on the Container's git while it is running anyway (git's own text). A capture first
+   * pulls the running Container's writes, which a CLI agent made there (SPI-1100). A capture of a repo above the guard
+   * makes the new ref an alias of the previous capture when nothing was written since, and runs the Container's git
+   * otherwise. A restore, and the authored paths of a range where HEAD moved, run the Container's git.
    */
   async checkpoint(op: CheckpointOp): Promise<CheckpointAnswer> {
     this.#alive();
@@ -945,27 +946,25 @@ export class WorkspaceDO extends ContainerHost {
     }
   }
 
-  async #capture(repo: Repo, ref: string): Promise<CheckpointAnswer> {
-    const global = currentRevision(this.ctx.storage.sql);
-    const head = await resolveCommit(repo, "HEAD");
-    let answer: CheckpointAnswer;
-    if (await withinGuard(repo)) {
-      await captureCheckpoint(repo, ref, Math.floor(Date.now() / 1000));
-      answer = { ok: true, value: null, by: "do" };
-    } else {
-      const previous = this.ctx.storage.kv.get<{ readonly commit: string; readonly rev: number; readonly head: string | null }>(LAST_CAPTURE_KEY);
-      if (previous !== undefined && previous.head === head && this.#journalSince(previous.rev, global).length === 0) {
-        await git.writeRef({ fs: repo.fs, dir: repo.dir, ref, value: previous.commit, force: true });
-        answer = { ok: true, value: null, by: "alias" };
-      } else {
-        const result = await this.exec({ script: captureScript(ref), cwd: REPO_ROOT, env: this.#identityEnv(), timeoutMs: 10 * 60_000 });
-        if (result.exitCode !== 0) return { ok: false, error: `git capture failed: ${result.stderr.slice(0, 1000)}` };
-        answer = { ok: true, value: null, by: "container" };
-      }
-    }
-    const commit = await resolveCommit(repo, ref);
-    if (commit !== null) this.ctx.storage.kv.put(LAST_CAPTURE_KEY, { commit, rev: global, head });
-    return answer;
+  /** SPI-1100: the Container's writes (a CLI agent's, a terminal's) are pulled first (`checkpointCapture.ts`). */
+  #capture(repo: Repo, ref: string): Promise<CheckpointAnswer> {
+    return captureTurn(
+      {
+        // Never starts the Container (`pullNow` skips a stopped one); serialised with the terminals' pulls.
+        pull: () => this.#terminalSync.pullNow(),
+        repo: () => Promise.resolve(repo),
+        revision: () => currentRevision(this.ctx.storage.sql),
+        journalSince: (after, through) => this.#journalSince(after, through),
+        last: () => this.ctx.storage.kv.get<LastCapture>(LAST_CAPTURE_KEY),
+        remember: (last) => this.ctx.storage.kv.put(LAST_CAPTURE_KEY, last),
+        inContainer: async (at) => {
+          const result = await this.exec({ script: captureScript(at), cwd: REPO_ROOT, env: this.#identityEnv(), timeoutMs: 10 * 60_000 });
+          return result.exitCode === 0 ? { ok: true } : { ok: false, error: `git capture failed: ${result.stderr.slice(0, 1000)}` };
+        },
+        nowSeconds: () => Math.floor(Date.now() / 1000),
+      },
+      ref,
+    );
   }
 
   async #diff(repo: Repo, op: Extract<CheckpointOp, { op: "diff" }>): Promise<CheckpointAnswer> {
