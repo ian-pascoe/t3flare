@@ -95,6 +95,14 @@ const claudeSwitches = (proxyUrl: string): Record<string, string> => ({
   CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "0",
 });
 
+/**
+ * What Claude Code calls the endpoint at `proxyUrl`: Anthropic's own API when `MODEL_PROXY_URL` is its host, a custom
+ * endpoint otherwise. Claude Code (2.1.322) refuses Anthropic's host under `customEndpoint` ("This session would go to
+ * the Anthropic API directly"), so the one provider admitted is the one the pinned endpoint is.
+ */
+export const claudeProviderOf = (proxyUrl: string): "anthropic" | "customEndpoint" =>
+  URL.canParse(proxyUrl) && new URL(proxyUrl).hostname === "api.anthropic.com" ? "anthropic" : "customEndpoint";
+
 /** The relay's server names an ACP agent is given (acpDriver's session servers): the owner's third-party servers. */
 const relayNames = (context: ProfileContext): ReadonlyArray<string> => (context.relay === undefined ? [] : context.relay.servers);
 
@@ -107,7 +115,7 @@ const relayNames = (context: ProfileContext): ReadonlyArray<string> => (context.
 export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = []) => ({
   apiKeyHelper: CLAUDE_KEY_HELPER,
   // Review F3: only the endpoint the managed env pins is admitted.
-  allowedProviders: ["customEndpoint"],
+  allowedProviders: [claudeProviderOf(proxyUrl)],
   availableModels: models.map((model) => model.id),
   env: { ...Object.fromEntries(CLAUDE_PINNED_EMPTY.map((name) => [name, ""])), ...claudeSwitches(proxyUrl) },
   skipWebFetchPreflight: true,

@@ -7,7 +7,7 @@ import * as path from "node:path";
 import type { CatalogModel } from "@t3flare/models";
 import { describe, expect, it } from "vitest";
 
-import { CLAUDE_PROJECTS, OPENCODE_SNAPSHOT_DIR } from "../src/agents/acpProfiles.ts";
+import { CLAUDE_PROJECTS, claudeManagedSettings, OPENCODE_SNAPSHOT_DIR } from "../src/agents/acpProfiles.ts";
 import { type ProfileContext, profileLaunch } from "../src/agents/cliProfiles.ts";
 
 const model = (id: string, extra: Partial<CatalogModel> = {}): CatalogModel => ({
@@ -93,6 +93,14 @@ describe("Claude Code's profile", () => {
     }
     for (const name of ["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_UPDATES"]) expect(env[name], name).toBe("1");
     expect(env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe("0");
+  });
+
+  it("admits Anthropic's own API, and only it, when that is the endpoint (Claude Code refuses it as a custom endpoint)", () => {
+    const allowed = (proxyUrl: string) => claudeManagedSettings(proxyUrl, context.models).allowedProviders;
+    expect(allowed("https://api.anthropic.com")).toEqual(["anthropic"]);
+    // A gateway whose URL only mentions Anthropic is still a custom endpoint.
+    expect(allowed("https://gateway.example/anthropic")).toEqual(["customEndpoint"]);
+    expect(allowed("https://api.anthropic.com.evil.example")).toEqual(["customEndpoint"]);
   });
 });
 
