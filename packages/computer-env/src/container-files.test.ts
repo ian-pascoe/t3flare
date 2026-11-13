@@ -312,3 +312,24 @@ describe("the Container's file operations", () => {
     ).toEqual([]);
   });
 });
+
+// ADR-0032 §7: a Container-only path's file operation whose Container start the budget refused shows the whole refusal,
+// not computer's outer message, which it cuts at 240 characters (shorter after `priorExit=`, as met on stage).
+describe("a refused Container start", () => {
+  const REASON = "Container budget (1) reached: raise it at /_t3flare/harness#environment";
+  const refused: ContainerAccess = {
+    patterns: async () => ["**/node_modules"],
+    running: () => false,
+    run: async () => {
+      const inner = new Error(`t3flare: the Container cannot start: ${REASON}`);
+      const backend = new Error(`ContainerBackend(container-shell): connect failed at stage=start priorExit="Container exited with unexpected ex lastError=t3flare: the Container cannot start: Container budget (1`, { cause: inner });
+      throw new Error("WorkspaceTransportError: shell.exec failed after 1 reconnect retry", { cause: backend });
+    },
+  };
+
+  it("is shown whole by a file tool on a Container-only path", async () => {
+    const stage = { read: async () => new Uint8Array(), write: async () => undefined, remove: async () => undefined };
+    const failed = await failure(new ContainerFiles(refused, stage, "/tmp/stage").readFile("/workspace/repo/node_modules/x/index.js"));
+    expect(failed).toEqual({ code: "unknown", message: `The Container could not run the file operation: t3flare: the Container cannot start: ${REASON}` });
+  });
+});

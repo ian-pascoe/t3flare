@@ -3,7 +3,7 @@
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is
 // a missing binary, as in step 1. Every routed command is kept in a short trace (admin `GET /_t3flare/agents/router-trace`).
-import { fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, REPO_ROOT, startRefusal, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
+import { describeFailure, fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, REPO_ROOT, startRefusal, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
 import { containerGitHubPermissions, ENVIRONMENT_GITHUB_PERMISSIONS } from "@t3flare/github-app/permissions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -299,7 +299,8 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
     }
   };
   const failed = (raw: string): Answer => {
-    // The budget's own reason, whole (the Workspace DO answers it from the cause chain, `startRefusal`).
+    // The budget's own reason, matched in the text (the Workspace DO's answers already carry it whole, read from the
+    // error's cause chain there); `raw` is a string, so this is the message regex, not a cause-chain walk.
     const budget = startRefusal(raw);
     const reason = budget === undefined ? raw : `the Container cannot start: ${budget}`;
     services.workspaces.setState(id, "failed", { lastError: raw });
@@ -320,13 +321,13 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
     if (bundled.bundle) await projectRpc.fs({ op: "remove", path: bundled.bundle, options: { force: true } }).catch(() => undefined);
     if (!finished.ok) return failed(`checkout: ${finished.error ?? "failed"}`);
     // The project-root view (plan section 4.2): the project's untracked files, for setup scripts' `$T3CODE_PROJECT_ROOT`.
-    const view = await step("projectRoot", () => worktree.seedProjectRoot({ parent: parent.id })).catch((error: unknown) => ({ error: String(error).slice(0, 300) }));
+    const view = await step("projectRoot", () => worktree.seedProjectRoot({ parent: parent.id })).catch((error: unknown) => ({ error: describeFailure(error).slice(0, 300) }));
     services.workspaces.setState(id, "ready", { lastError: null });
     const detail = JSON.stringify({ ...timings, totalMs: Date.now() - started, bundled: bundled.bundle !== null && bundled.bundle !== undefined, projectRoot: view });
     console.log(JSON.stringify({ t3flare: "worktree-ready", id, detail }));
     return { exitCode: 0, stdout: "", stderr: `Preparing worktree (checking out '${ref}')\nHEAD is now at ${bundled.commit.slice(0, 7)}\n`, route: "worktree", detail };
   } catch (error) {
-    return failed(String(error));
+    return failed(describeFailure(error));
   }
 };
 
@@ -523,7 +524,7 @@ export const spawn = (command: ChildProcess.Command) =>
               _tag: "Unknown",
               module: "ChildProcess",
               method: "spawn",
-              description: `t3flare: ${name}: ${String(cause).slice(0, 300)}`,
+              description: `t3flare: ${name}: ${describeFailure(cause).slice(0, 300)}`,
               pathOrDescriptor: name,
             }),
         });

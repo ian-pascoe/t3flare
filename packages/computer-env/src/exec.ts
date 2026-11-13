@@ -25,9 +25,9 @@ import {
   type ShellExecOptions,
   type ShellExecResult,
 } from "@earendil-works/pi-durable/env";
+import { describeFailure } from "@t3flare/workspace-client";
 import type { BackendTarget } from "./env.ts";
 import { resolve } from "./paths.ts";
-import { describeFailure } from "@t3flare/workspace-client";
 
 /** How long a killed command may take to stop before `exec` returns without it. */
 const KILL_GRACE_MS = 500;
@@ -140,7 +140,7 @@ export const exec = async (
   try {
     workspace = await getWorkspace(host.workspace);
   } catch (cause) {
-    return err(new ExecutionError("shell_unavailable", String(cause)));
+    return err(new ExecutionError("shell_unavailable", describeFailure(cause)));
   }
 
   // An abort while the client was being acquired fired before any listener could see it.

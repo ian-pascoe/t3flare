@@ -3,6 +3,7 @@
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
 // @effect-diagnostics extendsNativeError:off missingPipeableSignature:off
 import type { FileErrorCode } from "@earendil-works/pi-durable/env";
+import { failureMessage } from "@t3flare/workspace-client";
 import type { WireError } from "./wire.ts";
 
 const POSIX_CODES = new Map<string, FileErrorCode>([
@@ -34,7 +35,7 @@ export const posixCode = (cause: unknown): string | undefined =>
 export const toWireError = (cause: unknown, path: string): WireError => {
   if (cause instanceof HostFailure) return cause.wire;
 
-  const message = cause instanceof Error ? cause.message : String(cause);
+  const message = failureMessage(cause);
 
   return { code: POSIX_CODES.get(posixCode(cause) ?? "") ?? "unknown", message, path };
 };

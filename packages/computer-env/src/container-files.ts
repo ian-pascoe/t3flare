@@ -7,6 +7,7 @@
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
 // @effect-diagnostics asyncFunction:off cryptoRandomUUID:off preferEffectArray:off
 import type { FileErrorCode, FileInfo, FileKind } from "@earendil-works/pi-durable/env";
+import { failureMessage } from "@t3flare/workspace-client";
 import { HARNESS_ROOT, isContainerOnly } from "./container-paths.ts";
 import { HostFailure } from "./failure.ts";
 import { basename } from "./paths.ts";
@@ -607,7 +608,8 @@ export class ContainerFiles {
     } catch (cause) {
       throw new HostFailure(
         "unknown",
-        `The Container could not run the file operation: ${cause instanceof Error ? cause.message : String(cause)}`,
+        // A refused Container start is shown whole (ADR-0032 §7): computer cuts its own message around the reason.
+        `The Container could not run the file operation: ${failureMessage(cause)}`,
         path,
       );
     }

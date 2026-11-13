@@ -439,4 +439,4 @@ export const containerPreviewHost = (port: number): string => `${port}.${CONTAIN
 export const CONTAINER_PREVIEW_SOCKET_PATH = "/__t3flare/ws/";
 export const CONTAINER_PREVIEW_HEADER = "x-t3flare-preview";
 
-export { describeFailure, startRefusal } from "./startRefusal.ts";
+export { describeFailure, failureMessage, startRefusal } from "./startRefusal.ts";

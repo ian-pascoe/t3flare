@@ -1,7 +1,7 @@
 // A refused Container start's reason, whole (ADR-0032 §7), however computer cut its own messages around it.
 import { describe, expect, it } from "vitest";
 
-import { describeFailure, startRefusal } from "./startRefusal.ts";
+import { describeFailure, failureMessage, startRefusal } from "./startRefusal.ts";
 
 const REASON = "Container budget (1) reached: raise it at /_t3flare/harness#environment";
 
@@ -37,5 +37,16 @@ describe("describeFailure", () => {
 
   it("shows any other failure as it is", () => {
     expect(describeFailure(new Error("disk full"))).toBe("Error: disk full");
+  });
+});
+
+describe("failureMessage", () => {
+  it("shows a refused start as the whole refusal", () => {
+    expect(failureMessage(wrapped())).toBe(`t3flare: the Container cannot start: ${REASON}`);
+  });
+
+  it("shows any other failure by its message alone", () => {
+    expect(failureMessage(new Error("disk full"))).toBe("disk full");
+    expect(failureMessage("plain")).toBe("plain");
   });
 });

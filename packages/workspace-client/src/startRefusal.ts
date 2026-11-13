@@ -3,7 +3,8 @@
 // keeps only the first 240 characters of each message, its own prefix included (fewer still after `priorExit=`), so the
 // reason in the outer message may be cut. The whole one is the deepest cause carrying it; Workers RPC keeps an error's
 // `cause`, so the chain reaches the Session and the Environment too. Every surface that turns such an error into text
-// (a Durable agent's command, a terminal, a CLI process, git and checkpoint answers, worktree creation) goes through here.
+// (a Durable agent's command and file tools, a terminal, a CLI process, git and checkpoint answers, worktree creation)
+// goes through here.
 
 /** How deep a cause chain is followed: computer nests two or three levels; a cycle must not loop forever. */
 const MAX_CAUSE_DEPTH = 10;
@@ -31,4 +32,11 @@ export const startRefusal = (error: unknown): string | undefined => {
 export const describeFailure = (error: unknown): string => {
   const reason = startRefusal(error);
   return reason === undefined ? String(error) : `t3flare: the Container cannot start: ${reason}`;
+};
+
+/** As `describeFailure`, but any other failure by its message alone (no `Error: ` prefix), where a message is shown. */
+export const failureMessage = (error: unknown): string => {
+  const reason = startRefusal(error);
+  if (reason !== undefined) return `t3flare: the Container cannot start: ${reason}`;
+  return error instanceof Error ? error.message : String(error);
 };

@@ -5,6 +5,7 @@
 // @effect-diagnostics asyncFunction:off missingPipeableSignature:off
 import type { Context } from "@earendil-works/chord";
 import { err, FileError, type Result } from "@earendil-works/pi-durable/env";
+import { failureMessage } from "@t3flare/workspace-client";
 import {
   type EnvRequest,
   type EnvResponse,
@@ -77,7 +78,7 @@ export const caller =
     } catch (cause) {
       const error = new FileError(
         "unknown",
-        cause instanceof Error ? cause.message : String(cause),
+        failureMessage(cause),
         path,
       );
 
