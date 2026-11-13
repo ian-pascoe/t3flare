@@ -1,0 +1,108 @@
+{
+ "at": "2026-11-13T06:21:33.281Z",
+ "model": "anthropic/claude-haiku-5-5",
+ "ok": true,
+ "fork": {
+  "ok": true,
+  "sourceThreadId": "f3117b8f-392c-4a6b-9311-dd17d88465ca",
+  "targetThreadId": "be258b77-af55-49de-9d33-a84cbfabc75d",
+  "native": true,
+  "fork": {
+   "answer": "FIG-3, PLUM-9",
+   "words": [
+    "FIG-3",
+    "PLUM-9"
+   ],
+   "runs": [
+    {
+     "id": "run:thread:be258b77-af55-49de-9d33-a84cbfabc75d:ordinal:1",
+     "ordinal": 1,
+     "status": "completed",
+     "answer": "FIG-3, PLUM-9"
+    }
+   ],
+   "providerThreads": [
+    {
+     "id": "provider-thread:provider:piDurable:native-thread:pending%3Arun%3Athread%3Abe258b77-af55-49de-9d33-a84cbfabc75d%3Aordinal%3A1",
+     "nativeThreadRef": {
+      "driver": "piDurable",
+      "nativeId": "thread:be258b77-af55-49de-9d33-a84cbfabc75d",
+      "strength": "strong"
+     },
+     "forkedFrom": {
+      "providerThreadId": "provider-thread:provider:piDurable:native-thread:pending%3Arun%3Athread%3Af3117b8f-392c-4a6b-9311-dd17d88465ca%3Aordinal%3A1",
+      "providerTurnId": "provider-turn:provider:piDurable:native-turn:provider-thread%3Aprovider%3ApiDurable%3Anative-thread%3Apending%253Arun%253Athread%253Af3117b8f-392c-4a6b-9311-dd17d88465ca%253Aordinal%253A1%3Aattempt%3Arun-attempt%3Arun%3Arun%253Athread%253Af3117b8f-392c-4a6b-9311-dd17d88465ca%253Aordinal%253A2%3Aattempt%3A1"
+     }
+    }
+   ],
+   "handoffs": [],
+   "transfers": [
+    {
+     "id": "context-transfer:type:fork:source-thread:f3117b8f-392c-4a6b-9311-dd17d88465ca:target-thread:be258b77-af55-49de-9d33-a84cbfabc75d:32326d35-e457-47cd-bb9d-639fa35dd101",
+     "status": "consumed",
+     "resolution": {
+      "strategy": "native_fork",
+      "providerThreadRef": {
+       "driver": "piDurable",
+       "nativeId": "thread:be258b77-af55-49de-9d33-a84cbfabc75d",
+       "strength": "strong"
+      }
+     }
+    }
+   ],
+   "threadKeys": [
+    "thread",
+    "runs",
+    "attempts",
+    "nodes",
+    "subagents",
+    "providerSessions",
+    "providerThreads",
+    "providerTurns",
+    "runtimeRequests",
+    "messages",
+    "plans",
+    "turnItems",
+    "checkpointScopes",
+    "checkpoints",
+    "contextHandoffs",
+    "contextTransfers",
+    "visibleTurnItems",
+    "updatedAt"
+   ]
+  },
+  "source": {
+   "runs": [
+    {
+     "id": "run:thread:f3117b8f-392c-4a6b-9311-dd17d88465ca:ordinal:1",
+     "ordinal": 1,
+     "status": "completed",
+     "answer": "OK"
+    },
+    {
+     "id": "run:thread:f3117b8f-392c-4a6b-9311-dd17d88465ca:ordinal:2",
+     "ordinal": 2,
+     "status": "completed",
+     "answer": "OK"
+    },
+    {
+     "id": "run:thread:f3117b8f-392c-4a6b-9311-dd17d88465ca:ordinal:3",
+     "ordinal": 3,
+     "status": "completed",
+     "answer": "OK"
+    },
+    {
+     "id": "run:thread:f3117b8f-392c-4a6b-9311-dd17d88465ca:ordinal:4",
+     "ordinal": 4,
+     "status": "completed",
+     "answer": "FIG-3, PLUM-9, KIWI-7"
+    }
+   ],
+   "wordsAfter": [
+    "FIG-3",
+    "PLUM-9",
+    "KIWI-7"
+   ]
+  }
+ }
+}

@@ -4,6 +4,7 @@
 // @effect-diagnostics asyncFunction:off
 import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { type Conversation, createRegistry, Harness as HarnessApi, MemoryStorage } from "@earendil-works/pi-durable";
+import { CodemodeStoreDoc } from "@earendil-works/pi-durable/codemode";
 import type { TurnState } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
@@ -84,6 +85,24 @@ describe("rollback (SPI-987)", () => {
     expect([agent.model, agent.thinkingLevel, agent.cwd]).toEqual([{ provider: "faux", modelId: "faux-1" }, "low", "/workspace/repo"]);
     // The old conversation is history, unchanged.
     expect(userTexts((await root.context(context)).messages)).toEqual(["alpha", "bravo", "charlie"]);
+  });
+
+  it("rolls code mode's store back with the conversation: the fork sees the values as they were", async () => {
+    const { harness, root } = await open();
+    // As a script's `store()` lands: with an entry of the turn, in one commit.
+    const remember = (value: string) =>
+      root.commit(async (tx) => {
+        await root.submit(tx, { type: "write", entry: { kind: "t3flare.test-store", data: value } });
+        (await tx.doc(CodemodeStoreDoc, root.id)).values.word = value;
+      }, context);
+    const turns: Record<string, TurnState> = {};
+    turns.alpha = await turn(root, "alpha");
+    await remember("FIG-3");
+    turns.bravo = await turn(root, "bravo");
+    await remember("PLUM-9");
+    const next = await rewind(harness, root, rollbackPlan(turns, ["bravo"]).boundary!, context);
+    expect((await harness.snapshot(CodemodeStoreDoc, next.id, context))?.values).toEqual({ word: "FIG-3" });
+    expect((await harness.snapshot(CodemodeStoreDoc, root.id, context))?.values).toEqual({ word: "PLUM-9" });
   });
 
   it("rolls back to the thread's start: a fresh conversation with the same agent", async () => {

@@ -1,0 +1,87 @@
+{
+ "at": "2026-11-13T06:35:24.011Z",
+ "model": "anthropic/claude-haiku-5-5",
+ "ok": false,
+ "rollbackClaude": {
+  "ok": false,
+  "agent": "claude",
+  "threadId": "74de747e-ccb1-4045-876b-238bb4137e4b",
+  "worktreePath": "/w/.wt/p997-mwelq733/t3-62aff20a-ae4d01ab556af9b4",
+  "notes": [
+   "one",
+   "two",
+   "three"
+  ],
+  "checkpoints": [
+   {
+    "id": "checkpoint:scope:checkpoint-scope%3Athread%3A74de747e-ccb1-4045-876b-238bb4137e4b%3Aname%3Aroot:name:0",
+    "scopeId": "checkpoint-scope:thread:74de747e-ccb1-4045-876b-238bb4137e4b:name:root",
+    "appRunOrdinal": null,
+    "status": "ready"
+   },
+   {
+    "id": "checkpoint:scope:checkpoint-scope%3Athread%3A74de747e-ccb1-4045-876b-238bb4137e4b%3Aname%3Aroot:name:1",
+    "scopeId": "checkpoint-scope:thread:74de747e-ccb1-4045-876b-238bb4137e4b:name:root",
+    "appRunOrdinal": 1,
+    "status": "ready"
+   },
+   {
+    "id": "checkpoint:scope:checkpoint-scope%3Athread%3A74de747e-ccb1-4045-876b-238bb4137e4b%3Aname%3Aroot:name:2",
+    "scopeId": "checkpoint-scope:thread:74de747e-ccb1-4045-876b-238bb4137e4b:name:root",
+    "appRunOrdinal": 2,
+    "status": "ready"
+   },
+   {
+    "id": "checkpoint:scope:checkpoint-scope%3Athread%3A74de747e-ccb1-4045-876b-238bb4137e4b%3Aname%3Aroot:name:3",
+    "scopeId": "checkpoint-scope:thread:74de747e-ccb1-4045-876b-238bb4137e4b:name:root",
+    "appRunOrdinal": 3,
+    "status": "ready"
+   }
+  ],
+  "target": {
+   "id": "checkpoint:scope:checkpoint-scope%3Athread%3A74de747e-ccb1-4045-876b-238bb4137e4b%3Aname%3Aroot:name:1",
+   "appRunOrdinal": 1
+  },
+  "dispatch": {
+   "ok": true,
+   "value": {
+    "sequence": 683
+   }
+  },
+  "restored": null,
+  "rolledBack": [
+   2,
+   3
+  ],
+  "visibleRuns": [
+   {
+    "ordinal": 1,
+    "status": "completed"
+   },
+   {
+    "ordinal": 3,
+    "status": "rolled_back"
+   }
+  ],
+  "answer": "FIG-3, PLUM-9, KIWI-7",
+  "words": [
+   "FIG-3",
+   "PLUM-9",
+   "KIWI-7"
+  ],
+  "runs": [
+   {
+    "id": "run:thread:74de747e-ccb1-4045-876b-238bb4137e4b:ordinal:1",
+    "ordinal": 1,
+    "status": "completed",
+    "answer": "OK"
+   },
+   {
+    "id": "run:thread:74de747e-ccb1-4045-876b-238bb4137e4b:ordinal:4",
+    "ordinal": 4,
+    "status": "completed",
+    "answer": "FIG-3, PLUM-9, KIWI-7"
+   }
+  ]
+ }
+}

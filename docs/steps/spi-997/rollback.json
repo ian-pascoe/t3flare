@@ -1,0 +1,84 @@
+{
+ "at": "2026-11-13T06:31:49.971Z",
+ "model": "anthropic/claude-haiku-5-5",
+ "ok": true,
+ "rollback": {
+  "ok": true,
+  "threadId": "1002e36f-ff46-4ee3-9c76-ed920df07b7f",
+  "worktreePath": "/w/.wt/p997-mwellw6u/t3-f6ba7373-202c7837312b67eb",
+  "notes": [
+   "one",
+   "two",
+   "three"
+  ],
+  "checkpoints": [
+   {
+    "id": "checkpoint:scope:checkpoint-scope%3Athread%3A1002e36f-ff46-4ee3-9c76-ed920df07b7f%3Aname%3Aroot:name:0",
+    "scopeId": "checkpoint-scope:thread:1002e36f-ff46-4ee3-9c76-ed920df07b7f:name:root",
+    "appRunOrdinal": null,
+    "status": "ready"
+   },
+   {
+    "id": "checkpoint:scope:checkpoint-scope%3Athread%3A1002e36f-ff46-4ee3-9c76-ed920df07b7f%3Aname%3Aroot:name:1",
+    "scopeId": "checkpoint-scope:thread:1002e36f-ff46-4ee3-9c76-ed920df07b7f:name:root",
+    "appRunOrdinal": 1,
+    "status": "ready"
+   },
+   {
+    "id": "checkpoint:scope:checkpoint-scope%3Athread%3A1002e36f-ff46-4ee3-9c76-ed920df07b7f%3Aname%3Aroot:name:2",
+    "scopeId": "checkpoint-scope:thread:1002e36f-ff46-4ee3-9c76-ed920df07b7f:name:root",
+    "appRunOrdinal": 2,
+    "status": "ready"
+   },
+   {
+    "id": "checkpoint:scope:checkpoint-scope%3Athread%3A1002e36f-ff46-4ee3-9c76-ed920df07b7f%3Aname%3Aroot:name:3",
+    "scopeId": "checkpoint-scope:thread:1002e36f-ff46-4ee3-9c76-ed920df07b7f:name:root",
+    "appRunOrdinal": 3,
+    "status": "ready"
+   }
+  ],
+  "target": {
+   "id": "checkpoint:scope:checkpoint-scope%3Athread%3A1002e36f-ff46-4ee3-9c76-ed920df07b7f%3Aname%3Aroot:name:1",
+   "appRunOrdinal": 1
+  },
+  "dispatch": {
+   "ok": true,
+   "value": {
+    "sequence": 414
+   }
+  },
+  "restored": "one",
+  "rolledBack": [
+   2,
+   3
+  ],
+  "visibleRuns": [
+   {
+    "ordinal": 1,
+    "status": "completed"
+   },
+   {
+    "ordinal": 3,
+    "status": "rolled_back"
+   }
+  ],
+  "answer": "FIG-3",
+  "words": [
+   "FIG-3"
+  ],
+  "runs": [
+   {
+    "id": "run:thread:1002e36f-ff46-4ee3-9c76-ed920df07b7f:ordinal:1",
+    "ordinal": 1,
+    "status": "completed",
+    "answer": "OK"
+   },
+   {
+    "id": "run:thread:1002e36f-ff46-4ee3-9c76-ed920df07b7f:ordinal:4",
+    "ordinal": 4,
+    "status": "completed",
+    "answer": "FIG-3"
+   }
+  ]
+ }
+}

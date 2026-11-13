@@ -491,6 +491,19 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Blast radius**: no proposed plan or a plan Implement refuses; output only at the end; no suggestions. Turns and tools keep working.
 - **Fix**: follow t3's Codex adapter's shapes (`buildProposedPlanArtifacts`, `item/commandExecution/outputDelta`, `samplePromptSuggestion`).
 
+### U56. Fork and rollback of Durable threads (SPI-997, SPI-987)
+
+- **Where**:
+  - `apps/environment/src/provider/adapter.ts`:
+    - `rollbackThread` drops the provider turns after the target's ordinal (`ProviderAdapterV2RollbackTarget`, `providerThreadTurns`) and answers with the provider thread alone. t3's `CheckpointRollbackService` writes that thread back and restores the files (`t3code/apps/server/src/orchestration-v2/CheckpointRollbackService.ts`). t3's Pi adapter answers the same way.
+    - `forkThread` runs in the target thread's session, as `ProviderTurnStartService` calls it. It registers a provider thread with `forkedFrom` and asks the Session to seed itself from the source Session's name (`nativeThreadRef`).
+  - `provider/capabilities.ts`: `canRollbackThread`, `canForkThread`, `canForkFromTurn`, `providerCanRollbackConversation`, `providerRollbackReturnsSnapshot`, read by t3's `CommandPolicy.ts` (`ensureRollback`, `decideForkExecution`).
+  - `apps/agents/src/session/branches.ts` and `SessionDO`'s conversation pointer (`t3flare:conversation`). These use pi-durable 1.5.0's `Conversation.fork`, `context({ at })`, write entries with `model`, session-wide monotonic entry ids, and `CodemodeStoreDoc`'s `fork: "asOf"` (U24).
+- **Breaks when**: t3 changes the rollback target or input, what a rollback snapshot must hold, where `forkThread` is called or with which turn, or the policy's conditions. pi-durable changes fork semantics, entry ids or the write submission.
+- **Detection**: typecheck (the adapter's input types); `apps/environment/test/forkRollbackPolicy.test.ts` (t3's own `CommandPolicy` takes the native fork and admits the rollback); `apps/agents/test/branches.test.ts` (a real Harness: the rollback forgets turns and rolls code mode's store back; the fork pages and seeds). Stage: `scripts/p997.ts fork` and `rollback`, outside the bump. **Silent**: a native fork that fails falls back to t3's portable handoff, so the thread still answers, from a summary. Cheapest check: run `p997.ts fork` in the bump's acceptance and require `native_fork`.
+- **Blast radius**: "Revert to this message" fails, or rewinds the files but not the agent's memory. A fork loses tool detail (the handoff) or fails.
+- **Fix**: compare with t3's Pi adapter's `rollbackThread` and `forkThread` (`t3code/packages/provider-pi/src/server/adapter.ts`).
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).
