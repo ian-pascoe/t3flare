@@ -49,6 +49,15 @@ const OWNER_EMAIL = "ian.g.pascoe@gmail.com";
 /** The account's workers.dev subdomain: the Worker's host has to be known to name the Access destination. */
 const WORKERS_DEV_SUBDOMAIN = "ian-g-pascoe";
 
+/** A plain-text binding of `name` when it is set (and not empty), else none. */
+const optionalVar = (name: string) =>
+  Config.String(name).pipe(
+    Config.withDefault(""),
+    Effect.map((value): Record<string, string> => (value === "" ? {} : { [name]: value })),
+  );
+/** A secret binding of `name` when it is set in the deploy's environment, else none. */
+const optionalSecret = (name: string) => (process.env[name] ? { [name]: Config.Redacted(name) } : {});
+
 /**
  * The routes of t3's server (t3code, pinned) that take a credential from a caller who has no session yet, and so are
  * what a guesser or a flood would hit. All are POSTs:
@@ -96,6 +105,7 @@ export default Alchemy.Stack(
     const codemodeName = `t3flare-codemode-${stage}`;
     const mcpName = `t3flare-mcp-${stage}`;
     const fixtureName = `t3flare-mcpfixture-${stage}`;
+    const probeName = `t3flare-probe-${stage}`;
     // Test stages: the tools step's fixture MCP server, when the stage has its bearer (scripts/stage.ts).
     const fixtureBearer = stage === "prod" ? "" : yield* Config.String("T3FLARE_FIXTURE_BEARER").pipe(Config.withDefault(""));
     const workersDevHost = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
@@ -189,6 +199,40 @@ export default Alchemy.Stack(
       } as never);
     }
 
+    // Parity batch 2: a test stage's probe Worker (scripts/pbatch2/probe.ts), made when the stage asks (`T3FLARE_PROBE=1`),
+    // never for prod: a stand-in for Commissary's management API and an OTLP receiver. The stage's Environment is pointed
+    // at its management stand-in in place of Commissary's (below); the harness points t3's OTLP settings at it.
+    const probe = stage !== "prod" && (yield* Config.String("T3FLARE_PROBE").pipe(Config.withDefault(""))) === "1";
+    if (probe) {
+      yield* Cloudflare.Worker("Probe", {
+        name: probeName,
+        main: path.join(here, "scripts/pbatch2/probe.ts"),
+        compatibility: COMPATIBILITY,
+        workersDev: { enabled: true, previewsEnabled: false },
+        env: {
+          PROBE_KEY: Config.Redacted("T3FLARE_PROBE_KEY"),
+          LOG: Cloudflare.DurableObject("ProbeLog", { className: "ProbeLog" }),
+        },
+      } as never);
+    }
+    // Parity G8: Commissary's management API for t3's Usage page and limit meters, the Environment Worker's alone and
+    // optional (unset: no meters, no usage, as before). The principal of the Containers' key is not secret: its key id.
+    const containerKeyId = (yield* Config.String("COMMISSARY_CONTAINER_API_KEY").pipe(Config.withDefault(""))).split("_")[2] ?? "";
+    const commissaryManagement = probe
+      ? {
+          COMMISSARY_MANAGEMENT_URL: `https://${probeName}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`,
+          COMMISSARY_MANAGEMENT_KEY: Config.Redacted("T3FLARE_PROBE_KEY"),
+          COMMISSARY_ACCESS_CLIENT_ID: "probe-client.access",
+          COMMISSARY_ACCESS_CLIENT_SECRET: Config.Redacted("T3FLARE_PROBE_KEY"),
+        }
+      : {
+          ...(yield* optionalVar("COMMISSARY_MANAGEMENT_URL")),
+          ...(yield* optionalVar("COMMISSARY_MANAGEMENT_ORG")),
+          ...(yield* optionalVar("COMMISSARY_ACCESS_CLIENT_ID")),
+          ...optionalSecret("COMMISSARY_MANAGEMENT_KEY"),
+          ...optionalSecret("COMMISSARY_ACCESS_CLIENT_SECRET"),
+        };
+
     const agents = yield* Cloudflare.Worker("Agents", {
       name: agentsName,
       main: path.join(here, "../agents/dist/worker/worker.js"),
@@ -254,6 +298,8 @@ export default Alchemy.Stack(
         T3FLARE_GITHUB_APP_PRIVATE_KEY: Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),
         MODEL_PROXY_URL: modelProxyUrl,
         MODEL_PROXY_API_KEY: modelProxyKey,
+        ...commissaryManagement,
+        ...(containerKeyId === "" ? {} : { COMMISSARY_USAGE_PRINCIPALS: `key:${containerKeyId}` }),
         ...(idleAfterMs === "" ? {} : { T3FLARE_IDLE_AFTER_MS: idleAfterMs }),
         // Step 2b (review F3): the Workspace sweep purges on test stages; prod's reports what it would do until the owner
         // sets T3FLARE_SWEEP_PURGE=1 for it (the `prod` environment's variable, passed by deploy-prod.yml; on 2026-11-12, SPI-974).
