@@ -44,7 +44,7 @@ export interface SkillFiles {
   readonly read: (path: string) => Promise<string | undefined>;
 }
 
-/** Where each directory's skills are, in precedence order. */
+/** Where each directory's skills are, in precedence order: the Durable agent's (a CLI agent's are `CLI_ROOTS`'). */
 export const SKILL_ROOTS = [".pi/skills", ".agents/skills", ".claude/skills"] as const;
 
 /** The longest description kept, the Agent Skills limit: a repo's skills are not trusted to size the prompt. */
@@ -142,15 +142,15 @@ const candidatePaths = async (files: SkillFiles, root: string): Promise<Readonly
  * The Skills a thread in `cwd` can use. `environment` (the Environment skill set; empty until SPI-1148) comes first and
  * beats a Repo skill of the same name. Repo skills follow, nearest directory first and, in each, `SKILL_ROOTS` in order;
  * the first name found wins. At most `MAX_REPO_SKILLS` Repo skills are read; `omitted` counts the `SKILL.md` files past
- * the cap, unread.
+ * the cap, unread. `roots` replaces `SKILL_ROOTS` (a CLI agent's, SPI-1151).
  */
 export const discoverSkills = async (
   files: SkillFiles,
-  options: { readonly cwd: string; readonly root: string; readonly environment?: ReadonlyArray<Skill> },
+  options: { readonly cwd: string; readonly root: string; readonly environment?: ReadonlyArray<Skill>; readonly roots?: ReadonlyArray<string> },
 ): Promise<SkillDiscovery> => {
   const environment = options.environment ?? [];
   const taken = new Map<string, string>(environment.map((skill) => [skill.name, skill.filePath]));
-  const roots = directoriesUp(options.cwd, options.root).flatMap((directory) => SKILL_ROOTS.map((root) => join(directory, root)));
+  const roots = directoriesUp(options.cwd, options.root).flatMap((directory) => (options.roots ?? SKILL_ROOTS).map((root) => join(directory, root)));
   // Listed at once; read in order, since precedence decides which of two same-named skills is kept.
   const listed = await Promise.all(roots.map(async (root) => skillFiles(await candidatePaths(files, root)).map((path) => join(root, path))));
   const skills: Array<Skill> = [...environment];

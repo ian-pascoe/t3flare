@@ -5,6 +5,7 @@
 // `.agents/prompts` (cloudpid's convention) nor `.claude/commands`.
 import { parse } from "yaml";
 
+import type { CommandSource } from "./cliRoots.ts";
 import { join, type SkillFiles } from "./discovery.ts";
 
 /** A Prompt template as discovery lists it; its body is read when a message uses it. */
@@ -138,28 +139,42 @@ export const expandTemplate = (text: string, templates: ReadonlyArray<{ readonly
   return call === undefined ? undefined : substituteArgs(call.template.content, call.args);
 };
 
+/** The Durable agent's (and pi's) Prompt templates: the cwd's `.pi/prompts`, its files only. */
+const PI_PROMPTS: ReadonlyArray<CommandSource> = [{ directory: PROMPTS_DIRECTORY, nested: false }];
+
 /**
- * The Prompt templates of a thread in `cwd`: the `.md` files directly in its `.pi/prompts`, in name order. A file whose
- * name holds whitespace is not one (its Slash command would end at the space), nor one over `MAX_TEMPLATE_BYTES`.
+ * The Prompt templates of a thread in `cwd`: the `.md` files directly in its `.pi/prompts`, in name order; or, with
+ * `sources` (a CLI agent's commands, SPI-1151), in each of those directories, a nested file named `sub:name`, the first
+ * name found winning. A file whose name holds whitespace is not one (its Slash command would end at the space), nor one
+ * over `MAX_TEMPLATE_BYTES`.
  */
-export const discoverPrompts = async (files: SkillFiles, cwd: string): Promise<ReadonlyArray<PromptTemplate>> => {
-  const root = join(cwd.replace(/\/+$/, "") || "/", PROMPTS_DIRECTORY);
-  const entries = await files.list(root, MAX_ENTRIES);
-  const names = entries
-    .filter((entry) => entry.kind !== "directory" && !entry.path.includes("/") && !/\s/.test(entry.path) && entry.path.endsWith(".md"))
-    .map((entry) => entry.path)
-    .sort()
-    .slice(0, MAX_TEMPLATES);
-  const templates = await Promise.all(
-    names.map(async (name) => {
-      const path = join(root, name);
-      const text = await files.read(path);
-      if (text === undefined || new TextEncoder().encode(text).length > MAX_TEMPLATE_BYTES) return undefined;
-      const parsed = parseTemplate(path, text);
-      if (parsed === undefined) return undefined;
-      const { content: _content, ...template } = parsed;
-      return template;
+export const discoverPrompts = async (files: SkillFiles, cwd: string, sources: ReadonlyArray<CommandSource> = PI_PROMPTS): Promise<ReadonlyArray<PromptTemplate>> => {
+  const base = cwd.replace(/\/+$/, "") || "/";
+  const listed = await Promise.all(
+    sources.map(async (source) => {
+      const root = join(base, source.directory);
+      const entries = await files.list(root, MAX_ENTRIES);
+      return entries
+        .filter((entry) => entry.kind !== "directory" && (source.nested || !entry.path.includes("/")) && !/\s/.test(entry.path) && entry.path.endsWith(".md"))
+        .filter((entry) => !entry.path.split("/").some((segment) => segment.startsWith(".")))
+        .map((entry) => ({ path: join(root, entry.path), name: entry.path.replace(/\.md$/, "").replaceAll("/", ":") }))
+        .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     }),
   );
-  return templates.filter((template) => template !== undefined);
+  const seen = new Set<string>();
+  const chosen = listed
+    .flat()
+    .filter((entry) => (seen.has(entry.name) ? false : (seen.add(entry.name), true)))
+    .slice(0, MAX_TEMPLATES);
+  const templates = await Promise.all(
+    chosen.map(async (entry) => {
+      const text = await files.read(entry.path);
+      if (text === undefined || new TextEncoder().encode(text).length > MAX_TEMPLATE_BYTES) return undefined;
+      const parsed = parseTemplate(entry.path, text);
+      if (parsed === undefined) return undefined;
+      const { content: _content, ...template } = parsed;
+      return { ...template, name: entry.name };
+    }),
+  );
+  return templates.filter((template) => template !== undefined).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 };
