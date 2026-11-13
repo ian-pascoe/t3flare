@@ -1,0 +1,52 @@
+{
+  "fetchedAt": "2026-11-13",
+  "source": "GET https://relay.t3.codes/openapi.json (unauthenticated, no credential)",
+  "sha256": "3f10b0d8fe466301cc22913e021533ddc586fa013c59a272cb4a88bcef2999c6",
+  "bytes": 49827,
+  "info": {
+    "title": "T3 Code Relay API",
+    "version": "1.0.0",
+    "description": "Control-plane API for linking T3 environments, connecting authorized clients, and publishing agent activity."
+  },
+  "health": "GET https://relay.t3.codes/health -> 200 {\"ok\":true,\"service\":\"relay\"}",
+  "environmentPaths": [
+    "/v1/environments",
+    "/v1/client/environment-links",
+    "/v1/client/environment-link-challenges",
+    "/v1/client/environment-links/{environmentId}",
+    "/v1/client/environment-links/{environmentId}/tunnel",
+    "/v1/environments/{environmentId}/connect",
+    "/v1/environments/{environmentId}/status",
+    "/v1/environments/{environmentId}/tunnel/recovery",
+    "/v1/environments/{environmentId}/tunnel",
+    "/v1/environments/{environmentId}/threads/{threadId}/agent-activity",
+    "/v1/environments/{environmentId}/link-preferences",
+    "/v1/environments/{environmentId}/hooks/wake"
+  ],
+  "enumsOfInterest": [
+    [
+      "manual",
+      "cloudflare_tunnel",
+      "t3_relay"
+    ],
+    [
+      "client_proof_key_thumbprint_missing",
+      "environment_link_not_found",
+      "endpoint_provider_not_managed",
+      "managed_endpoint_allocation_not_found",
+      "managed_endpoint_base_domain_not_configured",
+      "managed_endpoint_allocation_not_ready",
+      "managed_endpoint_hostname_invalid",
+      "managed_endpoint_mismatch"
+    ],
+    [
+      "invalid_signature_or_scope",
+      "descriptor_mismatch",
+      "replayed_nonce",
+      "challenge_invalid",
+      "origin_not_allowed",
+      "endpoint_not_secure"
+    ]
+  ],
+  "reading": "The deployed relay publishes the same endpoint provider kinds and the same connect/status refusal reasons as the pinned t3code source (infra/relay, contracts/relay.ts at d8f3feff0c), including endpoint_provider_not_managed."
+}
