@@ -1,6 +1,6 @@
 # Previews (parity G11, SPI-1002): plan
 
-Status: in implementation on branch `previews` (2026-11-13). Owner decision D4 (2026-11-11): previews are part of parity, built last. Ticket: SPI-1002. Pinned t3: `t3code` at `d8f3feff0c`. Anchors drift; grep the symbol.
+Status: built on branch `previews` (2026-11-13); report [`previews.md`](previews.md). Owner decision D4 (2026-11-11): previews are part of parity, built last. Ticket: SPI-1002. Pinned t3: `t3code` at `d8f3feff0c`. Anchors drift; grep the symbol.
 
 ## Review changelog (2026-11-13, implementation)
 

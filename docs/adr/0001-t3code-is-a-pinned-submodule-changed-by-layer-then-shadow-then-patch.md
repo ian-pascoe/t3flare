@@ -34,3 +34,12 @@ Shadows 2 (unchanged), Patches 4: `0004-scratch-root-is-a-workspace.patch` (pari
 ## Counts after parity batch 2 (G8, G13, the Storage page, OTLP)
 
 Shadows 2 (unchanged; `builtInDrivers` now also lists usage readers in `BUILT_IN_USAGE_DRIVERS`), Patches 4 (unchanged). The rest are Layers over t3's services (`UsageLimitSources`, `AcpRegistryCatalog`, `DatabaseStorage`) and `ServerConfig` fields built from t3's own settings parser. Evidence: `docs/steps/parity-batch-2.md`.
+
+## Counts after G11 (previews)
+
+Shadows 4, Patches 5.
+- Shadow `apps/server/src/preview/ServerBrowserContexts.ts`: a class `ServerBrowser.make` builds with `new`, whose whole job is getting Playwright browsers, which is exactly the seam.
+- Shadow `apps/server/src/htmlRender/publicProxy.ts`: workerd has no `node:net` server, and Browser Run's egress stands in for its guard. It replaces the plan's Shadow of `headlessChrome.ts` (638 lines), which stays stock behind a CDP bridge in our process router (a Layer).
+- Patch `0005-server-browser-context-thread.patch`: one argument at the one `contextFor` call, the tab's thread. A Shadow of the 3,011-line `ServerBrowser.ts` would be far worse.
+
+Port discovery, `PreviewBrowser` and agent browser access are Layers, or the removal of ours. Evidence: `docs/steps/previews.md`.
