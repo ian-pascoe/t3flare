@@ -1,0 +1,192 @@
+{
+ "at": "2026-11-13T21:02:58.117Z",
+ "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "workspace": "penv-sizes",
+ "sizes": [
+  {
+   "name": "cpu-1",
+   "revision": 3,
+   "launch": {
+    "size": "cpu-1",
+    "instance": {
+     "vcpu": 1,
+     "memoryMib": 3072,
+     "diskMb": 12000
+    },
+    "idleMs": 300000,
+    "budget": 3,
+    "revision": 3
+   },
+   "limits": {
+    "cgroup": "/sys/fs/cgroup/",
+    "cpu.max(root)": "max 100000",
+    "cpu.max": "max 100000",
+    "memory.max(root)": "3221225472",
+    "memory.max": "3221225472",
+    "nproc": "1",
+    "memtotal_kb": "3291780",
+    "rootdisk_bytes": "12000002048"
+   },
+   "expected": {
+    "vcpu": 1,
+    "memoryMib": 3072,
+    "diskMb": 12000
+   },
+   "fit": {
+    "memoryBytes": 3221225472,
+    "memoryOk": true,
+    "disk": 12000002048,
+    "diskOk": true,
+    "cpus": 1,
+    "cpuOk": true,
+    "ok": true
+   },
+   "ok": true
+  },
+  {
+   "name": "standard-1",
+   "revision": 4,
+   "launch": {
+    "size": "standard-1",
+    "instance": "standard-1",
+    "idleMs": 300000,
+    "budget": 3,
+    "revision": 4
+   },
+   "limits": {
+    "cgroup": "/sys/fs/cgroup/",
+    "cpu.max(root)": "max 100000",
+    "cpu.max": "max 100000",
+    "memory.max(root)": "4294967296",
+    "memory.max": "4294967296",
+    "nproc": "1",
+    "memtotal_kb": "4356740",
+    "rootdisk_bytes": "8000000000"
+   },
+   "expected": {
+    "vcpu": 0.5,
+    "memoryMib": 4096,
+    "diskMb": 8000
+   },
+   "fit": {
+    "memoryBytes": 4294967296,
+    "memoryOk": true,
+    "disk": 8000000000,
+    "diskOk": true,
+    "cpus": 1,
+    "cpuOk": true,
+    "ok": true
+   },
+   "ok": true
+  },
+  {
+   "name": "standard-2",
+   "revision": 5,
+   "launch": {
+    "size": "standard-2",
+    "instance": "standard-2",
+    "idleMs": 300000,
+    "budget": 3,
+    "revision": 5
+   },
+   "limits": {
+    "cgroup": "/sys/fs/cgroup/",
+    "cpu.max(root)": "max 100000",
+    "cpu.max": "max 100000",
+    "memory.max(root)": "6442450944",
+    "memory.max": "6442450944",
+    "nproc": "1",
+    "memtotal_kb": "6490756",
+    "rootdisk_bytes": "12000002048"
+   },
+   "expected": {
+    "vcpu": 1,
+    "memoryMib": 6144,
+    "diskMb": 12000
+   },
+   "fit": {
+    "memoryBytes": 6442450944,
+    "memoryOk": true,
+    "disk": 12000002048,
+    "diskOk": true,
+    "cpus": 1,
+    "cpuOk": true,
+    "ok": true
+   },
+   "ok": true
+  },
+  {
+   "name": "standard-3",
+   "revision": 6,
+   "launch": {
+    "size": "standard-3",
+    "instance": "standard-3",
+    "idleMs": 300000,
+    "budget": 3,
+    "revision": 6
+   },
+   "limits": {
+    "cgroup": "/sys/fs/cgroup/",
+    "cpu.max(root)": "max 100000",
+    "cpu.max": "max 100000",
+    "memory.max(root)": "8589934592",
+    "memory.max": "8589934592",
+    "nproc": "2",
+    "memtotal_kb": "8622724",
+    "rootdisk_bytes": "16000000000"
+   },
+   "expected": {
+    "vcpu": 2,
+    "memoryMib": 8192,
+    "diskMb": 16000
+   },
+   "fit": {
+    "memoryBytes": 8589934592,
+    "memoryOk": true,
+    "disk": 16000000000,
+    "diskOk": true,
+    "cpus": 2,
+    "cpuOk": true,
+    "ok": true
+   },
+   "ok": true
+  },
+  {
+   "name": "standard-4",
+   "revision": 7,
+   "launch": {
+    "size": "standard-4",
+    "instance": "standard-4",
+    "idleMs": 300000,
+    "budget": 3,
+    "revision": 7
+   },
+   "limits": {
+    "cgroup": "/sys/fs/cgroup/",
+    "cpu.max(root)": "max 100000",
+    "cpu.max": "max 100000",
+    "memory.max(root)": "12884901888",
+    "memory.max": "12884901888",
+    "nproc": "4",
+    "memtotal_kb": "12888708",
+    "rootdisk_bytes": "20000002048"
+   },
+   "expected": {
+    "vcpu": 4,
+    "memoryMib": 12288,
+    "diskMb": 20000
+   },
+   "fit": {
+    "memoryBytes": 12884901888,
+    "memoryOk": true,
+    "disk": 20000002048,
+    "diskOk": true,
+    "cpus": 4,
+    "cpuOk": true,
+    "ok": true
+   },
+   "ok": true
+  }
+ ],
+ "ok": true
+}

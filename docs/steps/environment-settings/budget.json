@@ -1,0 +1,95 @@
+{
+ "at": "2026-11-13T21:14:41.332Z",
+ "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "workspaces": [
+  "penv-b1",
+  "penv-b2",
+  "penv-b3"
+ ],
+ "cases": [
+  {
+   "name": "at a budget of 1, a second Workspace's start is refused, and the message names the budget",
+   "first": {
+    "ok": true,
+    "status": 200,
+    "running": true,
+    "budget": 1,
+    "refusal": null
+   },
+   "second": {
+    "ok": false,
+    "status": 500,
+    "running": null,
+    "budget": null,
+    "refusal": "Container budget (1) reached: raise it at /_t3flare/harness#environment",
+    "raw": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"causes\":[\"ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\"],\"stack\":[\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"    at async handleAdmin (admin-vummz7fA.js:1:9408)\"]}"
+   },
+   "ok": true
+  },
+  {
+   "name": "raised to 2, it starts",
+   "raised": {
+    "ok": true,
+    "status": 200,
+    "running": true,
+    "budget": 2,
+    "refusal": null
+   },
+   "leases": [
+    "penv-b1",
+    "penv-b2"
+   ],
+   "ok": true
+  },
+  {
+   "name": "lowered to 1 with two running: neither stops, and a third start is refused",
+   "third": {
+    "ok": false,
+    "status": 500,
+    "running": null,
+    "budget": null,
+    "refusal": "Container budget (1) reached: raise it at /_t3flare/harness#environment",
+    "raw": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"causes\":[\"ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\"],\"stack\":[\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"    at async handleAdmin (admin-vummz7fA.js:1:9408)\"]}"
+   },
+   "running": [
+    true,
+    true
+   ],
+   "leases": [
+    "penv-b1",
+    "penv-b2"
+   ],
+   "ok": true
+  },
+  {
+   "name": "one stopped: one still runs at a budget of 1, so the third is still refused",
+   "afterOne": {
+    "ok": false,
+    "status": 500,
+    "running": null,
+    "budget": null,
+    "refusal": "Container budget (1) reached: raise it at /_t3flare/harness#environment",
+    "raw": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"causes\":[\"ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\"],\"stack\":[\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"    at async handleAdmin (admin-vummz7fA.js:1:9408)\"]}"
+   },
+   "leases": [
+    "penv-b2"
+   ],
+   "ok": true
+  },
+  {
+   "name": "under the budget again: the third starts",
+   "afterBoth": {
+    "ok": true,
+    "status": 200,
+    "running": true,
+    "budget": 1,
+    "refusal": null
+   },
+   "leases": [
+    "penv-b3"
+   ],
+   "ok": true
+  }
+ ],
+ "ok": true
+}

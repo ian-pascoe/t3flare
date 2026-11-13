@@ -1,0 +1,67 @@
+{
+ "at": "2026-11-13T21:01:48.982Z",
+ "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "entries": 5,
+ "cases": [
+  {
+   "name": "Environment changes carry entity environment, with the changed settings before and after",
+   "sample": [
+    {
+     "entity": "environment",
+     "at": 1794603699471,
+     "caller": "service-token",
+     "action": "environment.change",
+     "target": "containerIdleMinutes",
+     "before": {
+      "containerIdleMinutes": 4
+     },
+     "after": {
+      "containerIdleMinutes": 2
+     }
+    },
+    {
+     "entity": "environment",
+     "at": 1794603698424,
+     "caller": "service-token",
+     "action": "environment.change",
+     "target": "containerIdleMinutes",
+     "before": {
+      "containerIdleMinutes": 2
+     },
+     "after": {
+      "containerIdleMinutes": 4
+     }
+    }
+   ],
+   "ok": true
+  },
+  {
+   "name": "the entry written on main's deploy, without entity, reads as harness",
+   "entries": [
+    {
+     "at": 1794603637819,
+     "caller": "service-token",
+     "action": "extension.change",
+     "target": "codemode",
+     "before": null,
+     "after": {
+      "settings": {
+       "inlineBudget": 2345
+      }
+     },
+     "entity": "harness"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "name": "every entry has an entity",
+   "entities": [
+    "environment",
+    "harness"
+   ],
+   "ok": true
+  }
+ ],
+ "ok": true
+}

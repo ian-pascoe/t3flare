@@ -1,0 +1,63 @@
+{
+ "at": "2026-11-13T21:01:42.089Z",
+ "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "note": "The CSRF token binds the owner's Access subject; a script's service token needs none (ADR-0026 §2) and the owner's assertion cannot be made from a script. The CSRF refusals are the unit tests' (apps/environment/test/environmentSettings.test.ts), as for m3-panel-safety.json.",
+ "cases": [
+  {
+   "name": "service token + admin token reads the Environment settings",
+   "status": 200,
+   "ok": true
+  },
+  {
+   "name": "no Access credentials (GET and a change): refused at the edge",
+   "statuses": [
+    302,
+    302
+   ],
+   "ok": true
+  },
+  {
+   "name": "a forged Access assertion alone: refused at the edge",
+   "statuses": [
+    302,
+    302
+   ],
+   "ok": true
+  },
+  {
+   "name": "the service token without the admin token: refused",
+   "statuses": [
+    404,
+    404
+   ],
+   "ok": true
+  },
+  {
+   "name": "a wrong Origin, a cross-site fetch and a form-encoded body: refused",
+   "statuses": [
+    403,
+    403,
+    403
+   ],
+   "answers": [
+    "wrong origin\n",
+    "not same-origin\n",
+    "a change is JSON (Content-Type: application/json)\n"
+   ],
+   "ok": true
+  },
+  {
+   "name": "a size not offered: refused with the setting named",
+   "status": 400,
+   "answer": "containerSize: one of cpu-1, standard-1, standard-2, standard-3, standard-4\n",
+   "ok": true
+  },
+  {
+   "name": "nothing refused was stored",
+   "before": 2,
+   "after": 2,
+   "ok": true
+  }
+ ],
+ "ok": true
+}

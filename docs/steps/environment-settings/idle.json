@@ -1,0 +1,45 @@
+{
+ "at": "2026-11-13T21:09:49.465Z",
+ "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "workspace": "penv-sizes",
+ "note": "idleSeenMs: from the last command to the first poll (every 5 s) that saw the Container stopped",
+ "cases": [
+  {
+   "name": "idle 1 minute(s)",
+   "launch": {
+    "size": "cpu-1",
+    "instance": {
+     "vcpu": 1,
+     "memoryMib": 3072,
+     "diskMb": 12000
+    },
+    "idleMs": 60000,
+    "budget": 3,
+    "revision": 12
+   },
+   "lastUse": 1794603941548,
+   "stoppedSeenAt": 1794604004028,
+   "idleSeenMs": 62480,
+   "ok": true
+  },
+  {
+   "name": "idle 3 minute(s)",
+   "launch": {
+    "size": "cpu-1",
+    "instance": {
+     "vcpu": 1,
+     "memoryMib": 3072,
+     "diskMb": 12000
+    },
+    "idleMs": 180000,
+    "budget": 3,
+    "revision": 13
+   },
+   "lastUse": 1794604005812,
+   "stoppedSeenAt": 1794604189324,
+   "idleSeenMs": 183512,
+   "ok": true
+  }
+ ],
+ "ok": true
+}

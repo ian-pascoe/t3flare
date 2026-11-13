@@ -1,0 +1,91 @@
+{
+ "at": "2026-11-13T21:05:20.826Z",
+ "host": "t3flare-environment-penv.ian-g-pascoe.workers.dev",
+ "workspace": "penv-sizes",
+ "cases": [
+  {
+   "name": "started on standard-1 with a 2-minute idle time",
+   "startedAt": 1794603789695,
+   "launch": {
+    "size": "standard-1",
+    "instance": "standard-1",
+    "idleMs": 120000,
+    "budget": 3,
+    "revision": 9
+   },
+   "limits": {
+    "cgroup": "/sys/fs/cgroup/",
+    "cpu.max(root)": "max 100000",
+    "cpu.max": "max 100000",
+    "memory.max(root)": "4294967296",
+    "memory.max": "4294967296",
+    "nproc": "1",
+    "memtotal_kb": "4356740",
+    "rootdisk_bytes": "8000000000"
+   },
+   "ok": true
+  },
+  {
+   "name": "a change to standard-3 and 1 minute while it runs leaves its start time, size, idle time and limits as they were",
+   "revision": 10,
+   "startedAt": 1794603789695,
+   "launch": {
+    "size": "standard-1",
+    "instance": "standard-1",
+    "idleMs": 120000,
+    "budget": 3,
+    "revision": 9
+   },
+   "limits": {
+    "cgroup": "/sys/fs/cgroup/",
+    "cpu.max(root)": "max 100000",
+    "cpu.max": "max 100000",
+    "memory.max(root)": "4294967296",
+    "memory.max": "4294967296",
+    "nproc": "1",
+    "memtotal_kb": "4356740",
+    "rootdisk_bytes": "8000000000"
+   },
+   "ok": true
+  },
+  {
+   "name": "it stops after the idle time it started with (2 minutes), not the new one",
+   "lastUse": 1794603791315,
+   "stoppedSeenAt": 1794603915036,
+   "idleSeenMs": 123721,
+   "ok": true
+  },
+  {
+   "name": "the next start has the new size and idle time",
+   "startedAt": 1794603915459,
+   "launch": {
+    "size": "standard-3",
+    "instance": "standard-3",
+    "idleMs": 60000,
+    "budget": 3,
+    "revision": 10
+   },
+   "limits": {
+    "cgroup": "/sys/fs/cgroup/",
+    "cpu.max(root)": "max 100000",
+    "cpu.max": "max 100000",
+    "memory.max(root)": "8589934592",
+    "memory.max": "8589934592",
+    "nproc": "2",
+    "memtotal_kb": "8622724",
+    "rootdisk_bytes": "16000000000"
+   },
+   "fit": {
+    "memoryBytes": 8589934592,
+    "memoryOk": true,
+    "disk": 16000000000,
+    "diskOk": true,
+    "cpus": 2,
+    "cpuOk": true,
+    "ok": true
+   },
+   "ok": true
+  }
+ ],
+ "ok": true
+}
