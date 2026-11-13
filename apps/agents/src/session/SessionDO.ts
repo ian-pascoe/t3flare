@@ -62,6 +62,7 @@ import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
 import { McpQuestions } from "../extensions/mcpQuestions.ts";
 import { ApprovalStore, interactionModeSection, permissions, toToolPath } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
+import { proposePlan } from "../extensions/plan.ts";
 import { CONTEXT_EXTENSION, CONTEXT_NAMESPACE, contextExtension } from "../extensions/context.ts";
 import { ADVISOR_EXTENSION, AdvisorObserver, type AdvisorSettings, advisorExtension } from "../extensions/advisor.ts";
 import { GUARDIAN_EXTENSION, guardianExtension } from "../extensions/guardian.ts";
@@ -73,6 +74,7 @@ import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extens
 import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
+import { SUGGESTION_MODEL, suggestPrompt } from "./promptSuggestion.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
 import { liveOf, pushedEntry, turnOfEntry, usageOf } from "./state.ts";
@@ -204,6 +206,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
       }),
     );
     registry.install(interactionModeSection(() => interactionModeOf(this.#meta()?.interactionMode)));
+    // SPI-996: plan mode's proposed plan, as t3's proposed-plan item.
+    registry.install(proposePlan(() => interactionModeOf(this.#meta()?.interactionMode)));
     registry.install(askUser({ store: this.#questions, turn: () => this.#liveTurn() }));
     this.#t3 = new T3McpClient(
       (request) => environmentStub(env.ENVIRONMENT).mcp(request),
@@ -798,6 +802,34 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const fromEntry = input.fromEntry === undefined ? undefined : Number(input.fromEntry) + 1;
     return this.#state(fromEntry, Number.POSITIVE_INFINITY);
   }
+
+  /**
+   * SPI-996: the owner's likely next message after `providerTurnId` answered (t3's labs flag; the adapter asks only then),
+   * predicted by a small model from the turn's request and final answer; "" when there is none. Outside the turn's
+   * usage-limit records: its own models, its own fetch.
+   */
+  async suggestPrompt(input: { readonly providerTurnId: string }): Promise<{ readonly text: string }> {
+    const turn = this.#turns()[input.providerTurnId];
+    if (turn?.status !== "answered" || turn.inputEntry === undefined) return { text: "" };
+    if (Object.values(this.#turns()).some(isLive)) return { text: "" };
+    const root = await this.#root();
+    const textOf = (entry: unknown): { readonly role: string; readonly text: string } => {
+      const pushed = pushedEntry(entry as never, null);
+      return { role: pushed.role, text: pushed.content.flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : [])).join("") };
+    };
+    const first = (await root.entries({ minEntryId: Number(turn.inputEntry) as never, order: "ascending" }, 1, undefined, context)).items[0];
+    const user = first === undefined ? "" : textOf(first);
+    const newest = await root.entries({ minEntryId: Number(turn.inputEntry) as never, order: "descending" }, 20, undefined, context);
+    const answer = newest.items.map(textOf).find((entry) => entry.role === "assistant" && entry.text.trim() !== "");
+    if (user === "" || user.role !== "user" || answer === undefined) return { text: "" };
+    this.#suggestionModels ??= proxyModels({ url: this.env.MODEL_PROXY_URL, apiKey: this.env.MODEL_PROXY_API_KEY }, () => this.#catalog.current());
+    const model = this.#suggestionModels.getModel("anthropic", SUGGESTION_MODEL) ?? this.#suggestionModels.getModels().find((candidate) => candidate.id === SUGGESTION_MODEL);
+    if (model === undefined) return { text: "" };
+    const text = await suggestPrompt(this.#suggestionModels, model, user.text, answer.text);
+    console.log(JSON.stringify({ t3flare: "prompt-suggestion", suggested: text !== "" }));
+    return { text };
+  }
+  #suggestionModels: ReturnType<typeof proxyModels> | undefined;
 
   /** A test's fault (the inverse guard's check): forgets every turn, as a Session that lost its state would. */
   async dropTurns(): Promise<{ readonly dropped: number }> {

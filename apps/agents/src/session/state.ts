@@ -9,7 +9,7 @@ import type {
   TurnState,
   UsageSlim,
 } from "@t3flare/session-protocol";
-import { NESTED_ARGS_BYTES, NESTED_OUTPUT_BYTES, TOOL_OUTPUT_BYTES } from "@t3flare/session-protocol";
+import { NESTED_ARGS_BYTES, NESTED_OUTPUT_BYTES, TOOL_LIVE_OUTPUT_BYTES, TOOL_OUTPUT_BYTES } from "@t3flare/session-protocol";
 
 type Json = unknown;
 const record = (value: Json): Record<string, Json> =>
@@ -136,10 +136,13 @@ export const liveOf = (doc: Json, turnOfTask: (taskId: string) => string | null)
   const tools: Array<ToolSlotSlim> = (Array.isArray(live.tools) ? live.tools : []).map((raw) => {
     const slot = record(raw);
     const status = str(slot.status);
+    // SPI-996: a running call's output streams to t3; once done, its result carries it.
+    const output = status === "running" ? str(slot.output) : undefined;
     return {
       callId: str(slot.callId) ?? "",
       name: str(slot.name) ?? "tool",
       status: status === "running" || status === "done" ? status : "pending",
+      ...(output === undefined || output === "" ? {} : { output: output.slice(-TOOL_LIVE_OUTPUT_BYTES) }),
     };
   });
   const nestedTools: Array<NestedToolSlim> = (Array.isArray(live.nestedTools) ? live.nestedTools : []).flatMap((raw) => {

@@ -37,7 +37,8 @@ export const PiDurableCapabilities = {
   streaming: {
     streamsAssistantText: true,
     streamsReasoning: true,
-    streamsToolOutput: false,
+    // SPI-996: a running command's output, from `pi.live`, as t3's `command_output.delta`.
+    streamsToolOutput: true,
     streamsPlanText: false,
     emitsMessageCompleted: true,
   },
@@ -63,7 +64,8 @@ export const PiDurableCapabilities = {
     // SPI-1055: the `todo` extension's list, as t3's todo list and its plan artifact (OpenCode's shape).
     emitsPlanUpdated: true,
     emitsTodoList: true,
-    emitsProposedPlan: false,
+    // SPI-996: plan mode's `propose_plan`, as t3's proposed plan (Claude's `ExitPlanMode` shape).
+    emitsProposedPlan: true,
     // Step 3: the Session's `ask_user` (one question, optional choices), answered as t3's user_input request.
     supportsStructuredQuestions: true,
     planDeltasHaveItemIds: false,

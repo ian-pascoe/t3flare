@@ -41,6 +41,8 @@ export const allowedByDefault: ReadonlyArray<string> = [
   "advisor_report",
   // t3flare: the owner answers it in t3; it reveals nothing.
   "ask_user",
+  // t3flare (SPI-996): hands the plan to the owner; it runs nothing.
+  "propose_plan",
   // pi-termctrl's read-only, closed-world tools (they carry `readOnlyHint` there).
   "terminal_list",
   "terminal_wait",

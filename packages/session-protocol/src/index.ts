@@ -194,6 +194,11 @@ export interface ToolSlotSlim {
   readonly callId: string;
   readonly name: string;
   readonly status: "pending" | "running" | "done";
+  /**
+   * SPI-996: a running call's output so far (`pi.live`'s retained output), its last TOOL_LIVE_OUTPUT_BYTES characters;
+   * the differ streams what is new as t3's `command_output.delta`. Absent once done, and in pushes from before it.
+   */
+  readonly output?: string;
 }
 
 /**
@@ -212,6 +217,8 @@ export interface NestedToolSlim {
 
 export const NESTED_ARGS_BYTES = 4 * 1024;
 export const NESTED_OUTPUT_BYTES = 2 * 1024;
+/** A running model-issued call's output, as pushed (SPI-996): its tail. */
+export const TOOL_LIVE_OUTPUT_BYTES = 8 * 1024;
 
 export interface LiveSlim {
   /** The run in progress, if any: its generation task, and the turn it serves. */

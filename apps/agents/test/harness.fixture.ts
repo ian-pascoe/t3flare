@@ -92,6 +92,12 @@ export const restartingHarness = async (extensions: ReadonlyArray<Extension>, re
       current = await open();
       current.resume();
     },
+    /** The root conversation's entries, newest first, as their messages' roles and texts. */
+    messages: async () => {
+      const conversation = await current.conversation(root.id, context);
+      const page = await conversation?.entries({}, 50, undefined, context);
+      return (page?.items ?? []).flatMap((item) => (item.model ?? []).map((message) => ({ role: message.role, text: typeof message.content === "string" ? message.content : textOf(message as never) })));
+    },
     lastToolResult: async () => {
       const conversation = await current.conversation(root.id, context);
       const page = await conversation?.entries({}, 50, undefined, context);

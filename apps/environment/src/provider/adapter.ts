@@ -5,6 +5,7 @@
 // sink and the differ turns them into t3's events. The Session is the durable party: a provider session holds nothing
 // a restart would lose but its cursor, and re-reads the Session's state (`snapshot`) whenever it opens or sees a gap.
 import {
+  isDelegatedAppThread,
   type ModelSelection,
   type OrchestrationV2ProviderRef,
   type OrchestrationV2ProviderSession,
@@ -46,7 +47,7 @@ import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "./capabilities.ts";
 import { type AttachmentReader, turnPrompt } from "./attachments.ts";
-import { approvalIdOf, diff, makeDifferState, type DifferState, type TurnContext } from "./differ.ts";
+import { approvalIdOf, diff, forgetProposedPlan, makeDifferState, type DifferState, type TurnContext } from "./differ.ts";
 
 const driver = PI_DURABLE_DRIVER;
 const derive = IdAllocator.derive;
@@ -162,8 +163,14 @@ export const makePiDurableAdapter = (
       const apply = Effect.fn("PiDurableAdapter.apply")(function* (state: SessionState) {
           const at = yield* DateTime.now;
           const before = new Set(differ.terminated);
-          for (const event of diff(differ, state, at, pathOut, textOut)) offer(event);
+          const events = diff(differ, state, at, pathOut, textOut);
+          for (const event of events) offer(event);
           let settled = false;
+          for (const event of events) {
+            if (event.type !== "turn.terminal" || event.status !== "completed") continue;
+            const context = differ.turns.get(event.providerTurnId);
+            if (context?.suggests === true) yield* suggest(context);
+          }
           for (const id of differ.terminated) {
             if (before.has(id)) continue;
             differ.turns.delete(id);
@@ -175,6 +182,23 @@ export const makePiDurableAdapter = (
             emitSession("ready", at);
           }
       });
+
+      const promptSuggestions = input.promptSuggestions ?? Effect.succeed(false);
+      /**
+       * SPI-996: t3's prompt suggestion after a completed turn, while the owner has the labs flag on, as t3's Codex adapter
+       * samples one: best effort, and dropped when another turn started meanwhile.
+       */
+      const suggest = Effect.fn("PiDurableAdapter.suggest")(
+        function* (context: TurnContext) {
+          if (!(yield* promptSuggestions)) return;
+          const { text } = yield* call("suggestPrompt", () => client().suggestPrompt({ providerTurnId: context.providerTurnId }));
+          if (text === "" || closed || differ.turns.size > 0) return;
+          offer({ type: "prompt_suggestion.updated", driver, threadId: context.threadId, runId: context.runId, text });
+        },
+        Effect.catchCause((cause) => Effect.logDebug("pi-durable prompt suggestion failed", cause)),
+        Effect.forkIn(scope),
+        Effect.asVoid,
+      );
 
       const pathOut = (path: string) =>
         workspaceId === null ? path : path.replace(/^\/workspace\/repo(?=\/|$)/, `/w/${workspaceId}`);
@@ -386,7 +410,10 @@ export const makePiDurableAdapter = (
               contextWindow: catalogModel?.contextWindow ?? null,
               acceptsImages,
               providerSessionId: input.providerSessionId,
+              suggests: !isDelegatedAppThread(turnInput.appThread),
             };
+            // SPI-996: a default-mode turn (Implement, or the owner moving on) leaves the last proposed plan to t3.
+            if (interactionModeOf(turnInput.runtimePolicy.interactionMode) === "default") forgetProposedPlan(differ);
             // Registered before the submit, so a push that arrives first is not taken for an orphan (plan revision 3).
             differ.turns.set(providerTurn.id, context);
             lastPushAt.set(providerTurn.id, Date.now());

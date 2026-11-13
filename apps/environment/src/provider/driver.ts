@@ -28,9 +28,10 @@ import { snapshotModels } from "./models.ts";
 import { PiDurableSettings } from "./settings.ts";
 import { makePiDurableTextGeneration } from "./textGeneration.ts";
 
-const PRESENTATION = {
+export const PRESENTATION = {
   displayName: "Pi Durable",
-  showInteractionModeToggle: false,
+  // SPI-996: plan mode is enforced read-only in the Session, and its plan becomes t3's proposed plan.
+  showInteractionModeToggle: true,
   supportedRuntimeModes: ["approval-required", "auto-accept-edits", "full-access"],
   reportsContextWindow: true,
 } as const;

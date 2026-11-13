@@ -7,6 +7,7 @@ import {
   RuntimeRequestId,
   type NodeId,
   OrchestrationV2ExecutionNode,
+  type OrchestrationV2PlanArtifact,
   OrchestrationV2ProviderFailure,
   OrchestrationV2ProviderRef,
   OrchestrationV2RuntimeRequest,
@@ -49,6 +50,8 @@ export interface TurnContext {
   readonly providerSessionId: ProviderSessionId;
   /** Stop asked by t3 (`interruptTurn`): an abort settles as `interrupted`, else as `cancelled`. */
   interruptRequested?: boolean;
+  /** SPI-996: whether a completed turn may get a prompt suggestion (not a delegated thread's: no one types there). */
+  readonly suggests?: boolean;
 }
 
 export interface DifferState {
@@ -87,6 +90,14 @@ export interface DifferState {
   readonly decisions: Map<string, { readonly decision: ApprovalDecision; readonly feedback?: string; readonly answers?: Readonly<Record<string, unknown>> }>;
   /** SPI-1055: the Todo List's revision last shown (undefined: none yet). */
   todoRev?: number;
+  /** SPI-996: each running command's output as last streamed, by call id, to stream only what is new. */
+  readonly liveOutput: Map<string, string>;
+  /**
+   * SPI-996: the plan this provider session last proposed and nothing has implemented yet: a revised plan supersedes it,
+   * as t3's Claude adapter supersedes its last. A default-mode turn forgets it (`forgetProposedPlan`), since t3 then
+   * owns its status (Implement completes it).
+   */
+  proposedPlan?: Extract<OrchestrationV2PlanArtifact, { kind: "proposed_plan" }>;
 }
 
 interface OpenApproval {
@@ -110,7 +121,13 @@ export const makeDifferState = (sessionName: string): DifferState => ({
   approvals: new Map(),
   decisions: new Map(),
   nestedArgs: new Map(),
+  liveOutput: new Map(),
 });
+
+/** A default-mode turn starts (SPI-996): the last proposed plan is t3's now, never superseded by this session. */
+export const forgetProposedPlan = (state: DifferState): void => {
+  delete state.proposedPlan;
+};
 
 /** t3's runtime request id for the Session's approval request `requestId` (stable across re-diffs and restarts). */
 export const runtimeRequestIdOf = (sessionName: string, requestId: string): RuntimeRequestId =>
@@ -317,6 +334,12 @@ const emitTool = (
   // The Todo List is shown from the Session's document as t3's todo list (`emitTodo`), not as the calls that change it;
   // a failed call stays a tool item, whose output says why.
   if (call.name === "todo" && result?.isError !== true) return;
+  // A proposed plan (SPI-996) once the Session took it; a refused call stays a tool item, whose output says why.
+  if (call.name === PROPOSE_PLAN_TOOL && result?.isError !== true) {
+    const markdown = str(call.arguments.plan)?.trim() ?? "";
+    if (result !== undefined && markdown !== "") emitProposedPlan(state, out, turn, call.id, markdown, now);
+    return;
+  }
   if (call.name === "bash") {
     const exitCode = typeof details.exitCode === "number" ? details.exitCode : undefined;
     emitItem(state, out, turn, key, "tool_call", status, "bash", {
@@ -415,6 +438,80 @@ const emitTodo = (state: DifferState, out: Array<ProviderAdapterV2Event>, pushed
       status: steps.length > 0 && steps.every((step) => step.status === "completed") ? "completed" : "active",
       steps,
     },
+  });
+};
+
+/** The Durable agent's plan-mode tool (`apps/agents/src/extensions/plan.ts`). */
+export const PROPOSE_PLAN_TOOL = "propose_plan";
+
+/**
+ * A plan-mode turn's plan (SPI-996) as t3's proposed plan, in the shape t3's Codex and Claude adapters emit: a `plan`
+ * node, a `proposed_plan` turn item and an `active` plan artifact, which the owner's Implement completes. The plan the
+ * session proposed before it, if not yet t3's, is superseded (Claude's `emitClaudePlanProjection`).
+ */
+const emitProposedPlan = (state: DifferState, out: Array<ProviderAdapterV2Event>, turn: TurnContext, callId: string, markdown: string, now: DateTime.Utc) => {
+  const key = `plan:${callId}`;
+  const planId = PlanId.make(`plan:${driver}:${state.sessionName}:proposed:${callId}`);
+  const plan: Extract<OrchestrationV2PlanArtifact, { kind: "proposed_plan" }> = {
+    id: planId,
+    threadId: turn.threadId,
+    runId: turn.runId,
+    nodeId: derive.nodeFromProviderItem({ driver, nativeItemId: `${state.sessionName}:${key}` }),
+    kind: "proposed_plan",
+    status: "active",
+    markdown,
+  };
+  const fingerprint = JSON.stringify([markdown]);
+  if (state.emitted.get(`plan-artifact:${callId}`) === fingerprint) return;
+  const previous = state.proposedPlan;
+  if (previous !== undefined && previous.id !== planId) out.push({ type: "plan.updated", driver, plan: { ...previous, status: "superseded" } });
+  emitItem(state, out, turn, key, "plan", "completed", null, { type: "proposed_plan", planId, markdown, streaming: false }, now);
+  state.emitted.set(`plan-artifact:${callId}`, fingerprint);
+  out.push({ type: "plan.updated", driver, plan });
+  state.proposedPlan = plan;
+};
+
+/** The tools whose items are commands (`command_execution`), whose running output streams (SPI-996). */
+const isCommandItem = (call: ToolCallInfo): boolean =>
+  call.name === "bash" || call.name === "terminal_start" || (call.name === "terminal_send" && (str(call.arguments.text) !== undefined || Array.isArray(call.arguments.keys)));
+
+/** Characters `previous` and `next` share: the longest end of `previous` that `next` starts with (a sliding tail). */
+export const sharedTail = (previous: string, next: string): number => {
+  if (next.startsWith(previous)) return previous.length;
+  // A long shared part starts with `next`'s first characters: find them in `previous`, earliest (longest) first.
+  const probe = next.slice(0, 32);
+  if (probe === "") return 0;
+  for (let at = previous.indexOf(probe); at !== -1; at = previous.indexOf(probe, at + 1)) {
+    if (next.startsWith(previous.slice(at))) return previous.length - at;
+  }
+  // A short one is checked directly.
+  for (let shared = Math.min(probe.length - 1, previous.length); shared > 0; shared--) {
+    if (previous.endsWith(next.slice(0, shared))) return shared;
+  }
+  return 0;
+};
+
+/** Marks output the stream missed (more arrived between two pushes than a push carries). */
+export const SKIPPED_OUTPUT = "\n[… earlier output not streamed …]\n";
+
+/**
+ * A running command's new output (SPI-996) as t3's `command_output.delta`, as t3's Codex adapter streams a command's
+ * output: unpersisted, to clients showing the row; the result's output lands on the item when the call ends. The
+ * Session pushes the tail of `pi.live`'s retained output, so what is new is what follows the part both pushes share.
+ */
+const emitOutputDelta = (state: DifferState, out: Array<ProviderAdapterV2Event>, turn: TurnContext, callId: string, output: string, textOut: (text: string) => string) => {
+  const previous = state.liveOutput.get(callId) ?? "";
+  if (output === previous) return;
+  state.liveOutput.set(callId, output);
+  const shared = sharedTail(previous, output);
+  const chunk = shared === 0 && previous !== "" ? `${SKIPPED_OUTPUT}${output}` : output.slice(shared);
+  if (chunk === "") return;
+  out.push({
+    type: "command_output.delta",
+    driver,
+    threadId: turn.threadId,
+    itemId: derive.turnItemFromProviderItem({ driver, nativeItemId: `${state.sessionName}:call:${callId}` }),
+    chunk: textOut(chunk),
   });
 };
 
@@ -784,6 +881,8 @@ export const diff = (
     const status: ItemStatus =
       result !== undefined ? (result.isError === true ? "failed" : "completed") : slot?.status === "done" ? "completed" : "running";
     emitTool(state, out, turn, call, status, result, pathOut, textOut, now);
+    if (status === "running" && slot?.output !== undefined && isCommandItem(call)) emitOutputDelta(state, out, turn, id, slot.output, textOut);
+    else if (status !== "running") state.liveOutput.delete(id);
     if (call.name === "codemode") emitNested(state, out, turn, call, result, pushed.live.nestedTools ?? [], pathOut, textOut, now);
   }
 
@@ -839,6 +938,7 @@ export const diff = (
       if (callTurn !== providerTurnId) continue;
       state.toolCalls.delete(id);
       state.toolResults.delete(id);
+      state.liveOutput.delete(id);
       for (const nested of state.nestedArgs.keys()) if (nested.startsWith(`${id}/`)) state.nestedArgs.delete(nested);
     }
     const failure = turnState.status === "failed" ? failureOf(turnState, now) : null;

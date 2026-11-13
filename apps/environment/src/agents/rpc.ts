@@ -114,6 +114,8 @@ export interface SessionRpc {
   proxyFault(input: { readonly fixture: string; readonly resetAt: number }): Promise<{ readonly armed: { readonly fixture: string; readonly resetAt: number } }>;
   restart(): Promise<{ readonly restarting: true }>;
   destroy(): Promise<{ readonly destroyed: true }>;
+  /** SPI-996: the owner's likely next message after an answered turn (t3's prompt suggestions); "" when none. */
+  suggestPrompt(input: { readonly providerTurnId: string }): Promise<{ readonly text: string }>;
   /** Step 3: the T3 tools the Session offers and those its catalog left out (names only). */
   t3Tools(): Promise<{ readonly tools: ReadonlyArray<string>; readonly left: ReadonlyArray<string>; readonly hash: string | null; readonly credential: boolean }>;
 }

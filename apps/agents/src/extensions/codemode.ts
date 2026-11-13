@@ -12,6 +12,8 @@ import { defineExtension, type Extension, section, type ToolRegistration } from 
 import { type CodemodeNamespace, CODEMODE_TOOL_NAME, createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
 import { createToolSearchTool, TOOL_SEARCH_TOOL_NAME } from "@earendil-works/pi-durable/tool-search";
 
+import { PROPOSE_PLAN_TOOL } from "./plan.ts";
+
 /** The sandbox Durable Object namespace, as the agents Worker binds it from the codemode Worker (`scriptName`). */
 export interface CodemodeSandboxNamespace {
   getByName(name: string): CodemodeRemote;
@@ -49,8 +51,11 @@ export const codemodeExtension = (sandbox: CodemodeSandboxBase, options: { reado
   return { ...base, sections: [...(base.sections ?? []), section("codemode_rules", () => CODEMODE_RULES)] };
 };
 
-/** The tools no setting defers: `tool_search` is the way to every other deferred tool, and code mode reaches them all. */
-export const ALWAYS_OFFERED: ReadonlyArray<string> = [TOOL_SEARCH_TOOL_NAME, CODEMODE_TOOL_NAME];
+/**
+ * The tools no setting defers: `tool_search` is the way to every other deferred tool, and code mode reaches them all;
+ * `propose_plan` (SPI-996) ends a plan-mode turn and scripts cannot call it.
+ */
+export const ALWAYS_OFFERED: ReadonlyArray<string> = [TOOL_SEARCH_TOOL_NAME, CODEMODE_TOOL_NAME, PROPOSE_PLAN_TOOL];
 
 /** Whether `name` matches `pattern`, where `*` matches any run of characters. */
 export const matchesToolPattern = (pattern: string, name: string): boolean => {
