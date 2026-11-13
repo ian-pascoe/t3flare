@@ -15,7 +15,6 @@ import * as ProviderLatestVersions from "@t3tools/provider-core/server/ProviderL
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as OpenCodeRuntime from "@t3tools/provider-opencode/server/OpenCodeRuntime";
 import * as OpenCodeServerLedger from "@t3tools/provider-opencode/server/OpenCodeServerLedger";
-import * as AcpRegistrySupport from "@t3tools/provider-acp-registry/server/AcpRegistrySupport";
 import * as SourceControlRateLimit from "@t3tools/source-control-core/server/SourceControlRateLimit";
 import { MuseUsageHome } from "@t3tools/provider-muse/server";
 import * as CursorAccountReader from "@t3tools/provider-cursor/server/CursorAccountReader";
@@ -106,6 +105,7 @@ import * as ProviderAdapterRegistry from "t3/src/orchestration-v2/ProviderAdapte
 import * as ProviderRegistry from "t3/src/provider/ProviderRegistry.ts";
 import * as ProviderUsageLimitsIngestion from "t3/src/provider/ProviderUsageLimitsIngestion.ts";
 import * as CommissaryLimitSources from "../usage/limitSources.ts";
+import { layerAcpRegistry } from "../provider/acpRegistry.ts";
 import * as ProjectFaviconResolver from "t3/src/project/ProjectFaviconResolver.ts";
 import * as T3ProjectFileLoader from "t3/src/project/T3ProjectFileLoader.ts";
 import * as RepositoryIdentityResolver from "t3/src/project/RepositoryIdentityResolver.ts";
@@ -646,7 +646,8 @@ export const make = (options: CompositionOptions) => {
 
   const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
     Layer.provideMerge(DoServices.layerPty),
-    Layer.provideMerge(AcpRegistrySupport.layerFromHost.pipe(Layer.provide(ProviderHostLive.layer))),
+    // t3flare: the registry is listed with each agent's standing here; installs are refused (parity G13).
+    Layer.provideMerge(layerAcpRegistry.pipe(Layer.provide(ProviderHostLive.layer))),
     Layer.provideMerge(
       Layer.mergeAll(
         layerProviderEventLoggers,
