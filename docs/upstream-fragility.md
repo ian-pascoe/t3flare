@@ -468,6 +468,17 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Blast radius**: the web, todo and context tools' items render wrongly or not at all; `web_search` errors; the tools themselves keep working.
 - **Fix**: follow the shapes t3's OpenCode and ACP adapters use; for search, check the proxy's answer with `scripts/ports.ts turns` and switch `web.searchModel`.
 
+### U54. The second pi-harness ports: agent Terminals, the Guardian and the Advisor (SPI-1057, SPI-1058, SPI-1059)
+
+- **Where**:
+  - `apps/agents/src/workspace/agentTerminals.ts` renders each agent Terminal with `@xterm/headless` 6.0.0, imported by path (`lib-headless/xterm-headless.mjs`, typed by `src/xterm-headless.d.ts`) since the package names a `module` entry it does not ship, and reads two internals: `_core._bufferService.buffers.normal.lines.onTrim` (scrolled-off lines) and `_core.coreService.isCursorHidden` (a hidden cursor). It runs under a second `TerminalHost` (`holdFirstInput: false`) and `terminalCommand`'s `command` form (`apps/sandbox-image/src/terminal.ts`).
+  - `apps/environment/src/provider/differ.ts`: the terminal tools as `command_execution`, and the ports' entries (`t3flare.advice`, `t3flare.guardian`, `t3flare.terminal-exit`) as t3's `system_notice` on a `system` node, as t3's Pi provider shows its own notices (`t3code/packages/provider-pi/src/server/adapter.ts`).
+  - The Guardian is a pi-durable `ToolTask` `beforeTool` hook that calls `api.models.completeSimple` and `api.memo`; the Advisor uses `GenerationTask`'s `afterTools` and `onYield` (`continue`), an ownerless conversation in the Session's Harness (`createConversation` with `extensions`, `tools`, `instructions`, `maxTurns`), and `submit` writes and steers with `whenIdle: "reject"`. All lean on pi-durable 1.5.0 (U24).
+- **Breaks when**: an xterm bump renames those internals (scrolled-off lines then report nothing and gaps go unflagged; a hidden cursor shows as visible); t3 changes how it validates or renders `system_notice` or `command_execution`; a pi-durable bump changes hook signatures, `onYield`'s `continue`, writes with `model` (placed without starting a run), or how an ownerless conversation selects extensions.
+- **Detection**: typecheck; `apps/agents/test/{agentTerminals,termctrl,guardian,advisor}.test.ts`; `apps/environment/test/differPorts2.test.ts` (each item decoded with t3's schemas); `scripts/ports2.ts turns` on a stage. **Silent**: the xterm internals. No test fills a Terminal's 1,000-line scrollback, so a renamed `onTrim` shows only as a missing `output_missing` notice in a long Terminal, and a renamed `isCursorHidden` as a cursor where none is.
+- **Blast radius**: terminal results lose scrolled-off lines; notices stop showing in t3 (the tools and the model's text keep working); the Advisor's notes start a run or stop being placed (pi-durable semantics).
+- **Fix**: follow xterm's new buffer API in `agentTerminals.ts`; t3's item shapes in the differ; pi-durable's hook API in the three extensions.
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).

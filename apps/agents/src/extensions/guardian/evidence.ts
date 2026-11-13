@@ -11,6 +11,8 @@
 import type { Context as ChordContext } from "@earendil-works/chord";
 import type { EntryRecord, HookApi } from "@earendil-works/pi-durable";
 
+import { ADVISOR_CONTINUATION } from "../advisor.ts";
+
 /** Characters of untrusted evidence a review carries at most (about pi-guardian's 32,000-token ceiling). */
 export const EVIDENCE_CHARACTERS = 96_000;
 /** History read back for evidence, newest first. */
@@ -56,6 +58,8 @@ const entryEvidence = (entry: EntryRecord, trustUser: boolean, skipCalls: Readon
   if (message?.role !== "user") return undefined;
   const text = userText(message.content);
   if (text === "") return undefined;
+  // The Advisor's corrective continuation is placed as a user message, but the Advisor wrote it (pi-guardian: Advisor messages are never trusted).
+  if (entry.kind === "pi.user" && text === ADVISOR_CONTINUATION) return { trusted: false, origin: "advisor", message: { role: "user", content: text } };
   if (entry.kind === "pi.user") return { trusted: trustUser, origin: trustUser ? "user" : "linkedWork", message: { role: "user", content: text } };
   // Writes and steers of extensions (an Advisor's finding, a Terminal's exit, a context continuation): never the user's.
   return { trusted: false, origin: "extension", message: { role: "user", content: text } };

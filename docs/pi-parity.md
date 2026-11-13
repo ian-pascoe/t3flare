@@ -25,9 +25,9 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 | pi-web-tools (`web_search`, `web_fetch`) | W | `extensions/web.ts` (cloudpid `web`): `web_fetch` through the SSRF guard, on by default; `web_search` asks a search-capable model through the model proxy (Commissary, no new key), off until switched on in the Harness panel (a model request per search). Both show as t3's web search items | SPI-1054 |
 | pi-todo | W | `extensions/todo.ts` (cloudpid `todo`): the list in the Session's storage, shown as t3's `todo_list` rows and plan (parity G5) | SPI-1055 |
 | pi-context-management (notes, history, rollover) | W | `extensions/context.ts` (cloudpid `context`): bounded Notes and stored History in the Session's storage, `context_rollover`, and automatic compaction as a Rollover (switchable); t3's idle compaction stays off (K9) | SPI-1056 |
-| pi-termctrl (terminals, background jobs) | M | Container PTYs through t3flare's terminal host | SPI-1057 |
-| pi-guardian | M | model-reviewed gating on a Commissary model | SPI-1058 |
-| pi-advisor | M | background advice on a Commissary model | SPI-1059 |
+| pi-termctrl (terminals, background jobs) | W | `extensions/termctrl.ts` and `workspace/agentTerminals.ts` (pi-termctrl): `terminal_*` and `bash`'s `background` as PTYs in the Workspace's container under a second terminal host (ADR-0021: 8 at once, they end with the container), screens rendered by a headless xterm in the Workspace DO; approvals as `bash`'s; exits told as steers or notes, never a run of their own; shown as t3's command items. On by default: nothing starts a container until used. No `/ps` panel (t3's UI) | SPI-1057 |
+| pi-guardian | W | `extensions/guardian.ts` (pi-guardian): a `beforeTool` hook (code mode's nested calls too) reviews risky calls on a proxy model (Haiku by default) with pi-guardian's Tool Policy, policy prompt, Decision Table and Escalation Pass; a Rejection or Review Failure blocks the call and t3 shows a "Guardian blocked …" notice with the reason. Off by default; model, thinking, Tool Policies, Command Rules and Security Policy in the Harness panel. Beside t3's approvals. No `cd` proved harmless, no Allow once, no classifier | SPI-1058 |
+| pi-advisor | W | `extensions/advisor.ts` (pi-advisor): a private Advisor Session in the Session's Harness reviews the run on pi-advisor's cadence and gives cited findings, delivered as pi-advisor does (Concerns and Blockers steer the running agent, Nits and after-answer findings are notes, a final Blocker continues the same run once), shown as "Advisor …" notices in t3; never a run t3 did not start. Off by default; model, cadence, thinking and corrective continuations in the panel. No `advisor_ask` | SPI-1059 |
 | Skills (pi-skills-selector, skill-gates) | D | owner, 2026-11-12: not for now (parity G10, SPI-1001) | SPI-1001 |
 | pi-formatter | D | owner, 2026-11-12: not for now | — |
 | pi-lsp, pi-dap | D | owner, 2026-11-12: not for now (need servers and debuggers in the image) | — |
@@ -42,4 +42,4 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 
 ## Order
 
-Done: web tools (SPI-1054), todo (SPI-1055), context management (SPI-1056), on branch `ports` ([`docs/steps/pi-ports-1.md`](steps/pi-ports-1.md)). Next: terminals (SPI-1057), guardian (SPI-1058), advisor (SPI-1059).
+Done: web tools (SPI-1054), todo (SPI-1055), context management (SPI-1056), on branch `ports` ([`docs/steps/pi-ports-1.md`](steps/pi-ports-1.md)); terminals (SPI-1057), guardian (SPI-1058), advisor (SPI-1059), on branch `ports2` ([`docs/steps/pi-ports-2.md`](steps/pi-ports-2.md)). Every ticketed port is done; the rest is deferred by the owner or refused.

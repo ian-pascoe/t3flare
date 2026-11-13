@@ -55,6 +55,9 @@ export const ADVISOR_PROMPT = [
   `End every Review with exactly one JSON object and nothing after it: {"findings": [{"severity": "nit" | "concern" | "blocker", "message": "<one or two sentences>", "evidence": {"refs": ["<ref>"], "quote": "<short verbatim quote>"}}]}, at most ${MAX_FINDINGS} findings, each with refs, a quote, or both; {"findings": []} when there is nothing to report.`,
 ].join("\n\n");
 
+/** pi-advisor's corrective continuation; the Guardian never takes it for the user's (`guardian/evidence.ts`). */
+export const ADVISOR_CONTINUATION = "Address the recorded Advisor blocker, respecting the user's instructions.";
+
 export type Severity = "nit" | "concern" | "blocker";
 const RANK: Readonly<Record<Severity, number>> = { nit: 1, concern: 2, blocker: 3 };
 
@@ -202,7 +205,7 @@ export class AdvisorObserver {
     if (this.#blockerPending && this.#corrections < this.#settings.correctiveTurns) {
       this.#blockerPending = false;
       this.#corrections++;
-      return "Address the recorded Advisor blocker, respecting the user's instructions.";
+      return ADVISOR_CONTINUATION;
     }
     // The request ends: its Nit cap and Corrective Turn budget start over with the next.
     this.#blockerPending = false;
