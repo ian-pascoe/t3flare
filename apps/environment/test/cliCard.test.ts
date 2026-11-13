@@ -26,7 +26,7 @@ import { describe, expect, it } from "vitest";
 import * as TestProviderHost from "../../../t3code/packages/provider-testing/src/TestProviderHost.ts";
 import { makeTurnInput } from "t3/src/orchestration-v2/Adapters/AcpAdapterV2.testkit.ts";
 import { acpAdapterOptions, acpFlavor } from "../src/provider/cli/acpDriver.ts";
-import { approveCliTool, cancelCliAsk } from "../src/provider/cli/cliAsk.ts";
+import { approveCliTool, cancelCliAsk, cliQuestionAsker } from "../src/provider/cli/cliAsk.ts";
 import { wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 
 const AGENT = path.join(import.meta.dirname, "fixtures/fake-acp-agent.mjs");
@@ -219,6 +219,57 @@ describe("a relay tool call asked on a CLI thread (ADR-0028, M9)", () => {
         const order = harness.seen.flatMap((event) => (event.type === "turn.terminal" ? ["terminal"] : isCard(event) && event.type === "runtime_request.updated" && event.runtimeRequest.status === "cancelled" ? ["cancelled"] : []));
         expect(order).toEqual(["cancelled", "terminal"]);
         expect(yield* ask(harness, "ask-9")).toEqual({ approved: false, reason: "no live turn to ask on" });
+      }),
+    ));
+});
+
+describe("an MCP server's question asked on a CLI thread (SPI-1079)", () => {
+  const formCard = {
+    id: "t3flare-elicit-form-1",
+    kind: "form" as const,
+    server: "fixture",
+    title: "fixture asks",
+    prompt: "fixture asks: Colour?",
+    questions: [
+      { id: "colour", header: "Colour", question: "fixture asks: Colour?", options: [{ label: "red", description: "red", value: "red" }], allowCustomAnswer: false, required: true },
+      { id: "t3flare_send", header: "Send", question: "Send?", options: [{ label: "Send", description: "Send", value: "send" }], allowCustomAnswer: false, required: true },
+    ],
+  };
+
+  it("a form is t3's user_input card, its id marked, answered with the owner's answers", () =>
+    test(
+      Effect.gen(function* () {
+        const harness = yield* session();
+        yield* startTurn(harness);
+        const answer = yield* Effect.promise(() => cliQuestionAsker(harness.threadId).ask(formCard)).pipe(Effect.forkScoped);
+        const opened = yield* harness.until(cardOpened);
+        if (opened.type !== "runtime_request.updated") throw new Error("expected the card");
+        expect(opened.runtimeRequest.kind).toBe("user_input");
+        expect(opened.runtimeRequest.id).toContain(":t3flare-ask:t3flare-elicit-form-1");
+        const item = yield* harness.until((event) => event.type === "turn_item.updated" && "requestId" in event.turnItem && event.turnItem.requestId === opened.runtimeRequest.id);
+        if (item.type !== "turn_item.updated" || item.turnItem.type !== "user_input_request") throw new Error("expected a user_input item");
+        expect(item.turnItem.questions.map((question) => question.id)).toEqual(["colour", "t3flare_send"]);
+        yield* harness.runtime.respondToRuntimeRequest({ requestId: opened.runtimeRequest.id, answers: { colour: "red", t3flare_send: "send" } });
+        expect(yield* Fiber.join(answer)).toEqual({ decision: "accept", answers: { colour: "red", t3flare_send: "send" } });
+      }),
+    ));
+
+  it("a confirmation is t3's mcp-elicitation approval card; a decline is a decline; no live turn is a cancel", () =>
+    test(
+      Effect.gen(function* () {
+        const harness = yield* session();
+        expect(yield* Effect.promise(() => cliQuestionAsker(harness.threadId).ask({ ...formCard, id: "t3flare-elicit-0" }))).toMatchObject({ decision: "cancel" });
+        yield* startTurn(harness);
+        const card = { id: "t3flare-elicit-confirm-1", kind: "approval" as const, server: "fixture", title: "fixture asks", prompt: "Delete it?", options: [{ decision: "accept" as const, label: "Approve" }, { decision: "decline" as const, label: "Decline" }] };
+        const answer = yield* Effect.promise(() => cliQuestionAsker(harness.threadId).ask(card)).pipe(Effect.forkScoped);
+        const opened = yield* harness.until(cardOpened);
+        if (opened.type !== "runtime_request.updated") throw new Error("expected the card");
+        expect(opened.runtimeRequest.kind).toBe("mcp-elicitation");
+        const item = yield* harness.until((event) => event.type === "turn_item.updated" && "requestId" in event.turnItem && event.turnItem.requestId === opened.runtimeRequest.id);
+        if (item.type !== "turn_item.updated" || item.turnItem.type !== "approval_request") throw new Error("expected an approval item");
+        expect([item.turnItem.requestKind, item.turnItem.prompt]).toEqual(["mcp-elicitation", "Delete it?"]);
+        yield* harness.runtime.respondToRuntimeRequest({ requestId: opened.runtimeRequest.id, decision: "decline" });
+        expect(yield* Fiber.join(answer)).toMatchObject({ decision: "decline" });
       }),
     ));
 });

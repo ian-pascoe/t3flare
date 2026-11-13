@@ -43,6 +43,7 @@ const setup = async (mode: RuntimeMode, responses: ReadonlyArray<AssistantMessag
   const kv = memoryKv();
   const store = new ApprovalStore(kv, () => {});
   const sent: Array<string> = [];
+  const askers: Array<boolean> = [];
   const sandbox = new CodemodeSandbox({ timeoutMs: Number.POSITIVE_INFINITY });
   sandboxes.push(sandbox);
   const harness = await restartingHarness(
@@ -52,8 +53,10 @@ const setup = async (mode: RuntimeMode, responses: ReadonlyArray<AssistantMessag
         mode: () => mode,
         interaction: () => options.interaction ?? "default",
         turn: () => "turn-1",
+        asker: () => ({ ask: async () => ({ decision: "cancel" as const }), withdraw: () => undefined }),
         call: async (input) => {
           sent.push(`${input.tool} ${JSON.stringify(input.args)}`);
+          askers.push(input.asker !== undefined);
           if (options.hold !== undefined) await options.hold;
           return { kind: "result", isError: false, text: `${input.tool} ok` };
         },
@@ -62,7 +65,7 @@ const setup = async (mode: RuntimeMode, responses: ReadonlyArray<AssistantMessag
     ],
     responses,
   );
-  return { store, sent, harness, result: async () => (await until(async () => (await harness.lastToolResult()) !== undefined, "a result"), harness.lastToolResult()) };
+  return { store, sent, askers, harness, result: async () => (await until(async () => (await harness.lastToolResult()) !== undefined, "a result"), harness.lastToolResult()) };
 };
 
 const note = (id: string, line = "x") => call("mcp__commissary__fixture_note", { line }, id);
@@ -72,6 +75,8 @@ describe("mcp extension", () => {
     const run = await setup("approval-required", [call("mcp__commissary__fixture_echo", { text: "hi" }, "c1"), fauxAssistantMessage("done")], { interaction: "plan" });
     expect(textOf(await run.result())).toBe("fixture_echo ok");
     expect(run.store.pending()).toEqual([]);
+    // SPI-1079: every call carries the Session's asker, so the server's questions reach the owner as cards.
+    expect(run.askers).toEqual([true]);
   });
 
   it("plan mode refuses a write; nothing is sent", async () => {

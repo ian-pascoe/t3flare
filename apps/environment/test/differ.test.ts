@@ -230,6 +230,24 @@ describe("differ", () => {
     expect((withdrawn[0] as { runtimeRequest: { status: string } }).runtimeRequest.status).toBe("cancelled");
   });
 
+  it("opens an MCP server's confirmation as t3's mcp-elicitation card, and its form as a user_input card with its questions (SPI-1079)", () => {
+    const turnId = Object.keys(state.turns)[0]!;
+    const differ = withTurns();
+    const running = { ...state, entries: [], turns: { [turnId]: { ...state.turns[turnId]!, status: "running" as const } } };
+    const createdAt = Date.parse("2026-11-10T21:19:00.000Z");
+    const approval = { requestId: "t3flare-elicit-a", turn: turnId, callId: "c", tool: "fixture", kind: "mcp-elicitation" as const, title: "fixture asks", summary: "Delete it?", options: [{ decision: "accept" as const, label: "Approve" }], createdAt };
+    const form = { requestId: "t3flare-elicit-f", turn: turnId, callId: "c", question: "fixture asks", options: [], allowFreeText: false, questions: [{ id: "colour", header: "Colour", question: "Colour?", options: [{ label: "red", description: "red", value: "red" }] }], createdAt };
+    const opened = diff(differ, { ...running, approvals: [approval], questions: [form] }, now);
+    expect(opened.flatMap((event) => (event.type === "runtime_request.updated" ? [[event.runtimeRequest.kind, event.runtimeRequest.id.includes("t3flare-elicit")]] : []))).toEqual([
+      ["mcp-elicitation", true],
+      ["user_input", true],
+    ]);
+    const items = opened.flatMap((event) => (event.type === "turn_item.updated" ? [event.turnItem as { type: string; title: string; requestKind?: string; prompt?: string; questions?: ReadonlyArray<{ id: string }> }] : []));
+    expect(items[0]).toMatchObject({ type: "approval_request", title: "fixture asks", requestKind: "mcp-elicitation", prompt: "Delete it?" });
+    expect(items[1]).toMatchObject({ type: "user_input_request", title: "fixture asks" });
+    expect(items[1]?.questions?.map((question) => question.id)).toEqual(["colour"]);
+  });
+
   it("shows a call of t3's own tool as t3 shows it for its Pi provider (step 3)", () => {
     const turnId = Object.keys(state.turns)[0]!;
     const differ = withTurns();

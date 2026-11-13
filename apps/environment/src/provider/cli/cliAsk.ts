@@ -106,7 +106,8 @@ export const cliQuestionAsker = (thread: string): McpAsker => ({
         AbortSignal.any([AbortSignal.timeout(CLI_ASK_MS), withdrawn.signal]),
       );
       if (answer.reason === "withdrawn") return { decision: "cancel", reason: withdrawn.signal.aborted ? "withdrawn" : "no answer in time" };
-      const decision = answer.decision ?? (answer.approved ? "accept" : "decline");
+      // No decision from t3 means no owner answered (no live turn, the session ended): a cancel, never a decline.
+      const decision = answer.decision ?? (answer.approved ? "accept" : "cancel");
       return { decision, ...(answer.answers === undefined ? {} : { answers: answer.answers }), ...(answer.approved || answer.reason === undefined ? {} : { reason: answer.reason }) };
     } finally {
       withdrawals.delete(card.id);
