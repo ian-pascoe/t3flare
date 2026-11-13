@@ -1,9 +1,9 @@
 {
- "at": "2026-11-13T20:58:54.761Z",
+ "at": "2026-11-13T21:40:39.970Z",
  "model": "anthropic/claude-sonnet-5-5",
  "ok": true,
- "projectId": "352c6e2b-e40e-4931-98d5-6e76310b97ab",
- "root": "/w/p1001b",
+ "projectId": "53e67e25-9841-4985-9c12-c990091bfd3c",
+ "root": "/w/p1001c",
  "written": [
   ".agents/skills/fruit-code/reference/code.md",
   ".agents/skills/fruit-code/SKILL.md",
@@ -23,12 +23,12 @@
  },
  "project": {
   "error": null,
-  "snapshotCwd": "/w/p1001b",
+  "snapshotCwd": "/w/p1001c",
   "skills": [
    {
     "name": "fruit-code",
     "description": "How to find the fruit code. Use whenever anyone asks for the fruit code.",
-    "path": "/w/p1001b/.agents/skills/fruit-code/SKILL.md",
+    "path": "/w/p1001c/.agents/skills/fruit-code/SKILL.md",
     "scope": "project",
     "enabled": true,
     "userInvocationOnly": false
@@ -36,7 +36,7 @@
    {
     "name": "owner-only",
     "description": "A skill only the owner names; the agent's listing leaves it out.",
-    "path": "/w/p1001b/.agents/skills/owner-only/SKILL.md",
+    "path": "/w/p1001c/.agents/skills/owner-only/SKILL.md",
     "scope": "project",
     "enabled": true,
     "userInvocationOnly": true
@@ -51,11 +51,11 @@
   "slashCommandsPending": null
  },
  "m0": {
-  "project": "/w/p1001b",
+  "project": "/w/p1001c",
   "worktree": {
-   "path": "/w/.wt/p1001b/p1001-mwfgkde9-cc85fecf5d344615",
+   "path": "/w/.wt/p1001c/p1001-mwfi1wwx-467a2a1db5904234",
    "error": null,
-   "snapshotCwd": "/w/.wt/p1001b/p1001-mwfgkde9-cc85fecf5d344615",
+   "snapshotCwd": "/w/.wt/p1001c/p1001-mwfi1wwx-467a2a1db5904234",
    "skills": [],
    "slashCommands": [],
    "slashCommandsPending": null
