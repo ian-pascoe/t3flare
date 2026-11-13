@@ -57,6 +57,7 @@ export const mcpOverview = async (deps: HarnessDeps) => {
       error: inventory.error ?? null,
       tools: tools.map(({ inputSchema: _schema, ...tool }) => tool),
       overrides: Object.fromEntries(Object.entries(server.classes ?? {}).filter(([, value]) => value === "read" || value === "write")),
+      toolExposure: server.toolExposure ?? {},
       refused,
     });
   }
@@ -179,6 +180,14 @@ const testServer = async (request: Request, deps: HarnessDeps): Promise<Response
   return json({ server, status: inventory.status, error: inventory.error ?? null, tools: Object.keys(inventory.definitions).length, refused: inventory.refused.length, ms: (deps.now?.() ?? Date.now()) - started });
 };
 
+/** A class or per-tool Exposure change is logged against its tool, anything else against its server. */
+const auditTarget = (body: Record<string, unknown>): string => {
+  const server = String(body.server);
+  if (body.op === "class") return `${server}/${String(body.tool)}`;
+  const tools = body.op === "server" && body.toolExposure !== null && typeof body.toolExposure === "object" ? Object.keys(body.toolExposure) : [];
+  return tools.length === 1 ? `${server}/${tools[0]}` : server;
+};
+
 /** One change to the MCP server set (enable, Exposure, the linked switch, a tool's class, remove). */
 const changeMcp = async (request: Request, deps: HarnessDeps): Promise<Response> => {
   const body = await bodyOf(request);
@@ -198,7 +207,7 @@ const changeMcp = async (request: Request, deps: HarnessDeps): Promise<Response>
     at: deps.now?.() ?? Date.now(),
     caller: callerName(deps.caller),
     action: `mcp.${body.op}`,
-    target: body.op === "class" ? `${body.server}/${String(body.tool)}` : body.server,
+    target: auditTarget(body),
     before: before.mcp?.servers?.[body.server] ?? null,
     after: applied.harness.mcp?.servers?.[body.server] ?? null,
   });

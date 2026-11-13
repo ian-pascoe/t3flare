@@ -42,6 +42,16 @@ for (const button of document.querySelectorAll("button[data-mcp]")) {
     if (await post("/_t3flare/harness/api/mcp", change, button)) done();
   });
 }
+for (const select of document.querySelectorAll("select[data-mcp-exposure]")) {
+  select.addEventListener("change", async () => {
+    const server = select.dataset.mcpExposure;
+    const change = select.dataset.tool === undefined
+      ? { op: "server", server, exposure: select.value }
+      : { op: "server", server, toolExposure: { [select.dataset.tool]: select.value === "" ? null : select.value } };
+    if (await post("/_t3flare/harness/api/mcp", change, select)) done();
+    else select.value = select.querySelector("option[selected]").value;
+  });
+}
 for (const button of document.querySelectorAll("button[data-mcp-test]")) {
   button.addEventListener("click", async () => {
     const server = button.dataset.mcpTest;

@@ -25,8 +25,9 @@ export const FIXTURE_MCP: ReadonlyArray<McpRow> = [
     status: "ok",
     listedAt: minutes(3),
     error: null,
-    tools: [tool("fixture_echo", "write", "read"), tool("fixture_note", "write"), tool("fixture_inject", "read"), tool("fixture_slow", "read"), tool("fixture_ask", "write"), tool("fixture_page", "read")],
+    tools: [tool("fixture_echo", "write", "read"), { ...tool("fixture_note", "write"), exposure: "hidden" }, tool("fixture_inject", "read"), tool("fixture_slow", "read"), tool("fixture_ask", "write"), tool("fixture_page", "read")],
     overrides: { fixture_echo: "write" },
+    toolExposure: { fixture_note: "hidden" },
     refused: [{ tool: "fixture.flip", reason: "its name collides with fixture_flip as mcp__fixture__fixture_flip" }],
   },
   {

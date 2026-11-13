@@ -189,6 +189,37 @@ describe("harness panel", () => {
     expect(mcp.servers()["executor"]).toBeUndefined();
   });
 
+  it("the owner sets a server's and a tool's Exposure from the page, audited; a bad value or a missing token changes nothing", async () => {
+    const kv = memory();
+    const store = harnessStore(kv);
+    const mcp = new McpHost({ kv, engine: undefined, commissary: { url: undefined, key: undefined }, settings: () => store.load() });
+    const deps = { caller: owner, host: HOST, store, mcp, secrets: harnessSecrets(kv), now: () => NOW };
+    const post = async (body: unknown, headers?: Record<string, string>) =>
+      handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/mcp`, { method: "POST", headers: { "content-type": "application/json", ...(headers ?? (await ownerHeaders(store))) }, body: JSON.stringify(body) }), deps);
+    const page = async () => (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    await handleHarness(
+      new Request(`https://${HOST}/_t3flare/harness/api/mcp/servers`, { method: "POST", headers: { "content-type": "application/json", ...(await ownerHeaders(store)) }, body: JSON.stringify({ server: "executor", url: "https://mcp.executor.example/mcp", auth: { kind: "none" } }) }),
+      deps,
+    );
+    expect(await page()).toContain('data-mcp-exposure="executor"');
+    expect((await post({ op: "server", server: "executor", exposure: "direct" })).status).toBe(200);
+    expect((await post({ op: "server", server: "executor", toolExposure: { search: "hidden" } })).status).toBe(200);
+    expect(mcp.servers()["executor"]).toMatchObject({ exposure: "direct", toolExposure: { search: "hidden" } });
+    expect(store.auditLog(5).filter((entry) => entry.action === "mcp.server")).toMatchObject([
+      { target: "executor/search", after: { toolExposure: { search: "hidden" } } },
+      { target: "executor", after: { exposure: "direct" } },
+    ]);
+    expect((await post({ op: "server", server: "executor", toolExposure: { search: null } })).status).toBe(200);
+    expect(mcp.servers()["executor"]?.toolExposure).toEqual({});
+    const revision = store.load().revision;
+    expect((await post({ op: "server", server: "executor", exposure: "everywhere" })).status).toBe(400);
+    expect((await post({ op: "server", server: "executor", toolExposure: { search: "everywhere" } })).status).toBe(400);
+    expect((await post({ op: "server", server: "nope", exposure: "hidden" })).status).toBe(400);
+    expect((await post({ op: "server", server: "executor", exposure: "hidden" }, { origin: `https://${HOST}`, "sec-fetch-site": "same-origin" })).status).toBe(403);
+    expect(store.load().revision).toBe(revision);
+    expect(mcp.servers()["executor"]?.exposure).toBe("direct");
+  });
+
   it("refuses reserved names, IP literals and plain http for a direct server", async () => {
     const { deps } = setup({ kind: "service-token" });
     const kv = memory();

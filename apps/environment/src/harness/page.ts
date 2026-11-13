@@ -124,6 +124,8 @@ export interface McpRow {
   readonly tools: ReadonlyArray<{ readonly name: string; readonly upstream: string; readonly class: string; readonly hinted: string; readonly exposure: string }>;
   /** The owner's overrides, by upstream name. */
   readonly overrides?: Readonly<Record<string, string>>;
+  /** The owner's per-tool Exposure, by upstream name; a tool without one follows its server's. */
+  readonly toolExposure?: Readonly<Record<string, string>>;
   readonly refused: ReadonlyArray<{ readonly tool: string; readonly reason: string }>;
 }
 
@@ -131,6 +133,25 @@ const action = (label: string, change: unknown, options: { readonly className?: 
   `<button type="button" class="btn ${options.className ?? "btn-sm"}" data-mcp="${escapeHtml(JSON.stringify(change))}"${
     options.ariaLabel === undefined ? "" : ` aria-label="${escapeHtml(options.ariaLabel)}"`
   }>${options.icon === undefined ? "" : icon(options.icon)}${escapeHtml(label)}</button>`;
+
+const EXPOSURES = ["direct", "deferred", "codemode", "hidden"] as const;
+
+/**
+ * A select that saves an Exposure through the panel's JSON API (pageScript.ts). A server's carries its name; a tool's
+ * also its upstream name and an empty option that returns it to the server's Exposure. A value outside the four (never
+ * written by the API) is still shown, so the select never claims another.
+ */
+const exposureSelect = (row: McpRow, current: string, tool?: string): string => {
+  const options: Array<readonly [string, string]> = [
+    ...(tool === undefined ? [] : [["", `Server's (${row.setting.exposure})`] as const]),
+    ...EXPOSURES.map((value) => [value, value] as const),
+    ...(current === "" || (EXPOSURES as ReadonlyArray<string>).includes(current) ? [] : [[current, current] as const]),
+  ];
+  const label = tool === undefined ? `${row.name} exposure` : `${tool} exposure`;
+  return `<select class="sel-sm" data-mcp-exposure="${escapeHtml(row.name)}"${tool === undefined ? "" : ` data-tool="${escapeHtml(tool)}"`} aria-label="${escapeHtml(label)}">${options
+    .map(([value, text]) => `<option value="${escapeHtml(value)}"${value === current ? " selected" : ""}>${escapeHtml(text)}</option>`)
+    .join("")}</select>`;
+};
 
 /** The server's state as one pill: off, listed, failing, or not listed yet. */
 const statusPill = (row: McpRow): string => {
@@ -167,7 +188,7 @@ const toolsTable = (row: McpRow): string => {
       const other = tool.class === "read" ? "write" : "read";
       const overridden = row.overrides?.[tool.upstream] !== undefined;
       const source = overridden ? `Set by you; its hint says ${escapeHtml(tool.hinted)}` : "The tool's own hint";
-      return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(tool.upstream)}</code></td><td class="cls" data-label="Class"><div><span class="tag tag-${tool.class === "read" ? "read" : "write"}">${escapeHtml(tool.class)}</span><span class="src">${source}</span></div></td><td class="exp" data-label="Exposure"><div>${escapeHtml(tool.exposure)}</div></td><td class="actions" data-label="Change"><div>${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other }, { ariaLabel: `Mark ${tool.upstream} as ${other}` })}${
+      return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(tool.upstream)}</code></td><td class="cls" data-label="Class"><div><span class="tag tag-${tool.class === "read" ? "read" : "write"}">${escapeHtml(tool.class)}</span><span class="src">${source}</span></div></td><td class="exp" data-label="Exposure"><div>${exposureSelect(row, row.toolExposure?.[tool.upstream] ?? "", tool.upstream)}</div></td><td class="actions" data-label="Change"><div>${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other }, { ariaLabel: `Mark ${tool.upstream} as ${other}` })}${
         overridden ? ` ${action("Use its hint", { op: "class", server: row.name, tool: tool.upstream, class: null }, { className: "btn-sm btn-ghost", ariaLabel: `Use ${tool.upstream}'s own hint` })}` : ""
       }</div></td></tr>`;
     })
@@ -181,7 +202,6 @@ const serverCard = (row: McpRow): string => {
   const name = escapeHtml(row.name);
   const facts = [
     ["Tools", row.status === "never" ? "—" : String(row.tools.length)],
-    ["Exposure", escapeHtml(row.setting.exposure)],
     ["Listed", row.listedAt === null ? "Never" : time(row.listedAt)],
     ...(signIn(row) === undefined ? [] : [["Sign-in", signIn(row)!]]),
   ]
@@ -208,7 +228,7 @@ const serverCard = (row: McpRow): string => {
   }</div>
 <button type="button" class="switch" role="switch" aria-checked="${row.setting.enabled === true}" aria-label="${name} enabled" data-mcp="${escapeHtml(JSON.stringify({ op: "server", server: row.name, enabled: !row.setting.enabled }))}"></button>
 <dl class="facts">${facts}</dl></div>${error}${refused}
-<div class="server-actions"><button type="button" class="btn btn-sm" data-mcp-test="${name}">${icon("play")}Test</button>${oauth}<p class="test-result" data-test-result="${name}" role="status" aria-live="polite"></p><span class="spacer"></span>${remove}</div>
+<div class="server-actions"><button type="button" class="btn btn-sm" data-mcp-test="${name}">${icon("play")}Test</button>${oauth}<label class="exposure">Exposure ${exposureSelect(row, row.setting.exposure)}</label><p class="test-result" data-test-result="${name}" role="status" aria-live="polite"></p><span class="spacer"></span>${remove}</div>
 ${toolsTable(row)}</article>`;
 };
 

@@ -113,6 +113,27 @@ describe("harness page", () => {
     expect(html).toContain("1 tool refused");
   });
 
+  it("draws an Exposure select for each server and each tool, saving through the JSON API's own values", () => {
+    const selects = tags.filter((tag) => tag.name === "select" && tag.attrs["data-mcp-exposure"] !== undefined);
+    const optionsOf = (select: Tag) => {
+      const end = tags.findIndex((tag, index) => index > tags.indexOf(select) && tag.name === "select" && tag.closing);
+      return tags.slice(tags.indexOf(select) + 1, end).filter((tag) => tag.name === "option" && !tag.closing);
+    };
+    // One per server, one per tool.
+    expect(selects.filter((tag) => tag.attrs["data-tool"] === undefined).map((tag) => tag.attrs["data-mcp-exposure"])).toEqual(FIXTURE_MCP.map((row) => row.name));
+    expect(selects.filter((tag) => tag.attrs["data-tool"] !== undefined)).toHaveLength(FIXTURE_MCP.reduce((sum, row) => sum + row.tools.length, 0));
+    const server = selects.find((tag) => tag.attrs["data-mcp-exposure"] === "fixture" && tag.attrs["data-tool"] === undefined)!;
+    expect(optionsOf(server).map((option) => option.attrs.value)).toEqual(["direct", "deferred", "codemode", "hidden"]);
+    expect(optionsOf(server).find((option) => option.attrs.selected !== undefined)?.attrs.value).toBe("deferred");
+    // A tool without its own Exposure follows its server's; the owner's is selected.
+    const echo = selects.find((tag) => tag.attrs["data-tool"] === "fixture_echo")!;
+    expect(optionsOf(echo).map((option) => option.attrs.value)).toEqual(["", "direct", "deferred", "codemode", "hidden"]);
+    expect(optionsOf(echo).find((option) => option.attrs.selected !== undefined)?.attrs.value).toBe("");
+    const note = selects.find((tag) => tag.attrs["data-tool"] === "fixture_note")!;
+    expect(optionsOf(note).find((option) => option.attrs.selected !== undefined)?.attrs.value).toBe("hidden");
+    expect(note.attrs["aria-label"]).toBe("fixture_note exposure");
+  });
+
   it("draws the add form's three sign-in kinds, the header fields hidden until chosen", () => {
     for (const kind of ["oauth", "header", "none"]) expect(tags.some((tag) => tag.name === "input" && tag.attrs.name === "auth" && tag.attrs.value === kind)).toBe(true);
     expect(tags.find((tag) => tag.attrs["data-header-fields"] !== undefined)?.attrs.hidden).toBe("");
@@ -157,6 +178,7 @@ describe("harness page", () => {
       error: hostile,
       tools: [{ name: hostile, upstream: hostile, class: "write", hinted: hostile, exposure: hostile }],
       overrides: { [hostile]: "write" },
+      toolExposure: { [hostile]: hostile },
       refused: [{ tool: hostile, reason: hostile }],
     };
     const page = renderPage({

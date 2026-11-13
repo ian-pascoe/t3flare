@@ -105,6 +105,8 @@ input:disabled,select:disabled,textarea:disabled{opacity:.64;cursor:not-allowed}
 .btn-danger{border-color:transparent;background:transparent;box-shadow:none;color:var(--muted-fg)}
 .btn-danger:hover{background:var(--err-soft);color:var(--err)}
 .btn-sm{height:1.75rem;padding:0 .5rem;font-size:.75rem}
+select.sel-sm{height:1.75rem;min-width:0;padding:0 1.5rem 0 .5rem;font-size:.75rem}
+label.exposure{display:inline-flex;align-items:center;gap:.5rem;font-size:.75rem;color:var(--muted-fg)}
 .btn[aria-busy=true]{color:transparent}
 .btn[aria-busy=true]::after{content:"";position:absolute;inset:0;margin:auto;width:.875rem;height:.875rem;border-radius:50%;border:2px solid var(--muted-fg);border-right-color:transparent;animation:spin .7s linear infinite}
 .btn-primary[aria-busy=true]::after{border-color:var(--primary-fg);border-right-color:transparent}
@@ -219,6 +221,7 @@ section{scroll-margin-top:7rem}
 @media (max-width:640px){
 body{font-size:15px}
 input[type=text],input[type=url],input[type=password],input[type=number],select{font-size:16px;height:2.75rem}
+select.sel-sm{height:2.25rem;font-size:16px}
 .btn{height:2.5rem;padding:0 .875rem;font-size:.875rem}
 .btn-sm{height:2.25rem;padding:0 .625rem;font-size:.8125rem}
 .row{grid-template-columns:minmax(0,1fr);gap:.625rem}
