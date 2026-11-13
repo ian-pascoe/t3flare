@@ -124,7 +124,53 @@ export const codexOverrides = (proxyUrl: string, key: string): ReadonlyArray<str
   ];
 };
 
+/** The argv the Codex driver's investigating text generation sends (`provider/cli/codexInvestigation.ts`), with its model and schema file. */
+export const codexExecArgs = (model: string, schemaPath: string): ReadonlyArray<string> => [
+  "exec",
+  "--json",
+  "--ephemeral",
+  "--skip-git-repo-check",
+  "-s",
+  "read-only",
+  "--model",
+  model,
+  "--output-schema",
+  schemaPath,
+  "-",
+];
+
+/**
+ * `codex exec` for an investigation (parity G7: t3's review guide, `CodexTextGeneration`'s `-s read-only` run): only the
+ * driver's own argv, read-only, never asking, no MCP servers, the output schema copied from the State directory into
+ * the process's home.
+ */
+const codexExecLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => {
+  const model = input.args[7] ?? "";
+  const schemaPath = input.args[9] ?? "";
+  const expected = codexExecArgs(model, schemaPath);
+  if (input.args.length !== expected.length || input.args.some((arg, at) => arg !== expected[at])) return { refused: "Codex runs `codex exec` here only for t3's read-only investigations" };
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,100}$/.test(model)) return { refused: `Codex's model ${model} is not a model name` };
+  const schema = schemaPath.startsWith("/") ? context.readStateFile(schemaPath) : undefined;
+  if (schema === undefined) return { refused: `Codex's output schema ${schemaPath} is not in the State directory` };
+  const home = homeOf(input.key);
+  const overrides = [
+    ...codexOverrides(context.proxyUrl, input.key).filter((value) => !value.startsWith("approval_policy=") && !value.startsWith("sandbox_mode=")),
+    // `codex exec` cannot ask anyone: a command the read-only sandbox refuses fails back to the model.
+    `approval_policy="never"`,
+  ];
+  return {
+    argv: [`${CLI_BIN}/codex`, ...overrides.flatMap((value) => ["-c", value]), ...expected.slice(0, 9), `${home}/output-schema.json`, "-"],
+    env: { HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: `${home}/codex`, CODEX_SQLITE_HOME: `${home}/sqlite` },
+    files: [
+      { path: `${home}/codex/config.toml`, text: "# t3flare: every setting comes from the command line (-c)\n" },
+      { path: `${home}/output-schema.json`, text: schema },
+    ],
+    droppedEnv: dropped(input.env),
+  };
+};
+
 const codexLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => {
+  if (input.args[0] === "exec") return codexExecLaunch(input, context);
   if (input.args.length !== 1 || input.args[0] !== "app-server") return { refused: `Codex runs here only as \`codex app-server\` (not \`codex ${input.args.join(" ")}\`)` };
   const home = homeOf(input.key);
   const thread = input.env.T3CODE_THREAD_ID;

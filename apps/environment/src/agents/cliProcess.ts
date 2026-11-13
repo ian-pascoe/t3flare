@@ -13,6 +13,7 @@ import type * as ChildProcess from "effect/process/ChildProcess";
 
 import { environmentServices } from "./bindings.ts";
 import { traceProtocol } from "./processRouter.ts";
+import { scratchProjectOf } from "./scratch.ts";
 import { type ChannelProcess, type ChannelStart, ProcessRefused } from "./processChannel.ts";
 import { type CliName, profileLaunch } from "./cliProfiles.ts";
 import { CliSpawn, newToolHandle } from "../provider/cli/wrapper.ts";
@@ -77,7 +78,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     const args = command.args.map((word) => (typeof word === "string" ? word : Redacted.value(word)));
     const cwd = command.options.cwd;
     const services = environmentServices();
-    if (cwd === undefined || toWorkspace(cwd) === null) {
+    if (cwd === undefined || (toWorkspace(cwd) === null && scratchProjectOf(cwd) === undefined)) {
       return yield* refused(name, `${DISPLAY[name] ?? name} runs in a Workspace's Container; start the thread in a project`);
     }
     const channel = services.processes;

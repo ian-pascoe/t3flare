@@ -17,6 +17,7 @@ import { GitHubTokens } from "./agents/github.ts";
 import { deliverPush } from "./agents/sessionSink.ts";
 import { GRACE_MS } from "./agents/deletionConstants.ts";
 import { ProcessChannel } from "./agents/processChannel.ts";
+import { scratchProjectOf } from "./agents/scratch.ts";
 import { locate, workspaceRpc } from "./agents/workspaceClient.ts";
 import { workspaceRegistry } from "./agents/workspaces.ts";
 import type { AgentsBindings } from "./agents/rpc.ts";
@@ -158,7 +159,9 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     this.#processes = new ProcessChannel({
       environmentEpoch: boot,
       place: (cwd) => {
-        const at = locate(cwd);
+        // A scratch checkout (parity G7) is in its project's Container: the process starts there, in the checkout.
+        const scratch = scratchProjectOf(cwd);
+        const at = locate(scratch === undefined ? cwd : `/w/${scratch}`);
         if (at === undefined || at.record.state !== "ready") return undefined;
         // A fresh stub for every call: a stub to a Workspace DO that reset stays broken (its heartbeats would fail forever).
         const rpc = () => workspaceRpc(at.id);

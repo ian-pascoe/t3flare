@@ -30,7 +30,9 @@ import { ServerConfig } from "t3/src/config.ts";
 
 import { environmentServices } from "../../agents/bindings.ts";
 import { traceProtocol } from "../../agents/processRouter.ts";
-import { makePiDurableTextGeneration } from "../textGeneration.ts";
+import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
+import { runText } from "../textGeneration.ts";
+import { withCodexInvestigation } from "./codexInvestigation.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSession, type CliSessions, sessionFor, wrapCliAdapter } from "./wrapper.ts";
@@ -169,13 +171,14 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
     // binaryPath, homePath and launchArgs are not used: the image's binary and the CLI profile decide (plan §3).
     const settings = { ...config, enabled, setupMode: "existing" as const, binaryPath: "codex", homePath: "", launchArgs: "" } satisfies CodexSettings;
     const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
+    const fileSystem = yield* FileSystem.FileSystem;
     const adapter = yield* makeCodexAdapterV2({
       instanceId,
       settings,
       environment: {},
       clientFactory: cliClientFactory(spawner, sessions),
       digest: yield* Digest.Digest,
-      fileSystem: yield* FileSystem.FileSystem,
+      fileSystem,
       idAllocator: yield* IdAllocator.IdAllocatorV2,
       serverConfig: yield* ServerConfig,
       continuationRequests,
@@ -189,7 +192,8 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       enabled: enabled && config.setupMode !== "managed",
       snapshot,
       orchestrationAdapter: wrapCliAdapter(adapter, { sessions }),
-      textGeneration: makePiDurableTextGeneration(),
+      // The proxy's text generation; a review guide's investigation runs `codex exec` read-only in the checkout (G7).
+      textGeneration: TextGenerationOperations.fromRunner("CodexTextGeneration", withCodexInvestigation(spawner, fileSystem, runText)),
     } satisfies ProviderInstance;
   }),
 };

@@ -22,7 +22,7 @@ describe("the patterns a Container starts with", () => {
 
   it("keeps submodules and their git directories on the Container's disk, before the harness's re-includes", () => {
     const patterns = containerPatterns(CONTAINER_IGNORE, ["t3code", "vendor/a", "we,ird", "../escape", "glob*"]);
-    expect(patterns.slice(-5)).toEqual(["/repo/.git/modules", "/repo/t3code/**", "/repo/vendor/a/**", "!/.t3flare", "!/.t3flare/**"]);
+    expect(patterns.slice(-6)).toEqual(["/repo/.git/modules", "/repo/.git/worktrees", "/repo/t3code/**", "/repo/vendor/a/**", "!/.t3flare", "!/.t3flare/**"]);
     expect(patterns.filter((pattern) => /we,ird|escape|glob/.test(pattern))).toEqual([]);
   });
 
@@ -33,8 +33,8 @@ describe("the patterns a Container starts with", () => {
     expect(submoduleDirsScript(containerPatterns(CONTAINER_IGNORE, []))).toBe("");
   });
 
-  it("a repo without submodules still keeps `.git/modules` local", () => {
-    expect(containerPatterns(CONTAINER_IGNORE, [])).toEqual([...CONTAINER_IGNORE.slice(0, -2), "/repo/.git/modules", ...CONTAINER_IGNORE.slice(-2)]);
+  it("a repo without submodules still keeps `.git/modules` and `.git/worktrees` local", () => {
+    expect(containerPatterns(CONTAINER_IGNORE, [])).toEqual([...CONTAINER_IGNORE.slice(0, -2), "/repo/.git/modules", "/repo/.git/worktrees", ...CONTAINER_IGNORE.slice(-2)]);
   });
 });
 

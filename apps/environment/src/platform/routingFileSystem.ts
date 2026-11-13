@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off effectFnOpportunity:off
+// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off
 // The Environment's file system with Workspaces in it (ADR-0008; step 2a plan, section 2): `/w` lists the registry's
 // Workspaces and `/w/<id>/…` is that Workspace DO's files over RPC; every other path is the State directory
 // (fileSystem.ts). An id the registry does not list is NotFound and never reaches a Durable Object.
@@ -14,6 +14,7 @@ import * as Option from "effect/Option";
 import * as PlatformError from "effect/PlatformError";
 
 import { environmentServices } from "../agents/bindings.ts";
+import { dropScratchDir, isScratchDir, makeScratchDir } from "../agents/scratch.ts";
 import { locate, type Located } from "../agents/workspaceClient.ts";
 import type { FsOp } from "../agents/rpc.ts";
 import * as DoFileSystem from "./fileSystem.ts";
@@ -102,16 +103,19 @@ const listVirtual = (path: string): ReadonlyArray<string> => {
   return [...new Set(names)].toSorted();
 };
 
-/** PR review guides make a scratch checkout in t3's worktrees directory (review F6): refused, with the reason. */
-const noScratchCheckouts = (method: string, path: string) =>
-  Effect.fail(
-    failure(
-      method,
-      path,
-      "BadResource",
-      `t3flare: no scratch checkouts in ${WORKTREES_ROOT}: in the Cloud Environment every worktree is a Workspace of its own (a clone with its own Container), so t3's PR review guide, which reads a temporary checkout, is not available here`,
-    ),
-  );
+const randomName = () => [...crypto.getRandomValues(new Uint8Array(8))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+/**
+ * A temporary directory in t3's worktrees directory: a scratch directory for a detached checkout in a project's
+ * Container (parity G7, `agents/scratch.ts`; t3's PR review guide). Any other temporary directory in `/w` is refused.
+ */
+const scratchDir = (method: string, directory: string, prefix: string | undefined) =>
+  Effect.suspend(() => {
+    const made = makeScratchDir(directory, prefix, Date.now(), randomName);
+    return made === undefined
+      ? Effect.fail(failure(method, directory, "BadResource", `t3flare: temporary directories in ${WORKTREES_ROOT} are only scratch checkouts (a prefix of letters, digits, '.', '_' or '-')`))
+      : Effect.succeed(made);
+  });
 
 /** The Workspace of a `/w/<id>/…` path, or a NotFound when the id is not listed. */
 const workspace = (method: string, path: string): Effect.Effect<Located, PlatformError.PlatformError> =>
@@ -203,13 +207,13 @@ export const routing = (local: Impl): Impl => ({
   makeTempDirectory: (options) =>
     options?.directory !== undefined && isUnderW(options.directory)
       ? isVirtual(options.directory)
-        ? noScratchCheckouts("makeTempDirectory", options.directory)
+        ? scratchDir("makeTempDirectory", options.directory, options.prefix)
         : readOnly("makeTempDirectory", options.directory)
       : local.makeTempDirectory(options),
   makeTempDirectoryScoped: (options) =>
     options?.directory !== undefined && isUnderW(options.directory)
       ? isVirtual(options.directory)
-        ? noScratchCheckouts("makeTempDirectory", options.directory)
+        ? Effect.acquireRelease(scratchDir("makeTempDirectory", options.directory, options.prefix), (dir) => Effect.sync(() => dropScratchDir(dir)))
         : readOnly("makeTempDirectory", options.directory)
       : local.makeTempDirectoryScoped(options),
   makeTempFile: (options) =>
@@ -263,6 +267,8 @@ export const routing = (local: Impl): Impl => ({
   },
   remove: (path, options) => {
     if (!isUnderW(path)) return local.remove(path, options);
+    // A scratch directory: its checkout went with `git worktree remove` in the Container; only the name is left.
+    if (isScratchDir(path)) return Effect.sync(() => dropScratchDir(path));
     const at = toWorkspace(path);
     if (isRoot(path) || isVirtual(path)) return readOnly("remove", path);
     // A Workspace's root goes with the Workspace: its files, then its registry entry.

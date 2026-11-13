@@ -3,7 +3,7 @@
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is
 // a missing binary, as in step 1. Every routed command is kept in a short trace (admin `GET /_t3flare/agents/router-trace`).
-import { fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, toWorkspace } from "@t3flare/workspace-client";
+import { fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, REPO_ROOT, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
 import { containerGitHubPermissions, ENVIRONMENT_GITHUB_PERMISSIONS } from "@t3flare/github-app/permissions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -31,13 +31,14 @@ import {
   worktreeDestinationOf,
   worktreeListPorcelain,
 } from "./gitRoutes.ts";
+import { bindScratchCheckout, isScratchDir, scratchProjectOf } from "./scratch.ts";
 import { workspaceRpc } from "./workspaceClient.ts";
 import { CLI_NAMES, spawnCli } from "./cliProcess.ts";
 
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
 
-export type Route = "protocol" | "process" | "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
+export type Route = "protocol" | "process" | "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "scratch" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
 
 export interface TraceEntry {
   readonly at: number;
@@ -178,12 +179,18 @@ const bridgeIndex = async (id: string, env: Record<string, string>): Promise<Rec
   return { ...env, GIT_INDEX_FILE: seeded.bridged };
 };
 
-const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Record<string, unknown>> | undefined, stdin: string | undefined): Promise<Answer> => {
+const git = async (
+  args: ReadonlyArray<string>,
+  cwd: string,
+  env: Readonly<Record<string, unknown>> | undefined,
+  stdin: string | undefined,
+  options: { readonly action?: boolean; readonly route?: Route } = {},
+): Promise<Answer> => {
   const at = toWorkspace(cwd);
   if (at === null || environmentServices().workspaces.resolve(at.id) === undefined) {
     return { exitCode: 128, stdout: "", stderr: `fatal: cannot change to '${cwd}': No such file or directory\n`, route: "no-workspace" };
   }
-  const startContainer = mayStartContainer(args);
+  const startContainer = options.action === true || mayStartContainer(args);
   // No token goes with any git command: the Container's credential helper asks for the Workspace's (ADR-0013).
   const answer = await workspaceRpc(at.id)
     .git({
@@ -208,7 +215,7 @@ const git = async (args: ReadonlyArray<string>, cwd: string, env: Readonly<Recor
     exitCode: answer.exitCode,
     stdout: redactTokens(fromWorkspaceText(at.id, answer.stdout)),
     stderr: redactTokens(fromWorkspaceText(at.id, answer.stderr)),
-    route: answer.stale !== undefined ? `stale-${answer.stale}` : answer.cached === true ? "cache" : "container",
+    route: options.route ?? (answer.stale !== undefined ? `stale-${answer.stale}` : answer.cached === true ? "cache" : "container"),
     // An action's failure keeps git's own words in the trace (tokens taken out), as the evidence of what the remote said.
     detail: `${startContainer ? "action" : "passive"} ${answer.ms}ms${answer.startedContainer === undefined ? "" : ` started the Container: first ${answer.startedContainer} read`}${
       startContainer && answer.exitCode !== 0 ? `: ${redactTokens(answer.stderr).trim().slice(0, 400)}` : ""
@@ -228,12 +235,32 @@ const fail = (stderr: string, detail?: string): Answer => ({
   detail: `${detail === undefined ? "" : `${detail}: `}${stderr.trim()}`.slice(0, 1000),
 });
 
+/**
+ * A detached scratch checkout (parity G7, `scratch.ts`): t3's own `git worktree add --detach <scratch dir>/<name> <commit>`
+ * runs as written in the project's Container, at t3's path; every later command in it runs there too.
+ */
+const scratchAdd = async (
+  args: ReadonlyArray<string>,
+  cwd: string,
+  command: Extract<WorktreeCommand, { verb: "add" }>,
+  env: Readonly<Record<string, unknown>> | undefined,
+): Promise<Answer> => {
+  const project = toWorkspace(cwd);
+  const record = project === null ? undefined : environmentServices().workspaces.resolve(project.id);
+  if (project === null || record === undefined || record.kind !== "project" || project.inner !== REPO_ROOT) {
+    return fail("fatal: t3flare: a scratch checkout is made from a project's root in /w", "scratch refused");
+  }
+  const bound = bindScratchCheckout(command.path, project.id);
+  if ("refused" in bound) return fail(`fatal: t3flare: '${command.path}': ${bound.refused}`, "scratch refused");
+  return git(args, cwd, env, undefined, { action: true, route: "scratch" });
+};
+
 /** t3's `git worktree add -- <path> <ref>` in a project: provisions the worktree Workspace (plan section 3.2). */
 const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb: "add" }>): Promise<Answer> => {
   const services = environmentServices();
   if (command.detach) {
-    // Review F6: the PR review guide's scratch checkout (`worktree add --detach`).
-    return fail("fatal: t3flare: detached scratch worktrees are not made in the Cloud Environment: every worktree is a Workspace of its own (a clone and a Container), too heavy for a temporary checkout", "detached refused");
+    // Review F6: only t3's scratch checkouts are detached (`scratchAdd`); a worktree Workspace is made on a branch.
+    return fail(`fatal: t3flare: a detached worktree is made only in a scratch directory t3 made in ${WORKTREES_ROOT} (asked for '${command.path}')`, "detached refused");
   }
   const destination = worktreeDestinationOf(cwd, command.path);
   if ("refused" in destination) return fail(destination.refused, "destination refused");
@@ -331,6 +358,7 @@ const worktreeRouteOf = (
   if (command === null || at === null || at.id.startsWith(".wt/")) return null;
   switch (command.verb) {
     case "add":
+      if (command.detach && isScratchDir(command.path.replace(/\/[^/]+\/?$/, ""))) return (env) => scratchAdd(args, cwd, command, env);
       return () => worktreeAdd(cwd, command);
     case "list":
       return (env) => worktreeList(args, cwd, env, command);
@@ -338,6 +366,8 @@ const worktreeRouteOf = (
       // The registry keeps no stale links.
       return async () => ({ exitCode: 0, stdout: "", stderr: "", route: "worktree" });
     case "remove":
+      // t3's own removal of a scratch checkout, as written, in the project's Container.
+      if (scratchProjectOf(command.path) === at.id) return (env) => git(args, cwd, env, undefined, { action: true, route: "scratch" });
       return async () => {
         const { removeWorktree } = await import("./deletion.ts");
         const services = environmentServices();
@@ -412,6 +442,11 @@ const routeOf = (
   const cloneRequest = cloneRequestOf(args, cwd);
   if (cloneRequest !== null) return () => clone(cloneRequest);
   const normal = normalize(cwd);
+  // A command in a scratch checkout (parity G7): in its project's Container, at t3's path, never from the read cache.
+  const scratchProject = scratchProjectOf(normal);
+  if (scratchProject !== undefined) {
+    return (env, stdin) => git(["-C", normal, ...args], `/w/${scratchProject}`, env, stdin, { action: true, route: "scratch" });
+  }
   const worktree = worktreeRouteOf(args, normal);
   if (worktree !== null) return worktree;
   // Outside the Workspaces there is no repository: git says so, as it would on a laptop.

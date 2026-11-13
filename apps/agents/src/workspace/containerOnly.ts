@@ -17,6 +17,12 @@ const REPO_PATTERN = REPO_ROOT.slice(WORKSPACE_ROOT.length);
 /** The submodules' own repos (`git submodule` clones them under the superproject's `.git/modules`). */
 export const SUBMODULE_GIT_DIRS = `${REPO_PATTERN}/.git/modules`;
 
+/**
+ * The repo's own linked worktrees' admin directories (parity G7): only t3's scratch checkouts, which live on the
+ * Container's disk; their index and HEAD never reach the Workspace DO.
+ */
+export const WORKTREE_GIT_DIRS = `${REPO_PATTERN}/.git/worktrees`;
+
 /** The paths a `.gitmodules` file names (`path = …` of each `[submodule "…"]`), in order, without duplicates. */
 export const submodulePaths = (gitmodules: string): ReadonlyArray<string> => {
   const paths: Array<string> = [];
@@ -58,7 +64,7 @@ export const submoduleDirsScript = (patterns: ReadonlyArray<string>): string => 
 
 /** The ignore patterns a Container starts with: the static ones, the submodules' git directories, then each submodule. */
 export const containerPatterns = (base: ReadonlyArray<string>, submodules: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const extra = [SUBMODULE_GIT_DIRS, ...submodules.flatMap((path) => submodulePattern(path) ?? [])];
+  const extra = [SUBMODULE_GIT_DIRS, WORKTREE_GIT_DIRS, ...submodules.flatMap((path) => submodulePattern(path) ?? [])];
   // The base list ends with its re-includes (`!/.t3flare…`): the last matching pattern wins, so ours go before them.
   const firstInclude = base.findIndex((pattern) => pattern.startsWith("!"));
   const at = firstInclude === -1 ? base.length : firstInclude;
