@@ -29,6 +29,8 @@ const scriptHeaders = { ...accessHeaders, authorization: `Bearer ${process.env.T
 const WORKSPACE = "pvars";
 const NAME = "PVARS_PROBE";
 const ECHO = `echo ${NAME}=$${NAME}`;
+/** The echo, and where it ran: only the Container has the image's CLI binaries. */
+const ECHO_WHERE = `${ECHO}; test -e /opt/t3flare/bin && echo ON=container || echo ON=worker`;
 const SONNET = "anthropic/claude-sonnet-5-5";
 
 interface Case {
@@ -132,10 +134,11 @@ const turn = async (threadId: string, text: string, model: unknown, limitMs = 6 
 const commandsOf = (threadId: string, projection: any) =>
   Promise.all(
     itemsOf(projection)
-      .filter((item: any) => item.type === "command_execution")
+      .filter((item: any) => item.type === "command_execution" && (item.runId === undefined || item.runId === runsOf(projection).at(-1)?.id))
       .map(async (item: any) => {
         const output = await wsFirst(cookie, "orchestration.subscribeCommandOutput", { threadId, itemId: item.id }).catch((error: unknown) => ({ error: String(error).slice(0, 300) }));
-        return { input: item.input, status: item.status, output };
+        const text = typeof (output as { text?: unknown }).text === "string" ? (output as { text: string }).text : "";
+        return { input: item.input, status: item.status, output, text };
       }),
   );
 
@@ -160,10 +163,10 @@ const newThread = async (title: string, model: unknown) => {
 
 /** A Durable agent's `bash` on one backend: the command, its output as t3 shows it, and the value it printed. */
 const durableCommand = async (threadId: string, backend: "container" | "worker") => {
-  const projection = await turn(threadId, `Call the bash tool exactly once, with command \`${ECHO}\` and backend \`${backend}\`. Do not run anything else. Then reply with the tool's output, quoted exactly.`, DEFAULT_MODEL);
+  const projection = await turn(threadId, `Call the bash tool exactly once, with command \`${ECHO_WHERE}\` and backend \`${backend}\`. Do not run anything else. Then reply with the tool's output, quoted exactly.`, DEFAULT_MODEL);
   const commands = await commandsOf(threadId, projection);
-  const last = commands.at(-1);
-  return { backend, runs: runsOf(projection).map((run) => run.status), commands, value: last === undefined ? null : probed(JSON.stringify(last.output).replaceAll("\\n", "\n")) };
+  const text = commands.at(-1)?.text ?? "";
+  return { backend, runs: runsOf(projection).map((run) => run.status), commands, value: probed(text), ranOn: probed(text, "ON") };
 };
 
 // ── Commands ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -178,16 +181,16 @@ const apply = async () => {
   await enable(cookie, "piDurable", "piDurable");
   const durable = await newThread("pvars durable", DEFAULT_MODEL);
   const onContainer = await durableCommand(durable, "container");
-  cases.push({ name: "a Durable agent's command on the Container", ...onContainer, ok: onContainer.value === value });
+  cases.push({ name: "a Durable agent's command on the Container", ...onContainer, ok: onContainer.value === value && onContainer.ranOn === "container" });
   const onWorker = await durableCommand(durable, "worker");
-  cases.push({ name: "a Durable agent's command on the Worker Shell", ...onWorker, ok: onWorker.value === value });
+  cases.push({ name: "a Durable agent's command on the Worker Shell", ...onWorker, ok: onWorker.value === value && onWorker.ranOn === "worker" });
 
   await enable(cookie, "codex", "codex");
   const codexModel = { instanceId: "codex", model: process.env.T3FLARE_PVARS_CODEX_MODEL ?? "gpt-6-luna", options: [] };
   const codex = await newThread("pvars codex", codexModel);
   const codexProjection = await turn(codex, `Run exactly this shell command and nothing else: \`${ECHO}\`. Then reply with its output, quoted exactly.`, codexModel);
   const codexCommands = await commandsOf(codex, codexProjection);
-  const codexValue = probed(JSON.stringify(codexCommands).replaceAll("\\n", "\n"));
+  const codexValue = probed(codexCommands.map((entry) => entry.text).join("\n"));
   cases.push({ name: "a Codex command", runs: runsOf(codexProjection).map((run) => run.status), commands: codexCommands, value: codexValue, ok: codexValue === value });
 
   const terminal = await attachTerminal(cookie, { threadId: durable, terminalId: `pvars-${uuid().slice(0, 6)}`, cwd: `/w/${WORKSPACE}`, cols: 100, rows: 30 });
@@ -261,18 +264,17 @@ const precedence = async () => {
 };
 
 /**
- * The live CLI processes in the Container (an image binary with t3flare's exec marker): argv, the environment names, and
- * the values of the names below only (a process's nonce and tool handle are never read out).
+ * The live processes in the Container with t3flare's exec marker (CLI processes and what they run): executable, argv,
+ * the environment names, and the values of the names below only (a process's nonce and tool handle are never read out).
  */
 const SHOWN = [NAME, "NODE_ENV", "ANTHROPIC_BASE_URL", "HTTPS_PROXY", "HTTP_PROXY", "NODE_OPTIONS", "CODEX_HOME", "PI_CODING_AGENT_DIR", "CLAUDE_CONFIG_DIR", "XDG_CONFIG_HOME", "LANG", "HOME"];
 const PROCESSES = `for d in /proc/[0-9]*; do
-  exe=$(tr '\\0' ' ' < "$d/cmdline" 2>/dev/null) || continue
-  case "$exe" in */opt/t3flare/*|*claude-agent-sdk-linux-x64/claude*) ;; *) continue;; esac
   grep -qz '^T3FLARE_EXEC=' "$d/environ" 2>/dev/null || continue
   echo "PID \${d#/proc/}"
+  echo "EXE $(readlink "$d/exe")"
   echo "ARGV $(base64 -w0 < "$d/cmdline")"
   echo "NAMES $(tr '\\0' '\\n' < "$d/environ" | cut -d= -f1 | sort | tr '\\n' ' ')"
-  for name in ${SHOWN.join(" ")}; do v=$(tr '\\0' '\\n' < "$d/environ" | grep -m1 "^$name=" | cut -d= -f2-) && echo "ENV $name=$v"; done
+  for name in ${SHOWN.join(" ")}; do line=$(tr '\\0' '\\n' < "$d/environ" | grep -m1 "^$name=") && echo "ENV $line"; done
 done
 echo "CLAUDE $(cat /etc/claude-code/managed-settings.json 2>/dev/null | base64 -w0)"
 echo "OPENCODE $(cat /etc/opencode/opencode.json 2>/dev/null | base64 -w0)"
@@ -280,13 +282,14 @@ for f in /var/lib/t3flare/cli/*/agent/models.json; do [ -f "$f" ] && echo "PIMOD
 
 const processes = async () => {
   const run = await exec(PROCESSES);
-  const rows: Array<{ pid: string; argv: Array<string>; names: Array<string>; env: Record<string, string> }> = [];
+  const rows: Array<{ pid: string; exe: string; argv: Array<string>; names: Array<string>; env: Record<string, string> }> = [];
   const files: { claude: Array<any>; opencode: Array<any>; pi: Array<any> } = { claude: [], opencode: [], pi: [] };
   const decode = (text: string) => Buffer.from(text, "base64").toString("utf8");
   for (const line of run.stdout.split("\n")) {
     const [tag, ...rest] = line.split(" ");
     const body = rest.join(" ");
-    if (tag === "PID") rows.push({ pid: body, argv: [], names: [], env: {} });
+    if (tag === "PID") rows.push({ pid: body, exe: "", argv: [], names: [], env: {} });
+    else if (tag === "EXE") rows.at(-1)!.exe = body;
     else if (tag === "ARGV") rows.at(-1)!.argv = decode(body).split("\0").filter((arg) => arg !== "");
     else if (tag === "NAMES") rows.at(-1)!.names = body.trim().split(" ");
     else if (tag === "ENV") {
@@ -300,11 +303,14 @@ const processes = async () => {
   return { rows, files, exitCode: run.exitCode };
 };
 
+type Row = Awaited<ReturnType<typeof processes>>["rows"][number];
+
 const CLIS = {
-  codex: { instanceId: "codex", driver: "codex", model: process.env.T3FLARE_PVARS_CODEX_MODEL ?? "gpt-6-luna", binary: "/opt/t3flare/bin/codex" },
-  pi: { instanceId: "pi", driver: "pi", model: SONNET, binary: "/opt/t3flare/pi/" },
-  claude: { instanceId: "claudeAgent", driver: "claudeAgent", model: SONNET, binary: "claude-agent-acp" },
-  opencode: { instanceId: "opencode", driver: "opencode", model: SONNET, binary: "/opt/t3flare/opencode" },
+  codex: { instanceId: "codex", driver: "codex", model: process.env.T3FLARE_PVARS_CODEX_MODEL ?? "gpt-6-luna", is: (row: Row) => row.exe === "/opt/t3flare/bin/codex" },
+  // pi names its process `pi` (its argv is rewritten); its executable is the image's Node.
+  pi: { instanceId: "pi", driver: "pi", model: SONNET, is: (row: Row) => row.exe.endsWith("/bin/node") && (row.argv[0] === "pi" || row.argv.some((arg) => arg.startsWith("/opt/t3flare/pi/"))) },
+  claude: { instanceId: "claudeAgent", driver: "claudeAgent", model: SONNET, is: (row: Row) => row.argv.some((arg) => arg.includes("claude-agent-acp")) },
+  opencode: { instanceId: "opencode", driver: "opencode", model: SONNET, is: (row: Row) => row.exe.startsWith("/opt/t3flare/opencode/") },
 } as const;
 
 const pins = async () => {
@@ -313,7 +319,8 @@ const pins = async () => {
   await setVariables({ [NAME]: value, NODE_ENV: "pvars" });
   await stop();
   const cases: Array<Case> = [];
-  for (const [cli, spec] of Object.entries(CLIS)) {
+  const only = process.argv.slice(3);
+  for (const [cli, spec] of Object.entries(CLIS).filter(([name]) => only.length === 0 || only.includes(name))) {
     await enable(cookie, spec.instanceId, spec.driver);
     const model = { instanceId: spec.instanceId, model: spec.model, options: [] };
     const threadId = await newThread(`pvars ${cli}`, model);
@@ -323,7 +330,7 @@ const pins = async () => {
       .map((item: any) => String(item.text ?? ""))
       .join("");
     const seen = await processes();
-    const mine = seen.rows.filter((row) => row.argv.some((arg) => arg.includes(spec.binary)));
+    const mine = seen.rows.filter(spec.is);
     const argv = mine.flatMap((row) => row.argv).join(" ");
     let endpoint: unknown = null;
     let keyHelper: unknown = null;
@@ -352,15 +359,18 @@ const pins = async () => {
     }[cli as keyof typeof CLIS];
     cases.push({
       name: `${cli}: a turn through the proxy, its endpoint and key helper t3flare's, the Variables in its environment`,
-      runs: runsOf(projection).map((run) => run.status),
+      runs: runsOf(projection).map((run: any) => ({ status: run.status, failure: run.failure ?? null })),
       reply: reply.slice(-200),
       processes: mine.map((row) => ({ pid: row.pid, argv0: row.argv[0], env: row.env, names: row.names })),
+      allProcesses: seen.rows.map((row) => `${row.exe}: ${row.argv.slice(0, 3).join(" ")}`),
       endpoint,
       keyHelper,
       variableSeen,
       ok: /ready/i.test(reply) && runsOf(projection).at(-1)?.status === "completed" && mine.length > 0 && expected.endpoint(endpoint) && expected.keyHelper(keyHelper) && variableSeen.every((seenValue) => seenValue === value),
     });
     console.log(`${cli}: ${cases.at(-1)!.ok}`);
+    // Each CLI alone in its Container: a Workspace runs at most 4 CLI process weights (Claude Code and OpenCode count twice).
+    await stop();
   }
   const endpoints = cases.map((entry) => entry.endpoint).map((e: any) => (typeof e === "string" ? e.replace(/\/v1$/, "") : (e?.managed ?? null)));
   cases.push({ name: "every CLI reaches the same model proxy", endpoints, ok: endpoints.every((e) => e !== null && e === endpoints[0]) });
