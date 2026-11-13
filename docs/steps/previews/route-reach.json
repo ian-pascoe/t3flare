@@ -1,0 +1,13 @@
+{
+ "at": "2026-11-13",
+ "stage": "previews",
+ "what": "M3 hostile (route reach): the t3 host's public routes never reach a Container preview",
+ "ok": true,
+ "checks": {
+  "GET /__t3flare/ws/open": "200 text/html: the web client's asset fallback (index.html), not a carried socket",
+  "GET /__t3flare/ws/shim.js": "200 text/html: the asset fallback, not the shim",
+  "GET /api/preview-stream/ws (no upgrade)": "404 Not Found (t3's own route)",
+  "GET / with Host: 5173.t3flare.internal": "403 from Cloudflare's edge (a host the zone does not serve)"
+ },
+ "reading": "`ContainerPreviews` is an entrypoint reached only through Browser Run's outboundByHost; the agents Worker has no URL, so `WorkspaceContainerPreviews` is reached only by the Environment Worker's service binding."
+}
