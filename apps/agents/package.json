@@ -22,6 +22,7 @@
     "@t3flare/models": "workspace:*",
     "@t3flare/sandbox-image": "workspace:*",
     "@t3flare/session-protocol": "workspace:*",
+    "@t3flare/skills": "workspace:*",
     "@t3flare/workspace-client": "workspace:*",
     "@xterm/headless": "6.0.0",
     "diff": "9.0.0",

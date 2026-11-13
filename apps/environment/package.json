@@ -23,6 +23,7 @@
     "@t3flare/harness-registry": "workspace:*",
     "@t3flare/models": "workspace:*",
     "@t3flare/session-protocol": "workspace:*",
+    "@t3flare/skills": "workspace:*",
     "@t3flare/workspace-client": "workspace:*",
     "@t3tools/contracts": "workspace:*",
     "@t3tools/provider-acp": "workspace:*",
