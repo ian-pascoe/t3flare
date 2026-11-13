@@ -97,7 +97,7 @@ export const ENVIRONMENT_SETTINGS = {
   },
   variables: {
     title: "Variables",
-    description: `Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a secret. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most ${MAX_VARIABLES}. Applies at each Workspace's next Container start.`,
+    description: `Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a credential. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most ${MAX_VARIABLES}. Applies at each Workspace's next Container start.`,
     schema: { type: "variables", default: {} },
   },
 } as const satisfies Readonly<Record<string, EnvironmentSettingEntry>>;
