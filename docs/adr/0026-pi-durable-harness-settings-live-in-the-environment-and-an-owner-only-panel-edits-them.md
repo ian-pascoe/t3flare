@@ -43,3 +43,10 @@ The owner chose to stay close to stock t3 (`docs/scope-audit.md`). Removed from 
 - the per-server "offered to linked threads" switch (ADR-0028).
 
 Kept: CSRF, the Origin check against the configured host, escaping, the hash-only CSP, write-only secrets, and the audit log.
+
+## Refinement: Environment settings (SPI-1149, 2026-11-13)
+
+The page now edits two entities. What this ADR calls the harness settings are the **Harness settings**; beside them the
+**Environment settings** (the Container's size, idle time and budget) live under their own key and revision, are read by
+each Workspace DO before a Container start, and share this page, its guards and its audit log, whose entries now carry
+an `entity`. See [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md).

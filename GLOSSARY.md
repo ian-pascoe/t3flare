@@ -167,9 +167,27 @@ Claude Code's highest settings source, `/etc/claude-code/managed-settings.json`,
 ## Tools
 
 **Harness panel**:
-The owner's page for Pi Durable's harness, at `/_t3flare/harness` on the t3 host: extensions and their settings, the MCP server set,
-Status and the audit log. Changes apply at a thread's next turn.
+The owner's page at `/_t3flare/harness` on the t3 host for t3flare's own settings: the Harness settings and the
+Environment settings, with Status and the audit log.
 _Avoid_: settings page, dashboard, admin UI
+
+**Harness settings**:
+What agents are offered and how Pi Durable's loop runs: its extensions with their options, and the MCP server set.
+They apply at a thread's next turn.
+_Avoid_: harness config, settings (alone)
+
+**Environment settings**:
+What the Cloud Environment gives every Workspace and its Container: the Container size, idle time and budget, the Global
+mise config and the Environment skills. t3flare's own, not t3's server settings. They apply at a Container's next start.
+_Avoid_: environment config, server settings, Container settings
+
+**Container size**:
+The vCPU, memory and disk a Workspace's Container starts with, picked by name.
+_Avoid_: instance type, plan
+
+**Container budget**:
+How many Containers may run at once across the Cloud Environment. Lowering it stops none that run.
+_Avoid_: max instances, slots
 
 **Code mode**:
 The Durable agent's `codemode` tool: one short script that calls the agent's tools as functions, each nested call
