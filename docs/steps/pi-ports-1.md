@@ -114,8 +114,8 @@ The core preset of offered tools now includes all six, so they are direct. Code 
 
 ## Code review
 
-Done here in two passes, Standards and Spec, without sub-agents: this agent may not spawn them. The fixes are in the
-last commit.
+Done here in two passes, Standards and Spec, without sub-agents: this agent may not spawn them. Neither pass needed a
+fix.
 
 **Standards**
 
@@ -164,4 +164,5 @@ last commit.
 - 5d63ce0 SPI-1054: the web tools
 - c61518d SPI-1055: todo
 - f30b1a4 SPI-1056: context management
-- the stage harness, evidence, docs and this report (the branch head)
+- 751b112 the stage harness, evidence, docs and this report
+- the branch head: this correction to the report
