@@ -7,6 +7,8 @@
 // not taken is reported in `skipped` with its reason, so a skill that does not show can be explained.
 import { parse } from "yaml";
 
+import type { SkillRoot } from "./cliRoots.ts";
+
 /** A Skill: a directory with a `SKILL.md` whose frontmatter names and describes it. */
 export interface Skill {
   readonly name: string;
@@ -142,15 +144,19 @@ const candidatePaths = async (files: SkillFiles, root: string): Promise<Readonly
  * The Skills a thread in `cwd` can use. `environment` (the Environment skill set; empty until SPI-1148) comes first and
  * beats a Repo skill of the same name. Repo skills follow, nearest directory first and, in each, `SKILL_ROOTS` in order;
  * the first name found wins. At most `MAX_REPO_SKILLS` Repo skills are read; `omitted` counts the `SKILL.md` files past
- * the cap, unread. `roots` replaces `SKILL_ROOTS` (a CLI agent's, SPI-1151).
+ * the cap, unread. `roots` replaces `SKILL_ROOTS` (a CLI agent's, SPI-1151), a root marked `cwdOnly` counting at the
+ * cwd alone.
  */
 export const discoverSkills = async (
   files: SkillFiles,
-  options: { readonly cwd: string; readonly root: string; readonly environment?: ReadonlyArray<Skill>; readonly roots?: ReadonlyArray<string> },
+  options: { readonly cwd: string; readonly root: string; readonly environment?: ReadonlyArray<Skill>; readonly roots?: ReadonlyArray<SkillRoot> | undefined },
 ): Promise<SkillDiscovery> => {
   const environment = options.environment ?? [];
   const taken = new Map<string, string>(environment.map((skill) => [skill.name, skill.filePath]));
-  const roots = directoriesUp(options.cwd, options.root).flatMap((directory) => (options.roots ?? SKILL_ROOTS).map((root) => join(directory, root)));
+  const skillRoots = options.roots ?? SKILL_ROOTS.map((directory) => ({ directory, cwdOnly: false }));
+  const roots = directoriesUp(options.cwd, options.root).flatMap((directory, depth) =>
+    skillRoots.filter((root) => depth === 0 || !root.cwdOnly).map((root) => join(directory, root.directory)),
+  );
   // Listed at once; read in order, since precedence decides which of two same-named skills is kept.
   const listed = await Promise.all(roots.map(async (root) => skillFiles(await candidatePaths(files, root)).map((path) => join(root, path))));
   const skills: Array<Skill> = [...environment];

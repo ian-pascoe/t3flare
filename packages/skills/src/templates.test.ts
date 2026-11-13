@@ -87,4 +87,26 @@ describe("Prompt templates' discovery", () => {
     const files = memoryFiles({ [`${ROOT}/.pi/prompts/echo.md`]: "x" });
     expect(await discoverPrompts(files, `${ROOT}/sub`)).toEqual([]);
   });
+
+  it("keeps a dot-named file in .pi/prompts, as SPI-1147 did (the Durable agent's path is unchanged)", async () => {
+    const files = memoryFiles({ [`${ROOT}/.pi/prompts/.hidden.md`]: "h", [`${ROOT}/.pi/prompts/echo.md`]: "e" });
+    expect((await discoverPrompts(files, ROOT)).map((template) => template.name)).toEqual([".hidden", "echo"]);
+  });
+
+  it("with a CLI's sources (SPI-1151): a nested one names `sub/x.md` `sub:x` and skips dot directories, the first name wins", async () => {
+    const files = memoryFiles({
+      [`${ROOT}/.claude/commands/top.md`]: "t",
+      [`${ROOT}/.claude/commands/sub/x.md`]: "x",
+      [`${ROOT}/.claude/commands/.git/y.md`]: "y",
+      [`${ROOT}/.opencode/command/a.md`]: "first",
+      [`${ROOT}/.opencode/commands/a.md`]: "second",
+      [`${ROOT}/.opencode/commands/sub/b.md`]: "not nested",
+    });
+    expect((await discoverPrompts(files, ROOT, [{ directory: ".claude/commands", nested: true }])).map((template) => template.name)).toEqual(["sub:x", "top"]);
+    const opencode = await discoverPrompts(files, ROOT, [
+      { directory: ".opencode/command", nested: false },
+      { directory: ".opencode/commands", nested: false },
+    ]);
+    expect(opencode.map((template) => [template.name, template.filePath])).toEqual([["a", `${ROOT}/.opencode/command/a.md`]]);
+  });
 });

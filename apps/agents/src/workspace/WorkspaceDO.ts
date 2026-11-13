@@ -194,6 +194,11 @@ const BOOT_COUNT_KEY = "t3flare:boot-count";
  * (docs/steps/step-4a/m3-memory.json), so four take about 0.65 GB of 3 GiB, beside computerd (~100 MB) and the agents'
  * own commands (an `npm ci` and its tests peak at 1–1.5 GB). A fifth start is refused with this reason.
  */
+/** An RPC's CLI agent argument (SPI-1151): absent (the Durable agent's) or one of `CLI_AGENTS`, else refused. */
+const cliAgentArgument = (agent: unknown): void => {
+  if (agent !== undefined && !isCliAgent(agent)) throw new Error(`t3flare: no CLI agent ${String(agent)}`);
+};
+
 export const MAX_CLI_PROCESSES = 4;
 /** Set when the sync guard found a credential in the Workspace: the key is to be rotated (review F3). */
 const LEAK_FLAG_KEY = "t3flare:credential-leak";
@@ -611,7 +616,7 @@ export class WorkspaceDO extends ContainerHost {
   async skills(cwd: string, agent?: CliAgent): Promise<SkillDiscovery> {
     this.#alive();
     await this.#workspace.ready();
-    if (agent !== undefined && !isCliAgent(agent)) throw new Error(`t3flare: no CLI agent ${String(agent)}`);
+    cliAgentArgument(agent);
     return workspaceSkills(this.#host.readEnv(cwd), REPO_ROOT, agent === undefined ? this.#environmentSkills() : [], agent);
   }
 
@@ -624,7 +629,7 @@ export class WorkspaceDO extends ContainerHost {
   async prompts(cwd: string, agent?: CliAgent): Promise<ReadonlyArray<PromptTemplate>> {
     this.#alive();
     await this.#workspace.ready();
-    if (agent !== undefined && !isCliAgent(agent)) throw new Error(`t3flare: no CLI agent ${String(agent)}`);
+    cliAgentArgument(agent);
     return workspacePrompts(this.#host.readEnv(cwd), agent);
   }
 

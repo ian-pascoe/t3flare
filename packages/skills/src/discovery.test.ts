@@ -131,4 +131,17 @@ describe("the Environment skill set", () => {
     expect(found.skills.map((skill) => skill.description)).toEqual(["the owner's", "d"]);
     expect(found.skipped).toEqual([{ path: `${ROOT}/.agents/skills/fruit/SKILL.md`, reason: `"fruit" is shadowed by ${environment.filePath}` }]);
   });
+
+  it("with a CLI's roots (SPI-1151): a cwdOnly root counts at the cwd alone, the others up to the repo root", async () => {
+    const found = await discoverSkills(
+      memoryFiles({
+        [`${ROOT}/.pi/skills/root-pi/SKILL.md`]: skillMd({ name: "root-pi", description: "pi at the root" }),
+        [`${ROOT}/.agents/skills/root-agents/SKILL.md`]: skillMd({ name: "root-agents", description: "agents at the root" }),
+        [`${ROOT}/pkg/.pi/skills/here-pi/SKILL.md`]: skillMd({ name: "here-pi", description: "pi at the cwd" }),
+      }),
+      { cwd: `${ROOT}/pkg`, root: ROOT, roots: [{ directory: ".pi/skills", cwdOnly: true }, { directory: ".agents/skills", cwdOnly: false }] },
+    );
+    expect(found.skills.map((skill) => skill.name)).toEqual(["here-pi", "root-agents"]);
+  });
 });
+

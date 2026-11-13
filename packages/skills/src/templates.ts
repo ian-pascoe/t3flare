@@ -139,6 +139,8 @@ export const expandTemplate = (text: string, templates: ReadonlyArray<{ readonly
   return call === undefined ? undefined : substituteArgs(call.template.content, call.args);
 };
 
+const byName = (a: { readonly name: string }, b: { readonly name: string }) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+
 /** The Durable agent's (and pi's) Prompt templates: the cwd's `.pi/prompts`, its files only. */
 const PI_PROMPTS: ReadonlyArray<CommandSource> = [{ directory: PROMPTS_DIRECTORY, nested: false }];
 
@@ -156,9 +158,10 @@ export const discoverPrompts = async (files: SkillFiles, cwd: string, sources: R
       const entries = await files.list(root, MAX_ENTRIES);
       return entries
         .filter((entry) => entry.kind !== "directory" && (source.nested || !entry.path.includes("/")) && !/\s/.test(entry.path) && entry.path.endsWith(".md"))
-        .filter((entry) => !entry.path.split("/").some((segment) => segment.startsWith(".")))
+        // A nested source's dot directories (`.git`-like) hold no commands; a file's own name is not judged here.
+        .filter((entry) => !entry.path.split("/").slice(0, -1).some((segment) => segment.startsWith(".")))
         .map((entry) => ({ path: join(root, entry.path), name: entry.path.replace(/\.md$/, "").replaceAll("/", ":") }))
-        .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+        .sort(byName);
     }),
   );
   const seen = new Set<string>();
@@ -176,5 +179,5 @@ export const discoverPrompts = async (files: SkillFiles, cwd: string, sources: R
       return { ...template, name: entry.name };
     }),
   );
-  return templates.filter((template) => template !== undefined).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return templates.filter((template) => template !== undefined).sort(byName);
 };

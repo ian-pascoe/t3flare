@@ -26,7 +26,7 @@ export const skillFilesOf = (env: ReadEnv): SkillFiles => ({
  * that CLI's roots (`CLI_ROOTS`).
  */
 export const workspaceSkills = async (env: ReadEnv, root: string, environment: ReadonlyArray<Skill>, agent?: CliAgent): Promise<SkillDiscovery> => {
-  const found = await discoverSkills(skillFilesOf(env), { cwd: env.cwd, root, environment, ...(agent === undefined ? {} : { roots: CLI_ROOTS[agent].skills }) });
+  const found = await discoverSkills(skillFilesOf(env), { cwd: env.cwd, root, environment, roots: agent === undefined ? undefined : CLI_ROOTS[agent].skills });
   if (found.skipped.length > 0) {
     console.log(
       JSON.stringify({ t3flare: "skills", cwd: env.cwd, skills: found.skills.length, omitted: found.omitted, skipped: found.skipped.slice(0, 20), skippedCount: found.skipped.length }),
@@ -37,4 +37,4 @@ export const workspaceSkills = async (env: ReadEnv, root: string, environment: R
 
 /** The Prompt templates of a thread in `env`'s cwd; with `agent`, that CLI's repo commands (SPI-1151). */
 export const workspacePrompts = (env: ReadEnv, agent?: CliAgent): Promise<ReadonlyArray<PromptTemplate>> =>
-  agent === undefined ? discoverPrompts(skillFilesOf(env), env.cwd) : discoverPrompts(skillFilesOf(env), env.cwd, CLI_ROOTS[agent].commands);
+  discoverPrompts(skillFilesOf(env), env.cwd, agent === undefined ? undefined : CLI_ROOTS[agent].commands);

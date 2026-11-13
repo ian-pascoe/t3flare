@@ -4,8 +4,8 @@
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
-import { CLI_ROOTS } from "@t3flare/skills";
-import { HARNESS_ROOT } from "@t3flare/workspace-client";
+import { CLI_ROOTS, directoriesUp } from "@t3flare/skills";
+import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
 
 import { acpProfileLaunch } from "./acpProfiles.ts";
 
@@ -232,14 +232,20 @@ export const piModelsJson = (proxyUrl: string, models: ReadonlyArray<CatalogMode
 export const PI_SETTINGS = `${JSON.stringify({ defaultProjectTrust: "never", retry: { maxRetries: 1 } }, null, 1)}\n`;
 
 /**
- * SPI-1151: the repo's Skill roots and Prompt templates (`CLI_ROOTS.pi`), named to pi by flag. pi loads what a flag
- * names whatever the project's trust, so trust stays off (`--no-approve`): the repo's extensions, settings and packages
- * do not load (SPI-1001's D3). An absent root is only a diagnostic pi keeps, which RPC mode does not print.
+ * SPI-1151: the repo's Skill roots and Prompt templates (`CLI_ROOTS.pi`), named to pi by flag as pi would find them
+ * trusted: `.pi/skills` at the cwd, `.agents/skills` in each directory from the cwd up to the Workspace's repo root
+ * (a project may sit below it), nearest first; `.pi/prompts` at the cwd. pi loads what a flag names whatever the
+ * project's trust, so trust stays off (`--no-approve`): the repo's extensions, settings and packages do not load
+ * (SPI-1001's D3). An absent root is only a diagnostic pi keeps, which RPC mode does not print.
  */
 export const piRepoResourceArgs = (cwd: string): ReadonlyArray<string> => {
-  const base = cwd.replace(/\/+$/, "");
+  const base = normalize(cwd);
+  const workspace = toWorkspace(base);
+  const root = workspace === null ? base : base.slice(0, base.length - (workspace.inner.length - REPO_ROOT.length));
   return [
-    ...CLI_ROOTS.pi.skills.flatMap((root) => ["--skill", `${base}/${root}`]),
+    ...directoriesUp(base, root).flatMap((directory, depth) =>
+      CLI_ROOTS.pi.skills.filter((skillRoot) => depth === 0 || !skillRoot.cwdOnly).flatMap((skillRoot) => ["--skill", `${directory}/${skillRoot.directory}`]),
+    ),
     ...CLI_ROOTS.pi.commands.flatMap((source) => ["--prompt-template", `${base}/${source.directory}`]),
   ];
 };

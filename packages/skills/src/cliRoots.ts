@@ -15,26 +15,36 @@ export interface CommandSource {
   readonly nested: boolean;
 }
 
+/** A Skill root: a path a directory's Skills are below, and whether only the cwd's counts (else each from the cwd up to the repo root). */
+export interface SkillRoot {
+  readonly directory: string;
+  readonly cwdOnly: boolean;
+}
+
 export interface CliRoots {
   /** Skill roots in each directory from the cwd up to the repo root, in the CLI's precedence order (first name wins). */
-  readonly skills: ReadonlyArray<string>;
+  readonly skills: ReadonlyArray<SkillRoot>;
   /** Command directories at the cwd. */
   readonly commands: ReadonlyArray<CommandSource>;
 }
 
 /**
  * Each CLI's roots (M0, 2026-11-13). Codex 0.167.2: `.agents/skills` and `.codex/skills`, which it lists both of a
- * same-named pair from; no repo commands. pi 1.5.2: `.pi/skills` then `.agents/skills` and `.pi/prompts`, loaded
- * through the profile's `--skill` and `--prompt-template` (trust stays off). Claude Code 2.1.322: `.claude/skills` and
+ * same-named pair from; no repo commands. pi 1.5.2: `.pi/skills` at the cwd, then `.agents/skills` up to the repo root
+ * (`dist/core/package-manager.js`), and `.pi/prompts`, loaded through the profile's `--skill` and `--prompt-template`
+ * (trust stays off). The probe ran at the repo root, so where the other CLIs look from a cwd below it is unprobed: they
+ * walk up, as SPI-1147's discovery does. Claude Code 2.1.322: `.claude/skills` and
  * `.claude/commands` with its subdirectories. OpenCode 2.2.7: `.opencode/skills`, `.opencode/skill`, `.agents/skills`
  * (`.claude/` is off: `OPENCODE_DISABLE_CLAUDE_CODE`), and `.opencode/command` and `.opencode/commands`.
  */
+const up = (directory: string): SkillRoot => ({ directory, cwdOnly: false });
+
 export const CLI_ROOTS: Readonly<Record<CliAgent, CliRoots>> = {
-  codex: { skills: [".agents/skills", ".codex/skills"], commands: [] },
-  pi: { skills: [".pi/skills", ".agents/skills"], commands: [{ directory: ".pi/prompts", nested: false }] },
-  claude: { skills: [".claude/skills"], commands: [{ directory: ".claude/commands", nested: true }] },
+  codex: { skills: [up(".agents/skills"), up(".codex/skills")], commands: [] },
+  pi: { skills: [{ directory: ".pi/skills", cwdOnly: true }, up(".agents/skills")], commands: [{ directory: ".pi/prompts", nested: false }] },
+  claude: { skills: [up(".claude/skills")], commands: [{ directory: ".claude/commands", nested: true }] },
   opencode: {
-    skills: [".opencode/skills", ".opencode/skill", ".agents/skills"],
+    skills: [up(".opencode/skills"), up(".opencode/skill"), up(".agents/skills")],
     commands: [
       { directory: ".opencode/command", nested: false },
       { directory: ".opencode/commands", nested: false },

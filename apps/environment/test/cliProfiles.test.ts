@@ -3,7 +3,7 @@
 import type { CatalogModel } from "@t3flare/models";
 import { describe, expect, it } from "vitest";
 
-import { CODEX_SESSIONS, PI_SESSIONS, type ProfileContext, profileLaunch } from "../src/agents/cliProfiles.ts";
+import { CODEX_SESSIONS, PI_SESSIONS, piRepoResourceArgs, type ProfileContext, profileLaunch } from "../src/agents/cliProfiles.ts";
 
 const model = (id: string, extra: Partial<CatalogModel> = {}): CatalogModel => ({
   id,
@@ -131,6 +131,23 @@ describe("pi's profile", () => {
     // SPI-1151: the repo's Skills and templates are the profile's to name, never t3's.
     expect(launch("pi", ["--mode", "rpc", "--skill", "/elsewhere", "--extension", STATE_EXTENSION])).toHaveProperty("refused");
     expect(launch("pi", ["--mode", "rpc", "--prompt-template", "/elsewhere", "--extension", STATE_EXTENSION])).toHaveProperty("refused");
+  });
+
+  it("names pi's repo roots from a cwd below the repo root as pi finds them: .pi/skills at the cwd, .agents/skills up to the root (SPI-1151)", () => {
+    expect(piRepoResourceArgs("/w/demo/pkg/app")).toEqual([
+      "--skill",
+      "/w/demo/pkg/app/.pi/skills",
+      "--skill",
+      "/w/demo/pkg/app/.agents/skills",
+      "--skill",
+      "/w/demo/pkg/.agents/skills",
+      "--skill",
+      "/w/demo/.agents/skills",
+      "--prompt-template",
+      "/w/demo/pkg/app/.pi/prompts",
+    ]);
+    // A worktree's repo root is its own path, not the project's.
+    expect(piRepoResourceArgs("/w/.wt/demo/feature/")).toEqual(["--skill", "/w/.wt/demo/feature/.pi/skills", "--skill", "/w/.wt/demo/feature/.agents/skills", "--prompt-template", "/w/.wt/demo/feature/.pi/prompts"]);
     expect(launch("pi", ["--version"])).toHaveProperty("refused");
   });
 
