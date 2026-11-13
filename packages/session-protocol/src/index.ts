@@ -145,8 +145,60 @@ export interface AnswerInput {
 }
 
 export interface SnapshotInput {
-  /** Entries after this one; all of the root conversation's when absent. */
+  /** Entries after this one; all of the Session's conversation's when absent. */
   readonly fromEntry?: string;
+}
+
+/**
+ * G6 (SPI-987): t3's checkpoint rollback. The Session's conversation goes back to just before the first of these turns
+ * it placed (a pi-durable fork at the entry before it, or a fresh conversation), and it forgets every turn from there.
+ */
+export interface RollbackInput {
+  /** The provider turns t3 rolls back: those after the checkpoint's turn. */
+  readonly dropTurns: ReadonlyArray<string>;
+}
+
+export interface RollbackAnswer {
+  /** The pi-durable conversation the Session runs now. */
+  readonly conversation: string;
+  /** Whether the conversation changed (false: none of the turns was placed, or a repeated call). */
+  readonly rewound: boolean;
+  /** The turns the Session forgot. */
+  readonly dropped: number;
+}
+
+/**
+ * G6 (SPI-997): a new thread's Session seeded from another's conversation, as t3's native fork. The source's model
+ * context through the end of `providerTurnId` becomes this Session's conversation; later turns are not in it.
+ */
+export interface ForkInput {
+  /** The source thread's Session name (`sessionNameOf`). */
+  readonly source: string;
+  /** The source's turn the fork ends with; absent: nothing of the source's conversation. */
+  readonly providerTurnId?: string;
+}
+
+export interface ForkAnswer {
+  readonly conversation: string;
+  /** The model messages the fork was seeded with. */
+  readonly messages: number;
+}
+
+/** A Session asks the source Session for its conversation a page at a time (Session to Session). */
+export interface ForkSourceInput {
+  readonly providerTurnId: string;
+  /** The fork point the first page answered; absent on the first call. */
+  readonly at?: string;
+  readonly offset: number;
+}
+
+export interface ForkSourcePage {
+  /** The entry the fork ends at: the source's model context as of it. */
+  readonly at: string;
+  /** pi-ai messages, as pi-durable gives the model. */
+  readonly messages: ReadonlyArray<unknown>;
+  /** The offset of the next page; null after the last. */
+  readonly next: number | null;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

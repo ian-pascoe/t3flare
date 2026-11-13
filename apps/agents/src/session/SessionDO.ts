@@ -10,6 +10,7 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   type Conversation,
+  type ConversationWatch,
   createRegistry,
   Harness,
   type RegistryReader,
@@ -19,6 +20,12 @@ import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/stora
 import {
   type AbortInput,
   type AnswerInput,
+  type ForkAnswer,
+  type ForkInput,
+  type ForkSourceInput,
+  type ForkSourcePage,
+  type RollbackAnswer,
+  type RollbackInput,
   type ImageInput,
   type InteractionMode,
   interactionModeOf,
@@ -77,6 +84,7 @@ import { proxyModels } from "./models.ts";
 import { SUGGESTION_MODEL, suggestPrompt } from "./promptSuggestion.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
+import { FORK_PAGE_BYTES, forkPage, forkPoint, freshConversation, rewind, rollbackPlan, seed } from "./branches.ts";
 import { liveOf, pushedEntry, turnOfEntry, usageOf } from "./state.ts";
 
 export interface SessionEnv {
@@ -91,6 +99,8 @@ export interface SessionEnv {
   readonly T3FLARE_TURN_DEADLINE_MS?: string;
   /** Code mode's sandbox objects (ADR-0027), from the codemode Worker; absent in a deploy's bootstrap pass. */
   readonly CODEMODE_SANDBOX?: CodemodeSandboxNamespace;
+  /** The Session DOs (this class's own namespace): a fork reads its source Session's conversation (G6). */
+  readonly SESSIONS?: DurableObjectNamespace;
 }
 
 const context = BACKGROUND_CONTEXT;
@@ -125,6 +135,12 @@ const HARNESS_READ_MS = 5_000;
 const FAULT_KEY = "t3flare:proxy-fault";
 /** The most a Stop (or the object's start) waits for an aborted command's processes to be killed. */
 const KILL_BOUND_MS = 3_000;
+/**
+ * The conversation the Session runs (G6), when not the root: a rollback or a fork moved it. Absent: the Harness's root.
+ */
+const CONVERSATION_KEY = "t3flare:conversation";
+/** The fork this Session was seeded from (G6), so a repeated fork is answered, not seeded twice. */
+const FORK_KEY = "t3flare:fork";
 
 interface Meta {
   readonly threadId: string;
@@ -619,9 +635,28 @@ export class SessionDO extends DurableObject<SessionEnv> {
     return workspace === undefined ? undefined : new ComputerFiles(workspace, { reachContainer: true });
   }
 
-  async #root(model?: ModelRef, thinking?: ThinkingLevel | null): Promise<Conversation> {
+  /**
+   * The conversation the Session runs: the Harness's root (made with `model` when absent), or the one a rollback or a
+   * fork moved it to (G6).
+   */
+  async #conversation(model?: ModelRef, thinking?: ThinkingLevel | null): Promise<Conversation> {
     const harness = await this.#opening;
+    const moved = this.ctx.storage.kv.get<number>(CONVERSATION_KEY);
+    if (moved !== undefined) {
+      const conversation = await harness.conversation(moved as never, context);
+      if (conversation !== undefined) return conversation;
+      console.error(JSON.stringify({ t3flare: "session-conversation-missing", conversation: moved }));
+    }
     return harness.root(context, model === undefined ? undefined : { agent: { model, thinkingLevel: thinking ?? null } });
+  }
+
+  /** Runs `next` from now on (G6): the watch of the previous one ends, and the next push reads `next`. */
+  async #moveTo(next: Conversation): Promise<void> {
+    this.ctx.storage.kv.put(CONVERSATION_KEY, Number(next.id));
+    const watch = this.#watchHandle;
+    this.#watchHandle = undefined;
+    this.#lastView = undefined;
+    await watch?.stop();
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -683,9 +718,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
       epoch,
     } satisfies Meta);
     await this.#takeT3Mcp(input.t3Mcp);
-    const root = await this.#root(input.model, input.thinking);
+    const conversation = await this.#conversation(input.model, input.thinking);
     // The agent works in its Workspace's repo (t3's `/w/<id>`), or nowhere without one.
-    if (input.workspaceId !== null) await root.configure({ cwd: REPO_ROOT }, context);
+    if (input.workspaceId !== null) await conversation.configure({ cwd: REPO_ROOT }, context);
     const turns = this.#turnsWithProxy();
     return { epoch, busy: Object.values(turns).some(isLive), turns };
   }
@@ -707,15 +742,15 @@ export class SessionDO extends DurableObject<SessionEnv> {
     await this.#takeMcp();
     // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
     if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
-    const root = await this.#root(input.model, input.thinking);
-    await root.configure({ model: input.model, thinkingLevel: input.thinking ?? null }, context);
+    const conversation = await this.#conversation(input.model, input.thinking);
+    await conversation.configure({ model: input.model, thinkingLevel: input.thinking ?? null }, context);
     const startedAt = Date.now();
     // Recorded with a placeholder before the submit, so the alarm armed below covers it if the process dies after it.
     const turns = this.#turns();
     turns[input.providerTurnId] = { submissionId: "", runId: input.runId, attemptId: input.attemptId, status: "queued", startedAt };
     this.#saveTurns(turns);
     await this.#arm();
-    const submission = await root.submit(
+    const submission = await conversation.submit(
       { type: "input", content: userContent(input.text, input.images), requestId: input.providerTurnId, whenBusy: "followUp" },
       context,
     );
@@ -730,8 +765,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   async steer(input: SteerInput): Promise<{ readonly submissionId: string }> {
     const turn = this.#turns()[input.providerTurnId];
     if (turn === undefined || !isLive(turn)) throw new Error(`t3flare: turn ${input.providerTurnId} is not live`);
-    const root = await this.#root();
-    const submission = await root.submit(
+    const conversation = await this.#conversation();
+    const submission = await conversation.submit(
       // Only into a run in progress: a steer that finds the Session idle is refused, never a run t3 did not start.
       { type: "input", content: userContent(input.text, input.images), requestId: input.key, whenBusy: "steer", whenIdle: "reject" },
       context,
@@ -766,7 +801,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const status = record === undefined ? undefined : (await record.status(context)).status;
     if (record !== undefined && status === "queued") await record.abort(context);
     else if (status === "placed") {
-      await (await this.#root()).abort(context);
+      await (await this.#conversation()).abort(context);
       // The run's calls are aborted: their commands' processes are killed before the Stop returns (bounded).
       await this.#execs.killAll(KILL_BOUND_MS);
       await this.#arm();
@@ -814,14 +849,14 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const turn = this.#turns()[input.providerTurnId];
     if (turn?.status !== "answered" || turn.inputEntry === undefined) return { text: "" };
     if (Object.values(this.#turns()).some(isLive)) return { text: "" };
-    const root = await this.#root();
+    const conversation = await this.#conversation();
     const textOf = (entry: unknown): { readonly role: string; readonly text: string } => {
       const pushed = pushedEntry(entry as never, null);
       return { role: pushed.role, text: pushed.content.flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : [])).join("") };
     };
-    const first = (await root.entries({ minEntryId: Number(turn.inputEntry) as never, order: "ascending" }, 1, undefined, context)).items[0];
+    const first = (await conversation.entries({ minEntryId: Number(turn.inputEntry) as never, order: "ascending" }, 1, undefined, context)).items[0];
     const user = first === undefined ? "" : textOf(first);
-    const newest = await root.entries({ minEntryId: Number(turn.inputEntry) as never, order: "descending" }, 20, undefined, context);
+    const newest = await conversation.entries({ minEntryId: Number(turn.inputEntry) as never, order: "descending" }, 20, undefined, context);
     const answer = newest.items.map(textOf).find((entry) => entry.role === "assistant" && entry.text.trim() !== "");
     if (user === "" || user.role !== "user" || answer === undefined) return { text: "" };
     this.#suggestionModels ??= proxyModels({ url: this.env.MODEL_PROXY_URL, apiKey: this.env.MODEL_PROXY_API_KEY }, () => this.#catalog.current());
@@ -837,9 +872,88 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const dropped = Object.keys(this.#turns()).length;
     this.#saveTurns({});
     this.ctx.storage.kv.delete(PROXY_KEY);
-    await (await this.#root()).abort(context);
+    await (await this.#conversation()).abort(context);
     await this.#arm();
     return { dropped };
+  }
+
+  /**
+   * G6 (SPI-987): t3's checkpoint rollback. Refused while a turn is live (t3 refuses it too). The conversation goes back to
+   * just before the first dropped turn the Session placed: a fork at the entry before it (its documents, code mode's
+   * `store` among them, as they were there), or a fresh conversation at the thread's start. The old conversation is
+   * aborted and kept as history; the dropped turns, their proxy records and any request they left are forgotten. A
+   * repeated call finds nothing to drop and changes nothing.
+   */
+  async rollback(input: RollbackInput): Promise<RollbackAnswer> {
+    await this.#refreshTurns();
+    const turns = this.#turns();
+    if (Object.values(turns).some(isLive)) throw new Error("t3flare: a turn is running; roll back after it ends");
+    const harness = await this.#opening;
+    const { boundary, drop } = rollbackPlan(turns, input.dropTurns);
+    let conversation = await this.#conversation();
+    if (boundary !== undefined) {
+      const next = await rewind(harness, conversation, boundary, context);
+      await conversation.abort(context);
+      await this.#moveTo(next);
+      conversation = next;
+    }
+    if (drop.size > 0) {
+      for (const id of drop) delete turns[id];
+      this.#saveTurns(turns);
+      const proxy = this.ctx.storage.kv.get<Record<string, ProxyRecord>>(PROXY_KEY);
+      if (proxy !== undefined) this.ctx.storage.kv.put(PROXY_KEY, Object.fromEntries(Object.entries(proxy).filter(([id]) => !drop.has(id))));
+    }
+    this.#dropAbandonedApprovals();
+    console.log(JSON.stringify({ t3flare: "session-rollback", conversation: Number(conversation.id), boundary: boundary ?? null, dropped: drop.size }));
+    this.#schedulePush(0);
+    return { conversation: String(conversation.id), rewound: boundary !== undefined, dropped: drop.size };
+  }
+
+  /**
+   * G6 (SPI-997): seeds this new thread's Session with the source Session's model context through the end of
+   * `providerTurnId` (t3's native fork), in a new conversation the Session then runs. Refused once the Session has turns
+   * of its own; a repeated call for the same fork answers the first's result.
+   */
+  async fork(input: ForkInput): Promise<ForkAnswer> {
+    const kv = this.ctx.storage.kv;
+    const done = kv.get<ForkInput & ForkAnswer>(FORK_KEY);
+    if (done !== undefined) {
+      if (done.source === input.source && done.providerTurnId === input.providerTurnId) return { conversation: done.conversation, messages: done.messages };
+      throw new Error("t3flare: this Session was already forked from another conversation");
+    }
+    if (Object.keys(this.#turns()).length > 0) throw new Error("t3flare: this Session has turns of its own; only a new thread is forked");
+    if (input.source === (this.ctx.id.name ?? "")) throw new Error("t3flare: a Session cannot fork itself");
+    const sessions = this.env.SESSIONS;
+    if (sessions === undefined) throw new Error("t3flare: this Worker has no SESSIONS binding");
+    // SAFETY: the Session DO answers `forkSource` (below); a stub's RPC types only rewrite its declared type.
+    const source = sessions.get(sessions.idFromName(input.source)) as unknown as { forkSource(input: ForkSourceInput): Promise<ForkSourcePage> };
+    const harness = await this.#opening;
+    const target = await freshConversation(harness, await this.#conversation(), context);
+    let messages = 0;
+    if (input.providerTurnId !== undefined) {
+      let page: ForkSourcePage | undefined;
+      let offset: number | null = 0;
+      while (offset !== null) {
+        page = await source.forkSource({ providerTurnId: input.providerTurnId, offset, ...(page === undefined ? {} : { at: page.at }) });
+        await seed(target, page.messages, { source: input.source, at: page.at }, context);
+        messages += page.messages.length;
+        offset = page.next;
+      }
+    }
+    await this.#moveTo(target);
+    const answer: ForkAnswer = { conversation: String(target.id), messages };
+    kv.put(FORK_KEY, { ...input, ...answer });
+    console.log(JSON.stringify({ t3flare: "session-fork", source: input.source, conversation: Number(target.id), messages }));
+    this.#schedulePush(0);
+    return answer;
+  }
+
+  /** G6: a page of this Session's model context for a fork that ends with `providerTurnId` (another Session asks). */
+  async forkSource(input: ForkSourceInput): Promise<ForkSourcePage> {
+    await this.#refreshTurns();
+    const conversation = await this.#conversation();
+    const at = input.at === undefined ? await forkPoint(conversation, this.#turns(), input.providerTurnId, context) : (Number(input.at) as never);
+    return forkPage(conversation, at, input.offset, FORK_PAGE_BYTES, context);
   }
 
   /** Counts of this object's starts and alarms (the approval-survives-restarts check, step 2a M3). */
@@ -965,7 +1079,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // State and pushes
 
   async #state(fromEntry: number | undefined, bound: number): Promise<SessionState & { readonly lastEntry: number | undefined }> {
-    const root = await this.#root();
+    const conversation = await this.#conversation();
     const turns = this.#turnsWithProxy();
     const entries: Array<PushedEntry> = [];
     let bytes = 0;
@@ -973,7 +1087,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     let lastEntry: number | undefined;
     let cursor: unknown;
     do {
-      const page = await root.entries(
+      const page = await conversation.entries(
         { ...(fromEntry === undefined ? {} : { minEntryId: fromEntry as never }), order: "ascending" },
         100,
         cursor as never,
@@ -1008,43 +1122,47 @@ export class SessionDO extends DurableObject<SessionEnv> {
       inbox: { pending: inbox.items?.length ?? 0 },
       approvals: [...this.#approvals.pending(), ...this.#mcpQuestions.approvals()],
       questions: [...this.#questions.pending(), ...this.#mcpQuestions.questions()],
-      todo: await this.#todo(root),
+      todo: await this.#todo(conversation),
       turns,
       lastEntry,
     };
   }
 
-  /** The root conversation's Todo List (SPI-1055), as t3's todo list shows it; null when it never had one. */
-  async #todo(root: Conversation): Promise<TodoSlim | null> {
-    const state = await (await this.#opening).snapshot(TodoDoc, root.id, context);
+  /** The conversation's Todo List (SPI-1055), as t3's todo list shows it; null when it never had one. */
+  async #todo(conversation: Conversation): Promise<TodoSlim | null> {
+    const state = await (await this.#opening).snapshot(TodoDoc, conversation.id, context);
     if (state === undefined || state.rev === 0) return null;
     return { rev: state.rev, tasks: state.tasks.map((task) => ({ id: task.id, title: task.title, status: task.status })) };
   }
 
-  /** The root conversation's current view (documents), read through a one-shot watch. */
+  /** The conversation's current view (documents), read through a one-shot watch. */
   #lastView: { readonly docs: Readonly<Record<string, unknown>> } | undefined;
+  /** The watch `#watch` holds, so a move to another conversation (G6) can end it. */
+  #watchHandle: ConversationWatch | undefined;
   async #view(): Promise<{ readonly docs: Readonly<Record<string, unknown>> } | undefined> {
     if (this.#lastView !== undefined && this.#watching !== undefined) return this.#lastView;
-    const root = await this.#root();
-    const handle = await root.watch(context, { min: 1 });
+    const conversation = await this.#conversation();
+    const handle = await conversation.watch(context, { min: 1 });
     const value = handle.value as { docs: Readonly<Record<string, unknown>> };
     await handle.stop();
     return value;
   }
 
-  /** Watches the root conversation while turns are live: each commit makes a push due. */
+  /** Watches the conversation while turns are live: each commit makes a push due. */
   #watch(): Promise<void> {
     this.#watching ??= (async () => {
-      const root = await this.#root();
-      const handle = await root.watch(context, { min: 1 });
+      const conversation = await this.#conversation();
+      const handle = await conversation.watch(context, { min: 1 });
+      this.#watchHandle = handle;
       this.#lastView = handle.value as { docs: Readonly<Record<string, unknown>> };
       handle.start(async (call) => {
-        if (call.kind !== "value") return;
+        if (call.kind !== "value" || this.#watchHandle !== handle) return;
         this.#lastView = call.value as { docs: Readonly<Record<string, unknown>> };
         this.#schedulePush(PUSH_COALESCE_MS);
       });
       const end = await handle.closed;
       console.log(JSON.stringify({ t3flare: "session-watch-ended", kind: end.kind }));
+      if (this.#watchHandle === handle) this.#watchHandle = undefined;
       this.#watching = undefined;
       this.#lastView = undefined;
     })().catch((error: unknown) => {

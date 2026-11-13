@@ -288,6 +288,9 @@ export const makePiDurableAdapter = (
         readonly runtimeMode: string;
         readonly interactionMode: string;
         readonly resume: boolean;
+        /** G6: a new provider thread forked from another (t3's `forkedFrom`) and owned by `ownerNodeId`. */
+        readonly forkedFrom?: OrchestrationV2ProviderThread["forkedFrom"];
+        readonly ownerNodeId?: OrchestrationV2ProviderThread["ownerNodeId"];
       }) {
         const at = yield* DateTime.now;
         const { model, thinking } = modelOf(registerInput.modelSelection);
@@ -319,14 +322,14 @@ export const makePiDurableAdapter = (
                 providerInstanceId: instanceId,
                 providerSessionId: session.id,
                 appThreadId: registerInput.threadId,
-                ownerNodeId: null,
+                ownerNodeId: registerInput.ownerNodeId ?? null,
                 nativeThreadRef: ref(sessionName),
                 nativeConversationHeadRef: null,
                 status: "idle",
                 firstRunOrdinal: null,
                 lastRunOrdinal: null,
                 handoffIds: [],
-                forkedFrom: null,
+                forkedFrom: registerInput.forkedFrom ?? null,
                 pendingBackgroundTasks: [],
                 createdAt: at,
                 updatedAt: at,
@@ -535,8 +538,78 @@ export const makePiDurableAdapter = (
         readThreadSnapshot: Effect.fn("PiDurableAdapter.readThreadSnapshot")(function (snapshotInput) {
           return Effect.succeed({ providerThread: snapshotInput.providerThread, providerTurns: [], messages: [], runtimeRequests: [] });
         }),
-        rollbackThread: () => Effect.fail(protocolError("rollback is not supported")),
-        forkThread: () => Effect.fail(protocolError("fork is not supported")),
+        /**
+         * G6 (SPI-987): the conversation goes back to the checkpoint's turn (the Session forks its pi-durable conversation
+         * before the first turn after it); t3 restores the files. As t3's Pi adapter, the snapshot is the provider thread
+         * alone: t3 keeps its own transcript and marks the later runs rolled back.
+         */
+        rollbackThread: Effect.fn("PiDurableAdapter.rollbackThread")(
+          function* (rollbackInput) {
+            if (differ.turns.size > 0) return yield* protocolError("Cannot roll back while a turn is running");
+            if (rollbackInput.providerThread.nativeThreadRef?.nativeId !== sessionName) {
+              return yield* protocolError("Rollback requested for a thread this session does not host");
+            }
+            const ordinal = rollbackInput.target.type === "thread_start" ? 0 : rollbackInput.target.providerTurn.ordinal;
+            const dropTurns = rollbackInput.providerThreadTurns.filter((turn) => turn.ordinal > ordinal).map((turn) => turn.id);
+            const answer = yield* call("rollback", () => client().rollback({ dropTurns }));
+            yield* Effect.logInfo("pi-durable rollback", { sessionName, ordinal, ...answer });
+            const at = yield* DateTime.now;
+            const providerThread = { ...rollbackInput.providerThread, status: "idle" as const, updatedAt: at };
+            if (thread?.id === providerThread.id) thread = providerThread;
+            return { providerThread, providerTurns: [], messages: [], runtimeRequests: [] };
+          },
+          (effect, rollbackInput) =>
+            effect.pipe(
+              Effect.mapError(
+                (cause) =>
+                  new ProviderAdapter.ProviderAdapterRollbackThreadError({
+                    driver,
+                    providerThreadId: rollbackInput.providerThread.id,
+                    checkpointId: rollbackInput.target.checkpointId,
+                    cause,
+                  }),
+              ),
+            ),
+        ),
+        /**
+         * G6 (SPI-997): t3's native fork. The target thread's Session (this session's) is seeded with the source Session's
+         * model context through the end of `providerTurnId`, and runs on its own from there. On failure t3 falls back to
+         * its portable context handoff (ProviderTurnStartService).
+         */
+        forkThread: Effect.fn("PiDurableAdapter.forkThread")(
+          function* (forkInput) {
+            if (forkInput.targetThreadId !== input.threadId) return yield* protocolError("A fork opens in the target thread's own session");
+            if (differ.turns.size > 0) return yield* protocolError("Cannot fork while a turn is running");
+            const source = forkInput.sourceProviderThread.nativeThreadRef;
+            if (source?.driver !== driver || source.nativeId === null || !source.nativeId.startsWith("thread:") || source.nativeId === sessionName) {
+              return yield* protocolError("The fork's source is not another Durable agent session");
+            }
+            const policy = forkInput.runtimePolicy ?? input.runtimePolicy;
+            const forked = yield* register({
+              threadId: forkInput.targetThreadId,
+              modelSelection: forkInput.modelSelection ?? input.modelSelection,
+              runtimeMode: policy.runtimeMode,
+              interactionMode: policy.interactionMode,
+              resume: false,
+              forkedFrom: {
+                providerThreadId: forkInput.sourceProviderThread.id,
+                ...(forkInput.providerTurnId === undefined ? {} : { providerTurnId: forkInput.providerTurnId }),
+              },
+              ownerNodeId: forkInput.ownerNodeId ?? null,
+            });
+            const answer = yield* call("fork", () =>
+              client().fork({ source: source.nativeId!, ...(forkInput.providerTurnId === undefined ? {} : { providerTurnId: forkInput.providerTurnId }) }),
+            );
+            yield* Effect.logInfo("pi-durable fork", { sessionName, source: source.nativeId, ...answer });
+            return forked;
+          },
+          (effect, forkInput) =>
+            effect.pipe(
+              Effect.mapError(
+                (cause) => new ProviderAdapter.ProviderAdapterForkThreadError({ driver, providerThreadId: forkInput.sourceProviderThread.id, cause }),
+              ),
+            ),
+        ),
       };
       return runtime;
     }),

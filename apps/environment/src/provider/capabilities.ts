@@ -18,9 +18,11 @@ export const PiDurableCapabilities = {
   threads: {
     canCreateEmptyThread: true,
     canReadThreadSnapshot: true,
-    canRollbackThread: false,
-    canForkThread: false,
-    canForkFromTurn: false,
+    // G6: a rollback forks the Session's conversation before the first later turn; a fork seeds the new thread's Session
+    // with the source's conversation through the fork's turn (`agents/src/session/branches.ts`).
+    canRollbackThread: true,
+    canForkThread: true,
+    canForkFromTurn: true,
     canForkFromSubagentThread: false,
     exposesNativeThreadId: true,
   },
@@ -91,8 +93,9 @@ export const PiDurableCapabilities = {
   checkpointing: {
     appCanCheckpointFilesystem: true,
     supportsNestedCheckpointScopes: false,
-    providerCanRollbackConversation: false,
-    providerRollbackReturnsSnapshot: false,
+    providerCanRollbackConversation: true,
+    // As t3's Pi adapter: the snapshot is the provider thread; t3 keeps its own transcript.
+    providerRollbackReturnsSnapshot: true,
     providerCanReadConversationSnapshot: true,
   },
   identity: {

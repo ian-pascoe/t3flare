@@ -3,8 +3,12 @@
 import type {
   AbortInput,
   AnswerInput,
+  ForkAnswer,
+  ForkInput,
   OpenAnswer,
   OpenInput,
+  RollbackAnswer,
+  RollbackInput,
   SessionState,
   SnapshotInput,
   SteerInput,
@@ -109,6 +113,10 @@ export interface SessionRpc {
   abort(input: AbortInput): Promise<{ readonly aborted: boolean }>;
   answer(input: AnswerInput): Promise<{ readonly applied: boolean }>;
   snapshot(input?: SnapshotInput): Promise<SessionState>;
+  /** G6 (SPI-987): the conversation back to before the first dropped turn. */
+  rollback(input: RollbackInput): Promise<RollbackAnswer>;
+  /** G6 (SPI-997): a new thread's Session seeded from the source Session's conversation. */
+  fork(input: ForkInput): Promise<ForkAnswer>;
   dropTurns(): Promise<{ readonly dropped: number }>;
   diagnostics(): Promise<Readonly<Record<string, number>>>;
   proxyFault(input: { readonly fixture: string; readonly resetAt: number }): Promise<{ readonly armed: { readonly fixture: string; readonly resetAt: number } }>;
