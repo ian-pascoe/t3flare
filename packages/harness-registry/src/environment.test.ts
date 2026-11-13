@@ -27,6 +27,17 @@ describe("applyEnvironmentChange", () => {
     expect(resolveEnvironment(again.environment)).toEqual({ revision: 2, containerSize: "standard-4", containerIdleMinutes: 5, containerBudget: 3 });
   });
 
+  it("stores and bumps the revision for the settings that moved only; a save that moves none changes nothing", () => {
+    const first = applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { containerSize: "standard-2", containerIdleMinutes: 2, containerBudget: 3 } });
+    if (!first.ok) throw new Error(first.error);
+    expect(first.changed).toEqual(["containerSize"]);
+    expect(first.environment).toEqual({ revision: 1, settings: { containerSize: "standard-2" } });
+    const same = applyEnvironmentChange(first.environment, { settings: { containerSize: "standard-2", containerIdleMinutes: 2, containerBudget: 3 } });
+    if (!same.ok) throw new Error(same.error);
+    expect(same.changed).toEqual([]);
+    expect(same.environment).toBe(first.environment);
+  });
+
   it("keeps the idle time between 1 and 60 whole minutes", () => {
     for (const minutes of [1, 60]) expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { containerIdleMinutes: minutes } })).toMatchObject({ ok: true });
     for (const minutes of [0, 61, 1.5, -2, "5"]) expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { containerIdleMinutes: minutes } })).toMatchObject({ ok: false });
@@ -53,9 +64,9 @@ describe("containerInstance", () => {
     expect(containerInstance("standard-4")).toBe("standard-4");
   });
 
-  it("starts the default for a name it does not offer, never an omitted instance (which would start lite)", () => {
-    for (const name of ["lite", "basic", "mem-8", "custom-1", "", undefined, null, 3, { vcpu: 4 }]) {
-      expect(containerInstance(name)).toEqual({ vcpu: 1, memoryMib: 3072, diskMb: 12000 });
+  it("starts the default for a stored name it does not offer, never an omitted instance (which would start lite)", () => {
+    for (const name of ["lite", "basic", "mem-8", "custom-1", "", null, 3, { vcpu: 4 }]) {
+      expect(containerInstance(resolveEnvironment({ revision: 1, settings: { containerSize: name } }).containerSize)).toEqual({ vcpu: 1, memoryMib: 3072, diskMb: 12000 });
     }
   });
 });

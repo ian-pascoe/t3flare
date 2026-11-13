@@ -4,7 +4,8 @@
 // each Workspace DO before a Container start. Imported by both Workers.
 //
 // One schema (`ENVIRONMENT_SETTINGS`), one resolve (`resolveEnvironment`), one change (`applyEnvironmentChange`): a later
-// setting (the Global mise config, SPI-1150; Variables, SPI-1152) adds an entry here and appears in the panel's section.
+// setting (the Global mise config, SPI-1150; Variables, SPI-1152) is one entry in `ENVIRONMENT_SETTINGS`. The resolved
+// type, the resolve, the validation and the panel's section all follow from it.
 import { fieldProblem, type SettingEntry, type SettingValue } from "./fields.ts";
 
 /**
@@ -34,18 +35,19 @@ export type ContainerInstance = NamedContainerType | ContainerResources;
 
 /**
  * The Container sizes, by the name kept in the settings, smallest memory first. `cpu-1` is t3flare's size before this
- * setting (cloudpid's `cpu-1`: 1 vCPU, 3 GiB, 12 GB), a custom size; the others are Cloudflare's named types, with the
- * resources its limits page gives (docs/steps/spi-1001-research-container-sizes.md §2). Not offered: `lite` and `basic`
- * (the runtime refuses `basic`), and cloudpid's other custom sizes. A stored name never changes meaning: adding a size
- * is free, removing one needs a rename map.
+ * setting (cloudpid's `cpu-1`: 1 vCPU, 3 GiB, 12 GB), a custom size started as its resources; the others are Cloudflare's
+ * named types, started by name, with the resources its limits page gives
+ * (docs/steps/spi-1001-research-container-sizes.md §2). Not offered: `lite` and `basic` (the runtime refuses `basic`),
+ * and cloudpid's other custom sizes. A stored name never changes meaning: adding a size is free, removing one needs a
+ * rename map.
  */
 export const CONTAINER_SIZES = {
-  "cpu-1": { instance: { vcpu: 1, memoryMib: 3072, diskMb: 12_000 }, resources: { vcpu: 1, memoryMib: 3072, diskMb: 12_000 } },
-  "standard-1": { instance: "standard-1", resources: { vcpu: 0.5, memoryMib: 4096, diskMb: 8_000 } },
-  "standard-2": { instance: "standard-2", resources: { vcpu: 1, memoryMib: 6144, diskMb: 12_000 } },
-  "standard-3": { instance: "standard-3", resources: { vcpu: 2, memoryMib: 8192, diskMb: 16_000 } },
-  "standard-4": { instance: "standard-4", resources: { vcpu: 4, memoryMib: 12_288, diskMb: 20_000 } },
-} as const satisfies Readonly<Record<string, { readonly instance: ContainerInstance; readonly resources: ContainerResources }>>;
+  "cpu-1": { custom: true, resources: { vcpu: 1, memoryMib: 3072, diskMb: 12_000 } },
+  "standard-1": { custom: false, resources: { vcpu: 0.5, memoryMib: 4096, diskMb: 8_000 } },
+  "standard-2": { custom: false, resources: { vcpu: 1, memoryMib: 6144, diskMb: 12_000 } },
+  "standard-3": { custom: false, resources: { vcpu: 2, memoryMib: 8192, diskMb: 16_000 } },
+  "standard-4": { custom: false, resources: { vcpu: 4, memoryMib: 12_288, diskMb: 20_000 } },
+} as const satisfies Readonly<Record<string, { readonly custom: boolean; readonly resources: ContainerResources }>>;
 
 export type ContainerSize = keyof typeof CONTAINER_SIZES;
 
@@ -53,12 +55,15 @@ export const CONTAINER_SIZE_NAMES = Object.keys(CONTAINER_SIZES) as ReadonlyArra
 
 export const DEFAULT_CONTAINER_SIZE: ContainerSize = "cpu-1";
 
-/** The size stored as `name`, or the default for a name t3flare does not offer. */
-export const containerSizeOf = (name: unknown): ContainerSize =>
-  typeof name === "string" && Object.hasOwn(CONTAINER_SIZES, name) ? (name as ContainerSize) : DEFAULT_CONTAINER_SIZE;
-
-/** What `ctx.container.start({ instance })` takes for the stored size `name`: never undefined, the default for an unknown name. */
-export const containerInstance = (name: unknown): ContainerInstance => CONTAINER_SIZES[containerSizeOf(name)].instance;
+/**
+ * What `ctx.container.start({ instance })` takes for `size`: a custom size's resources, a named type's name. Never
+ * undefined (an omitted `instance` starts `lite`); a stored name t3flare does not offer resolves to the default first
+ * (`resolveEnvironment`).
+ */
+export const containerInstance = (size: ContainerSize): ContainerInstance => {
+  const entry = CONTAINER_SIZES[size];
+  return entry.custom ? entry.resources : (size as NamedContainerType);
+};
 
 /** What the Environment DO stores (`t3flare:environment:settings`): the settings set explicitly. */
 export interface StoredEnvironment {
@@ -68,14 +73,6 @@ export interface StoredEnvironment {
 }
 
 export const EMPTY_ENVIRONMENT: StoredEnvironment = { revision: 0, settings: {} };
-
-/** What a Workspace DO reads: every setting resolved, a stored value that no longer fits read as its default. */
-export interface ResolvedEnvironment {
-  readonly revision: number;
-  readonly containerSize: string;
-  readonly containerIdleMinutes: number;
-  readonly containerBudget: number;
-}
 
 /** The Environment settings' schema: the panel renders its section from it and the API validates against it. */
 export const ENVIRONMENT_SETTINGS = {
@@ -97,39 +94,68 @@ export const ENVIRONMENT_SETTINGS = {
   },
 } as const satisfies Readonly<Record<string, SettingEntry>>;
 
-type EnvironmentKey = keyof typeof ENVIRONMENT_SETTINGS;
+export type EnvironmentKey = keyof typeof ENVIRONMENT_SETTINGS;
 
-/** The stored `key`, or its default when it is missing or no longer fits the schema. */
-const valueOf = (stored: StoredEnvironment, key: EnvironmentKey): SettingValue => {
-  const entry: SettingEntry = ENVIRONMENT_SETTINGS[key];
-  const value = stored.settings[key];
-  return value !== undefined && fieldProblem(entry.schema, value) === undefined ? value : entry.schema.default;
+const ENVIRONMENT_KEYS = Object.keys(ENVIRONMENT_SETTINGS) as ReadonlyArray<EnvironmentKey>;
+
+/** The value a field of `schema` holds: an enum's own names, a number, a boolean or text. */
+type ValueOf<Schema> = Schema extends { readonly type: "enum"; readonly values: ReadonlyArray<infer Name> }
+  ? Name
+  : Schema extends { readonly type: "integer" }
+    ? number
+    : Schema extends { readonly type: "boolean" }
+      ? boolean
+      : string;
+
+/** What a Workspace DO reads: every setting resolved, a stored value that no longer fits read as its default. */
+export type ResolvedEnvironment = { readonly revision: number } & {
+  readonly [Key in EnvironmentKey]: ValueOf<(typeof ENVIRONMENT_SETTINGS)[Key]["schema"]>;
 };
 
-/** The settings every Workspace DO starts its Container with. */
-export const resolveEnvironment = (stored: StoredEnvironment): ResolvedEnvironment => ({
-  revision: stored.revision,
-  containerSize: valueOf(stored, "containerSize") as string,
-  containerIdleMinutes: valueOf(stored, "containerIdleMinutes") as number,
-  containerBudget: valueOf(stored, "containerBudget") as number,
-});
+/** Whether `value` fits setting `key`'s schema. */
+export const fitsEnvironmentSetting = (key: EnvironmentKey, value: unknown): boolean =>
+  fieldProblem((ENVIRONMENT_SETTINGS[key] as SettingEntry).schema, value) === undefined;
+
+/**
+ * The settings every Workspace DO starts its Container with. `settings` is what was stored, or an answer from an
+ * Environment newer or older than this Worker: a value that is missing or no longer fits reads as its default.
+ */
+export const resolveEnvironment = (stored: { readonly revision: number; readonly settings: Readonly<Record<string, unknown>> }): ResolvedEnvironment => {
+  const resolved: Record<string, unknown> = { revision: stored.revision };
+  for (const key of ENVIRONMENT_KEYS) {
+    const value = stored.settings[key];
+    resolved[key] = value !== undefined && fitsEnvironmentSetting(key, value) ? value : (ENVIRONMENT_SETTINGS[key] as SettingEntry).schema.default;
+  }
+  // SAFETY: every key of the schema was set above, each to a value its schema accepts.
+  return resolved as ResolvedEnvironment;
+};
 
 /** One change from the panel or a script: some of the settings. */
 export interface EnvironmentChange {
   readonly settings: Readonly<Record<string, unknown>>;
 }
 
-/** `stored` with `change` applied and the revision bumped, or why it is refused. */
+/**
+ * `stored` with `change` applied, or why it is refused. `changed` names the settings whose resolved value moved; only
+ * they are stored and the revision is bumped only when there is one (a form posts every setting on each save).
+ */
 export const applyEnvironmentChange = (
   stored: StoredEnvironment,
   change: EnvironmentChange,
-): { readonly ok: true; readonly environment: StoredEnvironment } | { readonly ok: false; readonly error: string } => {
+): { readonly ok: true; readonly environment: StoredEnvironment; readonly changed: ReadonlyArray<EnvironmentKey> } | { readonly ok: false; readonly error: string } => {
   const entries = Object.entries(change.settings);
   if (entries.length === 0) return { ok: false, error: "the change sets nothing" };
   for (const [key, value] of entries) {
     if (!Object.hasOwn(ENVIRONMENT_SETTINGS, key)) return { ok: false, error: `${key}: no such setting` };
-    const why = fieldProblem(ENVIRONMENT_SETTINGS[key as EnvironmentKey].schema, value);
+    const why = fieldProblem((ENVIRONMENT_SETTINGS[key as EnvironmentKey] as SettingEntry).schema, value);
     if (why !== undefined) return { ok: false, error: `${key}: ${why}` };
   }
-  return { ok: true, environment: { revision: stored.revision + 1, settings: { ...stored.settings, ...(change.settings as Record<string, SettingValue>) } } };
+  const before: Readonly<Record<string, unknown>> = resolveEnvironment(stored);
+  const moved = entries.filter(([key, value]) => before[key] !== value);
+  if (moved.length === 0) return { ok: true, environment: stored, changed: [] };
+  return {
+    ok: true,
+    environment: { revision: stored.revision + 1, settings: { ...stored.settings, ...(Object.fromEntries(moved) as Record<string, SettingValue>) } },
+    changed: moved.map(([key]) => key as EnvironmentKey),
+  };
 };
