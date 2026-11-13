@@ -8,6 +8,8 @@ import { PollingWatcher } from "./watch.ts";
 import type { Snapshot } from "./wire.ts";
 
 const target = { path: "/workspace", recursive: true, hidden: true, names: [] };
+/** A scan as slow as a loaded machine makes it: three of them, with the polls between, overran the old 100 ms wait. */
+const SLOW_SCAN_MS = 40;
 
 /**
  * A Workspace DO stand-in that answers each scan with the next step: a snapshot, or a thrown RPC failure; the last
@@ -77,7 +79,7 @@ describe("PollingWatcher", () => {
   it("reports the same overflow when every scan is slow", async () => {
     const snapshot: Snapshot = [["/workspace/a", "1"]];
 
-    expect(await changes([snapshot, "unreachable", "unreachable", snapshot], 40)).toEqual([
+    expect(await changes([snapshot, "unreachable", "unreachable", snapshot], SLOW_SCAN_MS)).toEqual([
       { kind: "overflow" },
     ]);
   });
