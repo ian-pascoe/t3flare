@@ -12,7 +12,7 @@ describe("resolveHarness", () => {
     expect(resolved.codemode).toEqual({ enabled: true, inlineBudget: 2000 });
     expect(resolved.toolSearch).toEqual({ enabled: true });
     expect(resolved.offered).toEqual([
-      "read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search",
+      "read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo",
     ]);
   });
 

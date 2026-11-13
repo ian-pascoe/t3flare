@@ -37,6 +37,7 @@ import {
   type SessionPushAnswer,
   type SessionState,
   type SnapshotInput,
+  type TodoSlim,
   type SteerInput,
   type SubmitTurnInput,
   sessionNameOf,
@@ -61,6 +62,7 @@ import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
 import { McpQuestions } from "../extensions/mcpQuestions.ts";
 import { ApprovalStore, interactionModeSection, permissions } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
+import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { catalogOf, type T3Catalog, t3McpExtension } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
@@ -304,7 +306,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // Harness settings (ADR-0026): code mode, tool search and the offered tools, taken at a turn's start
 
   /**
-   * Installs (or removes) the switchable extensions (web, SPI-1054), then code mode and tool search, as `harness` says:
+   * Installs (or removes) the switchable extensions (web, SPI-1054; todo, SPI-1055), then code mode and tool search, as `harness` says:
    * code mode's namespaces and tool search's deferral cover the tools installed before them. pi-durable applies it from
    * the next phase.
    */
@@ -323,6 +325,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     } else {
       registry.uninstall({ name: WEB_EXTENSION });
     }
+    if (extensionOf(harness, TODO_EXTENSION).enabled) registry.install(todoExtension(() => this.#opening));
+    else registry.uninstall({ name: TODO_EXTENSION });
     const sandbox = this.env.CODEMODE_SANDBOX;
     const sessionName = this.ctx.id.name ?? this.ctx.id.toString();
     if (harness.codemode.enabled && sandbox !== undefined) {
@@ -875,9 +879,17 @@ export class SessionDO extends DurableObject<SessionEnv> {
       inbox: { pending: inbox.items?.length ?? 0 },
       approvals: [...this.#approvals.pending(), ...this.#mcpQuestions.approvals()],
       questions: [...this.#questions.pending(), ...this.#mcpQuestions.questions()],
+      todo: await this.#todo(root),
       turns,
       lastEntry,
     };
+  }
+
+  /** The root conversation's Todo List (SPI-1055), as t3's todo list shows it; null when it never had one. */
+  async #todo(root: Conversation): Promise<TodoSlim | null> {
+    const state = await (await this.#opening).snapshot(TodoDoc, root.id, context);
+    if (state === undefined || state.rev === 0) return null;
+    return { rev: state.rev, tasks: state.tasks.map((task) => ({ id: task.id, title: task.title, status: task.status })) };
   }
 
   /** The root conversation's current view (documents), read through a one-shot watch. */

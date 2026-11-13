@@ -11,6 +11,7 @@ import {
   OrchestrationV2ProviderRef,
   OrchestrationV2RuntimeRequest,
   OrchestrationV2TurnItem,
+  PlanId,
   ProviderSessionId,
   ProviderThreadId,
   ProviderTurnId,
@@ -84,6 +85,8 @@ export interface DifferState {
   readonly approvals: Map<string, OpenApproval>;
   /** The owner's answers, by t3's runtime request id (`respondToRuntimeRequest`), to close a request as resolved. */
   readonly decisions: Map<string, { readonly decision: ApprovalDecision; readonly feedback?: string; readonly answers?: Readonly<Record<string, unknown>> }>;
+  /** SPI-1055: the Todo List's revision last shown (undefined: none yet). */
+  todoRev?: number;
 }
 
 interface OpenApproval {
@@ -311,6 +314,9 @@ const emitTool = (
   const key = `call:${call.id}`;
   const output = result === undefined ? "" : text(result.content);
   const details = (result?.details ?? {}) as Record<string, unknown>;
+  // The Todo List is shown from the Session's document as t3's todo list (`emitTodo`), not as the calls that change it;
+  // a failed call stays a tool item, whose output says why.
+  if (call.name === "todo" && result?.isError !== true) return;
   if (call.name === "bash") {
     const exitCode = typeof details.exitCode === "number" ? details.exitCode : undefined;
     emitItem(state, out, turn, key, "tool_call", status, "bash", {
@@ -360,6 +366,40 @@ const emitTool = (
     input,
     ...(result === undefined ? {} : { output: { content: result.content.filter((block) => block.type === "text") } }),
   }, now, parentKey);
+};
+
+/**
+ * The Todo List (SPI-1055) as t3 shows another provider's (OpenCode's `emitTodo`): each change a `todo_list` row where the
+ * turn changed it, and the turn's plan artifact (`plan.updated`), which t3's ingestor gives step durations. Steps keep the
+ * Task's id, so a Task keeps its timing as its status moves.
+ */
+const emitTodo = (state: DifferState, out: Array<ProviderAdapterV2Event>, pushed: SessionState, now: DateTime.Utc) => {
+  const todo = pushed.todo;
+  if (todo === undefined || todo === null || todo.rev === state.todoRev) return;
+  const turnId = pushed.live.run?.turn ?? Object.entries(pushed.turns).find(([, turn]) => turn.status === "running")?.[0];
+  const turn = turnId === undefined || turnId === null ? undefined : state.turns.get(turnId);
+  if (turn === undefined || state.terminated.has(turn.providerTurnId)) return;
+  state.todoRev = todo.rev;
+  const key = `todo:${turn.providerTurnId}:${todo.rev}`;
+  const steps = todo.tasks.flatMap((task) => {
+    const text = task.title.trim();
+    return text === "" ? [] : [{ id: `todo:${task.id}`, text, status: task.status === "active" ? ("running" as const) : task.status }];
+  });
+  const planId = PlanId.make(`plan:${driver}:${state.sessionName}:todo:${turn.providerTurnId}`);
+  emitItem(state, out, turn, key, "todo_list", "completed", "Todo list", { type: "todo_list", planId, steps }, now);
+  out.push({
+    type: "plan.updated",
+    driver,
+    plan: {
+      id: planId,
+      threadId: turn.threadId,
+      runId: turn.runId,
+      nodeId: derive.nodeFromProviderItem({ driver, nativeItemId: `${state.sessionName}:${key}` }),
+      kind: "todo_list",
+      status: steps.length > 0 && steps.every((step) => step.status === "completed") ? "completed" : "active",
+      steps,
+    },
+  });
 };
 
 /** A web tool's pages (`details.results` of `web_search`, `details` of `web_fetch`) as t3's web search results. */
@@ -675,6 +715,8 @@ export const diff = (
     emitTool(state, out, turn, call, status, result, pathOut, textOut, now);
     if (call.name === "codemode") emitNested(state, out, turn, call, result, pushed.live.nestedTools ?? [], pathOut, textOut, now);
   }
+
+  emitTodo(state, out, pushed, now);
 
   emitRequests(state, out, [...pushed.approvals.map((approval) => approvalView(approval, textOut)), ...(pushed.questions ?? []).map(questionView)], now);
 

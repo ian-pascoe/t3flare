@@ -1,6 +1,6 @@
 // The pi-harness ports in t3's thread (SPI-1054 web, SPI-1055 todo, SPI-1056 context): the items the differ makes of
 // their calls, each checked against t3's own schema (t3's decoder, not a cast).
-import { OrchestrationV2TurnItem } from "@t3tools/contracts";
+import { OrchestrationV2PlanArtifact, OrchestrationV2TurnItem } from "@t3tools/contracts";
 import type { PushedEntry, SessionState } from "@t3flare/session-protocol";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
@@ -96,5 +96,45 @@ describe("web tools in t3's thread (SPI-1054)", () => {
     const [fetched, failed] = items(events);
     expect(fetched).toMatchObject({ type: "web_search", title: "Fetched a page", patterns: ["https://example.com/a"], results: [{ url: "https://example.com/a", title: "Hello" }] });
     expect(failed).toMatchObject({ type: "dynamic_tool", status: "failed", toolName: "web_fetch" });
+  });
+});
+
+describe("the Todo List in t3's thread (SPI-1055)", () => {
+  const todo = (rev: number, statuses: ReadonlyArray<"pending" | "active" | "completed">) => ({
+    rev,
+    tasks: statuses.map((status, index) => ({ id: index + 1, title: `Task ${index + 1}`, status })),
+  });
+
+  it("shows each change as a todo_list row and the turn's plan, without the todo calls themselves", () => {
+    const state = differ();
+    const first = diff(
+      state,
+      sessionWith([call("c1", "todo", { action: "add", tasks: [{ title: "Task 1" }, { title: "Task 2" }] }, "1"), result("c1", "todo", "Added 2 Tasks", { todoRev: 1 }, "2")], {
+        todo: todo(1, ["pending", "pending"]),
+      }),
+      now,
+    );
+    const [row] = items(first);
+    expect(items(first)).toHaveLength(1);
+    expect(row).toMatchObject({ type: "todo_list", title: "Todo list", steps: [{ id: "todo:1", text: "Task 1", status: "pending" }, { id: "todo:2", status: "pending" }] });
+    const plan = first.find((event) => event.type === "plan.updated");
+    expect(plan).toMatchObject({ plan: { kind: "todo_list", status: "active", threadId: "thread-1", runId: "run-1" } });
+    expect(() => Schema.decodeUnknownSync(OrchestrationV2PlanArtifact)((plan as { plan: unknown }).plan)).not.toThrow();
+    // The same revision again: nothing; a new one: a new row on the same plan, its active Task running.
+    expect(diff(state, sessionWith([], { todo: todo(1, ["pending", "pending"]) }), now)).toEqual([]);
+    const second = diff(state, sessionWith([], { todo: todo(2, ["completed", "active"]) }), now);
+    const [next] = items(second);
+    expect(next?.id).not.toBe(row?.id);
+    expect(next).toMatchObject({ steps: [{ status: "completed" }, { status: "running" }] });
+    expect(second.find((event) => event.type === "plan.updated")).toMatchObject({ plan: { id: (plan as { plan: { id: string } }).plan.id } });
+    const done = diff(state, sessionWith([], { todo: todo(3, ["completed", "completed"]) }), now);
+    expect(done.find((event) => event.type === "plan.updated")).toMatchObject({ plan: { status: "completed" } });
+  });
+
+  it("keeps a failed todo call as a tool item, and shows no list outside a live turn", () => {
+    const failed = diff(differ(), sessionWith([call("c1", "todo", { action: "remove", id: 9 }, "1"), result("c1", "todo", "Todo remove failed: Task #9 was not found", undefined, "2", true)]), now);
+    expect(items(failed)).toMatchObject([{ type: "dynamic_tool", status: "failed", toolName: "todo" }]);
+    const settled = sessionWith([], { todo: todo(1, ["pending"]), live: { run: null, generation: null, tools: [], runFailure: null }, turns: {} });
+    expect(diff(differ(), settled, now)).toEqual([]);
   });
 });

@@ -60,8 +60,9 @@ export const PiDurableCapabilities = {
     approvalsCanOriginateFromSubagents: false,
   },
   planning: {
-    emitsPlanUpdated: false,
-    emitsTodoList: false,
+    // SPI-1055: the `todo` extension's list, as t3's todo list and its plan artifact (OpenCode's shape).
+    emitsPlanUpdated: true,
+    emitsTodoList: true,
     emitsProposedPlan: false,
     // Step 3: the Session's `ask_user` (one question, optional choices), answered as t3's user_input request.
     supportsStructuredQuestions: true,

@@ -47,7 +47,7 @@ export interface ExtensionEntry {
 /** The offered-tools presets (plan §2.2, OD-T4): which non-MCP tools the model is offered without a search. */
 export const OFFERED_PRESETS = {
   /** B, the default: the core coding tools, `ask_user`, code mode, tool search and t3's own tools. */
-  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search"],
+  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo"],
   /** A: code mode and tool search; every other tool through a script or a search. */
   "codemode-only": ["codemode", "tool_search"],
   /** C: everything direct. */
@@ -115,6 +115,14 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
         schema: { type: "enum", values: SEARCH_MODELS, default: "claude-haiku-5-5" },
       },
     },
+  },
+  {
+    id: "todo",
+    title: "Todo list",
+    description:
+      "todo: the agent's Task list for the thread, kept in the Session and shown as t3's todo list. It survives compaction and rollover, and plan mode allows it (SPI-1055).",
+    default: "on",
+    settings: {},
   },
   { id: "coding-tools", title: "Coding tools", description: "read, write, edit and bash (Worker Shell or Container).", default: "always", settings: {}, locked: CORE_LOCK },
   { id: "files", title: "File tools", description: "ls, find and grep.", default: "always", settings: {}, locked: CORE_LOCK },

@@ -365,6 +365,14 @@ export interface SessionState {
   /** Step 3: absent in a push from a Session before it. */
   readonly questions?: ReadonlyArray<PendingQuestion>;
   readonly turns: Readonly<Record<string, TurnState>>;
+  /** SPI-1055: the root conversation's Todo List (its revision and Tasks); absent from a Session before it, or without one. */
+  readonly todo?: TodoSlim | null;
+}
+
+/** The Todo List as pushed: what t3's todo list shows of each Task (at most 200, as the `todo` tool keeps it). */
+export interface TodoSlim {
+  readonly rev: number;
+  readonly tasks: ReadonlyArray<{ readonly id: number; readonly title: string; readonly status: "pending" | "active" | "completed" }>;
 }
 
 export interface SessionPush extends SessionState {
