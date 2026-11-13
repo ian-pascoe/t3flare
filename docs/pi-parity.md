@@ -15,7 +15,7 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 | `read`, `write`, `edit`, `bash` | W | `extensions/coding-tools.ts`; `bash` routes between the Worker Shell and the Container | — |
 | `ls`, `find`, `grep` | W | `extensions/files.ts` over the Workspace's files | — |
 | AGENTS.md discovery | W | `extensions/project-context.ts` (root down to the working directory) | — |
-| Approvals, plan mode | W | `extensions/permissions.ts`, t3's modes | — |
+| Approvals, plan mode | W | `extensions/permissions.ts`, t3's modes; `extensions/plan.ts` (`propose_plan`, t3's proposed plan) | SPI-996 |
 | Questions to the user | W | `extensions/ask-user.ts` (t3's `user_input` card) | — |
 | pi-minimal-subagents | C | t3's `delegate_task`, `create_threads`, `t3_thread_*` (`extensions/t3-mcp.ts`, step 3) | — |
 | Scheduled tasks | C | t3's `schedule_task` tools | — |

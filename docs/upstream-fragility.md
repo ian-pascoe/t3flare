@@ -479,6 +479,18 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Blast radius**: terminal results lose scrolled-off lines; notices stop showing in t3 (the tools and the model's text keep working); the Advisor's notes start a run or stop being placed (pi-durable semantics).
 - **Fix**: follow xterm's new buffer API in `agentTerminals.ts`; t3's item shapes in the differ; pi-durable's hook API in the three extensions.
 
+### U55. Plan mode's proposed plan, streamed command output and prompt suggestions (SPI-996)
+
+- **Where**:
+  - `apps/agents/src/extensions/plan.ts`: `propose_plan` (callers `model`, never deferred: `ALWAYS_OFFERED`) answers with pi-durable's `control.terminate`, so the plan ends the run (pi-durable 1.5.0, U24). Its text follows t3's Claude adapter's `ExitPlanMode` denial (`t3code/apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts`).
+  - `apps/environment/src/provider/differ.ts`: `emitProposedPlan` makes a `plan` node, a `proposed_plan` turn item and an `active` `proposed_plan` artifact, as t3's Codex and Claude adapters do; t3's Orchestrator implements only an `active` plan (`Orchestrator.ts`, "is not active") and completes it. A revised plan supersedes the last until a default-mode turn starts (`forgetProposedPlan`).
+  - `emitOutputDelta` emits `command_output.delta` (`ProviderAdapter.ts`), keyed by the command item's id, from the tail of `pi.live.tools[].output` (`state.ts` `liveOf`, `TOOL_LIVE_OUTPUT_BYTES`), diffed by `sharedTail`. t3's `CommandOutputHub` releases it when the item settles.
+  - `adapter.ts` `suggest`: `prompt_suggestion.updated` after a completed, non-delegated turn while `promptSuggestions` (t3's labs flag) is on; the Session's `suggestPrompt` asks Haiku with t3's `CODEX_PROMPT_SUGGESTION_PROMPT`, copied in `session/promptSuggestion.ts`.
+- **Breaks when**: t3 changes the proposed-plan item or artifact, what Implement requires of a plan, `command_output.delta`'s shape or how the hub matches items, the prompt-suggestion event or its labs flag; pi-durable renames `pi.live` slots' `output` or changes `terminate`'s all-calls rule.
+- **Detection**: typecheck; `apps/environment/test/differPlan.test.ts` (every event decoded with t3's `ProviderAdapterV2Event`, the capabilities with t3's schema); `apps/agents/test/{plan,liveOutput}.test.ts`; `scripts/p996.ts turns` on a stage. **Silent**: a renamed `pi.live` output field (commands stop streaming; the final output still lands), and a changed copy of t3's suggestion prompt.
+- **Blast radius**: no proposed plan or a plan Implement refuses; output only at the end; no suggestions. Turns and tools keep working.
+- **Fix**: follow t3's Codex adapter's shapes (`buildProposedPlanArtifacts`, `item/commandExecution/outputDelta`, `samplePromptSuggestion`).
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).

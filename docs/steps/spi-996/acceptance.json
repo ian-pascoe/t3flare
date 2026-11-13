@@ -1,13 +1,13 @@
 {
  "url": "https://t3flare-environment-p996.ian-g-pascoe.workers.dev",
- "startedAt": "2026-11-13T05:47:05.499Z",
+ "startedAt": "2026-11-13T05:55:32.485Z",
  "adminGuard": {
   "wrongToken": 404,
   "withAccessAndToken": 200,
   "build": {
    "t3": "v0.1.10-nightly.20261112.4606",
-   "commit": "2edde2496225",
-   "builtAt": "2026-11-13T05:37:55.417Z"
+   "commit": "d9c21b73e3c9",
+   "builtAt": "2026-11-13T05:50:03.966Z"
   }
  },
  "auth": {
@@ -17,15 +17,15 @@
  },
  "pairing": {
   "refusedBeforeArming": 401,
-  "armedUntil": "2026-11-13T05:57:06.276Z",
+  "armedUntil": "2026-11-13T06:05:32.941Z",
   "paired": 200,
-  "ms": 2107,
+  "ms": 1768,
   "refusedAfterDisarming": 401
  },
  "project": {
-  "projectId": "476a8fc9-79d5-47a1-b0c2-d9518123731c",
+  "projectId": "274a7b8e-aab3-4920-9124-c1cee76ee4dc",
   "threads": 12,
-  "ms": 2924
+  "ms": 2669
  },
  "fixtures": {
   "threads": 12,
@@ -36,30 +36,30 @@
   "eventSink": "fresh"
  },
  "shellSnapshot": {
-  "ms": 707,
-  "bytes": 31543,
+  "ms": 591,
+  "bytes": 64588,
   "listedFixtureThreads": 12
  },
  "threadWindow": {
   "threads": 12,
   "allOk": true,
   "minItems": 20,
-  "maxMs": 104,
-  "maxBytes": 46534
+  "maxMs": 98,
+  "maxBytes": 46535
  },
  "subscribeThread": {
-  "ms": 46,
-  "bytes": 46474,
+  "ms": 54,
+  "bytes": 46475,
   "items": 20
  },
  "search": {
-  "ms": 63,
+  "ms": 40,
   "matches": 12,
   "threads": 12
  },
  "searchThread": {
   "ok": true,
-  "bytes": 1536
+  "bytes": 1537
  },
  "sqlChecks": {
   "transactionRollback": true,
@@ -68,13 +68,13 @@
  "sqlAdapter": {
   "statementsInlined": 2,
   "maxParameters": 300,
-  "compoundsRewritten": 124,
+  "compoundsRewritten": 120,
   "maxCompoundTerms": 12,
   "ctesMaterialized": 0,
   "materializeFailures": 0,
-  "rowsWritten": 14264,
-  "rowsRead": 62053,
-  "databaseSize": 4947968,
+  "rowsWritten": 13695,
+  "rowsRead": 42855,
+  "databaseSize": 8048640,
   "refusedStatements": 0,
   "pragmaRefusals": 0
  },
@@ -91,7 +91,7 @@
     "module": "packages/shared/src/observability.ts",
     "name": "generatedServiceInstanceId",
     "initial": "undefined",
-    "now": "string:23151d11-2493-4661-8a48-adc4c74845bf"
+    "now": "string:d0c5be29-8d3d-4642-9d34-ea70d9333f67"
    },
    {
     "module": "apps/server/src/mcp/McpSessionRegistry.ts",
@@ -110,13 +110,13 @@
   "fixture": "ian-pascoe/t3flare-fixture",
   "model": "anthropic/claude-haiku-5-5",
   "clone": {
-   "destination": "/w/acceptance-mwek1gwn",
-   "ms": 4486,
-   "cwd": "/w/acceptance-mwek1gwn",
+   "destination": "/w/acceptance-mwekcc1w",
+   "ms": 6454,
+   "cwd": "/w/acceptance-mwekcc1w",
    "error": null
   },
   "turn": {
-   "threadId": "b2ea6c90-6c26-4b2f-8e7b-88622fa756e8",
+   "threadId": "9246b9cd-1086-4fd0-b0b2-93eff68f697b",
    "runs": [
     "completed"
    ],
@@ -130,14 +130,19 @@
      "kind": "command",
      "status": "resolved",
      "decision": "accept"
+    },
+    {
+     "kind": "command",
+     "status": "resolved",
+     "decision": "accept"
     }
    ],
    "edit": {
-    "fileName": "/w/acceptance-mwek1gwn/src/greeting.txt",
+    "fileName": "/w/acceptance-mwekcc1w/src/greeting.txt",
     "status": "completed"
    },
    "bash": {
-    "input": "cd /w/acceptance-mwek1gwn && bash test.sh",
+    "input": "cd /w/acceptance-mwekcc1w && bash test.sh",
     "status": "completed",
     "exitCode": 0
    },
@@ -149,7 +154,7 @@
      "deletions": 0
     }
    ],
-   "ms": 19106
+   "ms": 27303
   },
   "checkpointOps": [
    "has:do",
@@ -160,9 +165,9 @@
    "diff:container",
    "authored:do"
   ],
-  "ms": 20645
+  "ms": 28132
  },
- "totalMs": 27919,
+ "totalMs": 35221,
  "failures": [],
  "ok": true
 }
