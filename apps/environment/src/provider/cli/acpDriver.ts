@@ -82,11 +82,12 @@ export const acpSnapshotModels = (catalog: Catalog): ReadonlyArray<ServerProvide
   }));
 };
 
-/** The capabilities t3 reads (plan §1.4): t3's ACP set, rollback off (plan §3.3), Claude's proposed plan recovered (F1). */
+/**
+ * The capabilities t3 reads (plan §1.4): t3's ACP set, rollback on (SPI-1037, once SPI-1100 made the checkpoints hold
+ * what the CLI wrote; the wrapper spawns the replacement agent as the session's), Claude's proposed plan recovered (F1).
+ */
 export const acpCapabilities = (cli: AcpCli) => ({
   ...AcpProviderCapabilitiesV2,
-  threads: { ...AcpProviderCapabilitiesV2.threads, canRollbackThread: false },
-  checkpointing: { ...AcpProviderCapabilitiesV2.checkpointing, providerCanRollbackConversation: false },
   planning: { ...AcpProviderCapabilitiesV2.planning, emitsProposedPlan: cli === "claude" },
 });
 

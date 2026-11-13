@@ -324,6 +324,9 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
             }
             return runtime.forkThread(fork);
           },
+          // t3's ACP adapter rolls back by starting a replacement agent process (SPI-1037): it is spawned as the session's,
+          // with its thread and tool handle, as `openSession`'s is.
+          rollbackThread: (rollback) => runtime.rollbackThread(rollback).pipe(Effect.provideService(CliSpawn, session)),
         } satisfies ProviderAdapter.ProviderAdapterV2SessionRuntime;
       }),
   });
