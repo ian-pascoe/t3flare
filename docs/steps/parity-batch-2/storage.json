@@ -1,0 +1,46 @@
+{
+ "at": "2026-11-13T09:32:08.534Z",
+ "host": "t3flare-environment-pbatch2.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "database": {
+  "databaseBytes": 3059712,
+  "reclaimableBytes": 0,
+  "incrementalVacuumEnabled": true,
+  "compactCommand": "Not needed: Cloudflare manages this Environment's Durable Object storage.",
+  "canReclaim": false
+ },
+ "reclaim": {
+  "refused": {
+   "tag": "DatabaseReclaimError",
+   "reason": "This Environment's database lives in Durable Object storage, which Cloudflare manages: there is no space to reclaim here.",
+   "message": "This Environment's database lives in Durable Object storage, which Cloudflare manages: there is no space to reclaim here."
+  }
+ },
+ "cleanup": {
+  "report": {
+   "trigger": "automatic",
+   "startedAt": "2026-11-13T09:32:06.538Z",
+   "finishedAt": "2026-11-13T09:32:06.538Z",
+   "entries": [],
+   "counts": {
+    "removed": 0,
+    "kept": 0,
+    "failed": 0
+   },
+   "omittedCount": 0,
+   "bytesFreed": 0
+  }
+ },
+ "sqlStats": {
+  "statementsInlined": 0,
+  "maxParameters": 0,
+  "compoundsRewritten": 7,
+  "maxCompoundTerms": 12,
+  "ctesMaterialized": 0,
+  "materializeFailures": 0,
+  "rowsWritten": 651,
+  "rowsRead": 30323,
+  "errors": [],
+  "databaseSize": 3059712
+ }
+}

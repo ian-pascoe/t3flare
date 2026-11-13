@@ -1,0 +1,192 @@
+{
+ "at": "2026-11-13T09:34:33.574Z",
+ "host": "t3flare-environment-pbatch2.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "restart": {
+  "restarted": "in-place",
+  "lastBoot": {
+   "at": "2026-11-13T09:34:05.284Z",
+   "trigger": "admin-restart",
+   "wallMs": 10,
+   "bootstrapSeeded": false,
+   "isolateBoot": 15
+  }
+ },
+ "observability": {
+  "logsDirectoryPath": "/t3/userdata/logs",
+  "localTracingEnabled": true,
+  "otlpTracesUrl": "https://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/v1/traces",
+  "otlpTracesSource": "settings",
+  "otlpTracesEnabled": true,
+  "otlpMetricsUrl": "https://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/v1/metrics",
+  "otlpMetricsSource": "settings",
+  "otlpMetricsEnabled": true,
+  "otlpLogsEnabled": false
+ },
+ "received": {
+  "traces": 4,
+  "metrics": 3
+ },
+ "sample": [
+  {
+   "at": "2026-11-13T09:34:06.105Z",
+   "kind": "otlp",
+   "contentType": "application/json",
+   "bytes": 11092,
+   "userAgent": "OTel-OTLP-Exporter-JavaScript-Effect-OtlpMetrics/4.1.2",
+   "signal": "metrics",
+   "service": "t3code-server",
+   "count": 5,
+   "names": [
+    "t3_orchestration_effect_claims_total",
+    "t3_rpc_request_duration",
+    "t3_rpc_requests_total",
+    "t3_git_command_duration",
+    "t3_git_commands_total"
+   ]
+  },
+  {
+   "at": "2026-11-13T09:34:06.110Z",
+   "kind": "otlp",
+   "contentType": "application/json",
+   "bytes": 373609,
+   "userAgent": "OTel-OTLP-Exporter-JavaScript-Effect-OtlpTracer/4.1.2",
+   "signal": "traces",
+   "service": "t3code-server",
+   "count": 828,
+   "names": [
+    "ManagedPolicy.fromDocument",
+    "readLinuxMachineInfo",
+    "processRunner.runProcessCore",
+    "runFriendlyLabelCommand",
+    "resolveFriendlyHostLabel",
+    "resolveServerEnvironmentLabel",
+    "readOptionalFile",
+    "detectLinuxMachineKind",
+    "detectServerEnvironmentMachineKind",
+    "cloud.service_launcher_client.resolve_startup",
+    "cloud.service_launcher_client.resolve_mode",
+    "McpSessionRegistry.make",
+    "cloud.service_launcher_client.make",
+    "StaleWhileRevalidate.make",
+    "TelemetryIdentity.readJsonIdentityFile",
+    "TelemetryIdentity.readProviderLogins",
+    "getTelemetryIdentityForHome",
+    "WorktreeCheckoutCache.make",
+    "makeGitVcsDriverCore",
+    "makeHostResources",
+    "BEGIN",
+    "sqlite",
+    "COMMIT",
+    "sql.transaction",
+    "reconcileV2PreviewMigration"
+   ]
+  },
+  {
+   "at": "2026-11-13T09:34:06.926Z",
+   "kind": "otlp",
+   "contentType": "application/json",
+   "bytes": 428244,
+   "userAgent": "OTel-OTLP-Exporter-JavaScript-Effect-OtlpTracer/4.1.2",
+   "signal": "traces",
+   "service": "t3code-server",
+   "count": 1000,
+   "names": [
+    "ManagedPolicy.fromDocument",
+    "readLinuxMachineInfo",
+    "processRunner.runProcessCore",
+    "runFriendlyLabelCommand",
+    "resolveFriendlyHostLabel",
+    "resolveServerEnvironmentLabel",
+    "readOptionalFile",
+    "detectLinuxMachineKind",
+    "detectServerEnvironmentMachineKind",
+    "cloud.service_launcher_client.resolve_startup",
+    "cloud.service_launcher_client.resolve_mode",
+    "McpSessionRegistry.make",
+    "cloud.service_launcher_client.make",
+    "StaleWhileRevalidate.make",
+    "TelemetryIdentity.readJsonIdentityFile",
+    "TelemetryIdentity.readProviderLogins",
+    "getTelemetryIdentityForHome",
+    "WorktreeCheckoutCache.make",
+    "makeGitVcsDriverCore",
+    "makeHostResources",
+    "BEGIN",
+    "sqlite",
+    "COMMIT",
+    "sql.transaction",
+    "reconcileV2PreviewMigration"
+   ]
+  },
+  {
+   "at": "2026-11-13T09:34:15.508Z",
+   "kind": "otlp",
+   "contentType": "application/json",
+   "bytes": 75716,
+   "userAgent": "OTel-OTLP-Exporter-JavaScript-Effect-OtlpTracer/4.1.2",
+   "signal": "traces",
+   "service": "t3code-server",
+   "count": 159,
+   "names": [
+    "shell.resolveCommandPath",
+    "shell.resolveCommandPathForPlatform",
+    "editor.resolveEditorCommand",
+    "shell.isCommandAvailable",
+    "externalLauncher.resolveUsableFileManagerCommand",
+    "externalLauncher.buildAvailableEditors",
+    "externalLauncher.resolveAvailableEditors",
+    "StaleWhileRevalidate.settle",
+    "ws.resolveEditorConfig",
+    "tailscale.readTailscaleOutput",
+    "RemoteOpenTargets.resolveTargets",
+    "ws.loadServerConfig",
+    "ws.rpc.server.getConfig",
+    "sqlite",
+    "SessionStore.loadActiveSession",
+    "SessionStore.markDisconnected",
+    "GET",
+    "NativeTelemetryClient.failPending",
+    "SessionStore.verify",
+    "EnvironmentAuth.authenticateWebSocketUpgrade",
+    "AnalyticsService.recordOwners",
+    "KeyedLock.make",
+    "makeProviderMaintenanceCommandCoordinator",
+    "ProviderMaintenanceRunner.make",
+    "SessionStore.markConnected"
+   ]
+  },
+  {
+   "at": "2026-11-13T09:34:15.511Z",
+   "kind": "otlp",
+   "contentType": "application/json",
+   "bytes": 11093,
+   "userAgent": "OTel-OTLP-Exporter-JavaScript-Effect-OtlpMetrics/4.1.2",
+   "signal": "metrics",
+   "service": "t3code-server",
+   "count": 5,
+   "names": [
+    "t3_orchestration_effect_claims_total",
+    "t3_rpc_request_duration",
+    "t3_rpc_requests_total",
+    "t3_git_command_duration",
+    "t3_git_commands_total"
+   ]
+  },
+  {
+   "at": "2026-11-13T09:34:25.526Z",
+   "kind": "otlp",
+   "contentType": "application/json",
+   "bytes": 4208,
+   "userAgent": "OTel-OTLP-Exporter-JavaScript-Effect-OtlpTracer/4.1.2",
+   "signal": "traces",
+   "service": "t3code-server",
+   "count": 9,
+   "names": [
+    "ScheduledTaskService.runDueTasks",
+    "ScheduledTaskService.dispatchPendingWebhooks",
+    "UsageLimitRecoveryWorker.sweep"
+   ]
+  }
+ ]
+}

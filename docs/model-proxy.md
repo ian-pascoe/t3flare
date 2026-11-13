@@ -94,6 +94,25 @@ When the proxy cannot serve a turn because a limit is reached, the turn ends as 
 - **Text generation** (titles, commit messages) uses the same classification for its error text.
 - **Compaction** gets the same treatment. pi-durable's compaction summarizes with `completeSimple` and runs no `afterResponse` hook, so the Session's models classify each `completeSimple` answer the same way (`compactionLimits`). A summary refused for a limit or a key makes one request. It fails the compaction, and a turn that waited on that compaction fails with the record as above.
 
+## Usage and limits (t3's Usage page and limit meters)
+
+Optional (parity G8, [report](steps/parity-batch-2.md)). With it, t3's **Usage** page shows this Environment's token use and cost by agent and model, and its limit meters show each Commissary account's windows (5-hour, weekly, …) as a source named **Commissary**. Without it, both stay empty, as before.
+
+Commissary serves usage and quotas only on its **management API** (`/v9/management/...`, on the app host, behind Cloudflare Access on a self-hosted deployment). It refuses API keys (`cms_`) there, and t3's own `cliproxy` source cannot read it (Commissary did not port CLIProxyAPI's `/v0/management`). So the Environment Worker, and nothing in a Container, holds:
+
+| Setting | What | Where |
+|---|---|---|
+| `COMMISSARY_MANAGEMENT_URL` | The app host, e.g. `https://commissary.example.com` (not the API host) | variable |
+| `COMMISSARY_MANAGEMENT_ORG` | The org's slug; unset means the key's own org | variable, optional |
+| `COMMISSARY_MANAGEMENT_KEY` | A management key, `cmsm_…`, with the **admin** role (below) | secret |
+| `COMMISSARY_ACCESS_CLIENT_ID`, `COMMISSARY_ACCESS_CLIENT_SECRET` | Self-hosted only: an Access service token Commissary's Access application admits for `/v9/management` | variable, secret |
+
+Put them in `~/.config/t3flare/dev.env` (stages) or the GitHub environment `prod` (`deploy-prod.yml` passes them); `stage.ts` and `alchemy.run.ts` bind each one only when set.
+
+**Least privilege.** Commissary's roles are owner, admin and member; there is no read-only role. A member-role management key has no member id, so it reads none of the org's usage records and none of its accounts: **admin is the minimum.** An admin key can also change accounts, routing and keys (never download a credential or issue keys). Records served by a member's *private* accounts stay hidden from any management key. Issue it for t3flare alone (`POST /v9/management/orgs/<slug>/management-keys {"name":"t3flare","role":"admin"}`, or the panel's Management keys) and revoke it there.
+
+**What is read.** `GET /credentials` each time t3 refreshes its providers and every 5 minutes while t3 runs; `GET /observability/usage/records` when the Usage page asks (one read shared by its four readers for a minute), filtered to t3flare's two keys (`MODEL_PROXY_API_KEY`'s and `COMMISSARY_CONTAINER_API_KEY`'s key ids), up to 25,000 records per key per read. Requests are attributed by what Commissary recorded: Codex by its session identity or the Responses API, Claude Code by its session header, OpenCode by its affinity header, everything else (the Durable agent, text generation, the pi CLI) as **Pi**. Costs are Commissary's own, priced with your prices; unpriced models are left to t3's rate table. A Claude reset grant is claimed in Commissary's panel, not from t3.
+
 ## Set it up
 
 1. **Deploy Commissary.** Self-hosted: follow its [README](https://github.com/spiritledsoftware/commissary#deploy) (a Workers Paid account, a zone, Cloudflare Zero Trust) and [`docs/DEPLOY.md`](https://github.com/spiritledsoftware/commissary/blob/main/docs/DEPLOY.md). Or use Commissary Cloud, the paid service ([DEPLOY.md, "Commissary Cloud"](https://github.com/spiritledsoftware/commissary/blob/main/docs/DEPLOY.md#commissary-cloud)). Either way, connect your accounts and provider keys in its control panel, so `GET /v1/models` lists the models you want. A self-hosted Commissary has no rate limits or spend caps of its own: set spend limits on the key you give t3flare.

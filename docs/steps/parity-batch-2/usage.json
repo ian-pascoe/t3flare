@@ -1,0 +1,423 @@
+{
+ "at": "2026-11-13T09:33:28.916Z",
+ "host": "t3flare-environment-pbatch2.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "limitSources": [
+  {
+   "id": "commissary",
+   "kind": "cliproxy",
+   "label": "Commissary",
+   "checkedAt": "2026-11-13T09:33:24.440Z",
+   "accounts": [
+    {
+     "id": "c0ffee01",
+     "driver": "claudeAgent",
+     "email": "owner@example.com",
+     "plan": "Max 20x",
+     "usageLimits": {
+      "checkedAt": "2026-11-13T09:32:24.818Z",
+      "windows": [
+       {
+        "id": "five_hour",
+        "kind": "session",
+        "label": "5-hour",
+        "usedPercent": 37,
+        "resetsAt": "2026-11-13T11:33:24.818Z",
+        "windowDurationMins": 300
+       },
+       {
+        "id": "seven_day",
+        "kind": "weekly",
+        "label": "Weekly",
+        "usedPercent": 62,
+        "resetsAt": "2026-11-16T09:33:24.818Z",
+        "windowDurationMins": 10080
+       }
+      ]
+     }
+    },
+    {
+     "id": "c0ffee02",
+     "driver": "codex",
+     "plan": "pro",
+     "usageLimits": {
+      "checkedAt": "2026-11-13T09:32:24.818Z",
+      "windows": [],
+      "unavailable": {
+       "reason": "probeFailed",
+       "message": "the usage endpoint answered 401"
+      }
+     }
+    }
+   ]
+  }
+ ],
+ "summary": {
+  "sources": [
+   {
+    "fingerprint": {
+     "hostId": "t3flare",
+     "provider": "pi",
+     "resolvedHomePath": "commissary://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/pi",
+     "volumeId": "commissary"
+    },
+    "status": "ok",
+    "scannedFiles": 1,
+    "skippedFiles": 0,
+    "malformedRecords": 0,
+    "distinctSessions": 0,
+    "message": null
+   },
+   {
+    "fingerprint": {
+     "hostId": "t3flare",
+     "provider": "codex",
+     "resolvedHomePath": "commissary://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/codex",
+     "volumeId": "commissary"
+    },
+    "status": "ok",
+    "scannedFiles": 1,
+    "skippedFiles": 0,
+    "malformedRecords": 0,
+    "distinctSessions": 1,
+    "message": null
+   },
+   {
+    "fingerprint": {
+     "hostId": "t3flare",
+     "provider": "claude",
+     "resolvedHomePath": "commissary://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/claude",
+     "volumeId": "commissary"
+    },
+    "status": "ok",
+    "scannedFiles": 1,
+    "skippedFiles": 0,
+    "malformedRecords": 0,
+    "distinctSessions": 1,
+    "message": null
+   },
+   {
+    "fingerprint": {
+     "hostId": "t3flare",
+     "provider": "opencode",
+     "resolvedHomePath": "commissary://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/opencode",
+     "volumeId": "commissary"
+    },
+    "status": "ok",
+    "scannedFiles": 1,
+    "skippedFiles": 0,
+    "malformedRecords": 0,
+    "distinctSessions": 1,
+    "message": null
+   }
+  ],
+  "pricing": {
+   "status": "cached",
+   "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+   "fetchedAt": "2026-11-13T09:32:14.859Z",
+   "knownModels": 5348
+  },
+  "byProvider": {
+   "claude": {
+    "tokens": 6900,
+    "records": 2,
+    "costUsd": 0.025
+   },
+   "codex": {
+    "tokens": 6900,
+    "records": 2,
+    "costUsd": 0.04
+   },
+   "opencode": {
+    "tokens": 6900,
+    "records": 2,
+    "costUsd": 0.002
+   },
+   "pi": {
+    "tokens": 6900,
+    "records": 2,
+    "costUsd": 0.025
+   }
+  },
+  "bucketSample": [
+   {
+    "day": "2026-11-13",
+    "provider": "claude",
+    "model": "claude-sonnet-5-5",
+    "sourcePath": "commissary://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/claude",
+    "totals": {
+     "uncachedInputTokens": 300,
+     "cachedInputTokens": 4000,
+     "cacheCreationTokens": 2000,
+     "outputTokens": 600,
+     "reasoningTokens": 0
+    },
+    "costUsd": 0.025,
+    "cacheSavingsUsd": 0.0076,
+    "categoryCostUsd": {
+     "input": 0.00125,
+     "cacheRead": 0.000833,
+     "cacheWrite": 0.010417,
+     "output": 0.0125
+    },
+    "costSource": "providerReported",
+    "records": 2,
+    "unpricedRecords": 0,
+    "unpricedTokens": 0,
+    "sessions": 1
+   },
+   {
+    "day": "2026-11-13",
+    "provider": "codex",
+    "model": "gpt-6-luna",
+    "sourcePath": "commissary://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/codex",
+    "totals": {
+     "uncachedInputTokens": 300,
+     "cachedInputTokens": 4000,
+     "cacheCreationTokens": 2000,
+     "outputTokens": 600,
+     "reasoningTokens": 0
+    },
+    "costUsd": 0.04,
+    "cacheSavingsUsd": 0.00035999999999999997,
+    "categoryCostUsd": {
+     "input": 0.001935,
+     "cacheRead": 0.002581,
+     "cacheWrite": 0.016129,
+     "output": 0.019355
+    },
+    "costSource": "providerReported",
+    "records": 2,
+    "unpricedRecords": 0,
+    "unpricedTokens": 0,
+    "sessions": 1
+   },
+   {
+    "day": "2026-11-13",
+    "provider": "opencode",
+    "model": "claude-haiku-5-5",
+    "sourcePath": "commissary://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/opencode",
+    "totals": {
+     "uncachedInputTokens": 300,
+     "cachedInputTokens": 4000,
+     "cacheCreationTokens": 2000,
+     "outputTokens": 600,
+     "reasoningTokens": 0
+    },
+    "costUsd": 0.002,
+    "cacheSavingsUsd": 0.00035999999999999997,
+    "categoryCostUsd": {
+     "input": 0.000097,
+     "cacheRead": 0.000129,
+     "cacheWrite": 0.000806,
+     "output": 0.000968
+    },
+    "costSource": "providerReported",
+    "records": 2,
+    "unpricedRecords": 0,
+    "unpricedTokens": 0,
+    "sessions": 1
+   },
+   {
+    "day": "2026-11-13",
+    "provider": "pi",
+    "model": "claude-sonnet-5-5",
+    "sourcePath": "commissary://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev/pi",
+    "totals": {
+     "uncachedInputTokens": 300,
+     "cachedInputTokens": 4000,
+     "cacheCreationTokens": 2000,
+     "outputTokens": 600,
+     "reasoningTokens": 0
+    },
+    "costUsd": 0.025,
+    "cacheSavingsUsd": 0.0076,
+    "categoryCostUsd": {
+     "input": 0.00125,
+     "cacheRead": 0.000833,
+     "cacheWrite": 0.010417,
+     "output": 0.0125
+    },
+    "costSource": "providerReported",
+    "records": 2,
+    "unpricedRecords": 0,
+    "unpricedTokens": 0,
+    "sessions": 0
+   }
+  ]
+ },
+ "managementCalls": [
+  {
+   "at": "2026-11-13T09:33:00.467Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "credentials",
+   "query": {},
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:04.749Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "observability/usage/records",
+   "query": {
+    "since": "1794225600000",
+    "principal": "key:[id]",
+    "area": "models",
+    "failed": "false",
+    "limit": "1000"
+   },
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:04.773Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "observability/usage/records",
+   "query": {
+    "since": "1794225600000",
+    "principal": "key:[id]",
+    "area": "models",
+    "failed": "false",
+    "limit": "1000",
+    "before": "key:[id]-cursor"
+   },
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:04.796Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "observability/usage/records",
+   "query": {
+    "since": "1794225600000",
+    "principal": "key:[id]",
+    "area": "models",
+    "failed": "false",
+    "limit": "1000"
+   },
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:04.819Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "observability/usage/records",
+   "query": {
+    "since": "1794225600000",
+    "principal": "key:[id]",
+    "area": "models",
+    "failed": "false",
+    "limit": "1000",
+    "before": "key:[id]-cursor"
+   },
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:23.565Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "credentials",
+   "query": {},
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:24.146Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "credentials",
+   "query": {},
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:24.799Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "credentials",
+   "query": {},
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:28.706Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "observability/usage/records",
+   "query": {
+    "since": "1794225600000",
+    "principal": "key:[id]",
+    "area": "models",
+    "failed": "false",
+    "limit": "1000"
+   },
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:28.729Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "observability/usage/records",
+   "query": {
+    "since": "1794225600000",
+    "principal": "key:[id]",
+    "area": "models",
+    "failed": "false",
+    "limit": "1000",
+    "before": "key:[id]-cursor"
+   },
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:28.752Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "observability/usage/records",
+   "query": {
+    "since": "1794225600000",
+    "principal": "key:[id]",
+    "area": "models",
+    "failed": "false",
+    "limit": "1000"
+   },
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  },
+  {
+   "at": "2026-11-13T09:33:28.784Z",
+   "kind": "management",
+   "method": "GET",
+   "route": "observability/usage/records",
+   "query": {
+    "since": "1794225600000",
+    "principal": "key:[id]",
+    "area": "models",
+    "failed": "false",
+    "limit": "1000",
+    "before": "key:[id]-cursor"
+   },
+   "admitted": true,
+   "sentManagementKey": true,
+   "sentServiceToken": true
+  }
+ ]
+}

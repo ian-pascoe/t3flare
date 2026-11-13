@@ -1,0 +1,146 @@
+{
+ "at": "2026-11-13T09:32:05.253Z",
+ "host": "t3flare-environment-pbatch2.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "count": 23,
+ "agents": [
+  {
+   "id": "amp-acp",
+   "distribution": "binary",
+   "lead": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)"
+  },
+  {
+   "id": "autohand",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "claude-acp",
+   "distribution": "binary",
+   "lead": "Built in here: add the Claude provider, which runs this agent in your Workspace on the model proxy"
+  },
+  {
+   "id": "cortex-code",
+   "distribution": "binary",
+   "lead": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)"
+  },
+  {
+   "id": "corust-agent",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "crow-cli",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "cursor",
+   "distribution": "binary",
+   "lead": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)"
+  },
+  {
+   "id": "devin",
+   "distribution": "binary",
+   "lead": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)"
+  },
+  {
+   "id": "antigravity-acp",
+   "distribution": "binary",
+   "lead": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)"
+  },
+  {
+   "id": "goose",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "harn",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "junie",
+   "distribution": "binary",
+   "lead": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)"
+  },
+  {
+   "id": "kilo",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "kimchi",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "kimi",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "kiro",
+   "distribution": "binary",
+   "lead": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)"
+  },
+  {
+   "id": "mistral-vibe",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "opencode",
+   "distribution": "binary",
+   "lead": "Built in here: add the OpenCode provider, which runs this agent in your Workspace on the model proxy"
+  },
+  {
+   "id": "opencode-v2",
+   "distribution": "binary",
+   "lead": "Built in here: add the OpenCode provider, which runs this agent in your Workspace on the model proxy"
+  },
+  {
+   "id": "poolside",
+   "distribution": "binary",
+   "lead": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)"
+  },
+  {
+   "id": "sigit",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "stakpak",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  },
+  {
+   "id": "vtcode",
+   "distribution": "binary",
+   "lead": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)"
+  }
+ ],
+ "prepared": {
+  "claude-acp": {
+   "refused": {
+    "tag": "AcpRegistryOperationError",
+    "reason": "runner_unavailable",
+    "message": "Built in here: add the Claude provider, which runs this agent in your Workspace on the model proxy."
+   }
+  },
+  "gemini": {
+   "refused": {
+    "tag": "AcpRegistryOperationError",
+    "reason": "runner_unavailable",
+    "message": "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016)."
+   }
+  },
+  "cursor": {
+   "refused": {
+    "tag": "AcpRegistryOperationError",
+    "reason": "runner_unavailable",
+    "message": "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3)."
+   }
+  }
+ }
+}

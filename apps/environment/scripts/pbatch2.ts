@@ -8,7 +8,21 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { admin, base, pair, sleep, wsCall, wsFirst } from "./lib/client.ts";
+import { WsRpcGroup } from "@t3tools/contracts";
+import * as Effect from "effect/Effect";
+import * as Stream from "effect/Stream";
+import { RpcClient } from "effect/rpc";
+
+import { admin, base, pair, protocol, sleep, wsCall, wsFirst } from "./lib/client.ts";
+
+/** The first event of a streaming WS method that `match` accepts, or undefined after `ms`. */
+const wsFind = (cookie: string, method: string, payload: unknown, match: (event: any) => boolean, ms: number): Promise<any> =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Stream.Stream<unknown, unknown>>;
+      return yield* Stream.runHead(client[method]!(payload).pipe(Stream.filter(match)));
+    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped, Effect.timeoutOption(ms)),
+  ).then((head: any) => (head?._tag === "Some" && head.value?._tag === "Some" ? head.value.value : head?._tag === "Some" ? head.value : undefined));
 
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/parity-batch-2");
 const PROBE = `https://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev`;
@@ -21,7 +35,8 @@ const redact = (value: unknown): unknown => {
     return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, SECRET_KEYS.test(key) && typeof inner === "string" ? "[redacted]" : redact(inner)]));
   }
   if (typeof value === "string" && PROBE_KEY !== "" && value.includes(PROBE_KEY)) return value.replaceAll(PROBE_KEY, "[probe key]");
-  return value;
+  // t3flare's API keys' ids (not secret, but they name the keys): their shape only.
+  return typeof value === "string" ? value.replace(/key:[0-9a-f]{8,}/g, "key:[id]") : value;
 };
 
 const writeEvidence = (name: string, value: Record<string, unknown>) => {
@@ -53,8 +68,9 @@ switch (part) {
     // t3's provider refresh refreshes the usage-limit sources too (ws.ts serverRefreshProviders).
     await wsCall(cookie, "server.refreshProviders", {}).catch(() => undefined);
     await sleep(3_000);
-    const config = (await wsCall(cookie, "server.getConfig", {})) as any;
-    const sources = config?.usageLimitSources ?? [];
+    // The web client's own subscription, opted in: the sources arrive as a `usageLimitSourcesUpdated` event.
+    const update = await wsFind(cookie, "subscribeServerConfig", { usageLimitSources: true }, (event) => event?.type === "usageLimitSourcesUpdated", 30_000);
+    const sources = update?.payload?.sources ?? [];
     const commissary = sources.find((source: any) => source.id === "commissary");
     const summary = (await wsCall(cookie, "server.getUsageSummary", { sinceDay: day(-2), untilDay: day(0), timeZone: "UTC", awaitRefresh: true })) as any;
     const byProvider: Record<string, { tokens: number; records: number; costUsd: number }> = {};
