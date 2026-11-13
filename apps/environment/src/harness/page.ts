@@ -10,12 +10,14 @@
 import {
   EMPTY_ENVIRONMENT,
   ENVIRONMENT_SETTINGS,
+  type EnvironmentSettingEntry,
   type ExtensionEntry,
   EXTENSIONS,
+  MAX_VARIABLE_NAME_LENGTH,
+  MAX_VARIABLE_VALUE_LENGTH,
   type ResolvedEnvironment,
   type ResolvedHarness,
   resolveEnvironment,
-  type SettingEntry,
 } from "@t3flare/harness-registry";
 
 import { type ContainerCostTable, containerCostTable } from "./containerCost.ts";
@@ -60,7 +62,7 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
 
 // ── Extensions ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-const field = (extension: string, key: string, setting: SettingEntry, value: unknown, locked = false): string => {
+const field = (extension: string, key: string, setting: EnvironmentSettingEntry, value: unknown, locked = false): string => {
   const id = escapeHtml(`${extension}-${key}`);
   const hint = `<p class="hint" id="${id}-hint">${escapeHtml(setting.description)}</p>`;
   const attrs = `id="${id}" data-setting="${escapeHtml(key)}" data-kind="${setting.schema.type}" aria-describedby="${id}-hint"${locked ? " disabled" : ""}`;
@@ -77,8 +79,17 @@ const field = (extension: string, key: string, setting: SettingEntry, value: unk
       return setting.schema.multiline === true
         ? `<div class="field"><label for="${id}">${escapeHtml(setting.title)}</label><textarea rows="4" maxlength="${setting.schema.maxLength}" ${attrs}>${escapeHtml(typeof value === "string" ? value : "")}</textarea>${hint}</div>`
         : `<div class="field"><label for="${id}">${escapeHtml(setting.title)}</label><input type="text" maxlength="${setting.schema.maxLength}" ${attrs} value="${escapeHtml(typeof value === "string" ? value : "")}">${hint}</div>`;
+    case "variables": {
+      // One row per Variable; the script adds rows from the template, removes them, and posts `{ NAME: "value" }`.
+      const rows = Object.entries(value !== null && typeof value === "object" ? (value as Readonly<Record<string, string>>) : {}).map(([name, text]) => variableRow(name, text));
+      return `<fieldset class="field" ${attrs}><legend class="sr">${escapeHtml(setting.title)}</legend><div class="variables" data-variable-rows>${rows.join("")}</div><template data-variable-template>${variableRow("", "")}</template><div><button type="button" class="btn btn-sm" data-variable-add>${icon("plus")}Add a Variable</button></div>${hint}</fieldset>`;
+    }
   }
 };
+
+/** One Variable's row: its name, its value (a text area, so a value with a line break survives a save), and Remove. */
+const variableRow = (name: string, value: string): string =>
+  `<div class="variable" data-variable><input type="text" data-variable-name aria-label="Name" value="${escapeHtml(name)}" maxlength="${MAX_VARIABLE_NAME_LENGTH}" placeholder="NAME" autocapitalize="none" spellcheck="false"><textarea rows="1" data-variable-value aria-label="Value" maxlength="${MAX_VARIABLE_VALUE_LENGTH}" placeholder="value" spellcheck="false">${escapeHtml(value)}</textarea><button type="button" class="btn btn-sm btn-danger" data-variable-remove aria-label="Remove this Variable">${icon("trash")}</button></div>`;
 
 /** A locked extension's settings, shown and not editable. */
 const lockedSettings = (entry: ExtensionEntry, current: ResolvedHarness["extensions"][string] | undefined): string => {
@@ -153,12 +164,18 @@ const costTable = (costs: ContainerCostTable, size: string): string => {
  */
 const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCostTable, running: PageInput["running"]): string => {
   const values: Readonly<Record<string, unknown>> = { ...environment };
-  const fields = Object.entries(ENVIRONMENT_SETTINGS as Readonly<Record<string, SettingEntry>>).map(([key, setting]) => field("environment", key, setting, values[key]));
+  const entries = Object.entries(ENVIRONMENT_SETTINGS as Readonly<Record<string, EnvironmentSettingEntry>>);
+  // The scalar settings share the Containers row; a list (the Variables) gets a row of its own. One form, one Save.
+  const fields = entries.filter(([, setting]) => setting.schema.type !== "variables").map(([key, setting]) => field("environment", key, setting, values[key]));
+  const lists = entries
+    .filter(([, setting]) => setting.schema.type === "variables")
+    .map(([key, setting]) => `<div class="row"><div class="row-title"><h3>${escapeHtml(setting.title)}</h3></div><div class="row-extra"><div class="fields list">${field("environment", key, setting, values[key])}</div></div></div>`);
+  const save = `<div class="row"><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div></div>`;
   return `<section id="environment" aria-labelledby="environment-title">
 <div class="section-head"><h2 id="environment-title">${icon("container")}Environment</h2></div>
-<p class="section-desc">What every Workspace's Container gets. A change applies at each Workspace's next Container start; a running Container keeps its size and idle time, and a lower budget stops none.</p>
+<p class="section-desc">What every Workspace's Container gets. A change applies at each Workspace's next Container start; a running Container keeps its size, idle time and Variables, and a lower budget stops none.</p>
 <form class="group" data-environment aria-labelledby="environment-title" novalidate><div class="row"><div><div class="row-title"><h3>Containers</h3><span class="ident">revision ${environment.revision}</span></div><p class="desc">Their size, how long one may sit idle, and how many may run at once.</p></div>
-<div class="row-extra"><div class="fields">${fields.join("")}</div><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div></div></div></form>
+<div class="row-extra"><div class="fields">${fields.join("")}</div></div></div>${lists.join("")}${save}</form>
 <dl class="group kv"><div><dt>Running now</dt><dd>${
     running === null || running === undefined
       ? "unknown"

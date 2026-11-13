@@ -6,7 +6,10 @@
 // One schema (`ENVIRONMENT_SETTINGS`), one resolve (`resolveEnvironment`), one change (`applyEnvironmentChange`): a later
 // setting (the Global mise config, SPI-1150; Variables, SPI-1152) is one entry in `ENVIRONMENT_SETTINGS`. The resolved
 // type, the resolve, the validation and the panel's section all follow from it.
-import { fieldProblem, type SettingEntry, type SettingValue } from "./fields.ts";
+import { type EnvironmentSettingEntry, type EnvironmentValue, fieldProblem } from "./fields.ts";
+import { fitVariables, MAX_VARIABLES } from "./variables.ts";
+
+export * from "./variables.ts";
 
 /**
  * The Container budget's default (step 2a cost guardrails): at most this many Containers run at once across the deploy.
@@ -69,7 +72,7 @@ export const containerInstance = (size: ContainerSize): ContainerInstance => {
 export interface StoredEnvironment {
   /** Bumped by every change; never moved by a Harness settings change (and the reverse). */
   readonly revision: number;
-  readonly settings: Readonly<Record<string, SettingValue>>;
+  readonly settings: Readonly<Record<string, EnvironmentValue>>;
 }
 
 export const EMPTY_ENVIRONMENT: StoredEnvironment = { revision: 0, settings: {} };
@@ -92,7 +95,12 @@ export const ENVIRONMENT_SETTINGS = {
       "How many Containers may run at once across the Environment. Applies at the next start; lowering it stops no running Container, and new starts wait until fewer run.",
     schema: { type: "integer", minimum: 1, maximum: MAX_CONTAINER_BUDGET, default: DEFAULT_CONTAINER_BUDGET },
   },
-} as const satisfies Readonly<Record<string, SettingEntry>>;
+  variables: {
+    title: "Variables",
+    description: `Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a secret. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most ${MAX_VARIABLES}. Applies at each Workspace's next Container start.`,
+    schema: { type: "variables", default: {} },
+  },
+} as const satisfies Readonly<Record<string, EnvironmentSettingEntry>>;
 
 export type EnvironmentKey = keyof typeof ENVIRONMENT_SETTINGS;
 
@@ -105,7 +113,9 @@ type ValueOf<Schema> = Schema extends { readonly type: "enum"; readonly values: 
     ? number
     : Schema extends { readonly type: "boolean" }
       ? boolean
-      : string;
+      : Schema extends { readonly type: "variables" }
+        ? Readonly<Record<string, string>>
+        : string;
 
 /** What a Workspace DO reads: every setting resolved, a stored value that no longer fits read as its default. */
 export type ResolvedEnvironment = { readonly revision: number } & {
@@ -114,7 +124,7 @@ export type ResolvedEnvironment = { readonly revision: number } & {
 
 /** Whether `value` fits setting `key`'s schema. */
 export const fitsEnvironmentSetting = (key: EnvironmentKey, value: unknown): boolean =>
-  fieldProblem((ENVIRONMENT_SETTINGS[key] as SettingEntry).schema, value) === undefined;
+  fieldProblem((ENVIRONMENT_SETTINGS[key] as EnvironmentSettingEntry).schema, value) === undefined;
 
 /**
  * The settings every Workspace DO starts its Container with. `settings` is what was stored, or an answer from an
@@ -124,11 +134,18 @@ export const resolveEnvironment = (stored: { readonly revision: number; readonly
   const resolved: Record<string, unknown> = { revision: stored.revision };
   for (const key of ENVIRONMENT_KEYS) {
     const value = stored.settings[key];
-    resolved[key] = value !== undefined && fitsEnvironmentSetting(key, value) ? value : (ENVIRONMENT_SETTINGS[key] as SettingEntry).schema.default;
+    const schema = (ENVIRONMENT_SETTINGS[key] as EnvironmentSettingEntry).schema;
+    // Variables: one a later rule refuses is dropped alone, never the whole set (ADR-0032's Variables refinement).
+    if (schema.type === "variables") resolved[key] = fitVariables(value);
+    else resolved[key] = value !== undefined && fitsEnvironmentSetting(key, value) ? value : schema.default;
   }
   // SAFETY: every key of the schema was set above, each to a value its schema accepts.
   return resolved as ResolvedEnvironment;
 };
+
+/** Whether two settings' values are equal: a scalar by identity, Variables by their names and values in order. */
+const sameValue = (a: unknown, b: unknown): boolean =>
+  a === b || (typeof a === "object" && a !== null && typeof b === "object" && b !== null && JSON.stringify(Object.entries(a)) === JSON.stringify(Object.entries(b)));
 
 /** One change from the panel or a script: some of the settings. */
 export interface EnvironmentChange {
@@ -147,15 +164,15 @@ export const applyEnvironmentChange = (
   if (entries.length === 0) return { ok: false, error: "the change sets nothing" };
   for (const [key, value] of entries) {
     if (!Object.hasOwn(ENVIRONMENT_SETTINGS, key)) return { ok: false, error: `${key}: no such setting` };
-    const why = fieldProblem((ENVIRONMENT_SETTINGS[key as EnvironmentKey] as SettingEntry).schema, value);
+    const why = fieldProblem((ENVIRONMENT_SETTINGS[key as EnvironmentKey] as EnvironmentSettingEntry).schema, value);
     if (why !== undefined) return { ok: false, error: `${key}: ${why}` };
   }
   const before: Readonly<Record<string, unknown>> = resolveEnvironment(stored);
-  const moved = entries.filter(([key, value]) => before[key] !== value);
+  const moved = entries.filter(([key, value]) => !sameValue(before[key], value));
   if (moved.length === 0) return { ok: true, environment: stored, changed: [] };
   return {
     ok: true,
-    environment: { revision: stored.revision + 1, settings: { ...stored.settings, ...(Object.fromEntries(moved) as Record<string, SettingValue>) } },
+    environment: { revision: stored.revision + 1, settings: { ...stored.settings, ...(Object.fromEntries(moved) as Record<string, EnvironmentValue>) } },
     changed: moved.map(([key]) => key as EnvironmentKey),
   };
 };

@@ -108,14 +108,40 @@ if (adding !== null) {
     if (response !== undefined) done();
   });
 }
+// A Variables list's rows as { NAME: "value" }; a row with neither a name nor a value is skipped. A name listed twice
+// is refused here, before the save, since an object would keep only the last.
+const variablesOf = (list) => {
+  const variables = {};
+  for (const row of list.querySelectorAll("[data-variable]")) {
+    const name = row.querySelector("[data-variable-name]").value.trim();
+    const value = row.querySelector("[data-variable-value]").value;
+    if (name === "" && value === "") continue;
+    if (Object.prototype.hasOwnProperty.call(variables, name)) throw new Error("The Variable " + JSON.stringify(name) + " is listed twice; keep one.");
+    variables[name] = value;
+  }
+  return variables;
+};
 const settingsOf = (form) => {
   const settings = {};
   for (const input of form.querySelectorAll("[data-setting]")) {
     const kind = input.dataset.kind;
-    settings[input.dataset.setting] = kind === "boolean" ? input.checked : kind === "integer" ? Number(input.value) : input.value;
+    settings[input.dataset.setting] = kind === "boolean" ? input.checked : kind === "integer" ? Number(input.value) : kind === "variables" ? variablesOf(input) : input.value;
   }
   return settings;
 };
+for (const list of document.querySelectorAll('[data-kind="variables"]')) {
+  const rows = list.querySelector("[data-variable-rows]");
+  const changed = () => list.dispatchEvent(new Event("input", { bubbles: true }));
+  const removable = (row) => row.querySelector("[data-variable-remove]").addEventListener("click", () => { row.remove(); changed(); });
+  for (const row of rows.querySelectorAll("[data-variable]")) removable(row);
+  list.querySelector("[data-variable-add]").addEventListener("click", () => {
+    const row = list.querySelector("[data-variable-template]").content.firstElementChild.cloneNode(true);
+    rows.append(row);
+    removable(row);
+    row.querySelector("[data-variable-name]").focus();
+    changed();
+  });
+}
 const watchUnsaved = (form) => {
   const save = form.querySelector("[data-save]");
   const note = form.querySelector("[data-save-note]");
@@ -152,7 +178,15 @@ for (const form of document.querySelectorAll("form[data-environment]")) {
   for (const input of [size, budget]) if (input !== null) { input.addEventListener("input", cost); input.addEventListener("change", cost); }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (form.reportValidity() && (await post("/_t3flare/harness/api/environment", { settings: settingsOf(form) }, save))) done();
+    if (!form.reportValidity()) return;
+    let settings;
+    try {
+      settings = settingsOf(form);
+    } catch (error) {
+      notify("err", error.message);
+      return;
+    }
+    if (await post("/_t3flare/harness/api/environment", { settings }, save)) done();
   });
 }
 for (const form of document.querySelectorAll("form[data-extension]")) {

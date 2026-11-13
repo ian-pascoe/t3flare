@@ -158,3 +158,50 @@ describe("Environment settings in the panel", () => {
     expect(html).toContain("web-app");
   });
 });
+
+// SPI-1152: the Variables in the same section and guards; the audit log keeps names and values (the page shows them to
+// the owner anyway), the Workers Logs line neither.
+describe("Variables in the panel", () => {
+  it("stores a set of Variables through the same route and audits their names and values before and after", async () => {
+    const { store, deps } = setup();
+    const headers = await ownerHeaders(store);
+    expect((await post(deps, "environment", { settings: { variables: { NODE_ENV: "development" } } }, headers)).status).toBe(200);
+    const logged: Array<string> = [];
+    const log = console.log;
+    console.log = (line: string) => void logged.push(line);
+    try {
+      expect((await post(deps, "environment", { settings: { variables: { NODE_ENV: "test", REGION: "eu" } } }, headers)).status).toBe(200);
+    } finally {
+      console.log = log;
+    }
+    expect(await getJson(deps, "environment")).toMatchObject({ revision: 2, resolved: { variables: { NODE_ENV: "test", REGION: "eu" } } });
+    expect(store.auditLog(1)).toMatchObject([
+      { entity: "environment", action: "environment.change", target: "variables", before: { variables: { NODE_ENV: "development" } }, after: { variables: { NODE_ENV: "test", REGION: "eu" } } },
+    ]);
+    expect(logged).toHaveLength(1);
+    expect(JSON.parse(logged[0]!)).toEqual({ t3flare: "harness-change", entity: "environment", caller: "owner", action: "environment.change", target: "variables" });
+  });
+
+  it("refuses a refused name or a credential-looking value with the whole reason, and stores nothing", async () => {
+    const { store, deps } = setup({ kind: "service-token" });
+    const named = await post(deps, "environment", { settings: { variables: { GITHUB_TOKEN: "x" } } }, {});
+    expect(named.status).toBe(400);
+    expect(await named.text()).toBe('variables: "GITHUB_TOKEN" is refused: names starting GITHUB_ are GitHub\'s\n');
+    const value = await post(deps, "environment", { settings: { variables: { OPENAI: `sk-${"a".repeat(30)}` } } }, {});
+    expect(await value.text()).toBe('variables: "OPENAI"\'s value looks like an API key (sk-…), and secrets never enter a Container (ADR-0016)\n');
+    expect(store.loadEnvironment().revision).toBe(0);
+    expect(store.auditLog(5)).toEqual([]);
+  });
+
+  it("shows the Variables as a list in the Environment section: each name and value, escaped, and a way to add one", async () => {
+    const { store, deps } = setup();
+    await post(deps, "environment", { settings: { variables: { NODE_ENV: "test", GREETING: '<b>"hi"</b>' } } }, await ownerHeaders(store));
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    expect(html).toContain('data-setting="variables" data-kind="variables"');
+    expect(html).toContain('<input type="text" data-variable-name aria-label="Name" value="NODE_ENV"');
+    expect(html).toContain(">test</textarea>");
+    expect(html).toContain("&lt;b&gt;&quot;hi&quot;&lt;/b&gt;</textarea>");
+    expect(html).not.toContain('<b>"hi"</b>');
+    expect(html).toContain("data-variable-add");
+  });
+});
