@@ -1082,9 +1082,6 @@ importers:
 
   packages/skills:
     dependencies:
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../t3code/packages/shared
       yaml:
         specifier: ^2.9.0
         version: 2.9.0

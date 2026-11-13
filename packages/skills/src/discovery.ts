@@ -5,7 +5,6 @@
 //
 // Unlike cloudpid, an Environment skill beats a Repo skill of the same name (SPI-1001's shared decisions), and what is
 // not taken is reported in `skipped` with its reason, so a skill that does not show can be explained.
-import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
 import { parse } from "yaml";
 
 /** A Skill: a directory with a `SKILL.md` whose frontmatter names and describes it. */
@@ -55,10 +54,16 @@ export const MAX_DESCRIPTION_LENGTH = 1024;
 export const MAX_REPO_SKILLS = 100;
 
 /**
- * Whether `$name` is a mention t3 recognises, within the Agent Skills' 64 characters: t3's own `matchInlineSkills` is
- * asked, so its token rule (an alphanumeric first character, a letter, no number-like name) is the one applied.
+ * t3's mention token, copied from `SKILL_TOKEN_REGEX` in `t3code/packages/shared/src/inlineSkills.ts` (its
+ * `matchInlineSkills`): a currency sign after whitespace or the start, then a name with an alphanumeric first
+ * character and a letter, not number-like (`5k`, `2e5`). Copied, not imported, so the agents Worker loads no t3 code;
+ * `apps/environment/test/skillExpansion.test.ts` pins it to t3's.
  */
-export const isMentionable = (name: string): boolean => name.length <= 64 && [...matchInlineSkills(`$${name}`, [{ name }])].length === 1;
+export const SKILL_TOKEN_REGEX =
+  /(^|\s)\p{Sc}(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?=\s|$)/gu;
+
+/** Whether `$name` is a mention t3 recognises (`SKILL_TOKEN_REGEX`), within the Agent Skills' 64 characters. */
+export const isMentionable = (name: string): boolean => name.length <= 64 && [...`$${name}`.matchAll(SKILL_TOKEN_REGEX)].some((match) => match[2] === name);
 
 /** The most entries listed in one skills directory: far above any real one, below a walk of a whole tree. */
 const MAX_ROOT_ENTRIES = 5000;

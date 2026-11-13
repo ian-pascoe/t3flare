@@ -4,7 +4,7 @@ import * as NodeFs from "node:fs";
 
 import type { ChatAttachment } from "@t3tools/contracts";
 import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
-import type { PromptTemplate, Skill, SkillDiscovery } from "@t3flare/skills";
+import { isMentionable, type PromptTemplate, SKILL_TOKEN_REGEX, type Skill, type SkillDiscovery } from "@t3flare/skills";
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 
@@ -137,6 +137,21 @@ describe("upstream pins (U64)", () => {
     const names = (text: string) => [...matchInlineSkills(text, skills)].map((match) => match.rawText);
     expect(names("$fruit-code and $ns:tool_1")).toEqual(["$fruit-code", "$ns:tool_1"]);
     expect(names("x$fruit-code $fruit-code. `$fruit-code` $5 $nope")).toEqual([]);
+  });
+
+  it("discovery's isMentionable agrees with matchInlineSkills on which names t3 can mention", () => {
+    const names = ["_private", "-x", ":ns", "5k", "2e5", "123", "fruit-code", "ns:tool_1", "a", "x9", "A-b_c:d", "5kiwi", "e5", "a".repeat(64)];
+    for (const name of names) {
+      expect(isMentionable(name), name).toBe([...matchInlineSkills(`$${name}`, [{ name }])].length === 1);
+    }
+    expect(names.filter((name) => isMentionable(name))).toEqual(["fruit-code", "ns:tool_1", "a", "x9", "A-b_c:d", "5kiwi", "e5", "a".repeat(64)]);
+  });
+
+  it("discovery's copy of t3's mention token is still t3's (inlineSkills.ts)", () => {
+    const source = NodeFs.readFileSync(new URL("../../../t3code/packages/shared/src/inlineSkills.ts", import.meta.url), "utf8");
+    const t3 = /const SKILL_TOKEN_REGEX =\s*\/(.+)\/([a-z]*);/.exec(source);
+    expect(t3, "t3 moved SKILL_TOKEN_REGEX; re-read U64").not.toBeNull();
+    expect({ source: SKILL_TOKEN_REGEX.source, flags: SKILL_TOKEN_REGEX.flags }).toEqual({ source: t3![1], flags: t3![2] });
   });
 
   it("t3's composer inserts `$<name> ` for a picked skill (ChatComposer.tsx)", () => {

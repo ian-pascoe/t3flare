@@ -10,7 +10,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@t3tools/shared": "workspace:*",
     "yaml": "catalog:"
   },
   "devDependencies": {
