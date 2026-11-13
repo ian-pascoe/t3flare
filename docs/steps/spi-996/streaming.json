@@ -1,0 +1,105 @@
+{
+ "at": "2026-11-13T05:41:26.859Z",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "streaming": {
+  "threadId": "841ae3c8-5dd4-470e-91b1-64ac135f8b47",
+  "ok": true,
+  "frames": [
+   {
+    "atMs": 6225,
+    "kind": "replace",
+    "text": "tick 1\n",
+    "truncated": false,
+    "running": true
+   },
+   {
+    "atMs": 6808,
+    "kind": "append",
+    "text": "tick 2\n",
+    "truncated": false,
+    "running": true
+   },
+   {
+    "atMs": 7766,
+    "kind": "append",
+    "text": "tick 3\n",
+    "truncated": false,
+    "running": true
+   },
+   {
+    "atMs": 8775,
+    "kind": "append",
+    "text": "tick 4\n",
+    "truncated": false,
+    "running": true
+   },
+   {
+    "atMs": 9781,
+    "kind": "append",
+    "text": "tick 5\n",
+    "truncated": false,
+    "running": true
+   },
+   {
+    "atMs": 10869,
+    "kind": "replace",
+    "text": "tick 1\ntick 2\ntick 3\ntick 4\ntick 5\n",
+    "truncated": false,
+    "running": false
+   }
+  ],
+  "ticksWhileRunning": [
+   1,
+   2,
+   3,
+   4,
+   5
+  ],
+  "spreadMs": 3556,
+  "status": "completed",
+  "runs": [
+   {
+    "id": "run:thread:841ae3c8-5dd4-470e-91b1-64ac135f8b47:ordinal:1",
+    "status": "completed",
+    "sourcePlanRef": null,
+    "interactionMode": null
+   }
+  ],
+  "ms": 12556,
+  "items": [
+   {
+    "id": "turn-item:message:038a8f09-2c08-4af4-9fb7-e746a9d1c6d3",
+    "type": "user_message",
+    "status": "completed",
+    "title": null
+   },
+   {
+    "id": "turn-item:provider:piDurable:native-item:thread%3A841ae3c8-5dd4-470e-91b1-64ac135f8b47%3Acall%3Atoolu_01PmueN4oxJYYAfuYoYdmyvk",
+    "type": "command_execution",
+    "status": "completed",
+    "title": "bash",
+    "input": "for i in 1 2 3 4 5; do echo tick $i; sleep 1; done",
+    "output": "",
+    "exitCode": 0
+   },
+   {
+    "id": "turn-item:provider:piDurable:native-item:thread%3A841ae3c8-5dd4-470e-91b1-64ac135f8b47%3Agen%3A14%3A0",
+    "type": "assistant_message",
+    "status": "completed",
+    "title": null,
+    "text": "tick 5"
+   },
+   {
+    "id": "turn-item:provider:piDurable:native-item:checkpoint%3Acheckpoint%3Ascope%3Acheckpoint-scope%253Athread%253A841ae3c8-5dd4-470e-91b1-64ac135f8b47%253Aname%253Aroot%3Aname%3A1",
+    "type": "checkpoint",
+    "status": "completed",
+    "title": null
+   }
+  ],
+  "plans": [],
+  "thread": {
+   "interactionMode": "default"
+  }
+ }
+}

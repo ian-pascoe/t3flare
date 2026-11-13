@@ -11,8 +11,7 @@ import { type CodemodeRemote, type CodemodeSandboxBase, RemoteCodemodeSandbox } 
 import { defineExtension, type Extension, section, type ToolRegistration } from "@earendil-works/pi-durable";
 import { type CodemodeNamespace, CODEMODE_TOOL_NAME, createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
 import { createToolSearchTool, TOOL_SEARCH_TOOL_NAME } from "@earendil-works/pi-durable/tool-search";
-
-import { PROPOSE_PLAN_TOOL } from "./plan.ts";
+import { PROPOSE_PLAN_TOOL } from "@t3flare/session-protocol";
 
 /** The sandbox Durable Object namespace, as the agents Worker binds it from the codemode Worker (`scriptName`). */
 export interface CodemodeSandboxNamespace {

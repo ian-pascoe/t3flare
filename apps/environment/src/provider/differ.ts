@@ -22,7 +22,7 @@ import {
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import type { ProviderAdapterV2Event } from "@t3tools/provider-core/server/ProviderAdapter";
-import type { ApprovalDecision, ContentBlock, PendingApproval, PendingQuestion, PushedEntry, SessionState, TurnState } from "@t3flare/session-protocol";
+import { type ApprovalDecision, type ContentBlock, type PendingApproval, type PendingQuestion, PROPOSE_PLAN_TOOL, type PushedEntry, type SessionState, type TurnState } from "@t3flare/session-protocol";
 import { classifyProxyFailure, type ProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
 import * as DateTime from "effect/DateTime";
 
@@ -366,7 +366,7 @@ const emitTool = (
     }
   }
   // The agent's Terminals (SPI-1057) as commands, as t3 shows a command: what started or what was typed, and the screen.
-  if (call.name === "terminal_start" || (call.name === "terminal_send" && (str(call.arguments.text) !== undefined || Array.isArray(call.arguments.keys)))) {
+  if (isTerminalCommand(call)) {
     const keys = Array.isArray(call.arguments.keys) ? call.arguments.keys.filter((key): key is string => typeof key === "string") : [];
     const input =
       call.name === "terminal_start"
@@ -441,9 +441,6 @@ const emitTodo = (state: DifferState, out: Array<ProviderAdapterV2Event>, pushed
   });
 };
 
-/** The Durable agent's plan-mode tool (`apps/agents/src/extensions/plan.ts`). */
-export const PROPOSE_PLAN_TOOL = "propose_plan";
-
 /**
  * A plan-mode turn's plan (SPI-996) as t3's proposed plan, in the shape t3's Codex and Claude adapters emit: a `plan`
  * node, a `proposed_plan` turn item and an `active` plan artifact, which the owner's Implement completes. The plan the
@@ -471,9 +468,12 @@ const emitProposedPlan = (state: DifferState, out: Array<ProviderAdapterV2Event>
   state.proposedPlan = plan;
 };
 
-/** The tools whose items are commands (`command_execution`), whose running output streams (SPI-996). */
-const isCommandItem = (call: ToolCallInfo): boolean =>
-  call.name === "bash" || call.name === "terminal_start" || (call.name === "terminal_send" && (str(call.arguments.text) !== undefined || Array.isArray(call.arguments.keys)));
+/** A Terminal call shown as a command: one that starts a program or types into one (SPI-1057). */
+const isTerminalCommand = (call: ToolCallInfo): boolean =>
+  call.name === "terminal_start" || (call.name === "terminal_send" && (str(call.arguments.text) !== undefined || Array.isArray(call.arguments.keys)));
+
+/** The calls shown as commands (`command_execution`), whose running output streams (SPI-996). */
+const isCommandItem = (call: ToolCallInfo): boolean => call.name === "bash" || isTerminalCommand(call);
 
 /** Characters `previous` and `next` share: the longest end of `previous` that `next` starts with (a sliding tail). */
 export const sharedTail = (previous: string, next: string): number => {

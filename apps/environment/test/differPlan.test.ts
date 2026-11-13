@@ -4,13 +4,13 @@
 import { OrchestrationV2ProviderCapabilities } from "@t3tools/contracts";
 import { ProviderAdapterV2Event } from "@t3tools/provider-core/server/ProviderAdapter";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
-import type { PushedEntry, SessionState, ToolSlotSlim } from "@t3flare/session-protocol";
+import { PROPOSE_PLAN_TOOL, type PushedEntry, type SessionState, type ToolSlotSlim } from "@t3flare/session-protocol";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "../src/provider/capabilities.ts";
-import { diff, forgetProposedPlan, makeDifferState, PROPOSE_PLAN_TOOL, sharedTail, SKIPPED_OUTPUT, type DifferState, type TurnContext } from "../src/provider/differ.ts";
+import { diff, forgetProposedPlan, makeDifferState, sharedTail, SKIPPED_OUTPUT, type DifferState, type TurnContext } from "../src/provider/differ.ts";
 import { PRESENTATION } from "../src/provider/driver.ts";
 
 const now = DateTime.makeUnsafe("2026-11-13T12:00:00.000Z");
@@ -139,10 +139,9 @@ describe("a running command's live output (SPI-996)", () => {
 
   it("streams what is new on each push, to the command's own item, as t3's command_output.delta", () => {
     const state = differ();
-    const first = decoded(diff(state, withTools([bash], [running("1\n")]), now));
-    const item = first.find((event) => event.type === "turn_item.updated");
-    expect(item).toMatchObject({ turnItem: { id: itemId, type: "command_execution", status: "running" } });
-    expect(deltas(first.map((event) => event as never))).toMatchObject([{ threadId: "thread-1", itemId, chunk: "1\n" }]);
+    const first = diff(state, withTools([bash], [running("1\n")]), now);
+    expect(decoded(first).find((event) => event.type === "turn_item.updated")).toMatchObject({ turnItem: { id: itemId, type: "command_execution", status: "running" } });
+    expect(deltas(first)).toMatchObject([{ threadId: "thread-1", itemId, chunk: "1\n" }]);
     expect(deltas(diff(state, withTools([bash], [running("1\n2\n")]), now)).map((event) => event.chunk)).toEqual(["2\n"]);
     expect(deltas(diff(state, withTools([bash], [running("1\n2\n")]), now))).toEqual([]);
   });

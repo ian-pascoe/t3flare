@@ -4,7 +4,7 @@
 // while it runs (t3's own command-output subscription, as an expanded row reads it); with t3's labs flag on, a completed
 // turn gets a prompt suggestion. Evidence goes to docs/steps/spi-996/<file>.json, tokens and cookies redacted.
 //
-//   node scripts/stage.ts run p996 p996 turns [plan|streaming|suggestion]
+//   node scripts/stage.ts run p996 p996 turns [presentation|plan|streaming|streaming-worker|suggestion]
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -141,8 +141,13 @@ const plan = async (projectId: string) => {
   return { threadId, ok: proposedOk && implementOk, proposed: { ok: proposedOk, ...proposed }, implemented: { ok: implementOk, ...implemented } };
 };
 
-const streaming = async (projectId: string) => {
-  const threadId = await createThread(projectId, "spi-996: live output", "default");
+/**
+ * `container`: the command runs on the Container, whose output streams. `worker`: bash chooses its backend; a sleep loop
+ * goes to the Worker Shell, whose output arrives once at exit (computer's RPC), so nothing streams there (recorded, not
+ * failed: the gap is SPI-996's follow-up).
+ */
+const streaming = async (projectId: string, backend: "container" | "worker") => {
+  const threadId = await createThread(projectId, `spi-996: live output (${backend})`, "default");
   let frames: Promise<Array<{ atMs: number; value: unknown }>> | undefined;
   let itemSeenAtMs = 0;
   const started = Date.now();
@@ -152,7 +157,7 @@ const streaming = async (projectId: string) => {
       sendMessage(
         cookie,
         threadId,
-        'Run exactly this with bash, with backend "container": `for i in 1 2 3 4 5; do echo tick $i; sleep 1; done`. Then reply with the last line it printed.',
+        `Run exactly this with bash${backend === "container" ? ', with backend "container"' : " (leave its backend parameter out)"}: \`for i in 1 2 3 4 5; do echo tick $i; sleep 1; done\`. Then reply with the last line it printed.`,
         MODEL,
       ),
     (item) => {
@@ -168,9 +173,10 @@ const streaming = async (projectId: string) => {
   const ticksWhileRunning = [1, 2, 3, 4, 5].filter((index) => runningText.includes(`tick ${index}`));
   // Streamed: output arrived in more than one running frame, spread over the command's seconds, before it ended.
   const spreadMs = runningFrames.length < 2 ? 0 : (runningFrames.at(-1) as any).atMs - (runningFrames[0] as any).atMs;
-  const ok = run.status === "completed" && runningFrames.length >= 2 && spreadMs >= 1_500 && ticksWhileRunning.length >= 3;
-  console.log(`streaming: ${ok ? "ok" : "FAIL"} (${runningFrames.length} running frames over ${spreadMs} ms; ticks ${ticksWhileRunning.join(",")})`);
-  return { threadId, ok, frames: shown, ticksWhileRunning, spreadMs, ...run };
+  const streamed = runningFrames.length >= 2 && spreadMs >= 1_500 && ticksWhileRunning.length >= 3;
+  const ok = run.status === "completed" && (backend === "worker" || streamed);
+  console.log(`streaming ${backend}: ${ok ? "ok" : "FAIL"} (${runningFrames.length} running frames over ${spreadMs} ms; ticks ${ticksWhileRunning.join(",")})`);
+  return { threadId, ok, streamed, frames: shown, ticksWhileRunning, spreadMs, ...run };
 };
 
 const suggestion = async (projectId: string) => {
@@ -187,13 +193,28 @@ const suggestion = async (projectId: string) => {
   return { threadId, ok, suggestions: texts, status: run.status, runs: run.runs };
 };
 
+/** What t3 tells clients about the provider: the plan-mode toggle and the capabilities that turn on the rest. */
+const presentation = async () => {
+  const config = (await wsCall(cookie, "server.getConfig", {})) as { providers: Array<any> };
+  const provider = config.providers.find((candidate) => candidate.driver === "piDurable");
+  const shown = {
+    showInteractionModeToggle: provider?.showInteractionModeToggle ?? provider?.presentation?.showInteractionModeToggle ?? null,
+    displayName: provider?.displayName ?? null,
+  };
+  const ok = shown.showInteractionModeToggle === true;
+  console.log(`presentation: ${ok ? "ok" : "FAIL"}`);
+  return { ok, ...shown };
+};
+
 const turns = async () => {
   await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } } });
   const { projectId } = await ensureProject(cookie, `p996-${Date.now().toString(36)}`);
   const only = process.argv[3];
   const results: Record<string, any> = {};
+  if (only === undefined || only === "presentation") results.presentation = await presentation();
   if (only === undefined || only === "plan") results.plan = await plan(projectId);
-  if (only === undefined || only === "streaming") results.streaming = await streaming(projectId);
+  if (only === undefined || only === "streaming") results.streaming = await streaming(projectId, "container");
+  if (only === undefined || only === "streaming-worker") results.streamingWorker = await streaming(projectId, "worker");
   if (only === undefined || only === "suggestion") results.suggestion = await suggestion(projectId);
   const ok = Object.values(results).every((result) => result.ok);
   writeEvidence(only === undefined ? "turns.json" : `${only}.json`, { ok, ...results });
@@ -205,6 +226,6 @@ if (command === "turns") {
   cookie = await pair();
   await turns();
 } else {
-  console.error("usage: p996 turns [plan|streaming|suggestion]");
+  console.error("usage: p996 turns [presentation|plan|streaming|streaming-worker|suggestion]");
   process.exit(2);
 }

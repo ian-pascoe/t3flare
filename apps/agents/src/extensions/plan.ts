@@ -7,9 +7,7 @@
 // @effect-diagnostics asyncFunction:off
 import { defineExtension, defineTool, type Extension, section } from "@earendil-works/pi-durable";
 import { obj, str } from "@earendil-works/pi-schema";
-import type { InteractionMode } from "@t3flare/session-protocol";
-
-export const PROPOSE_PLAN_TOOL = "propose_plan";
+import { type InteractionMode, PROPOSE_PLAN_TOOL } from "@t3flare/session-protocol";
 
 /** Most characters of a plan: t3 keeps it in one projection row. */
 export const MAX_PLAN = 64_000;

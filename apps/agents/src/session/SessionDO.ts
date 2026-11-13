@@ -171,6 +171,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #registryWriter: ReturnType<typeof createRegistry>;
   /** The Advisor (SPI-1059), while the harness settings turn it on; one per object, so a Review under way survives a settings read. */
   #advisor: AdvisorObserver | undefined;
+  /** Prompt suggestions' models (SPI-996): the proxy without the turns' usage-limit records; made at the first one. */
+  #suggestionModels: ReturnType<typeof proxyModels> | undefined;
 
   constructor(ctx: DurableObjectState, env: SessionEnv) {
     super(ctx, env);
@@ -829,7 +831,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
     console.log(JSON.stringify({ t3flare: "prompt-suggestion", suggested: text !== "" }));
     return { text };
   }
-  #suggestionModels: ReturnType<typeof proxyModels> | undefined;
 
   /** A test's fault (the inverse guard's check): forgets every turn, as a Session that lost its state would. */
   async dropTurns(): Promise<{ readonly dropped: number }> {

@@ -190,6 +190,9 @@ export interface PushedEntry {
   readonly timestamp?: number;
 }
 
+/** The Durable agent's plan-mode tool (SPI-996): its call's `plan` argument is t3's proposed plan. */
+export const PROPOSE_PLAN_TOOL = "propose_plan";
+
 export interface ToolSlotSlim {
   readonly callId: string;
   readonly name: string;

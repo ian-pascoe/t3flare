@@ -34,6 +34,12 @@ describe("a running call's output in the push", () => {
 const reply = (text: string, stopReason: AssistantMessage["stopReason"] = "stop"): AssistantMessage =>
   ({ role: "assistant", content: [{ type: "text", text }], stopReason }) as AssistantMessage;
 
+/** The one user message's text (`suggestionContext` writes it as a string). */
+const askedText = (asked: ReturnType<typeof suggestionContext>): string => {
+  const content = asked.messages[0]!.content;
+  return typeof content === "string" ? content : "";
+};
+
 describe("prompt suggestions", () => {
   const model = { id: "claude-haiku-5-5", provider: "anthropic" } as never;
   const models = (answer: AssistantMessage | Error) => ({
@@ -42,11 +48,11 @@ describe("prompt suggestions", () => {
 
   it("asks with t3's prompt, the turn's request and answer only", () => {
     const asked = suggestionContext("fix the build", "Fixed: a missing import.");
-    const text = String(asked.messages[0]!.content);
+    const text = askedText(asked);
     expect(text).toContain("fix the build");
     expect(text).toContain("Fixed: a missing import.");
     expect(text.endsWith(PROMPT_SUGGESTION_PROMPT)).toBe(true);
-    expect(String(suggestionContext("u", "a".repeat(10_000)).messages[0]!.content).length).toBeLessThan(5_000);
+    expect(askedText(suggestionContext("u", "a".repeat(10_000))).length).toBeLessThan(5_000);
   });
 
   it("is the model's text, unquoted; nothing on an error, a failure, an overlong reply or an empty turn", async () => {

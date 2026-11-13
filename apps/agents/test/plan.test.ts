@@ -2,12 +2,12 @@
 // run (no model request after it); outside plan mode it refuses and the run goes on.
 // @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
-import type { InteractionMode } from "@t3flare/session-protocol";
+import { type InteractionMode, PROPOSE_PLAN_TOOL } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
 import { ALWAYS_OFFERED } from "../src/extensions/codemode.ts";
 import { allowedByDefault } from "../src/extensions/guardian/policy.ts";
-import { PLAN_CAPTURED, PLAN_OUTSIDE_PLAN_MODE, PROPOSE_PLAN_INSTRUCTION, PROPOSE_PLAN_TOOL, proposePlan } from "../src/extensions/plan.ts";
+import { PLAN_CAPTURED, PLAN_OUTSIDE_PLAN_MODE, PROPOSE_PLAN_INSTRUCTION, proposePlan } from "../src/extensions/plan.ts";
 import { context, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
 const PLAN = "# Add a cache\n\n1. Read the config.\n2. Add the cache.";
