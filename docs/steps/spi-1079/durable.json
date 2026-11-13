@@ -1,15 +1,15 @@
 {
- "at": "2026-11-13T01:35:13.253Z",
+ "at": "2026-11-13T01:41:19.563Z",
  "model": "anthropic/claude-sonnet-5-5",
- "workspace": "spi1079-durable-mweay0my",
+ "workspace": "spi1079-durable-mweb6inc",
  "cases": [
   {
    "name": "form: a user_input card with one question per field and Send; the owner's answers reach the server (full access: the question still asks)",
-   "threadId": "55a9f165-f5f4-4552-a2bf-6d809e249d2f",
+   "threadId": "e62bdd4b-67e9-4ad1-b535-a9a244e5a411",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:55a9f165-f5f4-4552-a2bf-6d809e249d2f:approval:t3flare-elicit-2de412da-4e16-4e0b-9466-64d346960969",
+     "id": "runtime-request:piDurable:thread:e62bdd4b-67e9-4ad1-b535-a9a244e5a411:approval:t3flare-elicit-fb223b04-a569-4beb-97e4-2f693f219d05",
      "marked": true,
      "kind": "user_input",
      "type": "user_input_request",
@@ -61,20 +61,20 @@
      }
     }
    ],
-   "output": "Script completed\nWall time 1.2 seconds\nOutput:\nthe fixture's question was answered: accept {\"colour\":\"blue\",\"note\":\"from the owner\",\"urgent\":true}",
+   "output": "Script completed\nWall time 1.9 seconds\nOutput:\nthe fixture's question was answered: accept {\"colour\":\"blue\",\"note\":\"from the owner\",\"urgent\":true}",
    "logAdded": [
     "fixture_ask:accept:{\"colour\":\"blue\",\"note\":\"from the owner\",\"urgent\":true}"
    ],
-   "ms": 8922,
+   "ms": 9208,
    "ok": true
   },
   {
    "name": "form: the owner picks Decline; the server is told decline and gets no values",
-   "threadId": "6e8c61cd-1dc1-4723-8d27-6e8f54379134",
+   "threadId": "c959f6bb-6ed9-494d-a368-e4e1242c9e5a",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:6e8c61cd-1dc1-4723-8d27-6e8f54379134:approval:t3flare-elicit-1571642f-a069-4d14-a129-ef45e04bc293",
+     "id": "runtime-request:piDurable:thread:c959f6bb-6ed9-494d-a368-e4e1242c9e5a:approval:t3flare-elicit-b4ee5cce-726f-4f27-98a0-11d0ab3db44a",
      "marked": true,
      "kind": "user_input",
      "type": "user_input_request",
@@ -124,20 +124,20 @@
      }
     }
    ],
-   "output": "Script completed\nWall time 1.8 seconds\nOutput:\nthe fixture's question was answered: decline",
+   "output": "Script completed\nWall time 2.3 seconds\nOutput:\nthe fixture's question was answered: decline",
    "logAdded": [
     "fixture_ask:decline"
    ],
-   "ms": 8904,
+   "ms": 9291,
    "ok": true
   },
   {
    "name": "confirmation: t3's mcp-elicitation approval card; approved",
-   "threadId": "77272860-301a-44c2-baf3-70aeeacc4359",
+   "threadId": "243527eb-e029-4c37-af33-519d3047dc2c",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:77272860-301a-44c2-baf3-70aeeacc4359:approval:t3flare-elicit-9393e70e-4fb8-4fe0-81ea-a57505aeb9f3",
+     "id": "runtime-request:piDurable:thread:243527eb-e029-4c37-af33-519d3047dc2c:approval:t3flare-elicit-92eccd44-a682-446d-b909-afb9007880c6",
      "marked": true,
      "kind": "mcp-elicitation",
      "type": "approval_request",
@@ -154,20 +154,20 @@
      }
     }
    ],
-   "output": "Script completed\nWall time 2.8 seconds\nOutput:\nthe fixture's question was answered: accept",
+   "output": "Script completed\nWall time 2.6 seconds\nOutput:\nthe fixture's question was answered: accept",
    "logAdded": [
     "fixture_confirm:accept"
    ],
-   "ms": 9267,
+   "ms": 9478,
    "ok": true
   },
   {
    "name": "confirmation: declined",
-   "threadId": "e4433dd5-0f22-452f-b31d-67943cabb881",
+   "threadId": "448d06b5-8462-46c5-895f-46887c9b9290",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:e4433dd5-0f22-452f-b31d-67943cabb881:approval:t3flare-elicit-39a50722-2bde-4169-8c92-fffe444c25a3",
+     "id": "runtime-request:piDurable:thread:448d06b5-8462-46c5-895f-46887c9b9290:approval:t3flare-elicit-2bc0c7bc-ba7c-4e17-9306-39f0f532f45d",
      "marked": true,
      "kind": "mcp-elicitation",
      "type": "approval_request",
@@ -184,20 +184,20 @@
      }
     }
    ],
-   "output": "Script completed\nWall time 2.3 seconds\nOutput:\nthe fixture's question was answered: decline",
+   "output": "Script completed\nWall time 2.9 seconds\nOutput:\nthe fixture's question was answered: decline",
    "logAdded": [
     "fixture_confirm:decline"
    ],
-   "ms": 8947,
+   "ms": 10303,
    "ok": true
   },
   {
    "name": "page (URL mode): the card shows the link; Opened it",
-   "threadId": "8f0006c9-d183-4b31-be9f-24525a73eb17",
+   "threadId": "6ae78305-a772-4678-bc0a-e509b85f93b6",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:8f0006c9-d183-4b31-be9f-24525a73eb17:approval:t3flare-elicit-d95686a9-ef3a-41e6-9f7f-a4942e381f0f",
+     "id": "runtime-request:piDurable:thread:6ae78305-a772-4678-bc0a-e509b85f93b6:approval:t3flare-elicit-13c8c5f8-0b91-4622-b719-40a10b3983d8",
      "marked": true,
      "kind": "mcp-elicitation",
      "type": "approval_request",
@@ -214,38 +214,38 @@
      }
     }
    ],
-   "output": "Script completed\nWall time 2.1 seconds\nOutput:\nthe fixture's question was answered: accept",
+   "output": "Script completed\nWall time 3.0 seconds\nOutput:\nthe fixture's question was answered: accept",
    "logAdded": [
     "fixture_page:accept"
    ],
-   "ms": 9036,
+   "ms": 9359,
    "ok": true
   },
   {
    "name": "a form asking for a password is declined unseen: no card, the server told decline",
-   "threadId": "ba786e8b-b4f7-4d79-8c89-03c14ed38b36",
+   "threadId": "4e3b869a-0382-44e9-8326-7fddf418f323",
    "status": "completed",
    "cards": [],
-   "output": "Script completed\nWall time 0.5 seconds\nOutput:\nthe fixture's question was answered: decline",
+   "output": "Script completed\nWall time 0.2 seconds\nOutput:\nthe fixture's question was answered: decline",
    "logAdded": [
     "fixture_password:decline"
    ],
-   "ms": 4833,
+   "ms": 6470,
    "ok": true
   },
   {
    "name": "owner only: another agent's t3_pending_request read and respond on the form card are refused; the card stays pending; no green",
    "attempt": {
-    "cardId": "runtime-request:piDurable:thread:9b9d30a9-2e88-4331-92b3-fa115b50f4eb:approval:t3flare-elicit-caafb787-d74b-43d4-addc-11474e3c3be2",
+    "cardId": "runtime-request:piDurable:thread:0d22b2a2-5820-4253-a39a-6277d41be319:approval:t3flare-elicit-9dd049ca-4430-49f1-8d32-33ec5b618c3b",
     "bStatus": "completed",
     "output": "Script completed\nWall time 0.3 seconds\nOutput:\nREAD read threw: Refused: this question comes from an MCP server, and only the owner answers it, on its card in a t3 client. Tell the owner it is waiting; do not answer it for them.\nRESPOND respond threw: Refused: this question comes from an MCP server, and only the owner answers it, on its card in a t3 client. Tell the owner it is waiting; do not answer it for them.",
     "stillPending": true
    },
-   "threadId": "9b9d30a9-2e88-4331-92b3-fa115b50f4eb",
+   "threadId": "0d22b2a2-5820-4253-a39a-6277d41be319",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:9b9d30a9-2e88-4331-92b3-fa115b50f4eb:approval:t3flare-elicit-caafb787-d74b-43d4-addc-11474e3c3be2",
+     "id": "runtime-request:piDurable:thread:0d22b2a2-5820-4253-a39a-6277d41be319:approval:t3flare-elicit-9dd049ca-4430-49f1-8d32-33ec5b618c3b",
      "marked": true,
      "kind": "user_input",
      "type": "user_input_request",
@@ -295,26 +295,26 @@
      }
     }
    ],
-   "output": "Script completed\nWall time 15.7 seconds\nOutput:\nthe fixture's question was answered: decline",
+   "output": "Script completed\nWall time 14.8 seconds\nOutput:\nthe fixture's question was answered: decline",
    "logAdded": [
     "fixture_ask:decline"
    ],
-   "ms": 21853,
+   "ms": 21992,
    "ok": true
   },
   {
    "name": "Executor-style approval: t3flare's card shows Executor's text (app, tool, arguments) and the agent's call; approved: resume ran once with accept",
-   "threadId": "fb90d43b-8a69-4a78-8900-566bb8f8f1a9",
+   "threadId": "3017ee59-cf21-4969-a1e9-29ea9d6100dc",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:fb90d43b-8a69-4a78-8900-566bb8f8f1a9:approval:t3flare-elicit-efb4d26c-9824-4bbc-a404-4fe6ca82b075",
+     "id": "runtime-request:piDurable:thread:3017ee59-cf21-4969-a1e9-29ea9d6100dc:approval:t3flare-elicit-1ec53221-df12-44ed-8845-f97d4e97dbba",
      "marked": true,
      "kind": "mcp-elicitation",
      "type": "approval_request",
      "requestKind": "mcp-elicitation",
      "title": "exefix: approve?",
-     "prompt": "exefix asks for your approval:\n\nApprove fixture-notes.note with line \"exec-mweb0yyo-yes\"?\n\nWhat exefix says waits (its own details):\n{\n  \"app\": \"fixture-notes\",\n  \"tool\": \"note\",\n  \"args\": {\n    \"line\": \"exec-mweb0yyo-yes\"\n  }\n}\nExpires 2026-11-13T01:44:58.564Z.\n\nThe agent's call: exefix: call\n{\n  \"calls\": {\n    \"path\": \"tools.fixture-notes.note\",\n    \"input\": {\n      \"line\": \"exec-mweb0yyo-yes\"\n    }\n  }\n}",
+     "prompt": "exefix asks for your approval:\n\nApprove fixture-notes.note with line \"exec-mweb8p5p-yes\"?\n\nWhat exefix says waits (its own details):\n{\n  \"app\": \"fixture-notes\",\n  \"tool\": \"note\",\n  \"args\": {\n    \"line\": \"exec-mweb8p5p-yes\"\n  }\n}\nExpires 2026-11-13T01:50:57.866Z.\n\nThe agent's call: exefix: call\n{\n  \"calls\": {\n    \"path\": \"tools.fixture-notes.note\",\n    \"input\": {\n      \"line\": \"exec-mweb8p5p-yes\"\n    }\n  }\n}",
      "options": [
       "accept:Approve",
       "decline:Decline",
@@ -325,27 +325,27 @@
      }
     }
    ],
-   "output": "Script completed\nWall time 1.5 seconds\nOutput:\n==> text 1/2 <==\n\"ran fixture-notes.note: noted #19\"\n==> text 2/2 <==\n RESUME:absent",
+   "output": "Script completed\nWall time 3.2 seconds\nOutput:\n==> text 1/2 <==\n\"ran fixture-notes.note: noted #34\"\n==> text 2/2 <==\n RESUME:absent",
    "logAdded": [
     "resume:accept",
-    "exec:exec-mweb0yyo-yes"
+    "exec:exec-mweb8p5p-yes"
    ],
-   "ms": 8852,
+   "ms": 10812,
    "ok": true
   },
   {
    "name": "Executor-style approval declined: Executor is sent its decline; nothing ran",
-   "threadId": "a1096e8a-1b09-4c76-897f-378cdb23a1a2",
+   "threadId": "f37e538f-42e2-44fd-8043-c318b9274674",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:a1096e8a-1b09-4c76-897f-378cdb23a1a2:approval:t3flare-elicit-93e74179-a30e-43c8-97e0-7b715911c60d",
+     "id": "runtime-request:piDurable:thread:f37e538f-42e2-44fd-8043-c318b9274674:approval:t3flare-elicit-f80f692d-4e83-4067-bfe5-9242a46b7ff9",
      "marked": true,
      "kind": "mcp-elicitation",
      "type": "approval_request",
      "requestKind": "mcp-elicitation",
      "title": "exefix: approve?",
-     "prompt": "exefix asks for your approval:\n\nApprove fixture-notes.note with line \"exec-mweb17bv-no\"?\n\nWhat exefix says waits (its own details):\n{\n  \"app\": \"fixture-notes\",\n  \"tool\": \"note\",\n  \"args\": {\n    \"line\": \"exec-mweb17bv-no\"\n  }\n}\nExpires 2026-11-13T01:45:07.645Z.\n\nThe agent's call: exefix: call\n{\n  \"calls\": {\n    \"path\": \"tools.fixture-notes.note\",\n    \"input\": {\n      \"line\": \"exec-mweb17bv-no\"\n    }\n  }\n}",
+     "prompt": "exefix asks for your approval:\n\nApprove fixture-notes.note with line \"exec-mweb8yy8-no\"?\n\nWhat exefix says waits (its own details):\n{\n  \"app\": \"fixture-notes\",\n  \"tool\": \"note\",\n  \"args\": {\n    \"line\": \"exec-mweb8yy8-no\"\n  }\n}\nExpires 2026-11-13T01:51:12.476Z.\n\nThe agent's call: exefix: call\n{\n  \"calls\": {\n    \"path\": \"tools.fixture-notes.note\",\n    \"input\": {\n      \"line\": \"exec-mweb8yy8-no\"\n    }\n  }\n}",
      "options": [
       "accept:Approve",
       "decline:Decline",
@@ -356,11 +356,11 @@
      }
     }
    ],
-   "output": "Script completed\nWall time 1.7 seconds\nOutput:\n\"The user declined the approval; nothing ran.\"",
+   "output": "Script completed\nWall time 3.4 seconds\nOutput:\n\"The user declined the approval; nothing ran.\"",
    "logAdded": [
     "resume:decline"
    ],
-   "ms": 7638,
+   "ms": 11290,
    "ok": true
   }
  ],
