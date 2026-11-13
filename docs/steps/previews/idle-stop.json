@@ -1,0 +1,44 @@
+{
+ "at": "2026-11-13T13:54:54.805Z",
+ "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "stoppedAfterMs": 124140,
+ "samples": [
+  {
+   "sinceCloseMs": 633,
+   "running": true
+  },
+  {
+   "sinceCloseMs": 16274,
+   "running": true
+  },
+  {
+   "sinceCloseMs": 32319,
+   "running": true
+  },
+  {
+   "sinceCloseMs": 47432,
+   "running": true
+  },
+  {
+   "sinceCloseMs": 62589,
+   "running": true
+  },
+  {
+   "sinceCloseMs": 77750,
+   "running": true
+  },
+  {
+   "sinceCloseMs": 92938,
+   "running": true
+  },
+  {
+   "sinceCloseMs": 109012,
+   "running": true
+  },
+  {
+   "sinceCloseMs": 124140,
+   "running": false
+  }
+ ]
+}

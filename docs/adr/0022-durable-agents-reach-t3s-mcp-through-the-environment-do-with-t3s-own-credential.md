@@ -78,3 +78,7 @@ is now "every denied name is still a real t3 tool" (`apps/environment/test/t3Gui
 Known gap: `request_secret`'s `delivery: "file"` writes the value into t3's State directory, on the Environment, which
 an agent's commands in a Container cannot read; `secretRef` and pasted values work as stock. SPI-1088.
 
+
+## Refinement (G11, 2026-11-13): `html_*`, `preview_*` and `t3_preview_*` are offered
+
+t3's HTML renders and server browser run in Browser Run (ADR-0031), so the denylist is `t3_attachment_*`, `t3_thread_send_attachments`, `device_*` and `t3_worktree_*`. t3 offers `preview_*` only while the owner's agent browser access is on (stock's default; the pin that held it off is gone). A t3 tool result's MCP `image` parts reach the Durable agent as image content, at most four, at most 5 MiB of base64 each (`html_preview`'s and `preview_snapshot`'s screenshots).

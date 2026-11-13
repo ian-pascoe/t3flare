@@ -85,6 +85,14 @@ _Avoid_: ignored path (that is git's), local-only
 **Worker Shell**:
 The shell that runs commands in a Worker, without a Container.
 
+**Preview browser**:
+The Browser Run browser t3's server browser drives for one Workspace's tabs, its `localhost` routed to that Workspace's Container (ADR-0031). HTML renders use a route-less one.
+_Avoid_: headless Chrome (stock's, on its host), remote browser
+
+**Container preview**:
+A preview browser's request to `http://<port>.t3flare.internal/`, answered from that port of the Workspace's Container, which it never starts (ADR-0031).
+_Avoid_: port proxy, tunnel, preview URL (t3's configured URL)
+
 **Session**:
 One Durable agent's conversation, kept in its own Durable Object.
 _Avoid_: thread (that is t3's), run

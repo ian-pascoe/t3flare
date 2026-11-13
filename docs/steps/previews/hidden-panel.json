@@ -1,0 +1,43 @@
+{
+ "at": "2026-11-13T13:28Z",
+ "stage": "previews",
+ "what": "review M5: a panel left open and unlooked-at (a stream viewer acking frames on https://example.com/, nothing else), sampled every 5 minutes",
+ "ok": true,
+ "samples": [
+  {
+   "minute": 0,
+   "sessions": []
+  },
+  {
+   "minute": 5,
+   "sessions": [
+    {
+     "id": "8c074b8a-9cb9-47eb-8117-6fe4ae1a25be",
+     "ageMs": 299533,
+     "browserRun": {
+      "closed": false,
+      "closeReason": null
+     }
+    }
+   ]
+  },
+  {
+   "minute": 10,
+   "sessions": [
+    {
+     "id": "8c074b8a-9cb9-47eb-8117-6fe4ae1a25be",
+     "ageMs": 599692,
+     "browserRun": {
+      "closed": false,
+      "closeReason": null
+     }
+    }
+   ]
+  },
+  {
+   "minute": 15,
+   "sessions": []
+  }
+ ],
+ "reading": "The Workspace browser's Browser Run session was up at 5 and 10 minutes (age 600 s) and gone from the Environment's record by 15: an idle page repaints nothing, so a viewer causes no CDP traffic, and Browser Run's 10-minute keep-alive ended the session; the Shadow's `disconnected` handler removed it. So a hidden panel on an idle page holds a browser for at most about 10 to 15 minutes, not 30: browser-seconds for this run at most 900 (about $0.02 past the free hours). A page that keeps repainting (an animation) sends frames and would hold it while the viewer stays. The harness's own 20-minute guard cut the run at minute 20, so this file is written from its log; Browser Run's close reason was not read."
+}

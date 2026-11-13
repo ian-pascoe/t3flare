@@ -43,7 +43,7 @@ export class ContainerPreviews extends WorkerEntrypoint<ContainerPreviewsEnv, Co
       return await previews.containerPreview(workspace, request, port);
     } catch (cause) {
       // Never the request's URL or headers (L5): the page's own paths and cookies stay out of the logs.
-      console.warn(JSON.stringify({ t3flare: "container-preview-failed", port, error: String(cause).slice(0, 200) }));
+      console.warn(JSON.stringify({ t3flare: "container-preview-failed", port, error: cause instanceof Error ? cause.name : "error" }));
       return text(502, "The Workspace could not be reached. Reload to try again.");
     }
   }

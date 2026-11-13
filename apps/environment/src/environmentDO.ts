@@ -768,6 +768,9 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     if (prWatch === null || prWatch === undefined) this.ctx.storage.kv.delete(Idle.PR_WATCH_WAKE_KEY);
     else this.ctx.storage.kv.put(Idle.PR_WATCH_WAKE_KEY, Date.parse(prWatch));
     await this.ctx.storage.setAlarm(planned.alarm);
+    // G11 (review M5): the reset ends t3's preview browsers with their tabs (ADR-0031); their Browser Run sessions are
+    // closed now, not left to Browser Run's 10-minute keep-alive.
+    if (this.env.BROWSER !== undefined) await closeLeftoverSessions(this.env.BROWSER, previewStore(this.ctx.storage.sql)).catch(() => 0);
     // `ctx.abort()` discards writes not yet durable: on production the alarm was lost without this.
     await this.ctx.storage.sync();
     const stored = await this.ctx.storage.getAlarm();

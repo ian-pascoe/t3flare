@@ -85,11 +85,11 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
-| Port discovery | `srv/preview/PortScanner.ts:338` (lsof); `ws.ts:3280` | M | lsof "not found" | — G11 |
-| Server browser, dev-server preview | `srv/preview/ServerBrowser.ts:225`; route `srv/server.ts:800` | M, part of parity, built last (D4) | capability stripped; route unmounted; ADR-0024 | SPI-1002 (G11) |
-| Agent browser tools | `preview_*` | M until previews exist (D4); pinned off (L3) | ADR-0024, ADR-0022 | SPI-1002 |
-| HTML visual replies | `srv/htmlRender/HtmlRender.ts` | M | `html_*` on `T3_TOOL_DENYLIST` (`packages/harness-registry/src/t3Tools.ts`) | — G11 |
-| MCP apps | `ws.ts:2579-2582` | M | the CLI wrapper strips `mcpApps` from t3's runtime (`env/provider/cli/wrapper.ts` `mcpApps: _apps`); the Durable differ emits none | — |
+| Port discovery | `srv/preview/PortScanner.ts:338` (lsof); `ws.ts:3280` | W: each running Container's `/proc`, through its Workspace DO, never starting one; terminal and agent attribution as stock (owned servers only); stop by process group | `docs/steps/previews/browser.json` (listed as the terminal's, 8080 never listed, stop, not-found); `env/preview/portDiscovery.ts`; ADR-0031 | G11 (SPI-1002) |
+| Server browser, dev-server preview | `srv/preview/ServerBrowser.ts:225`; route `srv/server.ts:800` | W, with P limits: pages are `http://<port>.t3flare.internal`, not a secure context; eight ports; downloads only those the page may fetch; a tab nobody watches ends | `browser.json` (frames over the stream route, 401 without a session, read-only vs operator input, HMR without reload, hostile page), `keepalive.json`, `hidden-panel.json`; Shadow `ServerBrowserContexts`, Patch 0005; ADR-0031 | G11 (SPI-1002) |
+| Agent browser tools | `preview_*` | W: offered while the owner's agent browser access is on (stock default); screenshots reach the Durable agent as images | `docs/steps/previews/agent.json` (Pi Durable: `preview_open`, `preview_snapshot`, `preview_act`, `preview_evaluate` over its own server; t3's API from the page: TypeError); Codex not exercised on a stage | G11 (SPI-1002, SPI-1104) |
+| HTML visual replies | `srv/htmlRender/HtmlRender.ts` | W: stock `headlessChrome.ts` over a CDP bridge to Browser Run; pages are opaque-origin on the t3 host as stock; renders are `https://t3-page.t3flare.internal` (an `http:` resource is mixed content) | `m1-html-bridge.json`, `agent.json` (`html_preview` seen as an image, `html_render` published), `asset-headers.json` (L2), `html-hostile.json` (L1) | G11 (SPI-1002) |
+| MCP apps | `ws.ts:2579-2582` | W† for Codex: the wrapper keeps `mcpApps`; the relay passes `_meta.ui`, `structuredContent` and `resources/read` of a declared `ui://` App; not exercised on a stage. **P** for Claude (ACP has no App channel; stock's support is in its native-SDK adapter, O5); ordinary rows for OpenCode, Pi CLI and Pi Durable, as stock pi | `test/mcpHost.test.ts`, `test/mcpRelay.test.ts`; ADR-0028 refinement | G11 (SPI-1002) |
 | Device hub | `srv/device/DeviceHubProxy.ts:241`; `ws.ts:3255-3278` | R; its settings (`enableDeviceSupport`, `enableAgentDeviceAccess`, `simlockDeviceHostsEnabled`) locked off (SPI-994) | unmounted; ADR-0024, ADR-0010, ADR-0023 | done (refusal) |
 | Relay tunnel | `ws.ts:2762` | R | ADR-0010 | — |
 
@@ -146,7 +146,7 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 | G8 | ~~**Usage meters.**~~ Done (SPI-999, parity batch 2): from Commissary's management API, optional, owner-provisioned ([`docs/steps/parity-batch-2.md`](steps/parity-batch-2.md)). t3's `cliproxy` source cannot read Commissary (no `/v0/management`). | M | An org-admin management key in the Environment Worker |
 | G9 | ~~**GitHub as the owner, and other hosts** (after D2).~~ Not now: D2 keeps GitHub App-only and GitHub-only (ADR-0013 refinement, SPI-1004). | M per host | Loosens ADR-0013's per-repo scope |
 | G10 | **Skills and the agent's own MCP servers** (after 3 and 4a). MCP servers: done (tools step, ADR-0028). Skills: deferred by the owner (SPI-1001); a repository's own skills, hooks and MCP servers now load in Claude Code and OpenCode (owner, 2026-11-12, back to stock). | M | ADR-0016 |
-| G11 | **Previews**: Container port discovery, an authenticated port proxy, HTML renders, later a browser (after D4). | L | Exposing dev servers publicly; Container sleep |
+| G11 | ~~**Previews**~~ Built (SPI-1002, ADR-0031, [`docs/steps/previews.md`](steps/previews.md)): t3's browser and HTML renders in Browser Run, `localhost` routed to the thread's Container, ports from each Container's `/proc`, MCP apps through the relay. Not a secure context, eight ports. | L | Browser Run hours; a watched tab holds the Environment |
 | G12 | ~~**Webhook origin and PR-watch wake.**~~ Done (parity batch): hook URLs on the public t3 host; the idle reset wakes for PR watches every 10 minutes ([`docs/steps/parity-batch.md`](steps/parity-batch.md)). | S | Every hook wakes the DO |
 | G13 | ~~**ACP registry agents**~~ Done as a refusal (SPI-1003, parity batch 2): listed with each agent's standing, installs refused; the four that fit ADR-0016 are already built in. Lifting ADR-0016 A′ for env-key agents is the owner's call. | S–M | Each agent needs a proxy base URL and a key helper |
 
@@ -164,7 +164,7 @@ Already documented, no action:
 
 Written down (SPI-1004, SPI-1006):
 1. **Host-bound features**: [ADR-0024](adr/0024-host-bound-features-are-refused.md) (device hub and simulators, local voice, open in editor, host diagnostics and power, triage, jj, agent-session import, server self-update, provider install and update).
-2. **Server browser and agent browser access**: not refused (D4). Built last under G11 (SPI-1002); until then stripped and pinned off (ADR-0024).
+2. **Server browser and agent browser access**: not refused (D4). Built under G11 (SPI-1002, ADR-0031); the device hub stays refused (ADR-0024).
 3. **Vendor-login CLIs**: refused (D3), [ADR-0015](adr/0015-cli-agents-run-through-platform-exec-codex-in-managed-mode-claude-and-opencode-over-acp.md) refinement.
 4. **`t3_attachment_*` withheld from Durable agents** (`request_secret` offered again since D5 was lifted, owner 2026-11-12, back to stock): [ADR-0022](adr/0022-durable-agents-reach-t3s-mcp-through-the-environment-do-with-t3s-own-credential.md) refinement. Keys typed into t3 (D5): [ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md) refinement.
 5. **Automatic git fetch off**: [ADR-0009](adr/0009-git-runs-in-the-container-status-and-checkpoints-come-from-the-workspace.md) refinement.

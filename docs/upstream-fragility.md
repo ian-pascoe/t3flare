@@ -530,6 +530,50 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Blast radius**: no meters or a wrong attribution on the Usage page; a registry list that offers an agent we cannot run (prepare still refused); a Storage page without a size; no OTLP export.
 - **Fix**: diff `UsageLimitSources.ts`, `UsageService.ts`, `provider-core/src/server/usage.ts`, `AcpRegistrySupport.ts`, `DatabaseStorage.ts`, `cli/config.ts` between tags; for Commissary, its `packages/contract/src`.
 
+### U59. The preview browser: a Shadow of `ServerBrowserContexts`, the HTML-render bridge, and `@cloudflare/playwright` (G11)
+
+- **Where**:
+  - `apps/environment/src/shadows/serverBrowserContexts.ts`, replacing `t3code/apps/server/src/preview/ServerBrowserContexts.ts`: `presentAsChrome` and the class `ServerBrowser.make` builds with `new` (`contextFor`, `scratchPage`, `connectDesktopPage` refused, `clearProfile`, `close`) with stock's `Options` (`profilesDir`, `executable`, `launcher` and `diagnose` ignored; `idleBrowserMs`, `onContextClose` used). It wraps every page's `goto` (`translatePreviewUrl`), each `Download.saveAs`, and `FileChooser.setFiles`/`Locator.setInputFiles` on the fork's prototypes.
+  - `src/shadows/publicProxy.ts`, replacing `htmlRender/publicProxy.ts` (`publicProxy`'s shape: `{ port, fakeIpHosts }`).
+  - `src/preview/htmlBrowser.ts`: our process router answers `PreviewBrowser`'s executable (`src/preview/previewBrowser.ts`, a Layer) with a CDP bridge that speaks stock `headlessChrome.ts`'s `--remote-debugging-pipe` (fd 3/fd 4, NUL-delimited), rewrites its page origin `http://t3-page.localhost` to `https://t3-page.t3flare.internal`, and answers `Browser.close` and `--version` itself.
+  - `@cloudflare/playwright` 1.4.0 (a port of Playwright 1.62.1) against t3's `playwright-core` pin (1.64.1 at `d8f3feff0c`), loaded by dynamic import; `playwright-core` is a dev dependency of `apps/environment` for its types only.
+- **Breaks when**: t3 adds a method or option to `ServerBrowserContexts`, or calls it a new way; `ServerBrowser.ts` uses a Playwright API the fork lacks, or navigates by something other than `goto`/`reload`; `headlessChrome.ts` changes its page origin, its pipe framing, or how it ends the browser; `publicProxy.ts` gains an export; Browser Run changes `outboundByHost` (HTTP only, eight hosts, port 80), its `keepAlive` bounds or its `localhost` policy.
+- **Detection**: the build fails on a missing Shadow export; `test/previews.test.ts` checks the Shadow keeps stock's exports and public methods, the URL translation and the bridge (fake socket). **Silent**: a Playwright call that exists but misbehaves over CDP; a new navigation path that skips `goto` (its `localhost` is refused, ERR_BLOCKED_BY_ADMINISTRATOR); a changed page origin in `headlessChrome.ts` (renders fail to load). Cheapest check: `scripts/previews.ts spike`, `op html-capture` and `browser` on a stage.
+- **Blast radius**: no browser tabs, tabs that cannot reach `localhost`, or no HTML screenshots and heights (publishing still works).
+- **Fix**: diff `ServerBrowserContexts.ts`, `headlessChrome.ts`, `publicProxy.ts` and `playwright-core` in `apps/server/package.json` between tags; read the fork's changelog.
+
+### U60. Port discovery from each Container (G11)
+
+- **Where**: `apps/environment/src/preview/portDiscovery.ts`, a Layer of `PortScanner.PortDiscovery` (seven methods) reusing t3's `stoppableProcessGroup`; `DiscoveredLocalServer`, `DiscoveredLocalServerList`, `PreviewStopLocalServerError` and the configured-URL limits (`contracts/src/preview.ts`); `isLoopbackHost`; t3's projection tables for a thread's Workspace (`orchestration_v2_projection_threads.payload_json` `$.worktreePath`, `projection_projects.workspace_root`, as `deletion.ts` reads them, U2); the terminal Layer's `registerTerminalProcesses`/`unregisterTerminal` options and its inspector's `processIds`; `apps/sandbox-image/src/ports.ts` (the scan, in the image's Node, and the group stop).
+- **Breaks when**: t3 adds a method or a field (a workspace or cwd on a server), renames `T3CODE_THREAD_ID`, changes the stop errors, stops calling `registerTerminalProcesses` from its inspector poll, or moves those projection fields; the image loses Node from mise's system directory.
+- **Detection**: typecheck covers the service and contracts; `test/previews.test.ts` (attribution, review M7, configured URLs, the projection read); `apps/agents/test/portsScript.test.ts` runs the scan and stop on real processes in Docker. **Silent**: a renamed variable or moved projection field leaves agent servers unlisted (stock lists only owned ones). Cheapest check: `scripts/previews.ts browser`.
+- **Blast radius**: servers missing from the list, or not stoppable.
+- **Fix**: diff `PortScanner.ts`, `contracts/src/preview.ts` and `terminal/Manager.ts`'s inspector loop.
+
+### U61. Patch 0005: the thread at `contextFor` (G11)
+
+- **Where**: `patches/0005-server-browser-context-thread.patch`, the one `contexts.contextFor(` call in `ServerBrowser.ts`, gaining `snapshot.threadId`.
+- **Breaks when**: the call moves, gains arguments, or a second call site appears.
+- **Detection**: the patch fails to apply at bump (loud). **Silent**: a new call site without the thread opens its tab in the route-less browser, whose `localhost` reaches nothing.
+- **Blast radius**: tabs that cannot reach the dev server.
+- **Fix**: re-cut the patch.
+
+### U62. Container previews and the carried-socket script (G11)
+
+- **Where**: `apps/agents/src/workspace/containerPreview.ts` and `containerPreviewScript.ts` (ported from cloudpid@93ba45a3), `WorkspaceDO.containerPreview` with its use and hold accounting (`#someoneWorks`, `#previewHold`), `WorkspaceContainerPreviews` (agents Worker) and `ContainerPreviews` (Environment Worker), the eight ports in `@t3flare/workspace-client`.
+- **Breaks when**: Browser Run starts routing WebSockets (the script becomes dead weight), a dev-server client changes how it opens sockets (Vite's `SharedWorker` ping), or Containers change `getTcpPort`.
+- **Detection**: `apps/agents/test/containerPreview.test.ts` (Host and Location, refusals, the script). **Silent**: HMR stops while pages still load. Cheapest check: `scripts/previews.ts browser` (its HMR line).
+- **Blast radius**: no live reload; pages still load.
+- **Fix**: compare with cloudpid's current `container-preview*.ts`, which meets the same breakage first.
+
+### U63. MCP apps through the CLI wrapper and the MCP host (G11)
+
+- **Where**: `provider/cli/wrapper.ts` (no longer strips `mcpApps`); `ProviderAdapterV2McpApps` (`provider-core/src/server/ProviderAdapter.ts`); `mcp/relay.ts` (`_meta.ui` in `tools/list`, `structuredContent`, `resources/read` of a `ui://` URI) and `mcp/host.ts` (`readAppResource`, through the vendored engine's `resources/read` with `app: true`); `appUriOfMeta` from `@cloudpid/mcp/types`.
+- **Breaks when**: t3 changes `ProviderAdapterV2McpApps`; Codex's app-server renames `mcpServerStatus/list`, `mcpServer/tool/call` or `mcpServer/resource/read`; the ext-apps spec moves its `_meta` key.
+- **Detection**: typecheck covers the adapter shape; `test/mcpHost.test.ts` and `test/mcpRelay.test.ts` cover the pass-through and the refusals. **Silent**: a moved `_meta` key shows plain tool rows.
+- **Blast radius**: apps show as ordinary tool rows.
+- **Fix**: diff `mcpApps/`, `CodexAdapterV2.ts`'s `mcpApps`, and the ext-apps spec version t3 pins.
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).

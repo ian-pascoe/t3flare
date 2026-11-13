@@ -52,3 +52,7 @@ designed this and never built it.
   production, with resize, exit codes, sessions and job control.
 - **Terminals that outlive their clients**: they would keep the Environment and the Container awake (an ADR-0003 change
   and Container cost); the owner chose not to (D1).
+
+## Refinement (G11, 2026-11-13): the preview hold
+
+A Container preview's requests (use) and carried sockets (a hold) keep a running Container only while someone works in the Workspace: a command runs, or a terminal, an agent's Terminal or a CLI process had input within the foreground terminal's 30 minutes. A preview never starts a Container, and a scan for listening ports is neither use nor input (ADR-0031).

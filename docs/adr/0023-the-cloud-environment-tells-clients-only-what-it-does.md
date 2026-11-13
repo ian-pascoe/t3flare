@@ -28,3 +28,7 @@ Stripped today:
 clients offer custom text generators and cloud voice as stock t3 does. Until then the policy locked `textGenerators`
 empty and the capability was stripped as "refused for now (owner decision D5)".
 
+
+## Refinement (G11, 2026-11-13): `serverBrowser` and `localServerStop` are advertised
+
+t3's server browser runs in Browser Run and a listed server is stopped by its process group in its Container (ADR-0031), so both capabilities are kept.

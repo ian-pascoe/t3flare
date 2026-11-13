@@ -1,0 +1,31 @@
+{
+ "at": "2026-11-13T13:52:29.971Z",
+ "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "reset": {
+  "reset": true,
+  "work": {
+   "openRuns": 0,
+   "openProviderSessions": 0,
+   "claimableEffects": 0,
+   "remoteTasksAnswering": 0,
+   "remoteTasksUnanswered": 0
+  },
+  "due": {
+   "at": null,
+   "sources": {
+    "outbox": null,
+    "scheduledTasks": null,
+    "usageLimitResets": null,
+    "pullRequestWatch": null
+   }
+  },
+  "alarm": "2026-11-14T13:10:14.980Z"
+ },
+ "before": 1,
+ "after": 0,
+ "browserRun": [
+  "BrowserBindingError: Session not found (status=404)"
+ ],
+ "reading": "A tab's session was recorded; a forced idle reset made a new Environment DO instance, whose constructor closed every recorded session (`closeLeftoverSessions`): the record is empty and Browser Run no longer knows the session (404). The run first judged only an explicit 'closed' answer as a pass; the criterion now also takes Browser Run's not-found."
+}

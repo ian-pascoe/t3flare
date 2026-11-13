@@ -122,3 +122,7 @@ report: [`docs/steps/spi-1079.md`](../steps/spi-1079.md).
   `execute` approvals still ask, since an elicitation always asks.
 - A `-32042` (URL required, Legacy) is still the server's error.
 - One more import in the Environment Worker: `@cloudpid/mcp/elicitation-url` (SDK-free; `sdk-isolation.test.ts`).
+
+## Refinement (G11, 2026-11-13): MCP apps through the relay
+
+The CLI wrapper no longer strips t3's `mcpApps`, so Codex renders an MCP server's App as stock does. The relay passes a tool's `_meta.ui` (and nothing else of its `_meta`) in `tools/list`, a result's `structuredContent`, and `resources/read` of a `ui://` URI that one of that server's offered tools declares, read through the engine as an App read and capped at 8 MiB. An App's own `tools/call` is judged as any call is. Claude's Apps stay ordinary tool rows: it runs over ACP (ADR-0031, O5).

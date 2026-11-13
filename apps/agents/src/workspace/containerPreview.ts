@@ -246,7 +246,8 @@ export class ContainerPreview {
   }
 
   #unreachable(port: number, cause: unknown): Response {
-    this.#deps.warn(`Container preview: nothing answered on port ${port}: ${String(cause).slice(0, 200)}`);
+    // The error's kind only: its message can carry the page's path (review L5).
+    this.#deps.warn(`Container preview: nothing answered on port ${port}: ${cause instanceof Error ? cause.name : "error"}`);
 
     return page(
       502,

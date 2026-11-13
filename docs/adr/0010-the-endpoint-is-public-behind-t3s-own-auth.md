@@ -60,3 +60,7 @@ Two exact paths on the t3 host are public, outside `/_t3flare` (so outside its A
 - `/t3flare/oauth/client.json`, our Client ID Metadata Document.
 
 Evidence: `docs/steps/tools/m3-panel-safety.json`, `m6-oauth.json` (P13).
+
+## Refinement (G11, 2026-11-13): the preview stream route is mounted
+
+`/api/preview-stream/ws`, `/download` and `/upload` are t3's own, under `/api` and t3's media auth (`orchestration:read` to watch, `preview:operate` to act). No new host serves a dev server: its page runs in Browser Run, and the owner's browser gets screencast frames (ADR-0031). The Environment Worker's public routes do not reach the `ContainerPreviews` entrypoint, which only Browser Run's routes call.

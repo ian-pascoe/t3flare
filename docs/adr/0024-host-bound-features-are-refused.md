@@ -28,3 +28,7 @@ Dev-server previews and t3's server browser are part of parity and are **built l
 | Feature | Why refused | Instead |
 | --- | --- | --- |
 | Local stdio MCP servers (a command the agent's host runs) | They would run in the Container, where no secret may go (ADR-0016), and they sleep with it. Most useful ones need a credential, and one without a credential buys nothing over the agent running it with `bash`. | Serve it over HTTP somewhere public and add it as a direct server in the harness panel, or as a Commissary toolkit (ADR-0028). |
+
+## Refinement (G11, 2026-11-13): previews are built
+
+Previews, the server browser and agent browser access are built (ADR-0031): t3's browser is Cloudflare Browser Run, `localhost` is the thread's Workspace Container, and ports are listed from each running Container. The device hub stays refused.

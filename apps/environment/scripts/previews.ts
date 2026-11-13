@@ -4,7 +4,8 @@
 // harness's own is written.
 //
 //   node scripts/stage.ts run previews previews <part>
-//   parts: spike | routes | op <spike op> | browser | close
+//   parts: spike | routes | op <spike op> [match] | browser | agent | publish | l2 <attachment> | keepalive | hidden [minutes]
+//          | idle | hold (stage deployed with T3FLARE_TERMINAL_IDLE_MS=180000) | profile | bootclose | tabtrace [minutes] | close
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -16,7 +17,7 @@ import { type Line as StageLine, openTab, step, streamStatus, tabEval, VITE_APP,
 setTimeout(() => {
   console.error("previews: the run took longer than 20 minutes");
   process.exit(1);
-}, 20 * 60_000).unref();
+}, Number(process.env.PREVIEWS_GUARD_MS ?? 20 * 60_000)).unref();
 import { attachTerminal } from "./lib/terminal.ts";
 
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/previews");
@@ -35,8 +36,8 @@ interface Line {
   readonly detail?: unknown;
 }
 
-const spike = async (op: string): Promise<ReadonlyArray<Line>> => {
-  const { status, json } = await admin("POST", `/_t3flare/previews/spike?op=${op}`);
+const spike = async (op: string, body?: { readonly match?: string; readonly expression?: string }): Promise<ReadonlyArray<Line>> => {
+  const { status, json } = await admin("POST", `/_t3flare/previews/spike?op=${op}`, body ?? {});
   if (status !== 200) throw new Error(`spike ${op}: HTTP ${status} ${JSON.stringify(json).slice(0, 300)}`);
   return (json as { lines: ReadonlyArray<Line> }).lines;
 };
@@ -116,7 +117,7 @@ switch (part) {
     break;
   case "op":
     // Any spike op, printed: `op html-capture`, `op html-page`.
-    print(await spike(process.argv[3] ?? ""));
+    print(await spike(process.argv[3] ?? "", process.argv[4] === undefined ? undefined : { match: process.argv[4] }));
     break;
   case "close":
     print(await spike("close"));
@@ -288,6 +289,222 @@ switch (part) {
     const lines = attachmentId === undefined ? [] : await assetChecks(cookie, attachmentId);
     writeEvidence("asset-headers", { ok: attachmentId !== undefined && lines.every((line) => line.ok), threadId, lines });
     process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "keepalive": {
+    // Review M5: a tab nobody watches gets no CDP traffic. A client stays connected (a port-list subscription, which
+    // touches no browser), so the Environment does not reset; Browser Run then closes the session at its 10-minute
+    // keep-alive, and t3 drops the tab (`disconnected` → `onContextClose`). Sampled every minute for 14, with Browser
+    // Run's own close reason read at the end.
+    const cookie = await pair();
+    const { projectId } = await ensureCloudFixtureProject(cookie);
+    const threadId = await createThread(cookie, projectId, { title: "previews: keep-alive" });
+    const awake = wsFind(cookie, "subscribeDiscoveredLocalServers", {}, () => false, 16 * 60_000);
+    const tab = await openTab(cookie, threadId, "https://example.com/");
+    const samples: Array<{ readonly minute: number; readonly sessions: number; readonly tabs: number | null }> = [];
+    const ids = new Set<string>();
+    const started = Date.now();
+    let closedAt: number | null = null;
+    for (let minute = 0; minute <= 14; minute++) {
+      if (minute > 0) await sleep(Math.max(0, started + minute * 60_000 - Date.now()));
+      const sessions = await spike("sessions").catch(() => []);
+      for (const line of sessions) ids.add((line.detail as { id: string }).id);
+      const tabs = (await wsCall(cookie, "preview.list", { threadId }).catch(() => null)) as { sessions?: Array<unknown> } | null;
+      samples.push({ minute, sessions: sessions.length, tabs: tabs?.sessions?.length ?? null });
+      console.log(JSON.stringify(samples.at(-1)));
+      if (closedAt === null && minute > 0 && sessions.length === 0 && (tabs?.sessions?.length ?? 0) === 0) closedAt = Date.now() - started;
+    }
+    const history = await spike("history", { match: [...ids].join(",") }).catch(() => []);
+    void awake;
+    writeEvidence("keepalive", { ok: closedAt !== null && closedAt >= 9 * 60_000, threadId, tabId: tab.tabId, closedAfterMs: closedAt, samples, browserRun: history.map((line) => line.detail) });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "hidden": {
+    // Review M5: a panel left open and unlooked-at for 30 minutes: what it holds, and the browser time it costs.
+    const minutes = Number(process.argv[3] ?? "30");
+    const cookie = await pair();
+    const { projectId } = await ensureCloudFixtureProject(cookie);
+    const threadId = await createThread(cookie, projectId, { title: "previews: hidden panel" });
+    const tab = await openTab(cookie, threadId, "https://example.com/");
+    const started = Date.now();
+    const watching = watchStream(cookie, { threadId, tabId: tab.tabId, maxWidth: "640", maxHeight: "400" }, minutes * 60_000);
+    const samples: Array<unknown> = [];
+    for (let minute = 0; minute <= minutes; minute += 5) {
+      if (minute > 0) await sleep(Math.min(300_000, Math.max(0, started + minute * 60_000 - Date.now())));
+      const sessions = await spike("sessions").catch((error: unknown) => [{ name: "error", ok: false, ms: 0, detail: String(error) }]);
+      samples.push({ minute, sessions: sessions.map((line) => line.detail) });
+      console.log(JSON.stringify(samples.at(-1)).slice(0, 300));
+    }
+    const watched = await watching;
+    const alive = (samples.at(-1) as { sessions: Array<{ browserRun?: { closed: boolean } } | undefined> }).sessions.some((session) => session?.browserRun?.closed === false);
+    await wsCall(cookie, "preview.close", { threadId, tabId: tab.tabId }).catch(() => undefined);
+    writeEvidence("hidden-panel", {
+      ok: true,
+      minutes,
+      browserSeconds: Math.round((Date.now() - started) / 1000),
+      sessionStillUpAtEnd: alive,
+      frames: watched.frames,
+      closeCode: watched.closeCode,
+      samples,
+    });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "idle": {
+    // Review L9: a running, idle Container still stops at its 2 minutes while a client keeps the port list polling.
+    const cookie = await pair();
+    const { projectId, workspaceRoot } = await ensureCloudFixtureProject(cookie);
+    const workspace = workspaceRoot.slice(3);
+    const threadId = await createThread(cookie, projectId, { title: "previews: idle" });
+    const term = await attachTerminal(cookie, { threadId, terminalId: "default", cwd: workspaceRoot });
+    await term.until(/[$#] $/, 180_000);
+    await term.close(true);
+    const running = async () => {
+      const { json } = await admin("GET", "/_t3flare/agents/workspaces");
+      return (json as { workspaces: Array<any> }).workspaces.find((entry) => entry.id === workspace)?.container?.running as boolean | undefined;
+    };
+    const closedAt = Date.now();
+    const samples: Array<unknown> = [];
+    // Watching the list: t3 polls the port scan every 3 s while the subscription lives.
+    const watching = wsFind(cookie, "subscribeDiscoveredLocalServers", {}, () => false, 300_000);
+    let stoppedAfterMs: number | null = null;
+    while (Date.now() - closedAt < 300_000) {
+      const now = await running().catch(() => undefined);
+      samples.push({ sinceCloseMs: Date.now() - closedAt, running: now });
+      if (now === false) {
+        stoppedAfterMs = Date.now() - closedAt;
+        break;
+      }
+      await sleep(15_000);
+    }
+    void watching;
+    writeEvidence("idle-stop", { ok: stoppedAfterMs !== null && stoppedAfterMs < 240_000, stoppedAfterMs, samples });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "hold": {
+    // Review M5, ADR-0021's cap: an open page (its carried HMR socket) keeps a running Container while someone works, and
+    // lets it go once the cap passes from the last input (run with T3FLARE_TERMINAL_IDLE_MS=180000 on the stage); the
+    // stopped Container then answers the page 503 and is not started again.
+    const cookie = await pair();
+    const { projectId, workspaceRoot } = await ensureCloudFixtureProject(cookie);
+    const workspace = workspaceRoot.slice(3);
+    const threadId = await createThread(cookie, projectId, { title: "previews: hold" });
+    const term = await attachTerminal(cookie, { threadId, terminalId: "default", cwd: workspaceRoot });
+    await term.until(/[$#] $/, 180_000);
+    const files = VITE_APP(base.origin);
+    const write = Object.entries(files).map(([name, text]) => `echo ${Buffer.from(text).toString("base64")} | base64 -d > ${name}`).join(" && ");
+    await term.run(`pkill -f 'vite --host' ; mkdir -p /tmp/vapp && cd /tmp/vapp && ${write} && (test -d node_modules/vite || (npm init -y >/dev/null && npm i --silent vite@6 >/dev/null 2>&1)) && (env -u T3FLARE_EXEC setsid nohup npx vite --host 0.0.0.0 --port 5173 --strictPort >/tmp/vite.log 2>&1 &) && sleep 4 && echo started`, 240_000);
+    // Started outside the terminal's marker, so closing the terminal (which kills by it) leaves the dev server running.
+    await term.close(true);
+    const lastInput = Date.now();
+    const tab = await openTab(cookie, threadId, "http://localhost:5173/");
+    await waitFor("the page", async () => ((await tabEval("5173.t3flare.internal", "document.getElementById('app')?.textContent").catch(() => undefined)) === "version-1" ? true : undefined), 60_000);
+    const running = async () => {
+      const { json } = await admin("GET", "/_t3flare/agents/workspaces");
+      return (json as { workspaces: Array<any> }).workspaces.find((entry) => entry.id === workspace)?.container?.running as boolean | undefined;
+    };
+    const samples: Array<{ readonly sinceInputMs: number; readonly running: boolean | undefined }> = [];
+    let stoppedAt: number | null = null;
+    while (Date.now() - lastInput < 9 * 60_000) {
+      const now = await running().catch(() => undefined);
+      samples.push({ sinceInputMs: Date.now() - lastInput, running: now });
+      console.log(JSON.stringify(samples.at(-1)));
+      if (now === false) {
+        stoppedAt = Date.now() - lastInput;
+        break;
+      }
+      await sleep(20_000);
+    }
+    const heldPastIdle = samples.some((sample) => sample.running === true && sample.sinceInputMs > 150_000);
+    const afterStop = stoppedAt === null ? null : await tabEval("5173.t3flare.internal", "fetch('/').then((r) => r.status)").catch((error: unknown) => String(error));
+    await sleep(20_000);
+    const stillStopped = (await running().catch(() => undefined)) === false;
+    await wsCall(cookie, "preview.close", { threadId, tabId: tab.tabId }).catch(() => undefined);
+    writeEvidence("hold", {
+      ok: heldPastIdle && stoppedAt !== null && stoppedAt >= 180_000 && afterStop === 503 && stillStopped,
+      capMs: 180_000,
+      heldPastIdle,
+      stoppedAfterLastInputMs: stoppedAt,
+      pageAfterStop: afterStop,
+      stillStopped,
+      samples,
+    });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "profile": {
+    // Review L4: a cookie survives the profile context's close (storageState in the Environment DO), and clearProfile ends it.
+    const cookie = await pair();
+    const { projectId } = await ensureCloudFixtureProject(cookie);
+    const threadId = await createThread(cookie, projectId, { title: "previews: profile" });
+    const lines: Array<StageLine> = [];
+    const readCookie = async () => {
+      const tab = await openTab(cookie, threadId, "https://example.com/");
+      const value = await waitFor("the tab", async () => (await tabEval("example.com", "document.cookie").catch(() => undefined)) as string | undefined, 60_000);
+      return { tab, value };
+    };
+    const first = await openTab(cookie, threadId, "https://example.com/");
+    await waitFor("the tab", async () => tabEval("example.com", "(document.cookie = 't3flare=kept; max-age=3600; path=/', document.cookie)").catch(() => undefined), 60_000);
+    await sleep(65_000);
+    await wsCall(cookie, "preview.close", { threadId, tabId: first.tabId });
+    // The profile context closes after 5 minutes without a page (saving first); its browser retires after.
+    await sleep(6.5 * 60_000);
+    const sessionsBetween = await spike("sessions");
+    const second = await readCookie();
+    await step(lines, "the cookie came back after the profile's context closed (storageState, L4)", async () => ({ ok: String(second.value).includes("t3flare=kept"), detail: { cookie: second.value, sessionsBetween: sessionsBetween.length } }));
+    await wsCall(cookie, "preview.close", { threadId, tabId: second.tab.tabId });
+    await wsCall(cookie, "preview.clearProfile", { profileId: "default" });
+    const third = await readCookie();
+    await step(lines, "clearProfile removes it", async () => ({ ok: !String(third.value).includes("t3flare=kept"), detail: { cookie: third.value } }));
+    await wsCall(cookie, "preview.close", { threadId, tabId: third.tab.tabId }).catch(() => undefined);
+    writeEvidence("profile", { ok: lines.every((line) => line.ok), lines });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "bootclose": {
+    // Review M5: a new Environment instance closes the Browser Run sessions the last one left (its own record).
+    const cookie = await pair();
+    const { projectId } = await ensureCloudFixtureProject(cookie);
+    const threadId = await createThread(cookie, projectId, { title: "previews: boot close" });
+    await openTab(cookie, threadId, "https://example.com/");
+    const before = await waitFor("a recorded session", async () => {
+      const lines = await spike("sessions");
+      return lines.length > 0 ? lines : undefined;
+    }, 60_000);
+    const ids = before.map((line) => (line.detail as { id: string }).id);
+    // An idle reset: the next request constructs a new instance.
+    const reset = await admin("POST", "/_t3flare/idle-check?force=1");
+    await sleep(5_000);
+    await spike("sessions");
+    await sleep(5_000);
+    const after = await spike("sessions");
+    const states = [];
+    for (const id of ids) {
+      const { json } = await admin("POST", "/_t3flare/previews/spike?op=session-state", { match: id });
+      states.push((json as { lines: Array<Line> }).lines[0]?.detail ?? null);
+    }
+    // Browser Run answers a closed session as closed, or no longer knows it (404).
+    const ok = after.length === 0 && states.every((state) => (state as { closed?: boolean } | null)?.closed === true || /not found|404/i.test(String(state)));
+    writeEvidence("boot-close", { ok, reset: reset.json, before: ids.length, after: after.length, browserRun: states });
+    process.exit(process.exitCode ?? 0);
+    break;
+  }
+  case "tabtrace": {
+    // Diagnosis: one unwatched tab, its list entry and the Environment's sessions every 20 s for `minutes`.
+    const cookie = await pair();
+    const { projectId } = await ensureCloudFixtureProject(cookie);
+    const threadId = await createThread(cookie, projectId, { title: "previews: tab trace" });
+    const tab = await openTab(cookie, threadId, "https://example.com/");
+    const started = Date.now();
+    while (Date.now() - started < Number(process.argv[3] ?? "4") * 60_000) {
+      const sessions = (await spike("sessions").catch(() => [])).map((line) => (line.detail as { id?: string; browserRun?: unknown } | undefined));
+      const tabs = (await wsCall(cookie, "preview.list", { threadId }).catch((error: unknown) => String(error))) as any;
+      console.log(JSON.stringify({ s: Math.round((Date.now() - started) / 1000), tab: tab.tabId.slice(-6), tabs: tabs?.sessions?.map((entry: any) => `${String(entry.tabId).slice(-6)}:${entry.navStatus?._tag}:${entry.serverControlled ?? ""}`) ?? tabs, sessions }).slice(0, 400));
+      await sleep(20_000);
+    }
+    process.exit(0);
     break;
   }
   case "l2": {

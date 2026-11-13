@@ -1,0 +1,95 @@
+{
+ "at": "2026-11-13T14:32:22.571Z",
+ "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+ "ok": false,
+ "threadId": "96b60412-4ecb-470a-b91d-17b15278bb0d",
+ "tabId": "tab_3_cdcd398b-e0df-4c11-800e-b171f10262ed",
+ "closedAfterMs": null,
+ "samples": [
+  {
+   "minute": 0,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 1,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 2,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 3,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 4,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 5,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 6,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 7,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 8,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 9,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 10,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 11,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 12,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 13,
+   "sessions": 1,
+   "tabs": 1
+  },
+  {
+   "minute": 14,
+   "sessions": 1,
+   "tabs": 1
+  }
+ ],
+ "browserRun": [
+  [
+   {
+    "id": "c0eef2b3-4ced-4ed1-b840-80eca3c746af",
+    "lifeS": null,
+    "closeReason": null
+   }
+  ]
+ ],
+ "reading": "Re-run on a clean stage (no other session recorded), with a client kept connected so the Environment does not reset. The unwatched tab and its Browser Run session lived the whole 14 minutes: Browser Run's 10-minute keep-alive never fired, because the Shadow's 60-second profile save (storageState over CDP) is traffic. So the plan's expectation (keep-alive ends an unwatched tab) does not hold: an open tab holds its browser for as long as anything keeps the Environment awake, as stock keeps a tab while its server runs. With no client the Environment resets about 60 s after the last request, and the reset closes its sessions (Browser Run history: NormalClosure, lives of 92, 327 and 359 s in the earlier runs). Filed as a cost follow-up rather than a stock departure."
+}

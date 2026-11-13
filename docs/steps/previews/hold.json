@@ -1,0 +1,72 @@
+{
+ "at": "2026-11-13T14:17:47.755Z",
+ "host": "t3flare-environment-previews.ian-g-pascoe.workers.dev",
+ "ok": true,
+ "capMs": 180000,
+ "heldPastIdle": true,
+ "stoppedAfterLastInputMs": 286455,
+ "pageAfterStop": 503,
+ "stillStopped": true,
+ "samples": [
+  {
+   "sinceInputMs": 2913,
+   "running": true
+  },
+  {
+   "sinceInputMs": 23608,
+   "running": true
+  },
+  {
+   "sinceInputMs": 43780,
+   "running": true
+  },
+  {
+   "sinceInputMs": 63934,
+   "running": true
+  },
+  {
+   "sinceInputMs": 84122,
+   "running": true
+  },
+  {
+   "sinceInputMs": 104294,
+   "running": true
+  },
+  {
+   "sinceInputMs": 124445,
+   "running": true
+  },
+  {
+   "sinceInputMs": 144569,
+   "running": true
+  },
+  {
+   "sinceInputMs": 165591,
+   "running": true
+  },
+  {
+   "sinceInputMs": 185760,
+   "running": true
+  },
+  {
+   "sinceInputMs": 205914,
+   "running": true
+  },
+  {
+   "sinceInputMs": 226039,
+   "running": true
+  },
+  {
+   "sinceInputMs": 246191,
+   "running": true
+  },
+  {
+   "sinceInputMs": 266335,
+   "running": true
+  },
+  {
+   "sinceInputMs": 286455,
+   "running": false
+  }
+ ]
+}
