@@ -3,7 +3,7 @@
 // request is one RPC and never starts the Container (ADR-0009). The Environment skill set is SPI-1148's; until then
 // it is empty.
 import type { ReadEnv } from "@t3flare/computer-env";
-import { discoverPrompts, discoverSkills, type PromptTemplate, type Skill, type SkillDiscovery, type SkillFiles } from "@t3flare/skills";
+import { CLI_ROOTS, type CliAgent, discoverPrompts, discoverSkills, type PromptTemplate, type Skill, type SkillDiscovery, type SkillFiles } from "@t3flare/skills";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 
 /** `env`'s file reads as discovery takes them: hidden names listed, git's ignore rules not applied, `node_modules` not walked. */
@@ -21,9 +21,12 @@ export const skillFilesOf = (env: ReadEnv): SkillFiles => ({
   },
 });
 
-/** The Skills of a thread in `env`'s cwd, logging one line when any was skipped. */
-export const workspaceSkills = async (env: ReadEnv, root: string, environment: ReadonlyArray<Skill>): Promise<SkillDiscovery> => {
-  const found = await discoverSkills(skillFilesOf(env), { cwd: env.cwd, root, environment });
+/**
+ * The Skills of a thread in `env`'s cwd, logging one line when any was skipped. With `agent` (a CLI agent's, SPI-1151):
+ * that CLI's roots (`CLI_ROOTS`).
+ */
+export const workspaceSkills = async (env: ReadEnv, root: string, environment: ReadonlyArray<Skill>, agent?: CliAgent): Promise<SkillDiscovery> => {
+  const found = await discoverSkills(skillFilesOf(env), { cwd: env.cwd, root, environment, ...(agent === undefined ? {} : { roots: CLI_ROOTS[agent].skills }) });
   if (found.skipped.length > 0) {
     console.log(
       JSON.stringify({ t3flare: "skills", cwd: env.cwd, skills: found.skills.length, omitted: found.omitted, skipped: found.skipped.slice(0, 20), skippedCount: found.skipped.length }),
@@ -32,5 +35,6 @@ export const workspaceSkills = async (env: ReadEnv, root: string, environment: R
   return found;
 };
 
-/** The Prompt templates of a thread in `env`'s cwd. */
-export const workspacePrompts = (env: ReadEnv): Promise<ReadonlyArray<PromptTemplate>> => discoverPrompts(skillFilesOf(env), env.cwd);
+/** The Prompt templates of a thread in `env`'s cwd; with `agent`, that CLI's repo commands (SPI-1151). */
+export const workspacePrompts = (env: ReadEnv, agent?: CliAgent): Promise<ReadonlyArray<PromptTemplate>> =>
+  agent === undefined ? discoverPrompts(skillFilesOf(env), env.cwd) : discoverPrompts(skillFilesOf(env), env.cwd, CLI_ROOTS[agent].commands);

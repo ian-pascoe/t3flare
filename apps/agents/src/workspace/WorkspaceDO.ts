@@ -37,7 +37,7 @@ import type {
   TerminalAnswer,
   TerminalOpenInput,
 } from "@t3flare/workspace-client";
-import type { PromptTemplate, Skill, SkillDiscovery } from "@t3flare/skills";
+import { type CliAgent, isCliAgent, type PromptTemplate, type Skill, type SkillDiscovery } from "@t3flare/skills";
 import { describeFailure, HARNESS_ROOT, REPO_ROOT, startRefusal } from "@t3flare/workspace-client";
 
 import * as git from "isomorphic-git";
@@ -605,12 +605,14 @@ export class WorkspaceDO extends ContainerHost {
 
   /**
    * The Repo skills of a thread in `cwd` (inside the Workspace), found in its own files (SPI-1147): never the Container.
-   * `environmentSkills` is the Environment skill set's slot, empty until SPI-1148.
+   * `environmentSkills` is the Environment skill set's slot, empty until SPI-1148. With `agent`, a CLI agent's: its own
+   * roots, and no Environment skills (SPI-1151; those reach a CLI with SPI-1153).
    */
-  async skills(cwd: string): Promise<SkillDiscovery> {
+  async skills(cwd: string, agent?: CliAgent): Promise<SkillDiscovery> {
     this.#alive();
     await this.#workspace.ready();
-    return workspaceSkills(this.#host.readEnv(cwd), REPO_ROOT, this.#environmentSkills());
+    if (agent !== undefined && !isCliAgent(agent)) throw new Error(`t3flare: no CLI agent ${String(agent)}`);
+    return workspaceSkills(this.#host.readEnv(cwd), REPO_ROOT, agent === undefined ? this.#environmentSkills() : [], agent);
   }
 
   /** The Environment skill set (SPI-1148); none yet. */
@@ -618,11 +620,12 @@ export class WorkspaceDO extends ContainerHost {
     return [];
   }
 
-  /** The Prompt templates of a thread in `cwd`: its `.pi/prompts` (SPI-1147). */
-  async prompts(cwd: string): Promise<ReadonlyArray<PromptTemplate>> {
+  /** The Prompt templates of a thread in `cwd`: its `.pi/prompts` (SPI-1147); with `agent`, that CLI's repo commands (SPI-1151). */
+  async prompts(cwd: string, agent?: CliAgent): Promise<ReadonlyArray<PromptTemplate>> {
     this.#alive();
     await this.#workspace.ready();
-    return workspacePrompts(this.#host.readEnv(cwd));
+    if (agent !== undefined && !isCliAgent(agent)) throw new Error(`t3flare: no CLI agent ${String(agent)}`);
+    return workspacePrompts(this.#host.readEnv(cwd), agent);
   }
 
   /** No nested instruction files (the Session reads AGENTS.md itself). */
