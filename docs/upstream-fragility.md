@@ -626,8 +626,11 @@ CLI behaviour over ACP is the silent part.
     `withPiBuiltinSlashCommands` (`packages/provider-pi/src/server/commands.ts`, by path) and a restated copy of
     Codex's `/goal` entry (`apps/server/src/provider/CodexProvider.ts`).
   - `provider/cli/claudeSkills.ts`: `planClaudeSkillDispatch`, imported from t3's server by path
-    (`apps/server/src/provider/Drivers/ClaudeSkillDispatch.ts`), and a copy of its note; applied in
-    `wrapCliAdapter`'s `startTurn` (`rewriteTurnText`). It leans on the ACP adapter's native-slash rule
+    (`apps/server/src/provider/Drivers/ClaudeSkillDispatch.ts`), for its native form (a sole opening mention becomes
+    `/name rest`); applied in `wrapCliAdapter`'s `startTurn` (`rewriteTurnText`). Every other mention is matched with
+    `SKILL_TOKEN_REGEX` (`@t3flare/skills`, U64's copy) and gets a note in stock's wording, once per Skill. Stock
+    differs: it notes only an earlier user-only Skill and sends the last mention as a native block of its own, which one
+    ACP text cannot carry; an opening mention followed by others stays native and unnoted here. It leans on the ACP adapter's native-slash rule
     (`packages/provider-acp/src/server/adapter.ts` `isNativeSlashCommand`, and `t3AcpPromptWithInstructions` leaving a
     leading `/` unwrapped): a leading `/name` goes alone, without t3's instructions or runtime block.
   - `provider/cli/acpDriver.ts` `acpPromptBuilder`: OpenCode's Skill embed in the flavor's `buildPrompt` (the ACP
@@ -637,14 +640,17 @@ CLI behaviour over ACP is the silent part.
     `dist/cli/args.js`, loaded whatever the trust), and t3's pi extension's `$name` input hook
     (`packages/provider-pi/src/server/mcpExtensionSource.ts`), which embeds a picked Skill from what pi loaded.
   - Codex parses `$name` itself (`makeCodexAdapterV2` passes the text through).
-- **Breaks when**: a CLI bump moves a root or changes a same-named pair's winner; t3 changes the hook, the
+- **Breaks when**: a CLI bump moves a root or changes a same-named pair's winner; t3's mention grammar moves, since
+  both patterns must keep up with it: stock planner's `SKILL_MENTION_PATTERN` (which decides the native form) and the
+  copied `SKILL_TOKEN_REGEX` (which finds the mentions to note; U64 pins it to `inlineSkills.ts`, not to the planner);
+  t3 changes the hook, the
   native-slash rule, `buildPrompt`'s input, `planClaudeSkillDispatch`'s shape or note, the pi extension's hook, or
   its static command entries; `claude-agent-acp` stops expanding a leading `/name`; OpenCode changes its skill
   tool's output, or starts returning a command's reply over ACP (its repo commands would then be worth listing).
 - **Detection**: the bump's check step: typecheck for the hook and the imports; `apps/environment/test/cliSkills.test.ts`
   (discovery with `CLI_ROOTS` against the recorded `docs/steps/spi-1151/m0-roots.json`; the built-ins and the `/goal`
   pin), `skillsSnapshot.test.ts`, `cliSkillDispatch.test.ts` (the rewrite and the embed through t3's real ACP adapter
-  against the scripted agent; the note pinned to `ClaudeSkillDispatch.ts`), `cliProfiles.test.ts` (pi's flags). The
+  against the scripted agent; the note's wording and the planner's pattern pinned to `ClaudeSkillDispatch.ts`), `cliProfiles.test.ts` (pi's flags). The
   bump's `test:docker` step: `test/docker/skills.docker.test.ts` re-runs the probe on the pinned CLIs and holds
   `CLI_ROOTS` to it, failing with "moved a skill root: update CLI_ROOTS". **Silent**: R6 (Claude's native expansion)
   and OpenCode's command reply are stage facts; cheapest check: `scripts/pcli.ts` on a stage after a CLI bump.

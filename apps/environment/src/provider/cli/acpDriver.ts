@@ -36,6 +36,7 @@ import {
 import { environmentServices } from "../../agents/bindings.ts";
 import { attachmentReader, turnPrompt } from "../attachments.ts";
 import { snapshotModels } from "../models.ts";
+import type { CliAgent } from "@t3flare/skills";
 import { cliSnapshotForCwdOf, environmentSkillsAccess, messageSkillsFor, type SkillsAccess } from "../skills.ts";
 import { claudeMentionRewrite } from "./claudeSkills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
@@ -232,7 +233,7 @@ export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpF
 export const acpPromptBuilder = (
   host: ProviderHost.ProviderHost["Service"],
   fileSystem: FileSystem.FileSystem,
-  skills?: { readonly access: SkillsAccess; readonly agent: "opencode" },
+  skills?: { readonly access: SkillsAccess; readonly agent: CliAgent },
 ): NonNullable<AcpAdapterV2Flavor["buildPrompt"]> => {
   const reader = attachmentReader(host, fileSystem);
   return (input) =>

@@ -58,9 +58,7 @@ export const workspaceComposerEntries = Effect.fn("PiDurable.workspaceComposerEn
   if (agent === undefined && !access.enabled()) return empty;
   const at = access.locate(cwd);
   if (at === undefined) return empty;
-  const [discovery, templates] = yield* ask("skills", () =>
-    Promise.all(agent === undefined ? [at.workspace.skills(at.inner), at.workspace.prompts(at.inner)] : [at.workspace.skills(at.inner, agent), at.workspace.prompts(at.inner, agent)]),
-  );
+  const [discovery, templates] = yield* ask("skills", () => Promise.all([at.workspace.skills(at.inner, agent), at.workspace.prompts(at.inner, agent)]));
   const skills = discovery.skills.map((skill): ServerProviderSkill => {
     const description = trimmed(skill.description);
     return {
@@ -139,19 +137,18 @@ export interface MessageSkills {
 }
 
 /**
- * The thread in t3 path `cwd`'s skills, through `access`; read only when a message asks. With `agent` (OpenCode's,
- * SPI-1151): its Skills at its roots, not behind the Harness switch (Pi Durable's), with no Prompt templates (its own
- * commands reach it as typed), embedded as OpenCode's skill tool returns them, in t3 paths (the Container's).
+ * The thread in t3 path `cwd`'s skills, through `access`; read only when a message asks. With `agent` (a CLI agent's,
+ * SPI-1151; OpenCode's is the one that embeds): its Skills at its roots, not behind the Harness switch (Pi Durable's),
+ * with no Prompt templates (the CLI's own commands reach it as typed), in t3 paths (the Container's), and OpenCode's
+ * block for OpenCode.
  */
-export const messageSkillsFor = (cwd: string | null | undefined, access: SkillsAccess, agent?: "opencode"): MessageSkills => ({
+export const messageSkillsFor = (cwd: string | null | undefined, access: SkillsAccess, agent?: CliAgent): MessageSkills => ({
   load: Effect.fn("PiDurable.loadMessageSkills")(function* () {
     if (cwd === null || cwd === undefined || (agent === undefined && !access.enabled())) return undefined;
     const at = access.locate(cwd);
     if (at === undefined) return undefined;
     const workspace = at.workspace;
-    const found = yield* ask("skills", () =>
-      agent === undefined ? Promise.all([workspace.skills(at.inner), workspace.prompts(at.inner)]) : Promise.all([workspace.skills(at.inner, agent), Promise.resolve([])]),
-    ).pipe(
+    const found = yield* ask("skills", () => Promise.all([workspace.skills(at.inner, agent), agent === undefined ? workspace.prompts(at.inner) : Promise.resolve([])])).pipe(
       Effect.tapError((error) => Effect.logWarning("t3flare: the Workspace's skills could not be read; the message goes as typed", error)),
       Effect.option,
     );
@@ -163,7 +160,7 @@ export const messageSkillsFor = (cwd: string | null | undefined, access: SkillsA
       skills: discovery.skills.map((skill) => ({ ...skill, filePath: fromWorkspace(at.id, skill.filePath) })),
       templates: [],
       read: (path: string) => readInner(toWorkspace(path)?.inner ?? path),
-      block: opencodeSkillBlock,
+      block: agent === "opencode" ? opencodeSkillBlock : skillBlock,
     };
   }),
 });

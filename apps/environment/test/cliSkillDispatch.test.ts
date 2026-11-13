@@ -1,7 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off globalDate:off
 // A picked Skill in a CLI agent's message (SPI-1151 §3): Claude Code gets stock's rewrite (`planClaudeSkillDispatch`)
 // in the wrapper's `startTurn`, a mention that opens the message becoming the native `/name rest` and any other an inline
-// `/name` with stock's note naming its `SKILL.md`; OpenCode gets the Skill embedded as its own skill tool returns it.
+// `/name` with a note in stock's wording naming its `SKILL.md`; OpenCode gets the Skill embedded as its own skill tool returns it.
 // Through t3's ACP adapter and our flavors, against the scripted agent (fixtures/fake-acp-agent.mjs), as acpAdapter.test.ts.
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -12,7 +12,7 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
-import type { CliAgent, PromptTemplate, SkillDiscovery } from "@t3flare/skills";
+import { type CliAgent, type PromptTemplate, SKILL_TOKEN_REGEX, type SkillDiscovery } from "@t3flare/skills";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -46,16 +46,28 @@ describe("Claude Code's rewrite of a Skill mention (stock's planClaudeSkillDispa
     expect(claudeSkillText("  $fruit-code", skills)).toBe("/fruit-code");
   });
 
-  it("makes any other mention an inline /name with stock's note naming its SKILL.md, once per Skill", () => {
+  it("makes any other mention an inline /name with a note in stock's wording naming its SKILL.md, once per Skill", () => {
     expect(claudeSkillText("what is the code? $fruit-code", skills)).toBe(`what is the code? /fruit-code${note("fruit-code")}`);
-    expect(claudeSkillText("$fruit-code then $veg and $fruit-code", skills)).toBe(`/fruit-code${note("fruit-code")} then /veg${note("veg")} and /fruit-code`);
+    expect(claudeSkillText("use $veg then $fruit-code and $veg", skills)).toBe(`use /veg${note("veg")} then /fruit-code${note("fruit-code")} and /veg`);
+  });
+
+  it("keeps an opening mention native, unnoted, when others follow: the rest are noted (Claude expands one Skill a message)", () => {
+    expect(claudeSkillText("$fruit-code then $veg and $fruit-code", skills)).toBe(`/fruit-code then /veg${note("veg")} and /fruit-code`);
+    expect(claudeSkillText("  $fruit-code then $veg", skills)).toBe(`/fruit-code then /veg${note("veg")}`);
   });
 
   it("leaves a message with no known mention as typed", () => {
     for (const text of ["say $nope", "costs $5", "plain", "x$fruit-code"]) expect(claudeSkillText(text, skills)).toBe(text);
   });
 
-  it("is stock's note (ClaudeSkillDispatch.ts)", () => {
+  it("finds the mentions the planner does: its SKILL_MENTION_PATTERN is the copied SKILL_TOKEN_REGEX (ClaudeSkillDispatch.ts)", () => {
+    const source = fs.readFileSync(new URL("../../../t3code/apps/server/src/provider/Drivers/ClaudeSkillDispatch.ts", import.meta.url), "utf8");
+    const planner = /const SKILL_MENTION_PATTERN =\s*\/(.+)\/([a-z]*);/.exec(source);
+    expect(planner, "t3 moved SKILL_MENTION_PATTERN; re-read U65").not.toBeNull();
+    expect({ source: SKILL_TOKEN_REGEX.source, flags: SKILL_TOKEN_REGEX.flags }).toEqual({ source: planner![1], flags: planner![2] });
+  });
+
+  it("words the note as stock does (ClaudeSkillDispatch.ts)", () => {
     const source = fs.readFileSync(new URL("../../../t3code/apps/server/src/provider/Drivers/ClaudeSkillDispatch.ts", import.meta.url), "utf8");
     expect(source, "t3 changed its Claude skill note; re-read U65").toContain(`\` ${CLAUDE_SKILL_NOTE}\${mention.skill.path}]\``);
   });
