@@ -4,6 +4,7 @@
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
+import { CLI_ROOTS } from "@t3flare/skills";
 import { HARNESS_ROOT } from "@t3flare/workspace-client";
 
 import { acpProfileLaunch } from "./acpProfiles.ts";
@@ -230,6 +231,19 @@ export const piModelsJson = (proxyUrl: string, models: ReadonlyArray<CatalogMode
 /** pi's agent settings: no project is trusted (review F2), few retries (ADR-0012: nothing retries into spend). */
 export const PI_SETTINGS = `${JSON.stringify({ defaultProjectTrust: "never", retry: { maxRetries: 1 } }, null, 1)}\n`;
 
+/**
+ * SPI-1151: the repo's Skill roots and Prompt templates (`CLI_ROOTS.pi`), named to pi by flag. pi loads what a flag
+ * names whatever the project's trust, so trust stays off (`--no-approve`): the repo's extensions, settings and packages
+ * do not load (SPI-1001's D3). An absent root is only a diagnostic pi keeps, which RPC mode does not print.
+ */
+export const piRepoResourceArgs = (cwd: string): ReadonlyArray<string> => {
+  const base = cwd.replace(/\/+$/, "");
+  return [
+    ...CLI_ROOTS.pi.skills.flatMap((root) => ["--skill", `${base}/${root}`]),
+    ...CLI_ROOTS.pi.commands.flatMap((source) => ["--prompt-template", `${base}/${source.directory}`]),
+  ];
+};
+
 const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => {
   if (input.args[0] !== "--mode" || input.args[1] !== "rpc") return { refused: `pi runs here only as \`pi --mode rpc\`` };
   const home = homeOf(input.key);
@@ -293,7 +307,7 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
   }
   const thread = input.env.T3CODE_THREAD_ID;
   return {
-    argv: [`${CLI_BIN}/pi`, "--mode", "rpc", ...rest, ...extensionArgs, "--no-approve"],
+    argv: [`${CLI_BIN}/pi`, "--mode", "rpc", ...rest, ...extensionArgs, ...piRepoResourceArgs(input.cwd), "--no-approve"],
     env,
     files,
     prune: [{ dir: PI_SESSIONS, days: PI_SESSION_RETENTION_DAYS }],

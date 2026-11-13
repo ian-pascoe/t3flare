@@ -28,5 +28,7 @@ export const CLIS = {
     version: "2.2.7",
     /** The release tarball `opencode-linux-x64.tar.gz` of `v<version>` (anomalyco/opencode). */
     sha256: "89a6cee227b54bc011179c528a5e63176032462b1a5e21723b616801cddc2ca7",
+    /** `opencode-linux-arm64.tar.gz`: only test:docker's image on an arm64 host (SPI-1151's skills probe). */
+    sha256Arm64: "c1682057f0815cb2abdd6e00305f1146ebaf1c167f0335cdb74ddc80008120e7",
   },
 } as const;

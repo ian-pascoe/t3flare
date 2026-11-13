@@ -85,6 +85,12 @@ describe("pi's profile", () => {
       `${PI_SESSIONS}/s1.jsonl`,
       "--extension",
       "/var/lib/t3flare/cli/proc-1/ext/pi-t3-mcp-extension.ts",
+      "--skill",
+      "/w/demo/.pi/skills",
+      "--skill",
+      "/w/demo/.agents/skills",
+      "--prompt-template",
+      "/w/demo/.pi/prompts",
       "--no-approve",
     ]);
     expect(answer.env).toEqual({
@@ -122,6 +128,9 @@ describe("pi's profile", () => {
     expect(launch("pi", ["--mode", "rpc", "--extension", "/t3/state/missing.ts"])).toHaveProperty("refused");
     expect(launch("pi", ["--mode", "rpc", "--session", "/workspace/repo/.pi/s.jsonl", "--extension", STATE_EXTENSION])).toHaveProperty("refused");
     expect(launch("pi", ["--mode", "rpc", "--approve", "--extension", STATE_EXTENSION])).toHaveProperty("refused");
+    // SPI-1151: the repo's Skills and templates are the profile's to name, never t3's.
+    expect(launch("pi", ["--mode", "rpc", "--skill", "/elsewhere", "--extension", STATE_EXTENSION])).toHaveProperty("refused");
+    expect(launch("pi", ["--mode", "rpc", "--prompt-template", "/elsewhere", "--extension", STATE_EXTENSION])).toHaveProperty("refused");
     expect(launch("pi", ["--version"])).toHaveProperty("refused");
   });
 

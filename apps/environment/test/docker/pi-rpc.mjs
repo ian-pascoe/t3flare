@@ -36,7 +36,7 @@ child.stdout.on("data", (chunk) => {
     note("in", msg);
     summary.events[msg.type] = (summary.events[msg.type] ?? 0) + 1;
     if (msg.type === "response") {
-      summary.responses.push({ command: msg.command, success: msg.success, error: msg.error ?? null, data: msg.command === "get_state" ? { sessionFile: msg.data?.sessionFile, sessionId: msg.data?.sessionId, model: msg.data?.model?.id } : undefined });
+      summary.responses.push({ command: msg.command, success: msg.success, error: msg.error ?? null, data: msg.command === "get_state" ? { sessionFile: msg.data?.sessionFile, sessionId: msg.data?.sessionId, model: msg.data?.model?.id } : msg.command === "get_commands" ? msg.data : undefined });
       if (waiter?.kind === "response" && msg.id === waiter.id) waiter.resolve();
     }
     if (msg.type === "extension_ui_request") {
