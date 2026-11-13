@@ -63,4 +63,13 @@ describe("the CLI manifest", () => {
       expect(resolveProviderCompatibility(manifest.compatibility as never, driver as never, version)?.status, `${driver}: bump the CLI in clis.ts`).toBe("supported");
     }
   });
+
+  it("runs the computerd of the @cloudflare/computer the Workspace DO runs: their sync protocol is not stable across releases", () => {
+    const computerd = /^ARG COMPUTERD_VERSION=(.+)$/m.exec(fs.readFileSync(path.join(image, "Dockerfile"), "utf8"))?.[1];
+    expect(computerd).toBeDefined();
+    for (const pkg of ["apps/agents", "packages/computer-env"]) {
+      const json = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "../../..", pkg, "package.json"), "utf8"));
+      expect(json.dependencies["@cloudflare/computer"], pkg).toBe(computerd);
+    }
+  });
 });

@@ -8,9 +8,9 @@
 # Workspace that asks for those versions. The image is glibc-based because computerd is a glibc Node SEA, and
 # linux/amd64 because that is what Cloudflare Containers run.
 
-# Keep in step with the version of @cloudflare/computer the Workspace DO runs (apps/sandbox-image/src/index.test.ts
+# Keep in step with the version of @cloudflare/computer the Workspace DO runs (apps/environment/test/cliManifest.test.ts
 # fails when they differ): the Workspace and computerd speak a sync protocol that is not stable across releases.
-ARG COMPUTERD_VERSION=0.9.0
+ARG COMPUTERD_VERSION=0.11.2
 ARG MISE_VERSION=v2026.11.2
 ARG MISE_SHA256=62cad463c1413f05398ca339168a8f655120b6f0b0b8adce3bc6758bafaf0602
 # The CLI agents (step 4a; apps/sandbox-image/src/clis.ts holds the same values, apps/environment/test/cliManifest.test.ts keeps them equal).
@@ -25,7 +25,7 @@ ARG OPENCODE_SHA256=89a6cee227b54bc011179c528a5e63176032462b1a5e21723b616801cddc
 # `ghcr.io/cloudflare/computer-computerd-linux-x64:<COMPUTERD_VERSION>`, Ubuntu's the index of `ubuntu:26.04`.
 
 # A single layer over scratch whose only content is the computerd binary at /usr/local/bin/computerd.
-FROM --platform=linux/amd64 ghcr.io/cloudflare/computer-computerd-linux-x64:${COMPUTERD_VERSION}@sha256:fd6a0bcd033345a34f9106f916898c2a63619d51c91c56f1044960a49714d17c AS computerd
+FROM --platform=linux/amd64 ghcr.io/cloudflare/computer-computerd-linux-x64:${COMPUTERD_VERSION}@sha256:783f3760367d25ca1555f88e8409d89d9f224737afcda3caa0af3ad0f20524ae AS computerd
 
 # mise is fetched and checked against its digest in a stage of its own, so the final image holds only the binary.
 FROM --platform=linux/amd64 ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c AS mise

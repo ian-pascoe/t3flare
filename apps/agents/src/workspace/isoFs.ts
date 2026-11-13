@@ -1,5 +1,5 @@
 // isomorphic-git's file system over the Workspace's own files (computer's SQLite VFS), as
-// `@cloudflare/computer@0.9.0`'s `git` entry builds it (`workspaceIsomorphicGitClient`, which it does not export):
+// `@cloudflare/computer@0.11.2`'s `git` entry builds it (`workspaceIsomorphicGitClient`, which it does not export):
 // `@platformatic/vfs` over a `VirtualProvider` that forwards to computer's `SQLiteWorkspaceProvider`. Reads and writes
 // go straight to the Workspace DO's SQLite, so they move its revision as any other write does.
 import type { Workspace as ComputerWorkspace } from "@cloudflare/computer";

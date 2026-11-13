@@ -724,8 +724,8 @@ importers:
   apps/agents:
     dependencies:
       '@cloudflare/computer':
-        specifier: 0.9.0
-        version: 0.9.0(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)
+        specifier: 0.11.2
+        version: 0.11.2(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)
       '@earendil-works/chord':
         specifier: 1.5.0
         version: 1.5.0(esbuild@0.28.2)(ws@8.22.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
@@ -987,8 +987,8 @@ importers:
   packages/computer-env:
     dependencies:
       '@cloudflare/computer':
-        specifier: 0.9.0
-        version: 0.9.0(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)
+        specifier: 0.11.2
+        version: 0.11.2(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)
       '@earendil-works/chord':
         specifier: 1.5.0
         version: 1.5.0(esbuild@0.28.2)(ws@8.22.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
@@ -2607,7 +2607,7 @@ importers:
         version: 4.1.2
       tldts:
         specifier: ^7.4.19
-        version: 7.4.26
+        version: 7.4.28
     devDependencies:
       '@cloudpid/config':
         specifier: workspace:*
@@ -3369,14 +3369,14 @@ packages:
       react-dom:
         optional: true
 
-  '@cloudflare/computer@0.9.0':
-    resolution: {integrity: sha512-T4LS7IYYzS6+Zq+sg/r2UFDIBCFeKHbRsXhjUKozFQp1cCz231WiEZgvXD/6aqjDtaAoTY1XcM7CxIPj6gPbTA==}
+  '@cloudflare/computer@0.11.2':
+    resolution: {integrity: sha512-/kE+FPRobBwpanw9ihUUqaTK/jp7/5hG4fDDVRW+6llRGAnhapFigmHeu7IiKc+cuWVw91MlYrL8aG83yRGNOA==}
     peerDependencies:
       '@cloudflare/workers-types': 5.20261108.1
       '@platformatic/vfs': '*'
       ai: ^6.0.196 || ^7.0.0
-      just-bash: ^3.0.1
-      zod: ^4.4.3
+      just-bash: ^3.6.0
+      zod: ^4.6.6
     peerDependenciesMeta:
       '@cloudflare/workers-types':
         optional: true
@@ -7129,9 +7129,6 @@ packages:
       typescript:
         optional: true
 
-  capnweb@0.10.0:
-    resolution: {integrity: sha512-lQ2nlzaifkqBeNfs8RLErn7NZ8FNf3vn1W7J3nSH73edWG+0B5nHZGR51S2S9HMZEuZcEypOO469dZRY/BluFA==}
-
   capnweb@0.12.0:
     resolution: {integrity: sha512-jgZ/LMtMVTi+RVlooIslH78Gg23XbDTdvcLghWx3oz17D6u5GuJARt+uhZk/wcTo+f81eeabfnow4d3zLBj+JQ==}
 
@@ -9779,15 +9776,15 @@ packages:
   tldts-core@7.4.2:
     resolution: {integrity: sha512-nwEyF4vl4RSJjwSjBUmOSxc3BFPoIFdlRthJ6e+5v9P3bHNsoD06UjuqMUspqp7vsEZ1beaHi1km+optiE17yA==}
 
-  tldts-core@7.4.26:
-    resolution: {integrity: sha512-fMNX6ToAFZa2pWrKUd95hhwzx4f6tc+TLtjAstkj6L20FCmbsQ7SCciD3tAJQ/er+SmAlanZ8x0qFkNDZaftIg==}
+  tldts-core@7.4.28:
+    resolution: {integrity: sha512-6qKNYXYQfPNmAcmBpT/MrYPia3X2uBKxduTBSG0gLE9aN8FJTcS1ILsnJ6sqOvR/NZxkORzwGiSUVtnu3HUSqg==}
 
   tldts@7.4.2:
     resolution: {integrity: sha512-kCwffuaH8ntKtygnWe1b4BJKWiCUH30n5KfoTr6IchcXOwR7chAOFJxFrH3vjANafUYrIA4a7SDL+nn7SiR4Sw==}
     hasBin: true
 
-  tldts@7.4.26:
-    resolution: {integrity: sha512-ImrRMX8xrz7KZKdINMHBTsEWNlPxzI/CdDXEXmV3Fp0jAU31x1ZD4YmrAPGCz325aXYSuBPG5k6v2wRmWbm2QQ==}
+  tldts@7.4.28:
+    resolution: {integrity: sha512-zbyA+C3nBymq7u4gZnKShj7RcyxJuQy66VRF9V9Zx8g1Jl8ui+9DVbV6knlRKaqKX6nSvhhy7D7KM75A6uVf6g==}
     hasBin: true
 
   to-buffer@1.2.2:
@@ -11239,9 +11236,9 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@cloudflare/computer@0.9.0(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)':
+  '@cloudflare/computer@0.11.2(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)':
     dependencies:
-      capnweb: 0.10.0
+      capnweb: 0.12.0
       vite: '@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@5.9.3))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.48.0)(typescript@5.9.3)(unrun@0.2.39)(yaml@2.9.0)'
     optionalDependencies:
       '@cloudflare/workers-types': 5.20261108.1
@@ -11271,9 +11268,9 @@ snapshots:
       - vue-tsc
       - yaml
 
-  '@cloudflare/computer@0.9.0(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)':
+  '@cloudflare/computer@0.11.2(@cloudflare/workers-types@5.20261108.1)(@platformatic/vfs@0.5.0)(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(just-bash@3.6.0(supports-color@10.2.2))(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)(zod@4.6.7)':
     dependencies:
-      capnweb: 0.10.0
+      capnweb: 0.12.0
       vite: '@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@7.0.2))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.48.0)(typescript@7.0.2)(unrun@0.2.39)(yaml@2.9.0)'
     optionalDependencies:
       '@cloudflare/workers-types': 5.20261108.1
@@ -14775,8 +14772,6 @@ snapshots:
   capnp-es@0.0.16(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
-
-  capnweb@0.10.0: {}
 
   capnweb@0.12.0: {}
 
@@ -18635,16 +18630,16 @@ snapshots:
   tldts-core@7.4.2:
     optional: true
 
-  tldts-core@7.4.26: {}
+  tldts-core@7.4.28: {}
 
   tldts@7.4.2:
     dependencies:
       tldts-core: 7.4.2
     optional: true
 
-  tldts@7.4.26:
+  tldts@7.4.28:
     dependencies:
-      tldts-core: 7.4.26
+      tldts-core: 7.4.28
 
   to-buffer@1.2.2:
     dependencies:
