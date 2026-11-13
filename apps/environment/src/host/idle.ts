@@ -224,6 +224,32 @@ export const standingAlarm = (current: number | null, openRemote: number, now: n
   return current === null || current > at ? at : undefined;
 };
 
+/**
+ * Parity G12: t3's PR watch (`PullRequestWatchReactor`) reads its watched pull requests every 2 minutes, but only while
+ * t3 runs. While any watch is on, a reset wakes t3 this long after it went down, for one sweep; it goes down again a
+ * minute later unless the sweep woke an agent. Cost (C): one boot and one host read per watched pull request every 10
+ * minutes, while a watch lasts (t3 ends it when the pull request closes or merges).
+ */
+export const PR_WATCH_WAKE_MS = 10 * 60_000;
+/** The PR watch's wake set at the last reset (ms since epoch), in DO storage: the alarm reads it with t3 down. */
+export const PR_WATCH_WAKE_KEY = "t3flare:pr-watch-wake";
+
+/**
+ * Watched pull requests: a `watch` on a thread's pull-request link (t3's `ThreadPullRequestLink.watch`), on a thread
+ * that is neither deleted nor archived, as the reactor's `getThreadsWithPullRequests` reads them. Throws `UnreadableTables`.
+ */
+export const watchedPullRequests = (sql: SqlStorage): number =>
+  rows<{ n: number }>(
+    sql,
+    "orchestration_v2_projection_threads",
+    `SELECT COUNT(*) AS n
+     FROM orchestration_v2_projection_threads t, json_each(t.payload_json, '$.pullRequests') pr
+     WHERE t.deleted_at IS NULL
+       AND json_extract(t.payload_json, '$.archivedAt') IS NULL
+       AND json_type(t.payload_json, '$.pullRequests') = 'array'
+       AND json_type(pr.value, '$.watch') = 'object'`,
+  )[0]?.n ?? 0;
+
 export interface NextDue {
   readonly at: Date | null;
   readonly sources: Record<string, string | null>;
@@ -239,9 +265,10 @@ const parseTime = (value: string | number | null | undefined): Date | null => {
  * The next time t3 has work due: the earliest pending outbox effect (`nextClaimableAt`), the earliest enabled
  * scheduled task, and the earliest usage-limit recovery (the query of t3's
  * `ProjectionStoreV2.getLimitRecoveryWakeAt`: a usage-limited thread set to resume when its limit resets, or
- * when its snooze ends). Throws `UnreadableTables`.
+ * when its snooze ends), and, while a pull request is watched, `prWatchWakeAt` (parity G12: at a reset, now plus
+ * `PR_WATCH_WAKE_MS`; at an alarm, what the reset stored, else now). Throws `UnreadableTables`.
  */
-export const nextDue = (sql: SqlStorage, now: Date = new Date()): NextDue => {
+export const nextDue = (sql: SqlStorage, now: Date = new Date(), prWatchWakeAt: number = now.getTime()): NextDue => {
   const outbox = rows<{ at: string | null }>(
     sql,
     "orchestration_v2_effect_outbox",
@@ -270,11 +297,17 @@ export const nextDue = (sql: SqlStorage, now: Date = new Date()): NextDue => {
   )[0];
   const limitWakes = [limits?.reset_ms, limits?.snooze_ms].filter((v): v is number => v !== null && v !== undefined);
   const usageLimit = limitWakes.length === 0 ? null : new Date(Math.round(Math.min(...limitWakes)));
-  const candidates = [parseTime(outbox), parseTime(scheduled), usageLimit].filter((d): d is Date => d !== null);
+  const prWatch = watchedPullRequests(sql) > 0 ? new Date(prWatchWakeAt) : null;
+  const candidates = [parseTime(outbox), parseTime(scheduled), usageLimit, prWatch].filter((d): d is Date => d !== null);
   const at = candidates.length === 0 ? null : new Date(Math.min(...candidates.map((d) => d.getTime())));
   return {
     at,
-    sources: { outbox: outbox ?? null, scheduledTasks: scheduled ?? null, usageLimitResets: usageLimit?.toISOString() ?? null },
+    sources: {
+      outbox: outbox ?? null,
+      scheduledTasks: scheduled ?? null,
+      usageLimitResets: usageLimit?.toISOString() ?? null,
+      pullRequestWatch: prWatch?.toISOString() ?? null,
+    },
   };
 };
 
@@ -298,7 +331,7 @@ export const idleVerdict = (sql: SqlStorage, now: Date, idleAfterMs = IDLE_AFTER
   try {
     const work = openWork(sql, now);
     if (hasOpenWork(work)) return { reset: false, why: `open work ${JSON.stringify(work)}`, work };
-    return { reset: true, work, due: nextDue(sql, now) };
+    return { reset: true, work, due: nextDue(sql, now, now.getTime() + PR_WATCH_WAKE_MS) };
   } catch (error) {
     if (!(error instanceof UnreadableTables)) throw error;
     activity.unreadableUntil = now.getTime() + UNREADABLE_BACKOFF_MS;

@@ -120,6 +120,29 @@ describe("idle queries", () => {
     expect(due.sources.usageLimitResets).toBe("2026-11-10T12:30:00.000Z");
   });
 
+  it("wakes for t3's PR watch while a live thread watches a pull request (parity G12)", () => {
+    const sql = t3Tables();
+    const link = (watch: boolean) => ({ host: "github.com", repository: "o/r", number: 1, ...(watch ? { watch: { startedAt: "2026-11-10T11:00:00.000Z" } } : {}) });
+    sql.exec(
+      "INSERT INTO orchestration_v2_projection_threads VALUES ('a', ?, NULL), ('b', ?, NULL), ('c', ?, '2026-11-10T00:00:00.000Z'), ('d', ?, NULL)",
+      JSON.stringify({ pullRequests: [link(false)] }),
+      JSON.stringify({ pullRequests: [link(true)], archivedAt: "2026-11-10T10:00:00.000Z" }),
+      JSON.stringify({ pullRequests: [link(true)] }),
+      JSON.stringify({}),
+    );
+    expect(Idle.watchedPullRequests(sql)).toBe(0);
+    expect(Idle.nextDue(sql, now).at).toBeNull();
+    sql.exec("INSERT INTO orchestration_v2_projection_threads VALUES ('e', ?, NULL)", JSON.stringify({ pullRequests: [link(false), link(true)] }));
+    expect(Idle.watchedPullRequests(sql)).toBe(1);
+    // At a reset: PR_WATCH_WAKE_MS ahead; at an alarm, the stored wake (or now, with none stored).
+    const reset = Idle.nextDue(sql, now, now.getTime() + Idle.PR_WATCH_WAKE_MS);
+    expect(reset.at?.toISOString()).toBe("2026-11-10T12:10:00.000Z");
+    expect(reset.sources.pullRequestWatch).toBe("2026-11-10T12:10:00.000Z");
+    expect(Idle.nextDue(sql, now).at?.toISOString()).toBe(now.toISOString());
+    Object.assign(Idle.activity, { sockets: 0, inFlight: 0, idleSince: now.getTime() - 120_000, unreadableUntil: 0 });
+    expect(Idle.idleVerdict(sql, now)).toMatchObject({ reset: true, due: { at: new Date("2026-11-10T12:10:00.000Z") } });
+  });
+
   it("counts a run or provider-session status it does not know as open", () => {
     const sql = t3Tables();
     sql.exec("INSERT INTO orchestration_v2_projection_runs VALUES ('r1', 'rolled_back'), ('r2', 'awaiting_input')");

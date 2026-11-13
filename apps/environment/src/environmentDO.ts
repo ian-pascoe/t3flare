@@ -207,6 +207,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       // t3's own `/mcp` as a Container reaches it (public, behind t3's bearer, ADR-0010): what a CLI is given in place of
       // t3's in-isolate address (owner, 2026-11-12, back to stock: t3's bearer goes to the CLI as stock t3 hands it).
       t3McpUrl: () => `https://${this.#configuredHost()}/mcp`,
+      publicOrigin: () => (this.env.T3FLARE_HOST === undefined ? null : `https://${this.env.T3FLARE_HOST}`),
     });
   }
 
@@ -730,6 +731,10 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     );
     if (planned.retry === undefined) this.ctx.storage.kv.delete(Idle.REMOTE_RETRY_KEY);
     else this.ctx.storage.kv.put(Idle.REMOTE_RETRY_KEY, planned.retry);
+    // Parity G12: the PR watch's wake, for the alarm to read with t3 down.
+    const prWatch = verdict.due.sources.pullRequestWatch;
+    if (prWatch === null || prWatch === undefined) this.ctx.storage.kv.delete(Idle.PR_WATCH_WAKE_KEY);
+    else this.ctx.storage.kv.put(Idle.PR_WATCH_WAKE_KEY, Date.parse(prWatch));
     await this.ctx.storage.setAlarm(planned.alarm);
     // `ctx.abort()` discards writes not yet durable: on production the alarm was lost without this.
     await this.ctx.storage.sync();
@@ -767,7 +772,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       // Remote tasks (SPI-1061 D7): their retry, or at once for one left open by a deploy or an eviction.
       let due: Date | null;
       try {
-        const t3Due = Idle.nextDue(this.ctx.storage.sql).at;
+        // A watch with no stored wake (one a reset before G12 left) is due now.
+        const t3Due = Idle.nextDue(this.ctx.storage.sql, new Date(), this.ctx.storage.kv.get<number>(Idle.PR_WATCH_WAKE_KEY) ?? Date.now()).at;
         const remote = Idle.remoteWakeAt(this.ctx.storage.kv.get<Idle.RemoteRetry>(Idle.REMOTE_RETRY_KEY), Idle.openRemoteTaskCount(this.ctx.storage.sql));
         due = remote === null ? t3Due : new Date(Math.min(remote, t3Due?.getTime() ?? Number.POSITIVE_INFINITY));
       } catch (error) {

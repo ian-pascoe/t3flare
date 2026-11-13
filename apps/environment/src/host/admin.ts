@@ -122,6 +122,11 @@ const health = async (environment: EnvironmentDO) => {
     nextDue: unreadableAsError(() => Idle.nextDue(storage.sql)),
     // SPI-1061 D7: the retry of Remote tasks whose machine does not answer, if one is pending.
     remoteRetry: storage.kv.get<Idle.RemoteRetry>(Idle.REMOTE_RETRY_KEY) ?? null,
+    // Parity G12: the PR watch's wake the last reset set, and the watches now.
+    prWatch: {
+      wake: ((at) => (at === undefined ? null : new Date(at).toISOString()))(storage.kv.get<number>(Idle.PR_WATCH_WAKE_KEY)),
+      watched: unreadableAsError(() => Idle.watchedPullRequests(storage.sql)),
+    },
     // The rows are t3's statements through the adapter since `isolate.startedAt` (cost audit F2).
     sql: { ...sqlStats, databaseSize: storage.sql.databaseSize },
     stateDirectory: StateStore.usage(),

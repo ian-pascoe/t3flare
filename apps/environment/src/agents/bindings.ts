@@ -30,6 +30,8 @@ export interface EnvironmentServices {
   readonly relayServers: () => ReadonlyArray<string>;
   /** t3's `/mcp` at the public host, as a CLI in a Container reaches it with t3's per-thread bearer. */
   readonly t3McpUrl: () => string;
+  /** t3's public origin (`https://<t3 host>`), or null where no host is configured (local workerd): task webhooks' base (parity G12). */
+  readonly publicOrigin: () => string | null;
 }
 
 let current: EnvironmentServices | undefined;

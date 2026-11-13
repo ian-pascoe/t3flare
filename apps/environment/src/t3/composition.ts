@@ -183,6 +183,8 @@ import * as WorkspaceCheckpoints from "../workspace/checkpoints.ts";
 import * as DoSql from "../platform/sql.ts";
 import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
+import { environmentServices } from "../agents/bindings.ts";
+import { webhookBaseUrl } from "./webhookOrigin.ts";
 import { cloudCapabilities } from "./capabilities.ts";
 import { layerManagedPolicy } from "./managedPolicy.ts";
 import { layerPeerLinksWithoutCause } from "./peerLinks.ts";
@@ -497,10 +499,11 @@ export const make = (options: CompositionOptions) => {
     CloudManagedEndpointRuntime.layer.pipe(Layer.provide(layerSecretStore), Layer.provide(layerRelayClient)),
   );
 
-  // t3flare: no relay, so scheduled-task webhooks have no public hook URL.
+  // t3flare (parity G12): no relay; the t3 host is public and serves t3's hook route itself (`/api/hooks/:hookId/:token`,
+  // ADR-0010), so a task's hook URL is on it. Stock t3's relay URL is `<relay>/v1/hooks/<endpoint key>`, which forwards there.
   const layerScheduledTaskWebhookOrigin = Layer.succeed(
     ScheduledTaskWebhookOrigin,
-    Effect.succeed({ relayHookBaseUrl: null }),
+    Effect.sync(() => ({ relayHookBaseUrl: webhookBaseUrl(environmentServices().publicOrigin()) })),
   );
 
   const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
