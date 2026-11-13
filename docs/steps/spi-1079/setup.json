@@ -1,0 +1,60 @@
+{
+ "at": "2026-11-13T01:29:08.680Z",
+ "fixture": "https://t3flare-mcpfixture-spi1079.ian-g-pascoe.workers.dev",
+ "results": [
+  {
+   "server": "fixture",
+   "added": 200,
+   "tested": {
+    "server": "fixture",
+    "status": "ok",
+    "error": null,
+    "tools": 10,
+    "refused": 0,
+    "ms": 567
+   }
+  },
+  {
+   "server": "exefix",
+   "added": 200,
+   "tested": {
+    "server": "exefix",
+    "status": "ok",
+    "error": null,
+    "tools": 3,
+    "refused": 0,
+    "ms": 21
+   }
+  }
+ ],
+ "listed": [
+  {
+   "name": "commissary",
+   "tools": []
+  },
+  {
+   "name": "fixture",
+   "tools": [
+    "fixture_echo:read",
+    "fixture_note:write",
+    "fixture_unknown:write",
+    "fixture_inject:read",
+    "fixture_slow:read",
+    "fixture_flip:write",
+    "fixture_ask:write",
+    "fixture_confirm:write",
+    "fixture_page:read",
+    "fixture_password:write"
+   ]
+  },
+  {
+   "name": "exefix",
+   "tools": [
+    "call:write",
+    "execute:write",
+    "resume:read"
+   ]
+  }
+ ],
+ "ok": true
+}

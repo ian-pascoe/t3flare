@@ -28,9 +28,9 @@ Agents in t3flare had t3's own tools and nothing else. The owner wants Commissar
 8. **t3's own tools for CLI agents** come as stock t3 hands them: t3's per-thread MCP bearer, given to the CLI, at t3's public `/mcp` (t3 names its in-isolate address, which a Container cannot reach, so only the endpoint is rewritten; SPI-1039, ADR-0022's tools refinement). The relay's handles stay for third-party servers, whose credentials are real secrets.
 9. **Not offered:**
    - **Local stdio servers** are refused (ADR-0024's table): Container-only, with no secrets, and served over HTTP instead.
-   - **Elicitation is not declared** by any t3flare client (OD-T7: later, under cloudpid ADR-0041's rules).
+   - **Elicitation is not declared** by any t3flare client (OD-T7: later, under cloudpid ADR-0041's rules). Superseded by the SPI-1079 refinement below: an agent's calls declare it, and the owner answers.
    - **MCP resources, prompts and apps** are not offered.
-   - **Executor** is added directly, in `browser` elicitation mode, so the agent never holds the approval. The owner chose direct over Commissary. `skills`, `search` and `describe` carry read hints; the owner marks `resume` read; `call` and `execute` are write.
+   - **Executor** is added directly, in `browser` elicitation mode, so the agent never holds the approval. Since SPI-1079 its `native` ("In your client") and `model` ("Through your agent") modes work too (refinement below). The owner chose direct over Commissary. `skills`, `search` and `describe` carry read hints; the owner marks `resume` read; `call` and `execute` are write.
 
 ## Considered options
 
@@ -61,3 +61,64 @@ The owner chose to stay close to stock t3 (`docs/scope-audit.md`). Removed, each
 3. Tool classes: definition-hash pins and write-until-marked for direct servers. Each tool's `readOnlyHint` is trusted, and the owner can override a class in the panel.
 
 Rerun on stage after the cut: the panel at its new path (`m3-panel-safety.json`), each CLI's relay and t3 tools with t3's bearer, with a prompt-injection case (`m5-cli-*.json`), a Durable direct-server read and write (`m6-direct-durable.json`), and prompt injection on linked threads (`m5-injection.json`).
+
+## Server questions reach the owner as t3 cards (refinement, SPI-1079, 2026-11-13)
+
+The owner wants Executor's "Through your agent" (`model`) and "In your client" (`native`) approval modes (owner,
+2026-11-12, SPI-1079). Neither may let an agent answer its own approval. Plan: [`docs/steps/spi-1079-plan.md`](../steps/spi-1079-plan.md);
+report: [`docs/steps/spi-1079.md`](../steps/spi-1079.md).
+
+1. **Every agent call declares elicitation** (form and URL), Durable and relayed alike, with no per-server switch: a
+   server that finds no elicitation may take that as consent. The panel's test and the inventory lists declare nothing.
+2. **The MCP host makes the card** (`mcp/elicitation.ts`), and the caller only shows it. The Session gets its card
+   through an `asker` it passes with `mcpCall` over Workers RPC; the relay gets its card through the CLI wrapper's asker
+   (`cliQuestionAsker`), on the calling thread's live turn, while the CLI's HTTP request is held. The cards are t3's own:
+   - a form with no fields, a page (URL mode) and an Executor `approval-required` become an `approval_request` of t3's
+     `mcp-elicitation` kind (as t3's Codex adapter shows an approval-shaped elicitation). A page's card shows its link and
+     site, and its accept is "Opened it";
+   - a form with fields, or an Executor `input-required`, becomes a `user_input` card with one question per field (as
+     t3's ACP adapter builds one), plus a last Send / Decline question, since t3 offers no way to dismiss a live question.
+   - Every card names the server and shows the agent's call (tool and arguments), through `cardText`.
+3. **The question waits live**, up to 10 minutes (cloudpid's Legacy wait; the CLI card's `CLI_ASK_MS`). The engine pauses
+   the call's 270 s bound meanwhile. No Modern `ResumeState` is kept: a Session or Environment restart ends the call, and
+   the card closes as cancelled. A read is replayed and asks again; a write answers "cut off", as before.
+4. **Only the owner answers** (cloudpid ADR-0041, ported):
+   - an approval card cannot be answered by an agent (t3's `t3_pending_request` answers `user_input` requests only);
+   - a form card's request id carries `t3flare-elicit`, and the Environment refuses an agent's `t3_pending_request` `read`
+     or `respond` naming it before t3 sees the request. The refusal is on `/mcp` (CLI agents, linked laptops) and on the
+     Durable `mcp()` RPC (`mcp/ownerOnly.ts`). Stock t3 would let a parent agent answer a delegated child's question;
+     here the parent is told to ask the owner;
+   - an elicitation always asks, in every runtime mode, as in stock t3.
+5. **Declined unseen**: a form whose field ends in a credential word (the spec forbids such forms, and t3 keeps every
+   `user_input` answer in its event log), and a page that is not on HTTPS, is on a local or private host, or is on the
+   t3 host. Malformed or over-bound forms are refused, and so are Sampling requests.
+6. **No answer is kept by t3flare.** The Session holds its question cards in memory, never in storage, and logs name
+   fields, never values. t3's own event log keeps a `user_input` card's answers, as it does for every question card;
+   that is platform, which is why credential forms are declined.
+7. **Pausing servers ("Through your agent")**: a server whose `resume` takes `requestId` and `response` is a pausing
+   server. Detection is by that shape, not by name; browser mode's `resume` takes only a `requestId`, so it is untouched.
+   - Its `resume` is hidden from every agent and refused if called.
+   - A result whose `structuredContent` is a pause (`approval-required` or `input-required`, with a `requestId` and a
+     form) raises the card, with the server's own text of what waits (its message and `_meta`) and the agent's call.
+   - t3flare then calls `resume({ requestId, response })` itself, at most 16 rounds, and the agent gets only the final
+     result. A `requestId` left in an expired outcome is masked.
+   - `accept` is sent only when the owner approved. A decline is sent as Executor's own `{ action: "decline" }`, and a
+     card nobody answered (no live turn, a timeout, Stop) as `{ action: "cancel" }`. Nothing is left to expire.
+8. **"In your client" (`native`)** needs only items 1–6. Executor marks its `call` destructive there, so the write card
+   t3flare already raises for `call` is that approval, and its approvals inside `execute` arrive as elicitations.
+
+**Considered**:
+
+- **Refusing the agent's `resume` until the owner answers** (an unlock per `requestId`). Rejected: the model would hold
+  and relay the request, and each round would need another unlock.
+- **Durable Modern questions** (cloudpid's `defer`/`resume` with a sealed `ResumeState`): the call would outlive a
+  restart. Deferred; no server the owner uses is Modern-only.
+- **Declining forms with fields**, as t3's Codex adapter does: safe, but Executor's `input-required` and real forms
+  would fail.
+
+**Consequences**:
+
+- In `native` mode on a full-access thread, Executor's `call` runs without a card, as any write does there. Its
+  `execute` approvals still ask, since an elicitation always asks.
+- A `-32042` (URL required, Legacy) is still the server's error.
+- One more import in the Environment Worker: `@cloudpid/mcp/elicitation-url` (SDK-free; `sdk-isolation.test.ts`).

@@ -242,7 +242,7 @@ text("READ " + String(read).slice(0, 400) + "\\nRESPOND " + String(responded).sl
   const exec = (line: string) => `text(JSON.stringify(await tools.mcp__exefix__call({ calls: { path: "tools.fixture-notes.note", input: { line: ${JSON.stringify(line)} } } }).catch((e) => "threw: " + e.message)));`;
   {
     const marker = `exec-${Date.now().toString(36)}`;
-    const run = await durableTurn(projectId, "exec-yes", `${exec(`${marker}-yes`)}\ntext(" RESUME:" + typeof tools.mcp__exefix__resume);`, owner("accept"));
+    const run = await durableTurn(projectId, "exec-yes", `${exec(`${marker}-yes`)}\ntry { tools.mcp__exefix__resume; text(" RESUME:present"); } catch (e) { text(" RESUME:absent"); }`, owner("accept"));
     const card = run.cards.find((c) => c.marked);
     cases.push({
       name: "Executor-style approval: t3flare's card shows Executor's text (app, tool, arguments) and the agent's call; approved: resume ran once with accept",
@@ -255,7 +255,7 @@ text("READ " + String(read).slice(0, 400) + "\\nRESPOND " + String(responded).sl
         JSON.stringify(run.logAdded) === JSON.stringify(["resume:accept", `exec:${marker}-yes`]) &&
         run.output.includes("ran fixture-notes.note") &&
         !run.output.includes("apr_") &&
-        run.output.includes("RESUME:undefined"),
+        run.output.includes("RESUME:absent"),
     });
   }
   {

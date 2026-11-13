@@ -203,6 +203,21 @@ _Avoid_: permission level
 An opaque per-process bearer a CLI agent sends to the MCP relay; useless outside its Workspace and after its process.
 _Avoid_: token, nonce
 
+**Server question**:
+What an MCP server asks the owner during an agent's call: an elicitation (a form, or a page to open), or a Pause.
+The MCP host makes it a t3 card on the calling thread; only the owner answers it, in a t3 client.
+_Avoid_: prompt, approval request (a Server question may ask for input)
+
+**Pause**:
+A tool result in which a server stops a call until someone answers (Executor's `approval-required` or
+`input-required`), to be continued with the server's `resume`. On a Pausing server t3flare raises the card and calls
+`resume` itself; the agent never sees the request.
+_Avoid_: pending interaction
+
+**Pausing server**:
+An MCP server that lists a `resume` taking a `requestId` and a `response` (Executor's "Through your agent" mode). Its
+`resume` is t3flare's to call, never an agent's.
+
 ## Credentials
 
 **Provider instance**:

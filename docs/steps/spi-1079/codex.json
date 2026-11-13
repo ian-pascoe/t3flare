@@ -1,0 +1,196 @@
+{
+ "at": "2026-11-13T01:36:30.920Z",
+ "workspace": "spi1079-codex-mweb1lw0",
+ "cases": [
+  {
+   "name": "Codex: a form's user_input card on the CLI thread; the owner's answers reach the server",
+   "threadId": "41d4b6f2-3552-4ba2-b23b-9e9b02889093",
+   "status": "completed",
+   "cards": [
+    {
+     "id": "runtime-request:codex:t3flare-ask:t3flare-elicit-ee1356f8-b1c8-4f8e-bf1b-db2609fb2024",
+     "marked": true,
+     "kind": "user_input",
+     "type": "user_input_request",
+     "requestKind": null,
+     "title": "fixture asks",
+     "questions": [
+      {
+       "id": "colour",
+       "header": "Colour",
+       "question": "fixture asks:\n\nThe fixture asks a few questions (codex approve).\n\nThe agent's call: fixture: fixture_ask\n{\n  \"text\": \"codex approve\"\n}\n\nPick a colour",
+       "options": [
+        "red",
+        "green",
+        "blue"
+       ]
+      },
+      {
+       "id": "note",
+       "header": "Note",
+       "question": "Anything to add (optional)",
+       "options": []
+      },
+      {
+       "id": "urgent",
+       "header": "Urgent",
+       "question": "Is it urgent? (optional)",
+       "options": [
+        "true",
+        "false"
+       ]
+      },
+      {
+       "id": "t3flare_send",
+       "header": "Send",
+       "question": "Send these answers to fixture?",
+       "options": [
+        "send",
+        "decline"
+       ]
+      }
+     ],
+     "given": {
+      "answers": {
+       "colour": "blue",
+       "note": "from the owner",
+       "urgent": "true",
+       "t3flare_send": "send"
+      }
+     }
+    }
+   ],
+   "reply": "the fixture's question was answered: accept {\"colour\":\"blue\",\"note\":\"from the owner\",\"urgent\":true}",
+   "logAdded": [
+    "fixture_ask:accept:{\"colour\":\"blue\",\"note\":\"from the owner\",\"urgent\":true}"
+   ],
+   "ms": 12476,
+   "ok": true
+  },
+  {
+   "name": "Codex: the owner declines the form",
+   "threadId": "13d0d59c-ac2d-492b-8937-4f5e6fd0dc9d",
+   "status": "completed",
+   "cards": [
+    {
+     "id": "runtime-request:codex:t3flare-ask:t3flare-elicit-6a2f3edd-2eb5-4cdd-aa01-6b1d570d320e",
+     "marked": true,
+     "kind": "user_input",
+     "type": "user_input_request",
+     "requestKind": null,
+     "title": "fixture asks",
+     "questions": [
+      {
+       "id": "colour",
+       "header": "Colour",
+       "question": "fixture asks:\n\nThe fixture asks a few questions (codex decline).\n\nThe agent's call: fixture: fixture_ask\n{\n  \"text\": \"codex decline\"\n}\n\nPick a colour",
+       "options": [
+        "red",
+        "green",
+        "blue"
+       ]
+      },
+      {
+       "id": "note",
+       "header": "Note",
+       "question": "Anything to add (optional)",
+       "options": []
+      },
+      {
+       "id": "urgent",
+       "header": "Urgent",
+       "question": "Is it urgent? (optional)",
+       "options": [
+        "true",
+        "false"
+       ]
+      },
+      {
+       "id": "t3flare_send",
+       "header": "Send",
+       "question": "Send these answers to fixture?",
+       "options": [
+        "send",
+        "decline"
+       ]
+      }
+     ],
+     "given": {
+      "answers": {
+       "colour": "red",
+       "t3flare_send": "decline"
+      }
+     }
+    }
+   ],
+   "reply": "the fixture's question was answered: decline",
+   "logAdded": [
+    "fixture_ask:decline"
+   ],
+   "ms": 11889,
+   "ok": true
+  },
+  {
+   "name": "Codex: a confirmation's mcp-elicitation card, declined",
+   "threadId": "8bfaa984-5ac6-4fd2-90a0-e51344c50d6c",
+   "status": "completed",
+   "cards": [
+    {
+     "id": "runtime-request:codex:t3flare-ask:t3flare-elicit-f0b76de0-6d3f-44ed-9e0f-9ce16f9f3d42",
+     "marked": true,
+     "kind": "mcp-elicitation",
+     "type": "approval_request",
+     "requestKind": "mcp-elicitation",
+     "title": "fixture asks",
+     "prompt": "fixture asks:\n\nConfirm the fixture's action (codex decline)?\n\nThe agent's call: fixture: fixture_confirm\n{\n  \"text\": \"codex decline\"\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "given": {
+      "decision": "decline"
+     }
+    }
+   ],
+   "reply": "the fixture's question was answered: decline",
+   "logAdded": [
+    "fixture_confirm:decline"
+   ],
+   "ms": 12166,
+   "ok": true
+  },
+  {
+   "name": "Codex: an Executor-style pause raises t3flare's card on the CLI thread; approved, resume ran once; the reply has no requestId",
+   "threadId": "8d00213b-d51a-4552-bcdb-1da399bcff5b",
+   "status": "completed",
+   "cards": [
+    {
+     "id": "runtime-request:codex:t3flare-ask:t3flare-elicit-ede0722a-4f15-4c1e-961d-37969bcbd013",
+     "marked": true,
+     "kind": "mcp-elicitation",
+     "type": "approval_request",
+     "requestKind": "mcp-elicitation",
+     "title": "exefix: approve?",
+     "prompt": "exefix asks for your approval:\n\nApprove fixture-notes.note with line \"cexec-mweb2qqw\"?\n\nWhat exefix says waits (its own details):\n{\n  \"app\": \"fixture-notes\",\n  \"tool\": \"note\",\n  \"args\": {\n    \"line\": \"cexec-mweb2qqw\"\n  }\n}\nExpires 2026-11-13T01:46:25.034Z.\n\nThe agent's call: exefix: call\n{\n  \"calls\": {\n    \"path\": \"tools.fixture-notes.note\",\n    \"input\": {\n      \"line\": \"cexec-mweb2qqw\"\n    }\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "given": {
+      "decision": "accept"
+     }
+    }
+   ],
+   "reply": "ran fixture-notes.note: noted #25",
+   "logAdded": [
+    "resume:accept",
+    "exec:cexec-mweb2qqw"
+   ],
+   "ms": 12324,
+   "ok": true
+  }
+ ],
+ "ok": true
+}

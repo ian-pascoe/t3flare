@@ -317,6 +317,12 @@ Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's 
 
 ### U37. Cards injected by the CLI wrapper (SPI-1040; the MCP relay's tool cards since the back-to-stock cut)
 
+- **SPI-1079**: the same mechanism raises MCP Server questions. An `mcp-elicitation` approval card, or a `user_input`
+  card (runtime request `user_input`, item `user_input_request` with `questions`) answered from t3's `answers`, which
+  t3 sends without a decision. Breaks too when t3 stops routing a live `user_input` response to the adapter, or reshapes
+  `OrchestrationV2UserInputQuestion`. Detection: `test/cliCard.test.ts` (the SPI-1079 cases); the stage's
+  `scripts/spi1079.ts codex`.
+
 - **Where**: `apps/environment/src/provider/cli/wrapper.ts` raises the MCP relay's tool card (`cliAsk.ts`
   `approveCliTool`, ADR-0028) on a CLI thread's live turn: it emits `runtime_request.updated`, `node.updated` and `turn_item.updated` with an `approval_request` item (`t3code/packages/provider-core/src/server/ProviderAdapter.ts` `ProviderAdapterV2Event`) that the native agent never sent, with ids from `IdAllocator.derive.approvalNode`/`approvalTurnItem` and a runtime request id of its own prefix (`runtime-request:<driver>:t3flare-ask:`), and answers t3's `respondToRuntimeRequest` for that prefix itself. It learns the turn's `providerTurnId` from the adapter's `provider_turn.updated` whose `nodeId` is the turn's `rootNodeId` (as the ACP, Pi and Codex adapters emit it), numbers the card's turn item after the highest ordinal seen, and closes open cards before passing on `turn.terminal`. (Until the back-to-stock cut, owner 2026-11-12, it raised the push gateway's "Allow git push?" card too.)
 - **Breaks when**: the event schema changes (typecheck); t3 validates a runtime request against the adapter's own state or snapshot (`readThreadSnapshot`) and drops ours; an adapter stops emitting its root `provider_turn.updated` before asking (the card is refused: "no live turn to ask on"); ordinals become unique per turn.
@@ -392,6 +398,41 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Detection**: the install step ("classify it" for a new setting; a missing importer); `verify-lock` (a moved version, with the importer and the keys); `check:workspace` (a stale generated file, or `t3code/node_modules/.pnpm` from a pnpm command run inside `t3code/`).
 - **Blast radius**: the bump fails; nothing reaches prod.
 - **Fix**: classify the new key in `gen-workspace.ts`; for a drift, find which of our packages pulls the other version (`pnpm why <name>`), and either pin it in `OUR_OVERRIDES` or list it in `PEER_DRIFT` with its reason.
+
+### U51. Server questions as t3 cards, and the `t3_pending_request` fence (SPI-1079)
+
+- **Where**: `apps/environment/src/mcp/elicitation.ts` makes t3 `mcp-elicitation` approval items and `user_input`
+  questions (`OrchestrationV2UserInputQuestion`'s shape, as `provider-acp`'s `parseElicitationForm` builds them).
+  `apps/environment/src/mcp/ownerOnly.ts` reads every `/mcp` body (`EnvironmentDO.fetch`, `EnvironmentDO.mcp`) and refuses
+  a `tools/call` of `t3_pending_request` whose `requestId` carries `t3flare-elicit`, unless the action is `list`
+  (`t3code/apps/server/src/mcp/toolkits/thread/tools.ts` `PendingRequestTool`). The Durable differ
+  (`provider/differ.ts` `approvalView`, `questionView`) renders the Session's `mcp-elicitation` approvals and form
+  questions.
+- **Breaks when**:
+  - t3 renames `t3_pending_request` or its `requestId`/`action` arguments, or adds another agent tool that answers
+    `user_input` requests (the fence then lets an agent answer a form);
+  - t3 starts letting `t3_pending_request` answer approvals (the `mcp-elicitation` cards);
+  - t3 drops the `mcp-elicitation` request kind or changes how its web client renders it or a multi-question `user_input`.
+- **Detection**: `test/mcpElicitation.test.ts` (`refuseOwnerOnly`), `test/differ.test.ts` (the SPI-1079 case);
+  `scripts/spi1079.ts durable` (the fence case). **Silent**: a new t3 tool that answers questions (read the thread
+  toolkit's diff on a bump: `git -C t3code diff <old>..<new> -- apps/server/src/mcp/toolkits/thread/`).
+- **Blast radius**: an agent could answer an MCP server's form for the owner, which is the rule this ticket exists for.
+- **Fix**: extend `ownerOnly.ts` to the new tool or argument.
+
+### U52. Executor's pause contract ("Through your agent", SPI-1079)
+
+- **Where**: `apps/environment/src/mcp/elicitation.ts` `isPausingServer` (a `resume` whose input has `requestId` and
+  `response`), `pauseOf` (`structuredContent.status` `approval-required`/`input-required`, `requestId`, `elicitation`
+  `{ message, requestedSchema, _meta }`, `expiresAt`); `mcp/host.ts` `#answerPauses` (`resume({ requestId, response })`,
+  an approval as a bare `{ action: "accept" }`, a decline as `{ action: "decline" }`). Known from Executor's docs
+  (`executor.sh/docs/mcp`), its MCP host's tests and pi-mcp-adapter's `executor-pauses.ts`, not yet from a live run.
+- **Breaks when**: Executor renames the statuses or `resume`'s arguments, moves the request out of
+  `structuredContent`, or starts accepting field values in an approval.
+- **Detection**: `test/mcpElicitation.test.ts` (the fixture's shape); the stage's `scripts/spi1079.ts durable`
+  against the fixture (`/executor-mcp`). **Silent** against the real Executor: a changed shape stops being recognised,
+  and the pause reaches the agent as text, with its `requestId`. The agent still cannot call the hidden `resume`, so
+  nothing is approved, but the call stalls. SPI-1092 runs it live.
+- **Fix**: follow Executor's new shape in `pauseOf` and `isPausingServer`.
 
 ## Gaps in detection
 
