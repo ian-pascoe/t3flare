@@ -52,6 +52,8 @@ export interface ContainerLaunch {
   readonly size: ContainerSize;
   readonly instance: ContainerInstance;
   readonly idleMs: number;
+  /** The Container budget carried with this start's lease request (the budget DO judges it, ADR-0032). */
+  readonly budget: number;
   /** The Environment settings' revision it came from. */
   readonly revision: number;
 }
@@ -61,11 +63,12 @@ export interface ContainerLaunch {
  * may answer a size or an idle time it does not know, which starts as the default.
  */
 export const launchOf = (settings: ResolvedEnvironment): ContainerLaunch => {
-  const resolved = resolveEnvironment({ revision: settings.revision, settings: { containerSize: settings.containerSize, containerIdleMinutes: settings.containerIdleMinutes } });
+  const resolved = resolveEnvironment({ revision: settings.revision, settings: { containerSize: settings.containerSize, containerIdleMinutes: settings.containerIdleMinutes, containerBudget: settings.containerBudget } });
   return {
     size: containerSizeOf(resolved.containerSize),
     instance: containerInstance(resolved.containerSize),
     idleMs: resolved.containerIdleMinutes * 60_000,
+    budget: resolved.containerBudget,
     revision: resolved.revision,
   };
 };

@@ -1,5 +1,5 @@
 // The Environment section's cost table (SPI-1149): each Container size's resources and the worst-case hourly cost of the
-// Container budget's three Containers, all at full CPU, at Cloudflare's Workers Paid list prices (the vendored
+// Container budget's Containers (the setting, 3 by default), all at full CPU, at Cloudflare's Workers Paid list prices (the vendored
 // `@cloudpid/config` prices). Expected figures are the research's worked example (docs/steps/spi-1001-research-
 // container-sizes.md §5: a standard-4 hour at full CPU is $0.288 CPU + $0.108 memory + $0.00504 disk), worked by hand for
 // the others.
@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { containerCostTable } from "../src/harness/containerCost.ts";
 
 describe("containerCostTable", () => {
-  const table = containerCostTable();
+  const table = containerCostTable(3);
   const row = (size: string) => table.rows.find((entry) => entry.size === size)!;
 
   it("lists the five offered sizes with their resources, the default first", () => {
@@ -25,6 +25,12 @@ describe("containerCostTable", () => {
   it("prices one standard-4 hour at full CPU as the research does, and the budget's three at three times that", () => {
     expect(row("standard-4").perContainerHour).toBeCloseTo(0.40104, 6);
     expect(row("standard-4").budgetHour).toBeCloseTo(1.20312, 6);
+  });
+
+  it("prices the budget the settings give: five standard-4s at five times one", () => {
+    const five = containerCostTable(5);
+    expect(five.budget).toBe(5);
+    expect(five.rows.find((entry) => entry.size === "standard-4")!.budgetHour).toBeCloseTo(2.0052, 6);
   });
 
   it("prices the default cpu-1: $0.072 CPU, $0.027 memory and $0.003024 disk an hour", () => {

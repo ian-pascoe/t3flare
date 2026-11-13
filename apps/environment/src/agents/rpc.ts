@@ -1,5 +1,6 @@
 // The environment Worker's view of the agents Worker's Durable Objects (ADR-0014): their RPC methods, typed here so
 // this Worker never imports the agents Worker's code (which is typed against the Workers globals, not Node's).
+import type { ContainerInstance } from "@t3flare/harness-registry";
 import type { PortScan } from "@t3flare/sandbox-image/ports";
 import type { PromptTemplate, SkillDiscovery } from "@t3flare/skills";
 import type {
@@ -79,7 +80,14 @@ export interface WorkspaceRpc {
   clone(input: CloneInput): Promise<GitAnswer>;
   info(): Promise<ProvisionInfo>;
   exec(input: ExecInput): Promise<ExecResult>;
-  containerState(): Promise<{ readonly running: boolean; readonly leased: boolean; readonly lastUse: number | null }>;
+  /** The Container's state, with when it started and what it started with (ADR-0032), null while it never has. */
+  containerState(): Promise<{
+    readonly running: boolean;
+    readonly leased: boolean;
+    readonly lastUse: number | null;
+    readonly startedAt: number | null;
+    readonly launch: { readonly size: string; readonly instance: ContainerInstance; readonly idleMs: number; readonly revision: number } | null;
+  }>;
   stopContainer(): Promise<void>;
   readText(path: string): Promise<string | null>;
   /** SPI-1147: the Repo skills and Prompt templates of a thread in `cwd`, from the Workspace's own files. */
@@ -144,7 +152,8 @@ export type LeaseAnswer =
   | { readonly ok: false; readonly reason: string; readonly running: ReadonlyArray<string> };
 
 export interface BudgetRpc {
-  acquire(holder: string): Promise<LeaseAnswer>;
+  /** `budget`: the Environment settings' Container budget, carried by a fresh start (ADR-0032). */
+  acquire(holder: string, budget?: number): Promise<LeaseAnswer>;
   release(holder: string): Promise<void>;
   state(): Promise<{ readonly max: number; readonly leases: ReadonlyArray<{ readonly holder: string; readonly until: number }> }>;
 }

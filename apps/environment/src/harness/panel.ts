@@ -50,7 +50,20 @@ export interface HarnessDeps {
   /** OAuth sign-ins (review M4). */
   readonly oauth?: Pick<HarnessOAuth, "begin" | "status" | "forget">;
   readonly now?: () => number;
+  /** The Container budget DO's state (ADR-0032): its leases, each with the Workspace that holds it when known. */
+  readonly budget?: () => Promise<{ readonly max: number; readonly leases: ReadonlyArray<{ readonly holder: string; readonly workspace?: string | null }> }>;
 }
+
+/** The Containers running now, by their Workspaces (a holder's DO id when its Workspace is unknown); null without the budget. */
+export const runningContainers = async (deps: HarnessDeps): Promise<{ readonly count: number; readonly holders: ReadonlyArray<string> } | null> => {
+  if (deps.budget === undefined) return null;
+  try {
+    const { leases } = await deps.budget();
+    return { count: leases.length, holders: leases.map((lease) => lease.workspace ?? lease.holder) };
+  } catch {
+    return null;
+  }
+};
 
 /** The MCP server set as the panel shows it: settings (no secret), inventory state, tools with classes. */
 export const mcpOverview = async (deps: HarnessDeps) => {
@@ -129,10 +142,12 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === HARNESS_PATH || path === `${HARNESS_PATH}/`) {
       const subject = deps.caller.kind === "owner" ? deps.caller.subject : "";
       const csrf = subject === "" ? "" : await csrfToken(deps.store.csrfKey(), subject, deps.now?.() ?? Date.now());
+      const environment = resolveEnvironment(deps.store.loadEnvironment());
       const html = renderPage({
         resolved: resolveHarness(deps.store.load()),
-        environment: resolveEnvironment(deps.store.loadEnvironment()),
-        costs: containerCostTable(),
+        environment,
+        costs: containerCostTable(environment.containerBudget),
+        running: await runningContainers(deps),
         csrf,
         audit: deps.store.auditLog(50),
         status: statusOf(deps),
@@ -146,7 +161,8 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     }
     if (path === `${HARNESS_PATH}/api/environment`) {
       const stored = deps.store.loadEnvironment();
-      return json({ revision: stored.revision, resolved: resolveEnvironment(stored), schema: ENVIRONMENT_SETTINGS, costs: containerCostTable(), stored });
+      const resolved = resolveEnvironment(stored);
+      return json({ revision: stored.revision, resolved, schema: ENVIRONMENT_SETTINGS, costs: containerCostTable(resolved.containerBudget), running: await runningContainers(deps), stored });
     }
     if (path === `${HARNESS_PATH}/api/status`) return json(statusOf(deps));
     if (path === `${HARNESS_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });

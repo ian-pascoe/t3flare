@@ -8,10 +8,14 @@
 import { fieldProblem, type SettingEntry, type SettingValue } from "./fields.ts";
 
 /**
- * The Container budget (step 2a cost guardrails): at most this many Containers run at once across the deploy. A deploy
- * constant, not a setting: the panel shows it read-only.
+ * The Container budget's default (step 2a cost guardrails): at most this many Containers run at once across the deploy.
+ * The owner changes it in the Environment settings (`containerBudget`, 1 to 10: a cost guard, far under the account's
+ * concurrent limits); each Workspace DO carries it with its lease request.
  */
-export const CONTAINER_BUDGET = 3;
+export const DEFAULT_CONTAINER_BUDGET = 3;
+
+/** The most the Container budget may be set to. */
+export const MAX_CONTAINER_BUDGET = 10;
 
 /** A Container's resources, as `ctx.container.start({ instance })` takes a custom size. */
 export interface ContainerResources {
@@ -70,6 +74,7 @@ export interface ResolvedEnvironment {
   readonly revision: number;
   readonly containerSize: string;
   readonly containerIdleMinutes: number;
+  readonly containerBudget: number;
 }
 
 /** The Environment settings' schema: the panel renders its section from it and the API validates against it. */
@@ -83,6 +88,12 @@ export const ENVIRONMENT_SETTINGS = {
     title: "Idle time (minutes)",
     description: "A Container stops after this long without a command. Applies at each Workspace's next Container start.",
     schema: { type: "integer", minimum: 1, maximum: 60, default: 2 },
+  },
+  containerBudget: {
+    title: "Container budget",
+    description:
+      "How many Containers may run at once across the Environment. Applies at the next start; lowering it stops no running Container, and new starts wait until fewer run.",
+    schema: { type: "integer", minimum: 1, maximum: MAX_CONTAINER_BUDGET, default: DEFAULT_CONTAINER_BUDGET },
   },
 } as const satisfies Readonly<Record<string, SettingEntry>>;
 
@@ -100,6 +111,7 @@ export const resolveEnvironment = (stored: StoredEnvironment): ResolvedEnvironme
   revision: stored.revision,
   containerSize: valueOf(stored, "containerSize") as string,
   containerIdleMinutes: valueOf(stored, "containerIdleMinutes") as number,
+  containerBudget: valueOf(stored, "containerBudget") as number,
 });
 
 /** One change from the panel or a script: some of the settings. */

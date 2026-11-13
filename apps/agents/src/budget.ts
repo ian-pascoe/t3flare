@@ -1,14 +1,18 @@
 // @effect-diagnostics globalDate:off
-// The Container budget (step 2a plan, cost guardrails): at most MAX_CONTAINERS Containers run at once across the
-// deploy. `max_instances` does not apply under `schedulingPolicy: "durable_object"`, so a singleton DO leases the slots.
+// The Container budget (step 2a plan, cost guardrails): at most the budget's Containers run at once across the
+// deploy. The budget is an Environment setting (ADR-0032): each Workspace DO carries it with its lease request, this
+// object judges the request by it and keeps the last one for renewals and status reads (MAX_CONTAINERS before any).
+// Lowering it stops nothing: a holder's own lease is always renewed, and only new starts wait until fewer run. `max_instances` does not apply under `schedulingPolicy: "durable_object"`, so a singleton DO leases the slots.
 // A Workspace DO takes a lease before it starts its Container, renews it from its alarm while the Container runs, and
 // releases it when the Container stops. A lease expires LEASE_MS after its last renewal, so a lost release frees its
 // slot within that time and a running Container never loses its slot while it is renewed.
-import { CONTAINER_BUDGET } from "@t3flare/harness-registry";
+import { DEFAULT_CONTAINER_BUDGET, MAX_CONTAINER_BUDGET } from "@t3flare/harness-registry";
 import { DurableObject } from "cloudflare:workers";
 
-/** The budget is a deploy constant (ADR-0032), shown read-only in the panel's Environment section. */
-export const MAX_CONTAINERS = CONTAINER_BUDGET;
+/** The budget before any request carried one (the Environment settings' default). */
+export const MAX_CONTAINERS = DEFAULT_CONTAINER_BUDGET;
+/** The last budget a request carried. */
+const BUDGET_KEY = "budget";
 export const LEASE_MS = 10 * 60_000;
 export const RENEW_EVERY_MS = 5 * 60_000;
 
@@ -25,7 +29,7 @@ export type LeaseAnswer =
   | { readonly ok: false; readonly reason: string; readonly running: ReadonlyArray<string> };
 
 export interface BudgetEnv {
-  /** Overrides MAX_CONTAINERS (tests). */
+  /** Overrides MAX_CONTAINERS and every carried budget (tests). */
   readonly T3FLARE_MAX_CONTAINERS?: string;
   /** Overrides LEASE_MS (tests). */
   readonly T3FLARE_LEASE_MS?: string;
@@ -35,9 +39,16 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
   /** The clock every lease is judged by; a field, not a method, so it is not part of the RPC surface. Tests swap it. */
   protected readonly now: () => number = () => Date.now();
 
-  #max(): number {
+  /** `T3FLARE_MAX_CONTAINERS` when set; a field, not a method, so it is not part of the RPC surface. Tests swap it. */
+  protected readonly maxOverride: () => number | undefined = () => {
     const value = Number(this.env.T3FLARE_MAX_CONTAINERS);
-    return Number.isInteger(value) && value > 0 ? value : MAX_CONTAINERS;
+    return Number.isInteger(value) && value > 0 ? value : undefined;
+  };
+
+  /** The budget: the override, else `carried` when valid (kept for later), else the last kept, else the default. */
+  #max(carried?: number): number {
+    if (carried !== undefined && Number.isInteger(carried) && carried >= 1 && carried <= MAX_CONTAINER_BUDGET) this.ctx.storage.kv.put(BUDGET_KEY, carried);
+    return this.maxOverride() ?? this.ctx.storage.kv.get<number>(BUDGET_KEY) ?? MAX_CONTAINERS;
   }
 
   #leaseMs(): number {
@@ -52,15 +63,19 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
     return live;
   }
 
-  /** Takes (or renews) `holder`'s lease if a slot is free. */
-  acquire(holder: string): LeaseAnswer {
+  /**
+   * Takes `holder`'s lease if a slot is free under `budget` (the Environment settings' Container budget, carried by the
+   * Workspace DO; absent, the last one carried), or renews the lease it holds: a holder is never refused its own.
+   */
+  acquire(holder: string, budget?: number): LeaseAnswer {
     const now = this.now();
     const live = this.#live(now);
     const others = live.filter((lease) => lease.holder !== holder);
-    if (others.length >= this.#max()) {
+    const max = this.#max(budget);
+    if (others.length >= max && others.length === live.length) {
       return {
         ok: false,
-        reason: `${others.length} Containers are running, the most this deploy allows; try again when one stops.`,
+        reason: `${others.length} Containers are running and the Container budget is ${max}; try again when one stops, or raise the budget in the Harness panel's Environment section (/_t3flare/harness#environment).`,
         running: others.map((lease) => lease.holder),
       };
     }

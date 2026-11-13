@@ -19,10 +19,13 @@ const memory = () => {
   };
 };
 
+/** The Container budget DO's state as the panel reads it: two Containers running. */
+const RUNNING = { max: 3, leases: [{ holder: "a1", until: NOW + 60_000, workspace: "web-app" }, { holder: "b2", until: NOW + 60_000, workspace: null }] };
+
 const setup = (caller: HarnessCaller = owner) => {
   const kv = memory();
   const store = harnessStore(kv);
-  return { kv, store, deps: { caller, host: HOST, store, now: () => NOW } };
+  return { kv, store, deps: { caller, host: HOST, store, now: () => NOW, budget: async () => RUNNING } };
 };
 
 const post = (deps: ReturnType<typeof setup>["deps"], path: string, body: unknown, headers: Record<string, string>) =>
@@ -54,7 +57,7 @@ describe("Environment settings in the panel", () => {
     expect((await post(deps, "extensions", { extension: "tool-search", enabled: false }, headers)).status).toBe(200);
     expect(store.load().revision).toBe(1);
     expect(store.loadEnvironment().revision).toBe(1);
-    expect(await getJson(deps, "environment")).toMatchObject({ revision: 1, resolved: { containerSize: "standard-2", containerIdleMinutes: 2 } });
+    expect(await getJson(deps, "environment")).toMatchObject({ revision: 1, resolved: { containerSize: "standard-2", containerIdleMinutes: 2, containerBudget: 3 } });
   });
 
   it("audits an Environment change with entity environment and the changed settings before and after; old entries read as harness", async () => {
@@ -102,23 +105,33 @@ describe("Environment settings in the panel", () => {
     expect(store.loadEnvironment().revision).toBe(0);
   });
 
-  it("answers the settings with their schema, the sizes' resources and costs, and the budget", async () => {
-    const { deps } = setup();
+  it("answers the settings with their schema, the sizes' costs at the budget set, and the Containers running now", async () => {
+    const { store, deps } = setup();
+    await post(deps, "environment", { settings: { containerBudget: 5 } }, await ownerHeaders(store));
     const answer = await getJson(deps, "environment");
-    expect(answer.revision).toBe(0);
+    expect(answer.revision).toBe(1);
     expect(answer.schema.containerSize.schema.values).toEqual(["cpu-1", "standard-1", "standard-2", "standard-3", "standard-4"]);
-    expect(answer.costs.budget).toBe(3);
+    expect(answer.schema.containerBudget.schema).toMatchObject({ minimum: 1, maximum: 10, default: 3 });
+    expect(answer.costs.budget).toBe(5);
     expect(answer.costs.rows).toHaveLength(5);
+    expect(answer.running).toEqual({ count: 2, holders: ["web-app", "b2"] });
   });
 
-  it("shows an Environment section with the size, the idle time, the read-only budget and the cost table", async () => {
+  it("refuses a budget out of 1 to 10", async () => {
+    const { deps } = setup({ kind: "service-token" });
+    for (const budget of [0, 11]) expect((await post(deps, "environment", { settings: { containerBudget: budget } }, {})).status).toBe(400);
+  });
+
+  it("shows an Environment section with the size, the idle time, the budget beside the running Containers, and the cost table", async () => {
     const { store, deps } = setup();
     await post(deps, "environment", { settings: { containerSize: "standard-1" } }, await ownerHeaders(store));
     const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
     expect(html).toContain('id="environment"');
     expect(html).toMatch(/<option value="standard-1" selected>/);
     expect(html).toContain('data-setting="containerIdleMinutes"');
+    expect(html).toContain('data-setting="containerBudget"');
     expect(html).toContain("$1.20");
-    expect(html).toMatch(/Container budget<\/dt><dd>3/);
+    expect(html).toMatch(/Running now<\/dt><dd>2 of 3/);
+    expect(html).toContain("web-app");
   });
 });

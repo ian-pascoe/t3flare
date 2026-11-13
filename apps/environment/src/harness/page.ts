@@ -139,15 +139,19 @@ const costTable = (costs: ContainerCostTable): string => {
  * The Environment settings (ADR-0032): one form rendered from their schema, the read-only budget, and each size's cost.
  * A later setting (SPI-1150, SPI-1152) is a schema entry, rendered here without page work.
  */
-const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCostTable): string => {
+const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCostTable, running: PageInput["running"]): string => {
   const values: Readonly<Record<string, unknown>> = { ...environment };
   const fields = Object.entries(ENVIRONMENT_SETTINGS as Readonly<Record<string, SettingEntry>>).map(([key, setting]) => field("environment", key, setting, values[key]));
   return `<section id="environment" aria-labelledby="environment-title">
 <div class="section-head"><h2 id="environment-title">${icon("container")}Environment</h2></div>
-<p class="section-desc">What every Workspace's Container gets. A change applies at each Workspace's next Container start; a running Container keeps its size and idle time.</p>
-<form class="group" data-environment aria-labelledby="environment-title" novalidate><div class="row"><div><div class="row-title"><h3>Container</h3><span class="ident">revision ${environment.revision}</span></div><p class="desc">Its size and how long it may sit idle.</p></div>
+<p class="section-desc">What every Workspace's Container gets. A change applies at each Workspace's next Container start; a running Container keeps its size and idle time, and a lower budget stops none.</p>
+<form class="group" data-environment aria-labelledby="environment-title" novalidate><div class="row"><div><div class="row-title"><h3>Containers</h3><span class="ident">revision ${environment.revision}</span></div><p class="desc">Their size, how long one may sit idle, and how many may run at once.</p></div>
 <div class="row-extra"><div class="fields">${fields.join("")}</div><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div></div></div></form>
-<dl class="group kv"><div><dt>Container budget</dt><dd>${costs.budget} Containers at once, a deploy constant</dd></div></dl>
+<dl class="group kv"><div><dt>Running now</dt><dd>${
+    running === null || running === undefined
+      ? "unknown"
+      : `${running.count} of ${environment.containerBudget}${running.holders.length === 0 ? "" : `: ${running.holders.map((holder) => `<code>${escapeHtml(holder)}</code>`).join(", ")}`}`
+  }</dd></div></dl>
 <h3 class="sub-head">Cost at worst</h3>
 <p class="section-desc">Cloudflare's Workers Paid list prices, every vCPU busy the whole hour. Memory and disk are billed while a Container runs, CPU only while it works, so a real hour costs less.</p>
 <div class="group">${costTable(costs)}</div>
@@ -357,6 +361,8 @@ export interface PageInput {
   /** The Environment settings (ADR-0032); the defaults when not given. */
   readonly environment?: ResolvedEnvironment;
   readonly costs?: ContainerCostTable;
+  /** The Containers running now (the budget's leases); null when the budget could not be read. */
+  readonly running?: { readonly count: number; readonly holders: ReadonlyArray<string> } | null;
   readonly csrf: string;
   readonly audit: ReadonlyArray<AuditEntry>;
   readonly status: Readonly<Record<string, string | number | null>>;
@@ -395,7 +401,7 @@ ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.leng
 <div id="result" class="notice" role="status" aria-live="polite" hidden><span class="notice-ico-ok">${icon("check")}</span><span class="notice-ico-err">${icon("alert")}</span><p class="msg"></p><button type="button" class="btn btn-ghost btn-sm" data-dismiss aria-label="Dismiss">${icon("x")}</button></div>
 ${extensionsSection(input.resolved)}
 ${mcpSection(rows)}
-${environmentSection(environment, input.costs ?? containerCostTable())}
+${environmentSection(environment, input.costs ?? containerCostTable(environment.containerBudget), input.running)}
 ${SKILLS}
 ${statusSection(input.status)}
 ${auditSection(input.audit)}

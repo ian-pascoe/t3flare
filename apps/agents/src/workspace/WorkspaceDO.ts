@@ -631,9 +631,11 @@ export class WorkspaceDO extends ContainerHost {
 
   /** The platform's Container API with the budget's lease taken before every start (step 2a cost guardrails). */
   #budgeted(api: IWorkspaceContainerAPI): IWorkspaceContainerAPI {
-    const lease = async () => {
-      let answer = await this.#budget().acquire(this.ctx.id.toString());
-      if (!answer.ok && (await this.#reclaimFrom(answer.running))) answer = await this.#budget().acquire(this.ctx.id.toString());
+    // `budget`: the Environment settings' Container budget, carried by a fresh start only; adopting a running Container
+    // renews the lease it holds, so a kept launch's budget never overwrites a newer one (ADR-0032).
+    const lease = async (budget: number | undefined) => {
+      let answer = await this.#budget().acquire(this.ctx.id.toString(), budget);
+      if (!answer.ok && (await this.#reclaimFrom(answer.running))) answer = await this.#budget().acquire(this.ctx.id.toString(), budget);
       if (!answer.ok) throw new Error(`t3flare: the Container cannot start: ${answer.reason}`);
       await this.ctx.storage.put(LEASED_KEY, true);
       if ((await this.ctx.storage.get<number>(STARTED_AT_KEY)) === undefined) await this.ctx.storage.put(STARTED_AT_KEY, Date.now());
@@ -642,13 +644,15 @@ export class WorkspaceDO extends ContainerHost {
     };
     return {
       start: async (spec: ContainerLaunchSpec) => {
+        const fresh = !this.containerRunning();
         const launch = await this.#launch();
-        await lease();
+        await lease(fresh ? launch.budget : undefined);
         return api.start({ ...spec, instance: launch.instance });
       },
       restart: async (spec: ContainerLaunchSpec) => {
+        const fresh = !this.containerRunning();
         const launch = await this.#launch();
-        await lease();
+        await lease(fresh ? launch.budget : undefined);
         return api.restart({ ...spec, instance: launch.instance });
       },
       interceptOutboundHttp: (host, workspace) => api.interceptOutboundHttp(host, workspace),
@@ -705,7 +709,7 @@ export class WorkspaceDO extends ContainerHost {
     });
     const launch = launchOf(taken.settings);
     kv.put(LAUNCH_KEY, launch);
-    console.log(JSON.stringify({ t3flare: "container-launch", workspace: this.#workspaceId() ?? null, source: taken.source, revision: launch.revision, size: launch.size, idleMs: launch.idleMs }));
+    console.log(JSON.stringify({ t3flare: "container-launch", workspace: this.#workspaceId() ?? null, source: taken.source, revision: launch.revision, size: launch.size, idleMs: launch.idleMs, budget: launch.budget }));
     return launch;
   }
 

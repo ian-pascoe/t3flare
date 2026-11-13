@@ -372,7 +372,23 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    */
   async harness(request: Request, caller: HarnessCaller): Promise<Response> {
     const { handleHarness } = await import("./harness/panel.ts");
-    return handleHarness(request, { caller, host: this.#configuredHost(), store: harnessStore(this.ctx.storage.kv), mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth });
+    return handleHarness(request, {
+      caller,
+      host: this.#configuredHost(),
+      store: harnessStore(this.ctx.storage.kv),
+      mcp: this.mcpHost,
+      secrets: harnessSecrets(this.ctx.storage.kv),
+      oauth: this.harnessOAuth,
+      // The Container budget's leases (ADR-0032): the Environment section shows the running count and holders.
+      budget: async () => {
+        const { environmentServices } = await import("./agents/bindings.ts");
+        const { byName } = await import("./agents/rpc.ts");
+        const services = environmentServices();
+        const state = await byName(services.agents.CONTAINER_BUDGET, "budget", "CONTAINER_BUDGET").state();
+        const names = new Map(services.workspaces.list().map((ws) => [String(services.agents.WORKSPACES?.idFromName(ws.id)), ws.id]));
+        return { max: state.max, leases: state.leases.map((lease) => ({ holder: lease.holder, workspace: names.get(lease.holder) ?? null })) };
+      },
+    });
   }
 
   /**

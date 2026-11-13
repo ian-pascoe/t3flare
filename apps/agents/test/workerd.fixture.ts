@@ -18,6 +18,11 @@ export class FakeClockContainerBudget extends ContainerBudget {
   }
 }
 
+/** The fake-clock budget as a deploy runs it: no `T3FLARE_MAX_CONTAINERS`, so the budget carried with a request judges it. */
+export class SettingContainerBudget extends FakeClockContainerBudget {
+  protected override readonly maxOverride = () => undefined;
+}
+
 export default { fetch: () => new Response("t3flare agents test worker") };
 
 /** A computer Workspace with no backends, over this object's SQLite: the VFS tables as the Workspace DO has them. */
