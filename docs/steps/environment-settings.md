@@ -159,7 +159,7 @@ before and after.
   that window to one RPC.
 - **A fallback budget is not sent.** A start whose read of the Environment settings timed out carries no budget, and the
   budget DO keeps the owner's last one.
-- **The 240-character cap.** On the `5334eb9` deploy (pre-rebase), `budget.json`'s first case met it: that Workspace's Container had
-  exited before, computer added `priorExit=…`, and the top message ended at `Container budget (1`. `f165c87` (rebased `63d645c`) reads
-  the reason from the cause chain (`startRefusal.ts`), and the harness reads the longest reason in the answer; the case
-  passes there.
+- **The 240-character cap.** On the `5334eb9` deploy (pre-rebase), `budget.json`'s first case met it: that Workspace's
+  Container had exited before, computer added `priorExit=…`, and the top message ended at `Container budget (1`.
+  `f165c87` (rebased `63d645c`) reads the reason from the cause chain (`startRefusal.ts`), and the harness reads the
+  longest reason in the answer; the case passes there.
