@@ -13,12 +13,13 @@
 //   `localhost:<port>` (and `127.0.0.1`, `[::1]`, `0.0.0.0`) to the port's preview host (review L6); a port outside the
 //   eight gets a page that names them.
 // - **Profiles** have no user-data directory: each is `storageState({ indexedDB: true })`, kept in the Environment DO's
-//   own table (`preview/store.ts`, review L4), loaded into `newContext`, saved every 60 s while open and before a close.
-//   A profile context with no page for `idleBrowserMs` is saved and closed, and an idle browser retires, so an open
-//   Environment holds no browser nobody uses.
+//   own table (`preview/store.ts`, review L4), loaded into `newContext`, saved before a close and, while open, at most
+//   every 60 s and only after a change (`profileSaver`, SPI-1123). A profile context with no page for `idleBrowserMs` is
+//   saved and closed, and an idle browser retires, so an open Environment holds no browser nobody uses.
 // - **Lifetime and cost** (review M5): each session id is recorded and closed when the browser closes; a new Environment
 //   instance closes the ones the last left (`preview/sessions.ts`). Browser Run closes a session after `keepAlive` with no
-//   CDP traffic: `disconnected` drops that browser's contexts and fires `onContextClose`, so t3 drops their tabs.
+//   command sent to it (its events do not count): `disconnected` drops that browser's contexts and fires
+//   `onContextClose`, so t3 drops their tabs. A quiet profile context therefore sends nothing (SPI-1123).
 // - **Downloads** (M0: the fork cannot copy an artifact off Browser Run's disk, cloudflare/playwright#93): a download's
 //   `saveAs` fetches its URL from the page that started it and writes it through t3's own `node:fs` (the State
 //   directory), where t3 reads it back. A cross-origin download the page may not read fails as "not available".
@@ -85,7 +86,7 @@ export const presentAsChrome = async (cdp: CDPSession, host: { readonly platform
   if (identity) await cdp.send("Emulation.setUserAgentOverride", identity);
 };
 
-/** How often an open profile context's state is saved. */
+/** The most often an open profile context's state is saved, while it has changed. */
 export const PROFILE_SAVE_MS = 60_000;
 /** The most a download or an uploaded file may be here: the isolate has 128 MB. */
 export const TRANSFER_MAX_BYTES = 16 * 1024 * 1024;
@@ -110,6 +111,67 @@ export const translatePreviewUrl = (url: string): string => {
   const ports = CONTAINER_PREVIEW_PORTS.join(", ");
   const page = `<!doctype html><meta charset="utf-8"><title>Port ${port} has no preview</title><body style="font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;line-height:1.5"><h1 style="font-size:1.25rem">Port ${port} has no preview</h1><p>The Cloud Environment previews a Workspace's dev server on ports ${ports}. Start it on one of them, listening on 0.0.0.0, then open it again.</p></body>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(page)}`;
+};
+
+/**
+ * Keeps a profile context's state saved without keeping its browser alive (SPI-1123). Browser Run's keep-alive counts
+ * the commands sent to the browser, and `storageState` is one, so the state is read only after a change was seen: a page
+ * opened, a frame navigated or a response came back (events the browser sends), or operator input went out on a CDP
+ * session (the preview stream's, `Input.*`). While changed, it is saved at most every `intervalMs`; the mark clears only
+ * once a save succeeds, and a state equal to the last one saved is not written. `save` (close, idle-retire) always reads.
+ *
+ * Known limit: a page that changes its storage from timers alone, with no request, navigation or input (or by an agent's
+ * action that makes none), is saved at close or idle-retire, not while open.
+ */
+export const profileSaver = (
+  context: BrowserContext,
+  options: { readonly saved: string | undefined; readonly write: (state: string) => void; readonly intervalMs?: number },
+) => {
+  let changes = 0;
+  let savedChanges = 0;
+  let last = options.saved;
+  let saving = false;
+  const mark = () => {
+    changes++;
+  };
+  const save = async () => {
+    const at = changes;
+    const state = JSON.stringify((await context.storageState({ indexedDB: true } as never)) as unknown);
+    if (state !== last) {
+      options.write(state);
+      last = state;
+    }
+    savedChanges = Math.max(savedChanges, at);
+  };
+  const timer = setInterval(() => {
+    if (saving || changes === savedChanges) return;
+    saving = true;
+    void save()
+      .catch(() => undefined)
+      .finally(() => {
+        saving = false;
+      });
+  }, options.intervalMs ?? PROFILE_SAVE_MS);
+  const watchPage = (page: Page) => {
+    mark();
+    page.on("framenavigated", mark);
+  };
+  for (const page of context.pages()) watchPage(page);
+  context.on("page", watchPage);
+  context.on("response", mark);
+  const newCDPSession = context.newCDPSession.bind(context);
+  context.newCDPSession = (async (target: Parameters<BrowserContext["newCDPSession"]>[0]) => {
+    const session = await newCDPSession(target);
+    const send = session.send.bind(session) as (method: string, params?: unknown) => Promise<unknown>;
+    session.send = ((method: string, params?: unknown) => {
+      if (method.startsWith("Input.")) mark();
+      return send(method, params);
+    }) as CDPSession["send"];
+    return session;
+  }) as BrowserContext["newCDPSession"];
+  const stop = () => clearInterval(timer);
+  context.on("close", stop);
+  return { save, stop };
 };
 
 interface Playwright {
@@ -293,15 +355,16 @@ export class ServerBrowserContexts {
     context.on("page", prepare);
   }
 
-  /** A profile context saves its state every PROFILE_SAVE_MS, and is saved and closed after `idleBrowserMs` with no page. */
+  /** A profile context saves its state after a change (`profileSaver`), and is saved and closed after `idleBrowserMs` with no page. */
   private keepProfile(context: BrowserContext, profileId: string, key: string, pending: Promise<BrowserContext>) {
-    const save = async () => {
-      const state = (await context.storageState({ indexedDB: true } as never)) as unknown;
-      if (this.store.saveProfile(profileId, JSON.stringify(state)) === "too-large") {
-        console.warn(JSON.stringify({ t3flare: "preview-profile-too-large", profile: profileId.slice(0, 64) }));
-      }
-    };
-    const timer = setInterval(() => void save().catch(() => undefined), PROFILE_SAVE_MS);
+    const { save, stop } = profileSaver(context, {
+      saved: this.store.profile(profileId),
+      write: (state) => {
+        if (this.store.saveProfile(profileId, state) === "too-large") {
+          console.warn(JSON.stringify({ t3flare: "preview-profile-too-large", profile: profileId.slice(0, 64) }));
+        }
+      },
+    });
     let idle: ReturnType<typeof setTimeout> | undefined;
     const pageCount = () => context.pages().length;
     const watch = () => {
@@ -323,16 +386,13 @@ export class ServerBrowserContexts {
     });
     const close = context.close.bind(context);
     context.close = (async (options?: Parameters<BrowserContext["close"]>[0]) => {
-      clearInterval(timer);
+      stop();
       clearTimeout(idle);
       if (!context.browser()?.isConnected()) return close(options);
       await save().catch(() => undefined);
       return close(options);
     }) as BrowserContext["close"];
-    context.on("close", () => {
-      clearInterval(timer);
-      clearTimeout(idle);
-    });
+    context.on("close", () => clearTimeout(idle));
     watch();
   }
 

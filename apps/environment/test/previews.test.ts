@@ -1,13 +1,15 @@
 // G11 (previews, ADR-0031): the seams of the Cloud Environment's previews that run without Browser Run or a Container:
 // where a `localhost` navigation goes, which listeners are listed and whose (review M7), the configured URLs stock takes
 // (review M4), the Browser Run sessions and profiles kept in the Environment DO (reviews L4, M5), the acquire options
-// (review L5), the HTML bridge (review M3), the stream route's socket (review H1) and the Shadow's shape (U59).
+// (review L5), the HTML bridge (review M3), the stream route's socket (review H1), the Shadow's shape (U59) and its
+// profile saves (SPI-1123).
 import type { PortScan } from "@t3flare/sandbox-image/ports";
 import { stopGroupArgv } from "@t3flare/sandbox-image/ports";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
-import { describe, expect, it } from "vitest";
+import { EventEmitter } from "node:events";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { acquireOptions } from "../src/preview/cdpSocket.ts";
 import { BRIDGED_PAGE_ORIGIN, fromBrowser, HTML_BROWSER_EXECUTABLE, spawnHtmlBrowser, STOCK_PAGE_ORIGIN, toBrowser } from "../src/preview/htmlBrowser.ts";
@@ -296,5 +298,101 @@ describe("the ServerBrowserContexts Shadow (U59)", () => {
       Object.getOwnPropertyNames(prototype).filter((name) => name !== "constructor" && typeof Object.getOwnPropertyDescriptor(prototype, name)?.value === "function");
     const stock = methods(Stock.ServerBrowserContexts.prototype).filter((name) => !["launchOptions", "launch", "sharedBrowser", "sharedContext", "retireWhenIdle", "retire", "createContext", "profileDirectory", "dispose"].includes(name));
     expect(methods(Shadow.ServerBrowserContexts.prototype)).toEqual(expect.arrayContaining(stock));
+  });
+});
+
+/** A fake profile context: its events, as the browser would send them, and every `storageState` and `Input.*` it saw. */
+const fakeProfileContext = (initial: unknown) => {
+  const events = new EventEmitter();
+  let state = initial;
+  const sent: Array<string> = [];
+  const storageState = vi.fn(async () => state);
+  const context = {
+    pages: () => [],
+    on: (event: string, listener: (...args: Array<unknown>) => void) => events.on(event, listener),
+    storageState,
+    newCDPSession: async () => ({ send: async (method: string) => void sent.push(method) }),
+  };
+  const page = new EventEmitter();
+  return {
+    context: context as never as import("playwright-core").BrowserContext,
+    storageState,
+    setState: (next: unknown) => void (state = next),
+    response: () => events.emit("response", {}),
+    openPage: () => events.emit("page", page),
+    navigate: () => page.emit("framenavigated", {}),
+    sent,
+  };
+};
+
+describe("a profile context's saves (SPI-1123)", () => {
+  afterEach(() => void vi.useRealTimers());
+  const MINUTE = Shadow.PROFILE_SAVE_MS;
+
+  it("reads no state across several intervals while the context is quiet, so Browser Run's keep-alive can end it", async () => {
+    vi.useFakeTimers();
+    const fake = fakeProfileContext({ cookies: [] });
+    const writes: Array<string> = [];
+    const saver = Shadow.profileSaver(fake.context, { saved: undefined, write: (state) => void writes.push(state) });
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    expect(fake.storageState).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
+    saver.stop();
+  });
+
+  it("saves once per interval after a response, a navigation, a new page or operator input, and nothing for other commands", async () => {
+    vi.useFakeTimers();
+    const fake = fakeProfileContext({ cookies: [] });
+    const writes: Array<string> = [];
+    const saver = Shadow.profileSaver(fake.context, { saved: undefined, write: (state) => void writes.push(state) });
+    fake.response();
+    fake.response();
+    await vi.advanceTimersByTimeAsync(3 * MINUTE);
+    expect(fake.storageState).toHaveBeenCalledTimes(1);
+    expect(writes).toEqual([JSON.stringify({ cookies: [] })]);
+
+    fake.openPage();
+    await vi.advanceTimersByTimeAsync(2 * MINUTE);
+    expect(fake.storageState).toHaveBeenCalledTimes(2);
+    fake.navigate();
+    await vi.advanceTimersByTimeAsync(2 * MINUTE);
+    expect(fake.storageState).toHaveBeenCalledTimes(3);
+
+    // The preview stream's input reaches the browser over a CDP session from the context.
+    const session = await fake.context.newCDPSession({} as never);
+    await session.send("Page.startScreencast" as never);
+    await vi.advanceTimersByTimeAsync(2 * MINUTE);
+    expect(fake.storageState).toHaveBeenCalledTimes(3);
+    await session.send("Input.dispatchMouseEvent" as never, { type: "mousePressed", x: 1, y: 1 } as never);
+    await vi.advanceTimersByTimeAsync(2 * MINUTE);
+    expect(fake.storageState).toHaveBeenCalledTimes(4);
+    expect(fake.sent).toEqual(["Page.startScreencast", "Input.dispatchMouseEvent"]);
+    saver.stop();
+  });
+
+  it("does not write a state equal to the last one saved, and keeps the change after a failed read", async () => {
+    vi.useFakeTimers();
+    const fake = fakeProfileContext({ cookies: [{ name: "a" }] });
+    const writes: Array<string> = [];
+    const saver = Shadow.profileSaver(fake.context, { saved: JSON.stringify({ cookies: [{ name: "a" }] }), write: (state) => void writes.push(state) });
+    fake.response();
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    expect(fake.storageState).toHaveBeenCalledTimes(1);
+    expect(writes).toEqual([]);
+
+    fake.setState({ cookies: [{ name: "b" }] });
+    fake.storageState.mockRejectedValueOnce(new Error("Target closed"));
+    fake.response();
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    expect(writes).toEqual([]);
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    expect(fake.storageState).toHaveBeenCalledTimes(3);
+    expect(writes).toEqual([JSON.stringify({ cookies: [{ name: "b" }] })]);
+
+    // A close's save always reads, and writes only a change.
+    await saver.save();
+    expect(fake.storageState).toHaveBeenCalledTimes(4);
+    expect(writes).toHaveLength(1);
+    saver.stop();
   });
 });
