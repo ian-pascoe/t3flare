@@ -17,7 +17,8 @@
 // Access (ADR-0010): `/ws`, `/mcp` and t3's auth routes are public (stock clients cannot pass Access); only
 // `<host>/_t3flare` (and below) has an Access application, admitting the owner by email and the stage's own service
 // token (for the acceptance test and the bump job). The Worker verifies the assertion itself against the application's
-// `aud` (src/access.ts), and also requires the admin token.
+// `aud` (src/access.ts), and also requires the admin token. `<host>/_t3flare/mcp`, the Settings server's Owner-client
+// endpoint (ADR-0034), has an application of its own with managed OAuth (`SettingsAccess` below).
 //
 // A stage with a domain also rate-limits t3's credential-presenting auth routes on that host (ADR-0010), as the
 // `http_ratelimit` phase of the domain's zone: see `AUTH_RATE_LIMIT` below.
@@ -40,6 +41,7 @@ import { MCP_WORKER_COMPATIBILITY } from "../mcp-worker/src/engine/compatibility
 
 import { COMPATIBILITY } from "./build.ts";
 import { credentialsFile, standinFile } from "./stage-files.ts";
+import { SETTINGS_MCP_PATH, SETTINGS_OAUTH_GRANT, SETTINGS_OAUTH_REDIRECT_URIS, settingsMcpUrl } from "./src/settings/ownerDoor.ts";
 import { principalOfApiKey } from "./src/usage/commissary.ts";
 
 const here = import.meta.dirname;
@@ -152,6 +154,32 @@ export default Alchemy.Stack(
       destinations: [{ type: "public", uri: `${host}/_t3flare` }],
       sessionDuration: "24h",
       appLauncherVisible: false,
+      // Its cookie is scoped to `/_t3flare`, so it never meets the Owner-client endpoint's (below; ADR-0034, plan D13).
+      pathCookieAttribute: true,
+      policies: [
+        { name: "owner", decision: "allow", include: [{ email: ownerEmail }] },
+        { name: "stage service token", decision: "non_identity", include: [{ serviceToken: serviceToken.serviceTokenId }] },
+      ],
+    } as never);
+    // The Owner-client endpoint's own Access application (ADR-0034, plan D13; layout (B), src/settings/ownerDoor.ts), on
+    // every stage including prod: `<host>/_t3flare/mcp` with managed OAuth, so the owner's MCP clients sign in to it. The
+    // more specific path wins over the application above (M0), and its tokens are refused there: a client's token
+    // never reaches the panel or the Change page. Same policies as the admin application. Access does not bound the
+    // grant's lifetimes, so they are set here (M0 P11). The redirect allowlist is any loopback port plus the named
+    // clients' custom schemes; no https redirect.
+    const settingsAccess = yield* Cloudflare.Access.Application("SettingsAccess", {
+      name: `${name} settings`,
+      type: "self_hosted",
+      domain: `${host}${SETTINGS_MCP_PATH}`,
+      destinations: [{ type: "public", uri: `${host}${SETTINGS_MCP_PATH}` }],
+      sessionDuration: "24h",
+      appLauncherVisible: false,
+      pathCookieAttribute: true,
+      oauthConfiguration: {
+        enabled: true,
+        grant: { ...SETTINGS_OAUTH_GRANT },
+        dynamicClientRegistration: { enabled: true, allowAnyOnLocalhost: true, allowAnyOnLoopback: true, allowedUris: [...SETTINGS_OAUTH_REDIRECT_URIS] },
+      },
       policies: [
         { name: "owner", decision: "allow", include: [{ email: ownerEmail }] },
         { name: "stage service token", decision: "non_identity", include: [{ serviceToken: serviceToken.serviceTokenId }] },
@@ -298,6 +326,7 @@ export default Alchemy.Stack(
         T3FLARE_CREDENTIALS_KEY: credentialsKey.text,
         T3FLARE_ACCESS_TEAM_DOMAIN: teamDomain,
         T3FLARE_ACCESS_AUD: admin.aud,
+        T3FLARE_ACCESS_SETTINGS_AUD: settingsAccess.aud,
         // The t3 host as deployed (ADR-0026): what the panel's `Origin` must name, the OAuth redirect's host, and the
         // `/mcp` a CLI is given (never taken from a request).
         T3FLARE_HOST: host,
@@ -410,7 +439,7 @@ export default Alchemy.Stack(
           fs.mkdirSync(path.dirname(file), { recursive: true });
           fs.writeFileSync(
             file,
-            JSON.stringify({ url, clientId, clientSecret: Redacted.value(clientSecret as Redacted.Redacted<string>) }),
+            JSON.stringify({ url, settingsMcpUrl: settingsMcpUrl(host), clientId, clientSecret: Redacted.value(clientSecret as Redacted.Redacted<string>) }),
             { mode: 0o600 },
           );
         }
@@ -421,6 +450,8 @@ export default Alchemy.Stack(
       url: environment.url,
       host,
       accessAud: admin.aud,
+      settingsAccessAud: settingsAccess.aud,
+      settingsMcpUrl: settingsMcpUrl(host),
       credentials,
       agents: agents.workerName,
       ...(standin ? { standin: standinCredentials as never, standinHost } : {}),
