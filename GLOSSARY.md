@@ -294,6 +294,10 @@ One configured way to reach an agent or model provider, with its own credentials
 The HTTP endpoint every model call goes to, for every agent (Durable agents' and CLI agents' turns, generated titles and commit text, the model list), set by `MODEL_PROXY_URL` and `MODEL_PROXY_API_KEY`. It holds the owner's Subscriptions and provider keys; t3flare holds only its URL and keys. It speaks the Anthropic Messages API, lists its models at `GET /v1/models` and translates to other providers; t3flare is built against Commissary. See `docs/model-proxy.md`.
 _Avoid_: gateway, LLM router
 
+**Model endpoint**:
+One of the owner's ways to reach models, set in the Harness panel: an API pi-ai speaks at a base URL, with an API key (sealed, write-only) or none, optional headers, and the models it serves, each named `<endpointId>/<modelId>` (draft ADR-0034). Replaces the Model proxy at the hard cut.
+_Avoid_: provider (that is t3's or pi-ai's), connection, backend
+
 **Subscription**:
 The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key. Connected in the Model proxy, never held by t3flare.
 _Avoid_: Subscription login (t3flare holds none), OAuth, account
