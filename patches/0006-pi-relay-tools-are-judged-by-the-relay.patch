@@ -1,5 +1,5 @@
 diff --git a/packages/provider-pi/src/server/mcpExtensionSource.ts b/packages/provider-pi/src/server/mcpExtensionSource.ts
-index 48aeff24370de89b40404599505cd9bfe20ddb52..5c108ec0373c4893cb9bb4e558659b8bd240aacb 100644
+index 48aeff2437..5c108ec037 100644
 --- a/packages/provider-pi/src/server/mcpExtensionSource.ts
 +++ b/packages/provider-pi/src/server/mcpExtensionSource.ts
 @@ -358,10 +358,18 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
