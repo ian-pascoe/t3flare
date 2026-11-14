@@ -3,8 +3,8 @@
 // one request from the Environment DO, with no Session and no tools.
 //
 // - A Model endpoint's model (`<endpointId>/<modelId>`, SPI-1163) runs on the agents Worker, through pi-ai, over the
-//   `TEXT_GENERATION` service binding: the Environment's bundle never holds pi-ai. The call carries the endpoint as stored
-//   now (secret-free); the agents Worker asks for its key as a Session does.
+//   `TEXT_GENERATION` service binding: the Environment's bundle never holds pi-ai. The call carries ids only; the agents
+//   Worker reads the endpoint and asks for its key as a Session does.
 // - `default` is a small model of the first endpoint that has one (`defaultTextModel`), else the Model proxy's.
 // - The Model proxy's `anthropic/<id>` models keep their plain Anthropic Messages request until the hard cut (SPI-1176).
 //
@@ -12,7 +12,7 @@
 import { TextGenerationError } from "@t3tools/contracts";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import { SMALL_MODEL_SLUG } from "@t3flare/models";
-import { defaultTextModel, EMPTY_ENDPOINTS, type ModelEndpoint, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { defaultTextModel, EMPTY_ENDPOINTS, jsonOnlyPrompt, type ModelEndpoint, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
 import { classifyProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
 import * as Effect from "effect/Effect";
 
@@ -51,7 +51,7 @@ const endpointText = (operation: TextGenerationOperations.Operation, prompt: str
     const binding = environmentServices().agents.TEXT_GENERATION;
     if (binding === undefined) return yield* fail(operation, `${named}: this Environment has no binding to the agents Worker for it.`);
     const answer = yield* Effect.tryPromise({
-      try: () => binding.generate({ endpoint, modelId, prompt }),
+      try: () => binding.generate({ endpointId: endpoint.id, modelId, prompt }),
       // The binding's own error text is the platform's, not the endpoint's: kept as the cause only.
       catch: (cause) => fail(operation, `${named}: the agents Worker could not be reached.`, cause),
     }).pipe(
@@ -78,7 +78,7 @@ const proxyText = (operation: TextGenerationOperations.Operation, prompt: string
           body: JSON.stringify({
             model: modelId,
             max_tokens: 2048,
-            messages: [{ role: "user", content: `${prompt}\n\nAnswer with the JSON object only.` }],
+            messages: [{ role: "user", content: jsonOnlyPrompt(prompt) }],
           }),
           signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
         }),
@@ -110,10 +110,12 @@ export const runText: TextGenerationOperations.Runner = (request) =>
     const services = environmentServices();
     const target = textModelOf(request.modelSelection.model, services.modelEndpoints?.() ?? EMPTY_ENDPOINTS, services.modelProxy !== undefined);
     if (target.kind === "none") return yield* fail(request.operation, target.detail);
-    const text =
-      target.kind === "endpoint"
-        ? yield* endpointText(request.operation, request.prompt, target.endpoint, target.modelId)
-        : yield* proxyText(request.operation, request.prompt, target.modelId);
+    if (target.kind === "endpoint") {
+      const text = yield* endpointText(request.operation, request.prompt, target.endpoint, target.modelId);
+      // Every failure names the endpoint and its model, an unusable reply's too.
+      return yield* TextGenerationOperations.decodeJsonReply(request, `The Model endpoint "${target.endpoint.id}" (model ${target.modelId})`, text);
+    }
+    const text = yield* proxyText(request.operation, request.prompt, target.modelId);
     return yield* TextGenerationOperations.decodeJsonReply(request, "Pi Durable", text);
   });
 

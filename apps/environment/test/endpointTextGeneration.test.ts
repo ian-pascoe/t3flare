@@ -1,5 +1,5 @@
 // Pi Durable's text generation on Model endpoints (SPI-1163): an `<endpointId>/<modelId>` selection runs as one request on
-// the agents Worker (`TEXT_GENERATION`), with the endpoint as stored now and no key; `default` is a small model of the
+// the agents Worker (`TEXT_GENERATION`), named by ids only, with no key; `default` is a small model of the
 // first endpoint that has one; the Model proxy's `anthropic/…` models keep their own path until the hard cut. Every
 // failure names the endpoint.
 import { ProviderInstanceId } from "@t3tools/contracts";
@@ -58,23 +58,28 @@ const detailOf = (exit: Exit.Exit<unknown, { readonly detail: string }>): string
 afterEach(() => vi.unstubAllGlobals());
 
 describe("runText on Model endpoints", () => {
-  it("runs an endpoint's model on the agents Worker with the endpoint as stored now, and no key", async () => {
+  it("runs an endpoint's model on the agents Worker, naming it by ids only, with no key", async () => {
     const calls = bind(() => ({ ok: true, text: '{"title":"Fix the build"}' }));
     const exit = await run("openai/gpt-5-mini");
     expect(exit).toEqual(Exit.succeed({ title: "Fix the build" }));
-    expect(calls).toEqual([{ endpoint: OPENAI, modelId: "gpt-5-mini", prompt: "Name this thread." }]);
+    expect(calls).toEqual([{ endpointId: "openai", modelId: "gpt-5-mini", prompt: "Name this thread." }]);
     expect(JSON.stringify(calls)).not.toContain("proxy-key");
   });
 
   it("runs `default` on a small model of the first endpoint that has one", async () => {
     const calls = bind(() => ({ ok: true, text: '{"title":"t"}' }));
     await run("default");
-    expect(calls.map((call) => `${call.endpoint.id}/${call.modelId}`)).toEqual(["openai/gpt-5-mini"]);
+    expect(calls.map((call) => `${call.endpointId}/${call.modelId}`)).toEqual(["openai/gpt-5-mini"]);
   });
 
   it("passes the agents Worker's failure on, naming the endpoint", async () => {
     bind(() => ({ ok: false, error: 'The Model endpoint "openai" refused its API key (HTTP 401): check it in the Harness panel.' }));
     expect(detailOf(await run("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" refused its API key (HTTP 401): check it in the Harness panel.');
+  });
+
+  it("names the endpoint and its model when the reply is not the JSON asked for", async () => {
+    bind(() => ({ ok: true, text: "Sure! Here is a title: Fix the build" }));
+    expect(detailOf(await run("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" (model gpt-5-mini) returned invalid structured output.');
   });
 
   it("names the endpoint when the agents Worker cannot be reached, without its error's text", async () => {

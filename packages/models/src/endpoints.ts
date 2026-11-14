@@ -112,14 +112,17 @@ export const defaultTextModel = (endpoints: ModelEndpoints): string | undefined 
 
 /**
  * One text-generation request on an endpoint's model (SPI-1163): the Environment DO's call of the agents Worker's
- * `EndpointTextGeneration`. The endpoint is the secret-free copy the Environment holds now; the agents Worker asks the
- * Environment for its key (`endpointCredential`) for that endpoint's target, as a Session does.
+ * `EndpointTextGeneration`. Ids only: the agents Worker reads the endpoint (`modelEndpoints`) and asks for its key
+ * (`endpointCredential`) for that endpoint's target, as a Session does.
  */
 export interface EndpointTextRequest {
-  readonly endpoint: ModelEndpoint;
+  readonly endpointId: string;
   readonly modelId: string;
   readonly prompt: string;
 }
+
+/** A text-generation prompt as sent to a model, on every path: t3's prompt, then the ask for its JSON object only. */
+export const jsonOnlyPrompt = (prompt: string): string => `${prompt}\n\nAnswer with the JSON object only.`;
 
 /** Its answer: the model's text, or a failure that names the endpoint and never holds a vendor's body or a key. */
 export type EndpointTextAnswer = { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string };
