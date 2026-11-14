@@ -9,7 +9,7 @@ import { applyMcpChange } from "@t3flare/harness-registry";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { BODY_MAX, LEGACY_VERSIONS, MODERN_VERSION, SUPPORTED_VERSIONS } from "../src/settings/endpoint.ts";
-import { isSettingsMcpPath, SETTINGS_MCP_PATH, settingsMcpUrl } from "../src/settings/endpointLayout.ts";
+import { isSettingsMcpPath, OWNER_ENDPOINT_EXCLUDED_STAGES, ownerEndpointOn, SETTINGS_MCP_PATH, settingsMcpUrl } from "../src/settings/endpointLayout.ts";
 import { SETTINGS_TOOLS } from "../src/settings/tools.ts";
 import { signToken } from "../src/settings/tokens.ts";
 import { ASKED, BOTH, bodyOf, ENDPOINT, endpointOf, FREE, initialize, KEY, legacy, modern, modernMeta, post, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
@@ -347,5 +347,13 @@ describe("layout (B): the endpoint's paths (settings/endpointLayout.ts)", () => 
     expect(isSettingsMcpPath("/_t3flare/mcp")).toBe(true);
     expect(isSettingsMcpPath("/_t3flare/mcp/anything")).toBe(true);
     for (const path of ["/_t3flare/mcpx", "/_t3flare/harness", "/_t3flare", "/mcp", "/_t3flare/mc"]) expect(isSettingsMcpPath(path)).toBe(false);
+  });
+
+  it("SPI-1195 review: prod is deployed without the endpoint until owner step 1 passes; every other stage with it", () => {
+    // alchemy.run.ts creates `SettingsAccess`, the admin application's path cookie and `T3FLARE_ACCESS_SETTINGS_AUD` only
+    // when `ownerEndpointOn(stage)`; the stack itself needs Cloudflare's providers, so this switch is what is tested.
+    expect(OWNER_ENDPOINT_EXCLUDED_STAGES).toEqual(["prod"]);
+    expect(ownerEndpointOn("prod")).toBe(false);
+    for (const stage of ["psettings", "pdev", "dev"]) expect(ownerEndpointOn(stage)).toBe(true);
   });
 });

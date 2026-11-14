@@ -3,7 +3,10 @@
 Status: accepted, conditionally (SPI-1196's M0 spike and SPI-1200, 2026-11-14). It rests on a probe the owner has not
 run yet: **owner step 1** ([`docs/steps/settings-mcp-m0-owner-steps.md`](../steps/settings-mcp-m0-owner-steps.md)), a
 real OAuth token's exchange for the endpoint's path and its refusal at the panel's paths. Until it is recorded, this is
-the layout built and deployed to test stages, not a confirmed one. Plan:
+the layout built and deployed to test stages, not a confirmed one, and **prod is deployed without it**: no
+`SettingsAccess`, the admin application exactly as before, no `T3FLARE_ACCESS_SETTINGS_AUD`, so `/_t3flare/mcp` on prod
+answers 404 `not_configured` (`OWNER_ENDPOINT_EXCLUDED_STAGES` in `apps/environment/src/settings/endpointLayout.ts`).
+Enabling prod is removing it from that list, once owner step 1 passes and M5a's stage evidence is recorded. Plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md) D13. Evidence:
 `docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json` (spike branch). Refines
 [ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) ("Access only on the admin path"),
@@ -31,7 +34,7 @@ tested with a service-token stand-in only, and the OAuth bearer case is owner st
    - access tokens of 15 minutes and sessions of 168 hours, set explicitly because Access checks no bounds (the token's
      actual `expires_in` is m5a-stage-run.md item 1);
    - the same policies as the admin application: the owner's email, and the stage's service token as `non_identity`.
-3. **Both applications set the path-cookie attribute**, so each one's `CF_Authorization` cookie is scoped to its own
+3. **Both applications set the path-cookie attribute** on a stage with the endpoint, so each one's `CF_Authorization` cookie is scoped to its own
    path and a browser sends the longer path's first.
 4. **The `/_t3flare` application is otherwise unchanged**: still no managed OAuth, so t3's root
    `/.well-known/oauth-*` documents stay t3's own and t3's `/mcp` sign-in is unaffected.
@@ -53,13 +56,13 @@ What this rests on, from M0 on a workers.dev stage:
 **Pending (owner step 1):** the token exchange for the path `resource` (P6 end to end), the OAuth bearer itself refused
 at `/_t3flare/harness` and `/_t3flare/echo` (P12), whether `sub` is the same in an OAuth-derived and a browser assertion
 (P13), the access token's `expires_in` (P11), and Cursor's actual redirect URI (owner step 2). Prod's custom domain
-has not been probed at all (only workers.dev): m5a-stage-run.md records its shape before the first prod deploy.
+has not been probed at all (only workers.dev): m5a-stage-run.md records its shape before prod is enabled.
 
 ## When to move to layout (C)
 
 Layout (C) is a Worker `t3flare-settings-<stage>` on its own workers.dev host, with an Access application and managed
 OAuth on the whole host, calling `EnvironmentDO.settingsMcp` through a cross-Worker binding. Move to it, on every stage
-including prod, when any of these holds:
+(prod included once enabled), when any of these holds:
 
 - owner step 1 shows an Owner client's OAuth token admitted at a `/_t3flare` path outside the endpoint (P12), or the
   path `resource` failing at the token exchange (P6);
@@ -87,10 +90,15 @@ Moving costs the clients' URL and nothing in the DO: `src/settings/endpointLayou
   (the admin application) and on `/_t3flare/mcp` (the endpoint's, with managed OAuth); everything else stays public
   behind t3's own auth.
 - Managed OAuth is a Cloudflare beta. Drift in its discovery or token scoping breaks Owner clients' sign-in under (B)
-  and, at worst, t3's own MCP sign-in; `docs/upstream-fragility.md` U68 says how it is detected, and the M5a stage run
-  asserts the root well-known documents are still t3's.
+  and, at worst, t3's own MCP sign-in; `docs/upstream-fragility.md` U68 says how it is detected.
+- Prod is excluded until owner step 1 passes and M5a's stage evidence (`m5a-settings-owner-browser.json`) is recorded:
+  on prod there is no Owner-client endpoint, the `/_t3flare` application has no path-cookie attribute, and Owner clients
+  cannot connect. Enabling prod then is a one-line change (`OWNER_ENDPOINT_EXCLUDED_STAGES`).
 - Only workers.dev was probed. Prod's custom domain was not (a second stage with a domain in the zone would take over
-  prod's rate-limit ruleset), so the first prod deploy is the first run on a custom domain.
+  prod's rate-limit ruleset), so the first prod deploy with the endpoint is the first run on a custom domain.
+- Every prod deploy's smoke check (`apps/environment/scripts/smoke.ts`) asserts the host's root `/.well-known/oauth-*`
+  documents are still t3's, as acceptance step 2b does on a stage, so drift in Access answering them is caught at the
+  deploy after it, prod's endpoint or not.
 - Dynamic registrations from probes and clients stay in the team's managed-OAuth client list; they hold no grant.
 - Until owner step 1 is recorded, the M5a stage run (`docs/steps/settings-mcp/m5a-stage-run.md` item 1) is the gate: if
   it fails, this ADR is superseded by one for layout (C).
