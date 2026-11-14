@@ -1,0 +1,196 @@
+{
+ "file": "m3-settings-cli-claude.json",
+ "stage": "psmcp",
+ "host": "t3flare-environment-psmcp.ian-g-pascoe.workers.dev",
+ "items": {
+  "1-read": {
+   "at": "2026-11-14T18:02:08.814Z",
+   "commit": "24f4a01a90e6",
+   "name": "claude: get_settings (environment) runs without a card",
+   "threadId": "4d6e87ca-379b-4540-8c6b-44f11e46aa80",
+   "status": "completed",
+   "cards": [],
+   "reply": "{\"revision\": 18, \"containerBudget\": 3}",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "Tool",
+     "status": "completed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "get settings",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 21614,
+   "result": "{\"revision\": 18, \"containerBudget\": 3}",
+   "verdict": "pass"
+  },
+  "2-free-full-access": {
+   "at": "2026-11-14T18:13:54.055Z",
+   "commit": "24f4a01a90e6",
+   "name": "claude: a free change (containerIdleMinutes lowered) runs in full access without a card",
+   "before": {
+    "revision": 18,
+    "containerIdleMinutes": 2
+   },
+   "after": {
+    "revision": 19,
+    "containerIdleMinutes": 1
+   },
+   "threadId": "2bedd467-f028-4d5d-a611-b819c3edf18e",
+   "status": "completed",
+   "cards": [],
+   "reply": "{\"status\":\"applied\",\"revision\":19,\"appliesAt\":\"Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"}",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "Tool",
+     "status": "completed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 21959,
+   "result": "{\"status\":\"applied\",\"revision\":19,\"appliesAt\":\"Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"}",
+   "audit": {
+    "caller": "agent:2bedd467-f028-4d5d-a611-b819c3edf18e",
+    "via": "mcp",
+    "thread": "2bedd467-f028-4d5d-a611-b819c3edf18e",
+    "agent": "claude",
+    "tier": "free",
+    "entity": "environment",
+    "action": "environment.change",
+    "target": "containerIdleMinutes",
+    "before": {
+     "containerIdleMinutes": 2
+    },
+    "after": {
+     "containerIdleMinutes": 1
+    },
+    "at": 1794680026536
+   },
+   "verdict": "pass"
+  },
+  "3-free-approval-required": {
+   "at": "2026-11-14T18:14:38.721Z",
+   "commit": "24f4a01a90e6",
+   "name": "claude: a free change in approval-required asks on one card; approved, applied (audit mode card, answeredBy card)",
+   "threadId": "3e3231c5-2bac-4318-a18b-90cff837e5c0",
+   "status": "completed",
+   "cards": [
+    {
+     "id": "runtime-request:claudeAgent:t3flare-ask:t3flare-elicit-0ba92c7e-606b-4c54-bf92-ade0853a21cd",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "An agent asks to change the Environment settings (revision 20):\n- containerIdleMinutes: 2 to 1 (free in either direction)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\nAsked by claude on thread 3e3231c5-2bac-4318-a18b-90cff837e5c0. This change is free (it narrows what agents have); this thread's mode asks for every write.\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 20,\n  \"settings\": {\n    \"containerIdleMinutes\": 1\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "reply": "{\"status\":\"applied\",\"revision\":21,\"appliesAt\":\"Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"}",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "Tool",
+     "status": "completed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 20740,
+   "result": "{\"status\":\"applied\",\"revision\":21,\"appliesAt\":\"Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"}",
+   "audit": {
+    "caller": "agent:3e3231c5-2bac-4318-a18b-90cff837e5c0",
+    "via": "mcp",
+    "thread": "3e3231c5-2bac-4318-a18b-90cff837e5c0",
+    "agent": "claude",
+    "tier": "free",
+    "mode": "card",
+    "answeredBy": "card",
+    "entity": "environment",
+    "action": "environment.change",
+    "target": "containerIdleMinutes",
+    "before": {
+     "containerIdleMinutes": 2
+    },
+    "after": {
+     "containerIdleMinutes": 1
+    },
+    "at": 1794680062996
+   },
+   "verdict": "pass"
+  },
+  "4-plan": {
+   "at": "2026-11-14T18:21:23.372Z",
+   "commit": "24f4a01a90e6",
+   "name": "claude: plan mode refuses the write; no card, no revision moved",
+   "revisions": {
+    "before": 26,
+    "after": 26
+   },
+   "threadId": "608d8100-3eb2-45e2-a810-d04b59de142f",
+   "status": "completed",
+   "cards": [
+    {
+     "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A87487c3b-383c-41dd-89ef-bc65fdbe30c9%253Aturn%253A1:native-request:toolu_01EPB3fFj29GGfGJBMBsmDQY:b5d374b0-dd76-4994-9928-e8ec57636aea",
+     "kind": "command",
+     "requestKind": "command",
+     "prompt": "mcp__settings__change_environment",
+     "options": null,
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "reply": "Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "Tool",
+     "status": "completed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "failed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "Action required",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 31844,
+   "result": "Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.",
+   "verdict": "pass",
+   "note": "Claude Code's own plan-mode permission prompt (a native `command` request naming mcp__settings__change_environment) was answered by the harness; the relay then refused the call with the plan text. The Settings server raised no card (serverCards counts the server's own)."
+  },
+  "5-linked": {
+   "commit": "24f4a01a90e6",
+   "name": "claude: a Linked thread's write is refused",
+   "verdict": "not-run",
+   "why": "the Linked check is the Environment's (threadLinkIn), the same for every CLI through the relay; run on Durable (m3-settings-own.json) and Codex (m3-settings-cli-codex.json), to keep model turns to what the items need"
+  }
+ }
+}

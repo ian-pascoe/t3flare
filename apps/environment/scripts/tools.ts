@@ -8,7 +8,8 @@
 //   node scripts/stage.ts run tools tools memory        P14: concurrent memory-heavy scripts against the 16 MiB cap
 //   node scripts/stage.ts run tools tools sandbox-loss  P14: a script waiting on approval while the sandbox is replaced
 //   node scripts/stage.ts run tools tools hostile       M2: H1-H3, H6, H7 (m2-hostile-script.json)
-//   node scripts/stage.ts run tools tools panel         the panel's API and safety from outside (m3-panel-safety.json)
+//   node scripts/stage.ts run tools tools panel [file]  the panel's API and safety from outside (m3-panel-safety.json)
+//   node scripts/stage.ts run tools tools cli-mcp <cli> [file]  a CLI through the relay (m5-cli-<cli>.json)
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -22,7 +23,8 @@ import { tailing } from "./lib/tail.ts";
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 const SLUG = process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/tools");
+// T3FLARE_EVIDENCE_DIR (repo-relative) sends the evidence elsewhere: the Settings server's runs re-use `panel` and `cli-mcp`.
+const EVIDENCE = path.resolve(import.meta.dirname, "../../..", process.env.T3FLARE_EVIDENCE_DIR ?? "docs/steps/tools");
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 
@@ -49,7 +51,7 @@ const scrubNumber = (raw: string) => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), scrubNumber(`${JSON.stringify(redact({ at: new Date().toISOString(), ...(value as object) }), null, 1)}\n`));
-  console.log(`wrote docs/steps/tools/${name}`);
+  console.log(`wrote ${path.join(EVIDENCE, name)}`);
 };
 
 /** The panel's JSON API at `/_t3flare/harness` on the t3 host, as a script calls it: the service token and the admin token. */
@@ -539,13 +541,14 @@ const panel = async () => {
   const page = await harness("GET", "/_t3flare/harness");
   const csp = page.headers.get("content-security-policy") ?? "";
   results.push({ name: "the page's CSP allows only its own hashed script and style", csp, ok: page.status === 200 && /script-src 'sha256-/.test(csp) && !csp.includes("'self' 'unsafe") });
-  writeEvidence("m3-panel-safety.json", { host: new URL(t3).host, note: "rerun after the back-to-stock cuts (owner, 2026-11-12): the panel on the t3 host; security case 2 included", cases: results, ok: results.every((r) => r.ok) });
+  writeEvidence(process.argv[3] ?? "m3-panel-safety.json", { host: new URL(t3).host, note: "rerun after the back-to-stock cuts (owner, 2026-11-12): the panel on the t3 host; security case 2 included", cases: results, ok: results.every((r) => r.ok) });
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
 // MCP on Durable threads (parts 2 and 4): the fixture server, direct (Route B) or through Commissary (Route A)
 
-const FIXTURE_URL = "https://t3flare-mcpfixture-tools.ian-g-pascoe.workers.dev";
+// The stage's own fixture Worker (alchemy.run.ts) when T3FLARE_FIXTURE_URL names it; the tools stage's by default.
+const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? "https://t3flare-mcpfixture-tools.ian-g-pascoe.workers.dev";
 const fixture = async (pathname: string, method = "GET") =>
   (await fetch(`${FIXTURE_URL}${pathname}`, { method, headers: { authorization: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` } })).json() as Promise<any>;
 const notes = async (): Promise<Array<string>> => (await fixture("/log")).lines ?? [];
@@ -788,7 +791,7 @@ const cliMcp = async (cli: RelayCli) => {
     const r = await turn("t3's own tools with t3's bearer, as stock t3 hands them (SPI-1039): t3_thread_list", "approval-required", `Call the t3-code MCP tool t3_thread_list and tell me how many threads it lists. ${only}`, "accept");
     cases.push({ ...r, ok: r.cards.length === 0 && /\d/.test(r.text) && !/unavailable|not available|isn.t available|can.t tell/i.test(r.text) });
   }
-  writeEvidence(`m5-cli-${cli}.json`, { cli, workspace, cases, ok: cases.every((c) => c.ok) });
+  writeEvidence(process.argv[4] ?? `m5-cli-${cli}.json`, { cli, workspace, cases, ok: cases.every((c) => c.ok) });
   await cleanup(workspace);
 };
 

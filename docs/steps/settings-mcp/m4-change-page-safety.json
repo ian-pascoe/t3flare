@@ -1,0 +1,146 @@
+{
+ "file": "m4-change-page-safety.json",
+ "stage": "psmcp",
+ "host": "t3flare-environment-psmcp.ian-g-pascoe.workers.dev",
+ "items": {
+  "1": {
+   "at": "2026-11-14T19:07:38.573Z",
+   "commit": "24f4a01a90e6",
+   "name": "the page's response headers: hash-only CSP equal to the deployed CHANGE_SCRIPT's hash, DENY, no-store, no-referrer",
+   "changeId": "chg_TGinHx0sS7ChZv38ZnRg3INWnO9huAQDkZIvFQYOIxA",
+   "status": 200,
+   "headers": {
+    "content-security-policy": "default-src 'none'; style-src 'sha256-EZQsFrsC5NUBUA4J2wad6deu7L9ydcEw9DpL16Ul3Vw='; script-src 'sha256-772zEcEi7FPgBpZC3n9DXaHwsrziGFBbW3bSdkUIP1I='; connect-src 'self'; img-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
+    "x-frame-options": "DENY",
+    "cache-control": "no-store",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff"
+   },
+   "scriptSrc": "script-src 'sha256-772zEcEi7FPgBpZC3n9DXaHwsrziGFBbW3bSdkUIP1I='",
+   "expectedScriptHash": "'sha256-772zEcEi7FPgBpZC3n9DXaHwsrziGFBbW3bSdkUIP1I='",
+   "verdict": "pass"
+  },
+  "2": {
+   "at": "2026-11-14T19:07:38.701Z",
+   "commit": "24f4a01a90e6",
+   "name": "without Access (no credential, from outside): the page and its API get Access's login, never the page",
+   "answers": [
+    {
+     "method": "GET",
+     "path": "/_t3flare/harness/changes/chg_<id>",
+     "accept": "text/html",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "body": false
+    },
+    {
+     "method": "GET",
+     "path": "/_t3flare/harness/changes/chg_<id>",
+     "accept": "application/json",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "body": false
+    },
+    {
+     "method": "POST",
+     "path": "/_t3flare/harness/api/changes/chg_<id>",
+     "accept": "application/json",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "body": false
+    },
+    {
+     "method": "GET",
+     "path": "/_t3flare/harness/api/changes",
+     "accept": "application/json",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "body": false
+    }
+   ],
+   "verdict": "pass"
+  },
+  "3": {
+   "at": "2026-11-14T19:07:39.282Z",
+   "commit": "24f4a01a90e6",
+   "name": "the POST refused: wrong Origin, Sec-Fetch-Site cross-site, form post, text/plain (403); GET on the POST's path 404; the service token with the admin token cannot approve an own agent's change (403); the change stays open",
+   "answers": {
+    "wrongOrigin": 403,
+    "crossSite": 403,
+    "formPost": 403,
+    "textPlain": 403,
+    "getOnPostPath": 404,
+    "serviceTokenApprove": {
+     "status": 403,
+     "body": "only the owner who asked answers this change\n"
+    }
+   },
+   "stillOpen": true,
+   "csrf": {
+    "pending": "owner-stage-run.md item 7 (a browser POST without the CSRF token needs the owner's Access session)"
+   },
+   "verdict": "pass"
+  },
+  "3-4-browser": {
+   "commit": "24f4a01a90e6",
+   "name": "in the owner's browser: no script but the page's own (no CSP violation); a POST without the CSRF token is 403",
+   "pending": "owner-stage-run.md item 7",
+   "verdict": "pending"
+  },
+  "4-add-server": {
+   "at": "2026-11-14T19:07:38.592Z",
+   "commit": "24f4a01a90e6",
+   "name": "a hostile change rendered inert: an added server's URL path holding <script> and U+202E is shown escaped, the override as \\u{202e}; the page has its own script alone",
+   "changeId": "chg_TGinHx0sS7ChZv38ZnRg3INWnO9huAQDkZIvFQYOIxA",
+   "rawScriptInHtml": false,
+   "escapedShown": true,
+   "rawBidiInHtml": false,
+   "bidiShownAsEscape": true,
+   "scriptTags": [
+    "<script>"
+   ],
+   "browserRun": {
+    "pending": "owner-stage-run.md item 7"
+   },
+   "verdict": "pass"
+  },
+  "4-variable": {
+   "at": "2026-11-14T19:07:56.628Z",
+   "commit": "24f4a01a90e6",
+   "name": "a Variable whose value holds <script> and U+202E: shown escaped, the override as \\u{202e}",
+   "changeId": "chg_xm4o82z9wMY64WQb5aPGv6tSPLAzLuG6idYCNYdSBqQ",
+   "status": 200,
+   "rawScriptInHtml": false,
+   "escapedShown": true,
+   "rawBidiInHtml": false,
+   "bidiShownAsEscape": true,
+   "closed": "withdrawn",
+   "verdict": "pass"
+  },
+  "5": {
+   "at": "2026-11-14T19:07:56.745Z",
+   "commit": "24f4a01a90e6",
+   "name": "a closed and an unknown change id: the closed one shows its outcome without Approve; the unknown one is gone (404)",
+   "closed": {
+    "changeId": "chg_TGinHx0sS7ChZv38ZnRg3INWnO9huAQDkZIvFQYOIxA",
+    "status": 200,
+    "approveShown": false,
+    "outcomeShown": "Withdrawn"
+   },
+   "closedBy": "withdrawn",
+   "unknown": {
+    "status": 404,
+    "gone": true
+   },
+   "verdict": "pass"
+  },
+  "probe-hostile": {
+   "at": "2026-11-14T19:06:30Z",
+   "commit": "24f4a01a90e6",
+   "name": "why two earlier runs of items 3 and 4-variable failed: their hostile asks closed within 3 s, cancelled on the card",
+   "probe": "settings.ts m4 probe-hostile: three asked Variables (a plain value, one holding <script>, one holding U+202E); every card stayed open until the harness cancelled it after 15 s",
+   "cause": "not the content: the cancels came from t3 restarting in place (the harness's bootstrap window closing, and provider upserts), which resolves pending requests as cancel. With both avoided, the run at 19:07 passes every item.",
+   "verdict": "pass"
+  }
+ }
+}
