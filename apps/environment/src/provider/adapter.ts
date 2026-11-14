@@ -45,8 +45,7 @@ import { toWorkspace } from "@t3flare/workspace-client";
 import { environmentServices } from "../agents/bindings.ts";
 import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
-import type { ThreadLink } from "../settings/caller.ts";
-import { durableModeRecord, threadLinkIn } from "./threadCaller.ts";
+import { durableModeRecord } from "./threadCaller.ts";
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "./capabilities.ts";
 import { type AttachmentReader, turnPrompt } from "./attachments.ts";
 import { messageSkillsFor, type SkillsAccess } from "./skills.ts";
@@ -97,12 +96,6 @@ export const linkedWorkOf = (threadId: string): LinkedWork | null => {
     return { label: "a linked environment", access: null };
   }
 };
-
-/**
- * The thread's Linked work for the Settings server (plan D3): `"own"`, `"linked"`, or `"unknown"` for a thread with no
- * projection row. Unlike `linkedWorkOf`, it fails closed.
- */
-export const threadLinkOf = (threadId: string): ThreadLink => threadLinkIn(environmentServices().sql, threadId);
 
 const call = <A>(what: string, thunk: () => Promise<A>) =>
   Effect.tryPromise({ try: thunk, catch: (cause) => protocolError(`The agent's session did not answer ${what}`, cause) });
