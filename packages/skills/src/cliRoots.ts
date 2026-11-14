@@ -26,7 +26,16 @@ export interface CliRoots {
   readonly skills: ReadonlyArray<SkillRoot>;
   /** Command directories at the cwd. */
   readonly commands: ReadonlyArray<CommandSource>;
+  /**
+   * SPI-1153: what the CLI does with a Repo skill and an Environment skill of the same name (its M0 probe,
+   * `docs/steps/env-skills-cli/m0-probe.json`): keeps the Environment's, keeps the Repo's, or lists both. The CLI's own
+   * rule; only pi's is t3flare's choice, by its flags' order.
+   */
+  readonly environmentPrecedence: EnvironmentPrecedence;
 }
+
+/** Who wins a same-named Repo and Environment skill in a CLI; `both`: the CLI lists both and a bare mention picks neither. */
+export type EnvironmentPrecedence = "environment" | "repo" | "both";
 
 /** A root that walks from the cwd up to the repo root. */
 const up = (directory: string): SkillRoot => ({ directory, cwdOnly: false });
@@ -41,15 +50,16 @@ const up = (directory: string): SkillRoot => ({ directory, cwdOnly: false });
  * (`.claude/` is off: `OPENCODE_DISABLE_CLAUDE_CODE`), and `.opencode/command` and `.opencode/commands`.
  */
 export const CLI_ROOTS: Readonly<Record<CliAgent, CliRoots>> = {
-  codex: { skills: [up(".agents/skills"), up(".codex/skills")], commands: [] },
-  pi: { skills: [{ directory: ".pi/skills", cwdOnly: true }, up(".agents/skills")], commands: [{ directory: ".pi/prompts", nested: false }] },
-  claude: { skills: [up(".claude/skills")], commands: [{ directory: ".claude/commands", nested: true }] },
+  codex: { skills: [up(".agents/skills"), up(".codex/skills")], commands: [], environmentPrecedence: "both" },
+  pi: { skills: [{ directory: ".pi/skills", cwdOnly: true }, up(".agents/skills")], commands: [{ directory: ".pi/prompts", nested: false }], environmentPrecedence: "environment" },
+  claude: { skills: [up(".claude/skills")], commands: [{ directory: ".claude/commands", nested: true }], environmentPrecedence: "environment" },
   opencode: {
     skills: [up(".opencode/skills"), up(".opencode/skill"), up(".agents/skills")],
     commands: [
       { directory: ".opencode/command", nested: false },
       { directory: ".opencode/commands", nested: false },
     ],
+    environmentPrecedence: "repo",
   },
 };
 

@@ -3,6 +3,7 @@
 // files. The Environment DO makes it from its rows; each Workspace DO keeps a copy and serves it read-only at
 // `SKILLS_MOUNT`. Ported from cloudpid@47941c7c (`apps/server/src/workspace/skill-set-schema.ts`, `skill-set.ts`).
 
+import type { EnvironmentPrecedence } from "./cliRoots.ts";
 import { parseSkill, type Skill, type SkillDiscovery } from "./discovery.ts";
 
 /** Where every Workspace serves the Environment skill set, read-only: outside the repo at `/workspace/repo`. */
@@ -127,3 +128,28 @@ export const listingOfSet = (files: Readonly<Record<string, string>>): ReadonlyA
       const parsed = parseSkill(`${SKILLS_MOUNT}/${path}`, files[path]!);
       return "reason" in parsed ? [] : [parsed];
     });
+
+/**
+ * SPI-1153: `repo` (a CLI agent's Repo-only discovery, at its roots) with `environment` merged by that CLI's own rule
+ * for a same-named pair (`CLI_ROOTS[cli].environmentPrecedence`), so the composer shows what the CLI loads:
+ * `environment` as `withEnvironmentSkills`; `repo`, the Repo skill kept and the Environment's in `skipped`; `both`, every
+ * skill of both, the Repo's first, as Codex lists them (t3's menu shows the first of a name). Anything the Workspace
+ * listed under `SKILLS_MOUNT` is dropped, as there.
+ */
+export const withEnvironmentSkillsFor = (precedence: EnvironmentPrecedence, environment: ReadonlyArray<EnvironmentSkillEntry>, repo: SkillDiscovery): SkillDiscovery => {
+  if (precedence === "environment") return withEnvironmentSkills(environment, repo);
+  const own = (skill: Skill) => !skill.filePath.startsWith(`${SKILLS_MOUNT}/`);
+  const repoSkills = repo.skills.filter(own);
+  const repoByName = new Map(repoSkills.map((skill) => [skill.name, skill]));
+  const atMount = (skill: EnvironmentSkillEntry): Skill => ({ name: skill.name, description: skill.description, filePath: environmentSkillPath(skill.name), disableModelInvocation: skill.disableModelInvocation });
+  const kept = precedence === "both" ? environment : environment.filter((skill) => !repoByName.has(skill.name));
+  const shadowed = precedence === "both" ? [] : environment.filter((skill) => repoByName.has(skill.name));
+  return {
+    skills: [...repoSkills, ...kept.map(atMount)],
+    skipped: [
+      ...shadowed.map((skill) => ({ path: environmentSkillPath(skill.name), reason: `"${skill.name}" is shadowed by the Repo skill at ${repoByName.get(skill.name)!.filePath}` })),
+      ...repo.skipped.filter((skip) => !skip.path.startsWith(`${SKILLS_MOUNT}/`)),
+    ],
+    omitted: repo.omitted,
+  };
+};

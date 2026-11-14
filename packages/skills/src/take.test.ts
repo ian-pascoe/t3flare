@@ -3,7 +3,7 @@
 // failing the turn: a Workspace that predates the call, refuses the set or does not answer in time leaves it as it was.
 import { describe, expect, it, vi } from "vitest";
 
-import { takeSkillsForTurn } from "../src/session/environmentSkills.ts";
+import { takeSkillsForTurn } from "./take.ts";
 
 describe("takeSkillsForTurn", () => {
   it("asks nothing without a hash (an adapter that carries none) or without a Workspace", async () => {

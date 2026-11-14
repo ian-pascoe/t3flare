@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import { EMPTY_SKILL_SET_HASH, listingOfSet, sha256Hex, skillFilePathProblem, skillSetHash, skillSetOf, skillSetProblem, withEnvironmentSkills } from "./skillSet.ts";
+import { withEnvironmentSkillsFor } from "./skillSet.ts";
 
 describe("skillSetHash", () => {
   it("is SHA-256 of nothing for no files", async () => {
@@ -81,6 +82,41 @@ describe("withEnvironmentSkills", () => {
   it("drops what an older Workspace listed from its held set, whose rows may be gone", () => {
     const old = { ...repo, skills: [repoSkill("gone", "/workspace/.agents/skills/gone/SKILL.md"), ...repo.skills], skipped: [{ path: "/workspace/.agents/skills/x/SKILL.md", reason: "r" }] };
     expect(withEnvironmentSkills([], old)).toEqual({ skills: repo.skills, skipped: [], omitted: 2 });
+  });
+});
+
+describe("withEnvironmentSkillsFor (SPI-1153: a CLI agent's own rule for a same-named pair)", () => {
+  const repoSkill = (name: string) => ({ name, description: `Repo ${name}.`, filePath: `/workspace/repo/.claude/skills/${name}/SKILL.md`, disableModelInvocation: false });
+  const atMount = (name: string, description: string) => ({ name, description, filePath: `/workspace/.agents/skills/${name}/SKILL.md`, disableModelInvocation: false });
+  const repo = { skills: [repoSkill("dup"), repoSkill("tdd")], skipped: [], omitted: 0 };
+  const environment = [
+    { name: "dup", description: "The Environment's dup.", disableModelInvocation: false },
+    { name: "e-env", description: "Only the Environment's.", disableModelInvocation: false },
+  ];
+
+  it("environment: the Environment's first, its Repo namesake shadowed (Claude Code, pi)", () => {
+    expect(withEnvironmentSkillsFor("environment", environment, repo)).toEqual(withEnvironmentSkills(environment, repo));
+  });
+
+  it("repo: the Repo's first, an Environment skill listed only without a Repo namesake, which it is shadowed by (OpenCode)", () => {
+    expect(withEnvironmentSkillsFor("repo", environment, repo)).toEqual({
+      skills: [repoSkill("dup"), repoSkill("tdd"), atMount("e-env", "Only the Environment's.")],
+      skipped: [{ path: "/workspace/.agents/skills/dup/SKILL.md", reason: '"dup" is shadowed by the Repo skill at /workspace/repo/.claude/skills/dup/SKILL.md' }],
+      omitted: 0,
+    });
+  });
+
+  it("both: every Repo skill, then every Environment skill, in Codex's own order (it lists both of a pair)", () => {
+    expect(withEnvironmentSkillsFor("both", environment, repo)).toEqual({
+      skills: [repoSkill("dup"), repoSkill("tdd"), atMount("dup", "The Environment's dup."), atMount("e-env", "Only the Environment's.")],
+      skipped: [],
+      omitted: 0,
+    });
+  });
+
+  it("drops what a Workspace listed at the mount, whatever the rule: the rows are the set", () => {
+    const old = { ...repo, skills: [atMount("gone", "Gone."), ...repo.skills] };
+    for (const precedence of ["environment", "repo", "both"] as const) expect(withEnvironmentSkillsFor(precedence, [], old).skills).toEqual(repo.skills);
   });
 });
 
