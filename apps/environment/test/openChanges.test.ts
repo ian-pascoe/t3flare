@@ -471,6 +471,30 @@ describe("SPI-1199 review: the strike lock, the declined-repeat hash, a skill pr
     }
   });
 
+  it("SPI-1201 review: a URL's fragment or empty query, a tree URL with a path, a skill name, and folders repeated or reordered are the same change", async () => {
+    fixture = settingsFixture({ answer: { decision: "decline" } });
+    const run = fixture;
+    const add = (url: string) => run.call(run.durable("thread-5"), "change_mcp", { expectedRevision: 0, change: { op: "add", server: "z", url, auth: { kind: "none" } } });
+    expect(await add("https://z.example/mcp")).toMatchObject({ structured: { status: "declined" } });
+    for (const url of ["https://z.example/mcp#top", "https://z.example/mcp?", "https://z.example/mcp?#"]) {
+      expect([url, await add(url)]).toMatchObject([url, { structured: { status: "refused", reason: "declined-repeat" } }]);
+    }
+    // A real query is another URL.
+    expect(await add("https://z.example/mcp?key=1")).toMatchObject({ structured: { status: "declined" } });
+    const commit = run.github.push("o/r", { "skills/a/SKILL.md": skillMd("a"), "skills/b/SKILL.md": skillMd("b") });
+    const install = (source: string, folders: ReadonlyArray<string>) => run.call(run.durable("thread-6"), "change_skills", { expectedRevision: 0, op: "install", source, commit, folders });
+    expect(await install("o/r", ["skills/a", "skills/b"])).toMatchObject({ structured: { status: "declined" } });
+    for (const [source, folders] of [
+      ["o/r", ["skills/b", "skills/a", "skills/a"]],
+      [`https://github.com/o/r/tree/${commit}/skills`, ["skills/a", "skills/b"]],
+      ["o/r@a", ["skills/b", "skills/a"]],
+    ] as const) {
+      expect([source, folders, await install(source, folders)]).toMatchObject([source, folders, { structured: { status: "refused", reason: "declined-repeat" } }]);
+    }
+    // Other folders are another change.
+    expect(await install("o/r", ["skills/a"])).toMatchObject({ structured: { status: "declined" } });
+  });
+
   it("an install's preview counts toward the GitHub read cap, and past it is refused before reaching GitHub", async () => {
     fixture = settingsFixture({ answer: { decision: "decline" } });
     const run = fixture;
