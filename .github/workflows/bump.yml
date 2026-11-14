@@ -65,6 +65,13 @@ jobs:
       # frozen: a new pin's lock must change (review H3).
       - uses: ./.github/actions/setup
 
+      # SPI-1175: GitHub masks only the whole secret, so its key and header values are masked each on its own, before any
+      # step that could print one. The commands go to the runner's log only, never a file.
+      - name: Mask the Model endpoint
+        run: node apps/environment/scripts/mask-endpoint.ts
+        env:
+          T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
+
       - name: Bump
         id: bump
         run: |

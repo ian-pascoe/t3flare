@@ -10,10 +10,10 @@
 // already there is kept as the owner left it; a test stage saves it again. Text generation needs no call: while the owner
 // has picked no model, its setting follows the endpoints' default (SPI-1163), the small model this returns as `turnModel`.
 //
-// No message here holds the key: an answer that repeats it has it replaced.
+// No message here holds the key or a header's value: an answer that repeats one has it replaced.
 import { defaultTextModel, endpointSlug, type ModelEndpoint } from "@t3flare/models/endpoints";
 
-import type { ModelEndpointSpec } from "./modelEndpointSpec.ts";
+import { type ModelEndpointSpec, scrubSecrets, secretsOf } from "./modelEndpointSpec.ts";
 
 /** One call of the panel's API as a script makes it: the path, and the JSON body of a change. */
 export type AdminCall = (method: "GET" | "POST", path: string, body?: unknown) => Promise<{ readonly status: number; readonly text: string }>;
@@ -64,7 +64,8 @@ const turnModelOf = (endpoint: ModelEndpoint): string => defaultTextModel({ revi
 export const ensureModelEndpoint = async (admin: AdminCall, spec: ModelEndpointSpec, options: EnsureOptions): Promise<EnsureResult> => {
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const now = options.now ?? Date.now;
-  const clean = (text: string) => text.split(spec.apiKey).join("[the key]").trim().slice(0, 500);
+  const secrets = secretsOf(spec);
+  const clean = (text: string) => scrubSecrets(text, secrets).trim().slice(0, 500);
   const fail = (error: string): EnsureResult => ({ ok: false, error: clean(error) });
 
   const list = async (): Promise<{ readonly endpoints: ReadonlyArray<ModelEndpoint> } | { readonly error: string }> => {

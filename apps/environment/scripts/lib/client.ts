@@ -237,3 +237,60 @@ export const readDoText = async (id: string, path: string): Promise<string> => {
   if (ok === undefined || ok === null) return "";
   return typeof ok === "string" ? ok : Buffer.from(Object.values(ok as Record<string, number>)).toString("utf8");
 };
+
+/**
+ * Turns the Durable agent provider on, as the client's onboarding "Turn on" does: a new Environment has it off, and t3
+ * resolves a text-generation selection on a provider that is off to its own fallback (upstream-fragility U67).
+ */
+export const enablePiDurable = (cookie: string) =>
+  wsCall(cookie, "server.updateSettings", {
+    patch: {},
+    providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } },
+  });
+
+/** The text-generation setting as t3 resolves it (`server.getConfig`), or null. */
+export const textGenerationSetting = async (cookie: string): Promise<{ readonly instanceId: string; readonly model: string } | null> => {
+  const selection = ((await wsCall(cookie, "server.getConfig", {})) as any)?.settings?.textGenerationModelSelection ?? null;
+  return selection === null ? null : { instanceId: selection.instanceId, model: selection.model };
+};
+
+/** Polls the text-generation setting until it names `model` or `timeoutMs` passes; the last one seen. */
+export const waitForTextGenerationSetting = async (cookie: string, model: string | undefined, timeoutMs = 30_000) => {
+  const started = Date.now();
+  let seen = await textGenerationSetting(cookie);
+  while (seen?.model !== model && Date.now() - started < timeoutMs) {
+    await sleep(1000);
+    seen = await textGenerationSetting(cookie);
+  }
+  return seen;
+};
+
+/** The first value under `key` anywhere in `value`. */
+export const findKey = (value: any, key: string): any => {
+  if (value === null || typeof value !== "object") return undefined;
+  if (key in value) return value[key];
+  for (const child of Object.values(value)) {
+    const found = findKey(child, key);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+};
+
+/**
+ * Generates a thread's title again on the text-generation model (t3's `thread.metadata.update` with `regenerateTitle`),
+ * after putting it back to "New thread", so a renamed title is this model's; the outcome t3 records in
+ * `lastTitleRegeneration` (upstream-fragility U67).
+ */
+export const regenerateTitle = async (cookie: string, threadId: string, timeoutMs = 3 * 60_000) => {
+  await dispatch(cookie, { type: "thread.metadata.update", commandId: uuid(), threadId, title: "New thread" });
+  const commandId = uuid();
+  await dispatch(cookie, { type: "thread.metadata.update", commandId, threadId, regenerateTitle: true });
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const projection = projectionOf(await threadWindow(cookie, threadId).catch(() => undefined));
+    const last = findKey(projection, "lastTitleRegeneration");
+    if (last?.requestId === commandId) return { outcome: last.status as string, message: (last.message ?? null) as string | null, title: findKey(projection, "title") as string | null };
+    await sleep(1500);
+  }
+  return { outcome: "timeout", message: null, title: null };
+};

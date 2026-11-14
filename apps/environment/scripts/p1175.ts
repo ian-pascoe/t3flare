@@ -15,8 +15,8 @@ import * as fs from "node:fs";
 
 import { defaultTextModel } from "@t3flare/models/endpoints";
 
-import { modelEndpointSpec } from "./lib/modelEndpointSpec.ts";
-import { admin, createProjectAndThread, dispatch, pair, projectionOf, sendMessage, sleep, threadWindow, updateSettings, uuid, wsCall } from "./lib/client.ts";
+import { modelEndpointSpec, secretsOf } from "./lib/modelEndpointSpec.ts";
+import { admin, createProjectAndThread, enablePiDurable, pair, regenerateTitle, sendMessage, textGenerationSetting, updateSettings } from "./lib/client.ts";
 
 const option = (name: string) => {
   const index = process.argv.indexOf(`--${name}`);
@@ -25,7 +25,7 @@ const option = (name: string) => {
 const out = option("out");
 const spec = modelEndpointSpec(process.env, { derive: true });
 if (!spec.ok) throw new Error(spec.reason);
-const secrets = [spec.spec.apiKey, process.env.MODEL_PROXY_API_KEY].filter((value): value is string => value !== undefined && value.length >= 8);
+const secrets = [...secretsOf(spec.spec), process.env.MODEL_PROXY_API_KEY].filter((value): value is string => value !== undefined && value.length >= 8);
 const failures: Array<string> = [];
 const report: Record<string, unknown> = { at: new Date().toISOString(), endpointFrom: spec.source };
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -55,47 +55,21 @@ check("its saves are audited, by the service token", saves.length > 0 && saves.e
 // 2. The text-generation setting, picked by no one, and a title generated on it.
 const cookie = await pair();
 await admin("POST", "/_t3flare/disarm-bootstrap");
-await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } } });
-const textSetting = async () => {
-  const selection = ((await wsCall(cookie, "server.getConfig", {})) as any)?.settings?.textGenerationModelSelection ?? null;
-  return selection === null ? null : { instanceId: selection.instanceId, model: selection.model };
-};
-report.setting = await textSetting();
+await enablePiDurable(cookie);
+report.setting = await textGenerationSetting(cookie);
 const expected = defaultTextModel({ revision: listed.json?.revision ?? 0, endpoints: listed.json?.endpoints ?? [] });
 report.expectedSetting = expected ?? null;
 check("text generation names the endpoint's small model", expected?.startsWith(`${spec.spec.id}/`) === true && (report.setting as any)?.model === expected, report.setting);
 
 const { threadId } = await createProjectAndThread(cookie, { title: "New thread", workspaceRoot: `/w/p1175-${Date.now().toString(36)}` });
 await sendMessage(cookie, threadId, "Please fix the failing date parser test in src/dates.ts: it treats 2024-02-29 as invalid.");
-const findKey = (value: any, key: string): any => {
-  if (value === null || typeof value !== "object") return undefined;
-  if (key in value) return value[key];
-  for (const child of Object.values(value)) {
-    const found = findKey(child, key);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-};
-const regenerateTitle = async () => {
-  await dispatch(cookie, { type: "thread.metadata.update", commandId: uuid(), threadId, title: "New thread" });
-  const commandId = uuid();
-  await dispatch(cookie, { type: "thread.metadata.update", commandId, threadId, regenerateTitle: true });
-  const started = Date.now();
-  while (Date.now() - started < 3 * 60_000) {
-    const projection = projectionOf(await threadWindow(cookie, threadId).catch(() => undefined));
-    const last = findKey(projection, "lastTitleRegeneration");
-    if (last?.requestId === commandId) return { outcome: last.status as string, message: (last.message ?? null) as string | null, title: findKey(projection, "title") as string };
-    await sleep(1500);
-  }
-  return { outcome: "timeout", message: null, title: null };
-};
-const title = await regenerateTitle();
+const title = await regenerateTitle(cookie, threadId);
 report.title = clean(title);
 check("a thread's title is generated on the endpoint's model", title.outcome === "renamed" && typeof title.title === "string" && title.title !== "New thread", title);
 
 // 3. No Model proxy: its model's text generation says so.
 await updateSettings(cookie, { textGenerationModelSelection: { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5" } });
-const proxyTitle = await regenerateTitle();
+const proxyTitle = await regenerateTitle(cookie, threadId);
 report.proxyModel = clean(proxyTitle);
 check("the stage has no Model proxy", proxyTitle.outcome === "failed" && /model proxy is not configured/i.test(proxyTitle.message ?? ""), proxyTitle);
 

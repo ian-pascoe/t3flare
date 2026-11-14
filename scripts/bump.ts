@@ -27,6 +27,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { scrubSecrets, secretsOf, stageEndpointSpec } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
+
 const root = path.resolve(import.meta.dirname, "..");
 const t3 = path.join(root, "t3code");
 const environment = path.join(root, "apps/environment");
@@ -117,7 +119,10 @@ const finish = (ok: boolean, note?: string) => {
     lock: lockLine ?? null,
     rollback: rollbackResult ?? null,
   };
-  fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`);
+  // SPI-1175: the report is an artifact; the Model endpoint's key and header values never reach it, even where a step's
+  // output repeated one (the workflow masks them in the log, not in files).
+  const endpoint = stageEndpointSpec(process.env);
+  fs.writeFileSync(reportFile, `${scrubSecrets(JSON.stringify(report, null, 2), endpoint.ok ? secretsOf(endpoint.spec) : [])}\n`);
   console.log(`\nbump ${ok ? "PASSED" : "FAILED"}: ${from} → ${to ?? "?"}${note ? ` (${note})` : ""}; report in ${path.relative(root, reportFile)}`);
   for (const s of steps) console.log(`  ${s.ok ? "ok  " : "FAIL"} ${s.name} (${s.seconds} s)`);
   process.exit(ok ? 0 : 1);

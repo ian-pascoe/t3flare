@@ -1,9 +1,22 @@
 // SPI-1175: the Model endpoint a stage, the acceptance test and CI set up through the panel's API: where its spec comes
 // from (scripts/lib/modelEndpointSpec.ts), and how it is saved (scripts/lib/modelEndpoint.ts).
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { type AdminCall, ensureModelEndpoint } from "../scripts/lib/modelEndpoint.ts";
-import { commissaryEndpoint, modelEndpointSecret, modelEndpointSpec, type ModelEndpointSpec } from "../scripts/lib/modelEndpointSpec.ts";
+import { ENDPOINT_APIS, type EndpointApi } from "@t3flare/models/endpoints";
+
+import {
+  commissaryEndpoint,
+  maskCommands,
+  modelEndpointSecret,
+  modelEndpointSpec,
+  type ModelEndpointSpec,
+  scrubSecrets,
+  secretsOf,
+  SPEC_APIS,
+  type SpecApi,
+  stageEndpointSpec,
+} from "../scripts/lib/modelEndpointSpec.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
 import type { Discovery } from "../src/endpoints/discover.ts";
 import { endpointStore } from "../src/endpoints/store.ts";
@@ -114,6 +127,7 @@ describe("modelEndpointSpec", () => {
       JSON.stringify({ id: "x", baseUrl: "https://a.example", apiKey: KEY, models: "all" }),
       JSON.stringify({ id: "x", baseUrl: "https://a.example", apiKey: KEY, match: "(" }),
       JSON.stringify({ id: "x", baseUrl: "https://a.example", apiKey: KEY, headers: { "x-a": 1 } }),
+      JSON.stringify({ id: "x", baseUrl: "https://a.example", apiKey: KEY, api: "bedrock" }),
     ];
     for (const value of cases) {
       const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value }, { derive: true });
@@ -125,6 +139,42 @@ describe("modelEndpointSpec", () => {
         expect(found.reason).not.toContain("a.example");
       }
     }
+  });
+});
+
+describe("the APIs a spec may name", () => {
+  it("are the endpoints' own", () => {
+    expect([...SPEC_APIS]).toEqual([...ENDPOINT_APIS]);
+    expectTypeOf<SpecApi>().toEqualTypeOf<EndpointApi>();
+  });
+});
+
+describe("stageEndpointSpec (stage.ts and acceptance.ts)", () => {
+  const proxy = { MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: KEY };
+  it("derives Commissary's endpoint on a laptop", () => {
+    expect(stageEndpointSpec(proxy)).toMatchObject({ ok: true, source: "MODEL_PROXY_URL" });
+  });
+  it("derives nothing in CI, even with the proxy's settings", () => {
+    expect(stageEndpointSpec({ ...proxy, GITHUB_ACTIONS: "true" })).toEqual({ ok: false, invalid: false, reason: "T3FLARE_MODEL_ENDPOINT is not set" });
+  });
+});
+
+const HEADER_SECRET = "gw-route-token-5555";
+const WITH_HEADERS = JSON.stringify({ id: "gw", baseUrl: "https://gw.example.com", apiKey: KEY, headers: { "x-gateway-token": HEADER_SECRET, "x-short": "1" } });
+
+describe("masking and scrubbing the endpoint's secrets", () => {
+  it("masks the key and each header value in CI, each on its own; short values are left", () => {
+    expect(maskCommands({ T3FLARE_MODEL_ENDPOINT: WITH_HEADERS })).toEqual([`::add-mask::${KEY}`, `::add-mask::${HEADER_SECRET}`]);
+  });
+  it("masks nothing more when the setting is unset or unusable (GitHub masks the whole value)", () => {
+    expect(maskCommands({})).toEqual([]);
+    expect(maskCommands({ T3FLARE_MODEL_ENDPOINT: "{not json" })).toEqual([]);
+  });
+  it("scrubs the key and header values from any text", () => {
+    const parsed = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: WITH_HEADERS }, { derive: false });
+    if (!parsed.ok) throw new Error(parsed.reason);
+    const text = scrubSecrets(`{"error":"bad ${KEY} and ${HEADER_SECRET}","n":1}`, secretsOf(parsed.spec));
+    expect(text).toBe('{"error":"bad [redacted] and [redacted]","n":1}');
   });
 });
 
@@ -207,7 +257,15 @@ describe("ensureModelEndpoint", () => {
     const result = await ensureModelEndpoint(refusing, { ...COMMISSARY, models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
     expect(result.ok).toBe(false);
     expect(JSON.stringify(result)).not.toContain(KEY);
-    expect(result).toEqual({ ok: false, error: "the Harness panel refused the Model endpoint \"commissary\" (HTTP 400): refused /_t3flare/harness/api/endpoints with [the key]" });
+    expect(result).toEqual({ ok: false, error: "the Harness panel refused the Model endpoint \"commissary\" (HTTP 400): refused /_t3flare/harness/api/endpoints with [redacted]" });
+  });
+
+  it("scrubs a header's value from a refusal too", async () => {
+    const refusing: AdminCall = async (method) =>
+      method === "GET" ? { status: 200, text: JSON.stringify({ revision: 0, endpoints: [] }) } : { status: 400, text: `bad header ${HEADER_SECRET}` };
+    const result = await ensureModelEndpoint(refusing, { ...COMMISSARY, headers: { "x-gateway-token": HEADER_SECRET }, models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
+    expect(JSON.stringify(result)).not.toContain(HEADER_SECRET);
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining("bad header [redacted]") });
   });
 
   it("refuses an endpoint the panel's validation refuses (a plain-http URL), saying why", async () => {

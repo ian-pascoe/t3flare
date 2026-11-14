@@ -12,14 +12,22 @@
 // proxy's URL and key, its Claude models. CI derives nothing (`derive: false`): it has the secret or skips the setup.
 // `infra/github.ts` (`ci:setup`) derives the secret the same way. No dependency: both read this file.
 //
-// No message here repeats the value: it holds a key.
+// No message here repeats the value: it holds a key. In CI each of its secrets is masked by value (`maskCommands`, run by
+// `mask-endpoint.ts` as the workflows' first step), because GitHub masks only the whole JSON string.
 
 export const MODEL_ENDPOINT_VAR = "T3FLARE_MODEL_ENDPOINT";
+
+/**
+ * The APIs an endpoint may speak: `ENDPOINT_APIS` of `@t3flare/models/endpoints`, restated so `infra` can read this file
+ * without that package (modelEndpointSetup.test.ts checks the two are the same).
+ */
+export const SPEC_APIS = ["anthropic-messages", "openai-responses", "openai-completions", "google-generative-ai", "mistral-conversations"] as const;
+export type SpecApi = (typeof SPEC_APIS)[number];
 
 export interface ModelEndpointSpec {
   readonly id: string;
   readonly label: string;
-  readonly api: string;
+  readonly api: SpecApi;
   readonly baseUrl: string;
   readonly apiKey: string;
   readonly headers: Readonly<Record<string, string>>;
@@ -62,7 +70,7 @@ const parse = (text: string): ModelEndpointSpecResult => {
   if (!isText(baseUrl)) return invalid("has no baseUrl");
   if (!isText(apiKey)) return invalid("has no apiKey");
   if (label !== undefined && !isText(label)) return invalid("has a label that is not text");
-  if (api !== undefined && !isText(api)) return invalid("has an api that is not text");
+  if (api !== undefined && !SPEC_APIS.includes(api as SpecApi)) return invalid(`has an api that is not one of ${SPEC_APIS.join(", ")}`);
   if (headers !== undefined && !(isRecord(headers) && Object.values(headers).every((header) => typeof header === "string"))) return invalid("has headers that are not names to text");
   if (models !== undefined && !(Array.isArray(models) && models.every(isText))) return invalid("has models that are not a list of ids");
   if (match !== undefined) {
@@ -79,7 +87,7 @@ const parse = (text: string): ModelEndpointSpecResult => {
     spec: {
       id,
       label: label ?? id,
-      api: api ?? "anthropic-messages",
+      api: (api ?? "anthropic-messages") as SpecApi,
       baseUrl,
       apiKey,
       headers: (headers ?? {}) as Record<string, string>,
@@ -104,4 +112,30 @@ export const modelEndpointSpec = (env: Readonly<Record<string, string | undefine
   const key = env.MODEL_PROXY_API_KEY;
   if (isText(url) && isText(key)) return { ok: true, source: "MODEL_PROXY_URL", spec: commissaryEndpoint(url, key) };
   return { ok: false, invalid: false, reason: `neither ${MODEL_ENDPOINT_VAR} nor MODEL_PROXY_URL and MODEL_PROXY_API_KEY are set` };
+};
+
+/** The stages' rule (stage.ts and acceptance.ts): CI derives nothing, a laptop derives Commissary's from the proxy. */
+export const stageEndpointSpec = (env: Readonly<Record<string, string | undefined>>): ModelEndpointSpecResult =>
+  modelEndpointSpec(env, { derive: env.GITHUB_ACTIONS !== "true" });
+
+/** Shorter values are not masked or scrubbed: no credential is that short, and masking one would garble every log line. */
+const MIN_SECRET_LENGTH = 4;
+
+/** The values of `spec` no log, report or artifact may carry: its key and every header's value. */
+export const secretsOf = (spec: Pick<ModelEndpointSpec, "apiKey" | "headers">): ReadonlyArray<string> =>
+  [spec.apiKey, ...Object.values(spec.headers)].flatMap((value) => value.split(/\r?\n/)).map((value) => value.trim()).filter((value) => value.length >= MIN_SECRET_LENGTH);
+
+/** `text` with each of `secrets` replaced. */
+export const scrubSecrets = (text: string, secrets: ReadonlyArray<string>): string =>
+  [...secrets].sort((a, b) => b.length - a.length).reduce((scrubbed, secret) => scrubbed.split(secret).join("[redacted]"), text);
+
+/**
+ * GitHub's workflow commands that mask `T3FLARE_MODEL_ENDPOINT`'s key and header values, each on its own, for the rest of
+ * the job. Nothing when it is unset or not an endpoint: the whole value is masked by GitHub already.
+ */
+export const maskCommands = (env: Readonly<Record<string, string | undefined>>): ReadonlyArray<string> => {
+  const given = env[MODEL_ENDPOINT_VAR];
+  if (given === undefined || given.trim() === "") return [];
+  const parsed = parse(given);
+  return parsed.ok ? secretsOf(parsed.spec).map((secret) => `::add-mask::${secret}`) : [];
 };

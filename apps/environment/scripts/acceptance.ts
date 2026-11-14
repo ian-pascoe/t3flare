@@ -36,7 +36,7 @@ import * as fs from "node:fs";
 import { defaultTextModel } from "@t3flare/models/endpoints";
 
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
-import { modelEndpointSpec } from "./lib/modelEndpointSpec.ts";
+import { scrubSecrets, secretsOf, stageEndpointSpec } from "./lib/modelEndpointSpec.ts";
 
 const arg = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`);
@@ -113,7 +113,7 @@ const adminCall = adminClient({
   clientId: process.env.T3FLARE_ACCESS_CLIENT_ID ?? "",
   clientSecret: process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "",
 });
-const endpointSpec = modelEndpointSpec(process.env, { derive: process.env.GITHUB_ACTIONS !== "true" });
+const endpointSpec = stageEndpointSpec(process.env);
 let endpointModel: string | undefined;
 if (endpointSpec.ok) {
   const result = await ensureModelEndpoint(adminCall, endpointSpec.spec, { overwrite: true, waitMs: 120_000 });
@@ -146,20 +146,11 @@ const cookie = paired.cookie;
 // a selection on a provider that is off to another (its fallback), and a new Environment has the Durable agent off: turn it
 // on first, as the client's onboarding "Turn on" does (and the real turn does).
 if (endpointModel !== undefined) {
-  const { wsCall, sleep } = await import("./lib/client.ts");
-  await wsCall(cookie, "server.updateSettings", {
-    patch: {},
-    providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } },
-  });
+  const { enablePiDurable, waitForTextGenerationSetting } = await import("./lib/client.ts");
+  await enablePiDurable(cookie);
   const listed = JSON.parse((await adminCall("GET", "/_t3flare/harness/api/endpoints")).text) as { revision: number; endpoints: Array<any> };
   const expected = defaultTextModel({ revision: listed.revision, endpoints: listed.endpoints });
-  const setting = async () => ((await wsCall(cookie, "server.getConfig", {})) as any)?.settings?.textGenerationModelSelection ?? null;
-  const waited = Date.now();
-  let seen = await setting();
-  while (seen?.model !== expected && Date.now() - waited < 30_000) {
-    await sleep(1000);
-    seen = await setting();
-  }
+  const seen = await waitForTextGenerationSetting(cookie, expected);
   report.textGeneration = { expected: expected ?? null, instanceId: seen?.instanceId ?? null, model: seen?.model ?? null };
   check("text generation names the Model endpoints' default", expected !== undefined && seen?.instanceId === "piDurable" && seen?.model === expected, report.textGeneration);
 }
@@ -373,7 +364,8 @@ if (peer) {
 report.totalMs = ms();
 report.failures = failures;
 report.ok = failures.length === 0;
-const text = JSON.stringify(report, null, 2);
+// The report is kept (bump.ts puts it in bump-report.json, an artifact): never with the endpoint's key or header values.
+const text = scrubSecrets(JSON.stringify(report, null, 2), endpointSpec.ok ? secretsOf(endpointSpec.spec) : []);
 console.log(text);
 if (outFile) fs.writeFileSync(outFile, `${text}\n`);
 process.exit(report.ok ? 0 : 1);
