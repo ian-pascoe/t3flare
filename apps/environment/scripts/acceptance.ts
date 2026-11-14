@@ -5,6 +5,9 @@
 //   T3FLARE_ACCESS_CLIENT_ID=… T3FLARE_ACCESS_CLIENT_SECRET=… node scripts/acceptance.ts [--threads 12] [--runs 4] [--out file.json]
 //
 // 1. The admin guard: refused without the admin token, admitted with Access (service token) plus the token.
+// 1b. The Model endpoint (SPI-1175): set up through the Harness panel's API from T3FLARE_MODEL_ENDPOINT (or, off CI, the
+//     Model proxy's settings: Commissary); the text-generation setting then names its default, and the real turn runs on
+//     its small model. Without a setting (CI before `ci:setup`), skipped and said so, and the real turn uses the proxy.
 // 2. Auth: the descriptor reports `remote-reachable`; the bootstrap token is refused until pairing is armed,
 //    pairs while armed (what the web client's /pair#token=… does), and is refused again once disarmed.
 // 3. A stock-protocol client over /ws (t3's own WsRpcGroup): create a project and threads, list them, open one.
@@ -29,6 +32,11 @@ import * as Stream from "effect/Stream";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 import * as Socket from "effect/socket/Socket";
 import * as fs from "node:fs";
+
+import { defaultTextModel } from "@t3flare/models/endpoints";
+
+import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
+import { modelEndpointSpec } from "./lib/modelEndpointSpec.ts";
 
 const arg = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`);
@@ -98,6 +106,24 @@ if (!check("admin health admitted", health0.status === 200, health0)) {
   process.exit(1);
 }
 
+// 1b. The Model endpoint, through the panel's API with the same service token and admin token.
+const adminCall = adminClient({
+  url: base.origin,
+  adminToken,
+  clientId: process.env.T3FLARE_ACCESS_CLIENT_ID ?? "",
+  clientSecret: process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "",
+});
+const endpointSpec = modelEndpointSpec(process.env, { derive: process.env.GITHUB_ACTIONS !== "true" });
+let endpointModel: string | undefined;
+if (endpointSpec.ok) {
+  const result = await ensureModelEndpoint(adminCall, endpointSpec.spec, { overwrite: true, waitMs: 120_000 });
+  report.modelEndpoint = { source: endpointSpec.source, ...result };
+  if (check("Model endpoint set up through the panel's API", result.ok, result) && result.ok) endpointModel = result.turnModel;
+} else {
+  report.modelEndpoint = { skipped: endpointSpec.reason };
+  check("the Model endpoint's setting is usable", !endpointSpec.invalid, endpointSpec.reason);
+}
+
 // 2. Auth.
 const descriptor = (await (await fetch(new URL("/.well-known/t3/environment", base))).json()) as Record<string, any>;
 const session = (await (await fetch(new URL("/api/auth/session", base))).json()) as Record<string, any>;
@@ -115,6 +141,28 @@ if (!check("pairs while armed", paired.status === 200, paired.body.slice(0, 300)
   process.exit(1);
 }
 const cookie = paired.cookie;
+
+// 1b, continued. While the owner has picked no model, text generation names the endpoints' default (SPI-1163). t3 resolves
+// a selection on a provider that is off to another (its fallback), and a new Environment has the Durable agent off: turn it
+// on first, as the client's onboarding "Turn on" does (and the real turn does).
+if (endpointModel !== undefined) {
+  const { wsCall, sleep } = await import("./lib/client.ts");
+  await wsCall(cookie, "server.updateSettings", {
+    patch: {},
+    providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } },
+  });
+  const listed = JSON.parse((await adminCall("GET", "/_t3flare/harness/api/endpoints")).text) as { revision: number; endpoints: Array<any> };
+  const expected = defaultTextModel({ revision: listed.revision, endpoints: listed.endpoints });
+  const setting = async () => ((await wsCall(cookie, "server.getConfig", {})) as any)?.settings?.textGenerationModelSelection ?? null;
+  const waited = Date.now();
+  let seen = await setting();
+  while (seen?.model !== expected && Date.now() - waited < 30_000) {
+    await sleep(1000);
+    seen = await setting();
+  }
+  report.textGeneration = { expected: expected ?? null, instanceId: seen?.instanceId ?? null, model: seen?.model ?? null };
+  check("text generation names the Model endpoints' default", expected !== undefined && seen?.instanceId === "piDurable" && seen?.model === expected, report.textGeneration);
+}
 
 // 3–4. A client over /ws.
 const socketUrl = new URL("/ws?orchestrationProtocol=2", base);
@@ -265,7 +313,9 @@ check("t3 boots twice in one isolate", reboot.json?.bothBootsServed === true && 
 // 6. A real turn (step 2a): clone the fixture, edit and `bash test.sh` with approvals, the checkpoint; `--push` adds a PR.
 if (process.argv.includes("--real-turn")) {
   const { realTurn } = await import("./lib/realTurn.ts");
-  const real = await realTurn(cookie, { push: process.argv.includes("--push") });
+  // On the Model endpoint's small model when there is one (T3FLARE_REAL_TURN_MODEL wins), else the proxy's.
+  const model = process.env.T3FLARE_REAL_TURN_MODEL ?? endpointModel;
+  const real = await realTurn(cookie, { push: process.argv.includes("--push"), ...(model === undefined ? {} : { model }) });
   report.realTurn = real;
   for (const failure of real.failures) failures.push(`real turn: ${failure}`);
 }

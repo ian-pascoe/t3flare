@@ -153,8 +153,10 @@ export default Alchemy.Stack(
     } as never);
 
     // The model proxy (ADR-0012) and the GitHub App (ADR-0013), from ~/.config/t3flare/dev.env or CI's environment.
-    const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL");
-    const modelProxyKey = Config.Redacted("MODEL_PROXY_API_KEY");
+    // SPI-1175: optional until the hard cut (SPI-1176); a stage without it reaches models through its Model endpoints only,
+    // and both Workers then have neither setting. With the URL, the key is required.
+    const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL").pipe(Config.withDefault(""));
+    const modelProxy = modelProxyUrl === "" ? {} : { MODEL_PROXY_URL: modelProxyUrl, MODEL_PROXY_API_KEY: Config.Redacted("MODEL_PROXY_API_KEY") };
     // Step 4a (ADR-0016, A′): the CLI agents' own proxy key, answered by the Workspace DO's key route only while a CLI
     // process lives there. Never the Workers' MODEL_PROXY_API_KEY; bound to the agents Worker alone.
     const containerModelKey = Config.Redacted("COMMISSARY_CONTAINER_API_KEY");
@@ -259,8 +261,7 @@ export default Alchemy.Stack(
               CODEMODE_SANDBOX: Cloudflare.DurableObject("CodemodeSandbox", { className: "CodemodeSandbox", scriptName: codemodeName }),
             }),
         LOADER: Cloudflare.WorkerLoader(),
-        MODEL_PROXY_URL: modelProxyUrl,
-        MODEL_PROXY_API_KEY: modelProxyKey,
+        ...modelProxy,
         COMMISSARY_CONTAINER_API_KEY: containerModelKey,
         // The model proxy fault route (step 2a part 2) answers on test stages only.
         ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
@@ -312,8 +313,7 @@ export default Alchemy.Stack(
             }),
         T3FLARE_GITHUB_APP_ID: Config.String("T3FLARE_GITHUB_APP_ID"),
         T3FLARE_GITHUB_APP_PRIVATE_KEY: Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),
-        MODEL_PROXY_URL: modelProxyUrl,
-        MODEL_PROXY_API_KEY: modelProxyKey,
+        ...modelProxy,
         ...commissaryManagement,
         ...(containerPrincipal === undefined ? {} : { COMMISSARY_USAGE_PRINCIPALS: containerPrincipal }),
         ...(idleAfterMs === "" ? {} : { T3FLARE_IDLE_AFTER_MS: idleAfterMs }),
