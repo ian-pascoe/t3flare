@@ -93,7 +93,7 @@ SPI-1152 with every code change but one lint fix in a test (`56d9fc1`). `variabl
 - **t3's own commit action fails on this base, with or without a Global mise config** (`git-gh.json`'s control):
   t3's git driver builds its commit context with a temporary `GIT_OBJECT_DIRECTORY` and alternates on its own
   side, which the Container cannot see (`prepareCommitContext.expandSplitIndex`, `not_a_repository`). t3flare's
-  router bridges `GIT_INDEX_FILE` only. Not this change; escalated below. The ticket's "t3's git status and commit"
+  router bridges `GIT_INDEX_FILE` only. Not this change; raised with the orchestrator. The ticket's "t3's git status and commit"
   is covered by t3's status and a commit through the Workspace's git.
 - **Status keeps one lay-down across all Workspaces**: the last to report. Another Workspace's later start replaces
   a "not laid down".
@@ -107,7 +107,7 @@ SPI-1152 with every code change but one lint fix in a test (`56d9fc1`). `variabl
 - **A Durable agent's command that reuses computer's cached handle does not retry a failed lay-down**; the alarm
   does, at most three times per Container.
 - **`hold.json`'s samples** list the kept outcome of the earlier Container until the new one's lay-down ends.
-- **Checks.** `pnpm run check` passes at `56d9fc1` (34/34).
+- **Checks.** `pnpm run check` passes at `9124fdd` (34/34); the commit after it changes only this report.
 
 ## Follow-up to file (pending with the orchestrator)
 
