@@ -13,6 +13,9 @@
 //   owner-only approval card written here (never by the agent) and on the Change page, and the first answer wins. A
 //   change that needs the page (a secret, a sign-in, or text too long for a card, D6) is approved on the page alone.
 // - Every change goes through `ops.ts`, as the panel's do.
+// - The Owner-client door (M5a, SPI-1200; `settingsOwnerCall`, at the end) shares the reads and the planned writes. An
+//   Owner client has no thread or mode: a free change runs, and an asked change becomes an Open change in its
+//   Elicitation mode, which the endpoint (endpoint.ts) delivers and the Change page answers.
 import {
   applyChange,
   applyEnvironmentChange,
@@ -64,7 +67,7 @@ import {
   NETWORK_READS,
   READ_CAP,
   READ_WINDOW_MS,
-  canonicalJson, CHANGE_TTL_MS, type ChangeRecord, changeHash, type ClosedBy, isOpen, newChangeId, type SettingsChanges } from "./changes.ts";
+  canonicalJson, type ChangeCaller, type ChangeMode, CHANGE_TTL_MS, type ChangeRecord, changeHash, type ClosedBy, isOpen, newChangeId, type SettingsChanges } from "./changes.ts";
 import {
   type AnswerDeps,
   answerOpenChange,
@@ -79,12 +82,12 @@ import {
 } from "./openChanges.ts";
 import { type ChangeItem, changeText, type ChangeView, environmentItems, extensionItems, mcpItems, shownSkill } from "./render.ts";
 import { settingsToolOf } from "./tools.ts";
-import { OFF_MESSAGE, type OwnCaller, type ThreadLink, type ThreadModes } from "./caller.ts";
+import { OFF_MESSAGE, type OwnCaller, type OwnerCaller, type ThreadLink, type ThreadModes } from "./caller.ts";
 
 /** How long the owner's card waits (the MCP host's question wait, `QUESTION_WAIT_MS`). */
 export const SETTINGS_CARD_WAIT_MS = 10 * 60_000;
 
-export type { OwnCaller, ThreadLink, ThreadModes } from "./caller.ts";
+export type { OwnCaller, OwnerCaller, ThreadLink, ThreadModes } from "./caller.ts";
 export { OFF_MESSAGE } from "./caller.ts";
 
 export interface SettingsServerDeps {
@@ -833,21 +836,37 @@ const mayNotWrite = (deps: SettingsServerDeps, caller: OwnCaller): { readonly re
  * for any installed repository, so only a caller that may write may preview (the owner's decision). Undefined: the read
  * runs, and is counted.
  */
-const readLimit = (deps: SettingsServerDeps, input: SettingsCallInput, tool: string): McpCallAnswer | undefined => {
+/** Who reads, for the read caps: the caps' key (a thread, or an Owner client's `sub`), what the log names, and whether it may write. */
+interface Reader {
+  readonly key: string;
+  /** "this thread" or "you", as a refusal names the reader. */
+  readonly who: string;
+  readonly log: Readonly<Record<string, unknown>>;
+  readonly mayNotWrite: () => { readonly reason: string; readonly text: string } | undefined;
+}
+
+const ownReader = (deps: SettingsServerDeps, caller: OwnCaller): Reader => ({
+  key: caller.thread ?? "unknown",
+  who: "this thread",
+  log: { door: caller.door, agent: caller.agent, thread: caller.thread ?? null },
+  mayNotWrite: () => mayNotWrite(deps, caller),
+});
+
+const readLimit = (deps: SettingsServerDeps, reader: Reader, tool: string): McpCallAnswer | undefined => {
   const refused = (reason: string, text: string) => {
-    deps.log?.({ t3flare: "settings-refused", via: "mcp", door: input.caller.door, agent: input.caller.agent, thread: input.caller.thread ?? null, tool, outcome: "refused", reason });
+    deps.log?.({ t3flare: "settings-refused", via: "mcp", ...reader.log, tool, outcome: "refused", reason });
     return readError(text);
   };
   if (tool === "preview_skills") {
-    const why = mayNotWrite(deps, input.caller);
+    const why = reader.mayNotWrite();
     if (why !== undefined) return refused(why.reason, `Not previewed: only a caller that may change the skills previews them. ${why.text}`);
   }
-  const key = input.caller.thread ?? "unknown";
+  const key = reader.key;
   const now = deps.ops.now();
   const network = NETWORK_READS.has(tool);
-  if (deps.changes.readsSince(key, "read", now - READ_WINDOW_MS) >= READ_CAP) return refused("read-cap", `Not read: this thread made ${READ_CAP} settings reads in the last hour, the most t3flare allows. Try again later.`);
+  if (deps.changes.readsSince(key, "read", now - READ_WINDOW_MS) >= READ_CAP) return refused("read-cap", `Not read: ${reader.who} made ${READ_CAP} settings reads in the last hour, the most t3flare allows. Try again later.`);
   if (network && deps.changes.readsSince(key, "network", now - READ_WINDOW_MS) >= NETWORK_READ_CAP) {
-    return refused("network-read-cap", `Not read: this thread made ${NETWORK_READ_CAP} reads that reach GitHub or an MCP server in the last hour, the most t3flare allows. Try again later.`);
+    return refused("network-read-cap", `Not read: ${reader.who} made ${NETWORK_READ_CAP} reads that reach GitHub or an MCP server in the last hour, the most t3flare allows. Try again later.`);
   }
   deps.changes.noteRead(key, network ? "network" : "read", now);
   return undefined;
@@ -937,6 +956,45 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
   });
 };
 
+/** One read tool's answer, for either door: `openKey` is the caller's key, whose Open changes `get_status` lists. */
+const runRead = async (deps: SettingsServerDeps, name: string, args: Readonly<Record<string, unknown>>, actor: AuditActor, openKey: string | undefined): Promise<McpCallAnswer> => {
+  switch (name) {
+    case "get_settings":
+      return getSettings(deps, args);
+    case "list_mcp_servers":
+      return listMcpServers(deps, args);
+    case "list_skills":
+      return listSkills(deps, args);
+    case "get_status": {
+      const access = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
+      return read({
+        status: deps.status?.() ?? {},
+        access: { enabled: access?.enabled ?? false, writes: access?.writes ?? true },
+        // This caller's Open changes (plan D8): its thread's, or its Access identity's.
+        openChanges: openKey === undefined ? [] : deps.changes.openBy(openKey).map((record) => openChangeSummary(record, changeUrlOf(deps, record.id))),
+      });
+    }
+    case "read_audit": {
+      const limit = typeof args.limit === "number" ? args.limit : undefined;
+      const before = typeof args.before === "number" ? args.before : undefined;
+      return read(readAudit(deps.ops, { ...(limit === undefined ? {} : { limit }), ...(before === undefined ? {} : { before }) }));
+    }
+    case "test_mcp_server": {
+      // No audit entry: a read through the server must not evict the log of changes (M3 review); the read cap bounds it.
+      const tested = await testMcpServer(deps.ops, stringArg(args, "server") ?? "", { actor, audit: false });
+      if (!tested.ok) return readError(tested.error);
+      const { ok: _ok, ...shown } = tested;
+      return readMcp(shown);
+    }
+    case "preview_skills":
+      return skillsRead(deps, "/preview", { source: stringArg(args, "source") ?? "" }, actor);
+    case "check_skill_updates":
+      return skillsRead(deps, "/check", Array.isArray(args.names) ? { names: args.names } : {}, actor);
+    default:
+      return readError(`${name} is not a read tool of the Settings server`);
+  }
+};
+
 /**
  * One call of the Settings server by t3flare's own agent (the MCP host's branch for kind `settings`). Its answer is the
  * host's: a result for the agent, or unavailable when the server is off.
@@ -947,40 +1005,218 @@ export const settingsCall = async (deps: SettingsServerDeps, input: SettingsCall
   const tool = settingsToolOf(input.tool);
   if (tool === undefined) return { kind: "unavailable", message: `The Settings server has no tool ${input.tool}.`, mayHaveRun: false };
   if (tool.class === "write") return write(deps, input);
-  const limited = readLimit(deps, input, tool.name);
+  const limited = readLimit(deps, ownReader(deps, input.caller), tool.name);
   if (limited !== undefined) return limited;
   const actor: AuditActor = { caller: input.caller.thread === undefined ? "agent" : `agent:${input.caller.thread}`, via: "mcp", ...(input.caller.thread === undefined ? {} : { thread: input.caller.thread }), agent: input.caller.agent };
-  switch (tool.name) {
-    case "get_settings":
-      return getSettings(deps, input.args);
-    case "list_mcp_servers":
-      return listMcpServers(deps, input.args);
-    case "list_skills":
-      return listSkills(deps, input.args);
-    case "get_status":
-      return read({
-        status: deps.status?.() ?? {},
-        access: { enabled: access.enabled, writes: access.writes ?? true },
-        // This caller's Open changes (plan D8): its thread's.
-        openChanges: input.caller.thread === undefined ? [] : deps.changes.openBy(input.caller.thread).map((record) => openChangeSummary(record, changeUrlOf(deps, record.id))),
-      });
-    case "read_audit": {
-      const limit = typeof input.args.limit === "number" ? input.args.limit : undefined;
-      const before = typeof input.args.before === "number" ? input.args.before : undefined;
-      return read(readAudit(deps.ops, { ...(limit === undefined ? {} : { limit }), ...(before === undefined ? {} : { before }) }));
-    }
-    case "test_mcp_server": {
-      // No audit entry: a read through the server must not evict the log of changes (M3 review); the read cap bounds it.
-      const tested = await testMcpServer(deps.ops, stringArg(input.args, "server") ?? "", { actor, audit: false });
-      if (!tested.ok) return readError(tested.error);
-      const { ok: _ok, ...shown } = tested;
-      return readMcp(shown);
-    }
-    case "preview_skills":
-      return skillsRead(deps, "/preview", { source: stringArg(input.args, "source") ?? "" }, actor);
-    case "check_skill_updates":
-      return skillsRead(deps, "/check", Array.isArray(input.args.names) ? { names: input.args.names } : {}, actor);
-    default:
-      return readError(`${tool.name} is not a read tool of the Settings server`);
+  return runRead(deps, tool.name, input.args, actor, input.caller.thread);
+};
+
+// ── The Owner-client door (plan D11, D12; M5a, SPI-1200) ─────────────────────────────────────────────────────────
+//
+// The endpoint (endpoint.ts) reaches the same reads and the same planned writes as the own agents' door, through these
+// entry points. An Owner client has no thread, no Linked work and no runtime mode (plan D7's last column): a read runs, a
+// free change runs, and an asked change becomes an Open change in the client's Elicitation mode, which the endpoint
+// then delivers (a page elicitation, or the link in the result) and which the Change page answers.
+
+/** What an Owner client's call answered: a result now, or an Open change for the endpoint to deliver. */
+export type OwnerCallAnswer =
+  | { readonly kind: "result"; readonly answer: McpCallAnswer }
+  | {
+      readonly kind: "open";
+      readonly record: ChangeRecord;
+      /** The Change page's URL (`U`), when the host is known. */
+      readonly url: string | undefined;
+      /** The server-written text of the change (`M`): the card's text without the agent's call. */
+      readonly message: string;
+    };
+
+export interface OwnerCallInput {
+  readonly tool: string;
+  readonly args: Readonly<Record<string, unknown>>;
+  readonly caller: OwnerCaller;
+  /** The Open change's mode: the request's Elicitation mode, after D12's fallbacks. */
+  readonly mode: Exclude<ChangeMode, "card">;
+}
+
+const ownerReader = (deps: SettingsServerDeps, caller: OwnerCaller): Reader => ({
+  key: caller.key,
+  who: "you",
+  log: { door: "owner", principal: caller.kind },
+  mayNotWrite: () => {
+    const access = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
+    if (access === undefined || !access.enabled) return { reason: "off", text: OFF_MESSAGE };
+    return access.writes === false ? { reason: "read-only", text: READ_ONLY_REFUSAL } : undefined;
+  },
+});
+
+const ownerChangeCaller = (caller: OwnerCaller): ChangeCaller => ({
+  door: "owner",
+  key: caller.key,
+  principal: caller.kind === "owner" ? "owner" : "service-token",
+  ...(caller.client === undefined ? {} : { client: caller.client }),
+});
+
+/** The audit's caller for an Owner client (plan D15): `owner:<sub>`, or `service-token`. */
+const ownerAuditCaller = (caller: OwnerCaller): string => (caller.kind === "owner" ? `owner:${caller.key}` : "service-token");
+
+/** An Open change's message `M` (plan D12): the change as the server wrote it, who asked, and where it is answered. */
+export const ownerMessage = (view: ChangeView, caller: Pick<OwnerCaller, "client">): string =>
+  cardText(
+    [
+      changeText(view),
+      "",
+      `Asked by an Owner client of yours${caller.client === undefined ? "" : ` calling itself ${caller.client.name} (unverified)`}.`,
+      "Approve or decline it on the Change page.",
+    ].join("\n"),
+  );
+
+/** The "waiting" result `W` (plan D12): the change waits for the owner at its page. `note` adds a fallback's reason. */
+export const ownerWaiting = (record: Pick<ChangeRecord, "id">, url: string | undefined, note?: string): McpCallAnswer => {
+  const where = url ?? "the Change page (its link is on the Harness panel's Open changes list)";
+  return written(
+    "waiting",
+    `Waiting for the owner at ${where}. It applies when he approves it there. Do not repeat this call; read the settings to check.${note === undefined ? "" : ` ${note}`}`,
+    { changeId: record.id, ...(url === undefined ? {} : { url }) },
+  );
+};
+
+/** A closed Open change's result for an Owner client (plan D11's statuses). */
+export const ownerOutcome = (outcome: ChangeOutcome, record: ChangeRecord): McpCallAnswer => resultOf(outcome, record, { appliesAt: record.shown?.appliesAt ?? "" });
+
+/**
+ * Withdraws an Owner client's Open change (a `decline` or `cancel` in its client's answer to the page elicitation, plan
+ * D12): answers the change's outcome, which is the earlier one when something answered it first.
+ */
+export const withdrawOwnerChange = (deps: SettingsServerDeps, id: string): ChangeOutcome | undefined => closeOpenChange(answerDepsOf(deps), id, "withdrawn", "client");
+
+/** An asked change from an Owner client (plan D8, D16): opened in `mode`, or the caller's same change already open. */
+const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned: Planned, expected: number): Promise<OwnerCallAnswer> => {
+  const { caller, tool, args } = input;
+  const now = deps.ops.now();
+  const hash = await changeHash(tool, args);
+  const changeCaller = ownerChangeCaller(caller);
+  const log = (event: string, extra: Record<string, unknown>) => deps.log?.({ t3flare: event, via: "mcp", door: "owner", principal: caller.kind, tool, ...extra });
+  // A repeated call (a client that retried, or an agent that did not read `W`) finds its own change, not a second one.
+  const same = deps.changes.openBy(caller.key).find((record) => record.state === "open" && record.hash === hash && record.expectedRevision === expected && record.mode === input.mode);
+  if (same?.shown !== undefined) return { kind: "open", record: same, url: changeUrlOf(deps, same.id), message: ownerMessage(same.shown, caller) };
+  const capped = capRefusal(deps.changes, changeCaller, hash, now, openListOf(deps));
+  if (capped !== undefined) {
+    log("settings-refused", { outcome: "refused", reason: capped.reason });
+    return { kind: "result", answer: written("refused", capped.text, { tier: "asked", reason: capped.reason, ...(capped.changeId === undefined ? {} : { changeId: capped.changeId }) }) };
   }
+  const described = await planned.describe();
+  if ("refused" in described) {
+    log("settings-refused", { outcome: "refused", reason: "invalid" });
+    return { kind: "result", answer: written("refused", `Not changed: ${scrubText(described.refused)}`) };
+  }
+  const view: ChangeView = { entity: planned.entity, subject: planned.subject, revision: expected, appliesAt: planned.appliesAt, reasons: planned.verdict.reasons, items: described.items, lines: described.lines };
+  const id = newChangeId();
+  const url = changeUrlOf(deps, id);
+  const message = ownerMessage(view, caller);
+  const needsPage = planned.verdict.needsPage ?? (visible(changeText(view)).length > CARD_TEXT_MAX ? "oversize" : undefined);
+  const record: ChangeRecord = {
+    id,
+    entity: planned.entity,
+    expectedRevision: expected,
+    tool,
+    args: JSON.parse(canonicalJson(args)) as unknown,
+    hash,
+    tier: "asked",
+    shown: view,
+    ...(needsPage === undefined ? {} : { needsPage }),
+    mode: input.mode,
+    caller: changeCaller,
+    createdAt: now,
+    expiresAt: now + CHANGE_TTL_MS,
+    state: "open",
+  };
+  deps.changes.insert(record);
+  log("settings-change", { outcome: "open", change: id, tier: "asked", mode: input.mode, needsPage: needsPage ?? null });
+  return { kind: "open", record, url, message };
+};
+
+/** An Owner client's write (plan D7's last column): the access switch, validation, the revision, the tier, the caps. */
+const ownerWrite = async (deps: SettingsServerDeps, input: OwnerCallInput): Promise<OwnerCallAnswer> => {
+  const { caller, tool, args } = input;
+  const result = (answer: McpCallAnswer): OwnerCallAnswer => ({ kind: "result", answer });
+  const log = (outcome: string, extra: Record<string, unknown> = {}) =>
+    deps.log?.({ t3flare: outcome === "applied" || outcome === "unchanged" ? "settings-change" : "settings-refused", via: "mcp", door: "owner", principal: caller.kind, tool, outcome, ...extra });
+  const refuse = (reason: string, why: string) => {
+    log("refused", { reason });
+    return result(written("refused", why));
+  };
+  const barred = ownerReader(deps, caller).mayNotWrite();
+  if (barred !== undefined) return refuse(barred.reason, barred.text);
+  const planned = planWrite(deps, tool, args);
+  if ("refused" in planned) return refuse("invalid", `Not changed: ${scrubText(planned.refused)}`);
+  const expected = args.expectedRevision;
+  if (typeof expected !== "number" || !Number.isSafeInteger(expected) || expected < 0) return refuse("invalid", "Not changed: expectedRevision is the revision you read, a whole number.");
+  const current = revisionOf(deps, planned.entity);
+  if (expected !== current) {
+    log("moved", { revision: current });
+    return result(written("moved", `Not changed: the ${planned.entity === "harness" ? "Harness" : "Environment"} settings are at revision ${current}, not ${expected}; read them again.`, { revision: current }));
+  }
+  if (planned.verdict.tier === "unchanged") {
+    log("unchanged");
+    return result(written("unchanged", `Nothing to change: the settings already say so (revision ${current}).`, { revision: current }));
+  }
+  if (planned.verdict.tier !== "free") return ownerAsk(deps, input, planned, expected);
+  const now = deps.ops.now();
+  if (deps.changes.appliedSince(caller.key, now - APPLIED_WINDOW_MS) >= APPLIED_CAP) return refuse("applied-cap", `Not changed: you made ${APPLIED_CAP} settings changes in the last hour, the most t3flare allows. Try again later.`);
+  const actor: AuditActor = { caller: ownerAuditCaller(caller), via: "mcp", ...(caller.client === undefined ? {} : { client: caller.client }), tier: "free" };
+  const ran = await planned.run({ actor, expectedRevision: expected });
+  const revision = revisionOf(deps, planned.entity);
+  if (!ran.ok) {
+    if (ran.moved !== undefined) {
+      log("moved", { revision: ran.moved });
+      return result(written("moved", `Not changed: ${scrubText(ran.error)}`, { revision: ran.moved }));
+    }
+    return refuse("invalid", `Not changed: ${scrubText(ran.error)}`);
+  }
+  if (ran.unchanged === true) {
+    log("unchanged");
+    return result(written("unchanged", `Nothing to change: the settings already say so (revision ${revision}).`, { revision }));
+  }
+  deps.changes.recordApplied({
+    id: newChangeId(),
+    entity: planned.entity,
+    expectedRevision: expected,
+    tool,
+    args: JSON.parse(canonicalJson(args)) as unknown,
+    hash: await changeHash(tool, args),
+    tier: "free",
+    caller: ownerChangeCaller(caller),
+    createdAt: now,
+    expiresAt: now,
+    state: "applied",
+    closed: { at: deps.ops.now(), revision },
+  });
+  log("applied", { tier: "free", entity: planned.entity, revision });
+  return result(written("applied", `Applied: the ${planned.entity === "harness" ? "Harness" : "Environment"} settings are at revision ${revision}. ${planned.appliesAt}`, { revision, appliesAt: planned.appliesAt }));
+};
+
+/**
+ * One call of the Settings server by an Owner client (the Owner-client endpoint, plan D11). The endpoint has checked the
+ * tool exists. Off answers every call refused, naming the panel; read-only refuses every write.
+ */
+export const settingsOwnerCall = async (deps: SettingsServerDeps, input: OwnerCallInput): Promise<OwnerCallAnswer> => {
+  const access = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
+  if (access === undefined || !access.enabled) {
+    deps.log?.({ t3flare: "settings-refused", via: "mcp", door: "owner", principal: input.caller.kind, tool: input.tool, outcome: "refused", reason: "off" });
+    return { kind: "result", answer: written("refused", OFF_MESSAGE) };
+  }
+  const tool = settingsToolOf(input.tool);
+  if (tool === undefined) return { kind: "result", answer: readError(`The Settings server has no tool ${input.tool}.`) };
+  if (tool.class === "write") return ownerWrite(deps, input);
+  const limited = readLimit(deps, ownerReader(deps, input.caller), tool.name);
+  if (limited !== undefined) return { kind: "result", answer: limited };
+  const actor: AuditActor = { caller: ownerAuditCaller(input.caller), via: "mcp", ...(input.caller.client === undefined ? {} : { client: input.caller.client }) };
+  return { kind: "result", answer: await runRead(deps, tool.name, input.args, actor, input.caller.key) };
+};
+
+/** Whether the Settings server lists `tool` to an Owner client now (plan D2's access switch): off lists none, read-only no write. */
+export const ownerListed = (deps: Pick<SettingsServerDeps, "ops">): ((tool: { readonly class: ToolClass }) => boolean) => {
+  const access = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
+  if (access === undefined || !access.enabled) return () => false;
+  return (tool) => tool.class === "read" || access.writes !== false;
 };

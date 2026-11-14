@@ -21,5 +21,17 @@ export interface OwnCaller {
   readonly agent: string;
 }
 
+/**
+ * An Owner client calling the Owner-client endpoint (plan D11, M5a): who Access admitted, as the Worker verified it. `key`
+ * is the caps' key: the Access `sub`, or `service-token`. `client` is the client's own label, display only and never
+ * trusted.
+ */
+export interface OwnerCaller {
+  readonly door: "owner";
+  readonly kind: "owner" | "service-token";
+  readonly key: string;
+  readonly client?: { readonly name: string; readonly source: string };
+}
+
 /** The answer to any call while the owner has the Settings server off (plan D2): the MCP host's and the server's. */
 export const OFF_MESSAGE = "The owner turned the Settings server off; only the Harness panel turns it back on.";

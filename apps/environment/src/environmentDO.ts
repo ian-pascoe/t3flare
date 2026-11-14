@@ -36,6 +36,7 @@ import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
 import { type ModelRelayTarget, relayTargetOf } from "@t3flare/models/relay";
 import type { SkillsApiDeps } from "./skills/api.ts";
+import type { EndpointCaller } from "./settings/endpoint.ts";
 import type { SettingsServerDeps } from "./settings/server.ts";
 import { githubReader, readAccessFor } from "./skills/contents.ts";
 import { type SkillStore, skillStore } from "./skills/store.ts";
@@ -431,6 +432,33 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async modelRelayTarget(input: { readonly endpointId: string }): Promise<ModelRelayTarget> {
     const endpointId = String(input.endpointId);
     return relayTargetOf(await this.#endpointStore().resolve(endpointId), endpointId);
+  }
+
+  /**
+   * The Owner-client endpoint (ADR-0034, plan D11), RPC from the Worker after it verified the endpoint's own Access
+   * application (D13). Never boots t3. Open work while it runs, and while a held stream is open (plan D17).
+   */
+  async settingsMcp(request: Request, caller: EndpointCaller): Promise<Response> {
+    Idle.requestStarted();
+    try {
+      const [{ handleSettingsMcp }, { settingsStateKey }] = await Promise.all([import("./settings/endpoint.ts"), import("./settings/tokens.ts")]);
+      return await handleSettingsMcp(request, caller, {
+        server: await this.#settingsDeps(),
+        stateKey: () => settingsStateKey(this.ctx.storage.kv),
+        now: () => Date.now(),
+        work: () => {
+          Idle.requestStarted();
+          let open = true;
+          return () => {
+            if (open) Idle.requestEnded();
+            open = false;
+          };
+        },
+        background: (work) => this.ctx.waitUntil(work),
+      });
+    } finally {
+      Idle.requestEnded();
+    }
   }
 
   /** The Container budget DO's state: its leases, each with the Workspace that holds it when known. */

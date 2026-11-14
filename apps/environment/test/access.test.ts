@@ -9,6 +9,8 @@ import {
   timingSafeEqual,
   verifyAdminRequest,
   verifyAdminToken,
+  verifyHarnessRequest,
+  verifySettingsRequest,
 } from "../src/access.ts";
 
 const TEAM = "team.cloudflareaccess.com";
@@ -118,6 +120,36 @@ describe("verifyAdminRequest", () => {
     expect(verifyAdminToken(request({ authorization: "Bearer admin-token" }), config).admitted).toBe(true);
     expect(verifyAdminToken(request({}), config).admitted).toBe(false);
     expect(verifyAdminToken(request({ authorization: "Bearer admin-token" }), { ...config, adminToken: undefined }).admitted).toBe(false);
+  });
+});
+
+describe("verifySettingsRequest (ADR-0034, plan D13): the Owner-client endpoint's own Access application", () => {
+  const SETTINGS_AUD = "the-settings-aud";
+  const settings: GuardConfig = { ...config, audience: SETTINGS_AUD };
+  const at = (path: string, headers: Record<string, string>) => new Request(`https://env.example${path}`, { method: "POST", headers });
+
+  it("admits the owner's assertion for its own audience alone, with a sub, and the service token only with the admin token", async () => {
+    const owner = await sign(ownerClaims({ aud: [SETTINGS_AUD], sub: "owner-sub" }));
+    expect(await verifySettingsRequest(at("/_t3flare/mcp", { "cf-access-jwt-assertion": owner }), settings, keys, NOW)).toEqual({ admitted: true, caller: { kind: "owner", subject: "owner-sub" } });
+    const noSub = await sign(ownerClaims({ aud: [SETTINGS_AUD] }));
+    expect(await verifySettingsRequest(at("/_t3flare/mcp", { "cf-access-jwt-assertion": noSub }), settings, keys, NOW)).toEqual({ admitted: false, reason: "malformed" });
+    const emptySub = await sign(ownerClaims({ aud: [SETTINGS_AUD], sub: "" }));
+    expect(await verifySettingsRequest(at("/_t3flare/mcp", { "cf-access-jwt-assertion": emptySub }), settings, keys, NOW)).toEqual({ admitted: false, reason: "malformed" });
+    const service = await sign(ownerClaims({ aud: [SETTINGS_AUD], email: undefined, common_name: SERVICE_CLIENT }));
+    expect(await verifySettingsRequest(at("/_t3flare/mcp", { "cf-access-jwt-assertion": service }), settings, keys, NOW)).toEqual({ admitted: false, reason: "bad_admin_token" });
+    expect(await verifySettingsRequest(at("/_t3flare/mcp", { "cf-access-jwt-assertion": service, authorization: "Bearer admin-token" }), settings, keys, NOW)).toEqual({ admitted: true, caller: { kind: "service-token" } });
+    expect(await verifySettingsRequest(at("/_t3flare/mcp", {}), { ...settings, audience: undefined }, keys, NOW)).toEqual({ admitted: false, reason: "not_configured" });
+  });
+
+  it("refuses the panel's audience at the endpoint, and the endpoint's audience at the panel", async () => {
+    const panelAssertion = await sign(ownerClaims({ sub: "owner-sub" }));
+    expect(await verifySettingsRequest(at("/_t3flare/mcp", { "cf-access-jwt-assertion": panelAssertion }), settings, keys, NOW)).toEqual({ admitted: false, reason: "wrong_audience" });
+    const endpointAssertion = await sign(ownerClaims({ aud: [SETTINGS_AUD], sub: "owner-sub" }));
+    expect(await verifyHarnessRequest(at("/_t3flare/harness", { "cf-access-jwt-assertion": endpointAssertion }), config, keys, NOW)).toEqual({ admitted: false, reason: "wrong_audience" });
+    expect(await verifyAdminRequest(at("/_t3flare/health", { "cf-access-jwt-assertion": endpointAssertion, authorization: "Bearer admin-token" }), config, keys, NOW)).toEqual({
+      admitted: false,
+      reason: "wrong_audience",
+    });
   });
 });
 

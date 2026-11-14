@@ -6,6 +6,8 @@ import { OAUTH_PUBLIC_PATHS } from "./harness/oauth.ts";
 import * as Access from "./access.ts";
 import type { EnvironmentEnv } from "./environmentDO.ts";
 import { type HarnessCaller, isHarnessPath } from "./harness/panel.ts";
+import type { EndpointCaller } from "./settings/endpoint.ts";
+import { isSettingsMcpPath, SETTINGS_MCP_PATH } from "./settings/ownerDoor.ts";
 
 export { EnvironmentDO } from "./environmentDO.ts";
 // G11 (ADR-0031): Browser Run's `outboundByHost` target for the Container preview hosts; no public route reaches it.
@@ -13,7 +15,9 @@ export { ContainerPreviews } from "./preview/containerPreviews.ts";
 
 export interface Env extends EnvironmentEnv {
   readonly ENVIRONMENT: {
-    getByName(name: string): { fetch(request: Request): Promise<Response>; harness(request: Request, caller: HarnessCaller): Promise<Response>; harnessPublic(request: Request): Promise<Response> };
+    getByName(name: string): { fetch(request: Request): Promise<Response>; harness(request: Request, caller: HarnessCaller): Promise<Response>; harnessPublic(request: Request): Promise<Response>;
+      settingsMcp(request: Request, caller: EndpointCaller): Promise<Response>;
+    };
   };
   readonly ASSETS: { fetch(request: Request): Promise<Response> };
   readonly T3FLARE_ADMIN_TOKEN?: string;
@@ -21,6 +25,8 @@ export interface Env extends EnvironmentEnv {
   readonly T3FLARE_ACCESS_AUD?: string;
   readonly T3FLARE_OWNER_EMAIL?: string;
   readonly T3FLARE_ACCESS_SERVICE_CLIENT_ID?: string;
+  /** The `aud` of the Owner-client endpoint's own Access application (ADR-0034, plan D13). */
+  readonly T3FLARE_ACCESS_SETTINGS_AUD?: string;
   /** Set only by wrangler.local.jsonc: there is no Access in front of localhost. */
   readonly T3FLARE_LOCAL_MODE?: string;
 }
@@ -57,6 +63,21 @@ export default {
     // The direct MCP servers' OAuth callback and client metadata document (ADR-0026, ADR-0010's refinement): public, GET
     // only, exact paths; the callback checks its single-use state.
     if (OAUTH_PUBLIC_PATHS.has(url.pathname)) return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).harnessPublic(request);
+    // The Owner-client endpoint (ADR-0034, plan D11, D13; layout (B), settings/ownerDoor.ts) at `/_t3flare/mcp`, behind its
+    // own Access application with managed OAuth: verified against that application's audience, never the panel's, so a
+    // token for one is refused at the other. Before the generic `/_t3flare` branch, which would ask for the admin token.
+    if (isSettingsMcpPath(url.pathname)) {
+      const config = { ...guardConfig(env), audience: env.T3FLARE_ACCESS_SETTINGS_AUD };
+      // Local mode (local workerd only): the admin token alone, on loopback, as the service-token caller (plan D17).
+      const local = env.T3FLARE_LOCAL_MODE === "true" && LOOPBACK_HOST.test(url.host);
+      const verdict = local ? Access.verifyAdminToken(request, config) : await Access.verifySettingsRequest(request, config, keysFor(config.teamDomain ?? ""));
+      if (!verdict.admitted || url.pathname !== SETTINGS_MCP_PATH) {
+        console.log(JSON.stringify({ t3flare: "settings-refused", via: "mcp", door: "owner", reason: verdict.admitted ? "path" : verdict.reason, path: url.pathname }));
+        return new Response("Not found\n", { status: 404, headers: { "cache-control": "no-store" } });
+      }
+      const caller: EndpointCaller = !local && verdict.caller.kind === "owner" ? { kind: "owner", subject: verdict.caller.subject ?? "" } : { kind: "service-token" };
+      return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).settingsMcp(request, caller);
+    }
     // The harness panel (ADR-0026) at `/_t3flare/harness`, behind the `/_t3flare` Access application (owner, 2026-11-12,
     // back to stock: no admin host). The owner's own Access identity reaches the panel without the admin token; every
     // other admin route still needs it.
