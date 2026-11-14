@@ -92,11 +92,23 @@ const cleanup = async () => {
   const rounds: Array<Record<string, unknown>> = [];
   for (let round = 0; round < 3; round++) {
     await writeFile(WORKSPACE, `round-${round}.txt`, `${round}\n`);
+    // Watched while the draft runs: its bridges, and its folders in the Workspace's files.
+    const seen = { liveBridges: new Set<string>(), folders: new Set<string>() };
+    let watching = true;
+    const watch = (async () => {
+      while (watching) {
+        const [live, folders] = await Promise.all([trace().then((answer) => answer.gitBridges as Array<{ bridged: string }>), bridgedFolders(WORKSPACE)]);
+        for (const entry of live) seen.liveBridges.add(entry.bridged);
+        for (const folder of folders) seen.folders.add(folder);
+      }
+    })();
     const done = await t3Commit(cookie, { id: WORKSPACE, cwd: root, filePaths: [`round-${round}.txt`], message: `pgitobj: cleanup round ${round}` });
+    watching = false;
+    await watch;
     // t3's status poll runs git, which reaps the drafts t3 has ended.
     await wsCall(cookie, "vcs.refreshStatus", { cwd: root }).catch(() => undefined);
     await sleep(2_000);
-    rounds.push({ committed: committed(done, [`round-${round}.txt`]), liveBridges: (await trace()).gitBridges, bridgedFolders: await bridgedFolders(WORKSPACE) });
+    rounds.push({ committed: committed(done, [`round-${round}.txt`]), duringDraft: { liveBridges: [...seen.liveBridges], folders: [...seen.folders] }, liveBridges: (await trace()).gitBridges, bridgedFolders: await bridgedFolders(WORKSPACE) });
   }
   // The Container's copy of the harness tmp/ (the Workspace's files are the truth; the Container's is synced).
   const inContainer = await call(WORKSPACE, { exec: { script: `ls -1 ${TMP} 2>/dev/null | grep -E '^(index|objects)-' || true`, timeoutMs: 60_000 } });
@@ -106,7 +118,7 @@ const cleanup = async () => {
     rounds,
     after,
     inContainer: String(inContainer?.result?.stdout ?? "").split("\n").filter(Boolean),
-    ok: rounds.every((round) => round.committed === true && (round.liveBridges as Array<unknown>).length === 0 && (round.bridgedFolders as Array<string>).length === 0) && after.length === 0,
+    ok: rounds.every((round) => round.committed === true && (round.duringDraft as { folders: Array<string> }).folders.length > 0 && (round.liveBridges as Array<unknown>).length === 0 && (round.bridgedFolders as Array<string>).length === 0) && after.length === 0,
   });
   await reset(WORKSPACE);
 };
@@ -119,6 +131,10 @@ const commitWhileStopped = async (id: string, root: string, primed: boolean) => 
     await reset(id);
     await sleep(5_000);
   }
+  // A client watching the project while its Container runs (after the clone): t3's status reads get real answers, as
+  // they would in use; those are passive, so they prime nothing.
+  const watched = await containerOf(id);
+  await wsCall(cookie, "vcs.refreshStatus", { cwd: root }).catch(() => undefined);
   const stopped = await stop(id);
   const stamp = Date.now().toString(36);
   await writeFile(id, "while-stopped.txt", `${stamp}\n`);
@@ -130,7 +146,7 @@ const commitWhileStopped = async (id: string, root: string, primed: boolean) => 
   const commands = gitIn((await trace(true)).entries, root);
   const draftReads = commands.filter((entry) => DRAFT_READS.includes(entry.argv));
   const starter = commands.find((entry) => /started the Container|^action/.test(String(entry.detail)));
-  return { stopped, afterPoll, report: done, draftReads, firstToRun: starter ?? null, commands, ok: stopped && afterPoll?.running === false && committed(done, ["while-stopped.txt"]) };
+  return { runningWhenWatched: watched?.running ?? null, stopped, afterPoll, report: done, draftReads, firstToRun: starter ?? null, commands, ok: stopped && afterPoll?.running === false && committed(done, ["while-stopped.txt"]) };
 };
 
 const stoppedCase = async () => {
@@ -147,9 +163,19 @@ const fresh = async () => {
   cookie ||= await pair();
   const id = `pgitobj-${Date.now().toString(36)}`;
   const { root } = await ensureProject(cookie, id);
+  // Leftovers as an earlier isolate would leave them (the bridge's map is in memory), beside a file of the Workspace's.
+  const planted = ["index-000000000000000000000000/index", "objects-111111111111111111111111/info/t3flare-draft", "keep.bundle"];
+  for (const file of planted) {
+    const target = `${TMP}/${file}`;
+    await call(id, { fs: { op: "mkdir", path: target.slice(0, target.lastIndexOf("/")), recursive: true } });
+    await call(id, { fs: { op: "write", path: target, data: "x" } });
+  }
+  const before = (((await call(id, { fs: { op: "readdir", path: TMP } }))?.result?.ok ?? []) as Array<{ name: string }>).map((entry) => entry.name);
   const result = await commitWhileStopped(id, root, false);
+  const after = (((await call(id, { fs: { op: "readdir", path: TMP } }))?.result?.ok ?? []) as Array<{ name: string }>).map((entry) => entry.name);
+  const sweep = { before, after, ok: after.includes("keep.bundle") && !after.some((name) => /^(index|objects)-/.test(name)) };
   // Never primed: one of the draft's first reads may start the Container (the allow-list), and the commit goes through.
-  await evidence("fresh.json", { root, ...result });
+  await evidence("fresh.json", { root, ...result, sweep, ok: result.ok && sweep.ok });
   await admin("POST", `/_t3flare/agents/workspace-remove?id=${id}`);
 };
 
