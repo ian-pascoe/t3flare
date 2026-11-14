@@ -5,6 +5,7 @@
 // `requestState`, session and elicitation id refused when tampered, expired, another identity's, another kind's, or for
 // another call, applying nothing. The audiences (the panel's at the endpoint and the endpoint's at the panel) are in
 // access.test.ts; `browser`'s delivery and holds are in settingsModes.test.ts.
+import { applyMcpChange } from "@t3flare/harness-registry";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { BODY_MAX, LEGACY_VERSIONS, MODERN_VERSION, SUPPORTED_VERSIONS } from "../src/settings/endpoint.ts";
@@ -231,6 +232,26 @@ describe("T-endpoint: versions and methods", () => {
       expect(result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
       expect(JSON.stringify(result?.content)).toMatch(/Harness panel/);
     }
+  });
+
+  it("SPI-1195 review: a tool the owner hid on the Settings server's entry is neither listed nor run, as at the own door", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const hid = applyMcpChange(f.store.load(), { op: "server", server: "settings", toolExposure: { change_environment: "hidden", get_status: "hidden" } });
+    if (!hid.ok) throw new Error(hid.error);
+    f.store.save(hid.harness);
+    const listed = (await bodyOf(await endpoint(modern("tools/list")))).result?.tools as Array<{ name: string }>;
+    expect(listed.map((tool) => tool.name)).toEqual(SETTINGS_TOOLS.map((tool) => tool.name).filter((name) => name !== "change_environment" && name !== "get_status"));
+    const revision = f.store.loadEnvironment().revision;
+    for (const name of ["get_status", "change_environment"]) {
+      const result = (await bodyOf(await endpoint(modern("tools/call", { name, arguments: FREE })))).result;
+      expect(result).toMatchObject({ isError: true });
+      expect(JSON.stringify(result?.content)).toContain(`${name} is hidden by the owner.`);
+    }
+    expect(f.store.loadEnvironment().revision).toBe(revision);
+    // The own door refuses the same tools the same way (McpHost.call).
+    expect(await f.call(f.durable(), "change_environment", FREE)).toMatchObject({ kind: "unavailable", message: "change_environment is hidden by the owner." });
+    expect((await bodyOf(await endpoint(modern("tools/call", { name: "get_settings", arguments: { entity: "environment" } })))).result?.isError).toBe(false);
   });
 
   it("an unknown tool or arguments that are not an object is -32602", async () => {

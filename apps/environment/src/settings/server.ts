@@ -191,6 +191,12 @@ export const accessSwitchOf = (deps: Pick<SettingsServerDeps, "ops">): AccessSwi
   return access.writes === false ? "read-only" : "on";
 };
 
+/** Whether the owner hid a tool on the Settings server's entry (its `toolExposure`), as the own door's listing and call read it. */
+const hiddenTools = (deps: Pick<SettingsServerDeps, "ops">): ((tool: string) => boolean) => {
+  const exposure = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER]?.toolExposure;
+  return (tool) => ownEntry(exposure, tool) === "hidden";
+};
+
 /** Why the access switch refuses a write now (off or read-only), or undefined when it is on. */
 const accessBar = (deps: Pick<SettingsServerDeps, "ops">): { readonly reason: string; readonly text: string } | undefined => {
   const access = accessSwitchOf(deps);
@@ -1454,6 +1460,11 @@ export const settingsOwnerCall = async (deps: SettingsServerDeps, input: OwnerCa
   }
   const tool = settingsToolOf(input.tool);
   if (tool === undefined) return { kind: "result", answer: readError(`The Settings server has no tool ${input.tool}.`) };
+  // A tool the owner hid on the Settings server's entry is hidden from this door as from the own door (McpHost.call).
+  if (hiddenTools(deps)(tool.name)) {
+    deps.log?.({ t3flare: "settings-refused", via: "mcp", door: "owner", principal: input.caller.kind, tool: input.tool, outcome: "refused", reason: "hidden" });
+    return { kind: "result", answer: readError(`${tool.name} is hidden by the owner.`) };
+  }
   if (tool.class === "write") return ownerWrite(deps, input);
   const limited = readLimit(deps, ownerReader(deps, input.caller), tool.name);
   if (limited !== undefined) return { kind: "result", answer: limited };
@@ -1499,8 +1510,12 @@ export const ownerResume = async (deps: SettingsServerDeps, input: { readonly ar
   return answerOwnerChange(deps, record, caller, "agent", action);
 };
 
-/** Whether the Settings server lists `tool` to an Owner client now (plan D2's access switch): off lists none, read-only no write. */
-export const ownerListed = (deps: Pick<SettingsServerDeps, "ops">): ((tool: { readonly class: ToolClass }) => boolean) => {
+/**
+ * Whether the Settings server lists `tool` to an Owner client now: plan D2's access switch (off lists none, read-only no
+ * write), and not a tool the owner hid on the server's entry (as the own door's listing omits it).
+ */
+export const ownerListed = (deps: Pick<SettingsServerDeps, "ops">): ((tool: { readonly name: string; readonly class: ToolClass }) => boolean) => {
   const access = accessSwitchOf(deps);
-  return (tool) => access === "on" || (access === "read-only" && tool.class === "read");
+  const hidden = hiddenTools(deps);
+  return (tool) => (access === "on" || (access === "read-only" && tool.class === "read")) && !hidden(tool.name);
 };
