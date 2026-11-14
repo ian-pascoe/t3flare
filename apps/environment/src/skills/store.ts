@@ -234,9 +234,9 @@ export const skillStore = (options: SkillStoreOptions) => {
       return { hash: hash(), files };
     },
     /**
-     * Applies `change` as one synchronous block (see the header). Without `expectedRevision` it tries again when the
-     * revision moved while the set's hash was made; with it (plan D15) it never retries, and a revision other than the one
-     * expected refuses the change as `moved`.
+     * Applies `change` as one synchronous block (see the header). Without `expectedRevision` it tries again (three tries in
+     * all) when the revision moved while the set's hash was made; with it (plan D15) it never retries, and a revision other
+     * than the one expected refuses the change as `moved`.
      */
     apply: async (change: SkillChange, caller: string | AuditActor, at: number, expectedRevision?: number): Promise<ChangeAnswer> => {
       const actor: AuditActor = typeof caller === "string" ? { caller } : caller;

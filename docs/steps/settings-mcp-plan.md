@@ -57,8 +57,8 @@ Verbatim where quoted; otherwise as the interviewer relayed it.
   `applyEnvironmentChange` (:171), `decideCall` (`mcp.ts:15`), `ServerKind` (:29, two kinds),
   `RESERVED_SERVER_NAMES` (:88).
 - **The store** (`apps/environment/src/harness/store.ts`): two entities with their own revisions, one audit log of 1,000
-  entries (`AuditEntry` :30). Skills live in SQLite (`apps/environment/src/skills/store.ts`), whose `apply` retries once
-  when the Environment revision moved (:240).
+  entries (`AuditEntry` :30). Skills live in SQLite (`apps/environment/src/skills/store.ts`), whose `apply` tries up to
+  three times when the Environment revision moved (:240; its comment says "once").
 - **The MCP host** (`apps/environment/src/mcp/host.ts`): `view()` (:298) and `call()` (:328) reach every server through
   the engine Worker. `EnvironmentDO.mcpCall` (`environmentDO.ts:479`) carries server, tool, args, judged class and an
   asker, and **no caller identity**.
@@ -574,7 +574,7 @@ In every mode the Change page can also answer the Open change; the first answer 
 
 - Every write tool requires `expectedRevision`, the revision of the entity it changes (Harness for extensions and the
   MCP server set; Environment for its settings and for skills). A mismatch is refused with the current revision; the
-  agent reads again. Skills pass it to `store.apply`, which must not retry once when it is given (`skills/store.ts:240`).
+  agent reads again. Skills pass it to `store.apply`, which must not retry when it is given (`skills/store.ts:240`).
 - Every result carries the new revision, so writes can be chained without a read.
 - `AuditEntry` gains optional fields; an entry without `via` reads as the panel's:
 
