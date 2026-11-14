@@ -90,18 +90,18 @@ describe("GlobalMise", () => {
     expect(t.killed()).toBe(1);
     expect(t.holds()).toBe(0);
     expect(t.reports).toMatchObject([{ outcome: "deadline", timedOut: true, runtime: "r1", workspace: "/w/app" }]);
-    expect(t.mise.retryFailed("r1")).toBe(false);
+    expect(t.mise.catchUp("r1")).toBe(false);
   });
 
   it("retries a failed exec once at once, then from the alarm, at most three times in all", async () => {
     const t = setup([{ throws: "exec refused" }, { throws: "exec refused" }, { throws: "exec refused" }, { stdout: answer(true) }]);
     expect(await t.mise.ensure("r1")).toMatchObject({ outcome: "exec-failed", attempts: 2 });
     expect(t.calls).toHaveLength(2);
-    expect(t.mise.retryFailed("r1")).toBe(true);
+    expect(t.mise.catchUp("r1")).toBe(true);
     await vi.waitFor(() => expect(t.calls).toHaveLength(3));
     await vi.waitFor(() => expect(t.mise.inFlight()).toBe(false));
     expect(t.mise.state()).toMatchObject({ outcome: "exec-failed", attempts: MAX_ATTEMPTS });
-    expect(t.mise.retryFailed("r1")).toBe(false);
+    expect(t.mise.catchUp("r1")).toBe(false);
     expect(await t.mise.ensure("r1")).toMatchObject({ attempts: MAX_ATTEMPTS });
     expect(t.calls).toHaveLength(3);
     expect(t.reports.map((report) => report.outcome)).toEqual(["exec-failed", "exec-failed", "exec-failed"]);
@@ -116,13 +116,6 @@ describe("GlobalMise", () => {
     const t = setup([{ stdout: `mise WARN noise\n${answer(false, { install: 1 })}` }]);
     expect(await t.mise.ensure("r1")).toMatchObject({ outcome: "not-laid" });
     expect(t.reports).toMatchObject([{ outcome: "not-laid", install: 1, timedOut: false, revision: 4, sha256: SHA, bytes: 25, source: "environment" }]);
-  });
-
-  it("runs nothing for a launch without text on a known Container", async () => {
-    const t = setup([], { launch: { ...LAUNCH, text: "", bytes: 0 } });
-    expect(await t.mise.ensure("r1")).toMatchObject({ outcome: "not-laid" });
-    expect(t.calls).toHaveLength(0);
-    expect(t.reports).toHaveLength(0);
   });
 
   it("runs the script with no text for a launch from before (no Global mise config recorded)", async () => {
@@ -140,12 +133,21 @@ describe("GlobalMise", () => {
     expect(t.storage.get(GLOBAL_MISE_KEY)).toBeUndefined();
   });
 
-  it("does not retry a failed exec for a passive read's connect, and does for the next command's", async () => {
-    const t = setup([{ throws: "exec refused" }, { throws: "exec refused" }, { stdout: answer(true) }]);
-    await t.mise.ensure("r1");
-    expect(await t.mise.ensure("r1", { retry: false })).toMatchObject({ outcome: "exec-failed", attempts: 2 });
-    expect(t.calls).toHaveLength(2);
-    expect(await t.mise.ensure("r1")).toMatchObject({ outcome: "laid", attempts: 3 });
+  it("never runs the lay-down for a connect that only passive reads made, and the alarm catches the Container up", async () => {
+    const t = setup([{ stdout: answer(true) }]);
+    expect(await t.mise.connected("r1", { passiveOnly: true })).toBeUndefined();
+    expect(t.calls).toHaveLength(0);
+    expect(t.mise.catchUp("r1")).toBe(true);
+    await vi.waitFor(() => expect(t.mise.state()).toMatchObject({ runtime: "r1", outcome: "laid" }));
+    expect(t.mise.catchUp("r1")).toBe(false);
+    expect(await t.mise.connected("r1", { passiveOnly: false })).toMatchObject({ outcome: "laid" });
+    expect(t.calls).toHaveLength(1);
+  });
+
+  it("reports a Container started with no text, so Status no longer shows an older start's file", async () => {
+    const t = setup([], { launch: { ...LAUNCH, text: "", bytes: 0, sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" } });
+    expect(await t.mise.ensure("r1")).toMatchObject({ outcome: "none" });
+    expect(t.calls).toHaveLength(0);
+    expect(t.reports).toMatchObject([{ outcome: "none", install: null, bytes: 0, revision: 4 }]);
   });
 });
-

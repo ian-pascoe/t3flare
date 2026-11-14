@@ -13,7 +13,7 @@
 //   (`GLOBAL_MISE_DEADLINE_MS`), then kills the exec and treats it as not laid, final for that Container.
 // - Retried: an exec that failed (refused, broken, no answer, the lock held) is tried again at once, then by the next
 //   caller or the alarm, at most `MAX_ATTEMPTS` times per Container. Every run is reported (`report`).
-import type { GlobalMiseOutcome, GlobalMiseReport } from "@t3flare/harness-registry";
+import type { GlobalMiseOutcome, GlobalMiseReport, SettingsSource } from "@t3flare/harness-registry";
 import { type GlobalMiseAnswer, globalMiseArgv, parseGlobalMiseAnswer } from "@t3flare/sandbox-image/globalMise";
 
 /** What a Container start lays down: the text of its launch, with its digest. */
@@ -22,7 +22,7 @@ export interface GlobalMiseLaunch {
   readonly bytes: number;
   readonly sha256: string;
   readonly revision: number;
-  readonly source: "environment" | "kept" | "default";
+  readonly source: SettingsSource;
 }
 
 /** A running exec on the Container (the platform's): its output when it ends, and a kill. */
@@ -62,7 +62,7 @@ export interface GlobalMiseState {
   readonly at: number;
 }
 
-const FINAL: ReadonlyArray<GlobalMiseOutcome> = ["laid", "not-laid", "deadline"];
+const FINAL: ReadonlyArray<GlobalMiseOutcome> = ["laid", "not-laid", "none", "deadline"];
 
 /** The launch with no text: what a Container gets when nothing is laid down. */
 const EMPTY_SHA = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -89,13 +89,12 @@ export class GlobalMise {
    * The lay-down of the Container `runtime` (computer's runtime id), run or joined; resolves when it has ended. A final
    * outcome is not run again; an exec failure is retried once at once and then by a later call, `MAX_ATTEMPTS` in all.
    */
-  ensure(runtime: string | undefined, options: { readonly retry?: boolean } = {}): Promise<GlobalMiseState> {
+  ensure(runtime: string | undefined): Promise<GlobalMiseState> {
     const key = runtime ?? "";
     const running = this.#running.get(key);
     if (running !== undefined) return running;
     const kept = this.state();
-    // `retry: false` (a passive read's connect): a Container that had a run keeps its outcome, failed or not.
-    if (runtime !== undefined && kept?.runtime === runtime && (FINAL.includes(kept.outcome) || kept.attempts >= MAX_ATTEMPTS || options.retry === false)) return Promise.resolve(kept);
+    if (runtime !== undefined && kept?.runtime === runtime && (FINAL.includes(kept.outcome) || kept.attempts >= MAX_ATTEMPTS)) return Promise.resolve(kept);
     const before = runtime !== undefined && kept?.runtime === runtime ? kept.attempts : 0;
     const promise = (async () => {
       let state = await this.#run(key, before);
@@ -107,10 +106,24 @@ export class GlobalMise {
     return promise;
   }
 
-  /** The alarm's retry: a Container whose lay-down's exec failed, with attempts left, is tried again (not awaited). */
-  retryFailed(runtime: string | undefined): boolean {
+  /**
+   * A connect to Container `runtime`: its lay-down runs (or is joined) before the connection is used, unless only passive
+   * reads made the connect (t3's status polls, the reclaim's and idle stop's usage), which never run it.
+   */
+  async connected(runtime: string | undefined, options: { readonly passiveOnly: boolean }): Promise<GlobalMiseState | undefined> {
+    if (options.passiveOnly) return undefined;
+    return this.ensure(runtime);
+  }
+
+  /**
+   * The alarm's catch-up (not awaited): the running Container's lay-down when none ran for it (only passive reads
+   * connected to it), or when its exec failed with attempts left. Answers whether it started one.
+   */
+  catchUp(runtime: string | undefined): boolean {
+    if (runtime === undefined || this.#running.has(runtime)) return false;
     const kept = this.state();
-    if (runtime === undefined || kept?.runtime !== runtime || kept.outcome !== "exec-failed" || kept.attempts >= MAX_ATTEMPTS || this.#running.has(runtime)) return false;
+    const due = kept?.runtime !== runtime || (kept.outcome === "exec-failed" && kept.attempts < MAX_ATTEMPTS);
+    if (!due) return false;
     void this.ensure(runtime).catch(() => undefined);
     return true;
   }
@@ -121,10 +134,12 @@ export class GlobalMise {
     // A launch from before SPI-1150 (no Global mise config recorded) runs the script with no text: it lays nothing down.
     const launch = known ?? { text: "", bytes: 0, sha256: EMPTY_SHA, revision: 0, source: "default" as const };
     const started = deps.now();
-    // No text in a known launch on a known Container: nothing to lay down, nothing run (its disk has no global file).
+    // No text in a known launch on a known Container: nothing to lay down, nothing run (its disk has no global file);
+    // reported all the same, so Status stops showing an older start's file once the owner clears it.
     if (known !== undefined && known.text === "" && runtime !== "") {
-      const state: GlobalMiseState = { runtime, outcome: "not-laid", attempts: attemptsBefore + 1, at: started };
+      const state: GlobalMiseState = { runtime, outcome: "none", attempts: attemptsBefore + 1, at: started };
       deps.storage.put(GLOBAL_MISE_KEY, state);
+      deps.report({ workspace: deps.workspace(), runtime, revision: known.revision, sha256: known.sha256, bytes: 0, source: known.source, outcome: "none", install: null, timedOut: false, ms: 0, at: started });
       return state;
     }
     const release = deps.hold();

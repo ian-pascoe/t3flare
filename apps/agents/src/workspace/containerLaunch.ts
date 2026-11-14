@@ -11,6 +11,7 @@ import {
   EMPTY_ENVIRONMENT,
   type ResolvedEnvironment,
   resolveEnvironment,
+  type SettingsSource,
 } from "@t3flare/harness-registry";
 
 import type { GlobalMiseLaunch } from "./globalMise.ts";
@@ -29,7 +30,7 @@ export interface TakeEnvironmentDeps {
 /** Settings for a start and where they came from: only an `environment` read is fresh. */
 export interface TakenEnvironment {
   readonly settings: ResolvedEnvironment;
-  readonly source: "environment" | "kept" | "default";
+  readonly source: SettingsSource;
 }
 
 /**

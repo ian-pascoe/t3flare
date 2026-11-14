@@ -336,8 +336,8 @@ export class WorkspaceDO extends ContainerHost {
       // Every connect: the Container's lay-down before computer sends it a command (SPI-1150).
       connected: async (handle) => {
         this.#runtime = handle.runtimeId;
-        // A passive read's connect lays down a new Container's file as any connect does, but never retries a failed one.
-        await this.#globalMise.ensure(handle.runtimeId, { retry: this.#activeExecs > 0 || this.#passiveExecs === 0 });
+        // A connect only passive reads made never runs the lay-down (the alarm catches such a Container up).
+        await this.#globalMise.connected(handle.runtimeId, { passiveOnly: this.#activeExecs === 0 && this.#passiveExecs > 0 });
       },
     });
     this.#globalMise = new GlobalMise({
@@ -1898,8 +1898,9 @@ export class WorkspaceDO extends ContainerHost {
       await this.stopContainer();
       return;
     }
-    // A lay-down whose exec failed is tried again here, not awaited, whoever calls next (ADR-0032's Global mise config refinement).
-    if (this.#globalMise.retryFailed(this.#runtime)) console.log(JSON.stringify({ t3flare: "global-mise-retry", workspace: this.#workspaceId() ?? null }));
+    // A lay-down whose exec failed, or that never ran (only passive reads connected), runs here, not awaited, whoever
+    // calls next (ADR-0032's Global mise config refinement).
+    if (this.#globalMise.catchUp(this.#runtime)) console.log(JSON.stringify({ t3flare: "global-mise-catch-up", workspace: this.#workspaceId() ?? null }));
     const renewed = await this.#budget().renew(this.ctx.id.toString());
     if (!renewed.ok) console.warn(JSON.stringify({ t3flare: "container-lease-lost", reason: renewed.reason }));
     await this.#scheduleAlarm();

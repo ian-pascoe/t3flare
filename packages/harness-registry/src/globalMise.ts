@@ -20,12 +20,15 @@ export const digestOf = async (text: string): Promise<TextDigest> => {
 
 /**
  * How one lay-down ended: `laid` (the owner's file is mise's global config), `not-laid` (git or gh failed under it, or
- * its install timed out, or there was no text), `exec-failed` (the platform's exec refused or broke; retried) or
- * `deadline` (the Workspace DO stopped waiting; final for that Container).
+ * its install timed out), `none` (the start had no Global mise config: nothing to lay down), `exec-failed` (the
+ * platform's exec refused or broke; retried) or `deadline` (the Workspace DO stopped waiting; final for that Container).
  */
-export type GlobalMiseOutcome = "laid" | "not-laid" | "exec-failed" | "deadline";
+export const GLOBAL_MISE_OUTCOMES = ["laid", "not-laid", "none", "exec-failed", "deadline"] as const;
+export type GlobalMiseOutcome = (typeof GLOBAL_MISE_OUTCOMES)[number];
 
-const OUTCOMES: ReadonlyArray<GlobalMiseOutcome> = ["laid", "not-laid", "exec-failed", "deadline"];
+/** Where a Container start's Environment settings came from (`takeEnvironment`): read fresh, the copy kept, the defaults. */
+export const SETTINGS_SOURCES = ["environment", "kept", "default"] as const;
+export type SettingsSource = (typeof SETTINGS_SOURCES)[number];
 
 export interface GlobalMiseReport {
   /** The Workspace's id (t3's path), or null when the Workspace DO does not know it. */
@@ -36,7 +39,7 @@ export interface GlobalMiseReport {
   readonly sha256: string;
   readonly bytes: number;
   /** Where the start's settings came from (`takeEnvironment`). */
-  readonly source: "environment" | "kept" | "default";
+  readonly source: SettingsSource;
   readonly outcome: GlobalMiseOutcome;
   /** `mise install`'s exit, or null when it did not run. */
   readonly install: number | null;
@@ -45,8 +48,6 @@ export interface GlobalMiseReport {
   readonly ms: number;
   readonly at: number;
 }
-
-const SOURCES = ["environment", "kept", "default"];
 
 /** `value` as a report, or undefined when it is not one (the Environment DO takes it from another Worker). */
 export const globalMiseReport = (value: unknown): GlobalMiseReport | undefined => {
@@ -61,8 +62,8 @@ export const globalMiseReport = (value: unknown): GlobalMiseReport | undefined =
     typeof report.sha256 === "string" &&
     /^[0-9a-f]{64}$/.test(report.sha256) &&
     count(report.bytes) &&
-    SOURCES.includes(report.source as string) &&
-    OUTCOMES.includes(report.outcome as GlobalMiseOutcome) &&
+    (SETTINGS_SOURCES as ReadonlyArray<unknown>).includes(report.source) &&
+    (GLOBAL_MISE_OUTCOMES as ReadonlyArray<unknown>).includes(report.outcome) &&
     (report.install === null || (typeof report.install === "number" && Number.isInteger(report.install))) &&
     typeof report.timedOut === "boolean" &&
     count(report.ms) &&
@@ -74,7 +75,7 @@ export const globalMiseReport = (value: unknown): GlobalMiseReport | undefined =
     revision: report.revision as number,
     sha256: report.sha256 as string,
     bytes: report.bytes as number,
-    source: report.source as GlobalMiseReport["source"],
+    source: report.source as SettingsSource,
     outcome: report.outcome as GlobalMiseOutcome,
     install: report.install as number | null,
     timedOut: report.timedOut as boolean,
@@ -89,9 +90,11 @@ export const describeGlobalMise = (report: GlobalMiseReport): string => {
     report.outcome === "laid"
       ? `laid down${report.install === 0 || report.install === null ? "" : ` (mise install exit ${report.install})`}`
       : report.outcome === "not-laid"
-        ? `not laid down (${report.timedOut ? "timed out" : report.install === null ? "no text" : report.install === 0 ? "git or gh did not run under it" : `mise install exit ${report.install}`})`
-        : report.outcome === "exec-failed"
+        ? `not laid down (${report.timedOut ? "timed out" : report.install === null || report.install === 0 ? "git or gh did not run under it" : `mise install exit ${report.install}`})`
+        : report.outcome === "none"
+          ? "no Global mise config"
+          : report.outcome === "exec-failed"
           ? "not laid down (the Container's exec failed; tried again)"
-          : "not laid down (no answer within the deadline)";
+            : "not laid down (no answer within the deadline)";
   return `${report.workspace ?? "a Workspace"} at revision ${report.revision}: ${what}, ${new Date(report.at).toISOString()}`;
 };
