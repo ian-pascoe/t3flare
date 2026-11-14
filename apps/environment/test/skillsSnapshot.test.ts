@@ -126,6 +126,22 @@ describe("a CLI agent's snapshotForCwd (SPI-1151)", () => {
     expect(answer.skills.map((skill) => skill.name)).toEqual(["fruit-code", "owner-only"]);
   });
 
+  it("lists the Environment skills, scope user, at the mount, each CLI's winner of a same-named pair first (SPI-1153 M0)", async () => {
+    const rows = [
+      { name: "fruit-code", description: "The Environment's.", disableModelInvocation: false },
+      { name: "grill-me", description: "Only the Environment's.", disableModelInvocation: false },
+    ];
+    const listed = async (agent: CliAgent) => (await cli("/w/proj", access({ rows }), agent)).skills.map((skill) => [skill.name, skill.scope, skill.path]);
+    const environment = (name: string) => [name, "user", `/workspace/.agents/skills/${name}/SKILL.md`];
+    const repo = (name: string, root: string) => [name, "project", `/w/proj/${root}/${name}/SKILL.md`];
+    // Claude Code and pi keep the Environment's (pi by the flag's order); its Repo namesake is not listed.
+    for (const agent of ["claude", "pi"] as const) expect(await listed(agent)).toEqual([environment("fruit-code"), environment("grill-me"), repo("owner-only", ".claude/skills")]);
+    // OpenCode keeps the Repo's.
+    expect(await listed("opencode")).toEqual([repo("fruit-code", ".agents/skills"), repo("owner-only", ".claude/skills"), environment("grill-me")]);
+    // Codex lists both, the Repo's first, as it does; t3's menu shows the first of a name.
+    expect(await listed("codex")).toEqual([repo("fruit-code", ".agents/skills"), repo("owner-only", ".claude/skills"), environment("fruit-code"), environment("grill-me")]);
+  });
+
   it("is the built-ins alone outside a Workspace", async () => {
     const skills = access();
     const answer = await cli("/elsewhere", skills);

@@ -29,6 +29,7 @@ import { cliSnapshotForCwdOf } from "../skills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSessions, wrapCliAdapter } from "./wrapper.ts";
+import { takeEnvironmentSkillsAt } from "./environmentSkillsTake.ts";
 
 export const PI_CLI_DRIVER = ProviderDriverKind.make("pi");
 
@@ -122,6 +123,7 @@ export const PiCliDriver: ProviderDriver<PiSettings, PiCliDriverEnv> = {
       // SPI-1151: the Workspace's Repo skills and Prompt templates at pi's roots (the ones its profile names by flag).
       snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: PI_CLI_DRIVER, instanceId, agent: "pi" }),
       orchestrationAdapter: wrapCliAdapter(adapter, {
+        takeEnvironmentSkills: (cwd) => takeEnvironmentSkillsAt(cwd),
         sessions,
         dropEvent: (event) => JSON.stringify(event).includes(MCP_UNAVAILABLE_NOTICE),
       }),

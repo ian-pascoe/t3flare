@@ -53,6 +53,7 @@ import {
 } from "./acpFlavor.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { CliSpawn, CliTurn, type CliSessions, wrapCliAdapter } from "./wrapper.ts";
+import { takeEnvironmentSkillsAt } from "./environmentSkillsTake.ts";
 import { relayUrl } from "../../agents/cliProfiles.ts";
 
 export type AcpCliDriverEnv =
@@ -317,7 +318,7 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
     // SPI-1151: the Workspace's Repo skills and commands at the CLI's roots, from the Workspace DO (never a spawn).
     // OpenCode's repo commands are not listed: over ACP their reply never reaches t3 (stage pcli).
     snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: spec.driver, instanceId, agent: spec.cli, access: skillsAccess, repoCommands: spec.cli !== "opencode" }),
-    orchestrationAdapter: wrapCliAdapter(adapter, { sessions, ...(spec.cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(skillsAccess) } : {}) }),
+    orchestrationAdapter: wrapCliAdapter(adapter, { sessions, takeEnvironmentSkills: (cwd) => takeEnvironmentSkillsAt(cwd), ...(spec.cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(skillsAccess) } : {}) }),
     textGeneration: makePiDurableTextGeneration(),
   } satisfies ProviderInstance;
 });

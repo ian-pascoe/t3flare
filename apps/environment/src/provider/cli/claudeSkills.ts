@@ -11,7 +11,7 @@ import { fromWorkspace } from "@t3flare/workspace-client";
 import * as Effect from "effect/Effect";
 
 import { planClaudeSkillDispatch } from "../../../../../t3code/apps/server/src/provider/Drivers/ClaudeSkillDispatch.ts";
-import { type SkillsAccess, SkillsReadError } from "../skills.ts";
+import { cliSkills, type SkillsAccess, SkillsReadError } from "../skills.ts";
 
 /** The note after an inline `/name`, in stock's wording (`ClaudeSkillDispatch.ts`), before the `SKILL.md` path and `]`. */
 export const CLAUDE_SKILL_NOTE = "[The user invoked this skill. Follow the instructions at: ";
@@ -53,8 +53,9 @@ export const claudeSkillText = (text: string, skills: ReadonlyArray<ClaudeSkill>
 };
 
 /**
- * The wrapper's rewrite for Claude Code: the thread's Skills at Claude Code's roots, read from the Workspace DO afresh,
- * only for a message with a sigil. A Workspace that does not answer leaves the message as typed.
+ * The wrapper's rewrite for Claude Code: the thread's Skills at Claude Code's roots, with the Environment skills by
+ * Claude Code's rule (SPI-1153: the Environment's beats a Repo namesake, as Claude keeps the user-level one), read from
+ * the Workspace DO afresh, only for a message with a sigil. A Workspace that does not answer leaves the message as typed.
  */
 export const claudeMentionRewrite =
   (access: SkillsAccess) =>
@@ -63,7 +64,7 @@ export const claudeMentionRewrite =
     if (cwd === null || !/\p{Sc}/u.test(text)) return Effect.succeed(text);
     const at = access.locate(cwd);
     if (at === undefined) return Effect.succeed(text);
-    return Effect.tryPromise({ try: () => at.workspace.skills(at.inner, "claude"), catch: (cause) => new SkillsReadError({ message: "Cannot read the Workspace's skills", cause }) }).pipe(
+    return Effect.tryPromise({ try: () => cliSkills(at, access, "claude"), catch: (cause) => new SkillsReadError({ message: "Cannot read the Workspace's skills", cause }) }).pipe(
       Effect.map((found) => claudeSkillText(text, found.skills.map((skill) => ({ name: skill.name, path: fromWorkspace(at.id, skill.filePath) })))),
       Effect.tapError((error) => Effect.logWarning("t3flare: the Workspace's skills could not be read; the message goes as typed", error)),
       Effect.orElseSucceed(() => text),

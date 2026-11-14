@@ -12,6 +12,7 @@
 // - The turn's state reaches the Workspace (`processTurn`): the Container's hold (review F7).
 // - The 2 h turn cap (ADR-0015): a turn still running then ends its process, and with it the session.
 // - Events can be filtered (pi's "t3-code MCP unavailable" notice, review F10).
+// - The thread's Workspace takes the Environment skill set before each turn (SPI-1153).
 // - A tool call the MCP relay asks about (ADR-0028) is raised as t3's approval card on the thread's live turn: the
 //   wrapper injects the request's events and answers it itself (`respondToRuntimeRequest`), never the CLI.
 import { toWorkspace } from "@t3flare/workspace-client";
@@ -95,6 +96,11 @@ export interface WrapOptions {
   readonly dropEvent?: (event: ProviderAdapter.ProviderAdapterV2Event) => boolean;
   /** SPI-1151: the turn's text as the CLI gets it, from the text and the thread's cwd (Claude Code's Skill mentions). */
   readonly rewriteTurnText?: (text: string, cwd: string | null) => Effect.Effect<string>;
+  /**
+   * SPI-1153: has the thread's Workspace take the Environment skill set before the turn (`environmentSkillsTake.ts`),
+   * bounded and never failing it, so the set the CLI reads through its link is current when the turn runs.
+   */
+  readonly takeEnvironmentSkills?: (cwd: string | null) => Effect.Effect<void>;
 }
 
 /**
@@ -307,6 +313,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
                 Effect.forkDetach,
               );
               const cwd = turn.runtimePolicy.cwd ?? null;
+              if (options.takeEnvironmentSkills !== undefined) yield* options.takeEnvironmentSkills(cwd);
               const text = options.rewriteTurnText === undefined ? turn.message.text : yield* options.rewriteTurnText(turn.message.text, cwd);
               const sent = text === turn.message.text ? turn : { ...turn, message: { ...turn.message, text } };
               // A turn that never started ends here: no `turn.terminal` follows, and the hold and the cap would stay.

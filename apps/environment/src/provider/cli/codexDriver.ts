@@ -38,6 +38,7 @@ import { cliSnapshotForCwdOf } from "../skills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSession, type CliSessions, sessionFor, wrapCliAdapter } from "./wrapper.ts";
+import { takeEnvironmentSkillsAt } from "./environmentSkillsTake.ts";
 
 export const CODEX_DRIVER = ProviderDriverKind.make("codex");
 
@@ -197,7 +198,7 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       snapshot,
       // SPI-1151: the Workspace's Repo skills at Codex's roots, from the Workspace DO (never a spawn in the project).
       snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: CODEX_DRIVER, instanceId, agent: "codex" }),
-      orchestrationAdapter: wrapCliAdapter(adapter, { sessions }),
+      orchestrationAdapter: wrapCliAdapter(adapter, { sessions, takeEnvironmentSkills: (cwd) => takeEnvironmentSkillsAt(cwd) }),
       // The proxy's text generation; a review guide's investigation runs `codex exec` read-only in the checkout (G7).
       textGeneration: TextGenerationOperations.fromRunner("CodexTextGeneration", withCodexInvestigation(spawner, fileSystem, runText)),
     } satisfies ProviderInstance;

@@ -17,6 +17,7 @@ import { scratchProjectOf } from "./scratch.ts";
 import { type ChannelProcess, type ChannelStart, ProcessRefused } from "./processChannel.ts";
 import { type CliName, profileLaunch } from "./cliProfiles.ts";
 import { CliSpawn, newToolHandle } from "../provider/cli/wrapper.ts";
+import { takeEnvironmentSkillsAt } from "../provider/cli/environmentSkillsTake.ts";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import * as StateStore from "../platform/stateStore.ts";
 
@@ -128,6 +129,9 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       ...(session !== undefined ? { thread: session.thread } : launch.thread !== undefined ? { thread: launch.thread } : {}),
       toolHandle,
     };
+    // SPI-1153: the Workspace takes the Environment skill set first, so a CLI that reads its Skills at start (through
+    // its link, or pi's flag) reads the current set. Bounded, and never the spawn's failure.
+    yield* takeEnvironmentSkillsAt(cwd);
     const process = yield* Effect.acquireRelease(
       Effect.tryPromise({
         try: () => channel.start(start),

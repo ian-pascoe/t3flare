@@ -129,7 +129,8 @@ const SESSION_NEW = {
 };
 
 /** The prompt the scripted agent received for one turn of `text`, through the wrapper and t3's adapter. */
-const promptFor = (cli: "claude" | "opencode", text: string, files: Record<string, string>) =>
+/** `rows`: the Environment skills (SPI-1153), each name's `SKILL.md`. */
+const promptFor = (cli: "claude" | "opencode", text: string, files: Record<string, string>, rows: Record<string, string> = {}, order?: Array<string>) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const dir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3flare-skill-" });
@@ -141,13 +142,18 @@ const promptFor = (cli: "claude" | "opencode", text: string, files: Record<strin
     const asked: Array<CliAgent | undefined> = [];
     const access: SkillsAccess = {
       enabled: () => false,
+      environment: {
+        entries: () => Object.keys(rows).map((name) => ({ name, description: `The Environment's ${name}.`, disableModelInvocation: false })),
+        skillMd: (name) => rows[name],
+        hash: () => "h",
+      },
       locate: (at) =>
         at === cwd
           ? {
               id: "proj",
               inner: "/workspace/repo",
               workspace: {
-                skills: (_inner, agent) => (asked.push(agent), Promise.resolve(discovery(Object.keys(files).map((file) => file.split("/").at(-2)!)))),
+                skills: (_inner, agent) => (asked.push(agent), order?.push(`skills ${agent}`), Promise.resolve(discovery(Object.keys(files).map((file) => file.split("/").at(-2)!)))),
                 prompts: (_inner, agent): Promise<ReadonlyArray<PromptTemplate>> => (asked.push(agent), Promise.resolve([])),
                 readText: (file) => Promise.resolve(files[file] ?? null),
               },
@@ -173,7 +179,11 @@ const promptFor = (cli: "claude" | "opencode", text: string, files: Record<strin
     const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
     const buildPrompt = acpPromptBuilder(yield* ProviderHost.ProviderHost, fileSystem, cli === "opencode" ? access : undefined);
     const adapter = yield* makeAcpAdapterV2({ instanceId, flavor: acpFlavor(cli, driver, { spawn, buildPrompt }), selfInvocation: { command: "none", entrypoint: undefined } });
-    const wrapped = wrapCliAdapter(adapter, { sessions: new Map(), ...(cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(access) } : {}) });
+    const wrapped = wrapCliAdapter(adapter, {
+      sessions: new Map(),
+      ...(cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(access) } : {}),
+      ...(order === undefined ? {} : { takeEnvironmentSkills: (at: string | null) => Effect.sync(() => void order.push(`take ${at}`)) }),
+    });
     const threadId = ThreadId.make(`thread-${cli}`);
     const modelSelection = { instanceId, model: "anthropic/claude-sonnet-5-5" } as const;
     const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd });
@@ -196,6 +206,7 @@ const promptFor = (cli: "claude" | "opencode", text: string, files: Record<strin
 
 const run = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never) as Promise<A>;
 
+const ENVIRONMENT_SKILL = "---\nname: env\ndescription: The Environment's.\n---\n\nInterview the owner.\n";
 const SKILL = "---\nname: fruit-code\ndescription: The fruit code.\n---\n\nRead reference/code.md for the code.\n";
 
 describe("through t3's ACP adapter", () => {
@@ -219,6 +230,29 @@ describe("through t3's ACP adapter", () => {
       `<skill_content name="fruit-code">\n# Skill: fruit-code\n\nRead reference/code.md for the code.\n\nBase directory for this skill: ${T3}/fruit-code\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\n</skill_content>`,
     );
     expect(asked).toEqual(["opencode"]);
+  });
+
+  it("Claude Code gets an Environment skill's mention noted at the mount, and the Environment's of a same-named pair (SPI-1153)", async () => {
+    const mount = "/workspace/.agents/skills";
+    const { blocks } = await run(promptFor("claude", "what is it? $grill-me then $fruit-code", { [`${INNER}/fruit-code/SKILL.md`]: SKILL }, { "grill-me": ENVIRONMENT_SKILL, "fruit-code": ENVIRONMENT_SKILL }));
+    expect(blocks[0]?.text).toContain(`/grill-me [The user invoked this skill. Follow the instructions at: ${mount}/grill-me/SKILL.md]`);
+    expect(blocks[0]?.text).toContain(`/fruit-code [The user invoked this skill. Follow the instructions at: ${mount}/fruit-code/SKILL.md]`);
+  });
+
+  it("OpenCode gets an Environment skill embedded from its row with the mount as its base, and the Repo's of a same-named pair (SPI-1153)", async () => {
+    const { blocks } = await run(promptFor("opencode", "go $grill-me $fruit-code", { [`${INNER}/fruit-code/SKILL.md`]: SKILL }, { "grill-me": ENVIRONMENT_SKILL, "fruit-code": ENVIRONMENT_SKILL }));
+    const text = blocks[0]?.text ?? "";
+    expect(text).toContain('<skill_content name="grill-me">\n# Skill: grill-me\n\nInterview the owner.\n\nBase directory for this skill: /workspace/.agents/skills/grill-me\n');
+    expect(text).toContain(`<skill_content name="fruit-code">\n# Skill: fruit-code\n\nRead reference/code.md for the code.\n\nBase directory for this skill: ${T3}/fruit-code\n`);
+  });
+
+  it("has the thread's Workspace take the Environment skill set before the turn's text is read and sent (SPI-1153)", async () => {
+    for (const cli of ["claude", "opencode"] as const) {
+      const order: Array<string> = [];
+      const { blocks } = await run(promptFor(cli, "$fruit-code go", { [`${INNER}/fruit-code/SKILL.md`]: SKILL }, {}, order));
+      expect(blocks.length).toBeGreaterThan(0);
+      expect(order, cli).toEqual(["take /w/proj", `skills ${cli}`]);
+    }
   });
 
   it("OpenCode's own commands reach it as typed: no Prompt template expands", async () => {
