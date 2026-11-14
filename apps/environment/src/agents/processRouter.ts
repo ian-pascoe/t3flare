@@ -3,7 +3,7 @@
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is
 // a missing binary, as in step 1. Every routed command is kept in a short trace (admin `GET /_t3flare/agents/router-trace`).
-import { describeFailure, fromWorkspaceText, HARNESS_ROOT, isUnderW, normalize, REPO_ROOT, startRefusal, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
+import { describeFailure, fromWorkspaceText, normalize, REPO_ROOT, startRefusal, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
 import { containerGitHubPermissions, ENVIRONMENT_GITHUB_PERMISSIONS } from "@t3flare/github-app/permissions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -31,6 +31,7 @@ import {
   worktreeDestinationOf,
   worktreeListPorcelain,
 } from "./gitRoutes.ts";
+import { makeGitBridge } from "./gitBridge.ts";
 import { bindScratchCheckout, isScratchDir, scratchProjectOf } from "./scratch.ts";
 import { workspaceRpc } from "./workspaceClient.ts";
 import { CLI_NAMES, spawnCli } from "./cliProcess.ts";
@@ -151,33 +152,24 @@ export const workspaceGitHubToken = async (
   }
 };
 
-/** Temporary index files t3 made on the Environment's side (State directory) and seeded into a Workspace, by path. */
-const seededIndexes = new Map<string, { readonly bridged: string; readonly at: number }>();
-
 /**
- * t3 builds temporary indexes (`GIT_INDEX_FILE`) in its own temp directory, which the Container cannot see: it copies
- * the repo's index there, then runs git with the variable set (the commit message's context, the review totals). The
- * router copies such a file into the Workspace's harness directory the first time a git command names it, and points
- * the variable there; from then on the Container's git owns it (t3 only hands it back to git, never reads it).
+ * t3's temporary git material (a commit draft's `GIT_INDEX_FILE` and `GIT_OBJECT_DIRECTORY`, a review's index), made
+ * in its State directory, bridged into the Workspace's harness `tmp/` and removed once t3's copy is gone (SPI-1186,
+ * `gitBridge.ts`).
  */
-const bridgeIndex = async (id: string, env: Record<string, string>): Promise<Record<string, string>> => {
-  const value = env.GIT_INDEX_FILE;
-  if (value === undefined || !value.startsWith("/") || isUnderW(value)) return env;
-  let seeded = seededIndexes.get(value);
-  if (seeded === undefined) {
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${id}\0${value}`));
-    const name = [...new Uint8Array(digest)].slice(0, 12).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    const bridged = `${HARNESS_ROOT}/tmp/index-${name}/index`;
-    const rpc = workspaceRpc(id);
-    const entry = StateStore.get(value);
-    await rpc.fs({ op: "remove", path: bridged.slice(0, bridged.lastIndexOf("/")), options: { recursive: true, force: true } });
-    await rpc.fs({ op: "mkdir", path: bridged.slice(0, bridged.lastIndexOf("/")), recursive: true });
-    if (entry !== undefined && entry.kind === "file") await rpc.fs({ op: "write", path: bridged, data: StateStore.readFile(value) });
-    seeded = { bridged, at: Date.now() };
-    seededIndexes.set(value, seeded);
-    for (const [key, old] of seededIndexes) if (Date.now() - old.at > 30 * 60_000) seededIndexes.delete(key);
-  }
-  return { ...env, GIT_INDEX_FILE: seeded.bridged };
+export const gitBridge = makeGitBridge({
+  fs: (id, op) => workspaceRpc(id).fs(op),
+  stateEntry: (path) => StateStore.get(path),
+  readStateFile: (path) => StateStore.readFile(path),
+});
+
+/** git's environment for Workspace `id`: translated (`gitEnvOf`), its alternates checked, t3's temp material bridged. */
+const gitEnvInto = async (id: string, env: Readonly<Record<string, unknown>> | undefined): Promise<Record<string, string>> => {
+  const dropped: Array<string> = [];
+  // An alternate in the State directory (t3's side) is one the Container cannot see.
+  const translated = gitEnvOf(id, env, { onT3Side: (entry) => StateStore.get(entry) !== undefined, dropped });
+  if (dropped.length > 0) console.warn(JSON.stringify({ t3flare: "git-alternate-dropped", id, dropped: dropped.map((entry) => entry.slice(0, 300)) }));
+  return gitBridge.bridge(id, translated);
 };
 
 const git = async (
@@ -192,12 +184,14 @@ const git = async (
     return { exitCode: 128, stdout: "", stderr: `fatal: cannot change to '${cwd}': No such file or directory\n`, route: "no-workspace" };
   }
   const startContainer = options.action === true || mayStartContainer(args);
+  // Drafts whose t3 copy is gone lose their bridged folders (never one in flight); t3's polls make this prompt.
+  void gitBridge.reap().catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "git-bridge-reap-failed", error: String(error).slice(0, 300) })));
   // No token goes with any git command: the Container's credential helper asks for the Workspace's (ADR-0013).
   const answer = await workspaceRpc(at.id)
     .git({
       argv: args.map((arg) => intoWorkspace(at.id, arg)),
       cwd: at.inner,
-      env: await bridgeIndex(at.id, gitEnvOf(at.id, env)),
+      env: await gitEnvInto(at.id, env),
       ...(stdin === undefined ? {} : { stdin }),
       startContainer,
       readScope: readScopeOf(args),

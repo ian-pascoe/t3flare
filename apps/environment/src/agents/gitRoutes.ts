@@ -155,14 +155,99 @@ export const intoWorkspace = (id: string, word: string): string => {
   return at !== null && at.id === id ? at.inner : word;
 };
 
-/** Environment variables that reach git in the Container: git's own, translated; never the DO's HOME or PATH. */
-export const gitEnvOf = (id: string, env: Readonly<Record<string, unknown>> | undefined): Record<string, string> => {
+/** git's C-style escapes (`quote.c`, `unquote_c_style`) that are one letter. */
+const C_ESCAPES: Record<string, number> = { a: 7, b: 8, f: 12, n: 10, r: 13, t: 9, v: 11, '"': 34, "\\": 92 };
+
+/**
+ * The entries of a `GIT_ALTERNATE_OBJECT_DIRECTORIES` list as git reads it (`parse_alt_odb_entry`): an entry starting
+ * with `"` is C-quoted up to its closing quote (so it may hold the `:` separator), any other runs to the next `:`.
+ */
+const alternateEntries = (value: string): Array<string> => {
+  const entries: Array<string> = [];
+  let i = 0;
+  while (i <= value.length) {
+    if (value[i] === '"') {
+      const bytes: Array<number> = [];
+      i++;
+      while (i < value.length && value[i] !== '"') {
+        const char = value[i]!;
+        if (char === "\\" && i + 1 < value.length) {
+          const next = value[i + 1]!;
+          const octal = /^[0-3][0-7]{2}/.exec(value.slice(i + 1, i + 4));
+          if (octal !== null) {
+            bytes.push(Number.parseInt(octal[0], 8));
+            i += 4;
+            continue;
+          }
+          if (C_ESCAPES[next] !== undefined) {
+            bytes.push(C_ESCAPES[next]);
+            i += 2;
+            continue;
+          }
+        }
+        bytes.push(...new TextEncoder().encode(char));
+        i++;
+      }
+      entries.push(new TextDecoder().decode(new Uint8Array(bytes)));
+      // Past the closing quote and its separator.
+      i = value.indexOf(":", i);
+      if (i === -1) break;
+      i++;
+    } else {
+      const end = value.indexOf(":", i);
+      entries.push(value.slice(i, end === -1 ? value.length : end));
+      if (end === -1) break;
+      i = end + 1;
+    }
+  }
+  return entries.filter((entry) => entry !== "");
+};
+
+/** An entry quoted as t3 quotes it (git 2.11.1+ reads it), so a path holding the separator stays one entry. */
+const quoteAlternate = (entry: string) => `"${entry.replace(/[\\"]/g, "\\$&")}"`;
+
+/**
+ * A `GIT_ALTERNATE_OBJECT_DIRECTORIES` list into Workspace `id` (SPI-1186): each entry on its own, a t3 path in this
+ * Workspace as the Workspace's path (`intoWorkspace`), quoting and the separator kept. An entry `onT3Side` names (in
+ * the Environment's State directory, which the Container cannot see) is dropped and reported. t3's commit draft lists
+ * the repo's objects (`/w/<id>/.git/objects`) and every alternate the Container's `count-objects -v` reported.
+ */
+export const alternatesInto = (
+  id: string,
+  value: string,
+  onT3Side: (entry: string) => boolean,
+): { readonly value: string | undefined; readonly dropped: ReadonlyArray<string> } => {
+  const kept: Array<string> = [];
+  const dropped: Array<string> = [];
+  for (const entry of alternateEntries(value)) {
+    if (entry.startsWith("/w/")) kept.push(intoWorkspace(id, entry));
+    else if (onT3Side(entry)) dropped.push(entry);
+    else kept.push(entry);
+  }
+  return { value: kept.length === 0 ? undefined : kept.map(quoteAlternate).join(":"), dropped };
+};
+
+/**
+ * Environment variables that reach git in the Container: git's own, translated; never the DO's HOME or PATH. The
+ * alternates list is translated entry by entry (`alternatesInto`, with `onT3Side`; dropped entries go to `dropped`).
+ */
+export const gitEnvOf = (
+  id: string,
+  env: Readonly<Record<string, unknown>> | undefined,
+  options: { readonly onT3Side?: (entry: string) => boolean; readonly dropped?: Array<string> } = {},
+): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(env ?? {})) {
     if (typeof value !== "string") continue;
     if (key.startsWith("GIT_") || key === "LANGUAGE" || key === "LC_ALL") {
       // The trace2 monitor writes to a file on the Environment's side; git in the Container cannot.
       if (key.startsWith("GIT_TRACE2")) continue;
+      if (key === "GIT_ALTERNATE_OBJECT_DIRECTORIES") {
+        const translated = alternatesInto(id, value, options.onT3Side ?? (() => false));
+        options.dropped?.push(...translated.dropped);
+        if (translated.value !== undefined) out[key] = translated.value;
+        continue;
+      }
       out[key] = intoWorkspace(id, value);
     }
   }

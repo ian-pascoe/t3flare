@@ -5,8 +5,10 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { env as processEnv } from "node:process";
 
 import {
+  alternatesInto,
   cloneRequestOf,
   gitEnvOf,
   intoWorkspace,
@@ -45,6 +47,33 @@ describe("mayStartContainer", () => {
       ["check-ignore", "-z", "--stdin"],
     ]) {
       expect(mayStartContainer(argv), argv.join(" ")).toBe(false);
+    }
+  });
+
+  it("keeps the reads of t3's commit path passive, and lets its writes start it (SPI-1186, SPI-1091)", () => {
+    // GitVcsDriverCore's prepareCommitContext and stageCommitChanges, as t3 sends them.
+    const config = ["-c", "core.splitIndex=false", "-c", "splitIndex.sharedIndexExpire=never"];
+    for (const argv of [
+      ["rev-parse", "--git-path", "index", "--git-path", "objects"],
+      ["count-objects", "-v"],
+      ["rev-parse", "--verify", "--quiet", "HEAD"],
+      ["-c", "diff.relative=false", "diff", "--name-only", "--diff-filter=U", "-z"],
+      ["-c", "diff.relative=false", "diff", "--check", "--no-color", "--", ":(top,literal)a.txt"],
+      ["-c", "diff.relative=false", "diff", "--cached", "--name-status"],
+      ["rev-parse", "--git-path", "MERGE_HEAD", "--git-path", "CHERRY_PICK_HEAD", "--git-path", "REVERT_HEAD"],
+    ]) {
+      expect(mayStartContainer(argv), argv.join(" ")).toBe(false);
+    }
+    for (const argv of [
+      [...config, "update-index", "--no-split-index"],
+      [...config, "read-tree", "--empty"],
+      [...config, "read-tree", "HEAD"],
+      [...config, "add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul"],
+      ["add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul"],
+      ["reset", "--quiet"],
+      ["commit", "-m", "subject", "-m", "body"],
+    ]) {
+      expect(mayStartContainer(argv), argv.join(" ")).toBe(true);
     }
   });
 
@@ -112,6 +141,97 @@ describe("paths into a Workspace", () => {
     expect(
       gitEnvOf("a", { HOME: "/t3/home", PATH: "/bin", GIT_OPTIONAL_LOCKS: "0", GIT_DIR: "/w/a/.git", GIT_TRACE2_EVENT: "/tmp/x", LANGUAGE: "C" }),
     ).toEqual({ GIT_OPTIONAL_LOCKS: "0", GIT_DIR: "/workspace/repo/.git", LANGUAGE: "C" });
+  });
+});
+
+// SPI-1186: t3's commit draft (`prepareCommitContext`) lists the repo's objects and every alternate `count-objects -v`
+// reported in `GIT_ALTERNATE_OBJECT_DIRECTORIES`, each C-quoted, joined with `:`.
+describe("the alternates list into a Workspace", () => {
+  const nothingOnT3Side = () => false;
+
+  it("translates each entry of this Workspace on its own, keeping git's quoting and separator", () => {
+    expect(alternatesInto("a", '"/w/a/.git/objects"', nothingOnT3Side)).toEqual({ value: '"/workspace/repo/.git/objects"', dropped: [] });
+    expect(alternatesInto("a", '"/w/a/.git/objects":"/srv/shared/objects"', nothingOnT3Side)).toEqual({
+      value: '"/workspace/repo/.git/objects":"/srv/shared/objects"',
+      dropped: [],
+    });
+    // An unquoted list (git's older form) is read too, and written quoted.
+    expect(alternatesInto("a", "/w/a/.git/objects:/srv/x", nothingOnT3Side).value).toBe('"/workspace/repo/.git/objects":"/srv/x"');
+  });
+
+  it("keeps a separator, a quote and a backslash inside one entry", () => {
+    const value = String.raw`"/w/a/.git/objects":"/srv/we:ird \"q\" b\\s"`;
+    expect(alternatesInto("a", value, nothingOnT3Side).value).toBe(String.raw`"/workspace/repo/.git/objects":"/srv/we:ird \"q\" b\\s"`);
+  });
+
+  it("reads git's octal escapes as UTF-8", () => {
+    // `count-objects -v` prints a non-ASCII path with octal escapes (core.quotePath).
+    expect(alternatesInto("a", String.raw`"/srv/caf\303\251"`, nothingOnT3Side).value).toBe('"/srv/café"');
+  });
+
+  it("leaves another Workspace's t3 path as written, as intoWorkspace does", () => {
+    expect(alternatesInto("a", '"/w/b/.git/objects"', nothingOnT3Side).value).toBe('"/w/b/.git/objects"');
+  });
+
+  it("drops an entry on t3's own side, which the Container cannot see", () => {
+    const onT3Side = (entry: string) => entry.startsWith("/tmp/t3code-");
+    expect(alternatesInto("a", '"/w/a/.git/objects":"/tmp/t3code-commit-index-x/objects"', onT3Side)).toEqual({
+      value: '"/workspace/repo/.git/objects"',
+      dropped: ["/tmp/t3code-commit-index-x/objects"],
+    });
+    expect(alternatesInto("a", '"/tmp/t3code-x"', onT3Side)).toEqual({ value: undefined, dropped: ["/tmp/t3code-x"] });
+  });
+
+  it("skips empty entries", () => {
+    expect(alternatesInto("a", '::"/w/a/.git/objects"::', nothingOnT3Side).value).toBe('"/workspace/repo/.git/objects"');
+    expect(alternatesInto("a", "", nothingOnT3Side).value).toBeUndefined();
+  });
+
+  it("is what gitEnvOf sends, reporting the dropped entries; with none left the variable is not sent", () => {
+    const dropped: Array<string> = [];
+    const env = gitEnvOf(
+      "a",
+      { GIT_INDEX_FILE: "/tmp/t3code-commit-index-x/index", GIT_OBJECT_DIRECTORY: "/tmp/t3code-commit-index-x/objects", GIT_ALTERNATE_OBJECT_DIRECTORIES: '"/w/a/.git/objects":"/tmp/gone"' },
+      { onT3Side: (entry) => entry === "/tmp/gone", dropped },
+    );
+    expect(env).toEqual({
+      // The temporary index and object directory are the bridge's (processRouter), untouched here.
+      GIT_INDEX_FILE: "/tmp/t3code-commit-index-x/index",
+      GIT_OBJECT_DIRECTORY: "/tmp/t3code-commit-index-x/objects",
+      GIT_ALTERNATE_OBJECT_DIRECTORIES: '"/workspace/repo/.git/objects"',
+    });
+    expect(dropped).toEqual(["/tmp/gone"]);
+    expect(gitEnvOf("a", { GIT_ALTERNATE_OBJECT_DIRECTORIES: '"/tmp/gone"' }, { onT3Side: () => true })).toEqual({});
+  });
+
+  it("is a list real git reads: a draft's object directory finds the repo's objects through it", () => {
+    // A repo whose path holds the separator and a quote, as one entry; the draft writes to its own object directory.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "t3flare-alt-"));
+    const repo = path.join(root, 'we:ird "repo"');
+    fs.mkdirSync(repo);
+    const git = (args: ReadonlyArray<string>, env: Record<string, string> = {}) =>
+      spawnSync("git", args, { cwd: repo, encoding: "utf8", env: { ...processEnv, GIT_CONFIG_NOSYSTEM: "1", HOME: root, ...env } });
+    try {
+      git(["init", "-q"]);
+      fs.writeFileSync(path.join(repo, "a.txt"), "a\n");
+      git(["add", "a.txt"]);
+      git(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "a"]);
+      const head = git(["rev-parse", "HEAD"]).stdout.trim();
+      const draft = path.join(root, "draft-objects");
+      fs.mkdirSync(draft);
+      // t3's quoting (`quoted` in prepareCommitContext), then through the router with the repo standing in for /w/a.
+      const t3Value = `"${path.join(repo, ".git/objects").replace(/[\\"]/g, "\\$&")}"`;
+      const { value } = alternatesInto("a", t3Value, nothingOnT3Side);
+      const draftEnv = { GIT_OBJECT_DIRECTORY: draft, GIT_ALTERNATE_OBJECT_DIRECTORIES: value! };
+      expect(git(["cat-file", "-t", head], draftEnv)).toMatchObject({ status: 0, stdout: "commit\n" });
+      fs.writeFileSync(path.join(repo, "b.txt"), "b\n");
+      const blob = git(["hash-object", "-w", "b.txt"], draftEnv).stdout.trim();
+      // The blob went to the draft's directory, not the repo's.
+      expect(fs.existsSync(path.join(draft, blob.slice(0, 2), blob.slice(2)))).toBe(true);
+      expect(git(["cat-file", "-e", blob]).status).not.toBe(0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
