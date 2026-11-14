@@ -270,6 +270,7 @@ table.stacked tbody tr:hover>td{background:none}
 .change{max-width:none}
 }
 .skill-extra{grid-column:1/-1;display:flex;flex-direction:column;gap:.5rem;min-width:0}
+[data-skill-row] .desc code{overflow-wrap:anywhere}
 .skill-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
 .skill-actions .spacer{flex:1}
 .skill-out:empty{display:none}
