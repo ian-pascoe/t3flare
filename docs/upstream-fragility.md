@@ -870,6 +870,36 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   probe (`scripts/settings-spike` on the spike branch); re-cut the Patch with `git diff` of a copy of the file, as the
   other Patches are cut (paths relative to `t3code/`, `a/` and `b/` prefixes, which `build.ts` reads).
 
+### U68. The Owner-client endpoint: Access managed OAuth (beta) and the hand-written MCP versions (SPI-1200)
+
+- **Where**: `apps/environment/src/settings/ownerDoor.ts` (layout (B): `<host>/_t3flare/mcp`), the `SettingsAccess`
+  application in `apps/environment/alchemy.run.ts` (`oauthConfiguration`, `pathCookieAttribute` on it and on
+  `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`), `worker.ts`'s branch for it
+  (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`), and `apps/environment/src/settings/endpoint.ts`, which
+  hand-writes MCP 2026-07-28 (`server/discover`, `_meta` `io.modelcontextprotocol/*`, `resultType`, `input_required`
+  with `inputRequests` and `requestState`, `-32022`, `-32020`, 404 for `-32601`) and 2025-11-25 to 2024-11-05 (session id,
+  `elicitation/create` with `mode: "url"` and `elicitationId` on the call's SSE stream, the response POST answered 202).
+  It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`, spike branch
+  `settings-mcp-m0-spike`): the more specific Access application wins a path; a token of one application is refused at
+  another's; Access answers no root or path-inserted well-known document, so clients find the authorization server
+  only from the 401's `WWW-Authenticate` `resource_metadata`; `resource` is accepted with or without the query; the
+  query reaches the origin; and Claude Code 2.1.322's 2026 traffic as captured (P17).
+- **Breaks when**: Access (in beta) starts answering the host's root `/.well-known/oauth-*` documents (t3's own `/mcp`
+  sign-in would find Access's server instead of t3's), changes how path-scoped applications nest or how it scopes
+  tokens and cookies, or refuses a path-scoped or queried `resource`; alchemy renames `oauthConfiguration` or
+  `pathCookieAttribute`; the MCP spec or a named client changes the 2026 shapes (a key under `_meta`, `resultType`, the
+  `input_required` result, `server/discover`'s result) or stops falling back to `initialize`.
+- **Detection**: `test/settingsEndpoint.test.ts` and `test/settingsModes.test.ts` pin our reading of the shapes, not a
+  client's; `test/access.test.ts` the audiences. **Silent** for Access and real clients: the stage run of
+  `m5a-settings-owner-browser.json` (a named client signs in, reads, makes a free and an asked change) and its
+  assertion that the host's root well-known documents are still t3's. Cheapest check: that assertion in the acceptance
+  test (not built yet: M6).
+- **Blast radius**: an Access change: Owner clients cannot sign in, or (root well-knowns) t3's own MCP clients cannot.
+  A client's shape change: that client gets errors or the link in the result; own agents and the panel are unaffected.
+- **Fix**: rerun M0's probes (`scripts/settings-spike` on the spike branch); if Access breaks layout (B), move to (C) by
+  replacing `ownerDoor.ts`, the worker branch and `SettingsAccess` (plan D13); for a client, compare with the spec's
+  `schema.ts` for the version and the client's traffic.
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).
