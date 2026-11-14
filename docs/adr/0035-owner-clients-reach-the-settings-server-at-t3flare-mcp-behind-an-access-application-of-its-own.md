@@ -14,7 +14,9 @@ An **Owner client** (the owner's Claude Code, pi, Cursor, Codex, OpenCode on his
 with OAuth, and Cloudflare Access issues the grant (managed OAuth). A managed-OAuth token is good for its whole Access
 application, so the endpoint cannot share the `/_t3flare` application: there the panel and the Change page admit the
 owner's assertion alone, and an Owner client's token would drive them. The endpoint gets an application of its own on a
-narrower path of the same host, which M0 showed Access keeps apart.
+narrower path of the same host. M0 showed Access routing the two paths apart; that it keeps their **tokens** apart was
+tested with a service-token stand-in only, and the OAuth bearer case is owner step 1
+(`docs/steps/settings-mcp/m5a-stage-run.md` items 1-4). Until that is recorded, layout (B) is unproven.
 
 1. **The endpoint is `https://<host>/_t3flare/mcp`**, served by the Environment Worker, which verifies Access's
    assertion against the endpoint's own audience (`T3FLARE_ACCESS_SETTINGS_AUD`, `verifySettingsRequest`) and hands the
@@ -22,9 +24,10 @@ narrower path of the same host, which M0 showed Access keeps apart.
 2. **Its Access application, `SettingsAccess`**, has the path `<host>/_t3flare/mcp` and managed OAuth with:
    - dynamic client registration on;
    - redirect URIs: any on `localhost` and any on loopback, plus `cursor://anysphere.cursor-mcp/oauth/callback` (older
-     Cursor desktop releases), kept in one constant (`SETTINGS_OAUTH_REDIRECT_URIS`); no https redirect, since no
-     named client is a web client;
-   - access tokens of 15 minutes and sessions of 168 hours, set explicitly because Access checks no bounds;
+     Cursor desktop releases, from third-party reports: **pending owner step 2**, since Cursor was not run in M0), kept
+     in one constant (`SETTINGS_OAUTH_REDIRECT_URIS`); no https redirect, since no named client is a web client;
+   - access tokens of 15 minutes and sessions of 168 hours, set explicitly because Access checks no bounds (the token's
+     actual `expires_in` is m5a-stage-run.md item 1);
    - the same policies as the admin application: the owner's email, and the stage's service token as `non_identity`.
 3. **Both applications set the path-cookie attribute**, so each one's `CF_Authorization` cookie is scoped to its own
    path and a browser sends the longer path's first.
@@ -42,11 +45,13 @@ What this rests on, from M0 on a workers.dev stage:
   OpenCode all followed (P2, P9, P14);
 - a path-scoped `resource`, with or without the query, is accepted and resolves to the endpoint's application (P6, at
   authorize);
-- an Access token issued for one application is refused at the other's paths (P12, with Access's own JWT as a stand-in).
+- an Access token issued for one application is refused at the other's paths (P12): tested with a service-token
+  stand-in only; the OAuth bearer case is owner step 1 (m5a-stage-run.md items 1-4).
 
 **Pending (owner step 1):** the token exchange for the path `resource` (P6 end to end), the OAuth bearer itself refused
 at `/_t3flare/harness` and `/_t3flare/echo` (P12), whether `sub` is the same in an OAuth-derived and a browser assertion
-(P13), and Cursor's actual redirect URI (owner step 2).
+(P13), the access token's `expires_in` (P11), and Cursor's actual redirect URI (owner step 2). Prod's custom domain
+has not been probed at all (only workers.dev): m5a-stage-run.md records its shape before the first prod deploy.
 
 ## When to move to layout (C)
 

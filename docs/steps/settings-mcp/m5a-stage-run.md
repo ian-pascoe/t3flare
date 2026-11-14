@@ -20,10 +20,16 @@ assertion by its decoded claims with `sub` and `email` reduced to "same as …" 
 
 ### Access, layout (B)
 
+Layout (B) is unproven until items 1-4 pass: M0 tested that one application's token is refused at the other's paths with
+a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bearer case.
+
 1. **M0's open conditions (owner step 1)**: the owner signs in from a named client (Claude Code first). Record that the
-   token exchange works for the path `resource` (P6), and that the client's token presented at `/_t3flare/harness` and
-   `/_t3flare/echo`-like paths of the admin application is refused (P12, as a bearer and as `cf-access-token`). If either
-   fails, layout (B) is out: stop, and move to (C) (plan D13; replace `src/settings/endpointLayout.ts`, the worker branch and
+   token exchange works for the path `resource` (P6), the claims of the OAuth-derived assertion the origin receives
+   (P7, as decoded claims), and that the client's token presented at `/_t3flare/harness` and `/_t3flare/echo`-like paths
+   of the admin application is refused (P12, as a bearer and as `cf-access-token`). Record the token response's
+   `expires_in` (P11): it must be 900 (the `15m` of `SETTINGS_OAUTH_GRANT`) or less; a longer one means Access ignored
+   the setting, and the grant's lifetime must be fixed before the endpoint is trusted. If the exchange or P12 fails,
+   layout (B) is out: stop, and move to (C) (ADR-0035; replace `src/settings/endpointLayout.ts`, the worker branch and
    `SettingsAccess`).
 2. **P13**: compare the `sub` of the endpoint's OAuth-derived assertion with the owner's browser assertion at the panel
    (the Change page). The page lets only the asking `sub` answer an Owner client's change (`openChanges.ts`); if the two
@@ -35,6 +41,17 @@ assertion by its decoded claims with `sub` and `email` reduced to "same as …" 
    `/.well-known/cloudflare-access-protected-resource/_t3flare/mcp`.
 4. `/_t3flare/mcpx` and `/_t3flare/mcp/anything`: the first is the admin application's (its Access login), the second
    the endpoint's and answered 404 after Access.
+4b. **Cursor (owner step 2)**: the redirect allowlist's one custom scheme, `cursor://anysphere.cursor-mcp/oauth/callback`,
+   comes from third-party reports. Record the `redirect_uri` Cursor registers (decoded from Access's sign-in URL, before
+   signing in) and whether registration succeeds. If Cursor uses another scheme, change `SETTINGS_OAUTH_REDIRECT_URIS`
+   (one constant) and ADR-0035; if it uses `localhost`, the scheme may be dropped.
+4c. **Prod's custom domain shape** (no deploy to prod; nothing changes there): M0 probed workers.dev only. Without
+   touching prod's Access applications, record from prod's host (`t3.ianpascoe.dev`) as it is today: what
+   `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`,
+   `/.well-known/cloudflare-access-protected-resource/_t3flare` and `/_t3flare/mcp` answer (status, `WWW-Authenticate`,
+   and whether Access or the origin answers), so the first prod deploy of `SettingsAccess` has a baseline to compare
+   with. After that deploy (CI's, not this run), the same requests must show `/_t3flare/mcp` as its own application and
+   the root documents still t3's; `scripts/acceptance.ts` step 2b asserts the latter on every run.
 
 ### A named client, end to end (Claude Code 2.1.322 on 2026-07-28; then OpenCode or Claude Code forced to 2025-11-25)
 

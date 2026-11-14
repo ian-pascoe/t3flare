@@ -8,8 +8,9 @@
 // 1b. The Model endpoint (SPI-1175): set up through the Harness panel's API from T3FLARE_MODEL_ENDPOINT (or, off CI, the
 //     Model proxy's settings: Commissary); the text-generation setting then names its default, and the real turn runs on
 //     its small model. Without a setting (CI before `ci:setup`), skipped and said so, and the real turn uses the proxy.
-// 2. Auth: the descriptor reports `remote-reachable`; the bootstrap token is refused until pairing is armed,
-//    pairs while armed (what the web client's /pair#token=… does), and is refused again once disarmed.
+// 2. Auth: the descriptor reports `remote-reachable`; the root `/.well-known/oauth-authorization-server` and
+//    `oauth-protected-resource` documents are t3's, not Access's (ADR-0035); the bootstrap token is refused until pairing
+//    is armed, pairs while armed (what the web client's /pair#token=… does), and is refused again once disarmed.
 // 3. A stock-protocol client over /ws (t3's own WsRpcGroup): create a project and threads, list them, open one.
 // 4. Turn-item fixtures written through t3's EventSink (admin route), then t3's heavy queries on them: the
 //    thread window (bounded snapshot over HTTP and subscribeThread), the shell snapshot, and search.
@@ -129,6 +130,31 @@ const descriptor = (await (await fetch(new URL("/.well-known/t3/environment", ba
 const session = (await (await fetch(new URL("/api/auth/session", base))).json()) as Record<string, any>;
 report.auth = { machine: descriptor.platform?.machine, label: descriptor.label, policy: session.auth?.policy };
 check("auth descriptor remote-reachable", session.auth?.policy === "remote-reachable", session.auth);
+// 2b. The host's root OAuth documents are still t3's (ADR-0035, plan D13): with managed OAuth on the Owner-client
+// endpoint's Access application (layout (B)), drift in Access (a beta) answering them would send t3's own MCP clients
+// to Access's authorization server. Public, no credential.
+const wellKnown = async (pathname: string) => {
+  const response = await fetch(new URL(pathname, base), { redirect: "manual", headers: { accept: "application/json" } });
+  const text = await response.text();
+  try {
+    return { status: response.status, json: JSON.parse(text) as Record<string, any> };
+  } catch {
+    return { status: response.status, json: undefined };
+  }
+};
+const authorizationServer = await wellKnown("/.well-known/oauth-authorization-server");
+const protectedResource = await wellKnown("/.well-known/oauth-protected-resource");
+report.rootWellKnown = {
+  authorizationServer: { status: authorizationServer.status, issuer: authorizationServer.json?.issuer },
+  protectedResource: { status: protectedResource.status, resource: protectedResource.json?.resource, authorizationServers: protectedResource.json?.authorization_servers },
+};
+check("the root authorization-server document is t3's", authorizationServer.status === 200 && authorizationServer.json?.issuer === base.origin, report.rootWellKnown);
+check(
+  "the root protected-resource document is t3's /mcp",
+  protectedResource.status === 200 && protectedResource.json?.resource === `${base.origin}/mcp` && Array.isArray(protectedResource.json?.authorization_servers) && protectedResource.json.authorization_servers.every((server: unknown) => server === base.origin),
+  report.rootWellKnown,
+);
+
 await admin("POST", "/_t3flare/disarm-bootstrap");
 const refusedBefore = await pair();
 check("bootstrap refused while disarmed", refusedBefore.status === 401, refusedBefore.status);

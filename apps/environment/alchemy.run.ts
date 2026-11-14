@@ -162,11 +162,12 @@ export default Alchemy.Stack(
       ],
     } as never);
     // The Owner-client endpoint's own Access application (ADR-0035, plan D13; layout (B),
-    // src/settings/endpointLayout.ts), on every stage including prod: `<host>/_t3flare/mcp` with managed OAuth, so the owner's MCP clients sign in to it. The
-    // more specific path wins over the application above (M0), and its tokens are refused there: a client's token
-    // never reaches the panel or the Change page. Same policies as the admin application. Access does not bound the
-    // grant's lifetimes, so they are set here (M0 P11). The redirect allowlist is any loopback port plus the named
-    // clients' custom schemes; no https redirect.
+    // src/settings/endpointLayout.ts), on every stage including prod: `<host>/_t3flare/mcp` with managed OAuth, so the
+    // owner's MCP clients sign in to it. The more specific path wins over the application above (M0, P8). That its
+    // tokens are refused at the panel and the Change page was tested with a service-token stand-in only; the OAuth
+    // bearer case is owner step 1 (m5a-stage-run.md items 1-4). Same policies as the admin application. Access does not
+    // bound the grant's lifetimes, so they are set here (M0 P11; `expires_in` is m5a-stage-run.md item 1). The redirect
+    // allowlist is any loopback port plus Cursor's custom scheme, pending owner step 2; no https redirect.
     const settingsAccess = yield* Cloudflare.Access.Application("SettingsAccess", {
       name: `${name} settings`,
       type: "self_hosted",
