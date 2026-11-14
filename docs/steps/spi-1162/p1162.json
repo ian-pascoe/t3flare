@@ -1,0 +1,972 @@
+{
+  "at": "2026-11-14T17:56:49.670Z",
+  "openai": "Commissary's OpenAI Responses API",
+  "discovered": {
+    "commissary": {
+      "ok": true,
+      "count": 119,
+      "error": null,
+      "sample": [
+        {
+          "id": "beam-free",
+          "name": "Beam Free",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "known": false
+        },
+        {
+          "id": "big-pickle",
+          "name": "Big Pickle",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 200000,
+          "maxTokens": 32000,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "known": false
+        },
+        {
+          "id": "claude-3-5-haiku-20241022",
+          "name": "Claude 3.5 Haiku",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 8192,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "known": false
+        },
+        {
+          "id": "claude-3-7-sonnet-20250219",
+          "name": "Claude 3.7 Sonnet",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 8192,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "known": false
+        },
+        {
+          "id": "claude-fable-5",
+          "name": "Claude Fable 5",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "cost": {
+            "input": 10,
+            "output": 50,
+            "cacheRead": 1,
+            "cacheWrite": 12.5
+          },
+          "known": true,
+          "thinkingLevelMap": {
+            "off": null,
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "compat": {
+            "forceAdaptiveThinking": true,
+            "supportsMidConvoSystemMessages": true,
+            "supportsMidConvoToolChanges": true,
+            "supportsStrictTools": true,
+            "allowedFallbackModels": [
+              {
+                "provider": "anthropic",
+                "model": "claude-opus-4-8",
+                "cost": {
+                  "input": 5,
+                  "output": 25,
+                  "cacheRead": 0.5,
+                  "cacheWrite": 6.25
+                }
+              },
+              {
+                "provider": "anthropic",
+                "model": "claude-opus-5",
+                "cost": {
+                  "input": 5,
+                  "output": 25,
+                  "cacheRead": 0.5,
+                  "cacheWrite": 6.25
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "openai": {
+      "ok": true,
+      "count": 119,
+      "error": null,
+      "sample": [
+        {
+          "id": "gpt-5-codex",
+          "name": "gpt-5-codex",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "known": false
+        },
+        {
+          "id": "gpt-5-nano",
+          "name": "GPT-5 Nano",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 400000,
+          "maxTokens": 128000,
+          "cost": {
+            "input": 0.05,
+            "output": 0.4,
+            "cacheRead": 0.005,
+            "cacheWrite": 0
+          },
+          "known": true,
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          },
+          "compat": {
+            "supportsStrictMode": true,
+            "supportsOpenAIGrammarTools": true
+          }
+        },
+        {
+          "id": "gpt-5.1",
+          "name": "GPT-5.1",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 400000,
+          "maxTokens": 128000,
+          "cost": {
+            "input": 1.25,
+            "output": 10,
+            "cacheRead": 0.125,
+            "cacheWrite": 0
+          },
+          "known": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          },
+          "compat": {
+            "supportsStrictMode": true,
+            "supportsOpenAIGrammarTools": true
+          }
+        },
+        {
+          "id": "gpt-5.1-codex",
+          "name": "gpt-5.1-codex",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "known": false
+        },
+        {
+          "id": "gpt-5.1-codex-max",
+          "name": "gpt-5.1-codex-max",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "known": false
+        }
+      ]
+    }
+  },
+  "models": {
+    "anthropic": "commissary/claude-haiku-5-5",
+    "openai": "openai/gemini-3-flash"
+  },
+  "saved": {
+    "commissary": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "revision": 9,
+        "endpoint": {
+          "id": "commissary",
+          "label": "Commissary",
+          "api": "anthropic-messages",
+          "baseUrl": "https://api.ai.ianpascoe.dev",
+          "auth": "api-key",
+          "headers": {},
+          "models": [
+            {
+              "id": "claude-haiku-5-5",
+              "name": "Claude Haiku 5.5",
+              "reasoning": true,
+              "input": [
+                "text",
+                "image"
+              ],
+              "contextWindow": 1000000,
+              "maxTokens": 128000,
+              "cost": {
+                "input": 0.1,
+                "output": 0.5,
+                "cacheRead": 0.01,
+                "cacheWrite": 0.125
+              },
+              "known": true,
+              "thinkingLevelMap": {
+                "minimal": null,
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "compat": {
+                "forceAdaptiveThinking": true,
+                "supportsTemperature": false,
+                "supportsMidConvoEffort": true,
+                "supportsMidConvoSystemMessages": true,
+                "supportsMidConvoToolChanges": true,
+                "supportsStrictTools": true
+              }
+            }
+          ]
+        },
+        "key": {
+          "set": true,
+          "setAt": 1794679011379,
+          "fingerprint": "a7c5148b"
+        }
+      }
+    },
+    "openai": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "revision": 10,
+        "endpoint": {
+          "id": "openai",
+          "label": "OpenAI (Responses)",
+          "api": "openai-responses",
+          "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+          "auth": "api-key",
+          "headers": {},
+          "models": [
+            {
+              "id": "gemini-3-flash",
+              "name": "gemini-3-flash",
+              "reasoning": false,
+              "input": [
+                "text"
+              ],
+              "contextWindow": 128000,
+              "maxTokens": 16384,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0
+              },
+              "known": false
+            }
+          ]
+        },
+        "key": {
+          "set": true,
+          "setAt": 1794679011509,
+          "fingerprint": "a7c5148b"
+        }
+      }
+    }
+  },
+  "listed": {
+    "revision": 10,
+    "credentialsKey": true,
+    "endpoints": [
+      {
+        "id": "commissary",
+        "label": "Commissary",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": {},
+        "models": [
+          {
+            "id": "claude-haiku-5-5",
+            "name": "Claude Haiku 5.5",
+            "reasoning": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 1000000,
+            "maxTokens": 128000,
+            "cost": {
+              "input": 0.1,
+              "output": 0.5,
+              "cacheRead": 0.01,
+              "cacheWrite": 0.125
+            },
+            "known": true,
+            "thinkingLevelMap": {
+              "minimal": null,
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "compat": {
+              "forceAdaptiveThinking": true,
+              "supportsTemperature": false,
+              "supportsMidConvoEffort": true,
+              "supportsMidConvoSystemMessages": true,
+              "supportsMidConvoToolChanges": true,
+              "supportsStrictTools": true
+            }
+          }
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794679011379,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      {
+        "id": "openai",
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": {},
+        "models": [
+          {
+            "id": "gemini-3-flash",
+            "name": "gemini-3-flash",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 128000,
+            "maxTokens": 16384,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "known": false
+          }
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794679011509,
+          "fingerprint": "a7c5148b"
+        }
+      }
+    ],
+    "presets": [
+      {
+        "preset": "anthropic",
+        "title": "Anthropic API",
+        "id": "anthropic-api",
+        "label": "Anthropic",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.anthropic.com",
+        "auth": "api-key"
+      },
+      {
+        "preset": "openai",
+        "title": "OpenAI API",
+        "id": "openai",
+        "label": "OpenAI",
+        "api": "openai-responses",
+        "baseUrl": "https://api.openai.com/v1",
+        "auth": "api-key"
+      },
+      {
+        "preset": "openrouter",
+        "title": "OpenRouter",
+        "id": "openrouter",
+        "label": "OpenRouter",
+        "api": "openai-completions",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "auth": "api-key"
+      },
+      {
+        "preset": "custom",
+        "title": "Custom (OpenAI-compatible)",
+        "id": "",
+        "label": "",
+        "api": "openai-completions",
+        "baseUrl": "",
+        "auth": "api-key"
+      }
+    ],
+    "apis": [
+      "anthropic-messages",
+      "openai-responses",
+      "openai-completions",
+      "google-generative-ai",
+      "mistral-conversations"
+    ]
+  },
+  "picker": {
+    "endpointModels": [
+      {
+        "slug": "commissary/claude-haiku-5-5",
+        "group": "Commissary",
+        "thinking": true
+      },
+      {
+        "slug": "openai/gemini-3-flash",
+        "group": "OpenAI (Responses)",
+        "thinking": false
+      }
+    ],
+    "proxyModels": 122
+  },
+  "anthropicTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "commissary/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwgpjoyz",
+      "ms": 6566,
+      "cwd": "/w/acceptance-mwgpjoyz",
+      "error": null
+    },
+    "turn": {
+      "threadId": "3b7bd572-9b07-4989-bba2-439d6914d8c1",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwgpjoyz/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwgpjoyz && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 22171
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "commit": {
+      "events": [
+        "action_started",
+        "phase_started",
+        "hook_output",
+        "hook_output",
+        "action_finished"
+      ],
+      "failure": null,
+      "result": {
+        "status": "created",
+        "commitSha": "b98393d5a9e724939508da992d128cb501cefe1a",
+        "subject": "acceptance: t3's commit action"
+      },
+      "head": {
+        "sha": "b98393d5a9e724939508da992d128cb501cefe1a",
+        "subject": "acceptance: t3's commit action",
+        "files": [
+          "src/greeting.txt"
+        ]
+      },
+      "ms": 6309
+    },
+    "ms": 29071
+  },
+  "openaiTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "openai/gemini-3-flash",
+    "clone": {
+      "destination": "/w/acceptance-mwgpkbei",
+      "ms": 4606,
+      "cwd": "/w/acceptance-mwgpkbei",
+      "error": null
+    },
+    "turn": {
+      "threadId": "14f50b37-c71b-417e-8716-114516bd4d46",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 27378
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "commit": {
+      "events": [
+        "action_started",
+        "phase_started",
+        "hook_output",
+        "hook_output",
+        "action_finished"
+      ],
+      "failure": null,
+      "result": {
+        "status": "created",
+        "commitSha": "309d27e08ec9fabb3590beeeba9def89927e6519",
+        "subject": "acceptance: t3's commit action"
+      },
+      "head": {
+        "sha": "309d27e08ec9fabb3590beeeba9def89927e6519",
+        "subject": "acceptance: t3's commit action",
+        "files": [
+          "src/greeting.txt"
+        ]
+      },
+      "ms": 4559
+    },
+    "ms": 32758
+  },
+  "changedList": {
+    "threadId": "952b657b-e498-47e1-a300-0b07d869a078",
+    "firstTurn": [
+      "completed"
+    ],
+    "saved": 200,
+    "added": "openai/claude-haiku-5-5",
+    "inPicker": true,
+    "nextTurn": [
+      "completed",
+      "completed"
+    ],
+    "errors": []
+  },
+  "removed": {
+    "status": 200,
+    "run": "failed",
+    "errors": [
+      "The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model.",
+      "The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model."
+    ],
+    "pickerAfter": []
+  },
+  "audit": [
+    {
+      "action": "endpoint.remove",
+      "target": "openai",
+      "before": {
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "gemini-3-flash",
+          "claude-haiku-5-5"
+        ]
+      },
+      "entity": "endpoints",
+      "at": 1794679088703,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.change",
+      "target": "openai",
+      "before": {
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "gemini-3-flash"
+        ]
+      },
+      "after": {
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "gemini-3-flash",
+          "claude-haiku-5-5"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794679011509,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794679082470,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.add",
+      "target": "openai",
+      "before": null,
+      "after": {
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "gemini-3-flash"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794679011509,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794679011509,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.change",
+      "target": "commissary",
+      "before": {
+        "label": "Commissary",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "claude-haiku-5-5"
+        ]
+      },
+      "after": {
+        "label": "Commissary",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "claude-haiku-5-5"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794679011379,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794679011379,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.remove",
+      "target": "probe",
+      "before": {
+        "label": "Probe",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "claude-haiku-5-5"
+        ]
+      },
+      "entity": "endpoints",
+      "at": 1794678997238,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.add",
+      "target": "probe",
+      "before": null,
+      "after": {
+        "label": "Probe",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "claude-haiku-5-5"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794678992853,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794678992853,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.remove",
+      "target": "probe",
+      "before": {
+        "label": "Probe",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "claude-haiku-5-5"
+        ]
+      },
+      "entity": "endpoints",
+      "at": 1794678905354,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.add",
+      "target": "probe",
+      "before": null,
+      "after": {
+        "label": "Probe",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "claude-haiku-5-5"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794678901468,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794678901468,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.remove",
+      "target": "openai",
+      "before": {
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "gpt-5.4-mini",
+          "gpt-5"
+        ]
+      },
+      "entity": "endpoints",
+      "at": 1794678607830,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.change",
+      "target": "openai",
+      "before": {
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "gpt-5.4-mini"
+        ]
+      },
+      "after": {
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "gpt-5.4-mini",
+          "gpt-5"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794678490322,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794678604358,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.add",
+      "target": "openai",
+      "before": null,
+      "after": {
+        "label": "OpenAI (Responses)",
+        "api": "openai-responses",
+        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "gpt-5.4-mini"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794678490322,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794678490322,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.add",
+      "target": "commissary",
+      "before": null,
+      "after": {
+        "label": "Commissary",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "claude-haiku-5-5"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794678490204,
+          "fingerprint": "a7c5148b"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794678490204,
+      "caller": "service-token"
+    }
+  ],
+  "failures": [],
+  "ok": true
+}
