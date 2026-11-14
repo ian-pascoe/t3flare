@@ -2,8 +2,8 @@
 // T-own (plan §5; ADR-0034, plan D2, D7, D14, D16, D17), M3 (SPI-1198): the Settings server for t3flare's own agents,
 // through the MCP host as the Environment wires it. D7's mode table, every cell, for a Durable caller (modes from the
 // adapter's record) and a relayed CLI caller (modes from its live session); the access switch; no `resume` and no Pause;
-// reads that carry no secret value, fingerprint, URL query or authorization URL; the applied cap; and the M3 interim:
-// an asked change is refused, naming the Harness panel.
+// reads that carry no secret value, fingerprint, URL query or authorization URL; the applied cap. Since M4 (SPI-1199) an
+// asked change asks on the owner-only card in every mode but plan (settingsCard.test.ts covers the card itself).
 import { applyMcpChange, EMPTY_HARNESS, PLAN_REFUSAL, type StoredHarness } from "@t3flare/harness-registry";
 import { MCP_QUESTION_MARKER, type McpAsker, type McpQuestionAnswer, type McpQuestionCard } from "@t3flare/session-protocol";
 import { afterEach, describe, expect, it } from "vitest";
@@ -55,7 +55,7 @@ const recordModes = (caller: OwnCaller, mode: ModeName) => {
   }
 };
 
-const setup = (options: { links?: Record<string, ThreadLink>; answer?: McpQuestionAnswer; harness?: StoredHarness } = {}) => {
+const setup = (options: { links?: Record<string, ThreadLink>; answer?: McpQuestionAnswer; harness?: StoredHarness; cardWaitMs?: number } = {}) => {
   let now = NOW;
   const kv = memory();
   const store = harnessStore(kv);
@@ -97,6 +97,7 @@ const setup = (options: { links?: Record<string, ThreadLink>; answer?: McpQuesti
           status: () => ({ "settings revision": store.load().revision }),
           running: async () => ({ count: 0, holders: [] }),
           log: (event) => void logs.push(event),
+          ...(options.cardWaitMs === undefined ? {} : { cardWaitMs: options.cardWaitMs }),
         },
         input,
       ),
@@ -150,19 +151,22 @@ describe("the Settings server: D7's mode table, every cell", () => {
           expect(run.cards.length).toBe(mode === "full-access" ? 0 : 1);
         });
 
-        it(`${mode}: an asked change is refused${mode === "plan" ? " (plan first)" : ", naming the Harness panel (M3)"}`, async () => {
+        it(`${mode}: an asked change ${mode === "plan" ? "is refused" : "asks on one card, full access included"}`, async () => {
           const run = setup();
           recordModes(caller(), mode);
           const answer = await run.call(caller(), "change_environment", ASKED);
-          expect(answer).toMatchObject({ kind: "result", isError: true });
-          if (mode === "plan") expect(textOf(answer)).toBe(PLAN_REFUSAL);
-          else {
-            expect(structured(answer)).toMatchObject({ status: "refused", url: PANEL });
-            expect(textOf(answer)).toContain(PANEL);
-            expect(textOf(answer)).toContain("containerBudget: 3 to 4 (turned up)");
+          if (mode === "plan") {
+            expect(answer).toMatchObject({ kind: "result", isError: true });
+            expect(textOf(answer)).toBe(PLAN_REFUSAL);
+            expect(run.store.loadEnvironment().revision).toBe(0);
+            expect(run.cards).toEqual([]);
+            return;
           }
-          expect(run.store.loadEnvironment().revision).toBe(0);
-          expect(run.cards).toEqual([]);
+          expect(structured(answer)).toMatchObject({ status: "applied", revision: 1 });
+          expect(run.store.loadEnvironment().settings.containerBudget).toBe(4);
+          expect(run.cards.length).toBe(1);
+          expect(run.cards[0]!.prompt).toContain("containerBudget: 3 to 4 (turned up)");
+          expect(run.store.auditLog(1)[0]).toMatchObject({ tier: "asked", mode: "card", answeredBy: "card" });
         });
       }
     });
@@ -249,8 +253,8 @@ describe("the Settings server's write checks", () => {
     expect(run.store.auditLog(1)[0]!.answeredBy).toBeUndefined();
   });
 
-  it("a free MCP change runs; turning a server on, adding one, a header value and a sign-in are asked and refused", async () => {
-    const run = setup();
+  it("a free MCP change runs; turning a server on, adding one and changing the Settings server's own entry are asked", async () => {
+    const run = setup({ answer: { decision: "decline" } });
     recordModes(durable(), "full-access");
     const off = await run.call(durable(), "change_mcp", { expectedRevision: 0, change: { op: "server", server: "commissary", enabled: false } });
     expect(structured(off)).toMatchObject({ status: "applied", revision: 1 });
@@ -259,8 +263,9 @@ describe("the Settings server's write checks", () => {
       { expectedRevision: 1, change: { op: "add", server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "none" } } },
       { expectedRevision: 1, change: { op: "server", server: "settings", exposure: "hidden" } },
     ]) {
-      expect(structured(await run.call(durable(), "change_mcp", args)), JSON.stringify(args)).toMatchObject({ status: "refused", url: PANEL });
+      expect(structured(await run.call(durable(), "change_mcp", args)), JSON.stringify(args)).toMatchObject({ status: "declined" });
     }
+    expect(run.cards.length).toBe(3);
     expect(run.store.load().revision).toBe(1);
   });
 
@@ -324,7 +329,7 @@ describe("the Settings server's access switch", () => {
 
 describe("the Settings server's reads (plan D14)", () => {
   it("carry no secret value, fingerprint, URL query or authorization URL, and no result is a Pause", async () => {
-    const run = setup();
+    const run = setup({ cardWaitMs: 5 });
     const ops = { store: run.store, secrets: run.secrets, oauth: run.oauth, now: () => NOW };
     const added = await addMcpServer(ops, { server: "keyed", url: "https://keyed.example/mcp?key=q-s3cr3t", auth: { kind: "header", header: "X-Api-Key" }, value: SECRET }, { actor: { caller: "owner:sub-1" } });
     expect(added.ok).toBe(true);

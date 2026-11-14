@@ -285,6 +285,17 @@ form[data-skill-install] .skill-out{padding:.75rem 1rem}
 .skill-pick{display:flex;gap:.5rem;align-items:flex-start;padding:.5rem 0;border-top:1px solid var(--row-border)}
 .skill-pick:first-of-type{border-top:0}
 .skill-pick .note{display:block;font-size:.75rem;color:var(--muted-fg)}
+.change-main{max-width:var(--content-w);margin:0 auto;padding:2.5rem 1.25rem 4rem;display:flex;flex-direction:column;gap:1.5rem}
+.change-block{padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem;min-width:0}
+.change-block h3{font-size:.875rem;font-weight:600}
+.change-block ul{margin:0;padding-left:1.125rem}
+pre.diff,pre.text{margin:0;padding:.5rem .75rem;border-radius:var(--radius);background:var(--muted);font:.8125rem/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:32rem;overflow:auto}
+pre.diff span{display:block}
+pre.diff .add{background:var(--ok-soft);color:var(--ok)}
+pre.diff .del{background:var(--err-soft);color:var(--err)}
+.url-host{font-weight:700;color:var(--fg);background:var(--warn-soft);padding:0 .125rem;border-radius:.25rem}
+.change-answer{display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end;padding:.75rem 1rem}
+.change-answer .field{flex:1 1 16rem}
 @media (pointer:coarse){.btn-sm{min-height:2.25rem}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0s!important;animation-duration:1.5s!important}}
 @media (forced-colors:active){.switch{border:1px solid ButtonText}.switch::before{background:ButtonText}.pill,.tag{border:1px solid}}`;

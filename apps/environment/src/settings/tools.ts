@@ -15,9 +15,9 @@ export interface SettingsTool {
 
 /** What agents are told about the server (plan D17): its instructions and its tools' descriptions, nothing else. */
 export const SETTINGS_INSTRUCTIONS =
-  "t3flare's own settings: the Harness settings (Pi Durable's extensions and the MCP server set), the Environment settings (Container size, idle time, budget, Variables, Global mise config) and the Environment skills. These are not t3's preferences (t3_environment_preferences_update). Read tools run. Every write names the expectedRevision it read, and the thread's mode rules it: plan mode refuses writes; outside full access a write waits for the owner's card; a change that widens what agents have or can do always waits for the owner.";
+  "t3flare's own settings: the Harness settings (Pi Durable's extensions and the MCP server set), the Environment settings (Container size, idle time, budget, Variables, Global mise config) and the Environment skills. These are not t3's preferences (t3_environment_preferences_update). Read tools run. Every write names the expectedRevision it read, and the thread's mode rules it: plan mode refuses writes; outside full access a write waits for the owner's card; a change that widens what agents have or can do always waits for the owner's answer on a card or its Change page (at most 10 minutes, one at a time per thread). Do not repeat a declined change.";
 
-const ASKED_NOTE = "Changes that widen what agents have or can do (the Change tier `asked`) wait for the owner; turning things down is `free`.";
+const ASKED_NOTE = "Changes that widen what agents have or can do (the Change tier `asked`) wait for the owner's answer, on his card or the Change page, before they apply; turning things down is `free`.";
 
 const EXPOSURES = ["direct", "deferred", "codemode", "hidden"] as const;
 
@@ -120,7 +120,7 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
   {
     name: "change_mcp",
     class: "write",
-    description: `Changes the MCP server set (the Harness settings): op server (enabled, exposure, toolExposure by upstream tool name with null for the server's, writes for the settings server only), op class (a tool's class read, write, or null for its own hint), op add (a Direct server: url and auth none, header with the header's name, or oauth; a header value is typed by the owner on the panel, never here), op remove, or op header-value (asks the owner to set a header server's value on the panel). ${ASKED_NOTE}`,
+    description: `Changes the MCP server set (the Harness settings): op server (enabled, exposure, toolExposure by upstream tool name with null for the server's, writes for the settings server only), op class (a tool's class read, write, or null for its own hint), op add (a Direct server: url and auth none, header with the header's name, or oauth; a header value is typed by the owner on the Change page, never here), op remove, or op header-value (asks the owner to type a header server's value on the Change page). ${ASKED_NOTE}`,
     inputSchema: {
       type: "object",
       required: ["expectedRevision", "change"],
@@ -155,7 +155,7 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
   {
     name: "start_mcp_sign_in",
     class: "write",
-    description: "Asks the owner to start an OAuth sign-in for a Direct server added with auth oauth. The sign-in happens in the owner's browser, never through an agent.",
+    description: "Asks the owner to start an OAuth sign-in for a Direct server added with auth oauth. The sign-in happens in the owner's browser from the Change page, never through an agent.",
     inputSchema: { type: "object", required: ["expectedRevision", "server"], properties: { expectedRevision: expectedRevision("Harness"), server: { type: "string" } }, additionalProperties: false },
   },
   {

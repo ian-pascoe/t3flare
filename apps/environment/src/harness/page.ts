@@ -18,6 +18,7 @@ import {
   type ResolvedEnvironment,
   type ResolvedHarness,
   resolveEnvironment,
+  visible,
 } from "@t3flare/harness-registry";
 
 import { type ContainerCostTable, containerCostTable } from "./containerCost.ts";
@@ -28,6 +29,9 @@ import { SCRIPT } from "./pageScript.ts";
 import { endpointsSection, type EndpointsView } from "./pageEndpoints.ts";
 import { STYLE } from "./pageStyle.ts";
 
+/** `text` with every control and format character shown (a bidi override is inert), then escaped. */
+const visibleHtml = (text: string): string => escapeHtml(visible(text));
+
 /** `text` safe in HTML text and in a double-quoted attribute. */
 export const escapeHtml = (text: string): string =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
@@ -35,12 +39,16 @@ export const escapeHtml = (text: string): string =>
 const sha256 = async (text: string): Promise<string> =>
   btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))));
 
-let hashes: Promise<{ readonly style: string; readonly script: string }> | undefined;
+const hashes = new Map<string, Promise<{ readonly style: string; readonly script: string }>>();
 
-/** The page's Content-Security-Policy: nothing but its own constant style and script, and calls to its own origin. */
-export const pageCsp = async (): Promise<string> => {
-  hashes ??= Promise.all([sha256(STYLE), sha256(SCRIPT)]).then(([style, script]) => ({ style, script }));
-  const { style, script } = await hashes;
+/**
+ * A page's Content-Security-Policy: nothing but the one constant stylesheet and its own constant script (the panel's,
+ * or the Change page's), and calls to its own origin.
+ */
+export const pageCsp = async (pageScript: string = SCRIPT): Promise<string> => {
+  let pending = hashes.get(pageScript);
+  if (pending === undefined) hashes.set(pageScript, (pending = Promise.all([sha256(STYLE), sha256(pageScript)]).then(([style, script]) => ({ style, script }))));
+  const { style, script } = await pending;
   return [
     "default-src 'none'",
     `style-src 'sha256-${style}'`,
@@ -489,6 +497,39 @@ const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
 </section>`;
 };
 
+/** The panel's Open changes list (plan D10): each change, who asked, and its page. */
+export interface OpenChangeRow {
+  readonly changeId: string;
+  readonly subject: string;
+  readonly tool: string;
+  readonly reasons: ReadonlyArray<string>;
+  readonly thread?: string;
+  readonly agent?: string;
+  readonly client?: { readonly name: string; readonly source: string };
+  readonly needsPage?: string;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+}
+
+const openChangesSection = (rows: ReadonlyArray<OpenChangeRow>): string => {
+  const body =
+    rows.length === 0
+      ? `<div class="empty"><h3>No open changes</h3><p>A change an agent asks for that widens what agents have waits here, and on its card, for 10 minutes.</p></div>`
+      : `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">Asked</th><th scope="col">Change</th><th scope="col">By</th><th scope="col">Expires</th><th scope="col"><span class="sr">Open</span></th></tr></thead><tbody>${rows
+          .map(
+            (row) =>
+              `<tr><td data-label="Asked"><div>${time(Date.parse(row.createdAt))}</div></td><td data-label="Change"><div><code>${visibleHtml(row.tool)}</code>: ${visibleHtml(row.reasons.join("; "))}</div></td><td data-label="By"><div>${
+                row.thread === undefined ? (row.client === undefined ? "an Owner client" : `${visibleHtml(row.client.name)} (unverified)`) : `${visibleHtml(row.agent ?? "agent")} on <code>${visibleHtml(row.thread)}</code>`
+              }</div></td><td data-label="Expires"><div>${time(Date.parse(row.expiresAt))}</div></td><td data-label="Open"><div><a class="btn btn-sm" href="/_t3flare/harness/changes/${encodeURIComponent(row.changeId)}">Open</a></div></td></tr>`,
+          )
+          .join("")}</tbody></table></div>`;
+  return `<section id="changes" aria-labelledby="changes-title">
+<div class="section-head"><h2 id="changes-title">Open changes</h2></div>
+<p class="section-desc">Changes agents asked for that wait for your answer, here or on their card. The first answer wins.</p>
+<div class="group">${body}</div>
+</section>`;
+};
+
 export interface PageInput {
   readonly mcp?: ReadonlyArray<McpRow>;
   readonly resolved: ResolvedHarness;
@@ -504,6 +545,8 @@ export interface PageInput {
   readonly skills?: SkillsView;
   /** The Model endpoints (SPI-1162); the section is left out without them. */
   readonly endpoints?: EndpointsView;
+  /** The Open changes (plan D10); the section is left out without them. */
+  readonly openChanges?: ReadonlyArray<OpenChangeRow>;
 }
 
 const navItem = (id: string, label: string, name: IconName, after = "") => `<a href="#${id}">${icon(name)}${label}${after}</a>`;
@@ -525,7 +568,7 @@ export const renderPage = (input: PageInput): string => {
 <aside class="side">
 <div class="brand"><span class="brand-mark">${icon("logo")}</span><div><strong>Harness</strong><span>t3flare · Pi Durable</span></div></div>
 <nav class="nav" aria-label="Sections">
-${navItem("extensions", "Extensions", "extensions", `<span class="count">${EXTENSIONS.length}</span>`)}
+${input.openChanges === undefined ? "" : `${navItem("changes", "Open changes", "alert", `<span class="count">${input.openChanges.length}</span>`)}\n`}${navItem("extensions", "Extensions", "extensions", `<span class="count">${EXTENSIONS.length}</span>`)}
 ${navItem("mcp", "MCP servers", "server", failing > 0 ? `<span class="flag" role="img" aria-label="${plural(failing, "server", "servers")} failing"></span>` : `<span class="count">${rows.length}</span>`)}
 ${input.endpoints === undefined ? "" : `${navItem("endpoints", "Model endpoints", "key", `<span class="count">${input.endpoints.endpoints.length}</span>`)}\n`}${navItem("environment", "Environment", "container")}
 ${navItem("skills", "Skills", "skills")}
@@ -537,7 +580,7 @@ ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.leng
 <main id="main" tabindex="-1"><div class="content">
 <header class="page-head"><div><h1>Harness</h1><p>t3flare's own settings for this Cloud Environment: the Harness settings (Pi Durable's extensions and MCP servers, applied at each thread's next turn) and the Environment settings (what every Container gets, applied at its next start).</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
 <div id="result" class="notice" role="status" aria-live="polite" hidden><span class="notice-ico-ok">${icon("check")}</span><span class="notice-ico-err">${icon("alert")}</span><p class="msg"></p><button type="button" class="btn btn-ghost btn-sm" data-dismiss aria-label="Dismiss">${icon("x")}</button></div>
-${extensionsSection(input.resolved)}
+${input.openChanges === undefined ? "" : `${openChangesSection(input.openChanges)}\n`}${extensionsSection(input.resolved)}
 ${mcpSection(rows)}
 ${endpointsSection(escapeHtml, input.endpoints)}${environmentSection(environment, input.costs ?? containerCostTable(environment.containerBudget), input.running)}
 ${skillsSection(input.skills)}

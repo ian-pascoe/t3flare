@@ -36,6 +36,7 @@ import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
 import { type ModelRelayTarget, relayTargetOf } from "@t3flare/models/relay";
 import type { SkillsApiDeps } from "./skills/api.ts";
+import type { SettingsServerDeps } from "./settings/server.ts";
 import { githubReader, readAccessFor } from "./skills/contents.ts";
 import { type SkillStore, skillStore } from "./skills/store.ts";
 import { HarnessOAuth, type McpOAuthBinding, OAUTH_CALLBACK_PATH, OAUTH_CLIENT_PATH } from "./harness/oauth.ts";
@@ -381,7 +382,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * Never boots t3. Not reachable through `fetch`.
    */
   async harness(request: Request, caller: HarnessCaller): Promise<Response> {
-    const { handleHarness } = await import("./harness/panel.ts");
+    const [{ handleHarness }, { changesApiOf }] = await Promise.all([import("./harness/panel.ts"), import("./settings/server.ts")]);
     return handleHarness(request, {
       caller,
       host: this.#configuredHost(),
@@ -397,6 +398,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         discover: async (target, apiKey) => (await import("./endpoints/discover.ts")).discoverModels(target, apiKey),
         changed: () => void import("./endpoints/changes.ts").then(({ endpointsChanged }) => endpointsChanged()),
       },
+      // The Open changes (plan D10): the Change page answers them through the Settings server's own apply.
+      changes: changesApiOf(await this.#settingsDeps()),
     });
   }
 
@@ -441,12 +444,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /**
-   * The Settings server's call (ADR-0034, plan D2): t3flare's own agent, as the MCP host passes it with the caller this
-   * object derived. Its writes go through the same ops as the panel's.
+   * The Settings server's deps (ADR-0034, plan D2, D8): its writes go through the same ops as the panel's, and its Open
+   * changes live in this object's SQLite.
    */
-  async #settingsCall(input: Parameters<NonNullable<McpHostDeps["settingsServer"]>>[0]): Promise<McpCallAnswer> {
-    const [{ settingsCall }, { settingsChanges }, { HARNESS_PATH, harnessStatus, runningContainers }, { threadLinkOf }, { durableModes }, { cliThreadState }] = await Promise.all([
-      import("./settings/server.ts"),
+  async #settingsDeps(): Promise<SettingsServerDeps> {
+    const [{ settingsChanges }, { HARNESS_PATH, harnessStatus, runningContainers }, { threadLinkOf }, { durableModes }, { cliThreadState }] = await Promise.all([
       import("./settings/changes.ts"),
       import("./harness/panel.ts"),
       import("./provider/adapter.ts"),
@@ -455,21 +457,24 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     ]);
     const store = harnessStore(this.ctx.storage.kv);
     const skills = this.#skillsApi();
-    return settingsCall(
-      {
-        ops: { store, mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth, skills, now: () => Date.now() },
-        oauthStatus: (server) => this.harnessOAuth.status(server),
-        link: (thread) => threadLinkOf(thread),
-        // A Durable thread's modes are the adapter's record; a CLI thread's are its live session's (plan D3).
-        modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
-        changes: settingsChanges(this.ctx.storage.sql),
-        panelUrl: () => (this.env.T3FLARE_HOST === undefined && this.#host === undefined ? undefined : `https://${this.#configuredHost()}${HARNESS_PATH}`),
-        status: () => harnessStatus({ store, skills }),
-        running: () => runningContainers({ budget: () => this.#budgetState() }),
-        log: (event) => console.log(JSON.stringify(event)),
-      },
-      input,
-    );
+    return {
+      ops: { store, mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth, skills, now: () => Date.now() },
+      oauthStatus: (server) => this.harnessOAuth.status(server),
+      link: (thread) => threadLinkOf(thread),
+      // A Durable thread's modes are the adapter's record; a CLI thread's are its live session's (plan D3).
+      modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
+      changes: settingsChanges(this.ctx.storage.sql),
+      panelUrl: () => (this.env.T3FLARE_HOST === undefined && this.#host === undefined ? undefined : `https://${this.#configuredHost()}${HARNESS_PATH}`),
+      status: () => harnessStatus({ store, skills }),
+      running: () => runningContainers({ budget: () => this.#budgetState() }),
+      log: (event) => console.log(JSON.stringify(event)),
+    };
+  }
+
+  /** The Settings server's call: t3flare's own agent, as the MCP host passes it with the caller this object derived. */
+  async #settingsCall(input: Parameters<NonNullable<McpHostDeps["settingsServer"]>>[0]): Promise<McpCallAnswer> {
+    const { settingsCall } = await import("./settings/server.ts");
+    return settingsCall(await this.#settingsDeps(), input);
   }
 
   /**
