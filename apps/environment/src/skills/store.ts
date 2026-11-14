@@ -11,7 +11,7 @@
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import { EMPTY_SKILL_SET_HASH, type SkillSet, skillSetHash } from "@t3flare/skills";
 
-import type { AuditEntry, HarnessStore } from "../harness/store.ts";
+import type { AuditActor, AuditEntry, HarnessStore } from "../harness/store.ts";
 import { setProblem } from "./checks.ts";
 import type { FetchedSkill } from "./fetch.ts";
 
@@ -59,7 +59,8 @@ export type SkillChange =
 
 export type ChangeAnswer =
   | { readonly ok: true; readonly action: "skill-install" | "skill-update" | "skill-remove" | "skill-enable" | "skill-disable" | "unchanged"; readonly revision: number; readonly hash: string }
-  | { readonly ok: false; readonly error: string };
+  /** `moved`: the change named the revision it expected and the Environment settings are at `revision` (plan D15). */
+  | { readonly ok: false; readonly error: string; readonly moved?: { readonly revision: number } };
 
 /** A Workspace that refused or could not mount a set (plan §4.5). */
 export interface SkillSetRefusal {
@@ -157,7 +158,7 @@ export const skillStore = (options: SkillStoreOptions) => {
   };
 
   /** Writes `change` with the set's hash `next`, bumping the revision and auditing; inside `transactionSync`. */
-  const write = (change: SkillChange, next: string, caller: string, at: number): ChangeAnswer => {
+  const write = (change: SkillChange, next: string, actor: AuditActor, at: number): ChangeAnswer => {
     const before = change.kind === "install" ? get(change.skill.name) : get(change.name);
     let action: Extract<ChangeAnswer, { ok: true }>["action"];
     if (change.kind === "install") {
@@ -210,7 +211,7 @@ export const skillStore = (options: SkillStoreOptions) => {
     const revision = environment.revision + 1;
     harness.saveEnvironment({ ...environment, revision });
     const name = change.kind === "install" ? change.skill.name : change.name;
-    const entry: AuditEntry = { entity: "environment", at, caller, action, target: name, before: auditView(before), after: auditView(get(name)) };
+    const entry: AuditEntry = { ...actor, entity: "environment", at, action, target: name, before: auditView(before), after: auditView(get(name)) };
     harness.audit(entry);
     return { ok: true, action, revision, hash: next };
   };
@@ -232,12 +233,31 @@ export const skillStore = (options: SkillStoreOptions) => {
       }
       return { hash: hash(), files };
     },
-    /** Applies `change` as one synchronous block (see the header), trying again once when the revision moved. */
-    apply: async (change: SkillChange, caller: string, at: number): Promise<ChangeAnswer> => {
+    /**
+     * Applies `change` as one synchronous block (see the header). Without `expectedRevision` it tries again when the
+     * revision moved while the set's hash was made; with it (plan D15) it never retries, and a revision other than the one
+     * expected refuses the change as `moved`.
+     */
+    apply: async (change: SkillChange, caller: string | AuditActor, at: number, expectedRevision?: number): Promise<ChangeAnswer> => {
+      const actor: AuditActor = typeof caller === "string" ? { caller } : caller;
+      if (expectedRevision !== undefined) {
+        const moved = (revision: number): ChangeAnswer => ({
+          ok: false,
+          error: `the Environment settings are at revision ${revision}, not ${expectedRevision}; read them again`,
+          moved: { revision },
+        });
+        const now = harness.loadEnvironment().revision;
+        if (now !== expectedRevision) return moved(now);
+        const next = await skillSetHash({}, digestsAfter(change));
+        return options.transactionSync(() => {
+          const revision = harness.loadEnvironment().revision;
+          return revision === expectedRevision ? write(change, next, actor, at) : moved(revision);
+        });
+      }
       for (let attempt = 0; attempt < 3; attempt++) {
         const revision = harness.loadEnvironment().revision;
         const next = await skillSetHash({}, digestsAfter(change));
-        const answer = options.transactionSync(() => (harness.loadEnvironment().revision === revision ? write(change, next, caller, at) : undefined));
+        const answer = options.transactionSync(() => (harness.loadEnvironment().revision === revision ? write(change, next, actor, at) : undefined));
         if (answer !== undefined) return answer;
       }
       return { ok: false, error: "the Environment settings kept changing while this change was made; try again" };
