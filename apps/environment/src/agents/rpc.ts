@@ -127,6 +127,8 @@ export interface WorkspaceRpc {
   leakCheck(): Promise<{ readonly do: ReadonlyArray<{ readonly name: string; readonly path: string }>; readonly container: unknown; readonly flagged: unknown }>;
   /** Step 4a M0 P1, test stages only. */
   probeProcess(op: unknown): Promise<unknown>;
+  /** Why a reclaim would leave the running Container alone now, or null (SPI-1150's stage check). */
+  reclaimReason(): Promise<string | null>;
   terminalState(): Promise<{ readonly epoch: string; readonly keys: ReadonlyArray<string>; readonly lastInput: number; readonly pushes: number; readonly sync: Readonly<Record<string, number>> }>;
 }
 

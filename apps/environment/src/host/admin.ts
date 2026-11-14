@@ -32,7 +32,7 @@
 //   GET  /_t3flare/agents/sweep[?dry=1]           step 2b: the Workspace sweep (dry: what it would do, with reasons)
 //   POST /_t3flare/agents/workspace-probe?id=<id>  the repo revision moves on a write and a delete (read cache check)
 //   POST /_t3flare/agents/workspace-workflows?id=<id>&on=1|0  the owner's opt-in to `workflows: write` on the Workspace's Container tokens
-//   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec"|"credentialHelper"|"killExecs": input} on the Workspace DO
+//   POST /_t3flare/agents/workspace-call?id=<id>   step 2a M3 checks: {"fs"|"git"|"checkpoint"|"exec"|"credentialHelper"|"killExecs"|"reclaimReason": input} on the Workspace DO
 //   GET  /_t3flare/agents/checkpoint-trace?clear=1 the checkpoint operations the Workspace DOs answered, and by which side
 //   POST /_t3flare/check/connect-leak            step 3+: T3 Connect's secrets (names only) found in {"text"} (Workers Logs)
 //   POST /_t3flare/check/peer-leak               step 3: secrets (names only) in a Workspace's Container and Sessions' state
@@ -364,7 +364,9 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                           ? await rpc.takeEnvironmentSkills(environment.skills.hash())
                           : "skills" in body
                             ? await rpc.skills(String(body.skills), undefined, body.repoOnly === true ? { repoOnly: true } : undefined)
-                            : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess, takeSkills, skills" };
+                            : "reclaimReason" in body
+                              ? await rpc.reclaimReason()
+                              : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess, takeSkills, skills, reclaimReason" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
       }
       case "POST /_t3flare/check/connect-leak": {

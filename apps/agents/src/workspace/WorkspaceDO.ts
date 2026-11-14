@@ -1716,6 +1716,11 @@ export class WorkspaceDO extends ContainerHost {
     return undefined;
   }
 
+  /** Why a reclaim would leave the running Container alone now, or null when it would stop it; stops nothing (stage checks). */
+  async reclaimReason(): Promise<string | null> {
+    return (await this.#notReclaimable()) ?? null;
+  }
+
   /** Whether `releaseIfIdle` would stop the Container now; stops nothing (a reclaim counts idle holders first). */
   async reclaimable(): Promise<boolean> {
     return (await this.#notReclaimable()) === undefined;

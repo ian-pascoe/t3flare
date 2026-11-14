@@ -4,13 +4,14 @@
 // stage's service token and admin token (never printed):
 //
 //   node scripts/stage.ts run pmise pmise variables   the guard variables from every command path (variables.json; first)
+//   … install | override | git-gh | hold | restart | invalid | size | cost | empty | late   (<case>.json)
 //
 // Evidence goes to docs/steps/global-mise/, each file naming the deployed commit.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { ensureProject } from "./lib/cliTurn.ts";
-import { admin, DEFAULT_MODEL, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, SETTLED, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
+import { admin, DEFAULT_MODEL, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, SETTLED, sleep, threadWindow, uuid, wsCall, wsStream } from "./lib/client.ts";
 import { tailing } from "./lib/tail.ts";
 import { attachTerminal, stripAnsi } from "./lib/terminal.ts";
 
@@ -82,6 +83,12 @@ const stopOn = (id: string) => admin("POST", `/_t3flare/agents/workspace-stop?id
 const stateOf = async (id: string) => ((await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces as Array<any> | undefined)?.find((row) => row.id === id)?.container;
 
 let cookie = "";
+
+interface Case {
+  readonly name?: string;
+  readonly ok: boolean;
+  readonly [key: string]: unknown;
+}
 
 /** One turn on a new thread of `instance`, every request accepted; its runs, answer and tool items. */
 const turn = async (projectId: string, model: { instanceId: string; model: string; options: [] }, prompt: string, timeoutMs = 8 * 60_000) => {
@@ -258,7 +265,300 @@ const opencodeDebug = async () => {
   for (const line of lines.slice(0, 60)) console.log(line.replace(/(bearer|token|key|secret)([^,}]{0,10})["':= ]+[^"',} ]+/gi, "$1$2=<redacted>").slice(0, 600));
 };
 
-const commands: Record<string, () => Promise<void>> = { variables, "opencode-debug": opencodeDebug };
+
+// ── The Global mise config's cases ───────────────────────────────────────────────────────────────────────────────
+
+const GLOBAL_FILE = "/var/lib/t3flare/mise/config.toml";
+/** A node the image lacks (it has 26.13.0). */
+const NODE_PIN = '[tools]\nnode = "24.11.1"\n';
+const OUT_DIR = "/workspace/.pmise";
+
+const setMise = (text: string) => setEnvironment({ globalMiseConfig: text });
+const status = async () => (await harness("GET", "/_t3flare/harness/api/status")).json?.["last Global mise lay-down"] ?? null;
+const sha256 = async (text: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+/** Stops every pmise Workspace's Container and waits until each is stopped. */
+const stopAll = async (ids: ReadonlyArray<string> = [WORKSPACE]) => {
+  for (const id of ids) {
+    const started = Date.now();
+    while (Date.now() - started < 180_000) {
+      await stopOn(id);
+      if ((await stateOf(id))?.running !== true) break;
+      await sleep(3_000);
+    }
+  }
+};
+
+/** A Durable agent's bash on the Container: one command, its tool output as t3's client expands it. */
+const durableBash = async (projectId: string, command: string, extra = "") =>
+  turn(projectId, durableModel, `Call the bash tool once with command \`${command}\` and backend \`container\`${extra}. Do not retry or run anything else. Then reply with the tool's output or error text, quoted exactly.`);
+
+/** A file the paths write their answers to, read through the Workspace DO (null when absent). */
+const readOut = async (name: string) => {
+  const read = await execOn(WORKSPACE, `cat ${OUT_DIR}/${name} 2>/dev/null || echo PMISE-ABSENT`);
+  return read.stdout.includes("PMISE-ABSENT") ? null : read.stdout.trim();
+};
+
+const install = async () => {
+  cookie ||= await pair();
+  const { projectId, root } = await ensureProject(cookie, WORKSPACE);
+  await enableAll();
+  await setEnvironment({ containerIdleMinutes: 2, containerBudget: 3 });
+  await setMise(NODE_PIN);
+  await execOn(WORKSPACE, `mkdir -p ${OUT_DIR} && rm -f ${OUT_DIR}/node-*.txt`);
+  const results: Array<Case> = [];
+  const check = async (who: string, run: () => Promise<unknown>) => {
+    await stopAll();
+    const detail = await run();
+    const text = await readOut(`node-${who}.txt`);
+    const state = await stateOf(WORKSPACE);
+    results.push({ name: who, node: text, globalMise: state?.globalMise ?? null, launch: state?.launch?.globalMise ?? null, detail, ok: text === "v24.11.1" && state?.globalMise?.outcome === "laid" });
+  };
+  await check("durable", () => durableBash(projectId, `node --version > ${OUT_DIR}/node-durable.txt 2>&1`));
+  await check("pi", () => turn(projectId, cliModel("pi"), `Run this exact shell command once with your shell tool: \`node --version > ${OUT_DIR}/node-pi.txt 2>&1\` . Then reply with the single word done.`));
+  await check("terminal", async () => {
+    const terminal = await attachTerminal(cookie, { threadId: `pmise-${uuid()}`, terminalId: "default", cwd: root });
+    await terminal.until(/[$#] $/, 600_000);
+    const typed = await terminal.run(`node --version > ${OUT_DIR}/node-terminal.txt 2>&1`, 120_000).catch((error: unknown) => ({ ms: -1, text: String(error).slice(0, 300) }));
+    await terminal.close(true).catch(() => undefined);
+    await terminal.detach().catch(() => undefined);
+    return { ms: typed.ms };
+  });
+  await writeEvidence("install.json", { pin: NODE_PIN, imageNode: "26.13.0", status: await status(), results, ok: results.every((entry) => entry.ok) });
+};
+
+const override = async () => {
+  cookie ||= await pair();
+  await ensureProject(cookie, WORKSPACE);
+  const global = `${NODE_PIN}"github:junegunn/fzf" = "0.56.3"\n`;
+  await setMise(global);
+  await stopAll();
+  const repo = '[tools]\nnode = "22.12.0"\n';
+  const run = await execOn(
+    WORKSPACE,
+    `cd /workspace/repo && printf '${repo.replaceAll("\n", "\\n")}' > mise.toml && echo "node $(node --version)" && echo "fzf $(fzf --version)" && echo "outside $(cd / && node --version)" && mise ls --current 2>/dev/null | awk '{print $1, $2, $3}'; rm -f mise.toml`,
+    600_000,
+  );
+  const line = (name: string) => new RegExp(`^${name} (.*)$`, "m").exec(run.stdout)?.[1] ?? null;
+  await writeEvidence("override.json", {
+    global,
+    repo,
+    node: line("node"),
+    fzf: line("fzf"),
+    outsideRepo: line("outside"),
+    miseLs: run.stdout.split("\n").filter((entry) => /^(node|github:|gh|conda:git) /.test(entry)),
+    stderr: run.stderr,
+    ok: line("node") === "v22.12.0" && line("fzf")?.startsWith("0.56.3") === true && line("outside") === "v24.11.1",
+  });
+};
+
+const gitGh = async () => {
+  cookie ||= await pair();
+  const { root } = await ensureProject(cookie, WORKSPACE);
+  const cases: Array<Case> = [];
+  // Under the node pin: t3's own status and commit, and gh.
+  await setMise(NODE_PIN);
+  await stopAll();
+  const gh = await execOn(WORKSPACE, "gh --version | head -1; git --version");
+  const statusAnswer = await wsCall(cookie, "vcs.refreshStatus", { cwd: root }).catch((error: unknown) => ({ error: String(error).slice(0, 300) }));
+  await execOn(WORKSPACE, `cd /workspace/repo && echo "pmise $(date +%s)" > pmise-commit.txt`);
+  const commit = await wsStream(cookie, "git.runStackedAction", { actionId: uuid(), cwd: root, action: "commit", commitMessage: "pmise: a commit under the Global mise config", filePaths: ["pmise-commit.txt"] }).catch((error: unknown) => [{ error: String(error).slice(0, 400) }]);
+  const head = await execOn(WORKSPACE, "cd /workspace/repo && git log -1 --format=%s && git reset -q --hard HEAD~1");
+  cases.push({
+    name: "t3's git status and commit, and gh, under a node pin",
+    gh: gh.stdout.trim().split("\n"),
+    status: JSON.stringify(statusAnswer).slice(0, 400),
+    commitEvents: (commit as Array<any>).map((event) => event?.kind ?? event?.error ?? null).slice(-4),
+    head: head.stdout.trim(),
+    ok: gh.stdout.startsWith("gh version") && !JSON.stringify(statusAnswer).includes('"error"') && head.stdout.startsWith("pmise: a commit under the Global mise config"),
+  });
+  // An owner-pinned conda:git: the lay-down gives it the image's system gitconfig (the credential helper).
+  const pinned = '[tools]\n"conda:git" = "2.49.0"\n';
+  await setMise(pinned);
+  await stopAll();
+  const fetched = await execOn(
+    WORKSPACE,
+    `cd /workspace/repo && git --version && echo "helper $(git config --system --get credential.helper | grep -c t3flare/git-credential)" && echo "password $(printf 'protocol=https\\nhost=github.com\\n\\n' | git credential fill 2>/dev/null | grep -c '^password=')" && GIT_TERMINAL_PROMPT=0 git fetch -q origin && echo fetched`,
+    600_000,
+  );
+  cases.push({
+    name: "an owner-pinned conda:git has the credential helper, and a credentialed fetch works",
+    pin: pinned,
+    stdout: fetched.stdout.trim().split("\n"),
+    stderr: fetched.stderr,
+    globalMise: (await stateOf(WORKSPACE))?.globalMise ?? null,
+    ok: fetched.stdout.includes("git version 2.49.0") && fetched.stdout.includes("helper 1") && fetched.stdout.includes("password 1") && fetched.stdout.includes("fetched"),
+  });
+  await writeEvidence("git-gh.json", { cases, ok: cases.every((entry) => entry.ok) });
+};
+
+/** A pin whose install takes more than a minute on a cpu-1 Container (measured in the file). */
+const LONG_PIN = '[tools]\nnode = "24.11.1"\nrust = "1.91.1"\ngo = "1.25.4"\n';
+
+const hold = async () => {
+  cookie ||= await pair();
+  const { projectId } = await ensureProject(cookie, WORKSPACE);
+  const other = "pmise-b";
+  await ensureProject(cookie, other);
+  await enableAll();
+  await stopAll([WORKSPACE, other]);
+  await setEnvironment({ containerIdleMinutes: 1, containerBudget: 1 });
+  await setMise(LONG_PIN);
+  const started = Date.now();
+  // From a Durable agent's bash: computer's path, where the Workspace DO's exec does not hold the Container itself.
+  const agent = durableBash(projectId, `node --version > ${OUT_DIR}/node-hold.txt 2>&1`);
+  const samples: Array<{ readonly s: number; readonly running: boolean | null; readonly globalMise: string | null }> = [];
+  let refused: unknown = null;
+  let reason: unknown = null;
+  while (Date.now() - started < 12 * 60_000) {
+    const state = await stateOf(WORKSPACE);
+    samples.push({ s: Math.round((Date.now() - started) / 1000), running: state?.running ?? null, globalMise: state?.globalMise?.outcome ?? null });
+    if (reason === null && state?.running === true && Date.now() - started > 40_000) {
+      reason = (await callOn(WORKSPACE, { reclaimReason: true })).result;
+      // A second Workspace's start at a budget of 1: refused, and the reclaim leaves this one alone.
+      const answer = await callOn(other, { exec: { script: "true", timeoutMs: 120_000 } });
+      refused = { status: answer.status, text: String(answer.text ?? JSON.stringify(answer.result)).slice(0, 400) };
+    }
+    if (state?.globalMise?.outcome !== undefined && state.globalMise.at > started) break;
+    await sleep(5_000);
+  }
+  const turned = await agent;
+  const state = await stateOf(WORKSPACE);
+  const node = await readOut("node-hold.txt");
+  await setEnvironment({ containerIdleMinutes: 2, containerBudget: 3 });
+  await writeEvidence("hold.json", {
+    pin: LONG_PIN,
+    idleMinutes: 1,
+    budget: 1,
+    installMs: state?.globalMise?.answer?.ms ?? null,
+    reclaimReasonDuringInstall: reason,
+    otherWorkspaceStart: refused,
+    samples,
+    agent: turned,
+    node,
+    globalMise: state?.globalMise ?? null,
+    ok: (state?.globalMise?.answer?.ms ?? 0) > 60_000 && reason === "in use" && samples.every((sample) => sample.running !== false || sample.s < 10) && state?.globalMise?.outcome === "laid" && node === "v24.11.1",
+  });
+};
+
+const restart = async () => {
+  cookie ||= await pair();
+  await ensureProject(cookie, WORKSPACE);
+  const first = NODE_PIN;
+  const second = '[tools]\nnode = "22.12.0"\n';
+  await setMise(first);
+  await stopAll();
+  const a = await execOn(WORKSPACE, `cat ${GLOBAL_FILE}; node --version`, 600_000);
+  await setMise(second);
+  const b = await execOn(WORKSPACE, `cat ${GLOBAL_FILE}; node --version; echo '# an agent edit' >> ${GLOBAL_FILE}; tail -1 ${GLOBAL_FILE}`, 600_000);
+  const running = await stateOf(WORKSPACE);
+  await stopAll();
+  const c = await execOn(WORKSPACE, `cat ${GLOBAL_FILE}; node --version`, 600_000);
+  const next = await stateOf(WORKSPACE);
+  await writeEvidence("restart.json", {
+    first: { text: first, file: a.stdout },
+    changedWhileRunning: { text: second, file: b.stdout, launchSha256: running?.launch?.globalMise?.sha256 ?? null, firstSha256: await sha256(first) },
+    nextStart: { file: c.stdout, launchSha256: next?.launch?.globalMise?.sha256 ?? null, secondSha256: await sha256(second) },
+    ok:
+      a.stdout.includes("v24.11.1") &&
+      b.stdout.startsWith(first) &&
+      b.stdout.includes("v24.11.1") &&
+      running?.launch?.globalMise?.sha256 === (await sha256(first)) &&
+      c.stdout.startsWith(second) &&
+      !c.stdout.includes("an agent edit") &&
+      c.stdout.includes("v22.12.0"),
+  });
+};
+
+const invalid = async () => {
+  cookie ||= await pair();
+  await ensureProject(cookie, WORKSPACE);
+  const text = "this is = = not toml\n";
+  await setMise(text);
+  await stopAll();
+  const run = await execOn(WORKSPACE, `git --version; gh --version | head -1; test -f ${GLOBAL_FILE} && echo laid || echo not-laid`);
+  const state = await stateOf(WORKSPACE);
+  const shown = await status();
+  await writeEvidence("invalid.json", { text, stdout: run.stdout.trim().split("\n"), globalMise: state?.globalMise ?? null, status: shown, ok: run.stdout.includes("git version") && run.stdout.includes("gh version") && run.stdout.includes("not-laid") && state?.globalMise?.outcome === "not-laid" && String(shown).includes("not laid down") });
+};
+
+const size = async () => {
+  cookie ||= await pair();
+  await ensureProject(cookie, WORKSPACE);
+  const head = NODE_PIN;
+  const filler = "# filler to reach 16 KiB of UTF-8, €\n";
+  let text = head;
+  while (new TextEncoder().encode(text + filler).length <= 16 * 1024) text += filler;
+  text += "#".repeat(16 * 1024 - new TextEncoder().encode(text).length - 1) + "\n";
+  const bytes = new TextEncoder().encode(text).length;
+  const saved = await setMise(text);
+  const over = await harness("POST", "/_t3flare/harness/api/environment", { settings: { globalMiseConfig: `${text}#` } });
+  await stopAll();
+  const run = await execOn(WORKSPACE, `wc -c < ${GLOBAL_FILE}; sha256sum ${GLOBAL_FILE} | cut -c1-64; node --version`, 600_000);
+  const [readBytes, readSha, node] = run.stdout.trim().split("\n");
+  await writeEvidence("size.json", { bytes, revision: saved.revision, oneByteMore: { status: over.status, answer: over.json }, read: { bytes: Number(readBytes), sha256: readSha, node }, expectedSha256: await sha256(text), ok: bytes === 16 * 1024 && over.status === 400 && Number(readBytes) === bytes && readSha === (await sha256(text)) && node === "v24.11.1" });
+};
+
+/** Seconds from a stopped Container to its first command's answer, through the Workspace DO's exec. */
+const startToFirst = async () => {
+  await stopAll();
+  const started = Date.now();
+  const run = await execOn(WORKSPACE, "true", 900_000);
+  return { seconds: (Date.now() - started) / 1000, exitCode: run.exitCode, globalMise: (await stateOf(WORKSPACE))?.globalMise ?? null };
+};
+
+const cost = async () => {
+  cookie ||= await pair();
+  await ensureProject(cookie, WORKSPACE);
+  await setMise("");
+  const without = [await startToFirst(), await startToFirst()];
+  await setMise(NODE_PIN);
+  const withPin = [await startToFirst(), await startToFirst()];
+  await writeEvidence("cost.json", { note: "No install cache: every start installs the owner's tools again.", pin: NODE_PIN, without, withPin, ok: withPin.every((entry) => entry.exitCode === 0 && entry.globalMise?.outcome === "laid") && without.every((entry) => entry.exitCode === 0) });
+};
+
+const empty = async () => {
+  cookie ||= await pair();
+  await ensureProject(cookie, WORKSPACE);
+  await setMise("");
+  const starts = [await startToFirst(), await startToFirst()];
+  const run = await execOn(WORKSPACE, `test -e ${GLOBAL_FILE} && echo present || echo absent; ls /var/lib/t3flare/mise 2>/dev/null | wc -l; node --version; git --version`);
+  await writeEvidence("empty.json", {
+    note: "With no Global mise config the lay-down runs nothing (no exec): its outcome is recorded without an answer, and mise resolves from the image's base file alone.",
+    starts,
+    after: run.stdout.trim().split("\n"),
+    ok: starts.every((entry) => entry.exitCode === 0 && entry.globalMise?.answer === undefined) && run.stdout.startsWith("absent\n0\nv26.13.0"),
+  });
+};
+
+/** C1: a Durable agent's command cut off while the Container installs never runs afterwards. */
+const late = async () => {
+  cookie ||= await pair();
+  const { projectId } = await ensureProject(cookie, WORKSPACE);
+  await enableAll();
+  await setMise(LONG_PIN);
+  await execOn(WORKSPACE, `mkdir -p ${OUT_DIR} && rm -f ${OUT_DIR}/late-ran`);
+  await stopAll();
+  const turned = await durableBash(projectId, `touch ${OUT_DIR}/late-ran`, " and timeout 10 (seconds)");
+  // The lay-down ends, then computer would have dispatched the command: wait past it.
+  const started = Date.now();
+  while (Date.now() - started < 12 * 60_000) {
+    const state = await stateOf(WORKSPACE);
+    if (state?.globalMise?.answer !== undefined && state.globalMise.at > started - 15 * 60_000) break;
+    await sleep(5_000);
+  }
+  await sleep(20_000);
+  const ran = await readOut("late-ran");
+  await writeEvidence("late.json", {
+    pin: LONG_PIN,
+    agent: turned,
+    ranAfterwards: ran !== null,
+    globalMise: (await stateOf(WORKSPACE))?.globalMise ?? null,
+    ok: ran === null && JSON.stringify(turned).includes("installing the Global mise config"),
+  });
+};
+
+const commands: Record<string, () => Promise<void>> = { variables, install, override, "git-gh": gitGh, hold, restart, invalid, size, cost, empty, late, "opencode-debug": opencodeDebug };
 const command = commands[process.argv[2] ?? ""];
 if (command === undefined) {
   console.error(`usage: pmise.ts ${Object.keys(commands).join(" | ")}`);
