@@ -16,7 +16,7 @@ import { relayMessage, type RelayDeps } from "../src/mcp/relay.ts";
 import { registerCliAsker } from "../src/provider/cli/cliAsk.ts";
 import { DURABLE_AGENT, forgetDurableModes, noteDurableModes } from "../src/provider/threadCaller.ts";
 import { OFF_MESSAGE, type OwnCaller } from "../src/settings/caller.ts";
-import { OPENED_CAP } from "../src/settings/changes.ts";
+import { OPENED_CAP, scrubUrls } from "../src/settings/changes.ts";
 import { OPEN_ACROSS, STRIKES } from "../src/settings/openChanges.ts";
 import { READ_ONLY_REFUSAL } from "../src/settings/server.ts";
 import { bodyOf, endpointOf, modern } from "./settingsEndpointFixture.ts";
@@ -167,6 +167,11 @@ describe("hostile: a leak scan finds a typed secret nowhere but the secret store
     for (const text of [page, answerText, JSON.stringify(result), JSON.stringify(reads), JSON.stringify(f.cards), JSON.stringify(f.logs), lines.join("\n"), JSON.stringify(f.store.auditLog(1000))]) {
       expect(text).not.toContain(SECRET);
     }
+  });
+
+  it("SPI-1195 review: an error's URL loses its query even when the URL parser refuses it (a bad port)", () => {
+    expect(scrubUrls("sign-in failed: discovery of https://h:99999/p?key=x failed (401)")).toBe("sign-in failed: discovery of https://h:99999/p failed (401)");
+    expect(scrubUrls("empty host https://?key=s3cr3t")).not.toContain("s3cr3t");
   });
 });
 

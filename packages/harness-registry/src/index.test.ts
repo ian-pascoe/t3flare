@@ -108,6 +108,13 @@ describe("withoutQuery", () => {
   it("drops a URL's query and fragment (a key an owner put there), and leaves other text alone", () => {
     expect(withoutQuery("https://mcp.example/mcp?connection=conn_1&key=s3cr3t#frag")).toBe("https://mcp.example/mcp");
     expect(withoutQuery("https://mcp.example/mcp")).toBe("https://mcp.example/mcp");
-    expect(withoutQuery("not a url ?key=x")).toBe("not a url ?key=x");
+    expect(withoutQuery("not a url")).toBe("not a url");
+  });
+
+  it("SPI-1195 review: cuts what the URL parser refuses at its first ? or #", () => {
+    expect(withoutQuery("https://h:99999/p?key=x")).toBe("https://h:99999/p");
+    expect(withoutQuery("https://?key=s3cr3t")).toBe("https://");
+    expect(withoutQuery("https://h:99999/p#key=x?y")).toBe("https://h:99999/p");
+    expect(withoutQuery("not a url ?key=x")).toBe("not a url ");
   });
 });
