@@ -43,3 +43,8 @@ Shadows 4, Patches 5.
 - Patch `0005-server-browser-context-thread.patch`: one argument at the one `contextFor` call, the tab's thread. A Shadow of the 3,011-line `ServerBrowser.ts` would be far worse.
 
 Port discovery, `PreviewBrowser` and agent browser access are Layers, or the removal of ours. Evidence: `docs/steps/previews.md`.
+
+## Counts after SPI-1162 (Model endpoints)
+
+Shadows 4 (unchanged), Patches 6.
+- Patch `0006-pi-durable-models-are-not-retained.patch`: one line at the top of `ProviderRegistry.ts`'s `shouldRetainMissingProviderModels`, so `piDurable` retains no model it stopped listing and a removed Model endpoint's models leave the picker. No Layer reaches the registry's merge, and a Shadow would copy the 1,194-line file. Evidence: `docs/steps/spi-1162.md`.

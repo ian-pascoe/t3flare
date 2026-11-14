@@ -295,7 +295,7 @@ The HTTP endpoint every model call goes to, for every agent (Durable agents' and
 _Avoid_: gateway, LLM router
 
 **Model endpoint**:
-One of the owner's ways to reach models, set in the Harness panel: an API pi-ai speaks at a base URL, with an API key (sealed, write-only) or none, optional headers, and the models it serves, each named `<endpointId>/<modelId>` (draft ADR-0034). Replaces the Model proxy at the hard cut.
+One of the owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Replaces the Model proxy at the hard cut.
 _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 
 **Subscription**:

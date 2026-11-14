@@ -29,7 +29,10 @@ optional headers, and the models it serves.
    (HKDF-SHA256) from the stage's credentials key `T3FLARE_CREDENTIALS_KEY`, the record's name as additional data
    (step-2a2's design). The key is 256 random bits alchemy makes once per stage and keeps in the stage's state
    (`Alchemy.Random`), so prod gets one at its next deploy with nothing for the owner to do. Without it no key is
-   stored. What the panel shows is that a key is set, when, and a fingerprint. A Session asks for a key at use time
+   stored. What the panel shows is that a key is set, when, a fingerprint, and whether this Environment's key still
+   opens it. A saved key goes only to the API and base URL it was saved with: an edit that moves either needs the key
+   again, discovery elsewhere needs a typed key, and no redirect is followed with it. Base URLs are https at a public
+   host name (no IP literal, `localhost` or `.internal`). A Session asks for a key at use time
    (`endpointCredential`, ADR-0018's direction) and keeps it in memory only.
 5. **Expand, then cut.** Until SPI-1176 the Model proxy's models and settings keep working beside the endpoints. A
    turn on a model whose endpoint was removed, or no longer lists it, fails with a message that says so.
