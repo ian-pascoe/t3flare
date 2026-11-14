@@ -15,10 +15,10 @@ import { OWNER_ONLY_REFUSAL, refuseOwnerOnly } from "../src/mcp/ownerOnly.ts";
 import { relayMessage, type RelayDeps } from "../src/mcp/relay.ts";
 import { registerCliAsker } from "../src/provider/cli/cliAsk.ts";
 import { DURABLE_AGENT, forgetDurableModes, noteDurableModes } from "../src/provider/threadCaller.ts";
-import type { OwnCaller } from "../src/settings/caller.ts";
+import { OFF_MESSAGE, type OwnCaller } from "../src/settings/caller.ts";
 import { OPENED_CAP } from "../src/settings/changes.ts";
 import { OPEN_ACROSS, STRIKES } from "../src/settings/openChanges.ts";
-import { OFF_MESSAGE, READ_ONLY_REFUSAL } from "../src/settings/server.ts";
+import { READ_ONLY_REFUSAL } from "../src/settings/server.ts";
 import { bodyOf, endpointOf, modern } from "./settingsEndpointFixture.ts";
 import { HOST, settingsFixture, type SettingsFixture, structured, textOf, until } from "./settingsFixture.ts";
 

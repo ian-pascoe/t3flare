@@ -1,9 +1,10 @@
 // @effect-diagnostics globalDate:off globalTimers:off
 // The Settings server (ADR-0034, plan D2, D3, D7, D8, D9, D14, D16, D17), pure over its deps: t3flare's own agents'
-// door, M3 (SPI-1198) and M4 (SPI-1199). The MCP host calls it for the `settings` entry of the MCP server set, before any inventory or pausing
-// logic, with the caller the Environment derived (never one the agent states) and the call's asker.
+// door, M3 (SPI-1198) and M4 (SPI-1199). The MCP host calls it for the `settings` entry of the MCP server set, before
+// any inventory or pausing logic, with the caller the Environment derived (never one the agent states) and the call's
+// asker.
 //
-// - Reads run for every caller, linked work included, and never carry a secret value, a fingerprint, a URL's query or an
+// - Reads run for every caller, Linked work included, and never carry a secret value, a fingerprint, a URL's query or an
 //   authorization URL (D14).
 // - A write is judged here, once (D7), in this order: the access switch; Linked or unknown work (D3); plan mode (and no
 //   mode record); validation by the registry; the expected revision (D15); the Change tier (D5); the caps (D16); then
@@ -11,7 +12,8 @@
 //   relay keep only the plan refusal for this server and raise no card of their own.
 // - An asked change (D8, D9) always asks, in every mode: it becomes an Open change (openChanges.ts), shown on an
 //   owner-only approval card written here (never by the agent) and on the Change page, and the first answer wins. A
-//   change that needs the page (a secret, a sign-in, or text too long for a card, D6) is approved on the page alone.
+//   change that needs the page (a secret, a sign-in, a skills install or update, or text too long for a card,
+//   `oversize`; D6) is approved on the page alone.
 // - Every change goes through `ops.ts`, as the panel's do.
 // - The Owner-client door (M5a, SPI-1200; `settingsOwnerCall`, at the end) shares the reads and the planned writes. An
 //   Owner client has no thread or mode: a free change runs, and an asked change becomes an Open change in its
@@ -104,8 +106,6 @@ import { askedByText, changeText, environmentItems, extensionItems, mcpItems, PA
 import { settingsToolOf } from "./tools.ts";
 import type { ChangeItem, ChangeView, PageReason } from "./types.ts";
 
-export type { OwnCaller, OwnerCaller, ThreadLink, ThreadModes } from "./caller.ts";
-export { OFF_MESSAGE } from "./caller.ts";
 
 export interface SettingsServerDeps {
   readonly ops: OpsDeps & { readonly mcp: Pick<McpHost, "servers" | "inventory" | "tools" | "list"> };
@@ -155,7 +155,7 @@ const json = (value: unknown) => JSON.stringify(value, null, 2);
 
 /**
  * `value` with every string scrubbed and every `fingerprint` dropped, at any depth (plan D14): for what describes the
- * MCP server set (a Direct server's URL may hold a key in its query), and only that (M3 review).
+ * MCP server set (a Direct server's URL may hold a key in its query), and only that (SPI-1198 review).
  */
 const scrub = (value: unknown): unknown => {
   if (typeof value === "string") return scrubUrls(value);
@@ -166,7 +166,7 @@ const scrub = (value: unknown): unknown => {
 
 /**
  * A read's answer, as the page shows it (plan D14): Variables' values, the Global mise config and a SKILL.md appear as
- * they are, so a read-then-write of them round-trips unchanged (M3 review).
+ * they are, so a read-then-write of them round-trips unchanged (SPI-1198 review).
  */
 const read = (value: Readonly<Record<string, unknown>>): McpCallAnswer => ({ kind: "result", isError: false, text: json(value), structured: value });
 
@@ -769,7 +769,7 @@ const actorOfChange = (record: ChangeRecord, by: AnsweredBy): AuditActor => ({
  * now (the registry validates it again), and run with its expected revision. A secret goes from the page to `run` alone.
  */
 export const applyOpenChange = async (deps: SettingsServerDeps, record: ChangeRecord, input: { readonly by: AnsweredBy; readonly secret?: string }): Promise<ApplyResult> => {
-  // The owner may have switched the server off or read-only while it waited (M3 review): nothing applies then.
+  // The owner may have switched the server off or read-only while it waited (SPI-1198 review): nothing applies then.
   const barred = accessBar(deps);
   if (barred !== undefined) return { ok: false, error: barred.text };
   const planned = planWrite(deps, record.tool, (record.args ?? {}) as Readonly<Record<string, unknown>>);
@@ -843,7 +843,7 @@ const prepareWrite = (deps: SettingsServerDeps, tool: string, args: Readonly<Rec
     log("moved", { revision: current });
     return { kind: "result", answer: written("moved", `Not changed: the ${entityName(planned.entity)} settings are at revision ${current}, not ${expected}; read them again.`, { revision: current }) };
   }
-  // Only `free` and `unchanged` are named; anything else is asked (M1 review: `tierOf` may answer `unchanged`).
+  // Only `free` and `unchanged` are named; anything else is asked (SPI-1197 review: `tierOf` may answer `unchanged`).
   if (planned.verdict.tier === "unchanged") {
     log("unchanged");
     return { kind: "result", answer: written("unchanged", `Nothing to change: the settings already say so (revision ${current}).`, { revision: current }) };
@@ -1133,10 +1133,10 @@ const networkSpent = (deps: SettingsServerDeps, reader: Reader): string | undefi
 };
 
 /**
- * The read caps (M3 review, D16-style): every read counts toward `READ_CAP` per thread per hour, and a read that reaches
- * GitHub or an MCP server (`NETWORK_READS`) toward `NETWORK_READ_CAP` as well. `preview_skills` mints a GitHub App token
- * for any installed repository, so only a caller that may write may preview (the owner's decision). Undefined: the read
- * runs, and is counted.
+ * The read caps (SPI-1198 review, D16-style): every read counts toward `READ_CAP` per caller (`capKeyOf`) per hour, and
+ * a read that reaches GitHub or an MCP server (`NETWORK_READS`) toward `NETWORK_READ_CAP` as well. `preview_skills`
+ * mints a GitHub App token for any installed repository, so only a caller that may write may preview (the owner's
+ * decision). Undefined: the read runs, and is counted.
  */
 const readLimit = (deps: SettingsServerDeps, reader: Reader, tool: string): McpCallAnswer | undefined => {
   const refused = (reason: string, text: string) => {
@@ -1190,7 +1190,7 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
       return written("withdrawn", `Not changed: the owner did not answer (${answer.reason ?? "cancelled"}).`);
     }
     // The card waited: the owner may have switched the server off or read-only, or the thread's mode moved, meanwhile
-    // (M3 review). The revision is checked by the op itself.
+    // (SPI-1198 review). The revision is checked by the op itself.
     const since = mayNotWrite(deps, caller);
     if (since !== undefined) return refuse(since.reason, `Not changed: ${since.text}`);
   }
@@ -1231,7 +1231,8 @@ const runRead = async (deps: SettingsServerDeps, name: string, args: Readonly<Re
       return read(readAudit(deps.ops, { ...(limit === undefined ? {} : { limit }), ...(before === undefined ? {} : { before }) }));
     }
     case "test_mcp_server": {
-      // No audit entry: a read through the server must not evict the log of changes (M3 review); the read cap bounds it.
+      // No audit entry: a read through the server must not evict the log of changes (SPI-1198 review); the read cap
+      // bounds it.
       const tested = await testMcpServer(deps.ops, stringArg(args, "server") ?? "", { actor, audit: false });
       if (!tested.ok) return readError(tested.error);
       const { ok: _ok, ...shown } = tested;

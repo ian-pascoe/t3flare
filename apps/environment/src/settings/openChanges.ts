@@ -334,7 +334,6 @@ export const openChangeSummary = (record: ChangeRecord, url: string | undefined)
   ...(url === undefined ? {} : { url }),
 });
 
-export type OpenChangeSummary = ReturnType<typeof openChangeSummary>;
 
 /** What the Change page and the panel's list run over (plan D10): the table, and answers by the page. */
 export interface ChangesApi {

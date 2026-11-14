@@ -12,7 +12,7 @@ export type CallVerdict = { readonly kind: "run" } | { readonly kind: "ask" } | 
 
 /**
  * `record[key]` when `key` is the record's own key, else undefined: a user-supplied key (a tool's or server's name)
- * never reads `Object.prototype` (`toString`, `constructor`, `__proto__`) (M3 review).
+ * never reads `Object.prototype` (`toString`, `constructor`, `__proto__`) (SPI-1198 review).
  */
 export const ownEntry = <T>(record: Readonly<Record<string, T>> | undefined, key: string): T | undefined =>
   record !== undefined && record !== null && Object.hasOwn(record, key) ? record[key] : undefined;

@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off
-// The Settings server's reads after the M3 review (SPI-1198; plan D14, D16): a read writes no audit entry, so reads
-// cannot evict the log of changes; reads are capped per thread, and those that reach GitHub or an MCP server more
+// The Settings server's reads after the SPI-1198 review (plan D14, D16): a read writes no audit entry, so reads
+// cannot evict the log of changes; reads are capped per caller, and those that reach GitHub or an MCP server more
 // tightly; `preview_skills` (it mints a GitHub App token) is for a caller that may write; and only what describes the MCP
 // server set is scrubbed of URL queries, so Variables, the Global mise config and a SKILL.md read as they are and a
 // read-then-write round-trips unchanged.

@@ -1,5 +1,5 @@
 // Who calls the Settings server, as the Environment derives it (ADR-0034, plan D3): the types the MCP host, the relay
-// and the provider share with the server, kept apart so none of them imports the server itself (M3 review).
+// and the provider share with the server, kept apart so none of them imports the server itself (SPI-1198 review).
 
 /** A thread's Linked work as the Environment establishes it. */
 export type ThreadLink = "own" | "linked" | "unknown";
