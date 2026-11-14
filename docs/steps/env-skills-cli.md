@@ -1,7 +1,7 @@
 # SPI-1153: Environment skills for the CLI agents (report)
 
 Date: 2026-11-14. Branch `spi-1153-env-skills-cli`, from `main` at 5bc4bb7 (SPI-1147, SPI-1148, SPI-1149, SPI-1151,
-SPI-1152). The ticket is the plan; SPI-1001's shared decisions apply. Evidence: [`env-skills-cli/`](env-skills-cli/).
+SPI-1152), rebased in review round 1 onto `main` at e5f3bda (SPI-1150) with one conflict, `STAGES` in `stage.ts`. The ticket is the plan; SPI-1001's shared decisions apply. Evidence: [`env-skills-cli/`](env-skills-cli/).
 Docker probe: `apps/environment/test/docker/envSkills.docker.test.ts`. Stage harness: `apps/environment/scripts/pclienv.ts`.
 Throwaway stage `pclienv`, added to `STAGES`, destroyed after the evidence (2026-11-14). Fragility: U65 (extended). Parity:
 [`docs/parity.md`](../parity.md) (Skills row, G10).
@@ -100,7 +100,13 @@ composer, read from the rows, lists it at once). Accepted as is (the orchestrato
 ## Evidence (stage `pclienv`)
 
 Review round 1 redeployed the stage at `35b29d5` (the deployed code is `b03ad58`'s; `35b29d5` changed only
-`pclienv.ts`) and took all four files again; the stage is destroyed. The fixture: SPI-1151's `cli-skills` written into
+`pclienv.ts`) and took all four files again; the stage is destroyed. Those runs came before the rebase onto e5f3bda
+(SPI-1150): `35b29d5` is a pre-rebase sha, kept only by the evidence; its change is the rebased `9312aad`, and
+`b03ad58`'s is `745d604`, which also hold `main`'s SPI-1150 (the same change, not the same build). SPI-1150 adds a wait
+for the Global mise config before a spawn, in the Workspace; of this change's files it also edits `SessionDO.ts`,
+`GLOSSARY.md`, `upstream-fragility.md` and `stage.ts`, all merged without a conflict but `STAGES`, and none of the CLI
+paths the evidence exercises (the profiles, the spawner, the wrapper, `provider/skills.ts`, `@t3flare/skills`). The
+stage was not run again after the rebase. The first run's files (at `f0134ad`, rebased `e5511fc`) are replaced. The fixture: SPI-1151's `cli-skills` written into
 a clone of the fixture project, and a `pair-<word>` Skill in each CLI Repo root (`.agents/skills` amber,
 `.codex/skills` birch, `.pi/skills` cedar, `.claude/skills` dune, `.opencode/skills` ember, `.opencode/skill` fjord;
 the Repo's says `REPO-<WORD>`); the Environment skills from `ian-pascoe/t3flare-fixture` branch `spi1153-env`
