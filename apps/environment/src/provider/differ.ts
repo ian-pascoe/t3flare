@@ -824,10 +824,17 @@ export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2Pr
     });
   }
   if (reason === "no_model") {
-    // pi-durable's detail names the ref (`Model <provider>/<id> is not available`); a Model endpoint's is its slug (SPI-1162).
+    // pi-durable's detail names the ref (`Model <provider>/<id> is not available`); a Model endpoint's is its slug, the
+    // Model proxy's `anthropic/<id>` (SPI-1162). Without one, it may be either.
     const slug = /^Model (\S+) is not available/.exec(detail)?.[1];
     const which = slug === undefined ? "The selected model" : `The model ${slug}`;
-    return makeProviderFailure({ class: "provider_error", message: `${which} is not available: its Model endpoint was removed or no longer lists it. Pick another model.`, code: reason });
+    const why =
+      slug === undefined
+        ? "its Model endpoint, or the Model proxy, no longer lists it"
+        : slug.startsWith("anthropic/")
+          ? "the Model proxy no longer lists it"
+          : "its Model endpoint was removed or no longer lists it";
+    return makeProviderFailure({ class: "provider_error", message: `${which} is not available: ${why}. Pick another model.`, code: reason });
   }
   const messages: Record<string, string> = {
     turn_deadline: "The turn ran longer than 2 hours and was stopped.",

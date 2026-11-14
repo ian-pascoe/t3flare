@@ -141,7 +141,7 @@ const removedProjection = await awaitRuns(threadId, 3);
 const lastRun = runsOf(removedProjection).at(-1);
 report.removed = clean({ status: removed.status, run: lastRun?.status ?? null, errors: failureText(removedProjection), pickerAfter });
 check("the removed endpoint's models leave the picker", pickerAfter.length === 0, pickerAfter);
-check("the removed endpoint's model failed the turn, saying why", lastRun?.status === "failed" && /Model endpoint was removed/.test(JSON.stringify(removedProjection)), report.removed);
+check("the removed endpoint's model failed the turn, saying why", lastRun?.status === "failed" && /is not available: its Model endpoint/.test(JSON.stringify(removedProjection)), report.removed);
 
 // 7. The audit log: every change, never a key.
 const audit = (await api("GET", "audit")).json?.entries?.filter((entry: any) => entry.entity === "endpoints") ?? [];

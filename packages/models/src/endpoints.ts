@@ -131,12 +131,40 @@ export interface EndpointInput {
 }
 
 /**
- * An endpoint's key as the Environment answers a Session (`endpointCredential`): the key, or null with why. `unreadable`:
- * a key is stored but this Environment's credentials key does not open it (the key changed, or the record is damaged).
+ * Where an endpoint's key goes: its API, base URL and headers. A saved key is sent only to the target it was saved with
+ * (a gateway may route by a header, so headers count). Every check of that rule goes through `sameTarget`.
+ */
+export interface EndpointTarget {
+  readonly api: EndpointApi;
+  readonly baseUrl: string;
+  readonly headers: Readonly<Record<string, string>>;
+}
+
+export const targetOf = (endpoint: EndpointTarget): EndpointTarget => ({ api: endpoint.api, baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers } });
+
+/** Headers as compared: names lowercased, sorted. */
+const headerList = (headers: Readonly<Record<string, string>>): string =>
+  JSON.stringify(Object.entries(headers).map(([name, value]) => [name.toLowerCase(), value]).sort(([a], [b]) => (a! < b! ? -1 : a! > b! ? 1 : 0)));
+
+/** Whether two targets are the same: the same API, base URL and headers (names case-insensitive). */
+export const sameTarget = (a: EndpointTarget, b: EndpointTarget): boolean => a.api === b.api && a.baseUrl === b.baseUrl && headerList(a.headers) === headerList(b.headers);
+
+/**
+ * An endpoint's key as the Environment answers a Session (`endpointCredential`): the key, or null with why.
+ * - `unreadable`: a key is stored but this Environment's credentials key does not open it (the key changed, or the
+ *   record is damaged).
+ * - `changed`: the endpoint's target is no longer the one the Session holds; the key is not given for the old one.
  */
 export interface EndpointCredential {
   readonly apiKey: string | null;
   readonly unreadable?: boolean;
+  readonly changed?: boolean;
+}
+
+/** A Session's request for an endpoint's key: the endpoint, and the target it will send the key to. */
+export interface EndpointCredentialRequest {
+  readonly endpointId: string;
+  readonly target: EndpointTarget;
 }
 
 /** What pi-ai's catalog knows of a model (`known.ts`). */
@@ -192,6 +220,8 @@ const modelInputOf = (value: unknown): EndpointModelInput | string => {
  */
 const baseUrlOf = (value: unknown): { readonly url: string } | { readonly problem: string } => {
   if (typeof value !== "string") return { problem: "baseUrl is an https URL" };
+  // `URL` drops a bare `?` or `#`: refuse them as written.
+  if (value.includes("?") || value.includes("#")) return { problem: "baseUrl has no credentials, query or fragment" };
   let url: URL;
   try {
     url = new URL(value.trim());
@@ -200,7 +230,7 @@ const baseUrlOf = (value: unknown): { readonly url: string } | { readonly proble
   }
   if (url.protocol !== "https:") return { problem: "baseUrl is https only" };
   if (url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") return { problem: "baseUrl has no credentials, query or fragment" };
-  const host = url.hostname.toLowerCase();
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
   if (/^[\d.]+$/.test(host) || host.startsWith("[") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) {
     return { problem: "baseUrl's host is a public host name, not an address" };
   }

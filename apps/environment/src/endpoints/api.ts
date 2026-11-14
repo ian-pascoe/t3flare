@@ -1,20 +1,20 @@
-// @effect-diagnostics globalDate:off
 // The Harness panel's Model endpoints routes (SPI-1162), answered after panel.ts has applied its guards (Access, then for
 // a change JSON, Origin, Sec-Fetch-Site and the owner's CSRF token):
 //
 //   GET  /api/endpoints            the entity, each endpoint with its key's mark (never the key), the presets and APIs
 //   POST /api/endpoints            { op: "save", endpoint, apiKey? } or { op: "remove", id }
 //   POST /api/endpoints/discover   { endpoint, apiKey? }: the endpoint's model list with pi-ai's metadata, read with the
-//                                  key given, else the saved endpoint's own, but only at its saved API and base URL
+//                                  key given, else the saved endpoint's own, but only at its saved target (API, base
+//                                  URL and headers)
 //
 // Every change bumps the endpoints' own revision and is audited under the entity `endpoints`, with the key's mark and the
 // headers' names only.
-import { ENDPOINT_APIS, ENDPOINT_PRESETS, isRecord, type ModelEndpoint, validateEndpoint } from "@t3flare/models/endpoints";
+import { ENDPOINT_APIS, ENDPOINT_PRESETS, isRecord, type ModelEndpoint, sameTarget, validateEndpoint } from "@t3flare/models/endpoints";
 
 import type { SealedMark } from "../credentials/sealed.ts";
 import type { AuditEntry } from "../harness/store.ts";
 import type { Discovery } from "./discover.ts";
-import { type EndpointStore, modelsWithMetadata, sameTarget } from "./store.ts";
+import { type EndpointStore, modelsWithMetadata } from "./store.ts";
 
 export interface EndpointsApiDeps {
   readonly store: EndpointStore;
@@ -84,10 +84,10 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
   if (valid.endpoint.auth === "api-key") {
     if (typed !== undefined) apiKey = typed;
     else {
-      // The saved key goes only to the API and base URL it was saved with.
+      // The saved key goes only to the target it was saved with: the same API, base URL and headers.
       const saved = await deps.store.resolve(valid.endpoint.id);
       if (saved === undefined || saved.endpoint.auth === "none" || !sameTarget(saved.endpoint, valid.endpoint)) {
-        return { status: 400, text: "type the API key: a saved key is sent only to the API and base URL it was saved with" };
+        return { status: 400, text: "type the API key: a saved key is sent only to the API, base URL and headers it was saved with" };
       }
       if (saved.apiKey === undefined) return { status: 400, text: "the saved API key cannot be read: enter it again" };
       apiKey = saved.apiKey;

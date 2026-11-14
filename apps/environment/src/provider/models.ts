@@ -41,8 +41,8 @@ const byVendor = (a: CatalogModel, b: CatalogModel): number =>
 /**
  * Each model labelled with its vendor and grouped by it (t3's picker keeps the order it is given), the catalog's order
  * within a vendor. Then each Model endpoint's models (SPI-1162) as `<endpointId>/<modelId>`, grouped by endpoint in the
- * owner's order, labelled with the endpoint's label (and its id when the label is a proxy vendor's, so the groups never
- * merge). The picker's default is the default model when the catalog lists it, else the catalog's first model
+ * owner's order, labelled with the endpoint's label (and its id when a proxy vendor or another endpoint has that label,
+ * so the groups never merge). The picker's default is the default model when the catalog lists it, else the catalog's first model
  * (an endpoint's first without one).
  */
 export const snapshotModels = (catalog: Catalog, endpoints: ModelEndpoints = EMPTY_ENDPOINTS): ReadonlyArray<ServerProviderModel> => {
@@ -53,9 +53,12 @@ export const snapshotModels = (catalog: Catalog, endpoints: ModelEndpoints = EMP
     isCustom: false,
     capabilities: capabilitiesOf(model),
   }));
+  // One group per endpoint: a label a proxy vendor or another endpoint also has is told apart by the endpoint's id.
   const vendors = new Set(proxy.map((model) => model.subProvider));
+  const labels = new Map<string, number>();
+  for (const endpoint of endpoints.endpoints) labels.set(endpoint.label, (labels.get(endpoint.label) ?? 0) + 1);
   const own = endpoints.endpoints.flatMap((endpoint) => {
-    const group = vendors.has(endpoint.label) ? `${endpoint.label} · ${endpoint.id}` : endpoint.label;
+    const group = vendors.has(endpoint.label) || (labels.get(endpoint.label) ?? 0) > 1 ? `${endpoint.label} · ${endpoint.id}` : endpoint.label;
     return endpoint.models.map((model) => ({
       slug: endpointSlug(endpoint.id, model.id),
       name: model.name,

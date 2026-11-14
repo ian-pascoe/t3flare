@@ -100,9 +100,51 @@ describe("endpointStore", () => {
     expect(await store.resolve("openai")).toMatchObject({ endpoint: { baseUrl: "https://other.example/v1" }, apiKey: "sk-other" });
   });
 
-  it("refuses an IP literal, localhost or an internal host as the base URL", async () => {
+  it("refuses to keep a saved key for an edit that adds or changes a header", async () => {
     const { store } = setup();
-    for (const baseUrl of ["https://127.0.0.1/v1", "https://[::1]/v1", "https://localhost/v1", "https://api.localhost/v1", "https://llm.internal/v1"]) {
+    await store.save(OPENAI, { apiKey: "sk-first" });
+    for (const headers of [{ "Helicone-Target-Url": "https://evil.example" }, {}]) {
+      if (Object.keys(headers).length === 0) {
+        await store.save({ ...OPENAI, headers: { "X-Org": "a" } }, { apiKey: "sk-first" });
+        expect(await store.save({ ...OPENAI, headers: { "X-Org": "b" } }, {})).toMatchObject({ ok: false, error: expect.stringMatching(/API key entered again/) });
+      } else expect(await store.save({ ...OPENAI, headers }, {})).toMatchObject({ ok: false, error: expect.stringMatching(/API key entered again/) });
+    }
+    // The same headers under other-cased names are the same target.
+    expect(await store.save({ ...OPENAI, headers: { "x-org": "a" } }, {})).toMatchObject({ ok: true });
+  });
+
+  it("seals no key for a refused save, and never pairs a stored key with a new endpoint", async () => {
+    const { kv, store } = setup();
+    for (let i = 0; i < 32; i++) await store.save({ ...OPENAI, id: `e${i}` }, { apiKey: `k${i}` });
+    expect(await store.save({ ...OPENAI, id: "victim", baseUrl: "https://good.example/v1" }, { apiKey: "sk-owner" })).toMatchObject({ ok: false, error: expect.stringMatching(/at most 32/) });
+    expect((await store.keyStatus("victim")).set).toBe(false);
+    expect(JSON.stringify([...kv.map.keys()])).not.toContain("endpoint/victim/");
+    store.remove("e0");
+    // A key stored under an id with no endpoint (as an older build could leave) is never adopted by a keyless create.
+    await sealedStore(kv, KEY).put("endpoint/victim/api-key", "sk-orphan");
+    expect(await store.save({ ...OPENAI, id: "victim", baseUrl: "https://evil.example/v1" }, {})).toMatchObject({ ok: false, error: expect.stringMatching(/needs its API key/) });
+    expect(await store.resolve("victim")).toBeUndefined();
+    // A create with its own key replaces it.
+    expect(await store.save({ ...OPENAI, id: "victim" }, { apiKey: "sk-new" })).toMatchObject({ ok: true });
+    expect((await store.resolve("victim"))?.apiKey).toBe("sk-new");
+  });
+
+  it("gives a Session's request a key only for the endpoint's target now", async () => {
+    const { store } = setup();
+    await store.save({ ...OPENAI, headers: { "X-Org": "a" } }, { apiKey: "sk-now" });
+    const target = { api: "openai-responses", baseUrl: "https://api.openai.com/v1", headers: { "x-org": "a" } } as const;
+    expect(await store.credential({ endpointId: "openai", target })).toEqual({ apiKey: "sk-now" });
+    expect(await store.credential({ endpointId: "openai", target: { ...target, baseUrl: "https://old.example/v1" } })).toEqual({ apiKey: null, changed: true });
+    expect(await store.credential({ endpointId: "openai", target: { ...target, headers: {} } })).toEqual({ apiKey: null, changed: true });
+    expect(await store.credential({ endpointId: "gone", target })).toEqual({ apiKey: null, changed: true });
+  });
+
+  it("refuses an IP literal, localhost, an internal host, or a bare query or fragment in the base URL", async () => {
+    const { store } = setup();
+    for (const baseUrl of ["https://api.openai.com/v1#", "https://api.openai.com/v1?"]) {
+      expect(await store.save({ ...OPENAI, baseUrl }, { apiKey: "k" })).toMatchObject({ ok: false, error: expect.stringMatching(/query or fragment/) });
+    }
+    for (const baseUrl of ["https://127.0.0.1/v1", "https://[::1]/v1", "https://localhost/v1", "https://localhost./v1", "https://api.localhost/v1", "https://llm.internal/v1", "https://2130706433/v1"]) {
       expect(await store.save({ ...OPENAI, baseUrl }, { apiKey: "k" })).toMatchObject({ ok: false, error: expect.stringMatching(/public host name/) });
     }
   });

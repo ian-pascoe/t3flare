@@ -35,6 +35,12 @@ describe("snapshotModels with Model endpoints", () => {
     expect(models.filter((entry) => entry.isDefault === true).map((entry) => entry.slug)).toEqual(["anthropic/claude-sonnet-5-5"]);
   });
 
+  it("keeps two endpoints with the same label in two groups, told apart by id", () => {
+    const twin = { ...ENDPOINTS.endpoints[0]!, id: "openai-work", models: [model("gpt-5", "GPT-5", true)] };
+    const models = snapshotModels({ models: [], fetchedAt: 1 }, { revision: 3, endpoints: [ENDPOINTS.endpoints[0]!, twin] });
+    expect([...new Set(models.map((entry) => entry.subProvider))]).toEqual(["OpenAI · openai", "OpenAI · openai-work"]);
+  });
+
   it("is the proxy's list alone without endpoints", () => {
     const catalog = { models: mergeLists([{ id: "claude-sonnet-5-5" }], undefined), fetchedAt: 1 };
     expect(snapshotModels(catalog, { revision: 0, endpoints: [] })).toEqual(snapshotModels(catalog));

@@ -22,6 +22,12 @@ const count = (value: unknown): number | undefined => (typeof value === "number"
 
 class ListError extends Error {}
 
+/** The endpoint's own headers, then the key in the header `name` takes it in (none without a key). */
+const keyedHeaders = (target: Target, apiKey: string | undefined, name: string, value: (key: string) => string = (key) => key): Record<string, string> => ({
+  ...target.headers,
+  ...(apiKey === undefined ? {} : { [name]: value(apiKey) }),
+});
+
 const getJson = async (url: URL, headers: Record<string, string>, fetcher: typeof fetch, signal: AbortSignal): Promise<unknown> => {
   // Never followed: a redirect would carry the key to wherever it points.
   const response = await fetcher(url, { headers: { accept: "application/json", ...headers }, signal, redirect: "manual" });
@@ -35,7 +41,7 @@ const getJson = async (url: URL, headers: Record<string, string>, fetcher: typeo
 };
 
 const anthropic = async (target: Target, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
-  const headers = { ...target.headers, "anthropic-version": "2023-06-01", ...(apiKey === undefined ? {} : { "x-api-key": apiKey }) };
+  const headers = { ...keyedHeaders(target, apiKey, "x-api-key"), "anthropic-version": "2023-06-01" };
   const models: Array<EndpointModelInput> = [];
   let after: string | undefined;
   for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -60,7 +66,7 @@ const anthropic = async (target: Target, apiKey: string | undefined, fetcher: ty
 };
 
 const openai = async (target: Target, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
-  const body = await getJson(new URL(`${target.baseUrl}/models`), { ...target.headers, ...(apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` }) }, fetcher, signal);
+  const body = await getJson(new URL(`${target.baseUrl}/models`), keyedHeaders(target, apiKey, "authorization", (key) => `Bearer ${key}`), fetcher, signal);
   if (!isRecord(body) || !Array.isArray(body.data)) throw new ListError("the endpoint's answer is not a list of models");
   return body.data.flatMap((entry): Array<EndpointModelInput> => (isRecord(entry) && typeof entry.id === "string" && entry.id !== "" ? [{ id: entry.id }] : []));
 };
@@ -68,7 +74,7 @@ const openai = async (target: Target, apiKey: string | undefined, fetcher: typeo
 const google = async (target: Target, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
   const url = new URL(`${target.baseUrl}/models`);
   url.searchParams.set("pageSize", "1000");
-  const body = await getJson(url, { ...target.headers, ...(apiKey === undefined ? {} : { "x-goog-api-key": apiKey }) }, fetcher, signal);
+  const body = await getJson(url, keyedHeaders(target, apiKey, "x-goog-api-key"), fetcher, signal);
   if (!isRecord(body) || !Array.isArray(body.models)) throw new ListError("the endpoint's answer is not a list of models");
   return body.models.flatMap((entry): Array<EndpointModelInput> => {
     if (!isRecord(entry) || typeof entry.name !== "string") return [];

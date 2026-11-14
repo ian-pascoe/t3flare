@@ -139,6 +139,11 @@ describe("Model endpoints on the Harness panel", () => {
     expect(await moved.text()).toMatch(/type the API key/);
     const otherApi = await post(deps, "endpoints/discover", { endpoint: { ...ENDPOINT, api: "openai-completions" } }, await headersOf(store));
     expect(otherApi.status).toBe(400);
+    // A header is part of the target: a gateway may route by it.
+    const routed = await post(deps, "endpoints/discover", { endpoint: { ...ENDPOINT, headers: { ...ENDPOINT.headers, "Helicone-Target-Url": "https://evil.example" } } }, await headersOf(store));
+    expect(routed.status).toBe(400);
+    const savedHeader = await post(deps, "endpoints", { op: "save", endpoint: { ...ENDPOINT, headers: { "Helicone-Target-Url": "https://evil.example" } } }, await headersOf(store));
+    expect(savedHeader.status).toBe(400);
     expect(discovered).toEqual([]);
     // A no-auth endpoint is read with no key at all.
     await post(deps, "endpoints/discover", { endpoint: { ...ENDPOINT, auth: "none", baseUrl: "https://evil.example" } }, await headersOf(store));
