@@ -208,7 +208,11 @@ export const lineDiff = (before: string, after: string): Array<DiffLine> => {
 
 const shown = (value: unknown): string => (typeof value === "string" ? JSON.stringify(value) : value === undefined ? "unset" : JSON.stringify(value));
 
-const sizeOf = (bytes: number) => (bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1024 / 1024).toFixed(2)} MiB`);
+/**
+ * A size as the card, the Change page and the panel show it: KiB below a MiB. Here rather than in harness/page.ts, which
+ * imports this file.
+ */
+export const sizeText = (bytes: number): string => (bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1024 / 1024).toFixed(2)} MiB`);
 
 /** One item as text lines. */
 const itemText = (item: ChangeItem): Array<string> => {
@@ -241,7 +245,7 @@ const itemText = (item: ChangeItem): Array<string> => {
         item.op === "install"
           ? `- Install from ${item.source} at ${item.commit}${item.ref === null ? "" : ` (${item.ref})`}:`
           : `- Update ${item.skills[0]?.name ?? "a skill"} from ${item.repo} at ${item.from ?? "?"} to ${item.commit}:`,
-        ...item.skills.map((skill) => `  ${skill.name} (${skill.path === "" ? "the repo's root" : skill.path}): ${skill.files} files, ${sizeOf(skill.bytes)}${skill.problems.length === 0 ? "" : `; cannot be installed: ${skill.problems.join("; ")}`}`),
+        ...item.skills.map((skill) => `  ${skill.name} (${skill.path === "" ? "the repo's root" : skill.path}): ${skill.files} files, ${sizeText(skill.bytes)}${skill.problems.length === 0 ? "" : `; cannot be installed: ${skill.problems.join("; ")}`}`),
       ];
     case "skill":
       return [`- ${item.op === "enable" ? "Enable" : item.op === "disable" ? "Disable" : "Remove"} the Environment skill ${item.name}${item.repo === undefined ? "" : ` (from ${item.repo}${item.commit === undefined ? "" : ` at ${item.commit.slice(0, 7)}`})`}.`];

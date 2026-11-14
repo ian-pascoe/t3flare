@@ -7,23 +7,16 @@
 // It is the only place a header value is typed for an agent's change, and the only place a sign-in's authorization URL
 // goes (in the POST's own answer, to this page's script): ADR-0034, O8.
 import { type ChangeRecord, CLOSED_KEPT_MS, type ClosedBy, durationText } from "../settings/changes.ts";
-import { askedByText, lineDiff } from "../settings/render.ts";
+import { askedByText, lineDiff, sizeText } from "../settings/render.ts";
 import type { ChangeItem, ShownSkill } from "../settings/types.ts";
 import { fileUrl } from "../skills/api.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
-import { escapeHtml, visibleHtml } from "./page.ts";
+import { escapeHtml, time, visibleHtml } from "./page.ts";
 import { OPEN_CHANGES_PATH } from "./paths.ts";
 import { STYLE } from "./pageStyle.ts";
 
 /** A value as JSON text, safe. */
 const value = (raw: unknown): string => (raw === undefined ? '<span class="desc">unset</span>' : `<code>${visibleHtml(typeof raw === "string" ? raw : JSON.stringify(raw))}</code>`);
-
-const time = (at: number): string => {
-  const iso = new Date(at).toISOString();
-  return `<time datetime="${iso}" data-local>${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC</time>`;
-};
-
-const sizeOf = (bytes: number) => (bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1024 / 1024).toFixed(2)} MiB`);
 
 /** A URL with its host set apart (plan D10: an MCP `add` shows where it goes). */
 const urlWithHost = (url: string, host: string): string => {
@@ -46,7 +39,7 @@ const skillBlock = (repo: string, commit: string, skill: ShownSkill): string => 
     .join("");
   return `<div class="change-block"><h3>${visibleHtml(skill.name)} <span class="ident">${visibleHtml(skill.path === "" ? "the repo's root" : skill.path)}</span></h3>
 <p class="desc">${visibleHtml(skill.description)}</p>
-<p class="desc">${skill.files} ${skill.files === 1 ? "file" : "files"}, ${sizeOf(skill.bytes)}; digest <code>${visibleHtml(skill.digest.slice(0, 16))}</code></p>${
+<p class="desc">${skill.files} ${skill.files === 1 ? "file" : "files"}, ${sizeText(skill.bytes)}; digest <code>${visibleHtml(skill.digest.slice(0, 16))}</code></p>${
     skill.problems.length === 0 ? "" : `<div class="callout" role="note"><div><strong>Cannot be installed</strong><ul>${skill.problems.map((problem) => `<li>${visibleHtml(problem)}</li>`).join("")}</ul></div></div>`
   }
 <details open><summary>SKILL.md${skill.skillMdCut === true ? " (cut: open it on GitHub for the rest)" : ""}</summary><pre class="text">${visibleHtml(skill.skillMd)}</pre></details>
