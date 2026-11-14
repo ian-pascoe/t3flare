@@ -41,7 +41,7 @@ import { MCP_WORKER_COMPATIBILITY } from "../mcp-worker/src/engine/compatibility
 
 import { COMPATIBILITY } from "./build.ts";
 import { credentialsFile, standinFile } from "./stage-files.ts";
-import { SETTINGS_MCP_PATH, SETTINGS_OAUTH_GRANT, SETTINGS_OAUTH_REDIRECT_URIS, settingsMcpUrl } from "./src/settings/ownerDoor.ts";
+import { SETTINGS_MCP_PATH, SETTINGS_OAUTH_GRANT, SETTINGS_OAUTH_REDIRECT_URIS, settingsMcpUrl } from "./src/settings/endpointLayout.ts";
 import { principalOfApiKey } from "./src/usage/commissary.ts";
 
 const here = import.meta.dirname;
@@ -161,8 +161,8 @@ export default Alchemy.Stack(
         { name: "stage service token", decision: "non_identity", include: [{ serviceToken: serviceToken.serviceTokenId }] },
       ],
     } as never);
-    // The Owner-client endpoint's own Access application (ADR-0034, plan D13; layout (B), src/settings/ownerDoor.ts), on
-    // every stage including prod: `<host>/_t3flare/mcp` with managed OAuth, so the owner's MCP clients sign in to it. The
+    // The Owner-client endpoint's own Access application (ADR-0035, plan D13; layout (B),
+    // src/settings/endpointLayout.ts), on every stage including prod: `<host>/_t3flare/mcp` with managed OAuth, so the owner's MCP clients sign in to it. The
     // more specific path wins over the application above (M0), and its tokens are refused there: a client's token
     // never reaches the panel or the Change page. Same policies as the admin application. Access does not bound the
     // grant's lifetimes, so they are set here (M0 P11). The redirect allowlist is any loopback port plus the named

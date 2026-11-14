@@ -7,7 +7,7 @@ import * as Access from "./access.ts";
 import type { EnvironmentEnv } from "./environmentDO.ts";
 import { type HarnessCaller, isHarnessPath } from "./harness/panel.ts";
 import type { EndpointCaller } from "./settings/endpoint.ts";
-import { isSettingsMcpPath, SETTINGS_MCP_PATH } from "./settings/ownerDoor.ts";
+import { isSettingsMcpPath, SETTINGS_MCP_PATH } from "./settings/endpointLayout.ts";
 
 export { EnvironmentDO } from "./environmentDO.ts";
 // G11 (ADR-0031): Browser Run's `outboundByHost` target for the Container preview hosts; no public route reaches it.
@@ -63,9 +63,10 @@ export default {
     // The direct MCP servers' OAuth callback and client metadata document (ADR-0026, ADR-0010's refinement): public, GET
     // only, exact paths; the callback checks its single-use state.
     if (OAUTH_PUBLIC_PATHS.has(url.pathname)) return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).harnessPublic(request);
-    // The Owner-client endpoint (ADR-0034, plan D11, D13; layout (B), settings/ownerDoor.ts) at `/_t3flare/mcp`, behind its
-    // own Access application with managed OAuth: verified against that application's audience, never the panel's, so a
-    // token for one is refused at the other. Before the generic `/_t3flare` branch, which would ask for the admin token.
+    // The Owner-client endpoint (ADR-0034, ADR-0035, plan D11, D13; layout (B), settings/endpointLayout.ts) at
+    // `/_t3flare/mcp`, behind its own Access application with managed OAuth: verified against that application's
+    // audience, never the panel's, so a token for one is refused at the other. Before the generic `/_t3flare` branch,
+    // which would ask for the admin token.
     if (isSettingsMcpPath(url.pathname)) {
       const config = { ...guardConfig(env), audience: env.T3FLARE_ACCESS_SETTINGS_AUD };
       // Local mode (local workerd only): the admin token alone, on loopback, as the service-token caller (plan D17).

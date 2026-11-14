@@ -876,7 +876,7 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 
 ### U68. The Owner-client endpoint: Access managed OAuth (beta) and the hand-written MCP versions (SPI-1200)
 
-- **Where**: `apps/environment/src/settings/ownerDoor.ts` (layout (B): `<host>/_t3flare/mcp`), the `SettingsAccess`
+- **Where**: `apps/environment/src/settings/endpointLayout.ts` (layout (B): `<host>/_t3flare/mcp`), the `SettingsAccess`
   application in `apps/environment/alchemy.run.ts` (`oauthConfiguration`, `pathCookieAttribute` on it and on
   `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`), `worker.ts`'s branch for it
   (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`), and `apps/environment/src/settings/endpoint.ts`, which
@@ -901,7 +901,7 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Blast radius**: an Access change: Owner clients cannot sign in, or (root well-knowns) t3's own MCP clients cannot.
   A client's shape change: that client gets errors or the link in the result; own agents and the panel are unaffected.
 - **Fix**: rerun M0's probes (`scripts/settings-spike` on the spike branch); if Access breaks layout (B), move to (C) by
-  replacing `ownerDoor.ts`, the worker branch and `SettingsAccess` (plan D13); for a client, compare with the spec's
+  replacing `endpointLayout.ts`, the worker branch and `SettingsAccess` (plan D13); for a client, compare with the spec's
   `schema.ts` for the version and the client's traffic.
 
 ### U69. The Owner-client endpoint's `native` and `model` modes: client forms and Executor's pause (SPI-1201)

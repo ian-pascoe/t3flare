@@ -23,7 +23,7 @@ assertion by its decoded claims with `sub` and `email` reduced to "same as …" 
 1. **M0's open conditions (owner step 1)**: the owner signs in from a named client (Claude Code first). Record that the
    token exchange works for the path `resource` (P6), and that the client's token presented at `/_t3flare/harness` and
    `/_t3flare/echo`-like paths of the admin application is refused (P12, as a bearer and as `cf-access-token`). If either
-   fails, layout (B) is out: stop, and move to (C) (plan D13; replace `src/settings/ownerDoor.ts`, the worker branch and
+   fails, layout (B) is out: stop, and move to (C) (plan D13; replace `src/settings/endpointLayout.ts`, the worker branch and
    `SettingsAccess`).
 2. **P13**: compare the `sub` of the endpoint's OAuth-derived assertion with the owner's browser assertion at the panel
    (the Change page). The page lets only the asking `sub` answer an Owner client's change (`openChanges.ts`); if the two
