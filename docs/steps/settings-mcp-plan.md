@@ -633,6 +633,7 @@ change through the server is recorded there as an already-closed row).
 | The same change (by hash) after a decline, per caller | refused for 10 minutes |
 | Three in a row declined or unanswered (own agents), or declined (Owner clients), within an hour of each other | that caller's asked changes are refused for 1 hour from the third |
 | Applied changes of any tier, per caller | 30 per hour |
+| Asked changes opened, per caller, whatever their outcome | 6 per hour, refused naming the panel (SPI-1195 review: a change withdrawn by a Stop, a cancelled card or a cut stream neither strikes nor applies, so nothing else bounded them) |
 
 - The caller key is the thread id, or the Access `sub` for every Owner client (the client label is unverified, so
   keying on it would let a client rotate labels), prefixed by its door (`own:`, `owner:`; SPI-1201 review), so a thread

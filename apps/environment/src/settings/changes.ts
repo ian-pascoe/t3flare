@@ -43,6 +43,13 @@ export const APPLYING_GRACE_MS = 5 * 60_000;
 export const APPLIED_CAP = 30;
 export const APPLIED_WINDOW_MS = 60 * 60_000;
 
+/**
+ * Asked changes opened per caller per hour, whatever their outcome (SPI-1195 review): a withdrawn change (a Stop, a
+ * cancelled card, a cut stream) neither strikes nor counts as applied, so without this an agent could ask without end.
+ */
+export const OPENED_CAP = 6;
+export const OPENED_WINDOW_MS = 60 * 60_000;
+
 /** Reads of any kind, per caller (a thread), per hour (M3 review: reads are bounded as changes are, D16-style). */
 export const READ_CAP = 240;
 /** Reads that reach GitHub or an MCP server, per caller, per hour: they spend a token's or a server's limits. */
@@ -131,6 +138,8 @@ export const capKeyOf = (door: ChangeCaller["door"], key: string): string => `${
 export interface SettingsChanges {
   /** Applied changes by `key` since `since`, of any tier. */
   appliedSince(key: string, since: number): number;
+  /** Asked changes `key` opened since `since`, in any state now. */
+  openedSince(key: string, since: number): number;
   /** Keeps a free change made through the server, already closed. */
   recordApplied(record: ChangeRecord): void;
   /** Keeps a new Open change. */
@@ -271,6 +280,11 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
       prepare();
       const row = sql.exec<{ count: number }>(`SELECT COUNT(*) AS count FROM ${CHANGES_TABLE} WHERE caller_key = ? AND state = 'applied' AND closed_at >= ?`, key, since).toArray()[0];
       return Number(row?.count ?? 0);
+    },
+    openedSince: (key, since) => {
+      prepare();
+      // Closed rows are kept two hours (`CLOSED_KEPT_MS`), longer than any window this is asked about.
+      return rows(`caller_key = ? AND created_at >= ?`, key, since).filter((record) => record.tier === "asked").length;
     },
     recordApplied: (record) => {
       prepare();
