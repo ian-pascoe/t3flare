@@ -8,8 +8,11 @@ import type { TreeEntry } from "../src/skills/paths.ts";
 /** A file's text, or a link (mode 120000) or a submodule at that path. */
 export type Files = Readonly<Record<string, string | { readonly link: string } | { readonly submodule: true }>>;
 
-/** The 40 hex digits of a string's hash: a stand-in for git's SHA that depends on the content alone. */
-const shaOf = (text: string): string => {
+/**
+ * A fake git SHA: 40 hex digits (an 8-digit djb2 hash of `text`, repeated) that depend on the content alone, so a file's
+ * SHA changes exactly when its text does. Not git's object hash.
+ */
+const fakeGitSha = (text: string): string => {
   let hash = 5381;
   for (let at = 0; at < text.length; at += 1) {
     hash = (hash * 33) ^ text.charCodeAt(at);
@@ -50,9 +53,9 @@ export const fakeGithub = () => {
       return {
         truncated,
         entries: Object.entries(files).map(([path, file]): TreeEntry => {
-          if (typeof file === "string") return { path, type: "blob", sha: shaOf(file), size: new TextEncoder().encode(file).length, mode: "100644" };
-          if ("link" in file) return { path, type: "blob", sha: shaOf(file.link), size: file.link.length, mode: "120000" };
-          return { path, type: "commit", sha: shaOf(path) };
+          if (typeof file === "string") return { path, type: "blob", sha: fakeGitSha(file), size: new TextEncoder().encode(file).length, mode: "100644" };
+          if ("link" in file) return { path, type: "blob", sha: fakeGitSha(file.link), size: file.link.length, mode: "120000" };
+          return { path, type: "commit", sha: fakeGitSha(path) };
         }),
       };
     },
@@ -61,7 +64,7 @@ export const fakeGithub = () => {
       failing(repo);
       for (const { repo: owner, files } of commits.values()) {
         if (owner !== key(repo)) continue;
-        for (const file of Object.values(files)) if (typeof file === "string" && shaOf(file) === sha) return new TextEncoder().encode(file);
+        for (const file of Object.values(files)) if (typeof file === "string" && fakeGitSha(file) === sha) return new TextEncoder().encode(file);
       }
       throw new GithubReadError("not_found", `no blob ${sha}`);
     },
@@ -71,7 +74,7 @@ export const fakeGithub = () => {
     requests,
     /** Push `files` as a new commit of `repo`'s branch `ref` (`main`: the default branch); its SHA. */
     push: (repo: string, files: Files, ref = "main"): string => {
-      const commit = `${(next++).toString(16).padStart(2, "0")}${shaOf(`${repo}${ref}${next}`)}`.slice(0, 40).padEnd(40, "0");
+      const commit = `${(next++).toString(16).padStart(2, "0")}${fakeGitSha(`${repo}${ref}${next}`)}`.slice(0, 40).padEnd(40, "0");
       commits.set(commit, { repo, files });
       refs.set(`${repo}@${ref}`, commit);
       return commit;

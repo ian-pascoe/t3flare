@@ -26,11 +26,11 @@ import {
   type FileChange,
   type WatchTarget,
 } from "@earendil-works/pi-durable/env";
+import { SKILLS_LOCK_SCRIPT } from "@t3flare/workspace-client";
+
 import { abortedResult, type Call, caller, type ComputerEnvHost } from "./client.ts";
 import { exec, type ExecLedger, killAll } from "./exec.ts";
 import { join, resolve } from "./paths.ts";
-import { SKILLS_LOCK_SCRIPT } from "@t3flare/workspace-client";
-
 import { inBash } from "./shell.ts";
 import { ComputerBinaryReader, ComputerDirReader, ComputerTextLineReader } from "./readers.ts";
 import { type PollingOptions, PollingWatcher } from "./watch.ts";

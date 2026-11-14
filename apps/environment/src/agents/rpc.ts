@@ -97,8 +97,6 @@ export interface WorkspaceRpc {
    */
   skills(cwd: string, agent?: CliAgent, options?: { readonly repoOnly?: boolean }): Promise<SkillDiscovery>;
   prompts(cwd: string, agent?: CliAgent): Promise<ReadonlyArray<PromptTemplate>>;
-  /** SPI-1148: the hash of the Environment skill set the Workspace serves at `/workspace/.agents/skills`. */
-  skillSetHash(): Promise<string>;
   /** SPI-1148: takes the Environment skill set from the Environment DO when `hash` differs from the one held. */
   takeEnvironmentSkills(hash: string): Promise<{ readonly taken: boolean; readonly hash: string; readonly error?: string; readonly container?: unknown }>;
   writeText(path: string, text: string): Promise<void>;

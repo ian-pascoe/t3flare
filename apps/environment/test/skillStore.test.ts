@@ -1,6 +1,6 @@
 // The Environment skills the Environment DO keeps (SPI-1148, plan §2): rows, the enabled set and its hash, the
 // Environment settings' revision and audit, the limits, and changes that cannot interleave. On Node's SQLite.
-import { skillSetHash, skillSetProblem } from "@t3flare/skills";
+import { sha256Hex, skillSetHash, skillSetProblem } from "@t3flare/skills";
 import { describe, expect, it } from "vitest";
 
 import { harnessStore } from "../src/harness/store.ts";
@@ -13,7 +13,6 @@ const memory = () => {
   return { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)) };
 };
 
-const sha = async (text: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 const fetched = async (name: string, files: Record<string, string>, digest = `digest-${name}`): Promise<FetchedSkill> => ({
   name,
@@ -22,7 +21,7 @@ const fetched = async (name: string, files: Record<string, string>, digest = `di
   disableModelInvocation: false,
   digest,
   bytes: Object.values(files).reduce((sum, text) => sum + new TextEncoder().encode(text).byteLength, 0),
-  files: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([path, text]) => [path, { text, blob: `blob-${text}`, size: text.length, sha256: await sha(text) }] as const))),
+  files: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([path, text]) => [path, { text, blob: `blob-${text}`, size: text.length, sha256: await sha256Hex(text) }] as const))),
 });
 
 const setup = () => {

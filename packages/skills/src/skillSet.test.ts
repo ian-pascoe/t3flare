@@ -2,7 +2,7 @@
 // apply, so a set the Environment keeps is always one a Workspace can mount.
 import { describe, expect, it } from "vitest";
 
-import { EMPTY_SKILL_SET_HASH, listingOfSet, skillFilePathProblem, skillSetHash, skillSetOf, skillSetProblem, withEnvironmentSkills } from "./skillSet.ts";
+import { EMPTY_SKILL_SET_HASH, listingOfSet, sha256Hex, skillFilePathProblem, skillSetHash, skillSetOf, skillSetProblem, withEnvironmentSkills } from "./skillSet.ts";
 
 describe("skillSetHash", () => {
   it("is SHA-256 of nothing for no files", async () => {
@@ -19,13 +19,10 @@ describe("skillSetHash", () => {
   it("is the same whether made from the files or from each file's SHA-256 (what the Environment keeps)", async () => {
     const set = await skillSetOf({ "a/SKILL.md": "x", "a/ref/notes.md": "é漢" });
     // SHA-256 of "x", a known value.
-    const fromDigests = await skillSetHash({}, { "a/SKILL.md": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881", "a/ref/notes.md": await sha("é漢") });
+    const fromDigests = await skillSetHash({}, { "a/SKILL.md": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881", "a/ref/notes.md": await sha256Hex("é漢") });
     expect(fromDigests).toBe(set.hash);
   });
 });
-
-const sha = async (text: string) =>
-  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 describe("skillFilePathProblem", () => {
   it("takes a plain relative path", () => {

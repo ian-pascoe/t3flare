@@ -757,7 +757,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     await this.#takeT3Mcp(input.t3Mcp);
     await this.#takeHarness();
     // SPI-1148: the turn's Environment skill set, in the Workspace before the agent runs (bounded; never fails the turn).
-    await takeSkillsForTurn(input.environmentSkills, this.#skillsTaker());
+    await takeSkillsForTurn(input.environmentSkillsHash, this.#skillsTaker());
     await this.#takeMcp();
     // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
     if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });

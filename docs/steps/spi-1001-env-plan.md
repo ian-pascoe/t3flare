@@ -302,7 +302,7 @@ checked when the skill is installed."
 ### 4.2 Timing: the turn carries the hash
 
 - **The input.** The Pi Durable adapter reads the set's hash from the store (§2) and passes it as
-  `environmentSkills?: string` on `submitTurn`'s input (`SubmitTurnInput` in `@t3flare/session-protocol`).
+  `environmentSkillsHash?: string` (renamed in review round 1) on `submitTurn`'s input (`SubmitTurnInput` in `@t3flare/session-protocol`).
 - **The take.** `SessionDO.submitTurn` calls the Workspace's `takeEnvironmentSkills(hash)` after `#takeHarness()`.
   - It is bounded at 10 s, which covers §4.1 plus the Container wait below; an 8 MiB set took 0.6 s.
   - It never fails the turn. A timeout or failure is logged, and the turn runs with the set the Workspace holds.

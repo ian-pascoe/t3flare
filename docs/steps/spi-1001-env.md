@@ -67,7 +67,7 @@ t3code is untouched. This is Layer work: no Shadow and no Patch of t3 (ADR-0001)
   - a failure leaves a marker that the take's command reads, and the Workspace logs it once per launch.
 - **The Session** (`environmentSkills.ts`) has the Workspace take the hash a turn carries, bounded at 10 s and never
   failing the turn.
-- **The Pi Durable adapter** carries `environmentSkills` (the store's hash) on `submitTurn`.
+- **The Pi Durable adapter** carries `environmentSkillsHash` (the store's hash) on `submitTurn`.
 
 ### Discovery, composer and expansion
 

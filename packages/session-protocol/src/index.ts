@@ -128,7 +128,7 @@ export interface SubmitTurnInput {
    * SPI-1148: the Environment skill set's hash now; the Session has its Workspace take the set when it differs from the
    * one held. Absent from an adapter that carries none (the CLI adapters until SPI-1153).
    */
-  readonly environmentSkills?: string;
+  readonly environmentSkillsHash?: string;
 }
 
 export interface SteerInput {

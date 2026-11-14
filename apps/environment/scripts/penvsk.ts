@@ -401,26 +401,40 @@ const readonly = async () => {
 const remove = async () => {
   await ready();
   await writeRepoFixture();
-  if (((await harness("GET", "skills")).json.skills as Array<any>).every((skill) => skill.name !== "fruit-code")) await install(`https://github.com/${FIXTURE_REPO}/tree/${ENV_BRANCH}/tools/plum`);
+  const kept = () => harness("GET", "skills").then((answer) => (answer.json.skills as Array<any>).map((skill) => skill.name as string));
+  if (!(await kept()).includes("fruit-code")) await install(`https://github.com/${FIXTURE_REPO}/tree/${ENV_BRANCH}/tools/plum`);
+  // An Environment skill with no Repo namesake: once removed, its `$name` is no Skill at all.
+  if (!(await kept()).includes("grill-me")) await install("mattpocock/skills", (skill) => skill.name === "grill-me");
   const thread = await newThread("spi-1148: remove");
   await turn(thread, "Reply with OK.");
-  await sh("true");
-  const removed = await harness("POST", "skills/remove", { name: "fruit-code" });
+  // The Container runs and holds both skills, so the take below has removed paths to wait on.
+  const held = await sh(`ls ${MOUNT}`);
+  const removed = [await harness("POST", "skills/remove", { name: "fruit-code" }), await harness("POST", "skills/remove", { name: "grill-me" })];
+  const running = await containerOf();
+  // A removal-only take while the Container runs: the wait checks each removed path is gone there.
+  const take = (await call({ takeSkills: true })).result;
   const snapshot = await composerSnapshot();
   const answer = await turn(thread, "$fruit-code What is the fruit code? Reply with the code alone.");
   const mount = await call({ fs: { op: "stat", path: `${MOUNT}/fruit-code/SKILL.md` } });
-  const container = await sh(`ls ${MOUNT}/fruit-code 2>&1; echo "exit=$?"`);
+  const container = await sh(`ls ${MOUNT}/fruit-code ${MOUNT}/grill-me 2>&1; echo "exit=$?"`);
+  const removedName = await turn(
+    thread,
+    "Without reading any file or running any command: does this message hold a <skill> block? Reply YES or NO on the first line, then on the second line exactly the text after the colon, unchanged: $grill-me",
+  );
   const unknown = await turn(thread, "Reply with exactly the text after the colon, unchanged: $plum-gone");
   const fruit = snapshot.skills.find((skill: any) => skill.name === "fruit-code");
   const checks = {
-    removed: removed.status === 200,
+    removed: removed.every((answer) => answer.status === 200),
+    waitedOnRemovals: running.running === true && take?.taken === true && take?.container?.caughtUp === true,
     repoBackInSnapshot: fruit?.scope === "project",
+    removedGoneFromSnapshot: snapshot.skills.every((skill: any) => skill.name !== "grill-me"),
     goneFromMount: JSON.stringify(mount.result).includes("ENOENT"),
-    goneFromContainer: container.stdout.includes("No such file"),
+    goneFromContainer: (container.stdout.match(/No such file/g) ?? []).length === 2,
     repoAnswers: answer.answer.includes("KIWI-7"),
+    removedNameUntouched: removedName.typed?.endsWith("$grill-me") === true && /^\W*NO\b/i.test(removedName.answer) && removedName.answer.includes("$grill-me"),
     unknownUntouched: unknown.answer.includes("$plum-gone"),
   };
-  await writeEvidence("env-remove.json", { ok: Object.values(checks).every(Boolean), checks, removed: removed.json, snapshot: snapshot.skills, turn: answer, mount: mount.result, container, unknown });
+  await writeEvidence("env-remove.json", { ok: Object.values(checks).every(Boolean), checks, held, removed: removed.map((answer) => answer.json), containerAtTake: running, take, snapshot: snapshot.skills, turn: answer, mount: mount.result, container, removedName, unknown });
 };
 
 const refusals = async () => {
