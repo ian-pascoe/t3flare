@@ -130,7 +130,7 @@ const policy = { runtimeMode: "full-access", interactionMode: "default", cwd: "/
 const turnInput = { threadId: "t1", runId: "r1", rootNodeId: "n1", providerThread: { id: "pt1" }, providerTurnOrdinal: 1, runtimePolicy: policy, message: { text: "hello" } } as never;
 
 const openWrapped = (driver: string, sessions: CliSessions, take?: (cwd: string | null) => Effect.Effect<void>) =>
-  wrapCliAdapter(innerAdapter(driver), { sessions, ...(take === undefined ? {} : { takeEnvironmentSkills: take }) }).openSession({ threadId: "t1", providerSessionId: "s1", runtimePolicy: policy } as never);
+  wrapCliAdapter(innerAdapter(driver), { sessions, ...(take === undefined ? {} : { takeEnvironmentSkills: take }) }).openSession({ threadId: "t1", providerSessionId: "s1", runtimePolicy: policy, modelSelection: { instanceId: driver, model: "gpt-6-luna" } } as never);
 
 describe("wrapCliAdapter's take", () => {
   it("is every driver's by default: the Workspace takes the set before the inner adapter's turn", async () => {

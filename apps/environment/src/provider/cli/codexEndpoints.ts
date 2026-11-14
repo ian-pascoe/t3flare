@@ -2,7 +2,6 @@
 // models as before, then those endpoints' models as `<endpointId>/<modelId>`, grouped by endpoint), and where each of
 // t3's models goes in Codex (the guard's route). Pure.
 import type { ServerProviderModel } from "@t3tools/contracts";
-import type { ProviderSelectionTransitionInput, ProviderSelectionTransitionPlan } from "@t3tools/provider-core/server/selectionTransition";
 import { EMPTY_ENDPOINTS, endpointSlug, type ModelEndpoint, type ModelEndpoints } from "@t3flare/models/endpoints";
 
 import { CODEX_PROVIDER_ID, codexEndpointProvider } from "../../agents/cliProfiles.ts";
@@ -32,11 +31,3 @@ export const codexRouteFor =
   (model: string): CodexModelRoute =>
     codexModelRoute(model, new Set(codexEndpoints(endpoints()).map((endpoint) => endpoint.id)), codexEndpointProvider, CODEX_PROVIDER_ID);
 
-/**
- * A model change in a Codex session: within one provider it applies at the next turn (the adapter's own plan); to
- * another provider it restarts the session, since a Codex process runs turns only on its own provider.
- */
-export const codexSelectionTransition =
-  (route: (model: string) => CodexModelRoute) =>
-  (input: ProviderSelectionTransitionInput): ProviderSelectionTransitionPlan | undefined =>
-    route(input.current.model).provider === route(input.target.model).provider ? undefined : { type: "restart_session" };

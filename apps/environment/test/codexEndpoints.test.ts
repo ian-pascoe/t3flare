@@ -3,7 +3,7 @@
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
-import { codexModelsOf, codexRouteFor, codexSelectionTransition } from "../src/provider/cli/codexEndpoints.ts";
+import { codexModelsOf, codexRouteFor } from "../src/provider/cli/codexEndpoints.ts";
 
 const model = (id: string) => ({ id, name: id.toUpperCase(), reasoning: false, input: ["text" as const], contextWindow: 1, maxTokens: 1, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false });
 const endpoints: ModelEndpoints = {
@@ -33,17 +33,5 @@ describe("Codex's Model endpoints", () => {
     expect(route("claude/claude-haiku-5-5")).toEqual({ provider: "t3flare-proxy", model: "claude/claude-haiku-5-5" });
     expect(route("gemini-3-flash")).toEqual({ provider: "t3flare-proxy", model: "gemini-3-flash" });
     expect(codexRouteFor(() => undefined)("openai/gpt-5-mini")).toEqual({ provider: "t3flare-proxy", model: "openai/gpt-5-mini" });
-  });
-});
-
-describe("a model change in a Codex session", () => {
-  const plan = codexSelectionTransition(codexRouteFor(() => endpoints));
-  const change = (current: string, target: string) => plan({ current: { instanceId: "codex", model: current }, target: { instanceId: "codex", model: target }, sessionCapabilities: {} as never } as never);
-
-  it("is the adapter's within one provider, and a new session across providers", () => {
-    expect(change("gemini-3-flash", "gpt-6-luna")).toBeUndefined();
-    expect(change("openai/gpt-5-mini", "openai/gpt-5")).toBeUndefined();
-    expect(change("gemini-3-flash", "openai/gpt-5-mini")).toEqual({ type: "restart_session" });
-    expect(change("openai/gpt-5-mini", "gw/m1")).toEqual({ type: "restart_session" });
   });
 });

@@ -34,7 +34,7 @@ import * as TextGenerationOperations from "@t3tools/provider-core/server/textGen
 import { runText } from "../textGeneration.ts";
 import { withCodexInvestigation } from "./codexInvestigation.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
-import { codexModelsOf, codexRouteFor, codexSelectionTransition } from "./codexEndpoints.ts";
+import { codexModelsOf, codexRouteFor } from "./codexEndpoints.ts";
 import { onEndpointsChanged } from "../../endpoints/changes.ts";
 import { cliSnapshotForCwdOf } from "../skills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
@@ -226,9 +226,7 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       snapshot,
       // SPI-1151: the Workspace's Repo skills at Codex's roots, from the Workspace DO (never a spawn in the project).
       snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: CODEX_DRIVER, instanceId, agent: "codex" }),
-      // SPI-1167: a model of another provider (another endpoint, or the proxy) needs a process on that provider; t3
-      // restarts the session and Codex resumes the thread there.
-      orchestrationAdapter: wrapCliAdapter(adapter, { sessions, selectionTransition: codexSelectionTransition(codexRouteFor(() => environmentServices().modelEndpoints?.())) }),
+      orchestrationAdapter: wrapCliAdapter(adapter, { sessions }),
       // The proxy's text generation; a review guide's investigation runs `codex exec` read-only in the checkout (G7).
       textGeneration: TextGenerationOperations.fromRunner("CodexTextGeneration", withCodexInvestigation(spawner, fileSystem, runText)),
     } satisfies ProviderInstance;
