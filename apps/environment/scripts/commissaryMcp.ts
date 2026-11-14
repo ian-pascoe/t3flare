@@ -165,9 +165,13 @@ const cli = async () => {
   const workspace = marker;
   const card = (request: any) => String(request.id ?? "").includes(":t3flare-ask:") && request.kind === "permission";
   const only = "Do not run any shell command; use only the MCP tools named.";
+  // The projection's requests are the thread's: each turn counts only those it raised.
+  const seen = new Set<string>();
   const turn = async (prompt: string, approve: "accept" | "decline", threadId?: string) => {
     const result: any = await cliTurn(cookie, { cli: "codex", workspace, mode: "approval-required", plan: false, prompt, approve, ...(threadId === undefined ? {} : { threadId }) });
-    return { threadId: result.threadId as string, model: result.model, run: result.runs.at(-1) ?? null, cards: result.requests.filter(card), requests: result.requests, text: String(result.text), items: result.items.filter((item: any) => /mcp|tool/i.test(item.type)).slice(0, 8) };
+    const requests = result.requests.filter((request: any) => !seen.has(request.id));
+    for (const request of requests) seen.add(request.id);
+    return { threadId: result.threadId as string, model: result.model, run: result.runs.at(-1) ?? null, cards: requests.filter(card), requests, text: String(result.text), items: result.items.filter((item: any) => /mcp|tool/i.test(item.type)).slice(0, 8) };
   };
   const cases: Array<any> = [];
   const write = await turn(`Call the MCP tool sandbox_open of the "${SERVER}" MCP server with no arguments. Then call its sandbox_write with the session id it gave, path "note.txt" and content "${marker}". Reply with only the session id. ${only}`, "accept");
