@@ -17,6 +17,7 @@ import {
   MAX_VARIABLE_VALUE_LENGTH,
   type ResolvedEnvironment,
   type ResolvedHarness,
+  ownEntry,
   resolveEnvironment,
   visible,
 } from "@t3flare/harness-registry";
@@ -289,7 +290,7 @@ const toolsTable = (row: McpRow): string => {
   const rows = row.tools
     .map((tool) => {
       const other = tool.class === "read" ? "write" : "read";
-      const overridden = row.overrides?.[tool.upstream] !== undefined;
+      const overridden = ownEntry(row.overrides, tool.upstream) !== undefined;
       const source = overridden ? `Set by you; its hint says ${escapeHtml(tool.hinted)}` : "The tool's own hint";
       // The Settings server's classes are fixed (plan D2): no class buttons.
       const change =
@@ -298,7 +299,7 @@ const toolsTable = (row: McpRow): string => {
           : `${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other }, { ariaLabel: `Mark ${tool.upstream} as ${other}` })}${
               overridden ? ` ${action("Use its hint", { op: "class", server: row.name, tool: tool.upstream, class: null }, { className: "btn-sm btn-ghost", ariaLabel: `Use ${tool.upstream}'s own hint` })}` : ""
             }`;
-      return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(tool.upstream)}</code></td><td class="cls" data-label="Class"><div><span class="tag tag-${tool.class === "read" ? "read" : "write"}">${escapeHtml(tool.class)}</span><span class="src">${row.setting.kind === "settings" ? "Fixed" : source}</span></div></td><td class="exp" data-label="Exposure"><div>${exposureSelect(row, row.toolExposure?.[tool.upstream] ?? "", tool.upstream)}</div></td><td class="actions" data-label="Change"><div>${change}</div></td></tr>`;
+      return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(tool.upstream)}</code></td><td class="cls" data-label="Class"><div><span class="tag tag-${tool.class === "read" ? "read" : "write"}">${escapeHtml(tool.class)}</span><span class="src">${row.setting.kind === "settings" ? "Fixed" : source}</span></div></td><td class="exp" data-label="Exposure"><div>${exposureSelect(row, ownEntry(row.toolExposure, tool.upstream) ?? "", tool.upstream)}</div></td><td class="actions" data-label="Change"><div>${change}</div></td></tr>`;
     })
     .join("");
   return `<details class="tools"${row.tools.length <= 12 ? " open" : ""}><summary>${icon("chevron")}Tools <span>${plural(row.tools.length, "tool", "tools")}: ${reads} read, ${row.tools.length - reads} write</span></summary>

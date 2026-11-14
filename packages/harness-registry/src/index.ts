@@ -385,12 +385,14 @@ export const applyMcpChange = (
     if (current.kind !== "settings") return { ok: false, error: `${change.server}: only the Settings server has a writes switch` };
     if (typeof change.writes !== "boolean") return { ok: false, error: "writes: true or false" };
   }
-  const toolExposure: Record<string, Exposure> = { ...current.toolExposure };
+  // A Map, so a tool named `__proto__` is a key like any other (M3 review), never the object's prototype.
+  const exposures = new Map<string, Exposure>(Object.entries(current.toolExposure ?? {}));
   for (const [tool, exposure] of Object.entries(change.toolExposure ?? {})) {
-    if (exposure === null) delete toolExposure[tool];
+    if (exposure === null) exposures.delete(tool);
     else if (!EXPOSURES.includes(exposure)) return { ok: false, error: `exposure: one of ${EXPOSURES.join(", ")}` };
-    else toolExposure[tool] = exposure;
+    else exposures.set(tool, exposure);
   }
+  const toolExposure: Record<string, Exposure> = Object.fromEntries(exposures);
   return save({
     ...servers,
     [change.server]: {

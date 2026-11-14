@@ -9,7 +9,7 @@
 import { applyEnvironmentChange, type EnvironmentChange, ENVIRONMENT_SETTINGS, resolveEnvironment, settingOf, type StoredEnvironment } from "./environment.ts";
 import type { SettingTier } from "./fields.ts";
 import { EXTENSIONS, type HarnessChange, type McpChange, mcpServersOf, resolveHarness, type StoredHarness } from "./index.ts";
-import type { Exposure, ToolClass } from "./mcp.ts";
+import { type Exposure, ownEntry, type ToolClass } from "./mcp.ts";
 
 export type ChangeTier = "free" | "asked";
 
@@ -113,7 +113,7 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
   const mark = (part: Part): Part => (own ? { asked: true, reason: `${part.reason} (the Settings server's own entry)` } : part);
   if (current === undefined) return { tier: "asked", reasons: [`${server}: not a server in the set`] };
   if (change.op === "class") {
-    const before = current.classes?.[change.tool];
+    const before = ownEntry(current.classes, change.tool);
     const after = change.class ?? undefined;
     if (before === after) return { tier: "unchanged", reasons: [] };
     const name = `${server}/${change.tool}`;
@@ -142,9 +142,10 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
   }
   // Each tool named, against its effective Exposure before and after (its own, else the server's).
   for (const [tool, exposure] of Object.entries(change.toolExposure ?? {})) {
-    const before = current.toolExposure?.[tool] ?? current.exposure;
+    const own = ownEntry(current.toolExposure, tool);
+    const before = own ?? current.exposure;
     const after = exposure ?? exposureAfter;
-    if (before === after && (exposure ?? undefined) === current.toolExposure?.[tool]) continue;
+    if (before === after && (exposure ?? undefined) === own) continue;
     if (before === after) {
       // Its own Exposure set or cleared to what it already was: nothing an agent sees moves.
       parts.push(mark({ asked: false, reason: `${server}/${tool}: Exposure stays ${after}` }));

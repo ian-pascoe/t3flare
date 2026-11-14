@@ -174,6 +174,23 @@ describe("tierOf: the MCP server set", () => {
     }
   });
 
+  it("a tool named after an Object.prototype key is a tool like any other (M3 review)", () => {
+    for (const tool of ["toString", "constructor", "__proto__", "hasOwnProperty"]) {
+      // On a hidden server, a tool of that name made direct widens: asked, never compared against the prototype's value.
+      expect(mcp(withDirect({ exposure: "hidden", toolExposure: {} }), { op: "server", server: "fixture", toolExposure: { [tool]: "direct" } }), tool).toBe("asked");
+      expect(mcp(withDirect({ exposure: "hidden" }), { op: "server", server: "fixture", toolExposure: { [tool]: "direct" } }), tool).toBe("asked");
+      // Its class from the prototype is no class: to read is asked, back to an unknown hint is unchanged.
+      expect(mcp(withDirect({ classes: {} }), { op: "class", server: "fixture", tool, class: "read" }), tool).toBe("asked");
+      expect(mcp(withDirect({ classes: {} }), { op: "class", server: "fixture", tool, class: null }), tool).toBe("unchanged");
+    }
+    // Stored as an own key, never as the object's prototype.
+    const stored = applyMcpChange(withDirect(), { op: "server", server: "fixture", toolExposure: JSON.parse('{"__proto__":"direct"}') as Record<string, "direct"> });
+    if (!stored.ok) throw new Error(stored.error);
+    const exposures = stored.harness.mcp!.servers.fixture!.toolExposure!;
+    expect(Object.hasOwn(exposures, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(exposures)).toBe(Object.prototype);
+  });
+
   it("Exposure up asked, down and sideways free, server-wide and per tool against the tool's effective Exposure", () => {
     expect(mcp(withDirect({ exposure: "codemode" }), { op: "server", server: "fixture", exposure: "deferred" })).toBe("asked");
     expect(mcp(withDirect({ exposure: "hidden" }), { op: "server", server: "fixture", exposure: "codemode" })).toBe("asked");
