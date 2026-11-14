@@ -4,7 +4,7 @@
 import { applyMcpChange, type McpServerSetting } from "@t3flare/harness-registry";
 
 import type { AccessCaller } from "../src/access.ts";
-import { type EndpointDeps, handleSettingsMcp, MODERN_VERSION } from "../src/settings/endpoint.ts";
+import { type EndpointDeps, handleSettingsMcp, MODERN_VERSION, type StreamHolds, streamHolds } from "../src/settings/endpoint.ts";
 import type { SettingsFixture } from "./settingsFixture.ts";
 
 export const SUB = "owner-sub";
@@ -17,11 +17,17 @@ export const KEY = new Uint8Array(32).fill(7);
 export const CLAUDE_INFO = { name: "claude-code", version: "2.1.322" };
 export const BOTH = { elicitation: { form: {}, url: {} } };
 
-/** The endpoint over `f`, its key fixed, its holds short. */
+/** Each Environment's held streams, as its isolate keeps them: one per fixture, so no test sees another's. */
+const holdsOf = new WeakMap<SettingsFixture, StreamHolds>();
+
+/** The endpoint over `f`, its key fixed, its holds short; `extra.holds` stands for another isolate's (a reset). */
 export const endpointOf =
   (f: SettingsFixture, extra: Partial<EndpointDeps> = {}) =>
-  (request: Request, caller: AccessCaller = OWNER) =>
-    handleSettingsMcp(request, caller, { server: f.deps, stateKey: () => KEY, now: f.now, holdMs: 80, beatMs: 30, ...extra });
+  (request: Request, caller: AccessCaller = OWNER) => {
+    const holds = holdsOf.get(f) ?? streamHolds();
+    holdsOf.set(f, holds);
+    return handleSettingsMcp(request, caller, { server: f.deps, stateKey: () => KEY, now: f.now, holdMs: 80, beatMs: 30, holds, ...extra });
+  };
 
 export const post = (body: unknown, options: { readonly query?: string; readonly headers?: Readonly<Record<string, string>> } = {}) =>
   new Request(`${ENDPOINT}${options.query ?? ""}`, {
