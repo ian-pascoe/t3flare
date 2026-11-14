@@ -7,7 +7,7 @@ import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, TOOL_HANDLE_ENV } from "@t3flar
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
 
-import { acpProfileLaunch } from "./acpProfiles.ts";
+import { acpProfileLaunch, environmentSkillsLink } from "./acpProfiles.ts";
 
 /**
  * The CLIs the channel runs; `probe` is M1's test program (stages only). Step 4b: Claude Code and OpenCode over ACP. A
@@ -72,13 +72,6 @@ export interface Launch {
 export type LaunchAnswer = Launch | { readonly refused: string };
 
 const homeOf = (key: string) => `${CLI_HOMES}/${key}`;
-
-/**
- * SPI-1153: the Environment skill set in a CLI's user-level Skill root, linked to the Workspace's read-only mount, never
- * copied, so the CLI reads the set the Workspace holds now. The launcher makes the link in the process's fresh home;
- * nothing writes through it (the mount is read-only from the Container's first command, SPI-1148's lock).
- */
-export const environmentSkillsLink = (path: string) => ({ path, target: SKILLS_MOUNT });
 
 /**
  * Where Codex gets the set: a directory inside its user-level root (`$CODEX_HOME/skills`, SPI-1151's M0 table), which

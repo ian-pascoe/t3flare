@@ -55,6 +55,7 @@ import {
 } from "@t3flare/session-protocol";
 import { ComputerExecutionEnv, ComputerFiles, type ComputerWorkspaceStub } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
+import { type SkillsTaker, takeSkillsForTurn } from "@t3flare/skills";
 import { REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
 
@@ -76,7 +77,6 @@ import { GUARDIAN_EXTENSION, guardianExtension } from "../extensions/guardian.ts
 import type { GuardianThinkingLevel } from "../extensions/guardian/review.ts";
 import { backgroundJobs, TERMCTRL_EXTENSION, TERMCTRL_NAMESPACE, type TermctrlHost, termctrlExtension } from "../extensions/termctrl.ts";
 import { SKILLS_EXTENSION, skillsExtension } from "../extensions/skills.ts";
-import { type SkillsTaker, takeSkillsForTurn } from "./environmentSkills.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";

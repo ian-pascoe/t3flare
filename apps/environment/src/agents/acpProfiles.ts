@@ -21,8 +21,13 @@ import type { Launch, LaunchAnswer, LaunchInput, ProfileContext } from "./cliPro
 const CLI_BIN = "/opt/t3flare/bin";
 const homeOf = (key: string) => `${CLI_HOMES}/${key}`;
 
-/** SPI-1153: the Environment skill set linked at `path` (`cliProfiles.ts` `environmentSkillsLink`, restated: no value import from it). */
-const environmentSkillsLink = (path: string) => ({ path, target: SKILLS_MOUNT });
+/**
+ * SPI-1153: the Environment skill set in a CLI's user-level Skill root, linked to the Workspace's read-only mount, never
+ * copied, so the CLI reads the set the Workspace holds now. The launcher makes the link in the process's fresh home;
+ * nothing writes through it (the mount is read-only from the Container's first command, SPI-1148's lock). Every
+ * profile's (`cliProfiles.ts` imports it from here).
+ */
+export const environmentSkillsLink = (path: string) => ({ path, target: SKILLS_MOUNT });
 
 /** Claude's session files, synced (resume after the Container sleeps, M0 P5). */
 export const CLAUDE_PROJECTS = `${HARNESS_ROOT}/claude/projects`;
