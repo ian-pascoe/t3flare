@@ -368,7 +368,8 @@ export class McpHost {
     if (server.kind === "settings") {
       // Fails closed (plan D3): without the Environment's caller nothing reaches the Settings server.
       if (this.#deps.settingsServer === undefined || input.caller === undefined) return { kind: "unavailable", message: "The Settings server cannot tell who is calling, so it answers nothing.", mayHaveRun: false };
-      if (ownEntry(server.toolExposure, input.tool) === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
+      // Hidden by the tool's exposure or the server's, as the listing reads it (`tools`), and as the Owner door's `hiddenTools`.
+      if ((ownEntry(server.toolExposure, input.tool) ?? server.exposure) === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
       return this.#deps.settingsServer({
         tool: input.tool,
         args: input.args,

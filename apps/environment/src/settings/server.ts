@@ -106,7 +106,6 @@ import { askedByText, changeText, environmentItems, extensionItems, mcpItems, PA
 import { settingsToolOf } from "./tools.ts";
 import type { ChangeItem, ChangeView, PageReason } from "./types.ts";
 
-
 export interface SettingsServerDeps {
   readonly ops: OpsDeps & { readonly mcp: Pick<McpHost, "servers" | "inventory" | "tools" | "list"> };
   /** An OAuth server's sign-in state (never a token). */
@@ -191,11 +190,18 @@ export const accessSwitchOf = (deps: Pick<SettingsServerDeps, "ops">): AccessSwi
   return access.writes === false ? "read-only" : "on";
 };
 
-/** Whether the owner hid a tool on the Settings server's entry (its `toolExposure`), as the own door's listing and call read it. */
-const hiddenTools = (deps: Pick<SettingsServerDeps, "ops">): ((tool: string) => boolean) => {
-  const exposure = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER]?.toolExposure;
-  return (tool) => ownEntry(exposure, tool) === "hidden";
+/**
+ * Whether the owner hid a tool on the Settings server's entry: its own `toolExposure`, else the server's `exposure`, as
+ * the own door's listing (McpHost.tools) and call (McpHost.call) read it.
+ */
+export const hiddenTools = (deps: Pick<SettingsServerDeps, "ops">): ((tool: string) => boolean) => {
+  const entry = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
+  return (tool) => (ownEntry(entry?.toolExposure, tool) ?? entry?.exposure) === "hidden";
 };
+
+/** Why an Open change is not applied when the owner hid its tool after it opened (SPI-1195 review): it names the panel. */
+export const HIDDEN_SINCE_REFUSAL = (tool: string): string =>
+  `the owner hid ${tool} on the Settings server after this change was asked; only the Harness panel shows it again.`;
 
 /** Why the access switch refuses a write now (off or read-only), or undefined when it is on. */
 const accessBar = (deps: Pick<SettingsServerDeps, "ops">): { readonly reason: string; readonly text: string } | undefined => {
@@ -772,6 +778,8 @@ export const applyOpenChange = async (deps: SettingsServerDeps, record: ChangeRe
   // The owner may have switched the server off or read-only while it waited (SPI-1198 review): nothing applies then.
   const barred = accessBar(deps);
   if (barred !== undefined) return { ok: false, error: barred.text };
+  // So may he have hidden its tool (SPI-1195 review): a hidden tool applies nothing, on either door.
+  if (hiddenTools(deps)(record.tool)) return { ok: false, error: HIDDEN_SINCE_REFUSAL(record.tool) };
   const planned = planWrite(deps, record.tool, (record.args ?? {}) as Readonly<Record<string, unknown>>);
   if ("refused" in planned) return { ok: false, error: planned.refused };
   const ran = await planned.run(
@@ -1513,7 +1521,8 @@ export const ownerResume = async (deps: SettingsServerDeps, input: { readonly ar
 
 /**
  * Whether the Settings server lists `tool` to an Owner client now: plan D2's access switch (off lists none, read-only no
- * write), and not a tool the owner hid on the server's entry (as the own door's listing omits it).
+ * write), and not a tool the owner hid on the server's entry, by the tool's exposure or the server's (as the own door's
+ * listing omits it).
  */
 export const ownerListed = (deps: Pick<SettingsServerDeps, "ops">): ((tool: { readonly name: string; readonly class: ToolClass }) => boolean) => {
   const access = accessSwitchOf(deps);

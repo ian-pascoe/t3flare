@@ -4,8 +4,10 @@
 //   reporting a failure it did not have (`closeOrSettle`), for an own agent's card, an Owner client's retry and `resume`;
 // - a Stop closes the change before it withdraws the card;
 // - a 2026 retry is refused naming the panel when the server is off (plan D2);
+// - an Open change whose tool the owner hid since it opened applies nothing, on either door, naming the panel;
 // - the call-stop registry: reads never register, a second registration under a running id shares it and never aborts
 //   the first, and a stop that arrives before its call registers is remembered briefly and boundedly.
+import { applyMcpChange } from "@t3flare/harness-registry";
 import type { McpAsker } from "@t3flare/session-protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,7 +16,7 @@ import { answerOpenChange, APPLYING_WAIT_MS, closeOrSettle, OWN_APPLYING_WAIT_MS
 import { REQUEST_BUDGET_MS } from "../src/skills/api.ts";
 import { answerDepsOf, ownerOutcome } from "../src/settings/server.ts";
 import { ASKED, bodyOf, endpointOf, modern, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
-import { settingsFixture, type SettingsFixture, structured, until } from "./settingsFixture.ts";
+import { settingsFixture, type SettingsFixture, structured, textOf, until } from "./settingsFixture.ts";
 
 let fixture: SettingsFixture | undefined;
 const world = (options: Parameters<typeof settingsFixture>[0] = {}) => (fixture = settingsFixture(options));
@@ -155,6 +157,67 @@ describe("the access switch on a 2026 retry (plan D2)", () => {
     expect(f.deps.changes.get(record!.id)?.state).toBe("open");
     expect(f.store.loadEnvironment().revision).toBe(0);
     expect(record!.caller.key).toBe(SUB);
+  });
+});
+
+describe("a tool the owner hid after its change opened (SPI-1195 review)", () => {
+  const hide = (f: SettingsFixture, change: { readonly exposure?: "hidden"; readonly toolExposure?: Readonly<Record<string, "hidden">> }) => {
+    const applied = applyMcpChange(f.store.load(), { op: "server", server: "settings", ...change });
+    if (!applied.ok) throw new Error(applied.error);
+    f.store.save(applied.harness);
+  };
+  const BY_TOOL = { toolExposure: { change_environment: "hidden" } } as const;
+  const BY_SERVER = { exposure: "hidden" } as const;
+
+  it.each([
+    ["its own exposure", BY_TOOL],
+    ["the server's exposure", BY_SERVER],
+  ] as const)("hidden by %s: an Owner client's 2026 accept retry is refused naming the panel, and nothing applies", async (_name, change) => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const first = await bodyOf(await endpoint(modern("tools/call", { name: "change_environment", arguments: ASKED }, { query: "?elicitation_mode=native" })));
+    const [record] = f.deps.changes.open();
+    hide(f, change);
+    const retry = await bodyOf(
+      await endpoint(
+        modern("tools/call", { name: "change_environment", arguments: ASKED, requestState: first.result?.requestState, inputResponses: { change: { action: "accept" } } }, { query: "?elicitation_mode=native", id: 2 }),
+      ),
+    );
+    expect(retry.result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
+    expect(JSON.stringify(retry.result?.content)).toContain("Harness panel");
+    expect(f.deps.changes.get(record!.id)?.state).toBe("open");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it.each([
+    ["its own exposure", BY_TOOL],
+    ["the server's exposure", BY_SERVER],
+  ] as const)("hidden by %s: the page's approval of an Owner client's change applies nothing, naming the panel", async (_name, change) => {
+    const f = world();
+    await endpointOf(f)(modern("tools/call", { name: "change_environment", arguments: ASKED }));
+    const [record] = f.deps.changes.open();
+    hide(f, change);
+    const outcome = await answerOpenChange(answerDepsOf(f.deps), record!.id, { by: "page", answerer: { kind: "owner", subject: SUB }, action: "approve" });
+    expect(outcome).toMatchObject({ ok: true, outcome: { state: "failed", by: "page" } });
+    expect(outcome.ok ? outcome.outcome.error : "").toContain("Harness panel");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it.each([
+    ["its own exposure", BY_TOOL],
+    ["the server's exposure", BY_SERVER],
+  ] as const)("hidden by %s: an own agent's change approved on its card afterwards applies nothing, naming the panel", async (_name, change) => {
+    let f!: SettingsFixture;
+    f = world({
+      answer: async () => {
+        hide(f, change);
+        return { decision: "accept" };
+      },
+    });
+    const answer = await f.call(f.durable(), "change_environment", ASKED);
+    expect(structured(answer)).toMatchObject({ status: "refused" });
+    expect(textOf(answer)).toContain("Harness panel");
+    expect(f.store.loadEnvironment().revision).toBe(0);
   });
 });
 
