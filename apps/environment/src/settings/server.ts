@@ -84,6 +84,7 @@ import {
   type OwnerMode,
   READ_CAP,
   READ_WINDOW_MS,
+  scrubUrls,
   type SettingsChanges,
 } from "./changes.ts";
 import {
@@ -152,15 +153,12 @@ export const APPLIES_AT = {
 
 const json = (value: unknown) => JSON.stringify(value, null, 2);
 
-/** Every http(s) URL inside `text` without its query (plan D14): an error or a listing may quote a Direct server's URL. */
-const scrubText = (text: string): string => text.replace(/https?:\/\/[^\s"'<>`]+/gi, (url) => withoutQuery(url));
-
 /**
  * `value` with every string scrubbed and every `fingerprint` dropped, at any depth (plan D14): for what describes the
  * MCP server set (a Direct server's URL may hold a key in its query), and only that (M3 review).
  */
 const scrub = (value: unknown): unknown => {
-  if (typeof value === "string") return scrubText(value);
+  if (typeof value === "string") return scrubUrls(value);
   if (Array.isArray(value)) return value.map(scrub);
   if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "fingerprint").map(([key, inner]) => [key, scrub(inner)]));
   return value;
@@ -175,7 +173,7 @@ const read = (value: Readonly<Record<string, unknown>>): McpCallAnswer => ({ kin
 /** A read of the MCP server set: every URL without its query, no secret's fingerprint (plan D14). */
 const readMcp = (value: Readonly<Record<string, unknown>>): McpCallAnswer => read(scrub(value) as Readonly<Record<string, unknown>>);
 
-const readError = (text: string): McpCallAnswer => ({ kind: "result", isError: true, text: scrubText(text) });
+const readError = (text: string): McpCallAnswer => ({ kind: "result", isError: true, text: scrubUrls(text) });
 
 const written = (status: WriteStatus, text: string, extra: Readonly<Record<string, unknown>> = {}): McpCallAnswer => ({
   kind: "result",
@@ -812,7 +810,7 @@ const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "ent
       // not known yet (SPI-1201 review).
       return written("waiting", `Not known yet: an answer is applying this change now. Do not repeat this call; read the settings to see whether it applied.`, { changeId: record.id });
     default:
-      return written("refused", `Not changed: ${scrubText(outcome.error ?? "the change failed")}`, { changeId: record.id });
+      return written("refused", `Not changed: ${scrubUrls(outcome.error ?? "the change failed")}`, { changeId: record.id });
   }
 };
 
@@ -831,7 +829,7 @@ const prepareWrite = (deps: SettingsServerDeps, tool: string, args: Readonly<Rec
     return { kind: "result", answer: written("refused", text) };
   };
   const planned = planWrite(deps, tool, args);
-  if ("refused" in planned) return refused(`Not changed: ${scrubText(planned.refused)}`);
+  if ("refused" in planned) return refused(`Not changed: ${scrubUrls(planned.refused)}`);
   const expected = args.expectedRevision;
   if (typeof expected !== "number" || !Number.isSafeInteger(expected) || expected < 0) return refused("Not changed: expectedRevision is the revision you read, a whole number.");
   const current = revisionOf(deps, planned.entity);
@@ -871,10 +869,10 @@ const applyFree = async (
   if (!ran.ok) {
     if (ran.moved !== undefined) {
       log("moved", { revision: ran.moved });
-      return written("moved", `Not changed: ${scrubText(ran.error)}`, { revision: ran.moved });
+      return written("moved", `Not changed: ${scrubUrls(ran.error)}`, { revision: ran.moved });
     }
     log("refused", { reason: "invalid" });
-    return written("refused", `Not changed: ${scrubText(ran.error)}`);
+    return written("refused", `Not changed: ${scrubUrls(ran.error)}`);
   }
   if (ran.unchanged === true) {
     log("unchanged");
@@ -948,7 +946,7 @@ const openAskedChange = async (deps: SettingsServerDeps, input: AskedInput): Pro
   const spent = planned.network === true ? networkSpent(deps, input.reader) : undefined;
   if (spent !== undefined) return refused("network-read-cap", written("refused", spent));
   const described = await planned.describe();
-  if ("refused" in described) return refused("invalid", written("refused", `Not changed: ${scrubText(described.refused)}`));
+  if ("refused" in described) return refused("invalid", written("refused", `Not changed: ${scrubUrls(described.refused)}`));
   const view: ChangeView = { entity: planned.entity, subject: planned.subject, revision: expected, appliesAt: planned.appliesAt, reasons: planned.verdict.reasons, items: described.items, lines: described.lines };
   const id = newChangeId();
   const needsPage = planned.verdict.needsPage ?? (visible(input.fullText(view, changeUrlOf(deps, id))).length > CARD_TEXT_MAX ? "oversize" : undefined);

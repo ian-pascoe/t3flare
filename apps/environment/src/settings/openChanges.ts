@@ -24,6 +24,7 @@ import {
   closedLine,
   durationText,
   isOpen,
+  scrubUrls,
   type SettingsChanges,
   STRIKE_LOCK_MS,
   STRIKE_WINDOW_MS,
@@ -195,8 +196,13 @@ const answererProblem = (record: ChangeRecord, answer: AnswerInput): string | un
   return undefined;
 };
 
+/**
+ * Moves `record` from one of `from` to closed `state`, then logs and settles it. A failed apply's error is scrubbed of
+ * URL queries first (plan D14): an op's error may quote a Direct server's URL, and the record, its log line, the panel's
+ * list and every door's result all read it from here.
+ */
 const closeAs = (deps: AnswerDeps, record: ChangeRecord, from: ReadonlyArray<ChangeState>, state: ChangeState, closed: NonNullable<ChangeRecord["closed"]>): ChangeOutcome | undefined => {
-  const next: ChangeRecord = { ...record, state, closed };
+  const next: ChangeRecord = { ...record, state, closed: closed.error === undefined ? closed : { ...closed, error: scrubUrls(closed.error) } };
   if (!deps.changes.replace(record.id, from, next)) return undefined;
   const outcome = outcomeOf(next);
   deps.log?.(closedLine(next));
