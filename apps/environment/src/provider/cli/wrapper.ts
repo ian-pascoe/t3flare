@@ -40,6 +40,7 @@ import * as Stream from "effect/Stream";
 
 import type { ChannelProcess } from "../../agents/processChannel.ts";
 import { type CliAnswer, type CliAsk, registerCliAsker } from "./cliAsk.ts";
+import { takeEnvironmentSkillsAt } from "./environmentSkillsTake.ts";
 
 /** ADR-0015: a CLI turn longer than this ends its process. */
 export const TURN_CAP_MS = 2 * 60 * 60_000;
@@ -97,8 +98,9 @@ export interface WrapOptions {
   /** SPI-1151: the turn's text as the CLI gets it, from the text and the thread's cwd (Claude Code's Skill mentions). */
   readonly rewriteTurnText?: (text: string, cwd: string | null) => Effect.Effect<string>;
   /**
-   * SPI-1153: has the thread's Workspace take the Environment skill set before the turn (`environmentSkillsTake.ts`),
-   * bounded and never failing it, so the set the CLI reads through its link is current when the turn runs.
+   * SPI-1153: has the thread's Workspace take the Environment skill set before the turn, bounded and never failing it,
+   * so the set the CLI reads through its link is current when the turn runs. The Environment's own take
+   * (`takeEnvironmentSkillsAt`) unless a test replaces it: every CLI driver gets it without asking.
    */
   readonly takeEnvironmentSkills?: (cwd: string | null) => Effect.Effect<void>;
 }
@@ -143,6 +145,7 @@ const answerOf = (decision: ProviderApprovalDecision): CliAnswer =>
 /** t3's adapter, as the Cloud Environment runs it. */
 export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Service"], options: WrapOptions): ProviderAdapter.ProviderAdapterV2["Service"] => {
   const { sessions } = options;
+  const takeEnvironmentSkills = options.takeEnvironmentSkills ?? ((cwd: string | null) => takeEnvironmentSkillsAt(cwd));
   const turnEnded = (session: CliSession) =>
     Effect.gen(function* () {
       if (!session.turnActive) return;
@@ -297,6 +300,9 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
           events,
           startTurn: (turn) =>
             Effect.gen(function* () {
+              const cwd = turn.runtimePolicy.cwd ?? null;
+              // SPI-1153: before the turn's hold and cap, so an interrupt during the take's wait leaves neither behind.
+              yield* takeEnvironmentSkills(cwd);
               session.runtimeMode = turn.runtimePolicy.runtimeMode;
               session.interactionMode = turn.runtimePolicy.interactionMode;
               session.turnActive = true;
@@ -312,8 +318,6 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
                 ),
                 Effect.forkDetach,
               );
-              const cwd = turn.runtimePolicy.cwd ?? null;
-              if (options.takeEnvironmentSkills !== undefined) yield* options.takeEnvironmentSkills(cwd);
               const text = options.rewriteTurnText === undefined ? turn.message.text : yield* options.rewriteTurnText(turn.message.text, cwd);
               const sent = text === turn.message.text ? turn : { ...turn, message: { ...turn.message, text } };
               // A turn that never started ends here: no `turn.terminal` follows, and the hold and the cap would stay.
