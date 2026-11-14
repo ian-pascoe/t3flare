@@ -126,3 +126,17 @@ report: [`docs/steps/spi-1079.md`](../steps/spi-1079.md).
 ## Refinement (G11, 2026-11-13): MCP apps through the relay
 
 The CLI wrapper no longer strips t3's `mcpApps`, so Codex renders an MCP server's App as stock does. The relay passes a tool's `_meta.ui` (and nothing else of its `_meta`) in `tools/list`, a result's `structuredContent`, and `resources/read` of a `ui://` URI that one of that server's offered tools declares, read through the engine as an App read and capped at 8 MiB. An App's own `tools/call` is judged as any call is. Claude's Apps stay ordinary tool rows: it runs over ACP (ADR-0031, O5).
+
+## Refinement (SPI-1160, 2026-11-14): Commissary is a direct server the owner adds
+
+Part of **Model endpoints** (owner, 2026-11-13): t3flare stops depending on the Model proxy, so the MCP host no longer reads its settings. Report: [`docs/steps/spi-1160.md`](../steps/spi-1160.md).
+
+1. **No built-in server.** The `commissary` server kind, `toolsKeyOf`, `COMMISSARY_TOOLS_URL` and `COMMISSARY_TOOLKITS` are gone. The MCP server set is the direct servers the owner added, and nothing else: a new Environment offers no MCP server until he adds one. This replaces item 3's first sentence and "Commissary's endpoint" in item 1.
+2. **Commissary is added by hand**, in the Harness panel, as any direct server: its MCP endpoint on the API host (`https://<api host>/mcp`, with `?toolkits=a,b` to narrow it), signed in with an `x-api-key` header whose value the owner types once. The key is his choice, a Commissary API key with a tool scope; it is stored write-only like every direct server's secret, and never enters a Container (item 3's rule for direct servers). `docs/model-proxy.md` says how.
+3. **The name `commissary` is free** for that server (no longer reserved), so its tools keep their names (`mcp__commissary__<tool>`). `t3` and `t3-code` stay reserved.
+4. **A stored entry of the old kind is dropped on load** (`mcpServersOf`): a Harness settings document that still names the built-in `commissary` server loads without it, and the next change to the server set saves it without it. Its kept inventory and protocol state stay in storage under its name until a server of that name is listed again.
+5. **Errors name no Model proxy key.** A refused header is the ordinary "the MCP call failed" text; the tools no longer mention `MODEL_PROXY_API_KEY`.
+
+**Considered**: keeping the old entry inert (listed, disabled, unremovable) until the owner removes it. Rejected: it would hold the name the owner re-adds Commissary under, and an entry with no URL can never work again.
+
+**Consequences**: after the deploy, an Environment that used Commissary's tools has none until the owner adds the server; threads see the tools gone at their next turn, as for a removed server.

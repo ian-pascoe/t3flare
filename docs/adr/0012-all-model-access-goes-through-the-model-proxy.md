@@ -52,7 +52,7 @@ An exception to D5. A direct MCP server's credential is a header value the owner
 - Only the owner sets it, and removing the server deletes it at once.
 - It is sent only from the strictly public MCP Worker, to that server's URL (ADR-0028).
 
-Commissary's tools key is not typed in: it is `MODEL_PROXY_API_KEY`, a deploy secret, read through `toolsKeyOf(env)`.
+Commissary's tools key is not typed in: it is `MODEL_PROXY_API_KEY`, a deploy secret, read through `toolsKeyOf(env)`. (Superseded by SPI-1160: Commissary is a direct server whose key the owner types in the panel; ADR-0028's SPI-1160 refinement.)
 
 Subsumed by D5's lifting (below): what this exception allowed for MCP servers is now the general rule.
 

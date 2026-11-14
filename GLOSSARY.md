@@ -203,11 +203,12 @@ judged exactly as a direct one.
 _Avoid_: scripting, eval
 
 **MCP server**:
-A remote MCP endpoint whose tools t3flare's agents may call: Commissary's, or a Direct server.
+A remote MCP endpoint whose tools t3flare's agents may call. Every one is a Direct server (Commissary's too, since
+SPI-1160).
 
 **Direct server**:
-An MCP server the owner adds in the Harness panel, with its own sign-in kept by t3flare, as opposed to one reached
-through Commissary.
+An MCP server the owner adds in the Harness panel, with its own sign-in kept by t3flare. Commissary's MCP endpoint is
+one, added with its `x-api-key` header.
 _Avoid_: custom server, Route B (the plan's word)
 
 **MCP server set**:
@@ -220,8 +221,8 @@ the MCP engine.
 _Avoid_: MCP proxy, gateway
 
 **MCP relay**:
-The `computer.internal/t3flare/mcp/<server>` routes through which CLI agents call Commissary's and Direct servers'
-tools, with a Tool handle. t3's own tools reach a CLI as stock t3 hands them, with t3's bearer.
+The `computer.internal/t3flare/mcp/<server>` routes through which CLI agents call Direct servers' tools, with a
+Tool handle. t3's own tools reach a CLI as stock t3 hands them, with t3's bearer.
 _Avoid_: MCP proxy, bridge
 
 **Exposure**:

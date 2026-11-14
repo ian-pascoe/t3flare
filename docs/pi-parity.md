@@ -20,7 +20,7 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 | pi-minimal-subagents | C | t3's `delegate_task`, `create_threads`, `t3_thread_*` (`extensions/t3-mcp.ts`, step 3) | — |
 | Scheduled tasks | C | t3's `schedule_task` tools | — |
 | `codemode`, `tool_search` | W | `extensions/codemode.ts`, sandbox Worker `t3flare-codemode-<stage>` (ADR-0027); switchable in the Harness panel | — |
-| MCP servers (pi-mcp-selector, `mcp.json`: Executor, REA, Superlogical) | W | `extensions/mcp.ts` over the Environment's MCP host (ADR-0028): Commissary toolkits, and Direct servers added in the Harness panel (Executor, in browser mode); REA and Superlogical once served over HTTP (stdio refused); `t3` is covered by t3's tools | — |
+| MCP servers (pi-mcp-selector, `mcp.json`: Executor, REA, Superlogical) | W | `extensions/mcp.ts` over the Environment's MCP host (ADR-0028): Direct servers added in the Harness panel (Commissary's toolkits, Executor in browser mode); REA and Superlogical once served over HTTP (stdio refused); `t3` is covered by t3's tools | — |
 | Harness settings | W | the Harness panel (ADR-0026): extensions, offered tools, MCP servers; later ports register in its extension registry | — |
 | pi-web-tools (`web_search`, `web_fetch`) | W | `extensions/web.ts` (cloudpid `web`): `web_fetch` through the SSRF guard, on by default; `web_search` asks a search-capable model through the model proxy (Commissary, no new key), off until switched on in the Harness panel (a model request per search). Both show as t3's web search items | SPI-1054 |
 | pi-todo | W | `extensions/todo.ts` (cloudpid `todo`): the list in the Session's storage, shown as t3's `todo_list` rows and plan (parity G5) | SPI-1055 |

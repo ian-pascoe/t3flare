@@ -153,15 +153,27 @@ Codex, the pi CLI, Claude Code and OpenCode run in the Workspaces' Containers an
 - **A second key.** The CLIs get `COMMISSARY_CONTAINER_API_KEY`, never `MODEL_PROXY_API_KEY`: anything in a Container that runs the key helper while a CLI process lives can read it. Create it as its own Commissary API key with an **empty tool scope** (models only), its **own spend limit**, and optionally an expiry. Put it in `~/.config/t3flare/dev.env`; `stage.ts` binds it to the agents Worker alone and refuses a stage deploy without it. CI: `pnpm --filter @t3flare/infra run ci:setup` sets it on the `prod` environment from `dev.env`; on `bump` set it by hand: `gh secret set COMMISSARY_CONTAINER_API_KEY --env bump --repo <owner>/<repo>`.
 - **Rotate it** after a `credential-in-workspace` error in the agents Worker's logs (the sync guard found it in a Workspace and flagged it; `POST /_t3flare/check/leak?id=<workspace>` shows the flag) or on any doubt: revoke it in Commissary, update `dev.env`, run `ci:setup`, set it on `bump`, redeploy.
 
-## MCP tools (tools step)
+## MCP tools: adding Commissary by hand
 
-Commissary's MCP endpoint is also a tool source for every agent (ADR-0028). There is no new secret: the Environment Worker uses `MODEL_PROXY_API_KEY` as Commissary's **tools key**, read through one accessor (`toolsKeyOf`) so a dedicated key can replace it later. It is a Workers-only secret and never enters a Container; the CLIs reach Commissary's tools through the MCP relay with a per-process handle.
+Commissary's MCP endpoint is not built in (SPI-1160; ADR-0028's SPI-1160 refinement): nothing in the MCP host reads the proxy's settings. To give every agent Commissary's tools, add it in the Harness panel as a **direct server**:
 
-- **Scope.** Give the key a tool scope of the toolkits t3flare should see. With "every tool you may use", every new private toolkit reaches t3flare at once.
+1. **A key.** Create a Commissary API key with a tool scope of the toolkits t3flare should see (with "every tool you may use", every new private toolkit reaches t3flare at once). Use a key of its own, not `COMMISSARY_CONTAINER_API_KEY` (models only, empty tool scope).
+2. **Add the server.** In the Harness panel's **MCP servers**, **Add server**:
+   - Name: `commissary` (its tools are then `mcp__commissary__<tool>`).
+   - URL: `https://<api host>/mcp`, the host that serves the client API (the API host if you set `COMMISSARY_API_DOMAIN`, else the app host; never behind Access). Narrow it with `?toolkits=a,b` if you like.
+   - Sign-in: **Header**, name `x-api-key`, value the key. It is stored write-only and never enters a Container.
+3. **Test** lists its tools.
+
+The same from a script, with the panel's admin API (the stage's admin token; the key passed in, never printed):
+
+```sh
+curl -sS "$T3_URL/_t3flare/harness/api/mcp/servers" -H "authorization: Bearer $T3FLARE_ADMIN_TOKEN" -H 'content-type: application/json' \
+  --data "$(jq -n --arg key "$KEY" '{server: "commissary", url: "https://<api host>/mcp", auth: {kind: "header", header: "x-api-key"}, value: $key}')"
+```
+
 - **No Commissary approval rules on it** (OD-T3). t3flare asks by each thread's mode, linked threads included. Commissary's rules would ask a second time, on its own panel.
 - **Classes.** A tool's class comes from its read-only hint (owner, 2026-11-12, back to stock: no pins). Fix a wrong class in Commissary (it then applies to every client), or for t3flare alone in the Harness panel.
-- **Limits.** Calls end after 240 s (Commissary's upstream cap), progress is not passed on, and upstream elicitation is not forwarded. Servers that need those are added as Direct servers in the Harness panel instead.
-- **`COMMISSARY_CONTAINER_API_KEY` keeps an empty tool scope.** It is models only.
+- **Limits.** Calls end after 240 s (Commissary's upstream cap), progress is not passed on, and upstream elicitation is not forwarded. Servers that need those are added as their own direct servers instead.
 
 ## Another Anthropic-compatible endpoint
 
