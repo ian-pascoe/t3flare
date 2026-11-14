@@ -143,7 +143,8 @@ owner's `mise.toml` text, which every Container's commands get as mise's global 
 3. **Laid down per Container.** The Workspace DO runs the lay-down (`@t3flare/sandbox-image/globalMise`) on each new
    Container, keyed by computer's runtime id. Every command sent to the Container that is not a passive read waits for
    it where it is sent, whoever sends it (a Durable agent's command, the Workspace DO's own); a Terminal or a CLI process
-   waits before its spawn. A passive read never runs it. It installs the owner's tools with the text as a
+   waits before its spawn, on the runtime id computer keeps in the Workspace DO's storage
+   (`computer:container-runtime-identity`, a lean on computer's internals: U23). A passive read never runs it. It installs the owner's tools with the text as a
    staging global config (`mise install` from `/`), and keeps the file only when `git --version` and `gh --version`
    still run under it, with mise's auto-install off: invalid TOML fails every shim, git's included, so laying it down
    unchecked would break t3's git. The launch records the text, so a running Container keeps what it started with, a

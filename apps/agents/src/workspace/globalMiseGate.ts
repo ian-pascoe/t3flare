@@ -71,9 +71,20 @@ export class GlobalMiseBackend implements WorkspaceBackend {
  */
 export const COMPUTER_RUNTIME_KEY = "computer:container-runtime-identity";
 
+/**
+ * The running Container's runtime for a spawn's wait: computer's stored id first, because computer writes it before the
+ * Container starts, while the DO's last-connect runtime still names a replaced Container until the new connect ends
+ * (waiting on that one would join its kept outcome and not wait). The last connect's runtime only when nothing is stored.
+ */
+export const spawnRuntime = async (stored: () => Promise<unknown>, lastConnect: string | undefined): Promise<string | undefined> => {
+  const value = await stored();
+  const id = typeof value === "object" && value !== null ? (value as { readonly id?: unknown }).id : undefined;
+  return typeof id === "string" && id !== "" ? id : lastConnect;
+};
+
 export interface SpawnReadiness {
   readonly running: () => boolean;
-  /** The running Container's runtime id: the last connect's, else computer's stored one; undefined when unknown. */
+  /** The running Container's runtime id (`spawnRuntime`): computer's stored one, else the last connect's; undefined when unknown. */
   readonly runtime: () => Promise<string | undefined>;
   readonly ensure: (runtime: string | undefined) => Promise<unknown>;
   readonly log: (event: Record<string, unknown>) => void;

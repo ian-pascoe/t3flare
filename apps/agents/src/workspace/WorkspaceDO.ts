@@ -51,7 +51,7 @@ import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, shownLaunch, takeEnvironment, withGlobalMise } from "./containerLaunch.ts";
 import { GlobalMise, type GlobalMiseState } from "./globalMise.ts";
 import { StoppedExecs, StoppedExecsBackend } from "./stoppedExecs.ts";
-import { commandEnvOf, COMPUTER_RUNTIME_KEY, GlobalMiseBackend, readyForSpawn } from "./globalMiseGate.ts";
+import { commandEnvOf, COMPUTER_RUNTIME_KEY, GlobalMiseBackend, readyForSpawn, spawnRuntime } from "./globalMiseGate.ts";
 import { commandEnv, VariablesBackend } from "./variables.ts";
 import { reclaimFor } from "./reclaim.ts";
 import { killInRunningContainer } from "./containerKill.ts";
@@ -1810,7 +1810,7 @@ export class WorkspaceDO extends ContainerHost {
   async #ensureGlobalMise(): Promise<void> {
     await readyForSpawn({
       running: () => this.containerRunning(),
-      runtime: async () => this.#runtime ?? (await this.ctx.storage.get<{ readonly id: string }>(COMPUTER_RUNTIME_KEY))?.id,
+      runtime: () => spawnRuntime(() => this.ctx.storage.get(COMPUTER_RUNTIME_KEY), this.#runtime),
       ensure: (runtime) => this.#globalMise.ensure(runtime),
       log: (event) => console.log(JSON.stringify({ ...event, workspace: this.#workspaceId() ?? null })),
     });

@@ -6,7 +6,7 @@
 import type { BackendHandle, WorkspaceBackend } from "@cloudflare/computer";
 import { describe, expect, it } from "vitest";
 
-import { commandEnvOf, COMPUTER_RUNTIME_KEY, GlobalMiseBackend, PASSIVE_MARKER, readyForSpawn } from "../src/workspace/globalMiseGate.ts";
+import { commandEnvOf, COMPUTER_RUNTIME_KEY, GlobalMiseBackend, PASSIVE_MARKER, readyForSpawn, spawnRuntime } from "../src/workspace/globalMiseGate.ts";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
@@ -140,11 +140,37 @@ describe("readyForSpawn", () => {
     }
   });
 
+  it("prefers computer's stored runtime over the last connect's, which names a replaced Container until the new connect ends", async () => {
+    expect(await spawnRuntime(async () => ({ id: "R2" }), "R1")).toBe("R2");
+    expect(await spawnRuntime(async () => undefined, "R1")).toBe("R1");
+    expect(await spawnRuntime(async () => ({ id: 7 }), "R1")).toBe("R1");
+    expect(await spawnRuntime(async () => undefined, undefined)).toBeUndefined();
+  });
+
+  it("waits on a replacement Container's lay-down even when the last connect named the one before it", async () => {
+    let release = () => {};
+    const laid = new Map<string, Promise<void>>([["R1", Promise.resolve()], ["R2", new Promise<void>((resolve) => (release = resolve))]]);
+    const events: Array<string> = [];
+    const spawn = readyForSpawn({
+      running: () => true,
+      runtime: () => spawnRuntime(async () => ({ id: "R2" }), "R1"),
+      ensure: (id) => laid.get(id ?? "") ?? Promise.resolve(),
+      log: () => undefined,
+    }).then(() => events.push("spawned"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    events.push("laid R2");
+    release();
+    await spawn;
+    expect(events).toEqual(["laid R2", "spawned"]);
+  });
+
   it("reads the key computer keeps the runtime id under", async () => {
     // @cloudflare/computer's container backend, as installed: the key and the runtime id its connect answers.
     const { readFileSync } = await import("node:fs");
     const code = readFileSync(`${import.meta.dirname}/../node_modules/@cloudflare/computer/dist/backends/container/index.js`, "utf8");
     expect(code).toContain(`const STORAGE_KEY = "${COMPUTER_RUNTIME_KEY}";`);
+    // The stored value's shape `{ id }` (spawnRuntime reads `.id`; any other shape falls back to the last connect's).
+    expect(code).toMatch(/STORAGE_KEY[\s\S]{0,800}\{\s*id\b/);
   });
 });
 

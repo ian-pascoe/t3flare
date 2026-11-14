@@ -41,10 +41,13 @@ Evidence: [`global-mise/`](global-mise/), from stage `pmise` (destroyed) and `te
     agent's command reaches computer through the Workspace stub, never `WorkspaceDO.exec`); `WorkspaceDO.exec` marks a
     passive read in its environment (`commandEnvOf`, which drops a caller's own mark), and the backend takes the mark
     out and sends it without waiting. Terminals and CLI processes wait before their spawn (`readyForSpawn`) with no
-    command, connect or start of their own: the runtime is the last connect's, else the one computer keeps in the
-    Workspace DO's storage (`computer:container-runtime-identity`, checked by a test against the installed package); a
-    stopped Container is started by the spawn's own `true`, which waits as every active command does. A runtime it
-    cannot learn, or a failed lay-down, is logged and the spawn goes on. It holds the Container (`#running`), notes
+    command, connect or start of their own: the runtime is the one computer keeps in the Workspace DO's storage
+    (`computer:container-runtime-identity`, its key and `{ id }` shape checked by a test against the installed
+    package), else the last connect's. Computer writes it before the Container starts, while the last connect's still
+    names a replaced Container until the new connect ends (`spawnRuntime`, review round 4). A stopped Container is
+    started by the spawn's own `true`, which waits as every active command does. A runtime it cannot learn, or a
+    lay-down whose wait rejects, is logged as `global-mise-spawn` and the spawn goes on; a lay-down that ends as
+    `exec-failed` is logged as `global-mise`. It holds the Container (`#running`), notes
     use when it ends, kills the exec at the deadline, retries a failed exec once at once and then from the next
     command, Terminal, CLI process or the alarm, at most three times, and keeps the outcome in storage. A passive read never
     runs it; the alarm runs it for a running Container only passive reads have reached. A start with no text
