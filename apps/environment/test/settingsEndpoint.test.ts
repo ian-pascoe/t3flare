@@ -172,8 +172,12 @@ describe("T-endpoint: versions and methods", () => {
     const unknown = await endpoint(post({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { headers: { "mcp-protocol-version": "2024-01-01" } }));
     expect(unknown.status).toBe(400);
     expect((await bodyOf(unknown)).error).toMatchObject({ code: -32600, data: { requested: "2024-01-01" } });
-    // A 2026 header with no 2026 `_meta` is not a 2025 version either.
-    expect((await endpoint(post({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { headers: { "mcp-protocol-version": MODERN_VERSION } }))).status).toBe(400);
+    // A 2026 header with no 2026 `_meta`: the header and the body disagree, -32020 (SPI-1201 review), on any method.
+    for (const method of ["tools/list", "server/discover"]) {
+      const disagreeing = await endpoint(post({ jsonrpc: "2.0", id: 1, method, params: {} }, { headers: { "mcp-protocol-version": MODERN_VERSION, "mcp-method": method } }));
+      expect(disagreeing.status).toBe(400);
+      expect((await bodyOf(disagreeing)).error).toMatchObject({ code: -32020 });
+    }
     const missing = await endpoint(post({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
     expect(missing.status).toBe(200);
     expect((await bodyOf(missing)).result).not.toHaveProperty("resultType");

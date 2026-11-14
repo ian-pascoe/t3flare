@@ -281,7 +281,7 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     const change = verdict.payload.change;
     const record = typeof change === "string" && isChangeId(change) ? server.changes.get(change) : undefined;
     const action = objectOf(message.result)?.action;
-    if (record !== undefined && record.caller.key === key && record.mode === "native") {
+    if (record !== undefined && record.caller.door === "owner" && record.caller.key === key && record.mode === "native") {
       // `native` (plan D12): the form's answer. `accept` applies the change (by `client`), `decline` declines it, `cancel`
       // withdraws it; the held call then writes its result. A response in another mode than the change's is refused.
       if (requested !== "native") return refuse(400, "other-mode", json(rpcError(null, -32600, "This question was asked in elicitation_mode=native."), 400));
@@ -291,7 +291,7 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
       return new Response(null, { status: 202, headers: NO_STORE });
     }
     // In `browser`, `accept` means only "opened it"; `decline` and `cancel` withdraw the change if it is still open.
-    if (record !== undefined && record.caller.key === key && record.mode === "browser" && (action === "decline" || action === "cancel")) await withdrawOwnerChange(server, record.id);
+    if (record !== undefined && record.caller.door === "owner" && record.caller.key === key && record.mode === "browser" && (action === "decline" || action === "cancel")) await withdrawOwnerChange(server, record.id);
     return new Response(null, { status: 202, headers: NO_STORE });
   }
   if (typeof method !== "string") return json(rpcError(null, -32600, "Invalid request"), 400);
@@ -319,6 +319,11 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
   } else {
     const session = await verifyToken(tokenKey, request.headers.get("mcp-session-id"), { kind: "session", sub: key, now: now() });
     const header = request.headers.get("mcp-protocol-version");
+    // A 2026 header on a request whose body names no 2026 version in `_meta`: the header and the body disagree (2026
+    // "Server Validation", -32020), which is not an unknown version (SPI-1201 review).
+    if (method !== "initialize" && header === MODERN_VERSION) {
+      return json(rpcError(id, -32020, "Header mismatch: MCP-Protocol-Version is 2026-07-28 but the request's _meta names no protocol version"), 400);
+    }
     // 2025-06-18 and 2025-11-25 (Transports, "Protocol Version Header"): an invalid or unsupported version is 400; a
     // missing header is 2025-03-26. `initialize` negotiates in its body, so its header is not judged.
     if (method !== "initialize" && header !== null && !LEGACY_VERSIONS.includes(header)) {
@@ -586,7 +591,7 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     const stateProblem = !verdict.ok ? verdict.reason : verdict.payload.digest !== (await callDigest(name, args)) ? ("other-call" as const) : undefined;
     const change = verdict.ok ? verdict.payload.change : undefined;
     const record = stateProblem === undefined && typeof change === "string" && isChangeId(change) ? server.changes.get(change) : undefined;
-    const problem = stateProblem ?? (record === undefined || record.caller.key !== key ? ("gone" as const) : undefined);
+    const problem = stateProblem ?? (record === undefined || record.caller.door !== "owner" || record.caller.key !== key ? ("gone" as const) : undefined);
     if (problem !== undefined || record === undefined) {
       log({ t3flare: "settings-refused", reason: `request-state-${problem ?? "gone"}`, tool: name });
       return reply(toolResult(refusedResult(`Not changed: ${STATE_REFUSED[problem ?? "gone"]}. Call ${name} again without requestState to ask afresh.`)));
