@@ -229,3 +229,51 @@ describe("the relay and MCP apps (G11, review L10)", () => {
     expect(await relayMessage(input({ jsonrpc: "2.0", id: 6, method: "resources/read", params: { uri: "ui://time/app.html" } }), harness().deps)).toMatchObject({ body: { error: { code: -32601 } } });
   });
 });
+
+// T-own (plan §5, D7), M3 (SPI-1198): the Settings server judges its own writes with one card of its own, so the relay
+// keeps only plan mode's refusal for it and raises no card; every other server still gets the relay's card.
+describe("the relay and the Settings server", () => {
+  const settingsTool = (upstream: string, cls: "read" | "write") => ({ ...tool(upstream, cls), name: `mcp__settings__${upstream}` });
+  const withSettings: McpView = {
+    ...VIEW,
+    servers: [...VIEW.servers, { name: "settings", kind: "settings", state: "available", listedAt: 1, exposure: "deferred", tools: [settingsTool("get_settings", "read"), settingsTool("change_environment", "write")] }],
+  };
+  const relayed = (modes: { runtimeMode: string; interactionMode: string }) => {
+    const run = harness({ modes: { "thread-1": modes } });
+    const callers: Array<unknown> = [];
+    const deps: RelayDeps = {
+      ...run.deps,
+      view: async () => withSettings,
+      call: async (call) => {
+        callers.push(call.caller);
+        return run.deps.call(call);
+      },
+    };
+    return { ...run, deps, callers };
+  };
+
+  it("passes a write through with the derived caller and no card of its own, outside plan mode", async () => {
+    for (const runtimeMode of ["approval-required", "auto-accept-edits", "full-access"]) {
+      const run = relayed({ runtimeMode, interactionMode: "default" });
+      const answer = await relayMessage(input(call("change_environment"), { server: "settings" }), run.deps);
+      expect(resultOf(answer).isError).toBe(false);
+      expect(run.asks).toEqual([]);
+      expect(run.callers).toEqual([{ door: "own", thread: "thread-1", agent: "codex" }]);
+    }
+  });
+
+  it("keeps plan mode's refusal for it", async () => {
+    const run = relayed({ runtimeMode: "full-access", interactionMode: "plan" });
+    const answer = await relayMessage(input(call("change_environment"), { server: "settings" }), run.deps);
+    expect(resultOf(answer)).toMatchObject({ isError: true });
+    expect(run.calls).toEqual([]);
+  });
+
+  it("still asks for every other server's write, and gives the server's own instructions", async () => {
+    const run = relayed({ runtimeMode: "approval-required", interactionMode: "default" });
+    await relayMessage(input(call("fixture_note")), run.deps);
+    expect(run.asks.length).toBe(1);
+    const initialized = await relayMessage(input({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } }, { server: "settings" }), run.deps);
+    expect(JSON.stringify(initialized)).toContain("not t3's preferences");
+  });
+});

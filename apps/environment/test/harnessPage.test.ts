@@ -247,3 +247,41 @@ describe("harness page", () => {
     expect(SCRIPT).toContain('confirm("Remove the Environment skill " + name + "? Agents lose it at their next turn.")');
   });
 });
+
+// The Settings server's row (ADR-0034, plan D2), M3 (SPI-1198): one three-way access control, fixed classes, no Test,
+// no Remove.
+describe("the Settings server's row", () => {
+  const row = (setting: Partial<McpRow["setting"]>): McpRow => ({
+    name: "settings",
+    setting: { kind: "settings", enabled: true, exposure: "deferred", writes: true, ...setting },
+    status: "ok",
+    listedAt: FIXTURE_NOW,
+    error: null,
+    tools: [
+      { name: "mcp__settings__get_settings", upstream: "get_settings", class: "read", hinted: "read", exposure: "deferred" },
+      { name: "mcp__settings__change_mcp", upstream: "change_mcp", class: "write", hinted: "write", exposure: "deferred" },
+    ],
+    refused: [],
+  });
+  const section = (html: string) => html.slice(html.indexOf('aria-labelledby="srv-settings"'), html.indexOf("</article>", html.indexOf('aria-labelledby="srv-settings"')));
+
+  it("offers off, read-only and read-write, the current one pressed", () => {
+    for (const [setting, pressed] of [
+      [{ enabled: false }, "Off"],
+      [{ writes: false }, "Read-only"],
+      [{}, "Read-write"],
+    ] as const) {
+      const html = section(renderPage(fixturePage({ mcp: [row(setting)] })));
+      expect(html).toContain('<span class="tag">Settings server</span>');
+      expect(html).toContain(escapeHtml(JSON.stringify({ op: "server", server: "settings", enabled: false })));
+      expect(html).toContain(escapeHtml(JSON.stringify({ op: "server", server: "settings", enabled: true, writes: false })));
+      expect(html).toContain(escapeHtml(JSON.stringify({ op: "server", server: "settings", enabled: true, writes: true })));
+      expect(html).toMatch(new RegExp(`aria-pressed="true"[^>]*>${pressed}<`));
+      expect(html.match(/aria-pressed="true"/g)?.length).toBe(1);
+      expect(html).not.toContain('role="switch"');
+      expect(html).not.toContain("data-mcp-test");
+      expect(html).not.toContain('"op":"remove"');
+      expect(html).not.toContain(escapeHtml('"op":"class"'));
+    }
+  });
+});

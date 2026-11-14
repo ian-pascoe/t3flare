@@ -200,7 +200,15 @@ const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCo
 /** One server of the panel's MCP section (panel.ts `mcpOverview`). */
 export interface McpRow {
   readonly name: string;
-  readonly setting: { readonly kind: string; readonly enabled: boolean; readonly exposure: string; readonly url?: string; readonly auth?: { readonly kind: string; readonly header?: string } };
+  readonly setting: {
+    readonly kind: string;
+    readonly enabled: boolean;
+    readonly exposure: string;
+    readonly url?: string;
+    readonly auth?: { readonly kind: string; readonly header?: string };
+    /** The Settings server's writes switch (plan D2). */
+    readonly writes?: boolean;
+  };
   readonly oauth?: { readonly signedIn: boolean };
   /** A header sign-in's value: whether it is set, when, and its fingerprint (never the value). */
   readonly secret?: { readonly set: boolean; readonly setAt: number | null; readonly fingerprint: string | null };
@@ -242,6 +250,7 @@ const exposureSelect = (row: McpRow, current: string, tool?: string): string => 
 /** The server's state as one pill: off, listed, failing, or not listed yet. */
 const statusPill = (row: McpRow): string => {
   if (!row.setting.enabled) return '<span class="pill">Disabled</span>';
+  if (row.setting.kind === "settings") return row.setting.writes === false ? '<span class="pill pill-ok">Read-only</span>' : '<span class="pill pill-ok">Read-write</span>';
   if (row.status === "ok") return '<span class="pill pill-ok">Connected</span>';
   if (row.status === "failed") return '<span class="pill pill-err">Error</span>';
   if (row.status === "never") return '<span class="pill">Not listed yet</span>';
@@ -274,13 +283,40 @@ const toolsTable = (row: McpRow): string => {
       const other = tool.class === "read" ? "write" : "read";
       const overridden = row.overrides?.[tool.upstream] !== undefined;
       const source = overridden ? `Set by you; its hint says ${escapeHtml(tool.hinted)}` : "The tool's own hint";
-      return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(tool.upstream)}</code></td><td class="cls" data-label="Class"><div><span class="tag tag-${tool.class === "read" ? "read" : "write"}">${escapeHtml(tool.class)}</span><span class="src">${source}</span></div></td><td class="exp" data-label="Exposure"><div>${exposureSelect(row, row.toolExposure?.[tool.upstream] ?? "", tool.upstream)}</div></td><td class="actions" data-label="Change"><div>${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other }, { ariaLabel: `Mark ${tool.upstream} as ${other}` })}${
-        overridden ? ` ${action("Use its hint", { op: "class", server: row.name, tool: tool.upstream, class: null }, { className: "btn-sm btn-ghost", ariaLabel: `Use ${tool.upstream}'s own hint` })}` : ""
-      }</div></td></tr>`;
+      // The Settings server's classes are fixed (plan D2): no class buttons.
+      const change =
+        row.setting.kind === "settings"
+          ? ""
+          : `${action(`Mark ${other}`, { op: "class", server: row.name, tool: tool.upstream, class: other }, { ariaLabel: `Mark ${tool.upstream} as ${other}` })}${
+              overridden ? ` ${action("Use its hint", { op: "class", server: row.name, tool: tool.upstream, class: null }, { className: "btn-sm btn-ghost", ariaLabel: `Use ${tool.upstream}'s own hint` })}` : ""
+            }`;
+      return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(tool.upstream)}</code></td><td class="cls" data-label="Class"><div><span class="tag tag-${tool.class === "read" ? "read" : "write"}">${escapeHtml(tool.class)}</span><span class="src">${row.setting.kind === "settings" ? "Fixed" : source}</span></div></td><td class="exp" data-label="Exposure"><div>${exposureSelect(row, row.toolExposure?.[tool.upstream] ?? "", tool.upstream)}</div></td><td class="actions" data-label="Change"><div>${change}</div></td></tr>`;
     })
     .join("");
   return `<details class="tools"${row.tools.length <= 12 ? " open" : ""}><summary>${icon("chevron")}Tools <span>${plural(row.tools.length, "tool", "tools")}: ${reads} read, ${row.tools.length - reads} write</span></summary>
 <div class="table-wrap"><table class="stacked tools-table"><thead><tr><th scope="col">Tool</th><th scope="col">Class</th><th scope="col">Exposure</th><th scope="col"><span class="sr">Change</span></th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
+};
+
+/** The kind's tag on a server's card. */
+const KIND_TAGS: Readonly<Record<string, string>> = { direct: "Direct", settings: "Settings server" };
+
+/**
+ * The Settings server's access switch (plan D2): one three-way control, off, read-only and read-write, for both doors.
+ * Three buttons through the panel's JSON API, the current one pressed.
+ */
+const settingsAccess = (row: McpRow): string => {
+  const current = !row.setting.enabled ? "off" : row.setting.writes === false ? "read" : "write";
+  const choices = [
+    ["off", "Off", { op: "server", server: row.name, enabled: false }],
+    ["read", "Read-only", { op: "server", server: row.name, enabled: true, writes: false }],
+    ["write", "Read-write", { op: "server", server: row.name, enabled: true, writes: true }],
+  ] as const;
+  return `<div class="server-access" role="group" aria-label="${escapeHtml(row.name)} access">${choices
+    .map(
+      ([value, label, change]) =>
+        `<button type="button" class="btn btn-sm${value === current ? " btn-primary" : ""}" aria-pressed="${value === current}" data-mcp="${escapeHtml(JSON.stringify(change))}">${label}</button>`,
+    )
+    .join("")}</div>`;
 };
 
 const serverCard = (row: McpRow): string => {
@@ -309,12 +345,16 @@ const serverCard = (row: McpRow): string => {
       : "";
   const remove = action("Remove", { op: "remove", server: row.name }, { className: "btn-sm btn-danger", ariaLabel: `Remove ${row.name}`, icon: "trash" });
   return `<article class="group server" aria-labelledby="${id}">
-<div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3>${statusPill(row)}</div>${
+<div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3><span class="tag">${escapeHtml(KIND_TAGS[row.setting.kind] ?? row.setting.kind)}</span>${statusPill(row)}</div>${
     row.setting.url === undefined ? "" : `<p class="server-url">${escapeHtml(row.setting.url)}</p>`
-  }</div>
-<button type="button" class="switch" role="switch" aria-checked="${row.setting.enabled === true}" aria-label="${name} enabled" data-mcp="${escapeHtml(JSON.stringify({ op: "server", server: row.name, enabled: !row.setting.enabled }))}"></button>
+  }${row.setting.kind === "settings" ? `<p class="server-url">t3flare's own settings, for agents: reads, and changes that wait for you when they widen what agents have.</p>` : ""}</div>
+${
+  row.setting.kind === "settings"
+    ? settingsAccess(row)
+    : `<button type="button" class="switch" role="switch" aria-checked="${row.setting.enabled === true}" aria-label="${name} enabled" data-mcp="${escapeHtml(JSON.stringify({ op: "server", server: row.name, enabled: !row.setting.enabled }))}"></button>`
+}
 <dl class="facts">${facts}</dl></div>${error}${refused}
-<div class="server-actions"><button type="button" class="btn btn-sm" data-mcp-test="${name}">${icon("play")}Test</button>${oauth}<label class="exposure">Exposure ${exposureSelect(row, row.setting.exposure)}</label><p class="test-result" data-test-result="${name}" role="status" aria-live="polite"></p><span class="spacer"></span>${remove}</div>
+<div class="server-actions">${row.setting.kind === "settings" ? "" : `<button type="button" class="btn btn-sm" data-mcp-test="${name}">${icon("play")}Test</button>`}${oauth}<label class="exposure">Exposure ${exposureSelect(row, row.setting.exposure)}</label><p class="test-result" data-test-result="${name}" role="status" aria-live="polite"></p><span class="spacer"></span>${remove}</div>
 ${toolsTable(row)}</article>`;
 };
 

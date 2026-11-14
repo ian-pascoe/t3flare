@@ -13,7 +13,7 @@
 //   Environment settings', ADR-0032), and is written to the audit log with its entity. The changes themselves are the
 //   transport-free ops (ops.ts, plan D1); this file parses a request into one and answers its outcome. A body may carry
 //   `expectedRevision` (plan D15): a moved revision is refused with 409.
-import { describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, type McpChange, resolveEnvironment, resolveHarness } from "@t3flare/harness-registry";
+import { describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, ignoredServersOf, type McpChange, resolveEnvironment, resolveHarness } from "@t3flare/harness-registry";
 
 import type { McpHost } from "../mcp/host.ts";
 import type { HarnessOAuth } from "./oauth.ts";
@@ -67,7 +67,7 @@ export interface HarnessDeps {
 }
 
 /** The Containers running now, by their Workspaces (a holder's DO id when its Workspace is unknown); null without the budget. */
-export const runningContainers = async (deps: HarnessDeps): Promise<{ readonly count: number; readonly holders: ReadonlyArray<string> } | null> => {
+export const runningContainers = async (deps: Pick<HarnessDeps, "budget">): Promise<{ readonly count: number; readonly holders: ReadonlyArray<string> } | null> => {
   if (deps.budget === undefined) return null;
   try {
     const { leases } = await deps.budget();
@@ -115,8 +115,10 @@ const refused = (status: number, reason: string) => new Response(`${reason}\n`, 
 
 const callerName = (caller: HarnessCaller) => (caller.kind === "owner" ? `owner:${caller.subject}` : "service-token");
 
-const statusOf = (deps: HarnessDeps) => {
+/** The panel's Status (the Settings server's `get_status` reads it too). */
+export const harnessStatus = (deps: Pick<HarnessDeps, "store" | "skills">) => {
   const stored = deps.store.load();
+  const ignored = ignoredServersOf(stored);
   const read = deps.store.lastRead();
   const environmentRead = deps.store.lastEnvironmentRead();
   const globalMise = deps.store.lastGlobalMise();
@@ -131,18 +133,20 @@ const statusOf = (deps: HarnessDeps) => {
     "last Global mise lay-down": globalMise === undefined ? null : describeGlobalMise(globalMise),
     Skills: skillsStatus(deps),
     "last Environment skill set refused": latestRefusal(deps) ?? null,
+    // A server stored under the Settings server's reserved name or kind (plan D2): ignored until the next MCP change drops it.
+    ...(ignored.length === 0 ? {} : { "ignored MCP servers": `${ignored.join(", ")}: stored under a name or kind reserved for the Settings server; add again under another name` }),
   };
 };
 
 /** Status's word on skills: Repo skills, and the Environment skills kept, enabled and their set's hash. */
-const skillsStatus = (deps: HarnessDeps): string => {
+const skillsStatus = (deps: Pick<HarnessDeps, "skills">): string => {
   if (deps.skills === undefined) return "Repo skills on (SPI-1147)";
   const { totals, hash } = skillsOverview(deps.skills);
   return `Repo skills on; ${totals.count} Environment ${totals.count === 1 ? "skill" : "skills"}, ${totals.enabled} enabled, set ${hash.slice(0, 12)}`;
 };
 
 /** The latest Workspace refusal of the Environment skill set (plan §4.5), as one line. */
-const latestRefusal = (deps: HarnessDeps): string | undefined => {
+const latestRefusal = (deps: Pick<HarnessDeps, "skills">): string | undefined => {
   const refusal = deps.skills?.store.refusals().at(-1);
   return refusal === undefined ? undefined : `${refusal.workspace} at ${new Date(refusal.at).toISOString()}: ${refusal.message}`;
 };
@@ -179,7 +183,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         running: await runningContainers(deps),
         csrf,
         audit: deps.store.auditLog(50),
-        status: statusOf(deps),
+        status: harnessStatus(deps),
         mcp: await mcpOverview(deps),
         ...(deps.skills === undefined ? {} : { skills: skillsOverview(deps.skills) }),
         ...(deps.endpoints === undefined ? {} : { endpoints: await endpointsOverview(deps.endpoints) }),
@@ -195,7 +199,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
       const resolved = resolveEnvironment(stored);
       return json({ revision: stored.revision, resolved, schema: ENVIRONMENT_SETTINGS, costs: containerCostTable(resolved.containerBudget), running: await runningContainers(deps), stored });
     }
-    if (path === `${HARNESS_PATH}/api/status`) return json(statusOf(deps));
+    if (path === `${HARNESS_PATH}/api/status`) return json(harnessStatus(deps));
     if (path === `${HARNESS_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });
     if (path === `${HARNESS_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
     if (path === `${HARNESS_PATH}/api/skills` && deps.skills !== undefined) return json(skillsOverview(deps.skills));
