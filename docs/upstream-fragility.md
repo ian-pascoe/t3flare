@@ -813,14 +813,14 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   guard, `codexProcessProvider` and the exclusion; re-run `p1167.ts`.
 ### U66. The Settings server's caller: `threadLinkIn` reads the thread projection (SPI-1198)
 
-- **Where**: `apps/environment/src/provider/threadCaller.ts` `threadLinkIn` (through `threadLinkOf`, `provider/adapter.ts`)
-  reads `orchestration_v2_projection_threads.payload_json` at `$.linkOrigin` and `$.lineage.parentThreadId`, by
-  `thread_id`, and walks the lineage up to `MAX_LINEAGE` (32) threads. It decides whether a Settings server write may
-  run (ADR-0034, plan D3): `own` only when every row up the lineage is there and carries no link origin; a missing row,
-  a row that is not JSON, a loop, a too-deep lineage, or a `parentThreadId` that is present but not a non-empty string
-  is `unknown`; any `linkOrigin` is `linked`. t3's side: the projection's thread payload
-  (`t3code/apps/server/src/persistence/Migrations/`, `ProjectionStoreV2`) and `OrchestrationV2Thread`'s `linkOrigin`
-  and `lineage` in `@t3tools/contracts`.
+- **Where**: `apps/environment/src/provider/threadCaller.ts` `threadLinkIn` (through `threadLinkOf`,
+  `provider/adapter.ts`) reads `orchestration_v2_projection_threads.payload_json` at `$.linkOrigin` and
+  `$.lineage.parentThreadId`, by `thread_id`, and walks the lineage up to `MAX_LINEAGE` (32) threads. It decides whether
+  a Settings server write may run (ADR-0034, plan D3): `own` only when every row up the lineage is there and carries no
+  link origin; a missing row, a row that is not JSON, a loop, a too-deep lineage, or a `parentThreadId` that is present
+  but not a non-empty string is `unknown`; any `linkOrigin` is `linked`. t3's side: the projection's thread payload
+  (`t3code/apps/server/src/persistence/Migrations/`, `ProjectionStoreV2`) and `OrchestrationV2Thread`'s `linkOrigin` and
+  `lineage` in `@t3tools/contracts`.
 - **Breaks when**: t3 renames the table or `payload_json`, moves `linkOrigin` or `lineage.parentThreadId` inside the
   payload, stops writing a projection row for a thread before its first turn, or marks Linked work some other way (a
   field beside `linkOrigin`).
@@ -838,37 +838,39 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 ### U67. pi's built-in MCP for the relay, and Patch 0006 (SPI-1076)
 
 - **Where**: `apps/environment/src/agents/cliProfiles.ts` `piMcpJson` writes `$PI_CODING_AGENT_DIR/mcp.json`, pi 1.5.2's
-  user-level file: one `mcpServers.<server>` per relayed server with `url` (`relayUrl`), `headers.Authorization:
-  "Bearer ${T3FLARE_TOOL_HANDLE}"` (pi expands `${VAR}` in a header from the process's environment; the handle is in
-  no file), `timeout` 900 (pi's per-request timeout, which progress notifications reset) and `exposure: "deferred"`
-  (found through pi's `tool_search`). It rests on pi's behaviour as M0's P16 found it (`docs/steps/settings-mcp/m0-pi.json`,
-  spike branch `settings-mcp-m0-spike`): `PI_OFFLINE=1` does not stop MCP connects; `--mode rpc` loads the built-in
-  MCP; `--no-extensions` (t3's fork launch, which gets no `mcp.json`) turns it off; a project's `.pi/mcp.json` is read
-  only under project trust, which `PI_SETTINGS`' `defaultProjectTrust: "never"` and `--no-approve` keep off.
+  user-level file: one `mcpServers.<server>` per relayed server with `url` (`relayUrl`), `headers.Authorization: "Bearer
+  ${T3FLARE_TOOL_HANDLE}"` (pi expands `${VAR}` in a header from the process's environment; the handle is in no file),
+  `timeout` 900 (pi's per-request timeout, which progress notifications reset) and `exposure: "deferred"` (found through
+  pi's `tool_search`). It rests on pi's behaviour as M0's P16 found it (`docs/steps/settings-mcp/m0-pi.json`, spike
+  branch `settings-mcp-m0-spike`): `PI_OFFLINE=1` does not stop MCP connects; `--mode rpc` loads the built-in MCP;
+  `--no-extensions` (t3's fork launch, which gets no `mcp.json`) turns it off; a project's `.pi/mcp.json` is read only
+  under project trust, which `PI_SETTINGS`' `defaultProjectTrust: "never"` and `--no-approve` keep off.
   `patches/0006-pi-relay-tools-are-judged-by-the-relay.patch` adds `isRelayedMcpTool` to the `tool_call` hook of t3's pi
   extension (`t3code/packages/provider-pi/src/server/mcpExtensionSource.ts`, beside `isReadOnlyMcpTool`): outside full
   access a tool named `mcp__<server>__…` whose server is one the profile names in `T3FLARE_RELAY_SERVERS`
   (`RELAY_SERVERS_ENV`, comma-separated, set by `piLaunch` beside the handle, the same list as `mcp.json`; SPI-1199
   review) and whose `pi.getAllTools()` entry (one per name, the one pi runs) has `sourceInfo.path === "builtin:mcp"` is
   not asked, because the relay judges it and asks on the thread; without the Patch a relay read would ask once and a
-  write twice. Every other tool is asked as stock t3 asks, including pi's resource tools (`read_mcp_resource`, also
-  from `builtin:mcp`), a tool of another extension under an `mcp__` name, and a `builtin:mcp` tool of a server the
-  relay does not serve this process. A relayed server matches as pi names its tools: `mcp__<server>__` with every
-  character but letters, digits and `_` replaced by `_` (pi 1.5.2 `docs/mcp.md`, and its `.replace(/[^A-Za-z0-9_]/g,
-  "_")`), so `my-docs` is `mcp__my_docs__…` (SPI-1200 review; server names are `[a-z0-9-]{1,20}`, `SERVER_NAME`).
+  write twice. Every other tool is asked as stock t3 asks, including pi's resource tools (`read_mcp_resource`, also from
+  `builtin:mcp`), a tool of another extension under an `mcp__` name, and a `builtin:mcp` tool of a server the relay does
+  not serve this process. A relayed server matches as pi names its tools: `mcp__<server>__` with every character but
+  letters, digits and `_` replaced by `_` (pi 1.5.2 `docs/mcp.md`; the code is `createMcpToolName` in
+  `@earendil-works/pi-mcp`'s `src/naming.ts`, bundled into pi, `.replace(/[^A-Za-z0-9_]/g, "_")`), so `my-docs` is
+  `mcp__my_docs__…` (SPI-1200 review; server names are `[a-z0-9-]{1,20}`, `SERVER_NAME`).
 - **Breaks when**: pi renames `mcp.json` or its keys, drops `${VAR}` expansion in headers, changes the `builtin:mcp`
   source path or `getAllTools`' `sourceInfo`, lets `PI_OFFLINE` stop MCP, stops turning MCP off with `--no-extensions`,
   or reads a project's `mcp.json` without trust; pi changes how it names a server's tool (`mcp__<server>__<tool>`, the
-  character replacement, or where it puts the hash suffix of colliding tool names), so the prefix no longer matches; t3 edits the hook's lines.
+  character replacement, or where it puts the hash suffix of colliding tool names), so the prefix no longer matches; t3
+  edits the hook's lines.
 - **Detection**: the Patch failing to apply (`check:patches`, loud); `test/piRelayPatch.test.ts` applies the Patch as
   `build.ts` does and runs the hook against a stand-in for pi's API (the relay's tools pass; bash, write, t3's tools, a
   look-alike extension tool, a resource tool, an unlisted tool, a `builtin:mcp` tool of an unnamed server, and every
-  tool when no server is named are asked; a hyphenated server matches by pi's `_` name and a longer name does not); `test/cliProfiles.test.ts` T-pi-1 pins the file, the environment (the
-  handle and `T3FLARE_RELAY_SERVERS`) and the fork. **Silent**: a renamed source path (pi asks the extension's "Allow
-  …?" before the relay's card: more asks, fail closed); a changed `mcp.json` shape or expansion (pi lists none of the
-  relay's tools).
-  Cheapest check: `scripts/tools.ts cli-mcp pi` on a stage (the read raises no request, the write only the relay's
-  card); or a `test:docker` case running the image's pi against a relay stand-in (not built).
+  tool when no server is named are asked; a hyphenated server matches by pi's `_` name and a longer name does not);
+  `test/cliProfiles.test.ts` T-pi-1 pins the file, the environment (the handle and `T3FLARE_RELAY_SERVERS`) and the
+  fork. **Silent**: a renamed source path (pi asks the extension's "Allow …?" before the relay's card: more asks, fail
+  closed); a changed `mcp.json` shape or expansion (pi lists none of the relay's tools). Cheapest check:
+  `scripts/tools.ts cli-mcp pi` on a stage (the read raises no request, the write only the relay's card); or a
+  `test:docker` case running the image's pi against a relay stand-in (not built).
 - **Blast radius**: a moved source label or tool-name shape: an extra ask per relay call (fail closed). A `builtin:mcp`
   server from elsewhere is asked as any tool is, unless it takes a relayed server's name, which pi's own config keeps
   unique per name and project trust (off) would be needed to override.
@@ -881,19 +883,20 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Where**: `apps/environment/src/settings/endpointLayout.ts` (layout (B): `<host>/_t3flare/mcp`), the `SettingsAccess`
   application in `apps/environment/alchemy.run.ts` (`oauthConfiguration`, `pathCookieAttribute` on it and on
   `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`), `worker.ts`'s branch for it
-  (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`), and `apps/environment/src/settings/endpoint.ts`, which
-  hand-writes MCP 2026-07-28 (`server/discover`, `_meta` `io.modelcontextprotocol/*`, `resultType`, `input_required`
-  with `inputRequests` and `requestState`; `-32022` with `data.supported` and `requested`, `-32020` for a missing or
-  mismatched `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` (Base64 sentinel decoded), and 404 with `-32601`, each
-  checked against the spec's `schema/2026-07-28/schema.ts` and its Streamable HTTP page on 2026-11-14, SPI-1200 review)
-  and 2025-11-25 to 2024-11-05 (session id, an unknown `MCP-Protocol-Version` answered 400 and a missing one read as
-  2025-03-26, `elicitation/create` with `mode: "url"` and `elicitationId` on the call's SSE stream, the response POST
-  answered 202). It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`, spike branch
-  `settings-mcp-m0-spike`): the more specific Access application wins a path; a token of one application is refused at
-  another's (tested with a service-token stand-in only; the OAuth bearer case is owner step 1,
-  `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4, so layout (B) is unproven until then); Access answers no root or path-inserted well-known document, so clients find the authorization server
-  only from the 401's `WWW-Authenticate` `resource_metadata`; `resource` is accepted with or without the query; the
-  query reaches the origin; and Claude Code 2.1.322's 2026 traffic as captured (P17).
+  (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`), and `apps/environment/src/settings/endpoint.ts`,
+  which hand-writes MCP 2026-07-28 (`server/discover`, `_meta` `io.modelcontextprotocol/*`, `resultType`,
+  `input_required` with `inputRequests` and `requestState`; `-32022` with `data.supported` and `requested`, `-32020` for
+  a missing or mismatched `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` (Base64 sentinel decoded), and 404 with
+  `-32601`, each checked against the spec's `schema/2026-07-28/schema.ts` and its Streamable HTTP page on 2026-11-14,
+  SPI-1200 review) and 2025-11-25 to 2024-11-05 (session id, an unknown `MCP-Protocol-Version` answered 400 and a
+  missing one read as 2025-03-26, `elicitation/create` with `mode: "url"` and `elicitationId` on the call's SSE stream,
+  the response POST answered 202). It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`,
+  spike branch `settings-mcp-m0-spike`): the more specific Access application wins a path; a token of one application is
+  refused at another's (tested with a service-token stand-in only; the OAuth bearer case is owner step 1,
+  `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4, so layout (B) is unproven until then); Access answers no root or
+  path-inserted well-known document, so clients find the authorization server only from the 401's `WWW-Authenticate`
+  `resource_metadata`; `resource` is accepted with or without the query; the query reaches the origin; and Claude Code
+  2.1.322's 2026 traffic as captured (P17).
 - **Breaks when**: Access (in beta) starts answering the host's root `/.well-known/oauth-*` documents (t3's own `/mcp`
   sign-in would find Access's server instead of t3's), changes how path-scoped applications nest or how it scopes
   tokens and cookies, or refuses a path-scoped or queried `resource`; alchemy renames `oauthConfiguration` or
@@ -908,8 +911,8 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Blast radius**: an Access change: Owner clients cannot sign in, or (root well-knowns) t3's own MCP clients cannot.
   A client's shape change: that client gets errors or the link in the result; own agents and the panel are unaffected.
 - **Fix**: rerun M0's probes (`scripts/settings-spike` on the spike branch); if Access breaks layout (B), move to (C) by
-  replacing `endpointLayout.ts`, the worker branch and `SettingsAccess` (plan D13); for a client, compare with the spec's
-  `schema.ts` for the version and the client's traffic.
+  replacing `endpointLayout.ts`, the worker branch and `SettingsAccess` (plan D13); for a client, compare with the
+  spec's `schema.ts` for the version and the client's traffic.
 
 ### U69. The Owner-client endpoint's `native` and `model` modes: client forms and Executor's pause (SPI-1201)
 

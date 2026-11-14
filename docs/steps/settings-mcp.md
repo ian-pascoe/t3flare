@@ -136,64 +136,67 @@ and Open change rows (it reads the Container and the Sessions; the rest must be 
 
 Changes the reviews made are recorded in the plan itself; each is listed here with its reason.
 
-1. **Layout (B) is conditional** (D13, ADR-0035). M0 showed Access routing `/_t3flare/mcp` and `/_t3flare` apart and
+1. **A second Access application** contradicts ADR-0026 §1 and its "Back to stock" (no second application). It is
+   recorded there as a refinement pointing at ADR-0035: an Owner client's managed-OAuth token on the `/_t3flare`
+   application would be admitted at the panel and the Change page, so the endpoint needs an application of its own.
+2. **Layout (B) is conditional** (D13, ADR-0035). M0 showed Access routing `/_t3flare/mcp` and `/_t3flare` apart and
    leaving the root well-known documents alone, but that one application's token is refused at the other's paths was
    tested with a service-token stand-in only. The OAuth bearer case is owner step 1 (M5a items 1-4); if it fails, the
    layout moves to (C). No `apps/settings-worker` was built.
-2. **Cursor's redirect is from third-party reports** (D13): `cursor://anysphere.cursor-mcp/oauth/callback` is in the
+3. **Cursor's redirect is from third-party reports** (D13): `cursor://anysphere.cursor-mcp/oauth/callback` is in the
    allowlist pending owner step 2; Cursor was not installed where M0 ran.
-3. **Access lifetimes are set explicitly** (D13): M0's P11 showed the applications API stores any value unvalidated, so
-   the 15-minute token and 168-hour session are written by t3flare, and the token's actual `expires_in` is a stage
-   check (M5a item 1).
-4. **More modules than §7 listed**: `settings/changes.ts` (the table, the read table, the caps' constants, the close
+4. **Access lifetimes are set explicitly** (D13): M0's P11 showed the applications API stores any value unvalidated, so
+   the 15-minute token and 168-hour session are written by t3flare, and the token's actual `expires_in` is a stage check
+   (M5a item 1).
+5. **More modules than §7 listed**: `settings/changes.ts` (the table, the read table, the caps' constants, the close
    line), `settings/caller.ts`, `settings/endpointLayout.ts`, `provider/threadCaller.ts`, `mcp/callStops.ts`,
    `harness/keys.ts`, `harness/paths.ts`, `harness/changePageScript.ts`. Reason: the reviews asked for one write path
    for both doors, one close line, shared keys and paths, and a host and relay that import no `settings/server.ts`.
-5. **The Linked-work check reads the parent too** (D3, §9's last row): `threadLinkIn` treats a child of a linked thread
+6. **The Linked-work check reads the parent too** (D3, §9's last row): `threadLinkIn` treats a child of a linked thread
    as linked even without the origin, and a parent id that is present but not a thread id as unknown (M3 review).
-6. **Patch 0006 is narrower than D4 wrote** (SPI-1199 and SPI-1200 reviews): it lets a built-in MCP tool through unasked
+7. **Patch 0006 is narrower than D4 wrote** (SPI-1199 and SPI-1200 reviews): it lets a built-in MCP tool through unasked
    only when its server is one the relay serves this process (`T3FLARE_RELAY_SERVERS`, set by `piLaunch`), matched as pi
    names its tools (`mcp__<server>__` with every character but letters, digits and `_` replaced; `my-docs` is
    `mcp__my_docs__`). Reason: a server from anywhere else, or a look-alike name, must still be asked.
-7. **Reads are capped and not audited** (not in the plan; SPI-1198 review): reads through the server write no audit
+8. **Reads are capped and not audited** (not in the plan; SPI-1198 review): reads through the server write no audit
    entry and are capped per caller per hour (240 in all; 20 that reach GitHub or an MCP server: `test_mcp_server`,
    `preview_skills`, `check_skill_updates`, and an install's or update's preview). Reason: an agent in a loop would fill
    the 1,000-entry audit log and spend the GitHub limit. `preview_skills` is refused to a caller that may not write
    (Linked, unknown, mode-less, plan).
-8. **Only the MCP server set is scrubbed of URL queries** (D14, SPI-1198 review): Variables, the Global mise config and
+9. **Only the MCP server set is scrubbed of URL queries** (D14, SPI-1198 review): Variables, the Global mise config and
    a `SKILL.md` read as they are, so writing back what was read is `unchanged`.
-9. **A card-approved free change is audited with `mode: card` and `answeredBy: card`** (D15 said `answeredBy` is absent
-   for a free change; SPI-1198 review, ADR-0034 §11). Reason: outside full access a free change is answered on a card,
-   and the audit says what answered. In full access a free change has neither.
-10. **Skill install and update need the page** (D6, SPI-1199 review): only the page shows each skill's `SKILL.md` and
+10. **A card-approved free change is audited with `mode: card` and `answeredBy: card`** (D15 said `answeredBy` is absent
+    for a free change; SPI-1198 review, ADR-0034 §11). Reason: outside full access a free change is answered on a card,
+    and the audit says what answered. In full access a free change has neither.
+11. **Skill install and update need the page** (D6, SPI-1199 review): only the page shows each skill's `SKILL.md` and
     files.
-11. **The card names no code-mode script** (D9; accepted in the SPI-1199 review): the MCP host carries no such fact for
+12. **The card names no code-mode script** (D9; accepted in the SPI-1199 review): the MCP host carries no such fact for
     a nested call.
-12. **A Stop closes a change `by: stop`** (D8, D9, SPI-1199 review), through `cancelAsk` and `mcp/callStops.ts`; `agent`
-    is model-mode `resume`'s alone. The registry registers writes only, shares a running id rather than aborting it,
-    and remembers a stop that arrives before its call for a minute (256 at most). A Stop closes the change before it
+13. **A Stop closes a change `by: stop`** (D8, D9, SPI-1199 review), through `cancelAsk` and `mcp/callStops.ts`; `agent`
+    is model-mode `resume`'s alone. The registry registers writes only, shares a running id rather than aborting it, and
+    remembers a stop that arrives before its call for a minute (256 at most). A Stop closes the change before it
     withdraws the card (SPI-1200 review).
-13. **The declined-repeat hash is of the normalized change** (D8, SPI-1199 and SPI-1200 reviews): junk keys, a respelled
+14. **The declined-repeat hash is of the normalized change** (D8, SPI-1199 and SPI-1200 reviews): junk keys, a respelled
     add URL and an install source spelled another way are the same change.
-14. **Closed rows are kept two hours, not one** (D8): the longest a cap looks back is a run of strikes and the lock after
-    it. **The strike lock runs an hour from the third strike** (D16; the first cut ran it from the first).
-15. **The open caps are checked again at insert** (D16): describing an asked change awaits (a skill preview reads
+15. **Closed rows are kept two hours, not one** (D8): the longest a cap looks back is a run of strikes and the lock
+    after it. **The strike lock runs an hour from the third strike** (D16; the first cut ran it from the first).
+16. **The open caps are checked again at insert** (D16): describing an asked change awaits (a skill preview reads
     GitHub), so parallel calls could each pass the first check.
-16. **An answer racing an applying answer waits for it** (`closeOrSettle`, SPI-1200 review): the card, an Owner
-    client's retry, a held stream and `resume` report `applied` rather than a stale `withdrawn`.
-17. **The access switch is checked again after a card** (D2, SPI-1198 review): a switch turned off or read-only while a
+17. **An answer racing an applying answer waits for it** (`closeOrSettle`, SPI-1200 review): the card, an Owner client's
+    retry, a held stream and `resume` report `applied` rather than a stale `withdrawn`.
+18. **The access switch is checked again after a card** (D2, SPI-1198 review): a switch turned off or read-only while a
     card waited applies nothing. A 2026 retry is refused naming the panel when the server is off or read-only.
-18. **The endpoint is stricter than D11's table** (SPI-1200 review, checked against the 2026-07-28 spec): on 2026
+19. **The endpoint is stricter than D11's table** (SPI-1200 review, checked against the 2026-07-28 spec): on 2026
     `MCP-Protocol-Version`, `Mcp-Method` and, on `tools/call`, `Mcp-Name` are required and must equal the body (400,
     `-32020`); an unsupported version is 400 with `-32022`; an unsupported method is `-32601`, 404 on 2026 and 200 on
     2025; on 2025 an unknown `MCP-Protocol-Version` is 400 and a missing one is `2025-03-26`; `initialize` at 2026 or an
     unknown version answers `2025-11-25`. Other query parameters are ignored (OpenCode appends `codemode=false`, M0).
-19. **Prototype-safe lookups** (SPI-1198 review): a user-supplied key never reads `Object.prototype` in the registry,
+20. **Prototype-safe lookups** (SPI-1198 review): a user-supplied key never reads `Object.prototype` in the registry,
     the tiers, the renderer or the panel page.
-20. **The interim of D17** (an asked change refused naming the panel) existed only between the M3 and M4 commits; it
+21. **The interim of D17** (an asked change refused naming the panel) existed only between the M3 and M4 commits; it
     never shipped.
-21. **M2's first commits were swept into two SPI-1198 review commits** (8d9001c, 3bdfb13) by a concurrent commit; 827e6bf
-    and e712a8c add the Patch and ADR-0001's counts. History only; the tree is as intended.
+22. **M2's first commits were swept into two SPI-1198 review commits** (8d9001c, 3bdfb13) by a concurrent commit;
+    827e6bf and e712a8c add the Patch and ADR-0001's counts. History only; the tree is as intended.
 
 ## Evidence
 
@@ -218,7 +221,8 @@ failure to "Deviations from the plan". -->
 
 ## Owner steps still open
 
-From [`settings-mcp-m0-owner-steps.md`](settings-mcp-m0-owner-steps.md) (copied from the spike branch, where its commands run):
+From [`settings-mcp-m0-owner-steps.md`](settings-mcp-m0-owner-steps.md) (copied from the spike branch, where its
+commands run):
 
 1. **Step 1, the OAuth flow end to end** (P6, P7, P12, P13, P15, P11 in part). **Gates layout (B)**: an Owner client's
    OAuth token must be refused at `/_t3flare/harness` and `/_t3flare/echo`, and the token exchange must work for the
@@ -254,7 +258,9 @@ its grant in the Access dashboard.
 ## Docs
 
 - With the plan and through the milestones: ADR-0034; ADR-0035 (layout (B), conditional); refinements of ADR-0001
-  (Patch 0006), ADR-0010 (two Access applications), ADR-0026, ADR-0028, ADR-0032 and ADR-0033; `GLOSSARY.md` (Settings
+  (Patch 0006), ADR-0010 (two Access applications), ADR-0026 (agents' changes; and, from the SPI-1201 review, the
+  SPI-1200 refinement that flags `SettingsAccess` as contradicting its §1 and "Back to stock", one Access application),
+  ADR-0028, ADR-0032 and ADR-0033; `GLOSSARY.md` (Settings
   server, Door, Owner client, Settings change, Change tier, Open change, Change page, Elicitation mode, Guardian, Guard,
   and the MCP server, Direct server, Pause and Pausing server entries); `docs/steps/tools.md`'s stale pi lines;
   `docs/upstream-fragility.md` U66-U69.

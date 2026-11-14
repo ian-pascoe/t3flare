@@ -76,4 +76,3 @@ prod keeps one host for the rate limit.
 [ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
 records the layout, the conditions it rests on (one still pending the owner's sign-in), and when it moves to a host of
 its own.
-
