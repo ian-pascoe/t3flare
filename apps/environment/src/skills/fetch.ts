@@ -175,6 +175,9 @@ export interface PreviewSkill {
   readonly digest: string;
   /** Empty when it can be installed, as far as the tree and its `SKILL.md` tell. */
   readonly problems: ReadonlyArray<string>;
+  /** With `detail` (the Change page, plan D10): its `SKILL.md` text and every file's path in its folder. */
+  readonly skillMd?: string;
+  readonly paths?: ReadonlyArray<string>;
 }
 
 export interface Preview {
@@ -215,7 +218,7 @@ const fileOf =
  * it. Reads one commit, one tree and the candidates' `SKILL.md` (at most `MAX_SKILL_CANDIDATES`); no other file, so the
  * content checks of the other files run at install.
  */
-export const previewSkills = async (reader: RepoReader, source: SkillSourceInput): Promise<Preview | Failed> => {
+export const previewSkills = async (reader: RepoReader, source: SkillSourceInput, options: { readonly detail?: boolean } = {}): Promise<Preview | Failed> => {
   const repo: SkillRepo = { owner: source.owner, name: source.name };
   try {
     const { commit, tree } = await readRepoAt(reader, repo, source.ref);
@@ -264,6 +267,7 @@ export const previewSkills = async (reader: RepoReader, source: SkillSourceInput
         internal: info.internal,
         digest: await folderHashOf({ tree: tree.entries }, skillMdPath),
         problems,
+        ...(options.detail === true ? { skillMd: decoder.decode(bytes), paths: entries.map((entry) => fileOf(skillMdPath)(entry).relative) } : {}),
       });
     }
     if (source.skill !== null && skills.length === 0) {

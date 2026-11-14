@@ -2,7 +2,7 @@
 // and the owner's changes (preview, install, check, update, remove, enable). `panel.ts` routes here after its guards
 // (Access, JSON, Origin, `Sec-Fetch-Site`, CSRF), so these answer only well-formed requests. A GitHub failure is a 502
 // whose text is the failure's whole message; a request that runs out of time keeps nothing.
-import { checkSkills, fetchSkills, type KeptForCheck, previewSkills, type RepoReader, type SkillRepo } from "./fetch.ts";
+import { checkSkills, fetchSkills, type KeptForCheck, type Preview, previewSkills, type RepoReader, type SkillRepo } from "./fetch.ts";
 import { MAX_ENVIRONMENT_SKILLS, MAX_SET_BYTES } from "./checks.ts";
 import { parseSkillSource } from "./source.ts";
 import type { ReadAccess } from "./contents.ts";
@@ -99,6 +99,38 @@ const preview = async (deps: SkillsApiDeps, body: Record<string, unknown>): Prom
   });
 };
 
+/**
+ * Why a fetch differs from what the owner was shown (plan D8), or undefined. `digests`, when sent (an Open change's
+ * apply: the Settings server keeps each skill's digest from its preview), names each folder's digest; a fetched skill
+ * whose folder has another digest refuses the whole change. The panel sends none: its own preview is its confirmation.
+ */
+const digestProblem = (digests: unknown, skills: ReadonlyArray<{ readonly name: string; readonly path: string; readonly digest: string }>): string | undefined => {
+  if (digests === undefined) return undefined;
+  if (digests === null || typeof digests !== "object" || Array.isArray(digests)) return "digests is an object of folders and digests";
+  const shown = digests as Readonly<Record<string, unknown>>;
+  const differs = skills.filter((skill) => shown[skill.path] !== skill.digest).map((skill) => skill.name);
+  return differs.length === 0 ? undefined : `Not installed: ${differs.join(", ")} at this commit differ from what the owner was shown; nothing was kept.`;
+};
+
+/**
+ * The Skills of `source` at `commit`, each with its `SKILL.md` text and file paths (the Change page, plan D8 and D10),
+ * or why not. `folders` keeps only the skills in those folders.
+ */
+export const previewAtCommit = async (
+  deps: Pick<SkillsApiDeps, "reader" | "now">,
+  input: { readonly source: string; readonly commit: string; readonly folders?: ReadonlyArray<string> },
+): Promise<{ readonly ok: true; readonly preview: Preview } | { readonly ok: false; readonly error: string }> => {
+  const parsed = parseSkillSource(input.source);
+  if (!parsed.ok) return { ok: false, error: parsed.message };
+  if (!/^[0-9a-f]{40}$/.test(input.commit)) return { ok: false, error: "commit is a 40-hex commit" };
+  const source = { ...parsed.source, ref: input.commit };
+  const { reader } = await deps.reader({ owner: source.owner, name: source.name }, deps.now() + REQUEST_BUDGET_MS);
+  const found = await previewSkills(reader, source, { detail: true });
+  if (found.status === "failed") return { ok: false, error: found.message };
+  const skills = input.folders === undefined ? found.skills : found.skills.filter((skill) => input.folders!.includes(skill.path));
+  return { ok: true, preview: { ...found, ref: parsed.source.ref, commit: input.commit, skills } };
+};
+
 /** `POST …/skills/install` `{ source, commit, folders }`: the folders the owner picked, fetched again at the previewed commit. */
 const install = async (deps: SkillsApiDeps, body: Record<string, unknown>): Promise<SkillsAnswer> => {
   const parsed = parseSkillSource(stringField(body, "source") ?? "");
@@ -112,6 +144,8 @@ const install = async (deps: SkillsApiDeps, body: Record<string, unknown>): Prom
   const fetched = await fetchSkills(reader, { repo: { owner: source.owner, name: source.name }, commit, folders });
   // Too many files is the request's own limit, not GitHub's failure.
   if (fetched.status === "failed") return refuse(fetched.kind === "too_many" ? 422 : 502, fetched.message);
+  const changed = digestProblem(body.digests, fetched.skills);
+  if (changed !== undefined) return refuse(422, changed);
   const results: Array<{ readonly name: string; readonly path: string; readonly action?: string; readonly error?: string }> = [];
   let expected = deps.expectedRevision;
   for (const skill of fetched.skills) {
@@ -184,6 +218,8 @@ const update = async (deps: SkillsApiDeps, body: Record<string, unknown>): Promi
   const [skill] = fetched.skills;
   if (skill === undefined) return refuse(422, `${name} was not updated, and is kept at ${short(row.commit)}: ${fetched.refused.map((refused) => refused.message).join("; ")}`);
   if (skill.name !== name) return refuse(422, `${name} was not updated: at ${short(commit)} its SKILL.md names it ${skill.name}. Install it under that name; removing ${name} is your choice.`);
+  const changed = digestProblem(body.digests, [skill]);
+  if (changed !== undefined) return refuse(422, changed);
   const before = new Map(deps.store.files(name).map((file) => [file.path, file.blob]));
   const after = new Map(Object.entries(skill.files).map(([path, file]) => [path, file.blob]));
   const answer = await deps.store.apply({ kind: "install", skill, source: { repo: row.repo, path: row.path, ref: row.ref, commit } }, deps.caller, deps.now(), deps.expectedRevision);
