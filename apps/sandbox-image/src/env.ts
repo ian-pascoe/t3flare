@@ -20,12 +20,20 @@ export const GLOBAL_MISE_CONFIG = `${GLOBAL_MISE_DIR}/config.toml`;
  * Workspace's one-repo token) and a config's `credential_command` are turned off here, and an environment variable beats
  * every config file's setting. A token that could fail an install that works without one is never sent. The two empty
  * values hold `disable_tools` and `disable_backends` at none, so no file can remove git or gh by them.
+ *
+ * mise's own directories are pinned to the image's defaults under /root, where the lay-down installs (and the shims on
+ * PATH point): a CLI profile that moves XDG_* (OpenCode's home) would otherwise send mise elsewhere, and a command
+ * there would install the pins again, or find none with auto-install off.
  */
 export const COMMAND_ENV: Readonly<Record<string, string>> = {
   MISE_SYSTEM_CONFIG_FILE: BASE_MISE_CONFIG,
   MISE_GLOBAL_CONFIG_FILE: GLOBAL_MISE_CONFIG,
   MISE_TRUSTED_CONFIG_PATHS: "/usr/local/share/cloudpid:/workspace",
   MISE_YES: "1",
+  MISE_DATA_DIR: "/root/.local/share/mise",
+  MISE_CACHE_DIR: "/root/.cache/mise",
+  MISE_STATE_DIR: "/root/.local/state/mise",
+  MISE_CONFIG_DIR: "/root/.config/mise",
   MISE_GITHUB_GH_CLI_TOKENS: "false",
   MISE_GITHUB_USE_GIT_CREDENTIALS: "false",
   MISE_GITHUB_CREDENTIAL_COMMAND: "",
