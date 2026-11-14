@@ -12,6 +12,12 @@ commit deployed, the stage, timestamps, and the thread, change and card ids. Nev
 authorization URL or code, a header value or a typed secret; record a secret's presence as `{ set, setAt }` and a leak
 scan's answer as names only.
 
+**Stay under the opened cap** (plan D16, `OPENED_CAP`) everywhere but item 1.4: a caller opens at most 6 asked changes
+an hour, whatever became of them. The own door counts per thread, so run each item on a new thread (the 17 children
+of item 1.3 are 17 threads); the Owner door counts per Access `sub`, so spread the owner's own clients' items (4, 5.2)
+across hours if earlier runs that hour opened changes from his `sub`; the service token is another caller. The cap has
+no test-only override, and none may be added.
+
 No stage harness for this run exists yet: the earlier milestones' runs and this one are owed together (the report's
 "Evidence" section). `scripts/tools.ts` (`relay-hostile`, `linked-injection`, `cli-mcp`, `panel`) and
 `scripts/spi1079.ts` are the patterns to follow; evidence goes through their redaction (`SECRET_KEYS`).
@@ -42,6 +48,16 @@ Unit: `settingsHostile.test.ts` "one thread …" and openChanges.test.ts's D16 c
    cards are open, the 16 Open changes on the panel's list (`GET /_t3flare/harness/api/changes`), and the 17th child's
    result: `refused`, `reason: open-across`, its text naming the panel's Open changes list. If t3 will not run 17
    delegated children at once, start 17 threads from the harness instead and record why.
+4. **The opened cap** (`OPENED_CAP`, SPI-1195 review; unit: `settingsHostile.test.ts` "40 asks each dropped …" and
+   openChanges.test.ts's D16 cases). Own door: a fresh Durable thread asks seven distinct asked changes (a Variable
+   `DROP_<n>=1` each), the owner stopping the turn while each card is open. Record six cards, each change closed
+   `withdrawn` (`closed.by: stop`), and the seventh call refused `reason: opened-cap` with no card, its text naming the
+   Harness panel; an hour after the first opened, the thread's next asked change shows a card again. Owner door: a
+   scripted Owner client (the service token with the admin token, `?elicitation_mode=browser`, 2026-07-28) asks seven
+   distinct asked changes, each cancelled by its retry (`inputResponses.change.action: "cancel"`), or each cut (a 2025
+   held stream ended by the client): record six withdrawn and the seventh refused `opened-cap` with the Owner door's
+   text naming the Harness panel. Record the `settings-refused` log lines (`reason: opened-cap`) and that no revision
+   moved.
 
 ### 2. An agent in a Container, and in the Preview browser, opening the Change page's URL gets Access's login
 
