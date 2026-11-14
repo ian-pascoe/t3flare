@@ -30,8 +30,10 @@ const environment = (initial: ModelEndpoints, proxy = true) => {
   return state;
 };
 
+/** The instances registered: Pi Durable, and Codex where the CLI agents are on. */
+let registered: ReadonlyArray<string> = [PI];
 const registry = Layer.succeed(ProviderInstanceRegistry.ProviderInstanceRegistry, {
-  getInstance: (id: ProviderInstanceId) => Effect.succeed(id === PI ? ({} as never) : undefined),
+  getInstance: (id: ProviderInstanceId) => Effect.succeed(registered.includes(id) ? ({} as never) : undefined),
 } as unknown as ProviderInstanceRegistry.ProviderInstanceRegistry["Service"]);
 
 /** The Pi Durable instance as the Environment configures it, so t3's settings read keeps a selection of it. */
@@ -62,6 +64,19 @@ describe("the text-generation setting's default", () => {
     environment(withModels("gpt-5.4", "gpt-5-mini"));
     const { selection } = await settingsAfter({}, [nothing]);
     expect(selection).toMatchObject({ instanceId: PI, model: "openai/gpt-5-mini" });
+  });
+
+  it("replaces t3's own default (Codex's model) even where a Codex instance is registered", async () => {
+    environment(withModels("gpt-5-mini"));
+    registered = [PI, "codex"];
+    try {
+      const { selection } = await settingsAfter({}, [() => undefined]);
+      expect(selection).toMatchObject({ instanceId: PI, model: "openai/gpt-5-mini" });
+      const picked = await settingsAfter({ textGenerationModelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" } }, [() => undefined]);
+      expect(picked.selection).toMatchObject({ instanceId: "codex", model: "gpt-5.4" });
+    } finally {
+      registered = [PI];
+    }
   });
 
   it("names the Model proxy's small model while no endpoint has one", async () => {

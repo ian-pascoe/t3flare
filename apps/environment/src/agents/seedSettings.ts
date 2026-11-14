@@ -4,10 +4,11 @@
 // the first Model endpoint that has one (`defaultTextModel`), else the Model proxy's small model until the hard cut,
 // else `default` (which fails saying to pick one). It is written at each boot and again whenever the endpoints change.
 //
-// "No model set" is: an instance this Environment does not have (t3's default), `default`, or the model this sync wrote
+// "No model set" is: t3's own default (Codex's model, even where the CLI agents register a `codex` instance), an
+// instance this Environment does not have, `default`, or the model this sync wrote
 // last (kept in the Environment DO's storage). A setting written by the earlier seed (the proxy's small model, with no
 // record kept) counts as unset too. Any other model is the owner's, and is never replaced.
-import { defaultInstanceIdForDriver } from "@t3tools/contracts";
+import { DEFAULT_SERVER_SETTINGS, defaultInstanceIdForDriver } from "@t3tools/contracts";
 import { SMALL_MODEL_SLUG } from "@t3flare/models";
 import { defaultTextModel, EMPTY_ENDPOINTS } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
@@ -27,7 +28,9 @@ export const syncTextGenerationDefault = Effect.gen(function* () {
   const current = (yield* settings.getSettings).textGenerationModelSelection;
   const instanceId = defaultInstanceIdForDriver(PI_DURABLE_DRIVER);
   const seeded = services.seededTextModel.get();
+  const stock = DEFAULT_SERVER_SETTINGS.textGenerationModelSelection;
   const unset =
+    (current.instanceId === stock.instanceId && current.model === stock.model) ||
     (yield* registry.getInstance(current.instanceId)) === undefined ||
     (current.instanceId === instanceId && (current.model === "default" || current.model === seeded || (seeded === undefined && current.model === SMALL_MODEL_SLUG)));
   if (!unset) return;
