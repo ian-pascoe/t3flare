@@ -270,7 +270,9 @@ interface OpenChange {
   tool: string;                  // the write tool's name
   args: unknown;                 // the call's arguments, canonical JSON, without a secret (none is ever in them)
   hash: string;                  // SHA-256 of tool + the change as its planner normalized it (only the fields the
-                                 // change takes; SPI-1199 review), canonical, without expectedRevision
+                                 // change takes; SPI-1199 review), canonical, without expectedRevision; an add's URL
+                                 // as a URL parser spells it, an install's source as its repo, folder and skill
+                                 // (SPI-1200 review), so a respelling is the same change
   shown: ChangeView;             // what the card and the page render: before, after, reasons, when it applies (D10)
   needsPage?: "secret" | "sign-in" | "skills" | "oversize";
   mode: "card" | "browser" | "native" | "model";
@@ -278,7 +280,8 @@ interface OpenChange {
             thread?: string; agent?: string; client?: { name: string; source: string } };
   createdAt: number; expiresAt: number;   // 10 minutes (QUESTION_WAIT_MS, host.ts:41)
   state: "open" | "applying" | "applied" | "declined" | "withdrawn" | "expired" | "moved" | "failed";
-  closed?: { at: number; by: "card" | "page" | "client" | "agent" | "stop"; revision?: number; error?: string };
+  closed?: { at: number; by: "card" | "page" | "client" | "agent" | "stop"; revision?: number; error?: string;
+             cut?: true };  // `cut`: a `native` stream the client ended unanswered (D12), in its close line
   // `stop`: the caller's Stop, turn end or going away withdrew it (D9); `agent` is model-mode `resume` alone
 }
 ```
@@ -291,7 +294,9 @@ interface OpenChange {
 - **One answer.** `answerOpenChange(id, { by, answerer, action, secret? })` moves `open` to `applying` in the same
   synchronous block that checks expiry, the answerer and the revision, so a second answer finds it closed. Then it
   applies through `ops.ts` with `expectedRevision`, audits, and closes the record. A moved revision closes it as
-  `moved`; nothing is applied.
+  `moved`; nothing is applied. A close without an answer (a decline or cancel from the client, a Stop, a timeout) that
+  lands while another answer is applying the change waits for that answer's outcome and reports it (`closeOrSettle`,
+  at most `APPLYING_WAIT_MS`, 30 s; an apply a reset stranded is the table's to close; SPI-1200 review).
 - **Who may answer**:
 
   | By | Which changes | Answerer |
@@ -331,7 +336,10 @@ server itself (not through `planQuestion`) and shown through the call's `McpAske
   audit entry say the change was answered on the Change page. A Stop or a turn's end withdraws the Open change
   (closed `by: "stop"`), also after "Opened it": Workers RPC carries no cancellation, so the Session names its call to
   `EnvironmentDO.cancelAsk` (the id it passed as `mcpCall`'s `stopId`), and the relay's call runs under the CLI's
-  `askId`, which the Workspace DO names when the CLI's request goes away (`mcp/callStops.ts`; SPI-1199 review).
+  `askId`, which the Workspace DO names when the CLI's request goes away (`mcp/callStops.ts`; SPI-1199 review). Only
+  writes register a stop; a second call under a running id shares its signal and never aborts it; a stop that arrives
+  before its call registers (the Stop raced the RPC) is remembered for `EARLY_STOP_MS` (a minute), at most
+  `EARLY_STOPS_MAX` (256) ids, oldest dropped first, and the call then starts stopped (SPI-1200 review).
 - ADR-0028's rule that a page on the t3 host is declined unseen governs third-party servers' questions
   (`planQuestion`); this card is the host's own and is not subject to it.
 - Rejected: page only (it loses one tap and the phone, ADR-0025); a form card (an agent can be stopped from answering
