@@ -1,7 +1,7 @@
 {
- "at": "2026-11-14T02:56:02.616Z",
+ "at": "2026-11-14T03:39:34.164Z",
  "host": "t3flare-environment-pclienv.ian-g-pascoe.workers.dev",
- "commit": "f0134ad05c84",
+ "commit": "35b29d5c0dd0",
  "project": {
   "id": "pclienv-proj",
   "root": "/w/pclienv-proj"
@@ -9,16 +9,16 @@
  "ok": true,
  "cli": "pi",
  "model": "anthropic/claude-sonnet-5-5",
- "expectedWinner": "environment",
  "checks": {
   "composerListsEnvironmentSkill": true,
-  "composerFollowsCliPrecedence": true,
+  "composerFollowsCliPerRoot": true,
   "noContainerForComposer": true,
   "describedReadsSkill": true,
   "mentionFollows": true,
-  "pairWinnerIsCli": true,
   "linkedToMount": true,
   "writeRefused": true,
+  "pairsCliChoiceIsRoots": true,
+  "pairsMentionIsRoots": true,
   "lateGoneFromMount": true,
   "lateSeenByNewProcess": true
  },
@@ -42,9 +42,49 @@
     "userInvocationOnly": false
    },
    {
-    "name": "fruit-code",
-    "description": "The fruit code, as the Environment keeps it. Use whenever anyone asks for the fruit code.",
-    "path": "/workspace/.agents/skills/fruit-code/SKILL.md",
+    "name": "pair-amber",
+    "description": "How to find the amber pair code. Use whenever anyone asks for the amber pair code.",
+    "path": "/workspace/.agents/skills/pair-amber/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "userInvocationOnly": false
+   },
+   {
+    "name": "pair-birch",
+    "description": "How to find the birch pair code. Use whenever anyone asks for the birch pair code.",
+    "path": "/workspace/.agents/skills/pair-birch/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "userInvocationOnly": false
+   },
+   {
+    "name": "pair-cedar",
+    "description": "How to find the cedar pair code. Use whenever anyone asks for the cedar pair code.",
+    "path": "/workspace/.agents/skills/pair-cedar/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "userInvocationOnly": false
+   },
+   {
+    "name": "pair-dune",
+    "description": "How to find the dune pair code. Use whenever anyone asks for the dune pair code.",
+    "path": "/workspace/.agents/skills/pair-dune/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "userInvocationOnly": false
+   },
+   {
+    "name": "pair-ember",
+    "description": "How to find the ember pair code. Use whenever anyone asks for the ember pair code.",
+    "path": "/workspace/.agents/skills/pair-ember/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "userInvocationOnly": false
+   },
+   {
+    "name": "pair-fjord",
+    "description": "How to find the fjord pair code. Use whenever anyone asks for the fjord pair code.",
+    "path": "/workspace/.agents/skills/pair-fjord/SKILL.md",
     "scope": "user",
     "enabled": true,
     "userInvocationOnly": false
@@ -52,16 +92,42 @@
   ]
  },
  "threads": {
-  "described": "19dadf0a-2f81-4820-a8a8-0400722c0134",
-  "mentioned": "38a6271f-bda6-4768-b491-7691e3676f7d",
-  "late": "a46f446d-d456-4b9e-81e3-e87305edfed3",
-  "fresh": "1161121e-5305-4df4-9dba-0ef7fbdbec3d"
+  "described": "e5860756-a3ff-4dff-bac9-539c30499f98",
+  "mentioned": "89a5b2d1-0df5-4e31-9647-44e60770b222",
+  "lateA": "fe7c4e89-06a6-40bb-b5aa-893b234617a4",
+  "lateB": "cb1833d5-69b4-4dd8-9a2c-71d8ced89ff0",
+  "late": "94244336-272f-46b0-9477-27fe42ecedd8",
+  "fresh": "6cc4acc4-35a0-4d9a-8986-f566be545b9d"
  },
  "steps": {
   "setup": {
    "status": 200,
    "skipped": "unchanged"
   },
+  "composerPairs": [
+   {
+    "root": ".pi/skills",
+    "expected": "environment",
+    "listed": [
+     {
+      "scope": "user",
+      "path": "/workspace/.agents/skills/pair-cedar/SKILL.md"
+     }
+    ],
+    "ok": true
+   },
+   {
+    "root": ".agents/skills",
+    "expected": "environment",
+    "listed": [
+     {
+      "scope": "user",
+      "path": "/workspace/.agents/skills/pair-amber/SKILL.md"
+     }
+    ],
+    "ok": true
+   }
+  ],
   "described": {
    "sent": "What is the environment code? Reply with the code alone.",
    "status": "completed",
@@ -83,15 +149,6 @@
     "{\"ordinal\":1000002,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/workspace/.agents/skills/env-code/reference/code.md\"},\"outputOmitted\":true}"
    ]
   },
-  "pair": {
-   "sent": "$fruit-code What is the fruit code? Reply with the code alone.",
-   "status": "completed",
-   "failure": null,
-   "typed": "$fruit-code What is the fruit code? Reply with the code alone.",
-   "answer": "PLUM-9",
-   "tools": []
-  },
-  "pairWinner": "environment",
   "linkedRoot": {
    "at": "/workspace/.agents/skills",
    "target": null,
@@ -99,7 +156,7 @@
   },
   "shellWrite": {
    "exitCode": 0,
-   "stdout": "touch: refused: touch: cannot touch '/workspace/.agents/skills/planted': Read-only file system\noverwrite: refused: touch: cannot touch '/workspace/.agents/skills/planted': Read-only file system\nenv-code\nfruit-code\n",
+   "stdout": "touch: refused: touch: cannot touch '/workspace/.agents/skills/planted': Read-only file system\noverwrite: refused: touch: cannot touch '/workspace/.agents/skills/planted': Read-only file system\nenv-code\npair-amber\npair-birch\npair-cedar\npair-dune\npair-ember\npair-fjord\n",
    "stderr": "/bin/sh: 6: cannot create /workspace/.agents/skills/env-code/SKILL.md: Read-only file system\n"
   },
   "agentWrite": {
@@ -109,17 +166,85 @@
    "typed": "Run exactly this shell command and reply with its error output verbatim: touch '/workspace/.agents/skills/planted-by-agent'",
    "answer": "touch: cannot touch '/workspace/.agents/skills/planted-by-agent': Read-only file system",
    "tools": [
-    "{\"ordinal\":3000002,\"status\":\"failed\",\"title\":\"bash\",\"type\":\"command_execution\",\"input\":\"touch '/workspace/.agents/skills/planted-by-agent'\",\"outputOmitted\":true,\"outputIndicatesFailure\":true,\"exitCode\":1}"
+    "{\"ordinal\":2000002,\"status\":\"failed\",\"title\":\"bash\",\"type\":\"command_execution\",\"input\":\"touch '/workspace/.agents/skills/planted-by-agent'\",\"outputOmitted\":true,\"outputIndicatesFailure\":true,\"exitCode\":1}"
    ]
   },
   "afterWrites": {
    "exitCode": 0,
-   "stdout": "/workspace/.agents/skills:\ntotal 0\ndrwxr-xr-x 1 root root 0 Nov 14 02:53 .\ndrwxr-xr-x 1 root root 0 Nov 14 02:31 ..\ndrwxr-xr-x 1 root root 0 Nov 14 02:53 env-code\ndrwxr-xr-x 1 root root 0 Nov 14 02:53 fruit-code\n\n/workspace/.agents/skills/env-code:\ntotal 0\ndrwxr-xr-x 1 root root   0 Nov 14 02:53 .\ndrwxr-xr-x 1 root root   0 Nov 14 02:53 ..\n-rw-r--r-- 1 root root 280 Nov 14 02:53 SKILL.md\ndrwxr-xr-x 1 root root   0 Nov 14 02:53 reference\n---\nname: env-code\ndescription: How to find the environment code, the code the Cloud Environment keeps. Use whenever anyone asks for the environment code.\n---\n\nThe environment code is written in reference/code.md, next to this file. Read that file and answer with the code alone.\n",
+   "stdout": "/workspace/.agents/skills:\ntotal 0\ndrwxr-xr-x 1 root root 0 Nov 14 03:35 .\ndrwxr-xr-x 1 root root 0 Nov 14 03:26 ..\ndrwxr-xr-x 1 root root 0 Nov 14 03:35 env-code\ndrwxr-xr-x 1 root root 0 Nov 14 03:35 pair-amber\ndrwxr-xr-x 1 root root 0 Nov 14 03:35 pair-birch\ndrwxr-xr-x 1 root root 0 Nov 14 03:35 pair-cedar\ndrwxr-xr-x 1 root root 0 Nov 14 03:35 pair-dune\ndrwxr-xr-x 1 root root 0 Nov 14 03:35 pair-ember\ndrwxr-xr-x 1 root root 0 Nov 14 03:35 pair-fjord\n\n/workspace/.agents/skills/env-code:\ntotal 0\ndrwxr-xr-x 1 root root   0 Nov 14 03:35 .\ndrwxr-xr-x 1 root root   0 Nov 14 03:35 ..\n-rw-r--r-- 1 root root 280 Nov 14 03:35 SKILL.md\ndrwxr-xr-x 1 root root   0 Nov 14 03:35 reference\n---\nname: env-code\ndescription: How to find the environment code, the code the Cloud Environment keeps. Use whenever anyone asks for the environment code.\n---\n\nThe environment code is written in reference/code.md, next to this file. Read that file and answer with the code alone.\n",
    "stderr": ""
+  },
+  "pairs": [
+   {
+    "root": ".pi/skills",
+    "word": "cedar",
+    "expected": "environment",
+    "cliChose": "environment",
+    "mentionGave": "environment",
+    "described": {
+     "sent": "What is the cedar pair code? Reply with the code alone.",
+     "status": "completed",
+     "failure": null,
+     "typed": "What is the cedar pair code? Reply with the code alone.",
+     "answer": "ENV-CEDAR",
+     "tools": [
+      "{\"ordinal\":1000002,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/workspace/.agents/skills/pair-cedar/SKILL.md\"},\"outputOmitted\":true}"
+     ]
+    },
+    "mention": {
+     "sent": "$pair-cedar What is the cedar pair code? Reply with the code alone.",
+     "status": "completed",
+     "failure": null,
+     "typed": "$pair-cedar What is the cedar pair code? Reply with the code alone.",
+     "answer": "ENV-CEDAR",
+     "tools": []
+    }
+   },
+   {
+    "root": ".agents/skills",
+    "word": "amber",
+    "expected": "environment",
+    "cliChose": "environment",
+    "mentionGave": "environment",
+    "described": {
+     "sent": "What is the amber pair code? Reply with the code alone.",
+     "status": "completed",
+     "failure": null,
+     "typed": "What is the amber pair code? Reply with the code alone.",
+     "answer": "ENV-AMBER",
+     "tools": [
+      "{\"ordinal\":1000002,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/workspace/.agents/skills/pair-amber/SKILL.md\"},\"outputOmitted\":true}"
+     ]
+    },
+    "mention": {
+     "sent": "$pair-amber What is the amber pair code? Reply with the code alone.",
+     "status": "completed",
+     "failure": null,
+     "typed": "$pair-amber What is the amber pair code? Reply with the code alone.",
+     "answer": "ENV-AMBER",
+     "tools": []
+    }
+   }
+  ],
+  "lateStartA": {
+   "sent": "Reply with the single word OK.",
+   "status": "completed",
+   "failure": null,
+   "typed": "Reply with the single word OK.",
+   "answer": "OK",
+   "tools": []
+  },
+  "lateStartB": {
+   "sent": "Reply with the single word OK.",
+   "status": "completed",
+   "failure": null,
+   "typed": "Reply with the single word OK.",
+   "answer": "OK",
+   "tools": []
   },
   "lateInstall": {
    "status": 200,
-   "commit": "b0e4cef998bf0a008191146ac276209f71646e55",
+   "commit": "c20f378457dfd7f57eba7a347e9bc71946a57730",
    "folders": [
     "late/late-code"
    ]
@@ -131,7 +256,8 @@
    "typed": "$late-code What is the late code? If you cannot find it, reply NONE.",
    "answer": "LATE-8",
    "tools": [
-    "{\"ordinal\":4000003,\"status\":\"completed\",\"title\":\"bash\",\"type\":\"command_execution\",\"input\":\"ls /workspace/.agents/skills/; cat /workspace/.agents/skills/late-code/SKILL.md 2>&1\",\"outputOmitted\":true,\"exitCode\":0}"
+    "{\"ordinal\":2000003,\"status\":\"completed\",\"title\":\"bash\",\"type\":\"command_execution\",\"input\":\"ls /w/pclienv-proj/.agents/skills /workspace/.agents/skills 2>&1; grep -ril \\\"late\\\" /w/pclienv-proj/.agents /workspace/.agents 2>/dev/null | head\",\"outputOmitted\":true,\"exitCode\":0}",
+    "{\"ordinal\":2000004,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/workspace/.agents/skills/late-code/SKILL.md\"},\"outputOmitted\":true}"
    ]
   },
   "lateDescribed": {
@@ -140,7 +266,10 @@
    "failure": null,
    "typed": "What is the late code? If you cannot find it, reply NONE.",
    "answer": "LATE-8",
-   "tools": []
+   "tools": [
+    "{\"ordinal\":2000003,\"status\":\"completed\",\"title\":\"bash\",\"type\":\"command_execution\",\"input\":\"cd /w/pclienv-proj; grep -ril \\\"late code\\\\|late-code\\\" . /workspace/.agents 2>/dev/null | head\",\"outputOmitted\":true,\"exitCode\":0}",
+    "{\"ordinal\":2000004,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/workspace/.agents/skills/late-code/SKILL.md\"},\"outputOmitted\":true}"
+   ]
   },
   "lateStart": {
    "sent": "Reply with the single word OK.",
@@ -156,22 +285,21 @@
    "status": "completed",
    "failure": null,
    "typed": "$late-code What is the late code? If you cannot find it, reply NONE.",
-   "answer": "NONE\n\nThe `late-code` skill file isn't on disk. `/workspace/.agents/skills/` only has `env-code` and `fruit-code`. The only other matches for \"late code\" were old session logs, which aren't a real source for the code.",
+   "answer": "NONE",
    "tools": [
     "{\"ordinal\":2000002,\"status\":\"completed\",\"title\":\"Could not load skill late-code from /workspace/.agents/skills/late-code/SKILL.md.\",\"type\":\"system_notice\",\"message\":\"Could not load skill late-code from /workspace/.agents/skills/late-code/SKILL.md.\"}",
     "{\"ordinal\":2000003,\"status\":\"failed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/workspace/.agents/skills/late-code/SKILL.md\"},\"outputOmitted\":true}",
-    "{\"ordinal\":2000004,\"status\":\"completed\",\"title\":\"bash\",\"type\":\"command_execution\",\"input\":\"find / -path /proc -prune -o -ipath \\\"*late-code*\\\" -print 2>/dev/null | head; ls -la /workspace/.agents/skills 2>&1 | head\",\"outputOmitted\":true,\"exitCode\":0}",
-    "{\"ordinal\":2000006,\"status\":\"completed\",\"title\":\"bash\",\"type\":\"command_execution\",\"input\":\"grep -rIil \\\"late code\\\\|late-code\\\" /workspace /w/pclienv-proj 2>/dev/null | head\",\"outputOmitted\":true,\"exitCode\":0}"
+    "{\"ordinal\":2000004,\"status\":\"completed\",\"title\":\"bash\",\"type\":\"command_execution\",\"input\":\"find / -path \\\"*skills/late-code*\\\" 2>/dev/null; ls -la /workspace/.agents/skills /w/pclienv-proj/.agents/skills 2>&1\",\"outputOmitted\":true,\"exitCode\":0}"
    ]
   },
   "lateRemovedMount": {
    "exitCode": 0,
-   "stdout": "env-code\nfruit-code\n",
+   "stdout": "env-code\npair-amber\npair-birch\npair-cedar\npair-dune\npair-ember\npair-fjord\n",
    "stderr": ""
   },
   "lateReinstall": {
    "status": 200,
-   "commit": "b0e4cef998bf0a008191146ac276209f71646e55",
+   "commit": "c20f378457dfd7f57eba7a347e9bc71946a57730",
    "folders": [
     "late/late-code"
    ]
