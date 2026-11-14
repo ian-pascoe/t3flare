@@ -48,3 +48,7 @@ Port discovery, `PreviewBrowser` and agent browser access are Layers, or the rem
 
 Shadows 4 (unchanged), Patches 6.
 - Patch `0006-pi-durable-models-are-not-retained.patch`: one line at the top of `ProviderRegistry.ts`'s `shouldRetainMissingProviderModels`, so `piDurable` retains no model it stopped listing and a removed Model endpoint's models leave the picker. No Layer reaches the registry's merge, and a Shadow would copy the 1,194-line file. Evidence: `docs/steps/spi-1162.md`.
+## Counts after the Settings server (SPI-1195)
+
+Shadows 4 (unchanged), Patches 7.
+- Patch `0006-pi-relay-tools-are-judged-by-the-relay.patch` (SPI-1076): t3's pi extension does not ask "Allow …?" for an `mcp__` tool that pi's built-in MCP client runs (`getAllTools()` source `builtin:mcp`); t3flare's MCP relay judges and asks for it. A Layer cannot reach it: `mcpExtensionSource.ts` is the text of a program pi runs in the Container (`FS_ALIAS_SKIP`), and the CLI profile requires the extension's content to be t3's own. A Shadow would freeze the whole extension for a ten-line early return. Recorded as U67 in `docs/upstream-fragility.md`.
