@@ -3,7 +3,7 @@ name: Deploy prod
 # Every push to main deploys the `prod` stage (the owner's Environment): `pnpm run check`, then
 # `apps/environment/scripts/stage.ts deploy prod`, then a smoke check that leaves nothing behind (scripts/smoke.ts: the
 # web client; the read-only admin health route, which must report this commit; and the host's root OAuth documents,
-# which must still be t3's, ADR-0035. Those two boot t3 in the Environment DO; no Container).
+# which must still be t3's, ADR-0035. The two documents boot t3 in the Environment DO; no Container).
 # Docs-only pushes are skipped. A manual run may deploy the `bump` stage instead, to try the job without touching prod.
 #
 # Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts) on the GitHub environment `prod` (main only):

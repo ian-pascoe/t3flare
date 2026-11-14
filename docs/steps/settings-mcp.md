@@ -142,7 +142,7 @@ Plan §5, line by line: where each is tested now, and what the stage run adds.
 
 | Hostile case | Unit tests | Stage (`m6-stage-run.md`) |
 | --- | --- | --- |
-| An injected agent asking repeatedly is stopped by the caps | `settingsHostile.test.ts`: "one thread: a repeat of a declined change is refused, and the third decline in a row locks it out without a card"; `openChanges.test.ts`: "D16's caps" (every cap), "the strike lock runs an hour from the third strike, not the first", "a second asked call on the same thread is refused while one is open, naming it", "D16's caps under parallel calls"; `settingsServer.test.ts`: the applied cap; `settingsHostile.test.ts`: "40 asks each dropped by a Stop, or cancelled on the card: past 6 in an hour the rest are refused" (the opened cap, SPI-1195 review) | items 1.1 (Durable), 1.2 (Codex) |
+| An injected agent asking repeatedly is stopped by the caps | `settingsHostile.test.ts`: "one thread: a repeat of a declined change is refused, and the third decline in a row locks it out without a card"; `openChanges.test.ts`: "D16's caps" (every cap), "the strike lock runs an hour from the third strike, not the first", "a second asked call on the same thread is refused while one is open, naming it", "D16's caps under parallel calls"; `settingsServer.test.ts`: the applied cap; `settingsHostile.test.ts`: "40 asks each dropped by a Stop, or cancelled on the card: past 6 in an hour the rest are refused" (the opened cap, SPI-1195 review) | items 1.1 (Durable), 1.2 (Codex), 1.4 (the opened cap, both doors) |
 | 17 children leave the 17th refused | `settingsHostile.test.ts`: "17 children asking at once: 16 wait for the owner, the next is refused naming the panel's list, with no card"; `openChanges.test.ts`: "at most 16 across the Environment …" | item 1.3 |
 | An agent in a Container, and in the Preview browser, opening the Change page's URL gets Access's login | `workerRouting.test.ts`: "the Change page and its API: nothing but the panel's own assertion reaches them" (behind the edge only; the login is Access's, at the edge) | item 2 (stage only) |
 | A leak scan finds a typed secret nowhere but the secret store | `settingsHostile.test.ts`: "after a header value is typed on the Change page: no SQLite row, no other kept key, no result, card, log line or audit entry holds it"; `changePage.test.ts`: "a secret typed on the page reaches the secret store and appears in no response, log line, audit entry or record"; `settingsServer.test.ts`: reads carry no secret | item 3 |
@@ -273,7 +273,9 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     owner turns it off on the admin routes once a fixed deploy is out.
 29. **Asked changes opened are capped at 6 per caller per hour, whatever their outcome** (D16; SPI-1195 review): a
     change withdrawn by a Stop, a cancelled card or a cut stream neither strikes nor applies, so nothing else bounded
-    an agent asking and dropping. Refused naming the Harness panel, for each door (own thread, Owner `sub`).
+    an agent asking and dropping. Refused naming the Harness panel, for each door (own thread, Owner `sub`). It has no
+    override, so the stage runs stay under it (a new thread per item on the own door; the owner's items spread across
+    hours on the Owner door; each stage-run doc says how), and M6 item 1.4 records it.
 
 ## Evidence
 

@@ -9,6 +9,13 @@ with the commit deployed, the stage, timestamps, the client and its version, and
 cookie, an authorization code or a header value; record an assertion by its decoded claims with `sub` and `email`
 reduced to "same as …" comparisons.
 
+**Stay under the opened cap** (plan D16, `OPENED_CAP`): a caller opens at most 6 asked changes an hour, whatever became
+of them (declined, withdrawn, expired and applied all count), and the Owner door counts per Access `sub`: every client
+the owner signs in from is the same caller. Items 7-11 open about seven changes from his one `sub`, so spread them over
+two hours (say items 7 and 8 in one, 9-11 in the next), counting each change opened; a seventh in an hour is refused
+`opened-cap`, naming the panel, with no question. The service token is another caller. The cap has no test-only
+override, and none may be added; `m6-stage-run.md` item 1.4 records the cap itself.
+
 ## Before the run
 
 1. `node scripts/stage.ts deploy psettings` (from `apps/environment`). The deploy makes the `SettingsAccess` application

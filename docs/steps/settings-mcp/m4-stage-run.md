@@ -5,6 +5,12 @@ M4's code and unit tests (T-open, T-card, T-page) landed without a deploy. Its t
 the commit deployed, the stage, timestamps, and the thread, change and card ids. Never record a header value, an
 authorization URL, a token or a cookie; record a secret's presence as `{ set, setAt }` only.
 
+**Stay under the opened cap** (plan D16, `OPENED_CAP`): a caller opens at most 6 asked changes an hour, whatever became
+of them (declined, withdrawn, expired and applied all count), and the own door counts per thread. Run each item below on
+a new thread, so no thread opens more than six (items 3 and 9 open three each). A seventh in a thread's hour is refused
+`opened-cap` with no card, which is not what these items record. The cap has no test-only override, and none may be
+added; `m6-stage-run.md` item 1.4 records the cap itself.
+
 ## `m4-settings-asked.json`
 
 An own agent's asked change, end to end, for a Durable thread and for at least one CLI thread (Codex), in
