@@ -12,7 +12,8 @@
 //    thread window (bounded snapshot over HTTP and subscribeThread), the shell snapshot, and search.
 // 5. t3's SQL client on DO SQLite (transaction rollback, >100 parameters), the SQL adapter's record (no
 //    statement refused except t3's PRAGMAs), and the twice-in-one-isolate boot check.
-// 6. With `--real-turn [--push]` (step 2a): a Durable agent turn on a fresh clone of the fixture (`lib/realTurn.ts`).
+// 6. With `--real-turn [--push]` (step 2a): a Durable agent turn on a fresh clone of the fixture, then t3's own commit
+//    action of its edit (SPI-1186) (`lib/realTurn.ts`).
 // 7. With `--terminal` and/or `--worktree` (step 2b): a terminal's echo, a worktree thread's setup script, its removal,
 //    and the sweep's dry run (`lib/terminalWorktree.ts`).
 // 8. With `--peer` (step 3): a Peer link from the harness, the forwarded launch and the link fence (`lib/peerAcceptance.ts`).

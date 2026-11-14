@@ -2,12 +2,14 @@
 // The acceptance test's real turn (step 2a plan, Tests → Deployed; `scripts/acceptance.ts --real-turn [--push]`):
 // clone the fixture into a new Workspace through t3's own clone, open a project and an approval-required thread on
 // it, run one turn with a small model that edits a file and runs `bash test.sh`, approve each call, and check the turn
-// items, the checkpoint diff and the tool output. With `--push` (the step's own stage), commit, push and open a PR
+// items, the checkpoint diff and the tool output; then commit the edit through t3's own commit action (the git panel's
+// Commit) and check the commit lists the file (SPI-1186, SPI-1091). With `--push` (the step's own stage), commit, push and open a PR
 // through t3's git action, then close the PR and delete the branch (with the local `gh`). The Workspace is forgotten
 // afterwards (its registry row; its DO's files stay until the stage goes).
 import { spawnSync } from "node:child_process";
 
 import { admin, dispatch, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall, wsStream } from "./client.ts";
+import { committed, t3Commit } from "./t3Commit.ts";
 
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 // T3FLARE_REAL_TURN_MODEL names another model of the proxy (a Claude model gets a thinking level, any other none).
@@ -100,7 +102,16 @@ export const realTurn = async (cookie: string, options: { readonly push: boolean
   const trace = (await admin("GET", "/_t3flare/agents/checkpoint-trace?clear=1")).json?.entries ?? [];
   report.checkpointOps = trace.filter((entry: any) => entry.cwd === destination).map((entry: any) => `${entry.op}:${entry.by}`);
 
-  // 3. Push and PR (the step's stage only).
+  // 3. t3's own commit action of the edited file (SPI-1186, SPI-1091): t3's commit draft in the Container (its temporary
+  // index, object directory and alternates) and the stdin staging. With `--push`, step 4's commit covers the same draft.
+  if (!options.push) {
+    const subject = "acceptance: t3's commit action";
+    const commit = await t3Commit(cookie, { id, cwd: destination, filePaths: ["src/greeting.txt"], message: subject });
+    report.commit = commit;
+    check("t3's commit action committed src/greeting.txt", committed(commit, ["src/greeting.txt"], subject), commit);
+  }
+
+  // 4. Push and PR (the step's stage only).
   if (options.push) {
     const events = (await wsStream(cookie, "git.runStackedAction", {
       actionId: uuid(),
