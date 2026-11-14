@@ -286,4 +286,12 @@ describe("tierOf: the Environment skills", () => {
     ];
     for (const [change, expected] of cases) expect(tier({ entity: "skills", change }), JSON.stringify(change)).toBe(expected);
   });
+
+  it("an install or update needs the page, which alone shows its SKILL.md text (SPI-1199 review); the rest do not", () => {
+    expect(tierOf({ entity: "skills", change: { op: "install" } }).needsPage).toBe("skills");
+    expect(tierOf({ entity: "skills", change: { op: "update", name: "a" } }).needsPage).toBe("skills");
+    for (const change of [{ op: "remove", name: "a" }, { op: "enable", name: "a", enabled: true }, { op: "enable", name: "a", enabled: false }] as const) {
+      expect(tierOf({ entity: "skills", change }).needsPage).toBeUndefined();
+    }
+  });
 });

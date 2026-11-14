@@ -35,6 +35,11 @@ export interface RelayDeps {
     readonly asker?: McpAsker;
     /** The calling thread and CLI, from the tool handle (plan D3): the Settings server judges its writes by it. */
     readonly caller: OwnCaller;
+    /**
+     * The id `EnvironmentDO.cancelAsk` stops the call by when the CLI went away (the Settings server's calls, plan D9):
+     * its Open change is withdrawn.
+     */
+    readonly stopId?: string;
   }) => Promise<McpCallAnswer>;
   /** G11 (MCP apps): an App's `ui://` resource of `server` (`McpHost.readAppResource`); absent, no resource is read. */
   readonly readAppResource?: (input: { readonly server: string; readonly uri: string }) => Promise<{ readonly kind: "result"; readonly value: unknown } | { readonly kind: "refused"; readonly message: string }>;
@@ -137,6 +142,8 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
         judged: tool.class,
         caller: { door: "own", thread: input.thread, agent: input.cli },
         ...(asker === undefined ? {} : { asker }),
+        // The Settings server holds its call for the owner (plan D9): the CLI going away withdraws its Open change.
+        ...(server.kind === "settings" ? { stopId: input.askId } : {}),
       });
       if (result.kind === "unavailable") return toolError(id, result.message);
       return ok(id, { content: [{ type: "text", text: result.text }], isError: result.isError, ...(result.structured === undefined ? {} : { structuredContent: result.structured }) });

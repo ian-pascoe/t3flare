@@ -98,9 +98,8 @@ describe("reads show Variables, the Global mise config and a SKILL.md as they ar
     const run = fixture;
     const text = "Read https://docs.example/guide?version=2 first.";
     const commit = run.github.push("o/r", { "skills/a/SKILL.md": skillMd("a", text) });
-    expect(structured(await run.call(run.durable("thread-full", "full-access"), "change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: ["skills/a"] }))).toMatchObject({
-      status: "applied",
-    });
+    const { changeSkills } = await import("../src/harness/ops.ts");
+    expect((await changeSkills(run.deps.ops, "/install", { source: "o/r", commit, folders: ["skills/a"] }, { actor: { caller: "owner:o" } })).status).toBe(200);
     expect(structured(await run.call(run.durable(), "list_skills", { name: "a" }))!.skillMd).toContain(text);
     const { addMcpServer } = await import("../src/harness/ops.ts");
     await addMcpServer(run.deps.ops, { server: "keyed", url: "https://keyed.example/mcp?key=q-s3cr3t", auth: { kind: "none" } }, { actor: { caller: "owner:o" } });

@@ -9,6 +9,7 @@ import type { HarnessCaller, HarnessDeps } from "../src/harness/panel.ts";
 import { harnessSecrets } from "../src/harness/secrets.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { McpHost } from "../src/mcp/host.ts";
+import { cliThreadState } from "../src/provider/cli/cliAsk.ts";
 import { DURABLE_AGENT, durableModes, forgetDurableModes, noteDurableModes } from "../src/provider/threadCaller.ts";
 import { settingsChanges } from "../src/settings/changes.ts";
 import { changesApiOf, type OwnCaller, settingsCall, type SettingsServerDeps, type ThreadLink } from "../src/settings/server.ts";
@@ -76,12 +77,13 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
     settingsServer: (input) => settingsCall(deps, input),
   });
   /** A new table over the same SQLite: an Environment reset between the ask and the answer. */
-  const changes = () => settingsChanges(sql, () => now);
+  const changes = () => settingsChanges(sql, () => now, (event) => void logs.push(event));
   deps = {
     ops: { store, mcp: host, secrets, oauth, skills, now: () => now },
     oauthStatus: oauth.status,
     link: (thread) => options.links?.[thread] ?? "own",
-    modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : undefined),
+    // As the Environment DO wires it: a Durable thread's modes are the adapter's record, a CLI's its live session's.
+    modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
     changes: changes(),
     panelUrl: () => PANEL,
     status: () => ({ "settings revision": store.load().revision }),

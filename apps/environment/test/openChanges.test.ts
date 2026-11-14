@@ -5,7 +5,7 @@
 // a dropped stream or an expiry is not a strike for an Owner client.
 import { afterEach, describe, expect, it } from "vitest";
 
-import { APPLIED_CAP, CHANGE_TTL_MS, type ChangeCaller, type ChangeRecord, CLOSED_KEPT_MS, newChangeId, settingsChanges } from "../src/settings/changes.ts";
+import { APPLIED_CAP, CHANGE_TTL_MS, type ChangeCaller, type ChangeRecord, CLOSED_KEPT_MS, NETWORK_READ_CAP, newChangeId, settingsChanges } from "../src/settings/changes.ts";
 import {
   type AnswerDeps,
   answerOpenChange,
@@ -15,8 +15,11 @@ import {
   OPEN_ACROSS,
   OPEN_PER_OWNER,
   STRIKE_LOCK_MS,
+  STRIKE_WINDOW_MS,
   waitForChange,
 } from "../src/settings/openChanges.ts";
+import { answerDepsOf, changesApiOf, settingsOwnerCall } from "../src/settings/server.ts";
+import { QUESTION_WAIT_MS } from "../src/mcp/host.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 import { NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 import { skillMd } from "./skillRepo.fixture.ts";
@@ -31,8 +34,9 @@ const world = () => {
   let revision = 4;
   const sql = nodeSqlStorage();
   const applied: Array<{ id: string; by: string; secret?: string }> = [];
+  const logs: Array<Record<string, unknown>> = [];
   const deps = (): AnswerDeps => ({
-    changes: settingsChanges(sql, () => now),
+    changes: settingsChanges(sql, () => now, (event) => void logs.push(event)),
     now: () => now,
     revisionOf: () => revision,
     apply: async (record, input) => {
@@ -62,7 +66,7 @@ const world = () => {
     deps().changes.insert(record);
     return record;
   };
-  return { sql, deps, open, applied, advance: (ms: number) => (now += ms), now: () => now, revision: () => revision, setRevision: (value: number) => (revision = value) };
+  return { sql, deps, open, applied, logs, advance: (ms: number) => (now += ms), now: () => now, revision: () => revision, setRevision: (value: number) => (revision = value) };
 };
 
 describe("an Open change has one answer", () => {
@@ -94,6 +98,10 @@ describe("an Open change has one answer", () => {
 });
 
 describe("expiry and pruning", () => {
+  it("an Open change waits as long as the MCP host's question wait", () => {
+    expect(CHANGE_TTL_MS).toBe(QUESTION_WAIT_MS);
+  });
+
   it("expires at 10 minutes, and an answer after it applies nothing", async () => {
     const w = world();
     const record = w.open(OWN);
@@ -101,6 +109,9 @@ describe("expiry and pruning", () => {
     expect(w.deps().changes.get(record.id)?.state).toBe("open");
     w.advance(1);
     expect(w.deps().changes.get(record.id)).toMatchObject({ state: "expired", closed: { at: NOW + CHANGE_TTL_MS } });
+    // An expiry is a log line (plan D15), written once, by the table that closed it.
+    w.deps().changes.get(record.id);
+    expect(w.logs).toEqual([{ t3flare: "settings-refused", via: "mcp", door: "own", tool: "change_environment", change: record.id, tier: "asked", mode: "card", outcome: "expired", answeredBy: null }]);
     expect(await answerOpenChange(w.deps(), record.id, { by: "card", answerer: { kind: "card" }, action: "approve" })).toMatchObject({ ok: false, status: 409 });
     expect(w.applied).toEqual([]);
   });
@@ -108,7 +119,7 @@ describe("expiry and pruning", () => {
   it("prunes a row an hour after it closed, lazily", () => {
     const w = world();
     const record = w.open(OWN);
-    closeOpenChange(w.deps(), record.id, "withdrawn", "agent");
+    closeOpenChange(w.deps(), record.id, "withdrawn", "stop");
     w.advance(CLOSED_KEPT_MS);
     expect(w.deps().changes.get(record.id)?.state).toBe("withdrawn");
     w.advance(1);
@@ -312,7 +323,9 @@ describe("through the Settings server", () => {
     if (item.kind !== "skills") throw new Error("not a skills item");
     const tampered: ChangeRecord = { ...record!, shown: { ...record!.shown!, items: [{ ...item, skills: [{ ...item.skills[0]!, digest: "0".repeat(64) }] }] } };
     expect(run.deps.changes.replace(record!.id, ["open"], tampered)).toBe(true);
+    // The card offers only "Opened it" for an install (its SKILL.md text is on the page alone): the page approves it.
     release!();
+    await changesApiOf(run.deps).answer(record!.id, { answerer: { kind: "owner", subject: "owner-sub" }, action: "approve" });
     const answer = await pending;
     expect(answer).toMatchObject({ kind: "result", isError: true, structured: { status: "refused" } });
     expect(answer.kind === "result" ? answer.text : "").toContain("differ from what the owner was shown");
@@ -320,11 +333,19 @@ describe("through the Settings server", () => {
     expect(run.deps.changes.get(record!.id)?.state).toBe("failed");
   });
 
-  it("a skill install the owner approves keeps it", async () => {
+  it("a skill install is approved on the page alone, its card offering only \"Opened it\", and the page's approval keeps it", async () => {
     fixture = settingsFixture();
     const run = fixture;
     const commit = run.github.push("o/r", { "skills/a/SKILL.md": skillMd("a") });
-    const answer = await run.call(run.durable(), "change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: ["skills/a"] });
+    const pending = run.call(run.durable(), "change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: ["skills/a"] });
+    await until(() => run.cards.length === 1);
+    expect(run.cards[0]!.options?.map((option) => option.label)).toEqual(["Opened it", "Decline", "Cancel"]);
+    expect(run.cards[0]!.prompt).toContain("SKILL.md text and files are shown on the Change page");
+    const [record] = run.deps.changes.open();
+    expect(record?.needsPage).toBe("skills");
+    expect(await answerOpenChange(answerDepsOf(run.deps), record!.id, { by: "card", answerer: { kind: "card" }, action: "approve" })).toMatchObject({ ok: false, status: 403 });
+    await changesApiOf(run.deps).answer(record!.id, { answerer: { kind: "owner", subject: "owner-sub" }, action: "approve" });
+    const answer = await pending;
     expect(answer).toMatchObject({ kind: "result", isError: false, structured: { status: "applied", revision: 1 } });
     expect(run.skills.store.list().map((skill) => skill.name)).toEqual(["a"]);
   });
@@ -340,5 +361,100 @@ describe("through the Settings server", () => {
     expect(run.cards.length).toBe(1);
     const status = await run.call(run.durable(), "get_status");
     expect(status.kind === "result" ? status.structured : undefined).toMatchObject({ openChanges: [{ changeId: record!.id, url: `${"https://t3.example.dev/_t3flare/harness"}/changes/${record!.id}`, tool: "change_environment" }] });
+  });
+});
+
+describe("D16's caps under parallel calls (SPI-1199 review)", () => {
+  let fixture: SettingsFixture | undefined;
+  afterEach(() => fixture?.dispose());
+
+  it("parallel skill installs on one thread open one change; the others are refused naming it", async () => {
+    fixture = settingsFixture({ answer: () => new Promise(() => undefined) });
+    const run = fixture;
+    const commit = run.github.push("o/r", { "skills/a/SKILL.md": skillMd("a"), "skills/b/SKILL.md": skillMd("b"), "skills/c/SKILL.md": skillMd("c") });
+    const caller = run.durable();
+    const calls = ["skills/a", "skills/b", "skills/c"].map((folder) => run.call(caller, "change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: [folder] }));
+    // Two of the three answer at once, refused; the third waits on its card.
+    const refused: Array<unknown> = [];
+    for (const each of calls) void each.then((answer) => refused.push(answer));
+    await until(() => refused.length === 2 && run.cards.length === 1);
+    const open = run.deps.changes.open();
+    expect(open).toHaveLength(1);
+    for (const each of refused) expect(each).toMatchObject({ kind: "result", structured: { status: "refused", reason: "open-thread", changeId: open[0]!.id } });
+  });
+
+  it("parallel asked calls of one Owner sub open at most two", async () => {
+    fixture = settingsFixture();
+    const run = fixture;
+    const commit = run.github.push("o/r", { "skills/a/SKILL.md": skillMd("a"), "skills/b/SKILL.md": skillMd("b"), "skills/c/SKILL.md": skillMd("c"), "skills/d/SKILL.md": skillMd("d") });
+    const answers = await Promise.all(
+      ["skills/a", "skills/b", "skills/c", "skills/d"].map((folder) =>
+        settingsOwnerCall(run.deps, { tool: "change_skills", args: { expectedRevision: 0, op: "install", source: "o/r", commit, folders: [folder] }, caller: { door: "owner", kind: "owner", key: "sub-1" }, mode: "browser" }),
+      ),
+    );
+    expect(answers.filter((each) => each.kind === "open")).toHaveLength(OPEN_PER_OWNER);
+    expect(run.deps.changes.open()).toHaveLength(OPEN_PER_OWNER);
+    for (const each of answers.filter((answer) => answer.kind === "result")) expect(each).toMatchObject({ answer: { structured: { status: "refused", reason: "open-owner" } } });
+  });
+});
+
+describe("SPI-1199 review: the strike lock, the declined-repeat hash, a skill preview's GitHub read", () => {
+  let fixture: SettingsFixture | undefined;
+  afterEach(() => fixture?.dispose());
+
+  it("the strike lock runs an hour from the third strike, not the first", async () => {
+    const w = world();
+    const decline = async (hash: string) => {
+      const record = w.open(OWN, { hash });
+      await answerOpenChange(w.deps(), record.id, { by: "card", answerer: { kind: "card" }, action: "decline" });
+    };
+    await decline("s-1");
+    w.advance(50 * 60_000);
+    await decline("s-2");
+    w.advance(5 * 60_000);
+    await decline("s-3");
+    const third = w.now();
+    // An hour after the first strike, the lock still holds: it runs from the third.
+    w.advance(15 * 60_000);
+    expect(capRefusal(w.deps().changes, OWN, "hash-9", w.now())).toMatchObject({ reason: "strikes" });
+    w.advance(third + STRIKE_LOCK_MS - 1 - w.now());
+    expect(capRefusal(w.deps().changes, OWN, "hash-9", w.now())).toMatchObject({ reason: "strikes" });
+    w.advance(1);
+    expect(capRefusal(w.deps().changes, OWN, "hash-9", w.now())).toBeUndefined();
+  });
+
+  it("three strikes spread over more than the run's window lock nothing", async () => {
+    const w = world();
+    for (const hash of ["s-1", "s-2", "s-3"]) {
+      const record = w.open(OWN, { hash });
+      await answerOpenChange(w.deps(), record.id, { by: "card", answerer: { kind: "card" }, action: "decline" });
+      w.advance(STRIKE_WINDOW_MS / 2 + 60_000);
+    }
+    expect(capRefusal(w.deps().changes, OWN, "hash-9", w.now())).toBeUndefined();
+  });
+
+  it("a declined change asked again with junk keys added is still the same change", async () => {
+    fixture = settingsFixture({ answer: { decision: "decline" } });
+    const run = fixture;
+    expect(await run.call(run.durable(), "change_environment", { expectedRevision: 0, settings: { containerBudget: 4 } })).toMatchObject({ structured: { status: "declined" } });
+    const again = await run.call(run.durable(), "change_environment", { expectedRevision: 0, settings: { containerBudget: 4 }, junk: 1, also: "x" });
+    expect(again).toMatchObject({ structured: { status: "refused", reason: "declined-repeat" } });
+    const mcp = await run.call(run.durable("thread-2"), "change_mcp", { expectedRevision: 0, change: { op: "add", server: "x", url: "https://x.example/mcp", auth: { kind: "none" } } });
+    expect(mcp).toMatchObject({ structured: { status: "declined" } });
+    const junked = await run.call(run.durable("thread-2"), "change_mcp", { expectedRevision: 0, change: { op: "add", server: "x", url: "https://x.example/mcp", auth: { kind: "none", extra: true }, note: "please" } });
+    expect(junked).toMatchObject({ structured: { status: "refused", reason: "declined-repeat" } });
+  });
+
+  it("an install's preview counts toward the GitHub read cap, and past it is refused before reaching GitHub", async () => {
+    fixture = settingsFixture({ answer: { decision: "decline" } });
+    const run = fixture;
+    const commit = run.github.push("o/r", { "skills/a/SKILL.md": skillMd("a") });
+    await run.call(run.durable(), "change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: ["skills/missing"] });
+    expect(run.deps.changes.readsSince("thread-d", "network", 0)).toBe(1);
+    for (let index = 1; index < NETWORK_READ_CAP; index++) run.deps.changes.noteRead("thread-d", "network", run.now());
+    const refused = await run.call(run.durable(), "change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: ["skills/a"] });
+    expect(refused).toMatchObject({ structured: { status: "refused" } });
+    expect(JSON.stringify(refused)).toContain(`${NETWORK_READ_CAP} reads that reach GitHub`);
+    expect(run.deps.changes.open()).toEqual([]);
   });
 });

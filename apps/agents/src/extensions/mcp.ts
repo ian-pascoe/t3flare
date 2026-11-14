@@ -50,7 +50,17 @@ export interface McpHostOfSession {
   readonly mode: () => RuntimeMode;
   readonly interaction: () => InteractionMode;
   readonly turn: () => string | null;
-  readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly judged: ToolClass; readonly asker?: McpAsker }) => Promise<McpCallAnswer>;
+  readonly call: (input: {
+    readonly server: string;
+    readonly tool: string;
+    readonly args: Readonly<Record<string, unknown>>;
+    readonly judged: ToolClass;
+    readonly asker?: McpAsker;
+    /** The tool call's id, by which `stop` names it (the Settings server's calls, ADR-0034 plan D9). */
+    readonly callId?: string;
+  }) => Promise<McpCallAnswer>;
+  /** The call `callId` was stopped (Stop): the Environment withdraws the Settings server's Open change it holds (plan D9). */
+  readonly stop?: (callId: string) => void;
   /** The cards for the server's questions during this call (SPI-1079); closed when the call is stopped. */
   readonly asker?: (callId: string, signal: AbortSignal | undefined) => McpAsker;
 }
@@ -96,7 +106,17 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
       if (tool.class === "write") await api.memo(STARTED_MEMO, true, context);
       // A server's question during the call is shown to the owner as a card; only the owner's answer goes back (SPI-1079).
       const asker = host.asker?.(api.callId, context.abortSignal);
-      const answer = await host.call({ server: server.name, tool: tool.upstream, args, judged: tool.class, ...(asker === undefined ? {} : { asker }) });
+      // The Settings server holds its call for the owner's answer (plan D9): a Stop reaches it by the call's id, since
+      // the call is an RPC that carries no cancellation, and withdraws its Open change.
+      const stoppable = server.kind === "settings" && host.stop !== undefined;
+      const onStop = () => host.stop?.(api.callId);
+      if (stoppable) context.abortSignal?.addEventListener("abort", onStop, { once: true });
+      let answer: McpCallAnswer;
+      try {
+        answer = await host.call({ server: server.name, tool: tool.upstream, args, judged: tool.class, ...(asker === undefined ? {} : { asker }), ...(stoppable ? { callId: api.callId } : {}) });
+      } finally {
+        if (stoppable) context.abortSignal?.removeEventListener("abort", onStop);
+      }
       if (answer.kind === "unavailable") return result(answer.message, true, details);
       return result(answer.text, answer.isError, details);
     },

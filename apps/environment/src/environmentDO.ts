@@ -360,10 +360,15 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     }
   }
 
-  /** RPC from a Workspace DO: the relay's CLI went away (ADR-0028); the card its call raised is withdrawn. */
+  /**
+   * RPC from a Workspace DO (the relay's CLI went away, ADR-0028) or a Session (its call was stopped, plan D9): the card
+   * the call raised is withdrawn, and a Settings server call held under the id withdraws its Open change.
+   */
   async cancelAsk(input: { readonly askId: string }): Promise<void> {
-    const { cancelCliAsk } = await import("./provider/cli/cliAsk.ts");
+    const [{ cancelCliAsk }, { stopCall }] = await Promise.all([import("./provider/cli/cliAsk.ts"), import("./mcp/callStops.ts")]);
     cancelCliAsk(input.askId);
+    // A Settings server call held under this id (a CLI's relayed call, or a Session's call stopped): plan D9.
+    stopCall(input.askId);
   }
 
   /**
@@ -491,7 +496,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       link: (thread) => threadLinkOf(thread),
       // A Durable thread's modes are the adapter's record; a CLI thread's are its live session's (plan D3).
       modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
-      changes: settingsChanges(this.ctx.storage.sql),
+      changes: settingsChanges(this.ctx.storage.sql, Date.now, (event) => console.log(JSON.stringify(event))),
       panelUrl: () => (this.env.T3FLARE_HOST === undefined && this.#host === undefined ? undefined : `https://${this.#configuredHost()}${HARNESS_PATH}`),
       status: () => harnessStatus({ store, skills }),
       running: () => runningContainers({ budget: () => this.#budgetState() }),
@@ -588,12 +593,15 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     readonly asker?: McpAsker;
     /** The Session's thread (plan D3); absent from a Session before SPI-1198, judged as unknown work. */
     readonly thread?: string;
+    /** The id the Session's Stop names in `cancelAsk` (plan D9): a Settings server call is stopped by it. */
+    readonly stopId?: string;
   }): Promise<McpCallAnswer> {
     Idle.requestStarted();
     try {
-      const { thread, ...call } = input;
-      // Only Sessions call this, so the agent is a Durable one; everything else about it is derived from the thread.
-      return await this.mcpHost.call({ ...call, caller: { door: "own", thread: typeof thread === "string" && thread !== "" ? thread : undefined, agent: DURABLE_AGENT } });
+      const { sessionMcpCall } = await import("./mcp/callStops.ts");
+      // Only Sessions call this, so the agent is a Durable one; everything else about it is derived from the thread. The
+      // Settings server's call alone is stopped by the Session's Stop (plan D9); other servers' calls run as before.
+      return await sessionMcpCall(this.mcpHost, input, DURABLE_AGENT);
     } finally {
       Idle.requestEnded();
     }
@@ -609,11 +617,15 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer> {
     Idle.requestStarted();
     try {
-      const [{ relayMessage }, { approveCliTool, cliQuestionAsker, cliThreadState }] = await Promise.all([import("./mcp/relay.ts"), import("./provider/cli/cliAsk.ts")]);
+      const [{ relayMessage }, { approveCliTool, cliQuestionAsker, cliThreadState }, { stoppableCall }] = await Promise.all([
+        import("./mcp/relay.ts"),
+        import("./provider/cli/cliAsk.ts"),
+        import("./mcp/callStops.ts"),
+      ]);
       const accepted = this.#relayAccepted;
       return await relayMessage(input, {
         view: () => this.mcpHost.view(),
-        call: (call) => this.mcpHost.call(call),
+        call: stoppableCall(this.mcpHost),
         readAppResource: (read) => this.mcpHost.readAppResource(read),
         state: cliThreadState,
         ask: approveCliTool,

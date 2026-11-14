@@ -10,7 +10,21 @@
 // - closing without an answer (`closeOpenChange`: withdrawn, expired);
 // - the in-memory waiters a held call waits on. With no waiter (after an Environment restart the call is gone), the
 //   record still stands until it expires, and the Change page can still apply it.
-import { APPLIED_CAP, APPLIED_WINDOW_MS, type ChangeCaller, type ChangeRecord, type ChangeState, type ClosedBy, isOpen, type SettingsChanges } from "./changes.ts";
+import {
+  type AnsweredBy,
+  APPLIED_CAP,
+  APPLIED_WINDOW_MS,
+  type ChangeCaller,
+  type ChangeRecord,
+  type ChangeState,
+  CLOSED_KEPT_MS,
+  type ClosedBy,
+  durationText,
+  isOpen,
+  type SettingsChanges,
+  STRIKE_LOCK_MS,
+  STRIKE_WINDOW_MS,
+} from "./changes.ts";
 
 /** Open changes per own-agent thread (plan D16): a second asked call is refused, not queued. */
 export const OPEN_PER_THREAD = 1;
@@ -20,9 +34,12 @@ export const OPEN_PER_OWNER = 2;
 export const OPEN_ACROSS = 16;
 /** The same change (by hash) after a decline, per caller, is refused this long. */
 export const DECLINED_REPEAT_MS = 10 * 60_000;
-/** This many in a row declined (or, for own agents, unanswered) refuse the caller's asked changes for an hour. */
+/**
+ * This many in a row declined (or, for own agents, unanswered), within `STRIKE_WINDOW_MS` of each other, refuse the
+ * caller's asked changes for `STRIKE_LOCK_MS` from the last of them.
+ */
 export const STRIKES = 3;
-export const STRIKE_LOCK_MS = 60 * 60_000;
+export { STRIKE_LOCK_MS, STRIKE_WINDOW_MS } from "./changes.ts";
 
 /** A closed change's outcome, as a held call and an answerer read it. Never an authorization URL. */
 export interface ChangeOutcome {
@@ -60,18 +77,21 @@ export const capRefusal = (changes: SettingsChanges, caller: ChangeCaller, hash:
   if (changes.open().length >= OPEN_ACROSS) {
     return { reason: "open-across", text: `Not changed: ${OPEN_ACROSS} changes already wait for the owner across this Environment, the most t3flare keeps. He sees them on the Harness panel's Open changes list${openList === undefined ? "" : `: ${openList}`}.` };
   }
-  const recent = changes.closedBy(caller.key, now - STRIKE_LOCK_MS);
+  const recent = changes.closedBy(caller.key, now - STRIKE_WINDOW_MS - STRIKE_LOCK_MS);
   if (recent.some((record) => record.hash === hash && record.state === "declined" && record.closed!.at > now - DECLINED_REPEAT_MS)) {
-    return { reason: "declined-repeat", text: "Not changed: the owner declined this same change less than 10 minutes ago. Do not ask again; ask him in the thread what he wants instead." };
+    return { reason: "declined-repeat", text: `Not changed: the owner declined this same change less than ${durationText(DECLINED_REPEAT_MS)} ago. Do not ask again; ask him in the thread what he wants instead.` };
   }
   // A strike is a decline; for own agents an expiry too (unanswered), never for an Owner client (a dropped stream or an
   // expiry is not one). A withdrawn or moved change neither strikes nor breaks the run; an applied one breaks it.
   const strike = (record: ChangeRecord) => record.state === "declined" || (caller.door === "own" && record.state === "expired");
-  const counted = recent.filter((record) => record.state === "applied" || strike(record));
-  if (counted.length >= STRIKES && counted.slice(0, STRIKES).every(strike)) {
+  // The lock runs from the last strike of the run (plan D16: refused for an hour after the third).
+  const run = recent.filter((record) => record.state === "applied" || strike(record)).slice(0, STRIKES);
+  const last = run[0]?.closed?.at ?? 0;
+  const first = run.at(-1)?.closed?.at ?? 0;
+  if (run.length === STRIKES && run.every(strike) && last - first <= STRIKE_WINDOW_MS && now < last + STRIKE_LOCK_MS) {
     return {
       reason: "strikes",
-      text: `Not changed: your last ${STRIKES} asked changes were ${caller.door === "own" ? "declined or unanswered" : "declined"}, so t3flare refuses your asked changes for an hour. Ask the owner in the thread what he wants.`,
+      text: `Not changed: your last ${STRIKES} asked changes were ${caller.door === "own" ? "declined or unanswered" : "declined"}, so t3flare refuses your asked changes until ${new Date(last + STRIKE_LOCK_MS).toISOString()} (${durationText(STRIKE_LOCK_MS)} after the last). Ask the owner in the thread what he wants.`,
     };
   }
   if (changes.appliedSince(caller.key, now - APPLIED_WINDOW_MS) >= APPLIED_CAP) {
@@ -119,7 +139,7 @@ export const outcomeOf = (record: ChangeRecord): ChangeOutcome => ({
 export type Answerer = { readonly kind: "card" } | { readonly kind: "owner"; readonly subject: string } | { readonly kind: "service-token" };
 
 export interface AnswerInput {
-  readonly by: ClosedBy;
+  readonly by: AnsweredBy;
   readonly answerer: Answerer;
   readonly action: "approve" | "decline";
   /** A header value typed on the Change page (plan D10): straight to the secret store, never kept or logged. */
@@ -135,7 +155,7 @@ export interface AnswerDeps {
   /** The entity's current revision. */
   readonly revisionOf: (entity: ChangeRecord["entity"]) => number;
   /** Applies the change through the ops with its expected revision. */
-  readonly apply: (record: ChangeRecord, input: { readonly by: ClosedBy; readonly secret?: string }) => Promise<ApplyResult>;
+  readonly apply: (record: ChangeRecord, input: { readonly by: AnsweredBy; readonly secret?: string }) => Promise<ApplyResult>;
   readonly log?: (event: Record<string, unknown>) => void;
 }
 
@@ -195,7 +215,7 @@ const closeAs = (deps: AnswerDeps, record: ChangeRecord, from: ReadonlyArray<Cha
  */
 export const answerOpenChange = async (deps: AnswerDeps, id: string, answer: AnswerInput): Promise<AnswerResult> => {
   const record = deps.changes.get(id);
-  if (record === undefined || record.tier !== "asked") return { ok: false, status: 404, error: "no such change (it may have closed over an hour ago)" };
+  if (record === undefined || record.tier !== "asked") return { ok: false, status: 404, error: `no such change (it may have closed over ${durationText(CLOSED_KEPT_MS)} ago)` };
   if (!isOpen(record)) return { ok: false, status: 409, error: `this change is already ${record.state}`, closed: outcomeOf(record) };
   if (record.state === "applying") return { ok: false, status: 409, error: "this change is being applied" };
   const problem = answererProblem(record, answer);
@@ -252,6 +272,8 @@ export const openChangeSummary = (record: ChangeRecord, url: string | undefined)
   state: record.state,
   mode: record.mode ?? null,
   ...(record.needsPage === undefined ? {} : { needsPage: record.needsPage }),
+  door: record.caller.door,
+  principal: record.caller.principal,
   ...(record.caller.thread === undefined ? {} : { thread: record.caller.thread }),
   ...(record.caller.agent === undefined ? {} : { agent: record.caller.agent }),
   ...(record.caller.client === undefined ? {} : { client: record.caller.client }),

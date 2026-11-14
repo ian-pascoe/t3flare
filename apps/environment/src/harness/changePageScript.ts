@@ -3,6 +3,8 @@
 // with the CSRF token from the meta tag, and shows the answer with `textContent`, never as HTML. A sign-in's approval
 // answers its authorization URL, and the script sends the browser there (https only), as the panel's own sign-in does.
 // No script computes a diff: the page is rendered by the server.
+import { CHANGES_API_PATH } from "./paths.ts";
+
 export const CHANGE_SCRIPT = `"use strict";
 const csrf = document.querySelector('meta[name="t3flare-csrf"]').getAttribute("content");
 const form = document.querySelector("form[data-change]");
@@ -31,7 +33,7 @@ if (form !== null) {
       for (const each of buttons) each.disabled = true;
       let response;
       try {
-        response = await fetch("/_t3flare/harness/api/changes/" + encodeURIComponent(form.dataset.change), {
+        response = await fetch(${JSON.stringify(`${CHANGES_API_PATH}/`)} + encodeURIComponent(form.dataset.change), {
           method: "POST",
           headers: { "content-type": "application/json", "x-t3flare-csrf": csrf },
           body: JSON.stringify(body),

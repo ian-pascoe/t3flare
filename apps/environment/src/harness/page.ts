@@ -23,15 +23,19 @@ import {
 } from "@t3flare/harness-registry";
 
 import { type ContainerCostTable, containerCostTable } from "./containerCost.ts";
+import { CHANGE_TTL_MS, durationText, type NeedsPage } from "../settings/changes.ts";
+import { type AskedBy, askedByText } from "../settings/render.ts";
 import type { AuditEntry } from "./store.ts";
 
 import { ICON_SPRITE, icon, type IconName } from "./pageIcons.ts";
+import { changePagePath } from "./paths.ts";
 import { SCRIPT } from "./pageScript.ts";
 import { endpointsSection, type EndpointsView } from "./pageEndpoints.ts";
 import { STYLE } from "./pageStyle.ts";
 
 /** `text` with every control and format character shown (a bidi override is inert), then escaped. */
-const visibleHtml = (text: string): string => escapeHtml(visible(text));
+/** `text` safe in HTML, with every control and format character shown as `\u{…}` (a hostile value is inert). */
+export const visibleHtml = (text: string): string => escapeHtml(visible(text));
 
 /** `text` safe in HTML text and in a double-quoted attribute. */
 export const escapeHtml = (text: string): string =>
@@ -504,10 +508,12 @@ export interface OpenChangeRow {
   readonly subject: string;
   readonly tool: string;
   readonly reasons: ReadonlyArray<string>;
+  readonly door: AskedBy["door"];
+  readonly principal?: AskedBy["principal"];
   readonly thread?: string;
   readonly agent?: string;
   readonly client?: { readonly name: string; readonly source: string };
-  readonly needsPage?: string;
+  readonly needsPage?: NeedsPage;
   readonly createdAt: string;
   readonly expiresAt: string;
 }
@@ -515,13 +521,11 @@ export interface OpenChangeRow {
 const openChangesSection = (rows: ReadonlyArray<OpenChangeRow>): string => {
   const body =
     rows.length === 0
-      ? `<div class="empty"><h3>No open changes</h3><p>A change an agent asks for that widens what agents have waits here, and on its card, for 10 minutes.</p></div>`
+      ? `<div class="empty"><h3>No open changes</h3><p>A change an agent asks for that widens what agents have waits here, and on its card, for ${durationText(CHANGE_TTL_MS)}.</p></div>`
       : `<div class="table-wrap"><table class="stacked"><thead><tr><th scope="col">Asked</th><th scope="col">Change</th><th scope="col">By</th><th scope="col">Expires</th><th scope="col"><span class="sr">Open</span></th></tr></thead><tbody>${rows
           .map(
             (row) =>
-              `<tr><td data-label="Asked"><div>${time(Date.parse(row.createdAt))}</div></td><td data-label="Change"><div><code>${visibleHtml(row.tool)}</code>: ${visibleHtml(row.reasons.join("; "))}</div></td><td data-label="By"><div>${
-                row.thread === undefined ? (row.client === undefined ? "an Owner client" : `${visibleHtml(row.client.name)} (unverified)`) : `${visibleHtml(row.agent ?? "agent")} on <code>${visibleHtml(row.thread)}</code>`
-              }</div></td><td data-label="Expires"><div>${time(Date.parse(row.expiresAt))}</div></td><td data-label="Open"><div><a class="btn btn-sm" href="/_t3flare/harness/changes/${encodeURIComponent(row.changeId)}">Open</a></div></td></tr>`,
+              `<tr><td data-label="Asked"><div>${time(Date.parse(row.createdAt))}</div></td><td data-label="Change"><div><code>${visibleHtml(row.tool)}</code>: ${visibleHtml(row.reasons.join("; "))}</div></td><td data-label="By"><div>${visibleHtml(askedByText(row))}</div></td><td data-label="Expires"><div>${time(Date.parse(row.expiresAt))}</div></td><td data-label="Open"><div><a class="btn btn-sm" href="${changePagePath(row.changeId)}">Open</a></div></td></tr>`,
           )
           .join("")}</tbody></table></div>`;
   return `<section id="changes" aria-labelledby="changes-title">

@@ -3,6 +3,7 @@
 // writes; a write cut off by a restart after it was sent is never sent again. Linked threads follow their own mode
 // (owner, 2026-11-12, back to stock).
 // @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
+import { withAbortSignal } from "@earendil-works/chord/context";
 import { CodemodeSandbox } from "@earendil-works/pi-codemode";
 import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
@@ -12,7 +13,7 @@ import { codemodeExtension } from "../src/extensions/codemode.ts";
 import { mcpExtension, mcpNamespaces, type McpView } from "../src/extensions/mcp.ts";
 import { ApprovalStore } from "../src/extensions/permissions.ts";
 
-import { memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
+import { context, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
 const sandboxes: Array<CodemodeSandbox> = [];
 afterAll(async () => {
@@ -161,5 +162,42 @@ describe("mcp extension", () => {
     const run = await setup("approval-required", [call("codemode", { code }, "cm"), fauxAssistantMessage("done")]);
     await until(() => run.sent.length === 1, "the call");
     expect(run.store.pending()).toEqual([]);
+  });
+
+  // SPI-1199 review (plan D9): the Settings server holds its call for the owner; a Stop reaches it by the call's id
+  // (`host.stop`, the Session's `cancelAsk`), since the call is an RPC that carries no cancellation.
+  it("a Stop of a Settings server call names the call to the Environment; another server's call is not named", async () => {
+    const stopped: Array<string> = [];
+    const calls: Array<{ server: string; callId?: string }> = [];
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const extension = mcpExtension(VIEW, {
+      store: new ApprovalStore(memoryKv(), () => {}),
+      mode: () => "full-access",
+      interaction: () => "default",
+      turn: () => "turn-1",
+      call: async (input) => {
+        calls.push({ server: input.server, ...(input.callId === undefined ? {} : { callId: input.callId }) });
+        await held;
+        return { kind: "result", isError: false, text: "ok" };
+      },
+      stop: (callId) => void stopped.push(callId),
+    });
+    const tools = (extension as unknown as { tools: ReadonlyArray<{ name: string; execute: (args: object, api: object, context: unknown) => Promise<unknown> }> }).tools;
+    const api = (callId: string) => ({ callId, memo: async () => undefined });
+    const run = async (name: string, callId: string) => {
+      const stop = new AbortController();
+      const before = calls.length;
+      const pending = tools.find((tool) => tool.name === name)!.execute({}, api(callId), withAbortSignal(stop.signal, context));
+      await until(() => calls.length > before, "the call");
+      stop.abort();
+      return { pending };
+    };
+    const settings = await run("mcp__settings__change_environment", "c-settings");
+    const other = await run("mcp__commissary__fixture_note", "c-other");
+    release();
+    await Promise.all([settings.pending, other.pending]);
+    expect(calls).toEqual([{ server: "settings", callId: "c-settings" }, { server: "commissary" }]);
+    expect(stopped).toEqual(["c-settings"]);
   });
 });
