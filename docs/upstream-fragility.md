@@ -14,8 +14,8 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
    | find the newest nightly tag (`:98`) | t3 changed its tag format: `NIGHTLY` at `bump.ts:80` |
    | regenerate the workspace and install (`:157`) | t3 added a workspace setting ("classify it") or changed its lock's layout: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); a patch no longer applies or matches nothing, or t3's lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
    | lock matches t3's, one effect (`:161`) | a t3 importer installs other versions than in t3's lock, a second `effect`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030), [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
-   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `provider/textGeneration.ts` and `endpointTextGeneration.test.ts` [U68](#u68-text-generation-names-the-endpoint-on-t3s-own-failures-spi-1163) |
-   | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)) |
+   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `provider/textGeneration.ts` and `endpointTextGeneration.test.ts` [U68](#u68-text-generation-names-the-endpoint-on-t3s-own-failures-spi-1163); `provider/cli/codexGuard.ts`, `codexEndpoints.ts`, `codexDriver.ts`, `cliProfiles.test.ts`'s Codex cases [U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167) |
+   | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)) |
    | deploy the bump stage (`:176`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
    | acceptance test (`:180`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
    | stock t3 nightly links and forwards (step 3) | the laptop half of [U7](#u7-client-version-skew-desktop-mobile-laptop) |
@@ -271,7 +271,7 @@ Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's 
 
 ### U29. Our Codex registration, client factory and request guard (step 4a)
 
-- **Where**: `apps/environment/src/provider/cli/codexDriver.ts` calls t3's `makeCodexAdapterV2` (`t3code/apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts`) with our `CodexAppServerClientFactoryShape` (t3's `layerAppServerClientFactory` restated without port discovery, spawning with the thread's cwd) and `CodexClient.layerChildProcess`; `provider/cli/codexGuard.ts` (back to stock, owner 2026-11-12: no allowlists) passes t3's requests but the provider pin, `feedback/*`, `account/*` and the per-turn policy; it once allowlisted app-server methods (the ones t3's adapter sends today) and thread config keys (`CODEX_THREAD_CONFIG` plus `shell_environment_policy.set.T3CODE_THREAD_ID`), and rewrites `turn/start`'s `approvalPolicy`/`approvalsReviewer`/`sandboxPolicy` from its mode table, reading `collaborationMode.mode`. `provider/cli/wrapper.ts` overrides `supportsMultipleProviderThreadsPerSession` (read by `Orchestrator.ts` `providerSessionIdFor` and `ProviderSessionManager.open`), and the fork error shape.
+- **Where**: `apps/environment/src/provider/cli/codexDriver.ts` calls t3's `makeCodexAdapterV2` (`t3code/apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts`) with our `CodexAppServerClientFactoryShape` (t3's `layerAppServerClientFactory` restated without port discovery, spawning with the thread's cwd) and `CodexClient.layerChildProcess`; `provider/cli/codexGuard.ts` (back to stock, owner 2026-11-12: no allowlists) passes t3's requests but the provider pin, `feedback/*`, `account/*` and the per-turn policy; it once allowlisted app-server methods (the ones t3's adapter sends today) and thread config keys (`CODEX_THREAD_CONFIG` plus `shell_environment_policy.set.T3CODE_THREAD_ID`), and rewrites `turn/start`'s `approvalPolicy`/`approvalsReviewer`/`sandboxPolicy` from its mode table, reading `collaborationMode.mode`. `provider/cli/wrapper.ts` overrides `supportsMultipleProviderThreadsPerSession` (read by `Orchestrator.ts` `providerSessionIdFor` and `ProviderSessionManager.open`), and the fork error shape. The guard's Model endpoint routing and the per-session process provider (SPI-1167) are [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167).
 - **Breaks when**: t3 renames these exports or the factory's input; renames a `turn/start` field; starts naming a provider or policy in a thread config key the pin drops (dropped silently); changes its mode table (`codexPolicyForRuntimeMode`, which `turnPolicy` restates); stops reading the session capability for attaching threads.
 - **Detection**: typecheck (exports, factory shape); `acceptance --codex` (a turn with approvals and a resume); `test/codexGuard.test.ts` (the mode table, written out). **Silent**: a new policy field, a changed mode table.
 - **Blast radius**: Codex threads fail to start or turn; a mode runs with t3's own policy; a second project's thread could run in the first one's Container (F1) if the attach logic moved.
@@ -752,6 +752,48 @@ Ranked with U64 to U67: a break leaves titles and commit text working; only an e
   failures.
 - **Blast radius**: an error text that doesn't name the endpoint.
 - **Fix**: diff `textGenerationOperations.ts` between tags and wrap any new operation or failure.
+
+### U69. Codex on Model endpoints through the model relay (SPI-1167)
+
+Ranked after U29, which it extends: a break fails Codex turns on endpoints (loudly, but with t3's generic text), or,
+for the shell exclusion, puts the model handle in an agent's commands. The Model proxy path is untouched.
+
+- **Where**: `apps/environment/src/provider/cli/codexGuard.ts`, `codexDriver.ts`, `codexEndpoints.ts`,
+  `agents/cliProfiles.ts` and `provider/cli/wrapper.ts`, against Codex's app-server protocol
+  (`t3code/packages/effect-codex-app-server`) and t3's `CodexAdapterV2.ts`:
+  - **The guard rewrites thread requests.** On `thread/start`, `thread/resume` and `thread/fork` with a `model` that is an
+    endpoint's slug, it sets `model` to the model's own id and `modelProvider` to `t3flare-endpoint-<id>`; on
+    `turn/start` it sets `model` and `collaborationMode.settings.model` the same way.
+  - **Codex runs a thread's turns only on its process's provider**: `turn/start` fails with "This chat uses <a>, but
+    your current provider is <b>" otherwise, whatever the thread's `modelProvider` or its config's `model_provider`
+    (measured on p1167). So the process's `-c model_provider` is the session's model's (`codexProcessProvider`), and the
+    guard refuses a turn whose model is another provider's.
+  - **The guard reads the thread openers' answers**: `modelProvider` and `thread.id` of the `thread/start`,
+    `thread/resume` and `thread/fork` responses give each thread's provider.
+  - **The session's model**: `wrapper.ts` reads `input.modelSelection.model` in `openSession` (the spawn's provider).
+  - **t3 resumes in the same process on a model change** within the Codex instance (`thread/resume` with the new model,
+    then `turn/start`); it never asks the adapter's `planSelectionTransition`, so no session restart can be planned
+    from the driver.
+  - **A refused turn's reason is only in the log**: t3 shows `ProviderAdapterTurnStartError`'s generic "The provider
+    could not start this turn"; `codexDriver.ts` logs `codex-turn-start-failed` with the cause.
+  - **The handle stays out of Codex's shells**: `shell_environment_policy.exclude` lists `T3FLARE_MODEL_HANDLE` (with the
+    nonce and the Tool handle), and the provider reads it through `env_key`.
+- **Breaks when**: Codex renames `modelProvider` in the thread params or responses, or `thread.id`; starts accepting a
+  per-thread provider (the refusal becomes needless) or rejects a provider set by `-c`; changes `env_key` or
+  `shell_environment_policy.exclude`; t3 starts restarting the session on a model change, or stops passing
+  `modelSelection` to `openSession`, or surfaces the cause's text.
+- **Detection**: typecheck (the response shapes, `ProviderAdapterV2OpenSessionInput.modelSelection`);
+  `test/codexGuard.test.ts`, `test/codexEndpoints.test.ts`, `test/cliProfiles.test.ts` (the rewrite, the routing, the
+  process provider, the exclusion); `scripts/p1167.ts` on a stage (a turn with tools, a resume, the refused switch,
+  the shell's environment). **Silent**: a renamed response field (the thread's provider is then unknown and the
+  refusal skipped; Codex's own error follows); a dropped exclusion in a new Codex (the handle reaches the agent's
+  commands; only the stage script's shell check sees it); t3 starting to restart sessions (the refusal still fires on
+  the first turn).
+- **Blast radius**: Codex threads on endpoints fail to start or turn, with t3's generic message; or the model handle
+  in Codex's shells (any command could spend through the endpoint while the process lives).
+- **Fix**: diff `CodexAdapterV2.ts` (`codexThreadRuntimeParams`, `buildCodexTurnStartParams`, `planSelectionTransition`)
+  and the app-server schema (`ThreadStartParams`, `ThreadStartResponse`, `TurnStartParams`) between tags; update the
+  guard, `codexProcessProvider` and the exclusion; re-run `p1167.ts`.
 
 ## Gaps in detection
 

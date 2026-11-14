@@ -93,16 +93,23 @@ hard cut (SPI-1176); for Model endpoints it is replaced by a **model relay**, wh
    egress host, which reaches the agents Worker's `WorkspaceProxy` (`apps/agents/src/workspace/modelRelay.ts`). The path
    below the endpoint's id is appended to the endpoint's base URL; the body and the answer are streamed through
    unchanged, in the Worker entrypoint (no Durable Object holds the stream). No protocol translation: a CLI uses only
-   endpoints whose API it speaks. No redirect is followed, and nothing leaves the endpoint's base URL.
-2. **The model handle.** The Workspace DO makes one per CLI process whose profile asks (`modelRelay`), 256 random bits,
+   endpoints whose API it speaks. No redirect is followed. A path holding an encoded dot segment, `/` or `\` (in any
+   encoding a decoding upstream might undo) is refused, so nothing leaves the endpoint's base URL.
+   **Headers are allowlisted** (`forwardedHeadersOf` in `@t3flare/models/relay`, beside the API's key header): the
+   body's type and length, `accept`, and the API's own version headers (`openai-beta`; `anthropic-version`,
+   `anthropic-beta`). Every other header the Container sends is dropped, so no header can route the key at a
+   header-routed gateway (ADR-0034 §4: the key goes only to its target, headers included). The dropped names are logged.
+2. **The model handle.** The Workspace DO makes one per CLI process whose profile names its endpoints (`modelRelay`),
+   256 random bits, good only for those endpoints (403 for any other),
    kept in memory beside the process and put only in that process's environment (`T3FLARE_MODEL_HANDLE`); never in
    argv, a file, the Environment DO or a log. It is refused once its process exits, in any other Workspace, and as a
-   Tool handle (and a Tool handle is refused as it). The CLI sends it as its key (a bearer, or `x-api-key`); the relay
-   takes it out of the request with every credential header and cookie.
+   Tool handle (and a Tool handle is refused as it); handles are compared in constant time. The CLI sends it as its
+   key, in any API's key header; the relay never forwards it.
 3. **The swap.** For a live handle, the Workspace DO asks the Environment DO (`modelRelayTarget`), which answers from the
    endpoint store's `resolve`: the endpoint's base URL and headers with its key in the header its API takes. The key is
    sent only there. The Workspace DO remembers the key's hash for the sync guard, which now looks for the endpoint
-   keys the relay used, and the leak check looks for every endpoint's key.
+   keys the relay used, and the leak check looks for every endpoint's key. A key shorter than 20 characters is looked
+   for only in the DO's files: its unsalted hash, in the scanner's argv, could be reversed by search.
 4. **The log.** Every relayed request is logged by the agents Worker with its endpoint, status, method, time and the
    handle's id (its process's key), never a handle, a key or a body.
 5. **Codex** gets one model provider per OpenAI Responses endpoint, `t3flare-endpoint-<endpointId>` (the id never
@@ -118,4 +125,5 @@ hard cut (SPI-1176); for Model endpoints it is replaced by a **model relay**, wh
 (`/proc/<pid>/environ`, the agent runs as root) can spend through the handle while its process lives. It cannot take
 the key out of the Container, and it ends with the process. The long-stream risk that sank option B in step 4a is
 measured: a stream of over 10 minutes with idle gaps up to 3 minutes completes through the relay
-(`docs/steps/spi-1167/p1167.json`).
+(`docs/steps/spi-1167/p1167.json`). The handle cannot move the key: the relay chooses the target, and the
+Container's headers do not reach it.

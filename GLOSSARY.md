@@ -299,7 +299,7 @@ One of the owner's own ways to reach models: where to send requests, with an API
 _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 
 **Model relay**:
-The `computer.internal/t3flare/model/<endpointId>` routes through which CLI agents reach Model endpoints with a Handle: the Workers swap it for the endpoint's own credential and stream the request to the endpoint unchanged.
+How a CLI agent reaches a Model endpoint without holding its credential: the agent presents a Handle, and the endpoint's own credential is used in its place.
 _Avoid_: model proxy (that is the Model proxy), gateway, intercept
 
 **Subscription**:
@@ -315,7 +315,7 @@ The GitHub installation token t3's own PR features use, answered to `gh auth tok
 _Avoid_: gh token, PAT
 
 **Handle**:
-An opaque per-process stand-in for a Model endpoint's credential (the model handle), made by the Workspace DO for one CLI agent process and redeemed only by the Model relay, outside the Container; useless in another Workspace and after its process.
+An opaque stand-in for a Model endpoint's credential (the model handle), given to one CLI agent process and good only at the Model relay, for that process's endpoints, while the process lives.
 _Avoid_: placeholder, fake token, Tool handle (that one is for the MCP relay)
 
 **Safe mode**:

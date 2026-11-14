@@ -26,6 +26,7 @@ import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { randomBytes } from "node:crypto";
 
 import { admin, base, pair, sleep, wsCall } from "./lib/client.ts";
 import { cliTurn, enable, ensureProject } from "./lib/cliTurn.ts";
@@ -52,7 +53,9 @@ const openaiKey = (() => {
   return result.status === 0 && result.stdout !== "" ? result.stdout : undefined;
 })();
 
-const secrets = [proxyKey, probeKey, openaiKey].filter((value): value is string => value !== undefined && value.length >= 8);
+/** The positive control's key (4b): a test endpoint's, planted in the Container for the leak scan to find. */
+const canaryKey = `sk-canary-${randomBytes(24).toString("hex")}`;
+const secrets = [proxyKey, probeKey, openaiKey, canaryKey].filter((value): value is string => value !== undefined && value.length >= 8);
 const handles: Array<string> = [];
 const failures: Array<string> = [];
 const report: Record<string, unknown> = { at: new Date().toISOString(), stage, openai: openaiKey === undefined ? "Commissary's OpenAI Responses API (<MODEL_PROXY_URL>/v1)" : "OpenAI's API" };
@@ -137,6 +140,16 @@ const codexModels = ((codexConfig?.providers ?? []) as Array<any>).find((provide
 const listed = codexModels.filter((model: any) => String(model.slug).includes("/")).map((model: any) => ({ slug: model.slug, group: model.subProvider }));
 report.codexModels = { endpointModels: listed, total: codexModels.length };
 check("Codex lists the Responses endpoints' models by slug", listed.some((row: any) => row.slug === `openai/${MODEL}`) && listed.some((row: any) => row.slug === "slow/drip"), listed);
+// A changed model list reaches Codex's at once, through its endpoints listener (read without asking for a refresh).
+const added = (await api("POST", "endpoints", { op: "save", endpoint: { ...SLOW, models: ["drip", "drip-2"] } })).status;
+let followed = false;
+for (let i = 0; i < 10 && !followed; i++) {
+  await sleep(1000);
+  const config = (await wsCall(cookie, "server.getConfig", {})) as any;
+  followed = (((config?.providers ?? []) as Array<any>).find((provider) => provider.driver === "codex")?.models ?? []).some((model: any) => model.slug === "slow/drip-2");
+}
+report.codexModelsFollow = { saved: added, listed: followed };
+check("an added endpoint model reaches Codex's list at once (no refresh asked)", added === 200 && followed, report.codexModelsFollow);
 
 const run = Date.now().toString(36);
 const A = `relay-codex-${run}`;
@@ -152,7 +165,10 @@ const first = await cliTurn(cookie, {
 report.turn = clean(first);
 check("a Codex turn with tools ran on the endpoint through the relay", first.runs.at(-1)?.status === "completed" && first.items.some((item: any) => item.type === "file_change" && String(item.fileName).endsWith("src/greeting.txt")) && first.items.some((item: any) => item.type === "command_execution" && String(item.input).includes("test.sh") && item.exitCode === 0), first.items);
 
-// 3. Handles in the Container (the turn's process lives on, holding the Container).
+// 3. Handles in the Container (the turn's process lives on, holding the Container). The `canary` endpoint is saved after
+// the process started: its handle is not for it.
+const CANARY = { id: "canary", label: "Canary", api: "openai-responses", baseUrl: `${PROBE}/relay/v1`, auth: "api-key", headers: {}, models: ["drip"] };
+check("the canary endpoint saved", (await api("POST", "endpoints", { op: "save", endpoint: CANARY, apiKey: canaryKey })).status === 200);
 const handleRun = await exec(
   A,
   [
@@ -164,6 +180,10 @@ const handleRun = await exec(
     `echo "tool=$(${code("$T")})"`,
     `echo "none=$(${code("")})"`,
     `echo "gone=$(${code("$H", "no-such-endpoint/models")})"`,
+    `echo "unconfigured=$(${code("$H", "canary/models")})"`,
+    `echo "encoded=$(${code("$H", "slow/%252e%252e/models")})"`,
+    // Headers a header-routed gateway would route by: the relay forwards none of them.
+    `echo "routing=$(curl -s -o /dev/null -w '%{http_code}' -H "authorization: Bearer $H" -H 'x-portkey-custom-host: https://evil.example' -H 'x-forwarded-host: evil.example' -H 'x-evidence-dropped: evil.example' http://computer.internal/t3flare/model/slow/models)"`,
   ].join("\n"),
 );
 const lines = Object.fromEntries(String(handleRun.stdout ?? "").trim().split("\n").map((line: string) => line.split("=", 2) as [string, string]));
@@ -173,7 +193,11 @@ delete lines.handle;
 report.handles = { found: handle !== undefined, statuses: lines };
 check("the process's model handle reaches the relay (200)", handle !== undefined && lines.valid === "200", report.handles);
 check("a forged handle, the tool handle and no handle are refused (401)", lines.forged === "401" && lines.tool === "401" && lines.none === "401", lines);
-check("an endpoint that does not exist answers 404", lines.gone === "404", lines);
+// The handle's scope comes first: an endpoint that does not exist is refused as any endpoint the process is not for.
+check("an endpoint that does not exist is refused (403, the handle is not for it)", lines.gone === "403", lines);
+check("an endpoint the process is not configured for is refused (403)", lines.unconfigured === "403", lines);
+check("an encoded dot segment is refused (400)", lines.encoded === "400", lines);
+check("a request with routing headers still reaches the endpoint (they are dropped, below)", lines.routing === "200", lines);
 await ensureProject(cookie, B);
 const foreign = handle === undefined ? {} : await exec(B, `echo "foreign=$(${code(handle)})"`);
 report.foreign = { output: String(foreign.stdout ?? "").trim() };
@@ -183,6 +207,21 @@ check("another Workspace's handle is refused in this Container (401)", String(fo
 const scan = await leak(A);
 report.leak = clean(scan);
 check("the leak scan finds no endpoint key (DO files, Container files, process environments and command lines)", (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0 && (scan?.container?.files ?? 0) > 0, scan);
+
+// 4b. The positive control: the canary endpoint's key, planted in the Container, is found by the same scan.
+await exec(A, `printf %s '${canaryKey}' > /tmp/p1167-canary.txt`);
+const planted = await leak(A);
+await exec(A, "rm -f /tmp/p1167-canary.txt");
+const plantedHits = (planted?.container?.hits ?? []) as Array<{ name: string; path: string }>;
+report.leakControl = clean({ hits: plantedHits });
+check("the leak scan finds an endpoint key planted in the Container", plantedHits.some((hit) => hit.name === "endpoint:canary" && hit.path === "/tmp/p1167-canary.txt"), report.leakControl);
+check("the canary endpoint removed", (await api("POST", "endpoints", { op: "remove", id: "canary" })).status === 200);
+
+// 4c. A Codex shell has no model handle (`shell_environment_policy.exclude`), though the Codex process has one.
+const shell = await cliTurn(cookie, { cli: "codex", workspace: A, model: `openai/${MODEL}`, mode: "full-access", plan: false, prompt: "Run exactly this shell command: `env > /tmp/p1167-shell-env.txt` and then reply with the single word done.", threadId: first.threadId });
+const shellEnv = await exec(A, "echo handle=$(grep -c '^T3FLARE_MODEL_HANDLE=' /tmp/p1167-shell-env.txt); echo exec=$(grep -c '^T3FLARE_EXEC=' /tmp/p1167-shell-env.txt); rm -f /tmp/p1167-shell-env.txt");
+report.shellEnv = { runs: shell.runs.slice(-1), counts: String(shellEnv.stdout ?? "").trim() };
+check("a Codex shell's environment has no model handle (its marker shows it was the shell's)", String(shellEnv.stdout ?? "").includes("handle=0") && String(shellEnv.stdout ?? "").includes("exec=1"), report.shellEnv);
 
 // 5. Resume after a Container restart; the old handle is revoked.
 await admin("POST", `/_t3flare/agents/workspace-stop?id=${A}`);
@@ -256,6 +295,7 @@ const relayed = (await probeLog()).filter((entry) => entry.kind === "relay");
 report.standIn = { requests: relayed.length, sawKey: relayed.every((entry) => entry.sawKey === true), evidenceHeader: relayed.every((entry) => entry.headers?.["x-t3flare-evidence"] === "p1167"), sample: relayed.slice(0, 3).map((entry) => ({ path: entry.path, headers: Object.keys(entry.headers ?? {}) })) };
 check("the stand-in got its key and the endpoint's header with every relayed request", relayed.length >= 2 && (report.standIn as any).sawKey && (report.standIn as any).evidenceHeader, report.standIn);
 check("no handle ever reached the endpoint", handles.every((value) => !JSON.stringify(relayed).includes(value)));
+check("no routing header from the Container reached the endpoint", relayed.length > 0 && !JSON.stringify(relayed).includes("evil.example") && relayed.every((entry) => entry.headers?.["x-portkey-custom-host"] === undefined));
 // The final turn's leak scan.
 const scanAfter = await leak(A);
 report.leakAfter = clean(scanAfter);
@@ -283,7 +323,14 @@ for (const chunk of raw.split(/\n(?=\{\n)/).filter((part) => part.trim().startsW
 }
 const byStatus: Record<string, number> = {};
 for (const entry of relayLogs) byStatus[entry.status] = (byStatus[entry.status] ?? 0) + 1;
-report.relayLog = { entries: relayLogs.length, byStatus, endpoints: [...new Set(relayLogs.map((entry) => entry.endpoint))], sample: relayLogs.slice(0, 4) };
+report.relayLog = {
+  entries: relayLogs.length,
+  byStatus,
+  endpoints: [...new Set(relayLogs.map((entry) => entry.endpoint))],
+  // What Codex sends that the allowlist keeps back (names only), from its turns on the openai endpoint.
+  codexDropped: [...new Set(relayLogs.filter((entry) => entry.cli === "codex" && entry.endpoint === "openai").flatMap((entry) => entry.dropped ?? []))].sort((a, b) => String(a).localeCompare(String(b))),
+  sample: relayLogs.slice(0, 4),
+};
 check("the agents Worker logged relayed requests with endpoint, status and handle id", relayLogs.length >= 5 && relayLogs.every((entry) => typeof entry.endpoint === "string" && typeof entry.status === "number" && "handle" in entry) && byStatus["200"] !== undefined && byStatus["401"] !== undefined, report.relayLog);
 check("no handle or key in the agents Worker's log", [...secrets, ...handles].every((value) => !raw.includes(value)));
 finish();
