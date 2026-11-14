@@ -1,22 +1,24 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
 // SPI-1153's stage harness (Environment skills for the CLI agents; docs/steps/env-skills-cli.md), through t3's own
 // calls as the web client makes them, and the Harness panel's API as a script calls it. The Repo fixture
-// (apps/environment/test/fixtures/cli-skills/: fruit-code says KIWI-7 at each CLI's root) is written, uncommitted, into
-// a clone of the fixture project; the Environment skills come from the fixture repo's branch `spi1153-env`, pushed by
-// `fixture`: env-code (its code, MANGO-5, in a reference file), fruit-code (PLUM-9, the same-named pair) and, apart,
-// late-code (LATE-8), installed and removed while a CLI's process runs.
+// (apps/environment/test/fixtures/cli-skills/, and a `pair-<word>` Skill in each CLI Repo root, `PAIRS`) is written,
+// uncommitted, into a clone of the fixture project; the Environment skills come from the fixture repo's branch
+// `spi1153-env`, pushed by `fixture`: env-code (its code, MANGO-5, in a reference file), a `pair-<word>` of each name
+// (the same-named pairs: the Repo's says REPO-<WORD>, the Environment's ENV-<WORD>) and, apart, late-code (LATE-8),
+// installed and removed while a CLI's process runs.
 //
 // Per CLI (codex, pi, claude, opencode), into docs/steps/env-skills-cli/<cli>.json:
-// - composer: the snapshot lists env-code with scope `user` at the mount, and the same-named fruit-code as the CLI
-//   keeps it (CLI_ROOTS' environmentPrecedence), with the Container stopped before and after;
+// - composer: the snapshot lists env-code with scope `user` at the mount, and each pair in the CLI's Repo roots as the
+//   CLI keeps it by that root (`CLI_ROOTS`' `environment`), with the Container stopped before and after;
 // - described: on a fresh thread, "what is the environment code?" reads env-code and answers MANGO-5;
 // - mention: on a fresh thread, `$env-code` answers MANGO-5, t3 keeping what was typed;
-// - pair: `$fruit-code` on that thread: the CLI's winner (PLUM-9 the Environment's, KIWI-7 the Repo's);
+// - pairs, per Repo root, each on a fresh thread: a description-matched turn (the CLI's own choice of the pair) and a
+//   mention (the composer's and, for OpenCode, t3flare's embed), both against that root's winner;
 // - write: a write through the CLI's linked root (pi: its flag's directory) refused, from the Container's shell and from
 //   the agent's own tool, nothing planted;
-// - catch-up, each on a thread whose history never held the late code: late-code installed while the process runs,
-//   then a mention and a described turn on it; removed while a process that started with it runs, then a mention; and
-//   installed again, then a mention on a new process (the Container stopped).
+// - catch-up, each on a thread whose history never held the late code: two processes started, late-code installed,
+//   then a mention on one and a described turn on the other; removed while a process that started with it runs, then
+//   a mention; installed again, then a mention on a new process (the Container stopped).
 //
 //   node scripts/stage.ts run pclienv pclienv fixture
 //   node scripts/stage.ts run pclienv pclienv [codex|pi|claude|opencode …]
@@ -25,18 +27,29 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { CLI_ROOTS, type EnvironmentPrecedence } from "@t3flare/skills";
+
 import { ensureProject } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
 
 type Cli = "codex" | "pi" | "claude" | "opencode";
 const SONNET = process.env.T3FLARE_PCLIENV_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MOUNT = "/workspace/.agents/skills";
-/** Each CLI: its instance, model, the Repo root of fruit-code, where its process reads the set, and its winner of the pair. */
-const CLIS: Readonly<Record<Cli, { readonly instanceId: string; readonly driver: string; readonly model: string; readonly repoRoot: string; readonly linked: string; readonly winner: "environment" | "repo" | "both" }>> = {
-  codex: { instanceId: "codex", driver: "codex", model: process.env.T3FLARE_PCLIENV_CODEX_MODEL ?? "gpt-6-luna", repoRoot: ".agents/skills", linked: "codex/skills/t3flare-environment", winner: "both" },
-  pi: { instanceId: "pi", driver: "pi", model: SONNET, repoRoot: ".agents/skills", linked: "", winner: "environment" },
-  claude: { instanceId: "claudeAgent", driver: "claudeAgent", model: SONNET, repoRoot: ".claude/skills", linked: "claude/skills", winner: "environment" },
-  opencode: { instanceId: "opencode", driver: "opencode", model: SONNET, repoRoot: ".agents/skills", linked: "config/opencode/skills", winner: "repo" },
+/** Each CLI: its instance, model, and where its process reads the set (pi: none, its flag names the mount). */
+const CLIS: Readonly<Record<Cli, { readonly instanceId: string; readonly driver: string; readonly model: string; readonly linked: string }>> = {
+  codex: { instanceId: "codex", driver: "codex", model: process.env.T3FLARE_PCLIENV_CODEX_MODEL ?? "gpt-6-luna", linked: "codex/skills/t3flare-environment" },
+  pi: { instanceId: "pi", driver: "pi", model: SONNET, linked: "" },
+  claude: { instanceId: "claudeAgent", driver: "claudeAgent", model: SONNET, linked: "claude/skills" },
+  opencode: { instanceId: "opencode", driver: "opencode", model: SONNET, linked: "config/opencode/skills" },
+};
+/** A same-named pair per CLI Repo root, by a neutral word (so a question does not name the root). */
+const PAIRS: Readonly<Record<string, string>> = {
+  ".agents/skills": "amber",
+  ".codex/skills": "birch",
+  ".pi/skills": "cedar",
+  ".claude/skills": "dune",
+  ".opencode/skills": "ember",
+  ".opencode/skill": "fjord",
 };
 const T3 = process.env.T3_URL ?? "";
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
@@ -73,10 +86,12 @@ const git = (cwd: string, ...args: Array<string>) => {
   return result.stdout.trim();
 };
 const SKILL_MD = (name: string, description: string, body: string) => `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}\n`;
+/** A pair's Skill, the same name and description on both sides; only its code says which side it is. */
+const pairMd = (word: string, code: string) => SKILL_MD(`pair-${word}`, `How to find the ${word} pair code. Use whenever anyone asks for the ${word} pair code.`, `The ${word} pair code is ${code}. Answer with the code alone.`);
 const ENV_FILES: Record<string, string> = {
   "skills/env-code/SKILL.md": SKILL_MD("env-code", "How to find the environment code, the code the Cloud Environment keeps. Use whenever anyone asks for the environment code.", "The environment code is written in reference/code.md, next to this file. Read that file and answer with the code alone."),
   "skills/env-code/reference/code.md": "The environment code is MANGO-5.\n",
-  "skills/fruit-code/SKILL.md": SKILL_MD("fruit-code", "The fruit code, as the Environment keeps it. Use whenever anyone asks for the fruit code.", "The fruit code is PLUM-9. Answer with the code alone."),
+  ...Object.fromEntries(Object.values(PAIRS).map((word) => [`skills/pair-${word}/SKILL.md`, pairMd(word, `ENV-${word.toUpperCase()}`)])),
   "late/late-code/SKILL.md": SKILL_MD("late-code", "How to find the late code. Use whenever anyone asks for the late code.", "The late code is LATE-8. Answer with the code alone."),
   "README.md": "SPI-1153's Environment skills fixture branch; moved by apps/environment/scripts/pclienv.ts.\n",
 };
@@ -159,7 +174,7 @@ const composerSnapshot = async (instanceId: string) => {
   const reply = (await wsCall(cookie, "server.refreshProviders", { instanceId, cwd: root, fresh: true }).catch((error: unknown) => ({ error: String(error).slice(0, 400) }))) as any;
   const provider = (reply?.providers ?? []).find((candidate: any) => candidate.instanceId === instanceId);
   const scoped = (provider?.workspaceSnapshots ?? []).find((snapshot: any) => snapshot.cwd === root) ?? provider?.workspaceSnapshots?.[0];
-  return { error: reply?.error ?? null, skills: ((scoped?.skills ?? []) as Array<any>).filter((skill) => ["env-code", "fruit-code", "late-code"].includes(skill.name)) };
+  return { error: reply?.error ?? null, skills: ((scoped?.skills ?? []) as Array<any>).filter((skill) => ["env-code", "late-code"].includes(skill.name) || String(skill.name).startsWith("pair-")) };
 };
 
 const settle = async (threadId: string, ordinal: number, timeoutMs = 8 * 60_000): Promise<any> => {
@@ -222,6 +237,15 @@ const linkedRoot = async (cli: Cli) => {
 
 // ── Per CLI ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+/** Which side a pair's answer came from. */
+const sideOf = (answer: string, word: string): "environment" | "repo" | "unclear" => {
+  const environment = answer.includes(`ENV-${word.toUpperCase()}`);
+  const repo = answer.includes(`REPO-${word.toUpperCase()}`);
+  return environment && !repo ? "environment" : repo && !environment ? "repo" : "unclear";
+};
+/** Whether `side` is what a root whose winner is `expected` gives: Codex's `both` picks neither, so any side. */
+const agrees = (side: string, expected: EnvironmentPrecedence) => (expected === "both" ? side !== "unclear" : side === expected);
+
 const probeCli = async (cli: Cli) => {
   const spec = CLIS[cli];
   await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: spec.instanceId, instance: { driver: spec.driver, enabled: true } } });
@@ -236,12 +260,16 @@ const probeCli = async (cli: Cli) => {
   const snapshot = await composerSnapshot(spec.instanceId);
   const after = await containerOf();
   const envCode = snapshot.skills.find((skill: any) => skill.name === "env-code");
-  const fruit = snapshot.skills.filter((skill: any) => skill.name === "fruit-code").map((skill: any) => ({ scope: skill.scope, path: skill.path }));
   checks.composerListsEnvironmentSkill = envCode?.scope === "user" && envCode?.path === `${MOUNT}/env-code/SKILL.md`;
-  const environmentFruit = { scope: "user", path: `${MOUNT}/fruit-code/SKILL.md` };
-  const repoFruit = { scope: "project", path: `${root}/${spec.repoRoot}/fruit-code/SKILL.md` };
-  const expectedFruit = spec.winner === "environment" ? [environmentFruit] : spec.winner === "repo" ? [repoFruit] : [repoFruit, environmentFruit];
-  checks.composerFollowsCliPrecedence = JSON.stringify(fruit) === JSON.stringify(expectedFruit);
+  const roots = CLI_ROOTS[cli].skills.map((root) => ({ directory: root.directory, word: PAIRS[root.directory]!, expected: root.environment! }));
+  steps.composerPairs = roots.map(({ directory, word, expected }) => {
+    const listed = snapshot.skills.filter((skill: any) => skill.name === `pair-${word}`).map((skill: any) => ({ scope: skill.scope, path: skill.path }));
+    const environment = { scope: "user", path: `${MOUNT}/pair-${word}/SKILL.md` };
+    const repo = { scope: "project", path: `${root}/${directory}/pair-${word}/SKILL.md` };
+    const wanted = expected === "environment" ? [environment] : expected === "repo" ? [repo] : [repo, environment];
+    return { root: directory, expected, listed, ok: JSON.stringify(listed) === JSON.stringify(wanted) };
+  });
+  checks.composerFollowsCliPerRoot = steps.composerPairs.every((pair: any) => pair.ok);
   checks.noContainerForComposer = before.running === false && after.running === false;
 
   // A description-matched turn on a fresh process.
@@ -254,14 +282,6 @@ const probeCli = async (cli: Cli) => {
   const mentioned = await newThread(cli, `spi-1153 ${cli}: mention`);
   steps.mention = await turn(mentioned, "$env-code");
   checks.mentionFollows = steps.mention.answer.includes("MANGO-5") && steps.mention.typed === "$env-code";
-
-  // The same-named pair.
-  steps.pair = await turn(mentioned, "$fruit-code What is the fruit code? Reply with the code alone.");
-  const plum = steps.pair.answer.includes("PLUM-9");
-  const kiwi = steps.pair.answer.includes("KIWI-7");
-  steps.pairWinner = plum && !kiwi ? "environment" : kiwi && !plum ? "repo" : "unclear";
-  // Codex lists both and a bare mention picks neither: the model's pick is recorded, not checked.
-  checks.pairWinnerIsCli = spec.winner === "both" ? steps.pairWinner !== "unclear" : steps.pairWinner === spec.winner;
 
   // A write through the linked root: from the Container's shell, and the agent's own.
   const linked = await linkedRoot(cli);
@@ -284,24 +304,44 @@ const probeCli = async (cli: Cli) => {
     !steps.afterWrites.stdout.includes("planted") &&
     steps.afterWrites.stdout.includes("name: env-code");
 
-  // Catch-up, each on a thread whose history never held the late code. Installed while this process runs:
-  steps.lateInstall = await install("late");
-  steps.lateMention = await turn(mentioned, "$late-code What is the late code? If you cannot find it, reply NONE.");
-  steps.lateDescribed = await turn(mentioned, "What is the late code? If you cannot find it, reply NONE.");
-  // A new process (the Container stopped), on a fresh thread; its first turn does not name the late code.
+  // The same-named pairs, one per Repo root, each turn on a fresh thread: the CLI's own choice (described) and the
+  // mention (t3's composer, and t3flare's embed for OpenCode), both against the root's winner.
+  steps.pairs = [];
+  for (const { directory, word, expected } of roots) {
+    await stopContainer();
+    const own = await newThread(cli, `spi-1153 ${cli}: pair ${word} described`);
+    const ownTurn = await turn(own, `What is the ${word} pair code? Reply with the code alone.`);
+    const byMention = await newThread(cli, `spi-1153 ${cli}: pair ${word} mention`);
+    const mentionTurn = await turn(byMention, `$pair-${word} What is the ${word} pair code? Reply with the code alone.`);
+    const cliChose = sideOf(ownTurn.answer, word);
+    const mentionGave = sideOf(mentionTurn.answer, word);
+    steps.pairs.push({ root: directory, word, expected, cliChose, mentionGave, described: ownTurn, mention: mentionTurn });
+  }
+  checks.pairsCliChoiceIsRoots = steps.pairs.every((pair: any) => agrees(pair.cliChose, pair.expected));
+  checks.pairsMentionIsRoots = steps.pairs.every((pair: any) => agrees(pair.mentionGave, pair.expected));
+
+  // Catch-up, each turn on a thread whose history never held the late code. Two processes started before the install:
   await stopContainer();
-  const late = await newThread(cli, `spi-1153 ${cli}: catch-up`);
+  const lateA = await newThread(cli, `spi-1153 ${cli}: catch-up mention`);
+  steps.lateStartA = await turn(lateA, "Reply with the single word OK.");
+  const lateB = await newThread(cli, `spi-1153 ${cli}: catch-up described`);
+  steps.lateStartB = await turn(lateB, "Reply with the single word OK.");
+  steps.lateInstall = await install("late");
+  steps.lateMention = await turn(lateA, "$late-code What is the late code? If you cannot find it, reply NONE.");
+  steps.lateDescribed = await turn(lateB, "What is the late code? If you cannot find it, reply NONE.");
+  // A process that started with it, then removed while it runs.
+  await stopContainer();
+  const late = await newThread(cli, `spi-1153 ${cli}: catch-up removal`);
   steps.lateStart = await turn(late, "Reply with the single word OK.");
   steps.lateRemove = await remove("late-code");
-  // Removed while that process runs (it started with late-code installed). The turn has the Workspace take the set
-  // first: the mount holds no late-code from then on, whatever the process kept.
+  // The turn has the Workspace take the set first: the mount holds no late-code from then on, whatever the process kept.
   steps.lateRemovedMention = await turn(late, "$late-code What is the late code? If you cannot find it, reply NONE.");
   steps.lateRemovedMount = await sh(`ls '${MOUNT}'`);
   checks.lateGoneFromMount = !steps.lateRemovedMount.stdout.includes("late-code");
-  // And installed again, then a new process on another fresh thread.
+  // Installed again, then a new process on another fresh thread.
   steps.lateReinstall = await install("late");
   await stopContainer();
-  const fresh = await newThread(cli, `spi-1153 ${cli}: new process`);
+  const fresh = await newThread(cli, `spi-1153 ${cli}: catch-up new process`);
   steps.lateMentionNewProcess = await turn(fresh, "$late-code What is the late code? If you cannot find it, reply NONE.");
   checks.lateSeenByNewProcess = steps.lateMentionNewProcess.answer.includes("LATE-8");
   await remove("late-code");
@@ -313,8 +353,16 @@ const probeCli = async (cli: Cli) => {
   };
 
   const ok = Object.values(checks).every(Boolean);
-  console.log(`${cli}: ${ok ? "ok" : "FAIL"} ${JSON.stringify(checks)} catch-up ${JSON.stringify(steps.catchUp)}`);
-  return { ok, cli, model: spec.model, expectedWinner: spec.winner, checks, composer: { container: { before, after }, ...snapshot }, threads: { described: described.threadId, mentioned: mentioned.threadId, late: late.threadId, fresh: fresh.threadId }, steps };
+  console.log(`${cli}: ${ok ? "ok" : "FAIL"} ${JSON.stringify(checks)} pairs ${JSON.stringify(steps.pairs.map((pair: any) => [pair.root, pair.expected, pair.cliChose, pair.mentionGave]))} catch-up ${JSON.stringify(steps.catchUp)}`);
+  return {
+    ok,
+    cli,
+    model: spec.model,
+    checks,
+    composer: { container: { before, after }, ...snapshot },
+    threads: { described: described.threadId, mentioned: mentioned.threadId, lateA: lateA.threadId, lateB: lateB.threadId, late: late.threadId, fresh: fresh.threadId },
+    steps,
+  };
 };
 
 const asked = process.argv.slice(2);
@@ -326,6 +374,9 @@ if (asked[0] === "fixture") {
   for (const file of fs.readdirSync(REPO_FIXTURE, { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile())) {
     const full = path.join(file.parentPath, file.name);
     await wsCall(cookie, "projects.writeFile", { cwd: root, relativePath: path.relative(REPO_FIXTURE, full), contents: fs.readFileSync(full, "utf8") });
+  }
+  for (const [directory, word] of Object.entries(PAIRS)) {
+    await wsCall(cookie, "projects.writeFile", { cwd: root, relativePath: `${directory}/pair-${word}/SKILL.md`, contents: pairMd(word, `REPO-${word.toUpperCase()}`) });
   }
   let failed = false;
   for (const cli of (asked.length === 0 ? Object.keys(CLIS) : asked) as Array<Cli>) {
