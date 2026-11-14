@@ -104,6 +104,27 @@ possible.
 - `model`: Executor's Pause at once on every version; `resume` listed in `model` alone; another sub's, another mode's,
   closed and unknown ids refused; the access switch refuses it.
 - D12's fallbacks toward `browser`, each with its reason in the `waiting` result.
+- **What `native` and `model` may approve.** Every asked change that does not need the page, including turning a Guard
+  off or changing its settings, marking a tool `read`, and changing the Settings server's own entry: ADR-0034 §8 and
+  its first consequence, and plan D6, which makes only a secret, a sign-in, a skills install or update, and text too
+  long to show page-only. Whatever holds an Owner client's token can therefore turn the Guardian off through `model`
+  with no person involved; the audit's `mode` and `answeredBy` are the only trace. This is the owner's decision (O5,
+  O6), not a gap.
+- The SPI-1201 spec review then changed (each tested):
+  - a close that gave up waiting on an applying answer answers `waiting`, not "the change failed"; an own agent's
+    close waits `OWN_APPLYING_WAIT_MS` (the skills request budget and 15 s) for it;
+  - a 2025 `native` answer POSTed with no live stream on its change (the Environment reset since) withdraws it by
+    `stop` and applies nothing;
+  - live held streams are counted per change and per caller: only the last one cut withdraws the change, and at most
+    2 per change and 8 per caller hold (past either, `W` saying why);
+  - Patch 0006 asks for a tool whose name only starts like a relayed server's (`settings--x`, `settings__x`,
+    `settings-`, `commissary_`);
+  - an Owner client's `oversize` is judged on the message actually sent in its mode, not the change's text alone;
+  - the declined-repeat hash drops a URL's fragment and empty query, takes an install's source as its repo alone and
+    its folders as a set;
+  - a 2026 `MCP-Protocol-Version` header with no version in `_meta` is `-32020`;
+  - caps, open changes and reads are keyed by door (`own:`, `owner:`), and `get_status` lists the calling door's own
+    changes.
 
 ### M6 (SPI-1202): the hostile list, this report, the docs
 
@@ -131,6 +152,14 @@ Plan §5, line by line: where each is tested now, and what the stage run adds.
 in the stage-run docs were found and fixed: `m4-stage-run.md` item 10 expected a Stop to close a change `by: agent`
 (the code, and the plan since the SPI-1199 review, say `stop`), and its item 6 implied `peer-leak` reads the audit log
 and Open change rows (it reads the Container and the Sessions; the rest must be passed in its `text`).
+
+**Bugs the SPI-1201 spec review found, all fixed with tests** (the M5b section lists each): a 2025 `native` answer
+applied after an Environment reset with nobody holding the result; one cut stream withdrew a change another stream
+still showed, and held streams were unbounded; a close that gave up on an applying answer said "the change failed";
+an Owner client's form or Pause could carry a cut message without the change being page-only; a thread whose id equalled
+an Access `sub` shared that client's caps and showed in its `get_status`; Patch 0006 let a tool of a look-alike server
+(`settings--x`) through unasked; respellings slipped past the declined-repeat hash; a 2026 header without a body
+version answered the wrong error code.
 
 ## Deviations from the plan
 
@@ -186,7 +215,8 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     retry, a held stream and `resume` report `applied` rather than a stale `withdrawn`.
 18. **The access switch is checked again after a card** (D2, SPI-1198 review): a switch turned off or read-only while a
     card waited applies nothing. A 2026 retry is refused naming the panel when the server is off or read-only.
-19. **The endpoint is stricter than D11's table** (SPI-1200 review, checked against the 2026-07-28 spec): on 2026
+19. **The endpoint is stricter than D11's table** (SPI-1200 review, checked against the 2026-07-28 spec; accepted in the
+    SPI-1201 spec review, since the specs mandate it; a 2026 header with no version in `_meta` is `-32020` too): on 2026
     `MCP-Protocol-Version`, `Mcp-Method` and, on `tools/call`, `Mcp-Name` are required and must equal the body (400,
     `-32020`); an unsupported version is 400 with `-32022`; an unsupported method is `-32601`, 404 on 2026 and 200 on
     2025; on 2025 an unknown `MCP-Protocol-Version` is 400 and a missing one is `2025-03-26`; `initialize` at 2026 or an
@@ -197,6 +227,21 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     never shipped.
 22. **M2's first commits were swept into two SPI-1198 review commits** (8d9001c, 3bdfb13) by a concurrent commit;
     827e6bf and e712a8c add the Patch and ADR-0001's counts. History only; the tree is as intended.
+23. **`W` says why, and `native` and `model` messages say how to answer** (D12; accepted in the SPI-1201 spec review).
+    The waiting result adds the fallback's reason (no form declared, a change that needs the page, too many held calls),
+    and the message `M` in `native` and `model` ends with how it is answered and the Change page's link, which the
+    plan's `M` (the card's text without the agent's call) did not have; `oversize` is judged on that whole message.
+24. **A JSON-RPC error in place of a 2025 form's answer withdraws the change** (D12 named `accept`, `decline` and
+    `cancel` only; accepted in the SPI-1201 spec review): the client could not ask, so the held call ends rather than
+    waiting out the change.
+25. **Additions the plan did not name, accepted in the SPI-1201 spec review**: `OWNER_MODE_INSTRUCTIONS` (the server's
+    instructions say which mode the client asked in); the cap's refusal in `model` names a `requestId` to resume (D16
+    named it for "one already open" only); the call-stop registry's early-stop memory (a flood of over 256 early stops
+    only drops the oldest, which restores the behaviour without the memory: a Stop that raced its call is lost).
+26. **Behaviour the SPI-1201 spec review added beyond the plan**: held streams counted and capped (2 per change, 8 per
+    caller), the last cut alone withdrawing; a native answer with no live stream withdrawn by `stop`; caps keyed by
+    door; the own door's longer wait for an applying answer and `waiting` when any wait runs out; the hash's further
+    canonicalisation; Patch 0006's rest-of-name rule. Each is recorded in the plan (D4, D6, D8, D12, D16) and U67.
 
 ## Evidence
 
