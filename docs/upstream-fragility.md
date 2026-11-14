@@ -883,10 +883,15 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 
 ### U68. The Owner-client endpoint: Access managed OAuth (beta) and the hand-written MCP versions (SPI-1200)
 
-- **Where**: `apps/environment/src/settings/endpointLayout.ts` (layout (B): `<host>/_t3flare/mcp`), the `SettingsAccess`
+- **Where**: `apps/environment/src/settings/endpointLayout.ts` (layout (B): `<host>/_t3flare/mcp`;
+  `OWNER_ENDPOINT_EXCLUDED_STAGES` keeps prod out of it until owner step 1 passes, ADR-0035), the `SettingsAccess`
   application in `apps/environment/alchemy.run.ts` (`oauthConfiguration`, `pathCookieAttribute` on it and on
-  `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`), `worker.ts`'s branch for it
-  (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`), and `apps/environment/src/settings/endpoint.ts`,
+  `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`; on prod neither), `worker.ts`'s branch
+  for it (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`; unset on prod, so 404 `not_configured`); the
+  Access `sub` of the endpoint's assertion, which keys an Owner client's caps, Open changes and reads (`capKeyOf`,
+  `owner:<sub>`) and decides who answers its Open changes on the Change page (`answererProblem` in
+  `settings/openChanges.ts`: the page's `sub` must equal the asker's; P13, the same `sub` in an OAuth-derived and a
+  browser assertion, is pending owner step 1); and `apps/environment/src/settings/endpoint.ts`,
   which hand-writes MCP 2026-07-28 (`server/discover`, `_meta` `io.modelcontextprotocol/*`, `resultType`,
   `input_required` with `inputRequests` and `requestState`; `-32022` with `data.supported` and `requested`, `-32020` for
   a missing or mismatched `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` (Base64 sentinel decoded), and 404 with
@@ -904,12 +909,17 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   sign-in would find Access's server instead of t3's), changes how path-scoped applications nest or how it scopes
   tokens and cookies, or refuses a path-scoped or queried `resource`; alchemy renames `oauthConfiguration` or
   `pathCookieAttribute`; the MCP spec or a named client changes the 2026 shapes (a key under `_meta`, `resultType`, the
-  `input_required` result, `server/discover`'s result) or stops falling back to `initialize`.
+  `input_required` result, `server/discover`'s result) or stops falling back to `initialize`; Access gives the owner a
+  different `sub` in the endpoint's OAuth-derived assertion than in his browser's at the panel, or changes it over time
+  (an Owner client's change could no longer be answered on the Change page, "only the owner who asked answers this
+  change", and its caps would restart under the new key).
 - **Detection**: `test/settingsEndpoint.test.ts` and `test/settingsModes.test.ts` pin our reading of the shapes, not a
   client's; `test/access.test.ts` the audiences and `test/workerRouting.test.ts` the Worker's branch (its order, the
-  endpoint's audience, the panel's refused, local mode). `scripts/acceptance.ts` step 2b asserts on every acceptance run
-  that the host's root `/.well-known/oauth-authorization-server` and `oauth-protected-resource` are still t3's (its
-  issuer, its `/mcp` resource). **Silent** for Access's token scoping and real clients: the stage run of
+  endpoint's audience, the panel's refused, local mode). `scripts/smoke.ts` asserts on every prod deploy, and
+  `scripts/acceptance.ts` step 2b on every acceptance run, that the host's root `/.well-known/oauth-authorization-server`
+  and `oauth-protected-resource` are still t3's (its issuer, its `/mcp` resource): nothing checks them between deploys. The `sub` (P13) is `m5a-stage-run.md` item 2 and
+  `test/openChanges.test.ts` ("page: an Owner client's change by the same sub only"); a later change of it is silent
+  until a page answer is refused. **Silent** for Access's token scoping and real clients: the stage run of
   `m5a-settings-owner-browser.json` (a named client signs in, reads, makes a free and an asked change).
 - **Blast radius**: an Access change: Owner clients cannot sign in, or (root well-knowns) t3's own MCP clients cannot.
   A client's shape change: that client gets errors or the link in the result; own agents and the panel are unaffected.

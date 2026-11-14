@@ -96,9 +96,11 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
     expect(await w.call("/_t3flare/mcpx", settings)).toEqual({ status: 404, seen: [] });
   });
 
-  it("refuses everything when the endpoint's audience is not configured", async () => {
+  it("refuses everything when the endpoint's audience is not configured (prod until owner step 1, ADR-0035)", async () => {
     const w = world({ T3FLARE_ACCESS_SETTINGS_AUD: undefined } as Partial<Env>);
     expect(await w.call("/_t3flare/mcp", { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) })).toEqual({ status: 404, seen: [] });
+    // Without `SettingsAccess` the admin application covers `/_t3flare/mcp`; its assertion and the admin token reach nothing there.
+    expect(await w.call("/_t3flare/mcp", { "cf-access-jwt-assertion": await assertion(PANEL_AUD), authorization: `Bearer ${ADMIN}` })).toEqual({ status: 404, seen: [] });
   });
 
   // Plan §5's hostile list (M6, SPI-1202): an agent that knows a Change page's URL (it is in the card and in the agent's

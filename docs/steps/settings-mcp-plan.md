@@ -565,8 +565,13 @@ In every mode the Change page can also answer the Open change; the first answer 
   (`T3FLARE_ACCESS_SETTINGS_AUD`) with a new `verifySettingsRequest` in `access.ts`. "Clean" means all of: Access does
   not answer the host's root well-known documents (P2), the more specific path wins and cookies do not collide (P8), a
   path-scoped `resource` is accepted (P6), and the MCP application's token gets no admitted assertion at the panel's
-  path (P12). With (B), the acceptance run also asserts that the root well-known documents are still t3's: Access is in
-  beta, and drift there would break t3's own `/mcp` sign-in.
+  path (P12). With (B), the acceptance run (step 2b) and every prod deploy's smoke check (`scripts/smoke.ts`) also
+  assert that the root well-known documents are still t3's: Access is in beta, and drift there would break t3's own
+  `/mcp` sign-in.
+- **Prod stays out of (B) until owner step 1 passes** (SPI-1195 review): `OWNER_ENDPOINT_EXCLUDED_STAGES`
+  (`settings/endpointLayout.ts`) holds `prod`, so prod gets no `SettingsAccess`, its admin application stays as it was
+  (no path-cookie attribute) and `T3FLARE_ACCESS_SETTINGS_AUD` stays unset, and `/_t3flare/mcp` answers 404
+  `not_configured`. Removing `prod` from the list, after owner step 1 and M5a's stage evidence, enables it.
 - **(C), otherwise, on every stage including prod**: a Worker `t3flare-settings-<stage>` (`apps/settings-worker`) on
   its own workers.dev host, with its own Access application and managed OAuth on the whole host. Endpoint
   `https://t3flare-settings-<stage>.<subdomain>.workers.dev/mcp`. It verifies its own audience with the shared
@@ -950,8 +955,9 @@ Each was read on `origin/main` at 747905d; check it still holds before building 
 - **A token read over an Outbound link.** A cloud agent that reaches the Laptop Environment could read an Owner
   client's stored token there and use `model`. The owner-only card holds only while no agent of ours can obtain such a
   token.
-- **Access managed OAuth is in beta.** Its discovery behaviour may change under (B); the acceptance assertion on the
-  root well-known documents detects it within a day.
+- **Access managed OAuth is in beta.** Its discovery behaviour may change under (B); `scripts/smoke.ts` asserts on
+  every prod deploy, and acceptance step 2b on every acceptance run, that the root well-known documents are still t3's,
+  so drift is caught at the next deploy or run, not by a schedule.
 - **The hand-written 2026-07-28 handling** rests on a new spec version. M0's capture and T-endpoint bound it; D11 names
   the fallback.
 - **The Patch** touches t3's pi extension and may not survive a nightly bump; without it pi only asks more.

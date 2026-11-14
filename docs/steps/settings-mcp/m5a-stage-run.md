@@ -2,7 +2,8 @@
 
 M5a's code and unit tests (T-endpoint, T-guards, T-state, and T-modes' `browser` cases) landed without a deploy. Its
 evidence, `m5a-settings-owner-browser.json`, needs a deployed workers.dev stage (`psettings`, now in `STAGES`; never
-`prod`) and the owner signing in. Record each item with the commit deployed, the stage, timestamps, the client and its
+`prod`) and the owner signing in. Prod is deployed without the endpoint (`OWNER_ENDPOINT_EXCLUDED_STAGES`, ADR-0035)
+until items 1-4 pass and this file is recorded; enabling it then is removing `prod` from that list. Record each item with the commit deployed, the stage, timestamps, the client and its
 version, and the change ids. Never record a token, a cookie, an authorization code or a header value; record an
 assertion by its decoded claims with `sub` and `email` reduced to "same as …" comparisons.
 
@@ -50,10 +51,11 @@ a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bea
      touching prod's Access applications, record from prod's host (`t3.ianpascoe.dev`) as it is today: what
      `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`,
      `/.well-known/cloudflare-access-protected-resource/_t3flare` and `/_t3flare/mcp` answer (status,
-     `WWW-Authenticate`, and whether Access or the origin answers), so the first prod deploy of `SettingsAccess` has a
-     baseline to compare with. After that deploy (CI's, not this run), the same requests must show `/_t3flare/mcp` as
-     its own application and the root documents still t3's; `scripts/acceptance.ts` step 2b asserts the latter on every
-     run.
+     `WWW-Authenticate`, and whether Access or the origin answers), so the first prod deploy of `SettingsAccess` (once
+     prod is enabled) has a baseline to compare with. After that deploy (CI's, not this run), the same requests must
+     show `/_t3flare/mcp` as its own application and the root documents still t3's; `scripts/smoke.ts` asserts the
+     latter on every prod deploy (and `scripts/acceptance.ts` step 2b on every acceptance run, which prod's deploy does
+     not make).
 
 ### A named client, end to end (Claude Code 2.1.322 on 2026-07-28; then OpenCode or Claude Code forced to 2025-11-25)
 
