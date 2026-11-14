@@ -11,28 +11,18 @@ import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import type { CatalogModel } from "@t3flare/models";
 import { CLI_AGENTS, CLI_ROOTS, discoverPrompts, discoverSkills } from "@t3flare/skills";
 import { memoryFiles } from "@t3flare/skills/testing";
 import { CLIS } from "@t3flare/sandbox-image/clis";
-import { processCommand } from "@t3flare/sandbox-image/process";
 
-import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
-import { type Launch, type LaunchInput, profileLaunch } from "../../src/agents/cliProfiles.ts";
+import { type Launch } from "../../src/agents/cliProfiles.ts";
 import { expect, it } from "vitest";
 
+import { type Cli, drive, IMAGE, launchOf, openCodeServedSkills, piLaunchOf, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 import { commandMd, type Loaded, PROBED, repoFixture, repoView, skillMd } from "./skillsProbe.ts";
 
 const here = import.meta.dirname;
-const imageContext = path.resolve(here, "../../../sandbox-image/image");
-const IMAGE = "t3flare-cli-test";
-const KEYHOST = "t3flare-skills-probe-keyhost";
-const NET_INT = "t3flare-skills-probe-int";
-const T3_PATH = "/w/fixture";
-const EXTENSION = "/t3/caches/pi-t3-mcp-extension.ts";
 const out = process.env.T3FLARE_SKILLS_PROBE_OUT;
-
-type Cli = "codex" | "pi" | "claude" | "opencode";
 
 /** User-level candidates under HOME (/root): skill roots, and each process's own home (`$HOME_OF`) by its variable. */
 const USER_SKILL_CANDIDATES: Readonly<Record<string, string>> = {
@@ -54,41 +44,20 @@ const PROCESS_SKILL_CANDIDATES: Readonly<Record<Cli, Readonly<Record<string, str
 const markerFiles = (root: string, key: string, name: string): ReadonlyArray<{ path: string; text: string }> =>
   key.endsWith(".md") ? [{ path: `${root}/${key}`, text: commandMd(name) }] : [{ path: `${root}/${key}/${name}/SKILL.md`, text: skillMd(name, `Probe marker for ${key}`) }];
 
-const docker = (args: ReadonlyArray<string>, options: { quiet?: boolean } = {}) => {
-  const result = spawnSync("docker", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-  if (result.status !== 0 && options.quiet !== true) throw new Error(`docker ${args.slice(0, 3).join(" ")} failed: ${(result.stderr ?? "").slice(-1500)}`);
-  return result;
-};
-
-const model = (id: string): CatalogModel => ({ id, name: id, provider: "anthropic", vendor: "Anthropic", api: "anthropic-messages", slug: `anthropic/${id}`, reasoning: false, input: ["text"], contextWindow: 200_000, maxTokens: 32_000 });
-
-const launchOf = (input: Omit<LaunchInput, "allowProbe" | "cwd">): Launch => {
-  const answer = profileLaunch(
-    { ...input, cwd: T3_PATH, allowProbe: false },
-    { proxyUrl: "http://computer.internal/no-model", models: [model("claude-haiku-5-5")], readStateFile: (file) => (file === EXTENSION ? PI_T3_MCP_EXTENSION_SOURCE : undefined), piExtensionSource: PI_T3_MCP_EXTENSION_SOURCE },
-  );
-  if ("refused" in answer) throw new Error(`the profile refused: ${answer.refused}`);
-  return answer;
+/**
+ * The launch without SPI-1153's Environment skill links and flag: this probe is of the CLIs' own roots, and a link
+ * where a marker sits (Claude Code's and OpenCode's user roots) would hide it (`envSkills.docker.test.ts` probes them).
+ */
+const withoutEnvironmentSkills = (launch: Launch): Launch => {
+  const argv = launch.argv.filter((arg, at) => !(arg === "/workspace/.agents/skills" || (arg === "--skill" && launch.argv[at + 1] === "/workspace/.agents/skills")));
+  const links = (launch.links ?? []).filter((link) => link.target !== "/workspace/.agents/skills");
+  return { ...launch, argv, links };
 };
 
 it("each CLI's skill and command roots (SPI-1151 M0) are CLI_ROOTS' table", async () => {
   const workspace = fs.mkdtempSync(path.join(here, ".skills-"));
   const nonces = { codex: `nonce-${randomUUID()}`, pi: `nonce-${randomUUID()}`, claude: `nonce-${randomUUID()}`, opencode: `nonce-${randomUUID()}` };
-  const cleanup = () => {
-    docker(["rm", "-f", KEYHOST], { quiet: true });
-    docker(["network", "rm", NET_INT], { quiet: true });
-  };
-  cleanup();
-  docker([
-    "build", "-q", "-t", IMAGE, "-f", path.join(here, "Dockerfile"),
-    "--build-arg", `CODEX_VERSION=${CLIS.codex.version}`, "--build-arg", `CODEX_SHA256=${CLIS.codex.sha256}`, "--build-arg", `CODEX_SHA256_ARM64=${CLIS.codex.sha256Arm64}`,
-    "--build-arg", `OPENCODE_VERSION=${CLIS.opencode.version}`, "--build-arg", `OPENCODE_SHA256=${CLIS.opencode.sha256}`, "--build-arg", `OPENCODE_SHA256_ARM64=${CLIS.opencode.sha256Arm64}`,
-    imageContext,
-  ]);
-  docker(["network", "create", "--internal", NET_INT]);
-  // The stand-in `computer.internal`: a key for any of the probe's nonces (no model is called), NXDOMAIN for every name.
-  docker(["run", "-d", "--name", KEYHOST, "--network", NET_INT, "--network-alias", "computer.internal", "-e", "KEYHOST_MODEL_KEY=probe-key", "-e", `KEYHOST_NONCES=${Object.values(nonces).join(",")}`, "-v", `${here}:/k:ro`, "node:26.13.0-bookworm-slim", "node", "/k/keyhost.mjs"]);
-  const keyhostIp = docker(["inspect", "-f", `{{(index .NetworkSettings.Networks "${NET_INT}").IPAddress}}`, KEYHOST]).stdout.trim();
+  const harness = startHarness("t3flare-skills-probe", Object.values(nonces));
   const repo = path.join(workspace, "repo");
   const write = (file: string, text: string) => {
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -104,26 +73,20 @@ it("each CLI's skill and command roots (SPI-1151 M0) are CLI_ROOTS' table", asyn
     .map((file) => `mkdir -p ${JSON.stringify(path.dirname(file.path))} && printf %s ${JSON.stringify(file.text)} > ${JSON.stringify(file.path)}`)
     .join("\n");
 
-  const run = (cli: Cli, launch: Launch, marker: string, argv?: ReadonlyArray<string>): Array<string> => {
+  const run = (cli: Cli, given: Launch, marker: string, argv?: ReadonlyArray<string>): Array<string> => {
+    const launch = withoutEnvironmentSkills(given);
     const home = `/var/lib/t3flare/cli/${marker}`;
-    const files = [...(launch.files ?? []), ...Object.entries(PROCESS_SKILL_CANDIDATES[cli]).flatMap(([key, name]) => markerFiles(home, key, name))];
-    const env: Record<string, string> = {
-      ...launch.env,
-      PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-      T3FLARE_EXEC: marker,
-      T3FLARE_MODEL_KEY_NONCE: nonces[cli],
-    };
-    const command = processCommand({ marker, t3Path: T3_PATH, cwd: T3_PATH, argv: argv ?? launch.argv, files, ...(launch.links ? { links: launch.links } : {}) });
-    return ["docker", "run", "--rm", "-i", "--name", `t3flare-skills-probe-${marker}`, "--network", NET_INT, "--dns", keyhostIp, "-v", `${workspace}:/workspace`, ...Object.entries(env).flatMap(([name, value]) => ["-e", `${name}=${value}`]), IMAGE, "bash", "-c", `${userSetup}\n${command}`];
-  };
-  const drive = (driver: string, scenario: unknown, command: ReadonlyArray<string>): any => {
-    const result = spawnSync("node", [path.join(here, driver), JSON.stringify(scenario), "--", ...command], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 300_000 });
-    const line = (result.stdout ?? "").trim().split("\n").at(-1) ?? "";
-    try {
-      return JSON.parse(line);
-    } catch {
-      return { driverFailed: `${result.stdout ?? ""}${result.stderr ?? ""}`.slice(-1500) };
-    }
+    return runCommand({
+      harness,
+      name: "t3flare-skills-probe",
+      launch,
+      marker,
+      nonce: nonces[cli],
+      workspace,
+      ...(argv === undefined ? {} : { argv }),
+      files: Object.entries(PROCESS_SKILL_CANDIDATES[cli]).flatMap(([key, name]) => markerFiles(home, key, name)),
+      setup: userSetup,
+    });
   };
   const marker = () => `proc-${randomUUID()}`;
   const report: Record<string, unknown> = { at: new Date().toISOString(), clis: { codex: CLIS.codex.version, pi: CLIS.pi.version, claude: `${CLIS.claude.version} (claude-agent-acp ${CLIS.claude.packageVersion})`, opencode: CLIS.opencode.version } };
@@ -147,7 +110,7 @@ it("each CLI's skill and command roots (SPI-1151 M0) are CLI_ROOTS' table", asyn
         commands: commands.filter((entry: any) => entry.source !== "skill").map((entry: any) => String(entry.name)),
       };
     };
-    const piLaunch = (key: string) => launchOf({ cli: "pi", args: ["--mode", "rpc", "--extension", EXTENSION, "--provider", "anthropic", "--model", "claude-haiku-5-5"], key, env: { T3_PI_RUNTIME_MODE: "approval-required" } });
+    const piLaunch = (key: string) => withoutEnvironmentSkills(piLaunchOf(key));
     const piKey = marker();
     const pi = drive("pi-rpc.mjs", { commands: [{ type: "get_commands" }], timeoutMs: 120_000 }, run("pi", piLaunch(piKey), piKey));
     loaded.pi = piCommands(pi);
@@ -168,34 +131,25 @@ it("each CLI's skill and command roots (SPI-1151 M0) are CLI_ROOTS' table", asyn
     // OpenCode lists no skills over ACP (its commands only): its own server's `GET /api/skill` for the cwd, with the
     // profile's environment and system configuration, answers them.
     const serveKey = marker();
-    const serveLaunch = launchOf({ cli: "opencode", args: ["acp"], key: serveKey, env: {} });
+    const serveLaunch = withoutEnvironmentSkills(launchOf({ cli: "opencode", args: ["acp"], key: serveKey, env: {} }));
     const serveHome = `/var/lib/t3flare/cli/${serveKey}`;
-    const serveScript = [
-      "set -eu",
-      `mkdir -p /etc/opencode "$XDG_DATA_HOME/opencode/log" && install -m 644 ${serveHome}/opencode.json /etc/opencode/opencode.json`,
-      "OPENCODE_SERVER_PASSWORD=probe /opt/t3flare/opencode/opencode serve --hostname 127.0.0.1 --port 4096 >/dev/null 2>&1 &",
-      "for i in $(seq 1 60); do curl -fsS -u opencode:probe -o /dev/null http://127.0.0.1:4096/api/location 2>/dev/null && break; sleep 1; done",
-      // The first request boots the location, whose skill scan settles after it: ask again once it has.
-      `curl -fsS -u opencode:probe -G --data-urlencode 'location[directory]=${T3_PATH}' -o /dev/null http://127.0.0.1:4096/api/skill`,
-      "sleep 5",
-      `curl -fsS -u opencode:probe -G --data-urlencode 'location[directory]=${T3_PATH}' http://127.0.0.1:4096/api/skill`,
-    ].join("\n");
-    const [serveBinary, ...serveArgs] = run("opencode", { ...serveLaunch, files: [...(serveLaunch.files ?? []), { path: `${serveHome}/serve.sh`, text: serveScript, mode: 0o700 }] }, serveKey, ["/bin/bash", `${serveHome}/serve.sh`]);
-    const serve = spawnSync(serveBinary!, serveArgs, { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, timeout: 180_000 });
-    let served: any;
-    try {
-      served = JSON.parse(serve.stdout);
-    } catch {
-      served = undefined;
-    }
-    const servedSkills: ReadonlyArray<any> = Array.isArray(served) ? served : (served?.data ?? served?.value ?? []);
+    const served = openCodeServedSkills({
+      harness,
+      name: "t3flare-skills-probe",
+      launch: serveLaunch,
+      marker: serveKey,
+      nonce: nonces.opencode,
+      workspace,
+      files: Object.entries(PROCESS_SKILL_CANDIDATES.opencode).flatMap(([key, name]) => markerFiles(serveHome, key, name)),
+      setup: userSetup,
+    });
     loaded["opencode (GET /api/skill)"] = {
-      skills: servedSkills.map((skill) => ({ name: skill.name, description: skill.description ?? null, path: skill.path ?? null })),
+      skills: served.skills.map((skill) => ({ name: skill.name, description: skill.description ?? null, path: skill.path ?? null })),
       commands: [],
     };
-    report.opencodeServeRaw = { status: serve.status, stdout: Array.isArray(servedSkills) && servedSkills.length > 0 ? undefined : String(serve.stdout).slice(0, 1500), stderr: String(serve.stderr ?? "").slice(-1200) };
+    report.opencodeServeRaw = served.raw;
   } finally {
-    cleanup();
+    harness.stop();
     spawnSync("docker", ["run", "--rm", "-v", `${workspace}:/workspace`, IMAGE, "rm", "-rf", "/workspace/repo", "/workspace/.t3flare"], { encoding: "utf8" });
     fs.rmSync(workspace, { recursive: true, force: true });
   }
