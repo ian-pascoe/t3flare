@@ -15,6 +15,7 @@ import {
   type AnsweredBy,
   APPLIED_CAP,
   APPLIED_WINDOW_MS,
+  capKeyOf,
   type ChangeCaller,
   type ChangeRecord,
   type ChangeState,
@@ -27,6 +28,7 @@ import {
   STRIKE_LOCK_MS,
   STRIKE_WINDOW_MS,
 } from "./changes.ts";
+import { REQUEST_BUDGET_MS } from "../skills/api.ts";
 
 /** Open changes per own-agent thread (plan D16): a second asked call is refused, not queued. */
 export const OPEN_PER_THREAD = 1;
@@ -62,7 +64,8 @@ export interface CapRefusal {
  * changes list, named by the Environment-wide cap's refusal.
  */
 export const capRefusal = (changes: SettingsChanges, caller: ChangeCaller, hash: string, now: number, openList?: string): CapRefusal | undefined => {
-  const mine = changes.openBy(caller.key);
+  const capKey = capKeyOf(caller.door, caller.key);
+  const mine = changes.openBy(capKey);
   const perCaller = caller.door === "own" ? OPEN_PER_THREAD : OPEN_PER_OWNER;
   if (mine.length >= perCaller) {
     const [first] = mine;
@@ -78,7 +81,7 @@ export const capRefusal = (changes: SettingsChanges, caller: ChangeCaller, hash:
   if (changes.open().length >= OPEN_ACROSS) {
     return { reason: "open-across", text: `Not changed: ${OPEN_ACROSS} changes already wait for the owner across this Environment, the most t3flare keeps. He sees them on the Harness panel's Open changes list${openList === undefined ? "" : `: ${openList}`}.` };
   }
-  const recent = changes.closedBy(caller.key, now - STRIKE_WINDOW_MS - STRIKE_LOCK_MS);
+  const recent = changes.closedBy(capKey, now - STRIKE_WINDOW_MS - STRIKE_LOCK_MS);
   if (recent.some((record) => record.hash === hash && record.state === "declined" && record.closed!.at > now - DECLINED_REPEAT_MS)) {
     return { reason: "declined-repeat", text: `Not changed: the owner declined this same change less than ${durationText(DECLINED_REPEAT_MS)} ago. Do not ask again; ask him in the thread what he wants instead.` };
   }
@@ -95,7 +98,7 @@ export const capRefusal = (changes: SettingsChanges, caller: ChangeCaller, hash:
       text: `Not changed: your last ${STRIKES} asked changes were ${caller.door === "own" ? "declined or unanswered" : "declined"}, so t3flare refuses your asked changes until ${new Date(last + STRIKE_LOCK_MS).toISOString()} (${durationText(STRIKE_LOCK_MS)} after the last). Ask the owner in the thread what he wants.`,
     };
   }
-  if (changes.appliedSince(caller.key, now - APPLIED_WINDOW_MS) >= APPLIED_CAP) {
+  if (changes.appliedSince(capKey, now - APPLIED_WINDOW_MS) >= APPLIED_CAP) {
     return { reason: "applied-cap", text: `Not changed: ${caller.door === "own" ? "this thread" : "you"} made ${APPLIED_CAP} settings changes in the last hour, the most t3flare allows. Try again later, or ask the owner.` };
   }
   return undefined;
@@ -256,8 +259,18 @@ export const closeOpenChange = (deps: Pick<AnswerDeps, "changes" | "now" | "log"
   );
 };
 
-/** How long a close waits for an answer that is applying (the Environment's own apply; a reset strands it). */
+/**
+ * How long a close waits for an answer that is applying (the Environment's own apply; a reset strands it), for an Owner
+ * client's call, which a client's own timeout (60 s or unknown, plan D12) bounds anyway.
+ */
 export const APPLYING_WAIT_MS = 30_000;
+
+/**
+ * The same wait for an own agent's call, which no client timeout cuts short: at least the longest apply, a skills
+ * install or update within the skills API's request budget, and a margin (SPI-1201 review), so a Stop or a timeout
+ * landing meanwhile reports what the apply did.
+ */
+export const OWN_APPLYING_WAIT_MS = REQUEST_BUDGET_MS + 15_000;
 
 /**
  * Closes Open change `id` as `closeOpenChange` does, but when an answer is applying it (state `applying`), waits for that

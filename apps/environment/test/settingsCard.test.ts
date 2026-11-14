@@ -60,7 +60,7 @@ describe("the asked change's card", () => {
     const run = fixture;
     await run.call(run.durable("thread-x"), "change_environment", { expectedRevision: 0, settings: { containerBudget: 4, variables: { FOO: "bar" } } });
     const prompt = run.cards[0]!.prompt;
-    const [record] = run.deps.changes.closedBy("thread-x", 0);
+    const [record] = run.deps.changes.closedBy("own:thread-x", 0);
     expect(prompt.startsWith("A change to the Environment settings (revision 0):")).toBe(true);
     expect(prompt).toContain("- containerBudget: 3 to 4");
     expect(prompt).toContain('added FOO="bar"');

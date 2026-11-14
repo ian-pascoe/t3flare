@@ -116,6 +116,12 @@ export interface ChangeRecord {
 
 export const isOpen = (record: Pick<ChangeRecord, "state">): boolean => record.state === "open" || record.state === "applying";
 
+/**
+ * The key a caller's caps, open changes and reads are counted under (plan D16): its door and its own key, so a thread id
+ * that happens to equal an Access `sub` is another caller (SPI-1201 review). Every `key` of `SettingsChanges` is one.
+ */
+export const capKeyOf = (door: ChangeCaller["door"], key: string): string => `${door}:${key}`;
+
 export interface SettingsChanges {
   /** Applied changes by `key` since `since`, of any tier. */
   appliedSince(key: string, since: number): number;
@@ -210,7 +216,7 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
     sql.exec(
       `INSERT OR REPLACE INTO ${CHANGES_TABLE} (id, caller_key, hash, state, created_at, closed_at, record) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       record.id,
-      record.caller.key,
+      capKeyOf(record.caller.door, record.caller.key),
       record.hash,
       record.state,
       record.createdAt,

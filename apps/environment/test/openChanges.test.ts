@@ -31,6 +31,7 @@ import { answerDepsOf, changesApiOf, settingsOwnerCall } from "../src/settings/s
 import { QUESTION_WAIT_MS } from "../src/mcp/host.ts";
 import { changePagePath } from "../src/harness/paths.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
+import { bodyOf, endpointOf, modern, structuredOf, SUB } from "./settingsEndpointFixture.ts";
 import { NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 import { skillMd } from "./skillRepo.fixture.ts";
 
@@ -475,11 +476,39 @@ describe("SPI-1199 review: the strike lock, the declined-repeat hash, a skill pr
     const run = fixture;
     const commit = run.github.push("o/r", { "skills/a/SKILL.md": skillMd("a") });
     await run.call(run.durable(), "change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: ["skills/missing"] });
-    expect(run.deps.changes.readsSince("thread-d", "network", 0)).toBe(1);
-    for (let index = 1; index < NETWORK_READ_CAP; index++) run.deps.changes.noteRead("thread-d", "network", run.now());
+    expect(run.deps.changes.readsSince("own:thread-d", "network", 0)).toBe(1);
+    for (let index = 1; index < NETWORK_READ_CAP; index++) run.deps.changes.noteRead("own:thread-d", "network", run.now());
     const refused = await run.call(run.durable(), "change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: ["skills/a"] });
     expect(refused).toMatchObject({ structured: { status: "refused" } });
     expect(JSON.stringify(refused)).toContain(`${NETWORK_READ_CAP} reads that reach GitHub`);
     expect(run.deps.changes.open()).toEqual([]);
+  });
+});
+
+describe("SPI-1201 review: caps and lists are scoped by door", () => {
+  let fixture: SettingsFixture | undefined;
+  afterEach(() => fixture?.dispose());
+
+  it("a thread whose id equals the owner's sub is another caller: its change is not the Owner client's to see, resume or count", async () => {
+    fixture = settingsFixture({ answer: () => new Promise(() => undefined) });
+    const run = fixture;
+    const endpoint = endpointOf(run);
+    void run.call(run.durable(SUB), "change_environment", { expectedRevision: 0, settings: { containerBudget: 4 } });
+    await until(() => run.cards.length === 1);
+    const [own] = run.deps.changes.open();
+    expect(own!.caller).toMatchObject({ door: "own", key: SUB });
+    // The Owner client's get_status lists none of it; the thread's lists it.
+    expect((await structuredOf(await endpoint(modern("tools/call", { name: "get_status", arguments: {} }))))?.openChanges).toEqual([]);
+    const status = await run.call(run.durable(SUB), "get_status");
+    expect(status.kind === "result" ? status.structured : undefined).toMatchObject({ openChanges: [{ changeId: own!.id }] });
+    // resume finds no change of its own under that id, as for a made-up one.
+    const resumed = await bodyOf(await endpoint(modern("tools/call", { name: "resume", arguments: { requestId: own!.id, response: { action: "accept" } } }, { query: "?elicitation_mode=model", id: 3 })));
+    expect(resumed.result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
+    expect(JSON.stringify(resumed.result?.content)).toContain("no change of yours");
+    // The Owner client's open cap does not count the thread's change: two of its own still open.
+    await endpoint(modern("tools/call", { name: "change_environment", arguments: { expectedRevision: 0, settings: { containerBudget: 5 } } }));
+    await endpoint(modern("tools/call", { name: "change_environment", arguments: { expectedRevision: 0, settings: { containerBudget: 6 } } }));
+    expect(run.deps.changes.open().filter((record) => record.caller.door === "owner")).toHaveLength(OPEN_PER_OWNER);
+    expect(run.deps.changes.get(own!.id)?.state).toBe("open");
   });
 });
