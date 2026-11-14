@@ -131,9 +131,12 @@ export type ResolvedEnvironment = { readonly revision: number } & {
   readonly [Key in EnvironmentKey]: ValueOf<(typeof ENVIRONMENT_SETTINGS)[Key]["schema"]>;
 };
 
+/** Setting `key`'s entry, typed as any Environment setting (the schema's own type is narrower per key). */
+export const settingOf = (key: EnvironmentKey): EnvironmentSettingEntry => ENVIRONMENT_SETTINGS[key];
+
 /** Whether `value` fits setting `key`'s schema. */
 export const fitsEnvironmentSetting = (key: EnvironmentKey, value: unknown): boolean =>
-  fieldProblem((ENVIRONMENT_SETTINGS[key] as EnvironmentSettingEntry).schema, value) === undefined;
+  fieldProblem(settingOf(key).schema, value) === undefined;
 
 /**
  * The settings every Workspace DO starts its Container with. `settings` is what was stored, or an answer from an
@@ -143,7 +146,7 @@ export const resolveEnvironment = (stored: { readonly revision: number; readonly
   const resolved: Record<string, unknown> = { revision: stored.revision };
   for (const key of ENVIRONMENT_KEYS) {
     const value = stored.settings[key];
-    const schema = (ENVIRONMENT_SETTINGS[key] as EnvironmentSettingEntry).schema;
+    const schema = settingOf(key).schema;
     // Variables: one a later rule refuses is dropped alone, never the whole set (ADR-0032's Variables refinement).
     if (schema.type === "variables") resolved[key] = fitVariables(value);
     else resolved[key] = value !== undefined && fitsEnvironmentSetting(key, value) ? value : schema.default;
@@ -171,9 +174,9 @@ export const applyEnvironmentChange = (
 ): { readonly ok: true; readonly environment: StoredEnvironment; readonly changed: ReadonlyArray<EnvironmentKey> } | { readonly ok: false; readonly error: string } => {
   if (Object.keys(change.settings).length === 0) return { ok: false, error: "the change sets nothing" };
   for (const key of Object.keys(change.settings)) if (!Object.hasOwn(ENVIRONMENT_SETTINGS, key)) return { ok: false, error: `${key}: no such setting` };
-  const entries = Object.entries(change.settings).map(([key, value]) => [key, normalizeField((ENVIRONMENT_SETTINGS[key as EnvironmentKey] as EnvironmentSettingEntry).schema, value)] as const);
+  const entries = Object.entries(change.settings).map(([key, value]) => [key, normalizeField(settingOf(key as EnvironmentKey).schema, value)] as const);
   for (const [key, value] of entries) {
-    const why = fieldProblem((ENVIRONMENT_SETTINGS[key as EnvironmentKey] as EnvironmentSettingEntry).schema, value);
+    const why = fieldProblem(settingOf(key as EnvironmentKey).schema, value);
     if (why !== undefined) return { ok: false, error: `${key}: ${why}` };
   }
   const before: Readonly<Record<string, unknown>> = resolveEnvironment(stored);
