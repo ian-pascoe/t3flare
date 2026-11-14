@@ -9,7 +9,8 @@ modes) and [ADR-0035](../adr/0035-owner-clients-reach-the-settings-server-at-t3f
 **State, 2026-11-14: built and unit-tested through M6 on branch `settings-mcp`, rebased on `origin/main` at 96ee913;
 nothing pushed, deployed or run on a stage after M0.** Every milestone's stage evidence is owed (the "Evidence"
 section), and two owner steps gate parts of it. Prod is deployed without the Owner-client endpoint until owner step 1
-passes and M5a's stage evidence is recorded (ADR-0035; one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES`).
+passes and M5a's stage evidence is recorded, and the nightly job's `bump` stage without it for good (ADR-0035; one
+switch, `OWNER_ENDPOINT_EXCLUDED_STAGES`).
 
 ## What was built
 
@@ -94,8 +95,9 @@ possible.
 - Layout (B) (`settings/endpointLayout.ts`, `worker.ts`, `alchemy.run.ts`): `SettingsAccess` on `<host>/_t3flare/mcp`
   with managed OAuth, the path-cookie attribute on both applications, `T3FLARE_ACCESS_SETTINGS_AUD`,
   `verifySettingsRequest`, the endpoint's URL (`settingsMcpUrl`) in the stage's credentials file; stage `psettings` in
-  `STAGES`. On every stage but prod: prod gets none of it until owner step 1 passes (`OWNER_ENDPOINT_EXCLUDED_STAGES`),
-  so its admin application is as on `main` and `/_t3flare/mcp` answers 404 `not_configured`. `scripts/acceptance.ts`
+  `STAGES`. On every stage but prod and `bump`: prod gets none of it until owner step 1 passes, `bump` none at all
+  (`OWNER_ENDPOINT_EXCLUDED_STAGES`), so their admin applications are as on `main` and `/_t3flare/mcp` answers 404
+  `not_configured`. `scripts/acceptance.ts`
   step 2b, and `scripts/smoke.ts` on every prod deploy, assert the host's root OAuth documents are still t3's.
 
 ### M5b (SPI-1201): `native` and `model`
@@ -251,16 +253,24 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     caller), the last cut alone withdrawing; a native answer with no live stream withdrawn by `stop`; caps keyed by
     door; the own door's longer wait for an applying answer and `waiting` when any wait runs out; the hash's further
     canonicalisation; Patch 0006's rest-of-name rule. Each is recorded in the plan (D4, D6, D8, D12, D16) and U67.
-27. **Prod is deployed without the Owner-client endpoint** (D13, ADR-0035; SPI-1195 review): the plan put layout (B)
-    on every stage. Until owner step 1 passes and M5a's evidence is recorded, `OWNER_ENDPOINT_EXCLUDED_STAGES` holds
+27. **Prod, and `bump`, are deployed without the Owner-client endpoint** (D13, ADR-0035; SPI-1195 review): the plan
+    put layout (B) on every stage. Until owner step 1 passes and M5a's evidence is recorded, `OWNER_ENDPOINT_EXCLUDED_STAGES` holds
     `prod`: no `SettingsAccess`, the admin application exactly as on `main`, no `T3FLARE_ACCESS_SETTINGS_AUD`, so
     `/_t3flare/mcp` answers 404 `not_configured`. Enabling prod is removing it from that list. Reason: (B) is unproven,
     and a prod deploy is not where to find that out. The switch is unit-tested; `alchemy.run.ts` itself needs
     Cloudflare's providers to run, so that it reads the switch is checked by reading it, and by M5a item 4c on prod.
+    Expected on prod while it is excluded: `/_t3flare/mcp` gets the admin application's Access login (its `kid` the
+    admin application's AUD) with no `resource_metadata` challenge, and the first prod deploy's output shows no
+    `SettingsAccess` and `AdminAccess` unchanged. `bump` is excluded too, for good: the nightly job deploys it with the
+    CI token `t3flare-ci-bump`, which is not known to be allowed to create a managed-OAuth Access application, and a
+    failure there would break the nightly job; its acceptance run never calls the endpoint.
 28. **The smoke check boots t3** (SPI-1195 review): `scripts/smoke.ts`, which every prod deploy runs, now asserts the
     root `/.well-known/oauth-*` documents are still t3's (acceptance step 2b's two assertions), so drift in Access is
     caught at the next deploy, not only by an acceptance run. Those two requests are t3's, so the smoke check now boots
-    t3 in the Environment DO (still no Container); before, it booted nothing.
+    t3 in the Environment DO (still no Container); before, it booted nothing. So a deploy whose t3 does not boot can,
+    through the smoke check's retries, put the Environment in safe mode after three failed boots in a row
+    (`SAFE_MODE_AFTER_FAILURES`, `host/bootState.ts`), as the owner's first use after that deploy would have; the
+    owner turns it off on the admin routes once a fixed deploy is out.
 29. **Asked changes opened are capped at 6 per caller per hour, whatever their outcome** (D16; SPI-1195 review): a
     change withdrawn by a Stop, a cancelled card or a cut stream neither strikes nor applies, so nothing else bounded
     an agent asking and dropping. Refused naming the Harness panel, for each door (own thread, Owner `sub`).

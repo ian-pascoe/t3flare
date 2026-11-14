@@ -884,10 +884,11 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 ### U68. The Owner-client endpoint: Access managed OAuth (beta) and the hand-written MCP versions (SPI-1200)
 
 - **Where**: `apps/environment/src/settings/endpointLayout.ts` (layout (B): `<host>/_t3flare/mcp`;
-  `OWNER_ENDPOINT_EXCLUDED_STAGES` keeps prod out of it until owner step 1 passes, ADR-0035), the `SettingsAccess`
-  application in `apps/environment/alchemy.run.ts` (`oauthConfiguration`, `pathCookieAttribute` on it and on
-  `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`; on prod neither), `worker.ts`'s branch
-  for it (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`; unset on prod, so 404 `not_configured`); the
+  `OWNER_ENDPOINT_EXCLUDED_STAGES` keeps prod out of it until owner step 1 passes, and the nightly job's `bump` for
+  good, ADR-0035), the `SettingsAccess` application in `apps/environment/alchemy.run.ts` (`oauthConfiguration`,
+  `pathCookieAttribute` on it and on `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`; on
+  prod and `bump` neither), `worker.ts`'s branch for it (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`;
+  unset on prod and `bump`, so 404 `not_configured`); the
   Access `sub` of the endpoint's assertion, which keys an Owner client's caps, Open changes and reads (`capKeyOf`,
   `owner:<sub>`) and decides who answers its Open changes on the Change page (`answererProblem` in
   `settings/openChanges.ts`: the page's `sub` must equal the asker's; P13, the same `sub` in an OAuth-derived and a

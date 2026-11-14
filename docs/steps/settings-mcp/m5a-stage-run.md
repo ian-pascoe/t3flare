@@ -2,8 +2,9 @@
 
 M5a's code and unit tests (T-endpoint, T-guards, T-state, and T-modes' `browser` cases) landed without a deploy. Its
 evidence, `m5a-settings-owner-browser.json`, needs a deployed workers.dev stage (`psettings`, now in `STAGES`; never
-`prod`) and the owner signing in. Prod is deployed without the endpoint (`OWNER_ENDPOINT_EXCLUDED_STAGES`, ADR-0035)
-until items 1-4 pass and this file is recorded; enabling it then is removing `prod` from that list. Record each item
+`prod`, nor `bump`) and the owner signing in. Prod is deployed without the endpoint (`OWNER_ENDPOINT_EXCLUDED_STAGES`,
+ADR-0035) until items 1-4 pass and this file is recorded; enabling it then is removing `prod` from that list. `bump`, the
+nightly job's stage, stays on it (its CI token is not known to be allowed to create a managed-OAuth application). Record each item
 with the commit deployed, the stage, timestamps, the client and its version, and the change ids. Never record a token, a
 cookie, an authorization code or a header value; record an assertion by its decoded claims with `sub` and `email`
 reduced to "same as …" comparisons.
@@ -53,7 +54,11 @@ a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bea
      `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`,
      `/.well-known/cloudflare-access-protected-resource/_t3flare` and `/_t3flare/mcp` answer (status,
      `WWW-Authenticate`, and whether Access or the origin answers), so the first prod deploy of `SettingsAccess` (once
-     prod is enabled) has a baseline to compare with. After that deploy (CI's, not this run), the same requests must
+     prod is enabled) has a baseline to compare with. Expected while prod is excluded: `/_t3flare/mcp` gets the admin
+     application's Access login (a redirect to Access's sign-in whose `kid` is the admin application's AUD, as at
+     `/_t3flare/harness`) with no `WWW-Authenticate` `resource_metadata` challenge, and, admitted, the Worker answers it
+     404 `not_configured`. Record too that the first prod deploy from this branch (CI's) showed no `SettingsAccess`
+     created and `AdminAccess` unchanged (no path-cookie attribute) in its output. After that deploy (CI's, not this run), the same requests must
      show `/_t3flare/mcp` as its own application and the root documents still t3's; `scripts/smoke.ts` asserts the
      latter on every prod deploy (and `scripts/acceptance.ts` step 2b on every acceptance run, which prod's deploy does
      not make).

@@ -6,7 +6,8 @@ real OAuth token's exchange for the endpoint's path and its refusal at the panel
 the layout built and deployed to test stages, not a confirmed one, and **prod is deployed without it**: no
 `SettingsAccess`, the admin application exactly as before, no `T3FLARE_ACCESS_SETTINGS_AUD`, so `/_t3flare/mcp` on prod
 answers 404 `not_configured` (`OWNER_ENDPOINT_EXCLUDED_STAGES` in `apps/environment/src/settings/endpointLayout.ts`).
-Enabling prod is removing it from that list, once owner step 1 passes and M5a's stage evidence is recorded. Plan:
+Enabling prod is removing it from that list, once owner step 1 passes and M5a's stage evidence is recorded. The
+nightly job's `bump` stage is on that list for good. Plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md) D13. Evidence:
 `docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json` (copied from the spike branch). Refines
 [ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) ("Access only on the admin path"),
@@ -94,6 +95,9 @@ Moving costs the clients' URL and nothing in the DO: `src/settings/endpointLayou
 - Prod is excluded until owner step 1 passes and M5a's stage evidence (`m5a-settings-owner-browser.json`) is recorded:
   on prod there is no Owner-client endpoint, the `/_t3flare` application has no path-cookie attribute, and Owner clients
   cannot connect. Enabling prod then is a one-line change (`OWNER_ENDPOINT_EXCLUDED_STAGES`).
+- `bump` is excluded for good: the nightly job deploys it with the CI token `t3flare-ci-bump`, which is not known to be
+  allowed to create a managed-OAuth Access application, and a failure there would break the nightly job. Its
+  acceptance run never calls the endpoint, so nothing it proves is lost; a throwaway stage (`psettings`) proves (B).
 - Only workers.dev was probed. Prod's custom domain was not (a second stage with a domain in the zone would take over
   prod's rate-limit ruleset), so the first prod deploy with the endpoint is the first run on a custom domain.
 - Every prod deploy's smoke check (`apps/environment/scripts/smoke.ts`) asserts the host's root `/.well-known/oauth-*`
