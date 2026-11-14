@@ -206,6 +206,8 @@ const variables = async () => {
   await enableAll();
   // A pin the image lacks: each path must see the lay-down's install with mise's auto-install off.
   await setEnvironment({ globalMiseConfig: NODE_PIN });
+  // A running Container keeps what it started with: every path starts a new one.
+  await stopAll();
   const written = await execOn(WORKSPACE, `mkdir -p ${VARS_DIR} && cat > ${VARS_DIR}/vars.sh <<'PMISE_EOF'\n${VARS_SCRIPT}PMISE_EOF\necho ok`);
   if (!written.stdout.includes("ok")) throw new Error(`could not write the check: ${JSON.stringify(written)}`);
   const paths: Array<{ who: string; how: string; detail: unknown }> = [];
@@ -565,11 +567,14 @@ const empty = async () => {
   await setMise("");
   const starts = [await startToFirst(), await startToFirst()];
   const run = await execOn(WORKSPACE, `test -e ${GLOBAL_FILE} && echo present || echo absent; ls /var/lib/t3flare/mise 2>/dev/null | wc -l; node --version; git --version`);
+  // A cleared config reports too: Status no longer shows an older start's file.
+  const shown = await status();
   await writeEvidence("empty.json", {
     note: "With no Global mise config the lay-down runs nothing (no exec): its outcome is recorded without an answer, and mise resolves from the image's base file alone.",
     starts,
+    status: shown,
     after: run.stdout.trim().split("\n"),
-    ok: starts.every((entry) => entry.exitCode === 0 && entry.globalMise?.answer === undefined) && run.stdout.startsWith("absent\n0\nv26.13.0"),
+    ok: starts.every((entry) => entry.exitCode === 0 && entry.globalMise?.outcome === "none" && entry.globalMise?.answer === undefined) && String(shown).includes("no Global mise config") && run.stdout.startsWith("absent\n0\nv26.13.0"),
   });
 };
 
