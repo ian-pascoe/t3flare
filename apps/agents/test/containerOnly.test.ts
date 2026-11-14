@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off globalTimers:off
 // Container-only submodules (the prod bug of 2026-11-11): the patterns a Container starts with, and the backend made
 // again when they change.
 import * as fs from "node:fs";
@@ -39,13 +39,15 @@ describe("the patterns a Container starts with", () => {
 });
 
 describe("the Container backend made again when the patterns change", () => {
-  const harness = (needed: Array<ReadonlyArray<string>>, failFirst?: string) => {
+  const harness = (needed: Array<ReadonlyArray<string>>, failFirst?: string, connected?: (handle: { readonly runtimeId?: string }) => Promise<void>) => {
     const made: Array<ReadonlyArray<string>> = [];
+    let runtimes = 0;
     const connects: Array<ReadonlyArray<string>> = [];
     let stops = 0;
     let failures = failFirst === undefined ? 0 : 1;
     const backend = new ContainerOnlyBackend({
       initial: ["/a"],
+      ...(connected === undefined ? {} : { connected: (handle: { readonly runtimeId?: string | undefined }) => connected({ ...(handle.runtimeId === undefined ? {} : { runtimeId: handle.runtimeId }) }) }),
       patterns: () => Promise.resolve(needed.shift() ?? ["/a"]),
       stop: () => {
         stops++;
@@ -66,7 +68,7 @@ describe("the Container backend made again when the patterns change", () => {
               return Promise.reject(error);
             }
             connects.push(patterns);
-            return Promise.resolve({ rpc: {} as never, close: () => Promise.resolve() });
+            return Promise.resolve({ rpc: {} as never, runtimeId: `r${++runtimes}`, close: () => Promise.resolve() });
           },
         };
       },
@@ -96,4 +98,26 @@ describe("the Container backend made again when the patterns change", () => {
     await expect(h.backend.connect({} as never)).rejects.toThrow(/MOUNT_IGNORE/);
     expect(h.stops()).toBe(0);
   });
+
+  it("runs `connected` with the handle's runtime id after every connect, before the handle is given (the Global mise config's lay-down)", async () => {
+    const seen: Array<string> = [];
+    let release: () => void = () => undefined;
+    const h = harness([["/a"], ["/a", "/b"]], "ContainerIgnoreMismatchError", async (handle) => {
+      seen.push(`start ${handle.runtimeId}`);
+      await new Promise<void>((resolve) => (release = resolve));
+      seen.push(`end ${handle.runtimeId}`);
+    });
+    const first = h.backend.connect({} as never).then(() => seen.push("given"));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(seen).toEqual(["start r1"]);
+    release();
+    await first;
+    expect(seen).toEqual(["start r1", "end r1", "given"]);
+    const second = h.backend.connect({} as never);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    release();
+    await second;
+    expect(seen.slice(3)).toEqual(["start r2", "end r2"]);
+  });
 });
+

@@ -89,12 +89,13 @@ export class GlobalMise {
    * The lay-down of the Container `runtime` (computer's runtime id), run or joined; resolves when it has ended. A final
    * outcome is not run again; an exec failure is retried once at once and then by a later call, `MAX_ATTEMPTS` in all.
    */
-  ensure(runtime: string | undefined): Promise<GlobalMiseState> {
+  ensure(runtime: string | undefined, options: { readonly retry?: boolean } = {}): Promise<GlobalMiseState> {
     const key = runtime ?? "";
     const running = this.#running.get(key);
     if (running !== undefined) return running;
     const kept = this.state();
-    if (runtime !== undefined && kept?.runtime === runtime && (FINAL.includes(kept.outcome) || kept.attempts >= MAX_ATTEMPTS)) return Promise.resolve(kept);
+    // `retry: false` (a passive read's connect): a Container that had a run keeps its outcome, failed or not.
+    if (runtime !== undefined && kept?.runtime === runtime && (FINAL.includes(kept.outcome) || kept.attempts >= MAX_ATTEMPTS || options.retry === false)) return Promise.resolve(kept);
     const before = runtime !== undefined && kept?.runtime === runtime ? kept.attempts : 0;
     const promise = (async () => {
       let state = await this.#run(key, before);

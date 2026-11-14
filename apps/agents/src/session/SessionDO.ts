@@ -619,6 +619,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
       // G11: the thread its commands belong to, as stock t3 launches agents with it (`AGENT_THREAD_ENV`): t3's port
       // discovery attributes a server the agent starts to its thread by it.
       containerEnv: threadId === undefined ? COMMAND_ENV : { ...COMMAND_ENV, T3CODE_THREAD_ID: threadId },
+      // What a command cut off before it started waited for: the Global mise config's install (SPI-1150).
+      // SAFETY: the Workspace DO answers `containerStartingNote` over RPC.
+      startingNote: async () => (await (workspace as unknown as { containerStartingNote(): Promise<string | undefined> }).containerStartingNote()) ?? undefined,
       ledger: {
         started: (execId) => this.#execs.started(execId),
         ended: (execId) => this.#execs.ended(execId),

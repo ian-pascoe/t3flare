@@ -139,4 +139,13 @@ describe("GlobalMise", () => {
     expect(t.calls).toHaveLength(2);
     expect(t.storage.get(GLOBAL_MISE_KEY)).toBeUndefined();
   });
+
+  it("does not retry a failed exec for a passive read's connect, and does for the next command's", async () => {
+    const t = setup([{ throws: "exec refused" }, { throws: "exec refused" }, { stdout: answer(true) }]);
+    await t.mise.ensure("r1");
+    expect(await t.mise.ensure("r1", { retry: false })).toMatchObject({ outcome: "exec-failed", attempts: 2 });
+    expect(t.calls).toHaveLength(2);
+    expect(await t.mise.ensure("r1")).toMatchObject({ outcome: "laid", attempts: 3 });
+  });
 });
+

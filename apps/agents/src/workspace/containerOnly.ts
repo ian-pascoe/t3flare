@@ -93,6 +93,11 @@ export interface ContainerOnlyOptions {
   /** Stops the running Container (its patterns are not the ones needed). */
   readonly stop: () => Promise<void>;
   readonly log?: (event: Record<string, unknown>) => void;
+  /**
+   * Runs after every connect, with the Container's runtime id, before computer gets the handle and sends a command: the
+   * Global mise config's lay-down (SPI-1150), once per runtime id. It never throws.
+   */
+  readonly connected?: (handle: { readonly runtimeId?: string | undefined }) => Promise<void>;
 }
 
 export class ContainerOnlyBackend implements WorkspaceBackend {
@@ -128,13 +133,16 @@ export class ContainerOnlyBackend implements WorkspaceBackend {
       this.#current = { patterns, backend: this.#options.make(patterns) };
     }
     const backend = this.#current.backend;
+    let handle: Awaited<ReturnType<WorkspaceBackend["connect"]>>;
     try {
-      return await backend.connect(host);
+      handle = await backend.connect(host);
     } catch (error) {
       if (!(error instanceof Error && error.name === "ContainerIgnoreMismatchError")) throw error;
       this.#options.log?.({ t3flare: "container-patterns-restart", error: String(error).slice(0, 300) });
       await this.#options.stop();
-      return backend.connect(host);
+      handle = await backend.connect(host);
     }
+    await this.#options.connected?.(handle).catch(() => undefined);
+    return handle;
   }
 }

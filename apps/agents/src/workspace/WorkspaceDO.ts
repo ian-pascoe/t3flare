@@ -16,6 +16,7 @@ import {
 import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
 import { type EnvRequest, type EnvResponse, type HostOperation, withHarnessKept, WorkspaceEnvHost } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
+import { GLOBAL_MISE_DEADLINE_MS } from "@t3flare/sandbox-image/globalMise";
 import { DurableObject } from "cloudflare:workers";
 
 import type {
@@ -47,7 +48,8 @@ import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts"
 import { environmentStub } from "../environment.ts";
 import { EMPTY_ENVIRONMENT, fitVariables, type McpRelayAnswer, type ResolvedEnvironment, resolveEnvironment } from "@t3flare/harness-registry";
 import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
-import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, takeEnvironment } from "./containerLaunch.ts";
+import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, shownLaunch, takeEnvironment, withGlobalMise } from "./containerLaunch.ts";
+import { GlobalMise, type GlobalMiseState } from "./globalMise.ts";
 import { commandEnv, VariablesBackend } from "./variables.ts";
 import { reclaimFor } from "./reclaim.ts";
 import { killInRunningContainer } from "./containerKill.ts";
@@ -265,6 +267,13 @@ export class WorkspaceDO extends ContainerHost {
   readonly #tokenPatterns: Array<CredentialPattern> = [];
   /** The token the credential helper is given, until shortly before it expires. */
   #token: { readonly token: string; readonly expiresAt: number } | undefined;
+  /** The Global mise config's lay-down, once per Container (SPI-1150, ADR-0032 §8). */
+  readonly #globalMise: GlobalMise;
+  /** Commands in flight by kind: a connect for passive reads alone never retries a failed lay-down. */
+  #passiveExecs = 0;
+  #activeExecs = 0;
+  /** The runtime id of the Container computer last connected to (its lay-down's key). */
+  #runtime: string | undefined;
   /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
   #sandbox: Promise<boolean> | undefined;
   /** G11: when a command of the Workspace's last ran (not t3's passive reads): someone works here. */
@@ -321,6 +330,48 @@ export class WorkspaceDO extends ContainerHost {
         if (this.ctx.container?.running === true) await this.ctx.container.destroy();
       },
       log: (event) => console.log(JSON.stringify({ ...event, workspace: this.#workspaceId() ?? null })),
+      // Every connect: the Container's lay-down before computer sends it a command (SPI-1150).
+      connected: async (handle) => {
+        this.#runtime = handle.runtimeId;
+        // A passive read's connect lays down a new Container's file as any connect does, but never retries a failed one.
+        await this.#globalMise.ensure(handle.runtimeId, { retry: this.#activeExecs > 0 || this.#passiveExecs === 0 });
+      },
+    });
+    this.#globalMise = new GlobalMise({
+      exec: async (argv, stdin) => {
+        const container = this.ctx.container;
+        if (container === undefined || !container.running) throw new Error("the Container is not running");
+        // The owner's Variables reach the install as every command (a mirror a tool's install reads); COMMAND_ENV wins.
+        const process = await container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: commandEnv(this.#variables(), COMMAND_ENV) });
+        const writer = process.stdin?.getWriter();
+        await writer?.write(new TextEncoder().encode(stdin));
+        await writer?.close();
+        return {
+          output: Promise.all([process.output(), process.exitCode.catch(() => null)]).then(([output, exitCode]) => ({ stdout: new TextDecoder().decode(output.stdout as unknown as Uint8Array), exitCode })),
+          kill: () => process.kill(9),
+        };
+      },
+      launch: () => ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY)?.globalMise,
+      // The lay-down counts as a command: no idle stop, and "in use" to a reclaim (ADR-0032 §8).
+      hold: () => {
+        this.#running++;
+        let released = false;
+        return () => {
+          if (released) return;
+          released = true;
+          this.#running--;
+        };
+      },
+      used: async () => {
+        await this.#noteUse();
+        await this.#scheduleAlarm();
+      },
+      report: (report) => ctx.waitUntil(environmentStub(this.env.ENVIRONMENT).noteGlobalMise(report).then(() => undefined, () => undefined)),
+      storage: ctx.storage.kv,
+      workspace: () => this.#workspaceId() ?? null,
+      now: () => Date.now(),
+      deadlineMs: GLOBAL_MISE_DEADLINE_MS,
+      log: (event) => console.log(JSON.stringify(event)),
     });
     this.#reads = readCache(ctx.storage.sql);
     this.#skillSet = skillSetStore({ kv: ctx.storage.kv, transactionSync: <T>(closure: () => T): T => ctx.storage.transactionSync(closure) });
@@ -383,6 +434,7 @@ export class WorkspaceDO extends ContainerHost {
       remember: (markers) => ctx.storage.kv.put(TERMINAL_MARKERS_KEY, [...markers]),
       remembered: () => ctx.storage.kv.get<ReadonlyArray<string>>(TERMINAL_MARKERS_KEY) ?? [],
       beforeSpawn: async () => {
+        await this.#ensureGlobalMise();
         if (this.containerRunning()) await this.#syncEntries("push");
       },
       projectRootView: PROJECT_ROOT_VIEW,
@@ -406,6 +458,7 @@ export class WorkspaceDO extends ContainerHost {
       remember: (markers) => ctx.storage.kv.put(AGENT_TERMINAL_MARKERS_KEY, [...markers]),
       remembered: () => ctx.storage.kv.get<ReadonlyArray<string>>(AGENT_TERMINAL_MARKERS_KEY) ?? [],
       beforeSpawn: async () => {
+        await this.#ensureGlobalMise();
         if (this.containerRunning()) await this.#syncEntries("push");
       },
       projectRootView: PROJECT_ROOT_VIEW,
@@ -444,7 +497,10 @@ export class WorkspaceDO extends ContainerHost {
       filesMayHaveChanged: (why) => this.#terminalSync.changed(why),
       maxProcesses: MAX_CLI_PROCESSES,
       allowProbe: env.T3FLARE_FAULTS === "1",
-      beforeStart: async (input) => ({ env: { T3FLARE_MODEL_KEY_NONCE: this.#keyGate.issue(input.key, input.cli) }, sandbox: await this.#sandboxWorks() }),
+      beforeStart: async (input) => {
+        await this.#ensureGlobalMise();
+        return { env: { T3FLARE_MODEL_KEY_NONCE: this.#keyGate.issue(input.key, input.cli) }, sandbox: await this.#sandboxWorks() };
+      },
     });
   }
 
@@ -813,9 +869,9 @@ export class WorkspaceDO extends ContainerHost {
       keep: (settings) => kv.put(ENVIRONMENT_KEY, settings),
       waitMs: ENVIRONMENT_READ_MS,
     });
-    const launch = launchOf(taken);
+    const launch = await withGlobalMise(launchOf(taken), taken);
     kv.put(LAUNCH_KEY, launch);
-    console.log(JSON.stringify({ t3flare: "container-launch", workspace: this.#workspaceId() ?? null, source: taken.source, revision: launch.revision, size: launch.size, idleMs: launch.idleMs, budget: launch.budget }));
+    console.log(JSON.stringify({ t3flare: "container-launch", workspace: this.#workspaceId() ?? null, source: taken.source, revision: launch.revision, size: launch.size, idleMs: launch.idleMs, budget: launch.budget, globalMise: launch.globalMise === undefined ? null : { bytes: launch.globalMise.bytes, sha256: launch.globalMise.sha256 } }));
     return launch;
   }
 
@@ -865,6 +921,11 @@ export class WorkspaceDO extends ContainerHost {
     const started = Date.now();
     const backend = input.backend === "worker-shell" ? WORKER_SHELL_BACKEND : CONTAINER_BACKEND;
     if (backend === CONTAINER_BACKEND && input.passive !== true) await this.#restartForSubmodules().catch(() => undefined);
+    // A passive exec (t3's reads, the reclaim's and the idle stop's usage) never runs or retries the lay-down.
+    if (backend === CONTAINER_BACKEND && input.passive !== true) await this.#ensureGlobalMise();
+    const passive = backend === CONTAINER_BACKEND && input.passive === true;
+    if (passive) this.#passiveExecs++;
+    else this.#activeExecs++;
     this.#running++;
     try {
       await this.#ready();
@@ -895,6 +956,8 @@ export class WorkspaceDO extends ContainerHost {
       };
     } finally {
       this.#running--;
+      if (passive) this.#passiveExecs--;
+      else this.#activeExecs--;
       if (backend === CONTAINER_BACKEND && input.passive !== true) {
         this.#lastCommandAt = Date.now();
         await this.#noteUse();
@@ -1734,20 +1797,43 @@ export class WorkspaceDO extends ContainerHost {
     return Number.isFinite(value) && value > 0 ? value : TERMINAL_PROMPT_IDLE_MS;
   }
 
+  #shownLaunch(): ReturnType<typeof shownLaunch> | null {
+    const launch = this.ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY);
+    return launch === undefined ? null : shownLaunch(launch);
+  }
+
+  /**
+   * The running Container's lay-down, before a Terminal's or a CLI process's spawn and a command's run: joined while it
+   * runs, a no-op once done, and run again after an exec failure (ADR-0032 §8's retry). A Container being started gets
+   * its own at its connect.
+   */
+  async #ensureGlobalMise(): Promise<void> {
+    if (!this.containerRunning() || this.#runtime === undefined) return;
+    await this.#globalMise.ensure(this.#runtime).catch(() => undefined);
+  }
+
+  /** What a command cut off before it started waited for (computer-env's message): the Global mise config's install. */
+  containerStartingNote(): string | undefined {
+    return this.#globalMise.inFlight() ? "installing the Global mise config" : undefined;
+  }
+
   /** Whether the Container runs, and the budget's view. */
   async containerState(): Promise<{
     readonly running: boolean;
     readonly leased: boolean;
     readonly lastUse: number | null;
     readonly startedAt: number | null;
-    readonly launch: ContainerLaunch | null;
+    readonly launch: ReturnType<typeof shownLaunch> | null;
+    /** The current Container's Global mise lay-down (its answer, never the text). */
+    readonly globalMise: GlobalMiseState | null;
   }> {
     return {
       running: this.containerRunning(),
       leased: (await this.ctx.storage.get<boolean>(LEASED_KEY)) === true,
       lastUse: (await this.ctx.storage.get<number>(LAST_USE_KEY)) ?? null,
       startedAt: (await this.ctx.storage.get<number>(STARTED_AT_KEY)) ?? null,
-      launch: this.ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY) ?? null,
+      launch: this.#shownLaunch(),
+      globalMise: this.#globalMise.state() ?? null,
     };
   }
 
@@ -1802,6 +1888,8 @@ export class WorkspaceDO extends ContainerHost {
       await this.stopContainer();
       return;
     }
+    // A lay-down whose exec failed is tried again here, not awaited, whoever calls next (ADR-0032 §8).
+    if (this.#globalMise.retryFailed(this.#runtime)) console.log(JSON.stringify({ t3flare: "global-mise-retry", workspace: this.#workspaceId() ?? null }));
     const renewed = await this.#budget().renew(this.ctx.id.toString());
     if (!renewed.ok) console.warn(JSON.stringify({ t3flare: "container-lease-lost", reason: renewed.reason }));
     await this.#scheduleAlarm();
