@@ -3,7 +3,7 @@
 // their key. The Workers check the handle, swap in the endpoint's own credential and stream the request to the
 // endpoint's base URL unchanged. These are the pieces both Workers share: the route, the handle's variable, and what the
 // Environment answers for an endpoint (its target with the credential in its header). A CLI adds only its own config.
-import type { EndpointApi, ModelEndpoint } from "./endpoints.ts";
+import { ENDPOINT_APIS, type EndpointApi, type ModelEndpoint, type ModelEndpoints } from "./endpoints.ts";
 
 /** The relay's path prefix in the Container's egress host. */
 export const MODEL_RELAY_PREFIX = "/t3flare/model/";
@@ -14,8 +14,22 @@ export const MODEL_HANDLE_ENV = "T3FLARE_MODEL_HANDLE";
 /** An endpoint's base URL as a CLI in the Container reaches it through the relay. */
 export const modelRelayUrl = (endpointId: string): string => `http://computer.internal${MODEL_RELAY_PREFIX}${endpointId}`;
 
-/** A model handle: 32 random bytes, hex (as a tool handle). */
-export const MODEL_HANDLE = /^[0-9a-f]{64}$/;
+/** An endpoint a CLI process is configured for through the relay: its id (the route's and the CLI's provider's) and label. */
+export interface RelayedEndpoint {
+  readonly id: string;
+  readonly label: string;
+}
+
+/** The endpoints that speak `api`, in the owner's order: those a CLI that speaks it reaches through the relay. */
+export const endpointsOfApi = (endpoints: ModelEndpoints | undefined, api: EndpointApi): ReadonlyArray<ModelEndpoint> =>
+  (endpoints?.endpoints ?? []).filter((endpoint) => endpoint.api === api);
+
+export const relayedEndpoint = (endpoint: ModelEndpoint): RelayedEndpoint => ({ id: endpoint.id, label: endpoint.label });
+
+// What each API knows of keys and headers, in one place: the header its key goes in, and the request headers a CLI's
+// client sends that the endpoint needs. The relay takes a handle from the key headers and forwards only the allowed
+// headers (ADR-0034 §4: the key goes only to its target, headers included; a header-routed gateway must never get a
+// host or a route from the Container).
 
 /** The header an API takes its key in, and the value it sends. */
 export const credentialHeaderOf = (api: EndpointApi, apiKey: string): { readonly name: string; readonly value: string } => {
@@ -31,20 +45,38 @@ export const credentialHeaderOf = (api: EndpointApi, apiKey: string): { readonly
   }
 };
 
+/** Every header a key goes in, for any API (lowercase), plus Azure's `api-key`: where a CLI's handle may come. */
+export const KEY_HEADERS: ReadonlyArray<string> = [...new Set([...ENDPOINT_APIS.map((api) => credentialHeaderOf(api, "").name), "api-key"])];
+
+/** Request headers every API's requests may carry: the body's type and length, and what the client accepts. */
+const FORWARDED_HEADERS: ReadonlyArray<string> = ["content-type", "content-length", "accept"];
+
+/** The request headers of each API its clients send and the endpoint reads (versions and betas), beside the shared ones. */
+const API_HEADERS: Readonly<Record<EndpointApi, ReadonlyArray<string>>> = {
+  "anthropic-messages": ["anthropic-version", "anthropic-beta"],
+  "openai-responses": ["openai-beta"],
+  "openai-completions": ["openai-beta"],
+  "google-generative-ai": [],
+  "mistral-conversations": [],
+};
+
+/** The request headers the relay forwards for `api` (lowercase); every other header of the Container's is dropped. */
+export const forwardedHeadersOf = (api: EndpointApi): ReadonlySet<string> => new Set([...FORWARDED_HEADERS, ...API_HEADERS[api]]);
+
 /**
  * What the Environment answers the relay for an endpoint: where to send the request (its base URL) and the headers to
  * add (the endpoint's own, then its credential's), or why not, as an HTTP status. `key` is the credential the headers
  * carry, for the Workspace DO's sync guard and leak check to look for (by hash), never to send anywhere else.
  */
 export type ModelRelayTarget =
-  | { readonly ok: true; readonly baseUrl: string; readonly headers: Readonly<Record<string, string>>; readonly key: string | null }
+  | { readonly ok: true; readonly api: EndpointApi; readonly baseUrl: string; readonly headers: Readonly<Record<string, string>>; readonly key: string | null }
   | { readonly ok: false; readonly status: number; readonly message: string };
 
 /** The relay's target for a resolved endpoint and its key (pure; the store's `resolve` gives both). */
 export const relayTargetOf = (resolved: { readonly endpoint: ModelEndpoint; readonly apiKey: string | undefined; readonly unreadable: boolean } | undefined, endpointId: string): ModelRelayTarget => {
   if (resolved === undefined) return { ok: false, status: 404, message: `no Model endpoint ${endpointId}: it was removed, or never saved` };
   const { endpoint, apiKey } = resolved;
-  if (endpoint.auth === "none") return { ok: true, baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers }, key: null };
+  if (endpoint.auth === "none") return { ok: true, api: endpoint.api, baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers }, key: null };
   if (apiKey === undefined) {
     return {
       ok: false,
@@ -57,5 +89,5 @@ export const relayTargetOf = (resolved: { readonly endpoint: ModelEndpoint; read
   const credential = credentialHeaderOf(endpoint.api, apiKey);
   // The endpoint's own headers never carry a credential (validateEndpoint), so the key's header is the only one.
   const headers = Object.fromEntries(Object.entries(endpoint.headers).filter(([name]) => name.toLowerCase() !== credential.name));
-  return { ok: true, baseUrl: endpoint.baseUrl, headers: { ...headers, [credential.name]: credential.value }, key: apiKey };
+  return { ok: true, api: endpoint.api, baseUrl: endpoint.baseUrl, headers: { ...headers, [credential.name]: credential.value }, key: apiKey };
 };

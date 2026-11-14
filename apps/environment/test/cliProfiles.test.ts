@@ -85,7 +85,7 @@ describe("Codex's profile", () => {
       'model_providers.t3flare-endpoint-work-gw={name="Work \\"gateway\\"",base_url="http://computer.internal/t3flare/model/work-gw",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
     );
     // The Workspace DO makes the handle and puts it in the process's environment; the profile only asks for one.
-    expect(answer.modelRelay).toBe(true);
+    expect(answer.modelRelay).toEqual(["openai", "work-gw"]);
     expect(JSON.stringify(answer.env)).not.toContain("T3FLARE_MODEL_HANDLE");
   });
 

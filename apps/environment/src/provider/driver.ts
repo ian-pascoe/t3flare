@@ -22,7 +22,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
 
 import { environmentServices } from "../agents/bindings.ts";
-import { onEndpointsChanged } from "../endpoints/changes.ts";
+import { refreshOnEndpointsChanged } from "../endpoints/changes.ts";
 import { makePiDurableAdapter } from "./adapter.ts";
 import { attachmentReader } from "./attachments.ts";
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
@@ -94,9 +94,7 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
     // Read the proxy's list now rather than at the first interval: a fresh Environment starts with the kept copy.
     yield* Effect.forkScoped(snapshot.refresh);
     // A change to the Model endpoints reaches the picker at once, not at the next check.
-    const services = yield* Effect.context<never>();
-    const stopHearing = onEndpointsChanged(() => void Effect.runForkWith(services)(snapshot.refresh));
-    yield* Effect.addFinalizer(() => Effect.sync(stopHearing));
+    yield* refreshOnEndpointsChanged(snapshot.refresh);
     const textGeneration = makePiDurableTextGeneration();
     // t3's MCP credential per thread (step 3): the adapter hands it to the Session with each open and turn.
     const mcpSessions = yield* McpProviderSessions.McpProviderSessions;

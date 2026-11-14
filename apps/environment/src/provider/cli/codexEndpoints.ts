@@ -3,12 +3,13 @@
 // t3's models goes in Codex (the guard's route). Pure.
 import type { ServerProviderModel } from "@t3tools/contracts";
 import { EMPTY_ENDPOINTS, endpointSlug, type ModelEndpoint, type ModelEndpoints } from "@t3flare/models/endpoints";
+import { endpointsOfApi } from "@t3flare/models/relay";
 
 import { CODEX_PROVIDER_ID, codexEndpointProvider } from "../../agents/cliProfiles.ts";
 import { codexModelRoute, type CodexModelRoute } from "./codexGuard.ts";
 
 /** The endpoints Codex reaches through the model relay: those that speak OpenAI Responses. */
-export const codexEndpoints = (endpoints: ModelEndpoints = EMPTY_ENDPOINTS): ReadonlyArray<ModelEndpoint> => endpoints.endpoints.filter((endpoint) => endpoint.api === "openai-responses");
+export const codexEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => endpointsOfApi(endpoints, "openai-responses");
 
 /** Codex's models: the proxy's (`proxy`, as listed), then each Responses endpoint's by slug, labelled with the endpoint. */
 export const codexModelsOf = (proxy: ReadonlyArray<ServerProviderModel>, endpoints: ModelEndpoints = EMPTY_ENDPOINTS): ReadonlyArray<ServerProviderModel> => {

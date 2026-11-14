@@ -79,7 +79,8 @@ import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, wit
 import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { ModelKeyGate } from "./modelKey.ts";
-import type { ModelRelayGrant } from "./modelRelay.ts";
+import { authorizeModelRelay, type ModelRelayGrant } from "./modelRelay.ts";
+import { EndpointKeyPatterns, leakTargets } from "./endpointKeys.ts";
 import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { AgentTerminals } from "./agentTerminals.ts";
@@ -269,7 +270,7 @@ export class WorkspaceDO extends ContainerHost {
   /** Patterns of the git tokens this object handed to the Container lately. */
   readonly #tokenPatterns: Array<CredentialPattern> = [];
   /** The Model endpoints' keys the model relay used here (SPI-1167), by hash, by endpoint: the sync guard's too. */
-  readonly #endpointPatterns = new Map<string, CredentialPattern>();
+  readonly #endpointKeys = new EndpointKeyPatterns();
   /** The token the credential helper is given, until shortly before it expires. */
   #token: { readonly token: string; readonly expiresAt: number } | undefined;
   /** Commands the Session stopped before they were sent (during a start's install): never sent (`stoppedExecs.ts`). */
@@ -509,16 +510,7 @@ export class WorkspaceDO extends ContainerHost {
   /** The credentials the sync guard looks for: the CLI agents' key and the git tokens handed out lately. */
   async #patterns(): Promise<ReadonlyArray<CredentialPattern>> {
     const key = this.env.COMMISSARY_CONTAINER_API_KEY;
-    return [...(key === undefined || key === "" ? [] : [await patternOf("model-key", key)]), ...this.#tokenPatterns, ...this.#endpointPatterns.values()];
-  }
-
-  /** An endpoint's key the model relay used here (SPI-1167): the sync guard looks for it too, by hash. */
-  async #rememberEndpointKey(endpointId: string, key: string): Promise<void> {
-    const pattern = await patternOf(`endpoint:${endpointId}`, key);
-    if (this.#endpointPatterns.get(endpointId)?.sha256 === pattern.sha256) return;
-    this.#endpointPatterns.delete(endpointId);
-    this.#endpointPatterns.set(endpointId, pattern);
-    if (this.#endpointPatterns.size > 32) this.#endpointPatterns.delete(this.#endpointPatterns.keys().next().value!);
+    return [...(key === undefined || key === "" ? [] : [await patternOf("model-key", key)]), ...this.#tokenPatterns, ...this.#endpointKeys.values()];
   }
 
   async #rememberToken(token: string): Promise<void> {
@@ -603,15 +595,11 @@ export class WorkspaceDO extends ContainerHost {
   }> {
     this.#alive();
     await this.#ready();
-    const values: Array<[string, string]> = [];
+    const values: Array<readonly [string, string]> = [];
     const key = this.env.COMMISSARY_CONTAINER_API_KEY;
     if (key !== undefined && key !== "") values.push(["model-key", key]);
-    const extra: Array<CredentialPattern> = [];
-    for (const credential of input.credentials ?? []) {
-      if (credential.value.length < 8) continue;
-      values.push([credential.name, credential.value]);
-      extra.push(await patternOf(credential.name, credential.value));
-    }
+    const { values: endpointValues, patterns: extra } = await leakTargets(input.credentials ?? []);
+    values.push(...endpointValues);
     const found: Array<{ name: string; path: string }> = [];
     for (const [credential, value] of values) {
       // computer's own grep over the DO's files; only the paths are kept (the matched text would hold the value).
@@ -1979,20 +1967,20 @@ export class WorkspaceDO extends ContainerHost {
 
   /**
    * The model relay's check (SPI-1167), from `WorkspaceProxy`: the model handle names a live CLI process of this
-   * Workspace (another Workspace's, a tool handle, or one whose process exited is refused), and the Environment gives the
+   * Workspace configured for the endpoint (`authorizeModelRelay`), and the Environment gives the
    * endpoint's target with its credential. The credential is remembered by hash for the sync guard, never kept or
    * logged; `WorkspaceProxy` sends the request and logs it. Never logs the handle.
    */
   async modelRelay(input: { readonly handle: string | null; readonly endpointId: string }): Promise<ModelRelayGrant> {
-    const workspace = this.#workspaceId() ?? null;
-    if (this.#isDestroyed()) return { kind: "refused", status: 410, message: "this Workspace was deleted", handleId: null, workspace };
-    const caller = this.#processes.modelCaller(input.handle);
-    if (caller === null) return { kind: "refused", status: 401, message: "unknown or revoked model handle (a handle ends with its process)", handleId: null, workspace };
-    const target = await environmentStub(this.env.ENVIRONMENT).modelRelayTarget({ endpointId: input.endpointId });
-    if (!target.ok) return { kind: "refused", status: target.status, message: target.message, handleId: caller.key, workspace };
-    if (target.key !== null) await this.#rememberEndpointKey(input.endpointId, target.key);
-    return { kind: "granted", handleId: caller.key, cli: caller.cli, workspace, target: { baseUrl: target.baseUrl, headers: target.headers } };
+    return authorizeModelRelay(input, {
+      workspace: this.#workspaceId() ?? null,
+      destroyed: this.#isDestroyed(),
+      caller: (handle) => this.#processes.modelCaller(handle),
+      target: (endpointId) => environmentStub(this.env.ENVIRONMENT).modelRelayTarget({ endpointId }),
+      remember: (endpointId, key) => this.#endpointKeys.remember(endpointId, key),
+    });
   }
+
 
   /**
    * The credential helper's request (ADR-0013): the Workspace's one-repo token (`contents: write`; `workflows` only for

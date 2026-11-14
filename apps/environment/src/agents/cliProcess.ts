@@ -2,7 +2,8 @@
 // t3's spawns of a CLI agent (step 4a): `codex app-server` and `pi --mode rpc …` in a Workspace run there, through the
 // process channel, as a streaming `ChildProcessHandle`. Fail closed: only the argv our drivers send, only in a
 // Workspace, only through a CLI profile (cliProfiles.ts) that fixes the binary, the environment and the home.
-import { toWorkspace } from "@t3flare/workspace-client";
+import { endpointsOfApi, relayedEndpoint } from "@t3flare/models/relay";
+import { newHandle, toWorkspace } from "@t3flare/workspace-client";
 import * as Effect from "effect/Effect";
 import * as PlatformError from "effect/PlatformError";
 import * as Redacted from "effect/Redacted";
@@ -16,7 +17,7 @@ import { traceProtocol } from "./processRouter.ts";
 import { scratchProjectOf } from "./scratch.ts";
 import { type ChannelProcess, type ChannelStart, ProcessRefused } from "./processChannel.ts";
 import { type CliName, profileLaunch } from "./cliProfiles.ts";
-import { CliSpawn, newToolHandle } from "../provider/cli/wrapper.ts";
+import { CliSpawn } from "../provider/cli/wrapper.ts";
 import { takeEnvironmentSkillsAt } from "../provider/cli/environmentSkillsTake.ts";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import * as StateStore from "../platform/stateStore.ts";
@@ -87,12 +88,12 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     // The opening session (the wrapper's), when t3's adapter spawns inside `openSession`.
     const session = yield* CliSpawn;
     // SPI-1167: the Model endpoints Codex reaches through the model relay (OpenAI Responses), as stored now.
-    const responsesEndpoints = (services.modelEndpoints?.().endpoints ?? []).filter((endpoint) => endpoint.api === "openai-responses").map((endpoint) => ({ id: endpoint.id, label: endpoint.label }));
+    const responsesEndpoints = endpointsOfApi(services.modelEndpoints?.(), "openai-responses").map(relayedEndpoint);
     const endpointsOnly = name === "codex" && responsesEndpoints.length > 0;
     if (services.modelProxy === undefined && name !== "t3flare-probe" && !endpointsOnly) return yield* refused(name, "this Environment has no model proxy or Model endpoint for it");
     // ADR-0028: the process's tool handle for the relay's third-party servers (the session's; pi spawns outside the
     // session's fiber and gets one of its own).
-    const toolHandle = session?.toolHandle ?? newToolHandle();
+    const toolHandle = session?.toolHandle ?? newHandle();
     const launch = profileLaunch(
       {
         cli: cliOf(name),
@@ -133,7 +134,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       ...(launch.prune === undefined ? {} : { prune: launch.prune }),
       ...(session !== undefined ? { thread: session.thread } : launch.thread !== undefined ? { thread: launch.thread } : {}),
       toolHandle,
-      ...(launch.modelRelay === true ? { modelRelay: true } : {}),
+      ...(launch.modelRelay === undefined ? {} : { modelRelay: launch.modelRelay }),
     };
     // SPI-1153: the Workspace takes the Environment skill set first, so a CLI that reads its Skills at start (through
     // its link, or pi's flag) reads the current set. Bounded, and never the spawn's failure.

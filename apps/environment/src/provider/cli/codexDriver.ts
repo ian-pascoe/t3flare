@@ -35,7 +35,7 @@ import { runText } from "../textGeneration.ts";
 import { withCodexInvestigation } from "./codexInvestigation.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
 import { codexModelsOf, codexRouteFor } from "./codexEndpoints.ts";
-import { onEndpointsChanged } from "../../endpoints/changes.ts";
+import { refreshOnEndpointsChanged } from "../../endpoints/changes.ts";
 import { cliSnapshotForCwdOf } from "../skills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
@@ -192,9 +192,7 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
     }).pipe(Effect.orDie);
     yield* Effect.forkScoped(snapshot.refresh);
     // SPI-1167: a change to the Model endpoints reaches Codex's model list at once, as it does Pi Durable's picker.
-    const services = yield* Effect.context<never>();
-    const stopHearing = onEndpointsChanged(() => void Effect.runForkWith(services)(snapshot.refresh));
-    yield* Effect.addFinalizer(() => Effect.sync(stopHearing));
+    yield* refreshOnEndpointsChanged(snapshot.refresh);
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
     const sessions: CliSessions = new Map();

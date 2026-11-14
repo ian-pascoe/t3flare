@@ -30,6 +30,7 @@ describe("the model relay's target", () => {
     await store.save(endpoint({ headers: { "X-Org": "acme" } }), { apiKey: "sk-relay-1" });
     expect(await target(store, "openai")).toEqual({
       ok: true,
+      api: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       headers: { "X-Org": "acme", authorization: "Bearer sk-relay-1" },
       key: "sk-relay-1",
@@ -47,7 +48,7 @@ describe("the model relay's target", () => {
   it("adds no credential for an endpoint with no auth", async () => {
     const { store } = setup();
     await store.save(endpoint({ id: "local", auth: "none", baseUrl: "https://models.example.com/v1" }), {});
-    expect(await target(store, "local")).toEqual({ ok: true, baseUrl: "https://models.example.com/v1", headers: {}, key: null });
+    expect(await target(store, "local")).toEqual({ ok: true, api: "openai-responses", baseUrl: "https://models.example.com/v1", headers: {}, key: null });
   });
 
   it("refuses an endpoint that is gone (404) or whose key no longer opens (503), naming no key", async () => {

@@ -9,6 +9,8 @@
 // endpoint's provider (`codexModelRoute`), named by the guard on every thread request. A thread stays on its provider:
 // a turn on a model of another provider is refused (Codex's `turn/start` cannot move a thread to another provider).
 
+import { parseEndpointSlug } from "@t3flare/models/endpoints";
+
 /** Refused with their own reason (review F5): `feedback/*` uploads logs to the vendor, `account/*` is a vendor login. */
 const REFUSED_PREFIXES: ReadonlyArray<[string, string]> = [
   ["feedback/", "feedback goes to the vendor, which t3flare never contacts"],
@@ -56,9 +58,8 @@ export interface TurnContext {
  * that endpoint's provider with the rest as its id; anything else is the Model proxy's model, as sent.
  */
 export const codexModelRoute = (model: string, endpointIds: ReadonlySet<string>, providerOf: (endpointId: string) => string, proxyProvider: string): CodexModelRoute => {
-  const slash = model.indexOf("/");
-  const endpointId = slash > 0 ? model.slice(0, slash) : "";
-  return endpointIds.has(endpointId) && slash < model.length - 1 ? { provider: providerOf(endpointId), model: model.slice(slash + 1) } : { provider: proxyProvider, model };
+  const slug = parseEndpointSlug(model);
+  return slug !== undefined && endpointIds.has(slug.endpointId) ? { provider: providerOf(slug.endpointId), model: slug.modelId } : { provider: proxyProvider, model };
 };
 
 export interface TurnPolicy {

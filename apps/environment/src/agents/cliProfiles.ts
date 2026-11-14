@@ -3,7 +3,8 @@
 // its only model provider with the key helper, and a home built fresh on the Container's own disk with only its session
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
-import { MODEL_HANDLE_ENV, modelRelayUrl } from "@t3flare/models/relay";
+import { parseEndpointSlug } from "@t3flare/models/endpoints";
+import { MODEL_HANDLE_ENV, modelRelayUrl, type RelayedEndpoint } from "@t3flare/models/relay";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
@@ -63,7 +64,7 @@ export interface ProfileContext {
    * The Model endpoints that speak OpenAI Responses (SPI-1167), as stored at the spawn: Codex gets one provider each,
    * through the model relay. Absent: none.
    */
-  readonly endpoints?: ReadonlyArray<{ readonly id: string; readonly label: string }>;
+  readonly endpoints?: ReadonlyArray<RelayedEndpoint>;
   /** The model the CLI's session was opened with, when known (SPI-1167: Codex's process provider is its model's). */
   readonly model?: string;
 }
@@ -78,8 +79,8 @@ export interface Launch {
   readonly links?: ReadonlyArray<{ readonly path: string; readonly target: string }>;
   readonly prune?: ReadonlyArray<{ readonly dir: string; readonly days: number }>;
   readonly thread?: string;
-  /** Whether the Workspace DO gives the process a model handle in `MODEL_HANDLE_ENV` (SPI-1167). */
-  readonly modelRelay?: boolean;
+  /** The Model endpoints the process reaches through the relay (SPI-1167): the Workspace DO gives it a handle for these. */
+  readonly modelRelay?: ReadonlyArray<string>;
   /** Names of t3's env keys not passed on (for the log). */
   readonly droppedEnv: ReadonlyArray<string>;
 }
@@ -118,7 +119,7 @@ export const codexRelayOverrides = (servers: ReadonlyArray<string>): ReadonlyArr
  * process's model handle as its key (`env_key`); the Workers swap it for the endpoint's credential. Codex's shells never
  * see the handle (`shell_environment_policy.exclude`).
  */
-export const codexEndpointOverrides = (endpoints: ReadonlyArray<{ readonly id: string; readonly label: string }>): ReadonlyArray<string> =>
+export const codexEndpointOverrides = (endpoints: ReadonlyArray<RelayedEndpoint>): ReadonlyArray<string> =>
   endpoints.map((endpoint) => {
     const provider = [
       `name=${tomlString(endpoint.label)}`,
@@ -139,14 +140,13 @@ export const codexEndpointOverrides = (endpoints: ReadonlyArray<{ readonly id: s
  * proxy's when there is one (until the hard cut), else the first endpoint's.
  */
 export const codexProcessProvider = (proxyUrl: string, endpoints: ReadonlyArray<{ readonly id: string }>, model: string | undefined): string => {
-  const slash = model?.indexOf("/") ?? -1;
-  const endpointId = model !== undefined && slash > 0 ? model.slice(0, slash) : undefined;
+  const endpointId = model === undefined ? undefined : parseEndpointSlug(model)?.endpointId;
   if (endpointId !== undefined && endpoints.some((endpoint) => endpoint.id === endpointId)) return codexEndpointProvider(endpointId);
   return proxyUrl === "" && endpoints[0] !== undefined ? codexEndpointProvider(endpoints[0].id) : CODEX_PROVIDER_ID;
 };
 
 /** Codex's `-c` overrides (plan §4.3; M0: P3, P10, P11). Each value is TOML. */
-export const codexOverrides = (proxyUrl: string, key: string, endpoints: ReadonlyArray<{ readonly id: string; readonly label: string }> = [], model?: string): ReadonlyArray<string> => {
+export const codexOverrides = (proxyUrl: string, key: string, endpoints: ReadonlyArray<RelayedEndpoint> = [], model?: string): ReadonlyArray<string> => {
   const proxy = [
     `name=${tomlString("Model proxy")}`,
     `base_url=${tomlString(`${proxyUrl}/v1`)}`,
@@ -241,7 +241,7 @@ const codexLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer 
     files: [{ path: `${home}/codex/config.toml`, text: "# t3flare: every setting comes from the command line (-c)\n" }],
     links: [{ path: `${home}/codex/sessions`, target: CODEX_SESSIONS }, environmentSkillsLink(`${home}/${CODEX_ENVIRONMENT_SKILLS}`)],
     ...(thread === undefined ? {} : { thread }),
-    ...((context.endpoints ?? []).length === 0 ? {} : { modelRelay: true }),
+    ...((context.endpoints ?? []).length === 0 ? {} : { modelRelay: (context.endpoints ?? []).map((endpoint) => endpoint.id) }),
     droppedEnv: dropped(input.env),
   };
 };

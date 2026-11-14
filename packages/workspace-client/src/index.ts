@@ -274,12 +274,27 @@ export interface ProcessStartInput {
    */
   readonly toolHandle?: string;
   /**
-   * Whether the process gets a model handle (SPI-1167): the Workspace DO makes one, puts it in the process's environment
-   * (`MODEL_HANDLE_ENV`) and redeems it at the model relay (`/t3flare/model/*`) while the process lives. It never leaves
-   * the Workspace DO and the process.
+   * The Model endpoints the process reaches through the model relay (SPI-1167), by id: with any, the Workspace DO makes
+   * it a model handle, puts it in the process's environment (`MODEL_HANDLE_ENV`) and redeems it at the relay
+   * (`/t3flare/model/<endpointId>/*`) for these endpoints only, while the process lives. The handle never leaves the
+   * Workspace DO and the process.
    */
-  readonly modelRelay?: boolean;
+  readonly modelRelay?: ReadonlyArray<string>;
 }
+
+/** A Tool handle or a model handle: 32 random bytes, hex. */
+export const HANDLE = /^[0-9a-f]{64}$/;
+
+/** A new Tool handle or model handle (`HANDLE`). */
+export const newHandle = (): string => [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+/** Whether two handles are equal, in time that does not depend on where they differ. */
+export const sameHandle = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let at = 0; at < a.length; at++) difference |= a.charCodeAt(at) ^ b.charCodeAt(at);
+  return difference === 0;
+};
 
 /** Every answer names the Workspace DO's boot counter: another value means the processes it held are gone. */
 export interface ProcessAnswer {

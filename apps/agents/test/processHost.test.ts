@@ -319,25 +319,27 @@ describe("model handles (SPI-1167)", () => {
 
   it("are issued to a process that asks, in its environment only, and resolve to it until it exits", async () => {
     const h = harness();
-    await h.host.start(start("proc-a", { modelRelay: true }));
+    await h.host.start(start("proc-a", { modelRelay: ["openai"] }));
     const handle = handleIn(h);
     expect(handle).toMatch(/^[0-9a-f]{64}$/);
     expect(h.spawned[0]!.argv.join(" ")).not.toContain(handle!);
-    expect(h.host.modelCaller(handle!)).toEqual({ key: "proc-a", cli: "codex", thread: "thread-1" });
+    expect(h.host.modelCaller(handle!)).toEqual({ key: "proc-a", cli: "codex", thread: "thread-1", endpoints: new Set(["openai"]) });
     h.procs[0]!.exit(0);
     await tick();
     expect(h.host.modelCaller(handle!)).toBeNull();
   });
 
-  it("are one per process, never a tool handle, and none for a process that does not ask", async () => {
+  it("are one per process, never a tool handle, and none for a process that names no endpoint", async () => {
     const h = harness();
     const TOOL = "c".repeat(64);
-    await h.host.start(start("proc-a", { modelRelay: true, toolHandle: TOOL }));
-    await h.host.start(start("proc-b", { modelRelay: true }));
+    await h.host.start(start("proc-a", { modelRelay: ["openai"], toolHandle: TOOL }));
+    await h.host.start(start("proc-b", { modelRelay: ["openai"] }));
     await h.host.start(start("proc-c"));
+    await h.host.start(start("proc-d", { modelRelay: [] }));
     expect(handleIn(h, 0)).not.toBe(handleIn(h, 1));
     expect(h.host.modelCaller(handleIn(h, 1)!)).toMatchObject({ key: "proc-b" });
     expect(h.spawned[2]!.env.T3FLARE_MODEL_HANDLE).toBeUndefined();
+    expect(h.spawned[3]!.env.T3FLARE_MODEL_HANDLE).toBeUndefined();
     expect(h.host.modelCaller(TOOL)).toBeNull();
     expect(h.host.toolCaller(handleIn(h, 0)!)).toBeNull();
     expect(h.host.modelCaller(null)).toBeNull();

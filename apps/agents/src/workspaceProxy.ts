@@ -44,7 +44,9 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
         log: (event) => console.log(JSON.stringify(event)),
         now: () => Date.now(),
       }).catch((error: unknown) => {
-        console.warn(JSON.stringify({ t3flare: "model-relay-failed", error: error instanceof Error ? error.name : "error" }));
+        // The route logs its own failures; this is what escaped it, with what the path names (never a value).
+        const endpoint = /^\/t3flare\/model\/([a-z0-9-]{1,32})(?:\/|$)/.exec(pathname)?.[1] ?? null;
+        console.warn(JSON.stringify({ t3flare: "model-relay-failed", endpoint, handle: null, error: error instanceof Error ? error.name : "error" }));
         return new Response("t3flare: the model relay failed\n", { status: 502 });
       });
     }

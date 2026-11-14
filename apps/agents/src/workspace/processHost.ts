@@ -14,7 +14,7 @@
 // - The hold (review F7): a process holds the Container while its thread is in a turn, and for `idleHoldMs` after the
 //   last turn ended (or the last input). Past that it no longer holds it, and t3's own idle release (Patch 0003, at the
 //   same 10 minutes) ends the session.
-import { MODEL_HANDLE, MODEL_HANDLE_ENV } from "@t3flare/models/relay";
+import { MODEL_HANDLE_ENV } from "@t3flare/models/relay";
 import { processCommand, type ProcessFile } from "@t3flare/sandbox-image/process";
 import type {
   ProcessAnswer,
@@ -25,6 +25,7 @@ import type {
   ProcessStartAnswer,
   ProcessStartInput,
 } from "@t3flare/workspace-client";
+import { HANDLE, newHandle, sameHandle } from "@t3flare/workspace-client";
 
 /** A process not heartbeaten for this long is killed (the spawner beats every 30 s). */
 export const HEARTBEAT_LAPSE_MS = 90_000;
@@ -110,13 +111,12 @@ interface Proc {
   readonly toolHandle: string | undefined;
   /** The process's model handle (SPI-1167), made here, in memory only: gone with the process or this object. */
   readonly modelHandle: string | undefined;
+  /** The Model endpoints its model handle is for (its profile's). */
+  readonly modelEndpoints: ReadonlySet<string>;
 }
 
-/** A new model handle: 32 random bytes, hex. */
-const newModelHandle = (): string => [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-
 /** Who a tool handle or a model handle speaks for: a live CLI process of this Workspace (its key is the handle's id in logs). */
-export interface ToolCaller {
+export interface HandleCaller {
   readonly key: string;
   readonly cli: string;
   readonly thread: string | null;
@@ -166,10 +166,10 @@ export class ProcessHost {
   }
 
   /** The live process `handle` was issued to, or null (unknown, or its process exited: revoked with it). */
-  toolCaller(handle: string | null): ToolCaller | null {
-    if (handle === null || handle.length < 32) return null;
+  toolCaller(handle: string | null): HandleCaller | null {
+    if (handle === null || !HANDLE.test(handle)) return null;
     for (const proc of this.#procs.values()) {
-      if (proc.exited || proc.toolHandle === undefined || proc.toolHandle !== handle) continue;
+      if (proc.exited || proc.toolHandle === undefined || !sameHandle(proc.toolHandle, handle)) continue;
       return { key: proc.key, cli: proc.cli, thread: proc.marker.thread ?? null };
     }
     return null;
@@ -177,13 +177,13 @@ export class ProcessHost {
 
   /**
    * The live process model handle `handle` was issued to, or null: unknown (another Workspace's, a tool handle, made up)
-   * or revoked (its process exited). The model relay's check (SPI-1167).
+   * or revoked (its process exited), with the endpoints the handle is for. The model relay's check (SPI-1167).
    */
-  modelCaller(handle: string | null): ToolCaller | null {
-    if (handle === null || !MODEL_HANDLE.test(handle)) return null;
+  modelCaller(handle: string | null): (HandleCaller & { readonly endpoints: ReadonlySet<string> }) | null {
+    if (handle === null || !HANDLE.test(handle)) return null;
     for (const proc of this.#procs.values()) {
-      if (proc.exited || proc.modelHandle === undefined || proc.modelHandle !== handle) continue;
-      return { key: proc.key, cli: proc.cli, thread: proc.marker.thread ?? null };
+      if (proc.exited || proc.modelHandle === undefined || !sameHandle(proc.modelHandle, handle)) continue;
+      return { key: proc.key, cli: proc.cli, thread: proc.marker.thread ?? null, endpoints: proc.modelEndpoints };
     }
     return null;
   }
@@ -278,8 +278,9 @@ export class ProcessHost {
       turnEndedAt: now,
       exited: false,
       killing: false,
-      toolHandle: input.toolHandle !== undefined && /^[0-9a-f]{64}$/.test(input.toolHandle) ? input.toolHandle : undefined,
-      modelHandle: input.modelRelay === true ? newModelHandle() : undefined,
+      toolHandle: input.toolHandle !== undefined && HANDLE.test(input.toolHandle) ? input.toolHandle : undefined,
+      modelHandle: (input.modelRelay ?? []).length > 0 ? newHandle() : undefined,
+      modelEndpoints: new Set(input.modelRelay ?? []),
     };
     this.#procs.set(input.key, proc);
     this.#save();

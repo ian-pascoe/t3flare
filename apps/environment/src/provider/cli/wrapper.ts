@@ -15,7 +15,7 @@
 // - The thread's Workspace takes the Environment skill set before each turn (SPI-1153).
 // - A tool call the MCP relay asks about (ADR-0028) is raised as t3's approval card on the thread's live turn: the
 //   wrapper injects the request's events and answers it itself (`respondToRuntimeRequest`), never the CLI.
-import { toWorkspace } from "@t3flare/workspace-client";
+import { newHandle, toWorkspace } from "@t3flare/workspace-client";
 import {
   type NodeId,
   type OrchestrationV2ExecutionNode,
@@ -62,8 +62,6 @@ export interface CliSession {
   model?: string;
 }
 
-/** A new tool handle (ADR-0028): 32 random bytes, hex. */
-export const newToolHandle = (): string => [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 /** Sessions of one driver instance, by provider session id: shared by its client factory and its wrapper. */
 export type CliSessions = Map<string, CliSession>;
@@ -77,7 +75,7 @@ export const CliSpawn = Context.Reference<CliSession | undefined>("t3flare/CliSp
 export const sessionFor = (sessions: CliSessions, providerSessionId: string, cwd: string | null, thread: string): CliSession => {
   let session = sessions.get(providerSessionId);
   if (session === undefined) {
-    session = { thread, process: undefined, runtimeMode: undefined, interactionMode: undefined, workspace: cwd === null ? null : (toWorkspace(cwd)?.id ?? null), turnActive: false, capFiber: undefined, toolHandle: newToolHandle() };
+    session = { thread, process: undefined, runtimeMode: undefined, interactionMode: undefined, workspace: cwd === null ? null : (toWorkspace(cwd)?.id ?? null), turnActive: false, capFiber: undefined, toolHandle: newHandle() };
     sessions.set(providerSessionId, session);
   }
   return session;

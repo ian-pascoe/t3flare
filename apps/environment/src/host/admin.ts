@@ -419,11 +419,8 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
       case "POST /_t3flare/check/leak": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");
         // SPI-1167: every Model endpoint's key is looked for too (by value in the DO's files, by hash in the Container).
-        const credentials: Array<{ name: string; value: string }> = [];
-        for (const endpoint of (await environment.modelEndpoints()).endpoints) {
-          const target = await environment.modelRelayTarget({ endpointId: endpoint.id });
-          if (target.ok && target.key !== null) credentials.push({ name: `endpoint:${endpoint.id}`, value: target.key });
-        }
+        const { endpointLeakCredentials } = await import("../endpoints/leak.ts");
+        const credentials = await endpointLeakCredentials({ endpoints: () => environment.modelEndpoints(), target: (endpointId) => environment.modelRelayTarget({ endpointId }) });
         return json(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck({ credentials }));
       }
       case "GET /_t3flare/agents/process-state": {
