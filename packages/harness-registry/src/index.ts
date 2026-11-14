@@ -334,14 +334,16 @@ export const directUrlProblem = (url: string): string | undefined => {
 
 /**
  * `url` without its query and fragment (plan D14): a Direct server's URL may carry a key in its query, so whatever shows
- * it outside the panel shows this. Text that is not a URL is returned unchanged.
+ * it outside the panel shows this. Text the URL parser refuses (a bad port, an empty host) is cut at its first `?` or
+ * `#` (SPI-1195 review): a key in a malformed URL is still a key.
  */
 export const withoutQuery = (url: string): string => {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    return url;
+    const cut = url.search(/[?#]/);
+    return cut === -1 ? url : url.slice(0, cut);
   }
   if (parsed.search === "" && parsed.hash === "") return url;
   parsed.search = "";
