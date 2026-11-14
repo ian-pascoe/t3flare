@@ -150,13 +150,48 @@ describe("the model relay route", () => {
 
   it("refuses a path that could leave the base URL at a decoding endpoint, in any encoding", async () => {
     const h = harness();
-    for (const rest of ["/%252e%252e/admin", "/x/%252E/y", "/a%2fb", "/a%2Fb", "/a%5cb", "/a%5Cb", "/a%255cb"]) {
+    for (const rest of [
+      "/%252e%252e/admin",
+      "/x/%252E/y",
+      "/a%2fb",
+      "/a%2Fb",
+      "/a%5cb",
+      "/a%5Cb",
+      "/a%255cb",
+      // A malformed escape anywhere in a segment: an upstream's laxer decoder could read the rest.
+      "/%ff%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fother",
+      "/%2e%2e%5c%ff",
+      "/x%2f..%2f..%ff",
+      "/%c0%ae%c0%ae/x",
+      // Encoded deeper than MAX_DECODES does not settle, and is refused.
+      "/%2525252e%2525252e/x",
+      "/%2525252f",
+      "/%25252e%25252e/x",
+      // Dot segments with a parameter (Tomcat's `..;`), and control characters (NUL, tab, CR LF).
+      "/..;/x",
+      "/a/%2e%2e;x=1/b",
+      "/.;/x",
+      "/.%00./x",
+      "/%2e%2e%00/x",
+      "/a%09/b",
+      "/%0d%0aHost:%20evil",
+    ]) {
       const response = await handleModelRelay(post("{}", {}, `http://computer.internal/t3flare/model/openai${rest}`), h.deps);
       expect(response.status, rest).toBe(400);
     }
     expect(h.asked).toEqual([]);
     expect(h.sent).toEqual([]);
     expect(h.logs.every((entry) => entry.handle === null && entry.endpoint === "openai")).toBe(true);
+  });
+
+  it("passes an ordinary escape (a colon, a space) through unchanged; a literal percent sign is refused with the rest", async () => {
+    const h = harness();
+    // `%25` decodes to a bare `%`, whose next decode fails: refused as a malformed escape (no model API path holds one).
+    expect((await handleModelRelay(post("{}", {}, "http://computer.internal/t3flare/model/openai/x/100%25"), h.deps)).status).toBe(400);
+    for (const rest of ["/models/gpt-5%3Amini", "/files/a%20b"]) {
+      expect((await handleModelRelay(post("{}", {}, `http://computer.internal/t3flare/model/openai${rest}`), h.deps)).status, rest).toBe(200);
+    }
+    expect(h.sent.map((request) => new URL(request.url).pathname)).toEqual(["/v1/models/gpt-5%3Amini", "/v1/files/a%20b"]);
   });
 
   it("resolves a dot segment the URL itself resolves (`..`, `%2e%2e`) before naming the endpoint, so the handle's scope judges it", async () => {
@@ -221,7 +256,7 @@ describe("the model relay route", () => {
 });
 
 describe("the Workspace DO's check of a model handle", () => {
-  const caller = { key: "proc-1", cli: "codex", endpoints: new Set(["openai"]) };
+  const caller = { key: "proc-1", cli: "codex", thread: "thread-1", endpoints: new Set(["openai"]) };
   const target = { ok: true as const, api: "openai-responses" as const, baseUrl: "https://api.example.com/v1", headers: { authorization: `Bearer ${KEY}` }, key: KEY };
   const deps = (extra: Partial<Parameters<typeof authorizeModelRelay>[1]> = {}) => {
     const remembered: Array<[string, string]> = [];

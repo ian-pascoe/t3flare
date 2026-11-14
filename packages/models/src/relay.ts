@@ -14,7 +14,10 @@ export const MODEL_HANDLE_ENV = "T3FLARE_MODEL_HANDLE";
 /** An endpoint's base URL as a CLI in the Container reaches it through the relay. */
 export const modelRelayUrl = (endpointId: string): string => `http://computer.internal${MODEL_RELAY_PREFIX}${endpointId}`;
 
-/** An endpoint a CLI process is configured for through the relay: its id (the route's and the CLI's provider's) and label. */
+/**
+ * What a CLI profile reads of an endpoint it configures for the relay: its id (the route's and the CLI's provider's) and
+ * label. A `ModelEndpoint` is one; the narrow type keeps the profiles from reading anything else.
+ */
 export interface RelayedEndpoint {
   readonly id: string;
   readonly label: string;
@@ -24,7 +27,6 @@ export interface RelayedEndpoint {
 export const endpointsOfApi = (endpoints: ModelEndpoints | undefined, api: EndpointApi): ReadonlyArray<ModelEndpoint> =>
   (endpoints?.endpoints ?? []).filter((endpoint) => endpoint.api === api);
 
-export const relayedEndpoint = (endpoint: ModelEndpoint): RelayedEndpoint => ({ id: endpoint.id, label: endpoint.label });
 
 // What each API knows of keys and headers, in one place: the header its key goes in, and the request headers a CLI's
 // client sends that the endpoint needs. The relay takes a handle from the key headers and forwards only the allowed

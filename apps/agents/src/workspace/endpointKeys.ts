@@ -28,14 +28,25 @@ export class EndpointKeyPatterns {
   }
 }
 
+/** Values shorter than this are not searched for in the DO's files either (too short to tell from ordinary text). */
+export const MIN_SEARCHED_VALUE_LENGTH = 8;
+
 /**
  * What a leak check looks for, of `credentials`: every value in the DO's files, and the patterns of those long enough
- * to scan for in the Container.
+ * to scan for in the Container. `skipped` names (never shows) each credential left out somewhere, so a skip is never
+ * read as a clean scan.
  */
 export const leakTargets = async (
   credentials: ReadonlyArray<{ readonly name: string; readonly value: string }>,
-): Promise<{ readonly values: ReadonlyArray<readonly [string, string]>; readonly patterns: ReadonlyArray<CredentialPattern> }> => {
-  const values = credentials.filter((credential) => credential.value.length >= 8).map((credential) => [credential.name, credential.value] as const);
+): Promise<{
+  readonly values: ReadonlyArray<readonly [string, string]>;
+  readonly patterns: ReadonlyArray<CredentialPattern>;
+  readonly skipped: ReadonlyArray<{ readonly name: string; readonly where: "container" | "everywhere" }>;
+}> => {
+  const values = credentials.filter((credential) => credential.value.length >= MIN_SEARCHED_VALUE_LENGTH).map((credential) => [credential.name, credential.value] as const);
   const patterns = await Promise.all(credentials.filter((credential) => credential.value.length >= MIN_SCANNED_KEY_LENGTH).map((credential) => patternOf(credential.name, credential.value)));
-  return { values, patterns };
+  const skipped = credentials
+    .filter((credential) => credential.value.length < MIN_SCANNED_KEY_LENGTH)
+    .map((credential) => ({ name: credential.name, where: credential.value.length < MIN_SEARCHED_VALUE_LENGTH ? ("everywhere" as const) : ("container" as const) }));
+  return { values, patterns, skipped };
 };

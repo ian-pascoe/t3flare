@@ -4,7 +4,7 @@
 import { patternOf } from "@t3flare/sandbox-image/leakscan";
 import { describe, expect, it } from "vitest";
 
-import { EndpointKeyPatterns, leakTargets, MAX_ENDPOINT_KEYS, MIN_SCANNED_KEY_LENGTH } from "../src/workspace/endpointKeys.ts";
+import { EndpointKeyPatterns, leakTargets, MAX_ENDPOINT_KEYS, MIN_SCANNED_KEY_LENGTH, MIN_SEARCHED_VALUE_LENGTH } from "../src/workspace/endpointKeys.ts";
 
 const LONG = "sk-endpoint-key-0123456789abcdef";
 
@@ -34,12 +34,18 @@ describe("the leak check's endpoint keys", () => {
     const targets = await leakTargets([
       { name: "endpoint:openai", value: LONG },
       { name: "endpoint:short", value: "short-key-123" },
-      { name: "endpoint:tiny", value: "abc" },
+      { name: "endpoint:tiny", value: "x".repeat(MIN_SEARCHED_VALUE_LENGTH - 1) },
     ]);
     expect(targets.values).toEqual([
       ["endpoint:openai", LONG],
       ["endpoint:short", "short-key-123"],
     ]);
     expect(targets.patterns).toEqual([await patternOf("endpoint:openai", LONG)]);
+    // A skip is named, never shown, so it does not read as a clean scan.
+    expect(targets.skipped).toEqual([
+      { name: "endpoint:short", where: "container" },
+      { name: "endpoint:tiny", where: "everywhere" },
+    ]);
+    expect(JSON.stringify(targets.skipped)).not.toContain("short-key-123");
   });
 });

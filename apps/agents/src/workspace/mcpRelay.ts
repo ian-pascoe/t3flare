@@ -3,6 +3,7 @@
 // request's shape and hands one JSON-RPC message to the Workspace DO, which resolves the handle and asks the Environment
 // DO; nothing of the request but the message goes on (no header, no key). Pure, deps injected.
 import { MCP_RELAY_PREFIX, type McpRelayAnswer } from "@t3flare/harness-registry";
+import { HANDLE } from "@t3flare/workspace-client";
 
 /** Requests from the Container are capped (plan §3.2). */
 export const MAX_RELAY_BYTES = 1024 * 1024;
@@ -26,8 +27,8 @@ const jsonRpcError = (id: unknown, code: number, message: string): Response =>
 const bearerOf = (headers: Headers): string | null => {
   const value = headers.get("authorization");
   if (value === null) return null;
-  const match = /^Bearer ([0-9a-f]{64})$/.exec(value.trim());
-  return match === null ? null : match[1]!;
+  const word = /^Bearer (\S+)$/.exec(value.trim())?.[1];
+  return word !== undefined && HANDLE.test(word) ? word : null;
 };
 
 /** Reads at most `MAX_RELAY_BYTES` of the body, or null when it is larger. */

@@ -2,7 +2,7 @@
 // t3's spawns of a CLI agent (step 4a): `codex app-server` and `pi --mode rpc …` in a Workspace run there, through the
 // process channel, as a streaming `ChildProcessHandle`. Fail closed: only the argv our drivers send, only in a
 // Workspace, only through a CLI profile (cliProfiles.ts) that fixes the binary, the environment and the home.
-import { endpointsOfApi, relayedEndpoint } from "@t3flare/models/relay";
+import { endpointsOfApi } from "@t3flare/models/relay";
 import { newHandle, toWorkspace } from "@t3flare/workspace-client";
 import * as Effect from "effect/Effect";
 import * as PlatformError from "effect/PlatformError";
@@ -88,7 +88,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     // The opening session (the wrapper's), when t3's adapter spawns inside `openSession`.
     const session = yield* CliSpawn;
     // SPI-1167: the Model endpoints Codex reaches through the model relay (OpenAI Responses), as stored now.
-    const responsesEndpoints = endpointsOfApi(services.modelEndpoints?.(), "openai-responses").map(relayedEndpoint);
+    const responsesEndpoints = endpointsOfApi(services.modelEndpoints?.(), "openai-responses");
     const endpointsOnly = name === "codex" && responsesEndpoints.length > 0;
     if (services.modelProxy === undefined && name !== "t3flare-probe" && !endpointsOnly) return yield* refused(name, "this Environment has no model proxy or Model endpoint for it");
     // ADR-0028: the process's tool handle for the relay's third-party servers (the session's; pi spawns outside the

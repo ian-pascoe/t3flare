@@ -12,6 +12,8 @@ import { ENDPOINT_ID, type EndpointApi } from "@t3flare/models/endpoints";
 import { forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, type ModelRelayTarget } from "@t3flare/models/relay";
 import { HANDLE } from "@t3flare/workspace-client";
 
+import type { HandleCaller } from "./processHost.ts";
+
 /** What the Workspace DO answers for a handle and an endpoint. */
 export type ModelRelayGrant =
   | {
@@ -52,26 +54,33 @@ const handleOf = (headers: Headers): string | null => {
   return null;
 };
 
-/** A segment decoded as an upstream might, up to three times (a double-encoded dot is still a dot). */
-const decodedSegment = (segment: string): string => {
+/** How many decodes a segment may take to settle: more layers than that is refused (an upstream may decode them all). */
+export const MAX_DECODES = 3;
+
+/**
+ * A segment decoded to its fixed point, as an upstream that decodes repeatedly might; undefined when a decode fails (a
+ * malformed escape, an overlong UTF-8 byte) or it has not settled after `MAX_DECODES` decodes. Either is refused: an
+ * upstream's own, laxer decoder could read something else there.
+ */
+const decodedSegment = (segment: string): string | undefined => {
   let decoded = segment;
-  for (let round = 0; round < 3; round++) {
+  for (let round = 0; round <= MAX_DECODES; round++) {
     let next: string;
     try {
       next = decodeURIComponent(decoded);
     } catch {
-      return decoded;
+      return undefined;
     }
     if (next === decoded) return decoded;
     decoded = next;
   }
-  return decoded;
+  return undefined;
 };
 
 /**
- * Whether the path below the endpoint's id could leave its base URL at an upstream that decodes it: a dot segment, or a
- * `/` or `\` in a segment, in any encoding. `URL` has already resolved literal and singly encoded dot segments, and
- * turned a literal `\` into `/`.
+ * Whether the path below the endpoint's id could leave its base URL at an upstream that decodes it: a segment that does
+ * not decode cleanly, a dot segment (also with a `;` parameter, as Tomcat reads `..;`), or a `/`, `\` or control
+ * character (a NUL a server may cut at, a CR or LF) in a segment, in any encoding. `URL` has already resolved literal and singly encoded dot segments, and turned a literal `\` into `/`.
  */
 const leavesBase = (rest: string): boolean =>
   rest
@@ -79,7 +88,8 @@ const leavesBase = (rest: string): boolean =>
     .slice(1)
     .some((segment) => {
       const decoded = decodedSegment(segment);
-      return decoded === "." || decoded === ".." || decoded.includes("/") || decoded.includes("\\");
+      // oxlint-disable-next-line no-control-regex -- control characters are what this refuses
+      return decoded === undefined || /^\.\.?(?:;|$)/.test(decoded) || /[/\\\u0000-\u001f\u007f]/.test(decoded);
     });
 
 /** Only the allowed headers of the Container's request, then the endpoint's own and its credential. */
@@ -119,8 +129,8 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
     return plain(404, "not a model relay path (/t3flare/model/<endpointId>/…)");
   }
   if (leavesBase(rest)) {
-    log(400, { handleId: null }, { why: "an encoded dot segment or separator" });
-    return plain(400, "the path holds an encoded dot segment, `/` or `\\`: it could leave the endpoint's base URL");
+    log(400, { handleId: null }, { why: "a malformed escape, a dot segment, a separator or a control character" });
+    return plain(400, "the path holds a malformed escape, an encoded dot segment, `/`, `\\` or a control character: it could leave the endpoint's base URL");
   }
   const handle = handleOf(request.headers);
   if (handle === null) {
@@ -176,7 +186,7 @@ export interface AuthorizeDeps {
   readonly workspace: string | null;
   readonly destroyed: boolean;
   /** The live process a model handle was issued to, with the endpoints it is for (`ProcessHost.modelCaller`). */
-  readonly caller: (handle: string | null) => { readonly key: string; readonly cli: string; readonly endpoints: ReadonlySet<string> } | null;
+  readonly caller: (handle: string | null) => (HandleCaller & { readonly endpoints: ReadonlySet<string> }) | null;
   /** The Environment DO's `modelRelayTarget`. */
   readonly target: (endpointId: string) => Promise<ModelRelayTarget>;
   /** The key the relay is about to use, for the sync guard (`EndpointKeyPatterns`). */
