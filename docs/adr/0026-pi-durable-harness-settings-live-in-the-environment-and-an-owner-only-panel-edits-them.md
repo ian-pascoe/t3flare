@@ -56,7 +56,7 @@ an `entity`. See [ADR-0032](0032-environment-settings-and-harness-settings-are-s
 §8 ("the agent gets no settings tools", OD-T9) is superseded by
 [ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md) (owner, 2026-11-14: "the whole point is
 that the agent can modify its own environment"). Everything this panel edits is changeable through the Settings server,
-by t3flare's own agents and by the owner's external MCP clients.
+by t3flare's own agents and by Owner clients.
 
 - The owner is no longer the only one who drafts a change. He is still the only one who answers on a page of this panel:
   an asked change of an agent's is answered on its t3 card or on the panel's Change page
@@ -66,7 +66,7 @@ by t3flare's own agents and by the owner's external MCP clients.
 - §7's audit entries gain who asked, through which door, the change's tier, and what answered it.
 - The panel's handlers move into one module that the panel and the Settings server both call.
 
-## Refinement (SPI-1200, 2026-11-14): a second Access application, for the Owner-client endpoint
+## Refinement: a second Access application, for the Owner-client endpoint (SPI-1200, 2026-11-14)
 
 Contradicts §1 and "Back to stock" ("no … second Access application"), deliberately. The panel itself is unchanged: it
 stays `/_t3flare/harness` behind the `/_t3flare` Access application, admitted as §2 says. What is new is the Settings

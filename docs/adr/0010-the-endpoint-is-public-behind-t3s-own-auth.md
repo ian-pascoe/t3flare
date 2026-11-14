@@ -71,8 +71,8 @@ Evidence: `docs/steps/tools/m3-panel-safety.json`, `m6-oauth.json` (P13).
 `/_t3flare/mcp` (`SettingsAccess`, the Owner-client endpoint's, with managed OAuth); everything else on the host stays
 public behind t3's own auth. The more specific application wins its path, each application's cookie is scoped to its own
 path, and the Worker verifies the endpoint's assertion against its own audience, so a token for one is not admitted at
-the other's paths. The admin application gets no managed OAuth, so t3's root well-known documents are untouched, and
-prod keeps one host for the rate limit.
+the other's paths, pending owner step 1 (ADR-0035). Prod has no `SettingsAccess` until then. The admin application gets
+no managed OAuth, so t3's root well-known documents are untouched, and prod keeps one host for the rate limit.
 [ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
 records the layout, the conditions it rests on (one still pending the owner's sign-in), and when it moves to a host of
 its own.

@@ -951,11 +951,11 @@ check it still holds before building on it.
 ## 10. Risks
 
 - **`model` and `native` do not prove the owner answered** (O6). Whatever holds an Owner client's token can make every
-  Settings change except typing a secret or completing a sign-in, with no person involved. ADR-0034 records it. The
-  audit's `mode` and `answeredBy` are the only trace.
-- **A token read over an Outbound link.** A cloud agent that reaches the Laptop Environment could read an Owner
-  client's stored token there and use `model`. The owner-only card holds only while no agent of ours can obtain such a
-  token.
+  Settings change except the page-only ones (a secret, a sign-in, a skills install or update, and `oversize` text, D6),
+  with no person involved. ADR-0034 records it. The audit's `mode` and `answeredBy` are the only trace.
+- **A token read over an Outbound link.** An agent in the Cloud Environment (a Durable or CLI agent) that reaches the
+  Laptop Environment could read an Owner client's stored token there and use `model`. The owner-only card holds only
+  while no agent of ours can obtain such a token.
 - **Access managed OAuth is in beta.** Its discovery behaviour may change under (B); `scripts/smoke.ts` asserts on
   every prod deploy, and acceptance step 2b on every acceptance run, that the root well-known documents are still t3's,
   so drift is caught at the next deploy or run, not by a schedule.

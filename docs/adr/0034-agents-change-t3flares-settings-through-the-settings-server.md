@@ -11,7 +11,7 @@ gets no settings tools", OD-T9). Refines ADR-0026, [ADR-0028](0028-mcp-tools-rea
 [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md) and
 [ADR-0033](0033-environment-skills-are-pinned-copies-fetched-from-github-kept-by-the-environment-and-changed-only-by-the-owner.md) §7.
 
-ADR-0026 kept settings away from agents: linked work and prompt injection made an agent that edits its own MCP server
+ADR-0026 kept settings away from agents: Linked work and prompt injection made an agent that edits its own MCP server
 set a larger target, and t3 had no surface for such changes. The owner reversed that: "the whole point is that the agent
 can modify its own environment", and later "make everything configurable by the agent. Since we are using elicitation,
 it's not a big deal to expose these." So everything the Harness panel edits is changeable through one MCP server, the
@@ -82,12 +82,14 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
   nothing, and Access issues the same grant for all three. In `native` the client's `accept`, and in `model` the agent's
   `resume`, is recorded as the owner's answer and applies the change, although a client hook, an auto-approve policy or
   the agent itself may have produced it. So whatever holds an Owner client's token can make every Settings change except
-  typing a secret or completing an OAuth sign-in, with no person involved, by asking in `model`: this includes turning
-  the Guardian off, marking a tool read and changing the Settings server's own entry. Only `browser`, and the card
-  t3flare's own agents get, show that the owner answered. The audit log records each change's mode and what answered it
-  (page, card, client or agent), and that is the only trace of the difference.
-- A cloud agent that reaches the Laptop Environment over an Outbound link could read an Owner client's stored token
-  there and use `model`. The owner-only card holds only while no agent of ours can obtain such a token.
+  the page-only ones (typing a secret, completing an OAuth sign-in, installing or updating a skill, and a change too
+  long to show, `oversize`), with no person involved, by asking in `model`: this includes turning the Guardian off,
+  marking a tool read and changing the Settings server's own entry. Only `browser`, and the card t3flare's own agents
+  get, show that the owner answered. The audit log records each change's mode and what answered it (page, card, client
+  or agent), and that is the only trace of the difference.
+- An agent in the Cloud Environment (a Durable or CLI agent) that reaches the Laptop Environment over an Outbound link
+  could read an Owner client's stored token there and use `model`. The owner-only card holds only while no agent of ours
+  can obtain such a token.
 - An agent can ask the owner, on a card, to weaken what reviews it. The card says so in the server's own words; nothing
   else stands between the request and the owner's click.
 - A server an agent asked for is added with its tools' own read-only hints trusted, as any Direct server is: after one

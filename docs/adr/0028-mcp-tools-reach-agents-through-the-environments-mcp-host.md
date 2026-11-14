@@ -156,10 +156,10 @@ Plan: [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md).
    and whether it is Linked work itself. A linked thread still sees every enabled server; the Settings server refuses
    its writes inside the call.
 4. **The pi CLI gets the relay's servers** (SPI-1076): one entry per server in its per-process `mcp.json`, with the
-   tool handle from its environment. This strikes the consequence above, "The pi CLI gets t3's tools only", and item 7's
+   Tool handle from its environment. This strikes the consequence above, "The pi CLI gets t3's tools only", and item 7's
    list of CLI agents now includes pi. t3flare grants pi no project trust, so a repository's `.pi/mcp.json` cannot
    replace an entry.
-5. **The pausing rule (SPI-1079 §7) is unchanged.** The Settings server is a pausing server only to an Owner client that
+5. **The pausing rule (SPI-1079 §7) is unchanged.** The Settings server is a Pausing server only to an Owner client that
    chose the `model` mode, at its own endpoint; to t3flare's agents it lists no `resume` and returns no pause. Its pause
    has Executor's shape, so a host with this rule hides its `resume` and asks its own owner.
 6. **Its card is the host's own.** The SPI-1079 rule that a page on the t3 host is declined unseen governs other
