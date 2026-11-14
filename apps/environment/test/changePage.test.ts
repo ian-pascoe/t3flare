@@ -15,7 +15,7 @@ import { CHANGES_API_PATH, changePagePath } from "../src/harness/paths.ts";
 import type { AccessCaller } from "../src/access.ts";
 import { handleHarness } from "../src/harness/panel.ts";
 import { CHANGE_TTL_MS, type ChangeRecord, newChangeId } from "../src/settings/changes.ts";
-import type { ChangeItem } from "../src/settings/render.ts";
+import type { ChangeItem } from "../src/settings/types.ts";
 import { AUTHORIZATION_URL, HOST, NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 
 let fixture: SettingsFixture | undefined;

@@ -1,6 +1,11 @@
 // The Environment DO's own keys and their encoding: base64url (RFC 4648 §5, no padding) for tokens and ids, and the
 // random keys the DO keeps in its KV storage, made on first use (the panel's CSRF key, the Settings server's token key).
-import type { KvStorage } from "./store.ts";
+
+/** The Durable Object's synchronous key-value storage. */
+export interface KvStorage {
+  get<T>(key: string): T | undefined;
+  put<T>(key: string, value: T): void;
+}
 
 /** `bytes` as base64url without padding. */
 export const base64Url = (bytes: Uint8Array | ArrayBuffer): string =>

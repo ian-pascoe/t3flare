@@ -6,13 +6,7 @@
 // `entity`; it holds no secret value (parts 2-4's secrets are masked before an entry is written).
 import { EMPTY_ENVIRONMENT, EMPTY_HARNESS, type GlobalMiseReport, globalMiseReport, type StoredEnvironment, type StoredHarness } from "@t3flare/harness-registry";
 
-import { keptKey } from "./keys.ts";
-
-/** The Durable Object's synchronous key-value storage. */
-export interface KvStorage {
-  get<T>(key: string): T | undefined;
-  put<T>(key: string, value: T): void;
-}
+import { keptKey, type KvStorage } from "./keys.ts";
 
 export const SETTINGS_KEY = "t3flare:harness:settings";
 export const ENVIRONMENT_KEY = "t3flare:environment:settings";

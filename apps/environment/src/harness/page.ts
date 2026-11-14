@@ -23,7 +23,8 @@ import {
 } from "@t3flare/harness-registry";
 
 import { type ContainerCostTable, containerCostTable } from "./containerCost.ts";
-import { CHANGE_TTL_MS, durationText, type NeedsPage } from "../settings/changes.ts";
+import { CHANGE_TTL_MS, durationText } from "../settings/changes.ts";
+import type { PageReason } from "../settings/types.ts";
 import { type AskedBy, askedByText } from "../settings/render.ts";
 import type { AuditEntry } from "./store.ts";
 
@@ -512,7 +513,7 @@ export interface OpenChangeRow {
   readonly thread?: string;
   readonly agent?: string;
   readonly client?: { readonly name: string; readonly source: string };
-  readonly needsPage?: NeedsPage;
+  readonly needsPage?: PageReason;
   readonly createdAt: string;
   readonly expiresAt: string;
 }

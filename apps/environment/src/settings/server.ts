@@ -79,7 +79,6 @@ import {
   isOpen,
   NETWORK_READ_CAP,
   NETWORK_READS,
-  type NeedsPage,
   newChangeId,
   type OwnerMode,
   READ_CAP,
@@ -101,8 +100,9 @@ import {
   outcomeOf,
   waitForChange,
 } from "./openChanges.ts";
-import { askedByText, type ChangeItem, changeText, type ChangeView, environmentItems, extensionItems, mcpItems, PAGE_REASON, shownSkill } from "./render.ts";
+import { askedByText, changeText, environmentItems, extensionItems, mcpItems, PAGE_REASON, shownSkill } from "./render.ts";
 import { settingsToolOf } from "./tools.ts";
+import type { ChangeItem, ChangeView, PageReason } from "./types.ts";
 
 export type { OwnCaller, OwnerCaller, ThreadLink, ThreadModes } from "./caller.ts";
 export { OFF_MESSAGE } from "./caller.ts";
@@ -682,7 +682,7 @@ const askedText = (view: ChangeView, input: SettingsCallInput, url: string | und
   [changeText(view), "", askedBy(input.caller), ...(url === undefined ? [] : [`The Change page: ${url}`]), "", callText(input.tool, input.args)].join("\n");
 
 /** The owner-only approval card for an asked change (plan D9); never a field, so no agent can answer it. */
-export const askedCard = (view: ChangeView, input: SettingsCallInput, url: string | undefined, needsPage: NeedsPage | undefined): McpQuestionCard => {
+export const askedCard = (view: ChangeView, input: SettingsCallInput, url: string | undefined, needsPage: PageReason | undefined): McpQuestionCard => {
   const full = askedText(view, input, url);
   const where = url === undefined ? "the Change page (its link is on the Harness panel's Open changes list)" : `the Change page: ${url}`;
   const prompt =
@@ -916,7 +916,7 @@ interface AskedInput {
   readonly expected: number;
   readonly reader: Reader;
   /** The change's mode, given what it needs (a change that needs the page is an Owner client's `browser`). */
-  readonly modeOf: (needsPage: NeedsPage | undefined) => ChangeMode;
+  readonly modeOf: (needsPage: PageReason | undefined) => ChangeMode;
   /** The text a question would show whole, whose length decides `oversize` (plan D6). */
   readonly fullText: (view: ChangeView, url: string | undefined) => string;
   /** The caller's own open change this call stands for (an Owner client's repeat), checked before and at the insert. */
@@ -1387,7 +1387,7 @@ export const answerOwnerChange = async (
 };
 
 /** The mode an Open change is answered in: a change that needs the page is answered there whatever was asked (plan D6, D12). */
-export const modeFor = (asked: OwnerMode, needsPage: NeedsPage | undefined): OwnerMode => (needsPage === undefined ? asked : "browser");
+export const modeFor = (asked: OwnerMode, needsPage: PageReason | undefined): OwnerMode => (needsPage === undefined ? asked : "browser");
 
 /** An asked change from an Owner client (plan D8, D16): opened in `mode`, or the caller's same change already open. */
 const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned: Planned, expected: number): Promise<OpenOrResult> => {

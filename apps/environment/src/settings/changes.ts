@@ -10,11 +10,11 @@
 // a run of strikes and the lock after its last). No alarm is added (ADR-0003: one alarm).
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import { MCP_ELICITATION_WAIT_MS } from "@cloudpid/mcp/types";
-import { type NeedsPage as TierNeedsPage, withoutQuery } from "@t3flare/harness-registry";
+import { withoutQuery } from "@t3flare/harness-registry";
 import { sha256Hex } from "@t3flare/skills";
 
 import { base64Url } from "../harness/keys.ts";
-import type { ChangeView } from "./render.ts";
+import type { ChangeView, PageReason } from "./types.ts";
 
 export const CHANGES_TABLE = "t3flare_settings_changes";
 
@@ -60,12 +60,6 @@ export const NETWORK_READS: ReadonlySet<string> = new Set(["test_mcp_server", "p
 
 /** The reads table: one row per read through the server, kept an hour, for the read caps. */
 export const READS_TABLE = "t3flare_settings_reads";
-
-/**
- * Why a change is answered on the Change page alone (plan D6): what its tier says (a secret, a sign-in, skills' text),
- * or `oversize`, text a card would cut.
- */
-export type NeedsPage = TierNeedsPage | "oversize";
 
 /**
  * Every http(s) URL inside `text` without its query (plan D14): an error, a listing or a failed apply may quote a Direct
@@ -116,7 +110,7 @@ export interface ChangeRecord {
   readonly tier: "free" | "asked";
   /** What the card and the Change page render (an asked change's). */
   readonly shown?: ChangeView;
-  readonly needsPage?: NeedsPage;
+  readonly needsPage?: PageReason;
   readonly mode?: ChangeMode;
   readonly caller: ChangeCaller;
   readonly createdAt: number;
