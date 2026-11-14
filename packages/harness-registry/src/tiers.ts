@@ -78,7 +78,9 @@ const extensionTier = (stored: StoredHarness, change: HarnessChange): TierVerdic
   if (entry === undefined) return { tier: "asked", reasons: [`${change.extension}: not an extension this registry knows`] };
   const current = resolveHarness(stored).extensions[entry.id]!;
   const parts: Array<Part> = [];
-  if (change.enabled !== undefined && change.enabled !== current.enabled) {
+  // Only `false` narrows; anything else that is not `true` would resolve to the default, so it is asked (fails closed).
+  if (change.enabled !== undefined && typeof change.enabled !== "boolean") parts.push({ asked: true, reason: `${entry.id}: a switch that is not true or false` });
+  else if (change.enabled !== undefined && change.enabled !== current.enabled) {
     if (change.enabled) parts.push({ asked: true, reason: `${entry.id}: turned on` });
     else if (entry.guard === true) parts.push({ asked: true, reason: `${entry.id}: a Guard turned off` });
     else parts.push({ asked: false, reason: `${entry.id}: turned off` });
@@ -99,7 +101,8 @@ const extensionTier = (stored: StoredHarness, change: HarnessChange): TierVerdic
 
 const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (server: string, tool: string) => ToolClass | undefined): TierVerdict => {
   const server = change.server;
-  const current = mcpServersOf(stored)[server];
+  const servers = mcpServersOf(stored);
+  const current = Object.hasOwn(servers, server) ? servers[server] : undefined;
   // The Settings server is known by its kind (plan D2); `mcpServersOf` lets no other entry take its name.
   const own = current?.kind === "settings";
   if (change.op === "add") return verdictOf([{ asked: true, reason: `${server}: a new server` }], change.auth.kind === "header" ? "secret" : undefined);
@@ -123,7 +126,8 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
     return verdictOf([mark({ asked: false, reason: `${name}: back to its own hint, ${hint}` })]);
   }
   const parts: Array<Part> = [];
-  if (change.enabled !== undefined && change.enabled !== current.enabled) {
+  if (change.enabled !== undefined && typeof change.enabled !== "boolean") parts.push({ asked: true, reason: `${server}: a switch that is not true or false` });
+  else if (change.enabled !== undefined && change.enabled !== current.enabled) {
     parts.push(mark(change.enabled ? { asked: true, reason: `${server}: turned on` } : { asked: false, reason: `${server}: turned off` }));
   }
   // The Settings server's writes switch (plan D2): only its own entry has one, so every move of it is asked.

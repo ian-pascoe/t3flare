@@ -355,7 +355,7 @@ export const applyMcpChange = (
   change: McpChange,
 ): { readonly ok: true; readonly harness: StoredHarness } | { readonly ok: false; readonly error: string } => {
   const servers: Record<string, McpServerSetting> = { ...mcpServersOf(stored) };
-  const current = servers[change.server];
+  const current = Object.hasOwn(servers, change.server) ? servers[change.server] : undefined;
   const save = (next: Record<string, McpServerSetting>) => ({ ok: true as const, harness: { ...stored, revision: stored.revision + 1, mcp: { servers: next } } });
   if (change.op === "add") {
     if (!SERVER_NAME.test(change.server)) return { ok: false, error: `${change.server}: a name of 1-20 of a-z, 0-9 and -` };
@@ -466,8 +466,10 @@ export const applyChange = (
   if (entry === undefined) return { ok: false, error: `${change.extension}: no such extension` };
   if (entry.locked !== undefined) return { ok: false, error: `${entry.id}: locked (${entry.locked})` };
   if (change.enabled !== undefined && entry.default === "always") return { ok: false, error: `${entry.id}: cannot be turned off` };
+  // A stored non-boolean would resolve to the default, which may be on (fails closed here, before any tier is judged).
+  if (change.enabled !== undefined && typeof change.enabled !== "boolean") return { ok: false, error: "enabled: true or false" };
   for (const [key, value] of Object.entries(change.settings ?? {})) {
-    const setting = entry.settings[key];
+    const setting = Object.hasOwn(entry.settings, key) ? entry.settings[key] : undefined;
     if (setting === undefined) return { ok: false, error: `${entry.id}.${key}: no such setting` };
     const why = fieldProblem(setting.schema, value);
     if (why !== undefined) return { ok: false, error: `${entry.id}.${key}: ${why}` };

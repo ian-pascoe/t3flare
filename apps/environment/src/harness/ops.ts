@@ -1,7 +1,8 @@
-// @effect-diagnostics globalDate:off
 // Every Settings change, with no transport (ADR-0034, plan D1): the Harness panel's handlers, moved here as functions
 // over the same dependencies, with no `Request` or `Response` in their signatures. The panel calls these and nothing
-// else, and so will both doors of the Settings server. Each takes the change, an optional `expectedRevision` (the
+// else, and so will both doors of the Settings server, except `setMcpHeader` and `beginMcpSignIn`: a header value and an
+// authorization URL never travel in a tool's arguments or result (ADR-0034), so those two run from the panel and the
+// Change page only. Each takes the change, an optional `expectedRevision` (the
 // revision of the entity it changes, plan D15: a moved one is refused with the current revision), and an actor (who
 // asked, through which door, and what answered), and answers an outcome with the new revision, or a refusal with an
 // HTTP-like status and the registry's words.
@@ -167,7 +168,7 @@ export const changeMcp = (deps: OpsDeps, change: McpChange, options: OpOptions):
   return { ok: true, revision: applied.harness.revision };
 };
 
-/** A Direct server to add (Route B): its sign-in as sent, checked here. */
+/** A Direct server to add: its sign-in as sent, checked here. */
 export interface AddServer {
   readonly server: string;
   readonly url: string;
@@ -268,24 +269,30 @@ export const changeSkills = async (deps: OpsDeps, route: (typeof SKILLS_WRITE_RO
 /** A Direct server's setting with its URL's query dropped (plan D14): what any reader but the panel is shown. */
 export const redactServer = (setting: McpServerSetting): McpServerSetting => (setting.url === undefined ? setting : { ...setting, url: withoutQuery(setting.url) });
 
-/** Every http(s) URL in `value` without its query, at any depth. */
-const redactUrls = (value: unknown): unknown => {
+/** Every http(s) URL in `value` without its query, and every secret's `fingerprint` dropped, at any depth. */
+const redactMcp = (value: unknown): unknown => {
   if (typeof value === "string") return /^https?:\/\//i.test(value) ? withoutQuery(value) : value;
-  if (Array.isArray(value)) return value.map(redactUrls);
-  if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, redactUrls(inner)]));
+  if (Array.isArray(value)) return value.map(redactMcp);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).flatMap(([key, inner]) => (key === "fingerprint" ? [] : [[key, redactMcp(inner)]])));
+  }
   return value;
 };
 
 /**
- * An audit entry as a reader other than the panel sees it (plan D14): every URL without its query, and the owner's Access
- * subject dropped (`owner:<sub>` reads `owner`).
+ * An audit entry as a reader other than the panel sees it (plan D14): the owner's Access subject dropped (`owner:<sub>`
+ * reads `owner`), and in a Harness entry every URL without its query and no secret's fingerprint. The Environment
+ * settings' Variables keep their values, as on the page.
  */
-export const redactAudit = (entry: AuditEntry): AuditEntry => ({
-  ...entry,
-  caller: entry.caller.startsWith("owner:") ? "owner" : entry.caller,
-  ...(entry.before === undefined ? {} : { before: redactUrls(entry.before) }),
-  ...(entry.after === undefined ? {} : { after: redactUrls(entry.after) }),
-});
+export const redactAudit = (entry: AuditEntry): AuditEntry => {
+  const redact = entry.entity === "harness" ? redactMcp : (value: unknown) => value;
+  return {
+    ...entry,
+    caller: entry.caller.startsWith("owner:") ? "owner" : entry.caller,
+    ...(entry.before === undefined ? {} : { before: redact(entry.before) }),
+    ...(entry.after === undefined ? {} : { after: redact(entry.after) }),
+  };
+};
 
 /** The audit log redacted, newest first: at most `limit` (1 to 50, default 20) entries older than the `before` index. */
 export const readAudit = (deps: Pick<OpsDeps, "store">, input: { readonly limit?: number; readonly before?: number } = {}) => {

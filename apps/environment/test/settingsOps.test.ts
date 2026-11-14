@@ -139,18 +139,18 @@ describe("expectedRevision", () => {
   });
 
   it("the panel takes one in the body: a stale one is 409, a malformed one 400, and none keeps the form working", async () => {
-    const it = setup({ kind: "service-token" });
-    expect((await post(it, "extensions", { extension: "tool-search", enabled: false, expectedRevision: 0 })).status).toBe(200);
-    const stale = await post(it, "extensions", { extension: "tool-search", enabled: true, expectedRevision: 0 });
+    const env = setup({ kind: "service-token" });
+    expect((await post(env, "extensions", { extension: "tool-search", enabled: false, expectedRevision: 0 })).status).toBe(200);
+    const stale = await post(env, "extensions", { extension: "tool-search", enabled: true, expectedRevision: 0 });
     expect(stale.status).toBe(409);
     expect(await stale.text()).toBe("the Harness settings are at revision 1, not 0; read them again\n");
-    expect((await post(it, "extensions", { extension: "tool-search", enabled: true, expectedRevision: "1" })).status).toBe(400);
-    expect((await post(it, "environment", { settings: { containerIdleMinutes: 9 }, expectedRevision: 1 })).status).toBe(409);
-    expect((await post(it, "mcp", { op: "server", server: "commissary", enabled: false, expectedRevision: 0 })).status).toBe(409);
-    expect((await post(it, "skills/remove", { name: "a", expectedRevision: 5 })).status).toBe(409);
-    expect((await post(it, "extensions", { extension: "tool-search", enabled: true })).status).toBe(200);
+    expect((await post(env, "extensions", { extension: "tool-search", enabled: true, expectedRevision: "1" })).status).toBe(400);
+    expect((await post(env, "environment", { settings: { containerIdleMinutes: 9 }, expectedRevision: 1 })).status).toBe(409);
+    expect((await post(env, "mcp", { op: "server", server: "commissary", enabled: false, expectedRevision: 0 })).status).toBe(409);
+    expect((await post(env, "skills/remove", { name: "a", expectedRevision: 5 })).status).toBe(409);
+    expect((await post(env, "extensions", { extension: "tool-search", enabled: true })).status).toBe(200);
     // The change stored is the change alone, never the revision it named.
-    expect(JSON.stringify(it.store.load())).not.toContain("expectedRevision");
+    expect(JSON.stringify(env.store.load())).not.toContain("expectedRevision");
   });
 
   it("skills: a stale one is refused before GitHub is read, and the store does not retry when one is given", async () => {
@@ -167,15 +167,15 @@ describe("expectedRevision", () => {
       }
       return closure();
     };
-    const it = setup(owner, racing);
-    holder.store = it.store;
-    const commit = it.github.push("o/r", { "skills/a/SKILL.md": skillMd("a") });
-    it.github.reset();
-    expect(await changeSkills(it.ops, "/install", { source: "o/r", commit, folders: ["skills/a"] }, { actor: agent, expectedRevision: 4 })).toEqual({
+    const env = setup(owner, racing);
+    holder.store = env.store;
+    const commit = env.github.push("o/r", { "skills/a/SKILL.md": skillMd("a") });
+    env.github.reset();
+    expect(await changeSkills(env.ops, "/install", { source: "o/r", commit, folders: ["skills/a"] }, { actor: agent, expectedRevision: 4 })).toEqual({
       status: 409,
       text: "the Environment settings are at revision 0, not 4; read them again",
     });
-    expect(it.github.requests).toEqual([]);
+    expect(env.github.requests).toEqual([]);
 
     const skill: FetchedSkill = {
       name: "b",
@@ -189,31 +189,31 @@ describe("expectedRevision", () => {
     const source = { repo: "o/r", path: "skills/b", ref: null, commit };
     moves = 1;
     calls = 0;
-    expect(await it.skills.apply({ kind: "install", skill, source }, agent, NOW, 0)).toEqual({
+    expect(await env.skills.apply({ kind: "install", skill, source }, agent, NOW, 0)).toEqual({
       ok: false,
       error: "the Environment settings are at revision 1, not 0; read them again",
       moved: { revision: 1 },
     });
     expect(calls).toBe(1);
-    expect(it.skills.get("b")).toBeUndefined();
+    expect(env.skills.get("b")).toBeUndefined();
     // Without one, it tries again and keeps the change.
     moves = 1;
     calls = 0;
-    expect(await it.skills.apply({ kind: "install", skill, source }, agent, NOW)).toMatchObject({ ok: true, action: "skill-install", revision: 3 });
+    expect(await env.skills.apply({ kind: "install", skill, source }, agent, NOW)).toMatchObject({ ok: true, action: "skill-install", revision: 3 });
     expect(calls).toBe(2);
   });
 
   it("skills: an install of several expects the revision of the first, then each next one the revision the last left", async () => {
-    const it = setup();
-    const commit = it.github.push("o/r", { "skills/a/SKILL.md": skillMd("a"), "skills/b/SKILL.md": skillMd("b") });
-    const answer = await changeSkills(it.ops, "/install", { source: "o/r", commit, folders: ["skills/a", "skills/b"] }, { actor: agent, expectedRevision: 0 });
+    const env = setup();
+    const commit = env.github.push("o/r", { "skills/a/SKILL.md": skillMd("a"), "skills/b/SKILL.md": skillMd("b") });
+    const answer = await changeSkills(env.ops, "/install", { source: "o/r", commit, folders: ["skills/a", "skills/b"] }, { actor: agent, expectedRevision: 0 });
     expect(answer).toMatchObject({ status: 200, json: { results: [{ name: "a", action: "skill-install" }, { name: "b", action: "skill-install" }] } });
-    expect(it.store.loadEnvironment().revision).toBe(2);
-    expect(await changeSkills(it.ops, "/enable", { name: "a", enabled: false }, { actor: agent, expectedRevision: 1 })).toEqual({
+    expect(env.store.loadEnvironment().revision).toBe(2);
+    expect(await changeSkills(env.ops, "/enable", { name: "a", enabled: false }, { actor: agent, expectedRevision: 1 })).toEqual({
       status: 409,
       text: "the Environment settings are at revision 2, not 1; read them again",
     });
-    expect(await changeSkills(it.ops, "/enable", { name: "a", enabled: false }, { actor: agent, expectedRevision: 2 })).toMatchObject({ status: 200, json: { action: "skill-disable", revision: 3 } });
+    expect(await changeSkills(env.ops, "/enable", { name: "a", enabled: false }, { actor: agent, expectedRevision: 2 })).toMatchObject({ status: 200, json: { action: "skill-disable", revision: 3 } });
   });
 });
 
@@ -221,48 +221,48 @@ describe("the set-header op", () => {
   const VALUE = "s3cr3t-header-VALUE-5678";
 
   it("stores the value, audits its mark as mcp.secret.set, bumps no revision, and answers nothing of the value", async () => {
-    const it = setup({ kind: "service-token" });
-    expect((await post(it, "mcp/servers", { server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "header", header: "Authorization" }, value: "first" })).status).toBe(200);
-    const revision = it.store.load().revision;
-    const response = await post(it, "mcp/secret", { server: "fixture", value: VALUE });
+    const env = setup({ kind: "service-token" });
+    expect((await post(env, "mcp/servers", { server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "header", header: "Authorization" }, value: "first" })).status).toBe(200);
+    const revision = env.store.load().revision;
+    const response = await post(env, "mcp/secret", { server: "fixture", value: VALUE });
     expect(response.status).toBe(200);
     const text = await response.text();
     expect(JSON.parse(text)).toEqual({ ok: true, revision, secret: { set: true, setAt: NOW, fingerprint: expect.stringMatching(/^[0-9a-f]{4}$/) } });
-    expect(it.secrets.read("fixture", "header")).toBe(VALUE);
-    expect(it.store.load().revision).toBe(revision);
-    expect(it.store.auditLog(1)).toEqual([{ caller: "service-token", entity: "harness", at: NOW, action: "mcp.secret.set", target: "fixture", after: { secret: it.secrets.mark("fixture", "header") } }]);
-    for (const shown of [text, JSON.stringify(it.store.auditLog(10)), JSON.stringify(it.store.load())]) {
+    expect(env.secrets.read("fixture", "header")).toBe(VALUE);
+    expect(env.store.load().revision).toBe(revision);
+    expect(env.store.auditLog(1)).toEqual([{ caller: "service-token", entity: "harness", at: NOW, action: "mcp.secret.set", target: "fixture", after: { secret: env.secrets.mark("fixture", "header") } }]);
+    for (const shown of [text, JSON.stringify(env.store.auditLog(10)), JSON.stringify(env.store.load())]) {
       expect(shown).not.toContain(VALUE);
       expect(shown).not.toContain(btoa(VALUE));
     }
   });
 
   it("refuses an unknown server, Commissary, a server with another sign-in, an empty value and a stale revision, storing nothing", async () => {
-    const it = setup();
-    await addMcpServer(it.ops, { server: "open", url: "https://open.example/mcp", auth: { kind: "oauth" } }, viaAgent);
-    await addMcpServer(it.ops, { server: "keyed", url: "https://keyed.example/mcp", auth: { kind: "header", header: "X-Key" }, value: "k" }, viaAgent);
-    expect(await setMcpHeader(it.ops, { server: "nope", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 404, error: "no such direct server" });
-    expect(await setMcpHeader(it.ops, { server: "commissary", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 404, error: "no such direct server" });
-    expect(await setMcpHeader(it.ops, { server: "open", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 400, error: "open does not sign in with a header" });
-    expect(await setMcpHeader(it.ops, { server: "keyed", value: "" }, viaAgent)).toEqual({ ok: false, status: 400, error: "a header sign-in needs its value" });
-    expect(await setMcpHeader(it.ops, { server: "keyed", value: 7 }, viaAgent)).toEqual({ ok: false, status: 400, error: "a header sign-in needs its value" });
-    expect(await setMcpHeader(it.ops, { server: "keyed", value: VALUE }, { actor: agent, expectedRevision: 0 })).toMatchObject({ ok: false, status: 409, revision: 2 });
-    expect(it.secrets.read("keyed", "header")).toBe("k");
-    expect(await setMcpHeader(it.ops, { server: "keyed", value: VALUE }, { actor: agent, expectedRevision: 2 })).toMatchObject({ ok: true, revision: 2 });
-    expect(it.secrets.read("keyed", "header")).toBe(VALUE);
+    const env = setup();
+    await addMcpServer(env.ops, { server: "open", url: "https://open.example/mcp", auth: { kind: "oauth" } }, viaAgent);
+    await addMcpServer(env.ops, { server: "keyed", url: "https://keyed.example/mcp", auth: { kind: "header", header: "X-Key" }, value: "k" }, viaAgent);
+    expect(await setMcpHeader(env.ops, { server: "nope", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 404, error: "no such direct server" });
+    expect(await setMcpHeader(env.ops, { server: "commissary", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 404, error: "no such direct server" });
+    expect(await setMcpHeader(env.ops, { server: "open", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 400, error: "open does not sign in with a header" });
+    expect(await setMcpHeader(env.ops, { server: "keyed", value: "" }, viaAgent)).toEqual({ ok: false, status: 400, error: "a header sign-in needs its value" });
+    expect(await setMcpHeader(env.ops, { server: "keyed", value: 7 }, viaAgent)).toEqual({ ok: false, status: 400, error: "a header sign-in needs its value" });
+    expect(await setMcpHeader(env.ops, { server: "keyed", value: VALUE }, { actor: agent, expectedRevision: 0 })).toMatchObject({ ok: false, status: 409, revision: 2 });
+    expect(env.secrets.read("keyed", "header")).toBe("k");
+    expect(await setMcpHeader(env.ops, { server: "keyed", value: VALUE }, { actor: agent, expectedRevision: 2 })).toMatchObject({ ok: true, revision: 2 });
+    expect(env.secrets.read("keyed", "header")).toBe(VALUE);
   });
 });
 
 describe("removing a server", () => {
   it("deletes its header value and forgets its OAuth sign-in at once", async () => {
-    const it = setup();
-    await addMcpServer(it.ops, { server: "keyed", url: "https://keyed.example/mcp", auth: { kind: "header", header: "X-Key" }, value: "k" }, viaAgent);
-    expect(it.secrets.read("keyed", "header")).toBe("k");
-    expect(changeMcp(it.ops, { op: "remove", server: "keyed" }, viaAgent)).toMatchObject({ ok: true });
-    expect(it.secrets.read("keyed", "header")).toBeUndefined();
-    expect(it.secrets.mark("keyed", "header")).toEqual({ set: false, setAt: null, fingerprint: null });
-    expect(it.forgotten).toEqual(["keyed"]);
-    expect(it.store.auditLog(1)[0]).toMatchObject({ action: "mcp.remove", target: "keyed", after: null });
+    const env = setup();
+    await addMcpServer(env.ops, { server: "keyed", url: "https://keyed.example/mcp", auth: { kind: "header", header: "X-Key" }, value: "k" }, viaAgent);
+    expect(env.secrets.read("keyed", "header")).toBe("k");
+    expect(changeMcp(env.ops, { op: "remove", server: "keyed" }, viaAgent)).toMatchObject({ ok: true });
+    expect(env.secrets.read("keyed", "header")).toBeUndefined();
+    expect(env.secrets.mark("keyed", "header")).toEqual({ set: false, setAt: null, fingerprint: null });
+    expect(env.forgotten).toEqual(["keyed"]);
+    expect(env.store.auditLog(1)[0]).toMatchObject({ action: "mcp.remove", target: "keyed", after: null });
   });
 });
 
@@ -279,33 +279,43 @@ describe("reads outside the panel", () => {
   });
 
   it("the audit log drops every URL's query and the owner's Access subject, and pages newest first", async () => {
-    const it = setup();
-    expect((await post(it, "mcp/servers", { server: "executor", url: "https://mcp.executor.example/mcp?key=s3cr3t", auth: { kind: "none" } })).status).toBe(200);
-    expect((await post(it, "mcp", { op: "server", server: "executor", exposure: "hidden" })).status).toBe(200);
-    for (let index = 0; index < 3; index++) changeExtension(it.ops, { extension: "termctrl", settings: { cols: 100 + index } }, viaAgent);
-    const all = JSON.stringify(readAudit(it.ops, { limit: 50 }));
+    const env = setup();
+    expect((await post(env, "mcp/servers", { server: "executor", url: "https://mcp.executor.example/mcp?key=s3cr3t", auth: { kind: "none" } })).status).toBe(200);
+    expect((await post(env, "mcp", { op: "server", server: "executor", exposure: "hidden" })).status).toBe(200);
+    for (let index = 0; index < 3; index++) changeExtension(env.ops, { extension: "termctrl", settings: { cols: 100 + index } }, viaAgent);
+    const all = JSON.stringify(readAudit(env.ops, { limit: 50 }));
     expect(all).not.toContain("s3cr3t");
     expect(all).not.toContain("owner-sub");
     expect(all).toContain("https://mcp.executor.example/mcp");
-    expect(redactAudit(it.store.auditLog(5)[4]!)).toMatchObject({ caller: "owner", action: "mcp.add", after: { url: "https://mcp.executor.example/mcp" } });
+    expect(redactAudit(env.store.auditLog(5)[4]!)).toMatchObject({ caller: "owner", action: "mcp.add", after: { url: "https://mcp.executor.example/mcp" } });
     // Paged: 2 at a time, newest first, `before` naming where the next page starts.
-    const first = readAudit(it.ops, { limit: 2 });
+    const first = readAudit(env.ops, { limit: 2 });
     expect(first.entries.map((entry) => entry.after)).toMatchObject([{ settings: { cols: 102 } }, { settings: { cols: 101 } }]);
-    const second = readAudit(it.ops, { limit: 2, before: first.before! });
+    const second = readAudit(env.ops, { limit: 2, before: first.before! });
     expect(second.entries.map((entry) => entry.action)).toEqual(["extension.change", "mcp.server"]);
-    const third = readAudit(it.ops, { limit: 2, before: second.before! });
+    const third = readAudit(env.ops, { limit: 2, before: second.before! });
     expect(third).toEqual({ entries: [expect.objectContaining({ action: "mcp.add" })] });
-    expect(readAudit(it.ops, { limit: 500 }).entries).toHaveLength(5);
-    expect(readAudit(it.ops).entries).toHaveLength(5);
+    expect(readAudit(env.ops, { limit: 500 }).entries).toHaveLength(5);
+    expect(readAudit(env.ops).entries).toHaveLength(5);
+  });
+
+  it("the audit log drops a secret's fingerprint, and keeps the Variables' values whole", async () => {
+    const env = setup();
+    expect((await post(env, "mcp/servers", { server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "header", header: "Authorization" }, value: "first" })).status).toBe(200);
+    expect(JSON.stringify(env.store.auditLog(1))).toContain("fingerprint");
+    expect(await changeEnvironment(env.ops, { variables: { DOCS_URL: "https://docs.example/?page=2" } }, viaAgent)).toMatchObject({ ok: true });
+    const all = JSON.stringify(readAudit(env.ops, { limit: 50 }));
+    expect(all).not.toContain("fingerprint");
+    expect(all).toContain("https://docs.example/?page=2");
   });
 
   it("the Workers Logs line names the door, tier, mode and answer, and never a value", () => {
-    const it = setup();
+    const env = setup();
     const logged: Array<string> = [];
     const log = console.log;
     console.log = (line: string) => void logged.push(line);
     try {
-      changeExtension(it.ops, { extension: "codemode", settings: { inlineBudget: 3000 } }, { actor: { ...agent, tier: "asked", mode: "card", answeredBy: "card", change: "chg_x" } });
+      changeExtension(env.ops, { extension: "codemode", settings: { inlineBudget: 3000 } }, { actor: { ...agent, tier: "asked", mode: "card", answeredBy: "card", change: "chg_x" } });
     } finally {
       console.log = log;
     }
