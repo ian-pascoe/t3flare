@@ -10,7 +10,7 @@
 // a run of strikes and the lock after its last). No alarm is added (ADR-0003: one alarm).
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import { MCP_ELICITATION_WAIT_MS } from "@cloudpid/mcp/types";
-import type { NeedsPage as TierNeedsPage } from "@t3flare/harness-registry";
+import { type NeedsPage as TierNeedsPage, withoutQuery } from "@t3flare/harness-registry";
 import { sha256Hex } from "@t3flare/skills";
 
 import { base64Url } from "../harness/keys.ts";
@@ -59,6 +59,12 @@ export const READS_TABLE = "t3flare_settings_reads";
  * or `oversize`, text a card would cut.
  */
 export type NeedsPage = TierNeedsPage | "oversize";
+
+/**
+ * Every http(s) URL inside `text` without its query (plan D14): an error, a listing or a failed apply may quote a Direct
+ * server's URL, whose query may hold a key. What a result, a closed change's record and its log line carry.
+ */
+export const scrubUrls = (text: string): string => text.replace(/https?:\/\/[^\s"'<>`]+/gi, (url) => withoutQuery(url));
 
 /** A change's state (plan D8). `open` and `applying` are open; the rest are closed. */
 export type ChangeState = "open" | "applying" | "applied" | "declined" | "withdrawn" | "expired" | "moved" | "failed";
@@ -202,7 +208,7 @@ export const closedLine = (record: ChangeRecord): Record<string, unknown> => ({
   outcome: record.state,
   answeredBy: record.closed?.by ?? null,
   ...(record.closed?.revision === undefined ? {} : { revision: record.closed.revision }),
-  ...(record.closed?.error === undefined ? {} : { error: record.closed.error }),
+  ...(record.closed?.error === undefined ? {} : { error: scrubUrls(record.closed.error) }),
   ...(record.closed?.cut === true ? { cut: true } : {}),
 });
 

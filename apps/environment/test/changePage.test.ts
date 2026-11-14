@@ -185,6 +185,27 @@ describe("the Change page's POST", () => {
       expect(text).not.toContain("s3cr3t-state");
     }
   });
+
+  it("SPI-1195 review: a failed sign-in's error quoting a URL with ?key= is kept, logged and answered without the query", async () => {
+    fixture = settingsFixture({ answer: { decision: "accept" } });
+    const run = fixture;
+    const lines: Array<string> = [];
+    vi.spyOn(console, "log").mockImplementation((...args: Array<unknown>) => void lines.push(args.map(String).join(" ")));
+    await addMcpServer(run.deps.ops, { server: "oauthy", url: "https://oauthy.example/mcp", auth: { kind: "oauth" } }, { actor: { caller: "owner:o" } });
+    run.oauth.begin = async () => ({ ok: false, error: "discovery failed at https://oauthy.example/.well-known/oauth-authorization-server?key=k3y-s3cr3t" }) as never;
+    const pending = run.call(run.durable(), "start_mcp_sign_in", { expectedRevision: 1, server: "oauthy" });
+    await until(() => run.cards.length === 1);
+    const [open] = run.deps.changes.open();
+    const answered = await post(run, open!.id, { action: "approve" }, await good(run));
+    const answerText = await answered.text();
+    const result = await pending;
+    const record = run.deps.changes.get(open!.id);
+    expect(record?.state).toBe("failed");
+    expect(record?.closed?.error).toContain("https://oauthy.example/.well-known/oauth-authorization-server");
+    for (const text of [answerText, JSON.stringify(result), JSON.stringify(run.logs), lines.join("\n"), JSON.stringify(record), JSON.stringify(run.deps.changes.closedBy("own:thread-d", 0))]) {
+      expect(text).not.toContain("k3y-s3cr3t");
+    }
+  });
 });
 
 describe("the Change page's CSP and the panel's list", () => {
