@@ -36,7 +36,9 @@ export const skillsWaitScript = (dir: string, tries: number, lockFailed: string)
     `: > "$t.sum"; : > "$t.gone"; awk -v sum="$t.sum" -v gone="$t.gone" '/^--removed--$/ { removed = 1; next } { print > (removed ? gone : sum) }' "$t"`,
     `cd ${dir} 2>/dev/null || cd /`,
     `n=0; while :; do n=$((n+1)); ok=1`,
-    `  if [ -s "$t.sum" ] && ! sha256sum -c --status "$t.sum" 2>/dev/null; then ok=0; fi`,
+    // Silenced on stdout too: uutils' sha256sum (Ubuntu 26.04's) ignores `--status` for a file it cannot read and prints
+    // `FAILED open or read`, which would land ahead of the answer's first line.
+    `  if [ -s "$t.sum" ] && ! sha256sum -c --status "$t.sum" >/dev/null 2>&1; then ok=0; fi`,
     `  while IFS= read -r p; do [ -n "$p" ] && [ -e "$p" ] && ok=0; done < "$t.gone"`,
     `  if [ $ok = 1 ] || [ $n -ge ${tries} ]; then break; fi; sleep 0.2`,
     `done`,
