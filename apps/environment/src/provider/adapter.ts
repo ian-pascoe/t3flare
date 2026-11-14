@@ -45,8 +45,8 @@ import { toWorkspace } from "@t3flare/workspace-client";
 import { environmentServices } from "../agents/bindings.ts";
 import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
-import type { ThreadLink } from "../settings/server.ts";
-import { forgetDurableModes, noteDurableModes, threadLinkIn } from "./threadCaller.ts";
+import type { ThreadLink } from "../settings/caller.ts";
+import { durableModeRecord, threadLinkIn } from "./threadCaller.ts";
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "./capabilities.ts";
 import { type AttachmentReader, turnPrompt } from "./attachments.ts";
 import { messageSkillsFor, type SkillsAccess } from "./skills.ts";
@@ -265,12 +265,9 @@ export const makePiDurableAdapter = (
         );
       const unregister = registerSession(sessionName, onPush);
       // The Settings server's record of this session's threads' modes (plan D3), cleared when it unregisters.
-      const modesOwner = {};
-      const modesNoted = new Set<string>();
-      const noteModes = (threadId: string, runtimeMode: string, interactionMode: string) => {
-        modesNoted.add(threadId);
-        noteDurableModes(threadId, { runtimeMode: runtimeModeOf(runtimeMode), interactionMode: interactionModeOf(interactionMode) }, modesOwner);
-      };
+      const modes = durableModeRecord();
+      const noteModes = (threadId: string, runtimeMode: string, interactionMode: string) =>
+        modes.note(threadId, { runtimeMode: runtimeModeOf(runtimeMode), interactionMode: interactionModeOf(interactionMode) });
 
       // The inverse guard: an open turn with no push for SILENT_TURN_MS pulls a snapshot; a turn the Session no longer
       // has is ended as lost, so a lost Session cannot keep a t3 run (and the Environment) open forever.
@@ -307,7 +304,7 @@ export const makePiDurableAdapter = (
         Effect.sync(() => {
           closed = true;
           unregister();
-          for (const threadId of modesNoted) forgetDurableModes(threadId, modesOwner);
+          modes.forgetAll();
         }).pipe(Effect.andThen(Queue.end(events)), Effect.ignore),
       );
 

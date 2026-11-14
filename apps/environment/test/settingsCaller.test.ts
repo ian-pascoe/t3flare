@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { harnessStore } from "../src/harness/store.ts";
 import { McpHost } from "../src/mcp/host.ts";
-import { DURABLE_AGENT, durableModes, forgetDurableModes, noteDurableModes, threadLinkIn } from "../src/provider/threadCaller.ts";
+import { DURABLE_AGENT, durableModeRecord, durableModes, forgetDurableModes, noteDurableModes, threadLinkIn } from "../src/provider/threadCaller.ts";
 import { settingsChanges } from "../src/settings/changes.ts";
 import { LINKED_REFUSAL, NO_MODES_REFUSAL, type OwnCaller, settingsCall, UNKNOWN_REFUSAL } from "../src/settings/server.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
@@ -27,6 +27,10 @@ const projection = () => {
   thread("loop-a", { lineage: lineage("loop-b") });
   thread("loop-b", { lineage: lineage("loop-a") });
   thread("not-json", "{");
+  thread("parent-number", { lineage: { parentThreadId: 42 } });
+  thread("parent-object", { lineage: { parentThreadId: { id: "own" } } });
+  thread("parent-empty", { lineage: { parentThreadId: "" } });
+  thread("parent-absent", { lineage: {} });
   return sql;
 };
 
@@ -52,6 +56,13 @@ describe("threadLinkIn", () => {
     expect(threadLinkIn(sql, "loop-a")).toBe("unknown");
     expect(threadLinkIn(sql, "not-json")).toBe("unknown");
   });
+
+  it("a parent that is present but not a thread id reads as unknown, not as no parent (M3 review)", () => {
+    expect(threadLinkIn(sql, "parent-number")).toBe("unknown");
+    expect(threadLinkIn(sql, "parent-object")).toBe("unknown");
+    expect(threadLinkIn(sql, "parent-empty")).toBe("unknown");
+    expect(threadLinkIn(sql, "parent-absent")).toBe("own");
+  });
 });
 
 describe("the Durable mode record", () => {
@@ -69,6 +80,25 @@ describe("the Durable mode record", () => {
     expect(durableModes("thread-m")?.runtimeMode).toBe("auto-accept-edits");
     forgetDurableModes("thread-m", newer);
     expect(durableModes("thread-m")).toBeUndefined();
+  });
+});
+
+describe("the adapter's part of the record (durableModeRecord, as makePiDurableAdapter wires it)", () => {
+  it("notes each thread at open and each submitTurn, and forgets all of them, and only them, at unregister", () => {
+    // As the adapter's openSession: one record per provider session; `open` (register) and `submitTurn` note; the
+    // scope's finalizer (unregister) forgets.
+    const first = durableModeRecord();
+    first.note("thread-a", { runtimeMode: "approval-required", interactionMode: "default" });
+    first.note("thread-b", { runtimeMode: "full-access", interactionMode: "default" });
+    first.note("thread-a", { runtimeMode: "full-access", interactionMode: "plan" });
+    expect(durableModes("thread-a")).toEqual({ runtimeMode: "full-access", interactionMode: "plan" });
+    const second = durableModeRecord();
+    second.note("thread-b", { runtimeMode: "auto-accept-edits", interactionMode: "default" });
+    first.forgetAll();
+    expect(durableModes("thread-a")).toBeUndefined();
+    expect(durableModes("thread-b")).toEqual({ runtimeMode: "auto-accept-edits", interactionMode: "default" });
+    second.forgetAll();
+    expect(durableModes("thread-b")).toBeUndefined();
   });
 });
 
