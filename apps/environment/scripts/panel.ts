@@ -42,6 +42,13 @@ const seed = async () => {
   await api("POST", "/_t3flare/harness/api/mcp/servers", { server: "docs", url: "https://mcp.docs-fixture.invalid/mcp", auth: { kind: "header", header: "Authorization" }, value: "panel-fixture-not-a-real-token" });
   // An OAuth server never signed in.
   await api("POST", "/_t3flare/harness/api/mcp/servers", { server: "linear", url: "https://mcp.linear.app/mcp", auth: { kind: "oauth" } });
+  // Commissary, added by hand as the owner would (SPI-1160): its MCP endpoint with the proxy's key as its x-api-key.
+  await api("POST", "/_t3flare/harness/api/mcp/servers", {
+    server: "commissary",
+    url: `${(process.env.MODEL_PROXY_URL ?? "").replace(/\/+$/, "")}/mcp`,
+    auth: { kind: "header", header: "x-api-key" },
+    value: process.env.MODEL_PROXY_API_KEY ?? "",
+  });
   await api("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" });
   await api("POST", "/_t3flare/harness/api/mcp/test", { server: "docs" });
   await api("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 3000 } });
