@@ -154,7 +154,8 @@ export default Alchemy.Stack(
 
     // The model proxy (ADR-0012) and the GitHub App (ADR-0013), from ~/.config/t3flare/dev.env or CI's environment.
     // SPI-1175: optional until the hard cut (SPI-1176); a stage without it reaches models through its Model endpoints only,
-    // and both Workers then have neither setting. With the URL, the key is required.
+    // and both Workers then have neither setting. Empty counts as unset (stage.ts passes both empty for a stage without the
+    // proxy, so a shell's own cannot be bound). With the URL, the key is required.
     const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL").pipe(Config.withDefault(""));
     const modelProxy = modelProxyUrl === "" ? {} : { MODEL_PROXY_URL: modelProxyUrl, MODEL_PROXY_API_KEY: Config.Redacted("MODEL_PROXY_API_KEY") };
     // Step 4a (ADR-0016, A′): the CLI agents' own proxy key, answered by the Workspace DO's key route only while a CLI

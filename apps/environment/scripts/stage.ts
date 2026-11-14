@@ -21,7 +21,8 @@ import { buildWorker } from "../build.ts";
 import { buildAgentsWorker } from "../../agents/build.ts";
 import { isDurableObjectClassNotFound } from "./deploy-retry.ts";
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
-import { MODEL_ENDPOINT_VAR, modelEndpointSpec } from "./lib/modelEndpointSpec.ts";
+import { DEPLOY_SECRETS, deployPlan, devEnvNames, MODEL_PROXY_SETTINGS, OPTIONAL_DEPLOY_SECRETS } from "./lib/deployPlan.ts";
+import { MODEL_ENDPOINT_VAR, type ModelEndpointSpecResult } from "./lib/modelEndpointSpec.ts";
 
 const here = path.resolve(import.meta.dirname, "..");
 const repoRoot = path.resolve(here, "../..");
@@ -74,37 +75,42 @@ const stageSecrets = (): Record<string, string> => {
 };
 
 /**
- * The deploy-wide secrets (step 2a): the model proxy and the GitHub App, from the environment (CI) or else from
- * ~/.config/t3flare/dev.env (0600, outside the repo), which bash reads as it is written (multi-line values included).
- * Never printed.
+ * The deploy-wide secrets (step 2a): the GitHub App, the CLI agents' key, the Model proxy and Commissary's management API
+ * (lib/deployPlan.ts lists them), and `extra`, from the environment (CI) or else ~/.config/t3flare/dev.env (0600,
+ * outside the repo), which bash reads as it is written (multi-line values included). Shell variables win. Never printed.
  */
-const DEPLOY_SECRETS = ["T3FLARE_GITHUB_APP_ID", "T3FLARE_GITHUB_APP_PRIVATE_KEY", "COMMISSARY_CONTAINER_API_KEY"];
-/**
- * Parity G8: Commissary's management API for t3's Usage page and limit meters; each optional (alchemy.run.ts). SPI-1175:
- * the Model proxy too, until the hard cut (SPI-1176): a stage without it gets models from its Model endpoint alone.
- */
-const OPTIONAL_DEPLOY_SECRETS = [
-  "MODEL_PROXY_URL",
-  "MODEL_PROXY_API_KEY",
-  "COMMISSARY_MANAGEMENT_URL",
-  "COMMISSARY_MANAGEMENT_ORG",
-  "COMMISSARY_MANAGEMENT_KEY",
-  "COMMISSARY_ACCESS_CLIENT_ID",
-  "COMMISSARY_ACCESS_CLIENT_SECRET",
-];
-const MODEL_PROXY = ["MODEL_PROXY_URL", "MODEL_PROXY_API_KEY"];
-/** The deploy-wide secrets and `extra`, from the environment or else dev.env. */
 const deploySecrets = (extra: ReadonlyArray<string> = []): Record<string, string> => {
-  const names = [...DEPLOY_SECRETS, ...OPTIONAL_DEPLOY_SECRETS, ...extra];
+  const names = [...DEPLOY_SECRETS, ...MODEL_PROXY_SETTINGS, ...OPTIONAL_DEPLOY_SECRETS, ...extra];
   const fromEnv = Object.fromEntries(names.flatMap((name) => (process.env[name] ? [[name, process.env[name]!]] : [])));
-  if ([...DEPLOY_SECRETS, ...MODEL_PROXY].every((name) => fromEnv[name] !== undefined)) return fromEnv;
+  const wanted = devEnvNames(fromEnv, extra);
   const file = path.join(process.env.HOME ?? "", ".config/t3flare/dev.env");
-  if (!fs.existsSync(file)) return fromEnv;
-  const script = `set -a; . "$1"; set +a; node -e 'process.stdout.write(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((n) => [n, process.env[n] ?? ""]))))' ${names.join(" ")}`;
+  if (wanted.length === 0 || !fs.existsSync(file)) return fromEnv;
+  const script = `set -a; . "$1"; set +a; node -e 'process.stdout.write(JSON.stringify(Object.fromEntries(process.argv.slice(1).map((n) => [n, process.env[n] ?? ""]))))' ${wanted.join(" ")}`;
   const result = spawnSync("bash", ["-c", script, "-", file], { encoding: "utf8" });
   if (result.status !== 0) throw new Error("t3flare: could not read ~/.config/t3flare/dev.env");
   const fromFile = JSON.parse(result.stdout) as Record<string, string>;
   return { ...Object.fromEntries(Object.entries(fromFile).filter(([, value]) => value !== "")), ...fromEnv };
+};
+
+/**
+ * SPI-1175: the stage's Model endpoint after a good deploy, through the panel's API with the stage's service token and
+ * admin token (lib/modelEndpoint.ts). prod keeps an endpoint already there as the owner left it; a test stage saves it
+ * again. Text generation follows the endpoints' default unless the owner picked. The exit status.
+ */
+const setUpEndpoint = async (endpoint: ModelEndpointSpecResult): Promise<number> => {
+  if (!endpoint.ok) {
+    console.log(`t3flare: no Model endpoint set up: ${endpoint.reason}`);
+    return 0;
+  }
+  const access = JSON.parse(fs.readFileSync(credentialsFile(stage), "utf8")) as { url: string; clientId: string; clientSecret: string };
+  const admin = adminClient({ url: access.url, adminToken: stageSecrets().T3FLARE_ADMIN_TOKEN!, clientId: access.clientId, clientSecret: access.clientSecret });
+  const result = await ensureModelEndpoint(admin, endpoint.spec, { overwrite: stage !== "prod", waitMs: 5 * 60_000 });
+  if (!result.ok) {
+    console.error(`t3flare: deployed, but the Model endpoint was not set up: ${result.error}`);
+    return 1;
+  }
+  console.log(`t3flare: Model endpoint "${result.id}" ${result.outcome} (from ${endpoint.source}, ${result.models} models; its small model ${result.turnModel})`);
+  return 0;
 };
 
 /** Runs alchemy, streaming its output live (it prints no secrets) while keeping a copy for the retry decision. */
@@ -152,66 +158,38 @@ switch (command) {
       console.error("t3flare: t3code/node_modules/.pnpm exists (a pnpm command ran inside t3code/); remove t3code/node_modules and run `pnpm install`");
       process.exit(2);
     }
+    // SPI-1175: what is bound and set up, decided before anything is built (lib/deployPlan.ts): the Model proxy is optional
+    // on a throwaway stage (`--no-model-proxy` drops it, blanked so a shell's own cannot be bound) and kept on prod; the
+    // stage's Model endpoint comes from T3FLARE_MODEL_ENDPOINT, else (a laptop) Commissary's, else (CI) a logged skip.
+    const plan = deployPlan({ stage, args: rest, read: deploySecrets([MODEL_ENDPOINT_VAR]), env: process.env });
+    if (!plan.ok) {
+      console.error(`t3flare: ${plan.error}`);
+      process.exit(1);
+    }
+    for (const note of plan.notes) console.log(`t3flare: ${note}`);
     if (rest.includes("--web") || !fs.existsSync(path.join(here, "dist/web/index.html"))) {
       const web = spawnSync("pnpm", ["run", "prepare:web"], { cwd: here, stdio: "inherit" });
       if (web.status !== 0) process.exit(web.status ?? 1);
     }
-    const read = deploySecrets([MODEL_ENDPOINT_VAR]);
-    // SPI-1175: the stage's Model endpoint, checked before the Workers are built. A laptop without T3FLARE_MODEL_ENDPOINT
-    // derives Commissary's from the Model proxy's settings; CI without the secret skips it (logged), so a deploy never
-    // waits on the owner's `ci:setup`.
-    const endpoint = modelEndpointSpec(read, { derive: !inCI });
-    if (!endpoint.ok && endpoint.invalid) {
-      console.error(`t3flare: ${endpoint.reason}`);
-      process.exit(1);
-    }
-    // `--no-model-proxy`: deploy without the Model proxy even when dev.env has it (a stage on its Model endpoint alone).
-    const noProxy = rest.includes("--no-model-proxy");
-    const secrets = Object.fromEntries(Object.entries(read).filter(([name]) => name !== MODEL_ENDPOINT_VAR && !(noProxy && MODEL_PROXY.includes(name))));
-    const missing = DEPLOY_SECRETS.filter((name) => secrets[name] === undefined);
-    if (missing.length > 0) {
-      console.error(`t3flare: missing ${missing.join(", ")} (set them, or put them in ~/.config/t3flare/dev.env)`);
-      process.exit(1);
-    }
-    if (secrets.MODEL_PROXY_URL === undefined) console.log("t3flare: deploying without the Model proxy (no MODEL_PROXY_URL)");
-    else if (secrets.MODEL_PROXY_API_KEY === undefined) {
-      console.error("t3flare: MODEL_PROXY_URL is set without MODEL_PROXY_API_KEY");
-      process.exit(1);
-    }
     await buildWorker();
     await buildAgentsWorker();
-    const attempt = await alchemy(["deploy"], { ...stageSecrets(), ...secrets });
+    const env = { ...stageSecrets(), ...plan.alchemyEnv };
+    const attempt = await alchemy(["deploy"], env);
     let status = attempt.status;
     // Only a brand-new stage fails this way: each Worker's Durable Object binding to a class in the other does not
     // exist yet (isDurableObjectClassNotFound). Deploy both once without the cross-Worker bindings, then again with
     // them. Any other failure exits as is: the first pass would unbind a live stage.
     if (status !== 0 && isDurableObjectClassNotFound(attempt.output)) {
       console.error("t3flare: Durable Object class not found; retrying in two passes (the first without cross-Worker bindings)");
-      const first = await alchemy(["deploy"], { ...stageSecrets(), ...secrets, T3FLARE_DEPLOY_BOOTSTRAP: "1" });
-      status = first.status === 0 ? (await alchemy(["deploy"], { ...stageSecrets(), ...secrets })).status : first.status;
+      const first = await alchemy(["deploy"], { ...env, T3FLARE_DEPLOY_BOOTSTRAP: "1" });
+      status = first.status === 0 ? (await alchemy(["deploy"], env)).status : first.status;
     }
     if (status === 0 && !fs.existsSync(credentialsFile(stage))) {
       console.error(`t3flare: deployed, but ${path.relative(here, credentialsFile(stage))} was not written`);
       process.exit(1);
     }
     if (status !== 0) process.exit(status);
-    if (!endpoint.ok) {
-      console.log(`t3flare: no Model endpoint set up: ${endpoint.reason}`);
-      process.exit(0);
-    }
-    // Through the panel's API with the stage's service token and admin token. prod keeps an endpoint already there as the
-    // owner left it; a test stage saves it again. Text generation follows the endpoints' default unless the owner picked.
-    const access = JSON.parse(fs.readFileSync(credentialsFile(stage), "utf8")) as { url: string; clientId: string; clientSecret: string };
-    const admin = adminClient({ url: access.url, adminToken: stageSecrets().T3FLARE_ADMIN_TOKEN!, clientId: access.clientId, clientSecret: access.clientSecret });
-    const result = await ensureModelEndpoint(admin, endpoint.spec, { overwrite: stage !== "prod", waitMs: 5 * 60_000 });
-    if (!result.ok) {
-      console.error(`t3flare: deployed, but the Model endpoint was not set up: ${result.error}`);
-      process.exit(1);
-    }
-    console.log(
-      `t3flare: Model endpoint "${result.id}" ${result.outcome} (from ${endpoint.source}, ${result.models} models; its small model ${result.turnModel})`,
-    );
-    process.exit(0);
+    process.exit(await setUpEndpoint(plan.endpoint));
   }
   case "run": {
     const [script, ...args] = rest;
