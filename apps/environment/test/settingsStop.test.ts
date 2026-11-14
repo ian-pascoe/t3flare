@@ -10,7 +10,8 @@ import { forgetEarlyStopsForTests, sessionMcpCall, stopCall, stoppableCall } fro
 import { relayMessage } from "../src/mcp/relay.ts";
 import { registerCliAsker } from "../src/provider/cli/cliAsk.ts";
 import { DURABLE_AGENT } from "../src/provider/threadCaller.ts";
-import { settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
+import { waitingOn } from "../src/settings/openChanges.ts";
+import { flush, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 
 /** A header add: it takes a secret, so it is answered on the Change page alone and its card offers "Opened it". */
 const ADD = { expectedRevision: 0, change: { op: "add", server: "notes", url: "https://notes.example/mcp", auth: { kind: "header", header: "X-Key" } } };
@@ -27,15 +28,19 @@ describe("a Stop withdraws the Open change after \"Opened it\" (plan D9)", () =>
   it("a Session's call: its Stop names the call's stopId (cancelAsk), and the Open change closes withdrawn by stop", async () => {
     const f = (fixture = settingsFixture({ answer: { decision: "accept" } }));
     const caller = f.durable("thread-stop");
-    const pending = sessionMcpCall(f.host, { server: "settings", tool: "change_mcp", args: ADD, judged: "write", asker: { ask: async (card) => (f.cards.push(card), { decision: "accept" }), withdraw: () => undefined }, thread: caller.thread!, stopId: "session:s1:call-1" }, DURABLE_AGENT);
+    const withdrawn: Array<string> = [];
+    const pending = sessionMcpCall(f.host, { server: "settings", tool: "change_mcp", args: ADD, judged: "write", asker: { ask: async (card) => (f.cards.push(card), { decision: "accept" }), withdraw: (id) => void withdrawn.push(id) }, thread: caller.thread!, stopId: "session:s1:call-1" }, DURABLE_AGENT);
     await until(() => f.cards.length === 1);
     const [record] = f.deps.changes.open();
     expect(record?.needsPage).toBe("secret");
-    // "Opened it" was answered: the call waits for the page, with no card open.
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    // "Opened it" was answered: once the call has taken it (no timer: the promise chains drained), it waits for the page
+    // with no card open, so the Stop below has no card to withdraw.
+    await flush();
+    expect(waitingOn(record!.id)).toBe(1);
     expect(f.deps.changes.get(record!.id)?.state).toBe("open");
     stopCall("session:s1:call-1");
     const answer = await pending;
+    expect(withdrawn).toEqual([]);
     expect(answer).toMatchObject({ kind: "result", structured: { status: "withdrawn" } });
     expect(f.deps.changes.get(record!.id)).toMatchObject({ state: "withdrawn", closed: { by: "stop" } });
   });
