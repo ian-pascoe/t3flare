@@ -1,30 +1,31 @@
 {
- "at": "2026-11-14T01:40:54.744Z",
+ "at": "2026-11-14T02:20:06.852Z",
  "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "1d55bd1c6833",
+ "commit": "8ef01cb97004",
  "note": "With no Global mise config the lay-down runs nothing (no exec): its outcome is recorded without an answer, and mise resolves from the image's base file alone.",
  "starts": [
   {
-   "seconds": 2.396,
+   "seconds": 3.259,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "434ead6c-b9f6-4372-86da-a8c48042ba1b",
-    "outcome": "not-laid",
+    "runtime": "b329acb0-585e-4199-a1c2-9d8943496654",
+    "outcome": "none",
     "attempts": 1,
-    "at": 1794620448139
+    "at": 1794622797558
    }
   },
   {
-   "seconds": 3.204,
+   "seconds": 2.517,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "065cd25d-cbe0-47f9-b131-dc0e53281658",
-    "outcome": "not-laid",
+    "runtime": "e486f8e1-c264-4b18-903c-832be8a5a6b6",
+    "outcome": "none",
     "attempts": 1,
-    "at": 1794620452151
+    "at": 1794622803277
    }
   }
  ],
+ "status": "pmise at revision 15: no Global mise config, 2026-11-14T02:20:03.277Z",
  "after": [
   "absent",
   "0",

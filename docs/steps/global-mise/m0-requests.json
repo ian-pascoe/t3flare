@@ -1,8 +1,8 @@
 {
  "ok": true,
- "commit": "b04b74e",
- "image": "sha256:86db19af3f3167d262699322f8a11017d9fb9724253898ccaaa98694048e32a1",
- "at": "2026-11-14T01:02:18.031Z",
+ "commit": "df41598",
+ "image": "sha256:73504cc206e3bf394058607079889fae214fe91c7b787007e955b53cbb37587c",
+ "at": "2026-11-14T02:17:35.541Z",
  "config": "[tools]\nnode = \"24.11.1\"\n\"github:junegunn/fzf\" = \"0.56.3\"\n",
  "default": {
   "layDown": {
@@ -12,7 +12,7 @@
    "laid": true,
    "install": 0,
    "timedOut": false,
-   "ms": 7972,
+   "ms": 4804,
    "bytes": 58
   },
   "byHost": {
@@ -86,12 +86,6 @@
    },
    {
     "method": "GET",
-    "host": "mise-versions.jdx.dev",
-    "path": "/api/github/repos/junegunn/fzf/attestations/sha256:78e96a88cecfbdb3ff65df89cc47c02573407aee0edd08c87e18a8033d498fef",
-    "authorization": ""
-   },
-   {
-    "method": "GET",
     "host": "nodejs.org",
     "path": "/dist/v24.11.1/SHASUMS256.txt",
     "authorization": ""
@@ -100,6 +94,12 @@
     "method": "GET",
     "host": "nodejs.org",
     "path": "/dist/v24.11.1/SHASUMS256.txt.sig",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "mise-versions.jdx.dev",
+    "path": "/api/github/repos/junegunn/fzf/attestations/sha256:78e96a88cecfbdb3ff65df89cc47c02573407aee0edd08c87e18a8033d498fef",
     "authorization": ""
    }
   ]

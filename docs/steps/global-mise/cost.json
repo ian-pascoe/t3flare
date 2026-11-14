@@ -1,70 +1,70 @@
 {
- "at": "2026-11-14T01:40:43.014Z",
+ "at": "2026-11-14T02:19:48.328Z",
  "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "1d55bd1c6833",
+ "commit": "8ef01cb97004",
  "note": "No install cache: every start installs the owner's tools again.",
  "pin": "[tools]\nnode = \"24.11.1\"\n",
  "without": [
   {
-   "seconds": 2.273,
+   "seconds": 1.68,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "12deedac-5d5b-4acd-92b8-b97382ad28c3",
-    "outcome": "not-laid",
+    "runtime": "ab8502b6-277c-45e9-9a7f-7a045d013a14",
+    "outcome": "none",
     "attempts": 1,
-    "at": 1794620418977
+    "at": 1794622769408
    }
   },
   {
-   "seconds": 2.176,
+   "seconds": 2.182,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "b7da9de2-e434-4bde-9a5a-c7c1a8b4a590",
-    "outcome": "not-laid",
+    "runtime": "8eb0f943-2ffd-4bf2-99c0-27d938ea00f5",
+    "outcome": "none",
     "attempts": 1,
-    "at": 1794620421849
+    "at": 1794622772537
    }
   }
  ],
  "withPin": [
   {
-   "seconds": 6.784,
+   "seconds": 5.921,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "9406b9e8-2ee5-4a8a-b013-64bed9c08deb",
+    "runtime": "65cf6c00-5d9f-49f6-ac9b-b072c6a80112",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
-     "revision": 36,
+     "revision": 14,
      "sha256": "0eb09ceb981ac62b1ed4ebb30295ad081a471bb40b9ebda4eb48fcf45aae8cf3",
      "source": "environment",
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 4560,
+     "ms": 4112,
      "bytes": 25
     },
-    "at": 1794620430118
+    "at": 1794622780577
    }
   },
   {
-   "seconds": 9.95,
+   "seconds": 5.949,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "cc57d6f3-f11f-4a91-a34d-03d3bd04ac7f",
+    "runtime": "0a86e131-73e9-4b36-a639-4e2cb7faa9f2",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
-     "revision": 36,
+     "revision": 14,
      "sha256": "0eb09ceb981ac62b1ed4ebb30295ad081a471bb40b9ebda4eb48fcf45aae8cf3",
      "source": "environment",
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 6646,
+     "ms": 4120,
      "bytes": 25
     },
-    "at": 1794620441811
+    "at": 1794622787418
    }
   }
  ],

@@ -137,6 +137,9 @@ owner's `mise.toml` text, which every Container's commands get as mise's global 
    Container-local `/var/lib/t3flare/mise/config.toml` its *global* config. mise layers system < global < project and
    merges `[tools]` per tool, so the image's `git` and `gh` stay under the owner's file, and a repository's own
    `mise.toml` wins per tool over both. With no text nothing is written there and mise resolves as before.
+   `COMMAND_ENV` also pins mise's data, cache, state and config directories to the image's defaults under `/root`, so
+   a CLI profile that moves `XDG_*` (OpenCode's own home) still finds the lay-down's installs instead of installing
+   the pins again.
 3. **Laid down per Container.** The Workspace DO runs the lay-down (`@t3flare/sandbox-image/globalMise`) on each new
    Container, keyed by computer's runtime id, after the connect and before computer sends the first command; Terminals,
    CLI processes and the Workspace DO's own commands wait for it too. It installs the owner's tools with the text as a
@@ -148,7 +151,8 @@ owner's `mise.toml` text, which every Container's commands get as mise's global 
    counts from its end. The script bounds its lock (60 s), install (600 s, KILL 10 s later) and checks (20 s each); the
    Workspace DO waits their sum and a minute, then kills it and takes the file as not laid down, final for that
    Container. An exec that failed is tried again at once, then by the next command, Terminal, CLI process or alarm, at
-   most three times per Container; a passive read never retries it. The outcome is kept in the Workspace DO's storage,
+   most three times per Container. A connect only passive reads made never runs it; the alarm then runs it for a
+   Container that had none. The outcome is kept in the Workspace DO's storage,
    so a new instance does not run a finished lay-down again; its answer is kept on the Container's disk by revision and
    SHA-256, on the assumption that a Container's disk never outlives it (one that did would at worst skip laying down
    the same text again). A Durable agent's command cut off while it waited (a timeout or an abort during the install)
@@ -163,7 +167,8 @@ owner's `mise.toml` text, which every Container's commands get as mise's global 
    command of each of Codex, Claude Code, OpenCode and pi. A Variable cannot set any of them (the `MISE_` prefix is
    refused).
 6. **Reported.** Each lay-down is logged (the text's size and SHA-256, never the text) and sent to the Environment DO;
-   the panel's Status shows the last one across all Workspaces: laid down or not, and why.
+   the panel's Status shows the last one across all Workspaces: laid down or not, and why. A start with no Global mise
+   config reports too ("no Global mise config"), so a cleared config replaces an older "not laid down".
 7. **Audit.** A `file` setting is audited as its size and SHA-256, not its text, a departure from §3's "as resolved
    before and after": the audit log is one stored value of up to 1,000 entries, and a Durable Object value is at most
    2 MB. The current text is on the panel.
