@@ -120,6 +120,9 @@ const ENDPOINT_STREAMS: Readonly<Record<EndpointApi, () => ProviderStreams>> = {
 /** The APIs whose pi-ai implementation takes a request's `fetch` (the Session's recording one). */
 const TAKES_FETCH: ReadonlySet<EndpointApi> = new Set(["anthropic-messages", "openai-responses", "openai-completions"]);
 
+/** What an endpoint with no auth sends as its key: pi-ai sends no request without one. */
+export const NO_KEY = "none";
+
 export interface EndpointAccess {
   /** The endpoint's API key at use time (the Environment's, ADR-0018): never stored by the Session. */
   readonly credential: (endpointId: string, target: EndpointTarget) => Promise<EndpointCredential>;
@@ -155,12 +158,15 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
       id: endpoint.id,
       name: endpoint.label,
       baseUrl: endpoint.baseUrl,
-      ...(Object.keys(endpoint.headers).length === 0 ? {} : { headers: { ...endpoint.headers } }),
       auth: {
         apiKey: {
           name: `${endpoint.label} API key`,
           resolve: async () => {
-            if (endpoint.auth === "none") return { auth: { baseUrl: endpoint.baseUrl }, source: "Model endpoint (no key)" };
+            // The endpoint's headers go with every request as the resolved auth's headers: pi-ai sends those (it reads no
+            // provider-level headers).
+            const headers = { ...endpoint.headers };
+            // pi-ai's APIs refuse a request without a key, so an endpoint with no auth sends a placeholder, never a secret.
+            if (endpoint.auth === "none") return { auth: { apiKey: NO_KEY, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint (no key)" };
             // The key is asked for the target this provider sends it to; the Environment gives none for an old one.
             const { apiKey, unreadable, changed } = await access.credential(endpoint.id, targetOf(endpoint));
             if (apiKey === null) {
@@ -172,7 +178,7 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
                     : `The Model endpoint "${endpoint.id}" has no API key: set one in the Harness panel.`,
               );
             }
-            return { auth: { apiKey, baseUrl: endpoint.baseUrl }, source: "Model endpoint" };
+            return { auth: { apiKey, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint" };
           },
         },
       },

@@ -146,8 +146,11 @@ export const targetOf = (endpoint: EndpointTarget): EndpointTarget => ({ api: en
 const headerList = (headers: Readonly<Record<string, string>>): string =>
   JSON.stringify(Object.entries(headers).map(([name, value]) => [name.toLowerCase(), value]).sort(([a], [b]) => (a! < b! ? -1 : a! > b! ? 1 : 0)));
 
+/** A target as one string: equal for the same API, base URL and headers (names case-insensitive). */
+export const targetKey = (target: EndpointTarget): string => JSON.stringify([target.api, target.baseUrl, headerList(target.headers)]);
+
 /** Whether two targets are the same: the same API, base URL and headers (names case-insensitive). */
-export const sameTarget = (a: EndpointTarget, b: EndpointTarget): boolean => a.api === b.api && a.baseUrl === b.baseUrl && headerList(a.headers) === headerList(b.headers);
+export const sameTarget = (a: EndpointTarget, b: EndpointTarget): boolean => targetKey(a) === targetKey(b);
 
 /**
  * An endpoint's key as the Environment answers a Session (`endpointCredential`): the key, or null with why.
@@ -255,8 +258,11 @@ export const validateEndpoint = (value: unknown): { readonly ok: true; readonly 
   const given = value.headers ?? {};
   if (!isRecord(given)) return { ok: false, error: "headers is an object of names to values" };
   if (Object.keys(given).length > MAX_HEADERS) return { ok: false, error: `at most ${MAX_HEADERS} headers` };
+  const names = new Set<string>();
   for (const [name, text] of Object.entries(given)) {
     if (!HEADER_NAME.test(name)) return { ok: false, error: `the header name ${JSON.stringify(name)} is 1–64 of A–Z, a–z, 0–9 and -` };
+    if (names.has(name.toLowerCase())) return { ok: false, error: `the header ${name} is given twice (header names ignore case)` };
+    names.add(name.toLowerCase());
     if (CREDENTIAL_HEADERS.has(name.toLowerCase())) return { ok: false, error: `${name} carries a credential: put the key in the API key field, which is sealed` };
     if (typeof text !== "string" || text.length > 1024 || /[\r\n]/.test(text)) return { ok: false, error: `the header ${name}'s value is one line of up to 1024 characters` };
     headers[name] = text;

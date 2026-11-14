@@ -5,25 +5,20 @@
 // fills in what the list does not say (store.ts). A failure is reported as its HTTP status, never its body (which may
 // echo the key).
 import { parseList, realIdOf } from "@t3flare/models/catalog";
-import { type EndpointApi, type EndpointModelInput, isRecord } from "@t3flare/models/endpoints";
+import { type EndpointModelInput, type EndpointTarget, isRecord } from "@t3flare/models/endpoints";
 
 const TIMEOUT_MS = 10_000;
 const MAX_PAGES = 10;
 
 export type Discovery = { readonly ok: true; readonly models: ReadonlyArray<EndpointModelInput> } | { readonly ok: false; readonly error: string };
 
-interface Target {
-  readonly api: EndpointApi;
-  readonly baseUrl: string;
-  readonly headers: Readonly<Record<string, string>>;
-}
 
 const count = (value: unknown): number | undefined => (typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined);
 
 class ListError extends Error {}
 
 /** The endpoint's own headers, then the key in the header `name` takes it in (none without a key). */
-const keyedHeaders = (target: Target, apiKey: string | undefined, name: string, value: (key: string) => string = (key) => key): Record<string, string> => ({
+const keyedHeaders = (target: EndpointTarget, apiKey: string | undefined, name: string, value: (key: string) => string = (key) => key): Record<string, string> => ({
   ...target.headers,
   ...(apiKey === undefined ? {} : { [name]: value(apiKey) }),
 });
@@ -40,7 +35,7 @@ const getJson = async (url: URL, headers: Record<string, string>, fetcher: typeo
   }
 };
 
-const anthropic = async (target: Target, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
+const anthropic = async (target: EndpointTarget, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
   const headers = { ...keyedHeaders(target, apiKey, "x-api-key"), "anthropic-version": "2023-06-01" };
   const models: Array<EndpointModelInput> = [];
   let after: string | undefined;
@@ -65,13 +60,13 @@ const anthropic = async (target: Target, apiKey: string | undefined, fetcher: ty
   return models;
 };
 
-const openai = async (target: Target, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
+const openai = async (target: EndpointTarget, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
   const body = await getJson(new URL(`${target.baseUrl}/models`), keyedHeaders(target, apiKey, "authorization", (key) => `Bearer ${key}`), fetcher, signal);
   if (!isRecord(body) || !Array.isArray(body.data)) throw new ListError("the endpoint's answer is not a list of models");
   return body.data.flatMap((entry): Array<EndpointModelInput> => (isRecord(entry) && typeof entry.id === "string" && entry.id !== "" ? [{ id: entry.id }] : []));
 };
 
-const google = async (target: Target, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
+const google = async (target: EndpointTarget, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
   const url = new URL(`${target.baseUrl}/models`);
   url.searchParams.set("pageSize", "1000");
   const body = await getJson(url, keyedHeaders(target, apiKey, "x-goog-api-key"), fetcher, signal);
@@ -94,7 +89,7 @@ const google = async (target: Target, apiKey: string | undefined, fetcher: typeo
 };
 
 /** The models `target` lists, sorted by id, read with `apiKey` (none for an endpoint without auth). */
-export const discoverModels = async (target: Target, apiKey: string | undefined, fetcher: typeof fetch = fetch): Promise<Discovery> => {
+export const discoverModels = async (target: EndpointTarget, apiKey: string | undefined, fetcher: typeof fetch = fetch): Promise<Discovery> => {
   const signal = AbortSignal.timeout(TIMEOUT_MS);
   try {
     const read = target.api === "anthropic-messages" ? anthropic : target.api === "google-generative-ai" ? google : openai;

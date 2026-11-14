@@ -830,7 +830,7 @@ export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2Pr
     const which = slug === undefined ? "The selected model" : `The model ${slug}`;
     const why =
       slug === undefined
-        ? "its Model endpoint, or the Model proxy, no longer lists it"
+        ? "its Model endpoint was removed or no longer lists it, or the Model proxy no longer lists it"
         : slug.startsWith("anthropic/")
           ? "the Model proxy no longer lists it"
           : "its Model endpoint was removed or no longer lists it";

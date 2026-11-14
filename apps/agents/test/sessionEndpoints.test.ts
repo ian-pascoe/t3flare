@@ -68,4 +68,47 @@ describe("a Session's Model endpoint keys", () => {
     expect(sent.length).toBeGreaterThan(0);
     expect(sent.every((line) => line.startsWith("https://new-host.example") && line.endsWith(" sk-K2-new"))).toBe(true);
   });
+
+  it("never uses a key answered for an old target after a newer install (the cache is by target)", async () => {
+    const at = (baseUrl: string) => endpointAt(baseUrl);
+    let environment = { revision: 1, endpoint: at("https://old-host.example"), key: "sk-K1-old" };
+    let hold: Promise<void> | undefined;
+    let asked = 0;
+    const sent: Array<string> = [];
+    const fetcher = (async (url: unknown, init?: RequestInit) => {
+      sent.push(`${new URL(String(url)).host} <- ${new Headers(init?.headers).get("x-api-key")}`);
+      return Response.json({ type: "error", error: { type: "invalid_request_error", message: "stub" } }, { status: 400 });
+    }) as typeof fetch;
+    const models = createModels();
+    const map = new Map<string, unknown>();
+    const endpoints = new SessionEndpoints({
+      kv: { get: <T>(key: string) => map.get(key) as T | undefined, put: (key, value) => void map.set(key, value) },
+      models,
+      fetch: fetcher,
+      readMs: 50,
+      source: () => ({
+        modelEndpoints: async () => ({ revision: environment.revision, endpoints: [environment.endpoint] }),
+        endpointCredential: async ({ target }: EndpointCredentialRequest) => {
+          asked += 1;
+          const answer = sameTarget(environment.endpoint, target) ? { apiKey: environment.key } : { apiKey: null, changed: true };
+          if (hold !== undefined) await hold;
+          return answer;
+        },
+      }),
+    });
+    await endpoints.take();
+    let release!: () => void;
+    hold = new Promise((resolve) => (release = resolve));
+    // A turn asks for the old target's key; the Environment answers K1, but the answer is held in flight.
+    const inFlight = models.getAuth("gw").catch(() => undefined);
+    while (asked === 0) await new Promise((resolve) => setTimeout(resolve, 1));
+    // The owner moves the endpoint with a new key; a follow-up turn installs it; then the old answer lands.
+    environment = { revision: 2, endpoint: at("https://new-host.example"), key: "sk-K2-new" };
+    await endpoints.take();
+    release();
+    hold = undefined;
+    await inFlight;
+    await models.completeSimple(models.getModel("gw", "claude-haiku-5-5")!, { messages: [{ role: "user", content: "hi", timestamp: 0 }] });
+    expect(sent).toEqual(["new-host.example <- sk-K2-new"]);
+  });
 });

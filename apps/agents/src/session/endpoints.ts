@@ -5,7 +5,7 @@
 // will send it to (API, base URL, headers), and the Environment gives it only for the endpoint's target now: a Session
 // still holding an endpoint the owner moved gets no key for the old target.
 import type { MutableModels, FetchFunction } from "@earendil-works/pi-ai";
-import { EMPTY_ENDPOINTS, type EndpointCredential, type EndpointCredentialRequest, type EndpointTarget, type ModelEndpoints } from "@t3flare/models/endpoints";
+import { EMPTY_ENDPOINTS, type EndpointCredential, type EndpointCredentialRequest, type EndpointTarget, type ModelEndpoints, targetKey } from "@t3flare/models/endpoints";
 
 import { endpointProviders } from "./models.ts";
 
@@ -35,7 +35,10 @@ export class SessionEndpoints {
   readonly #options: SessionEndpointsOptions;
   /** The endpoints whose providers the models have. */
   #ids: ReadonlySet<string> = new Set();
-  /** Keys in memory only. */
+  /**
+   * Keys in memory only, by endpoint and target: an answer for an old target (one that lands after a newer install) is
+   * never used for another.
+   */
   readonly #keys = new Map<string, { readonly credential: EndpointCredential; readonly at: number }>();
 
   constructor(options: SessionEndpointsOptions) {
@@ -56,10 +59,11 @@ export class SessionEndpoints {
   /** An endpoint's key for `target`, from memory while fresh, else from the Environment (a refusal is never kept). */
   async #credential(endpointId: string, target: EndpointTarget): Promise<EndpointCredential> {
     const now = this.#options.now ?? Date.now;
-    const kept = this.#keys.get(endpointId);
+    const cacheKey = JSON.stringify([endpointId, targetKey(target)]);
+    const kept = this.#keys.get(cacheKey);
     if (kept !== undefined && now() - kept.at < ENDPOINT_KEY_TTL_MS) return kept.credential;
     const credential = await this.#options.source().endpointCredential({ endpointId, target });
-    if (credential.apiKey !== null) this.#keys.set(endpointId, { credential, at: now() });
+    if (credential.apiKey !== null) this.#keys.set(cacheKey, { credential, at: now() });
     return credential;
   }
 

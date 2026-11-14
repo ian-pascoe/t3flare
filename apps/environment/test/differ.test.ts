@@ -113,7 +113,7 @@ describe("differ", () => {
     expect(failure).toMatchObject({ class: "provider_error", code: "no_model" });
     expect(failure.message).toBe("The model openai/gpt-5-mini is not available: its Model endpoint was removed or no longer lists it. Pick another model.");
     const bare = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", startedAt: 0 }, now);
-    expect(bare.message).toBe("The selected model is not available: its Model endpoint, or the Model proxy, no longer lists it. Pick another model.");
+    expect(bare.message).toBe("The selected model is not available: its Model endpoint was removed or no longer lists it, or the Model proxy no longer lists it. Pick another model.");
     const proxy = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", detail: "Model anthropic/claude-x is not available", startedAt: 0 }, now);
     expect(proxy.message).toBe("The model anthropic/claude-x is not available: the Model proxy no longer lists it. Pick another model.");
   });

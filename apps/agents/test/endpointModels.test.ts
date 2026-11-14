@@ -2,10 +2,10 @@
 // a model's ref is `{ provider: <endpointId>, modelId }` (its slug `<endpointId>/<modelId>`); each model with the
 // endpoint's API, base URL and the metadata stored with it; the key fetched at use time, never held by the provider.
 import { createModels } from "@earendil-works/pi-ai";
-import type { EndpointCredential, ModelEndpoints } from "@t3flare/models/endpoints";
+import type { EndpointApi, EndpointAuth, EndpointCredential, ModelEndpoints } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
-import { endpointProviders } from "../src/session/models.ts";
+import { endpointProviders, NO_KEY } from "../src/session/models.ts";
 
 const COST = { input: 0.25, output: 2, cacheRead: 0.025, cacheWrite: 0 };
 
@@ -58,7 +58,6 @@ describe("endpointProviders", () => {
       thinkingLevelMap: { off: null },
     });
     expect(models.getModel("commissary", "claude-haiku-5-5")).toMatchObject({ api: "anthropic-messages", baseUrl: "https://proxy.example" });
-    expect(models.getProvider("openai")?.headers).toEqual({ "OpenAI-Organization": "org-1" });
   });
 
   it("resolves each endpoint's key at use time, from the credential source", async () => {
@@ -70,7 +69,7 @@ describe("endpointProviders", () => {
     expect(asked).toEqual([]);
     expect((await models.getAuth("openai"))?.auth).toMatchObject({ apiKey: "key-of-openai", baseUrl: "https://api.openai.com/v1" });
     expect((await models.getAuth("commissary"))?.auth.apiKey).toBe("key-of-commissary");
-    expect((await models.getAuth("local"))?.auth.apiKey).toBeUndefined();
+    expect((await models.getAuth("local"))?.auth.apiKey).toBe(NO_KEY);
     expect(asked).toEqual(["openai", "commissary"]);
   });
 
@@ -83,4 +82,29 @@ describe("endpointProviders", () => {
     const models = modelsWith(async () => ({ apiKey: null, unreadable: true }));
     await expect(models.getAuth("openai")).rejects.toThrow(/can no longer be read .*enter it again/);
   });
+
+  // On the wire: pi-ai reads no provider-level headers, so the endpoint's go out as the resolved auth's headers.
+  for (const api of ["openai-completions", "openai-responses", "anthropic-messages"] as const satisfies ReadonlyArray<EndpointApi>) {
+    for (const auth of ["api-key", "none"] as const satisfies ReadonlyArray<EndpointAuth>) {
+      it(`sends the endpoint's headers with each ${api} request (${auth})`, async () => {
+        const sent: Array<Record<string, string>> = [];
+        const fetch = (async (input: unknown, init?: RequestInit) => {
+          const request = input instanceof Request ? input : new Request(String(input), init);
+          sent.push({ url: request.url, ...Object.fromEntries(request.headers.entries()) });
+          return Response.json({ error: { message: "stub", type: "invalid_request_error" } }, { status: 400 });
+        }) as typeof globalThis.fetch;
+        const endpoints: ModelEndpoints = {
+          revision: 1,
+          endpoints: [{ id: "gw", label: "GW", api, baseUrl: "https://gw.example/v1", auth, headers: { "X-Org": "acme", "Helicone-Target-Url": "https://upstream.example" }, models: [{ id: "m1", name: "m", reasoning: false, input: ["text"], contextWindow: 100_000, maxTokens: 1_000, cost: COST, known: false }] }],
+        };
+        const models = createModels();
+        for (const provider of endpointProviders(endpoints, { credential: async () => ({ apiKey: "sk-wire" }), fetch })) models.setProvider(provider);
+        await models.completeSimple(models.getModel("gw", "m1")!, { messages: [{ role: "user", content: "hi", timestamp: 0 }] });
+        expect(sent.length).toBeGreaterThan(0);
+        expect(sent[0]).toMatchObject({ "x-org": "acme", "helicone-target-url": "https://upstream.example" });
+        expect(sent[0]!.url.startsWith("https://gw.example/v1")).toBe(true);
+        expect(Object.values(sent[0]!).some((value) => value.includes("sk-wire"))).toBe(auth === "api-key");
+      });
+    }
+  }
 });

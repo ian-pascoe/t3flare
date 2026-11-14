@@ -109,6 +109,8 @@ describe("endpointStore", () => {
         expect(await store.save({ ...OPENAI, headers: { "X-Org": "b" } }, {})).toMatchObject({ ok: false, error: expect.stringMatching(/API key entered again/) });
       } else expect(await store.save({ ...OPENAI, headers }, {})).toMatchObject({ ok: false, error: expect.stringMatching(/API key entered again/) });
     }
+    // Two header names that differ only in case are one header given twice.
+    expect(await store.save({ ...OPENAI, headers: { "X-Org": "a", "x-org": "b" } }, { apiKey: "sk-first" })).toMatchObject({ ok: false, error: expect.stringMatching(/given twice/) });
     // The same headers under other-cased names are the same target.
     expect(await store.save({ ...OPENAI, headers: { "x-org": "a" } }, {})).toMatchObject({ ok: true });
   });

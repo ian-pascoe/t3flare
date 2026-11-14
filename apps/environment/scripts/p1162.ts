@@ -48,7 +48,7 @@ const api = (method: string, path: string, body?: unknown) => admin(method, `/_t
 const ANTHROPIC = { id: "commissary", label: "Commissary", api: "anthropic-messages", baseUrl: proxyUrl, auth: "api-key", headers: {} };
 const OPENAI =
   openaiKey === undefined
-    ? { id: "openai", label: "OpenAI (Responses)", api: "openai-responses", baseUrl: `${proxyUrl}/v1`, auth: "api-key", headers: {} }
+    ? { id: "openai", label: "OpenAI (Responses)", api: "openai-responses", baseUrl: `${proxyUrl}/v1`, auth: "api-key", headers: { "X-T3flare-Evidence": "p1162" } }
     : { id: "openai", label: "OpenAI", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api-key", headers: {} };
 const OPENAI_KEY = openaiKey ?? proxyKey;
 
@@ -141,7 +141,7 @@ const removedProjection = await awaitRuns(threadId, 3);
 const lastRun = runsOf(removedProjection).at(-1);
 report.removed = clean({ status: removed.status, run: lastRun?.status ?? null, errors: failureText(removedProjection), pickerAfter });
 check("the removed endpoint's models leave the picker", pickerAfter.length === 0, pickerAfter);
-check("the removed endpoint's model failed the turn, saying why", lastRun?.status === "failed" && /is not available: its Model endpoint/.test(JSON.stringify(removedProjection)), report.removed);
+check("the removed endpoint's model failed the turn, saying why", lastRun?.status === "failed" && /is not available: its Model endpoint was removed/.test(JSON.stringify(removedProjection)), report.removed);
 
 // 7. The audit log: every change, never a key.
 const audit = (await api("GET", "audit")).json?.entries?.filter((entry: any) => entry.entity === "endpoints") ?? [];

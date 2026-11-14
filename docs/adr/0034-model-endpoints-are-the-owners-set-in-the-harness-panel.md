@@ -30,10 +30,15 @@ optional headers, and the models it serves.
    (step-2a2's design). The key is 256 random bits alchemy makes once per stage and keeps in the stage's state
    (`Alchemy.Random`), so prod gets one at its next deploy with nothing for the owner to do. Without it no key is
    stored. What the panel shows is that a key is set, when, a fingerprint, and whether this Environment's key still
-   opens it. A saved key goes only to the API and base URL it was saved with: an edit that moves either needs the key
-   again, discovery elsewhere needs a typed key, and no redirect is followed with it. Base URLs are https at a public
-   host name (no IP literal, `localhost` or `.internal`). A Session asks for a key at use time
-   (`endpointCredential`, ADR-0018's direction) and keeps it in memory only.
+   opens it. A saved key goes only to the **target** it was saved with: the endpoint's API, base URL and headers
+   (header names ignore case; a gateway may route by a header). An edit that moves any of them needs the key again,
+   discovery elsewhere needs a typed key, and no redirect is followed with it. A key is sealed only for an endpoint
+   saved beside it. Base URLs are https at a public host name (no IP literal, `localhost` or `.internal`).
+   A Session asks for a key at use time (ADR-0018's direction) with the target it holds:
+   `endpointCredential({ endpointId, target })`. The Environment gives the key only when that is the endpoint's target
+   now. Otherwise the turn fails saying the endpoint changed and to retry. The Session keeps keys in memory only, by
+   endpoint and target. The endpoint's headers go with every request; an endpoint with no auth sends a placeholder
+   key, never a secret.
 5. **Expand, then cut.** Until SPI-1176 the Model proxy's models and settings keep working beside the endpoints. A
    turn on a model whose endpoint was removed, or no longer lists it, fails with a message that says so.
 
