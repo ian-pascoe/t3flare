@@ -3,7 +3,8 @@
 // names and their limits, sizes, Exposures); server and skill names are validated at call time. Every tool's class is
 // fixed: reads are `read`, writes are `write` (plan D7), and `readOnlyHint` says so.
 //
-// `resume` (plan D12) is not here: it is the Owner-client endpoint's alone (M5b), never the in-process server's.
+// `resume` (plan D12) is not among them: it is `RESUME_TOOL`, the Owner-client endpoint's alone in `model` (M5b,
+// SPI-1201), never the in-process server's.
 import { ENVIRONMENT_SETTINGS, type EnvironmentFieldSchema, EXTENSIONS, type ToolClass } from "@t3flare/harness-registry";
 
 import { CHANGE_TTL_MS, durationText } from "./changes.ts";
@@ -25,6 +26,14 @@ export const SETTINGS_INSTRUCTIONS =
  */
 export const SETTINGS_OWNER_INSTRUCTIONS =
   `t3flare's own settings: the Harness settings (Pi Durable's extensions and the MCP server set), the Environment settings (Container size, idle time, budget, Variables, Global mise config) and the Environment skills. These are not t3's preferences. Read tools run. Every write names the expectedRevision it read. A change that narrows what agents have or can do applies at once; one that widens it waits for the owner's answer on its Change page (at most ${durationText(CHANGE_TTL_MS)}): open the link the result or the question gives, and do not repeat the call; read the settings to see whether it applied. Do not repeat a declined change.`;
+
+/** What an Owner client is told besides, by its Elicitation mode (plan D12). */
+export const OWNER_MODE_INSTRUCTIONS = {
+  browser: "",
+  native: " In elicitation_mode=native such a change is asked as a form in your client: its Accept applies it.",
+  model:
+    " In elicitation_mode=model such a change answers approval-required with a requestId: show it to the user, then call resume with the requestId and their answer. A change that takes a secret, starts a sign-in or installs or updates skills waits on its Change page instead.",
+} as const;
 
 const ASKED_NOTE = "Changes that widen what agents have or can do (the Change tier `asked`) wait for the owner's answer, on his card or the Change page, before they apply; turning things down is `free`.";
 
@@ -206,6 +215,25 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
 ];
 
 export const settingsToolOf = (name: string): SettingsTool | undefined => SETTINGS_TOOLS.find((tool) => tool.name === name);
+
+/**
+ * `resume` (plan D12's `model`): Executor's shape, a `requestId` and a `response` with its `action`, so that
+ * `isPausingServer` is true of a tool list that includes it. A write: it applies the change it accepts.
+ */
+export const RESUME_TOOL: SettingsTool = {
+  name: "resume",
+  class: "write",
+  description:
+    "Answers a change that waits for approval (a write's approval-required result): requestId from that result, and response.action accept (applies it), decline (refuses it; do not ask again) or cancel (withdraws it). Call it only with the user's answer.",
+  inputSchema: {
+    type: "object",
+    required: ["requestId", "response"],
+    properties: {
+      requestId: { type: "string" },
+      response: { type: "object", required: ["action"], properties: { action: { enum: ["accept", "decline", "cancel"] }, content: { type: "object" } } },
+    },
+  },
+};
 
 /** The tools as MCP definitions, by name: what the MCP host lists as the server's inventory. */
 export const settingsDefinitions = (): Readonly<Record<string, Readonly<Record<string, unknown>>>> =>
