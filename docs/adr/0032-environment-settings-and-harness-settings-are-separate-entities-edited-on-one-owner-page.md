@@ -83,9 +83,10 @@ agent's own process, which are fixed-path binaries outside mise.
    export (up to 128 characters), each value up to 4,096 characters without a NUL (cloudpid's limits). The panel shows
    them as a list in the Environment section, behind the same guards.
 2. **Refused names**, checked by the API and again when read:
-   - the names t3flare already sets or pins: every name `COMMAND_ENV`, a CLI profile's environment or the managed
-     settings' `env` sets, listed in `SET_BY_T3FLARE` where no rule below covers it. A unit test derives the names from
-     the code and fails when the list misses one or keeps one nothing sets;
+   - the names t3flare already sets or pins: every name `COMMAND_ENV`, a CLI profile's environment, Codex's shell
+     policy, the managed settings' `env`, a Terminal's base environment or its rc file sets, listed in
+     `SET_BY_T3FLARE` where no rule below covers it. A unit test derives the names from the code, with a launch of
+     every CLI profile, and fails when the list misses one or keeps one nothing sets;
    - `PATH`, `HOME`, `PWD`, `SHELL`, `USER`;
    - the prefixes `T3`, `MISE_`, `GIT_`, `GH_`, `GITHUB_`, `SSH_`, `LD_`;
    - the loader hooks `NODE_OPTIONS`, `BASH_ENV`, `ENV`, `PROMPT_COMMAND`;
@@ -105,7 +106,8 @@ agent's own process, which are fixed-path binaries outside mise.
    A Session does not add them: it cannot know which Variables a command's Container will start with before the
    command starts it.
 6. **When.** A Container start takes them with the rest of its launch and keeps them while it runs; a change applies
-   at the Workspace's next start. The Worker Shell has the last start's.
+   at the Workspace's next start. The Worker Shell has the last start's, so before the Workspace's first Container
+   start its commands have none.
 7. **Precedence.** Variables are the lowest layer: `COMMAND_ENV`, a CLI profile's environment, t3's own variables,
    mise's `[env]` and whatever a command exports all win over them.
 8. **Audit.** The audit log records the Variables' names and values before and after, as the page shows them to the
