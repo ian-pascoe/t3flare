@@ -54,7 +54,7 @@ import {
 } from "./server.ts";
 import { PAGE_REASON } from "./render.ts";
 import { signToken, type TokenRefusal, verifyToken } from "./tokens.ts";
-import { OWNER_MODE_INSTRUCTIONS, RESUME_TOOL, SETTINGS_OWNER_INSTRUCTIONS, SETTINGS_TOOLS, settingsToolOf } from "./tools.ts";
+import { OWNER_MODE_INSTRUCTIONS, RESUME_TOOL, SETTINGS_OWNER_INSTRUCTIONS, SETTINGS_TOOLS, settingsToolOf, toolDefinition } from "./tools.ts";
 
 /** The 2026 version: per-request metadata, questions in results (MRTR). */
 export const MODERN_VERSION = "2026-07-28";
@@ -423,7 +423,7 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     case "tools/list": {
       const listed = ownerListed(server);
       // `resume` in `model` alone (plan D12), and only while writes are listed: it applies changes.
-      const tools = [...SETTINGS_TOOLS, ...(requested === "model" ? [RESUME_TOOL] : [])].filter(listed).map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, annotations: { readOnlyHint: tool.class === "read" } }));
+      const tools = [...SETTINGS_TOOLS, ...(requested === "model" ? [RESUME_TOOL] : [])].filter(listed).map(toolDefinition);
       return reply(context.modern ? { tools, ...NO_CACHE } : { tools });
     }
     case "tools/call":

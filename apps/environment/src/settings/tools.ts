@@ -239,8 +239,8 @@ export const RESUME_TOOL: SettingsTool = {
   },
 };
 
+/** A tool as an MCP definition: its name, description, input schema, and `readOnlyHint` from its class. */
+export const toolDefinition = (tool: SettingsTool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, annotations: { readOnlyHint: tool.class === "read" } });
+
 /** The tools as MCP definitions, by name: what the MCP host lists as the server's inventory. */
-export const settingsDefinitions = (): Readonly<Record<string, Readonly<Record<string, unknown>>>> =>
-  Object.fromEntries(
-    SETTINGS_TOOLS.map((tool) => [tool.name, { name: tool.name, description: tool.description, inputSchema: tool.inputSchema, annotations: { readOnlyHint: tool.class === "read" } }]),
-  );
+export const settingsDefinitions = (): Readonly<Record<string, Readonly<Record<string, unknown>>>> => Object.fromEntries(SETTINGS_TOOLS.map((tool) => [tool.name, toolDefinition(tool)]));
