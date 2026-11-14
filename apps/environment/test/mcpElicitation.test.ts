@@ -110,7 +110,11 @@ describe("Executor-style pauses", () => {
 
 const memory = () => {
   const map = new Map<string, unknown>();
-  return { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)) };
+  return {
+    get: <T>(key: string) => map.get(key) as T | undefined,
+    put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)),
+    delete: (key: string) => map.delete(key),
+  };
 };
 
 const tool = (name: string, properties: Record<string, unknown> = {}, readOnlyHint?: boolean) => ({ name, description: name, inputSchema: { type: "object", properties }, ...(readOnlyHint === undefined ? {} : { annotations: { readOnlyHint } }) });

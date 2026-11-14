@@ -9,7 +9,11 @@ import { McpHost, type McpEngineBinding } from "../src/mcp/host.ts";
 
 const memory = () => {
   const map = new Map<string, unknown>();
-  return { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)) };
+  return {
+    get: <T>(key: string) => map.get(key) as T | undefined,
+    put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)),
+    delete: (key: string) => map.delete(key),
+  };
 };
 
 const tool = (name: string, readOnlyHint?: boolean, description = name) => ({
@@ -171,6 +175,65 @@ describe("McpHost", () => {
     const view = await run.host.view();
     expect(view.servers[0]).toMatchObject({ state: "stale" });
     expect(view.servers[0]?.tools).toHaveLength(1);
+  });
+});
+
+describe("McpHost.forget: a server added again under its name starts fresh, even with old work in flight", () => {
+  /** An engine whose answers wait on gates the test opens; it records the prior each request was sent with. */
+  const gatedEngine = () => {
+    const priors: Array<unknown> = [];
+    const gates: Array<{ open: () => void; wait: Promise<void> }> = [];
+    const gate = () => {
+      let open = () => {};
+      const wait = new Promise<void>((resolve) => (open = resolve));
+      gates.push({ open, wait });
+      return wait;
+    };
+    const answers: Array<{ readonly gated: boolean; readonly tools: Array<Record<string, unknown>>; readonly session: string }> = [];
+    const engine: McpEngineBinding = {
+      discover: async (_target, prior) => {
+        priors.push(structuredClone(prior));
+        const answer = answers.shift() ?? { gated: false, tools: [], session: "s-none" };
+        if (answer.gated) await gate();
+        return { kind: "discovered", era: "legacy", protocolVersion: "2025-06-18", capabilities: { tools: {} }, tools: answer.tools, prompts: [], problems: [], fetchedAt: 0, state: { session: answer.session } } as never;
+      },
+      request: async (_target, prior) => {
+        priors.push(structuredClone(prior));
+        await gate();
+        return { kind: "complete", result: { kind: "inline", value: { content: [{ type: "text", text: "ok" }] } }, cacheable: false, fetchedAt: 0, state: { session: "s-old" } } as never;
+      },
+    };
+    const host = new McpHost({ kv: memory(), engine, settings: () => withCommissary(), secret: async () => COMMISSARY_KEY, now: () => 1_000_000 });
+    return { host, priors, answers, opened: () => gates.length, openAll: () => gates.forEach((g) => g.open()) };
+  };
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("a list in flight across a forget keeps neither its tools nor its session, and a new list does not join it", async () => {
+    const run = gatedEngine();
+    run.answers.push({ gated: true, tools: [tool("old_tool", true)], session: "s-old" }, { gated: false, tools: [tool("new_tool", true)], session: "s-new" });
+    const old = run.host.list("commissary");
+    await tick();
+    run.host.forget("commissary");
+    const fresh = await run.host.list("commissary");
+    run.openAll();
+    await old;
+    expect(Object.keys(fresh.definitions)).toEqual(["new_tool"]);
+    expect(Object.keys(run.host.inventory("commissary").definitions)).toEqual(["new_tool"]);
+    await run.host.list("commissary");
+    expect(run.priors).toEqual([{}, {}, { session: "s-new" }]);
+  });
+
+  it("a call in flight across a forget does not write its session back", async () => {
+    const run = gatedEngine();
+    run.answers.push({ gated: false, tools: [tool("note")], session: "s-first" });
+    await run.host.list("commissary");
+    const call = run.host.call({ server: "commissary", tool: "note", args: {}, judged: "write" });
+    while (run.opened() === 0) await tick();
+    run.host.forget("commissary");
+    run.openAll();
+    expect(await call).toMatchObject({ kind: "result", text: "ok" });
+    await run.host.list("commissary");
+    expect(run.priors).toEqual([{}, { session: "s-first" }, {}]);
   });
 });
 

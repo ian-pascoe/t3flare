@@ -347,9 +347,9 @@ const addServer = async (request: Request, deps: HarnessDeps): Promise<Response>
   const applied = applyMcpChange(before, { op: "add", server, url, auth: auth.kind === "header" ? { kind: "header", header: String(auth.header) } : auth.kind === "oauth" ? { kind: "oauth" } : { kind: "none" } });
   if (!applied.ok) return refused(400, applied.error);
   const mark = auth.kind === "header" && value !== undefined ? await deps.secrets.put(server, "header", value) : undefined;
+  deps.store.save(applied.harness);
   // A name that held a server before starts fresh: no old tool list shown as available, no old session id sent.
   deps.mcp?.forget(server);
-  deps.store.save(applied.harness);
   deps.store.audit({
     entity: "harness",
     at: deps.now?.() ?? Date.now(),

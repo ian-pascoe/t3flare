@@ -127,7 +127,7 @@ const errorText = (error: unknown): string => {
 };
 
 export interface McpHostDeps {
-  readonly kv: KvStorage & { delete?(key: string): unknown };
+  readonly kv: KvStorage & { delete(key: string): unknown };
   readonly engine: McpEngineBinding | undefined;
   readonly settings: () => StoredHarness;
   /** A direct server's header value, from the secret store (part 4). */
@@ -144,6 +144,8 @@ export interface McpHostDeps {
 export class McpHost {
   readonly #deps: McpHostDeps;
   readonly #refreshing = new Map<string, Promise<Inventory>>();
+  /** Bumped by `forget`: work started under an older generation of a name writes nothing back. */
+  readonly #generations = new Map<string, number>();
 
   constructor(deps: McpHostDeps) {
     this.#deps = deps;
@@ -182,8 +184,13 @@ export class McpHost {
     return this.#deps.kv.get<McpEnginePriorEncoded>(priorKey(name)) ?? {};
   }
 
-  #keepState(name: string, state: { readonly era?: unknown; readonly session?: unknown } | undefined) {
-    if (state === undefined) return;
+  #generation(name: string): number {
+    return this.#generations.get(name) ?? 0;
+  }
+
+  /** Keeps the engine's protocol state for `name`, unless `name` was forgotten since `generation` began. */
+  #keepState(name: string, state: { readonly era?: unknown; readonly session?: unknown } | undefined, generation: number) {
+    if (state === undefined || generation !== this.#generation(name)) return;
     const prior: Record<string, unknown> = { ...this.#prior(name) };
     for (const key of ["era", "session"] as const) {
       if (state[key] === null) delete prior[key];
@@ -194,13 +201,15 @@ export class McpHost {
 
   /**
    * Forgets `name`'s kept inventory and protocol state (era, session id), so a server added under a name that held one
-   * before (a removed server, or the retired built-in `commissary`) starts fresh: no old tools, no old session.
+   * before (a removed server, or the retired built-in `commissary`) starts fresh: no old tools, no old session. A list
+   * or call still in flight for the old server writes nothing back (its generation is past), and the next list starts
+   * anew rather than joining the old one.
    */
   forget(name: string): void {
-    for (const key of [inventoryKey(name), priorKey(name)]) {
-      if (this.#deps.kv.delete !== undefined) this.#deps.kv.delete(key);
-      else this.#deps.kv.put(key, undefined);
-    }
+    this.#generations.set(name, this.#generation(name) + 1);
+    this.#refreshing.delete(name);
+    this.#deps.kv.delete(inventoryKey(name));
+    this.#deps.kv.delete(priorKey(name));
   }
 
   inventory(name: string): Inventory {
@@ -211,17 +220,20 @@ export class McpHost {
   list(name: string): Promise<Inventory> {
     const running = this.#refreshing.get(name);
     if (running !== undefined) return running;
-    const work = this.#list(name).finally(() => this.#refreshing.delete(name));
+    const work: Promise<Inventory> = this.#list(name).finally(() => {
+      if (this.#refreshing.get(name) === work) this.#refreshing.delete(name);
+    });
     this.#refreshing.set(name, work);
     return work;
   }
 
   async #list(name: string): Promise<Inventory> {
+    const generation = this.#generation(name);
     const server = this.servers()[name];
     const before = this.inventory(name);
     const failed = (error: string): Inventory => {
       const next: Inventory = { ...before, status: "failed", error, listedAt: before.listedAt };
-      this.#deps.kv.put(inventoryKey(name), { ...next, failedAt: this.#now() });
+      if (generation === this.#generation(name)) this.#deps.kv.put(inventoryKey(name), { ...next, failedAt: this.#now() });
       console.warn(JSON.stringify({ t3flare: "mcp-list-failed", server: name, error: error.slice(0, 300) }));
       return next;
     };
@@ -235,7 +247,7 @@ export class McpHost {
     } catch (error) {
       return failed(`the MCP engine failed: ${String(error).slice(0, 300)}`);
     }
-    this.#keepState(name, result.state as never);
+    this.#keepState(name, result.state as never, generation);
     if (result.kind !== "discovered") return failed(errorText(result.error));
     const definitions: Record<string, Readonly<Record<string, unknown>>> = {};
     const refused: Array<{ tool: string; reason: string }> = (result.problems ?? []).map((problem) => ({ tool: problem.tool, reason: problem.problem }));
@@ -257,6 +269,8 @@ export class McpHost {
       refused,
       ...(typeof result.instructions === "string" ? { instructions: result.instructions.slice(0, 4000) } : {}),
     };
+    // Forgotten meanwhile (removed, or added again): the old server's tools are not kept under the new one's name.
+    if (generation !== this.#generation(name)) return this.inventory(name);
     this.#deps.kv.put(inventoryKey(name), next);
     console.log(JSON.stringify({ t3flare: "mcp-listed", server: name, tools: Object.keys(definitions).length, refused: refused.length }));
     return next;
@@ -366,6 +380,7 @@ export class McpHost {
     if (this.#deps.engine === undefined) return { kind: "refused", message: "The MCP engine is not bound." };
     const target = await this.#target(input.server, server);
     if (typeof target === "string") return { kind: "refused", message: target };
+    const generation = this.#generation(input.server);
     let result: typeof McpEngineRequestResult.Encoded;
     try {
       result = await this.#deps.engine.request(
@@ -377,7 +392,7 @@ export class McpHost {
     } catch (error) {
       return { kind: "refused", message: `The read failed: ${String(error).slice(0, 300)}` };
     }
-    this.#keepState(input.server, result.state as never);
+    this.#keepState(input.server, result.state as never, generation);
     if (result.kind !== "complete") return { kind: "refused", message: `The read failed (${result.kind === "failed" ? errorText(result.error) : result.kind}).` };
     const value = result.result.kind === "inline" ? result.result.value : await readStream(result.result.body as ReadableStream<Uint8Array>, MCP_APP_HTML_MAX_BYTES * 2);
     if (JSON.stringify(value).length > MCP_APP_HTML_MAX_BYTES * 2) return { kind: "refused", message: "The App is larger than t3flare passes on." };
@@ -401,6 +416,7 @@ export class McpHost {
       if (signal.aborted) resolve();
       signal.addEventListener("abort", () => resolve(), { once: true });
     });
+    const generation = this.#generation(name);
     const cards = new Map<string, string>();
     const questionHooks: McpEngineHooks =
       asker === undefined
@@ -434,7 +450,7 @@ export class McpHost {
     } catch (error) {
       return { kind: "unavailable", message: `The MCP call failed; it may have run: ${String(error).slice(0, 300)}`, mayHaveRun: true };
     }
-    this.#keepState(name, result.state as never);
+    this.#keepState(name, result.state as never, generation);
     if (result.kind === "failed") {
       const tag = (result.error as { _tag?: string })._tag;
       const message = `The MCP call failed (${errorText(result.error)}). It may have run upstream; do not repeat a change without checking.`;

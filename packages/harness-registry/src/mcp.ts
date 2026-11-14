@@ -25,14 +25,8 @@ export const decideCall = (input: {
   return { kind: "ask" };
 };
 
-/**
- * Where a server comes from: added in the panel (Route B), the only kind left. The field stays because stored settings
- * documents carry it, and an entry of a retired kind is dropped on load (`mcpServersOf`).
- */
+/** Where a server comes from: added in the panel (Route B), the only kind left. */
 export type ServerKind = "direct";
-
-/** Kinds stored settings may still name, dropped on load: `commissary`, the built-in server before SPI-1160. */
-export const RETIRED_SERVER_KINDS: ReadonlySet<string> = new Set(["commissary"]);
 
 /**
  * A tool's class: the owner's choice in the panel, else the tool's own `readOnlyHint` (true: read; anything else: write),
@@ -79,7 +73,7 @@ export type ServerAuth = { readonly kind: "none" } | { readonly kind: "header"; 
 
 /** One MCP server as the harness settings keep it (no secret: header values and tokens are in the secret store). */
 export interface McpServerSetting {
-  /** Always `direct` now; kept because stored documents carry it (a retired kind marks an entry to drop). */
+  /** Kept because stored documents carry it: an entry of any other kind is dropped on load (`mcpServersOf`). */
   readonly kind: ServerKind;
   readonly url?: string;
   readonly auth?: ServerAuth;
