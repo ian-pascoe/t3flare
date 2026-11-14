@@ -34,8 +34,8 @@ tested with a service-token stand-in only, and the OAuth bearer case is owner st
    - access tokens of 15 minutes and sessions of 168 hours, set explicitly because Access checks no bounds (the token's
      actual `expires_in` is m5a-stage-run.md item 1);
    - the same policies as the admin application: the owner's email, and the stage's service token as `non_identity`.
-3. **Both applications set the path-cookie attribute** on a stage with the endpoint, so each one's `CF_Authorization` cookie is scoped to its own
-   path and a browser sends the longer path's first.
+3. **Both applications set the path-cookie attribute** on a stage with the endpoint, so each one's `CF_Authorization`
+   cookie is scoped to its own path and a browser sends the longer path's first.
 4. **The `/_t3flare` application is otherwise unchanged**: still no managed OAuth, so t3's root
    `/.well-known/oauth-*` documents stay t3's own and t3's `/mcp` sign-in is unaffected.
 5. **The Elicitation mode travels in the URL's query** (`?elicitation_mode=`): Access's protected-resource document and

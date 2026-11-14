@@ -18,4 +18,5 @@ deployed, the stage and timestamps. Never record a header value, a token or a co
 4. **GET the panel on a cold DO**: after the Environment has idled out (no client socket, past the idle delay), the
    first `GET /_t3flare/harness` answers 200 and lists the Open changes section, and the Workers Logs show no t3 boot
    and no error for it (the panel's Settings deps read the thread link from `provider/threadCaller.ts`, not
-   `provider/adapter.ts`, so no provider module loads). Record the status, the time to first byte, and the log lines of that request.
+   `provider/adapter.ts`, so no provider module loads). Record the status, the time to first byte, and the log lines of
+   that request.
