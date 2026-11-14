@@ -288,6 +288,27 @@ export const piModelsJson = (proxyUrl: string, models: ReadonlyArray<CatalogMode
     1,
   )}\n`;
 
+/**
+ * pi's MCP relay entries (ADR-0028, SPI-1076, settings-mcp plan D4): its user-level `mcp.json` in the agent directory
+ * (`PI_CODING_AGENT_DIR`), one streamable-HTTP server per relayed source. The handle is named, never written: pi expands
+ * `${T3FLARE_TOOL_HANDLE}` in a header from the process's environment (M0 P16). The timeout is above the relay's
+ * 10-minute hold plus a call (review M11); the tools are deferred, found through pi's `tool_search`. A repository's
+ * `.pi/mcp.json` cannot replace an entry: it is read only under project trust, which the profile never grants.
+ */
+export const piMcpJson = (servers: ReadonlyArray<string>): string =>
+  `${JSON.stringify(
+    {
+      mcpServers: Object.fromEntries(
+        servers.map((server) => [
+          server,
+          { url: relayUrl(server), headers: { Authorization: `Bearer \${${TOOL_HANDLE_ENV}}` }, timeout: CLI_TOOL_TIMEOUT_SEC, exposure: "deferred" },
+        ]),
+      ),
+    },
+    null,
+    1,
+  )}\n`;
+
 /** pi's agent settings: no project is trusted (review F2), few retries (ADR-0012: nothing retries into spend). */
 export const PI_SETTINGS = `${JSON.stringify({ defaultProjectTrust: "never", retry: { maxRetries: 1 } }, null, 1)}\n`;
 
@@ -378,6 +399,14 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     // A missing or unknown mode is the extension's full access: here it is always set, and never above what t3 asked.
     const mode = input.env.T3_PI_RUNTIME_MODE;
     env.T3_PI_RUNTIME_MODE = mode !== undefined && RUNTIME_MODES.has(mode) ? mode : "approval-required";
+    // SPI-1076 (plan D4): the relay's servers through pi's built-in MCP, which the fork's `--no-extensions` turns off
+    // (M0 P16), so only this launch gets them. The handle is in this process's environment alone (review H2); pi's
+    // commands can read it there, the residual ADR-0028 accepts (it is judged as this thread).
+    const relay = context.relay;
+    if (relay !== undefined && relay.servers.length > 0) {
+      files.push({ path: `${home}/agent/mcp.json`, text: piMcpJson(relay.servers) });
+      env[TOOL_HANDLE_ENV] = relay.handle;
+    }
     // SPI-1039: t3's MCP server as stock t3 hands it, t3's public `/mcp` with t3's per-thread bearer (relayedMcp.ts;
     // owner, 2026-11-12, back to stock). Only an https `/mcp` URL passes.
     const t3Url = input.env.T3_MCP_URL;

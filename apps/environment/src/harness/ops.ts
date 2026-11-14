@@ -16,12 +16,15 @@ import {
   digestOf,
   type EnvironmentKey,
   type HarnessChange,
+  ignoredServersOf,
   type McpChange,
   type McpServerSetting,
   mcpServersOf,
+  ownEntry,
   resolveEnvironment,
   resolveHarness,
   settingOf,
+  type StoredHarness,
   withoutQuery,
 } from "@t3flare/harness-registry";
 
@@ -72,6 +75,21 @@ const moved = (entity: "Harness" | "Environment", current: number, expected: num
 
 const audit = (deps: OpsDeps, actor: AuditActor, entry: Omit<AuditEntry, keyof AuditActor | "at"> & { readonly at?: number }) =>
   deps.store.audit({ ...actor, ...entry, at: entry.at ?? deps.now() });
+
+/**
+ * A stored entry the set ignored (a Direct server named `settings` from before the name was reserved) is dropped from
+ * storage by the next change to the set: its header value and OAuth sign-in go with it (M3 review), unless the change
+ * itself added a Direct server under that name.
+ */
+const dropIgnored = (deps: OpsDeps, before: StoredHarness, after: StoredHarness) => {
+  const kept = after.mcp?.servers ?? {};
+  for (const name of ignoredServersOf(before)) {
+    // A Direct server stored under the name now is one this change added (never the dropped one): its secrets stay.
+    if (ownEntry(kept, name)?.kind === "direct") continue;
+    deps.secrets?.remove(name, ["header"]);
+    deps.oauth?.forget(name);
+  }
+};
 
 /** One extension's switch or settings (ADR-0026): validated against its registry entry, it bumps the Harness revision. */
 export const changeExtension = (deps: OpsDeps, change: HarnessChange, options: OpOptions): Outcome<{ revision: number; resolved: ReturnType<typeof resolveHarness> }> => {
@@ -124,16 +142,19 @@ export const changeEnvironment = async (
   return { ok: true, revision: applied.environment.revision, resolved };
 };
 
-/** The panel's "test": lists the server now, from the MCP Worker. A read; audited, never bumps a revision. */
+/**
+ * The panel's "test": lists the server now, from the MCP Worker. A read; never bumps a revision. Audited for the panel;
+ * not through the Settings server (`audit: false`), whose reads must not evict the log of changes (M3 review).
+ */
 export const testMcpServer = async (
   deps: OpsDeps,
   server: string,
-  options: Pick<OpOptions, "actor">,
+  options: Pick<OpOptions, "actor"> & { readonly audit?: boolean },
 ): Promise<Outcome<{ server: string; status: string; error: string | null; tools: number; refused: number; ms: number }>> => {
-  if (deps.mcp === undefined || deps.mcp.servers()[server] === undefined) return refuse(404, "no such server");
+  if (deps.mcp === undefined || ownEntry(deps.mcp.servers(), server) === undefined) return refuse(404, "no such server");
   const started = deps.now();
   const inventory = await deps.mcp.list(server);
-  audit(deps, options.actor, { entity: "harness", at: started, action: "mcp.test", target: server, after: { status: inventory.status } });
+  if (options.audit !== false) audit(deps, options.actor, { entity: "harness", at: started, action: "mcp.test", target: server, after: { status: inventory.status } });
   return { ok: true, server, status: inventory.status, error: inventory.error ?? null, tools: Object.keys(inventory.definitions).length, refused: inventory.refused.length, ms: deps.now() - started };
 };
 
@@ -154,6 +175,7 @@ export const changeMcp = (deps: OpsDeps, change: McpChange, options: OpOptions):
   const stale = moved("Harness", before.revision, options.expectedRevision);
   if (stale !== undefined) return stale;
   deps.store.save(applied.harness);
+  dropIgnored(deps, before, applied.harness);
   if (change.op === "remove") {
     deps.secrets?.remove(change.server, ["header"]);
     deps.oauth?.forget(change.server);
@@ -201,6 +223,7 @@ export const addMcpServer = async (deps: OpsDeps, input: AddServer, options: OpO
   deps.store.save(applied.harness);
   // A name that held a server before starts fresh: no old tool list shown as available, no old session id sent.
   deps.mcp?.forget(server);
+  dropIgnored(deps, before, applied.harness);
   audit(deps, options.actor, {
     entity: "harness",
     action: "mcp.add",
@@ -234,7 +257,7 @@ export const setMcpHeader = async (deps: OpsDeps, input: { readonly server: stri
  * authorization server sends the browser back to the public callback (oauth.ts). No revision moves.
  */
 export const beginMcpSignIn = async (deps: OpsDeps, server: string, options: OpOptions): Promise<Outcome<{ authorizationUrl: string }>> => {
-  const setting = deps.mcp?.servers()[server];
+  const setting = deps.mcp === undefined ? undefined : ownEntry(deps.mcp.servers(), server);
   if (setting === undefined || setting.kind !== "direct" || setting.url === undefined) return refuse(404, "no such direct server");
   if (setting.auth?.kind !== "oauth") return refuse(400, `${server} does not sign in with OAuth`);
   if (deps.oauth === undefined) return refuse(500, "no OAuth");

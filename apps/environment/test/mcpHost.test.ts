@@ -112,6 +112,24 @@ describe("McpHost", () => {
     expect((await run.host.view()).servers[0]?.tools[0]?.class).toBe("read");
   });
 
+  it("a tool named after an Object.prototype key takes its server's Exposure and its own hint (M3 review)", async () => {
+    const added = applyMcpChange(EMPTY_HARNESS, { op: "add", server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "none" } });
+    if (!added.ok) throw new Error(added.error);
+    const hidden = applyMcpChange(added.harness, { op: "server", server: "fixture", exposure: "hidden", toolExposure: { other: "hidden" } });
+    if (!hidden.ok) throw new Error(hidden.error);
+    const run = setup(() => [tool("constructor", true), tool("toString"), tool("other", true)], undefined, hidden.harness);
+    await run.host.list("fixture");
+    const { tools } = await run.host.tools("fixture", run.host.servers().fixture!, run.host.inventory("fixture"));
+    expect(tools.map((t) => [t.upstream, t.exposure, t.class])).toEqual([
+      ["constructor", "hidden", "read"],
+      ["toString", "hidden", "write"],
+      ["other", "hidden", "read"],
+    ]);
+    // A call naming a prototype key of a server's map reaches the tool, not Object.prototype.
+    expect(await run.host.call({ server: "fixture", tool: "hasOwnProperty", args: {} })).toMatchObject({ kind: "unavailable" });
+    expect(await run.host.call({ server: "toString", tool: "x", args: {} })).toMatchObject({ kind: "unavailable" });
+  });
+
   it("a direct server's tools take their own hint too (no write-until-marked rule)", async () => {
     const added = applyMcpChange(EMPTY_HARNESS, { op: "add", server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "none" } });
     if (!added.ok) throw new Error(added.error);

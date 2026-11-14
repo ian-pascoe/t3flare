@@ -18,7 +18,7 @@ import { cardText, decideCall, SETTINGS_SERVER, type McpRelayAnswer, type McpRel
 
 import type { McpAsker } from "@t3flare/session-protocol";
 
-import type { OwnCaller } from "../settings/server.ts";
+import type { OwnCaller } from "../settings/caller.ts";
 import { SETTINGS_INSTRUCTIONS } from "../settings/tools.ts";
 import type { McpCallAnswer, McpView } from "./host.ts";
 

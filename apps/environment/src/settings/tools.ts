@@ -120,7 +120,7 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
   {
     name: "change_mcp",
     class: "write",
-    description: `Changes the MCP server set (the Harness settings): op server (enabled, exposure, toolExposure by upstream tool name with null for the server's, writes for the settings server only), op class (a tool's class read, write, or null for its own hint), op add (a Direct server: url and auth none, header with the header's name, or oauth; a header value is typed by the owner on the Change page, never here), op remove, or op header-value (asks the owner to type a header server's value on the Change page). ${ASKED_NOTE}`,
+    description: `Changes the MCP server set (the Harness settings): op server (enabled, exposure, toolExposure by upstream tool name with null for the server's, writes for the Settings server only), op class (a tool's class read, write, or null for its own hint), op add (a Direct server: url and auth none, header with the header's name, or oauth; a header value is typed by the owner on the Change page, never here), op remove, or op header-value (asks the owner to type a header server's value on the Change page). ${ASKED_NOTE}`,
     inputSchema: {
       type: "object",
       required: ["expectedRevision", "change"],

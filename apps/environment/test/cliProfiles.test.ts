@@ -209,6 +209,56 @@ describe("pi's profile", () => {
     expect(answer.argv).toContain("--fork");
     expect(answer.env.T3_PI_MCP_EXTENSION_PATH).toBeUndefined();
   });
+
+  // T-pi-1 (settings-mcp plan §5, D4; SPI-1076): the relay's servers through pi's built-in MCP.
+  describe("the MCP relay's entries", () => {
+    const HANDLE = "tool-handle-0123456789abcdef";
+    const relayed = (args: ReadonlyArray<string>, servers: ReadonlyArray<string> = ["commissary", "settings", "docs"]) =>
+      profileLaunch({ cli: "pi", args, key: "proc-1", cwd: "/w/demo", env: { T3_PI_RUNTIME_MODE: "approval-required" }, allowProbe: false }, { ...context, relay: { handle: HANDLE, servers } });
+
+    it("writes one mcp.json entry per relay server in the agent dir, with the relay's URL, the handle's header, the CLI timeout and deferred exposure", () => {
+      const answer = relayed(rpc);
+      if ("refused" in answer) throw new Error(answer.refused);
+      const file = answer.files!.find((entry) => entry.path === "/var/lib/t3flare/cli/proc-1/agent/mcp.json");
+      // pi reads mcp.json from PI_CODING_AGENT_DIR (M0 P16).
+      expect(answer.env.PI_CODING_AGENT_DIR).toBe("/var/lib/t3flare/cli/proc-1/agent");
+      const entry = (url: string) => ({ url, headers: { Authorization: "Bearer ${T3FLARE_TOOL_HANDLE}" }, timeout: 900, exposure: "deferred" });
+      expect(JSON.parse(file!.text)).toEqual({
+        mcpServers: {
+          commissary: entry("http://computer.internal/t3flare/mcp/commissary"),
+          settings: entry("http://computer.internal/t3flare/mcp/settings"),
+          docs: entry("http://computer.internal/t3flare/mcp/docs"),
+        },
+      });
+      // Its trust stays off, so a repository's .pi/mcp.json cannot replace, disable or redirect an entry.
+      expect(answer.argv.at(-1)).toBe("--no-approve");
+      expect(JSON.parse(answer.files!.find((entry) => entry.path.endsWith("settings.json"))!.text)).toMatchObject({ defaultProjectTrust: "never" });
+      // PI_OFFLINE stays: it does not stop MCP connects (M0 P16).
+      expect(answer.env.PI_OFFLINE).toBe("1");
+    });
+
+    it("puts the handle in the process's environment and in no file", () => {
+      const answer = relayed(rpc);
+      if ("refused" in answer) throw new Error(answer.refused);
+      expect(answer.env.T3FLARE_TOOL_HANDLE).toBe(HANDLE);
+      for (const file of answer.files ?? []) expect(file.text).not.toContain(HANDLE);
+      expect(answer.argv.join(" ")).not.toContain(HANDLE);
+    });
+
+    it("gives the fork launch no mcp.json and no handle: --no-extensions turns pi's built-in MCP off", () => {
+      const answer = relayed(["--mode", "rpc", "--offline", "--no-extensions", "--no-tools", "--fork", `${PI_SESSIONS}/s1.jsonl`]);
+      if ("refused" in answer) throw new Error(answer.refused);
+      expect(answer.files!.some((file) => file.path.endsWith("mcp.json"))).toBe(false);
+      expect(answer.env.T3FLARE_TOOL_HANDLE).toBeUndefined();
+    });
+
+    it("writes no mcp.json and sets no handle when the relay has no server", () => {
+      const answer = relayed(rpc, []);
+      if ("refused" in answer) throw new Error(answer.refused);
+      expect(answer.files!.some((file) => file.path.endsWith("mcp.json"))).toBe(false);
+      expect(answer.env.T3FLARE_TOOL_HANDLE).toBeUndefined();
+    });
+  });
 });
 
 describe("the probe", () => {

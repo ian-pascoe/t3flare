@@ -27,6 +27,17 @@ export const APPLYING_GRACE_MS = 5 * 60_000;
 export const APPLIED_CAP = 30;
 export const APPLIED_WINDOW_MS = 60 * 60_000;
 
+/** Reads of any kind, per caller (a thread), per hour (M3 review: reads are bounded as changes are, D16-style). */
+export const READ_CAP = 240;
+/** Reads that reach GitHub or an MCP server, per caller, per hour: they spend a token's or a server's limits. */
+export const NETWORK_READ_CAP = 20;
+export const READ_WINDOW_MS = 60 * 60_000;
+/** The Settings server's reads that reach GitHub or an MCP server. */
+export const NETWORK_READS: ReadonlySet<string> = new Set(["test_mcp_server", "preview_skills", "check_skill_updates"]);
+
+/** The reads table: one row per read through the server, kept an hour, for the read caps. */
+export const READS_TABLE = "t3flare_settings_reads";
+
 /** A change's state (plan D8). `open` and `applying` are open; the rest are closed. */
 export type ChangeState = "open" | "applying" | "applied" | "declined" | "withdrawn" | "expired" | "moved" | "failed";
 
@@ -95,6 +106,10 @@ export interface SettingsChanges {
    * it did. Only this moves a change's state, so a second answer finds it already moved (plan D8: one answer).
    */
   replace(id: string, from: ReadonlyArray<ChangeState>, next: ChangeRecord): boolean;
+  /** Counts one read by `key` (`network`: one that reaches GitHub or an MCP server; it counts as a read too). */
+  noteRead(key: string, kind: "read" | "network", at: number): void;
+  /** Reads by `key` since `since`: every read for `read`, those that reach the network for `network`. */
+  readsSince(key: string, kind: "read" | "network", since: number): number;
 }
 
 /** Canonical JSON: keys sorted at every depth. */
@@ -162,6 +177,8 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
       );
       sql.exec(`CREATE INDEX IF NOT EXISTS ${CHANGES_TABLE}_caller ON ${CHANGES_TABLE} (caller_key, state, closed_at)`);
       sql.exec(`CREATE INDEX IF NOT EXISTS ${CHANGES_TABLE}_hash ON ${CHANGES_TABLE} (hash)`);
+      sql.exec(`CREATE TABLE IF NOT EXISTS ${READS_TABLE} (caller_key TEXT NOT NULL, kind TEXT NOT NULL, at INTEGER NOT NULL)`);
+      sql.exec(`CREATE INDEX IF NOT EXISTS ${READS_TABLE}_caller ON ${READS_TABLE} (caller_key, at)`);
       ready = true;
     }
     const at = now();
@@ -172,6 +189,7 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
       else if (record.state === "applying" && expiresAt + APPLYING_GRACE_MS <= at) write({ ...record, state: "failed", closed: { at, error: "the Environment restarted while the change applied; read the settings to see whether it did" } });
     }
     sql.exec(`DELETE FROM ${CHANGES_TABLE} WHERE closed_at IS NOT NULL AND closed_at < ?`, at - CLOSED_KEPT_MS);
+    sql.exec(`DELETE FROM ${READS_TABLE} WHERE at < ?`, at - READ_WINDOW_MS);
   };
   return {
     appliedSince: (key, since) => {
@@ -202,6 +220,17 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
     closedBy: (key, since) => {
       prepare();
       return rows(`caller_key = ? AND closed_at IS NOT NULL AND closed_at >= ? ORDER BY closed_at DESC, created_at DESC`, key, since).filter((record) => record.tier === "asked");
+    },
+    noteRead: (key, kind, at) => {
+      prepare();
+      sql.exec(`INSERT INTO ${READS_TABLE} (caller_key, kind, at) VALUES (?, ?, ?)`, key, kind, at);
+    },
+    readsSince: (key, kind, since) => {
+      prepare();
+      const row = sql
+        .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM ${READS_TABLE} WHERE caller_key = ? AND at >= ?${kind === "network" ? " AND kind = 'network'" : ""}`, key, since)
+        .toArray()[0];
+      return Number(row?.count ?? 0);
     },
     replace: (id, from, next) => {
       prepare();
