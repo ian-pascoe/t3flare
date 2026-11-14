@@ -170,4 +170,4 @@ The agents Worker still loads no t3 code: no `t3code/` or `@t3tools/` source in 
 
 ## Checks
 
-`pnpm run check`: see the last line.
+`pnpm run check` passes at `f76136f` (34/34); the commit after it changes only this line.
