@@ -863,8 +863,9 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   `build.ts` does and runs the hook against a stand-in for pi's API (the relay's tools pass; bash, write, t3's tools, a
   look-alike extension tool, a resource tool, an unlisted tool, a `builtin:mcp` tool of an unnamed server, and every
   tool when no server is named are asked); `test/cliProfiles.test.ts` T-pi-1 pins the file, the environment (the
-  handle and `T3FLARE_RELAY_SERVERS`) and the fork. **Silent**: a renamed source path (pi asks the extension's "Allow …?" before the
-  relay's card: more asks, fail closed); a changed `mcp.json` shape or expansion (pi lists none of the relay's tools).
+  handle and `T3FLARE_RELAY_SERVERS`) and the fork. **Silent**: a renamed source path (pi asks the extension's "Allow
+  …?" before the relay's card: more asks, fail closed); a changed `mcp.json` shape or expansion (pi lists none of the
+  relay's tools).
   Cheapest check: `scripts/tools.ts cli-mcp pi` on a stage (the read raises no request, the write only the relay's
   card); or a `test:docker` case running the image's pi against a relay stand-in (not built).
 - **Blast radius**: a moved source label or tool-name shape: an extra ask per relay call (fail closed). A `builtin:mcp`
