@@ -5,8 +5,7 @@
 // Every payload names its `kind`, the Access `sub` it was issued to and when it expires, so one kind cannot stand in for
 // another, another identity's token is refused, and none lives forever. A token says only what the server wrote into
 // it; the server still reads the Open change it names before it does anything (MRTR: `requestState` is attacker input).
-import { base64Url, fromBase64Url, keptKey } from "../harness/keys.ts";
-import type { KvStorage } from "../harness/store.ts";
+import { base64Url, fromBase64Url, keptKey, type KvStorage } from "../harness/keys.ts";
 
 /** Where the DO keeps the key. */
 export const STATE_KEY = "t3flare:settings:state-key";

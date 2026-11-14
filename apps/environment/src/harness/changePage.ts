@@ -7,7 +7,8 @@
 // It is the only place a header value is typed for an agent's change, and the only place a sign-in's authorization URL
 // goes (in the POST's own answer, to this page's script): ADR-0034, O8.
 import { type ChangeRecord, CLOSED_KEPT_MS, type ClosedBy, durationText } from "../settings/changes.ts";
-import { askedByText, type ChangeItem, lineDiff, type ShownSkill } from "../settings/render.ts";
+import { askedByText, lineDiff } from "../settings/render.ts";
+import type { ChangeItem, ShownSkill } from "../settings/types.ts";
 import { fileUrl } from "../skills/api.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
 import { escapeHtml, visibleHtml } from "./page.ts";

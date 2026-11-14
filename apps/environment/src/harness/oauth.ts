@@ -11,7 +11,7 @@
 //   `iss` must send it.
 // - Refresh: one in flight per server; a refreshed token replaces the old one at once (rotating refresh tokens).
 import type { HarnessSecrets } from "./secrets.ts";
-import type { KvStorage } from "./store.ts";
+import type { KvStorage } from "./keys.ts";
 
 export const OAUTH_CALLBACK_PATH = "/t3flare/oauth/callback";
 export const OAUTH_CLIENT_PATH = "/t3flare/oauth/client.json";

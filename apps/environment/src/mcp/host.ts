@@ -36,7 +36,7 @@ import {
 import type { McpAsker, McpQuestionAnswer } from "@t3flare/session-protocol";
 import { sha256Hex } from "@t3flare/skills";
 
-import type { KvStorage } from "../harness/store.ts";
+import type { KvStorage } from "../harness/keys.ts";
 import { OFF_MESSAGE, type OwnCaller } from "../settings/caller.ts";
 import { settingsDefinitions } from "../settings/tools.ts";
 import { type ElicitAnswer, type ElicitResultOrCancel, isPausingServer, pauseOf, planPause, planQuestion, type QuestionContext, type QuestionPlan } from "./elicitation.ts";

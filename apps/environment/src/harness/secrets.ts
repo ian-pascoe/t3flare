@@ -3,7 +3,7 @@
 // the harness panel, kept in the Environment DO's secret store namespace (`t3flare/secret/…`, apart from SQL, ADR-0010),
 // write-only: no route, page, log, push, Session or Container gets it back. What is shown is that it is set, when, and a
 // fingerprint: an HMAC under a key only this object holds (review LOW: owner-typed values may be low-entropy).
-import type { KvStorage } from "./store.ts";
+import type { KvStorage } from "./keys.ts";
 
 const keyOf = (server: string, field: string) => `t3flare/secret/harness/mcp/${server}/${field}`;
 const FINGERPRINT_KEY = "t3flare:harness:fingerprint-key";
