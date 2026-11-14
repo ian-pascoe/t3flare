@@ -176,7 +176,11 @@ export const gitBridge = makeGitBridge({
   onT3Side,
   stateEntry: (path) => StateStore.get(path),
   readStateFile: (path) => StateStore.readFile(path),
-  workspaceExists: (id) => environmentServices().workspaces.resolve(id) !== undefined,
+  // Not `resolve`: a tombstoned Workspace keeps its files and its DO answers, so its bridges are still reaped.
+  workspaceExists: (id) => {
+    const record = environmentServices().workspaces.get(id);
+    return record !== undefined && record.state !== "deleting";
+  },
 });
 
 /** git's environment for Workspace `id`: translated (`gitEnvOf`), its alternates checked, t3's temp material bridged. */

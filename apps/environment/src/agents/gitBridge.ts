@@ -28,7 +28,7 @@ export interface GitBridgeDeps {
   /** The State directory's entry at a t3 path. */
   readonly stateEntry: (path: string) => { readonly kind: string } | undefined;
   readonly readStateFile: (path: string) => Uint8Array;
-  /** Whether Workspace `id` still exists: a deleted one's bridges are forgotten, its files are gone with it. */
+  /** Whether Workspace `id`'s files still exist (listed, not being deleted): a deleted one's bridges are forgotten. */
   readonly workspaceExists: (id: string) => boolean;
   readonly log?: (line: Record<string, unknown>) => void;
 }
@@ -132,8 +132,10 @@ export const makeGitBridge = (deps: GitBridgeDeps) => {
     } catch (error) {
       // Not made: unregistered, so the next command of the draft makes it again; a partly made folder goes too (best
       // effort: one left behind is the next isolate's sweep's).
-      bridges.delete(key);
+      // Removed before the entry goes, so a command of the draft arriving meanwhile joins the failing entry rather than
+      // making a folder this remove would take.
       await removeFolder(id, folder);
+      bridges.delete(key);
       settle(error);
       throw error;
     }
