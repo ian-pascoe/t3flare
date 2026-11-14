@@ -4,7 +4,7 @@
 // stage's service token and admin token (never printed):
 //
 //   node scripts/stage.ts run pmise pmise variables   the guard variables from every command path (variables.json; first)
-//   … install | override | git-gh | hold | restart | invalid | size | cost | empty | late   (<case>.json)
+//   … install | override | git-gh | hold | restart | invalid | size | cost | empty | late | passive-first   (<case>.json)
 //
 // Evidence goes to docs/steps/global-mise/, each file naming the deployed commit.
 import * as fs from "node:fs";
@@ -605,7 +605,37 @@ const late = async () => {
   });
 };
 
-const commands: Record<string, () => Promise<void>> = { variables, install, override, "git-gh": gitGh, hold, restart, invalid, size, cost, empty, late, "opencode-debug": opencodeDebug };
+/**
+ * A passive read starts the Container (no lay-down for it) and holds it, and a Durable agent's `bash` arrives meanwhile
+ * through computer: the agent's command waits for the lay-down and sees the pin; the read never ran it.
+ */
+const passiveFirst = async () => {
+  cookie ||= await pair();
+  const { projectId } = await ensureProject(cookie, WORKSPACE);
+  await enableAll();
+  await setMise(NODE_PIN);
+  await execOn(WORKSPACE, `mkdir -p ${OUT_DIR} && rm -f ${OUT_DIR}/node-passive-first.txt`);
+  await stopAll();
+  const started = Date.now();
+  // The admin route's exec with \`passive\`: what t3's first status read does when it starts a stopped Container.
+  const read = callOn(WORKSPACE, { exec: { script: `test -f ${GLOBAL_FILE} && echo global-present || echo global-absent; sleep 25; echo read-done`, passive: true, timeoutMs: 180_000 } });
+  // Until the Container runs under the passive read, then the agent's command.
+  while (Date.now() - started < 120_000 && (await stateOf(WORKSPACE))?.running !== true) await sleep(1_000);
+  const agent = await durableBash(projectId, `node --version > ${OUT_DIR}/node-passive-first.txt 2>&1`);
+  const readAnswer = await read;
+  const node = await readOut("node-passive-first.txt");
+  const state = await stateOf(WORKSPACE);
+  await writeEvidence("passive-first.json", {
+    pin: NODE_PIN,
+    passiveRead: { stdout: String(readAnswer.result?.stdout ?? "").trim().split("\n"), exitCode: readAnswer.result?.exitCode ?? null },
+    agent,
+    node,
+    globalMise: state?.globalMise ?? null,
+    ok: String(readAnswer.result?.stdout ?? "").includes("global-absent") && node === "v24.11.1" && state?.globalMise?.outcome === "laid",
+  });
+};
+
+const commands: Record<string, () => Promise<void>> = { variables, install, override, "git-gh": gitGh, hold, restart, invalid, size, cost, empty, late, "passive-first": passiveFirst, "opencode-debug": opencodeDebug };
 const command = commands[process.argv[2] ?? ""];
 if (command === undefined) {
   console.error(`usage: pmise.ts ${Object.keys(commands).join(" | ")}`);
