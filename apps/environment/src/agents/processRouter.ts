@@ -153,21 +153,11 @@ export const workspaceGitHubToken = async (
 };
 
 /**
- * t3's temporary git material (a commit draft's `GIT_INDEX_FILE` and `GIT_OBJECT_DIRECTORY`, a review's index), made
- * in its State directory, bridged into the Workspace's harness `tmp/` and removed once t3's copy is gone (SPI-1186,
- * `gitBridge.ts`).
- */
-export const gitBridge = makeGitBridge({
-  fs: (id, op) => workspaceRpc(id).fs(op),
-  onT3Side: (path) => onT3Side(path),
-  stateEntry: (path) => StateStore.get(path),
-  readStateFile: (path) => StateStore.readFile(path),
-});
-
-/**
  * Whether a path git is handed is t3's own, which the Container cannot see: absolute, outside `/w`, and held by the State
  * directory, or a file t3 has yet to make in a folder it holds (a draft's index when the repo has none). The bridge
- * and the alternates list use this one rule.
+ * and the alternates list use this one rule. For an alternate, the parent clause can also drop a Container path that
+ * is a direct child of a folder the State directory holds (`/tmp/<leaf>`); real Container alternates sit deeper
+ * (`/tmp/ref.git/objects`) or under `/w`, so none is dropped in practice.
  */
 const onT3Side = (path: string): boolean => {
   if (!path.startsWith("/") || isUnderW(path)) return false;
@@ -175,6 +165,19 @@ const onT3Side = (path: string): boolean => {
   const parent = StateStore.parentOf(StateStore.normalize(path));
   return parent !== "/" && StateStore.get(parent) !== undefined;
 };
+
+/**
+ * t3's temporary git material (a commit draft's `GIT_INDEX_FILE` and `GIT_OBJECT_DIRECTORY`, a review's index), made
+ * in its State directory, bridged into the Workspace's harness `tmp/` and removed once t3's copy is gone (SPI-1186,
+ * `gitBridge.ts`).
+ */
+export const gitBridge = makeGitBridge({
+  fs: (id, op) => workspaceRpc(id).fs(op),
+  onT3Side,
+  stateEntry: (path) => StateStore.get(path),
+  readStateFile: (path) => StateStore.readFile(path),
+  workspaceExists: (id) => environmentServices().workspaces.resolve(id) !== undefined,
+});
 
 /** git's environment for Workspace `id`: translated (`gitEnvOf`), its alternates checked, t3's temp material bridged. */
 const bridgedGitEnv = async (id: string, env: Readonly<Record<string, unknown>> | undefined): Promise<Record<string, string>> => {

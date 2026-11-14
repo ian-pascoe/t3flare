@@ -16,6 +16,8 @@ const harness = (state: Map<string, "file" | "dir"> = new Map([[DRAFT, "dir"], [
   const logs: Array<Record<string, unknown>> = [];
   /** File operations the fake Workspace DO answers with an error, as the real one does (it does not throw). */
   const failing = new Set<string>();
+  /** Workspaces deleted since their bridge opened. */
+  const deleted = new Set<string>();
   const parentOf = (path: string) => path.slice(0, path.lastIndexOf("/")) || "/";
   const bridge = makeGitBridge({
     fs: async (id, op) => {
@@ -39,9 +41,10 @@ const harness = (state: Map<string, "file" | "dir"> = new Map([[DRAFT, "dir"], [
       return kind === undefined ? undefined : { kind };
     },
     readStateFile: (path) => new TextEncoder().encode(`index of ${path}`),
+    workspaceExists: (id) => !deleted.has(id),
     log: (line) => logs.push(line),
   });
-  return { bridge, ops, files, state, failing, logs };
+  return { bridge, ops, files, state, failing, logs, deleted };
 };
 
 const draftEnv = {
@@ -153,6 +156,28 @@ describe("the git bridge", () => {
     expect(env.GIT_OBJECT_DIRECTORY).toMatch(new RegExp(`^${TMP}/objects-`));
     expect(ops.filter((op) => op.op === "write").map((op) => op.path)).toEqual(expect.arrayContaining([env.GIT_INDEX_FILE, `${env.GIT_OBJECT_DIRECTORY}/info/t3flare-draft`]));
     expect(bridge.live()).toHaveLength(2);
+  });
+
+  it("removes a partly made folder when its bridge fails", async () => {
+    const { bridge, failing, files } = harness();
+    failing.add("write");
+    await expect(bridge.bridge("a", { GIT_OBJECT_DIRECTORY: `${DRAFT}/objects` })).rejects.toThrow(/write .* EIO/);
+    // The mkdir succeeded before the write failed; nothing of it is left.
+    expect([...(files.get("a") ?? [])].some((path) => path.startsWith(`${TMP}/objects-`))).toBe(false);
+  });
+
+  it("forgets a deleted Workspace's bridges without asking its DO again", async () => {
+    const { bridge, deleted, logs, ops, state } = harness();
+    await bridge.bridge("a", draftEnv);
+    deleted.add("a");
+    state.clear();
+    ops.splice(0);
+    expect(await bridge.reap()).toEqual([]);
+    expect(bridge.live()).toEqual([]);
+    expect(ops).toEqual([]);
+    expect(await bridge.reap()).toEqual([]);
+    expect(ops).toEqual([]);
+    expect(logs.some((line) => line.t3flare === "git-bridge-reap-failed")).toBe(false);
   });
 
   it("fails on a refused mkdir too", async () => {

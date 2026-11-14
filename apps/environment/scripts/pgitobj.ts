@@ -163,7 +163,7 @@ const commitWhileStopped = async (id: string, root: string, primed: boolean) => 
     draftReads,
     firstInContainer,
     commands,
-    ok: stopped && afterPoll?.running === false && committed(done, ["while-stopped.txt"]) && (firstInContainer === null || String(firstInContainer.detail).startsWith("action")),
+    ok: stopped && afterPoll?.running === false && committed(done, ["while-stopped.txt"]) && firstInContainer !== null && String(firstInContainer.detail).startsWith("action"),
   };
 };
 
