@@ -58,6 +58,7 @@ import {
   testMcpServer,
 } from "../harness/ops.ts";
 import type { AuditActor } from "../harness/store.ts";
+import { canonicalJson } from "../mcp/canonical.ts";
 import { newCardId } from "../mcp/elicitation.ts";
 import type { McpCallAnswer, McpHost } from "../mcp/host.ts";
 import { previewAtCommit, viewSkill } from "../skills/api.ts";
@@ -67,7 +68,6 @@ import {
   type AnsweredBy,
   APPLIED_CAP,
   APPLIED_WINDOW_MS,
-  canonicalJson,
   capKeyOf,
   CHANGE_TTL_MS,
   type ChangeCaller,

@@ -28,9 +28,10 @@ import { withoutHidden } from "@t3flare/harness-registry";
 import { sha256Hex } from "@t3flare/skills";
 
 import type { AccessCaller } from "../access.ts";
+import { canonicalJson } from "../mcp/canonical.ts";
 import type { McpCallAnswer } from "../mcp/host.ts";
 import type { OwnerCaller } from "./caller.ts";
-import { canonicalJson, type ChangeRecord, isChangeId, isOpen, OWNER_MODES, type OwnerMode } from "./changes.ts";
+import { type ChangeRecord, isChangeId, isOpen, OWNER_MODES, type OwnerMode } from "./changes.ts";
 import { type ChangeOutcome, closeOrSettle, outcomeOf, waitForChange } from "./openChanges.ts";
 import {
   answerDepsOf,
