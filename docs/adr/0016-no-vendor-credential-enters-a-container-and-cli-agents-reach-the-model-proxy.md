@@ -125,5 +125,7 @@ hard cut (SPI-1176); for Model endpoints it is replaced by a **model relay**, wh
 (`/proc/<pid>/environ`, the agent runs as root) can spend through the handle while its process lives. It cannot take
 the key out of the Container, and it ends with the process. The long-stream risk that sank option B in step 4a is
 measured: a stream of over 10 minutes with idle gaps up to 3 minutes completes through the relay
-(`docs/steps/spi-1167/p1167.json`). The handle cannot move the key: the relay chooses the target, and the
-Container's headers do not reach it.
+(`docs/steps/spi-1167/p1167.json`). The handle cannot move the key by a header: the relay chooses the target, and
+the Container's headers do not reach it. The allowlist covers **headers only**: the body and the query string pass
+unchanged by design (no protocol translation), so a gateway that routes on a body or query field (LiteLLM's
+`api_base`, say) can be steered from the Container. An endpoint at such a gateway is outside what the relay protects.

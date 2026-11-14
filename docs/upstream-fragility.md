@@ -781,7 +781,9 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Breaks when**: Codex renames `modelProvider` in the thread params or responses, or `thread.id`; starts accepting a
   per-thread provider (the refusal becomes needless) or rejects a provider set by `-c`; changes `env_key` or
   `shell_environment_policy.exclude`; t3 starts restarting the session on a model change, or stops passing
-  `modelSelection` to `openSession`, or surfaces the cause's text.
+  `modelSelection` to `openSession`, or surfaces the cause's text. And a CLI starts requiring a request header the
+  relay's allowlist drops (a new `openai-*` or `anthropic-*` header, `forwardedHeadersOf` in `@t3flare/models/relay`):
+  its requests fail or lose a feature at the endpoint; the relay log's `dropped` field names the header.
 - **Detection**: typecheck (the response shapes, `ProviderAdapterV2OpenSessionInput.modelSelection`);
   `test/codexGuard.test.ts`, `test/codexEndpoints.test.ts`, `test/cliProfiles.test.ts` (the rewrite, the routing, the
   process provider, the exclusion); `scripts/p1167.ts` on a stage (a turn with tools, a resume, the refused switch,

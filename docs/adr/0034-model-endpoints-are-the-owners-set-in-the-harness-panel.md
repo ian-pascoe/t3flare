@@ -51,7 +51,7 @@ optional headers, and the models it serves.
    setting names that default and follows it as the endpoints change.
 6. **Expand, then cut.** Until SPI-1176 the Model proxy's models and settings keep working beside the endpoints. A
    turn on a model whose endpoint was removed, or no longer lists it, fails with a message that says so.
-6. **CLI agents through the model relay** (SPI-1167): a CLI agent reaches an endpoint whose API it speaks at
+7. **CLI agents through the model relay** (SPI-1167): a CLI agent reaches an endpoint whose API it speaks at
    `computer.internal/t3flare/model/<endpointId>` with a per-process Handle; the Workers swap it for the key from
    `resolve` and stream the request to the endpoint unchanged ([ADR-0016](0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)'s
    model relay refinement). Codex is the first; its provider id is the endpoint's (`t3flare-endpoint-<id>`).
