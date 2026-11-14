@@ -2,14 +2,17 @@
 // T-modes (plan §5; ADR-0034, plan D12), M5a's part (SPI-1200): `browser`. The 2026 `input_required` shape and its
 // retry; the 45 s hold answering `applied`, `declined` and `waiting`; the 2025-11-25 page elicitation on the call's
 // stream, a late `decline` withdrawing; the link-in-result fallback for every client that declared no page elicitation;
-// the signed `requestState` and elicitation id refused when they are not this call's. `native` and `model` are M5b's
-// (SPI-1201): until then a request for them is answered as `browser`, as every fallback of D12 moves.
+// the signed `requestState` and elicitation id refused when they are not this call's. M5b's part (SPI-1201): `native`
+// (the 2026 form round trip, the 2025 held stream and its cut, 2025-06-18's params) and `model` (the Pause as `pauseOf`
+// reads it, `resume` and its refusals), and every fallback of D12's table.
 import { afterEach, describe, expect, it } from "vitest";
 
-import { changesApiOf } from "../src/settings/server.ts";
+import { isPausingServer, pauseOf } from "../src/mcp/elicitation.ts";
+import { CHANGE_TTL_MS } from "../src/settings/changes.ts";
+import { changesApiOf, PAUSE_LINE } from "../src/settings/server.ts";
 import { signToken } from "../src/settings/tokens.ts";
-import { ASKED, BOTH, bodyOf, endpointOf, initialize, KEY, legacy, modern, post, structuredOf, SUB } from "./settingsEndpointFixture.ts";
-import { NOW, PANEL, settingsFixture, type SettingsFixture } from "./settingsFixture.ts";
+import { ASKED, BOTH, bodyOf, endpointOf, initialize, KEY, legacy, modern, post, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
+import { NOW, PANEL, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 
 let fixture: SettingsFixture | undefined;
 const world = () => {
@@ -294,18 +297,6 @@ describe("D12's fallbacks toward browser", () => {
     expect(openChange(f).record.mode).toBe("browser");
   });
 
-  it.each(["native", "model"])("M5a: elicitation_mode=%s is answered as browser, and says so", async (mode) => {
-    const f = world();
-    const endpoint = endpointOf(f);
-    const tools = (await bodyOf(await endpoint(modern("tools/list", {}, { query: `?elicitation_mode=${mode}` })))).result?.tools as Array<{ name: string }>;
-    expect(tools.map((tool) => tool.name)).not.toContain("resume");
-    const first = await bodyOf(await endpoint(askedCall({ query: `?elicitation_mode=${mode}`, capabilities: { elicitation: { form: {} } } })));
-    expect(openChange(f).record.mode).toBe("browser");
-    expect(first.result).toMatchObject({ structuredContent: { status: "waiting" } });
-    expect(JSON.stringify(first.result?.content)).toContain(`answers elicitation_mode=${mode} as browser`);
-    expect(first.result?.structuredContent).not.toHaveProperty("requestId");
-  });
-
   it("a change that needs the page is answered there like any other in browser", async () => {
     const f = world();
     const endpoint = endpointOf(f);
@@ -315,5 +306,418 @@ describe("D12's fallbacks toward browser", () => {
     expect(openChange(f).record.needsPage).toBe("secret");
     // The URL the client itself sent is shown whole, so the owner approves exactly what is added (SPI-1199 review).
     expect(JSON.stringify(body)).toContain("https://notes.example/mcp?key=secret");
+  });
+});
+
+// ── M5b (SPI-1201): native ─────────────────────────────────────────────────────────────────────────────────────────
+
+const NATIVE = "?elicitation_mode=native";
+const MODEL = "?elicitation_mode=model";
+const FORM = { elicitation: { form: {} } };
+const EMPTY = { type: "object", properties: {} };
+
+describe("native on 2026-07-28: the form in input_required, answered by the retry", () => {
+  const retry = (requestState: unknown, action: string | undefined, query = NATIVE) =>
+    modern("tools/call", { name: "change_environment", arguments: ASKED, requestState, ...(action === undefined ? {} : { inputResponses: { change: { action } } }) }, { id: 2, query });
+
+  it("answers the first call at once with D12's exact form, opening a native-mode Open change", async () => {
+    const f = world();
+    const body = await bodyOf(await endpointOf(f)(askedCall({ query: NATIVE })));
+    const { record, url } = openChange(f);
+    expect(record).toMatchObject({ mode: "native", tier: "asked" });
+    expect(body.result).toEqual({
+      resultType: "input_required",
+      inputRequests: { change: { method: "elicitation/create", params: { mode: "form", message: expect.stringContaining("Accept applies it"), requestedSchema: EMPTY } } },
+      requestState: expect.stringMatching(/^v1\./),
+      _meta: expect.any(Object),
+    });
+    const message = JSON.stringify(body.result);
+    expect(message).toContain("containerBudget");
+    expect(message).toContain(url);
+  });
+
+  it("accept applies it, answered by client, with no hold, and audits mode native", async () => {
+    const f = world();
+    // A hold would outlast this test's timeout: the form's answer is the client's, so nothing waits.
+    const endpoint = endpointOf(f, { holdMs: 60_000 });
+    const first = await bodyOf(await endpoint(askedCall({ query: NATIVE })));
+    const { record } = openChange(f);
+    expect(await structuredOf(await endpoint(retry(first.result?.requestState, "accept")))).toMatchObject({ status: "applied", revision: 1, changeId: record.id });
+    expect(f.deps.changes.get(record.id)).toMatchObject({ state: "applied", closed: { by: "client" } });
+    expect(f.store.auditLog(1)[0]).toMatchObject({ via: "mcp", caller: `owner:${SUB}`, tier: "asked", mode: "native", answeredBy: "client", change: record.id });
+  });
+
+  it("decline closes it declined (a strike, by client); cancel withdraws it", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const first = await bodyOf(await endpoint(askedCall({ query: NATIVE })));
+    const declined = openChange(f).record;
+    expect(await structuredOf(await endpoint(retry(first.result?.requestState, "decline")))).toMatchObject({ status: "declined", changeId: declined.id });
+    expect(f.deps.changes.get(declined.id)).toMatchObject({ state: "declined", closed: { by: "client" } });
+    const other = { expectedRevision: 0, settings: { containerBudget: 6 } };
+    const second = await bodyOf(await endpoint(modern("tools/call", { name: "change_environment", arguments: other }, { query: NATIVE })));
+    const cancelled = openChange(f).record;
+    const cancel = await endpoint(modern("tools/call", { name: "change_environment", arguments: other, requestState: second.result?.requestState, inputResponses: { change: { action: "cancel" } } }, { query: NATIVE }));
+    expect(await structuredOf(cancel)).toMatchObject({ status: "withdrawn", changeId: cancelled.id });
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it("a retry without a response asks again on the same Open change", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const first = await bodyOf(await endpoint(askedCall({ query: NATIVE })));
+    const again = await bodyOf(await endpoint(retry(first.result?.requestState, undefined)));
+    expect(again.result).toMatchObject({ resultType: "input_required", inputRequests: { change: { params: { mode: "form" } } } });
+    expect(f.deps.changes.open()).toHaveLength(1);
+  });
+
+  it("a retry in another mode than the change's is refused and applies nothing", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const first = await bodyOf(await endpoint(askedCall({ query: NATIVE })));
+    const body = await bodyOf(await endpoint(retry(first.result?.requestState, "accept", "?elicitation_mode=browser")));
+    expect(body.result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
+    expect(JSON.stringify(body.result?.content)).toContain("elicitation_mode=native");
+    expect(openChange(f).record.state).toBe("open");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it("the page can still answer a native change; the client's later accept finds it closed", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const first = await bodyOf(await endpoint(askedCall({ query: NATIVE })));
+    expect((await pageAnswer(f, openChange(f).record.id, "decline")).ok).toBe(true);
+    expect(await structuredOf(await endpoint(retry(first.result?.requestState, "accept")))).toMatchObject({ status: "declined" });
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+});
+
+describe("native on 2025: the form on the call's held stream", () => {
+  const setup = async (version = "2025-11-25", extra: Parameters<typeof endpointOf>[1] = {}) => {
+    const f = world();
+    const endpoint = endpointOf(f, { beatMs: 30, ...extra });
+    const { session } = await initialize(endpoint, version, BOTH);
+    return { f, endpoint, session };
+  };
+  const call = (session: string, version = "2025-11-25", meta: Record<string, unknown> = {}) =>
+    legacy("tools/call", { name: "change_environment", arguments: ASKED, ...(Object.keys(meta).length === 0 ? {} : { _meta: meta }) }, { session, version, query: NATIVE, id: 7 });
+  const answer = (session: string, id: unknown, body: Record<string, unknown>, query = NATIVE) => post({ jsonrpc: "2.0", id, ...body }, { query, headers: { "mcp-session-id": session } });
+
+  /** The first SSE message of a held response, read without waiting for the stream's end. */
+  const firstMessage = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
+    let text = "";
+    while (!text.includes("\n\n")) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += new TextDecoder().decode(value);
+    }
+    return events(text)[0]!;
+  };
+  const rest = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
+    let text = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return text;
+      text += new TextDecoder().decode(value);
+    }
+  };
+
+  it.each([
+    ["accept", { status: "applied", revision: 1 }, "applied"],
+    ["decline", { status: "declined" }, "declined"],
+    ["cancel", { status: "withdrawn" }, "withdrawn"],
+  ] as const)("writes elicitation/create (form, no fields) and holds; the response POST's %s answers the call", async (action, expected, state) => {
+    const { f, endpoint, session } = await setup();
+    const response = await endpoint(call(session));
+    expect(response.headers.get("content-type")).toBe("text/event-stream");
+    const reader = response.body!.getReader();
+    const ask = await firstMessage(reader);
+    const { record } = openChange(f);
+    expect(record.mode).toBe("native");
+    expect(ask).toMatchObject({ jsonrpc: "2.0", method: "elicitation/create", params: { mode: "form", requestedSchema: EMPTY, message: expect.stringContaining("containerBudget") } });
+    expect(String(ask.id)).toMatch(/^v1\./);
+    const posted = await endpoint(answer(session, ask.id, { result: { action, content: {} } }));
+    expect(posted.status).toBe(202);
+    expect(await posted.text()).toBe("");
+    const [result, ...more] = events(await rest(reader));
+    expect(more).toEqual([]);
+    expect(result).toMatchObject({ jsonrpc: "2.0", id: 7, result: { structuredContent: { ...expected, changeId: record.id } } });
+    expect(f.deps.changes.get(record.id)).toMatchObject({ state, closed: { by: "client" } });
+    if (action === "accept") expect(f.store.auditLog(1)[0]).toMatchObject({ tier: "asked", mode: "native", answeredBy: "client", change: record.id });
+  });
+
+  it("2025-06-18 has no mode in the question's params", async () => {
+    const { session, endpoint } = await setup("2025-06-18");
+    const reader = (await endpoint(call(session, "2025-06-18"))).body!.getReader();
+    const ask = await firstMessage(reader);
+    expect(ask.params).toEqual({ message: expect.any(String), requestedSchema: EMPTY });
+    await reader.cancel();
+  });
+
+  it("sends progress each beat when the call carried a token, an SSE comment otherwise", async () => {
+    const { session, endpoint } = await setup("2025-11-25", { formWaitMs: 100 });
+    const withToken = events(await (await endpoint(call(session, "2025-11-25", { progressToken: "p9" }))).text());
+    expect(withToken.filter((each) => each.method === "notifications/progress").length).toBeGreaterThanOrEqual(2);
+    expect(withToken.filter((each) => each.method === "notifications/progress").every((each) => (each.params as { progressToken: unknown }).progressToken === "p9")).toBe(true);
+    const without = await (await endpoint(call(session))).text();
+    expect(without).toContain(": waiting for the form's answer");
+  });
+
+  it("a stream the client cuts withdraws the change (by stop, no strike), and a later accept applies nothing", async () => {
+    const { f, endpoint, session } = await setup();
+    const reader = (await endpoint(call(session))).body!.getReader();
+    const ask = await firstMessage(reader);
+    const { record } = openChange(f);
+    await reader.cancel();
+    await until(() => f.deps.changes.get(record.id)?.state !== "open");
+    expect(f.deps.changes.get(record.id)).toMatchObject({ state: "withdrawn", closed: { by: "stop" } });
+    expect((await endpoint(answer(session, ask.id, { result: { action: "accept" } }))).status).toBe(202);
+    expect(f.store.loadEnvironment().revision).toBe(0);
+    expect(f.deps.changes.get(record.id)?.state).toBe("withdrawn");
+  });
+
+  it("holds no longer than the change lives: unanswered, it expires and the call says so", async () => {
+    const { f, endpoint, session } = await setup("2025-11-25", { formWaitMs: 60 });
+    const messages = events(await (await endpoint(call(session))).text());
+    expect(messages.at(-1)).toMatchObject({ result: { isError: true, structuredContent: { status: "expired" } } });
+    expect(f.deps.changes.open()).toHaveLength(0);
+  });
+
+  it("a JSON-RPC error in place of the answer withdraws it; a response sent in another mode is refused", async () => {
+    const { f, endpoint, session } = await setup();
+    const reader = (await endpoint(call(session))).body!.getReader();
+    const ask = await firstMessage(reader);
+    const { record } = openChange(f);
+    expect((await endpoint(answer(session, ask.id, { result: { action: "accept" } }, "?elicitation_mode=browser"))).status).toBe(400);
+    expect(f.deps.changes.get(record.id)?.state).toBe("open");
+    expect((await endpoint(answer(session, ask.id, { error: { code: -1, message: "no UI" } }))).status).toBe(202);
+    expect(f.deps.changes.get(record.id)?.state).toBe("withdrawn");
+    await rest(reader);
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it("another identity's response to the question is refused (400) and answers nothing", async () => {
+    const { f, endpoint, session } = await setup();
+    const reader = (await endpoint(call(session))).body!.getReader();
+    const ask = await firstMessage(reader);
+    expect((await endpoint(answer(session, ask.id, { result: { action: "accept" } }), { kind: "owner", subject: "someone-else" })).status).toBe(400);
+    expect(openChange(f).record.state).toBe("open");
+    await reader.cancel();
+  });
+
+  it("counts the held stream as open work until it ends", async () => {
+    const f = world();
+    let open = 0;
+    const endpoint = endpointOf(f, {
+      formWaitMs: 40,
+      work: () => {
+        open += 1;
+        return () => void (open -= 1);
+      },
+    });
+    const { session } = await initialize(endpoint, "2025-11-25", BOTH);
+    const response = await endpoint(call(session));
+    expect(open).toBe(1);
+    await response.text();
+    await sleep(5);
+    expect(open).toBe(0);
+  });
+});
+
+// ── M5b (SPI-1201): model ──────────────────────────────────────────────────────────────────────────────────────────
+
+describe("model: Executor's Pause, and resume", () => {
+  const resume = (requestId: unknown, action: string, query = MODEL) => modern("tools/call", { name: "resume", arguments: { requestId, response: { action } } }, { query, id: 3 });
+
+  it("answers the write with the Pause's exact shape at once, which pauseOf reads as a pause", async () => {
+    const f = world();
+    const body = await bodyOf(await endpointOf(f)(askedCall({ query: MODEL })));
+    const { record, url } = openChange(f);
+    expect(record.mode).toBe("model");
+    const message = (body.result!.structuredContent as { elicitation: { message: string } }).elicitation.message;
+    expect(body.result).toEqual({
+      resultType: "complete",
+      content: [{ type: "text", text: `${message}\n\n${PAUSE_LINE}` }],
+      structuredContent: {
+        status: "approval-required",
+        requestId: record.id,
+        elicitation: { mode: "form", message, requestedSchema: EMPTY },
+        expiresAt: new Date(NOW + CHANGE_TTL_MS).toISOString(),
+      },
+      isError: false,
+      _meta: expect.any(Object),
+    });
+    expect(message).toContain("containerBudget");
+    expect(message).toContain(url);
+    expect(pauseOf(body.result)).toMatchObject({ status: "approval-required", requestId: record.id, message, requestedSchema: EMPTY });
+  });
+
+  it("is the same Pause on every version, with no elicitation declared and no stream", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const { session } = await initialize(endpoint, "2025-03-26", {});
+    const response = await endpoint(legacy("tools/call", { name: "change_environment", arguments: ASKED }, { session, version: "2025-03-26", query: MODEL }));
+    expect(response.headers.get("content-type")).toBe("application/json");
+    expect(pauseOf((await bodyOf(response)).result)).toMatchObject({ requestId: openChange(f).record.id });
+  });
+
+  it("lists resume in model alone, and isPausingServer is true of that list", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const listed = async (query: string) => (await bodyOf(await endpoint(modern("tools/list", {}, { query })))).result?.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
+    const model = await listed(MODEL);
+    expect(model.map((tool) => tool.name)).toContain("resume");
+    expect(isPausingServer(Object.fromEntries(model.map((tool) => [tool.name, tool])))).toBe(true);
+    for (const query of ["", NATIVE, "?elicitation_mode=browser"]) expect((await listed(query)).map((tool) => tool.name)).not.toContain("resume");
+    // Unlisted is unknown: resume outside model is no tool at all.
+    const outside = await bodyOf(await endpoint(resume("chg_x", "accept", NATIVE)));
+    expect(outside.error).toMatchObject({ code: -32602 });
+  });
+
+  it.each([
+    ["accept", { status: "applied", revision: 1 }, "applied", "agent"],
+    ["decline", { status: "declined" }, "declined", "agent"],
+    ["cancel", { status: "withdrawn" }, "withdrawn", "agent"],
+  ] as const)("resume with %s answers it, closed by agent", async (action, expected, state, by) => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    await endpoint(askedCall({ query: MODEL }));
+    const { record } = openChange(f);
+    expect(await structuredOf(await endpoint(resume(record.id, action)))).toMatchObject({ ...expected, changeId: record.id });
+    expect(f.deps.changes.get(record.id)).toMatchObject({ state, closed: { by } });
+    if (action === "accept") {
+      expect(f.store.auditLog(1)[0]).toMatchObject({ via: "mcp", caller: `owner:${SUB}`, tier: "asked", mode: "model", answeredBy: "agent", change: record.id });
+      expect(f.store.loadEnvironment().revision).toBe(1);
+    } else expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it("refuses another identity's, another mode's, an expired and an unknown id, applying nothing", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    await endpoint(askedCall({ query: MODEL }));
+    const model = openChange(f).record;
+    // Another sub: as unknown as a made-up id.
+    const stranger = await bodyOf(await endpoint(resume(model.id, "accept"), { kind: "owner", subject: "someone-else" }));
+    expect(stranger.result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
+    expect(JSON.stringify(stranger.result?.content)).toContain("call the original tool again");
+    expect(f.deps.changes.get(model.id)?.state).toBe("open");
+    // Another mode's: a browser change of this sub.
+    await endpoint(modern("tools/call", { name: "change_environment", arguments: { expectedRevision: 0, settings: { containerBudget: 6 } } }));
+    const browser = f.deps.changes.open().find((record) => record.mode === "browser")!;
+    const other = await bodyOf(await endpoint(resume(browser.id, "accept")));
+    expect(other.result).toMatchObject({ isError: true, structuredContent: { status: "refused", changeId: browser.id } });
+    expect(JSON.stringify(other.result?.content)).toContain("elicitation_mode=browser");
+    expect(f.deps.changes.get(browser.id)?.state).toBe("open");
+    // Unknown and malformed ids.
+    for (const id of ["chg_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "not-an-id", 5]) {
+      expect((await bodyOf(await endpoint(resume(id, "accept")))).result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
+    }
+    // Expired.
+    f.advance(CHANGE_TTL_MS + 1);
+    const expired = await bodyOf(await endpoint(resume(model.id, "accept")));
+    expect(expired.result).toMatchObject({ isError: true, structuredContent: { status: "expired" } });
+    expect(JSON.stringify(expired.result?.content)).toContain("call change_environment again");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it("a repeated call answers the same Pause; past the sub's cap the refusal names the requestId to resume", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const first = await structuredOf(await endpoint(askedCall({ query: MODEL })));
+    const again = await structuredOf(await endpoint(askedCall({ query: MODEL })));
+    expect(again?.requestId).toBe(first?.requestId);
+    await endpoint(modern("tools/call", { name: "change_environment", arguments: { expectedRevision: 0, settings: { containerBudget: 5 } } }, { query: MODEL }));
+    const third = await bodyOf(await endpoint(modern("tools/call", { name: "change_environment", arguments: { expectedRevision: 0, settings: { containerBudget: 6 } } }, { query: MODEL })));
+    const refused = third.result?.structuredContent as Record<string, unknown>;
+    expect(refused).toMatchObject({ status: "refused", reason: "open-owner", requestId: refused.changeId });
+    expect(f.deps.changes.open().map((record) => record.id)).toContain(refused.requestId);
+    expect(JSON.stringify(third.result?.content)).toContain("call resume");
+  });
+
+  it("the access switch: read-only lists no resume and refuses it; off refuses it naming the panel", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    await endpoint(askedCall({ query: MODEL }));
+    const { record } = openChange(f);
+    setAccess(f, { writes: false });
+    const tools = (await bodyOf(await endpoint(modern("tools/list", {}, { query: MODEL })))).result?.tools as Array<{ name: string }>;
+    expect(tools.map((tool) => tool.name)).not.toContain("resume");
+    expect(await structuredOf(await endpoint(resume(record.id, "accept")))).toMatchObject({ status: "refused" });
+    setAccess(f, { enabled: false });
+    const off = await bodyOf(await endpoint(resume(record.id, "accept")));
+    expect(JSON.stringify(off.result?.content)).toContain("Harness panel");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it("the page can still answer a model change; resume then reports it closed", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    await endpoint(askedCall({ query: MODEL }));
+    const { record } = openChange(f);
+    expect((await pageAnswer(f, record.id, "approve")).ok).toBe(true);
+    expect((await bodyOf(await endpoint(resume(record.id, "decline")))).result).toMatchObject({ isError: true, structuredContent: { status: "applied", revision: 1 } });
+  });
+});
+
+// ── M5b (SPI-1201): D12's fallbacks for native and model ───────────────────────────────────────────────────────────
+
+describe("D12's fallbacks for native and model", () => {
+  it("native with no form elicitation declared is browser for that request: the URL elicitation when declared, else W saying why", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const withUrl = await bodyOf(await endpoint(askedCall({ query: NATIVE, capabilities: { elicitation: { url: {} } } })));
+    expect(openChange(f).record.mode).toBe("browser");
+    expect(withUrl.result).toMatchObject({ resultType: "input_required", inputRequests: { change: { params: { mode: "url" } } } });
+    const g = world();
+    const none = await bodyOf(await endpointOf(g)(askedCall({ query: NATIVE, capabilities: {} })));
+    expect(openChange(g).record.mode).toBe("browser");
+    expect(none.result).toMatchObject({ structuredContent: { status: "waiting", url: openChange(g).url } });
+    expect(JSON.stringify(none.result?.content)).toContain("declared no form elicitation");
+  });
+
+  it.each([
+    ["2025-03-26", "2025-03-26", BOTH],
+    ["pi 1.5.2 (2025-11-25, roots only)", "2025-11-25", { roots: {} }],
+    ["2025-11-25 with URL elicitation only", "2025-11-25", { elicitation: { url: {} } }],
+  ])("native on %s: browser", async (_name, version, capabilities) => {
+    const f = world();
+    const endpoint = endpointOf(f, { holdMs: 40 });
+    const { session } = await initialize(endpoint, version, capabilities);
+    const response = await endpoint(legacy("tools/call", { name: "change_environment", arguments: ASKED }, { session, version, query: NATIVE }));
+    expect(openChange(f).record.mode).toBe("browser");
+    const text = await response.text();
+    expect(text).not.toContain('"mode":"form"');
+    expect(text).toContain('"status":"waiting"');
+  });
+
+  const header = { expectedRevision: 0, change: { op: "add", server: "notes", url: "https://notes.example/mcp", auth: { kind: "header", header: "X-Key" } } };
+
+  it("a change that needs the page, in native: the page elicitation (no form), the change browser-mode", async () => {
+    const f = world();
+    const body = await bodyOf(await endpointOf(f)(modern("tools/call", { name: "change_mcp", arguments: header }, { query: NATIVE })));
+    expect(openChange(f).record).toMatchObject({ mode: "browser", needsPage: "secret" });
+    expect(body.result).toMatchObject({ resultType: "input_required", inputRequests: { change: { params: { mode: "url", url: openChange(f).url } } } });
+  });
+
+  it("a change that needs the page, in native with form only: the link, saying why", async () => {
+    const f = world();
+    const body = await bodyOf(await endpointOf(f)(modern("tools/call", { name: "change_mcp", arguments: header }, { query: NATIVE, capabilities: FORM })));
+    expect(body.result).toMatchObject({ structuredContent: { status: "waiting", url: openChange(f).url } });
+    expect(JSON.stringify(body.result?.content)).toContain("takes a secret");
+  });
+
+  it("a change that needs the page, in model: the link, never a Pause nor a question", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const body = await bodyOf(await endpoint(modern("tools/call", { name: "change_mcp", arguments: header }, { query: MODEL })));
+    const { record, url } = openChange(f);
+    expect(record).toMatchObject({ mode: "browser", needsPage: "secret" });
+    expect(body.result).toMatchObject({ resultType: "complete", structuredContent: { status: "waiting", url } });
+    expect(pauseOf(body.result)).toBeUndefined();
+    // resume cannot approve it: it is not a model-mode change.
+    expect(await structuredOf(await endpoint(modern("tools/call", { name: "resume", arguments: { requestId: record.id, response: { action: "accept" } } }, { query: MODEL })))).toMatchObject({ status: "refused" });
+    // A repeat finds the same change, not a second one.
+    await endpoint(modern("tools/call", { name: "change_mcp", arguments: header }, { query: MODEL }));
+    expect(f.deps.changes.open()).toHaveLength(1);
   });
 });

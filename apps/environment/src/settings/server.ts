@@ -67,7 +67,7 @@ import {
   NETWORK_READS,
   READ_CAP,
   READ_WINDOW_MS,
-  canonicalJson, type ChangeCaller, type ChangeMode, CHANGE_TTL_MS, type AnsweredBy, type ChangeRecord, changeHash, durationText, isOpen, type NeedsPage, newChangeId, type SettingsChanges } from "./changes.ts";
+  canonicalJson, type ChangeCaller, type ChangeMode, CHANGE_TTL_MS, type AnsweredBy, type ChangeRecord, changeHash, durationText, isChangeId, isOpen, type NeedsPage, newChangeId, type SettingsChanges } from "./changes.ts";
 import {
   type AnswerDeps,
   answerOpenChange,
@@ -708,17 +708,20 @@ export const applyOpenChange = async (deps: SettingsServerDeps, record: ChangeRe
 
 /** A closed change's answer to the agent (plan D11's statuses). */
 const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "entity">, planned: Pick<Planned, "appliesAt">): McpCallAnswer => {
-  const where = outcome.by === "page" ? " on the Change page" : outcome.by === "card" ? " on the card" : "";
+  const where = outcome.by === "page" ? " on the Change page" : outcome.by === "card" ? " on the card" : outcome.by === "client" ? " in the client's form" : outcome.by === "agent" ? " through resume" : "";
   const name = record.entity === "harness" ? "Harness" : "Environment";
+  // `native` and `model` prove no person answered (ADR-0034, plan §10): their texts name what answered, not the owner.
+  const approved = outcome.by === "client" || outcome.by === "agent" ? `it was accepted${where}` : `the owner approved it${where}`;
+  const declined = outcome.by === "client" || outcome.by === "agent" ? `it was declined${where}` : `the owner declined it${where}`;
   switch (outcome.state) {
     case "applied":
-      return written("applied", `Applied: the owner approved it${where}. The ${name} settings are at revision ${outcome.revision ?? "?"}. ${planned.appliesAt}`, {
+      return written("applied", `Applied: ${approved}. The ${name} settings are at revision ${outcome.revision ?? "?"}. ${planned.appliesAt}`, {
         ...(outcome.revision === undefined ? {} : { revision: outcome.revision }),
         appliesAt: planned.appliesAt,
         changeId: record.id,
       });
     case "declined":
-      return written("declined", `Not changed: the owner declined it${where}. Do not ask again for the same change.`, { changeId: record.id });
+      return written("declined", `Not changed: ${declined}. Do not ask again for the same change.`, { changeId: record.id });
     case "expired":
       return written("expired", `Not changed: the owner did not answer within ${durationText(CHANGE_TTL_MS)}.`, { changeId: record.id });
     case "moved":
@@ -1087,19 +1090,11 @@ export const settingsCall = async (deps: SettingsServerDeps, input: SettingsCall
 // The endpoint (endpoint.ts) reaches the same reads and the same planned writes as the own agents' door, through these
 // entry points. An Owner client has no thread, no Linked work and no runtime mode (plan D7's last column): a read runs, a
 // free change runs, and an asked change becomes an Open change in the client's Elicitation mode, which the endpoint
-// then delivers (a page elicitation, or the link in the result) and which the Change page answers.
+// then delivers in the change's mode (D12: a page elicitation or the link, a form, or a Pause) and which the Change
+// page answers in every mode.
 
-/** What an Owner client's call answered: a result now, or an Open change for the endpoint to deliver. */
-export type OwnerCallAnswer =
-  | { readonly kind: "result"; readonly answer: McpCallAnswer }
-  | {
-      readonly kind: "open";
-      readonly record: ChangeRecord;
-      /** The Change page's URL (`U`), when the host is known. */
-      readonly url: string | undefined;
-      /** The server-written text of the change (`M`): the card's text without the agent's call. */
-      readonly message: string;
-    };
+/** What an Owner client's call answered: a result now, or an Open change for the endpoint to deliver in its mode. */
+export type OwnerCallAnswer = { readonly kind: "result"; readonly answer: McpCallAnswer } | { readonly kind: "open"; readonly record: ChangeRecord };
 
 export interface OwnerCallInput {
   readonly tool: string;
@@ -1130,16 +1125,48 @@ const ownerChangeCaller = (caller: OwnerCaller): ChangeCaller => ({
 /** The audit's caller for an Owner client (plan D15): `owner:<sub>`, or `service-token`. */
 const ownerAuditCaller = (caller: OwnerCaller): string => (caller.kind === "owner" ? `owner:${caller.key}` : "service-token");
 
-/** An Open change's message `M` (plan D12): the change as the server wrote it, who asked, and where it is answered. */
-export const ownerMessage = (view: ChangeView, caller: Pick<OwnerCaller, "kind" | "client">): string =>
+/** How an Owner client's change is answered, by its mode: the last line of its message `M`. */
+const ANSWERED_HOW: Readonly<Record<Exclude<ChangeMode, "card">, (url: string | undefined) => string>> = {
+  browser: () => "Approve or decline it on the Change page.",
+  native: (url) => `Accept applies it; Decline refuses it. It can also be answered on its Change page${url === undefined ? "" : `: ${url}`}.`,
+  model: (url) => `resume with accept applies it; decline refuses it; cancel withdraws it. It can also be answered on its Change page${url === undefined ? "" : `: ${url}`}.`,
+};
+
+/**
+ * An Open change's message `M` (plan D12): the change as the server wrote it, who asked, and how it is answered in its
+ * mode (`url`, the Change page's, is named in `native` and `model`, where the question itself carries no link).
+ */
+export const ownerMessage = (view: ChangeView, caller: Pick<OwnerCaller, "kind" | "client">, mode: Exclude<ChangeMode, "card"> = "browser", url?: string): string =>
   cardText(
     [
       changeText(view),
       "",
       `Asked by ${askedByText({ door: "owner", principal: caller.kind === "owner" ? "owner" : "service-token", ...(caller.client === undefined ? {} : { client: caller.client }) })}.`,
-      "Approve or decline it on the Change page.",
+      ANSWERED_HOW[mode](url),
     ].join("\n"),
   );
+
+/** The schema of D12's `native` form and `model` Pause: none, so the answer is the action alone (M0: shown as Accept / Decline). */
+export const EMPTY_SCHEMA = { type: "object", properties: {} } as const;
+
+/** What `model`'s Pause tells the agent to do (plan D12, Executor's words). */
+export const PAUSE_LINE = "This change waits for approval. Show it to the user, then call resume with requestId and their answer.";
+
+/**
+ * `model`'s Pause (plan D12): Executor's shape exactly, as `pauseOf` and `isPausingServer` read it, so a host with
+ * ADR-0028's pausing rule hides this server's `resume` and asks its own owner.
+ */
+export const ownerPause = (record: Pick<ChangeRecord, "id" | "expiresAt" | "createdAt">, message: string): McpCallAnswer => ({
+  kind: "result",
+  isError: false,
+  text: `${message}\n\n${PAUSE_LINE}`,
+  structured: {
+    status: "approval-required",
+    requestId: record.id,
+    elicitation: { mode: "form", message, requestedSchema: EMPTY_SCHEMA },
+    expiresAt: new Date(record.expiresAt ?? record.createdAt).toISOString(),
+  },
+});
 
 /** The "waiting" result `W` (plan D12): the change waits for the owner at its page. `note` adds a fallback's reason. */
 export const ownerWaiting = (record: Pick<ChangeRecord, "id">, url: string | undefined, note?: string): McpCallAnswer => {
@@ -1158,7 +1185,31 @@ export const ownerOutcome = (outcome: ChangeOutcome, record: ChangeRecord): McpC
  * Withdraws an Owner client's Open change (a `decline` or `cancel` in its client's answer to the page elicitation, plan
  * D12): answers the change's outcome, which is the earlier one when something answered it first.
  */
-export const withdrawOwnerChange = (deps: SettingsServerDeps, id: string): ChangeOutcome | undefined => closeOpenChange(answerDepsOf(deps), id, "withdrawn", "client");
+export const withdrawOwnerChange = (deps: SettingsServerDeps, id: string, by: "client" | "agent" | "stop" = "client"): ChangeOutcome | undefined =>
+  closeOpenChange(answerDepsOf(deps), id, "withdrawn", by);
+
+/**
+ * Answers an Owner client's Open change from the client (plan D8): `client` is `native`'s form, `agent` is `model`'s
+ * `resume`. `answerOpenChange` checks the change's mode, the same identity and that it does not need the page. Answers
+ * the change's outcome, or why nothing changed.
+ */
+export const answerOwnerChange = async (
+  deps: SettingsServerDeps,
+  id: string,
+  caller: Pick<OwnerCaller, "kind" | "key">,
+  by: "client" | "agent",
+  action: "accept" | "decline",
+): Promise<{ readonly ok: true; readonly outcome: ChangeOutcome } | { readonly ok: false; readonly error: string; readonly closed?: ChangeOutcome }> => {
+  const answered = await answerOpenChange(answerDepsOf(deps), id, {
+    by,
+    answerer: caller.kind === "owner" ? { kind: "owner", subject: caller.key } : { kind: "service-token" },
+    action: action === "accept" ? "approve" : "decline",
+  });
+  return answered.ok ? { ok: true, outcome: answered.outcome } : { ok: false, error: answered.error, ...(answered.closed === undefined ? {} : { closed: answered.closed }) };
+};
+
+/** The mode an Open change is answered in: a change that needs the page is answered there whatever was asked (plan D6, D12). */
+const modeFor = (asked: Exclude<ChangeMode, "card">, needsPage: NeedsPage | undefined): Exclude<ChangeMode, "card"> => (needsPage === undefined ? asked : "browser");
 
 /** An asked change from an Owner client (plan D8, D16): opened in `mode`, or the caller's same change already open. */
 const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned: Planned, expected: number): Promise<OwnerCallAnswer> => {
@@ -1168,17 +1219,32 @@ const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned
   const changeCaller = ownerChangeCaller(caller);
   const log = (event: string, extra: Record<string, unknown>) => deps.log?.({ t3flare: event, via: "mcp", door: "owner", principal: caller.kind, tool, ...extra });
   // A repeated call (a client that retried, or an agent that did not read `W`) finds its own change, not a second one.
+  // Its mode is the request's, or `browser` when the change needs the page (plan D12's fallbacks).
   const reused = (): OwnerCallAnswer | undefined => {
-    const same = deps.changes.openBy(caller.key).find((record) => record.state === "open" && record.hash === hash && record.expectedRevision === expected && record.mode === input.mode);
-    return same?.shown === undefined ? undefined : { kind: "open", record: same, url: changeUrlOf(deps, same.id), message: ownerMessage(same.shown, caller) };
+    const same = deps.changes
+      .openBy(caller.key)
+      .find((record) => record.state === "open" && record.hash === hash && record.expectedRevision === expected && record.mode === modeFor(input.mode, record.needsPage));
+    return same === undefined ? undefined : { kind: "open", record: same };
   };
   const first = reused();
   if (first !== undefined) return first;
-  const capped = capRefusal(deps.changes, changeCaller, hash, now, openListOf(deps));
-  if (capped !== undefined) {
+  /** A cap's refusal; in `model` one for "already open" names the `requestId` of a model-mode change to resume (plan D16). */
+  const cappedAnswer = (capped: NonNullable<ReturnType<typeof capRefusal>>): OwnerCallAnswer => {
     log("settings-refused", { outcome: "refused", reason: capped.reason });
-    return { kind: "result", answer: written("refused", capped.text, { tier: "asked", reason: capped.reason, ...(capped.changeId === undefined ? {} : { changeId: capped.changeId }) }) };
-  }
+    const open = input.mode === "model" && capped.reason === "open-owner" ? deps.changes.openBy(caller.key).filter((record) => record.mode === "model" && record.state === "open") : [];
+    const resumable = open.find((record) => record.id === capped.changeId) ?? open[0];
+    return {
+      kind: "result",
+      answer: written("refused", resumable === undefined ? capped.text : `${capped.text} To answer or cancel ${resumable.id}, call resume with it as requestId.`, {
+        tier: "asked",
+        reason: capped.reason,
+        ...(capped.changeId === undefined ? {} : { changeId: capped.changeId }),
+        ...(resumable === undefined ? {} : { requestId: resumable.id }),
+      }),
+    };
+  };
+  const capped = capRefusal(deps.changes, changeCaller, hash, now, openListOf(deps));
+  if (capped !== undefined) return cappedAnswer(capped);
   const spent = planned.network === true ? networkSpent(deps, ownerReader(deps, caller)) : undefined;
   if (spent !== undefined) {
     log("settings-refused", { outcome: "refused", reason: "network-read-cap" });
@@ -1191,9 +1257,8 @@ const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned
   }
   const view: ChangeView = { entity: planned.entity, subject: planned.subject, revision: expected, appliesAt: planned.appliesAt, reasons: planned.verdict.reasons, items: described.items, lines: described.lines };
   const id = newChangeId();
-  const url = changeUrlOf(deps, id);
-  const message = ownerMessage(view, caller);
   const needsPage = planned.verdict.needsPage ?? (visible(changeText(view)).length > CARD_TEXT_MAX ? "oversize" : undefined);
+  const mode = modeFor(input.mode, needsPage);
   const record: ChangeRecord = {
     id,
     entity: planned.entity,
@@ -1204,7 +1269,7 @@ const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned
     tier: "asked",
     shown: view,
     ...(needsPage === undefined ? {} : { needsPage }),
-    mode: input.mode,
+    mode,
     caller: changeCaller,
     createdAt: now,
     expiresAt: now + CHANGE_TTL_MS,
@@ -1214,13 +1279,10 @@ const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned
   const again = reused();
   if (again !== undefined) return again;
   const raced = capRefusal(deps.changes, changeCaller, hash, deps.ops.now(), openListOf(deps));
-  if (raced !== undefined) {
-    log("settings-refused", { outcome: "refused", reason: raced.reason });
-    return { kind: "result", answer: written("refused", raced.text, { tier: "asked", reason: raced.reason, ...(raced.changeId === undefined ? {} : { changeId: raced.changeId }) }) };
-  }
+  if (raced !== undefined) return cappedAnswer(raced);
   deps.changes.insert(record);
-  log("settings-change", { outcome: "open", change: id, tier: "asked", mode: input.mode, needsPage: needsPage ?? null });
-  return { kind: "open", record, url, message };
+  log("settings-change", { outcome: "open", change: id, tier: "asked", mode, needsPage: needsPage ?? null });
+  return { kind: "open", record };
 };
 
 /** An Owner client's write (plan D7's last column): the access switch, validation, the revision, the tier, the caps. */
@@ -1300,6 +1362,47 @@ export const settingsOwnerCall = async (deps: SettingsServerDeps, input: OwnerCa
   if (limited !== undefined) return { kind: "result", answer: limited };
   const actor: AuditActor = { caller: ownerAuditCaller(input.caller), via: "mcp", ...(input.caller.client === undefined ? {} : { client: input.caller.client }) };
   return { kind: "result", answer: await runRead(deps, tool.name, input.args, actor, input.caller.key) };
+};
+
+/**
+ * `resume` (plan D12's `model`): the client's agent answers its own model-mode Open change. Listed and called only on the
+ * Owner-client endpoint with `elicitation_mode=model`; the in-process server never has it. It is a write: the access
+ * switch refuses it as it refuses every write. `accept` applies (answered by `agent`), `decline` closes it declined,
+ * `cancel` withdraws it (closed by `agent`: model-mode resume is the only `agent` closer, SPI-1199 review).
+ */
+export const ownerResume = async (deps: SettingsServerDeps, input: { readonly args: Readonly<Record<string, unknown>>; readonly caller: OwnerCaller }): Promise<McpCallAnswer> => {
+  const { args, caller } = input;
+  const log = (outcome: string, extra: Record<string, unknown> = {}) => deps.log?.({ t3flare: "settings-refused", via: "mcp", door: "owner", principal: caller.kind, tool: "resume", outcome, ...extra });
+  const refuse = (reason: string, text: string, extra: Readonly<Record<string, unknown>> = {}) => {
+    log("refused", { reason });
+    return written("refused", text, extra);
+  };
+  const barred = ownerReader(deps, caller).mayNotWrite();
+  if (barred !== undefined) return refuse(barred.reason, barred.text);
+  const requestId = args.requestId;
+  const action = objectArg(args.response)?.action;
+  if (typeof requestId !== "string" || (action !== "accept" && action !== "decline" && action !== "cancel")) {
+    return refuse("invalid", "Not changed: resume takes requestId (from the write's result) and response { action: accept, decline or cancel }.");
+  }
+  const record = isChangeId(requestId) ? deps.changes.get(requestId) : undefined;
+  // Another identity's change is as unknown as a made-up one: nothing says it exists.
+  if (record === undefined || record.tier !== "asked" || record.caller.key !== caller.key) {
+    return refuse("unknown", "Not changed: no change of yours has that requestId (it may have closed long ago). To ask again, read the settings and call the original tool again.");
+  }
+  if (record.mode !== "model") {
+    return refuse("other-mode", `Not changed: ${record.id} was asked in elicitation_mode=${record.mode ?? "card"}, and resume answers only model-mode changes. Answer it the way it was asked, or call the original tool again in this mode.`, { changeId: record.id });
+  }
+  if (!isOpen(record)) {
+    const closed = ownerOutcome(outcomeOf(record), record);
+    log("closed", { reason: record.state, change: record.id });
+    if (closed.kind !== "result") return closed;
+    return { ...closed, isError: true, text: `${closed.text} This change is closed; to ask again, read the settings and call ${record.tool} again.` };
+  }
+  if (action === "cancel") return ownerOutcome(withdrawOwnerChange(deps, record.id, "agent") ?? outcomeOf(record), record);
+  const answered = await answerOwnerChange(deps, record.id, caller, "agent", action);
+  if (answered.ok) return ownerOutcome(answered.outcome, record);
+  if (answered.closed !== undefined) return ownerOutcome(answered.closed, record);
+  return refuse("answer", `Not changed: ${answered.error}.`, { changeId: record.id });
 };
 
 /** Whether the Settings server lists `tool` to an Owner client now (plan D2's access switch): off lists none, read-only no write. */
