@@ -3,7 +3,7 @@
 // settings dev.env is read for.
 import { describe, expect, it } from "vitest";
 
-import { deployPlan, devEnvNames } from "../scripts/lib/deployPlan.ts";
+import { allDeploySettings, deployPlan, devEnvNames } from "../scripts/lib/deployPlan.ts";
 
 const KEY = "cms_spi1175-proxy-key-0123456789";
 const REQUIRED = { T3FLARE_GITHUB_APP_ID: "1", T3FLARE_GITHUB_APP_PRIVATE_KEY: "pem", COMMISSARY_CONTAINER_API_KEY: "cms_container" };
@@ -52,6 +52,18 @@ describe("deployPlan", () => {
     expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED, ...PROXY }, env: ci })).toMatchObject({ ok: true });
   });
 
+  it("refuses a custom domain on any stage but prod (prod's host, Access application and rate limit); empty is unset", () => {
+    const domain = { T3FLARE_DOMAIN: "t3.example.dev" };
+    expect(deployPlan({ stage: "p1175", args: [], read: { ...REQUIRED, ...PROXY }, env: { ...laptop, ...domain } })).toEqual({
+      ok: false,
+      error: "T3FLARE_DOMAIN is set (to t3.example.dev) for the stage p1175: only prod has a custom domain; unset it (was dev.env sourced into the shell?)",
+    });
+    expect(deployPlan({ stage: "bump", args: [], read: { ...REQUIRED, ...PROXY }, env: { ...ci, ...domain } })).toMatchObject({ ok: false });
+    // deploy-prod.yml's `bump` run passes the `bump` environment's unset variable as "".
+    expect(deployPlan({ stage: "bump", args: [], read: { ...REQUIRED, ...PROXY }, env: { ...ci, T3FLARE_DOMAIN: "" } })).toMatchObject({ ok: true });
+    expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED, ...PROXY }, env: { ...ci, ...domain } })).toMatchObject({ ok: true });
+  });
+
   it("refuses an unusable endpoint setting, a missing required setting, and a proxy URL without its key", () => {
     expect(deployPlan({ stage: "p1175", args: [], read: { ...REQUIRED, ...PROXY, T3FLARE_MODEL_ENDPOINT: "{" }, env: ci })).toEqual({ ok: false, error: "T3FLARE_MODEL_ENDPOINT is not JSON" });
     expect(deployPlan({ stage: "p1175", args: [], read: { ...PROXY }, env: laptop })).toMatchObject({ ok: false, error: expect.stringMatching(/^missing T3FLARE_GITHUB_APP_ID/) });
@@ -67,7 +79,6 @@ describe("devEnvNames", () => {
     expect(devEnvNames({ ...REQUIRED, ...PROXY, T3FLARE_MODEL_ENDPOINT: ENDPOINT }, ["T3FLARE_MODEL_ENDPOINT"])).toEqual([]);
   });
   it("reads every setting when a required one is missing", () => {
-    expect(devEnvNames({ ...REQUIRED }, ["T3FLARE_MODEL_ENDPOINT"])).toContain("MODEL_PROXY_URL");
-    expect(devEnvNames({ ...REQUIRED }, ["T3FLARE_MODEL_ENDPOINT"])).toContain("T3FLARE_MODEL_ENDPOINT");
+    expect(devEnvNames({ ...REQUIRED }, ["T3FLARE_MODEL_ENDPOINT"])).toEqual(allDeploySettings(["T3FLARE_MODEL_ENDPOINT"]));
   });
 });

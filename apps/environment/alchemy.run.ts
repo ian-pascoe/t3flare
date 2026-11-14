@@ -112,6 +112,12 @@ export default Alchemy.Stack(
     const workersDevHost = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
     // The stage's custom domain, if it has one (unset or empty: workers.dev only).
     const domain = yield* Config.String("T3FLARE_DOMAIN").pipe(Config.withDefault(""));
+    // SPI-1175: only prod has one. Another stage given prod's domain would take over prod's Access application (alchemy
+    // finds it by domain) and the zone's rate-limit ruleset (owned whole by one stage); stage.ts refuses it first
+    // (scripts/lib/deployPlan.ts), and this refuses a direct alchemy run.
+    if (domain !== "" && stage !== "prod") {
+      return yield* Effect.die(new Error(`T3FLARE_DOMAIN is set (to ${domain}) for the stage ${stage}: only prod has a custom domain`));
+    }
     const host = domain === "" ? workersDevHost : domain;
     const teamDomain = yield* Config.String("T3FLARE_ACCESS_TEAM_DOMAIN").pipe(Config.withDefault(ACCESS_TEAM_DOMAIN));
     const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));

@@ -14,8 +14,10 @@ name: Nightly bump
 # and by `pnpm --filter @t3flare/infra run github-app:setup`: secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY.
 # and the repository setting that lets Actions create pull requests (infra/allow-actions-prs.ts).
 # The stage's own bootstrap and admin tokens are made fresh by the job; nothing else is stored.
-# The secrets reach only the Bump step. Its install runs no dependency build script (pnpm-workspace.yaml's allowBuilds,
-# review H4), but its check and deploy run dependency code, as they must.
+# The secrets reach only the Bump step, except T3FLARE_MODEL_ENDPOINT, which the "Mask the Model endpoint" step before it
+# also receives: that step runs node on apps/environment/scripts/mask-endpoint.ts alone (no dependency code, no install)
+# and writes only GitHub's mask commands to the log. The Bump step's install runs no dependency build script
+# (pnpm-workspace.yaml's allowBuilds, review H4), but its check and deploy run dependency code, as they must.
 
 on:
   schedule:

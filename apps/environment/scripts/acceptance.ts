@@ -36,7 +36,7 @@ import * as fs from "node:fs";
 import { defaultTextModel } from "@t3flare/models/endpoints";
 
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
-import { scrubSecrets, secretsOf, stageEndpointSpec } from "./lib/modelEndpointSpec.ts";
+import { keptReportJson, stageEndpointSpec } from "./lib/modelEndpointSpec.ts";
 
 const arg = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`);
@@ -102,7 +102,7 @@ report.adminGuard = { wrongToken: noToken.status, withAccessAndToken: health0.st
 check("admin refused with a wrong token", noToken.status === 404 || noToken.status === 403 || noToken.status === 302, noToken.status);
 if (!check("admin health admitted", health0.status === 200, health0)) {
   report.failures = failures;
-  console.log(JSON.stringify(report, null, 2));
+  console.log(keptReportJson(report, process.env));
   process.exit(1);
 }
 
@@ -137,7 +137,7 @@ const paired = await pair();
 report.pairing = { refusedBeforeArming: refusedBefore.status, armedUntil: armed.json?.armedUntil, paired: paired.status, ms: ms() };
 if (!check("pairs while armed", paired.status === 200, paired.body.slice(0, 300))) {
   report.failures = failures;
-  console.log(JSON.stringify(report, null, 2));
+  console.log(keptReportJson(report, process.env));
   process.exit(1);
 }
 const cookie = paired.cookie;
@@ -365,7 +365,7 @@ report.totalMs = ms();
 report.failures = failures;
 report.ok = failures.length === 0;
 // The report is kept (bump.ts puts it in bump-report.json, an artifact): never with the endpoint's key or header values.
-const text = scrubSecrets(JSON.stringify(report, null, 2), endpointSpec.ok ? secretsOf(endpointSpec.spec) : []);
+const text = keptReportJson(report, process.env);
 console.log(text);
 if (outFile) fs.writeFileSync(outFile, `${text}\n`);
 process.exit(report.ok ? 0 : 1);

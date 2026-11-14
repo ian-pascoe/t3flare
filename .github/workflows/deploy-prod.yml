@@ -20,7 +20,9 @@ name: Deploy prod
 #     (apps/environment/.alchemy/stages/prod.env.json); stage.ts refuses to make new ones for prod in CI.
 # The Access service token's credentials come from alchemy's state on every deploy, so nothing else is stored.
 # The secrets reach only the Deploy and Smoke steps, never the install or the check, where dependency code runs
-# (review H4; dependency build scripts are denied too, pnpm-workspace.yaml's allowBuilds).
+# (review H4; dependency build scripts are denied too, pnpm-workspace.yaml's allowBuilds). One exception:
+# T3FLARE_MODEL_ENDPOINT also reaches the "Mask the Model endpoint" step, which runs node on
+# apps/environment/scripts/mask-endpoint.ts alone (no dependency code) and writes only GitHub's mask commands to the log.
 
 on:
   push:

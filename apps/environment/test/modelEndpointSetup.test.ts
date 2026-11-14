@@ -1,5 +1,7 @@
 // SPI-1175: the Model endpoint a stage, the acceptance test and CI set up through the panel's API: where its spec comes
 // from (scripts/lib/modelEndpointSpec.ts), and how it is saved (scripts/lib/modelEndpoint.ts).
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { type AdminCall, ensureModelEndpoint } from "../scripts/lib/modelEndpoint.ts";
@@ -7,6 +9,7 @@ import { ENDPOINT_APIS, type EndpointApi } from "@t3flare/models/endpoints";
 
 import {
   commissaryEndpoint,
+  keptReportJson,
   maskCommands,
   modelEndpointSecret,
   modelEndpointSpec,
@@ -175,6 +178,34 @@ describe("masking and scrubbing the endpoint's secrets", () => {
     if (!parsed.ok) throw new Error(parsed.reason);
     const text = scrubSecrets(`{"error":"bad ${KEY} and ${HEADER_SECRET}","n":1}`, secretsOf(parsed.spec));
     expect(text).toBe('{"error":"bad [redacted] and [redacted]","n":1}');
+  });
+});
+
+describe("keptReportJson (the acceptance report and bump-report.json)", () => {
+  // A key holding JSON's escapes, and a header value that is a JSON token.
+  const QUOTED_KEY = 'sk-"quoted"\\key-0123456789';
+  const ci = { GITHUB_ACTIONS: "true", T3FLARE_MODEL_ENDPOINT: JSON.stringify({ id: "gw", baseUrl: "https://gw.example.com", apiKey: QUOTED_KEY, headers: { "x-flag": "true" } }) };
+  const report = { ok: true, failures: [`refused ${QUOTED_KEY}`], modelEndpoint: { ok: false, error: "header true was refused" }, count: 3, nested: [{ note: QUOTED_KEY }] };
+
+  it("scrubs the key and header values from every string, and stays JSON with its tokens intact", () => {
+    const kept = keptReportJson(report, ci);
+    const parsed = JSON.parse(kept);
+    expect(parsed).toEqual({ ok: true, failures: ["refused [redacted]"], modelEndpoint: { ok: false, error: "header [redacted] was refused" }, count: 3, nested: [{ note: "[redacted]" }] });
+    expect(kept).not.toContain('quoted\\"');
+    expect(kept).not.toContain("quoted");
+  });
+
+  it("is the plain report when there is no endpoint", () => {
+    expect(JSON.parse(keptReportJson(report, { GITHUB_ACTIONS: "true" }))).toEqual(report);
+  });
+
+  it("is how acceptance.ts and bump.ts write their reports", () => {
+    const root = path.resolve(import.meta.dirname, "../../..");
+    for (const file of ["apps/environment/scripts/acceptance.ts", "scripts/bump.ts"]) {
+      const source = fs.readFileSync(path.join(root, file), "utf8");
+      expect(source, file).toContain("keptReportJson(report, process.env)");
+      expect(source, file).not.toMatch(/JSON\.stringify\(report\b/);
+    }
   });
 });
 

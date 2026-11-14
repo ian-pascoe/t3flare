@@ -21,7 +21,7 @@ import { buildWorker } from "../build.ts";
 import { buildAgentsWorker } from "../../agents/build.ts";
 import { isDurableObjectClassNotFound } from "./deploy-retry.ts";
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
-import { DEPLOY_SECRETS, deployPlan, devEnvNames, MODEL_PROXY_SETTINGS, OPTIONAL_DEPLOY_SECRETS } from "./lib/deployPlan.ts";
+import { allDeploySettings, deployPlan, devEnvNames } from "./lib/deployPlan.ts";
 import { MODEL_ENDPOINT_VAR, type ModelEndpointSpecResult } from "./lib/modelEndpointSpec.ts";
 
 const here = path.resolve(import.meta.dirname, "..");
@@ -80,7 +80,7 @@ const stageSecrets = (): Record<string, string> => {
  * outside the repo), which bash reads as it is written (multi-line values included). Shell variables win. Never printed.
  */
 const deploySecrets = (extra: ReadonlyArray<string> = []): Record<string, string> => {
-  const names = [...DEPLOY_SECRETS, ...MODEL_PROXY_SETTINGS, ...OPTIONAL_DEPLOY_SECRETS, ...extra];
+  const names = allDeploySettings(extra);
   const fromEnv = Object.fromEntries(names.flatMap((name) => (process.env[name] ? [[name, process.env[name]!]] : [])));
   const wanted = devEnvNames(fromEnv, extra);
   const file = path.join(process.env.HOME ?? "", ".config/t3flare/dev.env");

@@ -15,7 +15,7 @@ import * as fs from "node:fs";
 
 import { defaultTextModel } from "@t3flare/models/endpoints";
 
-import { modelEndpointSpec, secretsOf } from "./lib/modelEndpointSpec.ts";
+import { MIN_SECRET_LENGTH, modelEndpointSpec, scrubValue, secretsOf } from "./lib/modelEndpointSpec.ts";
 import { admin, createProjectAndThread, enablePiDurable, pair, regenerateTitle, sendMessage, textGenerationSetting, updateSettings } from "./lib/client.ts";
 
 const option = (name: string) => {
@@ -25,16 +25,17 @@ const option = (name: string) => {
 const out = option("out");
 const spec = modelEndpointSpec(process.env, { derive: true });
 if (!spec.ok) throw new Error(spec.reason);
-const secrets = [...secretsOf(spec.spec), process.env.MODEL_PROXY_API_KEY].filter((value): value is string => value !== undefined && value.length >= 8);
+const secrets = [...secretsOf(spec.spec), process.env.MODEL_PROXY_API_KEY].filter((value): value is string => value !== undefined && value.length >= MIN_SECRET_LENGTH);
 const failures: Array<string> = [];
 const report: Record<string, unknown> = { at: new Date().toISOString(), endpointFrom: spec.source };
 const check = (name: string, ok: boolean, detail?: unknown) => {
   if (!ok) failures.push(`${name}: ${JSON.stringify(detail ?? null).slice(0, 600)}`);
   return ok;
 };
+// A secret in any string of an answer kept (compared value by value, not in the JSON text: a short header value would
+// match its tokens).
 const clean = <T>(value: T): T => {
-  const text = JSON.stringify(value);
-  for (const secret of secrets) if (text.includes(secret)) throw new Error("a key reached an answer kept as evidence");
+  if (JSON.stringify(scrubValue(value, secrets)) !== JSON.stringify(value)) throw new Error("a key reached an answer kept as evidence");
   return value;
 };
 

@@ -119,15 +119,36 @@ export const stageEndpointSpec = (env: Readonly<Record<string, string | undefine
   modelEndpointSpec(env, { derive: env.GITHUB_ACTIONS !== "true" });
 
 /** Shorter values are not masked or scrubbed: no credential is that short, and masking one would garble every log line. */
-const MIN_SECRET_LENGTH = 4;
+export const MIN_SECRET_LENGTH = 4;
 
 /** The values of `spec` no log, report or artifact may carry: its key and every header's value. */
 export const secretsOf = (spec: Pick<ModelEndpointSpec, "apiKey" | "headers">): ReadonlyArray<string> =>
   [spec.apiKey, ...Object.values(spec.headers)].flatMap((value) => value.split(/\r?\n/)).map((value) => value.trim()).filter((value) => value.length >= MIN_SECRET_LENGTH);
 
-/** `text` with each of `secrets` replaced. */
+/** `text` with each of `secrets` replaced. For plain text; a value to serialize goes through `scrubValue` first. */
 export const scrubSecrets = (text: string, secrets: ReadonlyArray<string>): string =>
   [...secrets].sort((a, b) => b.length - a.length).reduce((scrubbed, secret) => scrubbed.split(secret).join("[redacted]"), text);
+
+/**
+ * `value` with `secrets` replaced in every string in it (keys included), before it is serialized: scrubbing the JSON text
+ * instead would break it (a header value `true` would rewrite `"ok": true`) and miss a key holding `"` or `\`.
+ */
+export const scrubValue = (value: unknown, secrets: ReadonlyArray<string>): unknown => {
+  if (secrets.length === 0) return value;
+  if (typeof value === "string") return scrubSecrets(value, secrets);
+  if (Array.isArray(value)) return value.map((item) => scrubValue(item, secrets));
+  if (isRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [scrubSecrets(key, secrets), scrubValue(item, secrets)]));
+  return value;
+};
+
+/**
+ * A report as kept (the acceptance test's, `bump-report.json`: an artifact), as indented JSON with the stage's Model
+ * endpoint's key and header values scrubbed from it (`stageEndpointSpec(env)`).
+ */
+export const keptReportJson = (report: unknown, env: Readonly<Record<string, string | undefined>>): string => {
+  const endpoint = stageEndpointSpec(env);
+  return JSON.stringify(scrubValue(report, endpoint.ok ? secretsOf(endpoint.spec) : []), null, 2);
+};
 
 /**
  * GitHub's workflow commands that mask `T3FLARE_MODEL_ENDPOINT`'s key and header values, each on its own, for the rest of
