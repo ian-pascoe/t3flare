@@ -91,7 +91,7 @@ When the proxy cannot serve a turn because a limit is reached, the turn ends as 
 
 - A reset is held to at least **30 s after the turn ends**, so a `retry-after: 0` cannot start an instant resume (t3 arms no resume for a reset that is not after the run's end). There is no upper bound: a monthly spend limit resets weeks away.
 - **Resuming.** t3 offers the resume on the thread; with the client's "auto-resume limited threads" setting on (off by default, your own choice) it resumes by itself. An idle Environment's alarm wakes it at the reset. t3 resumes once per run and reset, so a limit that persists costs one request per window.
-- **Text generation** (titles, commit messages) uses the same classification for its error text.
+- **Text generation** (titles, commit messages) on the proxy's models (`anthropic/…`) uses the same classification for its error text. On a Model endpoint's model, a failure names the endpoint and its HTTP status instead (ADR-0034 §5).
 - **Compaction** gets the same treatment. pi-durable's compaction summarizes with `completeSimple` and runs no `afterResponse` hook, so the Session's models classify each `completeSimple` answer the same way (`compactionLimits`). A summary refused for a limit or a key makes one request. It fails the compaction, and a turn that waited on that compaction fails with the record as above.
 
 ## Usage and limits (t3's Usage page and limit meters)
@@ -140,7 +140,7 @@ Put them in `~/.config/t3flare/dev.env` (stages) or the GitHub environment `prod
    - It does not set the key. Set it yourself, once and again after a rotation: `gh secret set MODEL_PROXY_API_KEY --env bump --repo <owner>/<repo>` (the value on stdin).
    - [`.github/workflows/bump.yml`](../.github/workflows/bump.yml) passes both to the deploy.
 
-An Environment started without them answers text generation with "The model proxy is not configured." and lists only the static models; a Session cannot run a turn.
+An Environment started without them answers text generation on the proxy's models (`anthropic/…`) with "The model proxy is not configured." and lists only the static models; a Session cannot run a turn on them. Text generation on a Model endpoint's model does not need them.
 
 ## CLI agents (steps 4a, 4b)
 

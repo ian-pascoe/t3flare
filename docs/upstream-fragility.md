@@ -716,16 +716,18 @@ pick, each failure saying which.
     `resolveTextGenerationProvider` (`apps/server/src/serverSettings.ts`), which swaps a disabled or unknown instance
     for a fallback. The sync sees that fallback, not the stored value.
   - **`Effect.runForkWith(context)`** is fired from the `onEndpointsChanged` listener, with the layer's context
-    (`ServerSettingsService`, `ProviderInstanceRegistry`), outside t3's own fibers. Its finalizer stops the listener
-    when the layer's scope closes.
+    (`ServerSettingsService`, `ProviderInstanceRegistry`), outside t3's own fibers. Each sync is forked into the layer's
+    scope (`Effect.forkIn`), so the runtime's disposal interrupts one still running, and is bounded by
+    `SYNC_TIMEOUT_MS` (30 s) under a module semaphore. Its finalizer stops the listener when the layer's scope closes.
 - **Breaks when**:
-  - t3 changes its default text-generation selection: the stock value is no longer read as unset, and the setting
-    stays on it;
+  - t3 stops deriving its default text-generation selection from `DEFAULT_SERVER_SETTINGS` (a default applied
+    elsewhere, such as at decode or by a migration): the sync, which reads that constant live, no longer recognises the
+    stored default as unset, and the setting stays on it;
   - `getSettings` resolves differently: the sync replaces a fallback, or misses an unset value;
   - the registry or the layer's scope changes shape: typecheck catches it.
 - **Detection**: `apps/environment/test/textGenerationDefault.test.ts` runs the sync on t3's own test settings service,
-  including stock's default with `codex` registered, and the subscription. `scripts/p1163.ts` checks the setting on a
-  fresh stage. A changed stock default with a still-registered instance is **silent** outside that script.
+  including stock's default with `codex` registered, and the subscription. `apps/environment/scripts/p1163.ts` checks the setting on a
+  fresh stage. A default no longer taken from the constant, with a still-registered instance, is **silent** outside that script.
 - **Blast radius**: generated titles and commit text run on t3's stock model, or fail (no such instance), instead of the
   endpoints' default.
 - **Fix**: diff `DEFAULT_SERVER_SETTINGS.textGenerationModelSelection` and `resolveTextGenerationProvider` between tags.
