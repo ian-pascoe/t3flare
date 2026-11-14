@@ -291,7 +291,7 @@ _Avoid_: prompt, snippet, MCP prompt
 One configured way to reach an agent or model provider, with its own credentials. Used in t3's sense.
 
 **Model proxy**:
-The HTTP endpoint every model call goes to, for every agent (Durable agents' and CLI agents' turns, generated titles and commit text, the model list), set by `MODEL_PROXY_URL` and `MODEL_PROXY_API_KEY`. It holds the owner's Subscriptions and provider keys; t3flare holds only its URL and keys. It speaks the Anthropic Messages API, lists its models at `GET /v1/models` and translates to other providers; t3flare is built against Commissary. See `docs/model-proxy.md`.
+The HTTP endpoint model calls go to by default until the hard cut (Durable agents' and CLI agents' turns, and generated titles and commit text on its models; a Model endpoint's models go to that endpoint instead), set by `MODEL_PROXY_URL` and `MODEL_PROXY_API_KEY`. It holds the owner's Subscriptions and provider keys; t3flare holds only its URL and keys. It speaks the Anthropic Messages API, lists its models at `GET /v1/models` and translates to other providers; t3flare is built against Commissary. See `docs/model-proxy.md`.
 _Avoid_: gateway, LLM router
 
 **Model endpoint**:

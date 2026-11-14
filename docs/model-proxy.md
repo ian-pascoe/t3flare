@@ -9,7 +9,7 @@ The proxy t3flare is built and tested against is **[Commissary](https://github.c
 | Feature | Where it runs | Request |
 |---|---|---|
 | Durable agent turns | A Session DO in the `agents` Worker, through pi-ai's `anthropic` provider | `POST {MODEL_PROXY_URL}/v1/messages?beta=true`, streaming |
-| Text generation: thread titles, commit messages, PR titles and bodies | The Environment DO in the `environment` Worker, plain `fetch` | `POST {MODEL_PROXY_URL}/v1/messages`, one non-streaming request, no tools |
+| Text generation on the proxy's models (`anthropic/<id>`): thread titles, commit messages, PR titles and bodies | The Environment DO in the `environment` Worker, plain `fetch` | `POST {MODEL_PROXY_URL}/v1/messages`, one non-streaming request, no tools. A Model endpoint's model goes to that endpoint instead, through pi-ai on the agents Worker (ADR-0034 §5) |
 | The model list: the picker's models, each one's name, thinking levels and context window; the Session's models | Both Workers, each keeping its own copy | `GET {MODEL_PROXY_URL}/v1/models`, twice (see below) |
 | The nightly bump job's real turn ([ADR-0017](adr/0017-upstream-is-tracked-by-nightly-tag-with-an-automated-bump.md)) | The `bump` stage, deployed by CI with the same two settings | A Durable agent turn and text generation, as above |
 
@@ -68,7 +68,7 @@ Not checked: images, thinking, long contexts or parallel tool calls on a non-Cla
 
 ### Text generation's model
 
-Text generation uses `anthropic/claude-haiku-5-5` unless a thread's own model selection or the Environment's text-generation setting names another. The proxy must serve that id, or the setting must name one it does serve: there is no search for a small model.
+Text generation uses the model the Environment's text-generation setting (or a thread's own selection) names. While the owner has picked none, the setting names the default: a small model of the first Model endpoint that has one (ADR-0034 §5), else `anthropic/claude-haiku-5-5` on the proxy. That proxy model is chosen without a search: the proxy must serve it, or the setting must name a model it does serve.
 
 ## Usage limits
 

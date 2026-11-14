@@ -41,9 +41,10 @@ optional headers, and the models it serves.
    key, never a secret.
 5. **Text generation** (SPI-1163). Thread titles, commit messages and PR text on an endpoint's model are one pi-ai
    request on the agents Worker (`EndpointTextGeneration`, the Environment's `TEXT_GENERATION` service binding), so the
-   Environment's bundle never holds pi-ai. The call carries the endpoint as stored now, secret-free; the agents Worker
-   asks for the key with `endpointCredential`, as a Session does, and builds the request with a Session's own provider
-   (`endpointProviders`), so a sign-in's credential reaches it the same way once the broker exists. A failure names the
+   Environment's bundle never holds pi-ai. The call carries ids only; the agents Worker reads the endpoint with
+   `modelEndpoints` and asks for the key with `endpointCredential`, as a Session does, and builds the request with a
+   Session's own provider (`endpointProviders`), so a sign-in's credential reaches it through the same code once the
+   broker exists. A failure names the
    endpoint and says what happened by the answer's status alone. The default text model is a small model (haiku, mini,
    nano, flash, lite, small, tiny) of the first endpoint that has one, its cheapest by known price; until the hard cut,
    the Model proxy's small model when no endpoint has one. While the owner has picked no model, the text-generation

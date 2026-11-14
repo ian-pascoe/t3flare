@@ -14,7 +14,7 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
    | find the newest nightly tag (`:98`) | t3 changed its tag format: `NIGHTLY` at `bump.ts:80` |
    | regenerate the workspace and install (`:157`) | t3 added a workspace setting ("classify it") or changed its lock's layout: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); a patch no longer applies or matches nothing, or t3's lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
    | lock matches t3's, one effect (`:161`) | a t3 importer installs other versions than in t3's lock, a second `effect`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030), [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
-   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds) |
+   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163) |
    | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)) |
    | deploy the bump stage (`:176`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
    | acceptance test (`:180`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
@@ -191,10 +191,14 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 
 ### U19. Settings seeds
 
-- **Where**: `agents/seedSettings.ts`: `textGenerationModelSelection` points at the Durable agent provider's small model when it names an instance we lack (`:13-25`); `fastWorktreeCheckout` is pinned off (`:32-39`); step 3 adds `linkedEnvironmentsEnabled` on (`:50`) and `enableAgentBrowserAccess` off (`:67`). Through `ServerSettings.ServerSettingsService.updateSettings`.
+- **Where**: `agents/seedSettings.ts`, each through `ServerSettings.ServerSettingsService` (`getSettings`, `updateSettings`):
+  - **Text generation's model:** `layerSeedTextGenerationModel` and `syncTextGenerationDefault`, since SPI-1163 their own entry, [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163).
+  - **Fast worktree checkout:** `layerPinFastWorktreeCheckoutOff` pins `fastWorktreeCheckout` off at each boot.
+  - **Linked environments:** `layerSeedLinkedEnvironmentsOn` turns `linkedEnvironmentsEnabled` on once per Environment (step 3, L1), marked in the DO's storage.
+  - Agent browser access is no longer pinned (G11: stock's default).
 - **Breaks when**: t3 renames a setting or changes what its default means.
 - **Detection**: typecheck catches a rename. A changed default is silent but rarely matters, because each seed checks the current value.
-- **Blast radius**: generated titles and commit messages fail (no model), or a setting the cloud cannot honour comes back on.
+- **Blast radius**: a setting the cloud cannot honour comes back on (fast checkout), or the laptop cannot link (Linked environments).
 - **Fix**: `apps/server/src/serverSettings.ts` and the contracts' settings schema between tags.
 
 ### U20. Dependencies that ride t3's lock: alchemy beta, `patches/deps`, transitive pins
@@ -691,6 +695,40 @@ the silent part, and costs only stale entries in the picker.
 - **Detection**: the patch fails to apply at bump (loud). **Silent**: a new retention path keeps a removed endpoint's models in the picker; `scripts/p1162.ts` checks they leave it.
 - **Blast radius**: stale models in the picker; a turn on one fails with the removed-model message.
 - **Fix**: re-cut the patch.
+
+### U67. Text generation's default model follows the Model endpoints (SPI-1163)
+
+Ranked with U64 to U66: a break leaves turns running; titles and commit text fail or run on a model the owner did not
+pick, each failure saying which.
+
+- **Where**: `syncTextGenerationDefault` in `agents/seedSettings.ts`, run by `layerSeedTextGenerationModel` at boot and on
+  each endpoint change. It leans on t3 in five places:
+  - **The "unset" test** compares the setting with `DEFAULT_SERVER_SETTINGS.textGenerationModelSelection`
+    (`packages/contracts/src/settings.ts`, `DEFAULT_SERVER_SETTINGS`; today `codex` / `DEFAULT_TEXT_GENERATION_MODEL`,
+    `gpt-6-luna`).
+  - **t3's default survives a registered `codex` instance.** The CLI agents register `codex` (step 4a), so stock's
+    default names an instance this Environment has. The sync treats that exact value as unset. An owner who picks
+    exactly `codex`/`gpt-6-luna`, or exactly the default the sync last wrote, is read as unset too: the pick is
+    replaced at every boot and every endpoint change.
+  - **`ProviderInstanceRegistry.getInstance`** (`apps/server/src/provider/ProviderInstanceRegistry.ts`) answers
+    whether the named instance exists. A name with no instance counts as unset.
+  - **The settings read is t3's resolved one.** `ServerSettingsService.getSettings` passes the stored value through
+    `resolveTextGenerationProvider` (`apps/server/src/serverSettings.ts`), which swaps a disabled or unknown instance
+    for a fallback. The sync sees that fallback, not the stored value.
+  - **`Effect.runForkWith(context)`** is fired from the `onEndpointsChanged` listener, with the layer's context
+    (`ServerSettingsService`, `ProviderInstanceRegistry`), outside t3's own fibers. Its finalizer stops the listener
+    when the layer's scope closes.
+- **Breaks when**:
+  - t3 changes its default text-generation selection: the stock value is no longer read as unset, and the setting
+    stays on it;
+  - `getSettings` resolves differently: the sync replaces a fallback, or misses an unset value;
+  - the registry or the layer's scope changes shape: typecheck catches it.
+- **Detection**: `apps/environment/test/textGenerationDefault.test.ts` runs the sync on t3's own test settings service,
+  including stock's default with `codex` registered, and the subscription. `scripts/p1163.ts` checks the setting on a
+  fresh stage. A changed stock default with a still-registered instance is **silent** outside that script.
+- **Blast radius**: generated titles and commit text run on t3's stock model, or fail (no such instance), instead of the
+  endpoints' default.
+- **Fix**: diff `DEFAULT_SERVER_SETTINGS.textGenerationModelSelection` and `resolveTextGenerationProvider` between tags.
 
 ## Gaps in detection
 
