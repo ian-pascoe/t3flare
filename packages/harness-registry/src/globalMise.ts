@@ -86,15 +86,13 @@ export const globalMiseReport = (value: unknown): GlobalMiseReport | undefined =
 
 /** One line for the panel's Status. */
 export const describeGlobalMise = (report: GlobalMiseReport): string => {
-  const what =
-    report.outcome === "laid"
-      ? `laid down${report.install === 0 || report.install === null ? "" : ` (mise install exit ${report.install})`}`
-      : report.outcome === "not-laid"
-        ? `not laid down (${report.timedOut ? "timed out" : report.install === null || report.install === 0 ? "git or gh did not run under it" : `mise install exit ${report.install}`})`
-        : report.outcome === "none"
-          ? "no Global mise config"
-          : report.outcome === "exec-failed"
-          ? "not laid down (the Container's exec failed; tried again)"
-            : "not laid down (no answer within the deadline)";
+  // A run with no text installs nothing (`install` null): no Global mise config, whatever outcome it was given.
+  const noText = report.outcome === "none" || (report.outcome === "not-laid" && report.install === null && !report.timedOut);
+  let what: string;
+  if (noText) what = "no Global mise config";
+  else if (report.outcome === "laid") what = `laid down${report.install === 0 || report.install === null ? "" : ` (mise install exit ${report.install})`}`;
+  else if (report.outcome === "not-laid") what = `not laid down (${report.timedOut ? "timed out" : report.install === 0 ? "git or gh did not run under it" : `mise install exit ${report.install}`})`;
+  else if (report.outcome === "exec-failed") what = "not laid down (the Container's exec failed; tried again)";
+  else what = "not laid down (no answer within the deadline)";
   return `${report.workspace ?? "a Workspace"} at revision ${report.revision}: ${what}, ${new Date(report.at).toISOString()}`;
 };
