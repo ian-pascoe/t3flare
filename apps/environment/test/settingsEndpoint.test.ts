@@ -146,6 +146,41 @@ describe("T-endpoint: versions and methods", () => {
     expect((await bodyOf(mismatch)).error?.code).toBe(-32020);
   });
 
+  it("2026: MCP-Protocol-Version and Mcp-Method on every request and Mcp-Name on tools/call are required and must match the body (-32020, 400)", async () => {
+    const endpoint = endpointOf(world());
+    const send = async (method: string, params: Record<string, unknown>, headers: Record<string, string>) => {
+      const response = await endpoint(post({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta: modernMeta() } }, { headers }));
+      return { status: response.status, code: (await bodyOf(response)).error?.code };
+    };
+    const base = { "mcp-protocol-version": MODERN_VERSION, "mcp-method": "tools/list" };
+    expect(await send("tools/list", {}, { "mcp-method": "tools/list" })).toEqual({ status: 400, code: -32020 });
+    expect(await send("tools/list", {}, { "mcp-protocol-version": MODERN_VERSION })).toEqual({ status: 400, code: -32020 });
+    expect(await send("tools/list", {}, { ...base, "mcp-method": "ping" })).toEqual({ status: 400, code: -32020 });
+    expect(await send("tools/list", {}, base)).toEqual({ status: 200, code: undefined });
+    const call = { name: "get_status", arguments: {} };
+    const callHeaders = { "mcp-protocol-version": MODERN_VERSION, "mcp-method": "tools/call" };
+    expect(await send("tools/call", call, callHeaders)).toEqual({ status: 400, code: -32020 });
+    expect(await send("tools/call", call, { ...callHeaders, "mcp-name": "get_settings" })).toEqual({ status: 400, code: -32020 });
+    expect(await send("tools/call", call, { ...callHeaders, "mcp-name": "get_status" })).toEqual({ status: 200, code: undefined });
+    // The Base64 sentinel form is decoded before it is compared.
+    expect(await send("tools/call", call, { ...callHeaders, "mcp-name": `=?base64?${btoa("get_status")}?=` })).toEqual({ status: 200, code: undefined });
+    expect(await send("tools/call", call, { ...callHeaders, "mcp-name": "=?base64?***?=" })).toEqual({ status: 400, code: -32020 });
+  });
+
+  it("2025: an unknown MCP-Protocol-Version is 400; a missing one is 2025-03-26; initialize's header is not judged", async () => {
+    const endpoint = endpointOf(world());
+    const unknown = await endpoint(post({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { headers: { "mcp-protocol-version": "2024-01-01" } }));
+    expect(unknown.status).toBe(400);
+    expect((await bodyOf(unknown)).error).toMatchObject({ code: -32600, data: { requested: "2024-01-01" } });
+    // A 2026 header with no 2026 `_meta` is not a 2025 version either.
+    expect((await endpoint(post({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { headers: { "mcp-protocol-version": MODERN_VERSION } }))).status).toBe(400);
+    const missing = await endpoint(post({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
+    expect(missing.status).toBe(200);
+    expect((await bodyOf(missing)).result).not.toHaveProperty("resultType");
+    const init = await endpoint(post({ jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {} } }, { headers: { "mcp-protocol-version": "1999-01-01" } }));
+    expect(init.status).toBe(200);
+  });
+
   it("an unsupported method is -32601: 404 on 2026, 200 on 2025", async () => {
     const endpoint = endpointOf(world());
     const newer = await endpoint(modern("resources/list"));
