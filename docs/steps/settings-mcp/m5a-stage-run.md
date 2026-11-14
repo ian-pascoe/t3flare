@@ -63,7 +63,9 @@ a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bea
      `WWW-Authenticate`, and whether Access or the origin answers), so the first prod deploy of `SettingsAccess` (once
      prod is enabled) has a baseline to compare with. Expected while prod is excluded: `/_t3flare/mcp` gets the admin
      application's Access login (a redirect to Access's sign-in whose `kid` is the admin application's AUD, as at
-     `/_t3flare/harness`) with no `WWW-Authenticate` `resource_metadata` challenge, and, admitted, the Worker answers it
+     `/_t3flare/harness`): a 302 to the login, not a 401 `Bearer realm="OAuth"`. Access adds a `Cloudflare-Access`
+     `resource_metadata` header to the 302s of non-OAuth applications too (seen on psmcp's `/_t3flare/harness`), so
+     tell the applications apart by 302 login (admin) versus 401 `Bearer realm="OAuth"` (endpoint), and, admitted, the Worker answers it
      404 `not_configured`. Record too that the first prod deploy from this branch (CI's) showed no `SettingsAccess`
      created and `AdminAccess` unchanged (no path-cookie attribute) in its output. After that deploy (CI's, not this run), the same requests must
      show `/_t3flare/mcp` as its own application and the root documents still t3's; `scripts/smoke.ts` asserts the

@@ -260,7 +260,8 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     and a prod deploy is not where to find that out. The switch is unit-tested; `alchemy.run.ts` itself needs
     Cloudflare's providers to run, so that it reads the switch is checked by reading it, and by M5a item 4c on prod.
     Expected on prod while it is excluded: `/_t3flare/mcp` gets the admin application's Access login (its `kid` the
-    admin application's AUD) with no `resource_metadata` challenge, and the first prod deploy's output shows no
+    admin application's AUD), a 302 to the login rather than the endpoint's 401 `Bearer realm="OAuth"` (Access puts a
+    `resource_metadata` header on both, so the status and realm tell them apart), and the first prod deploy's output shows no
     `SettingsAccess` and `AdminAccess` unchanged. `bump` is excluded too, for good: the nightly job deploys it with the
     CI token `t3flare-ci-bump`, which is not known to be allowed to create a managed-OAuth Access application, and a
     failure there would break the nightly job; its acceptance run never calls the endpoint.
