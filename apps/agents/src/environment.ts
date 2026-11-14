@@ -20,7 +20,10 @@ export interface EnvironmentRpc {
    * (`workflows` only for an opted-in Workspace) and `pull_requests: write` for `gh`. With the repo and its expiry.
    */
   workspaceToken(id: string): Promise<{ readonly token: string | null; readonly expiresAt?: number; readonly repo?: { readonly owner: string; readonly name: string } }>;
-  /** The CLI relay's card for a call whose CLI went away (ADR-0028) is withdrawn. */
+  /**
+   * The CLI relay's card for a call whose CLI went away (ADR-0028) is withdrawn; a Settings server call held under the
+   * id (a relayed one, or a Session's `mcpCall` with this `stopId`) withdraws its Open change (plan D9).
+   */
   cancelAsk(input: { readonly askId: string }): Promise<void>;
   /** A Session's call of t3's `/mcp` (step 3, ADR-0022): t3's HTTP app answers it, never over the public host. */
   mcp(input: McpRpcRequest): Promise<McpRpcAnswer>;
@@ -56,6 +59,8 @@ export interface EnvironmentRpc {
     readonly asker?: McpAsker;
     /** The Session's thread: the Environment derives the caller from it (the Settings server, plan D3). */
     readonly thread: string;
+    /** The id a Stop names in `cancelAsk` (the Settings server's calls, plan D9). */
+    readonly stopId?: string;
   }): Promise<McpCallAnswer>;
   /** A CLI process's MCP message through the relay (ADR-0028), its caller resolved by the Workspace DO. */
   mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer>;

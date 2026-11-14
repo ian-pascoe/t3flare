@@ -313,6 +313,7 @@ describe("D12's fallbacks toward browser", () => {
     const body = await bodyOf(await endpoint(modern("tools/call", { name: "change_mcp", arguments: add })));
     expect(body.result?.resultType).toBe("input_required");
     expect(openChange(f).record.needsPage).toBe("secret");
-    expect(JSON.stringify(body)).not.toContain("key=secret");
+    // The URL the client itself sent is shown whole, so the owner approves exactly what is added (SPI-1199 review).
+    expect(JSON.stringify(body)).toContain("https://notes.example/mcp?key=secret");
   });
 });

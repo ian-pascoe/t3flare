@@ -111,7 +111,7 @@ export const extensionItems = (stored: StoredHarness, change: HarnessChange): { 
     if (entry.guard === true && change.enabled === false) lines.push(GUARD_OFF[entry.id] ?? `This turns off ${entry.title}, a Guard.`);
   }
   for (const [key, after] of Object.entries(change.settings ?? {})) {
-    const setting = Object.hasOwn(entry.settings, key) ? entry.settings[key] : undefined;
+    const setting = ownEntry(entry.settings, key);
     const before = current?.settings[key];
     if (setting === undefined || before === after) continue;
     const name = `${entry.id}.${key}`;
@@ -161,10 +161,12 @@ const hostOf = (url: string): string => {
  */
 export const mcpItems = (stored: StoredHarness, change: McpTierChange, secretSet: (server: string) => boolean): { readonly items: Array<ChangeItem>; readonly lines: Array<string> } => {
   const servers = mcpServersOf(stored);
-  const current = Object.hasOwn(servers, change.server) ? servers[change.server] : undefined;
+  const current = ownEntry(servers, change.server);
   switch (change.op) {
     case "add": {
-      const url = withoutQuery(change.url);
+      // The whole URL as it will be stored, query included (SPI-1199 review): the owner approves exactly what is added,
+      // and the caller wrote it. A stored server's URL (remove, sign-in) is still shown without its query (plan D14).
+      const url = change.url;
       return {
         items: [{ kind: "mcp-add", server: change.server, url, host: hostOf(change.url), auth: change.auth.kind, ...(change.auth.kind === "header" ? { header: change.auth.header } : {}) }],
         lines: [HINT_TRUST_LINE],
@@ -299,6 +301,22 @@ const itemText = (item: ChangeItem): Array<string> => {
       return [`- ${item.op === "enable" ? "Enable" : item.op === "disable" ? "Disable" : "Remove"} the Environment skill ${item.name}${item.repo === undefined ? "" : ` (from ${item.repo}${item.commit === undefined ? "" : ` at ${item.commit.slice(0, 7)}`})`}.`];
   }
 };
+
+/** Who asked a change, as every place names them: the card, the Change page, the panel's list, an Owner client's message. */
+export interface AskedBy {
+  readonly door: "own" | "owner";
+  readonly principal?: "agent" | "owner" | "service-token" | undefined;
+  readonly thread?: string | undefined;
+  readonly agent?: string | undefined;
+  /** An Owner client's own label: shown, and marked unverified. */
+  readonly client?: { readonly name: string; readonly source: string } | undefined;
+}
+
+/** Who asked, in words (plan D9, D10): an own agent's kind and thread, or an Owner client marked unverified. */
+export const askedByText = (caller: AskedBy): string =>
+  caller.door === "own"
+    ? `${caller.agent ?? "an agent"} on ${caller.thread === undefined ? "an unknown thread" : `thread ${caller.thread}`}`
+    : `${caller.principal === "service-token" ? "the stage's service token" : "an Owner client of yours"}${caller.client === undefined ? "" : `, calling itself ${caller.client.name} (unverified, from its ${caller.client.source})`}`;
 
 /**
  * The change in words (plan D12's `M`, and the head of the card's prompt): what changes, at which revision, why it

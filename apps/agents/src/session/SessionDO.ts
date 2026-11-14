@@ -493,9 +493,17 @@ export class SessionDO extends DurableObject<SessionEnv> {
       interaction: () => interactionModeOf(this.#meta()?.interactionMode),
       turn: () => this.#liveTurn(),
       // The thread it was opened with (plan D3): the Environment derives everything else about the caller itself.
-      call: (input) => environmentStub(this.env.ENVIRONMENT).mcpCall({ ...input, thread: this.#meta()?.threadId ?? "" }),
+      call: ({ callId, ...input }) =>
+        environmentStub(this.env.ENVIRONMENT).mcpCall({ ...input, thread: this.#meta()?.threadId ?? "", ...(callId === undefined ? {} : { stopId: this.#mcpStopId(callId) }) }),
+      // A Stop of a Settings server call (plan D9): the Environment withdraws the Open change the call holds.
+      stop: (callId) => void environmentStub(this.env.ENVIRONMENT).cancelAsk({ askId: this.#mcpStopId(callId) }).catch(() => undefined),
       asker: (callId, signal) => this.#mcpQuestions.asker(this.#liveTurn(), callId, signal),
     });
+  }
+
+  /** The Environment's id for one MCP call of this Session: unique across the Sessions it serves. */
+  #mcpStopId(callId: string): string {
+    return `session:${this.ctx.id.toString()}:${callId}`;
   }
 
   /** The MCP view the Session last installed, from its chunks. */

@@ -79,8 +79,8 @@ describe("the asked change's card", () => {
     expect(run.cards[0]!.prompt).toContain("This turns off the Guardian, which reviews risky tool calls.");
     await run.call(run.durable("thread-2"), "change_mcp", { expectedRevision: 1, change: { op: "add", server: "fixture", url: "https://fixture.example/mcp?key=q", auth: { kind: "none" } } });
     expect(run.cards[1]!.prompt).toContain(HINT_TRUST_LINE);
-    expect(run.cards[1]!.prompt).toContain("https://fixture.example/mcp (host fixture.example)");
-    expect(run.cards[1]!.prompt.split("The agent's call")[0]).not.toContain("key=q");
+    // An add shows the whole URL it would store, query included (SPI-1199 review): the owner approves exactly that.
+    expect(run.cards[1]!.prompt).toContain("https://fixture.example/mcp?key=q (host fixture.example)");
   });
 
   for (const [what, setup] of [
@@ -138,7 +138,7 @@ describe("the asked change's card", () => {
     const [record] = run.deps.changes.open();
     stop.abort();
     expect(structured(await pending)).toMatchObject({ status: "withdrawn" });
-    expect(run.deps.changes.get(record!.id)).toMatchObject({ state: "withdrawn", closed: { by: "agent" } });
+    expect(run.deps.changes.get(record!.id)).toMatchObject({ state: "withdrawn", closed: { by: "stop" } });
     expect(run.withdrawn).toEqual([run.cards[0]!.id]);
     // The page then finds it closed.
     expect((await pagePost(run, record!.id, { action: "approve" })).status).toBe(409);

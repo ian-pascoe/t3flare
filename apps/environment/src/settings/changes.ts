@@ -6,19 +6,34 @@
 //
 // Kept in storage, not memory: the Environment resets after about 60 s idle (ADR-0003), which can fall between the ask
 // and the owner's click. Rows expire and are pruned lazily, on every read and write of the table: an open row past its
-// `expiresAt` closes as `expired`, and a closed row goes an hour after it closed (the longest cap window). No alarm is
+// `expiresAt` closes as `expired`, and a closed row goes `CLOSED_KEPT_MS` after it closed (the longest a cap looks back:
+// a run of strikes and the lock after its last). No alarm is
 // added (ADR-0003: one alarm).
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
+import { MCP_ELICITATION_WAIT_MS } from "@cloudpid/mcp/types";
+import type { NeedsPage as TierNeedsPage } from "@t3flare/harness-registry";
 
 import type { ChangeView } from "./render.ts";
 
 export const CHANGES_TABLE = "t3flare_settings_changes";
 
-/** How long a closed row is kept: the longest cap window (plan D16). */
-export const CLOSED_KEPT_MS = 60 * 60_000;
+/** Three strikes count as a run when they fall within this long of each other (plan D16). */
+export const STRIKE_WINDOW_MS = 60 * 60_000;
+/** A run of strikes refuses the caller's asked changes this long after its last strike (plan D16). */
+export const STRIKE_LOCK_MS = 60 * 60_000;
 
-/** How long an Open change waits for its answer (plan D8: the MCP host's question wait, `QUESTION_WAIT_MS`). */
-export const CHANGE_TTL_MS = 10 * 60_000;
+/** How long a closed row is kept: the longest a cap looks back, a run of strikes and the lock after it (plan D16). */
+export const CLOSED_KEPT_MS = STRIKE_WINDOW_MS + STRIKE_LOCK_MS;
+
+/** How long an Open change waits for its answer (plan D8): the MCP host's question wait, `QUESTION_WAIT_MS`, which is this. */
+export const CHANGE_TTL_MS = MCP_ELICITATION_WAIT_MS;
+
+/** A duration as the texts name it: "10 minutes", "an hour", "2 hours". */
+export const durationText = (ms: number): string => {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes >= 60 && minutes % 60 === 0) return minutes === 60 ? "an hour" : `${minutes / 60} hours`;
+  return minutes === 1 ? "a minute" : `${minutes} minutes`;
+};
 
 /** An apply that never closed (the Environment reset while it ran) is closed as failed this long after its expiry. */
 export const APPLYING_GRACE_MS = 5 * 60_000;
@@ -38,14 +53,23 @@ export const NETWORK_READS: ReadonlySet<string> = new Set(["test_mcp_server", "p
 /** The reads table: one row per read through the server, kept an hour, for the read caps. */
 export const READS_TABLE = "t3flare_settings_reads";
 
+/**
+ * Why a change is answered on the Change page alone (plan D6): what its tier says (a secret, a sign-in, skills' text),
+ * or `oversize`, text a card would cut.
+ */
+export type NeedsPage = TierNeedsPage | "oversize";
+
 /** A change's state (plan D8). `open` and `applying` are open; the rest are closed. */
 export type ChangeState = "open" | "applying" | "applied" | "declined" | "withdrawn" | "expired" | "moved" | "failed";
 
 /** How an Open change is answered: on the owner-only card (own agents), or an Owner client's Elicitation mode (M5). */
 export type ChangeMode = "card" | "browser" | "native" | "model";
 
-/** What answered or closed a change. */
-export type ClosedBy = "card" | "page" | "client" | "agent";
+/** What answered a change (plan D8): the card, the Change page, an Owner client's form (`native`), its agent's `resume` (`model`). */
+export type AnsweredBy = "card" | "page" | "client" | "agent";
+
+/** What answered or closed a change: an answerer, or `stop` (the caller's Stop, turn end or going away, plan D9). */
+export type ClosedBy = AnsweredBy | "stop";
 
 /** Who asked, as a change records it (plan D8's `caller`). */
 export interface ChangeCaller {
@@ -74,7 +98,7 @@ export interface ChangeRecord {
   readonly tier: "free" | "asked";
   /** What the card and the Change page render (an asked change's). */
   readonly shown?: ChangeView;
-  readonly needsPage?: "secret" | "sign-in" | "oversize";
+  readonly needsPage?: NeedsPage;
   readonly mode?: ChangeMode;
   readonly caller: ChangeCaller;
   readonly createdAt: number;
@@ -124,7 +148,11 @@ export const canonicalJson = (value: unknown): string =>
           .map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`)
           .join(",")}}`;
 
-/** A change's hash (plan D8): SHA-256 of the tool and its canonical arguments without `expectedRevision`. */
+/**
+ * A change's hash (plan D8): SHA-256 of the tool and its change, canonical, without `expectedRevision`. The Settings
+ * server passes the change as its planner normalized it (only the fields the change takes, SPI-1199 review), never the
+ * raw arguments, so an extra key cannot make a declined change look new.
+ */
 export const changeHash = async (tool: string, args: Readonly<Record<string, unknown>>): Promise<string> => {
   const { expectedRevision: _expected, ...rest } = args;
   const bytes = new TextEncoder().encode(canonicalJson({ tool, args: rest }));
@@ -148,7 +176,25 @@ const parse = (text: unknown): ChangeRecord | undefined => {
   }
 };
 
-export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number = Date.now): SettingsChanges => {
+/** The log line of a change closed here, by its time running out (plan D15: expiries are log lines, as closes are). */
+const closedLine = (record: ChangeRecord): Record<string, unknown> => ({
+  t3flare: "settings-refused",
+  via: "mcp",
+  door: record.caller.door,
+  tool: record.tool,
+  change: record.id,
+  tier: record.tier,
+  mode: record.mode ?? null,
+  outcome: record.state,
+  answeredBy: null,
+  ...(record.closed?.error === undefined ? {} : { error: record.closed.error }),
+});
+
+/**
+ * The table over `sql`. `log` gets the line of each change the table itself closes (an expiry, or an apply the
+ * Environment's restart cut off), since no answerer is there to write it.
+ */
+export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number = Date.now, log?: (event: Record<string, unknown>) => void): SettingsChanges => {
   let ready = false;
   const write = (record: ChangeRecord) =>
     sql.exec(
@@ -169,7 +215,7 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
         const record = parse(row.record);
         return record === undefined ? [] : [record];
       });
-  /** Creates the table once, closes what has expired, and prunes what closed over an hour ago. */
+  /** Creates the table once, closes what has expired, and prunes what closed over `CLOSED_KEPT_MS` ago. */
   const prepare = () => {
     if (!ready) {
       sql.exec(
@@ -185,8 +231,15 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
     // At most the Environment-wide cap of open rows (plan D16), so reading them all is cheap.
     for (const record of rows(`state IN ('open', 'applying')`)) {
       const expiresAt = record.expiresAt ?? record.createdAt;
-      if (record.state === "open" && expiresAt <= at) write({ ...record, state: "expired", closed: { at: expiresAt } });
-      else if (record.state === "applying" && expiresAt + APPLYING_GRACE_MS <= at) write({ ...record, state: "failed", closed: { at, error: "the Environment restarted while the change applied; read the settings to see whether it did" } });
+      const closed: ChangeRecord | undefined =
+        record.state === "open" && expiresAt <= at
+          ? { ...record, state: "expired", closed: { at: expiresAt } }
+          : record.state === "applying" && expiresAt + APPLYING_GRACE_MS <= at
+            ? { ...record, state: "failed", closed: { at, error: "the Environment restarted while the change applied; read the settings to see whether it did" } }
+            : undefined;
+      if (closed === undefined) continue;
+      write(closed);
+      log?.(closedLine(closed));
     }
     sql.exec(`DELETE FROM ${CHANGES_TABLE} WHERE closed_at IS NOT NULL AND closed_at < ?`, at - CLOSED_KEPT_MS);
     sql.exec(`DELETE FROM ${READS_TABLE} WHERE at < ?`, at - READ_WINDOW_MS);

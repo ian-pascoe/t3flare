@@ -13,8 +13,12 @@ import { type Exposure, ownEntry, type ToolClass } from "./mcp.ts";
 
 export type ChangeTier = "free" | "asked";
 
-/** What a change answered on the Change page needs there (plan D6; `oversize` is the renderer's, not this function's). */
-export type NeedsPage = "secret" | "sign-in";
+/**
+ * What a change answered on the Change page alone needs there (plan D6; `oversize` is the renderer's, not this
+ * function's): a secret typed there, a sign-in started there, or skills whose SKILL.md text and files only the page
+ * shows (an install or update: a card would offer Approve on text it cannot show, SPI-1199 review).
+ */
+export type NeedsPage = "secret" | "sign-in" | "skills";
 
 export type TierVerdict =
   | { readonly tier: ChangeTier; readonly reasons: ReadonlyArray<string>; readonly needsPage?: NeedsPage }
@@ -43,7 +47,7 @@ export type TierInput =
 const EXPOSURE_RANK: Readonly<Record<Exposure, number>> = { hidden: 0, codemode: 1, deferred: 2, direct: 2 };
 
 /** An Exposure's rank; one this function does not know ranks above every other (fails closed). */
-const rankOf = (exposure: unknown): number => (typeof exposure === "string" && Object.hasOwn(EXPOSURE_RANK, exposure) ? EXPOSURE_RANK[exposure as Exposure] : 3);
+const rankOf = (exposure: unknown): number => (typeof exposure === "string" ? (ownEntry(EXPOSURE_RANK, exposure) ?? 3) : 3);
 
 /** One part of a change: whether it is asked, and why in words. */
 interface Part {
@@ -86,7 +90,7 @@ const extensionTier = (stored: StoredHarness, change: HarnessChange): TierVerdic
     else parts.push({ asked: false, reason: `${entry.id}: turned off` });
   }
   for (const [key, value] of Object.entries(change.settings ?? {})) {
-    const setting = Object.hasOwn(entry.settings, key) ? entry.settings[key] : undefined;
+    const setting = ownEntry(entry.settings, key);
     if (setting === undefined) {
       parts.push({ asked: true, reason: `${entry.id}.${key}: not a setting this registry knows` });
       continue;
@@ -102,15 +106,15 @@ const extensionTier = (stored: StoredHarness, change: HarnessChange): TierVerdic
 const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (server: string, tool: string) => ToolClass | undefined): TierVerdict => {
   const server = change.server;
   const servers = mcpServersOf(stored);
-  const current = Object.hasOwn(servers, server) ? servers[server] : undefined;
+  const current = ownEntry(servers, server);
   // The Settings server is known by its kind (plan D2); `mcpServersOf` lets no other entry take its name.
-  const own = current?.kind === "settings";
+  const isSettingsServer = current?.kind === "settings";
   if (change.op === "add") return verdictOf([{ asked: true, reason: `${server}: a new server` }], change.auth.kind === "header" ? "secret" : undefined);
   if (change.op === "remove") return verdictOf([{ asked: true, reason: `${server}: removed, with its secrets` }]);
   if (change.op === "header-value") return verdictOf([{ asked: true, reason: `${server}: its header value set` }], "secret");
   if (change.op === "sign-in") return verdictOf([{ asked: true, reason: `${server}: an OAuth sign-in started` }], "sign-in");
   // Every change to the Settings server's own entry is asked, narrowing included (plan D5).
-  const mark = (part: Part): Part => (own ? { asked: true, reason: `${part.reason} (the Settings server's own entry)` } : part);
+  const mark = (part: Part): Part => (isSettingsServer ? { asked: true, reason: `${part.reason} (the Settings server's own entry)` } : part);
   if (current === undefined) return { tier: "asked", reasons: [`${server}: not a server in the set`] };
   if (change.op === "class") {
     const before = ownEntry(current.classes, change.tool);
@@ -131,7 +135,7 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
     parts.push(mark(change.enabled ? { asked: true, reason: `${server}: turned on` } : { asked: false, reason: `${server}: turned off` }));
   }
   // The Settings server's writes switch (plan D2): only its own entry has one, so every move of it is asked.
-  if (change.writes !== undefined && !own) parts.push({ asked: true, reason: `${server}: has no writes switch` });
+  if (change.writes !== undefined && !isSettingsServer) parts.push({ asked: true, reason: `${server}: has no writes switch` });
   else if (change.writes !== undefined && change.writes !== (current.writes ?? true)) {
     parts.push(mark(change.writes ? { asked: true, reason: `${server}: write tools turned on` } : { asked: false, reason: `${server}: write tools turned off` }));
   }
@@ -142,10 +146,10 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
   }
   // Each tool named, against its effective Exposure before and after (its own, else the server's).
   for (const [tool, exposure] of Object.entries(change.toolExposure ?? {})) {
-    const own = ownEntry(current.toolExposure, tool);
-    const before = own ?? current.exposure;
+    const toolOwn = ownEntry(current.toolExposure, tool);
+    const before = toolOwn ?? current.exposure;
     const after = exposure ?? exposureAfter;
-    if (before === after && (exposure ?? undefined) === own) continue;
+    if (before === after && (exposure ?? undefined) === toolOwn) continue;
     if (before === after) {
       // Its own Exposure set or cleared to what it already was: nothing an agent sees moves.
       parts.push(mark({ asked: false, reason: `${server}/${tool}: Exposure stays ${after}` }));
@@ -157,7 +161,7 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
 };
 
 const environmentTier = (stored: StoredEnvironment, change: EnvironmentChange): TierVerdict => {
-  for (const key of Object.keys(change.settings)) if (!Object.hasOwn(ENVIRONMENT_SETTINGS, key)) return { tier: "asked", reasons: [`${key}: not a setting this registry knows`] };
+  for (const key of Object.keys(change.settings)) if (ownEntry(ENVIRONMENT_SETTINGS as Readonly<Record<string, unknown>>, key) === undefined) return { tier: "asked", reasons: [`${key}: not a setting this registry knows`] };
   const applied = applyEnvironmentChange(stored, change);
   // Malformed: the change function refuses it; until then it is asked.
   if (!applied.ok) return { tier: "asked", reasons: [applied.error] };
@@ -170,9 +174,9 @@ const skillsTier = (change: SkillsTierChange): TierVerdict => {
   const name = change.name === undefined ? "skills" : change.name;
   switch (change.op) {
     case "install":
-      return verdictOf([{ asked: true, reason: `${name}: installed` }]);
+      return verdictOf([{ asked: true, reason: `${name}: installed` }], "skills");
     case "update":
-      return verdictOf([{ asked: true, reason: `${name}: updated` }]);
+      return verdictOf([{ asked: true, reason: `${name}: updated` }], "skills");
     case "remove":
       return verdictOf([{ asked: true, reason: `${name}: removed` }]);
     case "enable":

@@ -44,10 +44,11 @@ import { isChangeId } from "../settings/changes.ts";
 import { type Answerer, type ChangesApi, openChangeSummary } from "../settings/openChanges.ts";
 import { renderChangePage, renderGonePage } from "./changePage.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
+import { CHANGES_API_PATH, CHANGES_PATH, HARNESS_PATH } from "./paths.ts";
 import { pageCsp, renderPage } from "./page.ts";
 import type { AuditActor, HarnessStore } from "./store.ts";
 
-export const HARNESS_PATH = "/_t3flare/harness";
+export { HARNESS_PATH } from "./paths.ts";
 export const CSRF_HEADER = "x-t3flare-csrf";
 
 /** Who the admin entrypoint admitted. */
@@ -200,8 +201,8 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
       });
       return new Response(html, { headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp() } });
     }
-    if (path.startsWith(`${HARNESS_PATH}/changes/`) && deps.changes !== undefined) {
-      const id = path.slice(`${HARNESS_PATH}/changes/`.length);
+    if (path.startsWith(`${CHANGES_PATH}/`) && deps.changes !== undefined) {
+      const id = path.slice(`${CHANGES_PATH}/`.length);
       const subject = deps.caller.kind === "owner" ? deps.caller.subject : "";
       const csrf = subject === "" ? "" : await csrfToken(deps.store.csrfKey(), subject, deps.now?.() ?? Date.now());
       const record = isChangeId(id) ? deps.changes.get(id) : undefined;
@@ -211,8 +212,8 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp(CHANGE_SCRIPT) },
       });
     }
-    if (path === `${HARNESS_PATH}/api/changes` && deps.changes !== undefined) {
-      return json({ changes: deps.changes.list().map((record) => openChangeSummary(record, `https://${deps.host}${HARNESS_PATH}/changes/${record.id}`)) });
+    if (path === CHANGES_API_PATH && deps.changes !== undefined) {
+      return json({ changes: deps.changes.list().map((record) => openChangeSummary(record, `https://${deps.host}${CHANGES_PATH}/${record.id}`)) });
     }
     if (path === `${HARNESS_PATH}/api/settings`) {
       const stored = deps.store.load();
@@ -235,7 +236,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/environment`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`, `${HARNESS_PATH}/api/mcp/servers`, `${HARNESS_PATH}/api/mcp/oauth`, `${HARNESS_PATH}/api/mcp/secret`];
   const skillsRoute = SKILLS_WRITE_ROUTES.find((route) => path === `${HARNESS_PATH}/api/skills${route}`);
   const endpointsRoute = deps.endpoints === undefined ? undefined : Object.values(ENDPOINTS_PATHS).find((route) => path === `${HARNESS_PATH}${route}`);
-  const changeRoute = path.startsWith(`${HARNESS_PATH}/api/changes/`) && deps.changes !== undefined ? path.slice(`${HARNESS_PATH}/api/changes/`.length) : undefined;
+  const changeRoute = path.startsWith(`${CHANGES_API_PATH}/`) && deps.changes !== undefined ? path.slice(`${CHANGES_API_PATH}/`.length) : undefined;
   if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined && changeRoute === undefined) return refused(404, "Not found");
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
