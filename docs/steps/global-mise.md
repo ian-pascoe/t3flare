@@ -92,24 +92,24 @@ lock); `date +%s%N`, `wc -c <`, `mv -f`, `cp`, `dirname` and `tail -n 1` behave 
 
 ## Evidence
 
-Every stage file names the deployed commit (`/_t3flare/health`): **`8ef01cb`**, after review round 1's fixes and the
-rebase onto SPI-1148 (`5bc4bb7`). Commits after it change only the stage harness, the docs and the evidence.
-`variables.json` ran first. The `m0-*.json` files were taken again from `test:docker` at `df41598` (the test, the
-script and `COMMAND_ENV` as at `8ef01cb`).
+Every stage file names the deployed commit (`/_t3flare/health`): **`07f5343`**, after review round 2's fixes, on
+SPI-1148 (`5bc4bb7`). Commits after it change only the stage harness (`hold.json`'s pin, run at that deploy), the docs
+and the evidence. `variables.json` ran first. The `m0-*.json` files name the commit `test:docker` ran at.
 
 | File | Shows |
 | -- | -- |
 | `variables.json` | With `node = "24.11.1"` set and a gh `hosts.yml` in each command's own home, on a fresh Container per path: all five guards arrive whole (empty ones too), `mise token github` is `(none)`, mise's effective data, cache, state and config dirs are `/root`'s, and `node --version` with mise's three auto-installs off answers `v24.11.1` from `/root/.local/share/mise/installs`, with nothing installed under the path's own `XDG_DATA_HOME`. Paths: the Workspace DO's command, a Durable agent's `bash`, a t3 Terminal, and a command of each of Codex, Claude Code, OpenCode (whose `XDG_DATA_HOME` is its own home's) and pi. |
-| `install.json` | `node = "24.11.1"` (the image has 26.13.0): `v24.11.1` in a new Container from a Durable agent's `bash`, pi's command and a t3 Terminal, each laid down (4.2–4.4 s). |
+| `install.json` | `node = "24.11.1"` (the image has 26.13.0): `v24.11.1` in a new Container from a Durable agent's `bash`, pi's command and a t3 Terminal, each laid down (4.4–5.5 s). |
 | `override.json` | A repo's `node = "22.12.0"` wins in the repo; the global `github:junegunn/fzf` stays; outside the repo node is the global 24.11.1. |
 | `git-gh.json` | Under the pin: t3's status, a commit through the Workspace's git, `gh --version`. An owner-pinned `conda:git` 2.49.0 has the credential helper, `git credential fill` gives a password, and `git fetch` works. t3's own commit action fails as its control without a Global mise config does (SPI-1186). |
-| `hold.json` | Idle time 1 minute, budget 1, an install of 152 s started from a Durable agent's `bash`: after 35 s the reclaim's reason is "in use", a second Workspace's start is refused with the budget's reason, the Container never stops, and the command answers `v24.11.1`. |
+| `passive-first.json` | A passive read starts the stopped Container and holds it for 25 s, and finds no global file (it never waits for the lay-down); a Durable agent's `bash` sent meanwhile through computer waits for the lay-down (3.9 s) and answers `v24.11.1`. |
+| `hold.json` | Idle time 1 minute, budget 1, an install of 88 s (the pin sets `jobs = 1`) started from a Durable agent's `bash`: after 35 s the reclaim's reason is "in use", a second Workspace's start is refused with the budget's reason, the Container never stops, and the command answers `v24.11.1`. |
 | `restart.json` | A change while the Container runs leaves its file and launch alone; an agent's edit is gone at the next start, which has the new text. |
 | `invalid.json` | Invalid TOML is not laid down; git and gh run; Status reads "not laid down (mise install exit 1)". |
 | `size.json` | A text of exactly 16,384 bytes is saved, laid down and read back with the same SHA-256; one byte more is refused whole. |
-| `cost.json` | Start to first command: 1.7 s and 2.2 s without a pin; 5.9 s and 5.9 s with the node pin (lay-down 4.1 s each; no cache, so the second start installs again). |
-| `empty.json` | No Global mise config: 3.3 s and 2.5 s, no lay-down exec (outcome `none`, no answer), nothing in `/var/lib/t3flare/mise`, the image's node, and Status reads "no Global mise config" after `invalid.json`'s "not laid down". **There is no baseline from `main` for the start time:** what carries the claim that an empty config costs what it did is that no lay-down exec runs. |
-| `late.json` | A Durable agent's `bash` with a 10 s timeout during a 49 s install: the command never runs afterwards, and its output reads "the Container was installing the Global mise config". |
+| `cost.json` | Start to first command: 1.7 s and 2.0 s without a pin; 6.0 s and 6.2 s with the node pin (lay-down 4.2 s and 4.1 s; no cache, so the second start installs again). |
+| `empty.json` | No Global mise config: 1.8 s and 1.9 s, no lay-down exec (outcome `none`, no answer), nothing in `/var/lib/t3flare/mise`, the image's node, and Status reads "no Global mise config" after `invalid.json`'s "not laid down". **There is no baseline from `main` for the start time:** what carries the claim that an empty config costs what it did is that no lay-down exec runs. |
+| `late.json` | A Durable agent's `bash` with a 10 s timeout during a 47 s install: the command never runs afterwards, and its output reads "the Container was installing the Global mise config". |
 | `m0-*.json` | M0 through the real script and `COMMAND_ENV`, on the image's mise. |
 
 ## Readings and limits

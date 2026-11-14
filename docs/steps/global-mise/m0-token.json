@@ -1,8 +1,8 @@
 {
  "ok": true,
- "commit": "df41598",
- "image": "sha256:73504cc206e3bf394058607079889fae214fe91c7b787007e955b53cbb37587c",
- "at": "2026-11-14T02:17:35.541Z",
+ "commit": "32ffa56",
+ "image": "sha256:febe02a9b41c1bc14210aa4712c72dcece5ec0a313a9ad80938bbb03842dfda8",
+ "at": "2026-11-14T03:06:39.214Z",
  "variables": {
   "MISE_GITHUB_GH_CLI_TOKENS": "false",
   "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",

@@ -1,8 +1,8 @@
 {
  "ok": true,
- "commit": "df41598",
- "image": "sha256:73504cc206e3bf394058607079889fae214fe91c7b787007e955b53cbb37587c",
- "at": "2026-11-14T02:17:35.541Z",
+ "commit": "32ffa56",
+ "image": "sha256:febe02a9b41c1bc14210aa4712c72dcece5ec0a313a9ad80938bbb03842dfda8",
+ "at": "2026-11-14T03:06:39.214Z",
  "config": "[tools]\nnode = \"24.11.1\"\n\"github:junegunn/fzf\" = \"0.56.3\"\n",
  "default": {
   "layDown": {
@@ -12,7 +12,7 @@
    "laid": true,
    "install": 0,
    "timedOut": false,
-   "ms": 4804,
+   "ms": 8740,
    "bytes": 58
   },
   "byHost": {
@@ -86,6 +86,12 @@
    },
    {
     "method": "GET",
+    "host": "mise-versions.jdx.dev",
+    "path": "/api/github/repos/junegunn/fzf/attestations/sha256:78e96a88cecfbdb3ff65df89cc47c02573407aee0edd08c87e18a8033d498fef",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
     "host": "nodejs.org",
     "path": "/dist/v24.11.1/SHASUMS256.txt",
     "authorization": ""
@@ -94,12 +100,6 @@
     "method": "GET",
     "host": "nodejs.org",
     "path": "/dist/v24.11.1/SHASUMS256.txt.sig",
-    "authorization": ""
-   },
-   {
-    "method": "GET",
-    "host": "mise-versions.jdx.dev",
-    "path": "/api/github/repos/junegunn/fzf/attestations/sha256:78e96a88cecfbdb3ff65df89cc47c02573407aee0edd08c87e18a8033d498fef",
     "authorization": ""
    }
   ]
@@ -170,12 +170,6 @@
    },
    {
     "method": "GET",
-    "host": "api.github.com",
-    "path": "/repos/junegunn/fzf/attestations/sha256:78e96a88cecfbdb3ff65df89cc47c02573407aee0edd08c87e18a8033d498fef",
-    "authorization": ""
-   },
-   {
-    "method": "GET",
     "host": "nodejs.org",
     "path": "/dist/v24.11.1/SHASUMS256.txt",
     "authorization": ""
@@ -184,6 +178,12 @@
     "method": "GET",
     "host": "nodejs.org",
     "path": "/dist/v24.11.1/SHASUMS256.txt.sig",
+    "authorization": ""
+   },
+   {
+    "method": "GET",
+    "host": "api.github.com",
+    "path": "/repos/junegunn/fzf/attestations/sha256:78e96a88cecfbdb3ff65df89cc47c02573407aee0edd08c87e18a8033d498fef",
     "authorization": ""
    }
   ]
