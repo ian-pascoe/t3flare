@@ -131,7 +131,6 @@ export interface ExecInput {
   readonly onlyIfRunning?: boolean;
 }
 
-export type { TakeAnswer } from "./skillSetTake.ts";
 
 export interface ExecResult {
   readonly exitCode: number;
@@ -691,6 +690,7 @@ export class WorkspaceDO extends ContainerHost {
     const warn = (line: string) => console.warn(line);
     return takeSkillSet(
       {
+        workspace,
         store: this.#skillSet,
         read: () => environment.environmentSkillSet({ workspace }),
         mount: (set) => this.ctx.blockConcurrencyWhile(() => mountWithFallback(this.#skillSet, () => this.#workspace.remount(), set, warn)),

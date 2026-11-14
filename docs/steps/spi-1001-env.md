@@ -113,15 +113,18 @@ Each file names its deployed commit. The commits after a file's run changed only
 Workspace for Repo skills: SPI-1151 made the second argument of `skills` a CLI agent, so `repoOnly` moved to the
 third. It also put SPI-1152's Variables wrapper under the Container backend that runs the lock and the wait. The five
 files those touch (public, precedence, update, readonly, remove) were taken again on the rebased head `0532c3d`, on a
-new stage `penvsk` (destroyed). The other three still hold from before the rebase: `env-install-private.json` and
-`env-refusals.json` exercise only the fetch, the store and the panel's API, and `env-no-container.json` only the agent's
-`read` tool on the Workspace's files. The rebase changed none of those code paths.
+new stage `penvsk` (destroyed). Two still hold from before the rebase: `env-install-private.json` and
+`env-refusals.json` exercise only the fetch, the store and the panel's API, which the rebase did not change.
+`env-no-container.json` was taken again at `d27dc0f` (review round 1).
 
 **Review round 1.** The wait's split of its stdin lost every removed path when the list began with them (a Remove or a
 disable): `sed '1,/^--removed--$/d'` looks for the range's end from line 2. It is one `awk` pass now, with removal-only
 and add-only tests. `env-remove.json` was taken again at `d27dc0f`: a removal-only take while the Container runs, and a
 removed Environment skill with no Repo namesake (`grill-me`) whose `$grill-me` reaches the agent untouched.
 `env-no-container.json` was taken again on the same stage. The stage is destroyed.
+
+**Review round 2.** No code-path change: the wait's `cwd` uses `WORKSPACE_ROOT`, the `skills-refused` log line names
+its Workspace again (lost when the take left the Durable Object), and two needless exports are gone.
 
 | File | Shows | Commit deployed |
 | -- | -- | -- |
@@ -203,7 +206,8 @@ The agents Worker still loads no t3 code: no `t3code/` or `@t3tools/` source in 
 
 - **Not driven through the Durable Object itself:** `WorkspaceDO` needs a Container binding and a Worker Loader, which
   the agents workerd harness does not give. Its wiring around `takeSkillSet` is thin and typechecked, and
-  `exec()`'s `onlyIfRunning` check is one line, covered on the stage only (`env-update.json`, `env-remove.json`).
+  `exec()`'s `onlyIfRunning` refusal is one line and is not covered: on the stage (`env-update.json`, `env-remove.json`)
+  the Container was running, so only the passing branch ran.
 
 ## Docs
 

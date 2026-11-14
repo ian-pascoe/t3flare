@@ -4,10 +4,12 @@
 import { skillSetProblem, SKILLS_MOUNT, type SkillSet } from "@t3flare/skills";
 import { SKILLS_LOCK_FAILED } from "@t3flare/workspace-client";
 
+import { WORKSPACE_ROOT } from "./constants.ts";
+
 import { type ContainerExpectation, expectationInput, expectationOf, parseWait, skillsWaitScript, type WaitAnswer } from "./skillSetWait.ts";
 
 /** How many times the wait for a running Container's copy looks, 200 ms apart (plan §4.2: up to 5 s). */
-export const SKILLS_WAIT_LOOKS = 25;
+const SKILLS_WAIT_LOOKS = 25;
 
 /** What a take answers: whether the set was taken, the hash held, why not, and the Container's copy. */
 export interface TakeAnswer {
@@ -19,6 +21,8 @@ export interface TakeAnswer {
 }
 
 export interface TakeDeps {
+  /** The Workspace, named in the take's log lines. */
+  readonly workspace: string;
   readonly store: {
     hash(): string;
     files(): Record<string, string>;
@@ -49,7 +53,7 @@ export const takeSkillSet = async (deps: TakeDeps, hash: string): Promise<TakeAn
   if (refused?.hash === hash) return { taken: false, hash: held, error: refused.message };
   const refuse = async (refusedHash: string, message: string): Promise<TakeAnswer> => {
     store.refuse({ hash: refusedHash, message });
-    deps.warn(JSON.stringify({ t3flare: "skills-refused", hash: refusedHash.slice(0, 12), message: message.slice(0, 300) }));
+    deps.warn(JSON.stringify({ t3flare: "skills-refused", workspace: deps.workspace, hash: refusedHash.slice(0, 12), message: message.slice(0, 300) }));
     await deps.report(refusedHash, message).catch((error: unknown) => deps.warn(JSON.stringify({ t3flare: "skills-refusal-unreported", error: String(error).slice(0, 200) })));
     return { taken: false, hash: store.hash(), error: message };
   };
@@ -92,7 +96,7 @@ export const awaitContainerCopy = async (
   if (expectation.present.length === 0 && expectation.removed.length === 0) return undefined;
   if (!deps.running()) return "stopped";
   const result = await deps
-    .exec({ script: skillsWaitScript(SKILLS_MOUNT, SKILLS_WAIT_LOOKS, SKILLS_LOCK_FAILED), stdin: expectationInput(expectation), cwd: "/workspace", passive: true, onlyIfRunning: true, timeoutMs: 15_000 })
+    .exec({ script: skillsWaitScript(SKILLS_MOUNT, SKILLS_WAIT_LOOKS, SKILLS_LOCK_FAILED), stdin: expectationInput(expectation), cwd: WORKSPACE_ROOT, passive: true, onlyIfRunning: true, timeoutMs: 15_000 })
     .catch((error: unknown) => ({ status: String(error).slice(0, 200), stdout: "" }));
   if (result.status === "not-running") return "stopped";
   const answer = parseWait(result.stdout);

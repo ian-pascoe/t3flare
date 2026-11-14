@@ -25,6 +25,7 @@ const deps = (overrides: Partial<TakeDeps> & { readonly store: ReturnType<typeof
   const calls = { read: 0, mount: 0, report: [] as Array<string>, awaited: [] as Array<unknown> };
   const store = overrides.store;
   const built: TakeDeps = {
+    workspace: "ws-test",
     read: async () => {
       calls.read++;
       return overrides.set;
