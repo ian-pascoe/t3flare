@@ -1,6 +1,9 @@
 # Agents change t3flare's settings through the Settings server
 
-Status: accepted (owner decisions, 2026-11-14; not yet built). Plan:
+Status: accepted (owner decisions, 2026-11-14; built through SPI-1201, the hostile run and report pending). Where the
+Owner-client endpoint lives:
+[ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md),
+conditional on the owner's sign-in probe. Plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md). Supersedes
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §8 ("the agent
 gets no settings tools", OD-T9). Refines ADR-0026, [ADR-0028](0028-mcp-tools-reach-agents-through-the-environments-mcp-host.md),
@@ -45,8 +48,10 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
    A fallback only ever moves toward `browser`.
 9. **Secrets and sign-ins happen on the Change page only.** An agent may ask to add a header-auth Direct server, set its
    header value, or start its OAuth sign-in; the value is typed, and the sign-in started, on the Change page under the
-   owner's Access identity, in every mode. No tool argument or result carries a secret or an authorization URL. A change
-   whose text would not fit a card whole is answered on the page as well.
+   owner's Access identity, in every mode. No tool argument or result carries a secret or an authorization URL. Two
+   more kinds of change are answered on the page alone, in every mode: installing or updating Environment skills (only
+   the page shows each skill's `SKILL.md` and files, so a card or a client would offer Approve on text it cannot show;
+   SPI-1199 review), and a change whose text would not fit a card whole.
 10. **Every write names the revision it expects**, and a moved revision refuses it.
 11. **Every change is audited** with the door it came through, who asked, its tier, its mode and what answered it.
 12. **The pi CLI gets the relay's servers.** Its built-in MCP client reads entries t3flare writes into its per-process
@@ -90,7 +95,9 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
   only the panel can.
 - The Global mise config and the Variables reach every Workspace of every Project, so an approved change made from one
   thread runs in another Project's Container.
-- Where the Owner-client endpoint lives (a second Access application on the t3 host, or a Worker of its own on its own
-  host) follows a spike on Access's managed OAuth and will be recorded in an ADR of its own.
+- Where the Owner-client endpoint lives is
+  [ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md):
+  a second Access application on the t3 host at `/_t3flare/mcp` (layout (B)), pending the owner's sign-in probe, with
+  a Worker on its own host (layout (C)) as the fallback.
 - ADR-0033's title still says Environment skills are "changed only by the owner"; an agent may now ask for a change, and
   its §7 is refined.

@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { BODY_MAX, LEGACY_VERSIONS, MODERN_VERSION, SUPPORTED_VERSIONS } from "../src/settings/endpoint.ts";
-import { isSettingsMcpPath, SETTINGS_MCP_PATH, settingsMcpUrl } from "../src/settings/ownerDoor.ts";
+import { isSettingsMcpPath, SETTINGS_MCP_PATH, settingsMcpUrl } from "../src/settings/endpointLayout.ts";
 import { SETTINGS_TOOLS } from "../src/settings/tools.ts";
 import { signToken } from "../src/settings/tokens.ts";
 import { ASKED, BOTH, bodyOf, ENDPOINT, endpointOf, FREE, initialize, KEY, legacy, modern, modernMeta, post, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
@@ -280,7 +280,7 @@ describe("T-state: capabilities per request (2026) and from the signed session (
   });
 });
 
-describe("layout (B): the endpoint's paths (settings/ownerDoor.ts)", () => {
+describe("layout (B): the endpoint's paths (settings/endpointLayout.ts)", () => {
   it("is /_t3flare/mcp; below it is the endpoint's application too, /_t3flare/mcpx is the panel's (M0 P8)", () => {
     expect(SETTINGS_MCP_PATH).toBe("/_t3flare/mcp");
     expect(settingsMcpUrl("t3.example.dev")).toBe(ENDPOINT);

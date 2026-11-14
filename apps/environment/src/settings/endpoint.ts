@@ -1,8 +1,8 @@
 // @effect-diagnostics globalDate:off globalTimers:off
-// The Owner-client endpoint (ADR-0034, plan D11, D12's `browser`), M5a (SPI-1200): the Settings server's second door,
-// for the owner's own MCP clients (Claude Code, pi, Cursor, Codex, OpenCode) signed in through the endpoint's Access
-// application with managed OAuth (plan D13; where it lives is `ownerDoor.ts`). `EnvironmentDO.settingsMcp` calls it
-// with the caller the Worker already verified; it never boots t3.
+// The Owner-client endpoint (ADR-0034, plan D11, D12), M5a and M5b (SPI-1200, SPI-1201): the Settings server's second
+// door, for the owner's own MCP clients (Claude Code, pi, Cursor, Codex, OpenCode) signed in through the endpoint's
+// Access application with managed OAuth (ADR-0035; where it lives is `endpointLayout.ts`). `EnvironmentDO.settingsMcp`
+// calls it with the caller the Worker already verified; it never boots t3.
 //
 // Hand-written JSON-RPC, stateless (the MCP SDK stays in the MCP Worker):
 //

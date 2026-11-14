@@ -64,3 +64,16 @@ Evidence: `docs/steps/tools/m3-panel-safety.json`, `m6-oauth.json` (P13).
 ## Refinement (G11, 2026-11-13): the preview stream route is mounted
 
 `/api/preview-stream/ws`, `/download` and `/upload` are t3's own, under `/api` and t3's media auth (`orchestration:read` to watch, `preview:operate` to act). No new host serves a dev server: its page runs in Browser Run, and the owner's browser gets screencast frames (ADR-0031). The Environment Worker's public routes do not reach the `ContainerPreviews` entrypoint, which only Browser Run's routes call.
+
+## Refinement (SPI-1200, 2026-11-14): a second Access application, on `/_t3flare/mcp`
+
+"Access only on the admin path" above now reads: Access on `/_t3flare` (the admin application, unchanged) and on
+`/_t3flare/mcp` (`SettingsAccess`, the Owner-client endpoint's, with managed OAuth); everything else on the host stays
+public behind t3's own auth. The more specific application wins its path, each application's cookie is scoped to its own
+path, and the Worker verifies the endpoint's assertion against its own audience, so a token for one is not admitted at
+the other's paths. The admin application gets no managed OAuth, so t3's root well-known documents are untouched, and
+prod keeps one host for the rate limit.
+[ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
+records the layout, the conditions it rests on (one still pending the owner's sign-in), and when it moves to a host of
+its own.
+

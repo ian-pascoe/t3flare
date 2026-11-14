@@ -850,7 +850,7 @@ Docs, at M6 unless already done with this plan:
 - done with this plan: ADR-0034; refinement notes on ADR-0026, 0028, 0032, 0033; GLOSSARY.md; the stale pi lines of
   `docs/steps/tools.md`;
 - a second ADR after M0 for the endpoint's Access application (it refines ADR-0010 and ADR-0026 §1–2, and ADR-0014 if
-  (C));
+  (C)): done as ADR-0035 (layout (B), pending owner step 1; SPI-1200 review);
 - `docs/upstream-fragility.md`: pi's `mcp.json` shape and trust flags, the Patch, Access managed OAuth's beta behaviour,
   the 2026-07-28 shapes the endpoint hand-writes;
 - both research files updated with M0's answers;
