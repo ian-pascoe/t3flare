@@ -226,11 +226,13 @@ an integer lowered is free, and the other direction is asked.
 - Rejected: every write asked (the owner's "risky writes" implies a tier); a static per-setting flag (it cannot tell
   lowering the budget from raising it).
 
-### D6. A change "needs the page" in three cases
+### D6. A change "needs the page" in four cases
 
 `needsPage` is set when the change takes a secret (`add` with `auth.kind: "header"`, or setting a header value), starts
-an OAuth sign-in, or its rendered text would be cut by `cardText` (`CARD_TEXT_MAX`, 16 KiB;
-`packages/harness-registry/src/cardText.ts`). The last is decided by the renderer, not by `tierOf`.
+an OAuth sign-in, installs or updates Environment skills (`skills`: only the page shows each skill's `SKILL.md` text and
+files, so a card would offer Approve on text it cannot show; SPI-1199 review), or its rendered text would be cut by
+`cardText` (`CARD_TEXT_MAX`, 16 KiB; `packages/harness-registry/src/cardText.ts`). The last is decided by the renderer,
+not by `tierOf`.
 
 Such a change is answered only on the Change page, for every caller and in every Elicitation mode: the card is
 link-only, and an Owner client gets the page's link whatever its mode. The owner never approves text he cannot see, and
@@ -267,7 +269,8 @@ interface OpenChange {
   expectedRevision: number;
   tool: string;                  // the write tool's name
   args: unknown;                 // the call's arguments, canonical JSON, without a secret (none is ever in them)
-  hash: string;                  // SHA-256 of tool + canonical args without expectedRevision
+  hash: string;                  // SHA-256 of tool + the change as its planner normalized it (only the fields the
+                                 // change takes; SPI-1199 review), canonical, without expectedRevision
   shown: ChangeView;             // what the card and the page render: before, after, reasons, when it applies (D10)
   needsPage?: "secret" | "sign-in" | "oversize";
   mode: "card" | "browser" | "native" | "model";
@@ -275,14 +278,16 @@ interface OpenChange {
             thread?: string; agent?: string; client?: { name: string; source: string } };
   createdAt: number; expiresAt: number;   // 10 minutes (QUESTION_WAIT_MS, host.ts:41)
   state: "open" | "applying" | "applied" | "declined" | "withdrawn" | "expired" | "moved" | "failed";
-  closed?: { at: number; by: "card" | "page" | "client" | "agent"; revision?: number; error?: string };
+  closed?: { at: number; by: "card" | "page" | "client" | "agent" | "stop"; revision?: number; error?: string };
+  // `stop`: the caller's Stop, turn end or going away withdrew it (D9); `agent` is model-mode `resume` alone
 }
 ```
 
 - **Kept in the Environment DO's SQLite**, table `t3flare_settings_changes` (one row per change, the record as JSON,
   indexed by caller key and hash). Memory is not enough: the Environment resets after about 60 s idle (ADR-0003), which
-  falls between an Owner client's first call and the click. Rows are pruned lazily, on every read and write of the table,
-  an hour after they close or expire. No alarm is added (ADR-0003: one alarm).
+  falls between an Owner client's first call and the click. Rows are pruned lazily, on every read and write of the table
+  two hours after they close or expire (SPI-1199 review; it was one hour: the longest a cap looks back is a run of
+  strikes and the lock after it), and an expiry there writes its log line. No alarm is added (ADR-0003: one alarm).
 - **One answer.** `answerOpenChange(id, { by, answerer, action, secret? })` moves `open` to `applying` in the same
   synchronous block that checks expiry, the answerer and the revision, so a second answer finds it closed. Then it
   applies through `ops.ts` with `expectedRevision`, audits, and closes the record. A moved revision closes it as
@@ -313,8 +318,9 @@ server itself (not through `planQuestion`) and shown through the call's `McpAske
 - An `approval` card (`McpQuestionCard.kind: "approval"`, id from `newCardId()`), options Approve / Decline / Cancel.
   An agent cannot answer an approval card at all (ADR-0028 SPI-1079 §4). It never has a field.
 - The prompt, through `cardText`, is written by the server, never by the agent: what changes (before and after as
-  resolved), the entity and revision, when it applies (D17), which thread and agent kind asked (and the script, when the
-  call is nested in code mode, as other cards name it), the reasons from `tierOf`, a fixed line for a Guard ("This turns
+  resolved), the entity and revision, when it applies (D17), which thread and agent kind asked (the plan also named
+  the script, when the call is nested in code mode, as other cards name it; **deviation, accepted in the SPI-1199
+  review: the card names no script, since the MCP host carries no such fact for a nested call**), the reasons from `tierOf`, a fixed line for a Guard ("This turns
   off the Guardian, which reviews risky tool calls."), a fixed line for a new server ("Its tools' own read-only hints are
   trusted: a tool it marks read runs without a card."), the Change page's link, and the agent's call (tool and
   arguments).
@@ -322,7 +328,10 @@ server itself (not through `planQuestion`) and shown through the call's `McpAske
   the call waiting for the page.
 - The call waits up to 10 minutes on a race of the card and the page. When the page answers first, the server calls
   `asker.withdraw(card.id)`, the path a timeout already takes; the card closes as cancelled, and the tool result and the
-  audit entry say the change was answered on the Change page. A Stop or a turn's end withdraws the Open change.
+  audit entry say the change was answered on the Change page. A Stop or a turn's end withdraws the Open change
+  (closed `by: "stop"`), also after "Opened it": Workers RPC carries no cancellation, so the Session names its call to
+  `EnvironmentDO.cancelAsk` (the id it passed as `mcpCall`'s `stopId`), and the relay's call runs under the CLI's
+  `askId`, which the Workspace DO names when the CLI's request goes away (`mcp/callStops.ts`; SPI-1199 review).
 - ADR-0028's rule that a page on the t3 host is declined unseen governs third-party servers' questions
   (`planQuestion`); this card is the host's own and is not subject to it.
 - Rejected: page only (it loses one tap and the phone, ADR-0025); a form card (an agent can be stopped from answering
@@ -347,7 +356,7 @@ What the page renders, by kind (server-side; no script computes a diff):
 | scalar settings | name, before, after |
 | Variables | a table of added, changed and removed names with values |
 | `file` and `text` settings (Global mise config, the Guardian's policy texts) | a line diff of the whole text |
-| MCP `add` | name, the URL with its host set apart, the sign-in kind, the hint-trust line; for a header sign-in a password field (`autocomplete="off"`) |
+| MCP `add` | name, the whole URL as it will be stored (query included: the caller wrote it, and the owner approves exactly that; SPI-1199 review) with its host set apart, the sign-in kind, the hint-trust line; for a header sign-in a password field (`autocomplete="off"`) |
 | MCP switches, Exposure, class | the server or tool, before, after |
 | a header value | the server and header name, whether one is set now, a password field |
 | an OAuth sign-in | the server and its URL; Approve starts `oauth.begin` and the page's script sends the browser to the authorization URL, as the panel's own sign-in does |
@@ -604,7 +613,7 @@ change through the server is recorded there as an already-closed row).
 | Open changes per Owner `sub` | 2 |
 | Open changes across the Environment | 16 (a storage bound; children spawned by `delegate_task` are new callers) |
 | The same change (by hash) after a decline, per caller | refused for 10 minutes |
-| Three in a row declined or unanswered (own agents), or declined (Owner clients) | that caller's asked changes are refused for 1 hour |
+| Three in a row declined or unanswered (own agents), or declined (Owner clients), within an hour of each other | that caller's asked changes are refused for 1 hour from the third |
 | Applied changes of any tier, per caller | 30 per hour |
 
 - The caller key is the thread id, or the Access `sub` for every Owner client (the client label is unverified, so
@@ -612,6 +621,10 @@ change through the server is recorded there as an already-closed row).
 - In `model`, a refusal for "one already open" names its `requestId`, so the agent can resume or cancel it.
 - No extra limit for `model` (O6).
 - A refusal for the Environment-wide cap names the panel's Open changes list.
+- The open caps are checked again in the same synchronous block as the insert (SPI-1199 review): describing an asked
+  change awaits (a skill's preview reads GitHub), so parallel calls could otherwise each pass the first check.
+- An install's or update's preview reads GitHub, so it counts toward the network read cap (20 per hour) as
+  `preview_skills` does, before it reaches GitHub (SPI-1199 review).
 
 ### D17. When a change applies, and the server's surroundings
 
