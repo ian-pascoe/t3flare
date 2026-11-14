@@ -192,6 +192,17 @@ export class McpHost {
     this.#deps.kv.put(priorKey(name), prior);
   }
 
+  /**
+   * Forgets `name`'s kept inventory and protocol state (era, session id), so a server added under a name that held one
+   * before (a removed server, or the retired built-in `commissary`) starts fresh: no old tools, no old session.
+   */
+  forget(name: string): void {
+    for (const key of [inventoryKey(name), priorKey(name)]) {
+      if (this.#deps.kv.delete !== undefined) this.#deps.kv.delete(key);
+      else this.#deps.kv.put(key, undefined);
+    }
+  }
+
   inventory(name: string): Inventory {
     return this.#deps.kv.get<Inventory>(inventoryKey(name)) ?? { server: name, listedAt: 0, status: "never", definitions: {}, refused: [] };
   }

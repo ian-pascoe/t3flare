@@ -7,6 +7,7 @@ import {
   type Exposure,
   type McpServerSetting,
   RESERVED_SERVER_NAMES,
+  RETIRED_SERVER_KINDS,
   SERVER_NAME,
   type ServerAuth,
   type ToolClass,
@@ -254,11 +255,11 @@ export interface StoredHarness {
 export const EMPTY_HARNESS: StoredHarness = { revision: 0, global: {}, overrides: {} };
 
 /**
- * The MCP server set (ADR-0028): the direct servers the owner added. An entry of the retired built-in kind
- * `commissary` (before SPI-1160) is dropped, so its name is free and the next change saves the set without it.
+ * The MCP server set (ADR-0028): the direct servers the owner added. An entry of a retired kind (the built-in
+ * `commissary`, before SPI-1160) is dropped, so its name is free and the next change saves the set without it.
  */
 export const mcpServersOf = (stored: StoredHarness): Readonly<Record<string, McpServerSetting>> =>
-  Object.fromEntries(Object.entries(stored.mcp?.servers ?? {}).filter(([, server]) => (server.kind as string) === "direct"));
+  Object.fromEntries(Object.entries(stored.mcp?.servers ?? {}).filter(([, server]) => !RETIRED_SERVER_KINDS.has(server.kind)));
 
 /** One change to the MCP server set from the panel or a script. */
 export type McpChange =

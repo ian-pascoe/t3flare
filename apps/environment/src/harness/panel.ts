@@ -49,7 +49,7 @@ export interface HarnessDeps {
   readonly host: string;
   readonly store: HarnessStore;
   /** The MCP host (ADR-0028): the servers' inventories and their test. */
-  readonly mcp?: Pick<McpHost, "servers" | "inventory" | "tools" | "list">;
+  readonly mcp?: Pick<McpHost, "servers" | "inventory" | "tools" | "list" | "forget">;
   /** Direct servers' write-only secrets (part 4). */
   readonly secrets?: HarnessSecrets;
   /** OAuth sign-ins (review M4). */
@@ -347,6 +347,8 @@ const addServer = async (request: Request, deps: HarnessDeps): Promise<Response>
   const applied = applyMcpChange(before, { op: "add", server, url, auth: auth.kind === "header" ? { kind: "header", header: String(auth.header) } : auth.kind === "oauth" ? { kind: "oauth" } : { kind: "none" } });
   if (!applied.ok) return refused(400, applied.error);
   const mark = auth.kind === "header" && value !== undefined ? await deps.secrets.put(server, "header", value) : undefined;
+  // A name that held a server before starts fresh: no old tool list shown as available, no old session id sent.
+  deps.mcp?.forget(server);
   deps.store.save(applied.harness);
   deps.store.audit({
     entity: "harness",
@@ -367,7 +369,7 @@ const beginOAuth = async (request: Request, deps: HarnessDeps): Promise<Response
   const body = await bodyOf(request);
   const server = typeof body?.server === "string" ? body.server : "";
   const setting = deps.mcp?.servers()[server];
-  if (setting === undefined || setting.kind !== "direct" || setting.url === undefined) return refused(404, "no such direct server");
+  if (setting === undefined || setting.url === undefined) return refused(404, "no such direct server");
   if (setting.auth?.kind !== "oauth") return refused(400, `${server} does not sign in with OAuth`);
   if (deps.oauth === undefined) return refused(500, "no OAuth");
   const begun = await deps.oauth.begin(server, setting.url);

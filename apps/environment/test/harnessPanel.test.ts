@@ -195,6 +195,35 @@ describe("harness panel", () => {
     expect(secrets.read("commissary", "header")).toBe("cms-key");
   });
 
+  it("a server added under a name that held one before starts fresh: no old tools shown, no old session sent", async () => {
+    const kv = memory();
+    const store = harnessStore(kv);
+    const priors: Array<unknown> = [];
+    let tools = [{ name: "old_tool", inputSchema: { type: "object" } }];
+    const engine = {
+      discover: async (_target: unknown, prior: unknown) => {
+        priors.push(prior);
+        return { kind: "discovered", tools, problems: [], state: { era: { v: 1 }, session: "s-old" } } as never;
+      },
+      request: async () => ({ kind: "failed", error: { _tag: "Unreachable", message: "x" }, state: {} }) as never,
+    };
+    const secrets = harnessSecrets(kv);
+    const mcp = new McpHost({ kv, engine, settings: () => store.load(), secret: async (server, field) => secrets.read(server, field), now: () => NOW });
+    const deps = { caller: { kind: "service-token" } as HarnessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
+    const post = (path: string, body: unknown) => handleHarness(new Request(`https://${HOST}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), deps);
+    const overview = async () => ((await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/mcp`), deps)).json()) as { servers: Array<{ name: string; status: string; tools: Array<{ upstream: string }> }> }).servers;
+    const add = { server: "commissary", url: "https://api.commissary.example/mcp", auth: { kind: "header", header: "x-api-key" }, value: "cms-key" };
+    expect((await post("/_t3flare/harness/api/mcp/servers", add)).status).toBe(200);
+    await post("/_t3flare/harness/api/mcp/test", { server: "commissary" });
+    expect((await overview())[0]).toMatchObject({ status: "ok", tools: [{ upstream: "old_tool" }] });
+    expect((await post("/_t3flare/harness/api/mcp", { op: "remove", server: "commissary" })).status).toBe(200);
+    expect((await post("/_t3flare/harness/api/mcp/servers", { ...add, value: "cms-key-2" })).status).toBe(200);
+    expect((await overview())[0]).toMatchObject({ status: "never", tools: [] });
+    tools = [{ name: "new_tool", inputSchema: { type: "object" } }];
+    await post("/_t3flare/harness/api/mcp/test", { server: "commissary" });
+    expect(priors).toEqual([{}, {}]);
+  });
+
   it("the owner adds an OAuth server from the page's form (a scoped URL with its query kept) and can remove it", async () => {
     const kv = memory();
     const store = harnessStore(kv);
