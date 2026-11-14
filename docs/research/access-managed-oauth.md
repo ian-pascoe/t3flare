@@ -293,7 +293,7 @@ Every UNKNOWN maps to a probe:
 
 Recorded on stage `psettings` (workers.dev only), 2026-11-14, by the spike on branch `settings-mcp-m0-spike`:
 `docs/steps/settings-mcp/m0-access-oauth.json` (probes P1-P13, P15) and `m0-clients.json` there, to be merged with this
-branch. "Owner step" refers to `docs/steps/settings-mcp-m0-owner-steps.md` on that branch. What was built on these
+branch. "Owner step" refers to [`docs/steps/settings-mcp-m0-owner-steps.md`](../steps/settings-mcp-m0-owner-steps.md) (copied from that branch). What was built on these
 answers: [ADR-0035](../adr/0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md).
 Each answer below replaces the matching UNKNOWN above.
 

@@ -65,3 +65,15 @@ by t3flare's own agents and by the owner's external MCP clients.
   sign-in an agent asked for starts there; neither passes through an agent.
 - §7's audit entries gain who asked, through which door, the change's tier, and what answered it.
 - The panel's handlers move into one module that the panel and the Settings server both call.
+
+## Refinement (SPI-1200, 2026-11-14): a second Access application, for the Owner-client endpoint
+
+Contradicts §1 and "Back to stock" ("no … second Access application"), deliberately. The panel itself is unchanged: it
+stays `/_t3flare/harness` behind the `/_t3flare` Access application, admitted as §2 says. What is new is the Settings
+server's Owner-client endpoint at `/_t3flare/mcp`, which needs managed OAuth; a managed-OAuth token is good for its whole
+application, so on the `/_t3flare` application an Owner client's token would be admitted at this panel and its Change
+page on the owner's assertion alone. The endpoint therefore gets an Access application of its own, `SettingsAccess`, on
+that narrower path, and the Worker verifies its audience apart from the panel's.
+[ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
+records the layout, the conditions it rests on (one still pending the owner's sign-in), and its fallback, a Worker on a
+host of its own. The back-to-stock reasons (no forwarder, no admin host) still hold for the panel.

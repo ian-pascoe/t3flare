@@ -17,8 +17,9 @@ lands.
 
 On stage `psettings`, on the spike branch `settings-mcp-m0-spike` (41b823a), which is never merged: its probe code
 (`apps/environment/scripts/settings-spike/`, the `T3FLARE_SETTINGS_SPIKE` switches) stays there. Its evidence
-(`m0-access-oauth.json`, `m0-clients.json`, `m0-pi.json`) and the owner's steps
-(`docs/steps/settings-mcp-m0-owner-steps.md`) are to be merged into this branch later. Its answers are summarised in
+(`m0-access-oauth.json`, `m0-clients.json`, `m0-pi.json`) are to be merged into this branch later; the owner's steps,
+[`settings-mcp-m0-owner-steps.md`](settings-mcp-m0-owner-steps.md), were copied here (their commands still run on the
+spike branch). Its answers are summarised in
 both research files' "M0's answers" sections
 ([`access-managed-oauth.md`](../research/access-managed-oauth.md#m0s-answers-spi-1196),
 [`mcp-elicitation-server.md`](../research/mcp-elicitation-server.md#m0s-answers-spi-1196)).
@@ -217,7 +218,7 @@ failure to "Deviations from the plan". -->
 
 ## Owner steps still open
 
-From `docs/steps/settings-mcp-m0-owner-steps.md` (spike branch):
+From [`settings-mcp-m0-owner-steps.md`](settings-mcp-m0-owner-steps.md) (copied from the spike branch, where its commands run):
 
 1. **Step 1, the OAuth flow end to end** (P6, P7, P12, P13, P15, P11 in part). **Gates layout (B)**: an Owner client's
    OAuth token must be refused at `/_t3flare/harness` and `/_t3flare/echo`, and the token exchange must work for the
