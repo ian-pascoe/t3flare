@@ -11,6 +11,7 @@ import * as path from "node:path";
 
 import { ensureProject } from "./lib/cliTurn.ts";
 import { admin, DEFAULT_MODEL, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, SETTLED, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
+import { tailing } from "./lib/tail.ts";
 import { attachTerminal, stripAnsi } from "./lib/terminal.ts";
 
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
@@ -106,6 +107,7 @@ const turn = async (projectId: string, model: { instanceId: string; model: strin
     runs: runsOf(view).map((run: any) => ({ status: run.status, failure: run.failure ?? null })),
     answer: String(items.filter((item: any) => item.type === "assistant_message").at(-1)?.text ?? "").slice(-400),
     tools: items.filter((item: any) => item.type === "command_execution").map((item: any) => String(item.input ?? "").slice(0, 200)),
+    errors: items.filter((item: any) => item.type === "error").map((item: any) => String(item.detail ?? item.message ?? item.text ?? JSON.stringify(item)).slice(-1200)),
     ms: Date.now() - started,
   };
 };
@@ -115,6 +117,8 @@ const cliModel = (cli: Cli) => ({ instanceId: CLIS[cli].instanceId, model: CLIS[
 const enableAll = async () => {
   await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } } });
   for (const cli of Object.values(CLIS)) await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: cli.instanceId, instance: { driver: cli.driver, enabled: true } } });
+  // Each instance's provider list fresh, as the client asks for it before a thread (OpenCode's session opens after it).
+  for (const cli of Object.values(CLIS)) await wsCall(cookie, "server.refreshProviders", { instanceId: cli.instanceId, fresh: true }).catch(() => undefined);
 };
 
 // ── variables.json ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -173,31 +177,39 @@ const variables = async () => {
   cookie ||= await pair();
   const { projectId, root } = await ensureProject(cookie, WORKSPACE);
   await enableAll();
-  const written = await execOn(WORKSPACE, `mkdir -p ${VARS_DIR} && rm -f ${VARS_DIR}/vars-*.txt && cat > ${VARS_DIR}/vars.sh <<'PMISE_EOF'\n${VARS_SCRIPT}PMISE_EOF\necho ok`);
+  const written = await execOn(WORKSPACE, `mkdir -p ${VARS_DIR} && cat > ${VARS_DIR}/vars.sh <<'PMISE_EOF'\n${VARS_SCRIPT}PMISE_EOF\necho ok`);
   if (!written.stdout.includes("ok")) throw new Error(`could not write the check: ${JSON.stringify(written)}`);
   const paths: Array<{ who: string; how: string; detail: unknown }> = [];
   const run = `bash ${VARS_DIR}/vars.sh`;
+  // `variables <who> …` runs only those paths, merged into the file's earlier results.
+  const only = process.argv.slice(3);
+  const wanted = (who: string) => only.length === 0 || only.includes(who);
 
   // The Workspace DO's own command (computerd's env, WorkspaceDO.exec).
-  paths.push({ who: "workspace-exec", how: "the Workspace DO's exec (t3's git and the admin route take this path)", detail: await execOn(WORKSPACE, `${run} workspace-exec`) });
+  if (wanted("workspace-exec")) paths.push({ who: "workspace-exec", how: "the Workspace DO's exec (t3's git and the admin route take this path)", detail: await execOn(WORKSPACE, `${run} workspace-exec`) });
 
   // A Durable agent's bash (computer's stub from the Session, computerd's env).
-  paths.push({
+  if (wanted("durable")) paths.push({
     who: "durable",
     how: "a Durable agent's bash on the Container",
     detail: await turn(projectId, durableModel, `Call the bash tool once with command \`${run} durable\` and backend \`container\`. Then reply with the single word done.`),
   });
 
   // A t3 Terminal (the platform's exec, terminalEnv).
+  if (wanted("terminal")) {
   const terminal = await attachTerminal(cookie, { threadId: `pmise-${uuid()}`, terminalId: "default", cwd: root });
   await terminal.until(/[$#] $/, 180_000);
   const typed = await terminal.run(`${run} terminal`, 120_000).catch((error: unknown) => ({ ms: -1, text: String(error).slice(0, 400) }));
   await terminal.close(true).catch(() => undefined);
   await terminal.detach().catch(() => undefined);
   paths.push({ who: "terminal", how: "a t3 Terminal", detail: { ms: typed.ms, tail: stripAnsi(typed.text).slice(-300) } });
+  }
 
   // A command each CLI agent runs (the platform's exec, then each CLI's own handling of its children's environment).
-  for (const cli of Object.keys(CLIS) as Array<Cli>) {
+  for (const cli of (Object.keys(CLIS) as Array<Cli>).filter(wanted)) {
+    // A Workspace runs at most 4 CLI process weights (Claude Code and OpenCode count twice): each CLI on a fresh
+    // Container, so the earlier ones' processes never refuse the next.
+    await stopOn(WORKSPACE);
     paths.push({
       who: cli,
       how: `a shell command ${cli} runs`,
@@ -219,28 +231,37 @@ const variables = async () => {
   );
   const results = paths.map((entry) => {
     const text = files[entry.who];
-    if (text === undefined) return { ...entry, ran: false, ok: false };
+    if (text === undefined) return { ...entry, ranAt: new Date().toISOString(), ran: false, ok: false };
     const parsed = parseVars(text);
     const arrived = Object.fromEntries(Object.entries(EXPECTED_ENV).map(([name, value]) => [name, parsed.env[name] === value]));
     const falseGuards = arrived.MISE_GITHUB_GH_CLI_TOKENS === true && arrived.MISE_GITHUB_USE_GIT_CREDENTIALS === true;
     const emptyGuards = arrived.MISE_GITHUB_CREDENTIAL_COMMAND === true && arrived.MISE_DISABLE_TOOLS === true && arrived.MISE_DISABLE_BACKENDS === true;
-    return { ...entry, ran: true, ...parsed, arrived, falseGuards, emptyGuards, noToken: parsed.token !== null && parsed.token.includes("(none)"), ok: falseGuards && emptyGuards && parsed.token?.includes("(none)") === true };
+    return { ...entry, ranAt: new Date().toISOString(), ran: true, ...parsed, arrived, falseGuards, emptyGuards, noToken: parsed.token !== null && parsed.token.includes("(none)"), ok: falseGuards && emptyGuards && parsed.token?.includes("(none)") === true };
   });
+  const earlier: Array<any> = only.length === 0 || !fs.existsSync(path.join(OUT, "variables.json")) ? [] : JSON.parse(fs.readFileSync(path.join(OUT, "variables.json"), "utf8")).results ?? [];
+  const merged = [...earlier.filter((entry) => !only.includes(entry.who)), ...results];
   await writeEvidence("variables.json", {
     note: "Each path ran `vars.sh` with a gh hosts.yml in its own home: the variables as its command has them (null: unset), mise's resolved settings, and the token mise would send.",
-    results,
-    ok: results.every((entry) => entry.ok),
+    results: merged,
+    ok: merged.every((entry) => entry.ok),
   });
 };
 
-const commands: Record<string, () => Promise<void>> = { variables };
+/** One OpenCode turn under `wrangler tail`: the log lines about its session's open, redacted (a diagnosis aid). */
+const opencodeDebug = async () => {
+  cookie ||= await pair();
+  const { projectId } = await ensureProject(cookie, WORKSPACE);
+  await enableAll();
+  const { result, text } = await tailing([new URL(T3).hostname.split(".")[0]!, `t3flare-agents-pmise`], () => turn(projectId, cliModel("opencode"), "Reply with the single word done."));
+  const lines = text.split("\n").filter((line) => /opencode|acp|process-start|refus|error/i.test(line));
+  console.log(JSON.stringify(result.runs));
+  for (const line of lines.slice(0, 60)) console.log(line.replace(/(bearer|token|key|secret)([^,}]{0,10})["':= ]+[^"',} ]+/gi, "$1$2=<redacted>").slice(0, 600));
+};
+
+const commands: Record<string, () => Promise<void>> = { variables, "opencode-debug": opencodeDebug };
 const command = commands[process.argv[2] ?? ""];
 if (command === undefined) {
   console.error(`usage: pmise.ts ${Object.keys(commands).join(" | ")}`);
   process.exit(2);
 }
 await command();
-// Unused until later cases; kept for them.
-void stopOn;
-void stateOf;
-void setEnvironment;
