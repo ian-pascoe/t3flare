@@ -34,7 +34,7 @@ import { QUESTION_WAIT_MS } from "../src/mcp/host.ts";
 import { changePagePath } from "../src/harness/paths.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 import { bodyOf, endpointOf, modern, structuredOf, SUB } from "./settingsEndpointFixture.ts";
-import { NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
+import { flush, NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 import { skillMd } from "./skillRepo.fixture.ts";
 
 const OWN: ChangeCaller = { door: "own", key: "thread-1", principal: "agent", thread: "thread-1", agent: "piDurable" };
@@ -54,8 +54,9 @@ const world = () => {
     revisionOf: () => revision,
     apply: async (record, input) => {
       applied.push({ id: record.id, by: input.by, ...(input.secret === undefined ? {} : { secret: input.secret }) });
-      // A real apply is asynchronous: give a second answer the chance to arrive while it runs.
-      await new Promise((resolve) => setTimeout(resolve, 1));
+      // A real apply is asynchronous: give a second answer the chance to arrive while it runs (no timer: a few turns of
+      // the microtask queue, as a second answer started meanwhile runs synchronously up to its own first await).
+      await flush(5);
       revision += 1;
       return { ok: true, revision };
     },
