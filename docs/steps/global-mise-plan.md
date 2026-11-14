@@ -1,8 +1,28 @@
 # SPI-1150: Global mise config in Environment settings — plan
 
-Status: plan for review, M0 done (2026-11-13). Ticket: SPI-1150, a sibling under SPI-1001's triage; its decisions are
+Status: revised after review (2026-11-14): the review of `eb82395` approved it with changes; this revision folds in
+its four blocking items, its decisions on D1–D6 and its advisories (see **Review changelog**), for a short re-review
+before Build. M0 done 2026-11-13. Ticket: SPI-1150, a sibling under SPI-1001's triage; its decisions are
 settled and not reopened here. Base: `main` at `660f922` (SPI-1149). Branch `spi-1150-global-mise`. Stage `pmise`.
 Report (after Build): `docs/steps/global-mise.md`. Background: [`spi-1001-research-mise.md`](spi-1001-research-mise.md).
+
+## Review changelog (review of `eb82395`)
+
+Where a section below disagrees with this table, the section is the revised one; the table says what moved.
+
+| Item | Change |
+| -- | -- |
+| B1: nothing holds the Container during the lay-down | `GlobalMise` holds the Container for its run (`#running` raised through a hold, use noted when it ends), so neither the idle alarm nor a reclaim stops it mid-install (§3.4). Unit test, and stage case `hold.json` with the idle time at 1 minute and an install longer than that. |
+| B2: unbounded waits | `timeout -k 10 600` on the install; `timeout -k 5 20` on each of `git --version` and `gh --version`, with mise's auto-install off for them; a DO-side deadline of 11 minutes on the whole exec, past which the run is logged and treated as not laid. Exit 124 is reported as a timeout (§3.2, §3.3). |
+| B3: "once per Container start" had no key | The run is keyed by the Container's runtime id: it runs on every `ContainerOnlyBackend.connect`, keyed by the handle's `runtimeId`, with `LAUNCH_KEY` read after `connect` returns. A Container that died on its own comes back with a new runtime id, so it gets its own run. The retry rule on computer's path is stated (§3.3). Both are unit-tested. |
+| B4: the guard variables' arrival unproven | `variables.json` runs **first** on the stage: `mise settings get` and `mise token github`, with a `hosts.yml` present, from a Durable agent's `bash`, a t3 Terminal, and a command run by each of Codex, Claude Code, OpenCode and pi. A transport that drops an empty value drops D4 and the `credential_command` guard; a CLI that filters a name gets it set back through its own mechanism (§2, §6). |
+| D1 | Accepted, with D3's change. |
+| D2 | Accepted. ADR-0032's refinement records the departure from §3's "as resolved before and after"; the `global-mise` log line carries the same SHA-256. |
+| D3 | Changed: the panel's Status shows the last lay-down (Workspace, revision, laid or not, exit, when) beside "last taken by a Workspace", through one RPC from the Workspace DO (§4). |
+| D4 | Accepted unless `variables.json` forces dropping it. The setting's description says `disable_tools` and `disable_backends` are ignored. |
+| D5 | Accepted. The text area has no `maxlength` (it counts UTF-16 units); the server's byte check is the limit. |
+| D6 | Accepted. |
+| Advisories folded in | `flock` around the script, a unique staging name, `mv` checked; the answer keyed by revision and SHA-256 (and the disk-outlives-a-start assumption noted in the ADR); `containerState()` returns the text's size and hash, not the text; the panel says the file is readable by agents and not for secrets; `source` in the log line and the answer; a first `bash` that times out during the install names it; a bash test of the real script with stub mise, git and gh, the text on stdin; a full 16 KiB text on the stage; CRLF normalised to LF and a newline after `<textarea>`; an owner-pinned `conda:git` gets the system gitconfig's credential helper, with a credentialed fetch under such a pin in `git-gh.json`; a note beside `ARG MISE_VERSION`; an unguarded row with a repo's file turning `use_git_credentials` on; `mitmproxy/mitmproxy` pinned by digest; SPI-1152's overlap (§8); the install-cache follow-up carried in the report, filing pending with the orchestrator. |
 
 ## M0: what the image's own mise does
 
@@ -83,6 +103,9 @@ proxy records each request's `Authorization` header.
   that exports one is its own act), mise's OAuth device-flow token and `github_tokens.toml` (each made only by an
   agent's own login).
 
+- **What M0 does not show:** M0 passes the variables with `docker run -e`, which is not how a command gets them in a
+  Container. The stage's `variables.json` checks each real path (§6).
+
 ## The design
 
 ### 1. The setting (`@t3flare/harness-registry`)
@@ -92,144 +115,232 @@ One entry in `ENVIRONMENT_SETTINGS`, as ADR-0032 §2 provides:
 ```ts
 globalMiseConfig: {
   title: "Global mise config",
-  description: "A mise.toml every Container's commands get, under a repository's own and over the image's base tools. "
-    + "Laid down and installed at each Workspace's next Container start; a running Container keeps what it started "
-    + "with. Kept only if git and gh still run under it.",
+  description:
+    "A mise.toml every Container's commands get, under a repository's own and over the image's base tools. Laid down "
+    + "and installed at each Workspace's next Container start; a running Container keeps what it started with. Kept "
+    + "only if git and gh still run under it. disable_tools and disable_backends are ignored. Agents can read this "
+    + "file: put no secret in it, [env] included.",
   schema: { type: "file", maxBytes: 16 * 1024, default: "" },
 }
 ```
 
-- **A new field type, `file`:** the text of a file a Container gets. `fieldProblem` refuses a non-string, a NUL
-  ("text without a NUL character") and more than `maxBytes` of UTF-8 ("text of at most 16 KiB of UTF-8"): cloudpid's
-  `toolchainsProblem`, ported (10 lines; `harness-registry` takes no dependency on `@cloudpid/config`). The `text`
-  type's character limit stays as it is, so the Harness settings' text fields do not change.
-- `ResolvedEnvironment.globalMiseConfig` is `string` (the type follows the schema); a stored value that no longer fits
-  reads as `""`.
-- **The panel** renders a `file` field as a monospace text area (no spell check, more rows). The section, the API and
-  validation pick the entry up from the schema; the page needs only the `file` case in its field renderer.
-- **The audit** records a `file` setting's before and after as `{ bytes, sha256 }`, not its text: the audit log is
-  one stored value of up to 1 000 entries, and two 16 KiB texts per entry would take it past a Durable Object value's
-  2 MB. The current text is always on the panel. (Decision D2.)
-
-SPI-1152 adds Variables as another entry beside it; nothing here is shared with it but the schema.
+- **A new field type, `file`** (D5): the text of a file a Container gets. `fieldProblem` refuses a non-string, a NUL
+  ("contains a NUL character") and more than `maxBytes` of UTF-8 ("is longer than 16 KiB of UTF-8"): cloudpid's
+  `toolchainsProblem`, ported (about 10 lines; `harness-registry` takes no dependency on `@cloudpid/config`). The
+  `text` type keeps its rules, so the Harness settings' fields do not change.
+- **CRLF is normalised to LF** when a change is applied (`applyEnvironmentChange`, for `file` fields), before the
+  comparison with the stored value, so a browser's CRLF round trip never reads as a change.
+- `ResolvedEnvironment.globalMiseConfig` is `string`; a stored value that no longer fits reads as `""`.
+- **The panel** renders a `file` field as a monospace text area: no spell check, more rows, **no `maxlength`** (it
+  counts UTF-16 units; the server's byte check is the limit and its refusal is shown whole), and a newline right after
+  `<textarea …>`, since an HTML parser drops the first newline of a text area's content. The section, the API and the
+  validation take the entry from the schema; the page needs only the `file` case in its field renderer.
+- **The audit** records a `file` setting's before and after as `{ bytes, sha256 }`, not its text (D2): the audit log
+  is one stored value of up to 1 000 entries, and a Durable Object value is at most 2 MB. This departs from ADR-0032
+  §3's "as resolved before and after", and the refinement says so. The current text is on the panel.
 
 ### 2. Every command's environment (`COMMAND_ENV`, `apps/sandbox-image/src/env.ts`)
 
-One change reaches all of them: the Durable agent's commands (`SessionDO`), CLI agents' processes and Terminals
-(`terminalEnv`), and the Workspace DO's own (`WorkspaceDO.exec`).
+One change reaches every path: the Durable agent's commands (`SessionDO`, through computerd's env), CLI agents'
+processes and Terminals (`terminalEnv`, through the platform's exec), the Workspace DO's own commands
+(`WorkspaceDO.exec`), and the lay-down itself (§3).
 
 ```ts
 MISE_SYSTEM_CONFIG_FILE: BASE_MISE_CONFIG,          // was MISE_GLOBAL_CONFIG_FILE
 MISE_GLOBAL_CONFIG_FILE: GLOBAL_MISE_CONFIG,         // /var/lib/t3flare/mise/config.toml
 MISE_TRUSTED_CONFIG_PATHS: "/usr/local/share/cloudpid:/workspace",
 MISE_YES: "1",
-MISE_GITHUB_GH_CLI_TOKENS: "false",
-MISE_GITHUB_USE_GIT_CREDENTIALS: "false",
-MISE_GITHUB_CREDENTIAL_COMMAND: "",
-MISE_DISABLE_TOOLS: "",
-MISE_DISABLE_BACKENDS: "",
+MISE_GITHUB_GH_CLI_TOKENS: "false",                  // the ticket's guard
+MISE_GITHUB_USE_GIT_CREDENTIALS: "false",            // the ticket's guard
+MISE_GITHUB_CREDENTIAL_COMMAND: "",                  // kept only if variables.json shows empties arrive
+MISE_DISABLE_TOOLS: "",                              // D4, the same condition
+MISE_DISABLE_BACKENDS: "",                           // D4, the same condition
 GIT_TERMINAL_PROMPT: "0",
 BASH_ENV: …,
 ```
 
-- `/var/lib/t3flare/mise` is on the Container's own disk, outside `/workspace`, so the file never syncs, and a new
-  Container starts without it (a Container's disk does not outlive it).
+- `/var/lib/t3flare/mise` is on the Container's own disk, outside `/workspace`, so the file never syncs.
 - With no owner text nothing is written there, and mise resolves exactly as today (`m0-layering.json`).
-- The image needs no change: its build installs the base file's tools into the system directory as before, and the
-  base `mise.lock` sits beside the base file.
+- **Each CLI's own filtering.** Codex builds its shells' environment from `shell_environment_policy`, whose default
+  excludes names matching `*TOKEN*`, `*KEY*` and `*SECRET*`: `MISE_GITHUB_GH_CLI_TOKENS` is likely dropped. Where
+  `variables.json` shows a CLI dropping a name, the CLI's profile sets it back (Codex: `shell_environment_policy.set.
+  <NAME>`, beside `T3FLARE_EXEC` in `cliProfiles.ts`; the others by their own mechanism if one drops it), and the case
+  is run again. If a path drops an **empty** value and has no way to set one, the empty guards go (D4 and
+  `credential_command`); the two `false` guards stay.
+- **The image** needs one note beside `ARG MISE_VERSION`: a bump re-runs `mise.docker.test.ts` (the nightly job runs
+  `test:docker`), since empty-value and layering behaviour is version-fragile.
 
 ### 3. Laying it down at each Container start
 
-- **What a start uses.** `#launch()` already records each fresh start's settings (`ContainerLaunch`). It gains
-  `globalMiseConfig`, the start's text. A running Container keeps its launch, so a change never reaches it; the next
-  start takes the new text. An agent's edit of the laid-down file lasts until its Container stops.
-- **The script** (`globalMiseScript(text)` in `@t3flare/sandbox-image/globalMise`, no Node imports, so the agents
-  Worker can import it), run on the Container through the platform's exec (as the leak scan runs), under
-  `COMMAND_ENV`:
-  1. If this Container's disk already has the lay-down's answer (`/var/lib/t3flare/mise/answer.json`), print it and
-     stop: the script runs again harmlessly after a Workspace DO restart or a reconnect.
-  2. Write the text (base64 in the script; 16 KiB fits an argument) to a staging file beside the global path.
-  3. `cd / && timeout 600 mise install` with the staging file as the global config: the base's tools are already
-     installed; the owner's are installed now. Output to `/var/lib/t3flare/mise/install.log`.
-  4. If `git --version` and `gh --version` run under it, move it to the global path; else delete it (D1).
-  5. Write and print the answer: `{ laid, install (exit code), ms, bytes }`.
-- **Before the first command.** A Workspace DO helper (`GlobalMise`, `apps/agents/src/workspace/globalMise.ts`)
-  runs the script once per Container start, single-flight, and every path to the Container waits for it:
-  - computer's commands (the Durable agent's `bash` and file tools, the Workspace DO's git and checkpoints): the
-    Container backend (`ContainerOnlyBackend`) awaits it after `connect` and before handing computer the connection,
-    so it runs once the Container is up and before computer sends any command;
-  - t3's Terminals and the agent's Terminals: in their `beforeSpawn`;
-  - CLI agents' processes: in their `beforeStart`.
-  
-  With no owner text it runs nothing, so a start without a Global mise config costs what it costs today. A script that
-  fails (the Container stopped under it) is logged and does not hold the command back; the next call runs it again.
-- **What is reported:** a `global-mise` log line per start (Workspace, revision, laid, install exit, ms, bytes; never
-  the text), the answer in `containerState()` (`globalMise`), and mise's output in `install.log` on the Container's
-  disk, which an agent can read. Nothing on the panel (D3).
+#### 3.1 What a start uses
 
-### 4. Install: no cache
+`#launch()` records each fresh start's settings (`ContainerLaunch`). It gains `globalMise: { text, bytes, sha256,
+revision, source }` (`source` is `environment`, `kept` or `default`, as `takeEnvironment` answers). A running Container
+keeps its launch, so a change never reaches it, and the next start takes the new text. An agent's edit of the laid-down
+file lasts until its Container stops. `containerState()` returns the launch with the text replaced by its `bytes` and
+`sha256`.
+
+#### 3.2 The script (`globalMiseScript`, `@t3flare/sandbox-image/globalMise`)
+
+No Node imports, so the agents Worker imports it. Run through the platform's exec (`ctx.container.exec`, as the leak
+scan runs) as `bash -c <script> -- <revision> <sha256>`, under `COMMAND_ENV`, **the text on stdin**:
+
+1. `exec 9>/var/lib/t3flare/mise/.lock; flock -w 660 9`: one lay-down at a time per Container, so two Workspace DO
+   instances across a deploy never overlap.
+2. If `answer.json` exists and names this revision and SHA-256, print it and stop (the same text was already laid
+   down on this disk).
+3. Read stdin into a unique staging file, `config.<sha256>.<pid>.toml`, beside the global path.
+4. `cd / && timeout -k 10 600 mise install` with the staging file as the global config, output to `install.log`.
+5. `MISE_AUTO_INSTALL=false MISE_EXEC_AUTO_INSTALL=false MISE_NOT_FOUND_AUTO_INSTALL=false timeout -k 5 20 git --version`,
+   and the same for `gh --version`, under the staging file (each checked by name against the image's mise in the
+   docker test).
+6. Both run: `mv -f` the staging file to the global path, and `laid` only if the `mv` succeeded. Else delete it and
+   leave the global path as it was at this start (absent: a new Container's disk has none).
+7. An owner-pinned git is not the image's: for each `git` under mise's installs on the Container's disk
+   (`/root/.local/share/mise/installs/*/*/bin/git`) whose system config lacks the credential helper, copy
+   `/usr/local/share/t3flare/gitconfig` into its prefix's `etc/gitconfig`, as the Dockerfile does for the image's
+   (Dockerfile:105-114). Checked in the docker test and by `git-gh.json`'s credentialed fetch.
+8. Write and print the answer: `{ revision, sha256, source, laid, install (exit), timedOut (exit 124), ms, bytes }`.
+
+#### 3.3 When it runs, and its key (`GlobalMise`, `apps/agents/src/workspace/globalMise.ts`)
+
+- **Keyed by the Container's runtime id.** computer's `ContainerBackend.connect` returns a handle with the
+  `runtimeId` of the Container it connected to; a restart inside `connect` (`#readyWithRestarts`) gives a new one, and
+  so does any new Container, including one that replaced a Container that died on its own (memory guard, platform
+  restart), which never passes `stopContainer()`. `GlobalMise` keeps one run per runtime id: `ensure(runtimeId)` starts
+  it or joins it.
+- **computer's path** (the Durable agent's `bash` and file tools, the Workspace DO's git, checkpoints and `exec`):
+  `ContainerOnlyBackend.connect` calls `ensure(handle.runtimeId)` after the inner `connect` returns, reads
+  `LAUNCH_KEY` then (the launch `#budgeted` just recorded for this start), and returns the handle only when the run
+  has ended. It runs on **every** connect: a connect to the same Container after a dropped transport finds the run done
+  (in memory, else the answer on disk), and costs one exec.
+- **Retry rule on computer's path.** computer caches the handle, so no later connect follows a failed run while the
+  transport holds. A run whose exec itself failed (the platform's exec refused or broke; not an answer of "not laid" or
+  a timeout, which are final for that runtime) is retried once at once inside `connect`; failing again, it is recorded
+  as failed for that runtime, and the next `ensure` of it runs again: the next connect (the handle drops when the
+  Container stops or the transport breaks), `WorkspaceDO.exec` (which calls `ensure` for the current runtime before its
+  command, a no-op once done), a Terminal's `beforeSpawn` or a CLI process's `beforeStart`. A Durable agent's command
+  that reuses the cached handle does not retry it.
+- **Terminals and CLI processes** (the platform's exec): their `beforeSpawn` and `beforeStart` call `ensure` for the
+  runtime id of the last connect (each starts the Container through `exec("true")`, so a connect precedes them).
+- **No text, nothing run:** a start without a Global mise config costs what it costs today.
+
+#### 3.4 Holding the Container, and bounds
+
+- **Hold.** A run raises `#running` (through a `hold()` callback that returns its release) for its whole length, so
+  `alarm()` does not idle-stop the Container and `#notReclaimable` answers "in use" to another Workspace's reclaim.
+  When it ends, it notes use and reschedules the alarm, so the idle time counts from the end of the install.
+- **Deadline.** The DO waits at most 11 minutes for the exec (the script's own bounds: 660 s for the lock, 600 + 10 s
+  for the install, 2 × 25 s for the checks, all inside it). Past it the DO kills the exec, logs, and treats the run as
+  not laid; it is final for that runtime.
+- **A first command that times out during the install** (a Durable agent's `bash` with a short timeout, which waits in
+  `connect`) names it: computer-env's timeout message (`exec.ts`, "Command timed out") gains "while the Container
+  installed the Global mise config" when the Workspace DO reports a lay-down in flight. Built if the error path carries
+  that state cheaply (a `GlobalMise.inFlight()` read through the existing failure helper); otherwise reported as a
+  limit.
+
+### 4. What is reported
+
+- A `global-mise` log line per run: Workspace, revision, `source`, laid, install exit, timed out, ms, bytes and the
+  text's SHA-256 (the audit's), never the text.
+- **The panel's Status** (D3): "last Global mise lay-down": Workspace, revision, laid or not, exit, when, beside "last
+  taken by a Workspace". The Workspace DO sends each run's answer to the Environment DO (`noteGlobalMise`, one RPC,
+  bounded and not awaited by the command); the store keeps the last one (`t3flare:environment:global-mise`).
+- `containerState()` gains `globalMise` (the answer); mise's output stays in `install.log` on the Container's disk,
+  which an agent can read.
+
+### 5. Install: no cache
 
 As the ticket holds: every start installs the owner's tools again, and `MISE_DATA_DIR` stays mise's default on the
-Container's disk (never under the synced `/workspace/.t3flare/`). The follow-up for an install cache
-(`directorySnapshots` in the start options, unresearched) is drafted in the report for the orchestrator to file: this
-run reads Linear only.
+Container's disk, never under the synced `/workspace/.t3flare/`. The install-cache follow-up (`directorySnapshots` in
+the start options, unresearched; and the lay-down's answer on the panel per Workspace) is drafted in the report; filing
+it is pending with the orchestrator.
 
-### 5. Docs
+### 6. Docs
 
-- **ADR-0032 refinement**, a §8: the setting, the layering (system < global < project), the lay-down at each start
-  and its git/gh check, the variables (and that they beat every file), no install cache. No new ADR: without the cache
-  there is no new trade-off.
-- **`GLOSSARY.md`:** **Global mise config**, worded as on SPI-1001: "The owner's mise configuration that every
-  Container's commands get, under a repository's own." _Avoid_: Toolchains (cloudpid's word), global tools.
-- **No `upstream-fragility.md` entry:** nothing here leans on t3code internals. The mise behaviour it leans on (the
-  variable names, the layering, the token order) is checked by the M0 test, which stays in `test:docker`, so the
-  nightly job re-checks it when the image's mise moves. After Build it imports the real `COMMAND_ENV` and
-  `globalMiseScript` instead of its own copies.
+- **ADR-0032 refinement**, the next free section after SPI-1152's: the setting; the layering (system < global <
+  project); the lay-down per runtime id with its hold, bounds and git/gh check; the variables, which beat every file,
+  and which of them `variables.json` showed arrive; the audit's `{ bytes, sha256 }` as a departure from §3; the answer
+  keyed by revision and SHA-256 on the assumption that a Container's disk never outlives it (a disk that did would at
+  worst skip a lay-down of the same text); no install cache. No new ADR: without the cache there is no new trade-off.
+- **`GLOSSARY.md`:** **Global mise config**: "The owner's mise configuration that every Container's commands get,
+  under a repository's own." _Avoid_: Toolchains (cloudpid's word), global tools.
+- **No `upstream-fragility.md` entry:** nothing leans on t3code internals. The mise behaviour it leans on is re-checked
+  by `mise.docker.test.ts` in the nightly `test:docker`, which after Build imports the real `COMMAND_ENV` and
+  `globalMiseScript`, pins `mitmproxy/mitmproxy` by digest, and adds an unguarded row where a repo's file turns
+  `use_git_credentials` on.
 
-## Tests (seams)
+### 7. Tests (seams)
 
 | Seam | What it catches | What it misses |
 | -- | -- | -- |
-| `packages/harness-registry/src/environment.test.ts`: the `globalMiseConfig` entry through `applyEnvironmentChange` / `resolveEnvironment` | 16 KiB of UTF-8 accepted, one byte more refused (a multi-byte character counts by bytes), NUL refused, default `""`, a stored value that no longer fits reads as `""`, the revision moves only when the text does | the panel's rendering |
-| `apps/environment/test/environmentSettings.test.ts`: the panel's API | a save stores, bumps and audits the setting as `{ bytes, sha256 }`; a refused one stores nothing and answers the whole reason | what a Container does with it |
-| `apps/agents/test/globalMise.test.ts`: `GlobalMise` with a fake exec | one run per start with concurrent callers, none without text, the launch's text (not a newer one), a failed run logged and retried, a new start runs again | the real script |
-| `apps/agents/test/containerLaunch.test.ts` | the launch carries the start's text; a running Container keeps it | |
-| `apps/sandbox-image` script, through the M0 docker test | the lay-down, the git/gh check, idempotence, the variables, on the image's mise | the platform's exec |
+| `packages/harness-registry/src/environment.test.ts`: the entry through `applyEnvironmentChange` / `resolveEnvironment` | 16 KiB of UTF-8 accepted, one byte more refused (a multi-byte character counts by bytes), NUL refused, CRLF stored as LF and not a change, default `""`, a stored value that no longer fits reads as `""`, the revision moves only when the text does | the panel |
+| `apps/environment/test/environmentSettings.test.ts`: the panel's API and page | a save stores, bumps and audits as `{ bytes, sha256 }`; a refusal stores nothing and answers whole; the text area has no `maxlength` and round-trips its first newline; Status shows the last lay-down | a Container |
+| `apps/agents/test/globalMise.test.ts`: `GlobalMise` with a fake exec and clock | one run per runtime id with concurrent callers; a new runtime id runs again (a Container that died on its own); none without text; the launch's text; the hold held for the run and released with use noted; the 11-minute deadline ends it as not laid; an exec failure retried once, then by the next `ensure` | the real script |
+| `apps/agents/test/containerOnly.test.ts` (existing seam) | `connect` runs `ensure` with the handle's `runtimeId` on every connect and reads the launch after the inner connect | computer itself |
+| `apps/agents/test/containerLaunch.test.ts` | the launch carries the start's text, hash and source; a running Container keeps it | |
+| `apps/sandbox-image/src/globalMise.test.ts`: the real script in bash with stub `mise`, `git`, `gh`, `flock` and `timeout` (as `killScript.test.ts` does) | the text from stdin, laid only when both checks run, `mv` checked, an answer of the same revision and hash short-circuits, a different one does not, exit 124 as a timeout, the gitconfig copy | the real mise |
+| `mise.docker.test.ts` | the script on the image's mise: the M0 cases through the real script and variables | the platform's transports |
 
-The stage covers what no unit test can: the platform's exec, the three command paths, and the cost.
+### 8. SPI-1152 (Variables) lands first
+
+SPI-1152 edits the same places. If it is on `main` when the re-review passes, this branch rebases onto it before Build
+starts; otherwise Build goes on and rebases when it lands. Where the two meet:
+
+- `fields.ts`: both add a field type; the `file` case sits beside SPI-1152's.
+- `ContainerLaunch`: `globalMise` beside its Variables.
+- The audit's pick: `file` fields as `{ bytes, sha256 }`, beside its own rule.
+- The page's field renderer: one more case.
+- `COMMAND_ENV`: SPI-1152's `commandEnv` builder merges the owner's Variables under `COMMAND_ENV`, which wins; the
+  guards join `COMMAND_ENV` and so beat a Variable, and its `MISE_` prefix refusal already covers every name here. The
+  lay-down is the builder's fourth user, so the owner's Variables reach `mise install` (a Variable a tool's install
+  reads, such as a mirror) as they reach every command.
+- ADR-0032: this refinement takes the section after SPI-1152's.
 
 ## Stage `pmise` (added to `STAGES`)
 
 `apps/environment/scripts/pmise.ts`, modelled on `penv.ts`, through `node scripts/stage.ts run pmise pmise <case>`.
-Each file carries the deployed commit (from `/_t3flare/health`). Evidence in `docs/steps/global-mise/`:
+Each file carries the deployed commit (from `/_t3flare/health`). Evidence in `docs/steps/global-mise/`, in this order:
 
-- `install.json`: a global `node` pin the image lacks; `node --version` in a new Container from a Durable agent's
-  `bash`, a CLI agent's command, and a t3 Terminal.
-- `override.json`: a repo's `mise.toml` naming `node` wins; the other global tools stay.
-- `git-gh.json`: t3's git status and a commit, and `gh --version`, under the pin.
-- `restart.json`: a change while a Container runs leaves it alone, and the next start has it; an agent's edit of the
-  laid-down file is gone at the next start.
-- `cost.json`: seconds from start to first command, with and without the pin, two starts in a row each.
-- `empty.json`: with no global config, start time as today (and no lay-down exec).
-- Also checked there: the variables reach a command whole (the empty ones included: `mise settings get` and
-  `mise token github` in the Container), and an invalid owner file is not laid down while git still works.
+1. `variables.json` (**first**): with a `hosts.yml` present, `mise settings get github.gh_cli_tokens`,
+   `github.use_git_credentials`, `github.credential_command`, `disable_tools`, `disable_backends`, and `mise token
+   github`, from a Durable agent's `bash`, a t3 Terminal, and a command run by each of Codex, Claude Code, OpenCode and
+   pi. Decides §2's conditions before the rest is run.
+2. `install.json`: a global `node` pin the image lacks; `node --version` in a new Container from a Durable agent's
+   `bash`, a CLI agent's command, and a t3 Terminal.
+3. `override.json`: a repo's `mise.toml` naming `node` wins; the other global tools stay.
+4. `git-gh.json`: t3's git status and a commit, and `gh --version`, under the pin; and a credentialed `git fetch` of
+   the Workspace's repo under an owner-pinned `conda:git`.
+5. `hold.json`: the idle time at 1 minute and a pin whose install takes longer (measured in the file); the Container is
+   not stopped mid-install, and a second Workspace's start at a budget of 1 does not reclaim it.
+6. `restart.json`: a change while a Container runs leaves it alone, and the next start has it; an agent's edit of the
+   laid-down file is gone at the next start.
+7. `invalid.json`: invalid TOML is not laid down, git still works, and Status shows it not laid with its exit.
+8. `size.json`: a full 16 KiB text saved, laid down and read back whole in the Container.
+9. `cost.json`: seconds from start to first command, with and without the pin, two starts in a row each.
+10. `empty.json`: with no global config, start time as today, and no lay-down exec.
 
 Then the stage is destroyed.
 
-## Decisions for review (provisional; each passes the escalation tests only if the reviewer disagrees)
+## Build order
 
-- **D1. A file under which git or gh fails is not laid down,** and the start goes on as with none (logged, and in
-  `containerState`). The alternative, laying it down anyway, breaks t3's git status and commit for every Workspace on
-  a typo (invalid TOML fails every shim). The owner may still pin git or gh to a version that installs.
-- **D2. The audit records the text's size and SHA-256, not the text** (the log's 2 MB value limit). The alternative
-  is a separate audit store for large values.
-- **D3. A file not laid down, or a failed install, is not shown on the panel** in this cut: logs, `containerState`
-  and the Container's `install.log`. Showing the last start's answer under the setting would need the Workspace DO
-  to report back to the Environment DO; proposed as part of the follow-up.
-- **D4. `MISE_DISABLE_TOOLS` and `MISE_DISABLE_BACKENDS` are held empty,** so neither the owner's file nor a repo's
-  can disable a tool or backend. Disabling is not needed to add tools, and both settings could remove git or gh.
-- **D5. A new `file` field type** rather than widening `text` (whose limit is in characters and which allows NUL), so
-  the Harness settings' fields keep their rules.
-- **D6. `mise install` runs from `/`,** so it installs the base and global tools only. A repo's own tools install as
-  today (mise installs a missing version on first use, `MISE_YES=1`). An install that exits non-zero for another tool
-  still lays the file down when git and gh run: the failed tool fails where it is used, as it would on a laptop.
+1. Rebase onto SPI-1152 if it has landed (§8).
+2. The setting: the `file` field type, CRLF, the entry, its tests (`environment.test.ts`).
+3. The panel: the renderer, the audit's `{ bytes, sha256 }`, the Status line and `noteGlobalMise`, their tests.
+4. The script and its bash test; `COMMAND_ENV`; the Dockerfile note.
+5. `GlobalMise` (key, hold, deadline, retry) and its tests; the launch's `globalMise`; `containerState()`.
+6. Wiring: `ContainerOnlyBackend.connect`, `WorkspaceDO.exec`, `beforeSpawn`, `beforeStart`; the timeout's naming.
+7. `mise.docker.test.ts` on the real script and variables, mitmproxy by digest, the extra row; re-run, its files
+   replaced at the new commit.
+8. Stage `pmise`: `variables.json` first, then fix any dropped name (§2) and re-deploy; then the rest in order.
+9. Docs: ADR-0032 refinement, glossary, report with the install-cache follow-up draft. `pnpm run check`.
+10. Destroy `pmise`.
+
+## Decisions (as reviewed)
+
+- **D1. A file under which git or gh fails is not laid down** (accepted), shown in Status (D3).
+- **D2. The audit records the text's size and SHA-256** (accepted), recorded in the ADR as a departure from §3.
+- **D3. The last lay-down is shown in the panel's Status** (changed by the review).
+- **D4. `MISE_DISABLE_TOOLS` and `MISE_DISABLE_BACKENDS` held empty** (accepted, conditional on `variables.json`).
+- **D5. A new `file` field type**, no `maxlength` on its text area (accepted).
+- **D6. `mise install` runs from `/`** (accepted).
