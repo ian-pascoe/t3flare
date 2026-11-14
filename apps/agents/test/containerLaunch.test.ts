@@ -87,7 +87,7 @@ describe("launchOf", () => {
 });
 
 describe("the launch's Global mise config", () => {
-  const taken = { settings: { revision: 7, containerSize: "cpu-1" as const, containerIdleMinutes: 2, containerBudget: 3, globalMiseConfig: '[tools]\nnode = "24.11.1"\n' }, source: "kept" as const };
+  const taken = { settings: { revision: 7, containerSize: "cpu-1" as const, containerIdleMinutes: 2, containerBudget: 3, variables: {}, globalMiseConfig: '[tools]\nnode = "24.11.1"\n' }, source: "kept" as const };
 
   it("carries the start's text, its size and SHA-256, its revision and where the settings came from", async () => {
     const launch = await withGlobalMise(launchOf(taken), taken);

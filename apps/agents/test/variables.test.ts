@@ -10,17 +10,9 @@ describe("commandEnv", () => {
   it("puts the Variables under everything else: COMMAND_ENV, a CLI profile's environment, t3's own variables", () => {
     const variables = { NODE_ENV: "development", LOG_LEVEL: "debug", MISE_YES: "0", T3CODE_THREAD_ID: "variable", CODEX_HOME: "/elsewhere" };
     const env = commandEnv(variables, { ...COMMAND_ENV, T3CODE_THREAD_ID: "t1" }, { CODEX_HOME: "/var/lib/t3flare/cli/k1/codex", LOG_LEVEL: "info" });
-    expect(env).toEqual({
-      NODE_ENV: "development",
-      LOG_LEVEL: "info",
-      MISE_YES: "1",
-      MISE_GLOBAL_CONFIG_FILE: COMMAND_ENV.MISE_GLOBAL_CONFIG_FILE,
-      MISE_TRUSTED_CONFIG_PATHS: COMMAND_ENV.MISE_TRUSTED_CONFIG_PATHS,
-      GIT_TERMINAL_PROMPT: "0",
-      BASH_ENV: COMMAND_ENV.BASH_ENV,
-      T3CODE_THREAD_ID: "t1",
-      CODEX_HOME: "/var/lib/t3flare/cli/k1/codex",
-    });
+    // Every COMMAND_ENV name as COMMAND_ENV has it (its mise configs and guards, SPI-1150), the Variable's MISE_YES lost.
+    expect(env).toEqual({ ...COMMAND_ENV, NODE_ENV: "development", LOG_LEVEL: "info", T3CODE_THREAD_ID: "t1", CODEX_HOME: "/var/lib/t3flare/cli/k1/codex" });
+    expect(env.MISE_YES).toBe("1");
   });
 
   it("is the layers alone without Variables", () => {
