@@ -185,7 +185,7 @@ The tier is a pure function in `packages/harness-registry/src/tiers.ts`:
 
 ```ts
 tierOf(input: { entity; stored; change; hintedClass?: (server, tool) => "read" | "write" | undefined })
-  : { tier: "free" | "asked"; reasons: string[]; needsPage?: "secret" | "sign-in" }
+  : { tier: "free" | "asked"; reasons: string[]; needsPage?: "secret" | "sign-in" | "skills" }
 ```
 
 Registry additions: `ExtensionEntry.guard?: true` (set on `guardian` and `permissions`); `SettingEntry.tier?: "free" |
@@ -272,7 +272,7 @@ interface OpenChange {
   hash: string;                  // SHA-256 of tool + the change as its planner normalized it (only the fields the
                                  // change takes; SPI-1199 review), canonical, without expectedRevision
   shown: ChangeView;             // what the card and the page render: before, after, reasons, when it applies (D10)
-  needsPage?: "secret" | "sign-in" | "oversize";
+  needsPage?: "secret" | "sign-in" | "skills" | "oversize";
   mode: "card" | "browser" | "native" | "model";
   caller: { door: "own" | "owner"; key: string; principal: "agent" | "owner" | "service-token";
             thread?: string; agent?: string; client?: { name: string; source: string } };
@@ -599,7 +599,9 @@ In every mode the Change page can also answer the Open change; the first answer 
   | `change` | the Open change's id |
 
 - The one Workers Logs line per change gains `via`, `tier`, `mode` and `answeredBy`, and still no value.
-- Refusals, declines and expiries are log lines (`settings-refused`, `settings-change`), not audit entries.
+- Refusals, declines and expiries are log lines, not audit entries: a change's own end (applied, expired) is a
+  `settings-change` line with its `outcome`, and a refusal, decline, withdrawal, move or failure a `settings-refused`
+  line (one builder, `closedLine` in `settings/changes.ts`; SPI-1200 review).
 - No revert tool: the audit log has before and after, and the owner reverts on the panel.
 
 ### D16. Caps
@@ -728,7 +730,7 @@ Unit tests live beside the existing ones (`apps/environment/test`, `packages/har
 
 **T-open** (`openChanges.test.ts`)
 - Single use: two answers, one applies.
-- Expiry at 10 minutes; lazy pruning an hour after closing.
+- Expiry at 10 minutes; lazy pruning two hours after closing (`CLOSED_KEPT_MS`, SPI-1199 review).
 - Each answerer rule of D8's table, and a wrong `sub`.
 - A moved revision closes as `moved` and applies nothing.
 - Two changes open against one revision: the first accept applies, the second is `moved`.
