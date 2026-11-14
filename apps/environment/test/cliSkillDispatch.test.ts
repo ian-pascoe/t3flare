@@ -103,8 +103,12 @@ describe("Claude Code's rewrite of a Skill mention (stock's planClaudeSkillDispa
   });
 });
 
+/** A discovery of Skills by name (at `INNER`) or by their `SKILL.md`'s path. */
 const discovery = (names: ReadonlyArray<string>): SkillDiscovery => ({
-  skills: names.map((name) => ({ name, description: `${name} things`, filePath: `${INNER}/${name}/SKILL.md`, disableModelInvocation: false })),
+  skills: names.map((entry) => {
+    const name = entry.includes("/") ? entry.split("/").at(-2)! : entry;
+    return { name, description: `${name} things`, filePath: entry.includes("/") ? entry : `${INNER}/${name}/SKILL.md`, disableModelInvocation: false };
+  }),
   skipped: [],
   omitted: 0,
 });
@@ -153,7 +157,7 @@ const promptFor = (cli: "claude" | "opencode", text: string, files: Record<strin
               id: "proj",
               inner: "/workspace/repo",
               workspace: {
-                skills: (_inner, agent) => (asked.push(agent), order?.push(`skills ${agent}`), Promise.resolve(discovery(Object.keys(files).map((file) => file.split("/").at(-2)!)))),
+                skills: (_inner, agent) => (asked.push(agent), order?.push(`skills ${agent}`), Promise.resolve(discovery(Object.keys(files).filter((file) => file.endsWith("/SKILL.md"))))),
                 prompts: (_inner, agent): Promise<ReadonlyArray<PromptTemplate>> => (asked.push(agent), Promise.resolve([])),
                 readText: (file) => Promise.resolve(files[file] ?? null),
               },
@@ -239,11 +243,16 @@ describe("through t3's ACP adapter", () => {
     expect(blocks[0]?.text).toContain(`/fruit-code [The user invoked this skill. Follow the instructions at: ${mount}/fruit-code/SKILL.md]`);
   });
 
-  it("OpenCode gets an Environment skill embedded from its row with the mount as its base, and the Repo's of a same-named pair (SPI-1153)", async () => {
-    const { blocks } = await run(promptFor("opencode", "go $grill-me $fruit-code", { [`${INNER}/fruit-code/SKILL.md`]: SKILL }, { "grill-me": ENVIRONMENT_SKILL, "fruit-code": ENVIRONMENT_SKILL }));
-    const text = blocks[0]?.text ?? "";
-    expect(text).toContain('<skill_content name="grill-me">\n# Skill: grill-me\n\nInterview the owner.\n\nBase directory for this skill: /workspace/.agents/skills/grill-me\n');
-    expect(text).toContain(`<skill_content name="fruit-code">\n# Skill: fruit-code\n\nRead reference/code.md for the code.\n\nBase directory for this skill: ${T3}/fruit-code\n`);
+  it("OpenCode gets an Environment skill embedded from its row with the mount as its base, and a same-named pair as OpenCode keeps it by root (SPI-1153)", async () => {
+    const mount = "/workspace/.agents/skills";
+    const rows = { "grill-me": ENVIRONMENT_SKILL, "fruit-code": ENVIRONMENT_SKILL };
+    // The Repo's fruit-code in `.agents/skills`: OpenCode keeps the Environment's.
+    const agents = (await run(promptFor("opencode", "go $grill-me $fruit-code", { "/workspace/repo/.agents/skills/fruit-code/SKILL.md": SKILL }, rows))).blocks[0]?.text ?? "";
+    expect(agents).toContain(`<skill_content name="grill-me">\n# Skill: grill-me\n\nInterview the owner.\n\nBase directory for this skill: ${mount}/grill-me\n`);
+    expect(agents).toContain(`<skill_content name="fruit-code">\n# Skill: fruit-code\n\nInterview the owner.\n\nBase directory for this skill: ${mount}/fruit-code\n`);
+    // In `.opencode/skills`: OpenCode keeps the Repo's.
+    const own = (await run(promptFor("opencode", "go $fruit-code", { "/workspace/repo/.opencode/skills/fruit-code/SKILL.md": SKILL }, rows))).blocks[0]?.text ?? "";
+    expect(own).toContain(`<skill_content name="fruit-code">\n# Skill: fruit-code\n\nRead reference/code.md for the code.\n\nBase directory for this skill: /w/proj/.opencode/skills/fruit-code\n`);
   });
 
   it("has the thread's Workspace take the Environment skill set before the turn's text is read and sent (SPI-1153)", async () => {

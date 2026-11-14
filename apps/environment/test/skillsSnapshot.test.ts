@@ -22,7 +22,7 @@ const templates: ReadonlyArray<PromptTemplate> = [
   { name: "review", description: "", argumentHint: "<file> [focus]", filePath: "/workspace/repo/.pi/prompts/review.md" },
 ];
 
-const access = (options: { enabled?: boolean; rows?: Array<{ name: string; description: string; disableModelInvocation: boolean }> } = {}): SkillsAccess & { asked: Array<string> } => {
+const access = (options: { enabled?: boolean; rows?: Array<{ name: string; description: string; disableModelInvocation: boolean }>; discovery?: SkillDiscovery } = {}): SkillsAccess & { asked: Array<string> } => {
   const asked: Array<string> = [];
   return {
     asked,
@@ -36,7 +36,7 @@ const access = (options: { enabled?: boolean; rows?: Array<{ name: string; descr
         inner: `/workspace/repo${match[2] ?? ""}`,
         workspace: {
           skills: (inner, agent, opts) =>
-            (asked.push(`skills ${inner}${agent === undefined ? "" : ` ${agent}`}${opts?.repoOnly === true ? " repo-only" : ""}`), Promise.resolve(discovery)),
+            (asked.push(`skills ${inner}${agent === undefined ? "" : ` ${agent}`}${opts?.repoOnly === true ? " repo-only" : ""}`), Promise.resolve(options.discovery ?? discovery)),
           prompts: (inner, agent) => (asked.push(`prompts ${inner}${agent === undefined ? "" : ` ${agent}`}`), Promise.resolve(templates)),
           readText: () => Promise.resolve(null),
         },
@@ -126,20 +126,21 @@ describe("a CLI agent's snapshotForCwd (SPI-1151)", () => {
     expect(answer.skills.map((skill) => skill.name)).toEqual(["fruit-code", "owner-only"]);
   });
 
-  it("lists the Environment skills, scope user, at the mount, each CLI's winner of a same-named pair first (SPI-1153 M0)", async () => {
+  it("lists the Environment skills, scope user, at the mount, each same-named pair as the CLI keeps it by its Repo root (SPI-1153 M0)", async () => {
     const rows = [
       { name: "fruit-code", description: "The Environment's.", disableModelInvocation: false },
       { name: "grill-me", description: "Only the Environment's.", disableModelInvocation: false },
     ];
-    const listed = async (agent: CliAgent) => (await cli("/w/proj", access({ rows }), agent)).skills.map((skill) => [skill.name, skill.scope, skill.path]);
+    const listed = async (agent: CliAgent, repo?: SkillDiscovery) => (await cli("/w/proj", access({ rows, ...(repo === undefined ? {} : { discovery: repo }) }), agent)).skills.map((skill) => [skill.name, skill.scope, skill.path]);
     const environment = (name: string) => [name, "user", `/workspace/.agents/skills/${name}/SKILL.md`];
     const repo = (name: string, root: string) => [name, "project", `/w/proj/${root}/${name}/SKILL.md`];
-    // Claude Code and pi keep the Environment's (pi by the flag's order); its Repo namesake is not listed.
-    for (const agent of ["claude", "pi"] as const) expect(await listed(agent)).toEqual([environment("fruit-code"), environment("grill-me"), repo("owner-only", ".claude/skills")]);
-    // OpenCode keeps the Repo's.
-    expect(await listed("opencode")).toEqual([repo("fruit-code", ".agents/skills"), repo("owner-only", ".claude/skills"), environment("grill-me")]);
+    // The fixture's fruit-code is in `.agents/skills`. Claude Code, pi and OpenCode keep the Environment's of it.
+    for (const agent of ["claude", "pi", "opencode"] as const) expect(await listed(agent), agent).toEqual([environment("fruit-code"), environment("grill-me"), repo("owner-only", ".claude/skills")]);
     // Codex lists both, the Repo's first, as it does; t3's menu shows the first of a name.
-    expect(await listed("codex")).toEqual([repo("fruit-code", ".agents/skills"), repo("owner-only", ".claude/skills"), environment("fruit-code"), environment("grill-me")]);
+    expect(await listed("codex")).toEqual([environment("grill-me"), repo("fruit-code", ".agents/skills"), repo("owner-only", ".claude/skills"), environment("fruit-code")]);
+    // OpenCode keeps a Repo skill in `.opencode/skills` over the Environment's.
+    const inOpencode: SkillDiscovery = { skills: [{ name: "fruit-code", description: "Repo.", filePath: "/workspace/repo/.opencode/skills/fruit-code/SKILL.md", disableModelInvocation: false }], skipped: [], omitted: 0 };
+    expect(await listed("opencode", inOpencode)).toEqual([environment("grill-me"), repo("fruit-code", ".opencode/skills")]);
   });
 
   it("is the built-ins alone outside a Workspace", async () => {

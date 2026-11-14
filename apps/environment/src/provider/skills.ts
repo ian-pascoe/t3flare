@@ -10,8 +10,8 @@ import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
 import type { ProviderWorkspaceSnapshot } from "@t3tools/provider-core/server/driver";
 import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
 import {
-  CLI_ROOTS,
   type CliAgent,
+  environmentPrecedenceOf,
   type EnvironmentSkillEntry,
   environmentSkillPath,
   type PromptTemplate,
@@ -90,11 +90,12 @@ const mergedSkills = (at: { readonly inner: string; readonly workspace: Workspac
 
 /**
  * A CLI agent's Skills (SPI-1151, SPI-1153): its Repo skills at its own roots with the Environment's rows merged by that
- * CLI's own rule for a same-named pair (`CLI_ROOTS[agent].environmentPrecedence`). The CLI reads the set through its
- * link (or pi's flag), so the rows are what it finds once its Workspace has taken them.
+ * CLI's own rule for a same-named pair, which depends on the root the Repo skill is in (`environmentPrecedenceOf`:
+ * OpenCode's `.opencode/` roots beat an Environment skill, its `.agents/skills` does not). The CLI reads the set through
+ * its link (or pi's flag), so the rows are what it finds once its Workspace has taken them.
  */
 export const cliSkills = (at: { readonly inner: string; readonly workspace: WorkspaceSkills }, access: SkillsAccess, agent: CliAgent): Promise<SkillDiscovery> =>
-  at.workspace.skills(at.inner, agent).then((repo) => withEnvironmentSkillsFor(CLI_ROOTS[agent].environmentPrecedence, access.environment?.entries() ?? [], repo));
+  at.workspace.skills(at.inner, agent).then((repo) => withEnvironmentSkillsFor((skill) => environmentPrecedenceOf(agent, skill.filePath), access.environment?.entries() ?? [], repo));
 
 /** Whether `skill` is an Environment skill (its `SKILL.md` at the mount). */
 const isEnvironmentSkill = (skill: Pick<Skill, "filePath">): boolean => skill.filePath.startsWith(`${SKILLS_MOUNT}/`);
@@ -193,7 +194,8 @@ export interface MessageSkills {
 /**
  * The thread in t3 path `cwd`'s skills, through `access`; read only when a message asks. With `opencode` (SPI-1151:
  * OpenCode is the one CLI agent whose adapter lacks an embed; Claude Code's is rejected): its Skills at OpenCode's
- * roots with the Environment skills by OpenCode's rule (SPI-1153: a Repo namesake wins), not behind the Harness switch
+ * roots with the Environment skills by OpenCode's rule (SPI-1153: a Repo namesake in `.opencode/` wins, one in
+ * `.agents/skills` loses), not behind the Harness switch
  * (Pi Durable's), with no Prompt templates (OpenCode's own commands reach it as typed), in t3 paths (the Container's),
  * as OpenCode's skill tool returns them.
  */

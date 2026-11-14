@@ -103,18 +103,37 @@ export const environmentSkillPath = (name: string): string => `${SKILLS_MOUNT}/$
  * `repo` (a Workspace's Repo-only discovery) with `environment` first: an Environment skill beats a Repo skill of the
  * same name (SPI-1001), which goes to `skipped`. Anything the Workspace listed under `SKILLS_MOUNT` (one that predates
  * Repo-only discovery) is dropped: the Environment's rows are the current set, so a removed or disabled Environment
- * skill un-shadows its Repo namesake at once. The Repo skills' cap and `omitted` are untouched.
+ * skill un-shadows its Repo namesake at once. The Repo skills' cap and `omitted` are untouched. Pi Durable's merge.
  */
-export const withEnvironmentSkills = (environment: ReadonlyArray<EnvironmentSkillEntry>, repo: SkillDiscovery): SkillDiscovery => {
-  const names = new Set(environment.map((skill) => skill.name));
-  const own = (skill: Skill) => !skill.filePath.startsWith(`${SKILLS_MOUNT}/`);
-  const shadowed = repo.skills.filter((skill) => own(skill) && names.has(skill.name));
+export const withEnvironmentSkills = (environment: ReadonlyArray<EnvironmentSkillEntry>, repo: SkillDiscovery): SkillDiscovery =>
+  withEnvironmentSkillsFor(() => "environment", environment, repo);
+
+/**
+ * `repo` (a Repo-only discovery) with `environment` merged, each same-named pair settled by `precedenceOf` its Repo
+ * skill (SPI-1153: a CLI agent's own rule, by the root the Repo skill is in, `environmentPrecedenceOf`), so the composer
+ * shows what the CLI loads. `environment`: the Environment's is listed, first, and the Repo's goes to `skipped`; `repo`:
+ * the Repo's is kept and the Environment's goes to `skipped`; `both`: both are listed, the Repo's first, as Codex lists
+ * them (t3's menu shows the first of a name). An Environment skill without a Repo namesake is listed first. Anything
+ * the Workspace listed under `SKILLS_MOUNT` is dropped: the rows are the set.
+ */
+export const withEnvironmentSkillsFor = (precedenceOf: (repoSkill: Skill) => EnvironmentPrecedence, environment: ReadonlyArray<EnvironmentSkillEntry>, repo: SkillDiscovery): SkillDiscovery => {
+  const own = repo.skills.filter((skill) => !skill.filePath.startsWith(`${SKILLS_MOUNT}/`));
+  const repoByName = new Map<string, Skill>();
+  for (const skill of own) if (!repoByName.has(skill.name)) repoByName.set(skill.name, skill);
+  const atMount = (skill: EnvironmentSkillEntry): Skill => ({ name: skill.name, description: skill.description, filePath: environmentSkillPath(skill.name), disableModelInvocation: skill.disableModelInvocation });
+  const by: Record<EnvironmentPrecedence, Array<EnvironmentSkillEntry>> = { environment: [], repo: [], both: [] };
+  for (const skill of environment) {
+    const namesake = repoByName.get(skill.name);
+    by[namesake === undefined ? "environment" : precedenceOf(namesake)].push(skill);
+  }
+  const winning = new Set(by.environment.map((skill) => skill.name));
   return {
-    skills: [
-      ...environment.map((skill): Skill => ({ name: skill.name, description: skill.description, filePath: environmentSkillPath(skill.name), disableModelInvocation: skill.disableModelInvocation })),
-      ...repo.skills.filter((skill) => own(skill) && !names.has(skill.name)),
+    skills: [...by.environment.map(atMount), ...own.filter((skill) => !winning.has(skill.name)), ...by.both.map(atMount)],
+    skipped: [
+      ...own.filter((skill) => winning.has(skill.name)).map((skill) => ({ path: skill.filePath, reason: `"${skill.name}" is shadowed by the Environment skill ${skill.name}` })),
+      ...by.repo.map((skill) => ({ path: environmentSkillPath(skill.name), reason: `"${skill.name}" is shadowed by the Repo skill at ${repoByName.get(skill.name)!.filePath}` })),
+      ...repo.skipped.filter((skip) => !skip.path.startsWith(`${SKILLS_MOUNT}/`)),
     ],
-    skipped: [...shadowed.map((skill) => ({ path: skill.filePath, reason: `"${skill.name}" is shadowed by the Environment skill ${skill.name}` })), ...repo.skipped.filter((skip) => !skip.path.startsWith(`${SKILLS_MOUNT}/`))],
     omitted: repo.omitted,
   };
 };
@@ -128,28 +147,3 @@ export const listingOfSet = (files: Readonly<Record<string, string>>): ReadonlyA
       const parsed = parseSkill(`${SKILLS_MOUNT}/${path}`, files[path]!);
       return "reason" in parsed ? [] : [parsed];
     });
-
-/**
- * SPI-1153: `repo` (a CLI agent's Repo-only discovery, at its roots) with `environment` merged by that CLI's own rule
- * for a same-named pair (`CLI_ROOTS[cli].environmentPrecedence`), so the composer shows what the CLI loads:
- * `environment` as `withEnvironmentSkills`; `repo`, the Repo skill kept and the Environment's in `skipped`; `both`, every
- * skill of both, the Repo's first, as Codex lists them (t3's menu shows the first of a name). Anything the Workspace
- * listed under `SKILLS_MOUNT` is dropped, as there.
- */
-export const withEnvironmentSkillsFor = (precedence: EnvironmentPrecedence, environment: ReadonlyArray<EnvironmentSkillEntry>, repo: SkillDiscovery): SkillDiscovery => {
-  if (precedence === "environment") return withEnvironmentSkills(environment, repo);
-  const own = (skill: Skill) => !skill.filePath.startsWith(`${SKILLS_MOUNT}/`);
-  const repoSkills = repo.skills.filter(own);
-  const repoByName = new Map(repoSkills.map((skill) => [skill.name, skill]));
-  const atMount = (skill: EnvironmentSkillEntry): Skill => ({ name: skill.name, description: skill.description, filePath: environmentSkillPath(skill.name), disableModelInvocation: skill.disableModelInvocation });
-  const kept = precedence === "both" ? environment : environment.filter((skill) => !repoByName.has(skill.name));
-  const shadowed = precedence === "both" ? [] : environment.filter((skill) => repoByName.has(skill.name));
-  return {
-    skills: [...repoSkills, ...kept.map(atMount)],
-    skipped: [
-      ...shadowed.map((skill) => ({ path: environmentSkillPath(skill.name), reason: `"${skill.name}" is shadowed by the Repo skill at ${repoByName.get(skill.name)!.filePath}` })),
-      ...repo.skipped.filter((skip) => !skip.path.startsWith(`${SKILLS_MOUNT}/`)),
-    ],
-    omitted: repo.omitted,
-  };
-};
