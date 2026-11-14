@@ -492,7 +492,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
       mode: () => runtimeModeOf(this.#meta()?.runtimeMode),
       interaction: () => interactionModeOf(this.#meta()?.interactionMode),
       turn: () => this.#liveTurn(),
-      call: (input) => environmentStub(this.env.ENVIRONMENT).mcpCall(input),
+      // The thread it was opened with (plan D3): the Environment derives everything else about the caller itself.
+      call: (input) => environmentStub(this.env.ENVIRONMENT).mcpCall({ ...input, thread: this.#meta()?.threadId ?? "" }),
       asker: (callId, signal) => this.#mcpQuestions.asker(this.#liveTurn(), callId, signal),
     });
   }

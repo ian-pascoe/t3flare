@@ -54,6 +54,8 @@ export interface EnvironmentRpc {
     readonly args: Readonly<Record<string, unknown>>;
     readonly judged: "read" | "write";
     readonly asker?: McpAsker;
+    /** The Session's thread: the Environment derives the caller from it (the Settings server, plan D3). */
+    readonly thread: string;
   }): Promise<McpCallAnswer>;
   /** A CLI process's MCP message through the relay (ADR-0028), its caller resolved by the Workspace DO. */
   mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer>;
