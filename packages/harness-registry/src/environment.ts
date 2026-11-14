@@ -6,7 +6,7 @@
 // One schema (`ENVIRONMENT_SETTINGS`), one resolve (`resolveEnvironment`), one change (`applyEnvironmentChange`): a later
 // setting (the Global mise config, SPI-1150; Variables, SPI-1152) is one entry in `ENVIRONMENT_SETTINGS`. The resolved
 // type, the resolve, the validation and the panel's section all follow from it.
-import { type EnvironmentSettingEntry, type EnvironmentValue, fieldProblem } from "./fields.ts";
+import { type EnvironmentSettingEntry, type EnvironmentValue, fieldProblem, normalizeField } from "./fields.ts";
 import { fitVariables, MAX_VARIABLES } from "./variables.ts";
 
 export * from "./variables.ts";
@@ -20,6 +20,9 @@ export const DEFAULT_CONTAINER_BUDGET = 3;
 
 /** The most the Container budget may be set to. */
 export const MAX_CONTAINER_BUDGET = 10;
+
+/** The largest Global mise config, in bytes of UTF-8 (cloudpid's `MAX_TOOLCHAINS_BYTES`). */
+export const MAX_GLOBAL_MISE_BYTES = 16 * 1024;
 
 /** A Container's resources, as `ctx.container.start({ instance })` takes a custom size. */
 export interface ContainerResources {
@@ -100,13 +103,19 @@ export const ENVIRONMENT_SETTINGS = {
     description: `Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a credential. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most ${MAX_VARIABLES}. Applies at each Workspace's next Container start.`,
     schema: { type: "variables", default: {} },
   },
+  globalMiseConfig: {
+    title: "Global mise config",
+    description:
+      "A mise.toml every Container's commands get, under a repository's own and over the image's base tools. Laid down and installed at each Workspace's next Container start; a running Container keeps what it started with. Kept only if git and gh still run under it. disable_tools and disable_backends are ignored. Agents can read this file: put no secret in it, [env] included.",
+    schema: { type: "file", maxBytes: MAX_GLOBAL_MISE_BYTES, default: "" },
+  },
 } as const satisfies Readonly<Record<string, EnvironmentSettingEntry>>;
 
 export type EnvironmentKey = keyof typeof ENVIRONMENT_SETTINGS;
 
 const ENVIRONMENT_KEYS = Object.keys(ENVIRONMENT_SETTINGS) as ReadonlyArray<EnvironmentKey>;
 
-/** The value a field of `schema` holds: an enum's own names, a number, a boolean or text. */
+/** The value a field of `schema` holds: an enum's own names, a number, a boolean or text (a `file` field's too). */
 type ValueOf<Schema> = Schema extends { readonly type: "enum"; readonly values: ReadonlyArray<infer Name> }
   ? Name
   : Schema extends { readonly type: "integer" }
@@ -160,10 +169,10 @@ export const applyEnvironmentChange = (
   stored: StoredEnvironment,
   change: EnvironmentChange,
 ): { readonly ok: true; readonly environment: StoredEnvironment; readonly changed: ReadonlyArray<EnvironmentKey> } | { readonly ok: false; readonly error: string } => {
-  const entries = Object.entries(change.settings);
-  if (entries.length === 0) return { ok: false, error: "the change sets nothing" };
+  if (Object.keys(change.settings).length === 0) return { ok: false, error: "the change sets nothing" };
+  for (const key of Object.keys(change.settings)) if (!Object.hasOwn(ENVIRONMENT_SETTINGS, key)) return { ok: false, error: `${key}: no such setting` };
+  const entries = Object.entries(change.settings).map(([key, value]) => [key, normalizeField((ENVIRONMENT_SETTINGS[key as EnvironmentKey] as EnvironmentSettingEntry).schema, value)] as const);
   for (const [key, value] of entries) {
-    if (!Object.hasOwn(ENVIRONMENT_SETTINGS, key)) return { ok: false, error: `${key}: no such setting` };
     const why = fieldProblem((ENVIRONMENT_SETTINGS[key as EnvironmentKey] as EnvironmentSettingEntry).schema, value);
     if (why !== undefined) return { ok: false, error: `${key}: ${why}` };
   }

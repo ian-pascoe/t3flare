@@ -7,12 +7,12 @@ import { applyEnvironmentChange, containerInstance, EMPTY_ENVIRONMENT, resolveEn
 
 describe("resolveEnvironment", () => {
   it("gives the defaults for empty settings: cpu-1 and a 2-minute idle time, at revision 0", () => {
-    expect(resolveEnvironment(EMPTY_ENVIRONMENT)).toEqual({ revision: 0, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {} });
+    expect(resolveEnvironment(EMPTY_ENVIRONMENT)).toEqual({ revision: 0, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {}, globalMiseConfig: "" });
   });
 
   it("reads a stored size it no longer offers, or an idle time out of bounds, as the default", () => {
-    expect(resolveEnvironment({ revision: 4, settings: { containerSize: "mem-8", containerIdleMinutes: 0, containerBudget: 11 } })).toEqual({ revision: 4, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {} });
-    expect(resolveEnvironment({ revision: 5, settings: { containerSize: "standard-3", containerIdleMinutes: 15, containerBudget: 5 } })).toEqual({ revision: 5, containerSize: "standard-3", containerIdleMinutes: 15, containerBudget: 5, variables: {} });
+    expect(resolveEnvironment({ revision: 4, settings: { containerSize: "mem-8", containerIdleMinutes: 0, containerBudget: 11 } })).toEqual({ revision: 4, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {}, globalMiseConfig: "" });
+    expect(resolveEnvironment({ revision: 5, settings: { containerSize: "standard-3", containerIdleMinutes: 15, containerBudget: 5 } })).toEqual({ revision: 5, containerSize: "standard-3", containerIdleMinutes: 15, containerBudget: 5, variables: {}, globalMiseConfig: "" });
   });
 });
 
@@ -21,10 +21,10 @@ describe("applyEnvironmentChange", () => {
     const applied = applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { containerSize: "standard-4", containerIdleMinutes: 10 } });
     if (!applied.ok) throw new Error(applied.error);
     expect(applied.environment.revision).toBe(1);
-    expect(resolveEnvironment(applied.environment)).toEqual({ revision: 1, containerSize: "standard-4", containerIdleMinutes: 10, containerBudget: 3, variables: {} });
+    expect(resolveEnvironment(applied.environment)).toEqual({ revision: 1, containerSize: "standard-4", containerIdleMinutes: 10, containerBudget: 3, variables: {}, globalMiseConfig: "" });
     const again = applyEnvironmentChange(applied.environment, { settings: { containerIdleMinutes: 5 } });
     if (!again.ok) throw new Error(again.error);
-    expect(resolveEnvironment(again.environment)).toEqual({ revision: 2, containerSize: "standard-4", containerIdleMinutes: 5, containerBudget: 3, variables: {} });
+    expect(resolveEnvironment(again.environment)).toEqual({ revision: 2, containerSize: "standard-4", containerIdleMinutes: 5, containerBudget: 3, variables: {}, globalMiseConfig: "" });
   });
 
   it("stores and bumps the revision for the settings that moved only; a save that moves none changes nothing", () => {
@@ -68,5 +68,38 @@ describe("containerInstance", () => {
     for (const name of ["lite", "basic", "mem-8", "custom-1", "", null, 3, { vcpu: 4 }]) {
       expect(containerInstance(resolveEnvironment({ revision: 1, settings: { containerSize: name } }).containerSize)).toEqual({ vcpu: 1, memoryMib: 3072, diskMb: 12000 });
     }
+  });
+});
+
+describe("the Global mise config", () => {
+  const set = (text: unknown) => applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { globalMiseConfig: text } });
+
+  it("is empty by default, and a stored value that no longer fits reads as empty", () => {
+    expect(resolveEnvironment(EMPTY_ENVIRONMENT).globalMiseConfig).toBe("");
+    expect(resolveEnvironment({ revision: 2, settings: { globalMiseConfig: "a\u0000b" } }).globalMiseConfig).toBe("");
+    expect(resolveEnvironment({ revision: 2, settings: { globalMiseConfig: 42 } }).globalMiseConfig).toBe("");
+  });
+
+  it("takes up to 16 KiB of UTF-8 and refuses one byte more, counting a character by its bytes", () => {
+    expect(set("x".repeat(16 * 1024))).toMatchObject({ ok: true });
+    expect(set("x".repeat(16 * 1024 + 1))).toEqual({ ok: false, error: "globalMiseConfig: is longer than 16 KiB of UTF-8" });
+    // 5462 three-byte characters are 16 386 bytes, though only 5462 UTF-16 units.
+    expect(set("€".repeat(5462))).toEqual({ ok: false, error: "globalMiseConfig: is longer than 16 KiB of UTF-8" });
+    expect(set("€".repeat(5461))).toMatchObject({ ok: true });
+  });
+
+  it("refuses a NUL and anything not text", () => {
+    expect(set('[tools]\nnode = "24"\u0000')).toEqual({ ok: false, error: "globalMiseConfig: contains a NUL character" });
+    expect(set(7)).toMatchObject({ ok: false });
+  });
+
+  it("stores CRLF as LF, so a browser's round trip of the same text is not a change", () => {
+    const first = set('[tools]\r\nnode = "24.11.1"\r\n');
+    if (!first.ok) throw new Error(first.error);
+    expect(resolveEnvironment(first.environment).globalMiseConfig).toBe('[tools]\nnode = "24.11.1"\n');
+    const again = applyEnvironmentChange(first.environment, { settings: { globalMiseConfig: '[tools]\r\nnode = "24.11.1"\r\n' } });
+    if (!again.ok) throw new Error(again.error);
+    expect(again.changed).toEqual([]);
+    expect(again.environment.revision).toBe(1);
   });
 });
