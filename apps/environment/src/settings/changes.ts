@@ -7,12 +7,12 @@
 // Kept in storage, not memory: the Environment resets after about 60 s idle (ADR-0003), which can fall between the ask
 // and the owner's click. Rows expire and are pruned lazily, on every read and write of the table: an open row past its
 // `expiresAt` closes as `expired`, and a closed row goes `CLOSED_KEPT_MS` after it closed (the longest a cap looks back:
-// a run of strikes and the lock after its last). No alarm is
-// added (ADR-0003: one alarm).
+// a run of strikes and the lock after its last). No alarm is added (ADR-0003: one alarm).
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import { MCP_ELICITATION_WAIT_MS } from "@cloudpid/mcp/types";
 import type { NeedsPage as TierNeedsPage } from "@t3flare/harness-registry";
 
+import { base64Url } from "../harness/keys.ts";
 import type { ChangeView } from "./render.ts";
 
 export const CHANGES_TABLE = "t3flare_settings_changes";
@@ -155,14 +155,17 @@ export const canonicalJson = (value: unknown): string =>
  */
 export const changeHash = async (tool: string, args: Readonly<Record<string, unknown>>): Promise<string> => {
   const { expectedRevision: _expected, ...rest } = args;
-  const bytes = new TextEncoder().encode(canonicalJson({ tool, args: rest }));
-  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(canonicalJson({ tool, args: rest }));
 };
+
+/** SHA-256 of `text`'s UTF-8, in hex: of canonical JSON, for a change's hash and a `requestState`'s call digest. */
+export const sha256Hex = async (text: string): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 /** A change's id (plan D8): `chg_` and 32 random bytes, base64url. */
 export const newChangeId = (): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return `chg_${btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "")}`;
+  return `chg_${base64Url(bytes)}`;
 };
 
 /** A well-formed change id, so a page path or a `resume` cannot name anything else. */
@@ -176,9 +179,12 @@ const parse = (text: unknown): ChangeRecord | undefined => {
   }
 };
 
-/** The log line of a change closed here, by its time running out (plan D15: expiries are log lines, as closes are). */
-const closedLine = (record: ChangeRecord): Record<string, unknown> => ({
-  t3flare: "settings-refused",
+/**
+ * The one log line of a closed change (plan D15): `settings-change` when it applied or expired (a change's own end),
+ * `settings-refused` when it was declined, withdrawn, moved or failed. Never a value.
+ */
+export const closedLine = (record: ChangeRecord): Record<string, unknown> => ({
+  t3flare: record.state === "applied" || record.state === "expired" ? "settings-change" : "settings-refused",
   via: "mcp",
   door: record.caller.door,
   tool: record.tool,
@@ -186,7 +192,8 @@ const closedLine = (record: ChangeRecord): Record<string, unknown> => ({
   tier: record.tier,
   mode: record.mode ?? null,
   outcome: record.state,
-  answeredBy: null,
+  answeredBy: record.closed?.by ?? null,
+  ...(record.closed?.revision === undefined ? {} : { revision: record.closed.revision }),
   ...(record.closed?.error === undefined ? {} : { error: record.closed.error }),
 });
 

@@ -4,14 +4,9 @@
 // another origin (which cannot read the page to learn it), and accepted for the current and the previous hour so a page
 // left open across the hour still works.
 import { timingSafeEqual } from "../access.ts";
+import { base64Url } from "./keys.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
-
-const base64Url = (bytes: ArrayBuffer): string =>
-  btoa(String.fromCharCode(...new Uint8Array(bytes)))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/, "");
 
 const hmac = async (key: Uint8Array<ArrayBuffer>, text: string): Promise<string> => {
   const imported = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);

@@ -36,7 +36,6 @@ import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
 import { type ModelRelayTarget, relayTargetOf } from "@t3flare/models/relay";
 import type { SkillsApiDeps } from "./skills/api.ts";
-import type { EndpointCaller } from "./settings/endpoint.ts";
 import type { SettingsServerDeps } from "./settings/server.ts";
 import { githubReader, readAccessFor } from "./skills/contents.ts";
 import { type SkillStore, skillStore } from "./skills/store.ts";
@@ -443,7 +442,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * The Owner-client endpoint (ADR-0034, plan D11), RPC from the Worker after it verified the endpoint's own Access
    * application (D13). Never boots t3. Open work while it runs, and while a held stream is open (plan D17).
    */
-  async settingsMcp(request: Request, caller: EndpointCaller): Promise<Response> {
+  async settingsMcp(request: Request, caller: HarnessCaller): Promise<Response> {
     Idle.requestStarted();
     try {
       const [{ handleSettingsMcp }, { settingsStateKey }] = await Promise.all([import("./settings/endpoint.ts"), import("./settings/tokens.ts")]);
@@ -481,7 +480,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * changes live in this object's SQLite.
    */
   async #settingsDeps(): Promise<SettingsServerDeps> {
-    const [{ settingsChanges }, { HARNESS_PATH, harnessStatus, runningContainers }, { threadLinkOf }, { durableModes }, { cliThreadState }] = await Promise.all([
+    const [{ settingsChanges }, { harnessStatus, runningContainers }, { threadLinkOf }, { durableModes }, { cliThreadState }] = await Promise.all([
       import("./settings/changes.ts"),
       import("./harness/panel.ts"),
       import("./provider/adapter.ts"),
@@ -497,7 +496,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       // A Durable thread's modes are the adapter's record; a CLI thread's are its live session's (plan D3).
       modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
       changes: settingsChanges(this.ctx.storage.sql, Date.now, (event) => console.log(JSON.stringify(event))),
-      panelUrl: () => (this.env.T3FLARE_HOST === undefined && this.#host === undefined ? undefined : `https://${this.#configuredHost()}${HARNESS_PATH}`),
+      origin: () => (this.env.T3FLARE_HOST === undefined && this.#host === undefined ? undefined : `https://${this.#configuredHost()}`),
       status: () => harnessStatus({ store, skills }),
       running: () => runningContainers({ budget: () => this.#budgetState() }),
       log: (event) => console.log(JSON.stringify(event)),

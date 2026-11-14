@@ -33,7 +33,6 @@ import { SCRIPT } from "./pageScript.ts";
 import { endpointsSection, type EndpointsView } from "./pageEndpoints.ts";
 import { STYLE } from "./pageStyle.ts";
 
-/** `text` with every control and format character shown (a bidi override is inert), then escaped. */
 /** `text` safe in HTML, with every control and format character shown as `\u{…}` (a hostile value is inert). */
 export const visibleHtml = (text: string): string => escapeHtml(visible(text));
 

@@ -3,11 +3,12 @@
 // fixed, its holds short, and requests as the named clients send them (M0's capture, P17).
 import { applyMcpChange, type McpServerSetting } from "@t3flare/harness-registry";
 
-import { type EndpointCaller, type EndpointDeps, handleSettingsMcp, MODERN_VERSION } from "../src/settings/endpoint.ts";
+import type { HarnessCaller } from "../src/harness/panel.ts";
+import { type EndpointDeps, handleSettingsMcp, MODERN_VERSION } from "../src/settings/endpoint.ts";
 import type { SettingsFixture } from "./settingsFixture.ts";
 
 export const SUB = "owner-sub";
-export const OWNER: EndpointCaller = { kind: "owner", subject: SUB };
+export const OWNER: HarnessCaller = { kind: "owner", subject: SUB };
 export const ENDPOINT = "https://t3.example.dev/_t3flare/mcp";
 export const FREE = { expectedRevision: 0, settings: { containerIdleMinutes: 7 } };
 export const ASKED = { expectedRevision: 0, settings: { containerBudget: 4 } };
@@ -19,7 +20,7 @@ export const BOTH = { elicitation: { form: {}, url: {} } };
 /** The endpoint over `f`, its key fixed, its holds short. */
 export const endpointOf =
   (f: SettingsFixture, extra: Partial<EndpointDeps> = {}) =>
-  (request: Request, caller: EndpointCaller = OWNER) =>
+  (request: Request, caller: HarnessCaller = OWNER) =>
     handleSettingsMcp(request, caller, { server: f.deps, stateKey: () => KEY, now: f.now, holdMs: 80, beatMs: 30, ...extra });
 
 export const post = (body: unknown, options: { readonly query?: string; readonly headers?: Readonly<Record<string, string>> } = {}) =>
@@ -54,7 +55,7 @@ export const legacy = (method: string, params: Record<string, unknown> = {}, opt
   );
 
 /** Initializes at `version` with `capabilities`; the session token the endpoint gave. */
-export const initialize = async (endpoint: ReturnType<typeof endpointOf>, version: string, capabilities: unknown = BOTH, caller: EndpointCaller = OWNER) => {
+export const initialize = async (endpoint: ReturnType<typeof endpointOf>, version: string, capabilities: unknown = BOTH, caller: HarnessCaller = OWNER) => {
   const response = await endpoint(post({ jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: version, capabilities, clientInfo: { name: "opencode", version: "2.2.7" } } }), caller);
   return { response, session: response.headers.get("mcp-session-id") ?? "", body: (await response.json()) as { result: Record<string, unknown> } };
 };

@@ -19,6 +19,7 @@ import {
   type ChangeState,
   CLOSED_KEPT_MS,
   type ClosedBy,
+  closedLine,
   durationText,
   isOpen,
   type SettingsChanges,
@@ -39,7 +40,6 @@ export const DECLINED_REPEAT_MS = 10 * 60_000;
  * caller's asked changes for `STRIKE_LOCK_MS` from the last of them.
  */
 export const STRIKES = 3;
-export { STRIKE_LOCK_MS, STRIKE_WINDOW_MS } from "./changes.ts";
 
 /** A closed change's outcome, as a held call and an answerer read it. Never an authorization URL. */
 export interface ChangeOutcome {
@@ -192,18 +192,7 @@ const closeAs = (deps: AnswerDeps, record: ChangeRecord, from: ReadonlyArray<Cha
   const next: ChangeRecord = { ...record, state, closed };
   if (!deps.changes.replace(record.id, from, next)) return undefined;
   const outcome = outcomeOf(next);
-  deps.log?.({
-    t3flare: state === "applied" ? "settings-change" : "settings-refused",
-    via: "mcp",
-    door: record.caller.door,
-    tool: record.tool,
-    change: record.id,
-    tier: record.tier,
-    mode: record.mode ?? null,
-    outcome: state,
-    answeredBy: closed.by ?? null,
-    ...(closed.revision === undefined ? {} : { revision: closed.revision }),
-  });
+  deps.log?.(closedLine(next));
   settle(record.id, outcome);
   return outcome;
 };

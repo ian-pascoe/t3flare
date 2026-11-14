@@ -120,7 +120,7 @@ describe("a Settings server write from a caller the Environment cannot vouch for
             link: (thread) => threadLinkIn(sql, thread),
             modes: (caller) => (caller.thread === undefined ? undefined : durableModes(caller.thread)),
             changes: settingsChanges(nodeSqlStorage(), () => 0),
-            panelUrl: () => undefined,
+            origin: () => undefined,
           },
           input,
         ),

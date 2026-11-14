@@ -1,11 +1,22 @@
 // @effect-diagnostics globalDate:off
 // T-open (plan §5; ADR-0034, plan D8, D16), M4 (SPI-1199): the Open change. Single use; expiry at 10 minutes and lazy
-// pruning an hour after closing; D8's answerer table, a wrong `sub`; a moved revision; two changes against one
+// pruning two hours after closing (`CLOSED_KEPT_MS`); D8's answerer table, a wrong `sub`; a moved revision; two changes against one
 // revision; the record surviving an Environment reset; a skill whose digest changed at apply; every cap of D16, and that
 // a dropped stream or an expiry is not a strike for an Owner client.
 import { afterEach, describe, expect, it } from "vitest";
 
-import { APPLIED_CAP, CHANGE_TTL_MS, type ChangeCaller, type ChangeRecord, CLOSED_KEPT_MS, NETWORK_READ_CAP, newChangeId, settingsChanges } from "../src/settings/changes.ts";
+import {
+  APPLIED_CAP,
+  CHANGE_TTL_MS,
+  type ChangeCaller,
+  type ChangeRecord,
+  CLOSED_KEPT_MS,
+  NETWORK_READ_CAP,
+  newChangeId,
+  settingsChanges,
+  STRIKE_LOCK_MS,
+  STRIKE_WINDOW_MS,
+} from "../src/settings/changes.ts";
 import {
   type AnswerDeps,
   answerOpenChange,
@@ -14,8 +25,6 @@ import {
   DECLINED_REPEAT_MS,
   OPEN_ACROSS,
   OPEN_PER_OWNER,
-  STRIKE_LOCK_MS,
-  STRIKE_WINDOW_MS,
   waitForChange,
 } from "../src/settings/openChanges.ts";
 import { answerDepsOf, changesApiOf, settingsOwnerCall } from "../src/settings/server.ts";
@@ -109,14 +118,14 @@ describe("expiry and pruning", () => {
     expect(w.deps().changes.get(record.id)?.state).toBe("open");
     w.advance(1);
     expect(w.deps().changes.get(record.id)).toMatchObject({ state: "expired", closed: { at: NOW + CHANGE_TTL_MS } });
-    // An expiry is a log line (plan D15), written once, by the table that closed it.
+    // An expiry is a log line (plan D15), `settings-change` as a change's own end, written once, by the table that closed it.
     w.deps().changes.get(record.id);
-    expect(w.logs).toEqual([{ t3flare: "settings-refused", via: "mcp", door: "own", tool: "change_environment", change: record.id, tier: "asked", mode: "card", outcome: "expired", answeredBy: null }]);
+    expect(w.logs).toEqual([{ t3flare: "settings-change", via: "mcp", door: "own", tool: "change_environment", change: record.id, tier: "asked", mode: "card", outcome: "expired", answeredBy: null }]);
     expect(await answerOpenChange(w.deps(), record.id, { by: "card", answerer: { kind: "card" }, action: "approve" })).toMatchObject({ ok: false, status: 409 });
     expect(w.applied).toEqual([]);
   });
 
-  it("prunes a row an hour after it closed, lazily", () => {
+  it("prunes a row two hours after it closed (CLOSED_KEPT_MS), lazily", () => {
     const w = world();
     const record = w.open(OWN);
     closeOpenChange(w.deps(), record.id, "withdrawn", "stop");

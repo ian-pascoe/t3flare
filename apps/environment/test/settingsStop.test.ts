@@ -40,11 +40,13 @@ describe("a Stop withdraws the Open change after \"Opened it\" (plan D9)", () =>
   });
 
   it("a Session's call of another server is never given the stop", async () => {
-    const f = (fixture = settingsFixture());
     const seen: Array<unknown> = [];
-    await sessionMcpCall({ call: async (input) => (seen.push(input), { kind: "result", isError: false, text: "ok" }) }, { server: "commissary", tool: "echo", args: {}, thread: "t", stopId: "session:s1:call-2" }, DURABLE_AGENT);
+    const host = {
+      servers: () => ({ commissary: { kind: "commissary" as const, enabled: true, exposure: "deferred" as const } }),
+      call: async (input: unknown) => (seen.push(input), { kind: "result" as const, isError: false, text: "ok" }),
+    };
+    await sessionMcpCall(host, { server: "commissary", tool: "echo", args: {}, thread: "t", stopId: "session:s1:call-2" }, DURABLE_AGENT);
     expect(seen).toEqual([{ server: "commissary", tool: "echo", args: {}, caller: { door: "own", thread: "t", agent: DURABLE_AGENT } }]);
-    void f;
   });
 
   it("a CLI's relayed call: the CLI going away (cancelAsk with its askId) withdraws the Open change", async () => {

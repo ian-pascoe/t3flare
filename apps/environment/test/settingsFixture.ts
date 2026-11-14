@@ -85,7 +85,7 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
     // As the Environment DO wires it: a Durable thread's modes are the adapter's record, a CLI's its live session's.
     modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
     changes: changes(),
-    panelUrl: () => PANEL,
+    origin: () => `https://${HOST}`,
     status: () => ({ "settings revision": store.load().revision }),
     running: async () => ({ count: 0, holders: [] }),
     log: (event) => void logs.push(event),

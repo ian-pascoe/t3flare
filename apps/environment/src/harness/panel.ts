@@ -44,7 +44,7 @@ import { isChangeId } from "../settings/changes.ts";
 import { type Answerer, type ChangesApi, openChangeSummary } from "../settings/openChanges.ts";
 import { renderChangePage, renderGonePage } from "./changePage.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
-import { CHANGES_API_PATH, CHANGES_PATH, HARNESS_PATH } from "./paths.ts";
+import { CHANGES_API_PATH, CHANGES_PATH, changePagePath, HARNESS_PATH } from "./paths.ts";
 import { pageCsp, renderPage } from "./page.ts";
 import type { AuditActor, HarnessStore } from "./store.ts";
 
@@ -213,7 +213,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
       });
     }
     if (path === CHANGES_API_PATH && deps.changes !== undefined) {
-      return json({ changes: deps.changes.list().map((record) => openChangeSummary(record, `https://${deps.host}${CHANGES_PATH}/${record.id}`)) });
+      return json({ changes: deps.changes.list().map((record) => openChangeSummary(record, `https://${deps.host}${changePagePath(record.id)}`)) });
     }
     if (path === `${HARNESS_PATH}/api/settings`) {
       const stored = deps.store.load();
