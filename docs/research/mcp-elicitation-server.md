@@ -237,7 +237,7 @@ Summary for the matrix:
 
 Recorded 2026-11-14 by the spike on branch `settings-mcp-m0-spike` against its probe MCP server:
 `docs/steps/settings-mcp/m0-clients.json` (P14, P17) and `m0-pi.json` (P16) there, to be merged with this branch. "Owner
-step" refers to `docs/steps/settings-mcp-m0-owner-steps.md` on that branch. What was built on them: plan D11 and D12,
+step" refers to [`docs/steps/settings-mcp-m0-owner-steps.md`](../steps/settings-mcp-m0-owner-steps.md) (copied from that branch). What was built on them: plan D11 and D12,
 `apps/environment/src/settings/endpoint.ts`.
 
 - **Claude Code 2.1.322** speaks 2026-07-28 first: `server/discover`, then `tools/list` and `tools/call`, each with

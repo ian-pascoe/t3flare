@@ -41,17 +41,19 @@ a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bea
    `/.well-known/cloudflare-access-protected-resource/_t3flare/mcp`.
 4. `/_t3flare/mcpx` and `/_t3flare/mcp/anything`: the first is the admin application's (its Access login), the second
    the endpoint's and answered 404 after Access.
-4b. **Cursor (owner step 2)**: the redirect allowlist's one custom scheme, `cursor://anysphere.cursor-mcp/oauth/callback`,
-   comes from third-party reports. Record the `redirect_uri` Cursor registers (decoded from Access's sign-in URL, before
-   signing in) and whether registration succeeds. If Cursor uses another scheme, change `SETTINGS_OAUTH_REDIRECT_URIS`
-   (one constant) and ADR-0035; if it uses `localhost`, the scheme may be dropped.
-4c. **Prod's custom domain shape** (no deploy to prod; nothing changes there): M0 probed workers.dev only. Without
-   touching prod's Access applications, record from prod's host (`t3.ianpascoe.dev`) as it is today: what
-   `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`,
-   `/.well-known/cloudflare-access-protected-resource/_t3flare` and `/_t3flare/mcp` answer (status, `WWW-Authenticate`,
-   and whether Access or the origin answers), so the first prod deploy of `SettingsAccess` has a baseline to compare
-   with. After that deploy (CI's, not this run), the same requests must show `/_t3flare/mcp` as its own application and
-   the root documents still t3's; `scripts/acceptance.ts` step 2b asserts the latter on every run.
+   - **4b. Cursor (owner step 2)**: the redirect allowlist's one custom scheme,
+     `cursor://anysphere.cursor-mcp/oauth/callback`, comes from third-party reports. Record the `redirect_uri` Cursor
+     registers (decoded from Access's sign-in URL, before signing in) and whether registration succeeds. If Cursor uses
+     another scheme, change `SETTINGS_OAUTH_REDIRECT_URIS` (one constant) and ADR-0035; if it uses `localhost`, the
+     scheme may be dropped.
+   - **4c. Prod's custom domain shape** (no deploy to prod; nothing changes there): M0 probed workers.dev only. Without
+     touching prod's Access applications, record from prod's host (`t3.ianpascoe.dev`) as it is today: what
+     `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`,
+     `/.well-known/cloudflare-access-protected-resource/_t3flare` and `/_t3flare/mcp` answer (status,
+     `WWW-Authenticate`, and whether Access or the origin answers), so the first prod deploy of `SettingsAccess` has a
+     baseline to compare with. After that deploy (CI's, not this run), the same requests must show `/_t3flare/mcp` as
+     its own application and the root documents still t3's; `scripts/acceptance.ts` step 2b asserts the latter on every
+     run.
 
 ### A named client, end to end (Claude Code 2.1.322 on 2026-07-28; then OpenCode or Claude Code forced to 2025-11-25)
 

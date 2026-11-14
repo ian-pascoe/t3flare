@@ -1,12 +1,14 @@
 # Owner clients reach the Settings server at `/_t3flare/mcp`, behind an Access application of its own
 
 Status: accepted, conditionally (SPI-1196's M0 spike and SPI-1200, 2026-11-14). It rests on a probe the owner has not
-run yet: **owner step 1** (`docs/steps/settings-mcp-m0-owner-steps.md` on the spike branch `settings-mcp-m0-spike`), a
+run yet: **owner step 1** ([`docs/steps/settings-mcp-m0-owner-steps.md`](../steps/settings-mcp-m0-owner-steps.md)), a
 real OAuth token's exchange for the endpoint's path and its refusal at the panel's paths. Until it is recorded, this is
 the layout built and deployed to test stages, not a confirmed one. Plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md) D13. Evidence:
 `docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json` (spike branch). Refines
-[ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) ("Access only on the admin path") and
+[ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) ("Access only on the admin path"),
+[ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §1-2 (one
+Access application, no second one; its SPI-1200 refinement) and
 [ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md) §1, which left where the Owner-client
 endpoint lives to this record.
 
