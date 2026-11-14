@@ -1,0 +1,354 @@
+{
+ "at": "2026-11-14T00:03:28.284Z",
+ "host": "t3flare-environment-pvars.ian-g-pascoe.workers.dev",
+ "commit": "6c70c3e4e01c",
+ "workspace": "pvars",
+ "variables": {
+  "PVARS_PROBE": "pinned-89a35bf8",
+  "NODE_ENV": "pvars"
+ },
+ "cases": [
+  {
+   "name": "codex: a turn through the proxy, its endpoint and key helper t3flare's, the Variables in its environment",
+   "runs": [
+    {
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "reply": "ready",
+   "processes": [
+    {
+     "pid": "54",
+     "argv0": "/opt/t3flare/bin/codex",
+     "env": {
+      "PVARS_PROBE": "pinned-89a35bf8",
+      "NODE_ENV": "pvars",
+      "CODEX_HOME": "/var/lib/t3flare/cli/proc-25eb27eb-64a9-4ddf-8ded-4f8ea6d0f0b0/codex",
+      "LANG": "C.UTF-8",
+      "HOME": "/root"
+     },
+     "names": [
+      "CODEX_HOME",
+      "CODEX_SQLITE_HOME",
+      "GIT_TERMINAL_PROMPT",
+      "HOME",
+      "LANG",
+      "MISE_GLOBAL_CONFIG_FILE",
+      "MISE_TRUSTED_CONFIG_PATHS",
+      "MISE_YES",
+      "NODE_ENV",
+      "OLDPWD",
+      "PATH",
+      "PVARS_PROBE",
+      "PWD",
+      "SHLVL",
+      "T3FLARE_EXEC",
+      "T3FLARE_MODEL_KEY_NONCE",
+      "T3FLARE_TOOL_HANDLE"
+     ]
+    }
+   ],
+   "allProcesses": [
+    "/usr/bin/setsid: setsid --wait /opt/t3flare/bin/codex",
+    "/opt/t3flare/bin/codex: /opt/t3flare/bin/codex app-server -c"
+   ],
+   "endpoint": "https://api.ai.ianpascoe.dev/v1",
+   "keyHelper": "/opt/t3flare/bin/t3flare-model-key",
+   "variableSeen": [
+    "pinned-89a35bf8"
+   ],
+   "ok": true
+  },
+  {
+   "name": "pi: a turn through the proxy, its endpoint and key helper t3flare's, the Variables in its environment",
+   "runs": [
+    {
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "reply": "ready",
+   "processes": [
+    {
+     "pid": "62",
+     "argv0": "pi",
+     "env": {
+      "PVARS_PROBE": "pinned-89a35bf8",
+      "NODE_ENV": "pvars",
+      "PI_CODING_AGENT_DIR": "/var/lib/t3flare/cli/proc-382ceecb-1dc0-4327-8e14-e5d0715c7ad9/agent",
+      "LANG": "C.UTF-8",
+      "HOME": "/root"
+     },
+     "names": [
+      "GIT_TERMINAL_PROMPT",
+      "HOME",
+      "LANG",
+      "MISE_GLOBAL_CONFIG_FILE",
+      "MISE_TRUSTED_CONFIG_PATHS",
+      "MISE_YES",
+      "NODE_ENV",
+      "OLDPWD",
+      "PATH",
+      "PI_CODING_AGENT_DIR",
+      "PI_CODING_AGENT_SESSION_DIR",
+      "PI_OFFLINE",
+      "PI_SKIP_VERSION_CHECK",
+      "PI_TELEMETRY",
+      "PVARS_PROBE",
+      "PWD",
+      "SHLVL",
+      "T3FLARE_EXEC",
+      "T3FLARE_MODEL_KEY_NONCE",
+      "T3_MCP_BEARER_TOKEN",
+      "T3_MCP_URL",
+      "T3_PI_MCP_EXTENSION_PATH",
+      "T3_PI_RUNTIME_MODE"
+     ]
+    }
+   ],
+   "allProcesses": [
+    "/usr/bin/setsid: setsid --wait /opt/t3flare/bin/pi",
+    "/usr/local/share/mise/installs/node/26.13.0/bin/node: pi"
+   ],
+   "endpoint": "https://api.ai.ianpascoe.dev",
+   "keyHelper": "!/opt/t3flare/bin/t3flare-model-key pi",
+   "variableSeen": [
+    "pinned-89a35bf8"
+   ],
+   "ok": true
+  },
+  {
+   "name": "claude: a turn through the proxy, its endpoint and key helper t3flare's, the Variables in its environment",
+   "runs": [
+    {
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "reply": "ready",
+   "processes": [
+    {
+     "pid": "39",
+     "argv0": "setsid",
+     "env": {
+      "PVARS_PROBE": "pinned-89a35bf8",
+      "NODE_ENV": "pvars",
+      "ANTHROPIC_BASE_URL": "https://api.ai.ianpascoe.dev",
+      "CLAUDE_CONFIG_DIR": "/var/lib/t3flare/cli/proc-98f7f70a-23fb-4acc-b7d0-7bf293e50466/claude",
+      "LANG": "C.UTF-8",
+      "HOME": "/root"
+     },
+     "names": [
+      "ANTHROPIC_BASE_URL",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+      "CLAUDE_AGENT_ACP_EXPERIMENTAL_V2",
+      "CLAUDE_CODE_API_KEY_HELPER_TTL_MS",
+      "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL",
+      "CLAUDE_CODE_EXECUTABLE",
+      "CLAUDE_CODE_MAX_RETRIES",
+      "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB",
+      "CLAUDE_CONFIG_DIR",
+      "DISABLE_AUTOUPDATER",
+      "DISABLE_ERROR_REPORTING",
+      "DISABLE_FEEDBACK_COMMAND",
+      "DISABLE_TELEMETRY",
+      "DISABLE_UPDATES",
+      "GIT_TERMINAL_PROMPT",
+      "HOME",
+      "LANG",
+      "MISE_GLOBAL_CONFIG_FILE",
+      "MISE_TRUSTED_CONFIG_PATHS",
+      "MISE_YES",
+      "NODE_ENV",
+      "OLDPWD",
+      "PATH",
+      "PVARS_PROBE",
+      "PWD",
+      "SHLVL",
+      "T3FLARE_EXEC",
+      "T3FLARE_MODEL_KEY_NONCE"
+     ]
+    },
+    {
+     "pid": "54",
+     "argv0": "/usr/local/share/mise/installs/node/26.13.0/bin/node",
+     "env": {
+      "PVARS_PROBE": "pinned-89a35bf8",
+      "NODE_ENV": "pvars",
+      "ANTHROPIC_BASE_URL": "https://api.ai.ianpascoe.dev",
+      "CLAUDE_CONFIG_DIR": "/var/lib/t3flare/cli/proc-98f7f70a-23fb-4acc-b7d0-7bf293e50466/claude",
+      "LANG": "C.UTF-8",
+      "HOME": "/root"
+     },
+     "names": [
+      "ANTHROPIC_BASE_URL",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+      "CLAUDE_AGENT_ACP_EXPERIMENTAL_V2",
+      "CLAUDE_CODE_API_KEY_HELPER_TTL_MS",
+      "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL",
+      "CLAUDE_CODE_EXECUTABLE",
+      "CLAUDE_CODE_MAX_RETRIES",
+      "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB",
+      "CLAUDE_CONFIG_DIR",
+      "DISABLE_AUTOUPDATER",
+      "DISABLE_ERROR_REPORTING",
+      "DISABLE_FEEDBACK_COMMAND",
+      "DISABLE_TELEMETRY",
+      "DISABLE_UPDATES",
+      "GIT_TERMINAL_PROMPT",
+      "HOME",
+      "LANG",
+      "MISE_GLOBAL_CONFIG_FILE",
+      "MISE_TRUSTED_CONFIG_PATHS",
+      "MISE_YES",
+      "NODE_ENV",
+      "OLDPWD",
+      "PATH",
+      "PVARS_PROBE",
+      "PWD",
+      "SHLVL",
+      "T3FLARE_EXEC"
+     ]
+    }
+   ],
+   "allProcesses": [
+    "/usr/bin/setsid: setsid --wait /opt/t3flare/bin/claude-agent-acp",
+    "/usr/local/share/mise/installs/node/26.13.0/bin/node: /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/claude/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js",
+    "/opt/t3flare/claude/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude: /opt/t3flare/claude/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude --output-format stream-json"
+   ],
+   "endpoint": {
+    "managed": "https://api.ai.ianpascoe.dev",
+    "process": "https://api.ai.ianpascoe.dev",
+    "httpsProxyPinned": ""
+   },
+   "keyHelper": "/opt/t3flare/bin/t3flare-claude-key",
+   "variableSeen": [
+    "pinned-89a35bf8",
+    "pinned-89a35bf8"
+   ],
+   "ok": true
+  },
+  {
+   "name": "opencode: a turn through the proxy, its endpoint and key helper t3flare's, the Variables in its environment",
+   "runs": [
+    {
+     "status": "completed",
+     "failure": null
+    }
+   ],
+   "reply": "ready",
+   "processes": [
+    {
+     "pid": "51",
+     "argv0": "/opt/t3flare/opencode/opencode",
+     "env": {
+      "PVARS_PROBE": "pinned-89a35bf8",
+      "NODE_ENV": "pvars",
+      "XDG_CONFIG_HOME": "/var/lib/t3flare/cli/proc-c5144e98-0ae8-41ad-ab61-7d0109828ef9/config",
+      "LANG": "C.UTF-8",
+      "HOME": "/root"
+     },
+     "names": [
+      "GIT_TERMINAL_PROMPT",
+      "HOME",
+      "LANG",
+      "MISE_GLOBAL_CONFIG_FILE",
+      "MISE_TRUSTED_CONFIG_PATHS",
+      "MISE_YES",
+      "NODE_ENV",
+      "OLDPWD",
+      "OPENCODE_DISABLE_AUTOUPDATE",
+      "OPENCODE_DISABLE_CLAUDE_CODE",
+      "OPENCODE_DISABLE_FREE_MODELS",
+      "OPENCODE_DISABLE_LSP_DOWNLOAD",
+      "OPENCODE_DISABLE_MODELS_FETCH",
+      "PATH",
+      "PVARS_PROBE",
+      "PWD",
+      "SHLVL",
+      "T3FLARE_EXEC",
+      "T3FLARE_MODEL_KEY_NONCE",
+      "XDG_CACHE_HOME",
+      "XDG_CONFIG_HOME",
+      "XDG_DATA_HOME",
+      "XDG_STATE_HOME"
+     ]
+    },
+    {
+     "pid": "74",
+     "argv0": "/opt/t3flare/opencode/opencode",
+     "env": {
+      "PVARS_PROBE": "pinned-89a35bf8",
+      "NODE_ENV": "pvars",
+      "XDG_CONFIG_HOME": "/var/lib/t3flare/cli/proc-c5144e98-0ae8-41ad-ab61-7d0109828ef9/config",
+      "LANG": "C.UTF-8",
+      "HOME": "/root"
+     },
+     "names": [
+      "GIT_TERMINAL_PROMPT",
+      "HOME",
+      "LANG",
+      "MISE_GLOBAL_CONFIG_FILE",
+      "MISE_TRUSTED_CONFIG_PATHS",
+      "MISE_YES",
+      "NODE_ENV",
+      "NO_PROXY",
+      "OLDPWD",
+      "OPENCODE_CLIENT",
+      "OPENCODE_DISABLE_AUTOUPDATE",
+      "OPENCODE_DISABLE_CLAUDE_CODE",
+      "OPENCODE_DISABLE_FREE_MODELS",
+      "OPENCODE_DISABLE_LSP_DOWNLOAD",
+      "OPENCODE_DISABLE_MODELS_FETCH",
+      "OPENCODE_PASSWORD",
+      "PATH",
+      "PVARS_PROBE",
+      "PWD",
+      "SHLVL",
+      "T3FLARE_EXEC",
+      "T3FLARE_MODEL_KEY_NONCE",
+      "XDG_CACHE_HOME",
+      "XDG_CONFIG_HOME",
+      "XDG_DATA_HOME",
+      "XDG_STATE_HOME",
+      "no_proxy"
+     ]
+    }
+   ],
+   "allProcesses": [
+    "/usr/lib/cargo/bin/coreutils/sleep: sleep 15",
+    "/usr/lib/cargo/bin/coreutils/sleep: sleep 1",
+    "/usr/bin/setsid: setsid --wait /opt/t3flare/bin/opencode",
+    "/opt/t3flare/opencode/opencode: /opt/t3flare/opencode/opencode acp",
+    "/usr/bin/dash: /bin/sh /opt/t3flare/bin/opencode acp",
+    "/usr/bin/dash: /bin/sh /opt/t3flare/bin/opencode acp",
+    "/opt/t3flare/opencode/opencode: /opt/t3flare/opencode/opencode serve --stdio"
+   ],
+   "endpoint": "https://api.ai.ianpascoe.dev/v1",
+   "keyHelper": [
+    "/opt/t3flare/share/opencode-key-plugin"
+   ],
+   "variableSeen": [
+    "pinned-89a35bf8",
+    "pinned-89a35bf8"
+   ],
+   "ok": true
+  },
+  {
+   "name": "every CLI reaches the same model proxy",
+   "endpoints": [
+    "https://api.ai.ianpascoe.dev",
+    "https://api.ai.ianpascoe.dev",
+    "https://api.ai.ianpascoe.dev",
+    "https://api.ai.ianpascoe.dev"
+   ],
+   "ok": true
+  }
+ ],
+ "ok": true
+}

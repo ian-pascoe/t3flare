@@ -1,0 +1,70 @@
+{
+ "at": "2026-11-14T00:00:26.388Z",
+ "host": "t3flare-environment-pvars.ian-g-pascoe.workers.dev",
+ "commit": "6c70c3e4e01c",
+ "workspace": "pvars",
+ "cases": [
+  {
+   "name": "started with the Variable at first",
+   "value": "first",
+   "startedAt": 1794614417386,
+   "launch": {
+    "size": "cpu-1",
+    "instance": {
+     "vcpu": 1,
+     "memoryMib": 3072,
+     "diskMb": 12000
+    },
+    "idleMs": 120000,
+    "budget": 3,
+    "revision": 22,
+    "variables": {
+     "PVARS_PROBE": "first"
+    }
+   },
+   "ok": true
+  },
+  {
+   "name": "changed to second while it runs: the running Container's commands still get first, its start unchanged",
+   "revision": 23,
+   "value": "first",
+   "startedAt": 1794614417386,
+   "launch": {
+    "size": "cpu-1",
+    "instance": {
+     "vcpu": 1,
+     "memoryMib": 3072,
+     "diskMb": 12000
+    },
+    "idleMs": 120000,
+    "budget": 3,
+    "revision": 22,
+    "variables": {
+     "PVARS_PROBE": "first"
+    }
+   },
+   "ok": true
+  },
+  {
+   "name": "the next start has second",
+   "value": "second",
+   "startedAt": 1794614422456,
+   "launch": {
+    "size": "cpu-1",
+    "instance": {
+     "vcpu": 1,
+     "memoryMib": 3072,
+     "diskMb": 12000
+    },
+    "idleMs": 120000,
+    "budget": 3,
+    "revision": 23,
+    "variables": {
+     "PVARS_PROBE": "second"
+    }
+   },
+   "ok": true
+  }
+ ],
+ "ok": true
+}

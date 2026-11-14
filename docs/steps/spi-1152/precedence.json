@@ -1,0 +1,50 @@
+{
+ "at": "2026-11-14T00:00:37.489Z",
+ "host": "t3flare-environment-pvars.ian-g-pascoe.workers.dev",
+ "commit": "6c70c3e4e01c",
+ "workspace": "pvars",
+ "script": "printf '[env]\\nPVARS_PROBE = \"from-mise\"\\n' > mise.toml\necho plain=$PVARS_PROBE\nmise exec -- bash -c 'echo mise=$PVARS_PROBE'\nexport PVARS_PROBE=exported\necho exported=$PVARS_PROBE\nrm -f mise.toml",
+ "run": {
+  "exitCode": 0,
+  "stdout": "plain=from-variable\nmise=from-mise\nexported=exported\n",
+  "stderr": "",
+  "startedAt": 1794614430045,
+  "launch": {
+   "size": "cpu-1",
+   "instance": {
+    "vcpu": 1,
+    "memoryMib": 3072,
+    "diskMb": 12000
+   },
+   "idleMs": 120000,
+   "budget": 3,
+   "revision": 24,
+   "variables": {
+    "PVARS_PROBE": "from-variable"
+   }
+  }
+ },
+ "cases": [
+  {
+   "name": "a plain command sees the Variable",
+   "value": "from-variable",
+   "ok": true
+  },
+  {
+   "name": "mise's [env] wins over it",
+   "value": "from-mise",
+   "ok": true
+  },
+  {
+   "name": "a command's own export wins over it",
+   "value": "exported",
+   "ok": true
+  },
+  {
+   "name": "the repo's mise.toml is gone again",
+   "status": "",
+   "ok": true
+  }
+ ],
+ "ok": true
+}

@@ -1,0 +1,68 @@
+{
+ "at": "2026-11-14T00:03:31.197Z",
+ "host": "t3flare-environment-pvars.ian-g-pascoe.workers.dev",
+ "commit": "6c70c3e4e01c",
+ "note": "The Workers Logs line of each change (store.ts) carries no value; unit-tested in apps/environment/test/environmentSettings.test.ts.",
+ "cases": [
+  {
+   "name": "each Variables change is logged with the names and values before and after",
+   "entries": [
+    {
+     "entity": "environment",
+     "at": 1794614611075,
+     "caller": "service-token",
+     "action": "environment.change",
+     "target": "variables",
+     "before": {
+      "variables": {
+       "PVARS_AUDIT": "two",
+       "PVARS_REGION": "eu"
+      }
+     },
+     "after": {
+      "variables": {}
+     }
+    },
+    {
+     "entity": "environment",
+     "at": 1794614610884,
+     "caller": "service-token",
+     "action": "environment.change",
+     "target": "variables",
+     "before": {
+      "variables": {
+       "PVARS_AUDIT": "one"
+      }
+     },
+     "after": {
+      "variables": {
+       "PVARS_AUDIT": "two",
+       "PVARS_REGION": "eu"
+      }
+     }
+    },
+    {
+     "entity": "environment",
+     "at": 1794614610760,
+     "caller": "service-token",
+     "action": "environment.change",
+     "target": "variables",
+     "before": {
+      "variables": {}
+     },
+     "after": {
+      "variables": {
+       "PVARS_AUDIT": "one"
+      }
+     }
+    }
+   ],
+   "ok": true
+  },
+  {
+   "name": "the refused change is not logged",
+   "ok": true
+  }
+ ],
+ "ok": true
+}

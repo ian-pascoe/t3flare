@@ -1,0 +1,104 @@
+{
+ "at": "2026-11-14T00:01:32.593Z",
+ "host": "t3flare-environment-pvars.ian-g-pascoe.workers.dev",
+ "commit": "6c70c3e4e01c",
+ "workspace": "pvars",
+ "variable": "PVARS_PROBE",
+ "value": "applied-48857092",
+ "revision": 25,
+ "cases": [
+  {
+   "name": "a Durable agent's command on the Container",
+   "backend": "container",
+   "runs": [
+    "completed"
+   ],
+   "commands": [
+    {
+     "input": "echo PVARS_PROBE=$PVARS_PROBE; test -e /opt/t3flare/bin && echo ON=container || echo ON=worker",
+     "status": "completed",
+     "output": {
+      "kind": "replace",
+      "text": "PVARS_PROBE=applied-48857092\nON=container\n",
+      "truncated": false,
+      "running": false
+     },
+     "text": "PVARS_PROBE=applied-48857092\nON=container\n"
+    }
+   ],
+   "value": "applied-48857092",
+   "ranOn": "container",
+   "ok": true
+  },
+  {
+   "name": "a Durable agent's command on the Worker Shell",
+   "backend": "worker",
+   "runs": [
+    "completed",
+    "completed"
+   ],
+   "commands": [
+    {
+     "input": "echo PVARS_PROBE=$PVARS_PROBE; test -e /opt/t3flare/bin && echo ON=container || echo ON=worker",
+     "status": "completed",
+     "output": {
+      "kind": "replace",
+      "text": "PVARS_PROBE=applied-48857092\nON=worker\n",
+      "truncated": false,
+      "running": false
+     },
+     "text": "PVARS_PROBE=applied-48857092\nON=worker\n"
+    }
+   ],
+   "value": "applied-48857092",
+   "ranOn": "worker",
+   "ok": true
+  },
+  {
+   "name": "a Codex command",
+   "runs": [
+    "completed"
+   ],
+   "commands": [
+    {
+     "input": "/bin/bash -c 'echo PVARS_PROBE=$PVARS_PROBE'",
+     "status": "completed",
+     "output": {
+      "kind": "replace",
+      "text": "PVARS_PROBE=applied-48857092\n",
+      "truncated": false,
+      "running": false
+     },
+     "text": "PVARS_PROBE=applied-48857092\n"
+    }
+   ],
+   "value": "applied-48857092",
+   "ok": true
+  },
+  {
+   "name": "a Terminal",
+   "output": "echo PVARS_PROBE=$PVARS_PROBE; echo T3D$((656651415+1))\nPVARS_PROBE=applied-48857092\nT3D656651416\n",
+   "value": "applied-48857092",
+   "ok": true
+  },
+  {
+   "name": "the Container's launch took the Variables",
+   "launch": {
+    "size": "cpu-1",
+    "instance": {
+     "vcpu": 1,
+     "memoryMib": 3072,
+     "diskMb": 12000
+    },
+    "idleMs": 120000,
+    "budget": 3,
+    "revision": 25,
+    "variables": {
+     "PVARS_PROBE": "applied-48857092"
+    }
+   },
+   "ok": true
+  }
+ ],
+ "ok": true
+}

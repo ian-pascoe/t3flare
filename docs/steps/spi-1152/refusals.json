@@ -1,0 +1,144 @@
+{
+ "at": "2026-11-14T00:00:11.885Z",
+ "host": "t3flare-environment-pvars.ian-g-pascoe.workers.dev",
+ "commit": "6c70c3e4e01c",
+ "cases": [
+  {
+   "name": "set by t3flare (a CLI profile)",
+   "tried": {
+    "ANTHROPIC_BASE_URL": "https://elsewhere.example"
+   },
+   "status": 400,
+   "answer": "variables: \"ANTHROPIC_BASE_URL\" is refused: t3flare sets it itself, for every command or for a CLI agent",
+   "ok": true
+  },
+  {
+   "name": "set by t3flare (the managed settings)",
+   "tried": {
+    "HTTPS_PROXY": "http://proxy.example:8080"
+   },
+   "status": 400,
+   "answer": "variables: \"HTTPS_PROXY\" is refused: t3flare sets it itself, for every command or for a CLI agent",
+   "ok": true
+  },
+  {
+   "name": "exact name",
+   "tried": {
+    "PATH": "/tmp"
+   },
+   "status": 400,
+   "answer": "variables: \"PATH\" is refused: the shell or the Container sets it for every command",
+   "ok": true
+  },
+  {
+   "name": "prefix T3",
+   "tried": {
+    "T3CODE_THREAD_ID": "x"
+   },
+   "status": 400,
+   "answer": "variables: \"T3CODE_THREAD_ID\" is refused: names starting T3 are t3's and t3flare's own",
+   "ok": true
+  },
+  {
+   "name": "prefix MISE_",
+   "tried": {
+    "MISE_ENV": "x"
+   },
+   "status": 400,
+   "answer": "variables: \"MISE_ENV\" is refused: names starting MISE_ are mise's settings, which t3flare sets for every command",
+   "ok": true
+  },
+  {
+   "name": "prefix GIT_",
+   "tried": {
+    "GIT_DIR": "x"
+   },
+   "status": 400,
+   "answer": "variables: \"GIT_DIR\" is refused: names starting GIT_ are git's, which t3flare sets for every command",
+   "ok": true
+  },
+  {
+   "name": "prefix GH_",
+   "tried": {
+    "GH_HOST": "x"
+   },
+   "status": 400,
+   "answer": "variables: \"GH_HOST\" is refused: names starting GH_ are the GitHub CLI's",
+   "ok": true
+  },
+  {
+   "name": "prefix GITHUB_",
+   "tried": {
+    "GITHUB_REPOSITORY": "x"
+   },
+   "status": 400,
+   "answer": "variables: \"GITHUB_REPOSITORY\" is refused: names starting GITHUB_ are GitHub's",
+   "ok": true
+  },
+  {
+   "name": "prefix SSH_",
+   "tried": {
+    "SSH_AUTH_SOCK": "x"
+   },
+   "status": 400,
+   "answer": "variables: \"SSH_AUTH_SOCK\" is refused: names starting SSH_ are ssh's",
+   "ok": true
+  },
+  {
+   "name": "prefix LD_",
+   "tried": {
+    "LD_PRELOAD": "x"
+   },
+   "status": 400,
+   "answer": "variables: \"LD_PRELOAD\" is refused: names starting LD_ are the dynamic loader's",
+   "ok": true
+  },
+  {
+   "name": "loader hook",
+   "tried": {
+    "NODE_OPTIONS": "--require /tmp/x.js"
+   },
+   "status": 400,
+   "answer": "variables: \"NODE_OPTIONS\" is refused: it makes programs load code before a command runs",
+   "ok": true
+  },
+  {
+   "name": "credential-like name",
+   "tried": {
+    "STRIPE_API_KEY": "x"
+   },
+   "status": 400,
+   "answer": "variables: \"STRIPE_API_KEY\" is refused: its KEY part names a credential, and secrets never enter a Container (ADR-0016)",
+   "ok": true
+  },
+  {
+   "name": "credential-looking value",
+   "tried": {
+    "OPENAI": "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "status": 400,
+   "answer": "variables: \"OPENAI\"'s value looks like an API key (sk-…), and secrets never enter a Container (ADR-0016)",
+   "ok": true
+  },
+  {
+   "name": "more than 50",
+   "tried": "51 Variables",
+   "status": 400,
+   "answer": "variables: at most 50 Variables (51 given)",
+   "ok": true
+  },
+  {
+   "name": "nothing refused was stored",
+   "before": {
+    "revision": 21,
+    "variables": {}
+   },
+   "after": {
+    "revision": 21,
+    "variables": {}
+   },
+   "ok": true
+  }
+ ],
+ "ok": true
+}

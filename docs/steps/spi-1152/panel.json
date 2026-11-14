@@ -1,0 +1,19 @@
+{
+ "at": "2026-11-14T00:04:12.199Z",
+ "host": "t3flare-environment-pvars.ian-g-pascoe.workers.dev",
+ "commit": "6c70c3e4e01c",
+ "note": "The Environment section on the stage's page, its script under the page's CSP; screenshots variables-<desktop|phone>-<light|dark>.png.",
+ "cases": [
+  {
+   "name": "a Variable added with the list's Add button and saved with Save is stored beside the others",
+   "stored": {
+    "NODE_ENV": "development",
+    "LOG_LEVEL": "debug",
+    "DATABASE_URL": "postgres://localhost:5432/dev",
+    "PVARS_PANEL": "from the page"
+   },
+   "ok": true
+  }
+ ],
+ "ok": true
+}
