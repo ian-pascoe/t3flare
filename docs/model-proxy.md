@@ -164,12 +164,7 @@ Commissary's MCP endpoint is not built in (SPI-1160; ADR-0028's SPI-1160 refinem
    - Sign-in: **Header**, name `x-api-key`, value the key. It is stored write-only and never enters a Container.
 3. **Test** lists its tools.
 
-The same from a script, with the panel's admin API (the stage's admin token; the key passed in, never printed):
-
-```sh
-curl -sS "$T3_URL/_t3flare/harness/api/mcp/servers" -H "authorization: Bearer $T3FLARE_ADMIN_TOKEN" -H 'content-type: application/json' \
-  --data "$(jq -n --arg key "$KEY" '{server: "commissary", url: "https://<api host>/mcp", auth: {kind: "header", header: "x-api-key"}, value: $key}')"
-```
+The same from a script: `POST /_t3flare/harness/api/mcp/servers` on the t3 host, through Access with a service token and the admin token, with the body `{"server": "commissary", "url": "https://<api host>/mcp", "auth": {"kind": "header", "header": "x-api-key"}, "value": "<key>"}`, then `POST /_t3flare/harness/api/mcp/test` with `{"server": "commissary"}`. Pass the key in from a file or the environment; never print it. `apps/environment/scripts/commissaryMcp.ts add` does this on a throwaway stage ([`docs/steps/spi-1160.md`](steps/spi-1160.md)).
 
 - **No Commissary approval rules on it** (OD-T3). t3flare asks by each thread's mode, linked threads included. Commissary's rules would ask a second time, on its own panel.
 - **Classes.** A tool's class comes from its read-only hint (owner, 2026-11-12, back to stock: no pins). Fix a wrong class in Commissary (it then applies to every client), or for t3flare alone in the Harness panel.
