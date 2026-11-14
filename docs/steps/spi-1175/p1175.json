@@ -1,0 +1,72 @@
+{
+  "at": "2026-11-14T21:13:46.983Z",
+  "endpointFrom": "MODEL_PROXY_URL",
+  "endpoint": {
+    "id": "commissary",
+    "label": "Commissary",
+    "api": "anthropic-messages",
+    "auth": "api-key",
+    "models": [
+      "claude-3-5-haiku-20241022",
+      "claude-3-7-sonnet-20250219",
+      "claude-fable-5",
+      "claude-fable-5-1",
+      "claude-fable-5-2",
+      "claude-haiku-4-5",
+      "claude-haiku-4-5-20251001",
+      "claude-haiku-5-5",
+      "claude-opus-4-1-20250805",
+      "claude-opus-4-20250514",
+      "claude-opus-4-5",
+      "claude-opus-4-5-20251101",
+      "claude-opus-4-6",
+      "claude-opus-4-6-thinking",
+      "claude-opus-4-7",
+      "claude-opus-4-8",
+      "claude-opus-5",
+      "claude-opus-5-5",
+      "claude-sonnet-4-20250514",
+      "claude-sonnet-4-5",
+      "claude-sonnet-4-6",
+      "claude-sonnet-5",
+      "claude-sonnet-5-5"
+    ],
+    "key": {
+      "set": true,
+      "readable": true
+    }
+  },
+  "audit": [
+    {
+      "action": "endpoint.change",
+      "caller": "service-token",
+      "key": {
+        "set": true
+      }
+    },
+    {
+      "action": "endpoint.add",
+      "caller": "service-token",
+      "key": {
+        "set": true
+      }
+    }
+  ],
+  "setting": {
+    "instanceId": "piDurable",
+    "model": "commissary/claude-haiku-5-5"
+  },
+  "expectedSetting": "commissary/claude-haiku-5-5",
+  "title": {
+    "outcome": "renamed",
+    "message": null,
+    "title": "Fix Leap Day Date Parsing"
+  },
+  "proxyModel": {
+    "outcome": "failed",
+    "message": "The model proxy is not configured.",
+    "title": "New thread"
+  },
+  "failures": [],
+  "ok": true
+}
