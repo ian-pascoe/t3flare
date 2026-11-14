@@ -1,9 +1,11 @@
 // @effect-diagnostics globalConsole:off globalTimers:off globalDate:off
 // A Session's Model endpoints (SPI-1162): the endpoints it last took, kept secret-free in its storage so a restart has the
 // same providers; their providers installed in the Session's models in place; and their keys, asked of the Environment at
-// use time (ADR-0018) and kept in memory only, never in storage.
+// use time (ADR-0018) and kept in memory only, never in storage. Each request for a key names the target the Session
+// will send it to (API, base URL, headers), and the Environment gives it only for the endpoint's target now: a Session
+// still holding an endpoint the owner moved gets no key for the old target.
 import type { MutableModels, FetchFunction } from "@earendil-works/pi-ai";
-import { EMPTY_ENDPOINTS, type EndpointCredential, type ModelEndpoints } from "@t3flare/models/endpoints";
+import { EMPTY_ENDPOINTS, type EndpointCredential, type EndpointCredentialRequest, type EndpointTarget, type ModelEndpoints } from "@t3flare/models/endpoints";
 
 import { endpointProviders } from "./models.ts";
 
@@ -15,7 +17,7 @@ export const ENDPOINT_KEY_TTL_MS = 5 * 60 * 1000;
 /** The Environment's answers (`EnvironmentRpc`). */
 export interface EndpointSource {
   modelEndpoints(): Promise<ModelEndpoints>;
-  endpointCredential(input: { readonly endpointId: string }): Promise<EndpointCredential>;
+  endpointCredential(input: EndpointCredentialRequest): Promise<EndpointCredential>;
 }
 
 export interface SessionEndpointsOptions {
@@ -43,7 +45,7 @@ export class SessionEndpoints {
 
   /** One provider per endpoint, in place: a removed endpoint's goes, so its models fail as unavailable. */
   #install(endpoints: ModelEndpoints): void {
-    const providers = endpointProviders(endpoints, { credential: (id) => this.#credential(id), ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }) });
+    const providers = endpointProviders(endpoints, { credential: (id, target) => this.#credential(id, target), ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }) });
     const next = new Set(providers.map((provider) => provider.id));
     for (const id of this.#ids) if (!next.has(id)) this.#options.models.deleteProvider(id);
     for (const provider of providers) this.#options.models.setProvider(provider);
@@ -51,13 +53,13 @@ export class SessionEndpoints {
     this.#keys.clear();
   }
 
-  /** An endpoint's key, from memory while fresh, else from the Environment. */
-  async #credential(endpointId: string): Promise<EndpointCredential> {
+  /** An endpoint's key for `target`, from memory while fresh, else from the Environment (a refusal is never kept). */
+  async #credential(endpointId: string, target: EndpointTarget): Promise<EndpointCredential> {
     const now = this.#options.now ?? Date.now;
     const kept = this.#keys.get(endpointId);
     if (kept !== undefined && now() - kept.at < ENDPOINT_KEY_TTL_MS) return kept.credential;
-    const credential = await this.#options.source().endpointCredential({ endpointId });
-    this.#keys.set(endpointId, { credential, at: now() });
+    const credential = await this.#options.source().endpointCredential({ endpointId, target });
+    if (credential.apiKey !== null) this.#keys.set(endpointId, { credential, at: now() });
     return credential;
   }
 

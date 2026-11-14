@@ -13,7 +13,7 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import type { CatalogModel } from "@t3flare/models";
 import type { Catalog, ModelProxy } from "@t3flare/models/catalog";
-import type { EndpointApi, EndpointCredential, EndpointModel, ModelEndpoint, ModelEndpoints } from "@t3flare/models/endpoints";
+import { type EndpointApi, type EndpointCredential, type EndpointModel, type EndpointTarget, type ModelEndpoint, type ModelEndpoints, targetOf } from "@t3flare/models/endpoints";
 
 export type { ModelProxy };
 
@@ -122,7 +122,7 @@ const TAKES_FETCH: ReadonlySet<EndpointApi> = new Set(["anthropic-messages", "op
 
 export interface EndpointAccess {
   /** The endpoint's API key at use time (the Environment's, ADR-0018): never stored by the Session. */
-  readonly credential: (endpointId: string) => Promise<EndpointCredential>;
+  readonly credential: (endpointId: string, target: EndpointTarget) => Promise<EndpointCredential>;
   /** Every model request's fetch, where the API takes one. */
   readonly fetch?: FetchFunction;
 }
@@ -138,6 +138,8 @@ const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api
   cost: { ...model.cost },
   contextWindow: model.contextWindow,
   maxTokens: model.maxTokens,
+  // SAFETY: both were copied from pi-ai's own catalog entry of this model (known.ts): `thinkingLevelMap` as pi-ai typed
+  // it, `compat` only from an entry of the same API, so each is the type `Model<api>` declares; the stored copy widened them.
   ...(model.thinkingLevelMap === undefined ? {} : { thinkingLevelMap: model.thinkingLevelMap as NonNullable<Model<Api>["thinkingLevelMap"]> }),
   ...(model.compat === undefined ? {} : { compat: model.compat as never }),
 });
@@ -159,12 +161,15 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
           name: `${endpoint.label} API key`,
           resolve: async () => {
             if (endpoint.auth === "none") return { auth: { baseUrl: endpoint.baseUrl }, source: "Model endpoint (no key)" };
-            const { apiKey, unreadable } = await access.credential(endpoint.id);
+            // The key is asked for the target this provider sends it to; the Environment gives none for an old one.
+            const { apiKey, unreadable, changed } = await access.credential(endpoint.id, targetOf(endpoint));
             if (apiKey === null) {
               throw new Error(
-                unreadable === true
-                  ? `The Model endpoint "${endpoint.id}"'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`
-                  : `The Model endpoint "${endpoint.id}" has no API key: set one in the Harness panel.`,
+                changed === true
+                  ? `The Model endpoint "${endpoint.id}" changed or was removed since this Session took it: retry the turn.`
+                  : unreadable === true
+                    ? `The Model endpoint "${endpoint.id}"'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`
+                    : `The Model endpoint "${endpoint.id}" has no API key: set one in the Harness panel.`,
               );
             }
             return { auth: { apiKey, baseUrl: endpoint.baseUrl }, source: "Model endpoint" };
@@ -178,6 +183,8 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
     if (fetch === undefined || !TAKES_FETCH.has(endpoint.api)) return base;
     return {
       ...base,
+      // SAFETY: only `fetch` is added, a field every API's stream options declare (`ProviderRequestOptions.fetch`); the
+      // cast restores the generic `ApiStreamOptions<T>` the spread widens.
       stream: (model, context, options) => base.stream(model, context, { ...options, fetch } as typeof options),
       streamSimple: (model, context, options) => base.streamSimple(model, context, { ...options, fetch }),
     } satisfies Provider;

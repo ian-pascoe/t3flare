@@ -134,7 +134,6 @@ const MCP_CHUNK_CHARS = 100_000;
 const TERMCTRL_USED_KEY = "t3flare:termctrl-used";
 /** How long a turn's start waits for the Environment's harness settings before it keeps the ones it has. */
 const HARNESS_READ_MS = 5_000;
-
 /** A test's model proxy fault (stages only). */
 const FAULT_KEY = "t3flare:proxy-fault";
 /** The most a Stop (or the object's start) waits for an aborted command's processes to be killed. */
