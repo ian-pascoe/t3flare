@@ -649,10 +649,12 @@ CLI behaviour over ACP is the silent part.
   - SPI-1153, Environment skills: each profile links the read-only mount into the CLI's user-level root
     (`$CLAUDE_CONFIG_DIR/skills`, `$XDG_CONFIG_HOME/opencode/skills`, and Codex's `$CODEX_HOME/skills/t3flare-environment`,
     a directory inside its root, which Codex walks following directory links; the root itself stays writable for
-    Codex's bundled `.system` Skills), and pi's profile names it first with `--skill`. `CLI_ROOTS`'
-    `environmentPrecedence` records each CLI's own winner of a same-named Repo and Environment skill (Claude Code keeps
-    its user-level Skill, pi its first, OpenCode its project's; Codex lists both and skips an ambiguous bare `$name`),
-    which the snapshot, Claude's rewrite and OpenCode's embed follow (`withEnvironmentSkillsFor`).
+    Codex's bundled `.system` Skills), and pi's profile names it first with `--skill`. Each `CLI_ROOTS` root's
+    `environment` records the CLI's own winner of a Repo skill there and an Environment skill of its name, probed one
+    root at a time (Claude Code keeps its user-level Skill, pi its first; OpenCode keeps one in `.opencode/skills` or
+    `.opencode/skill` but the Environment's over one in `.agents/skills`; Codex lists both and skips an ambiguous bare
+    `$name`). The snapshot, Claude's rewrite and OpenCode's embed follow it (`environmentPrecedenceOf`,
+    `withEnvironmentSkillsFor`).
 - **Breaks when**: a CLI bump moves a root or changes a same-named pair's winner (a Repo pair's, or a Repo and
   Environment pair's), or stops following a linked root or directory; t3's mention grammar moves, since
   both patterns must keep up with it: stock planner's `SKILL_MENTION_PATTERN` (which decides the native form) and the
@@ -667,7 +669,7 @@ CLI behaviour over ACP is the silent part.
   against the scripted agent; the note's wording and the planner's pattern pinned to `ClaudeSkillDispatch.ts`), `cliProfiles.test.ts` (pi's flags). The
   bump's `test:docker` step: `test/docker/skills.docker.test.ts` re-runs the probe on the pinned CLIs and holds
   `CLI_ROOTS` to it, failing with "moved a skill root: update CLI_ROOTS"; `test/docker/envSkills.docker.test.ts`
-  re-runs SPI-1153's probe (the set read through each link, its winner against `environmentPrecedence`, a write
+  re-runs SPI-1153's probe (the set read through each link, each root's winner against its `environment`, a write
   through the link refused). **Silent**: R6 (Claude's native expansion)
   and OpenCode's command reply are stage facts; cheapest check: `scripts/pcli.ts` on a stage after a CLI bump. So is
   when a running CLI sees a changed Environment skill set (SPI-1153: at its next process start; Claude Code and OpenCode
