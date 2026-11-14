@@ -16,9 +16,12 @@
 //
 //   pnpm --filter @t3flare/environment exec vitest run --config vitest.docker.config.ts test/docker/mise.docker.test.ts
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { COMMAND_ENV, GLOBAL_MISE_CONFIG } from "@t3flare/sandbox-image/env";
+import { GLOBAL_MISE_SCRIPT } from "@t3flare/sandbox-image/globalMise";
 import { expect, it } from "vitest";
 
 const here = import.meta.dirname;
@@ -27,11 +30,13 @@ const IMAGE = "t3flare-mise-test";
 const NET = "t3flare-mise-test-net";
 const PROXY = "t3flare-mise-test-proxy";
 const out = process.env.T3FLARE_MISE_M0_OUT;
+/** The logging proxy, pinned (this test gates the nightly bump). */
+const MITMPROXY = "mitmproxy/mitmproxy:12.3.1@sha256:2711066c855659b5af8b1dbb84494ed3eff69b42ece439c60b4fe09a2db829d4";
 
 /** The base mise.toml in the image (`BASE_MISE_CONFIG`, apps/sandbox-image/src/env.ts). */
 const BASE = "/usr/local/share/cloudpid/mise.toml";
-/** Where the design lays the owner's text down: the Container's own disk, outside /workspace. */
-const GLOBAL = "/var/lib/t3flare/mise/config.toml";
+/** Where the lay-down puts the owner's text: the Container's own disk, outside /workspace. */
+const GLOBAL = GLOBAL_MISE_CONFIG;
 
 /** What every command's environment carries today (`COMMAND_ENV` at 660f922, BASH_ENV aside). */
 const TODAY_ENV: Readonly<Record<string, string>> = {
@@ -57,35 +62,13 @@ const TOKEN_GUARDS: Readonly<Record<string, string>> = {
   MISE_GITHUB_CREDENTIAL_COMMAND: "",
 };
 
-/** The settings that drop a tool without naming it, held empty. */
-const TOOL_GUARDS: Readonly<Record<string, string>> = {
-  MISE_DISABLE_TOOLS: "",
-  MISE_DISABLE_BACKENDS: "",
-};
 
-/** The design's command environment (the plan's `COMMAND_ENV`). */
-const DESIGN_ENV: Readonly<Record<string, string>> = { ...LAYERED_ENV, ...TOKEN_GUARDS, ...TOOL_GUARDS };
+/** The command environment every Container command gets (`COMMAND_ENV`), without the memory guard's `BASH_ENV`. */
+const DESIGN_ENV: Readonly<Record<string, string>> = Object.fromEntries(Object.entries(COMMAND_ENV).filter(([name]) => name !== "BASH_ENV"));
 
-/**
- * The design's lay-down at a Container start (the plan's bootstrap): the owner's text into a staging file, `mise
- * install` from `/` with it as the global config, then git and gh must still run under it, or it is not laid down.
- * Prints one JSON line.
- */
-const layDown = (text: string): string => `
-dir=${path.dirname(GLOBAL)}; file=${GLOBAL}; next="$dir/config.next.toml"
-mkdir -p "$dir"; rm -f "$file"
-printf %s '${Buffer.from(text).toString("base64")}' | base64 -d > "$next"
-cd /
-started=$(date +%s%N)
-MISE_GLOBAL_CONFIG_FILE="$next" timeout 600 mise install > "$dir/install.log" 2>&1; install=$?
-if MISE_GLOBAL_CONFIG_FILE="$next" git --version > /dev/null 2>&1 && MISE_GLOBAL_CONFIG_FILE="$next" gh --version > /dev/null 2>&1; then
-  mv "$next" "$file"; laid=true
-else
-  rm -f "$next"; laid=false
-fi
-ms=$(( ($(date +%s%N) - started) / 1000000 ))
-printf '{"laid":%s,"install":%s,"ms":%s}\\n' "$laid" "$install" "$ms"
-`;
+/** The real lay-down (`GLOBAL_MISE_SCRIPT`), the text on stdin; prints its answer, one JSON line. */
+const layDown = (text: string): string =>
+  `printf %s '${Buffer.from(text).toString("base64")}' | base64 -d | bash -c '${GLOBAL_MISE_SCRIPT.replaceAll("'", "'\\''")}' t3flare-global-mise 1 ${createHash("sha256").update(text).digest("hex")} environment`;
 
 const docker = (args: ReadonlyArray<string>, options: { input?: string; quiet?: boolean } = {}) => {
   const result = spawnSync("docker", args, { encoding: "utf8", input: options.input, maxBuffer: 64 * 1024 * 1024 });
@@ -130,7 +113,7 @@ def request(flow):
         f.write(json.dumps({"method": flow.request.method, "host": flow.request.pretty_host, "path": flow.request.path.split("?")[0], "authorization": h.get("authorization", "")[:13]}) + "\\n")
 `,
     );
-    docker(["run", "-d", "--name", PROXY, "--network", NET, "-v", `${work}:/home/mitmproxy/.mitmproxy`, "mitmproxy/mitmproxy", "mitmdump", "-q", "-s", "/home/mitmproxy/.mitmproxy/log.py"]);
+    docker(["run", "-d", "--name", PROXY, "--network", NET, "-v", `${work}:/home/mitmproxy/.mitmproxy`, MITMPROXY, "mitmdump", "-q", "-s", "/home/mitmproxy/.mitmproxy/log.py"]);
     for (let tries = 0; !fs.existsSync(path.join(work, "mitmproxy-ca-cert.pem")) && tries < 60; tries++) spawnSync("sleep", ["1"]);
     const requestsFile = path.join(work, "requests.jsonl");
 
@@ -278,12 +261,13 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
       tokenCase("control: hosts.yml, no guard", LAYERED_ENV, FZF, undefined, { hostsYml: true, gitHelper: true }),
       tokenCase("control: the image's git helper (git outside the shims), owner turns git credentials on, no guard", LAYERED_ENV, `[settings]\ngithub.use_git_credentials = true\n${FZF}`, undefined, { gitHelper: true, plainGit: true }),
       tokenCase("control: the image's git helper, owner turns git credentials on, no guard, the image's PATH", LAYERED_ENV, `[settings]\ngithub.use_git_credentials = true\n${FZF}`, undefined, { gitHelper: true }),
+      tokenCase("control: the image's git helper (git outside the shims), a repo's file turns git credentials on, no guard", LAYERED_ENV, FZF, `[settings]\ngithub.use_git_credentials = true\n`, { gitHelper: true, plainGit: true }),
       tokenCase("control: owner's credential_command, no guard", LAYERED_ENV, `[settings]\ngithub.credential_command = "echo ghp_m0credentialcommand000000000000000000"\n${FZF}`, undefined, {}),
       tokenCase("design: every source present", DESIGN_ENV, FZF, undefined, all),
       tokenCase("design: every source present, the owner's file turns each on", DESIGN_ENV, `${SOURCES_ON}${FZF}`, undefined, all),
       tokenCase("design: every source present, a repo's file turns each on", DESIGN_ENV, FZF, SOURCES_ON, all),
     ];
-    const [hostsControl, helperControl, helperImagePath, commandControl, ...designCases] = tokenCases;
+    const [hostsControl, helperControl, helperImagePath, repoHelperControl, commandControl, ...designCases] = tokenCases;
     check("token: the hosts.yml control sends its token (the proxy sees one)", hostsControl!.withAuthorization > 0, hostsControl);
     check("token: the git helper control sends its token", helperControl!.withAuthorization > 0, helperControl);
     check("token: the credential_command control sends its token", commandControl!.withAuthorization > 0, commandControl);
@@ -324,6 +308,7 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
         precedence: "MISE_GITHUB_TOKEN > GITHUB_API_TOKEN > GITHUB_TOKEN > github.credential_command > OAuth > github_tokens.toml > gh hosts.yml (github.gh_cli_tokens) > git credential fill (github.use_git_credentials)",
         cases: tokenCases,
         imagePath: helperImagePath,
+        repoTurnsGitCredentialsOn: repoHelperControl,
       },
     };
     if (out !== undefined) {
