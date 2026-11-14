@@ -34,7 +34,7 @@ const [command, stage, ...rest] = process.argv.slice(2);
  * The stages this repo deploys to; anything else is refused, so a typo cannot create a stray stage. `prod` is the
  * owner's long-lived Environment, deployed from `main` only; step branches use their own throwaway stages.
  */
-const STAGES = new Set(["prod", "step1", "bump", "step2a", "models", "step2a2", "step2b", "debug2b", "leftovers", "ghfix", "modefix", "costwins", "step3", "idlesafe", "attach", "truecaps", "noanalytics", "bigrepo", "step3plus", "step4a", "step4b", "spi992", "pre1061", "tools", "stock", "pnpm", "bump1", "spi1079", "panel", "link", "ports", "ports2", "p996", "p997", "p1100", "pbatch", "pbatch2", "previews", "profilesave", "spi1141", "spi1050", "p1001", "penv", "pcli", "pvars", "penvsk", "pmise", "pclienv", "pgitobj", "p1160", "p1161", "p1162", "p1163", "p1164", "p1165", "p1166", "p1167", "p1168", "p1169", "p1170", "p1171", "p1172", "p1173", "p1174", "p1175", "p1176"]);
+const STAGES = new Set(["prod", "step1", "bump", "step2a", "models", "step2a2", "step2b", "debug2b", "leftovers", "ghfix", "modefix", "costwins", "step3", "idlesafe", "attach", "truecaps", "noanalytics", "bigrepo", "step3plus", "step4a", "step4b", "spi992", "pre1061", "tools", "stock", "pnpm", "bump1", "spi1079", "panel", "link", "ports", "ports2", "p996", "p997", "p1100", "pbatch", "pbatch2", "previews", "profilesave", "spi1141", "spi1050", "p1001", "penv", "pcli", "pvars", "penvsk", "pmise", "pclienv", "pgitobj", "p1160", "p1161", "p1162", "p1163", "p1164", "p1165", "p1166", "p1167", "p1168", "p1169", "p1170", "p1171", "p1172", "p1173", "p1174", "p1175", "p1176", "psettings"]);
 
 if (command === undefined || stage === undefined || !STAGES.has(stage)) {
   console.error(`usage: node scripts/stage.ts deploy|run|destroy <${[...STAGES].join("|")}> …`);
@@ -197,7 +197,7 @@ switch (command) {
       console.error("usage: node scripts/stage.ts run <stage> <script> [args]");
       process.exit(2);
     }
-    const access = JSON.parse(fs.readFileSync(credentialsFile(stage), "utf8")) as { url: string; adminUrl?: string; clientId: string; clientSecret: string };
+    const access = JSON.parse(fs.readFileSync(credentialsFile(stage), "utf8")) as { url: string; adminUrl?: string; settingsMcpUrl?: string; clientId: string; clientSecret: string };
     const result = spawnSync(process.execPath, [path.join(here, "scripts", `${script}.ts`), ...args], {
       cwd: here,
       stdio: "inherit",
@@ -208,6 +208,8 @@ switch (command) {
         ...deploySecrets([MODEL_ENDPOINT_VAR]),
         T3_URL: access.url,
         T3FLARE_HARNESS_URL: access.url,
+        // The Settings server's Owner-client endpoint (ADR-0034, plan D13), for the stage's MCP clients.
+        ...(access.settingsMcpUrl === undefined ? {} : { T3FLARE_SETTINGS_MCP_URL: access.settingsMcpUrl }),
         T3FLARE_ACCESS_CLIENT_ID: access.clientId,
         T3FLARE_ACCESS_CLIENT_SECRET: access.clientSecret,
       },
