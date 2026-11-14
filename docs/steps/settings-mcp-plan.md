@@ -1,7 +1,8 @@
 # Plan: the Settings server, agents change t3flare's settings over MCP
 
 Branch `settings-mcp` (worktree `.worktrees/settings-mcp`), planned on `origin/main` at 747905d and rebased onto
-`origin/main` at 96ee913. Stage `psettings` (added to `STAGES` in `apps/environment/scripts/stage.ts`). Evidence in `docs/steps/settings-mcp/`. Decision record:
+`origin/main` at 96ee913. Stage `psettings` (added to `STAGES` in `apps/environment/scripts/stage.ts`). Evidence in
+`docs/steps/settings-mcp/`. Decision record:
 [ADR-0034](../adr/0034-agents-change-t3flares-settings-through-the-settings-server.md), which supersedes ADR-0026 §8.
 Research: [`docs/research/access-managed-oauth.md`](../research/access-managed-oauth.md),
 [`docs/research/mcp-elicitation-server.md`](../research/mcp-elicitation-server.md).
@@ -571,7 +572,9 @@ In every mode the Change page can also answer the Open change; the first answer 
 - **Prod stays out of (B) until owner step 1 passes** (SPI-1195 review): `OWNER_ENDPOINT_EXCLUDED_STAGES`
   (`settings/endpointLayout.ts`) holds `prod`, so prod gets no `SettingsAccess`, its admin application stays as it was
   (no path-cookie attribute) and `T3FLARE_ACCESS_SETTINGS_AUD` stays unset, and `/_t3flare/mcp` answers 404
-  `not_configured`. Removing `prod` from the list, after owner step 1 and M5a's stage evidence, enables it.
+  `not_configured`. Removing `prod` from the list, after owner step 1 and M5a's stage evidence, enables it. The list
+  holds `bump` too, for good: the nightly job's CI token (`t3flare-ci-bump`) is not known to be allowed to create a
+  managed-OAuth Access application, and a failure there would break the nightly job.
 - **(C), otherwise, on every stage including prod**: a Worker `t3flare-settings-<stage>` (`apps/settings-worker`) on
   its own workers.dev host, with its own Access application and managed OAuth on the whole host. Endpoint
   `https://t3flare-settings-<stage>.<subdomain>.workers.dev/mcp`. It verifies its own audience with the shared

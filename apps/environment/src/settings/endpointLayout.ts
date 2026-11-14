@@ -11,16 +11,18 @@
 // root or path-inserted well-known document, so clients discover it from the 401's `resource_metadata`). That a token of
 // one application is refused at the other's paths was tested with a service-token stand-in only: the OAuth bearer case
 // (P6, P7, P12, P13) is owner step 1, recorded by `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4. Until then
-// layout (B) is unproven, and prod is kept out of it (`OWNER_ENDPOINT_EXCLUDED_STAGES`).
+// layout (B) is unproven, and prod is kept out of it (`OWNER_ENDPOINT_EXCLUDED_STAGES`), as is the nightly job's `bump`.
 
 /**
  * The stages deployed without the Owner-client endpoint (ADR-0035): no `SettingsAccess` application, the admin
  * application exactly as before layout (B) (no path-cookie attribute), and no `T3FLARE_ACCESS_SETTINGS_AUD`, so
  * `/_t3flare/mcp` stays under the admin application and the Worker answers it 404 `not_configured` (src/access.ts).
  * Prod is here until owner step 1 passes and M5a's stage evidence is recorded (`docs/steps/settings-mcp/m5a-stage-run.md`
- * items 1-4); enabling prod then is removing it from this list.
+ * items 1-4); enabling prod then is removing it from this list. `bump` is here for good (SPI-1195 review): the nightly
+ * job deploys it with the CI token `t3flare-ci-bump`, which is not known to be allowed to create a managed-OAuth Access
+ * application, and a failure there would break the nightly job; its acceptance test never calls the endpoint.
  */
-export const OWNER_ENDPOINT_EXCLUDED_STAGES: ReadonlyArray<string> = ["prod"];
+export const OWNER_ENDPOINT_EXCLUDED_STAGES: ReadonlyArray<string> = ["prod", "bump"];
 
 /** Whether `stage` is deployed with the Owner-client endpoint (layout (B)): `alchemy.run.ts` reads only this. */
 export const ownerEndpointOn = (stage: string): boolean => !OWNER_ENDPOINT_EXCLUDED_STAGES.includes(stage);
