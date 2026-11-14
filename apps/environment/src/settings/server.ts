@@ -503,20 +503,26 @@ const planEnvironment = (deps: SettingsServerDeps, args: Readonly<Record<string,
 /** `url` as a URL parser serializes it, or as given when it is not one (the registry refuses it then). */
 const canonicalUrl = (url: string): string => {
   try {
-    return new URL(url).href;
+    const parsed = new URL(url);
+    // A fragment never reaches the server, and an empty query is no query (SPI-1201 review): both spell the same URL.
+    parsed.hash = "";
+    if (parsed.search === "") parsed.search = "";
+    return parsed.href;
   } catch {
     return url;
   }
 };
 
 /**
- * An install's source as the hash covers it (SPI-1200 review): its repo (GitHub's names are case-insensitive), folder
- * and skill, however it was spelled (`owner/repo`, a tree URL, `owner/repo@skill`). The ref is left out: the commit
- * pins what is fetched. A source that does not parse is hashed as given (the preview refuses it).
+ * An install's source as the hash covers it (SPI-1200 and SPI-1201 reviews): its repo alone (GitHub's names are
+ * case-insensitive), however it was spelled (`owner/repo`, `owner/repo@skill`, a tree URL with or without a path). An
+ * install fetches the repo at the commit and the named folders, which are repo-relative whatever the source said; the
+ * source's ref, path and skill only narrow the preview, which must find every folder. A source that does not parse is
+ * hashed as given (the preview refuses it).
  */
 const canonicalSkillSource = (source: string): string => {
   const parsed = parseSkillSource(source);
-  return parsed.ok ? canonicalJson({ repo: parsed.source.repo.toLowerCase(), path: parsed.source.path, skill: parsed.source.skill }) : source;
+  return parsed.ok ? parsed.source.repo.toLowerCase() : source;
 };
 
 /** The digests an Open change's skills were shown with, by folder (plan D8): the apply refuses others. */
@@ -572,7 +578,8 @@ const planSkills = (deps: SettingsServerDeps, args: Readonly<Record<string, unkn
       const folders = args.folders as ReadonlyArray<string>;
       return planned(
         tierOf({ entity: "skills", change: { op: "install" } }),
-        { op, source: canonicalSkillSource(source), commit, folders: [...folders].sort() },
+        // The folders as a set: their order and repeats install nothing different (SPI-1201 review).
+        { op, source: canonicalSkillSource(source), commit, folders: [...new Set(folders)].sort() },
         () => preview({ source, commit, folders }, "install"),
         skillsRun("/install", { source, commit, folders }),
         true,
