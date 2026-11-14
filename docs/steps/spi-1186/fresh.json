@@ -1,0 +1,450 @@
+{
+ "at": "2026-11-14T12:12:39.765Z",
+ "host": "t3flare-environment-pgitobj.ian-g-pascoe.workers.dev",
+ "commit": "bc8bdfed2406",
+ "root": "/w/pgitobj-mwgd8j95",
+ "runningWhenWatched": true,
+ "stopped": true,
+ "afterPoll": {
+  "running": false,
+  "leased": false,
+  "lastUse": 1794658341580,
+  "startedAt": null,
+  "launch": {
+   "size": "cpu-1",
+   "instance": {
+    "vcpu": 1,
+    "memoryMib": 3072,
+    "diskMb": 12000
+   },
+   "idleMs": 120000,
+   "budget": 3,
+   "revision": 0,
+   "variables": {},
+   "globalMise": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "revision": 0,
+    "source": "environment"
+   }
+  },
+  "globalMise": {
+   "runtime": "68f05b86-4ee6-41f7-876d-800101eecfe2",
+   "outcome": "none",
+   "attempts": 1,
+   "at": 1794658339962
+  }
+ },
+ "report": {
+  "events": [
+   "action_started",
+   "phase_started",
+   "hook_output",
+   "hook_output",
+   "hook_output",
+   "action_finished"
+  ],
+  "failure": null,
+  "result": {
+   "status": "created",
+   "commitSha": "a965e4ae4e30164213b50ae7b6837065e982fa80",
+   "subject": "pgitobj: committed while stopped mwgd8tio"
+  },
+  "head": {
+   "sha": "a965e4ae4e30164213b50ae7b6837065e982fa80",
+   "subject": "pgitobj: committed while stopped mwgd8tio",
+   "files": [
+    "while-stopped.txt"
+   ]
+  },
+  "ms": 5910
+ },
+ "draftReads": [
+  {
+   "argv": "rev-parse --git-path index --git-path objects",
+   "route": "stale-last-answer",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "count-objects -v",
+   "route": "stale-last-answer",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  }
+ ],
+ "firstToRun": {
+  "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never update-index --no-split-index",
+  "route": "container",
+  "exitCode": 0,
+  "detail": "action 1684ms"
+ },
+ "commands": [
+  {
+   "argv": "rev-parse --git-path index",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "diff-index -M --numstat -z HEAD --",
+   "route": "stale-patched",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "status --porcelain=2 --branch -z --no-ahead-behind",
+   "route": "stale-patched",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get branch.main.t3-merge-base-ref",
+   "route": "cache",
+   "exitCode": 1,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get branch.main.t3-merge-base",
+   "route": "cache",
+   "exitCode": 1,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get branch.main.gh-merge-base",
+   "route": "cache",
+   "exitCode": 1,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "remote get-url -- origin",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "rev-parse --symbolic-full-name main@{upstream}",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "merge-base --end-of-options refs/remotes/origin/main HEAD",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "show-ref --verify --quiet refs/heads/main",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "ls-files --others --exclude-standard -z -- :(top,literal)while-stopped.txt",
+   "route": "container-stopped",
+   "exitCode": 128,
+   "detail": "needs the Workspace's Container, which is stopped, and has no earlier answer"
+  },
+  {
+   "argv": "config --get branch.main.remote",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get remote.origin.url",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "symbolic-ref --quiet HEAD",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "rev-parse --symbolic-full-name HEAD",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "rev-parse --symbolic-full-name @{upstream}",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "rev-list --left-right --count HEAD...@{upstream}",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "symbolic-ref refs/remotes/origin/HEAD",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get branch.main.remote",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get remote.origin.url",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "remote -v",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get-regexp ^remote\\..*\\.gh-resolved$",
+   "route": "cache",
+   "exitCode": 1,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "remote -v",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get-regexp ^remote\\..*\\.gh-resolved$",
+   "route": "cache",
+   "exitCode": 1,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "symbolic-ref --quiet HEAD",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "rev-parse --git-path index",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "status --porcelain=2 --branch -z --no-ahead-behind",
+   "route": "stale-patched",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "diff-index -M --numstat -z HEAD --",
+   "route": "stale-patched",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get branch.main.t3-merge-base-ref",
+   "route": "cache",
+   "exitCode": 1,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get branch.main.t3-merge-base",
+   "route": "cache",
+   "exitCode": 1,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get branch.main.gh-merge-base",
+   "route": "cache",
+   "exitCode": 1,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "remote get-url -- origin",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "rev-parse --symbolic-full-name main@{upstream}",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "merge-base --end-of-options refs/remotes/origin/main HEAD",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "show-ref --verify --quiet refs/heads/main",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get branch.main.remote",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "config --get remote.origin.url",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "symbolic-ref --quiet HEAD",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "for-each-ref --format=%(upstream:remotename) refs/heads/main",
+   "route": "container-stopped",
+   "exitCode": 128,
+   "detail": "needs the Workspace's Container, which is stopped, and has no earlier answer"
+  },
+  {
+   "argv": "rev-parse --git-path index",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "diff-index -M --numstat -z HEAD --",
+   "route": "stale-patched",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "status --porcelain=2 --branch -z",
+   "route": "stale-patched",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "rev-parse --git-path index --git-path objects",
+   "route": "stale-last-answer",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "count-objects -v",
+   "route": "stale-last-answer",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never update-index --no-split-index",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "action 1684ms"
+  },
+  {
+   "argv": "rev-parse --verify --quiet HEAD",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 119ms"
+  },
+  {
+   "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never read-tree HEAD",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "action 212ms"
+  },
+  {
+   "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never add -A --pathspec-from-file=- --pathspec-file-nul",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "action 184ms"
+  },
+  {
+   "argv": "-c diff.relative=false diff --cached --name-status",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 119ms"
+  },
+  {
+   "argv": "rev-parse --git-path MERGE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 78ms"
+  },
+  {
+   "argv": "reset --quiet",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "action 243ms"
+  },
+  {
+   "argv": "add -A --pathspec-from-file=- --pathspec-file-nul",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "action 191ms"
+  },
+  {
+   "argv": "commit -m pgitobj: committed while stopped mwgd8tio",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "action 377ms"
+  },
+  {
+   "argv": "rev-parse HEAD",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 155ms"
+  },
+  {
+   "argv": "rev-parse --git-common-dir",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 174ms"
+  },
+  {
+   "argv": "rev-parse --show-toplevel",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 143ms"
+  },
+  {
+   "argv": "symbolic-ref --quiet HEAD",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 180ms"
+  },
+  {
+   "argv": "rev-parse --git-path index",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 99ms"
+  },
+  {
+   "argv": "--git-dir /w/pgitobj-mwgd8j95/.git remote",
+   "route": "cache",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  }
+ ],
+ "ok": true,
+ "sweep": {
+  "before": [
+   "index-000000000000000000000000",
+   "keep.bundle",
+   "objects-111111111111111111111111"
+  ],
+  "after": [
+   "keep.bundle"
+  ],
+  "ok": true
+ }
+}

@@ -1,0 +1,196 @@
+{
+  "url": "https://t3flare-environment-pgitobj.ian-g-pascoe.workers.dev",
+  "startedAt": "2026-11-14T12:14:12.398Z",
+  "adminGuard": {
+    "wrongToken": 404,
+    "withAccessAndToken": 200,
+    "build": {
+      "t3": "v0.1.10-nightly.20261112.4606",
+      "commit": "bc8bdfed2406",
+      "builtAt": "2026-11-14T12:01:07.763Z"
+    }
+  },
+  "auth": {
+    "machine": "cloud",
+    "label": "t3flare",
+    "policy": "remote-reachable"
+  },
+  "pairing": {
+    "refusedBeforeArming": 401,
+    "armedUntil": "2026-11-14T12:24:12.982Z",
+    "paired": 200,
+    "ms": 1440,
+    "refusedAfterDisarming": 401
+  },
+  "project": {
+    "projectId": "d3102fb2-2d8d-4607-8bf5-25d6e357e2ec",
+    "threads": 12,
+    "ms": 1942
+  },
+  "fixtures": {
+    "threads": 12,
+    "runs": 48,
+    "messages": 96,
+    "turnItems": 240,
+    "events": 480,
+    "eventSink": "fresh"
+  },
+  "shellSnapshot": {
+    "ms": 184,
+    "bytes": 23064,
+    "listedFixtureThreads": 12
+  },
+  "threadWindow": {
+    "threads": 12,
+    "allOk": true,
+    "minItems": 20,
+    "maxMs": 131,
+    "maxBytes": 46534
+  },
+  "subscribeThread": {
+    "ms": 52,
+    "bytes": 46473,
+    "items": 20
+  },
+  "search": {
+    "ms": 61,
+    "matches": 12,
+    "threads": 12
+  },
+  "searchThread": {
+    "ok": true,
+    "bytes": 1535
+  },
+  "sqlChecks": {
+    "transactionRollback": true,
+    "overHundredParameters": true
+  },
+  "sqlAdapter": {
+    "statementsInlined": 2,
+    "maxParameters": 300,
+    "compoundsRewritten": 19,
+    "maxCompoundTerms": 12,
+    "ctesMaterialized": 0,
+    "materializeFailures": 0,
+    "rowsWritten": 10822,
+    "rowsRead": 44591,
+    "databaseSize": 5210112,
+    "refusedStatements": 0,
+    "pragmaRefusals": 0
+  },
+  "rebootCheck": {
+    "registered": {
+      "bindings": 204,
+      "modules": 113
+    },
+    "bothBootsServed": true,
+    "sameEnvironmentId": true,
+    "isolateBoots": 5,
+    "survivedIntoSecondBoot": [
+      {
+        "module": "packages/shared/src/observability.ts",
+        "name": "generatedServiceInstanceId",
+        "initial": "undefined",
+        "now": "string:acffb1e9-27a4-48ba-8d8c-ae0688307886"
+      },
+      {
+        "module": "apps/server/src/mcp/McpSessionRegistry.ts",
+        "name": "activeMcpSessionRegistry",
+        "initial": "undefined",
+        "now": "Object{issue,resolve,revokeAll,revokeProviderSession,revokeThread,touch}"
+      }
+    ],
+    "changedAfterFirstBoot": 2,
+    "globalsAddedDuringCheck": [],
+    "processChannelOnInstance": true
+  },
+  "realTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "anthropic/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwgdb4ay",
+      "ms": 9326,
+      "cwd": "/w/acceptance-mwgdb4ay",
+      "error": null
+    },
+    "turn": {
+      "threadId": "861212db-a897-4fb5-a667-220469322075",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwgdb4ay/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwgdb4ay && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 31184
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "commit": {
+      "events": [
+        "action_started",
+        "phase_started",
+        "hook_output",
+        "hook_output",
+        "action_finished"
+      ],
+      "failure": null,
+      "result": {
+        "status": "created",
+        "commitSha": "e8520b18d8eccb006560ff94a3fdf33afd87a8dd",
+        "subject": "acceptance: t3's commit action"
+      },
+      "head": {
+        "sha": "e8520b18d8eccb006560ff94a3fdf33afd87a8dd",
+        "subject": "acceptance: t3's commit action",
+        "files": [
+          "src/greeting.txt"
+        ]
+      },
+      "ms": 4728
+    },
+    "ms": 36804
+  },
+  "totalMs": 42446,
+  "failures": [],
+  "ok": true
+}

@@ -1,7 +1,7 @@
 {
- "at": "2026-11-14T02:51:19.677Z",
- "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "07f5343e4a1b",
+ "at": "2026-11-14T12:13:39.875Z",
+ "host": "t3flare-environment-pgitobj.ian-g-pascoe.workers.dev",
+ "commit": "bc8bdfed2406",
  "cases": [
   {
    "name": "t3's git status, a commit, and gh, under a node pin",
@@ -10,23 +10,33 @@
     "git version 2.56.0",
     "v24.11.1"
    ],
-   "status": "{\"isRepo\":true,\"sourceControlProvider\":{\"kind\":\"github\",\"name\":\"GitHub\",\"baseUrl\":\"https://github.com\"},\"hasPrimaryRemote\":true,\"isDefaultRef\":true,\"refName\":\"main\",\"hasWorkingTreeChanges\":false,\"workingTree\":{\"rootPath\":\"/w/pmise\",\"files\":[],\"insertions\":0,\"deletions\":0},\"branchChanges\":{\"baseRef\":",
+   "status": "{\"isRepo\":true,\"sourceControlProvider\":{\"kind\":\"github\",\"name\":\"GitHub\",\"baseUrl\":\"https://github.com\"},\"hasPrimaryRemote\":false,\"isDefaultRef\":true,\"refName\":\"main\",\"hasWorkingTreeChanges\":false,\"workingTree\":{\"rootPath\":\"/w/pmise\",\"files\":[],\"insertions\":0,\"deletions\":0},\"branchChanges\":{\"baseRef\"",
    "t3CommitAction": {
     "control": {
      "events": [
-      null
+      "action_started",
+      "phase_started",
+      "hook_output",
+      "hook_output",
+      "hook_output",
+      "action_finished"
      ],
-     "failure": "GitCommandError: Git command failed in GitVcsDriver.prepareCommitContext.expandSplitIndex (/w/pmise): Git command exited with a non-zero status. (not_a_repository)",
-     "head": "Fixture for t3flare's acceptance tests"
+     "failure": null,
+     "head": "pmise: control without a Global mise config"
     },
     "underPin": {
      "events": [
-      null
+      "action_started",
+      "phase_started",
+      "hook_output",
+      "hook_output",
+      "hook_output",
+      "action_finished"
      ],
-     "failure": "GitCommandError: Git command failed in GitVcsDriver.prepareCommitContext.expandSplitIndex (/w/pmise): Git command exited with a non-zero status. (not_a_repository)",
-     "head": "Fixture for t3flare's acceptance tests"
+     "failure": null,
+     "head": "pmise: under the node pin"
     },
-    "note": "t3's commit action fails the same way with no Global mise config: t3's temporary object directory is on its own side (not this change)"
+    "note": "t3's commit action commits, with and without a Global mise config (SPI-1186)"
    },
    "workspaceGit": {
     "add": 0,
@@ -46,20 +56,20 @@
    ],
    "stderr": "",
    "globalMise": {
-    "runtime": "893e01d6-2cde-4d0f-bb2f-02f2a1967eec",
+    "runtime": "6451de7c-7a3f-4eec-8265-cd2d4535a620",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
-     "revision": 5,
+     "revision": 2,
      "sha256": "5374ac4200041356ddda8d12b42aa2d52aed647c14f3db2419989cea8104c112",
      "source": "environment",
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 6627,
+     "ms": 6621,
      "bytes": 31
     },
-    "at": 1794624678578
+    "at": 1794658419094
    },
    "ok": true
   }

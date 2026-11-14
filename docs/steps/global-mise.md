@@ -108,7 +108,7 @@ stage harness, the docs and the evidence. `variables.json` ran first. The `m0-*.
 | `variables.json` | With `node = "24.11.1"` set and a gh `hosts.yml` in each command's own home, on a fresh Container per path: all five guards arrive whole (empty ones too), `mise token github` is `(none)`, mise's effective data, cache, state and config dirs are `/root`'s, and `node --version` with mise's three auto-installs off answers `v24.11.1` from `/root/.local/share/mise/installs`, with nothing installed under the path's own `XDG_DATA_HOME`. Paths: the Workspace DO's command, a Durable agent's `bash`, a t3 Terminal, and a command of each of Codex, Claude Code, OpenCode (whose `XDG_DATA_HOME` is its own home's) and pi. |
 | `install.json` | `node = "24.11.1"` (the image has 26.13.0): `v24.11.1` in a new Container from a Durable agent's `bash`, pi's command and a t3 Terminal, each laid down (4.4–5.5 s). |
 | `override.json` | A repo's `node = "22.12.0"` wins in the repo; the global `github:junegunn/fzf` stays; outside the repo node is the global 24.11.1. |
-| `git-gh.json` | Under the pin: t3's status, a commit through the Workspace's git, `gh --version`. An owner-pinned `conda:git` 2.49.0 has the credential helper, `git credential fill` gives a password, and `git fetch` works. t3's own commit action fails as its control without a Global mise config does (SPI-1186). |
+| `git-gh.json` | Under the pin: t3's status, a commit through the Workspace's git, `gh --version`. An owner-pinned `conda:git` 2.49.0 has the credential helper, `git credential fill` gives a password, and `git fetch` works. t3's own commit action failed as its control without a Global mise config did (SPI-1186); re-run on SPI-1186's stage `pgitobj` (commit `bc8bdfe`), both commit. |
 | `passive-first.json` | A passive read starts the stopped Container and holds it for 25 s, and finds no global file (it never waits for the lay-down); a Durable agent's `bash` sent meanwhile through computer waits for the lay-down (3.9 s) and answers `v24.11.1`. |
 | `passive-spawn.json` | A passive read starts the stopped Container (no global file) and holds it; a t3 Terminal opened meanwhile waits for the lay-down (4.5 s) with no command of its own: the Container's start time is the same before and after the spawn, and `node --version` answers `v24.11.1`. |
 | `hold.json` | Idle time 1 minute, budget 1, an install of 88 s (the pin sets `jobs = 1`) started from a Durable agent's `bash`: after 35 s the reclaim's reason is "in use", a second Workspace's start is refused with the budget's reason, the Container never stops, and the command answers `v24.11.1`. |
@@ -122,12 +122,14 @@ stage harness, the docs and the evidence. `variables.json` ran first. The `m0-*.
 
 ## Readings and limits
 
-- **t3's own commit action fails on this base, with or without a Global mise config** (`git-gh.json`'s control;
-  SPI-1186). Re-run `git-gh.json` when SPI-1186 lands:
-  t3's git driver builds its commit context with a temporary `GIT_OBJECT_DIRECTORY` and alternates on its own
-  side, which the Container cannot see (`prepareCommitContext.expandSplitIndex`, `not_a_repository`). t3flare's
-  router bridges `GIT_INDEX_FILE` only. Not this change. The ticket's "t3's git status and commit"
-  is covered by t3's status and a commit through the Workspace's git.
+- **t3's own commit action failed on this base, with or without a Global mise config** (`git-gh.json`'s control;
+  SPI-1186): t3's git driver builds its commit context with a temporary `GIT_OBJECT_DIRECTORY` and alternates on its
+  own side, which the Container could not see (`prepareCommitContext.expandSplitIndex`, `not_a_repository`); the
+  router bridged `GIT_INDEX_FILE` only. **SPI-1186 bridges both** ([`spi-1186.md`](spi-1186.md)), and `git-gh.json`
+  was re-run on its stage `pgitobj` (deployed commit `bc8bdfe`, `node scripts/stage.ts run pgitobj pmise git-gh`):
+  t3's commit action commits, both the control and under the node pin, and the other rows hold. That run's status
+  read `hasPrimaryRemote: false` once, its first read of a freshly cloned Workspace with the Container stopped (a
+  stale read); read again it is true. The file now names `pgitobj`'s host and commit.
 - **Status keeps one lay-down across all Workspaces**: the last to report. Another Workspace's later start replaces
   a "not laid down".
 - **An install that fails for one tool still lays the file down** when git and gh run (D6): `hold.json`'s long pin
@@ -153,4 +155,4 @@ stage harness, the docs and the evidence. `variables.json` ran first. The `m0-*.
 
 - **SPI-1185:** an install cache for the Global mise config, and each Workspace's last lay-down on the panel (Status
   keeps only the last one overall).
-- **SPI-1186:** t3's commit action and its temporary `GIT_OBJECT_DIRECTORY`; `git-gh.json` is re-run when it lands.
+- **SPI-1186:** t3's commit action and its temporary `GIT_OBJECT_DIRECTORY`; fixed there, and `git-gh.json` re-run.

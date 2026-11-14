@@ -72,6 +72,18 @@ Evidence: `docs/steps/bigrepo/` (the stage `bigrepo` before and after, through `
 `apps/environment/test/statusOverStale.test.ts` (t3's real `GitVcsDriver` over the router and `staleRead`, on a repo
 with a submodule); `apps/agents/test/staleReads.test.ts`, `containerOnly.test.ts`.
 
+## Refinement (SPI-1186): t3's commit draft joins the allow-list
+
+t3's commit action (the git panel's Commit) drafts its commit before its first write with two `.git`-only reads:
+`rev-parse --git-path index --git-path objects` and `count-objects -v` (`GitVcsDriverCore.prepareCommitContext`). Both
+stay passive and are primed with the worktree launch's, so a Workspace whose Container ran since gets its last answer
+and the draft's first write (`update-index` on its temporary index) starts the Container. They join the allow-list (now
+seven shapes) for the Workspace never primed: without it, a commit after the Container stopped would fail at its first
+read with no answer, every time. The rest of the draft runs on a temporary index and object directory that the process
+router bridges into the Workspace's harness `tmp/` (`apps/environment/src/agents/gitBridge.ts`).
+
+Evidence: `docs/steps/spi-1186/stopped.json` (primed: neither read ran in the Container), `fresh.json` (never primed).
+
 ## Refinement (SPI-1004): automatic fetch is off, and why
 
 t3's background fetch (`VcsStatusBroadcaster`'s automatic fetch interval) is set to zero in `composition.ts`. It would run `git fetch` in every watched Workspace on a timer, and each fetch starts that Workspace's Container (ADR-0009: git runs in the Container), so idle projects would keep Containers running for nothing. Ahead and behind counts are therefore as of the last fetch, pull, push or user action. A fetch the owner asks for runs as usual. Off is a refusal by design (parity: "automatic fetch off"), not a gap.
