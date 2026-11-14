@@ -81,3 +81,41 @@ included, so any agent can read them. A Variable is therefore never a credential
 like a credential are refused. So is every name t3flare sets or pins for a CLI agent, such as `ANTHROPIC_BASE_URL` and
 `HTTPS_PROXY`, so a Variable cannot move a CLI's endpoint or route its requests elsewhere; those also win over any
 Variable. These are guard rails for the owner, not a boundary against him.
+
+## Refinement (SPI-1167, 2026-11-14): the model relay replaces the key helper for Model endpoints
+
+Part of **Model endpoints** (owner, 2026-11-13; [ADR-0034](0034-model-endpoints-are-the-owners-set-in-the-harness-panel.md)).
+Report: [`docs/steps/spi-1167.md`](../steps/spi-1167.md). The key helper (A′ above) stays for the Model proxy until the
+hard cut (SPI-1176); for Model endpoints it is replaced by a **model relay**, which is the original design's Handle
+(option B) without an intercept or a CA:
+
+1. **The route.** A CLI agent's model provider points at `http://computer.internal/t3flare/model/<endpointId>`, computer's
+   egress host, which reaches the agents Worker's `WorkspaceProxy` (`apps/agents/src/workspace/modelRelay.ts`). The path
+   below the endpoint's id is appended to the endpoint's base URL; the body and the answer are streamed through
+   unchanged, in the Worker entrypoint (no Durable Object holds the stream). No protocol translation: a CLI uses only
+   endpoints whose API it speaks. No redirect is followed, and nothing leaves the endpoint's base URL.
+2. **The model handle.** The Workspace DO makes one per CLI process whose profile asks (`modelRelay`), 256 random bits,
+   kept in memory beside the process and put only in that process's environment (`T3FLARE_MODEL_HANDLE`); never in
+   argv, a file, the Environment DO or a log. It is refused once its process exits, in any other Workspace, and as a
+   Tool handle (and a Tool handle is refused as it). The CLI sends it as its key (a bearer, or `x-api-key`); the relay
+   takes it out of the request with every credential header and cookie.
+3. **The swap.** For a live handle, the Workspace DO asks the Environment DO (`modelRelayTarget`), which answers from the
+   endpoint store's `resolve`: the endpoint's base URL and headers with its key in the header its API takes. The key is
+   sent only there. The Workspace DO remembers the key's hash for the sync guard, which now looks for the endpoint
+   keys the relay used, and the leak check looks for every endpoint's key.
+4. **The log.** Every relayed request is logged by the agents Worker with its endpoint, status, method, time and the
+   handle's id (its process's key), never a handle, a key or a body.
+5. **Codex** gets one model provider per OpenAI Responses endpoint, `t3flare-endpoint-<endpointId>` (the id never
+   changes, so a rollout naming it resumes), with the handle as its `env_key`, kept out of its shells. Codex runs a
+   thread's turns only on its process's provider ("This chat uses <a>, but your current provider is <b>"), so the
+   process's `model_provider` is the session's model's and the request guard names each thread's provider from its
+   model's slug. A turn on a model of another provider (another endpoint, or the Model proxy) is refused: Codex cannot
+   move a thread between providers, and t3 resumes the thread in the same process rather than restarting the session
+   (measured on stage). Such a model needs a new thread. Claude Code, OpenCode and pi follow with their own config
+   only (SPI-1168–1170).
+
+**Residual**, as with the key helper and the Tool handle: any process that can read the CLI's environment
+(`/proc/<pid>/environ`, the agent runs as root) can spend through the handle while its process lives. It cannot take
+the key out of the Container, and it ends with the process. The long-stream risk that sank option B in step 4a is
+measured: a stream of over 10 minutes with idle gaps up to 3 minutes completes through the relay
+(`docs/steps/spi-1167/p1167.json`).

@@ -298,6 +298,10 @@ _Avoid_: gateway, LLM router
 One of the owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Replaces the Model proxy at the hard cut.
 _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 
+**Model relay**:
+The `computer.internal/t3flare/model/<endpointId>` routes through which CLI agents reach Model endpoints with a Handle: the Workers swap it for the endpoint's own credential and stream the request to the endpoint unchanged.
+_Avoid_: model proxy (that is the Model proxy), gateway, intercept
+
 **Subscription**:
 The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key. Connected in the Model proxy, never held by t3flare.
 _Avoid_: Subscription login (t3flare holds none), OAuth, account
@@ -311,8 +315,8 @@ The GitHub installation token t3's own PR features use, answered to `gh auth tok
 _Avoid_: gh token, PAT
 
 **Handle**:
-An opaque stand-in for a credential, given to one CLI agent process and redeemed only by an intercept outside the Container. Whether CLI agents get one, or the proxy key itself, is open (ADR-0016).
-_Avoid_: placeholder, fake token
+An opaque per-process stand-in for a Model endpoint's credential (the model handle), made by the Workspace DO for one CLI agent process and redeemed only by the Model relay, outside the Container; useless in another Workspace and after its process.
+_Avoid_: placeholder, fake token, Tool handle (that one is for the MCP relay)
 
 **Safe mode**:
 The Environment DO's state where it does not start t3, and only the admin routes answer; entered by hand or after three boots in a row fail.

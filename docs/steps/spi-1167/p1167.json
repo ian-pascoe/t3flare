@@ -1,0 +1,753 @@
+{
+  "at": "2026-11-14T20:42:13.186Z",
+  "stage": "p1167",
+  "openai": "Commissary's OpenAI Responses API (<MODEL_PROXY_URL>/v1)",
+  "endpoints": {
+    "saved": {
+      "openai": 200,
+      "slow": 200
+    },
+    "openai": {
+      "baseUrl": "https://api.ai.ianpascoe.dev/v1",
+      "model": "claude-haiku-5-5"
+    },
+    "slow": {
+      "baseUrl": "https://t3flare-probe-p1167.ian-g-pascoe.workers.dev/relay/v1"
+    }
+  },
+  "checks": [
+    {
+      "name": "both endpoints saved",
+      "ok": true
+    },
+    {
+      "name": "Codex lists the Responses endpoints' models by slug",
+      "ok": true
+    },
+    {
+      "name": "a Codex turn with tools ran on the endpoint through the relay",
+      "ok": true
+    },
+    {
+      "name": "the process's model handle reaches the relay (200)",
+      "ok": true
+    },
+    {
+      "name": "a forged handle, the tool handle and no handle are refused (401)",
+      "ok": true
+    },
+    {
+      "name": "an endpoint that does not exist answers 404",
+      "ok": true
+    },
+    {
+      "name": "another Workspace's handle is refused in this Container (401)",
+      "ok": true
+    },
+    {
+      "name": "the leak scan finds no endpoint key (DO files, Container files, process environments and command lines)",
+      "ok": true
+    },
+    {
+      "name": "the Container stopped",
+      "ok": true
+    },
+    {
+      "name": "the next turn completed after the restart",
+      "ok": true
+    },
+    {
+      "name": "it knew the code word",
+      "ok": true
+    },
+    {
+      "name": "the same native Codex thread (resumed, not a handoff)",
+      "ok": true
+    },
+    {
+      "name": "the protocol log shows Codex resumed that thread",
+      "ok": true
+    },
+    {
+      "name": "the first process's handle is refused after it ended (401), the new process's passes",
+      "ok": true
+    },
+    {
+      "name": "a turn on a model of another provider is refused, and the thread goes on with its endpoint's model",
+      "ok": true
+    },
+    {
+      "name": "the stream started",
+      "ok": true
+    },
+    {
+      "name": "a stream of over 10 minutes with idle gaps up to 3 minutes completed through the relay",
+      "ok": true
+    },
+    {
+      "name": "the stand-in endpoint finished the stream",
+      "ok": true
+    },
+    {
+      "name": "the stand-in got its key and the endpoint's header with every relayed request",
+      "ok": true
+    },
+    {
+      "name": "no handle ever reached the endpoint",
+      "ok": true
+    },
+    {
+      "name": "the leak scan after every turn finds no key",
+      "ok": true
+    },
+    {
+      "name": "the agents Worker logged relayed requests with endpoint, status and handle id",
+      "ok": true
+    },
+    {
+      "name": "no handle or key in the agents Worker's log",
+      "ok": true
+    }
+  ],
+  "codexModels": {
+    "endpointModels": [
+      {
+        "slug": "openai/claude-haiku-5-5",
+        "group": "OpenAI (Responses)"
+      },
+      {
+        "slug": "slow/drip",
+        "group": "Stand-in"
+      }
+    ],
+    "total": 123
+  },
+  "turn": {
+    "threadId": "bfb44c20-a6a7-48a2-94a5-8472265460e5",
+    "root": "/w/relay-codex-mwgvgped",
+    "model": "openai/claude-haiku-5-5",
+    "runs": [
+      {
+        "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:1",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "items": [
+      {
+        "type": "user_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "reasoning",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "assistant_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "command_execution",
+        "status": "completed",
+        "fileName": null,
+        "input": "/bin/bash -c 'cat -A src/greeting.txt; echo \"---\"; cat test.sh'",
+        "exitCode": 0
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "reasoning",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "assistant_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "file_change",
+        "status": "completed",
+        "fileName": "/w/relay-codex-mwgvgped/src/greeting.txt",
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "assistant_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "command_execution",
+        "status": "completed",
+        "fileName": null,
+        "input": "/bin/bash -c 'bash test.sh; echo \"exit=$?\"; cat src/greeting.txt'",
+        "exitCode": 0
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "assistant_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "checkpoint",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      }
+    ],
+    "text": "I'll read `src/greeting.txt` first to see its current contents.The file has one line ending in a newline. I'll append the new line with `apply_patch`.The patch applied. Now I'll run the test suite.Yes, `bash test.sh` passed (\"all checks passed\"), and `src/greeting.txt` now ends with `Hello through the relay.`\n\nI'll remember HERON-67.",
+    "requests": [
+      {
+        "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1dbcc-5aac-78f0-9983-733bbea253d9:native-request:toolu_019drQyKUMq3DoaY1G3JBdZf:7afaba30-d6bd-4f53-93cc-54485a7e7a6f",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": "accept"
+      },
+      {
+        "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1dbcc-5aac-78f0-9983-733bbea253d9:native-request:toolu_01Ah7urvwVbQp3QBMBqbYQej:4cd4f93e-26be-44e1-8093-04df68e27dcf",
+        "kind": "file-change",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": "accept"
+      },
+      {
+        "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1dbcc-5aac-78f0-9983-733bbea253d9:native-request:toolu_01W9TbqokoGrW5Dv4U8YUyG4:c67815e8-2d04-4047-ad53-ea84d8626cfb",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": "accept"
+      }
+    ],
+    "providerThreads": [
+      {
+        "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3Abfb44c20-a6a7-48a2-94a5-8472265460e5%3Aordinal%3A1",
+        "nativeThreadRef": {
+          "driver": "codex",
+          "nativeId": "01a1dbcc-5268-7272-b3b6-468d2ed7f0a1",
+          "strength": "strong"
+        },
+        "providerSessionId": "provider-session:provider-instance:codex:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:567bb7ed-d63c-4306-954b-5f8f4726bcac",
+        "providerInstanceId": "codex"
+      }
+    ],
+    "providerSessions": [
+      {
+        "id": "provider-session:provider-instance:codex:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:567bb7ed-d63c-4306-954b-5f8f4726bcac",
+        "status": "ready",
+        "cwd": "/w/relay-codex-mwgvgped"
+      }
+    ],
+    "ms": 28031
+  },
+  "handles": {
+    "found": true,
+    "statuses": {
+      "valid": "200",
+      "forged": "401",
+      "tool": "401",
+      "none": "401",
+      "gone": "404"
+    }
+  },
+  "foreign": {
+    "output": "foreign=401"
+  },
+  "leak": {
+    "do": [],
+    "container": {
+      "hits": [],
+      "files": 671,
+      "bytes": 10815632,
+      "ms": 211
+    },
+    "flagged": null
+  },
+  "resume": {
+    "threadId": "bfb44c20-a6a7-48a2-94a5-8472265460e5",
+    "root": "/w/relay-codex-mwgvgped",
+    "model": "openai/claude-haiku-5-5",
+    "runs": [
+      {
+        "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:1",
+        "status": "completed",
+        "failure": null
+      },
+      {
+        "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:2",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "items": [
+      {
+        "type": "user_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "assistant_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "checkpoint",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      }
+    ],
+    "text": "HERON-67",
+    "requests": [
+      {
+        "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1dbcc-5aac-78f0-9983-733bbea253d9:native-request:toolu_019drQyKUMq3DoaY1G3JBdZf:7afaba30-d6bd-4f53-93cc-54485a7e7a6f",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": "accept"
+      },
+      {
+        "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1dbcc-5aac-78f0-9983-733bbea253d9:native-request:toolu_01Ah7urvwVbQp3QBMBqbYQej:4cd4f93e-26be-44e1-8093-04df68e27dcf",
+        "kind": "file-change",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": "accept"
+      },
+      {
+        "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1dbcc-5aac-78f0-9983-733bbea253d9:native-request:toolu_01W9TbqokoGrW5Dv4U8YUyG4:c67815e8-2d04-4047-ad53-ea84d8626cfb",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": "accept"
+      }
+    ],
+    "providerThreads": [
+      {
+        "id": "provider-thread:provider:codex:native-thread:pending%3Arun%3Athread%3Abfb44c20-a6a7-48a2-94a5-8472265460e5%3Aordinal%3A1",
+        "nativeThreadRef": {
+          "driver": "codex",
+          "nativeId": "01a1dbcc-5268-7272-b3b6-468d2ed7f0a1",
+          "strength": "strong"
+        },
+        "providerSessionId": "provider-session:provider-instance:codex:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:567bb7ed-d63c-4306-954b-5f8f4726bcac",
+        "providerInstanceId": "codex"
+      }
+    ],
+    "providerSessions": [
+      {
+        "id": "provider-session:provider-instance:codex:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:567bb7ed-d63c-4306-954b-5f8f4726bcac",
+        "status": "ready",
+        "cwd": "/w/relay-codex-mwgvgped"
+      }
+    ],
+    "ms": 9934
+  },
+  "resumeTrace": [
+    {
+      "at": 1794688999121,
+      "command": "codex",
+      "argv": [
+        "thread/resume"
+      ],
+      "cwd": null,
+      "route": "protocol",
+      "exitCode": null,
+      "ms": 0,
+      "detail": "ok 01a1dbcc-5268-7272-b3b6-468d2ed7f0a1"
+    }
+  ],
+  "revoked": {
+    "output": "revoked=401\nfresh=200"
+  },
+  "switch": {
+    "toProxy": {
+      "runs": [
+        {
+          "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:3",
+          "status": "failed",
+          "failure": null
+        }
+      ]
+    },
+    "back": {
+      "runs": [
+        {
+          "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:4",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "text": "HERON-67",
+      "native": [
+        "01a1dbcc-5268-7272-b3b6-468d2ed7f0a1"
+      ]
+    }
+  },
+  "longStream": {
+    "gapsSeconds": [
+      30,
+      60,
+      90,
+      120,
+      150,
+      180
+    ],
+    "timeline": [
+      {
+        "s": 30,
+        "events": "2",
+        "exit": "",
+        "code": "",
+        "seconds": "30"
+      },
+      {
+        "s": 61,
+        "events": "2",
+        "exit": "",
+        "code": "",
+        "seconds": "61"
+      },
+      {
+        "s": 91,
+        "events": "3",
+        "exit": "",
+        "code": "",
+        "seconds": "91"
+      },
+      {
+        "s": 121,
+        "events": "3",
+        "exit": "",
+        "code": "",
+        "seconds": "121"
+      },
+      {
+        "s": 152,
+        "events": "3",
+        "exit": "",
+        "code": "",
+        "seconds": "152"
+      },
+      {
+        "s": 182,
+        "events": "4",
+        "exit": "",
+        "code": "",
+        "seconds": "182"
+      },
+      {
+        "s": 212,
+        "events": "4",
+        "exit": "",
+        "code": "",
+        "seconds": "212"
+      },
+      {
+        "s": 242,
+        "events": "4",
+        "exit": "",
+        "code": "",
+        "seconds": "243"
+      },
+      {
+        "s": 273,
+        "events": "4",
+        "exit": "",
+        "code": "",
+        "seconds": "273"
+      },
+      {
+        "s": 303,
+        "events": "5",
+        "exit": "",
+        "code": "",
+        "seconds": "303"
+      },
+      {
+        "s": 334,
+        "events": "5",
+        "exit": "",
+        "code": "",
+        "seconds": "335"
+      },
+      {
+        "s": 365,
+        "events": "5",
+        "exit": "",
+        "code": "",
+        "seconds": "365"
+      },
+      {
+        "s": 395,
+        "events": "5",
+        "exit": "",
+        "code": "",
+        "seconds": "395"
+      },
+      {
+        "s": 426,
+        "events": "5",
+        "exit": "",
+        "code": "",
+        "seconds": "426"
+      },
+      {
+        "s": 456,
+        "events": "6",
+        "exit": "",
+        "code": "",
+        "seconds": "457"
+      },
+      {
+        "s": 487,
+        "events": "6",
+        "exit": "",
+        "code": "",
+        "seconds": "487"
+      },
+      {
+        "s": 517,
+        "events": "6",
+        "exit": "",
+        "code": "",
+        "seconds": "517"
+      },
+      {
+        "s": 547,
+        "events": "6",
+        "exit": "",
+        "code": "",
+        "seconds": "548"
+      },
+      {
+        "s": 578,
+        "events": "6",
+        "exit": "",
+        "code": "",
+        "seconds": "578"
+      },
+      {
+        "s": 608,
+        "events": "6",
+        "exit": "",
+        "code": "",
+        "seconds": "608"
+      },
+      {
+        "s": 638,
+        "events": "8",
+        "exit": "0",
+        "code": "200",
+        "seconds": "630"
+      }
+    ],
+    "last": {
+      "s": 638,
+      "events": "8",
+      "exit": "0",
+      "code": "200",
+      "seconds": "630"
+    },
+    "end": "data: {\"n\":0,\"s\":0}\n\ndata: {\"n\":1,\"s\":30}\n\ndata: {\"n\":2,\"s\":90}\n\ndata: {\"n\":3,\"s\":180}\n\ndata: {\"n\":4,\"s\":300}\n\ndata: {\"n\":5,\"s\":450}\n\ndata: {\"n\":6,\"s\":630}\n\ndata: [DONE]\n\n\n"
+  },
+  "holdingTurn": {
+    "runs": [
+      {
+        "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:1",
+        "status": "completed",
+        "failure": null
+      },
+      {
+        "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:2",
+        "status": "completed",
+        "failure": null
+      },
+      {
+        "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:3",
+        "status": "failed",
+        "failure": null
+      },
+      {
+        "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:4",
+        "status": "completed",
+        "failure": null
+      },
+      {
+        "id": "run:thread:bfb44c20-a6a7-48a2-94a5-8472265460e5:ordinal:5",
+        "status": "completed",
+        "failure": null
+      }
+    ]
+  },
+  "standIn": {
+    "requests": 11,
+    "sawKey": true,
+    "evidenceHeader": true,
+    "sample": [
+      {
+        "path": "/relay/v1/models",
+        "headers": [
+          "accept",
+          "accept-encoding",
+          "cf-connecting-ip",
+          "cf-ipcountry",
+          "cf-ray",
+          "cf-visitor",
+          "cf-worker",
+          "connection",
+          "host",
+          "user-agent",
+          "x-forwarded-proto",
+          "x-real-ip",
+          "x-t3flare-evidence"
+        ]
+      },
+      {
+        "path": "/relay/v1/models",
+        "headers": [
+          "accept",
+          "accept-encoding",
+          "cf-connecting-ip",
+          "cf-ipcountry",
+          "cf-ray",
+          "cf-visitor",
+          "cf-worker",
+          "connection",
+          "host",
+          "user-agent",
+          "x-forwarded-proto",
+          "x-real-ip",
+          "x-t3flare-evidence"
+        ]
+      },
+      {
+        "path": "/relay/v1/models",
+        "headers": [
+          "accept",
+          "accept-encoding",
+          "cf-connecting-ip",
+          "cf-ipcountry",
+          "cf-ray",
+          "cf-visitor",
+          "cf-worker",
+          "connection",
+          "host",
+          "user-agent",
+          "x-forwarded-proto",
+          "x-real-ip",
+          "x-t3flare-evidence"
+        ]
+      }
+    ]
+  },
+  "leakAfter": {
+    "do": [],
+    "container": {
+      "hits": [],
+      "files": 679,
+      "bytes": 15601208,
+      "ms": 174
+    },
+    "flagged": null
+  },
+  "relayLog": {
+    "entries": 18,
+    "byStatus": {
+      "200": 12,
+      "401": 5,
+      "404": 1
+    },
+    "endpoints": [
+      "openai",
+      "slow",
+      "no-such-endpoint"
+    ],
+    "sample": [
+      {
+        "t3flare": "model-relay",
+        "endpoint": "openai",
+        "status": 200,
+        "handle": "proc-82db5b0f-380e-4ddb-b7eb-7631d40ea40c",
+        "cli": "codex",
+        "workspace": "relay-codex-mwgvgped",
+        "method": "POST",
+        "ms": 1996
+      },
+      {
+        "t3flare": "model-relay",
+        "endpoint": "openai",
+        "status": 200,
+        "handle": "proc-82db5b0f-380e-4ddb-b7eb-7631d40ea40c",
+        "cli": "codex",
+        "workspace": "relay-codex-mwgvgped",
+        "method": "POST",
+        "ms": 528
+      },
+      {
+        "t3flare": "model-relay",
+        "endpoint": "openai",
+        "status": 200,
+        "handle": "proc-82db5b0f-380e-4ddb-b7eb-7631d40ea40c",
+        "cli": "codex",
+        "workspace": "relay-codex-mwgvgped",
+        "method": "POST",
+        "ms": 552
+      },
+      {
+        "t3flare": "model-relay",
+        "endpoint": "openai",
+        "status": 200,
+        "handle": "proc-82db5b0f-380e-4ddb-b7eb-7631d40ea40c",
+        "cli": "codex",
+        "workspace": "relay-codex-mwgvgped",
+        "method": "POST",
+        "ms": 530
+      }
+    ]
+  },
+  "failures": [],
+  "ok": true
+}
