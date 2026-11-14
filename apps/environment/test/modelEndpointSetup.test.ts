@@ -1,0 +1,219 @@
+// SPI-1175: the Model endpoint a stage, the acceptance test and CI set up through the panel's API: where its spec comes
+// from (scripts/lib/modelEndpointSpec.ts), and how it is saved (scripts/lib/modelEndpoint.ts).
+import { describe, expect, it } from "vitest";
+
+import { type AdminCall, ensureModelEndpoint } from "../scripts/lib/modelEndpoint.ts";
+import { commissaryEndpoint, modelEndpointSecret, modelEndpointSpec, type ModelEndpointSpec } from "../scripts/lib/modelEndpointSpec.ts";
+import { sealedStore } from "../src/credentials/sealed.ts";
+import type { Discovery } from "../src/endpoints/discover.ts";
+import { endpointStore } from "../src/endpoints/store.ts";
+import { handleHarness, type HarnessDeps } from "../src/harness/panel.ts";
+import { harnessStore } from "../src/harness/store.ts";
+
+const KEY = "sk-spi1175-secret-key-0123456789";
+const HOST = "t3.example.dev";
+const NOW = Date.UTC(2026, 10, 14, 10, 0);
+
+const memory = () => {
+  const map = new Map<string, unknown>();
+  return {
+    get: <T>(key: string) => map.get(key) as T | undefined,
+    put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)),
+    delete: (key: string) => map.delete(key),
+  };
+};
+
+/**
+ * The panel's real routes behind a script's admin call (the stage's service token plus the admin token, which worker.ts
+ * checks before the panel runs). `listed` is the endpoint's model list; `down` answers that many calls as Access does
+ * before the stage's service token is honoured.
+ */
+const stagePanel = (options: { readonly listed?: ReadonlyArray<string> | string; readonly down?: number } = {}) => {
+  const kv = memory();
+  const endpoints = endpointStore(kv, sealedStore(kv, "d".repeat(64), () => NOW));
+  const discovered: Array<{ baseUrl: string; apiKey: string | undefined }> = [];
+  const calls: Array<string> = [];
+  let down = options.down ?? 0;
+  const deps: HarnessDeps = {
+    caller: { kind: "service-token" },
+    host: HOST,
+    store: harnessStore(kv),
+    now: () => NOW,
+    endpoints: {
+      store: endpoints,
+      discover: async (target, apiKey): Promise<Discovery> => {
+        discovered.push({ baseUrl: target.baseUrl, apiKey });
+        const listed = options.listed ?? [];
+        return typeof listed === "string" ? { ok: false, error: listed } : { ok: true, models: listed.map((id) => ({ id })) };
+      },
+    },
+  };
+  const admin: AdminCall = async (method, path, body) => {
+    calls.push(`${method} ${path}`);
+    if (down > 0) {
+      down--;
+      return { status: 302, text: "" };
+    }
+    const response = await handleHarness(
+      new Request(`https://${HOST}${path}`, { method, ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }) }),
+      deps,
+    );
+    return { status: response.status, text: await response.text() };
+  };
+  return { admin, endpoints, discovered, calls };
+};
+
+const noWait = { waitMs: 60_000, sleep: async () => {} };
+
+describe("modelEndpointSpec", () => {
+  it("reads T3FLARE_MODEL_ENDPOINT, with defaults for what it leaves out", () => {
+    const value = JSON.stringify({ id: "openai", api: "openai-responses", baseUrl: "https://api.openai.com/v1", apiKey: KEY, models: ["gpt-5-mini"] });
+    const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value }, { derive: false });
+    expect(found).toEqual({
+      ok: true,
+      source: "T3FLARE_MODEL_ENDPOINT",
+      spec: { id: "openai", label: "openai", api: "openai-responses", baseUrl: "https://api.openai.com/v1", apiKey: KEY, headers: {}, models: ["gpt-5-mini"] },
+    });
+  });
+
+  it("wins over the Model proxy's settings", () => {
+    const value = JSON.stringify({ id: "mine", label: "Mine", baseUrl: "https://llm.example.com", apiKey: KEY });
+    const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value, MODEL_PROXY_URL: "https://proxy.example.com", MODEL_PROXY_API_KEY: "cms_other" }, { derive: true });
+    expect(found.ok && found.spec).toMatchObject({ id: "mine", label: "Mine", api: "anthropic-messages", baseUrl: "https://llm.example.com" });
+  });
+
+  it("derives a Commissary endpoint from the Model proxy's settings when allowed: its Claude models, read from its list", () => {
+    const found = modelEndpointSpec({ MODEL_PROXY_URL: "https://llm.example.com/", MODEL_PROXY_API_KEY: KEY }, { derive: true });
+    expect(found).toEqual({
+      ok: true,
+      source: "MODEL_PROXY_URL",
+      spec: { id: "commissary", label: "Commissary", api: "anthropic-messages", baseUrl: "https://llm.example.com", apiKey: KEY, headers: {}, match: "^claude-" },
+    });
+  });
+
+  it("reads back in CI the secret ci:setup derives on the laptop", () => {
+    const laptop = modelEndpointSpec({ MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: KEY }, { derive: true });
+    if (!laptop.ok) throw new Error(laptop.reason);
+    const ci = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: modelEndpointSecret(laptop.spec) }, { derive: false });
+    expect(ci).toEqual({ ok: true, source: "T3FLARE_MODEL_ENDPOINT", spec: laptop.spec });
+  });
+
+  it("derives nothing in CI: a missing T3FLARE_MODEL_ENDPOINT is a skip, not an error", () => {
+    const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: "", MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: KEY }, { derive: false });
+    expect(found).toEqual({ ok: false, invalid: false, reason: "T3FLARE_MODEL_ENDPOINT is not set" });
+    expect(modelEndpointSpec({}, { derive: true })).toEqual({ ok: false, invalid: false, reason: "neither T3FLARE_MODEL_ENDPOINT nor MODEL_PROXY_URL and MODEL_PROXY_API_KEY are set" });
+  });
+
+  it("refuses a malformed value without repeating it", () => {
+    const cases = [
+      `{"id":"x","baseUrl":"https://a.example","apiKey":"${KEY}"`,
+      JSON.stringify(["https://a.example", KEY]),
+      JSON.stringify({ id: "x", baseUrl: "https://a.example" }),
+      JSON.stringify({ id: "x", apiKey: KEY }),
+      JSON.stringify({ baseUrl: "https://a.example", apiKey: KEY }),
+      JSON.stringify({ id: "x", baseUrl: "https://a.example", apiKey: KEY, models: "all" }),
+      JSON.stringify({ id: "x", baseUrl: "https://a.example", apiKey: KEY, match: "(" }),
+      JSON.stringify({ id: "x", baseUrl: "https://a.example", apiKey: KEY, headers: { "x-a": 1 } }),
+    ];
+    for (const value of cases) {
+      const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value }, { derive: true });
+      expect(found.ok, value).toBe(false);
+      if (!found.ok) {
+        expect(found.invalid).toBe(true);
+        expect(found.reason).toMatch(/^T3FLARE_MODEL_ENDPOINT /);
+        expect(found.reason).not.toContain(KEY);
+        expect(found.reason).not.toContain("a.example");
+      }
+    }
+  });
+});
+
+const COMMISSARY = commissaryEndpoint("https://llm.example.com", KEY);
+
+describe("ensureModelEndpoint", () => {
+  it("on a fresh stage, saves the endpoint with its key and the listed models `match` keeps; the turn model is its small model", async () => {
+    const panel = stagePanel({ listed: ["gpt-5.4-mini", "claude-sonnet-5-5", "claude-haiku-5-5", "gemini-3-flash"] });
+    const result = await ensureModelEndpoint(panel.admin, COMMISSARY, { overwrite: true, ...noWait });
+    expect(result).toEqual({ ok: true, outcome: "created", id: "commissary", models: 2, turnModel: "commissary/claude-haiku-5-5" });
+    expect(panel.discovered).toEqual([{ baseUrl: "https://llm.example.com", apiKey: KEY }]);
+    const [saved] = panel.endpoints.load().endpoints;
+    expect(saved).toMatchObject({ id: "commissary", label: "Commissary", api: "anthropic-messages", auth: "api-key" });
+    expect(saved!.models.map((model) => model.id)).toEqual(["claude-sonnet-5-5", "claude-haiku-5-5"]);
+    expect((await panel.endpoints.resolve("commissary"))?.apiKey).toBe(KEY);
+  });
+
+  it("saves the models the spec names without reading the list; with no small model, the turn runs on the first", async () => {
+    const panel = stagePanel({ listed: ["other"] });
+    const spec: ModelEndpointSpec = { ...COMMISSARY, id: "mine", models: ["claude-sonnet-5-5", "claude-opus-5-5"] };
+    const result = await ensureModelEndpoint(panel.admin, spec, { overwrite: true, ...noWait });
+    expect(result).toMatchObject({ ok: true, outcome: "created", models: 2, turnModel: "mine/claude-sonnet-5-5" });
+    expect(panel.discovered).toEqual([]);
+  });
+
+  it("keeps an endpoint already there when told not to overwrite (prod: the owner's edits stand)", async () => {
+    const panel = stagePanel({ listed: ["claude-haiku-5-5"] });
+    await ensureModelEndpoint(panel.admin, { ...COMMISSARY, models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
+    const before = panel.endpoints.load().revision;
+    const result = await ensureModelEndpoint(panel.admin, { ...COMMISSARY, apiKey: "sk-another-key-0000", models: ["claude-sonnet-5-5"] }, { overwrite: false, ...noWait });
+    expect(result).toEqual({ ok: true, outcome: "kept", id: "commissary", models: 1, turnModel: "commissary/claude-haiku-5-5" });
+    expect(panel.endpoints.load().revision).toBe(before);
+    expect((await panel.endpoints.resolve("commissary"))?.apiKey).toBe(KEY);
+  });
+
+  it("saves it again on a test stage, with the key given", async () => {
+    const panel = stagePanel();
+    await ensureModelEndpoint(panel.admin, { ...COMMISSARY, models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
+    const result = await ensureModelEndpoint(panel.admin, { ...COMMISSARY, apiKey: "sk-another-key-0000", models: ["claude-haiku-5-5", "claude-sonnet-5-5"] }, { overwrite: true, ...noWait });
+    expect(result).toMatchObject({ ok: true, outcome: "updated", models: 2 });
+    expect((await panel.endpoints.resolve("commissary"))?.apiKey).toBe("sk-another-key-0000");
+  });
+
+  it("waits for a freshly deployed stage's panel to admit the service token", async () => {
+    const panel = stagePanel({ down: 3 });
+    const result = await ensureModelEndpoint(panel.admin, { ...COMMISSARY, models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
+    expect(result).toMatchObject({ ok: true, outcome: "created" });
+    expect(panel.calls.slice(0, 4)).toEqual(Array(4).fill("GET /_t3flare/harness/api/endpoints"));
+  });
+
+  it("gives up when the panel never answers, saying how it answered", async () => {
+    const panel = stagePanel({ down: 1000 });
+    let clock = 0;
+    const result = await ensureModelEndpoint(panel.admin, COMMISSARY, {
+      overwrite: true,
+      waitMs: 30_000,
+      now: () => clock,
+      sleep: async (ms) => void (clock += ms),
+    });
+    expect(result).toEqual({ ok: false, error: "the Harness panel did not answer GET /_t3flare/harness/api/endpoints (HTTP 302)" });
+  });
+
+  it("fails when the list has no model `match` keeps, saving nothing", async () => {
+    const panel = stagePanel({ listed: ["gpt-5-mini"] });
+    const result = await ensureModelEndpoint(panel.admin, COMMISSARY, { overwrite: true, ...noWait });
+    expect(result).toEqual({ ok: false, error: 'the Model endpoint "commissary" lists no model matching ^claude- (1 listed)' });
+    expect(panel.endpoints.load().endpoints).toEqual([]);
+  });
+
+  it("fails when the model list cannot be read, with the panel's reason", async () => {
+    const panel = stagePanel({ listed: "the endpoint answered HTTP 401" });
+    const result = await ensureModelEndpoint(panel.admin, COMMISSARY, { overwrite: true, ...noWait });
+    expect(result).toEqual({ ok: false, error: 'the Model endpoint "commissary"\'s model list could not be read (HTTP 200): the endpoint answered HTTP 401' });
+    expect(panel.endpoints.load().endpoints).toEqual([]);
+  });
+
+  it("passes the panel's refusal on without the key, even when an answer repeats it", async () => {
+    const refusing: AdminCall = async (method, path) =>
+      method === "GET" ? { status: 200, text: JSON.stringify({ revision: 0, endpoints: [] }) } : { status: 400, text: `refused ${path} with ${KEY}` };
+    const result = await ensureModelEndpoint(refusing, { ...COMMISSARY, models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
+    expect(result.ok).toBe(false);
+    expect(JSON.stringify(result)).not.toContain(KEY);
+    expect(result).toEqual({ ok: false, error: "the Harness panel refused the Model endpoint \"commissary\" (HTTP 400): refused /_t3flare/harness/api/endpoints with [the key]" });
+  });
+
+  it("refuses an endpoint the panel's validation refuses (a plain-http URL), saying why", async () => {
+    const panel = stagePanel();
+    const result = await ensureModelEndpoint(panel.admin, { ...COMMISSARY, baseUrl: "http://llm.example.com", models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.error).toMatch(/^the Harness panel refused the Model endpoint "commissary" \(HTTP 400\): .*https/);
+  });
+});
