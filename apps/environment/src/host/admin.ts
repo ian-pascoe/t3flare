@@ -363,7 +363,7 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                           "takeSkills" in body
                           ? await rpc.takeEnvironmentSkills(environment.skills.hash())
                           : "skills" in body
-                            ? await rpc.skills(String(body.skills), body.repoOnly === true ? { repoOnly: true } : undefined)
+                            ? await rpc.skills(String(body.skills), undefined, body.repoOnly === true ? { repoOnly: true } : undefined)
                             : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess, takeSkills, skills" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
       }

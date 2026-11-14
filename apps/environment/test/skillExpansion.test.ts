@@ -152,7 +152,7 @@ describe("Environment skills in a message (SPI-1148)", () => {
         id: "proj",
         inner: "/workspace/repo",
         workspace: {
-          skills: (_inner, options) => (repoOnly.push(options?.repoOnly === true), Promise.resolve(held)),
+          skills: (_inner, _agent, options) => (repoOnly.push(options?.repoOnly === true), Promise.resolve(held)),
           prompts: () => Promise.resolve([]),
           readText: (path) => Promise.resolve(files[path] ?? null),
         },
