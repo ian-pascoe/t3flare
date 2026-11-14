@@ -9,8 +9,12 @@ import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/worksp
 
 import { acpProfileLaunch } from "./acpProfiles.ts";
 
-/** The CLIs the channel runs; `probe` is M1's test program (stages only). Step 4b: Claude Code and OpenCode over ACP. */
-export type CliName = "codex" | "pi" | "probe" | "claude" | "opencode";
+/**
+ * The CLIs the channel runs; `probe` is M1's test program (stages only). Step 4b: Claude Code and OpenCode over ACP. A
+ * list as well as a type, so a test can derive every profile's names (SPI-1152, ADR-0032's Variables refinement).
+ */
+export const CLI_PROFILE_NAMES = ["codex", "pi", "probe", "claude", "opencode"] as const;
+export type CliName = (typeof CLI_PROFILE_NAMES)[number];
 
 export const CLI_BIN = "/opt/t3flare/bin";
 /** Where CLI homes live in the Container (`apps/sandbox-image/src/process.ts` `CLI_HOMES`). */

@@ -32,11 +32,22 @@ export const REFUSED_LOADER_HOOKS: ReadonlyArray<string> = ["NODE_OPTIONS", "BAS
 /** A segment of a name (between underscores, any case, singular or plural) that names a credential. */
 export const CREDENTIAL_SEGMENTS: ReadonlyArray<string> = ["KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL"];
 
+/** The segment of `name` that names a credential (as written, upper-cased), or undefined. */
+export const credentialSegment = (name: string): string | undefined =>
+  name
+    .toUpperCase()
+    .split("_")
+    .find((part) => CREDENTIAL_SEGMENTS.some((word) => part === word || part === `${word}S`));
+
+/** Whether `value` is a plain object, as a set of Variables is stored and sent. */
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => value !== null && typeof value === "object" && !Array.isArray(value);
+
 /**
  * The names t3flare already sets or pins that no rule above covers: in `COMMAND_ENV`, a CLI profile's environment or
- * the managed settings' `env`. A Variable under one of them would be shadowed for some commands and not others, or
- * redirect a CLI's requests (`HTTPS_PROXY`). Derived from the code by `apps/environment/test/variableNames.test.ts`,
- * which fails when a profile sets a name this list misses, or this list keeps one nothing sets.
+ * Codex's shell policy, the managed settings' `env`, a Terminal's base environment or the shell variables its rc file
+ * assigns. A Variable under one of them would be shadowed for some commands and not others, or redirect a CLI's
+ * requests (`HTTPS_PROXY`). Derived from the code by `apps/environment/test/variableNames.test.ts`, which fails when one
+ * of those sets a name this list misses, or this list keeps one nothing sets.
  */
 export const SET_BY_T3FLARE: ReadonlyArray<string> = [
   "ALL_PROXY",
@@ -73,6 +84,9 @@ export const SET_BY_T3FLARE: ReadonlyArray<string> = [
   "DISABLE_FEEDBACK_COMMAND",
   "DISABLE_TELEMETRY",
   "DISABLE_UPDATES",
+  "HISTFILE",
+  "HISTFILESIZE",
+  "HISTSIZE",
   "HTTPS_PROXY",
   "HTTP_PROXY",
   "LANG",
@@ -89,8 +103,11 @@ export const SET_BY_T3FLARE: ReadonlyArray<string> = [
   "PI_OFFLINE",
   "PI_SKIP_VERSION_CHECK",
   "PI_TELEMETRY",
+  "PS0",
+  "PS1",
   "SSL_CERT_DIR",
   "SSL_CERT_FILE",
+  "TERM",
   "XDG_CACHE_HOME",
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
@@ -130,10 +147,7 @@ export const variableNameProblem = (name: string): string | undefined => {
   const prefix = REFUSED_PREFIXES.find((entry) => name.startsWith(entry.prefix));
   if (prefix !== undefined) return `${quoted} is refused: names starting ${prefix.prefix} are ${prefix.owner}`;
   if (REFUSED_LOADER_HOOKS.includes(name)) return `${quoted} is refused: it makes programs load code before a command runs`;
-  const segment = name
-    .toUpperCase()
-    .split("_")
-    .find((part) => CREDENTIAL_SEGMENTS.some((word) => part === word || part === `${word}S`));
+  const segment = credentialSegment(name);
   if (segment !== undefined) return `${quoted} is refused: its ${segment} part names a credential, and ${SECRETS_STAY_OUT}`;
   if (SET_BY_T3FLARE.includes(name)) return `${quoted} is refused: t3flare sets it itself, for every command or for a CLI agent`;
   return undefined;
@@ -151,7 +165,7 @@ export const variableValueProblem = (name: string, value: string): string | unde
 
 /** Why `value` is not a set of Variables (`{ NAME: "value" }`), every problem named; undefined when it is one. */
 export const variablesProblem = (value: unknown): string | undefined => {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return 'an object of Variables, { "NAME": "value" }';
+  if (!isRecord(value)) return 'an object of Variables, { "NAME": "value" }';
   const entries = Object.entries(value);
   if (entries.length > MAX_VARIABLES) return `at most ${MAX_VARIABLES} Variables (${entries.length} given)`;
   const problems = entries.flatMap(([name, text]) => {
@@ -166,7 +180,7 @@ export const variablesProblem = (value: unknown): string | undefined => {
  * dropped alone, not the whole set. Anything that is not a set reads as none.
  */
 export const fitVariables = (value: unknown): Readonly<Record<string, string>> => {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return {};
+  if (!isRecord(value)) return {};
   return Object.fromEntries(
     Object.entries(value)
       .filter((entry): entry is [string, string] => typeof entry[1] === "string" && variableNameProblem(entry[0]) === undefined && variableValueProblem(entry[0], entry[1]) === undefined)
