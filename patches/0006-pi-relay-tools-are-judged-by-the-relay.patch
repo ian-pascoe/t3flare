@@ -1,0 +1,24 @@
+diff --git a/packages/provider-pi/src/server/mcpExtensionSource.ts b/packages/provider-pi/src/server/mcpExtensionSource.ts
+index 48aeff24370de89b40404599505cd9bfe20ddb52..5c108ec0373c4893cb9bb4e558659b8bd240aacb 100644
+--- a/packages/provider-pi/src/server/mcpExtensionSource.ts
++++ b/packages/provider-pi/src/server/mcpExtensionSource.ts
+@@ -358,10 +358,18 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
+       NodePath.resolve(tool.sourceInfo.path) === NodePath.resolve(extensionPath));
+   };
+ 
++  // t3flare: a server tool of Pi's built-in MCP client is judged, and asked about on the
++  // thread, by t3flare's MCP relay, the only server the profile's mcp.json names (project
++  // trust stays off). Asking here too would ask twice. Every other tool is asked as before.
++  const isRelayedMcpTool = (name: string) =>
++    name.startsWith("mcp__") &&
++    typeof pi.getAllTools === "function" &&
++    pi.getAllTools().some((tool) => tool.name === name && tool.sourceInfo?.path === "builtin:mcp");
++
+   pi.on("tool_call", async (event, ctx) => {
+     const mode = runtimeMode();
+     if (mode === "full-access") return;
+-    if ((event.toolName === "tool_search" ? hasBuiltinToolSearch() : READ_ONLY_TOOLS.has(event.toolName)) || isReadOnlyMcpTool(event.toolName)) {
++    if ((event.toolName === "tool_search" ? hasBuiltinToolSearch() : READ_ONLY_TOOLS.has(event.toolName)) || isReadOnlyMcpTool(event.toolName) || isRelayedMcpTool(event.toolName)) {
+       return;
+     }
+     if (mode === "auto-accept-edits" && FILE_CHANGE_TOOLS.has(event.toolName)) {
