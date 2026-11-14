@@ -11,9 +11,6 @@ import type { SettingTier } from "./fields.ts";
 import { EXTENSIONS, type HarnessChange, type McpChange, mcpServersOf, resolveHarness, type StoredHarness } from "./index.ts";
 import type { Exposure, ToolClass } from "./mcp.ts";
 
-/** The Settings server's own name in the MCP server set (plan D2): every change to its entry is asked. */
-export const SETTINGS_SERVER = "settings";
-
 export type ChangeTier = "free" | "asked";
 
 /** What a change answered on the Change page needs there (plan D6; `oversize` is the renderer's, not this function's). */
@@ -102,8 +99,9 @@ const extensionTier = (stored: StoredHarness, change: HarnessChange): TierVerdic
 
 const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (server: string, tool: string) => ToolClass | undefined): TierVerdict => {
   const server = change.server;
-  const own = server === SETTINGS_SERVER;
   const current = mcpServersOf(stored)[server];
+  // The Settings server is known by its kind (plan D2); `mcpServersOf` lets no other entry take its name.
+  const own = current?.kind === "settings";
   if (change.op === "add") return verdictOf([{ asked: true, reason: `${server}: a new server` }], change.auth.kind === "header" ? "secret" : undefined);
   if (change.op === "remove") return verdictOf([{ asked: true, reason: `${server}: removed, with its secrets` }]);
   if (change.op === "header-value") return verdictOf([{ asked: true, reason: `${server}: its header value set` }], "secret");
@@ -127,6 +125,11 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
   const parts: Array<Part> = [];
   if (change.enabled !== undefined && change.enabled !== current.enabled) {
     parts.push(mark(change.enabled ? { asked: true, reason: `${server}: turned on` } : { asked: false, reason: `${server}: turned off` }));
+  }
+  // The Settings server's writes switch (plan D2): only its own entry has one, so every move of it is asked.
+  if (change.writes !== undefined && !own) parts.push({ asked: true, reason: `${server}: has no writes switch` });
+  else if (change.writes !== undefined && change.writes !== (current.writes ?? true)) {
+    parts.push(mark(change.writes ? { asked: true, reason: `${server}: write tools turned on` } : { asked: false, reason: `${server}: write tools turned off` }));
   }
   const exposureAfter = change.exposure ?? current.exposure;
   if (change.exposure !== undefined && change.exposure !== current.exposure) {
