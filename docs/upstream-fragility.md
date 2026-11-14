@@ -560,6 +560,14 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Blast radius**: tabs that cannot reach the dev server.
 - **Fix**: re-cut the patch.
 
+### U66. Patch 0006: Pi Durable's removed models leave the picker (SPI-1162)
+
+- **Where**: `patches/0006-pi-durable-models-are-not-retained.patch`, the first line of `shouldRetainMissingProviderModels` in `ProviderRegistry.ts`: `piDurable` retains no missing model. Stock t3 keeps every model a non-Codex, non-OpenCode driver stops listing (`mergeProviderModels`), and persists it, so a removed Model endpoint's models (or a model the proxy dropped) would stay in the picker for good.
+- **Breaks when**: the function is renamed or moved, or t3 adds another retention path.
+- **Detection**: the patch fails to apply at bump (loud). **Silent**: a new retention path keeps a removed endpoint's models in the picker; `scripts/p1162.ts` checks they leave it.
+- **Blast radius**: stale models in the picker; a turn on one fails with the removed-model message.
+- **Fix**: re-cut the patch.
+
 ### U62. Container previews and the carried-socket script (G11)
 
 - **Where**: `apps/agents/src/workspace/containerPreview.ts` and `containerPreviewScript.ts` (ported from cloudpid@93ba45a3), `WorkspaceDO.containerPreview` with its use and hold accounting (`#someoneWorks`, `#previewHold`), `WorkspaceContainerPreviews` (agents Worker) and `ContainerPreviews` (Environment Worker), the eight ports in `@t3flare/workspace-client`.

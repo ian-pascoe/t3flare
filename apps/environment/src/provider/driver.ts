@@ -73,10 +73,11 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       continuation: { groupKey: continuationIdentity.continuationKey },
     });
     const effective = { ...config, enabled };
-    const { catalog, modelEndpoints } = environmentServices();
+    const { catalog } = environmentServices();
     // The snapshot's models are the catalog's (the copy kept from the last read, now; the proxy's list again at each
-    // check) and the Model endpoints' as stored now (SPI-1162).
-    const models = () => snapshotModels(catalog.current(), modelEndpoints?.());
+    // check) and the Model endpoints' as stored now (SPI-1162), read through the services bound last: an Environment DO
+    // that reset in a warm isolate binds them again.
+    const models = () => snapshotModels(catalog.current(), environmentServices().modelEndpoints?.());
     const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: PI_DURABLE_DRIVER, packageName: null });
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
     const snapshot = yield* makeManagedServerProvider({
