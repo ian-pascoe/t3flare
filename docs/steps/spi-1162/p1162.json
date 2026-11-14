@@ -1,5 +1,5 @@
 {
-  "at": "2026-11-14T17:56:49.670Z",
+  "at": "2026-11-14T18:30:46.112Z",
   "openai": "Commissary's OpenAI Responses API",
   "discovered": {
     "commissary": {
@@ -258,7 +258,7 @@
       "status": 200,
       "json": {
         "ok": true,
-        "revision": 9,
+        "revision": 1,
         "endpoint": {
           "id": "commissary",
           "label": "Commissary",
@@ -305,8 +305,8 @@
         },
         "key": {
           "set": true,
-          "setAt": 1794679011379,
-          "fingerprint": "a7c5148b"
+          "setAt": 1794681049777,
+          "fingerprint": "a22aa595"
         }
       }
     },
@@ -314,7 +314,7 @@
       "status": 200,
       "json": {
         "ok": true,
-        "revision": 10,
+        "revision": 2,
         "endpoint": {
           "id": "openai",
           "label": "OpenAI (Responses)",
@@ -344,14 +344,14 @@
         },
         "key": {
           "set": true,
-          "setAt": 1794679011509,
-          "fingerprint": "a7c5148b"
+          "setAt": 1794681049928,
+          "fingerprint": "a22aa595"
         }
       }
     }
   },
   "listed": {
-    "revision": 10,
+    "revision": 2,
     "credentialsKey": true,
     "endpoints": [
       {
@@ -399,8 +399,9 @@
         ],
         "key": {
           "set": true,
-          "setAt": 1794679011379,
-          "fingerprint": "a7c5148b"
+          "setAt": 1794681049777,
+          "fingerprint": "a22aa595",
+          "readable": true
         }
       },
       {
@@ -431,8 +432,9 @@
         ],
         "key": {
           "set": true,
-          "setAt": 1794679011509,
-          "fingerprint": "a7c5148b"
+          "setAt": 1794681049928,
+          "fingerprint": "a22aa595",
+          "readable": true
         }
       }
     ],
@@ -495,7 +497,7 @@
         "thinking": false
       }
     ],
-    "proxyModels": 122
+    "proxyModels": 119
   },
   "anthropicTurn": {
     "ok": true,
@@ -503,13 +505,13 @@
     "fixture": "ian-pascoe/t3flare-fixture",
     "model": "commissary/claude-haiku-5-5",
     "clone": {
-      "destination": "/w/acceptance-mwgpjoyz",
-      "ms": 6566,
-      "cwd": "/w/acceptance-mwgpjoyz",
+      "destination": "/w/acceptance-mwgqremh",
+      "ms": 43763,
+      "cwd": "/w/acceptance-mwgqremh",
       "error": null
     },
     "turn": {
-      "threadId": "3b7bd572-9b07-4989-bba2-439d6914d8c1",
+      "threadId": "38525f20-f5fb-46bb-be4e-9846170e9e9e",
       "runs": [
         "completed"
       ],
@@ -526,11 +528,11 @@
         }
       ],
       "edit": {
-        "fileName": "/w/acceptance-mwgpjoyz/src/greeting.txt",
+        "fileName": "/w/acceptance-mwgqremh/src/greeting.txt",
         "status": "completed"
       },
       "bash": {
-        "input": "cd /w/acceptance-mwgpjoyz && bash test.sh",
+        "input": "cd /w/acceptance-mwgqremh && bash test.sh",
         "status": "completed",
         "exitCode": 0
       },
@@ -542,7 +544,7 @@
           "deletions": 0
         }
       ],
-      "ms": 22171
+      "ms": 61070
     },
     "checkpointOps": [
       "has:do",
@@ -564,19 +566,19 @@
       "failure": null,
       "result": {
         "status": "created",
-        "commitSha": "b98393d5a9e724939508da992d128cb501cefe1a",
+        "commitSha": "54b4cb96db2592b1359e2ca9169219b3522ddc3c",
         "subject": "acceptance: t3's commit action"
       },
       "head": {
-        "sha": "b98393d5a9e724939508da992d128cb501cefe1a",
+        "sha": "54b4cb96db2592b1359e2ca9169219b3522ddc3c",
         "subject": "acceptance: t3's commit action",
         "files": [
           "src/greeting.txt"
         ]
       },
-      "ms": 6309
+      "ms": 6753
     },
-    "ms": 29071
+    "ms": 68718
   },
   "openaiTurn": {
     "ok": true,
@@ -584,13 +586,13 @@
     "fixture": "ian-pascoe/t3flare-fixture",
     "model": "openai/gemini-3-flash",
     "clone": {
-      "destination": "/w/acceptance-mwgpkbei",
-      "ms": 4606,
-      "cwd": "/w/acceptance-mwgpkbei",
+      "destination": "/w/acceptance-mwgqsvnb",
+      "ms": 5858,
+      "cwd": "/w/acceptance-mwgqsvnb",
       "error": null
     },
     "turn": {
-      "threadId": "14f50b37-c71b-417e-8716-114516bd4d46",
+      "threadId": "09c26f63-8fb8-4602-b0cf-a094bab9445e",
       "runs": [
         "completed"
       ],
@@ -623,7 +625,7 @@
           "deletions": 0
         }
       ],
-      "ms": 27378
+      "ms": 29969
     },
     "checkpointOps": [
       "has:do",
@@ -645,22 +647,22 @@
       "failure": null,
       "result": {
         "status": "created",
-        "commitSha": "309d27e08ec9fabb3590beeeba9def89927e6519",
+        "commitSha": "359afbcbee00e09df583e363862c4e43347e454a",
         "subject": "acceptance: t3's commit action"
       },
       "head": {
-        "sha": "309d27e08ec9fabb3590beeeba9def89927e6519",
+        "sha": "359afbcbee00e09df583e363862c4e43347e454a",
         "subject": "acceptance: t3's commit action",
         "files": [
           "src/greeting.txt"
         ]
       },
-      "ms": 4559
+      "ms": 6872
     },
-    "ms": 32758
+    "ms": 37638
   },
   "changedList": {
-    "threadId": "952b657b-e498-47e1-a300-0b07d869a078",
+    "threadId": "3a81fc6c-699b-42fe-a811-b980ee84c701",
     "firstTurn": [
       "completed"
     ],
@@ -677,8 +679,8 @@
     "status": 200,
     "run": "failed",
     "errors": [
-      "The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model.",
-      "The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model."
+      "The selected model is not available: its Model endpoint, or the Model proxy, no longer lists it. Pick another model.",
+      "The selected model is not available: its Model endpoint, or the Model proxy, no longer lists it. Pick another model."
     ],
     "pickerAfter": []
   },
@@ -698,7 +700,7 @@
         ]
       },
       "entity": "endpoints",
-      "at": 1794679088703,
+      "at": 1794681172398,
       "caller": "service-token"
     },
     {
@@ -726,12 +728,12 @@
         ],
         "key": {
           "set": true,
-          "setAt": 1794679011509,
-          "fingerprint": "a7c5148b"
+          "setAt": 1794681049928,
+          "fingerprint": "a22aa595"
         }
       },
       "entity": "endpoints",
-      "at": 1794679082470,
+      "at": 1794681165993,
       "caller": "service-token"
     },
     {
@@ -749,198 +751,12 @@
         ],
         "key": {
           "set": true,
-          "setAt": 1794679011509,
-          "fingerprint": "a7c5148b"
+          "setAt": 1794681049928,
+          "fingerprint": "a22aa595"
         }
       },
       "entity": "endpoints",
-      "at": 1794679011509,
-      "caller": "service-token"
-    },
-    {
-      "action": "endpoint.change",
-      "target": "commissary",
-      "before": {
-        "label": "Commissary",
-        "api": "anthropic-messages",
-        "baseUrl": "https://api.ai.ianpascoe.dev",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "claude-haiku-5-5"
-        ]
-      },
-      "after": {
-        "label": "Commissary",
-        "api": "anthropic-messages",
-        "baseUrl": "https://api.ai.ianpascoe.dev",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "claude-haiku-5-5"
-        ],
-        "key": {
-          "set": true,
-          "setAt": 1794679011379,
-          "fingerprint": "a7c5148b"
-        }
-      },
-      "entity": "endpoints",
-      "at": 1794679011379,
-      "caller": "service-token"
-    },
-    {
-      "action": "endpoint.remove",
-      "target": "probe",
-      "before": {
-        "label": "Probe",
-        "api": "anthropic-messages",
-        "baseUrl": "https://api.ai.ianpascoe.dev",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "claude-haiku-5-5"
-        ]
-      },
-      "entity": "endpoints",
-      "at": 1794678997238,
-      "caller": "service-token"
-    },
-    {
-      "action": "endpoint.add",
-      "target": "probe",
-      "before": null,
-      "after": {
-        "label": "Probe",
-        "api": "anthropic-messages",
-        "baseUrl": "https://api.ai.ianpascoe.dev",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "claude-haiku-5-5"
-        ],
-        "key": {
-          "set": true,
-          "setAt": 1794678992853,
-          "fingerprint": "a7c5148b"
-        }
-      },
-      "entity": "endpoints",
-      "at": 1794678992853,
-      "caller": "service-token"
-    },
-    {
-      "action": "endpoint.remove",
-      "target": "probe",
-      "before": {
-        "label": "Probe",
-        "api": "anthropic-messages",
-        "baseUrl": "https://api.ai.ianpascoe.dev",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "claude-haiku-5-5"
-        ]
-      },
-      "entity": "endpoints",
-      "at": 1794678905354,
-      "caller": "service-token"
-    },
-    {
-      "action": "endpoint.add",
-      "target": "probe",
-      "before": null,
-      "after": {
-        "label": "Probe",
-        "api": "anthropic-messages",
-        "baseUrl": "https://api.ai.ianpascoe.dev",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "claude-haiku-5-5"
-        ],
-        "key": {
-          "set": true,
-          "setAt": 1794678901468,
-          "fingerprint": "a7c5148b"
-        }
-      },
-      "entity": "endpoints",
-      "at": 1794678901468,
-      "caller": "service-token"
-    },
-    {
-      "action": "endpoint.remove",
-      "target": "openai",
-      "before": {
-        "label": "OpenAI (Responses)",
-        "api": "openai-responses",
-        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "gpt-5.4-mini",
-          "gpt-5"
-        ]
-      },
-      "entity": "endpoints",
-      "at": 1794678607830,
-      "caller": "service-token"
-    },
-    {
-      "action": "endpoint.change",
-      "target": "openai",
-      "before": {
-        "label": "OpenAI (Responses)",
-        "api": "openai-responses",
-        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "gpt-5.4-mini"
-        ]
-      },
-      "after": {
-        "label": "OpenAI (Responses)",
-        "api": "openai-responses",
-        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "gpt-5.4-mini",
-          "gpt-5"
-        ],
-        "key": {
-          "set": true,
-          "setAt": 1794678490322,
-          "fingerprint": "a7c5148b"
-        }
-      },
-      "entity": "endpoints",
-      "at": 1794678604358,
-      "caller": "service-token"
-    },
-    {
-      "action": "endpoint.add",
-      "target": "openai",
-      "before": null,
-      "after": {
-        "label": "OpenAI (Responses)",
-        "api": "openai-responses",
-        "baseUrl": "https://api.ai.ianpascoe.dev/v1",
-        "auth": "api-key",
-        "headers": [],
-        "models": [
-          "gpt-5.4-mini"
-        ],
-        "key": {
-          "set": true,
-          "setAt": 1794678490322,
-          "fingerprint": "a7c5148b"
-        }
-      },
-      "entity": "endpoints",
-      "at": 1794678490322,
+      "at": 1794681049928,
       "caller": "service-token"
     },
     {
@@ -958,12 +774,12 @@
         ],
         "key": {
           "set": true,
-          "setAt": 1794678490204,
-          "fingerprint": "a7c5148b"
+          "setAt": 1794681049777,
+          "fingerprint": "a22aa595"
         }
       },
       "entity": "endpoints",
-      "at": 1794678490204,
+      "at": 1794681049777,
       "caller": "service-token"
     }
   ],

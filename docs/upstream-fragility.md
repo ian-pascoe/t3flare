@@ -683,6 +683,9 @@ CLI behaviour over ACP is the silent part.
 
 ### U66. Patch 0006: Pi Durable's removed models leave the picker (SPI-1162)
 
+Ranked last with U64 and U65: a break leaves turns running. The patch failing to apply is loud; a new retention path is
+the silent part, and costs only stale entries in the picker.
+
 - **Where**: `patches/0006-pi-durable-models-are-not-retained.patch`, the first line of `shouldRetainMissingProviderModels` in `ProviderRegistry.ts`: `piDurable` retains no missing model. Stock t3 keeps every model a non-Codex, non-OpenCode driver stops listing (`mergeProviderModels`), and persists it, so a removed Model endpoint's models (or a model the proxy dropped) would stay in the picker for good.
 - **Breaks when**: the function is renamed or moved, or t3 adds another retention path.
 - **Detection**: the patch fails to apply at bump (loud). **Silent**: a new retention path keeps a removed endpoint's models in the picker; `scripts/p1162.ts` checks they leave it.
