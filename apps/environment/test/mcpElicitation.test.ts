@@ -127,7 +127,7 @@ const hostOver = async (tools: Array<Record<string, unknown>>, respond: (request
       return { kind: "complete", result: { kind: "inline", value: await respond(request, hooks) }, cacheable: false, fetchedAt: 0, state: {} } as never;
     },
   };
-  const host = new McpHost({ kv: memory(), engine, commissary: { url: undefined, key: undefined }, settings: () => added.harness, now: () => 1, ownHost: () => "t3.example.com" });
+  const host = new McpHost({ kv: memory(), engine, settings: () => added.harness, now: () => 1, ownHost: () => "t3.example.com" });
   await host.list("fixture");
   return { host, requests };
 };

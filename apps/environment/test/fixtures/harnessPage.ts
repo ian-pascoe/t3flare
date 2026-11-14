@@ -1,7 +1,7 @@
 // @effect-diagnostics globalDate:off
 // The harness panel's fixture state (SPI-1086): what the page snapshot test renders and `scripts/panel-preview.ts` writes
-// for a local look. Four MCP servers in every state the page draws: Commissary listed with no tools, a direct server
-// listed with tools (one class set by the owner, one tool refused), one whose listing failed, and an OAuth server never
+// for a local look. Four MCP servers in every state the page draws: Commissary (added by hand with its `x-api-key`
+// header, SPI-1160) listed with no tools, a direct server listed with tools (one class set by the owner, one tool refused), one whose listing failed, and an OAuth server never
 // signed in. Fixed times, so the render is stable.
 import { applyChange, EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
 
@@ -17,7 +17,17 @@ if (!changed.ok) throw new Error(changed.error);
 const tool = (upstream: string, cls: "read" | "write", hinted: "read" | "write" = cls) => ({ name: `mcp__fixture__${upstream}`, upstream, class: cls, hinted, exposure: "deferred" });
 
 export const FIXTURE_MCP: ReadonlyArray<McpRow> = [
-  { name: "commissary", setting: { kind: "commissary", enabled: true, exposure: "deferred" }, status: "ok", listedAt: minutes(12), error: null, tools: [], overrides: {}, refused: [] },
+  {
+    name: "commissary",
+    setting: { kind: "direct", enabled: true, exposure: "deferred", url: "https://api.commissary-fixture.invalid/mcp?toolkits=fixture", auth: { kind: "header", header: "x-api-key" } },
+    secret: { set: true, setAt: minutes(60), fingerprint: "51c0" },
+    status: "ok",
+    listedAt: minutes(12),
+    error: null,
+    tools: [],
+    overrides: {},
+    refused: [],
+  },
   {
     name: "fixture",
     setting: { kind: "direct", enabled: true, exposure: "deferred", url: "https://t3flare-mcpfixture-panel.example.workers.dev/mcp", auth: { kind: "header", header: "Authorization" } },

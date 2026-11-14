@@ -61,7 +61,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
   const details = { server: server.name, tool: tool.upstream, class: tool.class };
   return {
     name: tool.name,
-    description: `${server.name} (MCP${server.kind === "commissary" ? ", through Commissary" : ""}; ${tool.class} tool): ${tool.description}`,
+    description: `${server.name} (MCP; ${tool.class} tool): ${tool.description}`,
     parameters: (tool.inputSchema ?? { type: "object", properties: {} }) as object,
     replay: "safe",
     ...(tool.exposure === "deferred" ? { deferred: true as const } : {}),
@@ -105,7 +105,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
 export const mcpNamespaces = (view: McpView): ReadonlyArray<CodemodeNamespace> =>
   view.servers.map((server) => ({
     name: server.name,
-    description: `MCP server ${server.name}${server.kind === "commissary" ? " (Commissary's toolkits)" : ""}`,
+    description: `MCP server ${server.name}`,
     prefix: `mcp__${server.name}__`,
   }));
 

@@ -137,7 +137,7 @@ describe("harness panel", () => {
     const kv = memory();
     const store = harnessStore(kv);
     const secrets = harnessSecrets(kv);
-    const mcp = new McpHost({ kv, engine: undefined, commissary: { url: undefined, key: undefined }, settings: () => store.load() });
+    const mcp = new McpHost({ kv, engine: undefined, settings: () => store.load() });
     const deps = { caller: { kind: "service-token" } as HarnessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
     const VALUE = "s3cr3t-header-VALUE-1234";
     const add = await handleHarness(
@@ -170,10 +170,35 @@ describe("harness panel", () => {
     expect(secrets.read("fixture", "header")).toBeUndefined();
   });
 
+  it("a stored settings document naming the retired built-in commissary server loads without it; Commissary is added by hand with its x-api-key header", async () => {
+    const kv = memory();
+    const store = harnessStore(kv);
+    store.save({ revision: 4, global: {}, overrides: {}, mcp: { servers: { commissary: { kind: "commissary", enabled: true, exposure: "deferred" } } } } as never);
+    const secrets = harnessSecrets(kv);
+    const mcp = new McpHost({ kv, engine: undefined, settings: () => store.load() });
+    const deps = { caller: { kind: "service-token" } as HarnessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
+    const overview = async () => (await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/mcp`), deps)).json()) as { servers: Array<{ name: string; setting: unknown }> };
+    expect((await overview()).servers).toEqual([]);
+    expect((await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), { ...deps, caller: owner })).status).toBe(200);
+    const url = "https://api.commissary.example/mcp?toolkits=fixture";
+    const add = await handleHarness(
+      new Request(`https://${HOST}/_t3flare/harness/api/mcp/servers`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ server: "commissary", url, auth: { kind: "header", header: "x-api-key" }, value: "cms-key" }),
+      }),
+      deps,
+    );
+    expect(add.status).toBe(200);
+    expect((await overview()).servers).toMatchObject([{ name: "commissary", setting: { kind: "direct", url, auth: { kind: "header", header: "x-api-key" }, enabled: true } }]);
+    expect(store.load().mcp?.servers).toEqual({ commissary: { kind: "direct", url, auth: { kind: "header", header: "x-api-key" }, enabled: true, exposure: "deferred" } });
+    expect(secrets.read("commissary", "header")).toBe("cms-key");
+  });
+
   it("the owner adds an OAuth server from the page's form (a scoped URL with its query kept) and can remove it", async () => {
     const kv = memory();
     const store = harnessStore(kv);
-    const mcp = new McpHost({ kv, engine: undefined, commissary: { url: undefined, key: undefined }, settings: () => store.load() });
+    const mcp = new McpHost({ kv, engine: undefined, settings: () => store.load() });
     const deps = { caller: owner, host: HOST, store, mcp, secrets: harnessSecrets(kv), now: () => NOW };
     const page = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
     expect(page).toContain("data-mcp-add");
@@ -192,7 +217,7 @@ describe("harness panel", () => {
   it("the owner sets a server's and a tool's Exposure from the page, audited; a bad value or a missing token changes nothing", async () => {
     const kv = memory();
     const store = harnessStore(kv);
-    const mcp = new McpHost({ kv, engine: undefined, commissary: { url: undefined, key: undefined }, settings: () => store.load() });
+    const mcp = new McpHost({ kv, engine: undefined, settings: () => store.load() });
     const deps = { caller: owner, host: HOST, store, mcp, secrets: harnessSecrets(kv), now: () => NOW };
     const post = async (body: unknown, headers?: Record<string, string>) =>
       handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/mcp`, { method: "POST", headers: { "content-type": "application/json", ...(headers ?? (await ownerHeaders(store))) }, body: JSON.stringify(body) }), deps);

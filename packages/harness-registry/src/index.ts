@@ -4,7 +4,6 @@
 // (pi-parity: web, todo, context, guardian…) add an entry here and appear in the panel without panel work.
 //
 import {
-  defaultCommissary,
   type Exposure,
   type McpServerSetting,
   RESERVED_SERVER_NAMES,
@@ -246,7 +245,7 @@ export interface StoredHarness {
   /** Bumped by every change; a Session reinstalls what changed when it sees a new one. */
   readonly revision: number;
   readonly global: HarnessLayer;
-  /** The MCP server set (ADR-0028), Environment-wide; Commissary's entry is implied until changed. */
+  /** The MCP server set (ADR-0028), Environment-wide: the servers the owner added. */
   readonly mcp?: { readonly servers: Readonly<Record<string, McpServerSetting>> };
   /** Per-Project overrides, by project id: the later seam (empty now). */
   readonly overrides: Readonly<Record<string, HarnessLayer>>;
@@ -254,11 +253,12 @@ export interface StoredHarness {
 
 export const EMPTY_HARNESS: StoredHarness = { revision: 0, global: {}, overrides: {} };
 
-/** The MCP server set with Commissary's entry (enabled by default, ADR-0028). */
-export const mcpServersOf = (stored: StoredHarness): Readonly<Record<string, McpServerSetting>> => ({
-  commissary: defaultCommissary(),
-  ...stored.mcp?.servers,
-});
+/**
+ * The MCP server set (ADR-0028): the direct servers the owner added. An entry of the retired built-in kind
+ * `commissary` (before SPI-1160) is dropped, so its name is free and the next change saves the set without it.
+ */
+export const mcpServersOf = (stored: StoredHarness): Readonly<Record<string, McpServerSetting>> =>
+  Object.fromEntries(Object.entries(stored.mcp?.servers ?? {}).filter(([, server]) => (server.kind as string) === "direct"));
 
 /** One change to the MCP server set from the panel or a script. */
 export type McpChange =
@@ -310,7 +310,6 @@ export const applyMcpChange = (
   }
   if (current === undefined) return { ok: false, error: `${change.server}: no such server` };
   if (change.op === "remove") {
-    if (current.kind === "commissary") return { ok: false, error: "commissary: disable it instead" };
     const { [change.server]: _removed, ...rest } = servers;
     return save(rest);
   }

@@ -24,7 +24,7 @@ const VIEW: McpView = {
   servers: [
     {
       name: "commissary",
-      kind: "commissary",
+      kind: "direct",
       state: "available",
       listedAt: 1,
       exposure: "deferred",

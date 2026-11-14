@@ -249,7 +249,7 @@ const statusPill = (row: McpRow): string => {
 
 const signIn = (row: McpRow): string | undefined => {
   const auth = row.setting.auth;
-  if (row.setting.kind !== "direct" || auth === undefined) return undefined;
+  if (auth === undefined) return undefined;
   if (auth.kind === "none") return "None";
   if (auth.kind === "oauth") return row.oauth?.signedIn === true ? '<span class="pill pill-ok">OAuth, signed in</span>' : '<span class="pill pill-warn">OAuth, signed out</span>';
   if (auth.kind === "header") {
@@ -306,9 +306,9 @@ const serverCard = (row: McpRow): string => {
     row.setting.auth?.kind === "oauth"
       ? `<button type="button" class="btn btn-sm${row.oauth?.signedIn === true ? "" : " btn-primary"}" data-mcp-oauth="${name}">${icon("login")}${row.oauth?.signedIn === true ? "Sign in again" : "Sign in"}</button>`
       : "";
-  const remove = row.setting.kind === "direct" ? action("Remove", { op: "remove", server: row.name }, { className: "btn-sm btn-danger", ariaLabel: `Remove ${row.name}`, icon: "trash" }) : "";
+  const remove = action("Remove", { op: "remove", server: row.name }, { className: "btn-sm btn-danger", ariaLabel: `Remove ${row.name}`, icon: "trash" });
   return `<article class="group server" aria-labelledby="${id}">
-<div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3><span class="tag">${row.setting.kind === "commissary" ? "Commissary" : "Direct"}</span>${statusPill(row)}</div>${
+<div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3>${statusPill(row)}</div>${
     row.setting.url === undefined ? "" : `<p class="server-url">${escapeHtml(row.setting.url)}</p>`
   }</div>
 <button type="button" class="switch" role="switch" aria-checked="${row.setting.enabled === true}" aria-label="${name} enabled" data-mcp="${escapeHtml(JSON.stringify({ op: "server", server: row.name, enabled: !row.setting.enabled }))}"></button>

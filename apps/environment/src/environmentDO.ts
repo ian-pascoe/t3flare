@@ -93,10 +93,6 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly MCP_ENGINE?: McpEngineBinding;
   /** The MCP Worker's OAuth entrypoint (review M4, M5): every sign-in and refresh request is made there. */
   readonly MCP_OAUTH?: McpOAuthBinding;
-  /** Commissary's MCP endpoint; default `${MODEL_PROXY_URL}/mcp`. */
-  readonly COMMISSARY_TOOLS_URL?: string;
-  /** `?toolkits=` narrowing of Commissary's tools. */
-  readonly COMMISSARY_TOOLKITS?: string;
   /** G11 (ADR-0031): Browser Run, t3's server browser and HTML renders. */
   readonly BROWSER?: BrowserRunBinding;
 }
@@ -117,12 +113,6 @@ ModuleState.install();
 
 const HOST_KEY = "t3flare/host";
 export const DEFAULT_ARM_MINUTES = 15;
-
-/**
- * The Commissary tools key (decision 1 of the tools step): the Workers' own proxy key for now, never the Containers'
- * (`COMMISSARY_CONTAINER_API_KEY`). One place, so a dedicated key can replace it.
- */
-export const toolsKeyOf = (env: { readonly MODEL_PROXY_API_KEY?: string }): string | undefined => env.MODEL_PROXY_API_KEY;
 
 export class SafeModeError extends Error {
   readonly safeMode: BootState.SafeMode;
@@ -428,11 +418,6 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     this.#mcpHost ??= new McpHost({
       kv: this.ctx.storage.kv,
       engine: this.env.MCP_ENGINE,
-      commissary: {
-        url: this.env.COMMISSARY_TOOLS_URL ?? (this.env.MODEL_PROXY_URL === undefined ? undefined : `${this.env.MODEL_PROXY_URL.replace(/\/+$/, "")}/mcp`),
-        key: toolsKeyOf(this.env),
-        ...(this.env.COMMISSARY_TOOLKITS === undefined ? {} : { toolkits: this.env.COMMISSARY_TOOLKITS }),
-      },
       settings: () => harnessStore(this.ctx.storage.kv).load(),
       secret: async (server, field) => harnessSecrets(this.ctx.storage.kv).read(server, field),
       oauthToken: (server, stale) => this.harnessOAuth.accessToken(server, stale),

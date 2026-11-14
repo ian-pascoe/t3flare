@@ -25,8 +25,11 @@ export const decideCall = (input: {
   return { kind: "ask" };
 };
 
-/** Where a server comes from: Commissary's endpoint (Route A) or added in the panel (Route B). */
-export type ServerKind = "commissary" | "direct";
+/**
+ * Where a server comes from: added in the panel (Route B). Commissary is one of these too (SPI-1160); a stored entry
+ * of the retired built-in kind `commissary` is dropped on load (`mcpServersOf`).
+ */
+export type ServerKind = "direct";
 
 /**
  * A tool's class: the owner's choice in the panel, else the tool's own `readOnlyHint` (true: read; anything else: write),
@@ -74,7 +77,6 @@ export type ServerAuth = { readonly kind: "none" } | { readonly kind: "header"; 
 /** One MCP server as the harness settings keep it (no secret: header values and tokens are in the secret store). */
 export interface McpServerSetting {
   readonly kind: ServerKind;
-  /** Direct servers only (Commissary's comes from the deploy's config). */
   readonly url?: string;
   readonly auth?: ServerAuth;
   readonly enabled: boolean;
@@ -85,11 +87,9 @@ export interface McpServerSetting {
 }
 
 /** Names a direct server may not take: they are the relay's or t3's. */
-export const RESERVED_SERVER_NAMES: ReadonlySet<string> = new Set(["commissary", "t3", "t3-code"]);
+export const RESERVED_SERVER_NAMES: ReadonlySet<string> = new Set(["t3", "t3-code"]);
 
 export const SERVER_NAME = /^[a-z0-9-]{1,20}$/;
-
-export const defaultCommissary = (): McpServerSetting => ({ kind: "commissary", enabled: true, exposure: "deferred" });
 
 /** Most tools taken from one server, and most bytes of their schemas (review M12). */
 export const MAX_TOOLS_PER_SERVER = 200;

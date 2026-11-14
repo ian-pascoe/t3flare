@@ -46,14 +46,6 @@ export interface McpEngineBinding {
   request(target: McpEngineTargetEncoded, prior: McpEnginePriorEncoded, request: McpEngineRequestEncoded, hooks: McpEngineHooks): Promise<typeof McpEngineRequestResult.Encoded>;
 }
 
-/** Where Commissary's MCP endpoint is and the key it takes (decision 1: the Workers' proxy key, for now). */
-export interface CommissaryConfig {
-  readonly url: string | undefined;
-  readonly key: string | undefined;
-  /** `?toolkits=` narrowing, when set. */
-  readonly toolkits?: string;
-}
-
 export const INVENTORY_TTL_MS = 10 * 60_000;
 /** A call's own bound: Commissary's upstream timeout is 240 s; ours is a little more. */
 export const CALL_TIMEOUT_MS = 270_000;
@@ -137,7 +129,6 @@ const errorText = (error: unknown): string => {
 export interface McpHostDeps {
   readonly kv: KvStorage & { delete?(key: string): unknown };
   readonly engine: McpEngineBinding | undefined;
-  readonly commissary: CommissaryConfig;
   readonly settings: () => StoredHarness;
   /** A direct server's header value, from the secret store (part 4). */
   readonly secret?: (server: string, field: string) => Promise<string | undefined>;
@@ -168,14 +159,6 @@ export class McpHost {
 
   /** The engine's target for `server`, its credential resolved; undefined when it cannot be reached. */
   async #target(name: string, server: McpServerSetting): Promise<McpEngineTargetEncoded | string> {
-    if (server.kind === "commissary") {
-      const { url, key, toolkits } = this.#deps.commissary;
-      if (url === undefined || url === "") return "Commissary's MCP endpoint is not configured (MODEL_PROXY_URL)";
-      if (key === undefined || key === "") return "the Commissary tools key (MODEL_PROXY_API_KEY) is not set";
-      const endpoint = new URL(url);
-      if (toolkits !== undefined && toolkits !== "") endpoint.searchParams.set("toolkits", toolkits);
-      return { kind: "http", conn: name, name, url: endpoint.toString(), headers: { authorization: `Bearer ${key}` }, redact: [key], timeoutMs: CALL_TIMEOUT_MS };
-    }
     if (server.url === undefined) return `${name} has no URL`;
     const headers: Record<string, string> = {};
     const redact: Array<string> = [];
@@ -443,11 +426,7 @@ export class McpHost {
     this.#keepState(name, result.state as never);
     if (result.kind === "failed") {
       const tag = (result.error as { _tag?: string })._tag;
-      const unauthorized = tag === "SignInRequired" || /\b40[13]\b/.test(errorText(result.error));
-      const message =
-        unauthorized && server.kind === "commissary"
-          ? `Commissary refused the tools key (MODEL_PROXY_API_KEY): ${errorText(result.error)}`
-          : `The MCP call failed (${errorText(result.error)}). It may have run upstream; do not repeat a change without checking.`;
+      const message = `The MCP call failed (${errorText(result.error)}). It may have run upstream; do not repeat a change without checking.`;
       if (tag === "NotFound") this.#deps.background?.(this.list(name).catch(() => undefined));
       return { kind: "unavailable", message, mayHaveRun: true };
     }

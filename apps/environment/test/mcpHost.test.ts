@@ -1,6 +1,7 @@
 // The MCP host's seam (ADR-0028): `McpHost` over a fake engine. Listing and the view (classes from the tool's own
-// hint or the owner's override; every enabled server for every thread: owner, 2026-11-12, back to stock), calls (disabled servers, failures that may have run, the
-// key named on a refusal), and the target it hands the engine (the key, and nothing else, to redact).
+// hint or the owner's override; every enabled server for every thread: owner, 2026-11-12, back to stock), calls (disabled
+// servers, failures that may have run), and the target it hands the engine (the header value, and nothing else, to
+// redact). Commissary is an ordinary direct server the owner adds with its `x-api-key` header (SPI-1160).
 import { applyMcpChange, EMPTY_HARNESS, type StoredHarness } from "@t3flare/harness-registry";
 import { describe, expect, it } from "vitest";
 
@@ -35,23 +36,58 @@ const fakeEngine = (tools: () => Array<Record<string, unknown>>, answer: () => u
   return { engine, seen };
 };
 
-const setup = (tools: () => Array<Record<string, unknown>>, answer?: () => unknown, harness: StoredHarness = EMPTY_HARNESS) => {
+const COMMISSARY_URL = "https://api.commissary.example/mcp?toolkits=fixture";
+const COMMISSARY_KEY = "cms-test-key";
+
+/** Settings with Commissary added by the owner as a direct server signed in with its `x-api-key` header. */
+const withCommissary = (): StoredHarness => {
+  const added = applyMcpChange(EMPTY_HARNESS, { op: "add", server: "commissary", url: COMMISSARY_URL, auth: { kind: "header", header: "x-api-key" } });
+  if (!added.ok) throw new Error(added.error);
+  return added.harness;
+};
+
+const setup = (tools: () => Array<Record<string, unknown>>, answer?: () => unknown, harness: StoredHarness = withCommissary()) => {
   let settings = harness;
   const { engine, seen } = fakeEngine(tools, answer);
-  const host = new McpHost({ kv: memory(), engine, commissary: { url: "https://proxy.example/mcp", key: "sk-test-key" }, settings: () => settings, now: () => 1_000_000 });
+  const host = new McpHost({
+    kv: memory(),
+    engine,
+    settings: () => settings,
+    secret: async (server, field) => (server === "commissary" && field === "header" ? COMMISSARY_KEY : undefined),
+    now: () => 1_000_000,
+  });
   return { host, seen, set: (next: StoredHarness) => (settings = next), settings: () => settings };
 };
 
 describe("McpHost", () => {
-  it("lists Commissary with the key and redacts it; tools take their own hint", async () => {
+  it("lists Commissary, added as a direct server, with its x-api-key header and redacts it; tools take their own hint", async () => {
     const run = setup(() => [tool("fixture_echo", true), tool("fixture_note")]);
     await run.host.list("commissary");
-    expect(run.seen[0].target).toMatchObject({ url: "https://proxy.example/mcp", headers: { authorization: "Bearer sk-test-key" }, redact: ["sk-test-key"] });
+    expect(run.seen[0].target).toEqual(expect.objectContaining({ url: COMMISSARY_URL, headers: { "x-api-key": COMMISSARY_KEY }, redact: [COMMISSARY_KEY] }));
     const view = await run.host.view();
     expect(view.servers[0]?.tools.map((t) => [t.name, t.class])).toEqual([
       ["mcp__commissary__fixture_echo", "read"],
       ["mcp__commissary__fixture_note", "write"],
     ]);
+  });
+
+  it("offers no server the owner has not added", async () => {
+    const run = setup(() => [tool("fixture_echo", true)], undefined, EMPTY_HARNESS);
+    expect(run.host.servers()).toEqual({});
+    expect((await run.host.view()).servers).toEqual([]);
+  });
+
+  it("a stored settings document that still names the built-in commissary server loads without it, and the name is free", async () => {
+    const fixture = { kind: "direct", url: "https://fixture.example/mcp", auth: { kind: "none" }, enabled: true, exposure: "deferred" };
+    const stored = { revision: 7, global: {}, overrides: {}, mcp: { servers: { commissary: { kind: "commissary", enabled: true, exposure: "deferred" }, fixture } } } as unknown as StoredHarness;
+    const run = setup(() => [tool("fixture_echo", true)], undefined, stored);
+    expect(Object.keys(run.host.servers())).toEqual(["fixture"]);
+    expect((await run.host.view()).servers.map((server) => server.name)).toEqual(["fixture"]);
+    expect(await run.host.call({ server: "commissary", tool: "fixture_echo", args: {} })).toMatchObject({ kind: "unavailable", mayHaveRun: false });
+    expect(run.seen.filter((call) => call.op === "request")).toEqual([]);
+    const added = applyMcpChange(stored, { op: "add", server: "commissary", url: COMMISSARY_URL, auth: { kind: "header", header: "x-api-key" } });
+    if (!added.ok) throw new Error(added.error);
+    expect(added.harness.mcp?.servers).toEqual({ fixture, commissary: { kind: "direct", url: COMMISSARY_URL, auth: { kind: "header", header: "x-api-key" }, enabled: true, exposure: "deferred" } });
   });
 
   it("a tool's class follows its hint as it changes, and the owner's override wins until cleared", async () => {
@@ -113,13 +149,14 @@ describe("McpHost", () => {
     expect(run.seen.filter((call) => call.op === "request")).toEqual([]);
   });
 
-  it("a failed call may have run and says so; a refusal of the key names it", async () => {
+  it("a failed call may have run and says so; a refused header names no Model proxy key", async () => {
     let error = new Error("timed out");
     const run = setup(() => [tool("fixture_note")], () => error);
     await run.host.list("commissary");
     expect(await run.host.call({ server: "commissary", tool: "fixture_note", args: {}, judged: "write" })).toMatchObject({ kind: "unavailable", mayHaveRun: true, message: expect.stringContaining("may have run") });
     error = new Error("HTTP 401 unauthorized");
-    expect(await run.host.call({ server: "commissary", tool: "fixture_note", args: {}, judged: "write" })).toMatchObject({ message: expect.stringContaining("MODEL_PROXY_API_KEY") });
+    expect(await run.host.call({ server: "commissary", tool: "fixture_note", args: {}, judged: "write" })).toMatchObject({ kind: "unavailable", message: expect.stringContaining("401") });
+    expect(JSON.stringify(await run.host.call({ server: "commissary", tool: "fixture_note", args: {}, judged: "write" }))).not.toContain("MODEL_PROXY");
   });
 
   it("a failed list keeps the last inventory, marked stale", async () => {
