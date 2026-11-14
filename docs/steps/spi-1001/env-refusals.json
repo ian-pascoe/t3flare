@@ -1,0 +1,95 @@
+{
+ "at": "2026-11-14T00:56:55.139Z",
+ "host": "t3flare-environment-penvsk.ian-g-pascoe.workers.dev",
+ "commit": "b4a3475029ff",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "checks": {
+  "notInstalledOwner": true,
+  "notInTheInstallation": true,
+  "credential": true,
+  "symlink": true,
+  "oversize": true,
+  "badPath": true,
+  "blobCap": true,
+  "nothingKept": true
+ },
+ "cases": {
+  "notInstalledOwner": {
+   "status": 502,
+   "json": "GitHub has no repo octocat/private-skills-nope, or it is private and the GitHub App is not installed on octocat (install it there, on all repositories)."
+  },
+  "notInTheInstallation": {
+   "status": 502,
+   "json": "GitHub has no repo ian-pascoe/no-such-private-repo, or the GitHub App's installation on ian-pascoe does not include it (install it on all repositories)."
+  },
+  "preview": {
+   "status": 200,
+   "commit": "cdaba76a3327616666f37aed9789801c55aeed5a",
+   "how": "repo",
+   "note": "Other files are checked when the skill is installed.",
+   "skills": [
+    {
+     "name": "badpath",
+     "path": "skills/badpath",
+     "files": 2,
+     "problems": [
+      "notes\\windows.md: the path has a backslash or a NUL"
+     ]
+    },
+    {
+     "name": "big",
+     "path": "skills/big",
+     "files": 4,
+     "problems": [
+      "the files are 4500067 bytes together, more than the 4194304 a Skill may be"
+     ]
+    },
+    {
+     "name": "leaky",
+     "path": "skills/leaky",
+     "files": 2,
+     "problems": []
+    },
+    {
+     "name": "linked",
+     "path": "skills/linked",
+     "files": 2,
+     "problems": [
+      "run.sh: a link or a submodule; a Skill may hold neither"
+     ]
+    },
+    {
+     "name": "many-a",
+     "path": "skills/many-a",
+     "files": 301,
+     "problems": []
+    },
+    {
+     "name": "many-b",
+     "path": "skills/many-b",
+     "files": 301,
+     "problems": []
+    }
+   ]
+  },
+  "installLeaky": {
+   "status": 200,
+   "json": {
+    "commit": "cdaba76a3327616666f37aed9789801c55aeed5a",
+    "results": [
+     {
+      "name": "leaky",
+      "path": "skills/leaky",
+      "error": "leaky: env.md: matches /\\bAKIA[0-9A-Z]{16}\\b/, which looks like a credential or a local path"
+     }
+    ],
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   }
+  },
+  "installOverBlobCap": {
+   "status": 422,
+   "json": "These skills hold 602 files; install at most 500 files at a time."
+  }
+ }
+}

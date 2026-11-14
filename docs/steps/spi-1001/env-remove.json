@@ -1,0 +1,65 @@
+{
+ "at": "2026-11-14T00:56:41.362Z",
+ "host": "t3flare-environment-penvsk.ian-g-pascoe.workers.dev",
+ "commit": "b4a3475029ff",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "checks": {
+  "removed": true,
+  "repoBackInSnapshot": true,
+  "goneFromMount": true,
+  "goneFromContainer": true,
+  "repoAnswers": true,
+  "unknownUntouched": true
+ },
+ "removed": {
+  "ok": true,
+  "action": "skill-remove",
+  "revision": 12,
+  "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+ },
+ "snapshot": [
+  {
+   "name": "fruit-code",
+   "description": "How to find the fruit code. Use whenever anyone asks for the fruit code.",
+   "path": "/w/penvsk-proj/.agents/skills/fruit-code/SKILL.md",
+   "scope": "project",
+   "enabled": true,
+   "userInvocationOnly": false
+  },
+  {
+   "name": "owner-only",
+   "description": "A skill only the owner names; the agent's listing leaves it out.",
+   "path": "/w/penvsk-proj/.agents/skills/owner-only/SKILL.md",
+   "scope": "project",
+   "enabled": true,
+   "userInvocationOnly": true
+  }
+ ],
+ "turn": {
+  "sent": "$fruit-code What is the fruit code? Reply with the code alone.",
+  "status": "completed",
+  "typed": "$fruit-code What is the fruit code? Reply with the code alone.",
+  "answer": "KIWI-7",
+  "tools": [
+   "{\"nativeItemRef\":{\"driver\":\"piDurable\",\"nativeId\":\"thread:dbb847b3-32c0-4ca5-8753-d0af49596634:call:toolu_01P9XFcfLwZLgQnqLhHn4RVZ\",\"strength\":\"strong\"},\"parentItemId\":null,\"ordinal\":2000002,\"status\":\"completed\",\"title\":\"read\",\"type\":\"dynamic_tool\",\"toolName\":\"read\",\"input\":{\"path\":\"/w/penvsk-proj/.agents/skills/fruit-code/reference/code.md\"},\"outputOmitted\":true}"
+  ]
+ },
+ "mount": {
+  "error": "ENOENT",
+  "message": "no such path: /workspace/.agents/skills/fruit-code/SKILL.md"
+ },
+ "container": {
+  "exitCode": 0,
+  "stdout": "ls: cannot access '/workspace/.agents/skills/fruit-code': No such file or directory\nexit=2\n",
+  "stderr": "",
+  "running": true
+ },
+ "unknown": {
+  "sent": "Reply with exactly the text after the colon, unchanged: $plum-gone",
+  "status": "completed",
+  "typed": "Reply with exactly the text after the colon, unchanged: $plum-gone",
+  "answer": "$plum-gone",
+  "tools": []
+ }
+}

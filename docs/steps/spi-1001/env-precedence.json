@@ -1,0 +1,71 @@
+{
+ "at": "2026-11-14T00:45:03.448Z",
+ "host": "t3flare-environment-penvsk.ian-g-pascoe.workers.dev",
+ "commit": "752cb4b9da1f",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "checks": {
+  "answersPlum": true,
+  "skippedNamesRepo": true,
+  "snapshotEnvironment": true
+ },
+ "take": {
+  "taken": true,
+  "hash": "2b7c2db2dfbaa62f19ef6e67a6b3ace1fed84f17a466f1790f33ba7fc3e3f6e3",
+  "container": {
+   "caughtUp": true,
+   "looks": 1,
+   "stale": []
+  }
+ },
+ "discovery": {
+  "skills": [
+   "/workspace/.agents/skills/fruit-code/SKILL.md",
+   "/workspace/.agents/skills/grill-me/SKILL.md",
+   "/workspace/repo/.agents/skills/owner-only/SKILL.md"
+  ],
+  "skipped": [
+   {
+    "path": "/workspace/repo/.agents/skills/fruit-code/SKILL.md",
+    "reason": "\"fruit-code\" is shadowed by /workspace/.agents/skills/fruit-code/SKILL.md"
+   },
+   {
+    "path": "/workspace/repo/.claude/skills/fruit-code/SKILL.md",
+    "reason": "\"fruit-code\" is shadowed by /workspace/.agents/skills/fruit-code/SKILL.md"
+   }
+  ]
+ },
+ "snapshot": [
+  {
+   "name": "fruit-code",
+   "description": "The fruit code, as the Environment keeps it.",
+   "path": "/workspace/.agents/skills/fruit-code/SKILL.md",
+   "scope": "user",
+   "enabled": true,
+   "userInvocationOnly": false
+  },
+  {
+   "name": "grill-me",
+   "description": "A relentless interview to sharpen a plan or design.",
+   "path": "/workspace/.agents/skills/grill-me/SKILL.md",
+   "scope": "user",
+   "enabled": true,
+   "userInvocationOnly": true
+  },
+  {
+   "name": "owner-only",
+   "description": "A skill only the owner names; the agent's listing leaves it out.",
+   "path": "/w/penvsk-proj/.agents/skills/owner-only/SKILL.md",
+   "scope": "project",
+   "enabled": true,
+   "userInvocationOnly": true
+  }
+ ],
+ "turn": {
+  "sent": "$fruit-code What is the fruit code? Reply with the code alone.",
+  "status": "completed",
+  "typed": "$fruit-code What is the fruit code? Reply with the code alone.",
+  "answer": "PLUM-9",
+  "tools": []
+ }
+}

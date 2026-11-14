@@ -1,0 +1,77 @@
+{
+ "at": "2026-11-14T00:44:40.637Z",
+ "host": "t3flare-environment-penvsk.ian-g-pascoe.workers.dev",
+ "commit": "752cb4b9da1f",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "checks": {
+  "pinned": true,
+  "snapshotAtMount": true,
+  "listingAtMount": true,
+  "mentionExpanded": true
+ },
+ "preview": {
+  "status": 200,
+  "commit": "5863806dd4e15c63174bee4e7515a4256792ecfa",
+  "how": "installation",
+  "note": "Other files are checked when the skill is installed.",
+  "count": 38,
+  "chosen": {
+   "name": "grill-me",
+   "path": "skills/productivity/grill-me",
+   "files": 2,
+   "problems": []
+  }
+ },
+ "installed": {
+  "commit": "5863806dd4e15c63174bee4e7515a4256792ecfa",
+  "results": [
+   {
+    "name": "grill-me",
+    "path": "skills/productivity/grill-me",
+    "action": "skill-install"
+   }
+  ],
+  "hash": "c7b7f32b0d0b358a5c3b9f6cb04240486d9c2422a899c1e3e0a71d541d237e9e"
+ },
+ "row": {
+  "name": "grill-me",
+  "description": "A relentless interview to sharpen a plan or design.",
+  "repo": "mattpocock/skills",
+  "path": "skills/productivity/grill-me",
+  "ref": null,
+  "commit": "5863806dd4e15c63174bee4e7515a4256792ecfa",
+  "digest": "7e1993ae9f97d876f115fd6528071875bae7a50bd6f9d55eb2222cc255b1ab0a",
+  "enabled": true,
+  "disableModelInvocation": true,
+  "savedAt": 1794617067717,
+  "bytes": 294,
+  "files": 2
+ },
+ "snapshotEntry": {
+  "name": "grill-me",
+  "description": "A relentless interview to sharpen a plan or design.",
+  "path": "/workspace/.agents/skills/grill-me/SKILL.md",
+  "scope": "user",
+  "enabled": true,
+  "userInvocationOnly": true
+ },
+ "modelListing": {
+  "name": "grill-me",
+  "description": "A relentless interview to sharpen a plan or design.",
+  "filePath": "/workspace/.agents/skills/grill-me/SKILL.md",
+  "disableModelInvocation": true
+ },
+ "mention": {
+  "sent": "$grill-me Do not follow the skill now. Reply with only the value of the location attribute of the skill block in this message.",
+  "status": "completed",
+  "typed": "$grill-me Do not follow the skill now. Reply with only the value of the location attribute of the skill block in this message.",
+  "answer": "/workspace/.agents/skills/grill-me/SKILL.md",
+  "tools": []
+ },
+ "chipViewInstructions": {
+  "note": "t3's chip opens skill.path in its file panel, which reads it with projects.readFile in the project's cwd",
+  "ok": false,
+  "error": "ProjectReadFileError: Failed to read workspace file '/workspace/.agents/skills/grill-me/SKILL.md' in '/w/penvsk-proj'."
+ }
+}

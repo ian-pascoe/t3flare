@@ -1,0 +1,84 @@
+{
+ "at": "2026-11-14T00:43:24.265Z",
+ "host": "t3flare-environment-penvsk.ian-g-pascoe.workers.dev",
+ "commit": "752cb4b9da1f",
+ "model": "anthropic/claude-sonnet-5-5",
+ "ok": true,
+ "checks": {
+  "readPrivately": true,
+  "outsideAnyRoot": true,
+  "pinned": true,
+  "view": true
+ },
+ "source": "https://github.com/ian-pascoe/t3flare-fixture/tree/spi1148-env/tools/plum",
+ "branchCommit": "3259ff852768524f3b113a9cfe54613ce9500e8f",
+ "branchMovedTo": "0b3fc5b3bba56e716e1d19f415690c9ed6f1f3df",
+ "preview": {
+  "status": 200,
+  "commit": "3259ff852768524f3b113a9cfe54613ce9500e8f",
+  "how": "repo",
+  "note": "Other files are checked when the skill is installed.",
+  "skills": [
+   {
+    "name": "fruit-code",
+    "path": "tools/plum/fruit-code",
+    "files": 2,
+    "problems": []
+   }
+  ]
+ },
+ "installed": {
+  "commit": "3259ff852768524f3b113a9cfe54613ce9500e8f",
+  "results": [
+   {
+    "name": "fruit-code",
+    "path": "tools/plum/fruit-code",
+    "action": "skill-install"
+   }
+  ],
+  "hash": "f78d5080aee02225f900db596372fe1800bd97bdcab44cc4b2f48afa873ee874"
+ },
+ "row": {
+  "name": "fruit-code",
+  "description": "The fruit code, as the Environment keeps it.",
+  "repo": "ian-pascoe/t3flare-fixture",
+  "path": "tools/plum/fruit-code",
+  "ref": "spi1148-env",
+  "commit": "3259ff852768524f3b113a9cfe54613ce9500e8f",
+  "digest": "1b97c9756911914109c14227befb5ba83d277c5b6731612ae1404cd7d648f139",
+  "enabled": true,
+  "disableModelInvocation": false,
+  "savedAt": 1794617000824,
+  "bytes": 161,
+  "files": 2
+ },
+ "view": {
+  "skill": {
+   "name": "fruit-code",
+   "description": "The fruit code, as the Environment keeps it.",
+   "repo": "ian-pascoe/t3flare-fixture",
+   "path": "tools/plum/fruit-code",
+   "ref": "spi1148-env",
+   "commit": "3259ff852768524f3b113a9cfe54613ce9500e8f",
+   "digest": "1b97c9756911914109c14227befb5ba83d277c5b6731612ae1404cd7d648f139",
+   "enabled": true,
+   "disableModelInvocation": false,
+   "savedAt": 1794617000824,
+   "bytes": 161,
+   "files": 2
+  },
+  "skillMd": "---\nname: fruit-code\ndescription: The fruit code, as the Environment keeps it.\n---\n\nThe fruit code is PLUM-9. The notes are in notes.md beside this file.\n",
+  "files": [
+   {
+    "path": "SKILL.md",
+    "size": 154,
+    "url": "https://github.com/ian-pascoe/t3flare-fixture/blob/3259ff852768524f3b113a9cfe54613ce9500e8f/tools/plum/fruit-code/SKILL.md"
+   },
+   {
+    "path": "notes.md",
+    "size": 7,
+    "url": "https://github.com/ian-pascoe/t3flare-fixture/blob/3259ff852768524f3b113a9cfe54613ce9500e8f/tools/plum/fruit-code/notes.md"
+   }
+  ]
+ }
+}
