@@ -200,6 +200,45 @@ describe("the Settings server's card for a free change", () => {
     expect(late.store.loadEnvironment().revision).toBe(0);
   });
 
+  it("a card-approved free change is audited with mode card and answeredBy card; in full access with neither (ADR-0034 §11)", async () => {
+    const run = setup();
+    recordModes(durable(), "approval-required");
+    await run.call(durable(), "change_environment", FREE);
+    expect(run.store.auditLog(1)[0]).toMatchObject({ tier: "free", mode: "card", answeredBy: "card" });
+    const full = setup();
+    recordModes(durable("thread-full"), "full-access");
+    await full.call(durable("thread-full"), "change_environment", FREE);
+    expect(full.store.auditLog(1)[0]!.mode).toBeUndefined();
+    expect(full.store.auditLog(1)[0]!.answeredBy).toBeUndefined();
+  });
+
+  for (const [what, change] of [
+    ["off", { enabled: false }],
+    ["read-only", { writes: false }],
+  ] as const) {
+    it(`the access switch turned ${what} while the card waited: nothing applies`, async () => {
+      const run = setup();
+      recordModes(durable(), "approval-required");
+      const asker: McpAsker = {
+        ask: async () => {
+          const switched = applyMcpChange(run.store.load(), { op: "server", server: "settings", ...change });
+          if (!switched.ok) throw new Error(switched.error);
+          run.store.save(switched.harness);
+          return { decision: "accept" };
+        },
+        withdraw: () => undefined,
+      };
+      // A free change (its card) and an asked one (its Open change) alike.
+      for (const args of [FREE, ASKED]) {
+        const answer = await run.host.call({ server: "settings", tool: "change_environment", args, caller: durable(), asker });
+        expect(textOf(answer)).toContain(what === "off" ? OFF_MESSAGE : READ_ONLY_REFUSAL);
+        expect(structured(answer).status).toBe("refused");
+        run.store.save({ ...run.store.load(), mcp: { servers: {} } });
+      }
+      expect(run.store.loadEnvironment().revision).toBe(0);
+    });
+  }
+
   it("a revision that moved while the card waited is refused as moved", async () => {
     const run = setup();
     recordModes(durable(), "approval-required");
@@ -303,12 +342,31 @@ describe("the Settings server's access switch", () => {
     expect(settings.tools.map((tool) => tool.name)).toContain("mcp__settings__change_mcp");
   });
 
-  it("off: the server is not in the view and every call is unavailable", async () => {
+  it("off: the server is not in the view, and through the host every call is unavailable with the off message", async () => {
+    let reached = 0;
     const run = setup({ harness: stored({ enabled: false }) });
-    expect((await run.host.view()).servers.map((server) => server.name)).not.toContain("settings");
-    expect(await run.call(durable(), "get_settings", { entity: "harness" })).toMatchObject({ kind: "unavailable" });
-    // Turned off by the panel; nothing reaches the server, so its message is the host's.
-    expect(OFF_MESSAGE).toContain("Harness panel");
+    const host = new McpHost({
+      kv: run.kv,
+      engine: undefined,
+      commissary: { url: undefined, key: undefined },
+      settings: () => run.store.load(),
+      settingsServer: async () => {
+        reached++;
+        return { kind: "result", isError: false, text: "ran" };
+      },
+    });
+    expect((await host.view()).servers.map((server) => server.name)).not.toContain("settings");
+    recordModes(durable(), "full-access");
+    for (const [tool, args] of [
+      ["get_settings", { entity: "harness" }],
+      ["change_mcp", { expectedRevision: 1, change: { op: "server", server: "settings", enabled: true } }],
+    ] as const) {
+      expect(await host.call({ server: "settings", tool, args, caller: durable() })).toEqual({ kind: "unavailable", message: OFF_MESSAGE, mayHaveRun: false });
+    }
+    // Nothing reached the server: it cannot turn itself back on.
+    expect(reached).toBe(0);
+    expect(run.store.load().revision).toBe(1);
+    expect(OFF_MESSAGE).toContain("only the Harness panel");
   });
 
   it("read-only: write tools are not listed and a write call is refused; reads run", async () => {

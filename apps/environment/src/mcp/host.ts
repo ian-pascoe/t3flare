@@ -17,6 +17,7 @@ import {
   MAX_TOOLS_PER_SERVER,
   type McpServerSetting,
   mcpServersOf,
+  ownEntry,
   type StoredHarness,
   type ToolClass,
   toolNamesOf,
@@ -35,7 +36,7 @@ import {
 import type { McpAsker, McpQuestionAnswer } from "@t3flare/session-protocol";
 
 import type { KvStorage } from "../harness/store.ts";
-import type { OwnCaller } from "../settings/server.ts";
+import { OFF_MESSAGE, type OwnCaller } from "../settings/caller.ts";
 import { settingsDefinitions } from "../settings/tools.ts";
 import { type ElicitAnswer, type ElicitResultOrCancel, isPausingServer, pauseOf, planPause, planQuestion, type QuestionContext, type QuestionPlan } from "./elicitation.ts";
 
@@ -228,13 +229,13 @@ export class McpHost {
 
   inventory(name: string): Inventory {
     // The Settings server's tools are static (plan D2): no engine, no inventory kept, no credential, always listed.
-    if (this.servers()[name]?.kind === "settings") return { server: name, listedAt: this.#now(), status: "ok", definitions: settingsDefinitions(), refused: [] };
+    if (ownEntry(this.servers(), name)?.kind === "settings") return { server: name, listedAt: this.#now(), status: "ok", definitions: settingsDefinitions(), refused: [] };
     return this.#deps.kv.get<Inventory>(inventoryKey(name)) ?? { server: name, listedAt: 0, status: "never", definitions: {}, refused: [] };
   }
 
   /** Lists `name`'s tools now (one list in flight per server). */
   list(name: string): Promise<Inventory> {
-    if (this.servers()[name]?.kind === "settings") return Promise.resolve(this.inventory(name));
+    if (ownEntry(this.servers(), name)?.kind === "settings") return Promise.resolve(this.inventory(name));
     const running = this.#refreshing.get(name);
     if (running !== undefined) return running;
     const work: Promise<Inventory> = this.#list(name).finally(() => {
@@ -246,7 +247,7 @@ export class McpHost {
 
   async #list(name: string): Promise<Inventory> {
     const generation = this.#generation(name);
-    const server = this.servers()[name];
+    const server = ownEntry(this.servers(), name);
     const before = this.inventory(name);
     const failed = (error: string): Inventory => {
       const next: Inventory = { ...before, status: "failed", error, listedAt: before.listedAt };
@@ -307,9 +308,9 @@ export class McpHost {
         inputSchema: (definition.inputSchema ?? { type: "object", properties: {} }) as Record<string, unknown>,
         hash: await definitionHash(definition),
         // Only "read" or "write" is an override (settings stored before the back-to-stock cut held hash pins: ignored).
-        class: classOf(annotations === undefined ? {} : { annotations }, overrideOf(server.classes?.[upstream])),
+        class: classOf(annotations === undefined ? {} : { annotations }, overrideOf(ownEntry(server.classes, upstream))),
         hinted: classOf(annotations === undefined ? {} : { annotations }, undefined),
-        exposure: server.toolExposure?.[upstream] ?? server.exposure,
+        exposure: ownEntry(server.toolExposure, upstream) ?? server.exposure,
         ...uiOf(definition),
       });
     }
@@ -368,12 +369,14 @@ export class McpHost {
     /** Who calls, as the Environment derived it (plan D3): the Settings server judges its writes by it. */
     readonly caller?: OwnCaller;
   }): Promise<McpCallAnswer> {
-    const server = this.servers()[input.server];
+    const server = ownEntry(this.servers(), input.server);
+    // The Settings server switched off says so, and that only the panel turns it back on (plan D2).
+    if (server?.kind === "settings" && !server.enabled) return { kind: "unavailable", message: OFF_MESSAGE, mayHaveRun: false };
     if (server === undefined || !server.enabled) return { kind: "unavailable", message: `The owner removed or disabled the MCP server ${input.server}; its tools are gone from the next turn.`, mayHaveRun: false };
     if (server.kind === "settings") {
       // Fails closed (plan D3): without the Environment's caller nothing reaches the Settings server.
       if (this.#deps.settingsServer === undefined || input.caller === undefined) return { kind: "unavailable", message: "The Settings server cannot tell who is calling, so it answers nothing.", mayHaveRun: false };
-      if (server.toolExposure?.[input.tool] === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
+      if (ownEntry(server.toolExposure, input.tool) === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
       return this.#deps.settingsServer({
         tool: input.tool,
         args: input.args,
@@ -383,9 +386,9 @@ export class McpHost {
       });
     }
     const inventory = this.inventory(input.server);
-    const definition = inventory.definitions[input.tool];
+    const definition = ownEntry(inventory.definitions, input.tool);
     if (definition === undefined) return { kind: "unavailable", message: `${input.server} has no tool ${input.tool} (any more).`, mayHaveRun: false };
-    if (server.toolExposure?.[input.tool] === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
+    if (ownEntry(server.toolExposure, input.tool) === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
     const pausing = isPausingServer(inventory.definitions);
     // SPI-1079: a pausing server's `resume` is t3flare's to call, with the owner's answer, never the agent's.
     if (pausing && input.tool === RESUME_TOOL) return { kind: "unavailable", message: RESUME_REFUSAL(input.server), mayHaveRun: false };
@@ -409,7 +412,7 @@ export class McpHost {
    * `ReadResourceResult` as it is otherwise.
    */
   async readAppResource(input: { readonly server: string; readonly uri: string }): Promise<{ readonly kind: "result"; readonly value: unknown } | { readonly kind: "refused"; readonly message: string }> {
-    const server = this.servers()[input.server];
+    const server = ownEntry(this.servers(), input.server);
     if (server === undefined || !server.enabled) return { kind: "refused", message: `${input.server} is not enabled.` };
     const { tools } = await this.tools(input.server, server, this.inventory(input.server));
     const declared = tools.some((tool) => tool.exposure !== "hidden" && tool.exposure !== "codemode" && tool.ui?.resourceUri === input.uri);

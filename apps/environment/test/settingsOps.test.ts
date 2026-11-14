@@ -266,6 +266,27 @@ describe("removing a server", () => {
   });
 });
 
+describe("a stale Direct entry named settings (M3 review)", () => {
+  it("is dropped by the next change to the set, and its header value and OAuth sign-in go with it", async () => {
+    const env = setup();
+    env.store.save({ ...env.store.load(), mcp: { servers: { settings: { kind: "direct", url: "https://old.example/mcp", auth: { kind: "header", header: "X-Key" }, enabled: true, exposure: "deferred" } } } });
+    await env.secrets.put("settings", "header", "stale-value");
+    expect(changeMcp(env.ops, { op: "server", server: "commissary", enabled: false }, viaAgent)).toMatchObject({ ok: true });
+    expect(env.store.load().mcp?.servers?.settings?.kind).toBe("settings");
+    expect(env.secrets.read("settings", "header")).toBeUndefined();
+    expect(env.forgotten).toEqual(["settings"]);
+  });
+
+  it("an add drops it too, and keeps the new server's own secret", async () => {
+    const env = setup();
+    env.store.save({ ...env.store.load(), mcp: { servers: { settings: { kind: "direct", url: "https://old.example/mcp", enabled: true, exposure: "deferred" } } } });
+    await env.secrets.put("settings", "header", "stale-value");
+    await addMcpServer(env.ops, { server: "keyed", url: "https://keyed.example/mcp", auth: { kind: "header", header: "X-Key" }, value: "k" }, viaAgent);
+    expect(env.secrets.read("settings", "header")).toBeUndefined();
+    expect(env.secrets.read("keyed", "header")).toBe("k");
+  });
+});
+
 describe("reads outside the panel", () => {
   it("a Direct server's URL is shown without its query", () => {
     expect(redactServer({ kind: "direct", url: "https://mcp.executor.example/mcp?connection=conn_1&key=s3cr3t", auth: { kind: "oauth" }, enabled: true, exposure: "deferred" })).toEqual({

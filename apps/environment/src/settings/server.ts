@@ -26,6 +26,7 @@ import {
   ignoredServersOf,
   type McpChange,
   mcpServersOf,
+  ownEntry,
   PLAN_REFUSAL,
   resolveEnvironment,
   resolveHarness,
@@ -56,7 +57,14 @@ import type { AuditActor } from "../harness/store.ts";
 import { newCardId } from "../mcp/elicitation.ts";
 import type { McpCallAnswer, McpHost } from "../mcp/host.ts";
 import { previewAtCommit, viewSkill } from "../skills/api.ts";
-import { APPLIED_CAP, APPLIED_WINDOW_MS, canonicalJson, CHANGE_TTL_MS, type ChangeRecord, changeHash, type ClosedBy, isOpen, newChangeId, type SettingsChanges } from "./changes.ts";
+import {
+  APPLIED_CAP,
+  APPLIED_WINDOW_MS,
+  NETWORK_READ_CAP,
+  NETWORK_READS,
+  READ_CAP,
+  READ_WINDOW_MS,
+  canonicalJson, CHANGE_TTL_MS, type ChangeRecord, changeHash, type ClosedBy, isOpen, newChangeId, type SettingsChanges } from "./changes.ts";
 import {
   type AnswerDeps,
   answerOpenChange,
@@ -71,28 +79,13 @@ import {
 } from "./openChanges.ts";
 import { type ChangeItem, changeText, type ChangeView, environmentItems, extensionItems, mcpItems, shownSkill } from "./render.ts";
 import { settingsToolOf } from "./tools.ts";
+import { OFF_MESSAGE, type OwnCaller, type ThreadLink, type ThreadModes } from "./caller.ts";
 
 /** How long the owner's card waits (the MCP host's question wait, `QUESTION_WAIT_MS`). */
 export const SETTINGS_CARD_WAIT_MS = 10 * 60_000;
 
-/** A thread's Linked work as the Environment establishes it (plan D3). */
-export type ThreadLink = "own" | "linked" | "unknown";
-
-/** A calling thread's modes, from the Environment's own record (plan D3). */
-export interface ThreadModes {
-  readonly runtimeMode: string | undefined;
-  readonly interactionMode: string | undefined;
-}
-
-/**
- * t3flare's own agent calling, as the Environment derived it (plan D3): its thread (undefined when the caller sent none:
- * judged as unknown work) and its agent kind (`piDurable`, or the CLI's name from the relay's tool handle).
- */
-export interface OwnCaller {
-  readonly door: "own";
-  readonly thread: string | undefined;
-  readonly agent: string;
-}
+export type { OwnCaller, ThreadLink, ThreadModes } from "./caller.ts";
+export { OFF_MESSAGE } from "./caller.ts";
 
 export interface SettingsServerDeps {
   readonly ops: OpsDeps & { readonly mcp: Pick<McpHost, "servers" | "inventory" | "tools" | "list"> };
@@ -129,7 +122,6 @@ type Entity = "harness" | "environment";
 export const LINKED_REFUSAL = "This thread is Linked work; the owner changes settings from his own thread, the Harness panel, or an Owner client.";
 export const UNKNOWN_REFUSAL = "t3flare cannot establish where this thread comes from, so it may read settings and change none. The owner changes them from his own thread or the Harness panel.";
 export const NO_MODES_REFUSAL = "t3flare has no record of this thread's modes (the Environment restarted during the turn), so it changes no settings now. Try again in the thread's next turn.";
-export const OFF_MESSAGE = "The owner turned the Settings server off; only the Harness panel turns it back on.";
 export const READ_ONLY_REFUSAL = "The owner made the Settings server read-only; its write tools are refused. Only the Harness panel changes that.";
 
 /** When a change applies, by what it changed (plan D17). */
@@ -144,7 +136,10 @@ const json = (value: unknown) => JSON.stringify(value, null, 2);
 /** Every http(s) URL inside `text` without its query (plan D14): an error or a listing may quote a Direct server's URL. */
 const scrubText = (text: string): string => text.replace(/https?:\/\/[^\s"'<>`]+/gi, (url) => withoutQuery(url));
 
-/** `value` with every string scrubbed and every `fingerprint` dropped, at any depth (plan D14). */
+/**
+ * `value` with every string scrubbed and every `fingerprint` dropped, at any depth (plan D14): for what describes the
+ * MCP server set (a Direct server's URL may hold a key in its query), and only that (M3 review).
+ */
 const scrub = (value: unknown): unknown => {
   if (typeof value === "string") return scrubText(value);
   if (Array.isArray(value)) return value.map(scrub);
@@ -152,11 +147,14 @@ const scrub = (value: unknown): unknown => {
   return value;
 };
 
-/** A read's answer: what any reader but the panel may see. */
-const read = (value: Readonly<Record<string, unknown>>): McpCallAnswer => {
-  const shown = scrub(value);
-  return { kind: "result", isError: false, text: json(shown), structured: shown };
-};
+/**
+ * A read's answer, as the page shows it (plan D14): Variables' values, the Global mise config and a SKILL.md appear as
+ * they are, so a read-then-write of them round-trips unchanged (M3 review).
+ */
+const read = (value: Readonly<Record<string, unknown>>): McpCallAnswer => ({ kind: "result", isError: false, text: json(value), structured: value });
+
+/** A read of the MCP server set: every URL without its query, no secret's fingerprint (plan D14). */
+const readMcp = (value: Readonly<Record<string, unknown>>): McpCallAnswer => read(scrub(value) as Readonly<Record<string, unknown>>);
 
 const readError = (text: string): McpCallAnswer => ({ kind: "result", isError: true, text: scrubText(text) });
 
@@ -254,7 +252,7 @@ const listMcpServers = async (deps: SettingsServerDeps, args: Readonly<Record<st
     });
   }
   const ignored = ignoredServersOf(stored);
-  return read({
+  return readMcp({
     revision: stored.revision,
     servers: rows,
     ...(ignored.length === 0 ? {} : { ignored: ignored.map((name) => `${name}: stored under a name or kind reserved for the Settings server, and ignored`) }),
@@ -307,7 +305,7 @@ const fromOutcome = (outcome: { readonly ok: boolean; readonly error?: string; r
     : { ok: false as const, error: outcome.error ?? "refused", ...(outcome.status === 409 && outcome.revision !== undefined ? { moved: outcome.revision } : {}) };
 
 const hintedClass = (deps: SettingsServerDeps) => (server: string, tool: string): ToolClass | undefined => {
-  const definition = deps.ops.mcp.inventory(server).definitions[tool];
+  const definition = ownEntry(deps.ops.mcp.inventory(server).definitions, tool);
   if (definition === undefined) return undefined;
   const annotations = definition.annotations as { readonly readOnlyHint?: unknown } | undefined;
   return classOf(annotations === undefined ? {} : { annotations }, undefined);
@@ -647,6 +645,10 @@ const actorOfChange = (record: ChangeRecord, by: ClosedBy): AuditActor => ({
  * now (the registry validates it again), and run with its expected revision. A secret goes from the page to `run` alone.
  */
 export const applyOpenChange = async (deps: SettingsServerDeps, record: ChangeRecord, input: { readonly by: ClosedBy; readonly secret?: string }): Promise<ApplyResult> => {
+  // The owner may have switched the server off or read-only while it waited (M3 review): nothing applies then.
+  const access = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
+  if (access === undefined || !access.enabled) return { ok: false, error: OFF_MESSAGE };
+  if (access.writes === false) return { ok: false, error: READ_ONLY_REFUSAL };
   const planned = planWrite(deps, record.tool, (record.args ?? {}) as Readonly<Record<string, unknown>>);
   if ("refused" in planned) return { ok: false, error: planned.refused };
   const ran = await planned.run(
@@ -810,6 +812,47 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
   }
 };
 
+/** Why `caller` may not write now (plan D2, D3, D7's order up to the change itself), or undefined. */
+const mayNotWrite = (deps: SettingsServerDeps, caller: OwnCaller): { readonly reason: string; readonly text: string } | undefined => {
+  const access = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
+  if (access === undefined || !access.enabled) return { reason: "off", text: OFF_MESSAGE };
+  if (access.writes === false) return { reason: "read-only", text: READ_ONLY_REFUSAL };
+  // Linked or unknown work reads only (plan D3): decided by the Environment from the thread, never by the agent.
+  const link = caller.thread === undefined ? "unknown" : deps.link(caller.thread);
+  if (link === "linked") return { reason: "linked", text: LINKED_REFUSAL };
+  if (link !== "own") return { reason: "unknown-thread", text: UNKNOWN_REFUSAL };
+  const modes = deps.modes(caller);
+  if (modes === undefined) return { reason: "no-modes", text: NO_MODES_REFUSAL };
+  if (modes.interactionMode === "plan") return { reason: "plan", text: PLAN_REFUSAL };
+  return undefined;
+};
+
+/**
+ * The read caps (M3 review, D16-style): every read counts toward `READ_CAP` per thread per hour, and a read that reaches
+ * GitHub or an MCP server (`NETWORK_READS`) toward `NETWORK_READ_CAP` as well. `preview_skills` mints a GitHub App token
+ * for any installed repository, so only a caller that may write may preview (the owner's decision). Undefined: the read
+ * runs, and is counted.
+ */
+const readLimit = (deps: SettingsServerDeps, input: SettingsCallInput, tool: string): McpCallAnswer | undefined => {
+  const refused = (reason: string, text: string) => {
+    deps.log?.({ t3flare: "settings-refused", via: "mcp", door: input.caller.door, agent: input.caller.agent, thread: input.caller.thread ?? null, tool, outcome: "refused", reason });
+    return readError(text);
+  };
+  if (tool === "preview_skills") {
+    const why = mayNotWrite(deps, input.caller);
+    if (why !== undefined) return refused(why.reason, `Not previewed: only a caller that may change the skills previews them. ${why.text}`);
+  }
+  const key = input.caller.thread ?? "unknown";
+  const now = deps.ops.now();
+  const network = NETWORK_READS.has(tool);
+  if (deps.changes.readsSince(key, "read", now - READ_WINDOW_MS) >= READ_CAP) return refused("read-cap", `Not read: this thread made ${READ_CAP} settings reads in the last hour, the most t3flare allows. Try again later.`);
+  if (network && deps.changes.readsSince(key, "network", now - READ_WINDOW_MS) >= NETWORK_READ_CAP) {
+    return refused("network-read-cap", `Not read: this thread made ${NETWORK_READ_CAP} reads that reach GitHub or an MCP server in the last hour, the most t3flare allows. Try again later.`);
+  }
+  deps.changes.noteRead(key, network ? "network" : "read", now);
+  return undefined;
+};
+
 const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promise<McpCallAnswer> => {
   const { caller, tool, args } = input;
   const log = (outcome: string, extra: Record<string, unknown> = {}) =>
@@ -818,15 +861,9 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
     log("refused", { reason });
     return written("refused", why, extra);
   };
-  const access = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
-  if (access?.writes === false) return refuse("read-only", READ_ONLY_REFUSAL);
-  // Linked or unknown work reads only (plan D3): decided by the Environment from the thread, never by the agent.
-  const link = caller.thread === undefined ? "unknown" : deps.link(caller.thread);
-  if (link === "linked") return refuse("linked", LINKED_REFUSAL);
-  if (link !== "own") return refuse("unknown-thread", UNKNOWN_REFUSAL);
-  const modes = deps.modes(caller);
-  if (modes === undefined) return refuse("no-modes", NO_MODES_REFUSAL);
-  if (modes.interactionMode === "plan") return refuse("plan", PLAN_REFUSAL);
+  const barred = mayNotWrite(deps, caller);
+  if (barred !== undefined) return refuse(barred.reason, barred.text);
+  const modes = deps.modes(caller)!;
   const planned = planWrite(deps, tool, args);
   if ("refused" in planned) return refuse("invalid", `Not changed: ${scrubText(planned.refused)}`);
   const expected = args.expectedRevision;
@@ -858,8 +895,14 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
       log("withdrawn", { reason: answer.reason ?? null });
       return written("withdrawn", `Not changed: the owner did not answer (${answer.reason ?? "cancelled"}).`);
     }
+    // The card waited: the owner may have switched the server off or read-only, or the thread's mode moved, meanwhile
+    // (M3 review). The revision is checked by the op itself.
+    const since = mayNotWrite(deps, caller);
+    if (since !== undefined) return refuse(since.reason, `Not changed: ${since.text}`);
   }
-  const actor: AuditActor = { caller: `agent:${key}`, via: "mcp", thread: key, agent: caller.agent, tier: "free" };
+  const onCard = modes.runtimeMode !== "full-access";
+  // A card-approved free change records how it was answered (ADR-0034 §11).
+  const actor: AuditActor = { caller: `agent:${key}`, via: "mcp", thread: key, agent: caller.agent, tier: "free", ...(onCard ? { mode: "card" as const, answeredBy: "card" as const } : {}) };
   const ran = await planned.run({ actor, expectedRevision: expected });
   const revision = revisionOf(deps, planned.entity);
   if (!ran.ok) {
@@ -904,6 +947,8 @@ export const settingsCall = async (deps: SettingsServerDeps, input: SettingsCall
   const tool = settingsToolOf(input.tool);
   if (tool === undefined) return { kind: "unavailable", message: `The Settings server has no tool ${input.tool}.`, mayHaveRun: false };
   if (tool.class === "write") return write(deps, input);
+  const limited = readLimit(deps, input, tool.name);
+  if (limited !== undefined) return limited;
   const actor: AuditActor = { caller: input.caller.thread === undefined ? "agent" : `agent:${input.caller.thread}`, via: "mcp", ...(input.caller.thread === undefined ? {} : { thread: input.caller.thread }), agent: input.caller.agent };
   switch (tool.name) {
     case "get_settings":
@@ -925,10 +970,11 @@ export const settingsCall = async (deps: SettingsServerDeps, input: SettingsCall
       return read(readAudit(deps.ops, { ...(limit === undefined ? {} : { limit }), ...(before === undefined ? {} : { before }) }));
     }
     case "test_mcp_server": {
-      const tested = await testMcpServer(deps.ops, stringArg(input.args, "server") ?? "", { actor });
+      // No audit entry: a read through the server must not evict the log of changes (M3 review); the read cap bounds it.
+      const tested = await testMcpServer(deps.ops, stringArg(input.args, "server") ?? "", { actor, audit: false });
       if (!tested.ok) return readError(tested.error);
       const { ok: _ok, ...shown } = tested;
-      return read(shown);
+      return readMcp(shown);
     }
     case "preview_skills":
       return skillsRead(deps, "/preview", { source: stringArg(input.args, "source") ?? "" }, actor);
