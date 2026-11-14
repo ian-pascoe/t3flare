@@ -42,11 +42,22 @@ showed (a screenshot or its transcript) and the tool result it got (`structuredC
    then carries the result `applied`. Record heartbeat lines seen while it held (progress with OpenCode's
    `progressToken`, or `: waiting for the form's answer`). Note: OpenCode under `permission: allow` accepts the empty
    form itself (M0); record whether it did here, since that is ADR-0034's accepted risk made visible.
+   - **The Environment stays alive for a long hold**: once more, answering only after 10 minutes less a few seconds
+     (the change's whole life; with a client whose timeout allows it, or Claude Code, which backgrounds the call).
+     Record that the stream kept its heartbeat to the end, that no `settings-refused` line with `no-live-stream`
+     appeared (the Environment DO did not reset under the stream: an idle reset would end it, ADR-0003, plan D17's
+     `Idle.requestStarted`), and that the answer applied. If the DO reset mid-hold, the accept is withdrawn by `stop`
+     (SPI-1201 review): record that instead, with the time the stream ended.
 7. **Decline** and **cancel** on the held stream: `declined` and `withdrawn`, `closed.by: client`.
 8. **A cut stream**: start an asked change and end the call from the client (Ctrl+C, or quit the client) before
    answering. Record that the change closes `withdrawn` with `closed.by: stop` and its one `settings-refused` log line
    carrying `cut: true`; then answer the still-open dialog if the client keeps it (Claude Code did in M0): the POST is
-   202 and nothing applies (revision unchanged).
+   202 and nothing applies (revision unchanged). **The cut must reach the Environment DO**: record the time from the
+   client's Ctrl+C to the close's log line (seconds, not the change's 10 minutes). If the change stays open until it
+   expires, Cloudflare did not pass the client's disconnect through the Worker's RPC to the DO's stream: record it as a
+   failure for `docs/upstream-fragility.md` and the report.
+   - Two calls on the same change (the client retried while the first still held): cutting one leaves the other's
+     question standing (no close line), and cutting both withdraws it once (SPI-1201 review).
 9. **2025-06-18** (if a named client negotiates it): the `elicitation/create` params have no `mode` key, and the client
    shows the form.
 

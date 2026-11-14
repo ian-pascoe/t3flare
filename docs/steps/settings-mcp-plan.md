@@ -173,7 +173,9 @@ and nothing else. A **Settings change** is one such call.
   as read-only (`t3code/packages/provider-pi/src/server/mcpExtensionSource.ts:361`). Relay tools are not in that set, so
   a relay read would ask and a relay write would ask twice. Patch `patches/0006-pi-relay-tools-are-judged-by-the-relay.patch`
   makes the hook return early for tools that come from pi's built-in MCP client. How pi labels such a tool's source is
-  an M0 probe (P16). If the Patch cannot be made safely, ship without it: the extension only asks more, never less.
+  an M0 probe (P16). As built: only a tool of a server the relay serves the process (`T3FLARE_RELAY_SERVERS`), matched
+  by pi's own name for it, and only when the rest after `mcp__<server>__` neither starts with `_` nor holds `__`
+  (SPI-1199, SPI-1200 and SPI-1201 reviews; U67). If the Patch cannot be made safely, ship without it: the extension only asks more, never less.
   Record the Patch in `docs/upstream-fragility.md`.
 
 ### D5. Two Change tiers, by direction, failing closed
@@ -232,7 +234,8 @@ an integer lowered is free, and the other direction is asked.
 an OAuth sign-in, installs or updates Environment skills (`skills`: only the page shows each skill's `SKILL.md` text and
 files, so a card would offer Approve on text it cannot show; SPI-1199 review), or its rendered text would be cut by
 `cardText` (`CARD_TEXT_MAX`, 16 KiB; `packages/harness-registry/src/cardText.ts`). The last is decided by the renderer,
-not by `tierOf`.
+not by `tierOf`, on the whole text the question would carry: the card's text for an own agent, and for an Owner client
+the message `M` of its requested mode, who asked and how to answer included (SPI-1201 review).
 
 Such a change is answered only on the Change page, for every caller and in every Elicitation mode: the card is
 link-only, and an Owner client gets the page's link whatever its mode. The owner never approves text he cannot see, and
@@ -271,8 +274,9 @@ interface OpenChange {
   args: unknown;                 // the call's arguments, canonical JSON, without a secret (none is ever in them)
   hash: string;                  // SHA-256 of tool + the change as its planner normalized it (only the fields the
                                  // change takes; SPI-1199 review), canonical, without expectedRevision; an add's URL
-                                 // as a URL parser spells it, an install's source as its repo, folder and skill
-                                 // (SPI-1200 review), so a respelling is the same change
+                                 // as a URL parser spells it, without a fragment or an empty query; an install's
+                                 // source as its repo alone and its folders as a sorted set (SPI-1200 and SPI-1201
+                                 // reviews), so a respelling is the same change
   shown: ChangeView;             // what the card and the page render: before, after, reasons, when it applies (D10)
   needsPage?: "secret" | "sign-in" | "skills" | "oversize";
   mode: "card" | "browser" | "native" | "model";
@@ -296,7 +300,9 @@ interface OpenChange {
   applies through `ops.ts` with `expectedRevision`, audits, and closes the record. A moved revision closes it as
   `moved`; nothing is applied. A close without an answer (a decline or cancel from the client, a Stop, a timeout) that
   lands while another answer is applying the change waits for that answer's outcome and reports it (`closeOrSettle`,
-  at most `APPLYING_WAIT_MS`, 30 s; an apply a reset stranded is the table's to close; SPI-1200 review).
+  at most `APPLYING_WAIT_MS`, 30 s, for an Owner client's call, and `OWN_APPLYING_WAIT_MS`, the skills request budget
+  and 15 s, for an own agent's; an apply a reset stranded is the table's to close; SPI-1200 review). A wait that runs
+  out answers `waiting` ("an answer is applying it now; read the settings"), never a failure (SPI-1201 review).
 - **Who may answer**:
 
   | By | Which changes | Answerer |
@@ -412,7 +418,7 @@ already verified Access (D13). It never boots t3. Hand-written JSON-RPC in the E
   No CORS header is ever sent. `Sec-Fetch-Mode` is not a reason to refuse (some non-browser HTTP clients are believed to
   send it; M0 records what each client sends). Every response is `cache-control: no-store`.
 - **Caller**: `{ kind: "owner", subject }` or `{ kind: "service-token" }`, from the Worker. The caller key for caps is
-  the `sub` (`service-token` for the token).
+  the `sub` (`service-token` for the token), scoped by door (D16).
 - **The client label** in the audit is display only and never trusted: from the 2026 request's `_meta` client info if
   the spec carries one, else the session token's `clientInfo`, else `User-Agent`; cut to 60 characters and escaped, with
   its source.
@@ -511,7 +517,9 @@ this call; read the settings to check." }], structuredContent: { status: "waitin
   `progressToken`, and an SSE comment every 15 s otherwise. The response POST (202, no body) with `accept` applies;
   `decline` and `cancel` close it. The call's result is then written and the stream ends.
   **A stream that ends unanswered withdraws the Open change**; a response that arrives later finds it gone and applies
-  nothing.
+  nothing. As built (SPI-1201 review): the isolate counts the live streams on each change; only the last one cut
+  withdraws it; a response POST with no live stream on its change (the Environment reset since) withdraws it by `stop`
+  and applies nothing; at most 2 live streams per change and 8 per caller, past which the call gets `W` saying why.
 - Why hold here: the client carries the answer, and ending the call may close its dialog. Why withdraw on a cut stream:
   a client that gives up at 60 s can then ask again at once, and nothing is ever written with nobody watching the result.
 
@@ -627,7 +635,8 @@ change through the server is recorded there as an already-closed row).
 | Applied changes of any tier, per caller | 30 per hour |
 
 - The caller key is the thread id, or the Access `sub` for every Owner client (the client label is unverified, so
-  keying on it would let a client rotate labels).
+  keying on it would let a client rotate labels), prefixed by its door (`own:`, `owner:`; SPI-1201 review), so a thread
+  id equal to a `sub` is another caller; `get_status` lists the calling door's own changes alone.
 - In `model`, a refusal for "one already open" names its `requestId`, so the agent can resume or cancel it.
 - No extra limit for `model` (O6).
 - A refusal for the Environment-wide cap names the panel's Open changes list.
