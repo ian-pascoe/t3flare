@@ -34,6 +34,7 @@ import { harnessStore } from "./harness/store.ts";
 import { sealedStore } from "./credentials/sealed.ts";
 import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
+import { type ModelRelayTarget, relayTargetOf } from "@t3flare/models/relay";
 import type { SkillsApiDeps } from "./skills/api.ts";
 import { githubReader, readAccessFor } from "./skills/contents.ts";
 import { type SkillStore, skillStore } from "./skills/store.ts";
@@ -423,6 +424,16 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    */
   async endpointCredential(input: EndpointCredentialRequest): Promise<EndpointCredential> {
     return this.#endpointStore().credential({ endpointId: String(input.endpointId), target: input.target });
+  }
+
+  /**
+   * The model relay's target for an endpoint (SPI-1167), for a Workspace DO that has checked a CLI process's model handle:
+   * the endpoint's base URL and headers with its credential, as `resolve` gives them (the endpoint returned is the key's
+   * target). Never logs the key. Never boots t3.
+   */
+  async modelRelayTarget(input: { readonly endpointId: string }): Promise<ModelRelayTarget> {
+    const endpointId = String(input.endpointId);
+    return relayTargetOf(await this.#endpointStore().resolve(endpointId), endpointId);
   }
 
   /**

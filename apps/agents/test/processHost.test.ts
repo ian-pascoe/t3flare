@@ -313,3 +313,41 @@ describe("tool handles (ADR-0028)", () => {
     expect(h.host.toolCaller("short")).toBeNull();
   });
 });
+
+describe("model handles (SPI-1167)", () => {
+  const handleIn = (h: ReturnType<typeof harness>, index = 0) => h.spawned[index]!.env.T3FLARE_MODEL_HANDLE;
+
+  it("are issued to a process that asks, in its environment only, and resolve to it until it exits", async () => {
+    const h = harness();
+    await h.host.start(start("proc-a", { modelRelay: true }));
+    const handle = handleIn(h);
+    expect(handle).toMatch(/^[0-9a-f]{64}$/);
+    expect(h.spawned[0]!.argv.join(" ")).not.toContain(handle!);
+    expect(h.host.modelCaller(handle!)).toEqual({ key: "proc-a", cli: "codex", thread: "thread-1" });
+    h.procs[0]!.exit(0);
+    await tick();
+    expect(h.host.modelCaller(handle!)).toBeNull();
+  });
+
+  it("are one per process, never a tool handle, and none for a process that does not ask", async () => {
+    const h = harness();
+    const TOOL = "c".repeat(64);
+    await h.host.start(start("proc-a", { modelRelay: true, toolHandle: TOOL }));
+    await h.host.start(start("proc-b", { modelRelay: true }));
+    await h.host.start(start("proc-c"));
+    expect(handleIn(h, 0)).not.toBe(handleIn(h, 1));
+    expect(h.host.modelCaller(handleIn(h, 1)!)).toMatchObject({ key: "proc-b" });
+    expect(h.spawned[2]!.env.T3FLARE_MODEL_HANDLE).toBeUndefined();
+    expect(h.host.modelCaller(TOOL)).toBeNull();
+    expect(h.host.toolCaller(handleIn(h, 0)!)).toBeNull();
+    expect(h.host.modelCaller(null)).toBeNull();
+    expect(h.host.modelCaller("e".repeat(64))).toBeNull();
+  });
+
+  it("cannot be set by the profile's environment", async () => {
+    const h = harness();
+    await h.host.start(start("proc-a", { env: { T3FLARE_MODEL_HANDLE: "f".repeat(64) } }));
+    expect(h.spawned[0]!.env.T3FLARE_MODEL_HANDLE).toBeUndefined();
+    expect(h.host.modelCaller("f".repeat(64))).toBeNull();
+  });
+});

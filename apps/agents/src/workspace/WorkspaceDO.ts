@@ -79,6 +79,7 @@ import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, wit
 import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { ModelKeyGate } from "./modelKey.ts";
+import type { ModelRelayGrant } from "./modelRelay.ts";
 import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { AgentTerminals } from "./agentTerminals.ts";
@@ -267,6 +268,8 @@ export class WorkspaceDO extends ContainerHost {
   #cliSinceScan = false;
   /** Patterns of the git tokens this object handed to the Container lately. */
   readonly #tokenPatterns: Array<CredentialPattern> = [];
+  /** The Model endpoints' keys the model relay used here (SPI-1167), by hash, by endpoint: the sync guard's too. */
+  readonly #endpointPatterns = new Map<string, CredentialPattern>();
   /** The token the credential helper is given, until shortly before it expires. */
   #token: { readonly token: string; readonly expiresAt: number } | undefined;
   /** Commands the Session stopped before they were sent (during a start's install): never sent (`stoppedExecs.ts`). */
@@ -506,7 +509,16 @@ export class WorkspaceDO extends ContainerHost {
   /** The credentials the sync guard looks for: the CLI agents' key and the git tokens handed out lately. */
   async #patterns(): Promise<ReadonlyArray<CredentialPattern>> {
     const key = this.env.COMMISSARY_CONTAINER_API_KEY;
-    return [...(key === undefined || key === "" ? [] : [await patternOf("model-key", key)]), ...this.#tokenPatterns];
+    return [...(key === undefined || key === "" ? [] : [await patternOf("model-key", key)]), ...this.#tokenPatterns, ...this.#endpointPatterns.values()];
+  }
+
+  /** An endpoint's key the model relay used here (SPI-1167): the sync guard looks for it too, by hash. */
+  async #rememberEndpointKey(endpointId: string, key: string): Promise<void> {
+    const pattern = await patternOf(`endpoint:${endpointId}`, key);
+    if (this.#endpointPatterns.get(endpointId)?.sha256 === pattern.sha256) return;
+    this.#endpointPatterns.delete(endpointId);
+    this.#endpointPatterns.set(endpointId, pattern);
+    if (this.#endpointPatterns.size > 32) this.#endpointPatterns.delete(this.#endpointPatterns.keys().next().value!);
   }
 
   async #rememberToken(token: string): Promise<void> {
@@ -515,10 +527,10 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /** Runs the scanner in the running Container, straight through the platform's exec (no computer sync around it). */
-  async #scan(input: Omit<LeakScanInput, "patterns">): Promise<LeakScanAnswer | undefined> {
+  async #scan(input: Omit<LeakScanInput, "patterns">, extra: ReadonlyArray<CredentialPattern> = []): Promise<LeakScanAnswer | undefined> {
     const container = this.ctx.container;
     if (container === undefined || !container.running) return undefined;
-    const patterns = await this.#patterns();
+    const patterns = [...(await this.#patterns()), ...extra];
     if (patterns.length === 0) return undefined;
     const process = await container.exec([...leakScanArgv({ ...input, patterns })], { stdout: "pipe", stderr: "pipe" });
     const output = await process.output();
@@ -581,21 +593,32 @@ export class WorkspaceDO extends ContainerHost {
   /**
    * The leak check (plan §4.7, acceptance): the Workspace's own files searched for each credential's value (the DO side),
    * and the Container's files, process environments and command lines scanned by hash (nothing sent in). Names and paths
-   * only, never a value.
+   * only, never a value. `credentials`: more to look for, by name (the Model endpoints' keys, SPI-1167: the admin route
+   * gives them from the Environment); used for this check only, never kept.
    */
-  async leakCheck(): Promise<{ readonly do: ReadonlyArray<{ readonly name: string; readonly path: string }>; readonly container: LeakScanAnswer | null; readonly flagged: unknown }> {
+  async leakCheck(input: { readonly credentials?: ReadonlyArray<{ readonly name: string; readonly value: string }> } = {}): Promise<{
+    readonly do: ReadonlyArray<{ readonly name: string; readonly path: string }>;
+    readonly container: LeakScanAnswer | null;
+    readonly flagged: unknown;
+  }> {
     this.#alive();
     await this.#ready();
     const values: Array<[string, string]> = [];
     const key = this.env.COMMISSARY_CONTAINER_API_KEY;
     if (key !== undefined && key !== "") values.push(["model-key", key]);
+    const extra: Array<CredentialPattern> = [];
+    for (const credential of input.credentials ?? []) {
+      if (credential.value.length < 8) continue;
+      values.push([credential.name, credential.value]);
+      extra.push(await patternOf(credential.name, credential.value));
+    }
     const found: Array<{ name: string; path: string }> = [];
     for (const [credential, value] of values) {
       // computer's own grep over the DO's files; only the paths are kept (the matched text would hold the value).
       const matches = await this.#workspace.fs.grep(value, WORKSPACE_ROOT, { regex: false, limit: 200 });
       for (const path of new Set(matches.map((match) => match.path))) found.push({ name: credential, path });
     }
-    const container = (await this.#scan({ roots: ["/workspace", "/root", "/tmp", "/var/lib/t3flare", "/var/lib/computerd"], since: 0, procs: true, skip: [] }).catch(() => undefined)) ?? null;
+    const container = (await this.#scan({ roots: ["/workspace", "/root", "/tmp", "/var/lib/t3flare", "/var/lib/computerd"], since: 0, procs: true, skip: [] }, extra).catch(() => undefined)) ?? null;
     return { do: found, container, flagged: this.ctx.storage.kv.get(LEAK_FLAG_KEY) ?? null };
   }
 
@@ -1952,6 +1975,23 @@ export class WorkspaceDO extends ContainerHost {
   /** The relay's CLI went away while its call was asked: the card is withdrawn. */
   async cancelMcpAsk(input: { readonly askId: string }): Promise<void> {
     await environmentStub(this.env.ENVIRONMENT).cancelAsk({ askId: input.askId });
+  }
+
+  /**
+   * The model relay's check (SPI-1167), from `WorkspaceProxy`: the model handle names a live CLI process of this
+   * Workspace (another Workspace's, a tool handle, or one whose process exited is refused), and the Environment gives the
+   * endpoint's target with its credential. The credential is remembered by hash for the sync guard, never kept or
+   * logged; `WorkspaceProxy` sends the request and logs it. Never logs the handle.
+   */
+  async modelRelay(input: { readonly handle: string | null; readonly endpointId: string }): Promise<ModelRelayGrant> {
+    const workspace = this.#workspaceId() ?? null;
+    if (this.#isDestroyed()) return { kind: "refused", status: 410, message: "this Workspace was deleted", handleId: null, workspace };
+    const caller = this.#processes.modelCaller(input.handle);
+    if (caller === null) return { kind: "refused", status: 401, message: "unknown or revoked model handle (a handle ends with its process)", handleId: null, workspace };
+    const target = await environmentStub(this.env.ENVIRONMENT).modelRelayTarget({ endpointId: input.endpointId });
+    if (!target.ok) return { kind: "refused", status: target.status, message: target.message, handleId: caller.key, workspace };
+    if (target.key !== null) await this.#rememberEndpointKey(input.endpointId, target.key);
+    return { kind: "granted", handleId: caller.key, cli: caller.cli, workspace, target: { baseUrl: target.baseUrl, headers: target.headers } };
   }
 
   /**

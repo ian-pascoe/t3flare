@@ -14,6 +14,7 @@
 // - The hold (review F7): a process holds the Container while its thread is in a turn, and for `idleHoldMs` after the
 //   last turn ended (or the last input). Past that it no longer holds it, and t3's own idle release (Patch 0003, at the
 //   same 10 minutes) ends the session.
+import { MODEL_HANDLE, MODEL_HANDLE_ENV } from "@t3flare/models/relay";
 import { processCommand, type ProcessFile } from "@t3flare/sandbox-image/process";
 import type {
   ProcessAnswer,
@@ -107,9 +108,14 @@ interface Proc {
   killing: boolean;
   /** The process's tool handle (ADR-0028), in memory only: gone with the process or this object. */
   readonly toolHandle: string | undefined;
+  /** The process's model handle (SPI-1167), made here, in memory only: gone with the process or this object. */
+  readonly modelHandle: string | undefined;
 }
 
-/** Who a tool handle speaks for: a live CLI process of this Workspace. */
+/** A new model handle: 32 random bytes, hex. */
+const newModelHandle = (): string => [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+/** Who a tool handle or a model handle speaks for: a live CLI process of this Workspace (its key is the handle's id in logs). */
 export interface ToolCaller {
   readonly key: string;
   readonly cli: string;
@@ -164,6 +170,19 @@ export class ProcessHost {
     if (handle === null || handle.length < 32) return null;
     for (const proc of this.#procs.values()) {
       if (proc.exited || proc.toolHandle === undefined || proc.toolHandle !== handle) continue;
+      return { key: proc.key, cli: proc.cli, thread: proc.marker.thread ?? null };
+    }
+    return null;
+  }
+
+  /**
+   * The live process model handle `handle` was issued to, or null: unknown (another Workspace's, a tool handle, made up)
+   * or revoked (its process exited). The model relay's check (SPI-1167).
+   */
+  modelCaller(handle: string | null): ToolCaller | null {
+    if (handle === null || !MODEL_HANDLE.test(handle)) return null;
+    for (const proc of this.#procs.values()) {
+      if (proc.exited || proc.modelHandle === undefined || proc.modelHandle !== handle) continue;
       return { key: proc.key, cli: proc.cli, thread: proc.marker.thread ?? null };
     }
     return null;
@@ -260,11 +279,16 @@ export class ProcessHost {
       exited: false,
       killing: false,
       toolHandle: input.toolHandle !== undefined && /^[0-9a-f]{64}$/.test(input.toolHandle) ? input.toolHandle : undefined,
+      modelHandle: input.modelRelay === true ? newModelHandle() : undefined,
     };
     this.#procs.set(input.key, proc);
     this.#save();
+    // The model handle is this object's alone: whatever the profile's environment names it is dropped.
+    const env: Record<string, string> = { ...this.#deps.baseEnv, ...input.env, ...extraEnv, T3FLARE_EXEC: input.key };
+    delete env[MODEL_HANDLE_ENV];
+    if (proc.modelHandle !== undefined) env[MODEL_HANDLE_ENV] = proc.modelHandle;
     try {
-      const process = await this.#deps.spawn(["bash", "-c", command], { ...this.#deps.baseEnv, ...input.env, ...extraEnv, T3FLARE_EXEC: input.key });
+      const process = await this.#deps.spawn(["bash", "-c", command], env);
       proc.process = process;
       proc.writer = process.stdin?.getWriter() as WritableStreamDefaultWriter<Uint8Array> | undefined;
       const reads = Promise.all([this.#read(proc, process.stdout, "stdout"), this.#read(proc, process.stderr, "stderr")]);

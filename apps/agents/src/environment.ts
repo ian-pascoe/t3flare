@@ -8,6 +8,7 @@ import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client
 import type { GlobalMiseReport, McpRelayAnswer, McpRelayInput, ResolvedEnvironment, ResolvedHarness } from "@t3flare/harness-registry";
 import type { SkillSet } from "@t3flare/skills";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
+import type { ModelRelayTarget } from "@t3flare/models/relay";
 import type { McpCallAnswer, McpView } from "./extensions/mcp.ts";
 
 export interface EnvironmentRpc {
@@ -31,6 +32,8 @@ export interface EnvironmentRpc {
   modelEndpoints(): Promise<ModelEndpoints>;
   /** A Model endpoint's API key at use time (ADR-0018), for the target the Session holds; null when it has none or moved. */
   endpointCredential(input: EndpointCredentialRequest): Promise<EndpointCredential>;
+  /** The model relay's target for an endpoint (SPI-1167): its base URL and headers with its credential, or why not. */
+  modelRelayTarget(input: { readonly endpointId: string }): Promise<ModelRelayTarget>;
   /** The Environment settings, resolved (ADR-0032): read before a Container start. Never boots t3. */
   environmentSettings(): Promise<ResolvedEnvironment>;
   /**

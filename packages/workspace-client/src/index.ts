@@ -273,6 +273,12 @@ export interface ProcessStartInput {
    * while the process lives; never logged.
    */
   readonly toolHandle?: string;
+  /**
+   * Whether the process gets a model handle (SPI-1167): the Workspace DO makes one, puts it in the process's environment
+   * (`MODEL_HANDLE_ENV`) and redeems it at the model relay (`/t3flare/model/*`) while the process lives. It never leaves
+   * the Workspace DO and the process.
+   */
+  readonly modelRelay?: boolean;
 }
 
 /** Every answer names the Workspace DO's boot counter: another value means the processes it held are gone. */

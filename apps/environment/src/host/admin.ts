@@ -43,7 +43,8 @@
 //   POST /_t3flare/agents/process-check           step 4a (stages only): the probe through t3's spawner and the process channel
 //   POST /_t3flare/agents/acp-check               step 4b (stages only): Claude Code or OpenCode over ACP through the channel
 //   GET  /_t3flare/agents/process-state?id=<id>   step 4a: a Workspace's CLI processes and this instance's channel
-//   POST /_t3flare/check/leak?id=<id>             step 4a: credentials in a Workspace's files (DO and Container), names and paths only
+//   POST /_t3flare/check/leak?id=<id>             step 4a: credentials in a Workspace's files (DO and Container), names and paths only;
+//                                                the Model endpoints' keys too (SPI-1167)
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -417,7 +418,13 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
       }
       case "POST /_t3flare/check/leak": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");
-        return json(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck());
+        // SPI-1167: every Model endpoint's key is looked for too (by value in the DO's files, by hash in the Container).
+        const credentials: Array<{ name: string; value: string }> = [];
+        for (const endpoint of (await environment.modelEndpoints()).endpoints) {
+          const target = await environment.modelRelayTarget({ endpointId: endpoint.id });
+          if (target.ok && target.key !== null) credentials.push({ name: `endpoint:${endpoint.id}`, value: target.key });
+        }
+        return json(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck({ credentials }));
       }
       case "GET /_t3flare/agents/process-state": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");
