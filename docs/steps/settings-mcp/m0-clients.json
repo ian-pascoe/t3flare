@@ -1,0 +1,1553 @@
+{
+ "at": "2026-11-14T14:16:46.892Z",
+ "ticket": "SPI-1196",
+ "what": "P14 and P17: each named client against the spike's probe MCP server (public host for behaviour; B and C for OAuth discovery up to Access's sign-in). Claude Code ran on the laptop (the owner's install, model haiku, a few calls); pi, Codex and OpenCode ran from the stage's sandbox image under Docker. Codex and Cursor tool calls, every accept button that needs a person, and everything after Access's sign-in are owner steps",
+ "clients": {
+  "claude-code 2.1.322": {
+   "protocol": "2026-07-28 first: server/discover, then tools/list and tools/call, each with _meta io.modelcontextprotocol/protocolVersion, clientInfo {name: claude-code, title, version, description, websiteUrl} and clientCapabilities {roots: {listChanged: true}, elicitation: {form: {}, url: {}}} on every request; also _meta progressToken and claudecode/toolUseId on tools/call. Headers MCP-Protocol-Version and Mcp-Method. Against a server that answers server/discover with an empty 400 it falls back to initialize 2025-11-25 with the same capabilities, opens a GET stream (polled about once a second when the GET is not refused) and posts elicitation responses as their own POSTs",
+   "headers": "User-Agent claude-code/2.1.322 (cli|sdk-cli); no Origin, no Sec-Fetch-Site, no Sec-Fetch-Mode",
+   "elicitation": {
+    "2026 form (empty requestedSchema)": "shown as 'MCP server \"spike\" requests your input' with Accept / Decline; Decline retried at once with inputResponses.change {action: decline} and requestState echoed; Escape gave cancel; in -p (non-interactive) it retried with cancel without asking. Accept did not submit from the scripted terminal (Enter, Space, y, Ctrl+M): owner step 3",
+    "2026 url": "shown as 'wants to open a URL' with the URL and Open in browser / I'm done, continue / Decline; Escape gave cancel; 'I'm done, continue' did not submit from the scripted terminal: owner step 3",
+    "2025-11-25 form on a held stream": "the same dialog; Escape posted {action: cancel} as a JSON-RPC response and the held call then returned",
+    "stream cut by the server with the form open": "Claude Code noticed nothing: the dialog stayed, the call kept 'Calling…', the later Decline was still posted, and the call was moved to the background as an MCP task (reported after 240 s). D12's 'a stream that ends unanswered withdraws the Open change' holds server-side; Claude Code will then show a stale form",
+    "model (Executor pause)": "the agent read the approval-required result, did not call resume itself, and asked the user"
+   },
+   "holds": "a 50 s held call (2026, progress every 15 s) finished; a call still unanswered after 120 s is moved to the background as an MCP task rather than failed",
+   "oauth": {
+    "redirectUri": "http://localhost:<port>/callback",
+    "registration": "DCR",
+    "resourceSent": "the protected-resource document's resource (no query) for both B and C",
+    "browser": "honours $BROWSER"
+   }
+  },
+  "pi 1.5.2": {
+   "protocol": "2025-11-25 initialize; capabilities {roots: {}}; no elicitation (see m0-pi.json)",
+   "headers": "User-Agent undici; Sec-Fetch-Mode: cors; no Origin, no Sec-Fetch-Site",
+   "oauth": {
+    "redirectUri": "http://127.0.0.1:<port>/callback",
+    "registration": "DCR (no CIMD offered)",
+    "resourceSent": "the protected-resource document's resource (no query)",
+    "followedResourceMetadata": true
+   }
+  },
+  "codex-cli 0.167.2": {
+   "oauth": {
+    "redirectUri": "http://127.0.0.1:<port>/callback/<random>",
+    "registration": "DCR",
+    "resourceSent": "the protected-resource document's resource (no query)",
+    "followedResourceMetadata": true
+   },
+   "toolCalls": "not run: Codex needs a model this run had no key for (owner step 4). docs/research/mcp-elicitation-server.md has its source-level elicitation behaviour"
+  },
+  "opencode 2.2.7": {
+   "protocol": "2025-11-25 initialize; capabilities {elicitation: {form: {}, url: {}}, roots: {}}; _meta ai.opencode/sessionID and progressToken on tools/call; GET stream; DELETE at exit",
+   "headers": "User-Agent opencode/latest/2.2.7/cli; no Origin, no Sec-Fetch-*",
+   "query": "appends codemode=false to the configured URL's query (…?case=opencode&codemode=false)",
+   "elicitation": "in `opencode run` with permission '*': 'allow' the empty form was accepted automatically in about 0.1 s ({action: accept, content: {}}) with no person: D12's 'native does not prove a person' (ADR-0034) is real",
+   "holds": "a 70 s held call finished (configured timeout 900000 ms)",
+   "oauth": {
+    "redirectUri": "http://127.0.0.1:<port>/callback",
+    "registration": "DCR",
+    "resourceSent": "the configured URL with its query (…/mcp?elicitation_mode=native)",
+    "followedResourceMetadata": true
+   }
+  },
+  "cursor": {
+   "status": "not installed on the machine; owner step 2",
+   "reportedRedirects": [
+    "http://localhost:8787/callback (current desktop)",
+    "cursor://anysphere.cursor-mcp/oauth/callback (older desktop)",
+    "https://www.cursor.com/agents/mcp/oauth/callback (web, Cloud Agents)"
+   ]
+  }
+ },
+ "guards": "No client sent Origin or Sec-Fetch-Site; pi (undici) sends Sec-Fetch-Mode: cors. D11's refusal of any Origin or Sec-Fetch-Site and its tolerance of Sec-Fetch-Mode fit every client seen",
+ "p17": "Claude Code's 2026-07-28 traffic is in evidence.claudeCode2026: server/discover first, per-request _meta with clientInfo (so D11's client label can come from _meta), no Mcp-Session-Id, retries of input_required with a new JSON-RPC id, the same name and arguments, inputResponses keyed as asked, and requestState verbatim",
+ "evidence": {
+  "claudeCode2026": {
+   "standaloneGetPollsOmitted": 0,
+   "entries": [
+    {
+     "n": 1,
+     "at": "2026-11-14T13:44:17.257Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "458",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "server/discover",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (sdk-cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "id": "server-discover-probe-1",
+      "method": "server/discover",
+      "params": {
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "n": 2,
+     "at": "2026-11-14T13:44:17.384Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "429",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "tools/list",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (sdk-cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 0,
+      "params": {
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "n": 3,
+     "at": "2026-11-14T13:44:20.466Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "538",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "tools/call",
+      "mcp-name": "spike_echo",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (sdk-cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_echo",
+       "arguments": {},
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         }
+        },
+        "claudecode/toolUseId": "toolu_01D6Fzj7e3bitQ1Kbj5L6YeQ",
+        "progressToken": 1
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 1
+     }
+    }
+   ]
+  },
+  "claudeCode2026FormP": {
+   "standaloneGetPollsOmitted": 0,
+   "entries": [
+    {
+     "n": 4,
+     "at": "2026-11-14T13:44:49.621Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "508",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "server/discover",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (sdk-cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "id": "server-discover-probe-1",
+      "method": "server/discover",
+      "params": {
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         },
+         "extensions": {
+          "io.modelcontextprotocol/tasks": {}
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "n": 5,
+     "at": "2026-11-14T13:44:49.709Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "479",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "tools/list",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (sdk-cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 0,
+      "params": {
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         },
+         "extensions": {
+          "io.modelcontextprotocol/tasks": {}
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "n": 6,
+     "at": "2026-11-14T13:44:51.249Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "542",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "tools/call",
+      "mcp-name": "spike_ask_form",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (sdk-cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_ask_form",
+       "arguments": {},
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         }
+        },
+        "claudecode/toolUseId": "toolu_01RDLzM8fwkeRqkNjeb1W449",
+        "progressToken": 1
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 1
+     }
+    },
+    {
+     "n": 7,
+     "at": "2026-11-14T13:44:51.333Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "616",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "tools/call",
+      "mcp-name": "spike_ask_form",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (sdk-cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_ask_form",
+       "arguments": {},
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         }
+        },
+        "claudecode/toolUseId": "toolu_01RDLzM8fwkeRqkNjeb1W449",
+        "progressToken": 2
+       },
+       "inputResponses": {
+        "change": {
+         "action": "cancel"
+        }
+       },
+       "requestState": "spike.f6"
+      },
+      "jsonrpc": "2.0",
+      "id": 2
+     }
+    },
+    {
+     "n": 8,
+     "at": "2026-11-14T13:44:51.374Z",
+     "event": "mrtr-retry",
+     "tool": "spike_ask_form",
+     "inputResponse": {
+      "action": "cancel"
+     },
+     "requestState": "spike.f6"
+    }
+   ]
+  },
+  "claudeCode2026Interactive": {
+   "standaloneGetPollsOmitted": 0,
+   "entries": [
+    {
+     "n": 9,
+     "at": "2026-11-14T13:45:00.925Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "508",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "server/discover",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "id": "server-discover-probe-1",
+      "method": "server/discover",
+      "params": {
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         },
+         "extensions": {
+          "io.modelcontextprotocol/tasks": {}
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "n": 10,
+     "at": "2026-11-14T13:45:01.028Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "479",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "tools/list",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 0,
+      "params": {
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         },
+         "extensions": {
+          "io.modelcontextprotocol/tasks": {}
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "n": 11,
+     "at": "2026-11-14T13:45:12.480Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?elicitation_mode=browser",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "592",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "tools/call",
+      "mcp-name": "spike_ask_form",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_ask_form",
+       "arguments": {},
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         },
+         "extensions": {
+          "io.modelcontextprotocol/tasks": {}
+         }
+        },
+        "claudecode/toolUseId": "toolu_01A8Riot9VDic5quU1ikde8k",
+        "progressToken": 1
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 1
+     }
+    }
+   ]
+  },
+  "claudeCode2025": {
+   "standaloneGetPollsOmitted": 92,
+   "entries": [
+    {
+     "n": 20,
+     "at": "2026-11-14T13:48:49.442Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "508",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "server/discover",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "id": "server-discover-probe-1",
+      "method": "server/discover",
+      "params": {
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         },
+         "extensions": {
+          "io.modelcontextprotocol/tasks": {}
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "n": 20,
+     "at": "2026-11-14T13:48:49.482Z",
+     "event": "modern-refused-as-legacy-server"
+    },
+    {
+     "n": 22,
+     "at": "2026-11-14T13:48:49.560Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "341",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "initialize",
+      "params": {
+       "protocolVersion": "2025-11-25",
+       "capabilities": {
+        "roots": {
+         "listChanged": true
+        },
+        "elicitation": {
+         "form": {},
+         "url": {}
+        }
+       },
+       "clientInfo": {
+        "name": "claude-code",
+        "title": "Claude Code",
+        "version": "2.1.322",
+        "description": "Anthropic's agentic coding tool",
+        "websiteUrl": "https://claude.com/claude-code"
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 0
+     }
+    },
+    {
+     "n": 23,
+     "at": "2026-11-14T13:48:49.673Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "54",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "method": "notifications/initialized"
+     }
+    },
+    {
+     "n": 25,
+     "at": "2026-11-14T13:48:49.846Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "46",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+     }
+    },
+    {
+     "n": 30,
+     "at": "2026-11-14T13:48:54.932Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "198",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_ask_form",
+       "arguments": {
+        "hold_seconds": 300
+       },
+       "_meta": {
+        "claudecode/toolUseId": "toolu_01Grc5quZ9BiEZZmDDEcyuhL",
+        "progressToken": 2
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 2
+     }
+    },
+    {
+     "n": 58,
+     "at": "2026-11-14T13:49:23.497Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "64",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "result": {
+       "action": "cancel"
+      },
+      "jsonrpc": "2.0",
+      "id": "elicit-f30"
+     }
+    },
+    {
+     "n": 30,
+     "at": "2026-11-14T13:49:24.458Z",
+     "event": "stream-ended-by-server",
+     "afterSeconds": 29.472,
+     "tool": "spike_ask_form",
+     "door": "pub",
+     "sessionId": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+     "modern": false,
+     "hold": 300
+    },
+    {
+     "n": 66,
+     "at": "2026-11-14T13:49:29.637Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "213",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_ask_form",
+       "arguments": {
+        "hold_seconds": 300,
+        "cut_after": 15
+       },
+       "_meta": {
+        "claudecode/toolUseId": "toolu_01QX4fU44RRFdvorg6inuppX",
+        "progressToken": 3
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 3
+     }
+    },
+    {
+     "n": 66,
+     "at": "2026-11-14T13:49:44.947Z",
+     "event": "stream-cut-by-server",
+     "tool": "spike_ask_form",
+     "door": "pub",
+     "sessionId": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+     "modern": false,
+     "afterSeconds": 15
+    },
+    {
+     "n": 66,
+     "at": "2026-11-14T13:49:44.983Z",
+     "event": "stream-error",
+     "error": "Error: cut",
+     "tool": "spike_ask_form",
+     "door": "pub",
+     "sessionId": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+     "modern": false,
+     "hold": 300,
+     "cut": 15
+    },
+    {
+     "n": 123,
+     "at": "2026-11-14T13:50:27.517Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "64",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2b1586b2-cc46-4b27-abfa-ac948c98f676",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "result": {
+       "action": "cancel"
+      },
+      "jsonrpc": "2.0",
+      "id": "elicit-f66"
+     }
+    }
+   ]
+  },
+  "claudeCodeCut": {
+   "standaloneGetPollsOmitted": 28,
+   "entries": [
+    {
+     "n": 151,
+     "at": "2026-11-14T13:52:15.326Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "508",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-method": "server/discover",
+      "mcp-protocol-version": "2026-07-28",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "id": "server-discover-probe-1",
+      "method": "server/discover",
+      "params": {
+       "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+         "name": "claude-code",
+         "title": "Claude Code",
+         "version": "2.1.322",
+         "description": "Anthropic's agentic coding tool",
+         "websiteUrl": "https://claude.com/claude-code"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {
+         "roots": {
+          "listChanged": true
+         },
+         "elicitation": {
+          "form": {},
+          "url": {}
+         },
+         "extensions": {
+          "io.modelcontextprotocol/tasks": {}
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "n": 151,
+     "at": "2026-11-14T13:52:15.417Z",
+     "event": "modern-refused-as-legacy-server"
+    },
+    {
+     "n": 153,
+     "at": "2026-11-14T13:52:15.497Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "341",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "initialize",
+      "params": {
+       "protocolVersion": "2025-11-25",
+       "capabilities": {
+        "roots": {
+         "listChanged": true
+        },
+        "elicitation": {
+         "form": {},
+         "url": {}
+        }
+       },
+       "clientInfo": {
+        "name": "claude-code",
+        "title": "Claude Code",
+        "version": "2.1.322",
+        "description": "Anthropic's agentic coding tool",
+        "websiteUrl": "https://claude.com/claude-code"
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 0
+     }
+    },
+    {
+     "n": 154,
+     "at": "2026-11-14T13:52:15.650Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "54",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2be5ae17-d4d3-40d3-9350-6b7b61fe0b2f",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "method": "notifications/initialized"
+     }
+    },
+    {
+     "n": 156,
+     "at": "2026-11-14T13:52:15.781Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "46",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2be5ae17-d4d3-40d3-9350-6b7b61fe0b2f",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+     }
+    },
+    {
+     "n": 157,
+     "at": "2026-11-14T13:52:21.086Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?era=legacy&elicitation_mode=native",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "213",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-2be5ae17-d4d3-40d3-9350-6b7b61fe0b2f",
+      "user-agent": "claude-code/2.1.322 (cli)",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_ask_form",
+       "arguments": {
+        "hold_seconds": 300,
+        "cut_after": 15
+       },
+       "_meta": {
+        "claudecode/toolUseId": "toolu_01XJhQyzpe7nLiZKFxy7ULQi",
+        "progressToken": 2
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 2
+     }
+    },
+    {
+     "n": 157,
+     "at": "2026-11-14T13:52:36.387Z",
+     "event": "stream-cut-by-server",
+     "tool": "spike_ask_form",
+     "door": "pub",
+     "sessionId": "spike-2be5ae17-d4d3-40d3-9350-6b7b61fe0b2f",
+     "modern": false,
+     "afterSeconds": 15
+    },
+    {
+     "n": 157,
+     "at": "2026-11-14T13:52:36.421Z",
+     "event": "stream-error",
+     "error": "Error: cut",
+     "tool": "spike_ask_form",
+     "door": "pub",
+     "sessionId": "spike-2be5ae17-d4d3-40d3-9350-6b7b61fe0b2f",
+     "modern": false,
+     "hold": 300,
+     "cut": 15
+    }
+   ]
+  },
+  "opencode": {
+   "standaloneGetPollsOmitted": 0,
+   "entries": [
+    {
+     "n": 184,
+     "at": "2026-11-14T14:06:04.333Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "202",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "initialize",
+      "params": {
+       "protocolVersion": "2025-11-25",
+       "capabilities": {
+        "elicitation": {
+         "form": {},
+         "url": {}
+        },
+        "roots": {}
+       },
+       "clientInfo": {
+        "name": "opencode",
+        "version": "2.2.7"
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 0
+     }
+    },
+    {
+     "n": 185,
+     "at": "2026-11-14T14:06:04.487Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "54",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-816321de-510c-47e0-a6aa-d5271e9c99cd",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "method": "notifications/initialized"
+     }
+    },
+    {
+     "n": 186,
+     "at": "2026-11-14T14:06:04.555Z",
+     "door": "pub",
+     "method": "GET",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-816321de-510c-47e0-a6aa-d5271e9c99cd",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     }
+    },
+    {
+     "n": 187,
+     "at": "2026-11-14T14:06:04.617Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "46",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-816321de-510c-47e0-a6aa-d5271e9c99cd",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+     }
+    },
+    {
+     "n": 188,
+     "at": "2026-11-14T14:06:05.175Z",
+     "door": "pub",
+     "method": "DELETE",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "*/*",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "0",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-816321de-510c-47e0-a6aa-d5271e9c99cd",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     }
+    },
+    {
+     "n": 189,
+     "at": "2026-11-14T14:06:16.618Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "202",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "initialize",
+      "params": {
+       "protocolVersion": "2025-11-25",
+       "capabilities": {
+        "elicitation": {
+         "form": {},
+         "url": {}
+        },
+        "roots": {}
+       },
+       "clientInfo": {
+        "name": "opencode",
+        "version": "2.2.7"
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 0
+     }
+    },
+    {
+     "n": 190,
+     "at": "2026-11-14T14:06:16.745Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "54",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "jsonrpc": "2.0",
+      "method": "notifications/initialized"
+     }
+    },
+    {
+     "n": 191,
+     "at": "2026-11-14T14:06:16.827Z",
+     "door": "pub",
+     "method": "GET",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     }
+    },
+    {
+     "n": 192,
+     "at": "2026-11-14T14:06:16.870Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "46",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+     }
+    },
+    {
+     "n": 193,
+     "at": "2026-11-14T14:06:17.270Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "177",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_echo",
+       "arguments": {},
+       "_meta": {
+        "ai.opencode/sessionID": "ses_e259eab06ffeu0ZOvsIKsp4bmh",
+        "progressToken": 2
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 2
+     }
+    },
+    {
+     "n": 194,
+     "at": "2026-11-14T14:06:17.515Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "198",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_ask_form",
+       "arguments": {
+        "hold_seconds": 60
+       },
+       "_meta": {
+        "ai.opencode/sessionID": "ses_e259eab06ffeu0ZOvsIKsp4bmh",
+        "progressToken": 3
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 3
+     }
+    },
+    {
+     "n": 195,
+     "at": "2026-11-14T14:06:17.611Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "78",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "result": {
+       "action": "accept",
+       "content": {}
+      },
+      "jsonrpc": "2.0",
+      "id": "elicit-f194"
+     }
+    },
+    {
+     "n": 194,
+     "at": "2026-11-14T14:06:18.583Z",
+     "event": "stream-ended-by-server",
+     "afterSeconds": 1.016,
+     "tool": "spike_ask_form",
+     "door": "pub",
+     "sessionId": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+     "modern": false,
+     "hold": 60
+    },
+    {
+     "n": 197,
+     "at": "2026-11-14T14:06:18.778Z",
+     "door": "pub",
+     "method": "POST",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "189",
+      "content-type": "application/json",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     },
+     "body": {
+      "method": "tools/call",
+      "params": {
+       "name": "spike_hold",
+       "arguments": {
+        "seconds": 70
+       },
+       "_meta": {
+        "ai.opencode/sessionID": "ses_e259eab06ffeu0ZOvsIKsp4bmh",
+        "progressToken": 4
+       }
+      },
+      "jsonrpc": "2.0",
+      "id": 4
+     }
+    },
+    {
+     "n": 197,
+     "at": "2026-11-14T14:07:28.834Z",
+     "event": "stream-ended-by-server",
+     "afterSeconds": 70,
+     "tool": "spike_hold",
+     "door": "pub",
+     "sessionId": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+     "modern": false,
+     "seconds": 70
+    },
+    {
+     "n": 199,
+     "at": "2026-11-14T14:07:29.247Z",
+     "door": "pub",
+     "method": "DELETE",
+     "path": "/mcp",
+     "query": "?case=opencode&codemode=false",
+     "headers": {
+      "accept": "*/*",
+      "accept-encoding": "gzip, br",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "connection": "Keep-Alive",
+      "content-length": "0",
+      "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+      "mcp-protocol-version": "2025-11-25",
+      "mcp-session-id": "spike-1c7eb0ee-fb44-4c38-bbfc-067cab2ea7cb",
+      "user-agent": "opencode/latest/2.2.7/cli",
+      "x-forwarded-proto": "https"
+     }
+    }
+   ]
+  },
+  "oauthAuthorizeUrls": "captured from each client's printed authorize URL (code_challenge and state removed); see clients.*.oauth"
+ }
+}

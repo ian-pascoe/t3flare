@@ -1,7 +1,7 @@
 # Plan: the Settings server, agents change t3flare's settings over MCP
 
-Branch `settings-mcp` (worktree `.worktrees/settings-mcp`), from `origin/main` at 747905d. Stage `psettings` (to be added
-to `STAGES` in `apps/environment/scripts/stage.ts`). Evidence in `docs/steps/settings-mcp/`. Decision record:
+Branch `settings-mcp` (worktree `.worktrees/settings-mcp`), planned on `origin/main` at 747905d and rebased onto
+`origin/main` at 96ee913. Stage `psettings` (added to `STAGES` in `apps/environment/scripts/stage.ts`). Evidence in `docs/steps/settings-mcp/`. Decision record:
 [ADR-0034](../adr/0034-agents-change-t3flares-settings-through-the-settings-server.md), which supersedes ADR-0026 §8.
 Research: [`docs/research/access-managed-oauth.md`](../research/access-managed-oauth.md),
 [`docs/research/mcp-elicitation-server.md`](../research/mcp-elicitation-server.md).
@@ -886,7 +886,8 @@ The hostile list's map (each line to its tests and its stage item) is in the rep
 
 ## 8. Facts an implementer must check
 
-Each was read on `origin/main` at 747905d; check it still holds before building on it.
+Each was read on `origin/main` at 747905d, before the branch was rebased onto 96ee913 (the line numbers are 747905d's);
+check it still holds before building on it.
 
 | Fact | Where |
 | -- | -- |

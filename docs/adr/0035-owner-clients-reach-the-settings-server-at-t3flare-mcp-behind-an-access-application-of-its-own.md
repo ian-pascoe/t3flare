@@ -8,7 +8,7 @@ the layout built and deployed to test stages, not a confirmed one, and **prod is
 answers 404 `not_configured` (`OWNER_ENDPOINT_EXCLUDED_STAGES` in `apps/environment/src/settings/endpointLayout.ts`).
 Enabling prod is removing it from that list, once owner step 1 passes and M5a's stage evidence is recorded. Plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md) D13. Evidence:
-`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json` (spike branch). Refines
+`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json` (copied from the spike branch). Refines
 [ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) ("Access only on the admin path"),
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §1-2 (one
 Access application, no second one; its SPI-1200 refinement) and
