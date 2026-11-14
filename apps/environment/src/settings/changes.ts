@@ -14,6 +14,7 @@ import { withoutQuery } from "@t3flare/harness-registry";
 import { sha256Hex } from "@t3flare/skills";
 
 import { base64Url } from "../harness/keys.ts";
+import { canonicalJson } from "../mcp/canonical.ts";
 import type { ChangeView, PageReason } from "./types.ts";
 
 export const CHANGES_TABLE = "t3flare_settings_changes";
@@ -156,18 +157,6 @@ export interface SettingsChanges {
   /** Reads by `key` since `since`: every read for `read`, those that reach the network for `network`. */
   readsSince(key: string, kind: "read" | "network", since: number): number;
 }
-
-/** Canonical JSON: keys sorted at every depth. */
-export const canonicalJson = (value: unknown): string =>
-  value === null || typeof value !== "object"
-    ? JSON.stringify(value)
-    : Array.isArray(value)
-      ? `[${value.map(canonicalJson).join(",")}]`
-      : `{${Object.keys(value as object)
-          .sort()
-          .filter((key) => (value as Record<string, unknown>)[key] !== undefined)
-          .map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`)
-          .join(",")}}`;
 
 /**
  * A change's hash (plan D8): SHA-256 of the tool and its change, canonical, without `expectedRevision`. The Settings
