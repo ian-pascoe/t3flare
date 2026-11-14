@@ -504,34 +504,6 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         const { agentsCheck } = await import("./agentsCheck.ts");
         return json(await agentsCheck(environment, request));
       }
-      case "POST /_t3flare/probe/env-skills": {
-        // SPI-1148's M0 probes: R1 (GitHub) and an Environment skill set handed to a Workspace in one call.
-        const probe = await import("./envSkillsProbe.ts");
-        const part = url.searchParams.get("part");
-        if (part === "github") {
-          return json(
-            await probe.probeGitHub(environment.github, {
-              owner: url.searchParams.get("owner") ?? "ian-pascoe",
-              repo: url.searchParams.get("repo") ?? "t3flare-fixture",
-              outside: url.searchParams.get("outside") ?? "mattpocock/skills",
-              privateOutside: url.searchParams.get("privateOutside") ?? "ian-pascoe/cloudpid-scratch",
-            }),
-          );
-        }
-        if (part === "set") {
-          const { workspaceRpc } = await import("../agents/workspaceClient.ts");
-          const mib = Number(url.searchParams.get("mib") ?? "8");
-          const made = Date.now();
-          const set = await probe.probeSkillSet(Number.isFinite(mib) && mib >= 0 ? mib : 8);
-          environment.probeSkillSet = mib === 0 ? undefined : set;
-          const makeMs = Date.now() - made;
-          const started = Date.now();
-          const rpc = workspaceRpc(url.searchParams.get("id") ?? "");
-          const answer = await rpc.takeEnvironmentSkills(mib === 0 ? "none" : set.hash).catch((error: unknown) => ({ error: String(error).slice(0, 500), causes: causesOf(error) }));
-          return json({ mib, files: Object.keys(set.files).length, hash: set.hash, makeMs, callMs: Date.now() - started, answer, held: await rpc.skillSetHash() });
-        }
-        return json({ error: "part=github|set" }, 400);
-      }
       case "POST /_t3flare/fixtures/turn-items": {
         const body = (await request.json()) as { threadIds?: Array<string>; runs?: number; marker?: string };
         const runtime = await environment.boot("fixtures", request);

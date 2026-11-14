@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off extendsNativeError:off cryptoRandomUUID:off
+// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off extendsNativeError:off cryptoRandomUUID:off globalFetch:off
 // The host is plain DO code around t3's Effect runtime, so it uses the platform's timers and errors.
 // The Environment DO (ADR-0002): the host around t3's runtime. It boots t3 lazily (the 1 s startup
 // limit), counts boots and falls back to safe mode (bootState.ts), seeds t3's bootstrap grant only while
@@ -10,7 +10,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
-import { EMPTY_SKILL_SET, type SkillSet } from "@t3flare/skills";
+import type { SkillSet } from "@t3flare/skills";
 import { extensionOf, type McpRelayAnswer, type McpRelayInput, resolveEnvironment, type ResolvedEnvironment, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { bindEnvironmentServices } from "./agents/bindings.ts";
@@ -31,6 +31,9 @@ import { bindStateStorage } from "./platform/stateStore.ts";
 import type { HarnessCaller } from "./harness/panel.ts";
 import { harnessSecrets } from "./harness/secrets.ts";
 import { harnessStore } from "./harness/store.ts";
+import type { SkillsApiDeps } from "./skills/api.ts";
+import { githubReader, readAccessFor } from "./skills/contents.ts";
+import { type SkillStore, skillStore } from "./skills/store.ts";
 import { HarnessOAuth, type McpOAuthBinding, OAUTH_CALLBACK_PATH, OAUTH_CLIENT_PATH } from "./harness/oauth.ts";
 import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpView } from "./mcp/host.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
@@ -229,6 +232,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
           .map(([name]) => name)
           .sort(),
       skillsEnabled: () => extensionOf(resolveHarness(harnessStore(ctx.storage.kv).load()), "skills").enabled,
+      environmentSkills: () => this.skills,
       // t3's own `/mcp` as a Container reaches it (public, behind t3's bearer, ADR-0010): what a CLI is given in place of
       // t3's in-isolate address (owner, 2026-11-12, back to stock: t3's bearer goes to the CLI as stock t3 hands it).
       t3McpUrl: () => `https://${this.#configuredHost()}/mcp`,
@@ -389,6 +393,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         const names = new Map(services.workspaces.list().map((ws) => [String(services.agents.WORKSPACES?.idFromName(ws.id)), ws.id]));
         return { max: state.max, leases: state.leases.map((lease) => ({ holder: lease.holder, workspace: names.get(lease.holder) ?? null })) };
       },
+      skills: this.#skillsApi(),
     });
   }
 
@@ -536,12 +541,47 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return resolveEnvironment(stored);
   }
 
-  /** SPI-1148's M0 probe: the set `environmentSkillSet` answers until the store exists (memory only). */
-  probeSkillSet: SkillSet | undefined;
+  /** The Environment skills this Environment keeps (SPI-1148, ADR-0033). */
+  #skills: SkillStore | undefined;
+  get skills(): SkillStore {
+    this.#skills ??= skillStore({
+      sql: this.ctx.storage.sql,
+      transactionSync: (closure) => this.ctx.storage.transactionSync(closure),
+      harness: harnessStore(this.ctx.storage.kv),
+      kv: this.ctx.storage.kv,
+    });
+    return this.#skills;
+  }
 
-  /** The Environment skill set (SPI-1148), RPC from a Workspace DO taking it. Never boots t3. */
-  async environmentSkillSet(): Promise<SkillSet> {
-    return this.probeSkillSet ?? EMPTY_SKILL_SET;
+  /** The panel's GitHub reads for Environment skills (plan §3.2): the token never leaves this object. */
+  #skillsApi(): Omit<SkillsApiDeps, "caller" | "now"> {
+    const installed = () =>
+      workspaceRegistry(this.ctx.storage.sql)
+        .list()
+        .flatMap((ws) => (ws.owner === null || ws.name === null ? [] : [{ owner: ws.owner, name: ws.name }]));
+    return {
+      store: this.skills,
+      reader: async (repo, deadline) => {
+        const access = await readAccessFor(this.github, installed(), repo);
+        return { reader: githubReader({ fetch: (url, init) => fetch(url, init), access, deadline }), how: access.how };
+      },
+      unauthenticated: () => installed().length === 0 || !this.github.configured,
+    };
+  }
+
+  /**
+   * The Environment skill set (SPI-1148), RPC from a Workspace DO taking it: every enabled skill's files and the set's
+   * hash. The Workspace names itself, so its last refusal is dropped (it reports again if it refuses this one). Never
+   * boots t3.
+   */
+  async environmentSkillSet(input?: { readonly workspace?: string }): Promise<SkillSet> {
+    if (typeof input?.workspace === "string") this.skills.noteTaken(input.workspace);
+    return this.skills.set();
+  }
+
+  /** A Workspace refused or could not mount the set `hash` (SPI-1148, plan §4.5): shown on the panel's Status. */
+  async skillSetRefused(input: { readonly workspace: string; readonly hash: string; readonly message: string }): Promise<void> {
+    this.skills.noteRefusal({ workspace: String(input.workspace).slice(0, 200), hash: String(input.hash).slice(0, 64), message: String(input.message).slice(0, 2000), at: Date.now() });
   }
 
   /** Diagnosis and the reboot check: this instance's channel. */

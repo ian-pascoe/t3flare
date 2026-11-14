@@ -7,6 +7,7 @@ import type { AgentsBindings } from "./rpc.ts";
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 
 import type { SweepSettings } from "./deletion.ts";
+import type { SkillStore } from "../skills/store.ts";
 import type { WorkspaceRegistry } from "./workspaces.ts";
 import type { ProcessChannel } from "./processChannel.ts";
 import type { CommissaryManagement } from "../usage/commissary.ts";
@@ -33,6 +34,8 @@ export interface EnvironmentServices {
   readonly relayServers: () => ReadonlyArray<string>;
   /** SPI-1147: the Harness `skills` switch, as the stored settings resolve it now. */
   readonly skillsEnabled: () => boolean;
+  /** SPI-1148: the Environment skills kept here (their rows, the enabled set's hash). */
+  readonly environmentSkills: () => SkillStore;
   /** t3's `/mcp` at the public host, as a CLI in a Container reaches it with t3's per-thread bearer. */
   readonly t3McpUrl: () => string;
   /** t3's public origin (`https://<t3 host>`), or null where no host is configured (local workerd): task webhooks' base (parity G12). */

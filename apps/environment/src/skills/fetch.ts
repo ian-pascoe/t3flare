@@ -171,6 +171,8 @@ export interface PreviewSkill {
   readonly files: number;
   readonly bytes: number;
   readonly internal: boolean;
+  /** Its folder hash at this commit, from the tree: equal to a kept Skill's when the files are the same. */
+  readonly digest: string;
   /** Empty when it can be installed, as far as the tree and its `SKILL.md` tell. */
   readonly problems: ReadonlyArray<string>;
 }
@@ -260,6 +262,7 @@ export const previewSkills = async (reader: RepoReader, source: SkillSourceInput
         files: entries.length,
         bytes: entries.reduce((sum, entry) => sum + (entry.size ?? 0), 0),
         internal: info.internal,
+        digest: await folderHashOf({ tree: tree.entries }, skillMdPath),
         problems,
       });
     }

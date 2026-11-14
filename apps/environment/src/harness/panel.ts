@@ -27,6 +27,7 @@ import type { McpHost } from "../mcp/host.ts";
 import type { HarnessOAuth } from "./oauth.ts";
 import type { HarnessSecrets } from "./secrets.ts";
 
+import { SKILLS_WRITE_ROUTES, skillsChange, type SkillsApiDeps, skillsOverview, viewSkill } from "../skills/api.ts";
 import { containerCostTable } from "./containerCost.ts";
 import { csrfToken, csrfValid } from "./csrf.ts";
 import { pageCsp, renderPage } from "./page.ts";
@@ -52,6 +53,8 @@ export interface HarnessDeps {
   readonly now?: () => number;
   /** The Container budget DO's state (ADR-0032): its leases, each with the Workspace that holds it when known. */
   readonly budget?: () => Promise<{ readonly max: number; readonly leases: ReadonlyArray<{ readonly holder: string; readonly workspace?: string | null }> }>;
+  /** The Environment skills (SPI-1148): their store and GitHub reads. */
+  readonly skills?: Omit<SkillsApiDeps, "caller" | "now">;
 }
 
 /** The Containers running now, by their Workspaces (a holder's DO id when its Workspace is unknown); null without the budget. */
@@ -114,8 +117,22 @@ const statusOf = (deps: HarnessDeps) => {
     "Environment settings revision": deps.store.loadEnvironment().revision,
     "last taken by a Workspace (revision)": environmentRead?.revision ?? null,
     "last taken by a Workspace (at)": environmentRead === undefined ? null : new Date(environmentRead.at).toISOString(),
-    Skills: "Repo skills on (SPI-1147); Environment skills deferred (SPI-1148)",
+    Skills: skillsStatus(deps),
+    "last Environment skill set refused": latestRefusal(deps) ?? null,
   };
+};
+
+/** Status's word on skills: Repo skills, and the Environment skills kept, enabled and their set's hash. */
+const skillsStatus = (deps: HarnessDeps): string => {
+  if (deps.skills === undefined) return "Repo skills on (SPI-1147)";
+  const { totals, hash } = skillsOverview(deps.skills);
+  return `Repo skills on; ${totals.count} Environment ${totals.count === 1 ? "skill" : "skills"}, ${totals.enabled} enabled, set ${hash.slice(0, 12)}`;
+};
+
+/** The latest Workspace refusal of the Environment skill set (plan §4.5), as one line. */
+const latestRefusal = (deps: HarnessDeps): string | undefined => {
+  const refusal = deps.skills?.store.refusals().at(-1);
+  return refusal === undefined ? undefined : `${refusal.workspace} at ${new Date(refusal.at).toISOString()}: ${refusal.message}`;
 };
 
 /** Why a state-changing request is refused before its body is read, or undefined. */
@@ -167,15 +184,23 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === `${HARNESS_PATH}/api/status`) return json(statusOf(deps));
     if (path === `${HARNESS_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });
     if (path === `${HARNESS_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
+    if (path === `${HARNESS_PATH}/api/skills` && deps.skills !== undefined) return json(skillsOverview(deps.skills));
+    if (path === `${HARNESS_PATH}/api/skills/view` && deps.skills !== undefined) return skillsResponse(viewSkill(deps.skills, url.searchParams.get("name") ?? ""));
     return refused(404, "Not found");
   }
   if (request.method !== "POST") return refused(405, "Method not allowed");
   const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/environment`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`, `${HARNESS_PATH}/api/mcp/servers`, `${HARNESS_PATH}/api/mcp/oauth`];
-  if (!routes.includes(path)) return refused(404, "Not found");
+  const skillsRoute = SKILLS_WRITE_ROUTES.find((route) => path === `${HARNESS_PATH}/api/skills${route}`);
+  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined)) return refused(404, "Not found");
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
     console.log(JSON.stringify({ t3flare: "harness-refused", reason: why, caller: deps.caller.kind }));
     return refused(403, why);
+  }
+  if (skillsRoute !== undefined && deps.skills !== undefined) {
+    const body = await bodyOf(request);
+    if (body === undefined) return refused(400, "the body is a JSON object");
+    return skillsResponse(await skillsChange({ ...deps.skills, caller: callerName(deps.caller), now: () => deps.now?.() ?? Date.now() }, skillsRoute, body));
   }
   if (path === `${HARNESS_PATH}/api/environment`) return changeEnvironment(request, deps);
   if (path === `${HARNESS_PATH}/api/mcp/test`) return testServer(request, deps);
@@ -205,6 +230,8 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   });
   return json({ ok: true, revision: applied.harness.revision, resolved: resolveHarness(applied.harness) });
 };
+
+const skillsResponse = (answer: Awaited<ReturnType<typeof skillsChange>>): Response => ("json" in answer ? json(answer.json, answer.status) : refused(answer.status, answer.text));
 
 const bodyOf = async (request: Request): Promise<Record<string, unknown> | undefined> => {
   try {
