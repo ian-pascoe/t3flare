@@ -109,19 +109,27 @@ The probe route was removed in M2. Details are in the plan's §1.
 
 Each file names its deployed commit. The commits after a file's run changed only what this table says.
 
+**Rebased onto `main` at 4af90c0 (SPI-1151, SPI-1152).** The rebase changed how the composer and expansion ask a
+Workspace for Repo skills: SPI-1151 made the second argument of `skills` a CLI agent, so `repoOnly` moved to the
+third. It also put SPI-1152's Variables wrapper under the Container backend that runs the lock and the wait. The five
+files those touch (public, precedence, update, readonly, remove) were taken again on the rebased head `0532c3d`, on a
+new stage `penvsk` (destroyed). The other three still hold from before the rebase: `env-install-private.json` and
+`env-refusals.json` exercise only the fetch, the store and the panel's API, and `env-no-container.json` only the agent's
+`read` tool on the Workspace's files. The rebase changed none of those code paths.
+
 | File | Shows | Commit deployed |
 | -- | -- | -- |
-| [`env-install-public.json`](spi-1001/env-install-public.json) | `mattpocock/skills`' `grill-me` previewed and installed at its commit; the snapshot and the model's listing at `/workspace/.agents/skills/grill-me/SKILL.md`, scope `user`; a `$grill-me` turn answering the block's location; the chip's "View instructions" read (t3's `ProjectReadFileError`) | `752cb4b` |
+| [`env-install-public.json`](spi-1001/env-install-public.json) | `mattpocock/skills`' `grill-me` previewed and installed at its commit; the snapshot and the model's listing at `/workspace/.agents/skills/grill-me/SKILL.md`, scope `user`; a `$grill-me` turn answering the block's location; the chip's "View instructions" read (t3's `ProjectReadFileError`) | `0532c3d` |
 | [`env-install-private.json`](spi-1001/env-install-private.json) | `tools/plum/fruit-code` of the private fixture repo (outside any discovered root), read with a token for that repo; the branch moved on and the install stayed at its commit; View's `SKILL.md` and GitHub URLs | `752cb4b` |
-| [`env-precedence.json`](spi-1001/env-precedence.json) | The Repo `fruit-code` says `KIWI-7` and the Environment's says `PLUM-9`; `$fruit-code` answers `PLUM-9`, and `skipped` names both Repo copies as shadowed | `752cb4b` |
-| [`env-update.json`](spi-1001/env-update.json) | Check and Update for a size-changing and a same-size edit while the Container runs; each take caught up at its first look; the agent's `bash` reads the new `notes.md`, its SHA-256 the new blob's | `752cb4b` |
+| [`env-precedence.json`](spi-1001/env-precedence.json) | The Repo `fruit-code` says `KIWI-7` and the Environment's says `PLUM-9`; `$fruit-code` answers `PLUM-9`, and `skipped` names both Repo copies as shadowed | `0532c3d` |
+| [`env-update.json`](spi-1001/env-update.json) | Check and Update for a size-changing and a same-size edit while the Container runs; each take caught up at its first look; the agent's `bash` reads the new `notes.md`, its SHA-256 the new blob's | `0532c3d` |
 | [`env-no-container.json`](spi-1001/env-no-container.json) | An install, then a turn whose `read` tool reads the skill's file; the Container stopped before and after | `752cb4b` |
-| [`env-readonly.json`](spi-1001/env-readonly.json) | The agent's `write` refused ("read-only mount …"); the agent's `bash` write as a fresh Container's first command refused ("Read-only file system", the bind in `mountinfo`); a write from the running Container refused; nothing planted | `752cb4b` |
-| [`env-remove.json`](spi-1001/env-remove.json) | Removed: gone from the mount and the running Container; the snapshot's `fruit-code` is the Repo's again, and `$fruit-code` answers `KIWI-7`; an unknown `$plum-gone` untouched | `b4a3475` |
+| [`env-readonly.json`](spi-1001/env-readonly.json) | The agent's `write` refused ("read-only mount …"); the agent's `bash` write as a fresh Container's first command refused ("Read-only file system", the bind in `mountinfo`); a write from the running Container refused; nothing planted | `0532c3d` |
+| [`env-remove.json`](spi-1001/env-remove.json) | Removed: gone from the mount and the running Container; the snapshot's `fruit-code` is the Repo's again, and `$fruit-code` answers `KIWI-7`; an unknown `$plum-gone` untouched | `0532c3d` |
 | [`env-refusals.json`](spi-1001/env-refusals.json) | An owner without the App, a repo outside the installation (both wordings, whole); a credential-looking file, a link, a skill over 4 MiB, a backslash path, and two skills over the 500-file cap (422); nothing kept | `b4a3475` |
 | `skills-{desktop,phone}-{light,dark}.png` | The section with two skills (one disabled), a skill's view open, and a preview of the refusals branch | `7e8ff88` |
 
-- **Between the commits:** `b4a3475` made an over-the-cap install answer 422 instead of 502 and fixed the stage
+- **Between the commits (before the rebase):** `b4a3475` made an over-the-cap install answer 422 instead of 502 and fixed the stage
   script's remove prompt. `aac13de` and `7e8ff88` changed only the section's layout and a wrap.
 - **The fixture branches:** `spi1148-env` and `spi1148-refusals` of `ian-pascoe/t3flare-fixture`, pushed by
   `penvsk.ts fixture`. Its `main` is untouched.
@@ -170,4 +178,4 @@ The agents Worker still loads no t3 code: no `t3code/` or `@t3tools/` source in 
 
 ## Checks
 
-`pnpm run check` passes at `f76136f` (34/34); the commit after it changes only this line.
+`pnpm run check` passes at `0532c3d` (34/34), the rebased head the evidence above was refreshed on; the commits after it change only this report and the refreshed evidence. One run before it failed in `apps/mcp-worker`'s `byteStream` timing test, which this branch does not touch, and passed on the next run.
