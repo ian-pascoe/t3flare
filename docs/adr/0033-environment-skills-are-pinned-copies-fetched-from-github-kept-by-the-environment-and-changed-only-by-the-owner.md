@@ -88,3 +88,17 @@ cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's 
 - t3's chip "View instructions" opens an Environment skill's path as a project file and shows t3's read error, since
   the path is outside `/w/<id>` (U64).
 - Installs and checks spend the installation's GitHub limit; with no installed repo, the shared unauthenticated one.
+
+## Refinement (ADR-0034, 2026-11-14): an agent may ask for a change
+
+§7 ("No agent tool changes them") is refined by
+[ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md); this ADR's title predates it. Plan:
+[`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md).
+
+- An agent may preview a Skill source and check for updates (reads), and ask to install, update, enable or remove an
+  Environment skill; each of those waits for an answer. Disabling one is free.
+- An install or update is asked at the previewed commit and digest, and is refused at apply when the fetched folder's
+  digest differs.
+- §2 stands: the credential is the Environment DO's, and no agent, Session or Container sees it.
+- §3 stands: nothing updates on a schedule; an update happens only after an answer.
+- §4 stands: every change bumps the Environment settings' revision and is audited without file content.

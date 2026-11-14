@@ -168,7 +168,7 @@ Claude Code's highest settings source, `/etc/claude-code/managed-settings.json`,
 
 **Harness panel**:
 The owner's page at `/_t3flare/harness` on the t3 host for t3flare's own settings: the Harness settings and the
-Environment settings, with Status and the audit log.
+Environment settings, with Status, the audit log and the Open changes waiting for him.
 _Avoid_: settings page, dashboard, admin UI
 
 **Harness settings**:
@@ -203,10 +203,11 @@ judged exactly as a direct one.
 _Avoid_: scripting, eval
 
 **MCP server**:
-A remote MCP endpoint whose tools t3flare's agents may call. Every one is a Direct server.
+An MCP endpoint whose tools t3flare's agents may call: a Direct server, or the Settings server.
 
 **Direct server**:
-An MCP server the owner adds in the Harness panel, with its own sign-in kept by t3flare.
+A remote MCP server added to the MCP server set by the owner in the Harness panel, or at an agent's asking, with its
+own sign-in kept by t3flare.
 _Avoid_: custom server, Route B (the plan's word)
 
 **MCP server set**:
@@ -243,13 +244,60 @@ _Avoid_: prompt, approval request (a Server question may ask for input)
 
 **Pause**:
 A tool result in which a server stops a call until someone answers (Executor's `approval-required` or
-`input-required`), to be continued with the server's `resume`. On a Pausing server t3flare raises the card and calls
-`resume` itself; the agent never sees the request.
+`input-required`), to be continued with the server's `resume`. When t3flare's agents call a Pausing server, t3flare
+raises the card and calls `resume` itself; the agent never sees the request.
 _Avoid_: pending interaction
 
 **Pausing server**:
-An MCP server that lists a `resume` taking a `requestId` and a `response` (Executor's "Through your agent" mode). Its
-`resume` is t3flare's to call, never an agent's.
+An MCP server that lists a `resume` taking a `requestId` and a `response` (Executor's "Through your agent" mode). When
+t3flare's agents reach one, its `resume` is t3flare's to call, never theirs. The Settings server is one only to an Owner
+client in the `model` Elicitation mode.
+
+**Settings server**:
+t3flare's own MCP server for the Harness settings, the Environment settings and the Environment skills. t3flare's agents
+reach it as a member of the MCP server set; Owner clients reach it at its own endpoint.
+_Avoid_: admin MCP, builtin MCP, config server, Harness server
+
+**Owner client**:
+An MCP client outside t3flare, such as Claude Code or Cursor on the owner's laptop, that the owner signed in to the
+Settings server through Access. It chooses its own Elicitation mode.
+_Avoid_: external agent, laptop client (the Laptop Environment is t3's), remote client
+
+**Settings change**:
+One validated change to the Harness settings, the Environment settings or the Environment skills, made on the Harness
+panel or through the Settings server. Linked work makes none.
+_Avoid_: Proposal, edit, mutation
+
+**Change tier**:
+Whether a Settings change through the Settings server waits for an answer: `free` (one that narrows) or `asked` (one
+that widens, spends, adds text or code agents will meet, destroys something, turns off a Guard, or touches the Settings
+server's own entry). In full access a free change runs unasked; an asked change always asks.
+_Avoid_: risk level, permission level, direct (that is an Exposure), confirmation tier
+
+**Open change**:
+An asked Settings change waiting for its answer, kept for at most 10 minutes and answered once.
+_Avoid_: Proposal (cloudpid's, a queue), pending request (t3's), draft
+
+**Change page**:
+The Harness panel's page for one Open change, where the owner reads it and answers. It is the only place a secret is
+typed or a Direct server's sign-in is started for a change an agent asked.
+_Avoid_: confirm page, approval page
+
+**Elicitation mode**:
+How an Owner client's asked change is answered, chosen in the Settings server's URL: `browser` (the owner, on the
+Change page), `native` (a form in the client) or `model` (the client's agent, by calling `resume`). Executor's names and
+meanings. t3flare's own agents have none: theirs is always a Server question.
+_Avoid_: approval mode, form mode, URL mode (an elicitation is a form or a page)
+
+**Guardian**:
+Pi Durable's `guardian` extension: a reviewer model that judges risky tool calls before they run, beside the thread's
+Approvals and never instead of them.
+_Avoid_: reviewer (the Advisor is one too), guard (that is the wider term)
+
+**Guard**:
+A Pi Durable extension that judges agents' calls: the Guardian, and `permissions`, which nothing can turn off. Turning
+a Guard off, or changing its settings, is an asked change.
+_Avoid_: safety extension, policy
 
 ## Skills
 
@@ -266,7 +314,7 @@ A directory in which an agent looks for Skills, such as a repository's `.agents/
 _Avoid_: skills folder, skill path
 
 **Environment skill**:
-A Skill the owner installed into the Cloud Environment, offered to every agent in every Project: Durable agents and CLI agents alike.
+A Skill installed into the Cloud Environment by the owner, or at an agent's asking, offered to every agent in every Project: Durable agents and CLI agents alike.
 _Avoid_: global skill (the owner's informal word, and cloudpid's Global), owner skill, personal skill
 
 **Skill source**:
