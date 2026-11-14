@@ -206,7 +206,7 @@ check("another Workspace's handle is refused in this Container (401)", String(fo
 // 4. The leak scan, with the turn's process alive.
 const scan = await leak(A);
 report.leak = clean(scan);
-check("the leak scan finds no endpoint key (DO files, Container files, process environments and command lines)", (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0 && (scan?.container?.files ?? 0) > 0, scan);
+check("the leak scan finds no endpoint key (DO files, Container files, process environments and command lines)", (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0 && (scan?.container?.files ?? 0) > 0 && (scan?.notScanned ?? []).length === 0, scan);
 
 // 4b. The positive control: the canary endpoint's key, planted in the Container, is found by the same scan.
 await exec(A, `printf %s '${canaryKey}' > /tmp/p1167-canary.txt`);
@@ -299,7 +299,7 @@ check("no routing header from the Container reached the endpoint", relayed.lengt
 // The final turn's leak scan.
 const scanAfter = await leak(A);
 report.leakAfter = clean(scanAfter);
-check("the leak scan after every turn finds no key", (scanAfter?.do ?? []).length === 0 && (scanAfter?.container?.hits ?? []).length === 0, scanAfter);
+check("the leak scan after every turn finds no key", (scanAfter?.do ?? []).length === 0 && (scanAfter?.container?.hits ?? []).length === 0 && (scanAfter?.notScanned ?? []).length === 0, scanAfter);
 
 await sleep(10_000);
 tail.kill("SIGINT");

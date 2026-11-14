@@ -27,7 +27,6 @@ export interface RelayedEndpoint {
 export const endpointsOfApi = (endpoints: ModelEndpoints | undefined, api: EndpointApi): ReadonlyArray<ModelEndpoint> =>
   (endpoints?.endpoints ?? []).filter((endpoint) => endpoint.api === api);
 
-
 // What each API knows of keys and headers, in one place: the header its key goes in, and the request headers a CLI's
 // client sends that the endpoint needs. The relay takes a handle from the key headers and forwards only the allowed
 // headers (ADR-0034 §4: the key goes only to its target, headers included; a header-routed gateway must never get a

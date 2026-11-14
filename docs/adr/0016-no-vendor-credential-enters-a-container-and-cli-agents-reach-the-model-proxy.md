@@ -93,8 +93,10 @@ hard cut (SPI-1176); for Model endpoints it is replaced by a **model relay**, wh
    egress host, which reaches the agents Worker's `WorkspaceProxy` (`apps/agents/src/workspace/modelRelay.ts`). The path
    below the endpoint's id is appended to the endpoint's base URL; the body and the answer are streamed through
    unchanged, in the Worker entrypoint (no Durable Object holds the stream). No protocol translation: a CLI uses only
-   endpoints whose API it speaks. No redirect is followed. A path holding an encoded dot segment, `/` or `\` (in any
-   encoding a decoding upstream might undo) is refused, so nothing leaves the endpoint's base URL.
+   endpoints whose API it speaks. No redirect is followed. A path segment is decoded to its fixed point and refused
+   (400) when a decode fails (a malformed escape, so a literal `%` too), it takes more than three decodes to settle,
+   or it settles to a dot segment (alone or followed by `;`, `?` or `#`) or holds `/`, `\` or a control character,
+   so no decoding upstream walks above the endpoint's base URL.
    **Headers are allowlisted** (`forwardedHeadersOf` in `@t3flare/models/relay`, beside the API's key header): the
    body's type and length, `accept`, and the API's own version headers (`openai-beta`; `anthropic-version`,
    `anthropic-beta`). Every other header the Container sends is dropped, so no header can route the key at a
@@ -128,4 +130,6 @@ measured: a stream of over 10 minutes with idle gaps up to 3 minutes completes t
 (`docs/steps/spi-1167/p1167.json`). The handle cannot move the key by a header: the relay chooses the target, and
 the Container's headers do not reach it. The allowlist covers **headers only**: the body and the query string pass
 unchanged by design (no protocol translation), so a gateway that routes on a body or query field (LiteLLM's
-`api_base`, say) can be steered from the Container. An endpoint at such a gateway is outside what the relay protects.
+`api_base`, say) can be steered from the Container. An endpoint at such a gateway is outside what the relay protects. Look-alikes an upstream would only resolve after
+Unicode (NFKC) normalisation or as a Windows path (fullwidth dots and slashes, `..` with a trailing space or dot) are
+not refused.

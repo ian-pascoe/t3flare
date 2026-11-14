@@ -79,7 +79,7 @@ const decodedSegment = (segment: string): string | undefined => {
 
 /**
  * Whether the path below the endpoint's id could leave its base URL at an upstream that decodes it: a segment that does
- * not decode cleanly, a dot segment (also with a `;` parameter, as Tomcat reads `..;`), or a `/`, `\` or control
+ * not decode cleanly, a dot segment (also followed by a `;` parameter, as Tomcat reads `..;`, or by a `?` or `#` a re-parsing upstream would split at), or a `/`, `\` or control
  * character (a NUL a server may cut at, a CR or LF) in a segment, in any encoding. `URL` has already resolved literal and singly encoded dot segments, and turned a literal `\` into `/`.
  */
 const leavesBase = (rest: string): boolean =>
@@ -89,7 +89,7 @@ const leavesBase = (rest: string): boolean =>
     .some((segment) => {
       const decoded = decodedSegment(segment);
       // oxlint-disable-next-line no-control-regex -- control characters are what this refuses
-      return decoded === undefined || /^\.\.?(?:;|$)/.test(decoded) || /[/\\\u0000-\u001f\u007f]/.test(decoded);
+      return decoded === undefined || /^\.\.?(?:[;?#]|$)/.test(decoded) || /[/\\\u0000-\u001f\u007f]/.test(decoded);
     });
 
 /** Only the allowed headers of the Container's request, then the endpoint's own and its credential. */

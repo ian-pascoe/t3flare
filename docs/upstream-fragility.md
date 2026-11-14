@@ -784,6 +784,8 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   `modelSelection` to `openSession`, or surfaces the cause's text. And a CLI starts requiring a request header the
   relay's allowlist drops (a new `openai-*` or `anthropic-*` header, `forwardedHeadersOf` in `@t3flare/models/relay`):
   its requests fail or lose a feature at the endpoint; the relay log's `dropped` field names the header.
+  Or a CLI's API path starts holding a literal `%`, a control character or a multiply encoded escape: the relay
+  refuses the path (400, `modelRelay.ts` `leavesBase`).
 - **Detection**: typecheck (the response shapes, `ProviderAdapterV2OpenSessionInput.modelSelection`);
   `test/codexGuard.test.ts`, `test/codexEndpoints.test.ts`, `test/cliProfiles.test.ts` (the rewrite, the routing, the
   process provider, the exclusion); `scripts/p1167.ts` on a stage (a turn with tools, a resume, the refused switch,

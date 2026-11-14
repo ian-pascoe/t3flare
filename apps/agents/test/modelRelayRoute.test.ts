@@ -169,6 +169,9 @@ describe("the model relay route", () => {
       "/%25252e%25252e/x",
       // Dot segments with a parameter (Tomcat's `..;`), and control characters (NUL, tab, CR LF).
       "/..;/x",
+      "/%2e%2e%3fx",
+      "/..%3f",
+      "/..%23",
       "/a/%2e%2e;x=1/b",
       "/.;/x",
       "/.%00./x",
