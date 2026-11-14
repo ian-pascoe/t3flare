@@ -4,10 +4,12 @@
 // (pi-parity: web, todo, context, guardian…) add an entry here and appear in the panel without panel work.
 //
 import {
+  defaultSettingsServer,
   type Exposure,
   type McpServerSetting,
   RESERVED_SERVER_NAMES,
   SERVER_NAME,
+  SETTINGS_SERVER,
   type ServerAuth,
   type ToolClass,
 } from "./mcp.ts";
@@ -267,12 +269,35 @@ export interface StoredHarness {
 export const EMPTY_HARNESS: StoredHarness = { revision: 0, global: {}, overrides: {} };
 
 /**
- * The MCP server set (ADR-0028): the direct servers the owner added. Anything not direct is dropped (the retired
- * built-in `commissary` kind among them, before SPI-1160), so its name is free and the next change saves the set
- * without it.
+ * The MCP server set (ADR-0028): the direct servers the owner added, and the Settings server's entry (on, deferred and
+ * read-write, plan D2), implied until a change stores one. Any other stored kind is dropped (the retired built-in
+ * `commissary` kind among them, before SPI-1160), so its name is free and the next change saves the set without it.
  */
-export const mcpServersOf = (stored: StoredHarness): Readonly<Record<string, McpServerSetting>> =>
-  Object.fromEntries(Object.entries(stored.mcp?.servers ?? {}).filter(([, server]) => server.kind === "direct"));
+export const mcpServersOf = (stored: StoredHarness): Readonly<Record<string, McpServerSetting>> => ({
+  // The Settings server's own entry is set last, from `settingsEntryOf`; no other entry may take its name.
+  ...Object.fromEntries(Object.entries(stored.mcp?.servers ?? {}).filter(([name, server]) => server.kind === "direct" && name !== SETTINGS_SERVER)),
+  settings: settingsEntryOf(stored),
+});
+
+/**
+ * A stored entry the set ignores (plan D2, M1 review): a server stored under the Settings server's name that is not the
+ * Settings server (a Direct server named `settings`, added before the name was reserved), or an entry of kind
+ * `settings` under any other name. Ignored, never mistaken for the Settings server; the panel's Status names it, and the
+ * next change to the set drops it from storage.
+ */
+const ignoredServer = (name: string, server: McpServerSetting): boolean => (name === SETTINGS_SERVER) !== (server.kind === "settings");
+
+/** The Settings server's entry: the stored one when it is of kind `settings`, else the implied default. */
+const settingsEntryOf = (stored: StoredHarness): McpServerSetting => {
+  const kept = stored.mcp?.servers?.[SETTINGS_SERVER];
+  return kept !== undefined && kept.kind === "settings" ? kept : defaultSettingsServer();
+};
+
+/** The names of stored MCP entries the set ignores (`ignoredServer`), for the panel's Status. */
+export const ignoredServersOf = (stored: StoredHarness): ReadonlyArray<string> =>
+  Object.entries(stored.mcp?.servers ?? {})
+    .filter(([name, server]) => ignoredServer(name, server))
+    .map(([name]) => name);
 
 /** One change to the MCP server set from the panel or a script. */
 export type McpChange =
@@ -282,6 +307,8 @@ export type McpChange =
       readonly enabled?: boolean;
       readonly exposure?: Exposure;
       readonly toolExposure?: Readonly<Record<string, Exposure | null>>;
+      /** The Settings server's entry only (plan D2): whether its write tools are offered. */
+      readonly writes?: boolean;
     }
   /** The owner's class for a tool; `null` returns it to the tool's own hint. */
   | { readonly op: "class"; readonly server: string; readonly tool: string; readonly class: ToolClass | null }
@@ -341,15 +368,23 @@ export const applyMcpChange = (
   }
   if (current === undefined) return { ok: false, error: `${change.server}: no such server` };
   if (change.op === "remove") {
+    if (current.kind === "settings") return { ok: false, error: `${change.server}: disable it instead` };
     const { [change.server]: _removed, ...rest } = servers;
     return save(rest);
   }
   if (change.op === "class") {
+    // The Settings server's tools have fixed classes (plan D2), for the panel as for everyone.
+    if (current.kind === "settings") return { ok: false, error: `${change.server}: its tools' classes are fixed` };
     if (change.class !== null && change.class !== "read" && change.class !== "write") return { ok: false, error: "class: read, write or null" };
     const { [change.tool]: _previous, ...classes } = current.classes ?? {};
     return save({ ...servers, [change.server]: { ...current, classes: change.class === null ? classes : { ...classes, [change.tool]: change.class } } });
   }
   if (change.exposure !== undefined && !EXPOSURES.includes(change.exposure)) return { ok: false, error: `exposure: one of ${EXPOSURES.join(", ")}` };
+  if (change.enabled !== undefined && typeof change.enabled !== "boolean") return { ok: false, error: "enabled: true or false" };
+  if (change.writes !== undefined) {
+    if (current.kind !== "settings") return { ok: false, error: `${change.server}: only the Settings server has a writes switch` };
+    if (typeof change.writes !== "boolean") return { ok: false, error: "writes: true or false" };
+  }
   const toolExposure: Record<string, Exposure> = { ...current.toolExposure };
   for (const [tool, exposure] of Object.entries(change.toolExposure ?? {})) {
     if (exposure === null) delete toolExposure[tool];
@@ -362,6 +397,7 @@ export const applyMcpChange = (
       ...current,
       ...(change.enabled === undefined ? {} : { enabled: change.enabled }),
       ...(change.exposure === undefined ? {} : { exposure: change.exposure }),
+      ...(change.writes === undefined ? {} : { writes: change.writes }),
       toolExposure,
     },
   });

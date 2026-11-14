@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { EMPTY_ENVIRONMENT, ENVIRONMENT_SETTINGS, type EnvironmentKey, type StoredEnvironment } from "./environment.ts";
 import type { FieldSchema } from "./fields.ts";
-import { applyChange, applyMcpChange, EMPTY_HARNESS, EXTENSIONS, type StoredHarness } from "./index.ts";
-import { type McpTierChange, SETTINGS_SERVER, type SkillsTierChange, tierOf } from "./tiers.ts";
+import { applyChange, applyMcpChange, EMPTY_HARNESS, EXTENSIONS, SETTINGS_SERVER, type StoredHarness } from "./index.ts";
+import { type McpTierChange, type SkillsTierChange, tierOf } from "./tiers.ts";
 
 /** Each extension's switch: `switch` (off to on asked, on to off free), `guard` (both asked), or `unchangeable`. */
 const SWITCHES: Readonly<Record<string, "switch" | "guard" | "unchangeable">> = {
@@ -141,8 +141,10 @@ describe("tierOf: the MCP server set", () => {
     if (!added.ok) throw new Error(added.error);
     return { ...added.harness, mcp: { servers: { ...added.harness.mcp!.servers, fixture: { ...added.harness.mcp!.servers.fixture!, ...setting } } } };
   };
-  /** The Settings server's entry, stored as M3 will imply it. */
-  const withSettings: StoredHarness = { ...EMPTY_HARNESS, mcp: { servers: { [SETTINGS_SERVER]: { kind: "direct", enabled: true, exposure: "deferred" } } } };
+  /** The Settings server's entry as it is implied (plan D2). */
+  const withSettings: StoredHarness = EMPTY_HARNESS;
+  /** A Direct server stored under the reserved name before it was reserved: ignored, and not the Settings server. */
+  const withStaleDirect: StoredHarness = { ...EMPTY_HARNESS, mcp: { servers: { [SETTINGS_SERVER]: { kind: "direct", url: "https://x.example/mcp", enabled: true, exposure: "deferred" } } } };
   const mcp = (stored: StoredHarness, change: McpTierChange, hint?: "read" | "write") => tier({ entity: "mcp", stored, change, hintedClass: () => hint });
   const ops = new Set<string>();
   const covered = (change: McpTierChange) => {
@@ -200,10 +202,18 @@ describe("tierOf: the MCP server set", () => {
       { op: "server", server: SETTINGS_SERVER, enabled: false },
       { op: "server", server: SETTINGS_SERVER, exposure: "hidden" },
       { op: "server", server: SETTINGS_SERVER, toolExposure: { change_mcp: "hidden" } },
+      { op: "server", server: SETTINGS_SERVER, writes: false },
       { op: "class", server: SETTINGS_SERVER, tool: "change_mcp", class: "write" },
     ] as const) {
       expect(mcp(withSettings, change), JSON.stringify(change)).toBe("asked");
+      // A stale Direct server under the name is ignored: the change still reaches the Settings server's entry.
+      expect(mcp(withStaleDirect, change), JSON.stringify(change)).toBe("asked");
     }
+  });
+
+  it("the writes switch is the Settings server's alone", () => {
+    expect(mcp(withDirect(), { op: "server", server: "fixture", writes: false })).toBe("asked");
+    expect(applyMcpChange(withDirect(), { op: "server", server: "fixture", writes: false })).toMatchObject({ ok: false });
   });
 
   it("an unknown server is asked; every MCP change shape is covered", () => {

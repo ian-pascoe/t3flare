@@ -25,8 +25,11 @@ export const decideCall = (input: {
   return { kind: "ask" };
 };
 
-/** Where a server comes from: added in the panel (Route B), the only kind left. */
-export type ServerKind = "direct";
+/**
+ * Where a server comes from: added in the panel (Route B), or the Settings server (ADR-0034, plan D2), served
+ * in-process by the MCP host. The built-in `commissary` kind is retired (SPI-1160).
+ */
+export type ServerKind = "direct" | "settings";
 
 /**
  * A tool's class: the owner's choice in the panel, else the tool's own `readOnlyHint` (true: read; anything else: write),
@@ -73,7 +76,7 @@ export type ServerAuth = { readonly kind: "none" } | { readonly kind: "header"; 
 
 /** One MCP server as the harness settings keep it (no secret: header values and tokens are in the secret store). */
 export interface McpServerSetting {
-  /** Kept because stored documents carry it: an entry of any other kind is dropped on load (`mcpServersOf`). */
+  /** `direct`, or `settings` for the Settings server's own entry; an entry of any other kind is dropped on load (`mcpServersOf`). */
   readonly kind: ServerKind;
   readonly url?: string;
   readonly auth?: ServerAuth;
@@ -82,12 +85,23 @@ export interface McpServerSetting {
   readonly toolExposure?: Readonly<Record<string, Exposure>>;
   /** The owner's class overrides, by exact upstream tool name. */
   readonly classes?: Readonly<Record<string, ToolClass>>;
+  /**
+   * Kind `settings` only (plan D2): whether its write tools are offered. Absent reads as true. With `enabled` it is the
+   * panel's three-way access switch: off, read-only, read-write.
+   */
+  readonly writes?: boolean;
 }
 
-/** Names a direct server may not take: they are the relay's or t3's. */
-export const RESERVED_SERVER_NAMES: ReadonlySet<string> = new Set(["t3", "t3-code"]);
+/** The Settings server's name in the MCP server set (plan D2): a Durable agent sees `mcp__settings__<tool>`. */
+export const SETTINGS_SERVER = "settings";
+
+/** Names a direct server may not take: they are the relay's, t3's or the Settings server's. */
+export const RESERVED_SERVER_NAMES: ReadonlySet<string> = new Set(["t3", "t3-code", SETTINGS_SERVER]);
 
 export const SERVER_NAME = /^[a-z0-9-]{1,20}$/;
+
+/** The Settings server's implied entry (plan D2): on, deferred and read-write until a change stores one. */
+export const defaultSettingsServer = (): McpServerSetting => ({ kind: "settings", enabled: true, exposure: "deferred", writes: true });
 
 /** Most tools taken from one server, and most bytes of their schemas (review M12). */
 export const MAX_TOOLS_PER_SERVER = 200;
