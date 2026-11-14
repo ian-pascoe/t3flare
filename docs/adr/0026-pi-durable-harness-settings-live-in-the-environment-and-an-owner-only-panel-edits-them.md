@@ -50,3 +50,18 @@ The page now edits two entities. What this ADR calls the harness settings are th
 **Environment settings** (the Container's size, idle time and budget) live under their own key and revision, are read by
 each Workspace DO before a Container start, and share this page, its guards and its audit log, whose entries now carry
 an `entity`. See [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md).
+
+## Refinement: agents ask for changes through the Settings server (ADR-0034, 2026-11-14)
+
+§8 ("the agent gets no settings tools", OD-T9) is superseded by
+[ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md) (owner, 2026-11-14: "the whole point is
+that the agent can modify its own environment"). Everything this panel edits is changeable through the Settings server,
+by t3flare's own agents and by the owner's external MCP clients.
+
+- The owner is no longer the only one who drafts a change. He is still the only one who answers on a page of this panel:
+  an asked change of an agent's is answered on its t3 card or on the panel's Change page
+  (`/_t3flare/harness/changes/<id>`), which sits behind this panel's guards (§2).
+- §6 stands: secrets are write-only. A header value an agent asked for is typed on the Change page, and an OAuth
+  sign-in an agent asked for starts there; neither passes through an agent.
+- §7's audit entries gain who asked, through which door, the change's tier, and what answered it.
+- The panel's handlers move into one module that the panel and the Settings server both call.

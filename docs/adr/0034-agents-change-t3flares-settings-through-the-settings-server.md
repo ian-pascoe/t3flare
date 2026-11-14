@@ -1,0 +1,96 @@
+# Agents change t3flare's settings through the Settings server
+
+Status: accepted (owner decisions, 2026-11-14; not yet built). Plan:
+[`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md). Supersedes
+[ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §8 ("the agent
+gets no settings tools", OD-T9). Refines ADR-0026, [ADR-0028](0028-mcp-tools-reach-agents-through-the-environments-mcp-host.md),
+[ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md) and
+[ADR-0033](0033-environment-skills-are-pinned-copies-fetched-from-github-kept-by-the-environment-and-changed-only-by-the-owner.md) §7.
+
+ADR-0026 kept settings away from agents: linked work and prompt injection made an agent that edits its own MCP server
+set a larger target, and t3 had no surface for such changes. The owner reversed that: "the whole point is that the agent
+can modify its own environment", and later "make everything configurable by the agent. Since we are using elicitation,
+it's not a big deal to expose these." So everything the Harness panel edits is changeable through one MCP server, the
+**Settings server**, and what widens an agent's reach waits for an answer.
+
+1. **One server, two doors.** The Settings server covers the Harness settings, the Environment settings and the
+   Environment skills, through the same functions the panel calls.
+   - t3flare's own agents (Durable agents, and the CLI agents through the MCP relay) reach it as a third kind of member
+     of the MCP server set, served in-process by the MCP host, with no Access and no OAuth. It is on by default, with
+     Exposure `deferred`.
+   - **Owner clients**, MCP clients outside t3flare that the owner signed in, reach it at an HTTP endpoint behind an
+     Access application of its own with managed OAuth.
+2. **Panel parity.** An agent may ask for any change the panel can make, including the Guardian's switch and settings, a
+   tool's class, and the Settings server's own entry. What the panel cannot change (a locked registry entry) nobody can.
+3. **Two Change tiers, by direction.** A change is `free` when it narrows (turning something off, hiding a tool,
+   lowering a budget, marking a tool write) and `asked` when it widens, spends, puts new text or code in front of agents,
+   destroys something, turns off a **Guard**, or touches the Settings server's own entry. A setting with no declared tier
+   is asked.
+4. **The thread's mode still rules.** Plan mode refuses every write. Outside full access every write asks. In full
+   access a free change runs and an asked change still asks, as an elicitation does in every mode. There is one card,
+   never the generic write card followed by a second.
+5. **Linked work reads only.** A thread that carries a link's origin, or whose origin the Environment cannot establish,
+   may read settings and change none. The laptop's way to change them is an Owner client.
+6. **An asked change is an Open change**: kept by the Environment DO for at most 10 minutes, bound to the revision it
+   was asked against, answered once.
+7. **t3flare's own agents get the owner-only card.** An asked change raises a Server question as an approval card on the
+   calling thread, which no agent can answer, with the change written by the server and a link to the **Change page**.
+   The page can answer it too; the first answer wins.
+8. **An Owner client's Elicitation mode is its own choice.** `?elicitation_mode=` on the endpoint's URL, with Executor's
+   names, read on every request and trusted as sent:
+   - `browser` (the default): the client is sent to the Change page, and the page applies the change;
+   - `native`: the client shows a form, and its `accept` applies the change;
+   - `model`: the result is a Pause, and the client's agent applies the change by calling `resume`.
+
+   A fallback only ever moves toward `browser`.
+9. **Secrets and sign-ins happen on the Change page only.** An agent may ask to add a header-auth Direct server, set its
+   header value, or start its OAuth sign-in; the value is typed, and the sign-in started, on the Change page under the
+   owner's Access identity, in every mode. No tool argument or result carries a secret or an authorization URL. A change
+   whose text would not fit a card whole is answered on the page as well.
+10. **Every write names the revision it expects**, and a moved revision refuses it.
+11. **Every change is audited** with the door it came through, who asked, its tier, its mode and what answered it.
+12. **The pi CLI gets the relay's servers.** Its built-in MCP client reads entries t3flare writes into its per-process
+    agent directory, so Commissary, Direct servers and the Settings server reach it as they reach the other CLI agents.
+
+## Considered options
+
+- **No settings tools for agents** (ADR-0026 §8). Reversed by the owner.
+- **A panel-only tier** for what judges agents (the Guardian, tool classes, the server's own entry). Proposed in the
+  design interview; the owner chose panel parity.
+- **A panel-side Proposal queue**, as cloudpid has. Rejected by the owner in favour of elicitation; an Open change lives
+  only as long as its question.
+- **Agents calling a public endpoint with a credential.** Rejected: a credential in a Container (ADR-0016), and the
+  origin could not tell which thread called.
+- **Every write asked.** Rejected: turning things down should be frictionless, and the owner spoke of "risky writes".
+- **Linked work with writes at full access**, as t3's Link fence would allow. Rejected: the laptop already has an
+  owner-authenticated door.
+- **The Owner-client endpoint under the existing `/_t3flare` Access application.** Rejected: a managed-OAuth token is
+  valid for its whole application, so an Owner client's token would also be admitted at the panel and the Change page.
+- **One answer path for Owner clients, the Change page.** Proposed in the design interview, because a client's answer
+  to an elicitation is not proof of a person. The owner chose Executor's three modes, trusted as sent.
+- **`model` as the default mode**, as Executor has it. Rejected: the weaker modes should be typed deliberately.
+
+## Consequences
+
+- An Owner client's Elicitation mode is whatever its URL says on each request; the Settings server checks it against
+  nothing, and Access issues the same grant for all three. In `native` the client's `accept`, and in `model` the agent's
+  `resume`, is recorded as the owner's answer and applies the change, although a client hook, an auto-approve policy or
+  the agent itself may have produced it. So whatever holds an Owner client's token can make every Settings change except
+  typing a secret or completing an OAuth sign-in, with no person involved, by asking in `model`: this includes turning
+  the Guardian off, marking a tool read and changing the Settings server's own entry. Only `browser`, and the card
+  t3flare's own agents get, show that the owner answered. The audit log records each change's mode and what answered it
+  (page, card, client or agent), and that is the only trace of the difference.
+- A cloud agent that reaches the Laptop Environment over an Outbound link could read an Owner client's stored token
+  there and use `model`. The owner-only card holds only while no agent of ours can obtain such a token.
+- An agent can ask the owner, on a card, to weaken what reviews it. The card says so in the server's own words; nothing
+  else stands between the request and the owner's click.
+- A server an agent asked for is added with its tools' own read-only hints trusted, as any Direct server is: after one
+  card, a tool it marks read runs without one, in plan mode too.
+- Once the Settings server is switched off or to read-only, the request to switch it back cannot be made through it;
+  only the panel can.
+- The Global mise config and the Variables reach every Workspace of every Project, so an approved change made from one
+  thread runs in another Project's Container.
+- Where the Owner-client endpoint lives (a second Access application on the t3 host, or a Worker of its own on its own
+  host) follows a spike on Access's managed OAuth and will be recorded in an ADR of its own.
+- ADR-0033's title still says Environment skills are "changed only by the owner"; an agent may now ask for a change, and
+  its §7 is refined.

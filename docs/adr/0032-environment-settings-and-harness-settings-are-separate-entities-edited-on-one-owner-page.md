@@ -184,3 +184,20 @@ Considered and rejected:
   Workspace.
 - **Putting the file under the Workspace.** It would sync, and an agent's edit would outlive the Container.
 - **An empty `MISE_GITHUB_TOKEN` alone.** mise falls through to the next source.
+
+## Refinement (ADR-0034, 2026-11-14): the Settings server changes both entities
+
+[ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md); plan:
+[`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md). Agents may ask for changes to the Harness settings
+and the Environment settings through the Settings server, which calls the same functions as the page.
+
+1. **Keys, revisions, readers and application points are unchanged** (§1). A change through the Settings server names
+   the revision of the entity it changes and is refused when that revision has moved.
+2. **Each setting declares its tier in the one schema** (§2): `containerIdleMinutes` is free, `containerBudget` is free
+   when lowered and asked when raised, and `containerSize`, `variables` and `globalMiseConfig` are asked. A setting
+   added later without a tier is asked.
+3. **One audit log still** (§3); its entries gain who asked, through which door, the tier and what answered.
+4. **A running Container still keeps what it started with** (§5): no tool restarts one, and every answer to a change
+   says when it applies.
+5. The Variables refinement's "guard rails for the owner, not a boundary against him" now also stand between an agent's
+   request and the store: its refused names and values are refused through the Settings server as on the page.

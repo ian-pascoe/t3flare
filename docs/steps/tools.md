@@ -61,8 +61,11 @@ describes the branch after the cut.
   - A write's card is raised on the CLI thread by the wrapper (SPI-1040's asker, generalised). It never offers the push
     card's trust answer (M9).
   - CLI tool timeouts are 900 s (M11).
-  - Who gets what: Codex, Claude Code and OpenCode get Commissary and direct servers through the relay. The pi CLI has no
-    MCP client in the image (SPI-1076).
+  - Who gets what: Codex, Claude Code and OpenCode get Commissary and direct servers through the relay. The pi CLI got
+    none in this step (SPI-1076).
+    - Note (2026-11-14): the reason first given here, "no MCP client in the image", was wrong. The image's pi 1.5.2 has
+      built-in MCP support; this step did not write its entries. SPI-1076 is now part of the Settings server work
+      (`docs/steps/settings-mcp-plan.md`, D4).
 - **t3's tools for CLI agents (SPI-1039)**, as stock t3 hands them: t3's per-thread bearer at t3's public `/mcp`; only
   the endpoint is rewritten (`relayedMcp.ts`). All four CLIs.
 - **t3's guidance filter (SPI-1060's rule)** moved to `packages/harness-registry/src/t3Guidance.ts`; it applies to
@@ -120,7 +123,9 @@ describes the branch after the cut.
 
 - **A nested call costs ~340 ms**, mostly in two Workspace RPCs per `read`. Code mode still wins on tokens (P4) and turns.
   SPI-1066.
-- **The pi CLI has no MCP client** in the image, so it gets t3's tools only. SPI-1076.
+- **The pi CLI gets t3's tools only**: this step wrote it no relay entries. SPI-1076. (Corrected 2026-11-14: it was
+  first recorded as "no MCP client in the image", but pi 1.5.2 has built-in MCP support. The entries are
+  `docs/steps/settings-mcp-plan.md`, D4.)
 - **Codex's linked full-access run** was read once before its turn ended. The harness now waits for four quiet polls
   before it counts a linked thread as settled (`tools.ts`).
 - **A stolen relay handle** (root in the Container reads `/proc`) is judged as that process's thread: the accepted risk
@@ -187,7 +192,7 @@ contract), and U49's new path (t3's guidance in harness-registry).
 ## Tickets
 
 - New:
-  - SPI-1076 pi CLI: MCP servers other than t3's.
+  - SPI-1076 pi CLI: MCP servers other than t3's. Now milestone M2 of `docs/steps/settings-mcp-plan.md`.
   - SPI-1077 `acceptance --tools` in the bump job.
   - SPI-1078 the stage cases left unrun.
   - SPI-1079 MCP elicitation as t3 cards (OD-T7).
