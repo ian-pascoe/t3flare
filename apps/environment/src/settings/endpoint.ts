@@ -38,6 +38,8 @@ import {
   answerOwnerChange,
   changeUrlOf,
   EMPTY_SCHEMA,
+  HIDDEN_SINCE_REFUSAL,
+  hiddenTools,
   modeFor,
   ownerListed,
   ownerMessage,
@@ -645,12 +647,17 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
   };
 
   // A 2026 retry of a call that asked (plan D12): the access switch first (plan D2: off refuses every call, read-only
-  // every write, naming the panel), then its state, before anything it names is read.
+  // every write, naming the panel), then whether its tool is hidden now, then its state, before anything it names is read.
   if (context.modern && params.requestState !== undefined) {
     const access = accessSwitchOf(server);
     if (access !== "on") {
       log({ t3flare: "settings-refused", reason: access, tool: name });
       return reply(toolResult(refusedResult(access === "off" ? OFF_MESSAGE : READ_ONLY_REFUSAL)));
+    }
+    // A tool the owner hid since the change was asked (SPI-1195 review): refused as a fresh call would be, naming the panel.
+    if (hiddenTools(server)(name)) {
+      log({ t3flare: "settings-refused", reason: "hidden", tool: name });
+      return reply(toolResult(refusedResult(`Not changed: ${HIDDEN_SINCE_REFUSAL(name)}`)));
     }
     const verdict = await verifyToken(tokenKey, params.requestState, { kind: "state", sub: key, now: now() });
     const stateProblem = !verdict.ok ? verdict.reason : verdict.payload.digest !== (await callDigest(name, args)) ? ("other-call" as const) : undefined;

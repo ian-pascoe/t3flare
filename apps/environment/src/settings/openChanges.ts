@@ -334,7 +334,6 @@ export const openChangeSummary = (record: ChangeRecord, url: string | undefined)
   ...(url === undefined ? {} : { url }),
 });
 
-
 /** What the Change page and the panel's list run over (plan D10): the table, and answers by the page. */
 export interface ChangesApi {
   readonly list: () => ReadonlyArray<ChangeRecord>;

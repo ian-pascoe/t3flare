@@ -254,6 +254,25 @@ describe("T-endpoint: versions and methods", () => {
     expect((await bodyOf(await endpoint(modern("tools/call", { name: "get_settings", arguments: { entity: "environment" } })))).result?.isError).toBe(false);
   });
 
+  it("SPI-1195 review: the server's own exposure hidden hides every tool on both doors, but a tool's own exposure overrides it", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const hid = applyMcpChange(f.store.load(), { op: "server", server: "settings", exposure: "hidden", toolExposure: { get_settings: "direct" } });
+    if (!hid.ok) throw new Error(hid.error);
+    f.store.save(hid.harness);
+    const listed = (await bodyOf(await endpoint(modern("tools/list")))).result?.tools as Array<{ name: string }>;
+    expect(listed.map((tool) => tool.name)).toEqual(["get_settings"]);
+    for (const name of ["get_status", "change_environment"]) {
+      const result = (await bodyOf(await endpoint(modern("tools/call", { name, arguments: FREE })))).result;
+      expect(result).toMatchObject({ isError: true });
+      expect(JSON.stringify(result?.content)).toContain(`${name} is hidden by the owner.`);
+      expect(await f.call(f.durable(), name, FREE)).toMatchObject({ kind: "unavailable", message: `${name} is hidden by the owner.` });
+    }
+    expect(f.store.loadEnvironment().revision).toBe(0);
+    expect((await bodyOf(await endpoint(modern("tools/call", { name: "get_settings", arguments: { entity: "environment" } })))).result?.isError).toBe(false);
+    expect(await f.call(f.durable(), "get_settings", { entity: "environment" })).toMatchObject({ kind: "result", isError: false });
+  });
+
   it("an unknown tool or arguments that are not an object is -32602", async () => {
     const endpoint = endpointOf(world());
     expect((await bodyOf(await endpoint(modern("tools/call", { name: "resume", arguments: {} })))).error?.code).toBe(-32602);
