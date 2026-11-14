@@ -51,7 +51,7 @@ import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, shownLaunch, takeEnvironment, withGlobalMise } from "./containerLaunch.ts";
 import { GlobalMise, type GlobalMiseState } from "./globalMise.ts";
 import { StoppedExecs, StoppedExecsBackend } from "./stoppedExecs.ts";
-import { GlobalMiseBackend, PASSIVE_MARKER, readyForSpawn } from "./globalMiseGate.ts";
+import { commandEnvOf, COMPUTER_RUNTIME_KEY, GlobalMiseBackend, readyForSpawn } from "./globalMiseGate.ts";
 import { commandEnv, VariablesBackend } from "./variables.ts";
 import { reclaimFor } from "./reclaim.ts";
 import { killInRunningContainer } from "./containerKill.ts";
@@ -936,7 +936,7 @@ export class WorkspaceDO extends ContainerHost {
         cwd: input.cwd ?? WORKSPACE_ROOT,
         encoding: "utf8",
         // A passive read is marked so the Container's backend sends it without waiting for the lay-down (ADR-0032's Global mise config refinement).
-        env: backend === CONTAINER_BACKEND ? { ...COMMAND_ENV, ...input.env, ...(input.passive === true ? { [PASSIVE_MARKER]: "1" } : {}) } : { ...input.env },
+        env: backend === CONTAINER_BACKEND ? commandEnvOf(COMMAND_ENV, input.env, input.passive === true) : { ...input.env },
         ...(input.stdin === undefined ? {} : { stdin: input.stdin }),
         timeoutMs: input.timeoutMs ?? 120_000,
       });
@@ -1804,15 +1804,15 @@ export class WorkspaceDO extends ContainerHost {
 
   /**
    * Before a Terminal's or a CLI process's spawn: the running Container's lay-down has ended (`readyForSpawn`), joined
-   * while it runs and run again after an exec failure. A Container this instance has not connected to is reached by an
-   * active `true`, which waits for it as every active command does (`GlobalMiseBackend`).
+   * while it runs and run again after an exec failure. No command and no connect: the runtime is the last connect's, or
+   * computer's stored one on a fresh instance.
    */
   async #ensureGlobalMise(): Promise<void> {
     await readyForSpawn({
       running: () => this.containerRunning(),
-      runtime: () => this.#runtime,
-      start: () => this.exec({ script: "true", timeoutMs: 180_000 }),
+      runtime: async () => this.#runtime ?? (await this.ctx.storage.get<{ readonly id: string }>(COMPUTER_RUNTIME_KEY))?.id,
       ensure: (runtime) => this.#globalMise.ensure(runtime),
+      log: (event) => console.log(JSON.stringify({ ...event, workspace: this.#workspaceId() ?? null })),
     });
   }
 

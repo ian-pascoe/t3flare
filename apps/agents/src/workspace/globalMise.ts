@@ -75,7 +75,7 @@ export class GlobalMise {
     this.#deps = deps;
   }
 
-  /** Whether a lay-down runs now (a command waiting in connect waits for it). */
+  /** Whether a lay-down runs now (an active command waits for it where it is sent, `GlobalMiseBackend`). */
   inFlight(): boolean {
     return this.#running.size > 0;
   }

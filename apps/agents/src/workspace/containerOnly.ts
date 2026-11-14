@@ -94,8 +94,8 @@ export interface ContainerOnlyOptions {
   readonly stop: () => Promise<void>;
   readonly log?: (event: Record<string, unknown>) => void;
   /**
-   * Runs after every connect, with the Container's runtime id, before computer gets the handle and sends a command: the
-   * Global mise config's lay-down (SPI-1150), once per runtime id. It never throws.
+   * Runs after every connect, with the Container's runtime id, before computer gets the handle: the Workspace DO keeps
+   * it as the key of the Global mise config's lay-down (SPI-1150), which each active command waits for. It never throws.
    */
   readonly connected?: (handle: { readonly runtimeId?: string | undefined }) => Promise<void>;
 }
