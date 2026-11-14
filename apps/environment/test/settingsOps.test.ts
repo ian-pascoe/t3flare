@@ -27,6 +27,7 @@ import { type AuditActor, type AuditEntry, harnessStore } from "../src/harness/s
 import type { FetchedSkill } from "../src/skills/fetch.ts";
 import { skillStore } from "../src/skills/store.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
+import { memory } from "./settingsFixture.ts";
 import { fakeGithub, skillMd } from "./skillRepo.fixture.ts";
 
 const HOST = "t3-admin.example.dev";
@@ -36,14 +37,6 @@ const owner: AccessCaller = { kind: "owner", subject: "owner-sub" };
 const agent: AuditActor = { caller: "agent:thread-1", via: "mcp", thread: "thread-1", agent: "piDurable", tier: "free" };
 const ACTOR_FIELDS = ["caller", "via", "thread", "agent", "client", "tier", "mode", "answeredBy", "change"] as const;
 
-const memory = () => {
-  const map = new Map<string, unknown>();
-  return {
-    get: <T>(key: string) => map.get(key) as T | undefined,
-    put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)),
-    delete: (key: string) => map.delete(key),
-  };
-};
 
 const setup = (caller: AccessCaller = owner, transactionSync: <T>(closure: () => T) => T = (closure) => closure()) => {
   const kv = memory();

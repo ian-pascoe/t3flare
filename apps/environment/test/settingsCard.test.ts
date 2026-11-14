@@ -12,15 +12,13 @@ import { OWNER_ONLY_REFUSAL, refuseOwnerOnly } from "../src/mcp/ownerOnly.ts";
 import { CHANGES_API_PATH, changePagePath } from "../src/harness/paths.ts";
 import { HINT_TRUST_LINE } from "../src/settings/render.ts";
 import { addMcpServer } from "../src/harness/ops.ts";
-import { HOST, PANEL, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
+import { HOST, PANEL, settingsFixture, type SettingsFixture, structured, until } from "./settingsFixture.ts";
 import { csrfToken } from "../src/harness/csrf.ts";
-import type { McpCallAnswer } from "../src/mcp/host.ts";
 
 let fixture: SettingsFixture | undefined;
 afterEach(() => fixture?.dispose());
 
 const open = () => new Promise<never>(() => undefined);
-const structured = (answer: McpCallAnswer) => (answer.kind === "result" ? (answer.structured as Record<string, unknown>) : { unavailable: answer.message });
 const ASKED = { expectedRevision: 0, settings: { containerBudget: 4 } };
 
 /** The owner's POST from the Change page. */

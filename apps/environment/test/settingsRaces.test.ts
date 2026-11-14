@@ -9,13 +9,12 @@
 import type { McpAsker } from "@t3flare/session-protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { McpCallAnswer } from "../src/mcp/host.ts";
 import { EARLY_STOP_MS, EARLY_STOPS_MAX, forgetEarlyStopsForTests, stopCall, stoppableCall, withCallStop } from "../src/mcp/callStops.ts";
 import { answerOpenChange, APPLYING_WAIT_MS, closeOrSettle, OWN_APPLYING_WAIT_MS, waitingOn } from "../src/settings/openChanges.ts";
 import { REQUEST_BUDGET_MS } from "../src/skills/api.ts";
 import { answerDepsOf, ownerOutcome } from "../src/settings/server.ts";
 import { ASKED, bodyOf, endpointOf, modern, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
-import { settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
+import { settingsFixture, type SettingsFixture, structured, until } from "./settingsFixture.ts";
 
 let fixture: SettingsFixture | undefined;
 const world = (options: Parameters<typeof settingsFixture>[0] = {}) => (fixture = settingsFixture(options));
@@ -26,7 +25,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const structured = (answer: McpCallAnswer) => (answer.kind === "result" ? (answer.structured as Record<string, unknown>) : { unavailable: answer.message });
 const never = () => new Promise<never>(() => undefined);
 
 /**

@@ -11,7 +11,6 @@ import { addMcpServer } from "../src/harness/ops.ts";
 import { handleHarness } from "../src/harness/panel.ts";
 import { changePagePath } from "../src/harness/paths.ts";
 import { pauseOf } from "../src/mcp/elicitation.ts";
-import type { McpCallAnswer } from "../src/mcp/host.ts";
 import { OWNER_ONLY_REFUSAL, refuseOwnerOnly } from "../src/mcp/ownerOnly.ts";
 import { relayMessage, type RelayDeps } from "../src/mcp/relay.ts";
 import { registerCliAsker } from "../src/provider/cli/cliAsk.ts";
@@ -21,7 +20,7 @@ import { OPENED_CAP } from "../src/settings/changes.ts";
 import { OPEN_ACROSS, STRIKES } from "../src/settings/openChanges.ts";
 import { OFF_MESSAGE, READ_ONLY_REFUSAL } from "../src/settings/server.ts";
 import { bodyOf, endpointOf, modern } from "./settingsEndpointFixture.ts";
-import { HOST, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
+import { HOST, settingsFixture, type SettingsFixture, structured, textOf, until } from "./settingsFixture.ts";
 
 let fixture: SettingsFixture | undefined;
 const unregisters: Array<() => void> = [];
@@ -37,8 +36,6 @@ const world = (options: Parameters<typeof settingsFixture>[0] = {}) => {
 };
 const never = () => new Promise<McpQuestionAnswer>(() => undefined);
 
-const structured = (answer: McpCallAnswer) => (answer.kind === "result" ? (answer.structured as Record<string, unknown> | undefined) : undefined);
-const textOf = (answer: McpCallAnswer) => (answer.kind === "result" ? answer.text : answer.message);
 
 /** A recording asker standing for one thread's cards (the Session's, or the CLI wrapper's). */
 const askerFor = (answer: McpQuestionAnswer | (() => Promise<McpQuestionAnswer>)) => {
