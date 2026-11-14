@@ -202,8 +202,9 @@ export class McpHost {
   /**
    * Forgets `name`'s kept inventory and protocol state (era, session id), so a server added under a name that held one
    * before (a removed server, or the retired built-in `commissary`) starts fresh: no old tools, no old session. A list
-   * or call still in flight for the old server writes nothing back (its generation is past), and the next list starts
-   * anew rather than joining the old one.
+   * or a single engine request still in flight for the old server writes nothing back (its generation is past), and the
+   * next list starts anew rather than joining the old one. A call paused on a card resumes under the new generation
+   * (ADR-0028's known limit).
    */
   forget(name: string): void {
     this.#generations.set(name, this.#generation(name) + 1);
