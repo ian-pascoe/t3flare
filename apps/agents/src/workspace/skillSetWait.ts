@@ -31,7 +31,9 @@ export const expectationInput = (expectation: ContainerExpectation): string =>
 export const skillsWaitScript = (dir: string, tries: number, lockFailed: string): string =>
   [
     `t=$(mktemp); cat > "$t"`,
-    `sed '/^--removed--$/,$d' "$t" > "$t.sum"; sed '1,/^--removed--$/d' "$t" > "$t.gone"`,
+    // One pass with a flag: a `sed '1,/re/d'` range finds its end from line 2, so a list whose marker is line 1 (a
+    // removal-only take) would lose every removed path.
+    `: > "$t.sum"; : > "$t.gone"; awk -v sum="$t.sum" -v gone="$t.gone" '/^--removed--$/ { removed = 1; next } { print > (removed ? gone : sum) }' "$t"`,
     `cd ${dir} 2>/dev/null || cd /`,
     `n=0; while :; do n=$((n+1)); ok=1`,
     `  if [ -s "$t.sum" ] && ! sha256sum -c --status "$t.sum" 2>/dev/null; then ok=0; fi`,

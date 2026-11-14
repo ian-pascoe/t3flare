@@ -64,6 +64,28 @@ describe.skipIf(!hasSha256sum)("skillsWaitScript", () => {
     expect(answer.looks).toBeGreaterThan(1);
   });
 
+  it("waits on removed paths alone (a Remove or a disable: the marker is the input's first line)", async () => {
+    const { skills } = dir();
+    fs.writeFileSync(path.join(skills, "a/old.md"), "o");
+    const input = expectationInput({ present: [], removed: ["a/old.md"] });
+    expect(input.startsWith("--removed--\n")).toBe(true);
+    expect(parseWait(await run(skills, input, 2))).toEqual({ caughtUp: false, looks: 2, stale: ["present: a/old.md"] });
+    const waiting = run(skills, input, 25);
+    setTimeout(() => fs.rmSync(path.join(skills, "a/old.md")), 500);
+    const answer = parseWait(await waiting);
+    expect(answer.caughtUp).toBe(true);
+    expect(answer.looks).toBeGreaterThan(1);
+  });
+
+  it("waits on added files alone (no removed path)", async () => {
+    const { skills } = dir();
+    const input = expectationInput({ present: [{ path: "a/x.md", sha256: SHA_X }], removed: [] });
+    expect(parseWait(await run(skills, input, 2))).toMatchObject({ caughtUp: false, looks: 2 });
+    const waiting = run(skills, input, 25);
+    setTimeout(() => fs.writeFileSync(path.join(skills, "a/x.md"), "x"), 500);
+    expect(parseWait(await waiting)).toMatchObject({ caughtUp: true });
+  });
+
   it("answers stale with the paths still wrong after its looks, and the lock's failure when marked", async () => {
     const { root, skills } = dir();
     fs.writeFileSync(path.join(skills, "a/x.md"), "y");
