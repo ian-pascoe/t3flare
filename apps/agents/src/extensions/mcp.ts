@@ -61,7 +61,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
   const details = { server: server.name, tool: tool.upstream, class: tool.class };
   return {
     name: tool.name,
-    description: `${server.name} (MCP; ${tool.class} tool): ${tool.description}`,
+    description: `${server.name} (MCP${server.kind === "settings" ? ", t3flare's own settings" : ""}; ${tool.class} tool): ${tool.description}`,
     parameters: (tool.inputSchema ?? { type: "object", properties: {} }) as object,
     replay: "safe",
     ...(tool.exposure === "deferred" ? { deferred: true as const } : {}),
@@ -75,7 +75,9 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
       });
       if (verdict.kind === "refuse") return result(verdict.reason, true, details);
       if (tool.class === "write" && (await api.memo<boolean>(STARTED_MEMO, context)) === true) return cutOffResult();
-      if (verdict.kind === "ask") {
+      // The Settings server judges its own writes and asks with one card of its own (ADR-0034, plan D7): this tool keeps
+      // only plan mode's refusal for it, and raises no card.
+      if (verdict.kind === "ask" && server.kind !== "settings") {
         const declined = await askOwner(
           host.store,
           {
@@ -105,7 +107,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
 export const mcpNamespaces = (view: McpView): ReadonlyArray<CodemodeNamespace> =>
   view.servers.map((server) => ({
     name: server.name,
-    description: `MCP server ${server.name}`,
+    description: `MCP server ${server.name}${server.kind === "settings" ? " (t3flare's own Harness and Environment settings; not t3's preferences)" : ""}`,
     prefix: `mcp__${server.name}__`,
   }));
 

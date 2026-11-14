@@ -33,6 +33,16 @@ const VIEW: McpView = {
         { name: "mcp__commissary__fixture_note", upstream: "fixture_note", description: "note", inputSchema: { type: "object", properties: { line: { type: "string" } } }, hash: "h-note", class: "write", exposure: "direct" },
       ],
     },
+    {
+      name: "settings",
+      kind: "settings",
+      state: "available",
+      listedAt: 1,
+      exposure: "deferred",
+      tools: [
+        { name: "mcp__settings__change_environment", upstream: "change_environment", description: "change", inputSchema: { type: "object", properties: {} }, hash: "h-env", class: "write", exposure: "direct" },
+      ],
+    },
   ],
 };
 
@@ -121,5 +131,35 @@ describe("mcp extension", () => {
     await run.harness.restart();
     expect(textOf(await run.result())).toContain("cut off by a restart");
     expect(run.sent).toHaveLength(1);
+  });
+
+  // T-own (plan §5, D7), M3 (SPI-1198): the Settings server judges its own writes with one card of its own, so this tool
+  // keeps only plan mode's refusal for it and raises no card; a script's nested call is judged as a direct one.
+  const settingsWrite = (id: string) => call("mcp__settings__change_environment", { line: "x" }, id);
+
+  it("a Settings server write outside plan mode raises no card of the Session's: it goes to the server", async () => {
+    for (const mode of ["approval-required", "auto-accept-edits", "full-access"] as const) {
+      const run = await setup(mode, [settingsWrite("s1"), fauxAssistantMessage("done")]);
+      expect(textOf(await run.result())).toBe("change_environment ok");
+      expect(run.store.pending()).toEqual([]);
+      expect(run.askers).toEqual([true]);
+    }
+  });
+
+  it("plan mode still refuses a Settings server write, directly and from a script", async () => {
+    const direct = await setup("full-access", [settingsWrite("s1"), fauxAssistantMessage("done")], { interaction: "plan" });
+    expect(textOf(await direct.result())).toContain("plan mode");
+    expect(direct.sent).toEqual([]);
+    const code = `const r = await tools.mcp__settings__change_environment({ line: "x" }); text(JSON.stringify(r));`;
+    const scripted = await setup("full-access", [call("codemode", { code }, "cm"), fauxAssistantMessage("done")], { interaction: "plan" });
+    expect(textOf(await scripted.result())).toContain("plan mode");
+    expect(scripted.sent).toEqual([]);
+  });
+
+  it("a script's Settings server write is passed through as a direct one is, with no card", async () => {
+    const code = `await tools.mcp__settings__change_environment({ line: "x" }); text("done");`;
+    const run = await setup("approval-required", [call("codemode", { code }, "cm"), fauxAssistantMessage("done")]);
+    await until(() => run.sent.length === 1, "the call");
+    expect(run.store.pending()).toEqual([]);
   });
 });
