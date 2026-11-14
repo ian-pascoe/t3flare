@@ -13,6 +13,8 @@ import {
   CLOSED_KEPT_MS,
   NETWORK_READ_CAP,
   newChangeId,
+  OPENED_CAP,
+  OPENED_WINDOW_MS,
   settingsChanges,
   STRIKE_LOCK_MS,
   STRIKE_WINDOW_MS,
@@ -297,6 +299,8 @@ describe("D16's caps", () => {
       w.advance(CHANGE_TTL_MS);
       expect(w.deps().changes.get(expiring.id)?.state).toBe("expired");
     }
+    // Past the opened cap's hour, so only the strikes are judged.
+    w.advance(OPENED_WINDOW_MS);
     expect(capRefusal(w.deps().changes, OWNER, "hash-9", w.now())).toBeUndefined();
     for (let index = 0; index < 3; index++) {
       const record = w.open(OWNER, { hash: `d-${index}` });
@@ -309,7 +313,7 @@ describe("D16's caps", () => {
     const w = world();
     const changes = w.deps().changes;
     for (let index = 0; index < APPLIED_CAP; index++) {
-      changes.recordApplied({ id: newChangeId(), entity: "harness", tool: "change_extension", args: {}, hash: `h${index}`, tier: index % 2 === 0 ? "free" : "asked", caller: OWN, createdAt: w.now(), state: "applied", closed: { at: w.now() } });
+      changes.recordApplied({ id: newChangeId(), entity: "harness", tool: "change_extension", args: {}, hash: `h${index}`, tier: index % OPENED_CAP === 0 ? "asked" : "free", caller: OWN, createdAt: w.now(), state: "applied", closed: { at: w.now() } });
     }
     expect(capRefusal(changes, OWN, "hash-a", w.now())).toMatchObject({ reason: "applied-cap" });
     w.advance(60 * 60_000 + 1);

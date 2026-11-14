@@ -24,6 +24,8 @@ import {
   closedLine,
   durationText,
   isOpen,
+  OPENED_CAP,
+  OPENED_WINDOW_MS,
   scrubUrls,
   type SettingsChanges,
   STRIKE_LOCK_MS,
@@ -55,7 +57,7 @@ export interface ChangeOutcome {
 
 /** A cap's refusal: why, in words for the agent, and the open change it names when one is open. */
 export interface CapRefusal {
-  readonly reason: "open-thread" | "open-owner" | "open-across" | "declined-repeat" | "strikes" | "applied-cap";
+  readonly reason: "open-thread" | "open-owner" | "open-across" | "declined-repeat" | "strikes" | "applied-cap" | "opened-cap";
   readonly text: string;
   readonly changeId?: string;
 }
@@ -81,6 +83,15 @@ export const capRefusal = (changes: SettingsChanges, caller: ChangeCaller, hash:
   }
   if (changes.open().length >= OPEN_ACROSS) {
     return { reason: "open-across", text: `Not changed: ${OPEN_ACROSS} changes already wait for the owner across this Environment, the most t3flare keeps. He sees them on the Harness panel's Open changes list${openList === undefined ? "" : `: ${openList}`}.` };
+  }
+  if (changes.openedSince(capKey, now - OPENED_WINDOW_MS) >= OPENED_CAP) {
+    return {
+      reason: "opened-cap",
+      text:
+        caller.door === "own"
+          ? `Not changed: this thread asked for ${OPENED_CAP} changes in the last hour, answered or not, the most t3flare allows. Ask the owner in the thread; he changes settings on the Harness panel${openList === undefined ? "" : ` (${openList})`}.`
+          : `Not changed: you asked for ${OPENED_CAP} changes in the last hour, answered or not, the most t3flare allows. Make the change on the Harness panel${openList === undefined ? "" : ` (${openList})`}, or try again later.`,
+    };
   }
   const recent = changes.closedBy(capKey, now - STRIKE_WINDOW_MS - STRIKE_LOCK_MS);
   if (recent.some((record) => record.hash === hash && record.state === "declined" && record.closed!.at > now - DECLINED_REPEAT_MS)) {

@@ -17,6 +17,7 @@ import { relayMessage, type RelayDeps } from "../src/mcp/relay.ts";
 import { registerCliAsker } from "../src/provider/cli/cliAsk.ts";
 import { DURABLE_AGENT, forgetDurableModes, noteDurableModes } from "../src/provider/threadCaller.ts";
 import type { OwnCaller } from "../src/settings/caller.ts";
+import { OPENED_CAP } from "../src/settings/changes.ts";
 import { OPEN_ACROSS, STRIKES } from "../src/settings/openChanges.ts";
 import { OFF_MESSAGE, READ_ONLY_REFUSAL } from "../src/settings/server.ts";
 import { bodyOf, endpointOf, modern } from "./settingsEndpointFixture.ts";
@@ -80,6 +81,38 @@ describe("hostile: an injected agent asking repeatedly is stopped by the caps; 1
     }
     expect(f.cards).toHaveLength(STRIKES);
     expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+
+  it(`SPI-1195 review: 40 asks each dropped by a Stop, or cancelled on the card: past ${OPENED_CAP} in an hour the rest are refused with no card, naming the panel`, async () => {
+    const f = world({ answer: never });
+    const agent = f.durable("thread-dropper");
+    const statuses: Array<Record<string, unknown> | undefined> = [];
+    let refusal = "";
+    for (let index = 0; index < 40; index++) {
+      const stop = new AbortController();
+      const before = f.cards.length;
+      let settled = false;
+      const pending = f.call(agent, "change_environment", { expectedRevision: 0, settings: { containerBudget: 4 } }, { signal: stop.signal }).finally(() => (settled = true));
+      await until(() => settled || f.cards.length > before);
+      stop.abort();
+      const answer = await pending;
+      statuses.push(structured(answer));
+      if (index === OPENED_CAP) refusal = textOf(answer);
+    }
+    expect(statuses.slice(0, OPENED_CAP).every((status) => status?.status === "withdrawn")).toBe(true);
+    expect(statuses.slice(OPENED_CAP).every((status) => status?.status === "refused" && status.reason === "opened-cap")).toBe(true);
+    expect(f.cards).toHaveLength(OPENED_CAP);
+    expect(refusal).toContain("Harness panel");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+
+    // The card's Cancel is no different: each closes withdrawn, and the asks past the cap get no card.
+    const g = world({ answer: { decision: "cancel" } });
+    const other = g.durable("thread-canceller");
+    const cancelled: Array<unknown> = [];
+    for (let index = 0; index < OPENED_CAP + 2; index++) cancelled.push(structured(await g.call(other, "change_environment", { expectedRevision: 0, settings: { containerBudget: 4 } }))?.status);
+    expect(cancelled).toEqual([...Array.from({ length: OPENED_CAP }, () => "withdrawn"), "refused", "refused"]);
+    expect(g.cards).toHaveLength(OPENED_CAP);
+    f.dispose();
   });
 
   it(`${OPEN_ACROSS + 1} children asking at once: ${OPEN_ACROSS} wait for the owner, the next is refused naming the panel's list, with no card`, async () => {
