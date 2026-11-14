@@ -78,8 +78,10 @@ cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's 
 
 - A new or changed Environment skill reaches the model's listing at the next context window (the listing is frozen per
   window), its files at the next turn, and the composer at once.
-- Only the Pi Durable adapter carries the set's hash. CLI agents' threads (SPI-1153) need their adapter to carry it, or a
-  Container start to take the set.
+- A Pi Durable turn carries the set's hash to its Session, which has the Workspace take it. A CLI agent's Workspace
+  takes it on the Environment's side, before the CLI's process starts and before each of its turns (SPI-1153,
+  `docs/steps/env-skills-cli.md`); the CLI reads it through a link in its user-level Skill root (pi: a `--skill` flag)
+  and keeps its own rule for a same-named Repo skill, so in OpenCode the Repo skill wins and in Codex neither does.
 - t3's chip "View instructions" opens an Environment skill's path as a project file and shows t3's read error, since
   the path is outside `/w/<id>` (U64).
 - Installs and checks spend the installation's GitHub limit; with no installed repo, the shared unauthenticated one.

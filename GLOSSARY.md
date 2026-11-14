@@ -267,7 +267,7 @@ A directory in which an agent looks for Skills, such as a repository's `.agents/
 _Avoid_: skills folder, skill path
 
 **Environment skill**:
-A Skill the owner installed into the Cloud Environment, offered to Durable agents in every Project.
+A Skill the owner installed into the Cloud Environment, offered to every agent in every Project: Durable agents and CLI agents alike.
 _Avoid_: global skill (the owner's informal word, and cloudpid's Global), owner skill, personal skill
 
 **Skill source**:
