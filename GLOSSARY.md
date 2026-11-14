@@ -258,6 +258,12 @@ t3flare's own MCP server for the Harness settings, the Environment settings and 
 reach it as a member of the MCP server set; Owner clients reach it at its own endpoint.
 _Avoid_: admin MCP, builtin MCP, config server, Harness server
 
+**Door**:
+One of the Settings server's two ways in, over one implementation: the own agents' door (t3flare's own agents, in-process
+through the MCP host, owner-only cards) and the Owner-client door (Owner clients, at its endpoint behind Access). A
+change records the door it came through.
+_Avoid_: entrypoint, channel (a Process channel is another thing), transport
+
 **Owner client**:
 An MCP client outside t3flare, such as Claude Code or Cursor on the owner's laptop, that the owner signed in to the
 Settings server through Access. It chooses its own Elicitation mode.

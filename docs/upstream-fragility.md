@@ -46,7 +46,7 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 
 ### U2. The idle reset reads t3's private tables
 
-- **Where**: `apps/environment/src/host/idle.ts`: `openWork` counts `orchestration_v2_projection_runs` and `orchestration_v2_projection_provider_sessions` whose status is not in `SETTLED_RUN_STATUSES` / `SETTLED_SESSION_STATUSES`, and claimable `orchestration_v2_effect_outbox` rows; `nextDue` reads `scheduled_tasks.next_run_at` and `orchestration_v2_projection_threads.payload_json` at `$.limitRecovery.resetAt`, `$.limitRecovery.autoResume` and `$.snoozedUntil` (a copy of t3's `ProjectionStoreV2.getLimitRecoveryWakeAt`). Since SPI-1024 these reads fail safe (ADR-0003's refinement): `rows` turns any error into `UnreadableTables`, on which the idle check does not reset (it logs `idle-check-unreadable` and backs off 10 minutes) and an alarm boots t3; a status it does not know counts as open. Step 3 adds more such reads: `linkedWorkOf` reads `$.linkOrigin` (`provider/adapter.ts:80-95` on `step-3`) and `reraiseQuestionsAfterRestart` reads `orchestration_v2_projection_runtime_requests` with `$.responseCapability.type` and threads' `$.delegatedFrom` (`agents/questionRestart.ts:27-37` on `step-3`).
+- **Where**: `apps/environment/src/host/idle.ts`: `openWork` counts `orchestration_v2_projection_runs` and `orchestration_v2_projection_provider_sessions` whose status is not in `SETTLED_RUN_STATUSES` / `SETTLED_SESSION_STATUSES`, and claimable `orchestration_v2_effect_outbox` rows; `nextDue` reads `scheduled_tasks.next_run_at` and `orchestration_v2_projection_threads.payload_json` at `$.limitRecovery.resetAt`, `$.limitRecovery.autoResume` and `$.snoozedUntil` (a copy of t3's `ProjectionStoreV2.getLimitRecoveryWakeAt`). Since SPI-1024 these reads fail safe (ADR-0003's refinement): `rows` turns any error into `UnreadableTables`, on which the idle check does not reset (it logs `idle-check-unreadable` and backs off 10 minutes) and an alarm boots t3; a status it does not know counts as open. Step 3 adds more such reads: `linkedWorkOf` reads `$.linkOrigin` (`provider/adapter.ts:80-95` on `step-3`), and SPI-1198's `threadLinkIn` reads `$.linkOrigin` and `$.lineage.parentThreadId` for the Settings server's caller ([U66](#u66-the-settings-servers-caller-threadlinkin-reads-the-thread-projection-spi-1198)) and `reraiseQuestionsAfterRestart` reads `orchestration_v2_projection_runtime_requests` with `$.responseCapability.type` and threads' `$.delegatedFrom` (`agents/questionRestart.ts:27-37` on `step-3`).
 - **Breaks when**: t3 renames a table or column, adds a run or session status (`awaiting_…`), moves a field inside `payload_json`, or changes how it computes the next wake.
 - **Detection**: **silent**, but no longer dangerous for `idle.ts`: a missing table or column keeps the Environment up and logs `idle-check-unreadable` (the health route shows `openWork`/`nextDue` as `{ unreadable }`); a new status reads as open. Still silent: a field moved inside `payload_json` (reads as null: a missed wake), a new resting status (the DO never sleeps), and step 3's reads below. Cheapest check: [T4](#gaps-in-detection), a workerd test that runs t3's migrations and runs each of these queries, and compares the status lists with t3's run-status literals.
 - **Blast radius**: high. A read that fails, or a status a nightly adds, now keeps the DO resident (cost) instead of resetting it. A moved `payload_json` field still means a usage-limited thread never resumes; a wrong settled list would still let the Environment abort itself under a running turn, which ends the turn (ADR-0004). Step 3: a linked thread's push stops asking for approval, or a delegated question is not raised again after a restart.
@@ -71,7 +71,7 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 ### U5. MCP, `delegate_task` and `linkOrigin` (step 3)
 
 - **Where** (all on `step-3`): `EnvironmentDO.mcp` (`apps/environment/src/environmentDO.ts:172`) forwards a Session's MCP call to t3's `/mcp` with `authorization`, `mcp-session-id` and `mcp-protocol-version`; the adapter hands t3's per-thread MCP credential to the Session (`provider/adapter.ts:114`, from `McpProviderSessions.read`) with t3's `T3_CODE_ORCHESTRATION_INSTRUCTIONS` (`@t3tools/provider-core/server/orchestrationInstructions`); the Session's `t3-mcp` extension offers every tool t3 lists but `T3_TOOL_DENYLIST` (`packages/harness-registry/src/t3Tools.ts`; owner, 2026-11-12, back to stock), splits `t3_thread_wait`/`t3_background_wait` into `WAIT_PIECE_MS` pieces (`:81-83`), and adds a `clientRequestId` to tools whose schema has one (`:149`, `:183`); the seeds `linkedEnvironmentsEnabled` and `enableAgentBrowserAccess` (`agents/seedSettings.ts:50`, `:67`).
-- **Breaks when**: t3 renames or adds a tool, changes a tool's input schema or annotations, changes how `/mcp` authenticates or its session headers, changes the instructions to name tools we do not offer, or changes `linkOrigin`'s shape. Since `v0.1.10-nightly.20261112.4606`, t3 lists `tool_search` only to a client that sends `t3-tool-exposure: deferred` (`McpHttpServer.ts` `layerDeferredListing`); the Session sends no such header, so it gets every tool but `tool_search`, and `test/t3Guidance.test.ts` lists t3's tools the same way.
+- **Breaks when**: t3 renames or adds a tool, changes a tool's input schema or annotations, changes how `/mcp` authenticates or its session headers, changes the instructions to name tools we do not offer, or changes `linkOrigin`'s shape (which also moves the Settings server's Linked-work check, [U66](#u66-the-settings-servers-caller-threadlinkin-reads-the-thread-projection-spi-1198)). Since `v0.1.10-nightly.20261112.4606`, t3 lists `tool_search` only to a client that sends `t3-tool-exposure: deferred` (`McpHttpServer.ts` `layerDeferredListing`); the Session sends no such header, so it gets every tool but `tool_search`, and `test/t3Guidance.test.ts` lists t3's tools the same way.
 - **Detection**: `acceptance --peer` (step 3) catches a broken link, forwarded launch or fence; `test/t3Guidance.test.ts` fails when a denied name is no longer a t3 tool. **Silent**: a new tool that cannot work here is offered until someone denies it (stock t3's behaviour).
 - **Blast radius**: delegation from the laptop to the cloud fails, or the agent loses a tool without notice.
 - **Outbound direction (SPI-1061)**: a cloud Durable agent's `delegate_task` with a linked `environmentId` forwards `t3_project_list` and `t3_thread_launch` through t3's `PeerForwarding`, and t3's `RemoteDelegation` follows the Remote task from the Environment DO; the thread there carries `delegatedFrom` and `linkOrigin`. Detection: `scripts/outbound.ts --phase delegate` (C1) against the stage stand-in; see U46–U48.
@@ -118,7 +118,7 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 
 ### U10. Patches
 
-- **Where**: `patches/0001-lazy-server-browser-ref-namespace.patch` makes `refNamespace` lazy (t3 `apps/server/src/preview/ServerBrowserPage.ts:93`: `NodeCrypto.randomUUID()` at module scope, which workerd refuses). `patches/0002-new-project-root-is-w.patch` sets `namedProjectsRoot` to `/w` (t3 `apps/server/src/project/ManagedProjectFolders.ts:356`), so New project makes a Workspace. `patches/0004-scratch-root-is-a-workspace.patch` (parity G4) sets the No project folder to `/w/t3-scratch` (the probe's `path.resolve(config.baseDir, "scratch")`, `ManagedProjectFolders.ts:258`), so scratch threads run in a Workspace; it applies after 0002 to the same file. Applied in memory at bundle time (`build.ts:109-145`); the submodule stays clean.
+- **Where**: `patches/0001-lazy-server-browser-ref-namespace.patch` makes `refNamespace` lazy (t3 `apps/server/src/preview/ServerBrowserPage.ts:93`: `NodeCrypto.randomUUID()` at module scope, which workerd refuses). `patches/0002-new-project-root-is-w.patch` sets `namedProjectsRoot` to `/w` (t3 `apps/server/src/project/ManagedProjectFolders.ts:356`), so New project makes a Workspace. `patches/0004-scratch-root-is-a-workspace.patch` (parity G4) sets the No project folder to `/w/t3-scratch` (the probe's `path.resolve(config.baseDir, "scratch")`, `ManagedProjectFolders.ts:258`), so scratch threads run in a Workspace; it applies after 0002 to the same file. `patches/0006-pi-relay-tools-are-judged-by-the-relay.patch` (SPI-1076) lets t3's pi extension's `tool_call` hook pass a tool of pi's built-in MCP client ([U67](#u67-pis-built-in-mcp-for-the-relay-and-patch-0006-spi-1076)). Applied in memory at bundle time (`build.ts:109-145`); the submodule stays clean.
 - **Breaks when**: t3 edits the lines a Patch touches or their context.
 - **Detection**: the bump's "patches apply" step (`build.ts --check`, `git apply --check`). A Patch that still applies but whose surroundings changed meaning (another module-scope random value elsewhere; a second use of the projects root) is caught by deploy and by `--real-turn` respectively.
 - **Blast radius**: none in production: the bump stops and the pin stays.
@@ -372,7 +372,7 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 
 ### U43. The CLIs' MCP configuration surfaces (tools step; extends U32, U35)
 
-- **Where**: `apps/environment/src/agents/cliProfiles.ts` (Codex `mcp_servers.<name>` with `bearer_token_env_var`, `default_tools_approval_mode="approve"`, `tool_timeout_sec` 900, `startup_timeout_sec`), `acpProfiles.ts` (Claude Code's managed `permissions.allow` for the relay's servers; OpenCode's tool permissions for the relay's tools and `t3-code`; the admission locks were removed, owner 2026-11-12, back to stock), the handles per process (review H2: never a Container-wide file).
+- **Where**: `apps/environment/src/agents/cliProfiles.ts` (Codex `mcp_servers.<name>` with `bearer_token_env_var`, `default_tools_approval_mode="approve"`, `tool_timeout_sec` 900, `startup_timeout_sec`), `acpProfiles.ts` (Claude Code's managed `permissions.allow` for the relay's servers; OpenCode's tool permissions for the relay's tools and `t3-code`; the admission locks were removed, owner 2026-11-12, back to stock), pi's `mcp.json` ([U67](#u67-pis-built-in-mcp-for-the-relay-and-patch-0006-spi-1076)), the handles per process (review H2: never a Container-wide file).
 - **Breaks when**: an image bump renames a key, changes a precedence (a repo's `opencode.json` or `.mcp.json` winning over ours) or a default timeout, or adds a CLI-side approval that answers before ours.
 - **Detection**: `test/cliProfiles.test.ts` (snapshot of the managed files and argv); the stage's `cli-mcp <cli>` per CLI (read without a card, write asks, decline, full access, plan); `relay-hostile`.
 - **Fix**: re-read the CLI's config reference at the new version; adjust the profile and its snapshot.
@@ -811,6 +811,64 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Fix**: diff `CodexAdapterV2.ts` (`codexThreadRuntimeParams`, `buildCodexTurnStartParams`, `planSelectionTransition`)
   and the app-server schema (`ThreadStartParams`, `ThreadStartResponse`, `TurnStartParams`) between tags; update the
   guard, `codexProcessProvider` and the exclusion; re-run `p1167.ts`.
+### U66. The Settings server's caller: `threadLinkIn` reads the thread projection (SPI-1198)
+
+- **Where**: `apps/environment/src/provider/threadCaller.ts` `threadLinkIn` (through `threadLinkOf`, `provider/adapter.ts`)
+  reads `orchestration_v2_projection_threads.payload_json` at `$.linkOrigin` and `$.lineage.parentThreadId`, by
+  `thread_id`, and walks the lineage up to `MAX_LINEAGE` (32) threads. It decides whether a Settings server write may
+  run (ADR-0034, plan D3): `own` only when every row up the lineage is there and carries no link origin; a missing row,
+  a row that is not JSON, a loop, a too-deep lineage, or a `parentThreadId` that is present but not a non-empty string
+  is `unknown`; any `linkOrigin` is `linked`. t3's side: the projection's thread payload
+  (`t3code/apps/server/src/persistence/Migrations/`, `ProjectionStoreV2`) and `OrchestrationV2Thread`'s `linkOrigin`
+  and `lineage` in `@t3tools/contracts`.
+- **Breaks when**: t3 renames the table or `payload_json`, moves `linkOrigin` or `lineage.parentThreadId` inside the
+  payload, stops writing a projection row for a thread before its first turn, or marks Linked work some other way (a
+  field beside `linkOrigin`).
+- **Detection**: **silent**, but fails closed for a moved field only in part: a renamed table, a moved `lineage` or a
+  missing row reads `unknown`, so every own agent's write is refused (`UNKNOWN_REFUSAL` in the tool result and a
+  `settings-refused` log line with `reason: unknown-thread`); a moved `linkOrigin` reads as no link, so Linked work
+  could write. `test/settingsCaller.test.ts` pins our reading of the shapes, not t3's. Cheapest check: T4's workerd
+  test, extended to write a linked thread and a child through t3's own projector and run `threadLinkIn` on both.
+- **Blast radius**: a moved `linkOrigin`: a laptop's linked thread could change the cloud's settings without the
+  Settings server telling it apart (its cards still go to the owner). Anything else: agents cannot change settings
+  until it is fixed; reads and the panel are unaffected.
+- **Fix**: compare both JSON paths with `OrchestrationV2Thread` in `@t3tools/contracts` and t3's projector for the
+  thread row, and `linkedWorkOf` (`provider/adapter.ts`, which reads `$.linkOrigin` too, U2 and U5).
+
+### U67. pi's built-in MCP for the relay, and Patch 0006 (SPI-1076)
+
+- **Where**: `apps/environment/src/agents/cliProfiles.ts` `piMcpJson` writes `$PI_CODING_AGENT_DIR/mcp.json`, pi 1.5.2's
+  user-level file: one `mcpServers.<server>` per relayed server with `url` (`relayUrl`), `headers.Authorization:
+  "Bearer ${T3FLARE_TOOL_HANDLE}"` (pi expands `${VAR}` in a header from the process's environment; the handle is in
+  no file), `timeout` 900 (pi's per-request timeout, which progress notifications reset) and `exposure: "deferred"`
+  (found through pi's `tool_search`). It rests on pi's behaviour as M0's P16 found it (`docs/steps/settings-mcp/m0-pi.json`,
+  spike branch `settings-mcp-m0-spike`): `PI_OFFLINE=1` does not stop MCP connects; `--mode rpc` loads the built-in
+  MCP; `--no-extensions` (t3's fork launch, which gets no `mcp.json`) turns it off; a project's `.pi/mcp.json` is read
+  only under project trust, which `PI_SETTINGS`' `defaultProjectTrust: "never"` and `--no-approve` keep off.
+  `patches/0006-pi-relay-tools-are-judged-by-the-relay.patch` adds `isRelayedMcpTool` to the `tool_call` hook of t3's pi
+  extension (`t3code/packages/provider-pi/src/server/mcpExtensionSource.ts`, beside `isReadOnlyMcpTool`): outside full
+  access a tool named `mcp__…` whose `pi.getAllTools()` entry (one per name, the one pi runs) has `sourceInfo.path ===
+  "builtin:mcp"` is not asked, because the relay judges it and asks on the thread; without the Patch a relay read
+  would ask once and a write twice. Every other tool is asked as stock t3 asks, including pi's resource tools
+  (`read_mcp_resource`, also from `builtin:mcp`) and a tool of another extension under an `mcp__` name.
+- **Breaks when**: pi renames `mcp.json` or its keys, drops `${VAR}` expansion in headers, changes the `builtin:mcp`
+  source path or `getAllTools`' `sourceInfo`, lets `PI_OFFLINE` stop MCP, stops turning MCP off with `--no-extensions`,
+  or reads a project's `mcp.json` without trust; pi or the profile lets another source add `builtin:mcp` servers (an
+  extension's `registerMcpServer`, today impossible since the profile loads t3's extension alone); t3 edits the hook's
+  lines.
+- **Detection**: the Patch failing to apply (`check:patches`, loud); `test/piRelayPatch.test.ts` applies the Patch as
+  `build.ts` does and runs the hook against a stand-in for pi's API (the relay's tools pass; bash, write, t3's tools, a
+  look-alike extension tool, a resource tool and an unlisted tool are asked); `test/cliProfiles.test.ts` T-pi-1 pins the
+  file, the environment and the fork. **Silent**: a renamed source path (pi asks the extension's "Allow …?" before the
+  relay's card: more asks, fail closed); a changed `mcp.json` shape or expansion (pi lists none of the relay's tools).
+  Cheapest check: `scripts/tools.ts cli-mcp pi` on a stage (the read raises no request, the write only the relay's
+  card); or a `test:docker` case running the image's pi against a relay stand-in (not built).
+- **Blast radius**: a moved source label: an extra ask per relay call. A `builtin:mcp` server from elsewhere: its tools
+  would run unasked by the extension, which is why the profile keeps project trust off and the hook also requires the
+  `mcp__` name.
+- **Fix**: re-read pi's `docs/mcp.md`, `docs/extensions.md` and `docs/security.md` at the new version; rerun M0's P16
+  probe (`scripts/settings-spike` on the spike branch); re-cut the Patch with `git diff` of a copy of the file, as the
+  other Patches are cut (paths relative to `t3code/`, `a/` and `b/` prefixes, which `build.ts` reads).
 
 ## Gaps in detection
 
@@ -821,7 +879,7 @@ Checks worth adding, each closing a silent or late path above. Each has a ticket
 | T1 | ~~The bump runs the whole `bun run check`~~ Done (ADR-0030): it runs `pnpm run check` | U27, U20 | [SPI-1010](https://linear.app/spiritledsoftware/issue/SPI-1010) |
 | T2 | Fingerprint the t3 code we restate or emulate (the `server.ts` layer graph and routes, `TerminalManager.make`, `ServerEnvironment.make`'s capabilities, the git argv and `gh` schema literals); the bump fails on any change until the matching file of ours is reviewed | U1, U12, U13, U15 | [SPI-1011](https://linear.app/spiritledsoftware/issue/SPI-1011) |
 | T3 | ~~A test of the descriptor's capability keys against a classified list (kept, stripped), failing on a new key~~ Done: `test/capabilities.test.ts` and typecheck | U4 | [SPI-1012](https://linear.app/spiritledsoftware/issue/SPI-1012) |
-| T4 | A workerd test that runs t3's migrations, then each private-table query of `idle.ts` (and step 3's) and expects no `UnreadableTables`, and compares the status lists with t3's; the same for computer's VFS tables | U2, U23 | [SPI-1013](https://linear.app/spiritledsoftware/issue/SPI-1013) |
+| T4 | A workerd test that runs t3's migrations, then each private-table query of `idle.ts` (and step 3's) and expects no `UnreadableTables`, and compares the status lists with t3's; the same for computer's VFS tables | U2, U23, U66 | [SPI-1013](https://linear.app/spiritledsoftware/issue/SPI-1013) |
 | T5 | Assert `dist/build-report.json` against the pin's: Shadows applied, alias importers, skipped dependency imports, stub names | U9, U11 | [SPI-1014](https://linear.app/spiritledsoftware/issue/SPI-1014) |
 | T6 | Acceptance asserts from the router trace that t3's polls started no stopped Container and that patched read shapes were not answered `last-answer` | U6, U13 | [SPI-1015](https://linear.app/spiritledsoftware/issue/SPI-1015) |
 | T7 | Acceptance asserts t3's source-control discovery shows GitHub signed in through the `gh` emulation | U15 | [SPI-1016](https://linear.app/spiritledsoftware/issue/SPI-1016) |
