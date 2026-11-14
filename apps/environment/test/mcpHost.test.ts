@@ -266,3 +266,20 @@ describe("McpHost and MCP apps (G11, review L10)", () => {
     expect(await run.host.call({ server: "commissary", tool: "get_time", args: {}, judged: "read" })).toEqual({ kind: "result", isError: false, text: "12:00", structured: { time: "12:00" } });
   });
 });
+
+// The Settings server (ADR-0034, plan D2), M3: a member of the set with static tools, reached without the engine.
+describe("McpHost and the Settings server", () => {
+  it("lists its static tools without the engine, never stale; a call without the Environment's caller or server is refused", async () => {
+    const run = setup(() => []);
+    const inventory = await run.host.list("settings");
+    expect(inventory).toMatchObject({ status: "ok" });
+    expect(run.seen).toEqual([]);
+    const settings = (await run.host.view()).servers.find((server) => server.name === "settings");
+    expect(settings).toMatchObject({ kind: "settings", state: "available" });
+    expect(settings?.tools.find((t) => t.upstream === "get_settings")).toMatchObject({ class: "read", hinted: "read", exposure: "deferred" });
+    expect(settings?.tools.find((t) => t.upstream === "change_mcp")).toMatchObject({ class: "write", hinted: "write" });
+    expect(await run.host.call({ server: "settings", tool: "get_settings", args: { entity: "harness" }, caller: { door: "own", thread: "t", agent: "piDurable" } })).toMatchObject({ kind: "unavailable" });
+    // Commissary's stale inventory is listed again in the background; nothing goes to the engine for the Settings server.
+    expect(run.seen.filter((seen) => seen.target.name === "settings")).toEqual([]);
+  });
+});

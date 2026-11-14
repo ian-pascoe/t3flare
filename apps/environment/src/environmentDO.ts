@@ -39,7 +39,8 @@ import type { SkillsApiDeps } from "./skills/api.ts";
 import { githubReader, readAccessFor } from "./skills/contents.ts";
 import { type SkillStore, skillStore } from "./skills/store.ts";
 import { HarnessOAuth, type McpOAuthBinding, OAUTH_CALLBACK_PATH, OAUTH_CLIENT_PATH } from "./harness/oauth.ts";
-import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpView } from "./mcp/host.ts";
+import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpHostDeps, type McpView } from "./mcp/host.ts";
+import { DURABLE_AGENT } from "./provider/threadCaller.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
 import { commissaryManagementOf } from "./usage/commissary.ts";
@@ -389,14 +390,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       secrets: harnessSecrets(this.ctx.storage.kv),
       oauth: this.harnessOAuth,
       // The Container budget's leases (ADR-0032): the Environment section shows the running count and holders.
-      budget: async () => {
-        const { environmentServices } = await import("./agents/bindings.ts");
-        const { byName } = await import("./agents/rpc.ts");
-        const services = environmentServices();
-        const state = await byName(services.agents.CONTAINER_BUDGET, "budget", "CONTAINER_BUDGET").state();
-        const names = new Map(services.workspaces.list().map((ws) => [String(services.agents.WORKSPACES?.idFromName(ws.id)), ws.id]));
-        return { max: state.max, leases: state.leases.map((lease) => ({ holder: lease.holder, workspace: names.get(lease.holder) ?? null })) };
-      },
+      budget: () => this.#budgetState(),
       skills: this.#skillsApi(),
       endpoints: {
         store: this.#endpointStore(),
@@ -436,6 +430,48 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return relayTargetOf(await this.#endpointStore().resolve(endpointId), endpointId);
   }
 
+  /** The Container budget DO's state: its leases, each with the Workspace that holds it when known. */
+  async #budgetState() {
+    const { environmentServices } = await import("./agents/bindings.ts");
+    const { byName } = await import("./agents/rpc.ts");
+    const services = environmentServices();
+    const state = await byName(services.agents.CONTAINER_BUDGET, "budget", "CONTAINER_BUDGET").state();
+    const names = new Map(services.workspaces.list().map((ws) => [String(services.agents.WORKSPACES?.idFromName(ws.id)), ws.id]));
+    return { max: state.max, leases: state.leases.map((lease) => ({ holder: lease.holder, workspace: names.get(lease.holder) ?? null })) };
+  }
+
+  /**
+   * The Settings server's call (ADR-0034, plan D2): t3flare's own agent, as the MCP host passes it with the caller this
+   * object derived. Its writes go through the same ops as the panel's.
+   */
+  async #settingsCall(input: Parameters<NonNullable<McpHostDeps["settingsServer"]>>[0]): Promise<McpCallAnswer> {
+    const [{ settingsCall }, { settingsChanges }, { HARNESS_PATH, harnessStatus, runningContainers }, { threadLinkOf }, { durableModes }, { cliThreadState }] = await Promise.all([
+      import("./settings/server.ts"),
+      import("./settings/changes.ts"),
+      import("./harness/panel.ts"),
+      import("./provider/adapter.ts"),
+      import("./provider/threadCaller.ts"),
+      import("./provider/cli/cliAsk.ts"),
+    ]);
+    const store = harnessStore(this.ctx.storage.kv);
+    const skills = this.#skillsApi();
+    return settingsCall(
+      {
+        ops: { store, mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth, skills, now: () => Date.now() },
+        oauthStatus: (server) => this.harnessOAuth.status(server),
+        link: (thread) => threadLinkOf(thread),
+        // A Durable thread's modes are the adapter's record; a CLI thread's are its live session's (plan D3).
+        modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
+        changes: settingsChanges(this.ctx.storage.sql),
+        panelUrl: () => (this.env.T3FLARE_HOST === undefined && this.#host === undefined ? undefined : `https://${this.#configuredHost()}${HARNESS_PATH}`),
+        status: () => harnessStatus({ store, skills }),
+        running: () => runningContainers({ budget: () => this.#budgetState() }),
+        log: (event) => console.log(JSON.stringify(event)),
+      },
+      input,
+    );
+  }
+
   /**
    * The t3 host's public OAuth paths (review M4: the callback and the client metadata document, outside `/_t3flare`),
    * RPC from the Worker. Nothing else is answered here.
@@ -472,6 +508,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       oauthToken: (server, stale) => this.harnessOAuth.accessToken(server, stale),
       background: (work) => this.ctx.waitUntil(work),
       ownHost: () => this.env.T3FLARE_HOST ?? this.#host,
+      settingsServer: (input) => this.#settingsCall(input),
     });
     return this.#mcpHost;
   }
@@ -516,10 +553,14 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     readonly args: Readonly<Record<string, unknown>>;
     readonly judged?: "read" | "write";
     readonly asker?: McpAsker;
+    /** The Session's thread (plan D3); absent from a Session before SPI-1198, judged as unknown work. */
+    readonly thread?: string;
   }): Promise<McpCallAnswer> {
     Idle.requestStarted();
     try {
-      return await this.mcpHost.call(input);
+      const { thread, ...call } = input;
+      // Only Sessions call this, so the agent is a Durable one; everything else about it is derived from the thread.
+      return await this.mcpHost.call({ ...call, caller: { door: "own", thread: typeof thread === "string" && thread !== "" ? thread : undefined, agent: DURABLE_AGENT } });
     } finally {
       Idle.requestEnded();
     }

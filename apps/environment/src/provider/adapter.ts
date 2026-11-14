@@ -45,6 +45,8 @@ import { toWorkspace } from "@t3flare/workspace-client";
 import { environmentServices } from "../agents/bindings.ts";
 import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
+import type { ThreadLink } from "../settings/server.ts";
+import { forgetDurableModes, noteDurableModes, threadLinkIn } from "./threadCaller.ts";
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "./capabilities.ts";
 import { type AttachmentReader, turnPrompt } from "./attachments.ts";
 import { messageSkillsFor, type SkillsAccess } from "./skills.ts";
@@ -95,6 +97,12 @@ export const linkedWorkOf = (threadId: string): LinkedWork | null => {
     return { label: "a linked environment", access: null };
   }
 };
+
+/**
+ * The thread's Linked work for the Settings server (plan D3): `"own"`, `"linked"`, or `"unknown"` for a thread with no
+ * projection row. Unlike `linkedWorkOf`, it fails closed.
+ */
+export const threadLinkOf = (threadId: string): ThreadLink => threadLinkIn(environmentServices().sql, threadId);
 
 const call = <A>(what: string, thunk: () => Promise<A>) =>
   Effect.tryPromise({ try: thunk, catch: (cause) => protocolError(`The agent's session did not answer ${what}`, cause) });
@@ -256,6 +264,13 @@ export const makePiDurableAdapter = (
           ),
         );
       const unregister = registerSession(sessionName, onPush);
+      // The Settings server's record of this session's threads' modes (plan D3), cleared when it unregisters.
+      const modesOwner = {};
+      const modesNoted = new Set<string>();
+      const noteModes = (threadId: string, runtimeMode: string, interactionMode: string) => {
+        modesNoted.add(threadId);
+        noteDurableModes(threadId, { runtimeMode: runtimeModeOf(runtimeMode), interactionMode: interactionModeOf(interactionMode) }, modesOwner);
+      };
 
       // The inverse guard: an open turn with no push for SILENT_TURN_MS pulls a snapshot; a turn the Session no longer
       // has is ended as lost, so a lost Session cannot keep a t3 run (and the Environment) open forever.
@@ -292,6 +307,7 @@ export const makePiDurableAdapter = (
         Effect.sync(() => {
           closed = true;
           unregister();
+          for (const threadId of modesNoted) forgetDurableModes(threadId, modesOwner);
         }).pipe(Effect.andThen(Queue.end(events)), Effect.ignore),
       );
 
@@ -324,6 +340,7 @@ export const makePiDurableAdapter = (
             linked,
           }),
         );
+        noteModes(registerInput.threadId, registerInput.runtimeMode, registerInput.interactionMode);
         // ADR-0004: an Environment restart ends running turns. A Session still busy when a provider session reopens it
         // has a turn t3 already ended; abort it so both sides agree (the push's orphans usually did it already).
         if (opened.busy && differ.turns.size === 0) {
@@ -445,6 +462,7 @@ export const makePiDurableAdapter = (
             emitSession("running", startedAt, turnInput.modelSelection.model);
             const credential = yield* t3Mcp;
             const linked = linkedWorkOf(turnInput.threadId);
+            noteModes(turnInput.threadId, turnInput.runtimePolicy.runtimeMode, turnInput.runtimePolicy.interactionMode);
             yield* call("submitTurn", () =>
               client().submitTurn({
                 providerTurnId: providerTurn.id,

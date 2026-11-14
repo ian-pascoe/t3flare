@@ -3,6 +3,9 @@
 // and calls through the MCP host as a Session does, with the same `decideCall`; a write that asks raises t3's card on
 // the calling thread (`approveCliTool`) while the HTTP request is held.
 //
+// The Settings server (ADR-0034, plan D7) judges its own writes with a card of its own: for it the relay keeps only plan
+// mode's refusal, raises no card, and passes the calling thread and CLI as the caller (plan D3).
+//
 // A server's question during a call (SPI-1079) is the MCP host's to turn into a card; the relay hands it the calling
 // thread's asker (`askCliQuestion`), so the card is raised on that thread's live turn while the HTTP request is held. The
 // CLI is never sent an elicitation and never sees a pause's `requestId`.
@@ -11,10 +14,12 @@
 // only, never an elicitation, so `initialize`, `ping`, `tools/list` and `tools/call` are the whole surface, and the MCP
 // Worker keeps no inbound entrypoint. G11 (MCP apps, review L10) adds a tool's `_meta.ui` to `tools/list`, a result's
 // `structuredContent`, and `resources/read` of a `ui://` resource one of this server's offered tools declares.
-import { cardText, decideCall, type McpRelayAnswer, type McpRelayInput, type ToolClass } from "@t3flare/harness-registry";
+import { cardText, decideCall, SETTINGS_SERVER, type McpRelayAnswer, type McpRelayInput, type ToolClass } from "@t3flare/harness-registry";
 
 import type { McpAsker } from "@t3flare/session-protocol";
 
+import type { OwnCaller } from "../settings/server.ts";
+import { SETTINGS_INSTRUCTIONS } from "../settings/tools.ts";
 import type { McpCallAnswer, McpView } from "./host.ts";
 
 /** Protocol versions the relay speaks; it answers with the client's when it knows it. */
@@ -22,7 +27,15 @@ export const RELAY_PROTOCOL_VERSIONS: ReadonlyArray<string> = ["2025-11-25", "20
 
 export interface RelayDeps {
   readonly view: () => Promise<McpView>;
-  readonly call: (input: { readonly server: string; readonly tool: string; readonly args: Readonly<Record<string, unknown>>; readonly judged: ToolClass; readonly asker?: McpAsker }) => Promise<McpCallAnswer>;
+  readonly call: (input: {
+    readonly server: string;
+    readonly tool: string;
+    readonly args: Readonly<Record<string, unknown>>;
+    readonly judged: ToolClass;
+    readonly asker?: McpAsker;
+    /** The calling thread and CLI, from the tool handle (plan D3): the Settings server judges its writes by it. */
+    readonly caller: OwnCaller;
+  }) => Promise<McpCallAnswer>;
   /** G11 (MCP apps): an App's `ui://` resource of `server` (`McpHost.readAppResource`); absent, no resource is read. */
   readonly readAppResource?: (input: { readonly server: string; readonly uri: string }) => Promise<{ readonly kind: "result"; readonly value: unknown } | { readonly kind: "refused"; readonly message: string }>;
   /** The cards for a server's questions on the calling thread (SPI-1079). */
@@ -60,7 +73,8 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
         protocolVersion,
         capabilities: { tools: { listChanged: false }, ...(deps.readAppResource === undefined ? {} : { resources: {} }) },
         serverInfo: { name: `t3flare-${input.server}`, version: "1" },
-        instructions: `Tools of the MCP server "${input.server}" through t3flare. Write tools may wait for the owner's approval on this thread.`,
+        instructions:
+          input.server === SETTINGS_SERVER ? SETTINGS_INSTRUCTIONS : `Tools of the MCP server "${input.server}" through t3flare. Write tools may wait for the owner's approval on this thread.`,
       });
     }
     case "ping":
@@ -98,7 +112,9 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
         log("refused");
         return toolError(id, verdict.reason);
       }
-      if (verdict.kind === "ask") {
+      // The Settings server judges its own writes, with one card of its own (plan D7): the relay keeps only plan mode's
+      // refusal for it, and raises no card.
+      if (verdict.kind === "ask" && server.kind !== "settings") {
         const answer = await deps.ask({
           thread: input.thread,
           askId: input.askId,
@@ -112,9 +128,16 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
         }
         if (answer.forSession === true) deps.accepted.add(input.thread, acceptKey);
         log("approved", { forSession: answer.forSession === true });
-      } else log("run");
+      } else log(verdict.kind === "ask" ? "to-settings" : "run");
       const asker = deps.asker?.(input.thread);
-      const result = await deps.call({ server: input.server, tool: tool.upstream, args: args as Record<string, unknown>, judged: tool.class, ...(asker === undefined ? {} : { asker }) });
+      const result = await deps.call({
+        server: input.server,
+        tool: tool.upstream,
+        args: args as Record<string, unknown>,
+        judged: tool.class,
+        caller: { door: "own", thread: input.thread, agent: input.cli },
+        ...(asker === undefined ? {} : { asker }),
+      });
       if (result.kind === "unavailable") return toolError(id, result.message);
       return ok(id, { content: [{ type: "text", text: result.text }], isError: result.isError, ...(result.structured === undefined ? {} : { structuredContent: result.structured }) });
     }

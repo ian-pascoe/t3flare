@@ -35,6 +35,8 @@ import {
 import type { McpAsker, McpQuestionAnswer } from "@t3flare/session-protocol";
 
 import type { KvStorage } from "../harness/store.ts";
+import type { OwnCaller } from "../settings/server.ts";
+import { settingsDefinitions } from "../settings/tools.ts";
 import { type ElicitAnswer, type ElicitResultOrCancel, isPausingServer, pauseOf, planPause, planQuestion, type QuestionContext, type QuestionPlan } from "./elicitation.ts";
 
 /** How long a server's question waits for the owner: cloudpid's Legacy wait, and the CLI card's (`CLI_ASK_MS`). */
@@ -139,6 +141,17 @@ export interface McpHostDeps {
   readonly background?: (work: Promise<unknown>) => void;
   /** The t3 host as deployed: a page question that sends the owner there is declined (SPI-1079). */
   readonly ownHost?: () => string | undefined;
+  /**
+   * The Settings server (ADR-0034, plan D2): a call to the `settings` entry goes here, with the caller the Environment
+   * derived and the call's asker, before any inventory or pausing logic. Absent, its calls are refused.
+   */
+  readonly settingsServer?: (input: {
+    readonly tool: string;
+    readonly args: Readonly<Record<string, unknown>>;
+    readonly caller: OwnCaller;
+    readonly asker?: McpAsker;
+    readonly signal?: AbortSignal;
+  }) => Promise<McpCallAnswer>;
 }
 
 export class McpHost {
@@ -214,11 +227,14 @@ export class McpHost {
   }
 
   inventory(name: string): Inventory {
+    // The Settings server's tools are static (plan D2): no engine, no inventory kept, no credential, always listed.
+    if (this.servers()[name]?.kind === "settings") return { server: name, listedAt: this.#now(), status: "ok", definitions: settingsDefinitions(), refused: [] };
     return this.#deps.kv.get<Inventory>(inventoryKey(name)) ?? { server: name, listedAt: 0, status: "never", definitions: {}, refused: [] };
   }
 
   /** Lists `name`'s tools now (one list in flight per server). */
   list(name: string): Promise<Inventory> {
+    if (this.servers()[name]?.kind === "settings") return Promise.resolve(this.inventory(name));
     const running = this.#refreshing.get(name);
     if (running !== undefined) return running;
     const work: Promise<Inventory> = this.#list(name).finally(() => {
@@ -322,7 +338,13 @@ export class McpHost {
         listedAt: inventory.listedAt > 0 ? inventory.listedAt : null,
         exposure: server.exposure,
         // SPI-1079: a pausing server's `resume` is t3flare's to call (with the owner's answer), so no agent is offered it.
-        tools: tools.filter((tool) => tool.exposure !== "hidden" && !(pausing && tool.upstream === RESUME_TOOL)),
+        tools: tools.filter(
+          (tool) =>
+            tool.exposure !== "hidden" &&
+            !(pausing && tool.upstream === RESUME_TOOL) &&
+            // The Settings server read-only (plan D2): its write tools are not listed.
+            !(server.kind === "settings" && server.writes === false && tool.class === "write"),
+        ),
       });
     }
     const version = await definitionHash({ name: "view", inputSchema: servers.map((server) => [server.name, server.tools.map((tool) => [tool.name, tool.hash, tool.class, tool.exposure])]) });
@@ -343,9 +365,23 @@ export class McpHost {
     readonly signal?: AbortSignal;
     /** The caller's cards for the server's questions (SPI-1079); without one, every question is cancelled. */
     readonly asker?: McpAsker;
+    /** Who calls, as the Environment derived it (plan D3): the Settings server judges its writes by it. */
+    readonly caller?: OwnCaller;
   }): Promise<McpCallAnswer> {
     const server = this.servers()[input.server];
     if (server === undefined || !server.enabled) return { kind: "unavailable", message: `The owner removed or disabled the MCP server ${input.server}; its tools are gone from the next turn.`, mayHaveRun: false };
+    if (server.kind === "settings") {
+      // Fails closed (plan D3): without the Environment's caller nothing reaches the Settings server.
+      if (this.#deps.settingsServer === undefined || input.caller === undefined) return { kind: "unavailable", message: "The Settings server cannot tell who is calling, so it answers nothing.", mayHaveRun: false };
+      if (server.toolExposure?.[input.tool] === "hidden") return { kind: "unavailable", message: `${input.tool} is hidden by the owner.`, mayHaveRun: false };
+      return this.#deps.settingsServer({
+        tool: input.tool,
+        args: input.args,
+        caller: input.caller,
+        ...(input.asker === undefined ? {} : { asker: input.asker }),
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      });
+    }
     const inventory = this.inventory(input.server);
     const definition = inventory.definitions[input.tool];
     if (definition === undefined) return { kind: "unavailable", message: `${input.server} has no tool ${input.tool} (any more).`, mayHaveRun: false };

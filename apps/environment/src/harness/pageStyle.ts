@@ -125,6 +125,7 @@ label.exposure{display:inline-flex;align-items:center;gap:.5rem;font-size:.75rem
 .switch:is([aria-checked=true],:checked){background:var(--primary)}
 .switch:is([aria-checked=true],:checked)::before{transform:translateX(1rem)}
 input.switch{appearance:none;margin:0}
+.server-access{display:inline-flex;flex:none;gap:.25rem}
 .switch:disabled,.switch[aria-busy=true]{opacity:.64;cursor:progress}
 .pill{display:inline-flex;align-items:center;gap:.375rem;height:1.375rem;padding:0 .5rem;border-radius:999px;font-size:.6875rem;font-weight:550;white-space:nowrap;background:var(--muted);color:var(--muted-fg)}
 .pill::before{content:"";width:.375rem;height:.375rem;border-radius:50%;background:currentColor}
