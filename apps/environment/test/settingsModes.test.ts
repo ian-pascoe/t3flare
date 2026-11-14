@@ -5,7 +5,7 @@
 // the signed `requestState` and elicitation id refused when they are not this call's. M5b's part (SPI-1201): `native`
 // (the 2026 form round trip, the 2025 held stream and its cut, 2025-06-18's params) and `model` (the Pause as `pauseOf`
 // reads it, `resume` and its refusals), and every fallback of D12's table.
-import { MAX_GLOBAL_MISE_BYTES } from "@t3flare/harness-registry";
+import { CARD_TEXT_MAX, MAX_GLOBAL_MISE_BYTES } from "@t3flare/harness-registry";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { addMcpServer } from "../src/harness/ops.ts";
@@ -772,6 +772,41 @@ describe("D12's fallbacks for native and model", () => {
     expect(JSON.stringify(body.result?.content)).toContain("whatever the elicitation_mode");
     expect(await structuredOf(await endpoint(modern("tools/call", { name: "resume", arguments: { requestId: record.id, response: { action: "accept" } } }, { query: MODEL, id: 3 })))).toMatchObject({ status: "refused" });
     expect(f.deps.changes.get(record.id)?.state).toBe("open");
+  });
+
+  // C5 (SPI-1201 review): `oversize` is judged on the message the client is actually sent in its mode (the change, who
+  // asked, how to answer and the page's link), so no question ever carries a cut message.
+  it.each([
+    ["native", NATIVE, (result: Record<string, unknown> | undefined) => (result as { inputRequests?: { change?: { params?: { message?: string } } } } | undefined)?.inputRequests?.change?.params?.message],
+    ["model", MODEL, (result: Record<string, unknown> | undefined) => (result?.structuredContent as { elicitation?: { message?: string } } | undefined)?.elicitation?.message],
+  ] as const)("%s: at the boundary, the longest change asked in the mode is sent whole, and one character more is answered on the page", async (_mode, query, messageOf) => {
+    const ask = async (n: number) => {
+      const f = settingsFixture();
+      try {
+        const body = await bodyOf(await endpointOf(f)(modern("tools/call", { name: "change_environment", arguments: { expectedRevision: 0, settings: { globalMiseConfig: `# ${"x".repeat(n)}\n` } } }, { query })));
+        return { record: f.deps.changes.open()[0]!, result: body.result };
+      } finally {
+        f.dispose();
+      }
+    };
+    let low = 0;
+    let high = MAX_GLOBAL_MISE_BYTES - 8;
+    expect((await ask(high)).record.needsPage).toBe("oversize");
+    expect((await ask(low)).record.needsPage).toBeUndefined();
+    while (high - low > 1) {
+      const middle = Math.floor((low + high) / 2);
+      if ((await ask(middle)).record.needsPage === "oversize") high = middle;
+      else low = middle;
+    }
+    const fits = await ask(low);
+    expect(fits.record.mode).toBe(query === NATIVE ? "native" : "model");
+    const message = messageOf(fits.result);
+    expect(message).toBeDefined();
+    expect(message).not.toContain("[TRUNCATED");
+    expect(message!.length).toBeLessThanOrEqual(CARD_TEXT_MAX);
+    const over = await ask(high);
+    expect(over.record).toMatchObject({ mode: "browser", needsPage: "oversize" });
+    expect(pauseOf(over.result)).toBeUndefined();
   });
 
   it("a change that needs the page, in model: the link, never a Pause nor a question", async () => {

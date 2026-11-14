@@ -1295,14 +1295,16 @@ const ANSWERED_HOW: Readonly<Record<OwnerMode, (url: string | undefined) => stri
  * mode (`url`, the Change page's, is named in `native` and `model`, where the question itself carries no link).
  */
 export const ownerMessage = (view: ChangeView, caller: Pick<OwnerCaller, "kind" | "client">, mode: OwnerMode = "browser", url?: string): string =>
-  cardText(
-    [
-      changeText(view),
-      "",
-      `Asked by ${askedByText({ door: "owner", principal: caller.kind === "owner" ? "owner" : "service-token", ...(caller.client === undefined ? {} : { client: caller.client }) })}.`,
-      ANSWERED_HOW[mode](url),
-    ].join("\n"),
-  );
+  cardText(ownerMessageText(view, caller, mode, url));
+
+/** `ownerMessage` whole, before `cardText`: what decides `oversize` for an Owner client (plan D6; SPI-1201 review). */
+const ownerMessageText = (view: ChangeView, caller: Pick<OwnerCaller, "kind" | "client">, mode: OwnerMode, url: string | undefined): string =>
+  [
+    changeText(view),
+    "",
+    `Asked by ${askedByText({ door: "owner", principal: caller.kind === "owner" ? "owner" : "service-token", ...(caller.client === undefined ? {} : { client: caller.client }) })}.`,
+    ANSWERED_HOW[mode](url),
+  ].join("\n");
 
 /** The schema of D12's `native` form and `model` Pause: none, so the answer is the action alone (M0: shown as Accept / Decline). */
 export const EMPTY_SCHEMA = { type: "object", properties: {} } as const;
@@ -1388,7 +1390,9 @@ const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned
     reader: ownerReader(deps, caller),
     // Its mode is the request's, or `browser` when the change needs the page (plan D12's fallbacks).
     modeOf: (needsPage) => modeFor(input.mode, needsPage),
-    fullText: (view) => changeText(view),
+    // The message the client is sent in the requested mode, whole (its Change page's URL included): a change whose
+    // message a question would cut is answered on the page (plan D6), judged on what is actually sent (SPI-1201 review).
+    fullText: (view, url) => ownerMessageText(view, caller, input.mode, url),
     // A repeated call (a client that retried, or an agent that did not read `W`) finds its own change, not a second one.
     reuse: (hash) =>
       deps.changes.openBy(capKeyOf("owner", caller.key)).find((record) => record.state === "open" && record.hash === hash && record.expectedRevision === expected && record.mode === modeFor(input.mode, record.needsPage)),
