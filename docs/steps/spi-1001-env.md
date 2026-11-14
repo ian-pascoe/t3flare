@@ -117,15 +117,21 @@ new stage `penvsk` (destroyed). The other three still hold from before the rebas
 `env-refusals.json` exercise only the fetch, the store and the panel's API, and `env-no-container.json` only the agent's
 `read` tool on the Workspace's files. The rebase changed none of those code paths.
 
+**Review round 1.** The wait's split of its stdin lost every removed path when the list began with them (a Remove or a
+disable): `sed '1,/^--removed--$/d'` looks for the range's end from line 2. It is one `awk` pass now, with removal-only
+and add-only tests. `env-remove.json` was taken again at `d27dc0f`: a removal-only take while the Container runs, and a
+removed Environment skill with no Repo namesake (`grill-me`) whose `$grill-me` reaches the agent untouched.
+`env-no-container.json` was taken again on the same stage. The stage is destroyed.
+
 | File | Shows | Commit deployed |
 | -- | -- | -- |
 | [`env-install-public.json`](spi-1001/env-install-public.json) | `mattpocock/skills`' `grill-me` previewed and installed at its commit; the snapshot and the model's listing at `/workspace/.agents/skills/grill-me/SKILL.md`, scope `user`; a `$grill-me` turn answering the block's location; the chip's "View instructions" read (t3's `ProjectReadFileError`) | `0532c3d` |
 | [`env-install-private.json`](spi-1001/env-install-private.json) | `tools/plum/fruit-code` of the private fixture repo (outside any discovered root), read with a token for that repo; the branch moved on and the install stayed at its commit; View's `SKILL.md` and GitHub URLs | `752cb4b` |
 | [`env-precedence.json`](spi-1001/env-precedence.json) | The Repo `fruit-code` says `KIWI-7` and the Environment's says `PLUM-9`; `$fruit-code` answers `PLUM-9`, and `skipped` names both Repo copies as shadowed | `0532c3d` |
 | [`env-update.json`](spi-1001/env-update.json) | Check and Update for a size-changing and a same-size edit while the Container runs; each take caught up at its first look; the agent's `bash` reads the new `notes.md`, its SHA-256 the new blob's | `0532c3d` |
-| [`env-no-container.json`](spi-1001/env-no-container.json) | An install, then a turn whose `read` tool reads the skill's file; the Container stopped before and after | `752cb4b` |
+| [`env-no-container.json`](spi-1001/env-no-container.json) | An install, then a turn whose `read` tool reads the skill's file; the Container stopped before and after | `d27dc0f` |
 | [`env-readonly.json`](spi-1001/env-readonly.json) | The agent's `write` refused ("read-only mount …"); the agent's `bash` write as a fresh Container's first command refused ("Read-only file system", the bind in `mountinfo`); a write from the running Container refused; nothing planted | `0532c3d` |
-| [`env-remove.json`](spi-1001/env-remove.json) | Removed: gone from the mount and the running Container; the snapshot's `fruit-code` is the Repo's again, and `$fruit-code` answers `KIWI-7`; an unknown `$plum-gone` untouched | `0532c3d` |
+| [`env-remove.json`](spi-1001/env-remove.json) | Two removed (`fruit-code`, `grill-me`): a removal-only take while the Container runs, caught up; gone from the mount and the running Container; the snapshot's `fruit-code` is the Repo's again, and `$fruit-code` answers `KIWI-7`; `grill-me` gone from the snapshot and `$grill-me` reaching the agent untouched (no `<skill>` block); an unknown `$plum-gone` untouched | `d27dc0f` |
 | [`env-refusals.json`](spi-1001/env-refusals.json) | An owner without the App, a repo outside the installation (both wordings, whole); a credential-looking file, a link, a skill over 4 MiB, a backslash path, and two skills over the 500-file cap (422); nothing kept | `b4a3475` |
 | `skills-{desktop,phone}-{light,dark}.png` | The section with two skills (one disabled), a skill's view open, and a preview of the refusals branch | `7e8ff88` |
 
@@ -133,6 +139,33 @@ new stage `penvsk` (destroyed). The other three still hold from before the rebas
   script's remove prompt. `aac13de` and `7e8ff88` changed only the section's layout and a wrap.
 - **The fixture branches:** `spi1148-env` and `spi1148-refusals` of `ian-pascoe/t3flare-fixture`, pushed by
   `penvsk.ts fixture`. Its `main` is untouched.
+
+### Commits the evidence names that are on no branch now
+
+**This repo.** The rebase onto 4af90c0 rewrote the branch. Five deployed commits that evidence files still name are
+pre-rebase shas, kept only by those files. Each maps by its change to a rebased commit. The rebased one also holds
+`main`'s SPI-1151 and SPI-1152, so it is the same change, not the same build.
+
+| Pre-rebase | Rebased | Named by |
+| -- | -- | -- |
+| `f64889a` (M0 probes) | `947531e` | `env-probe.json` |
+| `1fdd389` (the first plan) | `33f64d6` | `env-sync.json` (its Worker code was `f64889a`'s) |
+| `752cb4b` (M5 harness) | `6bec1e9` | `env-install-private.json` |
+| `b4a3475` (the 422) | `71ce45c` | `env-refusals.json` |
+| `7e8ff88` (a phone wrap) | `02f3ad5` | `skills-*.png` |
+
+`0532c3d` and `d27dc0f` are on the branch.
+
+**The fixture repo.** Each run of the stage script force-pushes `spi1148-env` with a new orphan commit. The commits
+earlier runs pushed are unreferenced there now, kept by GitHub for a time by SHA and then gone:
+
+- `3259ff8` and `0b3fc5b`: the pinned and moved-to commits in `env-install-private.json`, whose View URLs point at
+  `3259ff8`;
+- `ad19bf8`, `4d5f90a` and the other edits in `env-update.json`;
+- `cdaba76` (`spi1148-refusals`, still its head) and `be26ac6` (`spi1148-env`'s head now) stay referenced.
+
+No evidence file needs those commits to be read again: each records what was read then. A re-run pushes and pins new
+ones. Only the GitHub links in `env-install-private.json` may stop resolving.
 
 ## Seams tested
 
@@ -147,9 +180,10 @@ new stage `penvsk` (destroyed). The other three still hold from before the rebas
 | The API through `handleHarness`: guards, preview, install, view, check, update (gone, renamed), remove, enable, a GitHub failure, the 422 cap | `apps/environment/test/skillsApi.test.ts` |
 | Snapshot scope `user` and paths, Repo-only asks; expansion from rows; the adapter carrying the hash | `apps/environment/test/skillsSnapshot.test.ts`, `skillExpansion.test.ts` |
 | The section's render, escaping, totals, the script writing text only, confirm on remove | `apps/environment/test/harnessPage.test.ts` |
-| The set served read-only over a real computer Workspace in workerd, replaced whole, a failed copy falling back | `apps/agents/test/skillSet.workerd.test.ts` |
+| The set served read-only over a real computer Workspace in workerd, replaced whole, a failed copy falling back to the held set, and to the empty set when that fails too | `apps/agents/test/skillSet.workerd.test.ts` |
 | The wait's expectation and script (run against a directory changed part-way), the lock marker, `keepPriorSkills`, the mount path pinned across packages, the lock in `exec()` | `apps/agents/test/skillSetWait.test.ts` |
 | A turn's take: no hash, refusal, an older Workspace, the bound | `apps/agents/test/environmentSkillsTake.test.ts` |
+| The Workspace's take (`skillSetTake.ts`, what `WorkspaceDO.takeEnvironmentSkills` runs): a held hash, a refused set remembered by hash and read again only when it moves, a mount that fails, an Environment without either call; the wait sending no command to a stopped Container and an `onlyIfRunning` one to a running Container | `apps/agents/test/skillSetTake.test.ts` |
 | The lock leaves a command's output and status alone, and is tried once per launch | `packages/workspace-client/src/skillsLock.test.ts` |
 | The Durable agent's Container commands start with the lock | `packages/computer-env/src/containerScript.test.ts` |
 
@@ -167,6 +201,10 @@ The agents Worker still loads no t3 code: no `t3code/` or `@t3tools/` source in 
 - **CLI agents** take no set at their turns (SPI-1153; ADR-0033 Consequences).
 - **The Container lock is not a boundary:** the agent is root (ADR-0033 §5).
 
+- **Not driven through the Durable Object itself:** `WorkspaceDO` needs a Container binding and a Worker Loader, which
+  the agents workerd harness does not give. Its wiring around `takeSkillSet` is thin and typechecked, and
+  `exec()`'s `onlyIfRunning` check is one line, covered on the stage only (`env-update.json`, `env-remove.json`).
+
 ## Docs
 
 - ADR-0033, and the ADR-0032 refinement (its table's row for Environment skills).
@@ -178,4 +216,4 @@ The agents Worker still loads no t3 code: no `t3code/` or `@t3tools/` source in 
 
 ## Checks
 
-`pnpm run check` passes at `0532c3d` (34/34), the rebased head the evidence above was refreshed on; the commits after it change only this report and the refreshed evidence. One run before it failed in `apps/mcp-worker`'s `byteStream` timing test, which this branch does not touch, and passed on the next run.
+`pnpm run check` passes at `d27dc0f` (34/34), the head of review round 1's fixes, where `env-remove.json` and `env-no-container.json` were taken again; the commit after it changes only this report and those two files. After the rebase it passed at `0532c3d` too; one run before that failed in `apps/mcp-worker`'s `byteStream` timing test, which this branch does not touch, and passed on the next run.
