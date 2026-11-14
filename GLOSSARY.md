@@ -185,6 +185,10 @@ A plain `NAME=value` every command in a Workspace starts with, kept in the Envir
 is never a credential.
 _Avoid_: env var, environment variable (it reads as the Environment's own), secret
 
+**Global mise config**:
+The owner's mise configuration that every Container's commands get, under a repository's own.
+_Avoid_: Toolchains (cloudpid's word), global tools
+
 **Container size**:
 The vCPU, memory and disk a Workspace's Container starts with, picked by name.
 _Avoid_: instance type, plan

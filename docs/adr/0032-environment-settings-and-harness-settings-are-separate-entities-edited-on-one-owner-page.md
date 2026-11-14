@@ -123,3 +123,54 @@ Considered and rejected:
 - **Keeping Variables out of CLI agent processes.** A CLI agent's commands would get none.
 - **Adding them in the Session**, beside `COMMAND_ENV`. The Session's command can be the one that starts the Container,
   with Variables the Session has not seen.
+
+## Refinement (SPI-1150): the Global mise config
+
+Report: [`docs/steps/global-mise.md`](../steps/global-mise.md); plan and M0:
+[`global-mise-plan.md`](../steps/global-mise-plan.md). The Environment settings gain the **Global mise config**: the
+owner's `mise.toml` text, which every Container's commands get as mise's global config.
+
+1. **Shape.** One setting, `globalMiseConfig`, of the schema's `file` type: at most 16 KiB of UTF-8, no NUL (cloudpid's
+   `toolchainsProblem`), line ends stored as LF so a browser's round trip is not a change. The panel shows it as a text
+   area of its own, without `maxlength` (which counts UTF-16 units; the API's refusal is the limit).
+2. **Layers.** Every command's environment (`COMMAND_ENV`) makes the image's base file mise's *system* config and the
+   Container-local `/var/lib/t3flare/mise/config.toml` its *global* config. mise layers system < global < project and
+   merges `[tools]` per tool, so the image's `git` and `gh` stay under the owner's file, and a repository's own
+   `mise.toml` wins per tool over both. With no text nothing is written there and mise resolves as before.
+3. **Laid down per Container.** The Workspace DO runs the lay-down (`@t3flare/sandbox-image/globalMise`) on each new
+   Container, keyed by computer's runtime id, after the connect and before computer sends the first command; Terminals,
+   CLI processes and the Workspace DO's own commands wait for it too. It installs the owner's tools with the text as a
+   staging global config (`mise install` from `/`), and keeps the file only when `git --version` and `gh --version`
+   still run under it, with mise's auto-install off: invalid TOML fails every shim, git's included, so laying it down
+   unchecked would break t3's git. The launch records the text, so a running Container keeps what it started with, a
+   change applies at the next start, and an agent's edit of the file is gone then.
+4. **Held and bounded.** The lay-down counts as a command: no idle stop and no reclaim under it, and the idle time
+   counts from its end. The script bounds its lock (60 s), install (600 s, KILL 10 s later) and checks (20 s each); the
+   Workspace DO waits their sum and a minute, then kills it and takes the file as not laid down, final for that
+   Container. An exec that failed is tried again at once, then by the next command, Terminal, CLI process or alarm, at
+   most three times per Container; a passive read never retries it. The outcome is kept in the Workspace DO's storage,
+   so a new instance does not run a finished lay-down again; its answer is kept on the Container's disk by revision and
+   SHA-256, on the assumption that a Container's disk never outlives it (one that did would at worst skip laying down
+   the same text again).
+5. **No GitHub token.** `COMMAND_ENV` sets `MISE_GITHUB_GH_CLI_TOKENS=false`, `MISE_GITHUB_USE_GIT_CREDENTIALS=false`
+   and an empty `MISE_GITHUB_CREDENTIAL_COMMAND`, and an environment variable beats the owner's and a repository's
+   files: mise sends no token from gh's `hosts.yml`, git's credential helper (the Workspace's one-repo token) or a
+   credential command, any of which could fail an install that works without one. `MISE_DISABLE_TOOLS` and
+   `MISE_DISABLE_BACKENDS` are held empty, so no file disables git or gh by name. The stage showed each of the five
+   arriving whole, empty values included, in a Durable agent's command, a Terminal, the Workspace DO's command and a
+   command of each of Codex, Claude Code, OpenCode and pi. A Variable cannot set any of them (the `MISE_` prefix is
+   refused).
+6. **Reported.** Each lay-down is logged (the text's size and SHA-256, never the text) and sent to the Environment DO;
+   the panel's Status shows the last one across all Workspaces: laid down or not, and why.
+7. **Audit.** A `file` setting is audited as its size and SHA-256, not its text, a departure from §3's "as resolved
+   before and after": the audit log is one stored value of up to 1,000 entries, and a Durable Object value is at most
+   2 MB. The current text is on the panel.
+8. **No install cache.** Every Container start installs the owner's tools again; mise's data stays in its default
+   place on the Container's disk, never under the synced `/workspace/.t3flare/`. A cache is follow-up work.
+
+Considered and rejected:
+
+- **Laying a file down whatever git and gh do under it.** One typo would break t3's git status and commit in every
+  Workspace.
+- **Putting the file under the Workspace.** It would sync, and an agent's edit would outlive the Container.
+- **An empty `MISE_GITHUB_TOKEN` alone.** mise falls through to the next source.
