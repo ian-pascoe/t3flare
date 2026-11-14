@@ -22,11 +22,12 @@ const templates: ReadonlyArray<PromptTemplate> = [
   { name: "review", description: "", argumentHint: "<file> [focus]", filePath: "/workspace/repo/.pi/prompts/review.md" },
 ];
 
-const access = (options: { enabled?: boolean } = {}): SkillsAccess & { asked: Array<string> } => {
+const access = (options: { enabled?: boolean; rows?: Array<{ name: string; description: string; disableModelInvocation: boolean }> } = {}): SkillsAccess & { asked: Array<string> } => {
   const asked: Array<string> = [];
   return {
     asked,
     enabled: () => options.enabled ?? true,
+    ...(options.rows === undefined ? {} : { environment: { entries: () => options.rows!, skillMd: () => undefined, hash: () => "h" } }),
     locate: (cwd) => {
       const match = /^\/w\/(proj)(\/.*)?$/.exec(cwd);
       if (match === null) return undefined;
@@ -34,7 +35,8 @@ const access = (options: { enabled?: boolean } = {}): SkillsAccess & { asked: Ar
         id: match[1]!,
         inner: `/workspace/repo${match[2] ?? ""}`,
         workspace: {
-          skills: (inner, agent) => (asked.push(`skills ${inner}${agent === undefined ? "" : ` ${agent}`}`), Promise.resolve(discovery)),
+          skills: (inner, agent, opts) =>
+            (asked.push(`skills ${inner}${agent === undefined ? "" : ` ${agent}`}${opts?.repoOnly === true ? " repo-only" : ""}`), Promise.resolve(discovery)),
           prompts: (inner, agent) => (asked.push(`prompts ${inner}${agent === undefined ? "" : ` ${agent}`}`), Promise.resolve(templates)),
           readText: () => Promise.resolve(null),
         },
@@ -53,7 +55,7 @@ describe("Pi Durable's snapshotForCwd", () => {
       { name: "fruit-code", description: "The fruit code.", path: "/w/proj/.agents/skills/fruit-code/SKILL.md", scope: "project", enabled: true, userInvocationOnly: false },
       { name: "owner-only", description: "Only when named.", path: "/w/proj/.claude/skills/owner-only/SKILL.md", scope: "project", enabled: true, userInvocationOnly: true },
     ]);
-    expect(skills.asked).toEqual(["skills /workspace/repo", "prompts /workspace/repo"]);
+    expect(skills.asked).toEqual(["skills /workspace/repo repo-only", "prompts /workspace/repo"]);
     expect(answer.instanceId).toBe("piDurable");
     expect(answer.slashCommandsPending).toBe(false);
   });
@@ -76,6 +78,19 @@ describe("Pi Durable's snapshotForCwd", () => {
       expect(answer.slashCommands).toEqual([]);
       expect(skills.asked).toEqual([]);
     }
+  });
+
+  it("puts the Environment skills first, scope user, at the Workspace's mount, beating a Repo skill of the same name (SPI-1148)", async () => {
+    const answer = await snapshot("/w/proj", access({ rows: [{ name: "fruit-code", description: "The Environment's.", disableModelInvocation: true }] }));
+    expect(answer.skills).toEqual([
+      { name: "fruit-code", description: "The Environment's.", path: "/workspace/.agents/skills/fruit-code/SKILL.md", scope: "user", enabled: true, userInvocationOnly: true },
+      { name: "owner-only", description: "Only when named.", path: "/w/proj/.claude/skills/owner-only/SKILL.md", scope: "project", enabled: true, userInvocationOnly: true },
+    ]);
+    // Removed or disabled: the rows no longer hold it, and the Repo skill is back at once.
+    expect((await snapshot("/w/proj", access({ rows: [] }))).skills.map((skill) => [skill.name, skill.scope])).toEqual([
+      ["fruit-code", "project"],
+      ["owner-only", "project"],
+    ]);
   });
 });
 

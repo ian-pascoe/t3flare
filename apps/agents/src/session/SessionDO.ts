@@ -76,6 +76,7 @@ import { GUARDIAN_EXTENSION, guardianExtension } from "../extensions/guardian.ts
 import type { GuardianThinkingLevel } from "../extensions/guardian/review.ts";
 import { backgroundJobs, TERMCTRL_EXTENSION, TERMCTRL_NAMESPACE, type TermctrlHost, termctrlExtension } from "../extensions/termctrl.ts";
 import { SKILLS_EXTENSION, skillsExtension } from "../extensions/skills.ts";
+import { type SkillsTaker, takeSkillsForTurn } from "./environmentSkills.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
@@ -596,6 +597,14 @@ export class SessionDO extends DurableObject<SessionEnv> {
     return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as ComputerWorkspaceStub;
   }
 
+  /** The thread's Workspace DO as a taker of the Environment skill set (SPI-1148); undefined without one. */
+  #skillsTaker(): SkillsTaker | undefined {
+    const id = this.#meta()?.workspaceId;
+    if (id === undefined || id === null) return undefined;
+    // SAFETY: the Workspace DO answers `takeEnvironmentSkills` (WorkspaceDO.ts); an older one rejects, which is logged.
+    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as SkillsTaker;
+  }
+
   /** The agent's environment: its Workspace's files and commands, in `cwd` (the repo by default). */
   #envAt(cwd: string | undefined): ComputerExecutionEnv | undefined {
     const workspace = this.#workspaceStub();
@@ -747,6 +756,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     await this.#takeT3Mcp(input.t3Mcp);
     await this.#takeHarness();
+    // SPI-1148: the turn's Environment skill set, in the Workspace before the agent runs (bounded; never fails the turn).
+    await takeSkillsForTurn(input.environmentSkills, this.#skillsTaker());
     await this.#takeMcp();
     // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
     if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });

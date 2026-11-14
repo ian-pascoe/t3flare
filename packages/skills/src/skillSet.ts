@@ -3,6 +3,8 @@
 // files. The Environment DO makes it from its rows; each Workspace DO keeps a copy and serves it read-only at
 // `SKILLS_MOUNT`. Ported from cloudpid@47941c7c (`apps/server/src/workspace/skill-set-schema.ts`, `skill-set.ts`).
 
+import { parseSkill, type Skill, type SkillDiscovery } from "./discovery.ts";
+
 /** Where every Workspace serves the Environment skill set, read-only: outside the repo at `/workspace/repo`. */
 export const SKILLS_MOUNT = "/workspace/.agents/skills";
 
@@ -53,6 +55,8 @@ export const skillSetOf = async (files: Readonly<Record<string, string>>): Promi
  */
 export const skillFilePathProblem = (path: string): string | undefined => {
   if (path.includes("\\") || path.includes("\0")) return "has a backslash or a NUL";
+  // oxlint-disable-next-line no-control-regex
+  if (/[\u0001-\u001f\u007f]/.test(path)) return "has a control character";
   const segments = path.split("/");
   if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return "has an empty, `.` or `..` segment";
   const bytes = encoder.encode(path).byteLength;
@@ -83,3 +87,43 @@ export const skillSetProblem = (set: unknown): string | undefined => {
   if (both !== undefined) return `Skill file path ${both} is also a directory`;
   return undefined;
 };
+
+/** An Environment skill as the composer and expansion see it, from the Environment's rows. */
+export interface EnvironmentSkillEntry {
+  readonly name: string;
+  readonly description: string;
+  readonly disableModelInvocation: boolean;
+}
+
+/** Where an Environment skill's `SKILL.md` is in every Workspace. */
+export const environmentSkillPath = (name: string): string => `${SKILLS_MOUNT}/${name}/SKILL.md`;
+
+/**
+ * `repo` (a Workspace's Repo-only discovery) with `environment` first: an Environment skill beats a Repo skill of the
+ * same name (SPI-1001), which goes to `skipped`. Anything the Workspace listed under `SKILLS_MOUNT` (one that predates
+ * Repo-only discovery) is dropped: the Environment's rows are the current set, so a removed or disabled Environment
+ * skill un-shadows its Repo namesake at once. The Repo skills' cap and `omitted` are untouched.
+ */
+export const withEnvironmentSkills = (environment: ReadonlyArray<EnvironmentSkillEntry>, repo: SkillDiscovery): SkillDiscovery => {
+  const names = new Set(environment.map((skill) => skill.name));
+  const own = (skill: Skill) => !skill.filePath.startsWith(`${SKILLS_MOUNT}/`);
+  const shadowed = repo.skills.filter((skill) => own(skill) && names.has(skill.name));
+  return {
+    skills: [
+      ...environment.map((skill): Skill => ({ name: skill.name, description: skill.description, filePath: environmentSkillPath(skill.name), disableModelInvocation: skill.disableModelInvocation })),
+      ...repo.skills.filter((skill) => own(skill) && !names.has(skill.name)),
+    ],
+    skipped: [...shadowed.map((skill) => ({ path: skill.filePath, reason: `"${skill.name}" is shadowed by the Environment skill ${skill.name}` })), ...repo.skipped.filter((skip) => !skip.path.startsWith(`${SKILLS_MOUNT}/`))],
+    omitted: repo.omitted,
+  };
+};
+
+/** The Skills a set's files declare, each `<name>/SKILL.md` read as at `SKILLS_MOUNT`: the model's listing of a Workspace's set. */
+export const listingOfSet = (files: Readonly<Record<string, string>>): ReadonlyArray<Skill> =>
+  Object.keys(files)
+    .filter((path) => /^[^/]+\/SKILL\.md$/.test(path))
+    .sort()
+    .flatMap((path) => {
+      const parsed = parseSkill(`${SKILLS_MOUNT}/${path}`, files[path]!);
+      return "reason" in parsed ? [] : [parsed];
+    });

@@ -128,6 +128,15 @@ export const makePiDurableAdapter = (
       const workspaceInnerCwd = input.runtimePolicy.cwd ? (toWorkspace(input.runtimePolicy.cwd)?.inner ?? null) : null;
       // SPI-1147: the thread's Repo skills and Prompt templates, which a message's `$name` or leading `/` expands with.
       const threadSkills = messageSkillsFor(input.runtimePolicy.cwd, skills);
+      /** The Environment skill set's hash now, or undefined when the store cannot be read (never fails the turn). */
+      const environmentSkillsInput = (): { readonly environmentSkills?: string } => {
+        try {
+          const hash = skills.environment?.hash();
+          return hash === undefined ? {} : { environmentSkills: hash };
+        } catch {
+          return {};
+        }
+      };
       const now = yield* DateTime.now;
       let session: OrchestrationV2ProviderSession = {
         id: input.providerSessionId,
@@ -449,6 +458,8 @@ export const makePiDurableAdapter = (
                 interactionMode: interactionModeOf(turnInput.runtimePolicy.interactionMode),
                 ...(credential === undefined ? {} : { t3Mcp: credential }),
                 linked,
+                // SPI-1148: the Environment skill set's hash; the Session has its Workspace take a new one (plan §4.2).
+                ...environmentSkillsInput(),
               }),
             ).pipe(
               Effect.tapError(() =>

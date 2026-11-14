@@ -28,8 +28,13 @@ export interface EnvironmentRpc {
   harnessSettings(input: { readonly projectId?: string }): Promise<ResolvedHarness>;
   /** The Environment settings, resolved (ADR-0032): read before a Container start. Never boots t3. */
   environmentSettings(): Promise<ResolvedEnvironment>;
-  /** The Environment skill set (SPI-1148): every enabled Environment skill's files and the set's hash. Never boots t3. */
-  environmentSkillSet(): Promise<SkillSet>;
+  /**
+   * The Environment skill set (SPI-1148): every enabled Environment skill's files and the set's hash. The Workspace names
+   * itself, so the Environment drops its last refusal. Never boots t3.
+   */
+  environmentSkillSet(input: { readonly workspace: string }): Promise<SkillSet>;
+  /** A Workspace refused or could not mount the set `hash` (SPI-1148): shown on the Harness panel's Status. */
+  skillSetRefused(input: { readonly workspace: string; readonly hash: string; readonly message: string }): Promise<void>;
   /** The MCP tools this Session may install (ADR-0028). */
   mcpView(): Promise<McpView>;
   /** An MCP call the Session's tool has judged (`decideCall`); the server's questions come back through `asker` (SPI-1079). */

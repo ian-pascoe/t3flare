@@ -2,7 +2,7 @@
 // apply, so a set the Environment keeps is always one a Workspace can mount.
 import { describe, expect, it } from "vitest";
 
-import { EMPTY_SKILL_SET_HASH, skillFilePathProblem, skillSetHash, skillSetOf, skillSetProblem } from "./skillSet.ts";
+import { EMPTY_SKILL_SET_HASH, listingOfSet, skillFilePathProblem, skillSetHash, skillSetOf, skillSetProblem, withEnvironmentSkills } from "./skillSet.ts";
 
 describe("skillSetHash", () => {
   it("is SHA-256 of nothing for no files", async () => {
@@ -34,7 +34,7 @@ describe("skillFilePathProblem", () => {
   });
 
   it("refuses a backslash, a NUL, and an empty, `.` or `..` segment", () => {
-    for (const path of ["a\\b/SKILL.md", "a/\0", "a//b", "a/./b", "a/../b", "/a", "a/"]) expect(skillFilePathProblem(path)).toBeDefined();
+    for (const path of ["a\\b/SKILL.md", "a/\0", "a/b\nc", "a/\u001b", "a//b", "a/./b", "a/../b", "/a", "a/"]) expect(skillFilePathProblem(path)).toBeDefined();
   });
 
   it("refuses a path over 512 UTF-8 bytes, and a segment over 255", () => {
@@ -58,5 +58,47 @@ describe("skillSetProblem", () => {
 
   it("refuses what is not a set", () => {
     for (const value of [null, 3, { hash: "", files: {} }, { hash: "h" }, { hash: "h", files: { a: 1 } }]) expect(skillSetProblem(value)).toBeDefined();
+  });
+});
+
+describe("withEnvironmentSkills", () => {
+  const repoSkill = (name: string, path = `/workspace/repo/.agents/skills/${name}/SKILL.md`) => ({ name, description: `Repo ${name}.`, filePath: path, disableModelInvocation: false });
+  const repo = { skills: [repoSkill("fruit-code"), repoSkill("tdd")], skipped: [{ path: "/workspace/repo/.claude/skills/x/SKILL.md", reason: "no description" }], omitted: 2 };
+  const environment = [{ name: "fruit-code", description: "The Environment's.", disableModelInvocation: true }];
+
+  it("puts the Environment skills first, at the mount, and shadows a Repo skill of the same name", () => {
+    expect(withEnvironmentSkills(environment, repo)).toEqual({
+      skills: [{ name: "fruit-code", description: "The Environment's.", filePath: "/workspace/.agents/skills/fruit-code/SKILL.md", disableModelInvocation: true }, repoSkill("tdd")],
+      skipped: [
+        { path: "/workspace/repo/.agents/skills/fruit-code/SKILL.md", reason: '"fruit-code" is shadowed by the Environment skill fruit-code' },
+        { path: "/workspace/repo/.claude/skills/x/SKILL.md", reason: "no description" },
+      ],
+      omitted: 2,
+    });
+  });
+
+  it("un-shadows the Repo skill once the Environment skill is removed or disabled (absent from the rows)", () => {
+    expect(withEnvironmentSkills([], repo).skills.map((skill) => skill.filePath)).toEqual(["/workspace/repo/.agents/skills/fruit-code/SKILL.md", "/workspace/repo/.agents/skills/tdd/SKILL.md"]);
+  });
+
+  it("drops what an older Workspace listed from its held set, whose rows may be gone", () => {
+    const old = { ...repo, skills: [repoSkill("gone", "/workspace/.agents/skills/gone/SKILL.md"), ...repo.skills], skipped: [{ path: "/workspace/.agents/skills/x/SKILL.md", reason: "r" }] };
+    expect(withEnvironmentSkills([], old)).toEqual({ skills: repo.skills, skipped: [], omitted: 2 });
+  });
+});
+
+describe("listingOfSet", () => {
+  it("reads each top-level SKILL.md of a set as at the mount, skipping what is no Skill", () => {
+    expect(
+      listingOfSet({
+        "b/SKILL.md": "---\nname: b\ndescription: B.\n---\n",
+        "a/SKILL.md": "---\nname: a\ndescription: A.\ndisable-model-invocation: true\n---\n",
+        "a/refs/SKILL.md": "---\nname: nested\ndescription: N.\n---\n",
+        "c/SKILL.md": "no frontmatter",
+      }),
+    ).toEqual([
+      { name: "a", description: "A.", filePath: "/workspace/.agents/skills/a/SKILL.md", disableModelInvocation: true },
+      { name: "b", description: "B.", filePath: "/workspace/.agents/skills/b/SKILL.md", disableModelInvocation: false },
+    ]);
   });
 });

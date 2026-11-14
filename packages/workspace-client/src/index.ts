@@ -440,3 +440,4 @@ export const CONTAINER_PREVIEW_SOCKET_PATH = "/__t3flare/ws/";
 export const CONTAINER_PREVIEW_HEADER = "x-t3flare-preview";
 
 export { describeFailure, failureMessage, startRefusal } from "./startRefusal.ts";
+export * from "./skillsLock.ts";

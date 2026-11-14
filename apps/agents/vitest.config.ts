@@ -24,6 +24,7 @@ export default defineConfig({
                 WALL_CLOCK_BUDGET: { className: "ContainerBudget", useSQLite: true },
                 SETTING_BUDGET: { className: "SettingContainerBudget", useSQLite: true },
                 VFS_PROBE: { className: "VfsProbe", useSQLite: true },
+                SKILL_SET_PROBE: { className: "SkillSetProbe", useSQLite: true },
               },
             },
           }),

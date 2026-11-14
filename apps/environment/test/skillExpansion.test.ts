@@ -110,6 +110,12 @@ describe("the caller's switch", () => {
     for (const match of calls) expect(match[2]).toMatch(/\bskills: threadSkills\b/);
   });
 
+  it("the Pi Durable adapter carries the Environment skill set's hash on a new turn (SPI-1148)", () => {
+    const source = NodeFs.readFileSync(new URL("../src/provider/adapter.ts", import.meta.url), "utf8");
+    const call = /client\(\)\.submitTurn\(\{([\s\S]*?)\)\.pipe\(/.exec(source)?.[1];
+    expect(call).toMatch(/\.\.\.environmentSkillsInput\(\)/);
+  });
+
   it("expands nothing with the Harness switch off, or outside a Workspace", async () => {
     const discovery: SkillDiscovery = { skills: [skill("fruit-code")], skipped: [], omitted: 0 };
     const access = (enabled: boolean): SkillsAccess => ({
@@ -126,6 +132,44 @@ describe("the caller's switch", () => {
     expect(await expand("$fruit-code", messageSkillsFor("/w/proj", access(true)))).toBe(`$fruit-code\n\n${fruitBlock}`);
     expect(await expand("$fruit-code", messageSkillsFor("/w/proj", access(false)))).toBe("$fruit-code");
     expect(await expand("$fruit-code", messageSkillsFor("/elsewhere", access(true)))).toBe("$fruit-code");
+  });
+});
+
+describe("Environment skills in a message (SPI-1148)", () => {
+  const ENV = "/workspace/.agents/skills";
+  const repoFruit = { skills: [skill("fruit-code")], skipped: [], omitted: 0 };
+  const access = (rows: Array<{ name: string; description: string; disableModelInvocation: boolean }>, held: SkillDiscovery = repoFruit): SkillsAccess & { repoOnly: Array<boolean> } => {
+    const repoOnly: Array<boolean> = [];
+    return {
+      repoOnly,
+      enabled: () => true,
+      environment: {
+        entries: () => rows,
+        skillMd: (name) => (name === "fruit-code" ? "---\nname: fruit-code\ndescription: The Environment's.\n---\nThe code is PLUM-9.\n" : undefined),
+        hash: () => "h",
+      },
+      locate: () => ({
+        id: "proj",
+        inner: "/workspace/repo",
+        workspace: {
+          skills: (_inner, options) => (repoOnly.push(options?.repoOnly === true), Promise.resolve(held)),
+          prompts: () => Promise.resolve([]),
+          readText: (path) => Promise.resolve(files[path] ?? null),
+        },
+      }),
+    };
+  };
+
+  it("embeds the Environment's row for $name, beating the Repo skill of that name, and asks the Workspace for Repo skills only", async () => {
+    const skills = access([{ name: "fruit-code", description: "The Environment's.", disableModelInvocation: false }]);
+    expect(await expand("$fruit-code", messageSkillsFor("/w/proj", skills))).toBe(
+      `$fruit-code\n\n<skill name="fruit-code" location="${ENV}/fruit-code/SKILL.md">\nReferences are relative to ${ENV}/fruit-code.\n\nThe code is PLUM-9.\n</skill>`,
+    );
+    expect(skills.repoOnly).toEqual([true]);
+  });
+
+  it("expands the Repo skill again once the Environment skill is gone from the rows", async () => {
+    expect(await expand("$fruit-code", messageSkillsFor("/w/proj", access([])))).toBe(`$fruit-code\n\n${fruitBlock}`);
   });
 });
 

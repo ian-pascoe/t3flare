@@ -92,14 +92,15 @@ export interface WorkspaceRpc {
   readText(path: string): Promise<string | null>;
   /**
    * SPI-1147: the Repo skills and Prompt templates of a thread in `cwd`, from the Workspace's own files; SPI-1151: with
-   * `agent`, a CLI agent's Repo skills and commands, at its own roots.
+   * `agent`, a CLI agent's Repo skills and commands, at its own roots; SPI-1148: `repoOnly` leaves out the Environment
+   * skill set the Workspace holds (the Environment merges its own rows).
    */
-  skills(cwd: string, agent?: CliAgent): Promise<SkillDiscovery>;
+  skills(cwd: string, agent?: CliAgent, options?: { readonly repoOnly?: boolean }): Promise<SkillDiscovery>;
   prompts(cwd: string, agent?: CliAgent): Promise<ReadonlyArray<PromptTemplate>>;
   /** SPI-1148: the hash of the Environment skill set the Workspace serves at `/workspace/.agents/skills`. */
   skillSetHash(): Promise<string>;
   /** SPI-1148: takes the Environment skill set from the Environment DO when `hash` differs from the one held. */
-  takeEnvironmentSkills(hash: string): Promise<{ readonly taken: boolean; readonly hash: string; readonly bytes?: number; readonly readMs?: number; readonly mountMs?: number; readonly error?: string }>;
+  takeEnvironmentSkills(hash: string): Promise<{ readonly taken: boolean; readonly hash: string; readonly error?: string; readonly container?: unknown }>;
   writeText(path: string, text: string): Promise<void>;
   worktreeClone(input: { readonly id: string; readonly url: string | null; readonly parent?: string }): Promise<{ readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string }>;
   worktreeBundle(input: { readonly ref: string; readonly tips: ReadonlyArray<string>; readonly name: string }): Promise<{ readonly ok: boolean; readonly commit?: string; readonly bundle?: string | null; readonly config?: ReadonlyArray<string>; readonly error?: string }>;

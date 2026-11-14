@@ -37,8 +37,8 @@ import type {
   TerminalAnswer,
   TerminalOpenInput,
 } from "@t3flare/workspace-client";
-import { type CliAgent, isCliAgent, type PromptTemplate, type Skill, type SkillDiscovery, type SkillSet, SKILLS_MOUNT, skillSetProblem } from "@t3flare/skills";
-import { describeFailure, HARNESS_ROOT, REPO_ROOT, startRefusal } from "@t3flare/workspace-client";
+import { type CliAgent, isCliAgent, type PromptTemplate, type SkillDiscovery, SKILLS_MOUNT, skillSetProblem } from "@t3flare/skills";
+import { describeFailure, HARNESS_ROOT, REPO_ROOT, SKILLS_LOCK_FAILED, SKILLS_LOCK_SCRIPT, startRefusal } from "@t3flare/workspace-client";
 
 import * as git from "isomorphic-git";
 
@@ -79,7 +79,8 @@ import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakSc
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { AgentTerminals } from "./agentTerminals.ts";
 import { workspacePrompts, workspaceSkills } from "./skills.ts";
-import { skillSetMount, skillSetStore } from "./skillSet.ts";
+import { mountWithFallback, skillSetMount, skillSetStore } from "./skillSet.ts";
+import { type ContainerExpectation, expectationInput, expectationOf, keepPriorSkills, parseWait, skillsWaitScript, type WaitAnswer } from "./skillSetWait.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
@@ -125,6 +126,20 @@ export interface ExecInput {
   readonly timeoutMs?: number;
   /** A read t3 makes on its own: it does not keep the Container up (no last-use update). */
   readonly passive?: boolean;
+  /** Never start a stopped Container: answer status `not-running` instead (SPI-1148's wait for a running Container's copy). */
+  readonly onlyIfRunning?: boolean;
+}
+
+/** How many times the wait for a running Container's copy looks, 200 ms apart (plan §4.2: up to 5 s). */
+const SKILLS_WAIT_LOOKS = 25;
+
+/** What a take of the Environment skill set answers (SPI-1148): whether it was taken, the hash held, and the Container's copy. */
+export interface TakeAnswer {
+  readonly taken: boolean;
+  readonly hash: string;
+  readonly error?: string;
+  /** A running Container's copy waited for, or `stopped` (none to wait for). */
+  readonly container?: WaitAnswer | "stopped";
 }
 
 export interface ExecResult {
@@ -227,6 +242,10 @@ export class WorkspaceDO extends ContainerHost {
   readonly #workspace: ComputerWorkspace;
   /** The Environment skill set the mount at `SKILLS_MOUNT` serves (SPI-1148): empty until one is handed over. */
   readonly #skillSet: ReturnType<typeof skillSetStore>;
+  /** What the Workspace had at the mount before it existed, moved aside once (`#ready`). */
+  #priorChecked: Promise<void> | undefined;
+  /** The launch (its start time) whose lock failure was logged (SPI-1148, plan §4.3). */
+  #lockFailureLogged: number | undefined;
   readonly #reads: ReturnType<typeof readCache>;
   readonly #container: ContainerOnlyBackend;
   /** The Session's `ComputerExecutionEnv` file operations (the agent's tools), answered here. */
@@ -320,8 +339,8 @@ export class WorkspaceDO extends ContainerHost {
       storage: ctx.storage,
       // The Environment skill set appears read-only: a write under the mount fails with EROFS, and a set of another
       // hash replaces the copy (`takeEnvironmentSkills`).
-      mounts: { [SKILLS_MOUNT]: skillSetMount(() => skillSet.current()) },
-            // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
+      mounts: { [SKILLS_MOUNT]: skillSetMount(skillSet) },
+      // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
       backends: [this.#withVariables(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx })), this.#withVariables(this.#container)],
     });
     // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
@@ -521,7 +540,7 @@ export class WorkspaceDO extends ContainerHost {
    */
   async leakCheck(): Promise<{ readonly do: ReadonlyArray<{ readonly name: string; readonly path: string }>; readonly container: LeakScanAnswer | null; readonly flagged: unknown }> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     const values: Array<[string, string]> = [];
     const key = this.env.COMMISSARY_CONTAINER_API_KEY;
     if (key !== undefined && key !== "") values.push(["model-key", key]);
@@ -570,7 +589,7 @@ export class WorkspaceDO extends ContainerHost {
   async #containerPatterns(): Promise<ReadonlyArray<string>> {
     let gitmodules = "";
     try {
-      await this.#workspace.ready();
+      await this.#ready();
       gitmodules = await this.#workspace.fs.readFile(`${REPO_ROOT}/.gitmodules`, "utf8");
     } catch {
       // No `.gitmodules`: no submodules.
@@ -613,77 +632,136 @@ export class WorkspaceDO extends ContainerHost {
   /** One of `ComputerExecutionEnv`'s file operations (the Session's tools), answered as plain data. */
   async fileOperation(request: EnvRequest): Promise<EnvResponse<HostOperation>> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     this.#hostReady ??= this.#host.prepare(WORKSPACE_ROOT, Date.now());
     await this.#hostReady;
     return this.#host.handle(request);
   }
 
   /**
-   * The Repo skills of a thread in `cwd` (inside the Workspace), found in its own files (SPI-1147): never the Container.
-   * `environmentSkills` is the Environment skill set's slot, empty until SPI-1148. With `agent`, a CLI agent's: its own
-   * roots, and no Environment skills (SPI-1151; those reach a CLI with SPI-1153).
+   * computer's `ready()`, after what the Workspace had at the Environment skills' mount before it existed is moved aside
+   * (computer clears a mount's root when it first indexes it; SPI-1148).
    */
-  async skills(cwd: string, agent?: CliAgent): Promise<SkillDiscovery> {
-    this.#alive();
+  async #ready(): Promise<void> {
+    this.#priorChecked ??= keepPriorSkills({
+      fs: this.#workspace.fs,
+      mount: SKILLS_MOUNT,
+      indexed: () => this.#mountIndexed(),
+      warn: (message) => console.warn(JSON.stringify({ t3flare: "skills-prior-moved", message })),
+    }).then(
+      () => undefined,
+      (cause: unknown) => {
+        // Checked again by the next call: nothing is indexed over files that could not be moved.
+        this.#priorChecked = undefined;
+        throw cause;
+      },
+    );
+    await this.#priorChecked;
     await this.#workspace.ready();
-    cliAgentArgument(agent);
-    return workspaceSkills(this.#host.readEnv(cwd), REPO_ROOT, agent === undefined ? this.#environmentSkills() : [], agent);
   }
 
-  /** The Environment skill set (SPI-1148); none yet. */
-  #environmentSkills(): ReadonlyArray<Skill> {
-    return [];
+  /** Whether computer has indexed the skills' mount (its own table); a table it cannot read counts as indexed. */
+  #mountIndexed(): boolean {
+    try {
+      return this.ctx.storage.sql.exec("SELECT 1 FROM _vfs_mounts WHERE root = ?", SKILLS_MOUNT).toArray().length > 0;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * The Skills of a thread in `cwd` (inside the Workspace), found in its own files (SPI-1147): never the Container. The
+   * Environment skill set this Workspace holds comes first and beats a Repo skill of the same name (SPI-1148): the
+   * model's listing. `repoOnly` leaves it out: the Environment merges its own rows, current at once, for the composer and
+   * expansion (plan §4.4). With `agent`, a CLI agent's: its own roots, and no Environment skills (SPI-1151; those reach a
+   * CLI with SPI-1153).
+   */
+  async skills(cwd: string, agent?: CliAgent, options?: { readonly repoOnly?: boolean }): Promise<SkillDiscovery> {
+    this.#alive();
+    await this.#ready();
+    cliAgentArgument(agent);
+    const environment = agent === undefined && options?.repoOnly !== true ? this.#skillSet.listing() : [];
+    return workspaceSkills(this.#host.readEnv(cwd), REPO_ROOT, environment, agent);
   }
 
   /** The hash of the Environment skill set this Workspace holds. */
   skillSetHash(): string {
-    return this.#skillSet.current().hash;
+    return this.#skillSet.hash();
   }
 
   /**
-   * Takes the Environment skill set from the Environment DO when `hash` differs from the one held, and serves it at
-   * `SKILLS_MOUNT`: computer clears the mount and writes the set. A set that cannot be mounted leaves the one held.
-   * M0 probe shape (SPI-1148); the Session calls it at a turn's start from M3.
+   * Takes the Environment skill set when `hash` (the Environment's, carried by a turn) differs from the one held, and
+   * serves it read-only at `SKILLS_MOUNT` (SPI-1148, ADR-0033, plan §4.1-§4.2). A set this Workspace refused is not read
+   * again until the hash moves. A set that is no set, or cannot be mounted, is refused, reported to the Environment, and
+   * the Workspace keeps the one it held (else the empty set). Then, outside `blockConcurrencyWhile` (inside it, the
+   * command's own calls to this object would wait for it), a running Container's copy is waited for; a stopped one is
+   * never started. Never throws for the set's sake.
    */
-  async takeEnvironmentSkills(hash: string): Promise<{ readonly taken: boolean; readonly hash: string; readonly bytes?: number; readonly readMs?: number; readonly mountMs?: number; readonly error?: string }> {
+  async takeEnvironmentSkills(hash: string): Promise<TakeAnswer> {
     this.#alive();
-    await this.#workspace.ready();
-    if (hash === this.#skillSet.current().hash) return { taken: false, hash };
-    const started = Date.now();
-    const set = await environmentStub(this.env.ENVIRONMENT).environmentSkillSet();
-    const readMs = Date.now() - started;
+    await this.#ready();
+    const held = this.#skillSet.hash();
+    if (hash === held) return { taken: false, hash: held };
+    const refused = this.#skillSet.refused();
+    if (refused?.hash === hash) return { taken: false, hash: held, error: refused.message };
+    const workspace = this.#workspaceId() ?? this.ctx.id.toString();
+    const set = await environmentStub(this.env.ENVIRONMENT).environmentSkillSet({ workspace });
     const problem = skillSetProblem(set);
-    if (problem !== undefined) return { taken: false, hash: this.#skillSet.current().hash, error: problem };
-    const bytes = Object.values(set.files).reduce((sum, text) => sum + new TextEncoder().encode(text).byteLength, 0);
-    const mounted = Date.now();
-    const answer = await this.ctx.blockConcurrencyWhile(() => this.#mountSkills(set));
-    return { ...answer, bytes, readMs, mountMs: Date.now() - mounted };
+    if (problem !== undefined) return this.#refuseSet(typeof (set as { hash?: unknown })?.hash === "string" ? set.hash : hash, `The Environment skill set was refused: ${problem}`);
+    if (set.hash === held) return { taken: false, hash: held };
+    const previous = this.#skillSet.files();
+    const mounted = await this.ctx.blockConcurrencyWhile(() => mountWithFallback(this.#skillSet, () => this.#workspace.remount(), set, (line) => console.warn(line)));
+    if (mounted.error !== undefined) return this.#refuseSet(set.hash, mounted.error);
+    this.#skillSet.clearRefused();
+    const container = await this.#awaitContainerCopy(await expectationOf(previous, set.files));
+    return { taken: true, hash: set.hash, ...(container === undefined ? {} : { container }) };
   }
 
-  /** Keeps and mounts `set`; on failure the set held before is kept and mounted again. Never throws. */
-  async #mountSkills(set: SkillSet): Promise<{ readonly taken: boolean; readonly hash: string; readonly error?: string }> {
-    const previous = this.#skillSet.current();
-    if (set.hash === previous.hash) return { taken: false, hash: set.hash };
-    try {
-      this.#skillSet.replace(set);
-      await this.#workspace.remount();
-      return { taken: true, hash: set.hash };
-    } catch (cause) {
-      try {
-        this.#skillSet.replace(previous);
-        await this.#workspace.remount();
-      } catch (again) {
-        console.warn(JSON.stringify({ t3flare: "skills-remount-failed", error: String(again).slice(0, 300) }));
+  /** Remembers and reports a refused set (plan §4.5, A2): best effort, never failing the take. */
+  async #refuseSet(hash: string, message: string): Promise<TakeAnswer> {
+    this.#skillSet.refuse({ hash, message });
+    const workspace = this.#workspaceId() ?? this.ctx.id.toString();
+    console.warn(JSON.stringify({ t3flare: "skills-refused", workspace, hash: hash.slice(0, 12), message: message.slice(0, 300) }));
+    await environmentStub(this.env.ENVIRONMENT)
+      .skillSetRefused({ workspace, hash, message })
+      .catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "skills-refusal-unreported", error: String(error).slice(0, 200) })));
+    return { taken: false, hash: this.#skillSet.hash(), error: message };
+  }
+
+  /**
+   * A running Container's copy of a new set, waited for (plan §4.2): one passive command checks `expectation` (on its
+   * stdin) every 200 ms for up to 5 s. The Container is checked running and the command sent in the same tick, and the
+   * command refuses to start one (`onlyIfRunning`): computer's connect would start a stopped Container, and after an
+   * eviction renew its lease and idle clock. Logs the lock's failure once per launch.
+   */
+  async #awaitContainerCopy(expectation: ContainerExpectation): Promise<WaitAnswer | "stopped" | undefined> {
+    if (expectation.present.length === 0 && expectation.removed.length === 0) return undefined;
+    if (!this.containerRunning()) return "stopped";
+    const result = await this.exec({
+      script: skillsWaitScript(SKILLS_MOUNT, SKILLS_WAIT_LOOKS, SKILLS_LOCK_FAILED),
+      stdin: expectationInput(expectation),
+      cwd: WORKSPACE_ROOT,
+      passive: true,
+      onlyIfRunning: true,
+      timeoutMs: 15_000,
+    }).catch((error: unknown) => ({ exitCode: -1, status: String(error).slice(0, 200), stdout: "", stderr: "", ms: 0 }));
+    if (result.status === "not-running") return "stopped";
+    const answer = parseWait(result.stdout);
+    if (!answer.caughtUp) console.warn(JSON.stringify({ t3flare: "skills-container-stale", looks: answer.looks, stale: answer.stale.slice(0, 20), status: result.status }));
+    if (answer.lockFailed !== undefined) {
+      const launch = (await this.ctx.storage.get<number>(STARTED_AT_KEY)) ?? 0;
+      if (this.#lockFailureLogged !== launch) {
+        this.#lockFailureLogged = launch;
+        console.warn(JSON.stringify({ t3flare: "skills-lock-failed", workspace: this.#workspaceId() ?? null, reason: answer.lockFailed }));
       }
-      return { taken: false, hash: previous.hash, error: `The Environment skill set could not be mounted, and the Workspace keeps the one it held: ${String(cause).slice(0, 300)}` };
     }
+    return answer;
   }
 
   /** The Prompt templates of a thread in `cwd`: its `.pi/prompts` (SPI-1147); with `agent`, that CLI's repo commands (SPI-1151). */
   async prompts(cwd: string, agent?: CliAgent): Promise<ReadonlyArray<PromptTemplate>> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     cliAgentArgument(agent);
     return workspacePrompts(this.#host.readEnv(cwd), agent);
   }
@@ -833,13 +911,15 @@ export class WorkspaceDO extends ContainerHost {
     if (backend === CONTAINER_BACKEND && input.passive !== true) await this.#restartForSubmodules().catch(() => undefined);
     this.#running++;
     try {
-      await this.#workspace.ready();
+      await this.#ready();
       // The patterns this command's Container starts with, or started with (`containerOnly.ts`).
       // While a CLI process lives, the command's own pull (computer syncs when it ends) is guarded too (review F3): the
       // command runs in a subshell, then the scanner, before computer reads the files.
       const guard = backend === CONTAINER_BACKEND && input.passive !== true && this.#processes.size > 0 ? await this.#scanSuffix() : undefined;
       const body = guard === undefined ? input.script : `(\n${input.script}\n)\n__t3flare_rc=$?\n${guard}\nexit $__t3flare_rc`;
-      const script = backend === CONTAINER_BACKEND ? `${submoduleDirsScript(await this.#containerPatterns())}${body}` : body;
+      // SPI-1148: every Container command starts with the Environment skills' lock (ADR-0033).
+      const script = backend === CONTAINER_BACKEND ? `${SKILLS_LOCK_SCRIPT}${submoduleDirsScript(await this.#containerPatterns())}${body}` : body;
+      if (input.onlyIfRunning === true && !this.containerRunning()) return { exitCode: -1, status: "not-running", stdout: "", stderr: "", ms: Date.now() - started };
       const handle = await this.#workspace.runtime.exec(script, {
         backend,
         cwd: input.cwd ?? WORKSPACE_ROOT,
@@ -884,7 +964,7 @@ export class WorkspaceDO extends ContainerHost {
   /** Reads a text file from the Workspace's own files (never the Container). Paths inside the Workspace. */
   async readText(path: string): Promise<string | null> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     try {
       return await this.#workspace.fs.readFile(path, "utf8");
     } catch {
@@ -895,7 +975,7 @@ export class WorkspaceDO extends ContainerHost {
   /** Writes a text file into the Workspace's own files, as the agent's file tools do. */
   async writeText(path: string, text: string): Promise<void> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     await this.#workspace.fs.mkdir(path.slice(0, path.lastIndexOf("/")) || "/", { recursive: true });
     await this.#workspace.fs.writeFile(path, text);
   }
@@ -905,7 +985,7 @@ export class WorkspaceDO extends ContainerHost {
 
   async fs(op: FsOp): Promise<FsAnswer<unknown>> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     const ops = fileOps(this.#workspace);
     switch (op.op) {
       case "stat":
@@ -1080,7 +1160,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** The repo, for isomorphic-git (a fresh parse cache per operation). */
   async #repo(): Promise<Repo> {
-    await this.#workspace.ready();
+    await this.#ready();
     this.#gitFs ??= isomorphicFs(this.#workspace);
     return { fs: this.#gitFs, dir: REPO_ROOT, cache: {}, fileSizes: () => repoFileSizes(this.ctx.storage.sql, REPO_ROOT) };
   }
@@ -1297,7 +1377,7 @@ export class WorkspaceDO extends ContainerHost {
   /** A slice of one of this object's own files (another Workspace DO copies a bundle with it). */
   async readChunk(path: string, offset: number, length: number): Promise<{ readonly bytes: Uint8Array; readonly done: boolean } | { readonly error: string }> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     const answer = await fileOps(this.#workspace).read(path, { offset, length });
     if (!("ok" in answer)) return { error: answer.message };
     return { bytes: answer.ok, done: answer.ok.byteLength < length };
@@ -1328,7 +1408,7 @@ export class WorkspaceDO extends ContainerHost {
    * it, check `ref` out at `commit`, copy `branch.<ref>.*`, and check HEAD.
    */
   async worktreeFinish(input: { readonly parent: string; readonly bundle: string | null; readonly ref: string; readonly commit: string; readonly config: ReadonlyArray<string> }): Promise<{ readonly ok: boolean; readonly head?: string; readonly error?: string }> {
-    await this.#workspace.ready();
+    await this.#ready();
     let local: string | null = null;
     if (input.bundle !== null) {
       local = `${HARNESS_ROOT}/tmp/seed.bundle`;
@@ -1383,7 +1463,7 @@ export class WorkspaceDO extends ContainerHost {
   /** Copies the project's untracked files into this worktree's project-root view (step 2b), object to object. */
   async seedProjectRoot(input: { readonly parent: string }): Promise<{ readonly files: number; readonly bytes: number; readonly capped: boolean; readonly names: ReadonlyArray<string> }> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     const ops = fileOps(this.#workspace);
     const listed = await this.#peer(input.parent).projectRootFiles({ maxFiles: PROJECT_ROOT_MAX_FILES, maxBytes: PROJECT_ROOT_MAX_BYTES });
     await ops.remove(PROJECT_ROOT_VIEW, { recursive: true, force: true });
@@ -1470,7 +1550,7 @@ export class WorkspaceDO extends ContainerHost {
   /** In the project: fetch a removed worktree's carried refs from its bundle (object to object) and give each a home. */
   async carryIn(input: { readonly worktree: string; readonly bundle: string; readonly dir: string; readonly carried: ReadonlyArray<{ readonly ref: string; readonly sha: string }> }): Promise<{ readonly ok: boolean; readonly lines: ReadonlyArray<string>; readonly error?: string }> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     const local = `${HARNESS_ROOT}/tmp/carry-in.bundle`;
     const copied = await this.#copyFrom(input.worktree, input.bundle, local);
     if (copied !== undefined) return { ok: false, lines: [], error: `the worktree's bundle could not be copied: ${copied}` };
@@ -1482,7 +1562,7 @@ export class WorkspaceDO extends ContainerHost {
 
   async info(): Promise<ProvisionInfo> {
     if (this.#isDestroyed()) return { provisioned: false, repo: false, containerRunning: this.containerRunning(), revision: 0, gitRevision: 0, cachedReads: 0, id: null, destroyed: true };
-    await this.#workspace.ready();
+    await this.#ready();
     const ops = fileOps(this.#workspace);
     const repo = "ok" in (await ops.stat(REPO_ROOT));
     const git = "ok" in (await ops.stat(`${REPO_ROOT}/.git`));
@@ -1774,7 +1854,7 @@ export class WorkspaceDO extends ContainerHost {
   /** computer's Workspace RPC (`getWorkspace()`, the Worker Shell's proxy): the caller disposes the stub. */
   async __getWorkspaceStub(): Promise<WorkspaceStub> {
     this.#alive();
-    await this.#workspace.ready();
+    await this.#ready();
     return this.#workspace.stub();
   }
 

@@ -29,6 +29,8 @@ import {
 import { abortedResult, type Call, caller, type ComputerEnvHost } from "./client.ts";
 import { exec, type ExecLedger, killAll } from "./exec.ts";
 import { join, resolve } from "./paths.ts";
+import { SKILLS_LOCK_SCRIPT } from "@t3flare/workspace-client";
+
 import { inBash } from "./shell.ts";
 import { ComputerBinaryReader, ComputerDirReader, ComputerTextLineReader } from "./readers.ts";
 import { type PollingOptions, PollingWatcher } from "./watch.ts";
@@ -79,9 +81,11 @@ export type BackendTarget = {
  * registers (`@cloudflare/computer`'s defaults for the Worker Shell and the Container). The Worker Shell is bash; the
  * Container's `/bin/sh` is dash, so its commands are wrapped.
  */
-const BACKENDS = {
+export const BACKENDS = {
   worker: { id: "worker-shell", script: (command) => command },
-  container: { id: "container-shell", script: inBash },
+  // SPI-1148 (ADR-0033): the Environment skill set is read-only in the Container from the launch's first command, the
+  // Durable agent's `bash` included (it never goes through the Workspace DO's own `exec`).
+  container: { id: "container-shell", script: (command) => `${SKILLS_LOCK_SCRIPT}${inBash(command)}` },
 } as const satisfies Record<string, BackendTarget>;
 
 export type ComputerBackend = keyof typeof BACKENDS;

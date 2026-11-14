@@ -1,12 +1,26 @@
-// Repo skills and Prompt templates for Pi Durable, on the Environment's side (SPI-1147 §3 and §4): the composer's
-// snapshot (`snapshotForCwd`) and the expansion of a message's Skill mentions and Slash commands (`turnPrompt`). Both
-// ask the thread's Workspace DO, which finds them in its own files and never starts the Container (ADR-0009); both are
-// off with the Harness `skills` switch.
+// Repo skills, Environment skills and Prompt templates on the Environment's side (SPI-1147 §3 and §4, SPI-1148 §4.4,
+// SPI-1151): the composer's snapshot (`snapshotForCwd`) and the expansion of a message's Skill mentions and Slash
+// commands (`turnPrompt`). Both ask the thread's Workspace DO for its Repo skills, which it finds in its own files and
+// never starts the Container (ADR-0009). For Pi Durable they merge the Environment skills from this Environment's own
+// rows, so a change shows at once (an Environment skill beats a Repo skill of its name), and are off with the Harness
+// `skills` switch; a CLI agent's are at its own roots, without Environment skills (SPI-1153).
 import type { ProviderDriverKind, ProviderInstanceId, ServerProvider, ServerProviderSkill, ServerProviderSlashCommand } from "@t3tools/contracts";
 import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
 import type { ProviderWorkspaceSnapshot } from "@t3tools/provider-core/server/driver";
 import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
-import { type CliAgent, type PromptTemplate, type Skill, type SkillDiscovery, stripFrontmatter, substituteArgs, templateCall } from "@t3flare/skills";
+import {
+  type CliAgent,
+  type EnvironmentSkillEntry,
+  environmentSkillPath,
+  type PromptTemplate,
+  type Skill,
+  type SkillDiscovery,
+  SKILLS_MOUNT,
+  stripFrontmatter,
+  substituteArgs,
+  templateCall,
+  withEnvironmentSkills,
+} from "@t3flare/skills";
 import { fromWorkspace, toWorkspace } from "@t3flare/workspace-client";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -16,20 +30,39 @@ import { locate } from "../agents/workspaceClient.ts";
 
 /** What the Environment asks of one Workspace for skills; paths inside it (`/workspace/repo/…`). `agent`: a CLI agent's roots (SPI-1151). */
 export interface WorkspaceSkills {
-  readonly skills: (inner: string, agent?: CliAgent) => Promise<SkillDiscovery>;
+  /** `repoOnly`: without the Environment skill set the Workspace holds (SPI-1148); an older Workspace ignores it. */
+  readonly skills: (inner: string, agent?: CliAgent, options?: { readonly repoOnly?: boolean }) => Promise<SkillDiscovery>;
   readonly prompts: (inner: string, agent?: CliAgent) => Promise<ReadonlyArray<PromptTemplate>>;
   readonly readText: (inner: string) => Promise<string | null>;
 }
 
-/** The switch, and the Workspace a t3 path is in. */
+/** The Environment skills from this Environment's rows (SPI-1148): the enabled ones, a `SKILL.md`, and the set's hash. */
+export interface EnvironmentSkillRows {
+  readonly entries: () => ReadonlyArray<EnvironmentSkillEntry>;
+  readonly skillMd: (name: string) => string | undefined;
+  readonly hash: () => string;
+}
+
+/** The switch, the Workspace a t3 path is in, and the Environment skills. */
 export interface SkillsAccess {
   readonly enabled: () => boolean;
+  readonly environment?: EnvironmentSkillRows;
   readonly locate: (cwd: string) => { readonly id: string; readonly inner: string; readonly workspace: WorkspaceSkills } | undefined;
 }
 
 /** The Environment's access: its harness switch, and the registry's Workspaces. */
 export const environmentSkillsAccess = (): SkillsAccess => ({
   enabled: () => environmentServices().skillsEnabled(),
+  environment: {
+    entries: () =>
+      environmentServices()
+        .environmentSkills()
+        .list()
+        .filter((row) => row.enabled)
+        .map(({ name, description, disableModelInvocation }) => ({ name, description, disableModelInvocation })),
+    skillMd: (name) => environmentServices().environmentSkills().content(name, "SKILL.md"),
+    hash: () => environmentServices().environmentSkills().hash(),
+  },
   locate: (cwd) => {
     const located = locate(cwd);
     return located === undefined ? undefined : { id: located.id, inner: located.inner, workspace: located.rpc };
@@ -48,6 +81,13 @@ const ask = <A>(what: string, run: () => Promise<A>) =>
 
 const trimmed = (text: string): string | undefined => (text.trim() === "" ? undefined : text.trim());
 
+/** The Workspace's Repo skills with the Environment's rows merged first (plan §4.4): Pi Durable's. */
+const mergedSkills = (at: { readonly inner: string; readonly workspace: WorkspaceSkills }, access: SkillsAccess): Promise<SkillDiscovery> =>
+  at.workspace.skills(at.inner, undefined, { repoOnly: true }).then((repo) => withEnvironmentSkills(access.environment?.entries() ?? [], repo));
+
+/** Whether `skill` is an Environment skill (its `SKILL.md` at the mount). */
+const isEnvironmentSkill = (skill: Pick<Skill, "filePath">): boolean => skill.filePath.startsWith(`${SKILLS_MOUNT}/`);
+
 /**
  * The composer's entries for a thread in `cwd`: its Repo skills and its Prompt templates; none outside a Workspace or
  * switched off. With `agent` (SPI-1151), a CLI agent's Repo skills and commands at its own roots, and not behind the
@@ -58,14 +98,16 @@ export const workspaceComposerEntries = Effect.fn("PiDurable.workspaceComposerEn
   if (agent === undefined && !access.enabled()) return empty;
   const at = access.locate(cwd);
   if (at === undefined) return empty;
-  const [discovery, templates] = yield* ask("skills", () => Promise.all([at.workspace.skills(at.inner, agent), at.workspace.prompts(at.inner, agent)]));
+  const [discovery, templates] = yield* ask("skills", () => Promise.all([agent === undefined ? mergedSkills(at, access) : at.workspace.skills(at.inner, agent), at.workspace.prompts(at.inner, agent)]));
   const skills = discovery.skills.map((skill): ServerProviderSkill => {
     const description = trimmed(skill.description);
     return {
       name: skill.name,
       ...(description === undefined ? {} : { description }),
+      // An Environment skill's path is the Workspace's mount, outside `/w/<id>`: t3's chip opens it as a project file and
+      // shows its own read error (docs/upstream-fragility.md U64).
       path: fromWorkspace(at.id, skill.filePath),
-      scope: "project",
+      scope: isEnvironmentSkill(skill) ? "user" : "project",
       enabled: true,
       userInvocationOnly: skill.disableModelInvocation,
     };
@@ -148,14 +190,26 @@ export const messageSkillsFor = (cwd: string | null | undefined, access: SkillsA
     const at = access.locate(cwd);
     if (at === undefined) return undefined;
     const workspace = at.workspace;
-    const found = yield* ask("skills", () => (opencode ? Promise.all([workspace.skills(at.inner, "opencode"), Promise.resolve([])]) : Promise.all([workspace.skills(at.inner), workspace.prompts(at.inner)]))).pipe(
+    const found = yield* ask("skills", () => (opencode ? Promise.all([workspace.skills(at.inner, "opencode"), Promise.resolve([])]) : Promise.all([mergedSkills(at, access), workspace.prompts(at.inner)]))).pipe(
       Effect.tapError((error) => Effect.logWarning("t3flare: the Workspace's skills could not be read; the message goes as typed", error)),
       Effect.option,
     );
     if (found._tag === "None") return undefined;
     const [discovery, templates] = found.value;
     const readInner = (path: string) => ask(path, () => workspace.readText(path)).pipe(Effect.orElseSucceed(() => null));
-    if (!opencode) return { skills: discovery.skills, templates, read: readInner };
+    if (!opencode) {
+      return {
+        skills: discovery.skills,
+        templates,
+        // An Environment skill's `SKILL.md` is the Environment's row, current at once; the turn carries the set's hash, so
+        // its other files are in the Workspace before the agent reads them (SPI-1148).
+        read: (path: string) => {
+          const name = discovery.skills.find((skill) => isEnvironmentSkill(skill) && skill.filePath === path && environmentSkillPath(skill.name) === path)?.name;
+          const row = name === undefined ? undefined : access.environment?.skillMd(name);
+          return row !== undefined ? Effect.succeed(row) : readInner(path);
+        },
+      };
+    }
     return {
       skills: discovery.skills.map((skill) => ({ ...skill, filePath: fromWorkspace(at.id, skill.filePath) })),
       templates: [],
