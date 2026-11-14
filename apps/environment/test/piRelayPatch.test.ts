@@ -1,5 +1,6 @@
 // Patch 0006 (settings-mcp plan D4, SPI-1076): t3's pi extension lets a server tool of pi's built-in MCP client through
-// its `tool_call` hook, since t3flare's MCP relay judges and asks for those; every other tool is asked as before. The
+// its `tool_call` hook when its server is one the relay serves this process (`T3FLARE_RELAY_SERVERS`, SPI-1199 review),
+// since t3flare's MCP relay judges and asks for those; every other tool is asked as before. The
 // Patch is applied here as build.ts applies it (`git apply` to a copy of the pinned file), and the extension it yields
 // runs against a stand-in for pi's API.
 import { spawnSync } from "node:child_process";
@@ -84,6 +85,8 @@ const RELAY_TOOL = "mcp__settings__change_environment";
 const TOOLS: ReadonlyArray<ToolInfo> = [
   { name: RELAY_TOOL, sourceInfo: { path: "builtin:mcp", source: "builtin" } },
   { name: "mcp__commissary__search", sourceInfo: { path: "builtin:mcp" } },
+  // A built-in MCP tool of a server the relay does not serve this process (another source added it).
+  { name: "mcp__stranger__write", sourceInfo: { path: "builtin:mcp" } },
   // A tool of another extension that takes an MCP-shaped name.
   { name: "mcp__lookalike__write", sourceInfo: { path: "/root/.pi/agent/extensions/other.ts" } },
   { name: "mcp__t3-code__delegate_task", sourceInfo: { path: "/var/lib/t3flare/cli/proc-1/ext/pi-t3-mcp-extension.ts" } },
@@ -107,17 +110,23 @@ describe("Patch 0006: pi's relay tools are judged by the relay", () => {
   let patched: Hook;
   let stock: Hook;
   let noToolList: Hook;
+  let noServers: Hook;
 
   beforeAll(async () => {
     // Without t3's MCP URL the extension registers its hooks and connects nothing.
     delete process.env.T3_MCP_URL;
     delete process.env.T3_MCP_BEARER_TOKEN;
     delete process.env.T3_PI_MCP_EXTENSION_PATH;
+    // The profile names the relayed servers (cliProfiles.ts); the extension reads them when it loads.
+    process.env.T3FLARE_RELAY_SERVERS = "commissary,settings";
     const source = await extensionSource(true);
     expect(source).not.toBe(PI_T3_MCP_EXTENSION_SOURCE);
     patched = await toolCallHook(source, "patched", () => TOOLS);
     stock = await toolCallHook(await extensionSource(false), "stock", () => TOOLS);
     noToolList = await toolCallHook(source, "no-tool-list", () => undefined);
+    // A process the profile named no relayed server for.
+    delete process.env.T3FLARE_RELAY_SERVERS;
+    noServers = await toolCallHook(source, "no-servers", () => TOOLS);
   });
 
   afterAll(() => {
@@ -134,7 +143,7 @@ describe("Patch 0006: pi's relay tools are judged by the relay", () => {
 
   it("asks, as stock t3 does, for every tool not from pi's built-in MCP client", async () => {
     for (const mode of ["approval-required", "auto-accept-edits"]) {
-      for (const tool of ["mcp__lookalike__write", "mcp__t3-code__delegate_task", "read_mcp_resource", "bash", "mcp__unlisted__call"]) {
+      for (const tool of ["mcp__lookalike__write", "mcp__t3-code__delegate_task", "read_mcp_resource", "bash", "mcp__unlisted__call", "mcp__stranger__write"]) {
         expect([mode, tool, await asks(patched, mode, tool)]).toEqual([mode, tool, true]);
         expect([mode, tool, await asks(stock, mode, tool)]).toEqual([mode, tool, true]);
       }
@@ -146,6 +155,11 @@ describe("Patch 0006: pi's relay tools are judged by the relay", () => {
 
   it("asks for a built-in MCP tool when pi cannot list its tools' sources", async () => {
     expect(await asks(noToolList, "approval-required", RELAY_TOOL)).toBe(true);
+  });
+
+  it("asks for every built-in MCP tool when the profile named no relayed server", async () => {
+    expect(await asks(noServers, "approval-required", RELAY_TOOL)).toBe(true);
+    expect(await asks(noServers, "approval-required", "mcp__commissary__search")).toBe(true);
   });
 
   it("is what changes the answer: stock t3 asks for the relay's tool", async () => {

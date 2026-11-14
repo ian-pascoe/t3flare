@@ -241,6 +241,8 @@ describe("pi's profile", () => {
       const answer = relayed(rpc);
       if ("refused" in answer) throw new Error(answer.refused);
       expect(answer.env.T3FLARE_TOOL_HANDLE).toBe(HANDLE);
+      // Patch 0006 lets a built-in MCP tool through unasked only for these servers.
+      expect(answer.env.T3FLARE_RELAY_SERVERS).toBe("commissary,settings,docs");
       for (const file of answer.files ?? []) expect(file.text).not.toContain(HANDLE);
       expect(answer.argv.join(" ")).not.toContain(HANDLE);
     });
@@ -250,6 +252,7 @@ describe("pi's profile", () => {
       if ("refused" in answer) throw new Error(answer.refused);
       expect(answer.files!.some((file) => file.path.endsWith("mcp.json"))).toBe(false);
       expect(answer.env.T3FLARE_TOOL_HANDLE).toBeUndefined();
+      expect(answer.env.T3FLARE_RELAY_SERVERS).toBeUndefined();
     });
 
     it("writes no mcp.json and sets no handle when the relay has no server", () => {

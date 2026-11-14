@@ -5,7 +5,7 @@
 import { type CatalogModel } from "@t3flare/models";
 import { parseEndpointSlug } from "@t3flare/models/endpoints";
 import { MODEL_HANDLE_ENV, modelRelayUrl, type RelayedEndpoint } from "@t3flare/models/relay";
-import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
+import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, RELAY_SERVERS_ENV, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
 
@@ -406,6 +406,8 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     if (relay !== undefined && relay.servers.length > 0) {
       files.push({ path: `${home}/agent/mcp.json`, text: piMcpJson(relay.servers) });
       env[TOOL_HANDLE_ENV] = relay.handle;
+      // Patch 0006: t3's extension lets a built-in MCP tool through unasked only when its server is one of these.
+      env[RELAY_SERVERS_ENV] = relay.servers.join(",");
     }
     // SPI-1039: t3's MCP server as stock t3 hands it, t3's public `/mcp` with t3's per-thread bearer (relayedMcp.ts;
     // owner, 2026-11-12, back to stock). Only an https `/mcp` URL passes.

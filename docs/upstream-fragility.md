@@ -847,25 +847,29 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   only under project trust, which `PI_SETTINGS`' `defaultProjectTrust: "never"` and `--no-approve` keep off.
   `patches/0006-pi-relay-tools-are-judged-by-the-relay.patch` adds `isRelayedMcpTool` to the `tool_call` hook of t3's pi
   extension (`t3code/packages/provider-pi/src/server/mcpExtensionSource.ts`, beside `isReadOnlyMcpTool`): outside full
-  access a tool named `mcp__…` whose `pi.getAllTools()` entry (one per name, the one pi runs) has `sourceInfo.path ===
-  "builtin:mcp"` is not asked, because the relay judges it and asks on the thread; without the Patch a relay read
-  would ask once and a write twice. Every other tool is asked as stock t3 asks, including pi's resource tools
-  (`read_mcp_resource`, also from `builtin:mcp`) and a tool of another extension under an `mcp__` name.
+  access a tool named `mcp__<server>__…` whose server is one the profile names in `T3FLARE_RELAY_SERVERS`
+  (`RELAY_SERVERS_ENV`, comma-separated, set by `piLaunch` beside the handle, the same list as `mcp.json`; SPI-1199
+  review) and whose `pi.getAllTools()` entry (one per name, the one pi runs) has `sourceInfo.path === "builtin:mcp"` is
+  not asked, because the relay judges it and asks on the thread; without the Patch a relay read would ask once and a
+  write twice. Every other tool is asked as stock t3 asks, including pi's resource tools (`read_mcp_resource`, also
+  from `builtin:mcp`), a tool of another extension under an `mcp__` name, and a `builtin:mcp` tool of a server the
+  relay does not serve this process. The server segment is the name up to the next `__` (server names are
+  `[a-z0-9-]{1,20}`, `SERVER_NAME`).
 - **Breaks when**: pi renames `mcp.json` or its keys, drops `${VAR}` expansion in headers, changes the `builtin:mcp`
   source path or `getAllTools`' `sourceInfo`, lets `PI_OFFLINE` stop MCP, stops turning MCP off with `--no-extensions`,
-  or reads a project's `mcp.json` without trust; pi or the profile lets another source add `builtin:mcp` servers (an
-  extension's `registerMcpServer`, today impossible since the profile loads t3's extension alone); t3 edits the hook's
-  lines.
+  or reads a project's `mcp.json` without trust; pi changes how it names a server's tool (`mcp__<server>__<tool>`), so
+  the server segment no longer matches; t3 edits the hook's lines.
 - **Detection**: the Patch failing to apply (`check:patches`, loud); `test/piRelayPatch.test.ts` applies the Patch as
   `build.ts` does and runs the hook against a stand-in for pi's API (the relay's tools pass; bash, write, t3's tools, a
-  look-alike extension tool, a resource tool and an unlisted tool are asked); `test/cliProfiles.test.ts` T-pi-1 pins the
-  file, the environment and the fork. **Silent**: a renamed source path (pi asks the extension's "Allow …?" before the
+  look-alike extension tool, a resource tool, an unlisted tool, a `builtin:mcp` tool of an unnamed server, and every
+  tool when no server is named are asked); `test/cliProfiles.test.ts` T-pi-1 pins the file, the environment (the
+  handle and `T3FLARE_RELAY_SERVERS`) and the fork. **Silent**: a renamed source path (pi asks the extension's "Allow …?" before the
   relay's card: more asks, fail closed); a changed `mcp.json` shape or expansion (pi lists none of the relay's tools).
   Cheapest check: `scripts/tools.ts cli-mcp pi` on a stage (the read raises no request, the write only the relay's
   card); or a `test:docker` case running the image's pi against a relay stand-in (not built).
-- **Blast radius**: a moved source label: an extra ask per relay call. A `builtin:mcp` server from elsewhere: its tools
-  would run unasked by the extension, which is why the profile keeps project trust off and the hook also requires the
-  `mcp__` name.
+- **Blast radius**: a moved source label or tool-name shape: an extra ask per relay call (fail closed). A `builtin:mcp`
+  server from elsewhere is asked as any tool is, unless it takes a relayed server's name, which pi's own config keeps
+  unique per name and project trust (off) would be needed to override.
 - **Fix**: re-read pi's `docs/mcp.md`, `docs/extensions.md` and `docs/security.md` at the new version; rerun M0's P16
   probe (`scripts/settings-spike` on the spike branch); re-cut the Patch with `git diff` of a copy of the file, as the
   other Patches are cut (paths relative to `t3code/`, `a/` and `b/` prefixes, which `build.ts` reads).
