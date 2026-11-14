@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off
+// @effect-diagnostics globalDate:off globalTimers:off
 // Parity batch 2's probe Worker (test stages only, `t3flare-probe-<stage>`, made when T3FLARE_PROBE=1): two throwaway
 // receivers the stage's Environment is pointed at, each logging what it got to a Durable Object the harness reads.
 //
@@ -8,6 +8,11 @@
 //   Commissary's two credentials), and 403 otherwise.
 // - An OTLP/HTTP receiver (`/v1/traces`, `/v1/metrics`, `/v1/logs`, JSON): it keeps each export's size, service name and
 //   a sample of span and metric names.
+//
+// - SPI-1167: a stand-in Model endpoint at `/relay/v1` for the model relay, admitted only with the probe key as its
+//   bearer (the key the endpoint is saved with). It logs each request's path, whether the key came, and every other
+//   header (so the harness can look for a model handle that should never arrive). `/relay/v1/drip?gaps=30,60,…` answers
+//   a server-sent event stream with an event at the start and after each gap (seconds): the long, idle stream check.
 //
 // `GET /log` (with the probe key as bearer) answers everything logged.
 import { DurableObject } from "cloudflare:workers";
@@ -217,6 +222,44 @@ export default {
         return json(records(now, url.searchParams.get("principal") ?? "", url.searchParams.get("before")));
       }
       return json({ error: "not_found" }, 404);
+    }
+
+    if (url.pathname.startsWith("/relay/v1/")) {
+      const sawKey = authorization === `Bearer ${env.PROBE_KEY}`;
+      await log.append({
+        at: new Date().toISOString(),
+        kind: "relay",
+        method: request.method,
+        path: url.pathname,
+        query: Object.fromEntries(url.searchParams),
+        sawKey,
+        headers: Object.fromEntries([...request.headers].filter(([name]) => name !== "authorization")),
+      });
+      if (!sawKey) return json({ error: { message: "the stand-in endpoint wants its key" } }, 401);
+      if (url.pathname === "/relay/v1/models") return json({ object: "list", data: [{ id: "drip", object: "model" }] });
+      if (url.pathname === "/relay/v1/drip") {
+        const gaps = (url.searchParams.get("gaps") ?? "1")
+          .split(",")
+          .map(Number)
+          .filter((gap) => Number.isFinite(gap) && gap >= 0 && gap <= 900);
+        const encoder = new TextEncoder();
+        const started = Date.now();
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const event = (n: number) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ n, s: Math.round((Date.now() - started) / 1000) })}\n\n`));
+            event(0);
+            for (const [at, gap] of gaps.entries()) {
+              await new Promise((resolve) => setTimeout(resolve, gap * 1000));
+              event(at + 1);
+            }
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            await log.append({ at: new Date().toISOString(), kind: "relay-drip-done", seconds: Math.round((Date.now() - started) / 1000) });
+            controller.close();
+          },
+        });
+        return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+      }
+      return json({ error: { message: "not found" } }, 404);
     }
 
     const signal = /^\/v1\/(traces|metrics|logs)$/.exec(url.pathname)?.[1];
