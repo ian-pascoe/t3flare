@@ -230,3 +230,42 @@ Summary for the matrix:
 - TypeScript SDK (main, fetched 2026-11-14): `packages/core-internal/src/shared/protocol.ts`, `packages/client/src/client/client.ts`, `packages/server/src/server/server.ts`, `docs/protocol-versions.md`
 - Clients: https://code.claude.com/docs/en/mcp ; https://code.claude.com/docs/en/hooks ; https://developers.openai.com/codex/mcp ; https://github.com/openai/codex/issues/45776 ; https://raw.githubusercontent.com/openai/codex/main/codex-rs/codex-mcp/src/elicitation.rs ; https://cursor.com/docs/context/mcp ; https://code.visualstudio.com/api/extension-guides/ai/mcp ; https://opencode.ai/docs/mcp-servers/ ; https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/core/src/mcp/index.ts ; local pi docs `docs/mcp.md` ; https://github.com/pixu1980/pi-coding-agent-extensions/blob/main/packages/pi-mcp/README.md (third-party)
 - Third-party, low trust, used only to flag gaps: https://canimcp.dev/feature/elicitation.url
+
+---
+
+## M0's answers (SPI-1196)
+
+Recorded 2026-11-14 by the spike on branch `settings-mcp-m0-spike` against its probe MCP server:
+`docs/steps/settings-mcp/m0-clients.json` (P14, P17) and `m0-pi.json` (P16) there, to be merged with this branch. "Owner
+step" refers to `docs/steps/settings-mcp-m0-owner-steps.md` on that branch. What was built on them: plan D11 and D12,
+`apps/environment/src/settings/endpoint.ts`.
+
+- **Claude Code 2.1.322** speaks 2026-07-28 first: `server/discover`, then `tools/list` and `tools/call`, each with
+  `_meta` `io.modelcontextprotocol/protocolVersion`, `clientInfo` and `clientCapabilities`
+  (`{ roots: { listChanged: true }, elicitation: { form: {}, url: {} } }`) on every request, `progressToken` on
+  `tools/call`, headers `MCP-Protocol-Version` and `Mcp-Method`, no `Mcp-Session-Id`. It retries `input_required` with a
+  new JSON-RPC id, the same name and arguments, `inputResponses` keyed as asked and `requestState` verbatim. Against a
+  server that refuses `server/discover` it falls back to `initialize` 2025-11-25 with the same capabilities.
+  - An empty form shows Accept / Decline; Decline and Escape (cancel) retried at once; Accept, and the URL dialog's
+    "I'm done, continue", did not submit from a scripted terminal (owner step 3). In `-p` it retried with cancel unasked.
+  - A 2025 form on a held stream shows the same dialog; Escape posts `cancel` as its own POST.
+  - A stream the server cuts with the form open: Claude Code shows nothing, keeps the dialog and later posts its answer;
+    the call moves to the background as an MCP task. The server's withdrawal on a cut stream (D12) holds; Claude Code
+    then shows a stale form (U69).
+  - A 50 s held call (progress every 15 s) finished; one unanswered after 120 s went to the background.
+  - `model`: its agent read the Pause, did not call `resume` itself, and asked the user.
+- **OpenCode 2.2.7**: `initialize` 2025-11-25 with `{ elicitation: { form: {}, url: {} }, roots: {} }`, `progressToken`
+  on `tools/call`, a GET stream; it appends `codemode=false` to the server URL's query. Under `permission: allow` it
+  accepted an empty form by itself in about 0.1 s: `native` does not prove a person (ADR-0034). A 70 s held call
+  finished.
+- **pi 1.5.2**: `initialize` 2025-11-25 with `{ roots: {} }` only, so no elicitation: the form and URL fallbacks (the
+  link in the result) apply. `User-Agent: undici`, `Sec-Fetch-Mode: cors`.
+- **Codex 0.167.2**: OAuth discovery and registration only (no model key in M0); its tool calls are owner step 4.
+- **Cursor**: not run (owner step 2).
+- **Headers**: no client sent `Origin` or `Sec-Fetch-Site`; pi sends `Sec-Fetch-Mode`. D11's refusal of the first two
+  and tolerance of the third fit every client seen.
+- **pi under t3flare's profile (P16)**: `PI_OFFLINE=1` does not stop MCP connects (kept); `--mode rpc` loads built-in
+  MCP; `mcp.json` is read from `PI_CODING_AGENT_DIR`; `${T3FLARE_TOOL_HANDLE}` expands in a header; calls held 870 s and
+  960 s under `timeout: 900` finished (pi sends a `progressToken`, and progress resets its timer); pi's `bash` sees the
+  handle (ADR-0028's accepted residual); the `tool_call` event carries no source, but `pi.getAllTools()` gives a built-in
+  MCP tool `sourceInfo.path: "builtin:mcp"` (Patch 0006's test); the fork launch (`--no-extensions`) loads no MCP.
