@@ -5,8 +5,10 @@
 // the signed `requestState` and elicitation id refused when they are not this call's. M5b's part (SPI-1201): `native`
 // (the 2026 form round trip, the 2025 held stream and its cut, 2025-06-18's params) and `model` (the Pause as `pauseOf`
 // reads it, `resume` and its refusals), and every fallback of D12's table.
+import { MAX_GLOBAL_MISE_BYTES } from "@t3flare/harness-registry";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { addMcpServer } from "../src/harness/ops.ts";
 import { isPausingServer, pauseOf } from "../src/mcp/elicitation.ts";
 import { changePagePath } from "../src/harness/paths.ts";
 import { CHANGE_TTL_MS } from "../src/settings/changes.ts";
@@ -14,6 +16,7 @@ import { waitingOn } from "../src/settings/openChanges.ts";
 import { changesApiOf, PAUSE_LINE } from "../src/settings/server.ts";
 import { signToken } from "../src/settings/tokens.ts";
 import { ASKED, BOTH, bodyOf, endpointOf, initialize, KEY, legacy, modern, post, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
+import { skillMd } from "./skillRepo.fixture.ts";
 import { HOST, NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 
 let fixture: SettingsFixture | undefined;
@@ -715,6 +718,60 @@ describe("D12's fallbacks for native and model", () => {
     const body = await bodyOf(await endpointOf(f)(modern("tools/call", { name: "change_mcp", arguments: header }, { query: NATIVE, capabilities: FORM })));
     expect(body.result).toMatchObject({ structuredContent: { status: "waiting", url: openChange(f).url } });
     expect(JSON.stringify(body.result?.content)).toContain("takes a secret");
+  });
+
+  // A2 (SPI-1201 review): every other kind of change that needs the page, in each mode, as the header add above.
+  const pageOnly: ReadonlyArray<readonly [string, "skills" | "sign-in" | "oversize", (f: SettingsFixture) => Promise<readonly [string, Record<string, unknown>]>]> = [
+    [
+      "a skill install",
+      "skills",
+      async (f) => {
+        const commit = f.github.push("o/r", { "skills/a/SKILL.md": skillMd("a", "Do a.") });
+        return ["change_skills", { expectedRevision: 0, op: "install", source: "o/r", commit, folders: ["skills/a"] }] as const;
+      },
+    ],
+    [
+      "a sign-in",
+      "sign-in",
+      async (f) => {
+        await addMcpServer(f.deps.ops, { server: "oauthy", url: "https://oauthy.example/mcp", auth: { kind: "oauth" } }, { actor: { caller: "owner:o" } });
+        return ["start_mcp_sign_in", { expectedRevision: 1, server: "oauthy" }] as const;
+      },
+    ],
+    [
+      "text too long to show",
+      "oversize",
+      async () => ["change_environment", { expectedRevision: 0, settings: { globalMiseConfig: `[tools]\n${"# a comment line of the config, long enough\n".repeat(Math.floor((MAX_GLOBAL_MISE_BYTES - 64) / 44))}` } }] as const,
+    ],
+  ];
+
+  it.each(pageOnly)("%s, in native: the page elicitation, never a form; the client's accept applies nothing", async (_what, needsPage, setup) => {
+    const f = world();
+    const endpoint = endpointOf(f, { holdMs: 30 });
+    const [tool, args] = await setup(f);
+    const body = await bodyOf(await endpoint(modern("tools/call", { name: tool, arguments: args }, { query: NATIVE })));
+    const { record, url } = openChange(f);
+    expect(record).toMatchObject({ mode: "browser", needsPage });
+    expect(body.result).toMatchObject({ resultType: "input_required", inputRequests: { change: { params: { mode: "url", url } } } });
+    const revisions = [f.store.load().revision, f.store.loadEnvironment().revision];
+    const retry = await bodyOf(await endpoint(modern("tools/call", { name: tool, arguments: args, requestState: body.result?.requestState, inputResponses: { change: { action: "accept" } } }, { query: NATIVE, id: 2 })));
+    expect(retry.result).toMatchObject({ structuredContent: { status: "waiting", url } });
+    expect([f.store.load().revision, f.store.loadEnvironment().revision]).toEqual(revisions);
+    expect(f.deps.changes.get(record.id)?.state).toBe("open");
+  });
+
+  it.each(pageOnly)("%s, in model: the link with the reason, never a Pause; resume cannot approve it", async (_what, needsPage, setup) => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    const [tool, args] = await setup(f);
+    const body = await bodyOf(await endpoint(modern("tools/call", { name: tool, arguments: args }, { query: MODEL })));
+    const { record, url } = openChange(f);
+    expect(record).toMatchObject({ mode: "browser", needsPage });
+    expect(body.result).toMatchObject({ resultType: "complete", structuredContent: { status: "waiting", url } });
+    expect(pauseOf(body.result)).toBeUndefined();
+    expect(JSON.stringify(body.result?.content)).toContain("whatever the elicitation_mode");
+    expect(await structuredOf(await endpoint(modern("tools/call", { name: "resume", arguments: { requestId: record.id, response: { action: "accept" } } }, { query: MODEL, id: 3 })))).toMatchObject({ status: "refused" });
+    expect(f.deps.changes.get(record.id)?.state).toBe("open");
   });
 
   it("a change that needs the page, in model: the link, never a Pause nor a question", async () => {
