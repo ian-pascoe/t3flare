@@ -60,13 +60,27 @@ export class VfsProbe extends DurableObject {
  * the take with its fallback. A set holding `boom/SKILL.md` fails its copy, as a write computer cannot make would.
  */
 export class SkillSetProbe extends DurableObject {
+  /** Every copy of a set with files fails: the held set's too, so the mount falls back to the empty set. */
+  #failAll = false;
+
+  failAll(on: boolean): void {
+    this.#failAll = on;
+  }
+
   readonly #store = skillSetStore({ kv: this.ctx.storage.kv, transactionSync: (closure) => this.ctx.storage.transactionSync(closure) });
   readonly #mount = skillSetMount(this.#store);
   readonly #workspace = new Workspace({
     storage: this.ctx.storage,
     backends: [],
     mounts: {
-      [SKILLS_MOUNT]: { ...this.#mount, materialize: (api) => (this.#store.files()["boom/SKILL.md"] === undefined ? this.#mount.materialize(api) : Promise.reject(new Error("boom"))) },
+      [SKILLS_MOUNT]: {
+        ...this.#mount,
+        materialize: (api) => {
+          const files = this.#store.files();
+          const fails = files["boom/SKILL.md"] !== undefined || (this.#failAll && Object.keys(files).length > 0);
+          return fails ? Promise.reject(new Error("boom")) : this.#mount.materialize(api);
+        },
+      },
     },
   });
 

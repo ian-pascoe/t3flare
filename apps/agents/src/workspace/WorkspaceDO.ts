@@ -37,8 +37,8 @@ import type {
   TerminalAnswer,
   TerminalOpenInput,
 } from "@t3flare/workspace-client";
-import { type CliAgent, isCliAgent, type PromptTemplate, type SkillDiscovery, SKILLS_MOUNT, skillSetProblem } from "@t3flare/skills";
-import { describeFailure, HARNESS_ROOT, REPO_ROOT, SKILLS_LOCK_FAILED, SKILLS_LOCK_SCRIPT, startRefusal } from "@t3flare/workspace-client";
+import { type CliAgent, isCliAgent, type PromptTemplate, type SkillDiscovery, SKILLS_MOUNT } from "@t3flare/skills";
+import { describeFailure, HARNESS_ROOT, REPO_ROOT, SKILLS_LOCK_SCRIPT, startRefusal } from "@t3flare/workspace-client";
 
 import * as git from "isomorphic-git";
 
@@ -80,7 +80,8 @@ import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { AgentTerminals } from "./agentTerminals.ts";
 import { workspacePrompts, workspaceSkills } from "./skills.ts";
 import { mountWithFallback, skillSetMount, skillSetStore } from "./skillSet.ts";
-import { type ContainerExpectation, expectationInput, expectationOf, keepPriorSkills, parseWait, skillsWaitScript, type WaitAnswer } from "./skillSetWait.ts";
+import { keepPriorSkills } from "./skillSetWait.ts";
+import { awaitContainerCopy, type TakeAnswer, takeSkillSet } from "./skillSetTake.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
@@ -130,17 +131,7 @@ export interface ExecInput {
   readonly onlyIfRunning?: boolean;
 }
 
-/** How many times the wait for a running Container's copy looks, 200 ms apart (plan §4.2: up to 5 s). */
-const SKILLS_WAIT_LOOKS = 25;
-
-/** What a take of the Environment skill set answers (SPI-1148): whether it was taken, the hash held, and the Container's copy. */
-export interface TakeAnswer {
-  readonly taken: boolean;
-  readonly hash: string;
-  readonly error?: string;
-  /** A running Container's copy waited for, or `stopped` (none to wait for). */
-  readonly container?: WaitAnswer | "stopped";
-}
+export type { TakeAnswer } from "./skillSetTake.ts";
 
 export interface ExecResult {
   readonly exitCode: number;
@@ -684,11 +675,6 @@ export class WorkspaceDO extends ContainerHost {
     return workspaceSkills(this.#host.readEnv(cwd), REPO_ROOT, environment, agent);
   }
 
-  /** The hash of the Environment skill set this Workspace holds. */
-  skillSetHash(): string {
-    return this.#skillSet.hash();
-  }
-
   /**
    * Takes the Environment skill set when `hash` (the Environment's, carried by a turn) differs from the one held, and
    * serves it read-only at `SKILLS_MOUNT` (SPI-1148, ADR-0033, plan §4.1-§4.2). A set this Workspace refused is not read
@@ -700,62 +686,32 @@ export class WorkspaceDO extends ContainerHost {
   async takeEnvironmentSkills(hash: string): Promise<TakeAnswer> {
     this.#alive();
     await this.#ready();
-    const held = this.#skillSet.hash();
-    if (hash === held) return { taken: false, hash: held };
-    const refused = this.#skillSet.refused();
-    if (refused?.hash === hash) return { taken: false, hash: held, error: refused.message };
     const workspace = this.#workspaceId() ?? this.ctx.id.toString();
-    const set = await environmentStub(this.env.ENVIRONMENT).environmentSkillSet({ workspace });
-    const problem = skillSetProblem(set);
-    if (problem !== undefined) return this.#refuseSet(typeof (set as { hash?: unknown })?.hash === "string" ? set.hash : hash, `The Environment skill set was refused: ${problem}`);
-    if (set.hash === held) return { taken: false, hash: held };
-    const previous = this.#skillSet.files();
-    const mounted = await this.ctx.blockConcurrencyWhile(() => mountWithFallback(this.#skillSet, () => this.#workspace.remount(), set, (line) => console.warn(line)));
-    if (mounted.error !== undefined) return this.#refuseSet(set.hash, mounted.error);
-    this.#skillSet.clearRefused();
-    const container = await this.#awaitContainerCopy(await expectationOf(previous, set.files));
-    return { taken: true, hash: set.hash, ...(container === undefined ? {} : { container }) };
+    const environment = environmentStub(this.env.ENVIRONMENT);
+    const warn = (line: string) => console.warn(line);
+    return takeSkillSet(
+      {
+        store: this.#skillSet,
+        read: () => environment.environmentSkillSet({ workspace }),
+        mount: (set) => this.ctx.blockConcurrencyWhile(() => mountWithFallback(this.#skillSet, () => this.#workspace.remount(), set, warn)),
+        report: (refused, message) => environment.skillSetRefused({ workspace, hash: refused, message }),
+        awaitContainer: async (expectation) => {
+          const answer = await awaitContainerCopy({ running: () => this.containerRunning(), exec: (command) => this.exec(command), warn }, expectation);
+          if (typeof answer === "object" && answer.lockFailed !== undefined) await this.#logLockFailure(answer.lockFailed);
+          return answer;
+        },
+        warn,
+      },
+      hash,
+    );
   }
 
-  /** Remembers and reports a refused set (plan §4.5, A2): best effort, never failing the take. */
-  async #refuseSet(hash: string, message: string): Promise<TakeAnswer> {
-    this.#skillSet.refuse({ hash, message });
-    const workspace = this.#workspaceId() ?? this.ctx.id.toString();
-    console.warn(JSON.stringify({ t3flare: "skills-refused", workspace, hash: hash.slice(0, 12), message: message.slice(0, 300) }));
-    await environmentStub(this.env.ENVIRONMENT)
-      .skillSetRefused({ workspace, hash, message })
-      .catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "skills-refusal-unreported", error: String(error).slice(0, 200) })));
-    return { taken: false, hash: this.#skillSet.hash(), error: message };
-  }
-
-  /**
-   * A running Container's copy of a new set, waited for (plan §4.2): one passive command checks `expectation` (on its
-   * stdin) every 200 ms for up to 5 s. The Container is checked running and the command sent in the same tick, and the
-   * command refuses to start one (`onlyIfRunning`): computer's connect would start a stopped Container, and after an
-   * eviction renew its lease and idle clock. Logs the lock's failure once per launch.
-   */
-  async #awaitContainerCopy(expectation: ContainerExpectation): Promise<WaitAnswer | "stopped" | undefined> {
-    if (expectation.present.length === 0 && expectation.removed.length === 0) return undefined;
-    if (!this.containerRunning()) return "stopped";
-    const result = await this.exec({
-      script: skillsWaitScript(SKILLS_MOUNT, SKILLS_WAIT_LOOKS, SKILLS_LOCK_FAILED),
-      stdin: expectationInput(expectation),
-      cwd: WORKSPACE_ROOT,
-      passive: true,
-      onlyIfRunning: true,
-      timeoutMs: 15_000,
-    }).catch((error: unknown) => ({ exitCode: -1, status: String(error).slice(0, 200), stdout: "", stderr: "", ms: 0 }));
-    if (result.status === "not-running") return "stopped";
-    const answer = parseWait(result.stdout);
-    if (!answer.caughtUp) console.warn(JSON.stringify({ t3flare: "skills-container-stale", looks: answer.looks, stale: answer.stale.slice(0, 20), status: result.status }));
-    if (answer.lockFailed !== undefined) {
-      const launch = (await this.ctx.storage.get<number>(STARTED_AT_KEY)) ?? 0;
-      if (this.#lockFailureLogged !== launch) {
-        this.#lockFailureLogged = launch;
-        console.warn(JSON.stringify({ t3flare: "skills-lock-failed", workspace: this.#workspaceId() ?? null, reason: answer.lockFailed }));
-      }
-    }
-    return answer;
+  /** The Container lock's failure, logged once per launch (plan §4.3, A5). */
+  async #logLockFailure(reason: string): Promise<void> {
+    const launch = (await this.ctx.storage.get<number>(STARTED_AT_KEY)) ?? 0;
+    if (this.#lockFailureLogged === launch) return;
+    this.#lockFailureLogged = launch;
+    console.warn(JSON.stringify({ t3flare: "skills-lock-failed", workspace: this.#workspaceId() ?? null, reason }));
   }
 
   /** The Prompt templates of a thread in `cwd`: its `.pi/prompts` (SPI-1147); with `agent`, that CLI's repo commands (SPI-1151). */

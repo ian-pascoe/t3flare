@@ -42,4 +42,16 @@ describe("the Environment skill set in a Workspace", () => {
     expect(await p.read("/workspace/.agents/skills/a/SKILL.md")).toBe(md("a"));
     expect(await p.write("/workspace/.agents/skills/a/x.md")).toMatch(/read-only mount/);
   });
+
+  it("falls back to the empty set, read-only, when the set held before cannot be copied again either", async () => {
+    const p = probe();
+    const held = await skillSetOf({ "a/SKILL.md": md("a") });
+    await p.take(held);
+    await p.failAll(true);
+    const answer = await p.take(await skillSetOf({ "b/SKILL.md": md("b") }));
+    expect(answer.error).toMatch(/could not be mounted/);
+    expect(answer.hash).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    expect(await p.find()).toEqual([]);
+    expect(await p.write("/workspace/.agents/skills/a/SKILL.md")).toMatch(/read-only mount/);
+  });
 });
