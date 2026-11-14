@@ -266,6 +266,10 @@ _Avoid_: skills folder, skill path
 A Skill the owner installed into the Cloud Environment, offered to Durable agents in every Project.
 _Avoid_: global skill (the owner's informal word, and cloudpid's Global), owner skill, personal skill
 
+**Skill source**:
+Where an Environment skill was installed from: a GitHub repository, the Skill's folder, the ref named and the commit it is pinned to.
+_Avoid_: upstream, origin
+
 **Skill mention**:
 A `$name` in the owner's message that names a Skill; t3's composer writes one when a Skill is picked.
 _Avoid_: skill chip, invocation

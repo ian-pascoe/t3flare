@@ -216,7 +216,7 @@ which only the Environment Worker loads.
   no Session, Container, page or log.
 - **The permissions.** A new set, `SKILL_FETCH_GITHUB_PERMISSIONS = { contents: "read", metadata: "read" }`, goes
   beside the three lists in `@t3flare/github-app/permissions`, added on purpose as that module requires. M5 also probes
-  `metadata: read` alone against outside repos; the build keeps the narrower set if it reads them (advisory).
+  `metadata: read` alone against outside repos; the build keeps the narrower set if it reads them (advisory). *(Build: not probed; the token keeps `contents: read`, which R1 showed reading them.)*
 - **Which token for `owner/repo`:**
   1. The App is installed on `owner` and covers the repo: a token for that one repo. This is the only path for private
      repos.
@@ -243,7 +243,7 @@ request:
 - **Preview** reads one commit, one recursive tree, and the candidates' `SKILL.md` blobs (at most 200). It reads no
   other file. A candidate's file count and bytes come from the tree's sizes.
 - **Install and update** check each chosen skill's file count, its bytes, the paths and the set's limits from the tree's
-  entries **before reading any blob**. Then they read the blobs.
+  entries **before reading any blob**. Then they read the blobs. *(Build: each folder's `SKILL.md` is read first, for the name the path rule prefixes; the 500-blob cap is checked before any read, and the other files only after the tree's checks pass.)*
 - **(r3, C3) The blob cap.** At most 500 blob reads per request, the largest single skill. GitHub's secondary limit is
   900 points a minute per REST endpoint (a GET is 1 point), so 500 reads plus the commit and the tree stay under it in
   any minute; 1,000 would not. The 10,000 subrequests a paid Worker invocation may make are far above either. A
@@ -269,7 +269,7 @@ checked when the skill is installed."
 | Case | Outcome |
 | -- | -- |
 | The folder is gone at the ref's latest commit | "No longer in owner/repo at <ref>"; no update is offered; the skill is kept |
-| The frontmatter `name` changed | "Now named <new>"; no update is offered. Install it under the new name; removing the old one is the owner's choice |
+| The frontmatter `name` changed | "Now named <new>"; no update is offered. Install it under the new name; removing the old one is the owner's choice. *(Build: the check reads no file, so this is told at Update, which refuses it and keeps the Skill.)* |
 | A changed file breaks a check | The update is refused with that check's message; the skill is kept |
 
 ## 4. Delivery (M3)
@@ -314,7 +314,7 @@ checked when the skill is installed."
   - **(r3, C1)** The command shape is probed on the stage before it is built on: one passive command that loops every
     200 ms for up to 5 s, for a size-changing edit and a same-size edit. If one command does not converge (its own
     reads keeping the stale view), the wait is instead up to N separate passive commands, 500 ms apart, within the same
-    5 s. The build uses whichever the probe shows converging (`env-update.json` records it).
+    5 s. The build uses whichever the probe shows converging (`env-update.json` records it). *(Build: one command; on the stage it answered caught-up at its first look for both edits, so its later looks were not exercised there; they are unit-tested against a directory changed part-way.)*
   - It answers whether the Container caught up. A copy still stale at 5 s is logged with its paths.
   - **(r3, C2)** The wait runs **after** `blockConcurrencyWhile` returns: inside it, the exec's own RPCs to this object
     would wait for it, and hang.

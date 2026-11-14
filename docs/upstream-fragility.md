@@ -198,8 +198,8 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 
 ### U20. Dependencies that ride t3's lock: alchemy beta, `patches/deps`, transitive pins
 
-- **Where**: the root workspace and lock follow t3's ([U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030)): t3's catalog, overrides and patches apply as they are and t3's packages resolve as in its lock, so a t3 bump moves alchemy (`t3code/pnpm-workspace.yaml:70`, `2.0.0-beta.85`), effect, zod and others under our own code too. Our own dependency patches are keyed by exact version (`patches/deps/@alchemy.run__cloudflare@2.0.0-beta.85.patch`, `patches/deps/@earendil-works__pi-durable@1.5.0.patch`; wired into `pnpm-workspace.yaml`'s `patchedDependencies` by `gen-workspace.ts`). `OUR_OVERRIDES` there holds a few of our core packages where Bun's pins held them (`workerd`, `@cloudflare/workers-types`, `@effect/sql-d1`). `@alchemy.run/cloudflare-runtime` is pinned at `2.0.0-beta.85` by hand in `apps/environment/package.json`, and `build.ts:2-4` works around beta.85 dropping `build.input.plugins` (ADR-0020). `@earendil-works/pi-durable` (1.5.0) and `@cloudflare/computer` (0.11.2) are ours alone, and their dependencies resolve within their own ranges (pnpm, unlike Bun's per-name pins, gives each package its declared version).
-- **Breaks when**: t3 bumps alchemy; t3's lock moves a package pi-durable or computer depends on; `effect` resolves twice.
+- **Where**: the root workspace and lock follow t3's ([U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030)): t3's catalog, overrides and patches apply as they are and t3's packages resolve as in its lock, so a t3 bump moves alchemy (`t3code/pnpm-workspace.yaml:70`, `2.0.0-beta.85`), effect, zod and others under our own code too. Our own dependency patches are keyed by exact version (`patches/deps/@alchemy.run__cloudflare@2.0.0-beta.85.patch`, `patches/deps/@earendil-works__pi-durable@1.5.0.patch`, and `patches/deps/@cloudflare__computer@0.11.2.patch`, which adds `Workspace.remount()` so a Workspace serves a new Environment skill set without restarting (ADR-0033; pnpm fails the install when it no longer applies); wired into `pnpm-workspace.yaml`'s `patchedDependencies` by `gen-workspace.ts`). `OUR_OVERRIDES` there holds a few of our core packages where Bun's pins held them (`workerd`, `@cloudflare/workers-types`, `@effect/sql-d1`). `@alchemy.run/cloudflare-runtime` is pinned at `2.0.0-beta.85` by hand in `apps/environment/package.json`, and `build.ts:2-4` works around beta.85 dropping `build.input.plugins` (ADR-0020). `@earendil-works/pi-durable` (1.5.0) and `@cloudflare/computer` (0.11.2) are ours alone, and their dependencies resolve within their own ranges (pnpm, unlike Bun's per-name pins, gives each package its declared version).
+- **Breaks when**: t3 bumps alchemy; t3's lock moves a package pi-durable or computer depends on; `effect` resolves twice; computer is bumped (its `remount()` patch is re-cut against the new `dist/index.js`, and `apps/agents/test/skillSet.workerd.test.ts` shows it still serves a new set).
 - **Detection**: when alchemy moves, the install fails on the `patches/deps` patch keyed to beta.85 (`ERR_PNPM_UNUSED_PATCH`), and on a patch that no longer applies; `verify-lock` fails on a second `effect` and on any t3-patched version installed unpatched; deploy catches an alchemy that cannot deploy.
 - **Blast radius**: flaky or failed deploys of prod; agent runtime errors after a transitive move.
 - **Fix**: re-cut the patch for the new version (`pnpm patch <pkg>@<version>`, edit, `pnpm patch-commit <dir> --patches-dir patches/deps`, then `pnpm run relock`), move `cloudflare-runtime` with alchemy, re-check ADR-0020's workaround.
@@ -595,15 +595,21 @@ and field shapes it leans on fail typecheck rather than silently.
   - t3: `ProviderInstance.snapshotForCwd` (`provider-core/src/server/driver.ts`) and
     `ProviderRegistry.refreshWorkspaceSnapshot`, with the directory `ProjectService.workspaceScanDirectory` passes; the
     composer's `$name` insertion (`apps/web/src/components/chat/ChatComposer.tsx`).
+  - Environment skills (SPI-1148): the snapshot lists them with `scope: "user"` and a `path` outside `/w/<id>`
+    (`/workspace/.agents/skills/<name>/SKILL.md`), which t3's chip opens with `projects.readFile` in the project's cwd
+    (`apps/web/src/components/chat/SkillInlineText.tsx` `skillInstructionsOpener`) and answers with its own read error
+    (`docs/steps/spi-1001/env-install-public.json`); their expansion embeds the Environment's own row under that path.
 - **Breaks when**: t3 renames or re-types the hook, `ProviderDriverError` or the snapshot's fields; changes the mention
   grammar or what the composer inserts for a picked skill; changes its Pi provider's skill block; passes the hook
-  another directory.
+  another directory; filters or re-scopes a snapshot skill by its `scope` or its path being outside the project, or
+  makes the chip's "View instructions" fail harder than a read error.
 - **Detection**: the bump's check step (`pnpm run check`): typecheck for the hook, the error and the fields; the tests
   `apps/environment/test/skillsSnapshot.test.ts`, `apps/environment/test/skillExpansion.test.ts` (pins on
   `matchInlineSkills`, on the copied `SKILL_TOKEN_REGEX`'s source and on its answers matching t3's for a table of names,
   and on the composer's inserted text) and `packages/skills/src/discovery.test.ts` (the mentionable names). Stage: `scripts/p1001.ts`, outside the bump. **Silent**: a client that sends skills another way leaves
-  `$name` unexpanded, and a changed Pi provider block goes unnoticed (ours stays as it was); cheapest check: the
-  source-text test, and a diff of `mcpExtensionSource.ts` in the bump PR.
+  `$name` unexpanded, and a changed Pi provider block goes unnoticed (ours stays as it was); a chip that stops opening an
+  Environment skill's path is only seen on a stage (`scripts/penvsk.ts public`). Cheapest check: the source-text test,
+  and a diff of `mcpExtensionSource.ts` and `SkillInlineText.tsx` in the bump PR.
 - **Blast radius**: the composer lists no skills or commands for Pi Durable, or a picked skill reaches the agent as
   plain `$name`. A grammar change also changes which names the agent's listing and the composer offer, since discovery
   skips a name t3 cannot mention. Turns still run.

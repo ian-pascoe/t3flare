@@ -2,7 +2,9 @@
 
 Status: accepted (SPI-1149, 2026-11-13; decided in SPI-1001's triage, the budget added at the owner's request the same
 day). Report: [`docs/steps/environment-settings.md`](../steps/environment-settings.md). Refines
-[ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md).
+[ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md). Refined by
+[ADR-0033](0033-environment-skills-are-pinned-copies-fetched-from-github-kept-by-the-environment-and-changed-only-by-the-owner.md)
+(Environment skills: the same entity, revision and audit `entity`, applied at a turn, not a Container start).
 
 ADR-0026 gave t3flare one owner page and one settings entity, the **Harness settings**: Pi Durable's extensions and the
 MCP server set, read by a Session at a turn's start. What every Workspace's Container gets (its size, how long it may
@@ -16,6 +18,7 @@ configuration. Both are edited on the one page at `/_t3flare/harness`, the Envir
    | -- | -- | -- | -- |
    | Harness settings | `t3flare:harness:settings` | a Session (`harnessSettings`) | the thread's next turn |
    | Environment settings | `t3flare:environment:settings` | a Workspace DO (`environmentSettings`) | the Workspace's next Container start |
+   | Environment skills (part of the Environment settings; [ADR-0033](0033-environment-skills-are-pinned-copies-fetched-from-github-kept-by-the-environment-and-changed-only-by-the-owner.md)) | tables `t3flare_env_skills`, `t3flare_env_skill_files`, `t3flare_env_skill_meta` | the Pi Durable adapter (the set's hash) and a Workspace DO (`environmentSkillSet`) | the thread's next turn; the composer at once |
 
    Each has its own revision, bumped only by its own changes, so a size change never makes every Session take the
    Harness settings again. A Workspace DO reads them before each Container start with a 5 s bound and keeps the copy it
