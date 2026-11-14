@@ -31,6 +31,9 @@ import { bindStateStorage } from "./platform/stateStore.ts";
 import type { HarnessCaller } from "./harness/panel.ts";
 import { harnessSecrets } from "./harness/secrets.ts";
 import { harnessStore } from "./harness/store.ts";
+import { sealedStore } from "./credentials/sealed.ts";
+import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
+import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import type { SkillsApiDeps } from "./skills/api.ts";
 import { githubReader, readAccessFor } from "./skills/contents.ts";
 import { type SkillStore, skillStore } from "./skills/store.ts";
@@ -95,6 +98,11 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly MCP_OAUTH?: McpOAuthBinding;
   /** G11 (ADR-0031): Browser Run, t3's server browser and HTML renders. */
   readonly BROWSER?: BrowserRunBinding;
+  /**
+   * SPI-1162: the stage's credentials key (alchemy.run.ts, made once per stage and kept in its state), under which the
+   * Model endpoints' API keys are sealed. Without it no key is stored.
+   */
+  readonly T3FLARE_CREDENTIALS_KEY?: string;
 }
 
 /** Module state that outlives `ctx.abort()` in a warm isolate (ADR-0003); reported by the health route. */
@@ -202,6 +210,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     bindEnvironmentServices({
       agents: env,
       modelProxy,
+      modelEndpoints: () => this.#endpointStore().load(),
       catalog: modelCatalog({
         proxy: modelProxy,
         store: { read: () => ctx.storage.kv.get(CATALOG_KEY), write: (catalog) => ctx.storage.kv.put(CATALOG_KEY, catalog) },
@@ -384,7 +393,31 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         return { max: state.max, leases: state.leases.map((lease) => ({ holder: lease.holder, workspace: names.get(lease.holder) ?? null })) };
       },
       skills: this.#skillsApi(),
+      endpoints: {
+        store: this.#endpointStore(),
+        discover: async (target, apiKey) => (await import("./endpoints/discover.ts")).discoverModels(target, apiKey),
+        changed: () => void import("./endpoints/changes.ts").then(({ endpointsChanged }) => endpointsChanged()),
+      },
     });
+  }
+
+  /** The Model endpoints (SPI-1162): their entity, and their keys sealed under the stage's credentials key. */
+  #endpointStore(): EndpointStore {
+    return endpointStore(this.ctx.storage.kv, sealedStore(this.ctx.storage.kv, this.env.T3FLARE_CREDENTIALS_KEY));
+  }
+
+  /** The Model endpoints for a Session's turn (SPI-1162), secret-free. Never boots t3. */
+  async modelEndpoints(): Promise<ModelEndpoints> {
+    return this.#endpointStore().load();
+  }
+
+  /**
+   * A Model endpoint's API key for a Session's request (SPI-1162; ADR-0018: the Session asks at use time and keeps it in
+   * memory only). Null for an endpoint with none, or that is gone. Never boots t3.
+   */
+  async endpointCredential(input: { readonly endpointId: string }): Promise<{ readonly apiKey: string | null }> {
+    const resolved = await this.#endpointStore().resolve(String(input.endpointId));
+    return { apiKey: resolved?.apiKey ?? null };
   }
 
   /**

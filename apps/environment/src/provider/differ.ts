@@ -823,13 +823,18 @@ export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2Pr
       retryable: null,
     });
   }
+  if (reason === "no_model") {
+    // pi-durable's detail names the ref (`Model <provider>/<id> is not available`); a Model endpoint's is its slug (SPI-1162).
+    const slug = /^Model (\S+) is not available/.exec(detail)?.[1];
+    const which = slug === undefined ? "The selected model" : `The model ${slug}`;
+    return makeProviderFailure({ class: "provider_error", message: `${which} is not available: its Model endpoint was removed or no longer lists it. Pick another model.`, code: reason });
+  }
   const messages: Record<string, string> = {
     turn_deadline: "The turn ran longer than 2 hours and was stopped.",
     restart_limit: "The agent's session was cut off too many times in a row.",
     faulted: "The agent's session failed.",
     orphaned: "The agent's session could not run this turn.",
     interrupted: "The model request was interrupted too many times.",
-    no_model: "The selected model is not available.",
     turn_limit: "The turn reached its tool-round limit.",
     lost: "The agent's session lost this turn.",
   };

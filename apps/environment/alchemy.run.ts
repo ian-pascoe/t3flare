@@ -155,6 +155,11 @@ export default Alchemy.Stack(
     // Step 4a (ADR-0016, A′): the CLI agents' own proxy key, answered by the Workspace DO's key route only while a CLI
     // process lives there. Never the Workers' MODEL_PROXY_API_KEY; bound to the agents Worker alone.
     const containerModelKey = Config.Redacted("COMMISSARY_CONTAINER_API_KEY");
+    // SPI-1162: the stage's credentials key, under which the Environment seals the Model endpoints' API keys. 256 random
+    // bits made once per stage on its first deploy after this, kept in the stage's alchemy state (Cloudflare's, so CI and
+    // the laptop share it), and gone with the stage: prod gets its own at its next deploy, with nothing for the owner to
+    // do. Losing the state means entering the keys again.
+    const credentialsKey = yield* Alchemy.Random("CredentialsKey", { bytes: 32 });
 
     const workspaceContainer = Cloudflare.Container("WorkspaceContainer", {
       schedulingPolicy: "durable_object",
@@ -279,6 +284,7 @@ export default Alchemy.Stack(
         ENVIRONMENT: Cloudflare.DurableObject("EnvironmentDO", { className: "EnvironmentDO" }),
         T3_BOOTSTRAP_TOKEN: Config.Redacted("T3_BOOTSTRAP_TOKEN"),
         T3FLARE_ADMIN_TOKEN: Config.Redacted("T3FLARE_ADMIN_TOKEN"),
+        T3FLARE_CREDENTIALS_KEY: credentialsKey.text,
         T3FLARE_ACCESS_TEAM_DOMAIN: teamDomain,
         T3FLARE_ACCESS_AUD: admin.aud,
         // The t3 host as deployed (ADR-0026): what the panel's `Origin` must name, the OAuth redirect's host, and the

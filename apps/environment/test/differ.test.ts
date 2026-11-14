@@ -108,6 +108,14 @@ describe("differ", () => {
     expect(other.message).toBe("The model provider returned HTTP 400.");
   });
 
+  it("says which model is gone when its Model endpoint was removed or no longer lists it (SPI-1162)", () => {
+    const failure = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", detail: "Model openai/gpt-5-mini is not available", startedAt: 0 }, now);
+    expect(failure).toMatchObject({ class: "provider_error", code: "no_model" });
+    expect(failure.message).toBe("The model openai/gpt-5-mini is not available: its Model endpoint was removed or no longer lists it. Pick another model.");
+    const bare = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", startedAt: 0 }, now);
+    expect(bare.message).toBe("The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model.");
+  });
+
   describe("a model proxy failure the Session classified", () => {
     const nowMs = DateTime.toEpochMillis(now);
     const failed = (failure: NonNullable<TurnState["proxy"]>["failure"], detail = "t3flare model proxy: x") =>

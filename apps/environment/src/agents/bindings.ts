@@ -2,6 +2,7 @@
 // the agents Worker's Durable Object bindings, the model proxy and its model catalog, and the GitHub minter. Set by the DO's constructor, before
 // t3 boots; module state, as the DO is the only one in its isolate.
 import type { ModelCatalog } from "@t3flare/models/catalog";
+import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import type { GitHubTokens } from "./github.ts";
 import type { AgentsBindings } from "./rpc.ts";
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
@@ -19,6 +20,8 @@ export interface EnvironmentServices {
   readonly modelProxy: { readonly url: string; readonly apiKey: string } | undefined;
   /** The proxy's model list, kept in the DO's storage (ADR-0012). */
   readonly catalog: ModelCatalog;
+  /** The Model endpoints as stored now (SPI-1162), secret-free: the picker's other models. Absent: none. */
+  readonly modelEndpoints?: () => ModelEndpoints;
   readonly github: () => GitHubTokens;
   readonly workspaces: WorkspaceRegistry;
   /** The Environment DO's SQLite (t3's projection, read by the deletion's reference check). */

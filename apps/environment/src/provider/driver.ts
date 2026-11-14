@@ -22,6 +22,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
 
 import { environmentServices } from "../agents/bindings.ts";
+import { onEndpointsChanged } from "../endpoints/changes.ts";
 import { makePiDurableAdapter } from "./adapter.ts";
 import { attachmentReader } from "./attachments.ts";
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
@@ -72,9 +73,10 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       continuation: { groupKey: continuationIdentity.continuationKey },
     });
     const effective = { ...config, enabled };
-    const { catalog } = environmentServices();
-    // The snapshot's models are the catalog's: the copy kept from the last read, now; the proxy's list again at each check.
-    const models = () => snapshotModels(catalog.current());
+    const { catalog, modelEndpoints } = environmentServices();
+    // The snapshot's models are the catalog's (the copy kept from the last read, now; the proxy's list again at each
+    // check) and the Model endpoints' as stored now (SPI-1162).
+    const models = () => snapshotModels(catalog.current(), modelEndpoints?.());
     const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: PI_DURABLE_DRIVER, packageName: null });
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
     const snapshot = yield* makeManagedServerProvider({
@@ -90,6 +92,10 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
     }).pipe(Effect.orDie);
     // Read the proxy's list now rather than at the first interval: a fresh Environment starts with the kept copy.
     yield* Effect.forkScoped(snapshot.refresh);
+    // A change to the Model endpoints reaches the picker at once, not at the next check.
+    const services = yield* Effect.context<never>();
+    const stopHearing = onEndpointsChanged(() => void Effect.runForkWith(services)(snapshot.refresh));
+    yield* Effect.addFinalizer(() => Effect.sync(stopHearing));
     const textGeneration = makePiDurableTextGeneration();
     // t3's MCP credential per thread (step 3): the adapter hands it to the Session with each open and turn.
     const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
