@@ -269,6 +269,14 @@ table.tools-table td.actions>div{display:flex;flex-direction:column;align-items:
 table.stacked tbody tr:hover>td{background:none}
 .change{max-width:none}
 }
+.skill-out:empty{display:none}
+.skill-out{display:flex;flex-direction:column;gap:.5rem;padding:.75rem 1rem;border-top:1px solid var(--row-border);font-size:.8125rem;min-width:0}
+.skill-out pre{margin:0;max-height:24rem;overflow:auto;padding:.75rem;border-radius:var(--radius);background:var(--muted);font-family:var(--mono);font-size:.75rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.skill-out ul{margin:0;padding-left:1.25rem}
+.skill-out .err{color:var(--err)}
+.skill-pick{display:flex;gap:.5rem;align-items:flex-start;padding:.5rem 0;border-top:1px solid var(--row-border)}
+.skill-pick:first-of-type{border-top:0}
+.skill-pick .note{display:block;font-size:.75rem;color:var(--muted-fg)}
 @media (pointer:coarse){.btn-sm{min-height:2.25rem}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0s!important;animation-duration:1.5s!important}}
 @media (forced-colors:active){.switch{border:1px solid ButtonText}.switch::before{background:ButtonText}.pill,.tag{border:1px solid}}`;

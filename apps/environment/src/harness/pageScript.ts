@@ -208,6 +208,138 @@ for (const form of document.querySelectorAll("form[data-extension]")) {
     if (form.reportValidity()) send(save);
   });
 }
+// Environment skills (SPI-1148): every answer is built with textContent and createElement, never as HTML.
+const el = (tag, text, className) => {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (className !== undefined) node.className = className;
+  return node;
+};
+const kib = (bytes) => (bytes / 1024).toFixed(1) + " KiB";
+const show = (out, ...nodes) => { out.replaceChildren(...nodes); };
+const failed = (out, text) => show(out, el("p", text, "err"));
+const getJson = async (path) => {
+  const response = await fetch(path, { credentials: "same-origin" });
+  if (!response.ok) throw new Error("Refused (" + response.status + "): " + (await response.text()).trim());
+  return response.json();
+};
+const preview = document.querySelector("[data-skill-preview]");
+const installing = document.querySelector("form[data-skill-install]");
+if (installing !== null && preview !== null) {
+  installing.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const source = installing.querySelector("[name=source]").value.trim();
+    show(preview, el("p", "Reading " + source + " from GitHub…"));
+    const response = await post("/_t3flare/harness/api/skills/preview", { source }, installing.querySelector("[type=submit]"));
+    busy(installing.querySelector("[type=submit]"), false);
+    if (response === undefined) { show(preview); return; }
+    const answer = await response.json();
+    const nodes = [el("p", answer.repo + " at " + answer.commit.slice(0, 7) + (answer.ref === null ? " (the default branch)" : " (" + answer.ref + ")") + ". " + answer.note)];
+    if (answer.how === "unauthenticated") nodes.push(el("p", "Read without a token, from GitHub's shared limit of 60 an hour.", "note"));
+    const picks = [];
+    for (const skill of answer.skills) {
+      const row = el("label", undefined, "skill-pick");
+      const box = el("input");
+      box.type = "checkbox";
+      box.value = skill.path;
+      const blocked = skill.problems.length > 0 || skill.unchanged === true;
+      box.disabled = blocked;
+      box.checked = !blocked;
+      const text = el("span");
+      text.append(el("strong", skill.name), el("span", " " + skill.description));
+      const notes = [skill.files + (skill.files === 1 ? " file, " : " files, ") + kib(skill.bytes)];
+      if (skill.unchanged === true) notes.push("unchanged: installed with these files from this source");
+      if (skill.replaces !== undefined) notes.push("replaces " + skill.name + " from " + skill.replaces.repo + (skill.replaces.path === "" ? "" : "/" + skill.replaces.path) + " at " + skill.replaces.commit);
+      for (const problem of skill.problems) notes.push("cannot be installed: " + problem);
+      text.append(el("span", notes.join("; "), skill.problems.length > 0 ? "note err" : "note"));
+      row.append(box, text);
+      picks.push(box);
+      nodes.push(row);
+    }
+    for (const skip of answer.unreadable) nodes.push(el("p", (skip.path || "SKILL.md") + ": " + skip.message, "note"));
+    if (answer.internal > 0) nodes.push(el("p", answer.internal + " internal skills left out; name one with owner/repo@skill.", "note"));
+    if (answer.omitted > 0) nodes.push(el("p", answer.omitted + " more SKILL.md files not read; name a folder with a tree URL.", "note"));
+    const install = el("button", "Install selected", "btn btn-primary btn-sm");
+    install.type = "button";
+    install.addEventListener("click", async () => {
+      const folders = picks.filter((box) => box.checked).map((box) => box.value);
+      if (folders.length === 0) { notify("err", "Pick at least one skill."); return; }
+      const done = await post("/_t3flare/harness/api/skills/install", { source, commit: answer.commit, folders }, install);
+      busy(install, false);
+      if (done === undefined) return;
+      const result = await done.json();
+      const lines = result.results.map((entry) => entry.name + ": " + (entry.error === undefined ? entry.action : entry.error));
+      notify(result.results.every((entry) => entry.error === undefined) ? "ok" : "err", lines.join(" · "));
+      if (result.results.some((entry) => entry.error === undefined)) setTimeout(() => location.reload(), 1500);
+    });
+    nodes.push(install);
+    show(preview, ...nodes);
+  });
+}
+const outOf = (name) => document.querySelector('[data-skill-out="' + CSS.escape(name) + '"]');
+for (const button of document.querySelectorAll("button[data-skill-view]")) {
+  button.addEventListener("click", async () => {
+    const name = button.dataset.skillView;
+    const out = outOf(name);
+    try {
+      const view = await getJson("/_t3flare/harness/api/skills/view?name=" + encodeURIComponent(name));
+      const list = el("ul");
+      for (const file of view.files) {
+        const item = el("li");
+        if (file.url.startsWith("https://github.com/")) {
+          const link = el("a", file.path);
+          link.href = file.url;
+          link.rel = "noopener noreferrer";
+          link.target = "_blank";
+          item.append(link, el("span", " " + kib(file.size)));
+        } else item.textContent = file.path + " " + kib(file.size);
+        list.append(item);
+      }
+      show(out, el("pre", view.skillMd), list);
+    } catch (error) { failed(out, error.message); }
+  });
+}
+for (const button of document.querySelectorAll("button[data-skill-check]")) {
+  button.addEventListener("click", async () => {
+    const name = button.dataset.skillCheck;
+    const response = await post("/_t3flare/harness/api/skills/check", name === "" ? {} : { names: [name] }, button);
+    busy(button, false);
+    if (response === undefined) return;
+    const answer = await response.json();
+    for (const result of answer.results) {
+      const out = outOf(result.name);
+      if (out === null) continue;
+      if (result.status === "current") { show(out, el("p", "Up to date at " + result.from + ".")); continue; }
+      if (result.status !== "update") { failed(out, result.message); continue; }
+      const parts = [["added", result.added], ["changed", result.changed], ["removed", result.removed]].filter(([, paths]) => paths.length > 0).map(([what, paths]) => what + ": " + paths.join(", "));
+      const update = el("button", "Update to " + result.to, "btn btn-primary btn-sm");
+      update.type = "button";
+      update.addEventListener("click", async () => {
+        const done = await post("/_t3flare/harness/api/skills/update", { name: result.name, commit: result.commit }, update);
+        busy(update, false);
+        if (done === undefined) return;
+        const updated = await done.json();
+        notify("ok", updated.name + " updated from " + updated.from.slice(0, 7) + " to " + updated.to.slice(0, 7) + ".");
+        setTimeout(() => location.reload(), 1500);
+      });
+      show(out, el("p", "An update: " + result.from + " → " + result.to + ". " + (parts.length === 0 ? "" : parts.join("; ") + ".")), update);
+    }
+    if (answer.note !== undefined) notify("ok", answer.note);
+  });
+}
+for (const button of document.querySelectorAll("button[data-skill-remove]")) {
+  button.addEventListener("click", async () => {
+    const name = button.dataset.skillRemove;
+    if (!confirm("Remove the Environment skill " + name + "? Agents lose it at their next turn.")) return;
+    if (await post("/_t3flare/harness/api/skills/remove", { name }, button)) done();
+  });
+}
+for (const input of document.querySelectorAll("input[data-skill-enable]")) {
+  input.addEventListener("change", async () => {
+    if (await post("/_t3flare/harness/api/skills/enable", { name: input.dataset.skillEnable, enabled: input.checked }, input)) done();
+    else input.checked = !input.checked;
+  });
+}
 const format = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 for (const time of document.querySelectorAll("time[data-local]")) {
   const at = new Date(time.getAttribute("datetime"));

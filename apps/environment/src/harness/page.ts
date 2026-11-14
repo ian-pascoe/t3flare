@@ -346,10 +346,64 @@ ${ADD_SERVER}</div>
 
 // ── Skills, Status, Audit ───────────────────────────────────────────────────────────────────────────────────────
 
-const SKILLS = `<section id="skills" aria-labelledby="skills-title">
-<div class="section-head"><h2 id="skills-title">${icon("skills")}Skills</h2></div>
-<div class="group"><div class="empty"><span class="empty-icon">${icon("skills")}</span><h3>Environment skills aren't here yet</h3><p>Repo skills load from each Workspace's own files, switched by the Skills extension above. Environment skills, installed here for every Project, come with SPI-1148.</p></div></div>
+/** The Environment skills as the page shows them (panel.ts `skillsOverview`). */
+export interface SkillsView {
+  readonly skills: ReadonlyArray<{
+    readonly name: string;
+    readonly description: string;
+    readonly repo: string;
+    readonly path: string;
+    readonly ref: string | null;
+    readonly commit: string;
+    readonly enabled: boolean;
+    readonly savedAt: number;
+    readonly files: number;
+    readonly bytes: number;
+  }>;
+  readonly totals: { readonly count: number; readonly enabled: number; readonly disabled: number; readonly bytes: number; readonly disabledBytes: number; readonly maxBytes: number; readonly maxSkills: number };
+  readonly unauthenticated: boolean;
+}
+
+/** A size as the page shows it: KiB below a MiB. */
+const mib = (bytes: number) => (bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1024 / 1024).toFixed(2)} MiB`);
+
+/** One kept skill: its source at its commit, its switch, and its actions; the script fills its output area. */
+const skillRow = (skill: SkillsView["skills"][number]): string => {
+  const id = escapeHtml(`skill-${skill.name}`);
+  const name = escapeHtml(skill.name);
+  const where = `${skill.repo}${skill.path === "" ? "" : `/${skill.path}`}`;
+  return `<div class="row" data-skill-row="${name}"><div><div class="row-title"><h3 id="${id}">${name}</h3><span class="ident">${escapeHtml(skill.commit.slice(0, 7))}</span>${skill.enabled ? "" : '<span class="pill">Disabled</span>'}</div>
+<p class="desc">${escapeHtml(skill.description)}</p>
+<p class="hint">From <code>${escapeHtml(where)}</code>${skill.ref === null ? " on the default branch" : ` at <code>${escapeHtml(skill.ref)}</code>`}, ${plural(skill.files, "file", "files")}, ${mib(skill.bytes)}, saved ${time(skill.savedAt)}.</p></div>
+<div class="row-control"><input type="checkbox" class="switch" role="switch" data-skill-enable="${name}" aria-labelledby="${id}"${skill.enabled ? " checked" : ""}></div>
+<div class="row-extra"><div class="server-actions"><button type="button" class="btn btn-sm" data-skill-view="${name}">${icon("play")}View</button><button type="button" class="btn btn-sm" data-skill-check="${name}">Check for updates</button><span class="spacer"></span><button type="button" class="btn btn-sm btn-danger" data-skill-remove="${name}" aria-label="Remove ${name}">${icon("trash")}Remove</button></div><div class="skill-out" data-skill-out="${name}" aria-live="polite"></div></div></div>`;
+};
+
+/**
+ * The Environment skills (SPI-1148, ADR-0033): installed from GitHub for every Project, pinned to a commit, changed only
+ * here. The install form's preview is the confirmation; the script renders it, and every answer, as text.
+ */
+const skillsSection = (view: SkillsView | undefined): string => {
+  if (view === undefined) return "";
+  const { totals } = view;
+  const list =
+    view.skills.length === 0
+      ? `<div class="empty"><span class="empty-icon">${icon("skills")}</span><h3>No Environment skills</h3><p>Install one from GitHub below. Durable agents in every Project get it at their next turn.</p></div>`
+      : view.skills.map(skillRow).join("\n");
+  return `<section id="skills" aria-labelledby="skills-title">
+<div class="section-head"><h2 id="skills-title">${icon("skills")}Skills</h2>${view.skills.length === 0 ? "" : '<button type="button" class="btn btn-sm" data-skill-check="">Check all for updates</button>'}</div>
+<p class="section-desc">Environment skills, offered to Durable agents in every Project and served read-only in every Workspace at <code>/workspace/.agents/skills</code>. Each is pinned to the commit it was installed at, and beats a Repo skill of the same name. A change applies at each thread's next turn; the composer shows it at once. Repo skills load from each Workspace's own files, switched by the Skills extension above.</p>
+<p class="section-desc" data-skill-totals>${plural(totals.count, "skill", "skills")} (${totals.enabled} enabled, ${totals.disabled} disabled) of ${totals.maxSkills}; ${mib(totals.bytes)} of ${mib(totals.maxBytes)}${totals.disabled === 0 ? "" : `, ${mib(totals.disabledBytes)} of it disabled`}. Disabled skills count toward the limits.</p>
+${view.unauthenticated ? `<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>Reads from GitHub are unauthenticated</strong><p>No repository with the GitHub App is a Project here, so public repos are read from GitHub's shared limit of 60 an hour for this Worker's address. Install the GitHub App on a repository and add it as a Project to read with its own limit.</p></div></div>` : ""}
+<div class="group">${list}</div>
+<form class="group add" id="install-skill" data-skill-install autocomplete="off" aria-labelledby="install-title">
+<div class="row"><div><div class="row-title"><h3 id="install-title">Install from GitHub</h3></div><p class="desc">Preview shows the skills the source holds at its latest commit; pick them and install. Private repos need the GitHub App installed on them.</p></div></div>
+<div class="form-body"><div class="field wide"><label for="install-source">Source</label><input id="install-source" name="source" type="text" required placeholder="owner/repo, owner/repo@skill, or https://github.com/owner/repo/tree/ref/path" autocapitalize="none" spellcheck="false"></div></div>
+<div class="form-foot"><p></p><button type="submit" class="btn btn-primary">Preview</button></div>
+<div class="skill-out" data-skill-preview aria-live="polite"></div>
+</form>
 </section>`;
+};
 
 /** A status value; an ISO time reads as a time. */
 const statusValue = (value: string | number | null): string => {
@@ -399,6 +453,8 @@ export interface PageInput {
   readonly csrf: string;
   readonly audit: ReadonlyArray<AuditEntry>;
   readonly status: Readonly<Record<string, string | number | null>>;
+  /** The Environment skills (SPI-1148); the section is left out without them. */
+  readonly skills?: SkillsView;
 }
 
 const navItem = (id: string, label: string, name: IconName, after = "") => `<a href="#${id}">${icon(name)}${label}${after}</a>`;
@@ -427,7 +483,7 @@ ${navItem("skills", "Skills", "skills")}
 ${navItem("status", "Status", "status")}
 ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.length}</span>`)}
 </nav>
-<p class="side-foot">Harness revision <strong>${revision}</strong>, applied at each thread's next turn. Environment revision <strong>${environment.revision}</strong>, applied at each Container's next start.</p>
+<p class="side-foot">Harness revision <strong>${revision}</strong>, applied at each thread's next turn. Environment revision <strong>${environment.revision}</strong>: Container settings apply at each Container's next start, Environment skills at each thread's next turn.</p>
 </aside>
 <main id="main" tabindex="-1"><div class="content">
 <header class="page-head"><div><h1>Harness</h1><p>t3flare's own settings for this Cloud Environment: the Harness settings (Pi Durable's extensions and MCP servers, applied at each thread's next turn) and the Environment settings (what every Container gets, applied at its next start).</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
@@ -435,7 +491,7 @@ ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.leng
 ${extensionsSection(input.resolved)}
 ${mcpSection(rows)}
 ${environmentSection(environment, input.costs ?? containerCostTable(environment.containerBudget), input.running)}
-${SKILLS}
+${skillsSection(input.skills)}
 ${statusSection(input.status)}
 ${auditSection(input.audit)}
 </div></main>

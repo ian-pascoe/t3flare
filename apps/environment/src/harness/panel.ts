@@ -169,6 +169,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         audit: deps.store.auditLog(50),
         status: statusOf(deps),
         mcp: await mcpOverview(deps),
+        ...(deps.skills === undefined ? {} : { skills: skillsOverview(deps.skills) }),
       });
       return new Response(html, { headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp() } });
     }

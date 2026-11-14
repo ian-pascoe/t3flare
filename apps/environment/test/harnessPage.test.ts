@@ -4,7 +4,26 @@
 import { EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
 import { describe, expect, it } from "vitest";
 
-import { escapeHtml, type McpRow, renderPage } from "../src/harness/page.ts";
+import { escapeHtml, type McpRow, renderPage, type SkillsView } from "../src/harness/page.ts";
+import { SCRIPT } from "../src/harness/pageScript.ts";
+
+const NO_SKILLS: SkillsView = {
+  skills: [],
+  totals: { count: 0, enabled: 0, disabled: 0, bytes: 0, disabledBytes: 0, maxBytes: 8_388_608, maxSkills: 100 },
+  unauthenticated: false,
+};
+const SKILL: SkillsView["skills"][number] = {
+  name: "grill-me",
+  description: "Grill the plan.",
+  repo: "mattpocock/skills",
+  path: "skills/grill-me",
+  ref: null,
+  commit: "5863806dd4e15c63174bee4e7515a4256792ecfa",
+  enabled: true,
+  savedAt: Date.UTC(2026, 10, 14),
+  files: 2,
+  bytes: 1024,
+};
 import { FIXTURE_MCP, FIXTURE_NOW, fixturePage } from "./fixtures/harnessPage.ts";
 
 interface Tag {
@@ -148,11 +167,13 @@ describe("harness page", () => {
     expect(html).toContain("locked: the thread&#39;s modes and the link fence depend on it");
   });
 
-  it("draws the empty states: no server, no audit entry, and the Skills placeholder", () => {
-    const empty = renderPage(fixturePage({ mcp: [], audit: [] }));
+  it("draws the empty states: no server, no audit entry, no Environment skill (the placeholder gone, SPI-1148)", () => {
+    const empty = renderPage(fixturePage({ mcp: [], audit: [], skills: NO_SKILLS }));
     expect(empty).toContain("No MCP servers");
     expect(empty).toContain("No changes yet");
-    expect(empty).toContain("Environment skills aren't here yet");
+    expect(empty).toContain("No Environment skills");
+    expect(empty).not.toContain("aren't here yet");
+    expect(empty).toContain("data-skill-install");
     expect(empty).toContain("data-mcp-add");
     expect(balance(tagsOf(empty))).toBe("balanced");
   });
@@ -195,5 +216,34 @@ describe("harness page", () => {
     const parsed = tagsOf(page);
     expect(balance(parsed)).toBe("balanced");
     expect(parsed.some((tag) => Object.keys(tag.attrs).some((name) => /^on/i.test(name)))).toBe(false);
+  });
+
+  it("draws each Environment skill with its source, commit, switch and actions, and the totals with disabled ones apart (SPI-1148)", () => {
+    const page = renderPage(fixturePage({ skills: { ...NO_SKILLS, skills: [SKILL, { ...SKILL, name: "off", enabled: false }], totals: { ...NO_SKILLS.totals, count: 2, enabled: 1, disabled: 1, bytes: 2048, disabledBytes: 1024 } } }));
+    const parsed = tagsOf(page);
+    expect(parsed.filter((tag) => tag.attrs["data-skill-enable"] !== undefined).map((tag) => [tag.attrs["data-skill-enable"], tag.attrs.checked !== undefined])).toEqual([
+      ["grill-me", true],
+      ["off", false],
+    ]);
+    expect(parsed.filter((tag) => tag.attrs["data-skill-remove"] !== undefined)).toHaveLength(2);
+    expect(page).toContain("From <code>mattpocock/skills/skills/grill-me</code> on the default branch, 2 files, 1.0 KiB");
+    expect(page).toContain("2 skills (1 enabled, 1 disabled) of 100; 2.0 KiB of 8.00 MiB, 1.0 KiB of it disabled. Disabled skills count toward the limits.");
+    expect(page).not.toContain("Reads from GitHub are unauthenticated");
+    expect(renderPage(fixturePage({ skills: { ...NO_SKILLS, unauthenticated: true } }))).toContain("Reads from GitHub are unauthenticated");
+  });
+
+  it("escapes hostile strings in every Environment skill field: description, path, ref, repo (SPI-1148)", () => {
+    const hostile = `"><img src=x onerror=alert(1)>'&<script>`;
+    const page = renderPage(fixturePage({ skills: { ...NO_SKILLS, skills: [{ ...SKILL, name: hostile, description: hostile, repo: hostile, path: hostile, ref: hostile, commit: hostile }] } }));
+    expect(page).not.toContain("<img");
+    expect(page.match(/<script/g)).toHaveLength(1);
+    const parsed = tagsOf(page);
+    expect(balance(parsed)).toBe("balanced");
+    expect(parsed.some((tag) => Object.keys(tag.attrs).some((name) => /^on/i.test(name)))).toBe(false);
+  });
+
+  it("writes every answer in the page script as text, never as HTML, and confirms a skill's removal", () => {
+    expect(SCRIPT).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/);
+    expect(SCRIPT).toContain('confirm("Remove the Environment skill " + name + "? Agents lose it at their next turn.")');
   });
 });
