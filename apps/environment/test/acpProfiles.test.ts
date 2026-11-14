@@ -63,7 +63,11 @@ describe("Claude Code's profile", () => {
       CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "0",
     });
     expect(Object.keys(answer.env).filter((name) => /API_KEY$|AUTH_TOKEN|OAUTH|NONCE|PROXY/.test(name))).toEqual([]);
-    expect(answer.links).toEqual([{ path: "/var/lib/t3flare/cli/proc-7/claude/projects", target: CLAUDE_PROJECTS }]);
+    // SPI-1153: the Environment skill set as Claude Code's user-level Skill root, linked, never copied.
+    expect(answer.links).toEqual([
+      { path: "/var/lib/t3flare/cli/proc-7/claude/projects", target: CLAUDE_PROJECTS },
+      { path: "/var/lib/t3flare/cli/proc-7/claude/skills", target: "/workspace/.agents/skills" },
+    ]);
     expect(CLAUDE_PROJECTS).toBe("/workspace/.t3flare/claude/projects");
   });
 
@@ -152,6 +156,8 @@ describe("OpenCode's profile", () => {
     });
     expect(Object.keys(answer.env).filter((name) => /API_KEY|CONFIG_CONTENT|NONCE/.test(name))).toEqual([]);
     expect(OPENCODE_SNAPSHOT_DIR).toBe("/workspace/.t3flare/opencode");
+    // SPI-1153: the Environment skill set as OpenCode's user-level Skill root, linked, never copied.
+    expect(answer.links).toEqual([{ path: "/var/lib/t3flare/cli/proc-7/config/opencode/skills", target: "/workspace/.agents/skills" }]);
   });
 
   it("writes system configuration with one provider, the catalog, the project's own config honoured, and asking agents (M0 P2)", () => {

@@ -59,7 +59,12 @@ describe("Codex's profile", () => {
     // Codex's subagents stay on, as stock t3 leaves them (owner, 2026-11-12, back to stock).
     expect(overrides.some((value) => value.startsWith("features.multi_agent"))).toBe(false);
     expect(answer.env).toEqual({ HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: "/var/lib/t3flare/cli/proc-1/codex", CODEX_SQLITE_HOME: "/var/lib/t3flare/cli/proc-1/sqlite" });
-    expect(answer.links).toEqual([{ path: "/var/lib/t3flare/cli/proc-1/codex/sessions", target: CODEX_SESSIONS }]);
+    // SPI-1153: the Environment skill set linked inside Codex's user-level root, which stays writable for its bundled
+    // `.system` Skills (M0: a read-only root fails their install).
+    expect(answer.links).toEqual([
+      { path: "/var/lib/t3flare/cli/proc-1/codex/sessions", target: CODEX_SESSIONS },
+      { path: "/var/lib/t3flare/cli/proc-1/codex/skills/t3flare-environment", target: "/workspace/.agents/skills" },
+    ]);
     expect(answer.thread).toBe("thread-1");
     expect(answer.droppedEnv.toSorted()).toEqual(["CODEX_HOME", "OPENAI_API_KEY"]);
   });
@@ -85,6 +90,9 @@ describe("pi's profile", () => {
       `${PI_SESSIONS}/s1.jsonl`,
       "--extension",
       "/var/lib/t3flare/cli/proc-1/ext/pi-t3-mcp-extension.ts",
+      // SPI-1153: the Environment skill set, first, so it beats a Repo skill of its name (pi keeps the first).
+      "--skill",
+      "/workspace/.agents/skills",
       "--skill",
       "/w/demo/.pi/skills",
       "--skill",
@@ -137,6 +145,8 @@ describe("pi's profile", () => {
   it("names pi's repo roots from a cwd below the repo root as pi finds them: .pi/skills at the cwd, .agents/skills up to the root (SPI-1151)", () => {
     expect(piRepoResourceArgs("/w/demo/pkg/app")).toEqual([
       "--skill",
+      "/workspace/.agents/skills",
+      "--skill",
       "/w/demo/pkg/app/.pi/skills",
       "--skill",
       "/w/demo/pkg/app/.agents/skills",
@@ -149,7 +159,7 @@ describe("pi's profile", () => {
     ]);
     expect([repoRootOf("/w/demo/pkg/app"), repoRootOf("/w/demo"), repoRootOf("/w/.wt/demo/feature/src"), repoRootOf("/elsewhere/x")]).toEqual(["/w/demo", "/w/demo", "/w/.wt/demo/feature", "/elsewhere/x"]);
     // A worktree's repo root is its own path, not the project's.
-    expect(piRepoResourceArgs("/w/.wt/demo/feature/")).toEqual(["--skill", "/w/.wt/demo/feature/.pi/skills", "--skill", "/w/.wt/demo/feature/.agents/skills", "--prompt-template", "/w/.wt/demo/feature/.pi/prompts"]);
+    expect(piRepoResourceArgs("/w/.wt/demo/feature/")).toEqual(["--skill", "/workspace/.agents/skills", "--skill", "/w/.wt/demo/feature/.pi/skills", "--skill", "/w/.wt/demo/feature/.agents/skills", "--prompt-template", "/w/.wt/demo/feature/.pi/prompts"]);
   });
 
   it("runs t3's fork (no extensions, no tools) without the extension", () => {

@@ -4,7 +4,7 @@
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
-import { CLI_ROOTS, directoriesUp } from "@t3flare/skills";
+import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
 
 import { acpProfileLaunch } from "./acpProfiles.ts";
@@ -72,6 +72,20 @@ export interface Launch {
 export type LaunchAnswer = Launch | { readonly refused: string };
 
 const homeOf = (key: string) => `${CLI_HOMES}/${key}`;
+
+/**
+ * SPI-1153: the Environment skill set in a CLI's user-level Skill root, linked to the Workspace's read-only mount, never
+ * copied, so the CLI reads the set the Workspace holds now. The launcher makes the link in the process's fresh home;
+ * nothing writes through it (the mount is read-only from the Container's first command, SPI-1148's lock).
+ */
+export const environmentSkillsLink = (path: string) => ({ path, target: SKILLS_MOUNT });
+
+/**
+ * Where Codex gets the set: a directory inside its user-level root (`$CODEX_HOME/skills`, SPI-1151's M0 table), which
+ * Codex walks following directory links. Not the root itself: Codex installs its bundled Skills into `skills/.system`
+ * at start, which a read-only root would refuse (SPI-1153 M0).
+ */
+export const CODEX_ENVIRONMENT_SKILLS = "codex/skills/t3flare-environment";
 
 /** t3's env keys the profiles read; everything else is dropped. */
 const READ_ENV = new Set(["T3CODE_THREAD_ID", "T3_PI_RUNTIME_MODE", "T3_PI_MCP_EXTENSION_PATH", "T3_MCP_URL", "T3_MCP_BEARER_TOKEN"]);
@@ -184,7 +198,7 @@ const codexLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer 
     argv: [`${CLI_BIN}/codex`, "app-server", ...[...codexOverrides(context.proxyUrl, input.key), ...codexRelayOverrides(relay?.servers ?? [])].flatMap((value) => ["-c", value])],
     env: { HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: `${home}/codex`, CODEX_SQLITE_HOME: `${home}/sqlite`, ...(relay === undefined ? {} : { [TOOL_HANDLE_ENV]: relay.handle }) },
     files: [{ path: `${home}/codex/config.toml`, text: "# t3flare: every setting comes from the command line (-c)\n" }],
-    links: [{ path: `${home}/codex/sessions`, target: CODEX_SESSIONS }],
+    links: [{ path: `${home}/codex/sessions`, target: CODEX_SESSIONS }, environmentSkillsLink(`${home}/${CODEX_ENVIRONMENT_SKILLS}`)],
     ...(thread === undefined ? {} : { thread }),
     droppedEnv: dropped(input.env),
   };
@@ -258,6 +272,10 @@ export const piRepoResourceArgs = (cwd: string): ReadonlyArray<string> => {
   const base = normalize(cwd);
   const root = repoRootOf(base);
   return [
+    // SPI-1153: the Environment skill set first: pi keeps the first Skill of a name, so an Environment skill beats a
+    // Repo skill of its name (SPI-1001's rule; pi's flag order is the one precedence t3flare chooses).
+    "--skill",
+    SKILLS_MOUNT,
     ...directoriesUp(base, root).flatMap((directory, depth) =>
       CLI_ROOTS.pi.skills.filter((skillRoot) => depth === 0 || !skillRoot.cwdOnly).flatMap((skillRoot) => ["--skill", `${directory}/${skillRoot.directory}`]),
     ),

@@ -12,6 +12,7 @@
 import type { CatalogModel } from "@t3flare/models";
 import { SMALL_MODEL_SLUG, DEFAULT_MODEL_SLUG } from "@t3flare/models";
 import { CLI_HOMES } from "@t3flare/sandbox-image/process";
+import { SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT } from "@t3flare/workspace-client";
 
 import type { Launch, LaunchAnswer, LaunchInput, ProfileContext } from "./cliProfiles.ts";
@@ -19,6 +20,9 @@ import type { Launch, LaunchAnswer, LaunchInput, ProfileContext } from "./cliPro
 /** The image's CLI binaries (`cliProfiles.ts` `CLI_BIN`, restated: that module imports this one). */
 const CLI_BIN = "/opt/t3flare/bin";
 const homeOf = (key: string) => `${CLI_HOMES}/${key}`;
+
+/** SPI-1153: the Environment skill set linked at `path` (`cliProfiles.ts` `environmentSkillsLink`, restated: no value import from it). */
+const environmentSkillsLink = (path: string) => ({ path, target: SKILLS_MOUNT });
 
 /** Claude's session files, synced (resume after the Container sleeps, M0 P5). */
 export const CLAUDE_PROJECTS = `${HARNESS_ROOT}/claude/projects`;
@@ -137,7 +141,8 @@ const claudeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer
       ...claudeSwitches(context.proxyUrl),
     },
     files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(context.proxyUrl, context.models, relayNames(context)), null, 1)}\n` }],
-    links: [{ path: `${home}/claude/projects`, target: CLAUDE_PROJECTS }],
+    // SPI-1153: the Environment skill set as Claude Code's user-level root (`$CLAUDE_CONFIG_DIR/skills`).
+    links: [{ path: `${home}/claude/projects`, target: CLAUDE_PROJECTS }, environmentSkillsLink(`${home}/claude/skills`)],
     ...(thread === undefined ? {} : { thread }),
     droppedEnv: dropped(input.env),
   } satisfies Launch;
@@ -222,6 +227,8 @@ const opencodeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnsw
       OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
     },
     files: [{ path: `${home}/opencode.json`, text: `${JSON.stringify(opencodeConfig(context.proxyUrl, context.models, relayNames(context)), null, 1)}\n` }],
+    // SPI-1153: the Environment skill set as OpenCode's user-level root (`$XDG_CONFIG_HOME/opencode/skills`).
+    links: [environmentSkillsLink(`${home}/config/opencode/skills`)],
     ...(thread === undefined ? {} : { thread }),
     droppedEnv: dropped(input.env),
   } satisfies Launch;
