@@ -1,5 +1,5 @@
 {
-  "at": "2026-11-14T19:58:43.875Z",
+  "at": "2026-11-14T20:21:18.658Z",
   "openai": "Commissary's OpenAI Responses API",
   "settingBefore": {
     "instanceId": "piDurable",
@@ -23,8 +23,8 @@
     "commit": {
       "failure": null,
       "status": "created",
-      "subject": "Add isLeapYear helper in leap-anthropic module",
-      "head": "Add isLeapYear helper in leap-anthropic module"
+      "subject": "Add leap year helper in leap-anthropic module",
+      "head": "Add leap year helper in leap-anthropic module"
     }
   },
   "openaiResponses": {
@@ -32,13 +32,13 @@
     "title": {
       "outcome": "renamed",
       "message": null,
-      "title": "Fix Date Parser Leap Year Bug"
+      "title": "Fix Date Parser Leap Day Test"
     },
     "commit": {
       "failure": null,
       "status": "created",
-      "subject": "Add isLeapYear helper in leap-openai module",
-      "head": "Add isLeapYear helper in leap-openai module"
+      "subject": "Add leap year helper in leap-openai module",
+      "head": "Add leap year helper in leap-openai module"
     }
   },
   "wrongKey": {
