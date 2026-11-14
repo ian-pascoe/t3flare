@@ -134,7 +134,7 @@ Put them in `~/.config/t3flare/dev.env` (stages) or the GitHub environment `prod
    MODEL_PROXY_API_KEY=cms_…
    ```
 
-   `apps/environment/scripts/stage.ts` reads the file (shell variables of the same name win) and binds them as Worker settings and secrets of both Workers, and never prints them. Until the hard cut (SPI-1176) both are optional: a stage deployed without them, or with `--no-model-proxy`, has no Model proxy and reaches models through its Model endpoints alone ([below](#the-stages-model-endpoint)).
+   `apps/environment/scripts/stage.ts` reads the file (shell variables of the same name win) and binds them as Worker settings and secrets of both Workers, and never prints them. Until the hard cut (SPI-1176) both are optional on a throwaway stage (prod refuses to deploy without them): a stage deployed without them, or with `--no-model-proxy` (which overrides shell variables too), has no Model proxy and reaches models through its Model endpoints alone ([below](#the-stages-model-endpoint)).
 5. **CI (the nightly bump).** The `bump` GitHub environment needs the variable `MODEL_PROXY_URL` and the secret `MODEL_PROXY_API_KEY` (and, for its Model endpoint, `T3FLARE_MODEL_ENDPOINT`, [below](#the-stages-model-endpoint)).
    - `pnpm --filter @t3flare/infra run ci:setup` creates the variable, reading `MODEL_PROXY_URL` from `~/.config/t3flare/dev.env`.
    - It does not set the key. Set it yourself, once and again after a rotation: `gh secret set MODEL_PROXY_API_KEY --env bump --repo <owner>/<repo>` (the value on stdin).
@@ -162,7 +162,7 @@ Where it comes from:
 - **CI:** the GitHub secret `T3FLARE_MODEL_ENDPOINT` on the `bump` and `prod` environments. `pnpm --filter @t3flare/infra run ci:setup` sets it on both from `dev.env`, deriving Commissary's as above when `dev.env` has no `T3FLARE_MODEL_ENDPOINT`. Run `ci:setup` again after changing the endpoint or rotating its key. CI derives nothing: until the secret is set, a deploy and the acceptance test skip the endpoint and say so, and the bump's real turn runs on the Model proxy.
 - **prod** gets the endpoint only when it has none of that id: what the owner changes in the panel stays, so a rotated key reaches prod's endpoint only when entered in the panel. A removed one comes back at the next deploy while the secret is set; delete the secret to stop that. A test stage saves it again on each deploy.
 
-A setting that is set but unusable fails the deploy before the Workers are built. A setup that fails after the deploy (the panel not answering within five minutes, the model list unreadable, the panel refusing the endpoint) fails the command, saying why; no message carries the key.
+A setting that is set but unusable fails the deploy before the Workers are built. In CI, the workflows' first step after the setup (`apps/environment/scripts/mask-endpoint.ts`) masks its key and each header value on their own (GitHub masks only the whole JSON string), and `bump-report.json` and the acceptance report are written with them scrubbed. A setup that fails after the deploy (the panel not answering within five minutes, the model list unreadable, the panel refusing the endpoint) fails the command, saying why; no message carries the key.
 
 ## CLI agents (steps 4a, 4b)
 
