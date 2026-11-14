@@ -1,0 +1,51 @@
+{
+ "at": "2026-11-14T17:35:48.947Z",
+ "agent": "Pi Durable",
+ "model": "anthropic/claude-sonnet-5-5",
+ "threadId": "5804bb66-bbdd-4a22-b8ee-3599bd11ca05",
+ "mode": "approval-required",
+ "cases": [
+  {
+   "name": "a write: sandbox_open and sandbox_write each raise a card in approval-required; accepted, they run",
+   "status": "completed",
+   "cards": [
+    {
+     "kind": "permission",
+     "prompt": "commissary: sandbox_open\n{}\n\nA write tool (the tool's own hint).\n\nFrom a code mode script:\nconst opened = String(await tools.mcp__commissary__sandbox_open({}));\nconst session = opened.match(/sbx_[0-9a-f]+/)[0];\nconst wrote = await tools.mcp__commissary__sandbox_write({ session, path: \"note.txt\", content: \"spi1160-durable-mwgoqmwz\" });\ntext(session + \"\\n\" + wrote);",
+     "decision": "accept"
+    },
+    {
+     "kind": "permission",
+     "prompt": "commissary: sandbox_write\n{\n  \"session\": \"sbx_9ffa91097ad148ca8fa6775c4c701c3a\",\n  \"path\": \"note.txt\",\n  \"content\": \"spi1160-durable-mwgoqmwz\"\n}\n\nA write tool (the tool's own hint).\n\nFrom a code mode script:\nconst opened = String(await tools.mcp__commissary__sandbox_open({}));\nconst session = opened.match(/sbx_[0-9a-f]+/)[0];\nconst wrote = await tools.mcp__commissary__sandbox_write({ session, path: \"note.txt\", content: \"spi1160-durable-mwgoqmwz\" });\ntext(session + \"\\n\" + wrote);",
+     "decision": "accept"
+    }
+   ],
+   "ms": 15236,
+   "output": "Script completed\nWall time 4.5 seconds\nOutput:\nsbx_9ffa91097ad148ca8fa6775c4c701c3a\nSuccessfully wrote 24 bytes to /workspace/note.txt",
+   "ok": true
+  },
+  {
+   "name": "a read: sandbox_read runs without a card and shows what the write wrote",
+   "status": "completed",
+   "cards": [],
+   "ms": 7223,
+   "output": "Script completed\nWall time 0.3 seconds\nOutput:\nspi1160-durable-mwgoqmwz",
+   "ok": true
+  },
+  {
+   "name": "cleanup: sandbox_close (a write, its card accepted)",
+   "status": "completed",
+   "cards": [
+    {
+     "kind": "permission",
+     "prompt": "commissary: sandbox_close\n{\n  \"session\": \"sbx_9ffa91097ad148ca8fa6775c4c701c3a\"\n}\n\nA write tool (the tool's own hint).\n\nFrom a code mode script:\ntext(await tools.mcp__commissary__sandbox_close({ session: \"sbx_9ffa91097ad148ca8fa6775c4c701c3a\" }));",
+     "decision": "accept"
+    }
+   ],
+   "ms": 7880,
+   "output": "Script completed\nWall time 1.4 seconds\nOutput:\nClosed sandbox session sbx_9ffa91097ad148ca8fa6775c4c701c3a; its files are deleted.",
+   "ok": true
+  }
+ ],
+ "ok": true
+}
