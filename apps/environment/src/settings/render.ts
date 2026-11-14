@@ -19,6 +19,8 @@ import {
 } from "@t3flare/harness-registry";
 import type { McpTierChange } from "@t3flare/harness-registry";
 
+import type { NeedsPage } from "./changes.ts";
+
 /** One skill an install or update would keep, as previewed at its commit (plan D8, D10). */
 export interface ShownSkill {
   readonly name: string;
@@ -94,6 +96,17 @@ const GUARD_OFF: Readonly<Record<string, string>> = { guardian: "This turns off 
 
 /** The fixed line for a new server (plan D9). */
 export const HINT_TRUST_LINE = "Its tools' own read-only hints are trusted: a tool it marks read runs without a card.";
+
+/**
+ * Why a change is answered on its Change page alone (plan D6), by what it needs; `where` names the page. The card says
+ * it beside "Opened it", and an Owner client's `W` beside the mode it asked in.
+ */
+export const PAGE_REASON: Readonly<Record<NeedsPage, (where: string) => string>> = {
+  secret: (where) => `It takes a secret, typed only on ${where}.`,
+  "sign-in": (where) => `Its sign-in starts in the owner's browser, only from ${where}.`,
+  skills: (where) => `Each skill's SKILL.md text and files are shown on ${where}; review and approve them there.`,
+  oversize: (where) => `It is too long to show whole in a card or a question, so it is answered on ${where}.`,
+};
 
 const asText = (value: unknown): string => (typeof value === "string" ? value : value === undefined || value === null ? "" : JSON.stringify(value));
 

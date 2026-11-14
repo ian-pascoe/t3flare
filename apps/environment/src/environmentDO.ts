@@ -28,7 +28,7 @@ import * as ModuleState from "./host/moduleState.ts";
 import * as Pairing from "./host/pairing.ts";
 import { isRefusedRelayRoute } from "./host/relayRoutes.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
-import type { HarnessCaller } from "./harness/panel.ts";
+import type { AccessCaller } from "./access.ts";
 import { harnessSecrets } from "./harness/secrets.ts";
 import { harnessStore } from "./harness/store.ts";
 import { sealedStore } from "./credentials/sealed.ts";
@@ -386,7 +386,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * The harness panel (ADR-0026) at `/_t3flare/harness` on the t3 host, RPC from the Worker after it verified Access.
    * Never boots t3. Not reachable through `fetch`.
    */
-  async harness(request: Request, caller: HarnessCaller): Promise<Response> {
+  async harness(request: Request, caller: AccessCaller): Promise<Response> {
     const [{ handleHarness }, { changesApiOf }] = await Promise.all([import("./harness/panel.ts"), import("./settings/server.ts")]);
     return handleHarness(request, {
       caller,
@@ -442,7 +442,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * The Owner-client endpoint (ADR-0034, plan D11), RPC from the Worker after it verified the endpoint's own Access
    * application (D13). Never boots t3. Open work while it runs, and while a held stream is open (plan D17).
    */
-  async settingsMcp(request: Request, caller: HarnessCaller): Promise<Response> {
+  async settingsMcp(request: Request, caller: AccessCaller): Promise<Response> {
     Idle.requestStarted();
     try {
       const [{ handleSettingsMcp }, { settingsStateKey }] = await Promise.all([import("./settings/endpoint.ts"), import("./settings/tokens.ts")]);

@@ -4,14 +4,15 @@
 import { describe, expect, it } from "vitest";
 
 import { csrfToken } from "../src/harness/csrf.ts";
-import { CSRF_HEADER, handleHarness, type HarnessCaller } from "../src/harness/panel.ts";
+import type { AccessCaller } from "../src/access.ts";
+import { CSRF_HEADER, handleHarness } from "../src/harness/panel.ts";
 import { AUDIT_KEY, harnessStore } from "../src/harness/store.ts";
 
 const HOST = "t3-admin.example.dev";
 const NOW = Date.UTC(2026, 10, 13, 10, 30);
 /** sha256 of '[tools]\nnode = "24.11.1"\n' (`shasum -a 256`). */
 const SHA_OF_TEXT = "0eb09ceb981ac62b1ed4ebb30295ad081a471bb40b9ebda4eb48fcf45aae8cf3";
-const owner: HarnessCaller = { kind: "owner", subject: "owner-sub" };
+const owner: AccessCaller = { kind: "owner", subject: "owner-sub" };
 
 const memory = () => {
   const map = new Map<string, unknown>();
@@ -24,7 +25,7 @@ const memory = () => {
 /** The Container budget DO's state as the panel reads it: two Containers running. */
 const RUNNING = { max: 3, leases: [{ holder: "a1", until: NOW + 60_000, workspace: "web-app" }, { holder: "b2", until: NOW + 60_000, workspace: null }] };
 
-const setup = (caller: HarnessCaller = owner) => {
+const setup = (caller: AccessCaller = owner) => {
   const kv = memory();
   const store = harnessStore(kv);
   return { kv, store, deps: { caller, host: HOST, store, now: () => NOW, budget: async () => RUNNING } };

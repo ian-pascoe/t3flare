@@ -1,8 +1,8 @@
 // @effect-diagnostics globalDate:off
 // T-open (plan §5; ADR-0034, plan D8, D16), M4 (SPI-1199): the Open change. Single use; expiry at 10 minutes and lazy
-// pruning two hours after closing (`CLOSED_KEPT_MS`); D8's answerer table, a wrong `sub`; a moved revision; two changes against one
-// revision; the record surviving an Environment reset; a skill whose digest changed at apply; every cap of D16, and that
-// a dropped stream or an expiry is not a strike for an Owner client.
+// pruning two hours after closing (`CLOSED_KEPT_MS`); D8's answerer table, a wrong `sub`; a moved revision; two changes
+// against one revision; the record surviving an Environment reset; a skill whose digest changed at apply; every cap of
+// D16, and that a dropped stream or an expiry is not a strike for an Owner client.
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -29,6 +29,7 @@ import {
 } from "../src/settings/openChanges.ts";
 import { answerDepsOf, changesApiOf, settingsOwnerCall } from "../src/settings/server.ts";
 import { QUESTION_WAIT_MS } from "../src/mcp/host.ts";
+import { changePagePath } from "../src/harness/paths.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 import { NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 import { skillMd } from "./skillRepo.fixture.ts";
@@ -118,7 +119,8 @@ describe("expiry and pruning", () => {
     expect(w.deps().changes.get(record.id)?.state).toBe("open");
     w.advance(1);
     expect(w.deps().changes.get(record.id)).toMatchObject({ state: "expired", closed: { at: NOW + CHANGE_TTL_MS } });
-    // An expiry is a log line (plan D15), `settings-change` as a change's own end, written once, by the table that closed it.
+    // An expiry is a log line (plan D15), `settings-change` as a change's own end, written once, by the table that
+    // closed it.
     w.deps().changes.get(record.id);
     expect(w.logs).toEqual([{ t3flare: "settings-change", via: "mcp", door: "own", tool: "change_environment", change: record.id, tier: "asked", mode: "card", outcome: "expired", answeredBy: null }]);
     expect(await answerOpenChange(w.deps(), record.id, { by: "card", answerer: { kind: "card" }, action: "approve" })).toMatchObject({ ok: false, status: 409 });
@@ -369,7 +371,7 @@ describe("through the Settings server", () => {
     expect(second).toMatchObject({ kind: "result", isError: true, structured: { status: "refused", reason: "open-thread", changeId: record!.id } });
     expect(run.cards.length).toBe(1);
     const status = await run.call(run.durable(), "get_status");
-    expect(status.kind === "result" ? status.structured : undefined).toMatchObject({ openChanges: [{ changeId: record!.id, url: `${"https://t3.example.dev/_t3flare/harness"}/changes/${record!.id}`, tool: "change_environment" }] });
+    expect(status.kind === "result" ? status.structured : undefined).toMatchObject({ openChanges: [{ changeId: record!.id, url: `https://t3.example.dev${changePagePath(record!.id)}`, tool: "change_environment" }] });
   });
 });
 

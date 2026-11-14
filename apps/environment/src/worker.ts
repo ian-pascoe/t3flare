@@ -5,7 +5,8 @@ import { OAUTH_PUBLIC_PATHS } from "./harness/oauth.ts";
 
 import * as Access from "./access.ts";
 import type { EnvironmentEnv } from "./environmentDO.ts";
-import { type HarnessCaller, isHarnessPath } from "./harness/panel.ts";
+import type { AccessCaller } from "./access.ts";
+import { isHarnessPath } from "./harness/panel.ts";
 import { isSettingsMcpPath, SETTINGS_MCP_PATH } from "./settings/endpointLayout.ts";
 
 export { EnvironmentDO } from "./environmentDO.ts";
@@ -16,9 +17,9 @@ export interface Env extends EnvironmentEnv {
   readonly ENVIRONMENT: {
     getByName(name: string): {
       fetch(request: Request): Promise<Response>;
-      harness(request: Request, caller: HarnessCaller): Promise<Response>;
+      harness(request: Request, caller: AccessCaller): Promise<Response>;
       harnessPublic(request: Request): Promise<Response>;
-      settingsMcp(request: Request, caller: HarnessCaller): Promise<Response>;
+      settingsMcp(request: Request, caller: AccessCaller): Promise<Response>;
     };
   };
   readonly ASSETS: { fetch(request: Request): Promise<Response> };
@@ -67,8 +68,10 @@ export default {
     if (OAUTH_PUBLIC_PATHS.has(url.pathname)) return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).harnessPublic(request);
     // The Owner-client endpoint (ADR-0034, ADR-0035, plan D11, D13; layout (B), settings/endpointLayout.ts) at
     // `/_t3flare/mcp`, behind its own Access application with managed OAuth: verified against that application's
-    // audience, never the panel's. That Access keeps one application's token from the other's paths was tested with a service-token stand-in only; the OAuth bearer case is owner step 1 (m5a-stage-run.md items 1-4); this branch's own check is test/workerRouting.test.ts. Before the generic
-    // `/_t3flare` branch, which would ask for the admin token.
+    // audience, never the panel's. That Access keeps one application's token from the other's paths was tested with a
+    // service-token stand-in only; the OAuth bearer case is owner step 1 (m5a-stage-run.md items 1-4); this branch's
+    // own check is test/workerRouting.test.ts. Before the generic `/_t3flare` branch, which would ask for the admin
+    // token.
     if (isSettingsMcpPath(url.pathname)) {
       const config = { ...guardConfig(env), audience: env.T3FLARE_ACCESS_SETTINGS_AUD };
       // Local mode (local workerd only): the admin token alone, on loopback, as the service-token caller (plan D17).
@@ -78,7 +81,7 @@ export default {
         console.log(JSON.stringify({ t3flare: "settings-refused", via: "mcp", door: "owner", reason: verdict.admitted ? "path" : verdict.reason, path: url.pathname }));
         return new Response("Not found\n", { status: 404, headers: { "cache-control": "no-store" } });
       }
-      const caller: HarnessCaller = !local && verdict.caller.kind === "owner" ? { kind: "owner", subject: verdict.caller.subject ?? "" } : { kind: "service-token" };
+      const caller: AccessCaller = !local && verdict.caller.kind === "owner" ? { kind: "owner", subject: verdict.caller.subject ?? "" } : { kind: "service-token" };
       return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).settingsMcp(request, caller);
     }
     // The harness panel (ADR-0026) at `/_t3flare/harness`, behind the `/_t3flare` Access application (owner, 2026-11-12,
@@ -91,7 +94,7 @@ export default {
         console.log(JSON.stringify({ t3flare: "harness-refused", reason: verdict.reason, path: url.pathname }));
         return new Response("Not found\n", { status: 404 });
       }
-      const caller: HarnessCaller = verdict.caller.kind === "owner" ? { kind: "owner", subject: verdict.caller.subject ?? "" } : { kind: "service-token" };
+      const caller: AccessCaller = verdict.caller.kind === "owner" ? { kind: "owner", subject: verdict.caller.subject ?? "" } : { kind: "service-token" };
       return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).harness(request, caller);
     }
     if (url.pathname === "/_t3flare" || url.pathname.startsWith("/_t3flare/")) {

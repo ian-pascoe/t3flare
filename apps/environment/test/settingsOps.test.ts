@@ -6,7 +6,8 @@
 import { sha256Hex } from "@t3flare/skills";
 import { describe, expect, it } from "vitest";
 
-import { CSRF_HEADER, handleHarness, type HarnessCaller } from "../src/harness/panel.ts";
+import type { AccessCaller } from "../src/access.ts";
+import { CSRF_HEADER, handleHarness } from "../src/harness/panel.ts";
 import { csrfToken } from "../src/harness/csrf.ts";
 import {
   addMcpServer,
@@ -30,7 +31,7 @@ import { fakeGithub, skillMd } from "./skillRepo.fixture.ts";
 
 const HOST = "t3-admin.example.dev";
 const NOW = Date.UTC(2026, 10, 14, 10, 30);
-const owner: HarnessCaller = { kind: "owner", subject: "owner-sub" };
+const owner: AccessCaller = { kind: "owner", subject: "owner-sub" };
 /** An own agent's actor, as the Settings server will write it (plan D15). */
 const agent: AuditActor = { caller: "agent:thread-1", via: "mcp", thread: "thread-1", agent: "piDurable", tier: "free" };
 const ACTOR_FIELDS = ["caller", "via", "thread", "agent", "client", "tier", "mode", "answeredBy", "change"] as const;
@@ -44,7 +45,7 @@ const memory = () => {
   };
 };
 
-const setup = (caller: HarnessCaller = owner, transactionSync: <T>(closure: () => T) => T = (closure) => closure()) => {
+const setup = (caller: AccessCaller = owner, transactionSync: <T>(closure: () => T) => T = (closure) => closure()) => {
   const kv = memory();
   const store = harnessStore(kv);
   const secrets = harnessSecrets(kv, () => NOW);

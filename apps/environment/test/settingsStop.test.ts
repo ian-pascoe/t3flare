@@ -6,7 +6,7 @@
 import type { McpRelayInput } from "@t3flare/harness-registry";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { sessionMcpCall, stopCall, stoppableCall } from "../src/mcp/callStops.ts";
+import { forgetEarlyStopsForTests, sessionMcpCall, stopCall, stoppableCall } from "../src/mcp/callStops.ts";
 import { relayMessage } from "../src/mcp/relay.ts";
 import { registerCliAsker } from "../src/provider/cli/cliAsk.ts";
 import { DURABLE_AGENT } from "../src/provider/threadCaller.ts";
@@ -20,6 +20,7 @@ const unregisters: Array<() => void> = [];
 afterEach(() => {
   fixture?.dispose();
   for (const unregister of unregisters.splice(0)) unregister();
+  forgetEarlyStopsForTests();
 });
 
 describe("a Stop withdraws the Open change after \"Opened it\" (plan D9)", () => {

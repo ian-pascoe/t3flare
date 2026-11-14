@@ -8,11 +8,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { isPausingServer, pauseOf } from "../src/mcp/elicitation.ts";
+import { changePagePath } from "../src/harness/paths.ts";
 import { CHANGE_TTL_MS } from "../src/settings/changes.ts";
+import { waitingOn } from "../src/settings/openChanges.ts";
 import { changesApiOf, PAUSE_LINE } from "../src/settings/server.ts";
 import { signToken } from "../src/settings/tokens.ts";
 import { ASKED, BOTH, bodyOf, endpointOf, initialize, KEY, legacy, modern, post, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
-import { NOW, PANEL, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
+import { HOST, NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 
 let fixture: SettingsFixture | undefined;
 const world = () => {
@@ -21,7 +23,6 @@ const world = () => {
 };
 afterEach(() => fixture?.dispose());
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pageAnswer = (f: SettingsFixture, id: string, action: "approve" | "decline", subject = SUB) => changesApiOf(f.deps).answer(id, { answerer: { kind: "owner", subject }, action });
 
@@ -29,7 +30,7 @@ const pageAnswer = (f: SettingsFixture, id: string, action: "approve" | "decline
 const openChange = (f: SettingsFixture) => {
   const [record] = f.deps.changes.open();
   if (record === undefined) throw new Error("no open change");
-  return { record, url: `${PANEL}/changes/${record.id}` };
+  return { record, url: `https://${HOST}${changePagePath(record.id)}` };
 };
 
 /** The JSON-RPC messages of an SSE body. */
@@ -71,7 +72,7 @@ describe("browser on 2026-07-28: input_required with the Change page, then the r
     const first = await bodyOf(await endpoint(askedCall()));
     const { record } = openChange(f);
     const held = endpoint(retry(first.result?.requestState, "accept"));
-    await sleep(20);
+    await until(() => waitingOn(record.id) > 0);
     expect((await pageAnswer(f, record.id, action)).ok).toBe(true);
     expect(await structuredOf(await held)).toMatchObject({ ...expected, changeId: record.id });
     if (action === "approve") expect(f.store.auditLog(1)[0]).toMatchObject({ via: "mcp", caller: `owner:${SUB}`, tier: "asked", mode: "browser", answeredBy: "page", change: record.id });
@@ -176,9 +177,9 @@ describe("browser on 2026-07-28: input_required with the Change page, then the r
 });
 
 describe("browser on 2025-11-25: the page elicitation on the call's stream", () => {
-  const setup = async (options: { readonly holdMs?: number } = {}) => {
+  const setup = async (options: { readonly holdMs?: number; readonly work?: () => () => void } = {}) => {
     const f = world();
-    const endpoint = endpointOf(f, { holdMs: options.holdMs ?? 80, beatMs: 30 });
+    const endpoint = endpointOf(f, { holdMs: options.holdMs ?? 80, beatMs: 30, ...(options.work === undefined ? {} : { work: options.work }) });
     const { session } = await initialize(endpoint, "2025-11-25", BOTH);
     return { f, endpoint, session };
   };
@@ -188,7 +189,7 @@ describe("browser on 2025-11-25: the page elicitation on the call's stream", () 
     const response = await endpoint(legacy("tools/call", { name: "change_environment", arguments: ASKED }, { session, id: 7 }));
     expect(response.headers.get("content-type")).toBe("text/event-stream");
     expect(response.headers.get("cache-control")).toBe("no-store");
-    await sleep(20);
+    await until(() => f.deps.changes.open().some((each) => waitingOn(each.id) > 0));
     const { record, url } = openChange(f);
     await pageAnswer(f, record.id, "approve");
     const [ask, result, ...rest] = events(await response.text());
@@ -238,12 +239,20 @@ describe("browser on 2025-11-25: the page elicitation on the call's stream", () 
   });
 
   it("a stream the client cuts leaves the change open for the page (browser)", async () => {
-    const { f, endpoint, session } = await setup({ holdMs: 2000 });
+    let open = 0;
+    const { f, endpoint, session } = await setup({
+      holdMs: 2000,
+      work: () => {
+        open += 1;
+        return () => void (open -= 1);
+      },
+    });
     const response = await endpoint(legacy("tools/call", { name: "change_environment", arguments: ASKED }, { session }));
     const reader = response.body!.getReader();
     await reader.read();
     await reader.cancel();
-    await sleep(20);
+    // The held stream has ended (its work released) with whatever its cut does done.
+    await until(() => open === 0);
     expect(openChange(f).record.state).toBe("open");
   });
 
@@ -260,8 +269,7 @@ describe("browser on 2025-11-25: the page elicitation on the call's stream", () 
     const response = await endpoint(legacy("tools/call", { name: "change_environment", arguments: ASKED }, { session }));
     expect(open).toBe(1);
     await response.text();
-    await sleep(5);
-    expect(open).toBe(0);
+    await until(() => open === 0);
   });
 });
 
@@ -470,7 +478,11 @@ describe("native on 2025: the form on the call's held stream", () => {
     const { record } = openChange(f);
     await reader.cancel();
     await until(() => f.deps.changes.get(record.id)?.state !== "open");
-    expect(f.deps.changes.get(record.id)).toMatchObject({ state: "withdrawn", closed: { by: "stop" } });
+    expect(f.deps.changes.get(record.id)).toMatchObject({ state: "withdrawn", closed: { by: "stop", cut: true } });
+    // One log line for the close, which says the stream was cut.
+    const lines = f.logs.filter((line) => line.change === record.id && line.outcome === "withdrawn");
+    expect(lines).toEqual([expect.objectContaining({ t3flare: "settings-refused", answeredBy: "stop", cut: true })]);
+    expect(f.logs.some((line) => line.t3flare === "settings-stream-cut")).toBe(false);
     expect((await endpoint(answer(session, ask.id, { result: { action: "accept" } }))).status).toBe(202);
     expect(f.store.loadEnvironment().revision).toBe(0);
     expect(f.deps.changes.get(record.id)?.state).toBe("withdrawn");
@@ -519,8 +531,7 @@ describe("native on 2025: the form on the call's held stream", () => {
     const response = await endpoint(call(session));
     expect(open).toBe(1);
     await response.text();
-    await sleep(5);
-    expect(open).toBe(0);
+    await until(() => open === 0);
   });
 });
 

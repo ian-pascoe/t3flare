@@ -64,6 +64,9 @@ export const stopCall = (id: string): void => {
   while (early.size > EARLY_STOPS_MAX) early.delete(early.keys().next().value!);
 };
 
+/** Tests only: forgets every remembered early stop, so one test's stops never reach another's. */
+export const forgetEarlyStopsForTests = (): void => early.clear();
+
 type HostCall = McpHost["call"];
 type HostInput = Parameters<HostCall>[0];
 

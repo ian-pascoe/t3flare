@@ -34,6 +34,7 @@ import {
   type McpEngineTargetEncoded,
 } from "@cloudpid/mcp/types";
 import type { McpAsker, McpQuestionAnswer } from "@t3flare/session-protocol";
+import { sha256Hex } from "@t3flare/skills";
 
 import type { KvStorage } from "../harness/store.ts";
 import { OFF_MESSAGE, type OwnCaller } from "../settings/caller.ts";
@@ -116,8 +117,7 @@ const canonical = (value: unknown): string =>
 /** A tool definition's hash: what the server says the tool is (name, description, schemas, annotations). */
 export const definitionHash = async (definition: Readonly<Record<string, unknown>>): Promise<string> => {
   const { name, title, description, inputSchema, outputSchema, annotations } = definition;
-  const bytes = new TextEncoder().encode(canonical({ name, title, description, inputSchema, outputSchema, annotations }));
-  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  return (await sha256Hex(canonical({ name, title, description, inputSchema, outputSchema, annotations }))).slice(0, 32);
 };
 
 const overrideOf = (value: unknown): ToolClass | undefined => (value === "read" || value === "write" ? value : undefined);

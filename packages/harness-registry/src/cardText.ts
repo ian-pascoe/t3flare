@@ -12,10 +12,11 @@ export const CARD_TEXT_MAX = 16 * 1024;
 // Every character that hides or reorders text: controls, format characters (bidi overrides and isolates, zero-width
 // marks, the soft hyphen, the BOM) and the line and paragraph separators. The card set keeps newline and tab; the
 // label set does not. U+2060 to U+206F is named whole (format characters and the unassigned code points among them).
-// oxlint-disable-next-line no-control-regex -- matching control characters is the point.
-const HIDDEN = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\p{Cf}\u2028\u2029\u2060-\u206f]/gu;
-// oxlint-disable-next-line no-control-regex -- the same, with newline and tab.
-const HIDDEN_OR_BREAK = /[\u0000-\u001f\u007f-\u009f\p{Cf}\u2028\u2029\u2060-\u206f]/gu;
+// Both are built from one class body: the characters every card hides, without newline (U+000A) and tab (U+0009).
+const HIDDEN_CLASS = String.raw`\u0000-\u0008\u000b-\u001f\u007f-\u009f\p{Cf}\u2028\u2029\u2060-\u206f`;
+const HIDDEN = new RegExp(`[${HIDDEN_CLASS}]`, "gu");
+// The same, with newline and tab.
+const HIDDEN_OR_BREAK = new RegExp(`[${HIDDEN_CLASS}\\u0009\\u000a]`, "gu");
 
 /** `text` with control and format characters made visible. */
 export const visible = (text: string): string =>
