@@ -30,7 +30,7 @@ import type { HarnessCaller } from "../harness/panel.ts";
 import type { McpCallAnswer } from "../mcp/host.ts";
 import type { OwnerCaller } from "./caller.ts";
 import { canonicalJson, type ChangeRecord, isChangeId, isOpen, type NeedsPage, sha256Hex } from "./changes.ts";
-import { type ChangeOutcome, closeOpenChange, outcomeOf, waitForChange } from "./openChanges.ts";
+import { type ChangeOutcome, closeOrSettle, outcomeOf, waitForChange } from "./openChanges.ts";
 import {
   answerDepsOf,
   answerOwnerChange,
@@ -42,6 +42,9 @@ import {
   ownerPause,
   ownerResume,
   ownerWaiting,
+  OFF_MESSAGE,
+  READ_ONLY_REFUSAL,
+  settingsAccess,
   settingsOwnerCall,
   type SettingsServerDeps,
   withdrawOwnerChange,
@@ -209,6 +212,30 @@ const STATE_REFUSED: Readonly<Record<TokenRefusal | "other-call" | "gone", strin
   gone: "the change it names is gone",
 };
 
+/** A 2026 `Mcp-Name` value: plain, or the spec's Base64 sentinel `=?base64?…?=` (UTF-8). Undefined when malformed. */
+const headerValue = (raw: string): string | undefined => {
+  if (!raw.startsWith("=?base64?") || !raw.endsWith("?=")) return raw;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(atob(raw.slice("=?base64?".length, -"?=".length)), (char) => char.charCodeAt(0)));
+  } catch {
+    return undefined;
+  }
+};
+
+/** Which of a 2026 request's standard headers is missing or differs from its body, or undefined when they agree. */
+const headerMismatch = (headers: Headers, version: unknown, method: string, name: unknown): string | undefined => {
+  const versionHeader = headers.get("mcp-protocol-version");
+  if (versionHeader === null) return "MCP-Protocol-Version is missing";
+  if (versionHeader !== version) return "MCP-Protocol-Version does not match the request's protocol version";
+  const methodHeader = headers.get("mcp-method");
+  if (methodHeader === null) return "Mcp-Method is missing";
+  if (methodHeader !== method) return "Mcp-Method does not match the request's method";
+  if (name === undefined) return undefined;
+  const nameHeader = headers.get("mcp-name");
+  if (nameHeader === null) return "Mcp-Name is missing";
+  return headerValue(nameHeader) === name ? undefined : "Mcp-Name does not match the request's name";
+};
+
 /**
  * One request to the Owner-client endpoint (plan D11). `caller` is the Worker's verdict; nothing in the request names who
  * calls.
@@ -263,11 +290,11 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
       if (requested !== "native") return refuse(400, "other-mode", json(rpcError(null, -32600, "This question was asked in elicitation_mode=native."), 400));
       if (action === "accept" || action === "decline") await answerOwnerChange(server, record.id, { kind: caller.kind, key }, "client", action);
       // `cancel`, or a JSON-RPC error in place of a result (the client could not ask): withdrawn, so the held call ends.
-      else if (action === "cancel" || "error" in message) withdrawOwnerChange(server, record.id);
+      else if (action === "cancel" || "error" in message) await withdrawOwnerChange(server, record.id);
       return new Response(null, { status: 202, headers: NO_STORE });
     }
     // In `browser`, `accept` means only "opened it"; `decline` and `cancel` withdraw the change if it is still open.
-    if (record !== undefined && record.caller.key === key && record.mode === "browser" && (action === "decline" || action === "cancel")) withdrawOwnerChange(server, record.id);
+    if (record !== undefined && record.caller.key === key && record.mode === "browser" && (action === "decline" || action === "cancel")) await withdrawOwnerChange(server, record.id);
     return new Response(null, { status: 202, headers: NO_STORE });
   }
   if (typeof method !== "string") return json(rpcError(null, -32600, "Invalid request"), 400);
@@ -287,12 +314,19 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
     if (metaVersion !== MODERN_VERSION) {
       return json(rpcError(id, -32022, "Unsupported protocol version", { supported: SUPPORTED_VERSIONS, requested: metaVersion }), 400);
     }
-    const header = request.headers.get("mcp-protocol-version");
-    if (header !== null && header !== metaVersion) return json(rpcError(id, -32020, "MCP-Protocol-Version does not match the request's protocol version"), 400);
+    // 2026 Streamable HTTP's standard headers (spec, "Server Validation"): `MCP-Protocol-Version` and `Mcp-Method` on
+    // every request and `Mcp-Name` on `tools/call`, each present and equal to the body's value, else `-32020` with 400.
+    const mismatch = headerMismatch(request.headers, metaVersion, method, method === "tools/call" ? params.name : undefined);
+    if (mismatch !== undefined) return json(rpcError(id, -32020, `Header mismatch: ${mismatch}`), 400);
     context = { modern: true, version: MODERN_VERSION, elicitation: declaredOf(meta?.[META_CAPABILITIES]), ...withClient(clientOf(meta?.[META_CLIENT], "clientInfo in _meta") ?? fromAgent) };
   } else {
     const session = await verifyToken(tokenKey, request.headers.get("mcp-session-id"), { kind: "session", sub: key, now: now() });
     const header = request.headers.get("mcp-protocol-version");
+    // 2025-06-18 and 2025-11-25 (Transports, "Protocol Version Header"): an invalid or unsupported version is 400; a
+    // missing header is 2025-03-26. `initialize` negotiates in its body, so its header is not judged.
+    if (method !== "initialize" && header !== null && !LEGACY_VERSIONS.includes(header)) {
+      return json(rpcError(id, -32600, "Unsupported MCP-Protocol-Version", { supported: SUPPORTED_VERSIONS, requested: header.slice(0, 40) }), 400);
+    }
     if (session.ok) {
       const kept = session.payload;
       const version = typeof kept.protocolVersion === "string" && LEGACY_VERSIONS.includes(kept.protocolVersion) ? kept.protocolVersion : NO_ELICITATION_VERSION;
@@ -411,8 +445,8 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
     question: Json,
     waiting: { readonly progress: string; readonly comment: string },
     totalMs: number,
-    finish: (outcome: ChangeOutcome | undefined) => McpCallAnswer,
-    onCut?: () => void,
+    finish: (outcome: ChangeOutcome | undefined) => McpCallAnswer | Promise<McpCallAnswer>,
+    onCut?: () => Promise<void>,
   ): Response => {
     const release = deps.work?.() ?? (() => undefined);
     const encoder = new TextEncoder();
@@ -448,10 +482,10 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
           else if (!closed) controller.enqueue(encoder.encode(`: ${waiting.comment}\n\n`));
         }
         if (closed && outcome === undefined) {
-          onCut?.();
+          await onCut?.();
           return;
         }
-        send({ jsonrpc: "2.0", id, result: toolResult(finish(outcome)) });
+        send({ jsonrpc: "2.0", id, result: toolResult(await finish(outcome)) });
         if (!closed) {
           closed = true;
           controller.close();
@@ -511,10 +545,10 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
       { jsonrpc: "2.0", id: elicitId, method: "elicitation/create", params: context.version === FORM_ELICITATION_VERSION ? form : { mode: "form", ...form } },
       { progress: "Waiting for the answer in the client's form", comment: "waiting for the form's answer" },
       Math.min(untilExpiry, deps.formWaitMs ?? untilExpiry),
-      (outcome) => ownerOutcome(outcome ?? closeOpenChange(answerDepsOf(server), record.id, "expired") ?? { state: "expired" }, record),
-      () => {
+      async (outcome) => ownerOutcome(outcome ?? (await closeOrSettle(answerDepsOf(server), record.id, "expired")) ?? { state: "expired" }, record),
+      async () => {
         // The client went away unanswered: the change is withdrawn, and a response that arrives later applies nothing.
-        const outcome = withdrawOwnerChange(server, record.id, "stop");
+        const outcome = await withdrawOwnerChange(server, record.id, "stop");
         log({ t3flare: "settings-stream-cut", change: record.id, outcome: outcome?.state ?? null });
       },
     );
@@ -534,8 +568,14 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
     }
   };
 
-  // A 2026 retry of a call that asked (plan D12): its state is checked before anything it names is read.
+  // A 2026 retry of a call that asked (plan D12): the access switch first (plan D2: off refuses every call, read-only
+  // every write, naming the panel), then its state, before anything it names is read.
   if (context.modern && params.requestState !== undefined) {
+    const access = settingsAccess(server);
+    if (access !== "on") {
+      log({ t3flare: "settings-refused", reason: access, tool: name });
+      return reply(toolResult(refusedResult(access === "off" ? OFF_MESSAGE : READ_ONLY_REFUSAL)));
+    }
     const verdict = await verifyToken(tokenKey, params.requestState, { kind: "state", sub: key, now: now() });
     const stateProblem = !verdict.ok ? verdict.reason : verdict.payload.digest !== (await callDigest(name, args)) ? ("other-call" as const) : undefined;
     const change = verdict.ok ? verdict.payload.change : undefined;
@@ -557,7 +597,7 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
       return reply(toolResult(ownerOutcome(answered.ok ? answered.outcome : (answered.closed ?? outcomeOf(record)), record)));
     }
     // `browser`'s decline and cancel, and `native`'s cancel: the client withdraws its question.
-    if (action === "decline" || action === "cancel") return reply(toolResult(ownerOutcome(withdrawOwnerChange(server, record.id) ?? outcomeOf(record), record)));
+    if (action === "decline" || action === "cancel") return reply(toolResult(ownerOutcome((await withdrawOwnerChange(server, record.id)) ?? outcomeOf(record), record)));
     if (!isOpen(record)) return reply(toolResult(ownerOutcome(outcomeOf(record), record)));
     // No answer to the question: ask it again, on the same Open change (MRTR: the server may ask again).
     if (action !== "accept") return deliver(record);

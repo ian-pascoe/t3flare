@@ -454,6 +454,20 @@ describe("SPI-1199 review: the strike lock, the declined-repeat hash, a skill pr
     expect(junked).toMatchObject({ structured: { status: "refused", reason: "declined-repeat" } });
   });
 
+  it("SPI-1200 review: a respelled add URL or install source is still the same change", async () => {
+    fixture = settingsFixture({ answer: { decision: "decline" } });
+    const run = fixture;
+    const add = (url: string) => run.call(run.durable("thread-3"), "change_mcp", { expectedRevision: 0, change: { op: "add", server: "y", url, auth: { kind: "none" } } });
+    expect(await add("https://y.example/mcp")).toMatchObject({ structured: { status: "declined" } });
+    for (const url of ["https://Y.EXAMPLE/mcp", "https://y.example:443/mcp"]) expect(await add(url)).toMatchObject({ structured: { status: "refused", reason: "declined-repeat" } });
+    const commit = run.github.push("o/r", { "skills/a/SKILL.md": skillMd("a") });
+    const install = (source: string) => run.call(run.durable("thread-4"), "change_skills", { expectedRevision: 0, op: "install", source, commit, folders: ["skills/a"] });
+    expect(await install("o/r")).toMatchObject({ structured: { status: "declined" } });
+    for (const source of ["https://github.com/o/r", "O/R", `https://github.com/o/r/tree/${commit}`, "https://github.com/o/r?tab=readme"]) {
+      expect([source, await install(source)]).toMatchObject([source, { structured: { status: "refused", reason: "declined-repeat" } }]);
+    }
+  });
+
   it("an install's preview counts toward the GitHub read cap, and past it is refused before reaching GitHub", async () => {
     fixture = settingsFixture({ answer: { decision: "decline" } });
     const run = fixture;

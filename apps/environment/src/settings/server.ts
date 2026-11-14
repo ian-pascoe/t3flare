@@ -61,6 +61,7 @@ import type { AuditActor } from "../harness/store.ts";
 import { newCardId } from "../mcp/elicitation.ts";
 import type { McpCallAnswer, McpHost } from "../mcp/host.ts";
 import { previewAtCommit, viewSkill } from "../skills/api.ts";
+import { parseSkillSource } from "../skills/source.ts";
 import { OFF_MESSAGE, type OwnCaller, type OwnerCaller, type ThreadLink, type ThreadModes } from "./caller.ts";
 import {
   type AnsweredBy,
@@ -91,7 +92,7 @@ import {
   type CapRefusal,
   type ChangeOutcome,
   type ChangesApi,
-  closeOpenChange,
+  closeOrSettle,
   openChangeSummary,
   outcomeOf,
   waitForChange,
@@ -451,7 +452,8 @@ const planMcp = (deps: SettingsServerDeps, args: Readonly<Record<string, unknown
     return {
       ...TARGET.mcp,
       verdict,
-      normalized: add,
+      // The URL as a URL parser spells it (host case, default port, escapes), so a respelling is the same change.
+      normalized: { ...add, url: canonicalUrl(add.url) },
       describe,
       run: async (options, extra) =>
         fromOutcome(await addMcpServer(deps.ops, { server: add.server, url: add.url, auth: add.auth, ...(extra?.secret === undefined ? {} : { value: extra.secret }) }, options)),
@@ -493,6 +495,25 @@ const planEnvironment = (deps: SettingsServerDeps, args: Readonly<Record<string,
     describe: async () => ({ items: environmentItems(stored, settings), lines: [] }),
     run: async (options) => fromOutcome(await changeEnvironment(deps.ops, settings, options)),
   };
+};
+
+/** `url` as a URL parser serializes it, or as given when it is not one (the registry refuses it then). */
+const canonicalUrl = (url: string): string => {
+  try {
+    return new URL(url).href;
+  } catch {
+    return url;
+  }
+};
+
+/**
+ * An install's source as the hash covers it (SPI-1200 review): its repo (GitHub's names are case-insensitive), folder
+ * and skill, however it was spelled (`owner/repo`, a tree URL, `owner/repo@skill`). The ref is left out: the commit
+ * pins what is fetched. A source that does not parse is hashed as given (the preview refuses it).
+ */
+const canonicalSkillSource = (source: string): string => {
+  const parsed = parseSkillSource(source);
+  return parsed.ok ? canonicalJson({ repo: parsed.source.repo.toLowerCase(), path: parsed.source.path, skill: parsed.source.skill }) : source;
 };
 
 /** The digests an Open change's skills were shown with, by folder (plan D8): the apply refuses others. */
@@ -546,7 +567,13 @@ const planSkills = (deps: SettingsServerDeps, args: Readonly<Record<string, unkn
       if (source === undefined || commit === undefined || !/^[0-9a-f]{40}$/.test(commit)) return { refused: "install names the source and the previewed 40-hex commit" };
       if (!Array.isArray(args.folders) || args.folders.length === 0 || !args.folders.every((folder) => typeof folder === "string")) return { refused: "install names at least one folder from the preview" };
       const folders = args.folders as ReadonlyArray<string>;
-      return planned(tierOf({ entity: "skills", change: { op: "install" } }), { op, source, commit, folders: [...folders].sort() }, () => preview({ source, commit, folders }, "install"), skillsRun("/install", { source, commit, folders }), true);
+      return planned(
+        tierOf({ entity: "skills", change: { op: "install" } }),
+        { op, source: canonicalSkillSource(source), commit, folders: [...folders].sort() },
+        () => preview({ source, commit, folders }, "install"),
+        skillsRun("/install", { source, commit, folders }),
+        true,
+      );
     }
     case "update": {
       const commit = stringArg(args, "commit");
@@ -998,7 +1025,7 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
     if (current !== undefined && !isOpen(current)) return outcomeOf(current);
     const event = await Promise.race([closed, ended]);
     if (event.kind === "closed") return event.outcome;
-    return finalOf(closeOpenChange(answers, id, event.kind === "stop" ? "withdrawn" : "expired", event.kind === "stop" ? "stop" : undefined));
+    return finalOf(await closeOrSettle(answers, id, event.kind === "stop" ? "withdrawn" : "expired", event.kind === "stop" ? "stop" : undefined));
   };
   try {
     let waitingFor: Array<Promise<Event>> = [cardAnswer, closed, ended];
@@ -1009,13 +1036,12 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
         await withdrawCard();
         return resultOf(event.outcome, record, planned);
       }
-      if (event.kind === "timeout") {
+      if (event.kind === "timeout" || event.kind === "stop") {
+        // The change closes first (an answer applying meanwhile is waited for), then the card: a card withdrawn first
+        // could be answered "cancel" by the asker before the change knows it was a Stop (SPI-1200 review).
+        const outcome = await closeOrSettle(answers, id, event.kind === "stop" ? "withdrawn" : "expired", event.kind === "stop" ? "stop" : undefined);
         await withdrawCard();
-        return resultOf(finalOf(closeOpenChange(answers, id, "expired")), record, planned);
-      }
-      if (event.kind === "stop") {
-        await withdrawCard();
-        return resultOf(finalOf(closeOpenChange(answers, id, "withdrawn", "stop")), record, planned);
+        return resultOf(finalOf(outcome), record, planned);
       }
       cardOpen = false;
       const { decision, reason } = event.answer;
@@ -1035,7 +1061,7 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
       // A cancel: the owner's on the card; the card withdrawn by the caller's Stop, turn end or going away (`stop`); or the
       // card closing otherwise (no live turn, the CLI's own wait).
       const closer = reason === undefined ? "card" : reason === "withdrawn" || reason === "the turn ended" ? "stop" : undefined;
-      const withdrawn = closeOpenChange(answers, id, reason === "no answer in time" ? "expired" : "withdrawn", closer);
+      const withdrawn = await closeOrSettle(answers, id, reason === "no answer in time" ? "expired" : "withdrawn", closer);
       return resultOf(finalOf(withdrawn), record, planned);
     }
   } finally {
@@ -1313,8 +1339,8 @@ export const ownerOutcome = (outcome: ChangeOutcome, record: ChangeRecord): McpC
  * Withdraws an Owner client's Open change (a `decline` or `cancel` in its client's answer to the page elicitation, plan
  * D12): answers the change's outcome, which is the earlier one when something answered it first.
  */
-export const withdrawOwnerChange = (deps: SettingsServerDeps, id: string, by: "client" | "agent" | "stop" = "client"): ChangeOutcome | undefined =>
-  closeOpenChange(answerDepsOf(deps), id, "withdrawn", by);
+export const withdrawOwnerChange = (deps: SettingsServerDeps, id: string, by: "client" | "agent" | "stop" = "client"): Promise<ChangeOutcome | undefined> =>
+  closeOrSettle(answerDepsOf(deps), id, "withdrawn", by);
 
 /**
  * Answers an Owner client's Open change from the client (plan D8): `client` is `native`'s form, `agent` is `model`'s
@@ -1333,7 +1359,13 @@ export const answerOwnerChange = async (
     answerer: caller.kind === "owner" ? { kind: "owner", subject: caller.key } : { kind: "service-token" },
     action: action === "accept" ? "approve" : "decline",
   });
-  return answered.ok ? { ok: true, outcome: answered.outcome } : { ok: false, error: answered.error, ...(answered.closed === undefined ? {} : { closed: answered.closed }) };
+  if (answered.ok) return { ok: true, outcome: answered.outcome };
+  // Another answer is applying it (the page's): wait for that outcome rather than report this one refused.
+  if (deps.changes.get(id)?.state === "applying") {
+    const settled = await closeOrSettle(answerDepsOf(deps), id, "withdrawn", by);
+    if (settled !== undefined) return { ok: false, error: answered.error, closed: settled };
+  }
+  return { ok: false, error: answered.error, ...(answered.closed === undefined ? {} : { closed: answered.closed }) };
 };
 
 /** The mode an Open change is answered in: a change that needs the page is answered there whatever was asked (plan D6, D12). */
@@ -1449,7 +1481,7 @@ export const ownerResume = async (deps: SettingsServerDeps, input: { readonly ar
     if (closed.kind !== "result") return closed;
     return { ...closed, isError: true, text: `${closed.text} This change is closed; to ask again, read the settings and call ${record.tool} again.` };
   }
-  if (action === "cancel") return ownerOutcome(withdrawOwnerChange(deps, record.id, "agent") ?? outcomeOf(record), record);
+  if (action === "cancel") return ownerOutcome((await withdrawOwnerChange(deps, record.id, "agent")) ?? outcomeOf(record), record);
   const answered = await answerOwnerChange(deps, record.id, caller, "agent", action);
   if (answered.ok) return ownerOutcome(answered.outcome, record);
   if (answered.closed !== undefined) return ownerOutcome(answered.closed, record);

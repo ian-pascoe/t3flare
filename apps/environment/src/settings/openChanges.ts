@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off
+// @effect-diagnostics globalDate:off globalTimers:off
 // Open changes (ADR-0034, plan D8, D16), M4 (SPI-1199): an asked Settings change waiting for its answer, kept in the
 // changes table (changes.ts). This file holds what every door shares, pure over its deps:
 //
@@ -7,7 +7,8 @@
 //   the answerer and the revision, so a second answer finds it closed; then it applies through the deps' `apply` (the
 //   Settings server's, over `ops.ts`) with the expected revision, and closes the record. A moved revision closes it as
 //   `moved` and applies nothing;
-// - closing without an answer (`closeOpenChange`: withdrawn, expired);
+// - closing without an answer (`closeOpenChange`: withdrawn, expired), or, when an answer is applying, waiting for its
+//   outcome (`closeOrSettle`);
 // - the in-memory waiters a held call waits on. With no waiter (after an Environment restart the call is gone), the
 //   record still stands until it expires, and the Change page can still apply it.
 import {
@@ -250,6 +251,34 @@ export const closeOpenChange = (deps: Pick<AnswerDeps, "changes" | "now" | "log"
     closeAs({ ...deps, revisionOf: () => 0, apply: async () => ({ ok: false, error: "" }) }, record, ["open"], state, { at, ...(by === undefined ? {} : { by }) }) ??
     outcomeOf(deps.changes.get(id) ?? record)
   );
+};
+
+/** How long a close waits for an answer that is applying (the Environment's own apply; a reset strands it). */
+export const APPLYING_WAIT_MS = 30_000;
+
+/**
+ * Closes Open change `id` as `closeOpenChange` does, but when an answer is applying it (state `applying`), waits for that
+ * outcome instead (SPI-1200 review): a decline, Stop or timeout landing meanwhile reports what the answer did, never a
+ * failure it did not have. The wait is bounded (`waitMs`): an apply a reset stranded is the table's to close.
+ */
+export const closeOrSettle = async (
+  deps: Pick<AnswerDeps, "changes" | "now" | "log">,
+  id: string,
+  state: "withdrawn" | "expired",
+  by?: ClosedBy,
+  waitMs: number = APPLYING_WAIT_MS,
+): Promise<ChangeOutcome | undefined> => {
+  const waiter = waitForChange(id);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const record = deps.changes.get(id);
+    if (record?.state !== "applying") return closeOpenChange(deps, id, state, by);
+    const gaveUp = new Promise<undefined>((resolve) => (timer = setTimeout(() => resolve(undefined), waitMs)));
+    return (await Promise.race([waiter.closed, gaveUp])) ?? outcomeOf(deps.changes.get(id) ?? record);
+  } finally {
+    clearTimeout(timer);
+    waiter.cancel();
+  }
 };
 
 /** An Open change as a caller's `get_status` lists it and the panel's Open changes list shows it: never a secret. */

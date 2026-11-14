@@ -37,11 +37,14 @@ export const modernMeta = (capabilities: unknown = BOTH, extra: Record<string, u
   ...extra,
 });
 
-/** A 2026 request, as Claude Code 2.1.322 sends it (M0 P17): `_meta` on every request, the version header. */
+/** A 2026 request, as Claude Code 2.1.322 sends it (M0 P17): `_meta` on every request, `MCP-Protocol-Version`, `Mcp-Method` and, on `tools/call`, `Mcp-Name`. */
 export const modern = (method: string, params: Record<string, unknown> = {}, options: { readonly capabilities?: unknown; readonly query?: string; readonly id?: number } = {}) =>
   post(
     { jsonrpc: "2.0", id: options.id ?? 1, method, params: { ...params, _meta: modernMeta(options.capabilities ?? BOTH, (params._meta as Record<string, unknown>) ?? {}) } },
-    { headers: { "mcp-protocol-version": MODERN_VERSION }, ...(options.query === undefined ? {} : { query: options.query }) },
+    {
+      headers: { "mcp-protocol-version": MODERN_VERSION, "mcp-method": method, ...(method === "tools/call" && typeof params.name === "string" ? { "mcp-name": params.name } : {}) },
+      ...(options.query === undefined ? {} : { query: options.query }),
+    },
   );
 
 /** A 2025 request on a session (`Mcp-Session-Id`). */
