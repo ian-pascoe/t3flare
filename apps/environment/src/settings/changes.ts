@@ -51,7 +51,7 @@ export const APPLIED_WINDOW_MS = 60 * 60_000;
 export const OPENED_CAP = 6;
 export const OPENED_WINDOW_MS = 60 * 60_000;
 
-/** Reads of any kind, per caller (a thread), per hour (M3 review: reads are bounded as changes are, D16-style). */
+/** Reads of any kind, per caller (`capKeyOf`), per hour (SPI-1198 review: reads are bounded as changes are, D16-style). */
 export const READ_CAP = 240;
 /** Reads that reach GitHub or an MCP server, per caller, per hour: they spend a token's or a server's limits. */
 export const NETWORK_READ_CAP = 20;

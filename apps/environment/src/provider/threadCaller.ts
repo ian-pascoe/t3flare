@@ -39,7 +39,7 @@ export const threadLinkIn = (sql: Pick<SqlStorage, "exec">, thread: string): Thr
     }
     if (row === undefined) return "unknown";
     if (row.origin !== null && row.origin !== undefined) return "linked";
-    // No parent is null (or absent); a parent of any other shape is a lineage this cannot follow (M3 review).
+    // No parent is null (or absent); a parent of any other shape is a lineage this cannot follow (SPI-1198 review).
     if (row.parent === null || row.parent === undefined) current = null;
     else if (typeof row.parent === "string" && row.parent !== "") current = row.parent;
     else return "unknown";

@@ -112,7 +112,7 @@ describe("McpHost", () => {
     expect((await run.host.view()).servers[0]?.tools[0]?.class).toBe("read");
   });
 
-  it("a tool named after an Object.prototype key takes its server's Exposure and its own hint (M3 review)", async () => {
+  it("a tool named after an Object.prototype key takes its server's Exposure and its own hint (SPI-1198 review)", async () => {
     const added = applyMcpChange(EMPTY_HARNESS, { op: "add", server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "none" } });
     if (!added.ok) throw new Error(added.error);
     const hidden = applyMcpChange(added.harness, { op: "server", server: "fixture", exposure: "hidden", toolExposure: { other: "hidden" } });

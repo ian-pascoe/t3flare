@@ -1,6 +1,6 @@
-// Every Settings change, with no transport (ADR-0034, plan D1): the Harness panel's handlers, moved here as functions
+// Every Settings change, called by both doors (ADR-0034, plan D1): the Harness panel's handlers, moved here as functions
 // over the same dependencies, with no `Request` or `Response` in their signatures. The panel calls these and nothing
-// else, and so will both doors of the Settings server, except `setMcpHeader` and `beginMcpSignIn`: a header value and an
+// else, and so do both doors of the Settings server, except `setMcpHeader` and `beginMcpSignIn`: a header value and an
 // authorization URL never travel in a tool's arguments or result (ADR-0034), so those two run from the panel and the
 // Change page only. Each takes the change, an optional `expectedRevision` (the
 // revision of the entity it changes, plan D15: a moved one is refused with the current revision), and an actor (who
@@ -78,8 +78,8 @@ const audit = (deps: OpsDeps, actor: AuditActor, entry: Omit<AuditEntry, keyof A
 
 /**
  * A stored entry the set ignored (a Direct server named `settings` from before the name was reserved) is dropped from
- * storage by the next change to the set: its header value and OAuth sign-in go with it (M3 review), unless the change
- * itself added a Direct server under that name.
+ * storage by the next change to the set: its header value and OAuth sign-in go with it (SPI-1198 review), unless the
+ * change itself added a Direct server under that name.
  */
 const dropIgnored = (deps: OpsDeps, before: StoredHarness, after: StoredHarness) => {
   const kept = after.mcp?.servers ?? {};
@@ -144,7 +144,7 @@ export const changeEnvironment = async (
 
 /**
  * The panel's "test": lists the server now, from the MCP Worker. A read; never bumps a revision. Audited for the panel;
- * not through the Settings server (`audit: false`), whose reads must not evict the log of changes (M3 review).
+ * not through the Settings server (`audit: false`), whose reads must not evict the log of changes (SPI-1198 review).
  */
 export const testMcpServer = async (
   deps: OpsDeps,

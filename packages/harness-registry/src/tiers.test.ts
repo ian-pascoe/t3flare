@@ -174,7 +174,7 @@ describe("tierOf: the MCP server set", () => {
     }
   });
 
-  it("a tool named after an Object.prototype key is a tool like any other (M3 review)", () => {
+  it("a tool named after an Object.prototype key is a tool like any other (SPI-1198 review)", () => {
     for (const tool of ["toString", "constructor", "__proto__", "hasOwnProperty"]) {
       // On a hidden server, a tool of that name made direct widens: asked, never compared against the prototype's value.
       expect(mcp(withDirect({ exposure: "hidden", toolExposure: {} }), { op: "server", server: "fixture", toolExposure: { [tool]: "direct" } }), tool).toBe("asked");

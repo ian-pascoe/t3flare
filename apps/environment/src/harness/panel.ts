@@ -11,8 +11,8 @@
 //   needs none.
 // - Every change is validated against the registry, bumps its entity's revision (the Harness settings' or the
 //   Environment settings', ADR-0032), and is written to the audit log with its entity. The changes themselves are the
-//   transport-free ops (ops.ts, plan D1); this file parses a request into one and answers its outcome. A body may carry
-//   `expectedRevision` (plan D15): a moved revision is refused with 409.
+//   ops called by both doors (ops.ts, plan D1); this file parses a request into one and answers its outcome. A body may
+//   carry `expectedRevision` (plan D15): a moved revision is refused with 409.
 // - The Change page (plan D10, M4): `GET …/changes/<id>` renders one Open change; `POST …/api/changes/<id>`
 //   `{ action, value? }`, behind the same write guard, answers it, and is what applies it. A header value goes from its
 //   body to the secret store alone; a sign-in's authorization URL is in its answer alone. `GET …/api/changes` lists them.
@@ -49,7 +49,6 @@ import { CHANGES_API_PATH, CHANGES_PATH, changePagePath, HARNESS_PATH } from "./
 import { pageCsp, renderPage } from "./page.ts";
 import type { AuditActor, HarnessStore } from "./store.ts";
 
-export { HARNESS_PATH } from "./paths.ts";
 export const CSRF_HEADER = "x-t3flare-csrf";
 
 
@@ -336,7 +335,7 @@ const bodyOf = async (request: Request): Promise<Record<string, unknown> | undef
 
 const EXPECTED_REVISION = "expectedRevision, when sent, is the revision read: a whole number";
 
-/** The panel's actor: who the admin entrypoint admitted. An entry without `via` reads as the panel's (plan D15). */
+/** The panel's actor: who the admin Access application admitted. An entry without `via` reads as the panel's (plan D15). */
 const actorOf = (deps: HarnessDeps): AuditActor => ({ caller: callerName(deps.caller) });
 
 /** The change's options from its body: the panel's actor and the optional `expectedRevision`; undefined when that is malformed. */

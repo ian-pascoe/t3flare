@@ -280,10 +280,10 @@ export const mcpServersOf = (stored: StoredHarness): Readonly<Record<string, Mcp
 });
 
 /**
- * A stored entry the set ignores (plan D2, M1 review): a server stored under the Settings server's name that is not the
- * Settings server (a Direct server named `settings`, added before the name was reserved), or an entry of kind
- * `settings` under any other name. Ignored, never mistaken for the Settings server; the panel's Status names it, and the
- * next change to the set drops it from storage.
+ * A stored entry the set ignores (plan D2, SPI-1197 review): a server stored under the Settings server's name that is
+ * not the Settings server (a Direct server named `settings`, added before the name was reserved), or an entry of kind
+ * `settings` under any other name. Ignored, never mistaken for the Settings server; the panel's Status names it, and
+ * the next change to the set drops it from storage.
  */
 const ignoredServer = (name: string, server: McpServerSetting): boolean => (name === SETTINGS_SERVER) !== (server.kind === "settings");
 
@@ -385,7 +385,7 @@ export const applyMcpChange = (
     if (current.kind !== "settings") return { ok: false, error: `${change.server}: only the Settings server has a writes switch` };
     if (typeof change.writes !== "boolean") return { ok: false, error: "writes: true or false" };
   }
-  // A Map, so a tool named `__proto__` is a key like any other (M3 review), never the object's prototype.
+  // A Map, so a tool named `__proto__` is a key like any other (SPI-1198 review), never the object's prototype.
   const exposures = new Map<string, Exposure>(Object.entries(current.toolExposure ?? {}));
   for (const [tool, exposure] of Object.entries(change.toolExposure ?? {})) {
     if (exposure === null) exposures.delete(tool);

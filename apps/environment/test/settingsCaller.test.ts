@@ -8,7 +8,8 @@ import { harnessStore } from "../src/harness/store.ts";
 import { McpHost } from "../src/mcp/host.ts";
 import { DURABLE_AGENT, durableModeRecord, durableModes, forgetDurableModes, noteDurableModes, threadLinkIn } from "../src/provider/threadCaller.ts";
 import { settingsChanges } from "../src/settings/changes.ts";
-import { LINKED_REFUSAL, NO_MODES_REFUSAL, type OwnCaller, settingsCall, UNKNOWN_REFUSAL } from "../src/settings/server.ts";
+import type { OwnCaller } from "../src/settings/caller.ts";
+import { LINKED_REFUSAL, NO_MODES_REFUSAL, settingsCall, UNKNOWN_REFUSAL } from "../src/settings/server.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
 const projection = () => {
@@ -57,7 +58,7 @@ describe("threadLinkIn", () => {
     expect(threadLinkIn(sql, "not-json")).toBe("unknown");
   });
 
-  it("a parent that is present but not a thread id reads as unknown, not as no parent (M3 review)", () => {
+  it("a parent that is present but not a thread id reads as unknown, not as no parent (SPI-1198 review)", () => {
     expect(threadLinkIn(sql, "parent-number")).toBe("unknown");
     expect(threadLinkIn(sql, "parent-object")).toBe("unknown");
     expect(threadLinkIn(sql, "parent-empty")).toBe("unknown");

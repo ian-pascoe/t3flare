@@ -1,8 +1,8 @@
-// T-ops (plan §5, D1, D14, D15): the transport-free Settings changes. The same change through the panel's handler and
-// through the ops as the Settings server will call them stores the same state and the same audit entry, but for `via`
-// and the actor fields; a stale `expectedRevision` is refused with the current revision, and skills do not retry when it
-// is given; the set-header op stores the value, audits its mark and answers nothing of it; a removed server's secrets
-// are gone; reads other than the panel's see no URL query and no Access subject.
+// T-ops (plan §5, D1, D14, D15): the Settings changes called by both doors. The same change through the panel's handler
+// and through the ops as the Settings server calls them stores the same state and the same audit entry, but for `via`
+// and the actor fields; a stale `expectedRevision` is refused with the current revision, and skills do not retry when
+// it is given; the set-header op stores the value, audits its mark and answers nothing of it; a removed server's
+// secrets are gone; reads other than the panel's see no URL query and no Access subject.
 import { sha256Hex } from "@t3flare/skills";
 import { describe, expect, it } from "vitest";
 
@@ -260,7 +260,7 @@ describe("removing a server", () => {
   });
 });
 
-describe("a stale Direct entry named settings (M3 review)", () => {
+describe("a stale Direct entry named settings (SPI-1198 review)", () => {
   it("is dropped by the next change to the set, and its header value and OAuth sign-in go with it", async () => {
     const env = setup();
     env.store.save({ ...env.store.load(), mcp: { servers: { settings: { kind: "direct", url: "https://old.example/mcp", auth: { kind: "header", header: "X-Key" }, enabled: true, exposure: "deferred" } } } });
