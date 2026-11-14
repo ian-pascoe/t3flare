@@ -853,16 +853,17 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   not asked, because the relay judges it and asks on the thread; without the Patch a relay read would ask once and a
   write twice. Every other tool is asked as stock t3 asks, including pi's resource tools (`read_mcp_resource`, also
   from `builtin:mcp`), a tool of another extension under an `mcp__` name, and a `builtin:mcp` tool of a server the
-  relay does not serve this process. The server segment is the name up to the next `__` (server names are
-  `[a-z0-9-]{1,20}`, `SERVER_NAME`).
+  relay does not serve this process. A relayed server matches as pi names its tools: `mcp__<server>__` with every
+  character but letters, digits and `_` replaced by `_` (pi 1.5.2 `docs/mcp.md`, and its `.replace(/[^A-Za-z0-9_]/g,
+  "_")`), so `my-docs` is `mcp__my_docs__…` (SPI-1200 review; server names are `[a-z0-9-]{1,20}`, `SERVER_NAME`).
 - **Breaks when**: pi renames `mcp.json` or its keys, drops `${VAR}` expansion in headers, changes the `builtin:mcp`
   source path or `getAllTools`' `sourceInfo`, lets `PI_OFFLINE` stop MCP, stops turning MCP off with `--no-extensions`,
-  or reads a project's `mcp.json` without trust; pi changes how it names a server's tool (`mcp__<server>__<tool>`), so
-  the server segment no longer matches; t3 edits the hook's lines.
+  or reads a project's `mcp.json` without trust; pi changes how it names a server's tool (`mcp__<server>__<tool>`, the
+  character replacement, or where it puts the hash suffix of colliding tool names), so the prefix no longer matches; t3 edits the hook's lines.
 - **Detection**: the Patch failing to apply (`check:patches`, loud); `test/piRelayPatch.test.ts` applies the Patch as
   `build.ts` does and runs the hook against a stand-in for pi's API (the relay's tools pass; bash, write, t3's tools, a
   look-alike extension tool, a resource tool, an unlisted tool, a `builtin:mcp` tool of an unnamed server, and every
-  tool when no server is named are asked); `test/cliProfiles.test.ts` T-pi-1 pins the file, the environment (the
+  tool when no server is named are asked; a hyphenated server matches by pi's `_` name and a longer name does not); `test/cliProfiles.test.ts` T-pi-1 pins the file, the environment (the
   handle and `T3FLARE_RELAY_SERVERS`) and the fork. **Silent**: a renamed source path (pi asks the extension's "Allow
   …?" before the relay's card: more asks, fail closed); a changed `mcp.json` shape or expansion (pi lists none of the
   relay's tools).
@@ -882,11 +883,15 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`), `worker.ts`'s branch for it
   (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`), and `apps/environment/src/settings/endpoint.ts`, which
   hand-writes MCP 2026-07-28 (`server/discover`, `_meta` `io.modelcontextprotocol/*`, `resultType`, `input_required`
-  with `inputRequests` and `requestState`, `-32022`, `-32020`, 404 for `-32601`) and 2025-11-25 to 2024-11-05 (session id,
-  `elicitation/create` with `mode: "url"` and `elicitationId` on the call's SSE stream, the response POST answered 202).
-  It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`, spike branch
+  with `inputRequests` and `requestState`; `-32022` with `data.supported` and `requested`, `-32020` for a missing or
+  mismatched `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` (Base64 sentinel decoded), and 404 with `-32601`, each
+  checked against the spec's `schema/2026-07-28/schema.ts` and its Streamable HTTP page on 2026-11-14, SPI-1200 review)
+  and 2025-11-25 to 2024-11-05 (session id, an unknown `MCP-Protocol-Version` answered 400 and a missing one read as
+  2025-03-26, `elicitation/create` with `mode: "url"` and `elicitationId` on the call's SSE stream, the response POST
+  answered 202). It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`, spike branch
   `settings-mcp-m0-spike`): the more specific Access application wins a path; a token of one application is refused at
-  another's; Access answers no root or path-inserted well-known document, so clients find the authorization server
+  another's (tested with a service-token stand-in only; the OAuth bearer case is owner step 1,
+  `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4, so layout (B) is unproven until then); Access answers no root or path-inserted well-known document, so clients find the authorization server
   only from the 401's `WWW-Authenticate` `resource_metadata`; `resource` is accepted with or without the query; the
   query reaches the origin; and Claude Code 2.1.322's 2026 traffic as captured (P17).
 - **Breaks when**: Access (in beta) starts answering the host's root `/.well-known/oauth-*` documents (t3's own `/mcp`
@@ -895,10 +900,11 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   `pathCookieAttribute`; the MCP spec or a named client changes the 2026 shapes (a key under `_meta`, `resultType`, the
   `input_required` result, `server/discover`'s result) or stops falling back to `initialize`.
 - **Detection**: `test/settingsEndpoint.test.ts` and `test/settingsModes.test.ts` pin our reading of the shapes, not a
-  client's; `test/access.test.ts` the audiences. **Silent** for Access and real clients: the stage run of
-  `m5a-settings-owner-browser.json` (a named client signs in, reads, makes a free and an asked change) and its
-  assertion that the host's root well-known documents are still t3's. Cheapest check: that assertion in the acceptance
-  test (not built yet: M6).
+  client's; `test/access.test.ts` the audiences and `test/workerRouting.test.ts` the Worker's branch (its order, the
+  endpoint's audience, the panel's refused, local mode). `scripts/acceptance.ts` step 2b asserts on every acceptance run
+  that the host's root `/.well-known/oauth-authorization-server` and `oauth-protected-resource` are still t3's (its
+  issuer, its `/mcp` resource). **Silent** for Access's token scoping and real clients: the stage run of
+  `m5a-settings-owner-browser.json` (a named client signs in, reads, makes a free and an asked change).
 - **Blast radius**: an Access change: Owner clients cannot sign in, or (root well-knowns) t3's own MCP clients cannot.
   A client's shape change: that client gets errors or the link in the result; own agents and the panel are unaffected.
 - **Fix**: rerun M0's probes (`scripts/settings-spike` on the spike branch); if Access breaks layout (B), move to (C) by
