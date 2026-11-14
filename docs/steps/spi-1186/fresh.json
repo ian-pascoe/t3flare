@@ -1,14 +1,14 @@
 {
- "at": "2026-11-14T12:12:39.765Z",
+ "at": "2026-11-14T12:40:55.025Z",
  "host": "t3flare-environment-pgitobj.ian-g-pascoe.workers.dev",
- "commit": "bc8bdfed2406",
- "root": "/w/pgitobj-mwgd8j95",
+ "commit": "cce390dbe537",
+ "root": "/w/pgitobj-mwge8t2o",
  "runningWhenWatched": true,
  "stopped": true,
  "afterPoll": {
   "running": false,
   "leased": false,
-  "lastUse": 1794658341580,
+  "lastUse": 1794660034093,
   "startedAt": null,
   "launch": {
    "size": "cpu-1",
@@ -29,10 +29,10 @@
    }
   },
   "globalMise": {
-   "runtime": "68f05b86-4ee6-41f7-876d-800101eecfe2",
+   "runtime": "d0d47dfd-babc-41f8-accc-97f8f8d33610",
    "outcome": "none",
    "attempts": 1,
-   "at": 1794658339962
+   "at": 1794660032345
   }
  },
  "report": {
@@ -47,389 +47,513 @@
   "failure": null,
   "result": {
    "status": "created",
-   "commitSha": "a965e4ae4e30164213b50ae7b6837065e982fa80",
-   "subject": "pgitobj: committed while stopped mwgd8tio"
+   "commitSha": "ac57244e95a08af76705fb02901590cf77fcfd90",
+   "subject": "pgitobj: committed while stopped mwge954d"
   },
   "head": {
-   "sha": "a965e4ae4e30164213b50ae7b6837065e982fa80",
-   "subject": "pgitobj: committed while stopped mwgd8tio",
+   "sha": "ac57244e95a08af76705fb02901590cf77fcfd90",
+   "subject": "pgitobj: committed while stopped mwge954d",
    "files": [
     "while-stopped.txt"
    ]
   },
-  "ms": 5910
+  "ms": 6168
  },
  "draftReads": [
   {
+   "at": 1794660048868,
+   "ms": 19,
    "argv": "rev-parse --git-path index --git-path objects",
    "route": "stale-last-answer",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048893,
+   "ms": 37,
    "argv": "count-objects -v",
    "route": "stale-last-answer",
    "exitCode": 0,
    "detail": "passive 0ms"
   }
  ],
- "firstToRun": {
+ "firstInContainer": {
+  "at": 1794660048980,
+  "ms": 2278,
   "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never update-index --no-split-index",
   "route": "container",
   "exitCode": 0,
-  "detail": "action 1684ms"
+  "detail": "action 1951ms"
  },
  "commands": [
   {
+   "at": 1794660045243,
+   "ms": 41,
    "argv": "rev-parse --git-path index",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045325,
+   "ms": 76,
    "argv": "diff-index -M --numstat -z HEAD --",
    "route": "stale-patched",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045325,
+   "ms": 76,
    "argv": "status --porcelain=2 --branch -z --no-ahead-behind",
    "route": "stale-patched",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045401,
+   "ms": 42,
    "argv": "config --get branch.main.t3-merge-base-ref",
    "route": "cache",
    "exitCode": 1,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045443,
+   "ms": 75,
    "argv": "config --get branch.main.t3-merge-base",
    "route": "cache",
    "exitCode": 1,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045518,
+   "ms": 74,
    "argv": "config --get branch.main.gh-merge-base",
    "route": "cache",
    "exitCode": 1,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045592,
+   "ms": 74,
    "argv": "remote get-url -- origin",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045666,
+   "ms": 48,
    "argv": "rev-parse --symbolic-full-name main@{upstream}",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045714,
+   "ms": 41,
    "argv": "merge-base --end-of-options refs/remotes/origin/main HEAD",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045755,
+   "ms": 41,
    "argv": "show-ref --verify --quiet refs/heads/main",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045796,
+   "ms": 11,
    "argv": "ls-files --others --exclude-standard -z -- :(top,literal)while-stopped.txt",
    "route": "container-stopped",
    "exitCode": 128,
    "detail": "needs the Workspace's Container, which is stopped, and has no earlier answer"
   },
   {
+   "at": 1794660045807,
+   "ms": 73,
    "argv": "config --get branch.main.remote",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660045880,
+   "ms": 40,
    "argv": "config --get remote.origin.url",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046005,
+   "ms": 70,
    "argv": "symbolic-ref --quiet HEAD",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046181,
+   "ms": 71,
    "argv": "rev-parse --symbolic-full-name HEAD",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046252,
+   "ms": 63,
    "argv": "rev-parse --symbolic-full-name @{upstream}",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046315,
+   "ms": 72,
    "argv": "rev-list --left-right --count HEAD...@{upstream}",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046387,
+   "ms": 75,
    "argv": "symbolic-ref refs/remotes/origin/HEAD",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046462,
+   "ms": 77,
    "argv": "config --get branch.main.remote",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046539,
+   "ms": 40,
    "argv": "config --get remote.origin.url",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046579,
+   "ms": 42,
    "argv": "remote -v",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046621,
+   "ms": 39,
    "argv": "config --get-regexp ^remote\\..*\\.gh-resolved$",
    "route": "cache",
    "exitCode": 1,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046849,
+   "ms": 67,
    "argv": "remote -v",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660046916,
+   "ms": 41,
    "argv": "config --get-regexp ^remote\\..*\\.gh-resolved$",
    "route": "cache",
    "exitCode": 1,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660047735,
+   "ms": 40,
    "argv": "symbolic-ref --quiet HEAD",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660047928,
+   "ms": 76,
    "argv": "rev-parse --git-path index",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048010,
+   "ms": 42,
    "argv": "status --porcelain=2 --branch -z --no-ahead-behind",
    "route": "stale-patched",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048010,
+   "ms": 42,
    "argv": "diff-index -M --numstat -z HEAD --",
    "route": "stale-patched",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048052,
+   "ms": 55,
    "argv": "config --get branch.main.t3-merge-base-ref",
    "route": "cache",
    "exitCode": 1,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048107,
+   "ms": 46,
    "argv": "config --get branch.main.t3-merge-base",
    "route": "cache",
    "exitCode": 1,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048153,
+   "ms": 45,
    "argv": "config --get branch.main.gh-merge-base",
    "route": "cache",
    "exitCode": 1,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048198,
+   "ms": 45,
    "argv": "remote get-url -- origin",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048243,
+   "ms": 44,
    "argv": "rev-parse --symbolic-full-name main@{upstream}",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048287,
+   "ms": 45,
    "argv": "merge-base --end-of-options refs/remotes/origin/main HEAD",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048332,
+   "ms": 46,
    "argv": "show-ref --verify --quiet refs/heads/main",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048378,
+   "ms": 44,
    "argv": "config --get branch.main.remote",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048422,
+   "ms": 44,
    "argv": "config --get remote.origin.url",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048732,
+   "ms": 45,
    "argv": "symbolic-ref --quiet HEAD",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048777,
+   "ms": 12,
    "argv": "for-each-ref --format=%(upstream:remotename) refs/heads/main",
    "route": "container-stopped",
    "exitCode": 128,
    "detail": "needs the Workspace's Container, which is stopped, and has no earlier answer"
   },
   {
+   "at": 1794660048789,
+   "ms": 46,
    "argv": "rev-parse --git-path index",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
-   "argv": "diff-index -M --numstat -z HEAD --",
-   "route": "stale-patched",
-   "exitCode": 0,
-   "detail": "passive 0ms"
-  },
-  {
+   "at": 1794660048842,
+   "ms": 26,
    "argv": "status --porcelain=2 --branch -z",
    "route": "stale-patched",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048842,
+   "ms": 26,
+   "argv": "diff-index -M --numstat -z HEAD --",
+   "route": "stale-patched",
+   "exitCode": 0,
+   "detail": "passive 0ms"
+  },
+  {
+   "at": 1794660048868,
+   "ms": 19,
    "argv": "rev-parse --git-path index --git-path objects",
    "route": "stale-last-answer",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048893,
+   "ms": 37,
    "argv": "count-objects -v",
    "route": "stale-last-answer",
    "exitCode": 0,
    "detail": "passive 0ms"
   },
   {
+   "at": 1794660048980,
+   "ms": 2278,
    "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never update-index --no-split-index",
    "route": "container",
    "exitCode": 0,
-   "detail": "action 1684ms"
+   "detail": "action 1951ms"
   },
   {
+   "at": 1794660051258,
+   "ms": 176,
    "argv": "rev-parse --verify --quiet HEAD",
    "route": "container",
    "exitCode": 0,
-   "detail": "passive 119ms"
+   "detail": "passive 111ms"
   },
   {
+   "at": 1794660051434,
+   "ms": 273,
    "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never read-tree HEAD",
    "route": "container",
    "exitCode": 0,
-   "detail": "action 212ms"
+   "detail": "action 233ms"
   },
   {
+   "at": 1794660051707,
+   "ms": 259,
    "argv": "-c core.splitIndex=false -c splitIndex.sharedIndexExpire=never add -A --pathspec-from-file=- --pathspec-file-nul",
    "route": "container",
    "exitCode": 0,
-   "detail": "action 184ms"
+   "detail": "action 214ms"
   },
   {
+   "at": 1794660051966,
+   "ms": 188,
    "argv": "-c diff.relative=false diff --cached --name-status",
    "route": "container",
    "exitCode": 0,
-   "detail": "passive 119ms"
+   "detail": "passive 149ms"
   },
   {
+   "at": 1794660052154,
+   "ms": 200,
    "argv": "rev-parse --git-path MERGE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD",
    "route": "container",
    "exitCode": 0,
-   "detail": "passive 78ms"
+   "detail": "passive 130ms"
   },
   {
+   "at": 1794660052375,
+   "ms": 259,
    "argv": "reset --quiet",
    "route": "container",
    "exitCode": 0,
-   "detail": "action 243ms"
+   "detail": "action 215ms"
   },
   {
+   "at": 1794660052634,
+   "ms": 248,
    "argv": "add -A --pathspec-from-file=- --pathspec-file-nul",
    "route": "container",
    "exitCode": 0,
-   "detail": "action 191ms"
+   "detail": "action 201ms"
   },
   {
-   "argv": "commit -m pgitobj: committed while stopped mwgd8tio",
+   "at": 1794660052882,
+   "ms": 494,
+   "argv": "commit -m pgitobj: committed while stopped mwge954d",
    "route": "container",
    "exitCode": 0,
-   "detail": "action 377ms"
+   "detail": "action 423ms"
   },
   {
+   "at": 1794660053376,
+   "ms": 264,
    "argv": "rev-parse HEAD",
    "route": "container",
    "exitCode": 0,
-   "detail": "passive 155ms"
+   "detail": "passive 206ms"
   },
   {
+   "at": 1794660053640,
+   "ms": 247,
    "argv": "rev-parse --git-common-dir",
    "route": "container",
    "exitCode": 0,
-   "detail": "passive 174ms"
+   "detail": "passive 209ms"
   },
   {
-   "argv": "rev-parse --show-toplevel",
-   "route": "container",
-   "exitCode": 0,
-   "detail": "passive 143ms"
-  },
-  {
+   "at": 1794660053898,
+   "ms": 242,
    "argv": "symbolic-ref --quiet HEAD",
    "route": "container",
    "exitCode": 0,
-   "detail": "passive 180ms"
+   "detail": "passive 202ms"
   },
   {
+   "at": 1794660053898,
+   "ms": 277,
+   "argv": "rev-parse --show-toplevel",
+   "route": "container",
+   "exitCode": 0,
+   "detail": "passive 234ms"
+  },
+  {
+   "at": 1794660054549,
+   "ms": 177,
    "argv": "rev-parse --git-path index",
    "route": "container",
    "exitCode": 0,
-   "detail": "passive 99ms"
+   "detail": "passive 133ms"
   },
   {
-   "argv": "--git-dir /w/pgitobj-mwgd8j95/.git remote",
+   "at": 1794660054731,
+   "ms": 45,
+   "argv": "--git-dir /w/pgitobj-mwge8t2o/.git remote",
    "route": "cache",
    "exitCode": 0,
    "detail": "passive 0ms"

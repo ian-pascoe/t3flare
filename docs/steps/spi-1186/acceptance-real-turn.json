@@ -1,13 +1,13 @@
 {
   "url": "https://t3flare-environment-pgitobj.ian-g-pascoe.workers.dev",
-  "startedAt": "2026-11-14T12:14:12.398Z",
+  "startedAt": "2026-11-14T12:41:03.962Z",
   "adminGuard": {
     "wrongToken": 404,
     "withAccessAndToken": 200,
     "build": {
       "t3": "v0.1.10-nightly.20261112.4606",
-      "commit": "bc8bdfed2406",
-      "builtAt": "2026-11-14T12:01:07.763Z"
+      "commit": "cce390dbe537",
+      "builtAt": "2026-11-14T12:33:20.519Z"
     }
   },
   "auth": {
@@ -17,15 +17,15 @@
   },
   "pairing": {
     "refusedBeforeArming": 401,
-    "armedUntil": "2026-11-14T12:24:12.982Z",
+    "armedUntil": "2026-11-14T12:51:04.472Z",
     "paired": 200,
-    "ms": 1440,
+    "ms": 1269,
     "refusedAfterDisarming": 401
   },
   "project": {
-    "projectId": "d3102fb2-2d8d-4607-8bf5-25d6e357e2ec",
+    "projectId": "0382e059-b525-4110-8c1a-7eb36fe52840",
     "threads": 12,
-    "ms": 1942
+    "ms": 2276
   },
   "fixtures": {
     "threads": 12,
@@ -36,24 +36,24 @@
     "eventSink": "fresh"
   },
   "shellSnapshot": {
-    "ms": 184,
-    "bytes": 23064,
+    "ms": 481,
+    "bytes": 22338,
     "listedFixtureThreads": 12
   },
   "threadWindow": {
     "threads": 12,
     "allOk": true,
     "minItems": 20,
-    "maxMs": 131,
+    "maxMs": 202,
     "maxBytes": 46534
   },
   "subscribeThread": {
-    "ms": 52,
+    "ms": 50,
     "bytes": 46473,
     "items": 20
   },
   "search": {
-    "ms": 61,
+    "ms": 30,
     "matches": 12,
     "threads": 12
   },
@@ -72,9 +72,9 @@
     "maxCompoundTerms": 12,
     "ctesMaterialized": 0,
     "materializeFailures": 0,
-    "rowsWritten": 10822,
-    "rowsRead": 44591,
-    "databaseSize": 5210112,
+    "rowsWritten": 10753,
+    "rowsRead": 43763,
+    "databaseSize": 4194304,
     "refusedStatements": 0,
     "pragmaRefusals": 0
   },
@@ -91,7 +91,7 @@
         "module": "packages/shared/src/observability.ts",
         "name": "generatedServiceInstanceId",
         "initial": "undefined",
-        "now": "string:acffb1e9-27a4-48ba-8d8c-ae0688307886"
+        "now": "string:23601dd9-bb33-4a4d-9655-7c170071f66f"
       },
       {
         "module": "apps/server/src/mcp/McpSessionRegistry.ts",
@@ -110,13 +110,13 @@
     "fixture": "ian-pascoe/t3flare-fixture",
     "model": "anthropic/claude-haiku-5-5",
     "clone": {
-      "destination": "/w/acceptance-mwgdb4ay",
-      "ms": 9326,
-      "cwd": "/w/acceptance-mwgdb4ay",
+      "destination": "/w/acceptance-mwge9o6i",
+      "ms": 47019,
+      "cwd": "/w/acceptance-mwge9o6i",
       "error": null
     },
     "turn": {
-      "threadId": "861212db-a897-4fb5-a667-220469322075",
+      "threadId": "a465449a-5bf0-44a2-86c0-138aae34cb5a",
       "runs": [
         "completed"
       ],
@@ -130,19 +130,14 @@
           "kind": "command",
           "status": "resolved",
           "decision": "accept"
-        },
-        {
-          "kind": "command",
-          "status": "resolved",
-          "decision": "accept"
         }
       ],
       "edit": {
-        "fileName": "/w/acceptance-mwgdb4ay/src/greeting.txt",
+        "fileName": "/w/acceptance-mwge9o6i/src/greeting.txt",
         "status": "completed"
       },
       "bash": {
-        "input": "cd /w/acceptance-mwgdb4ay && bash test.sh",
+        "input": "cd /w/acceptance-mwge9o6i && bash test.sh",
         "status": "completed",
         "exitCode": 0
       },
@@ -154,7 +149,7 @@
           "deletions": 0
         }
       ],
-      "ms": 31184
+      "ms": 64781
     },
     "checkpointOps": [
       "has:do",
@@ -176,21 +171,21 @@
       "failure": null,
       "result": {
         "status": "created",
-        "commitSha": "e8520b18d8eccb006560ff94a3fdf33afd87a8dd",
+        "commitSha": "326db246fa857f19604b48b5783cd45f4d1e660e",
         "subject": "acceptance: t3's commit action"
       },
       "head": {
-        "sha": "e8520b18d8eccb006560ff94a3fdf33afd87a8dd",
+        "sha": "326db246fa857f19604b48b5783cd45f4d1e660e",
         "subject": "acceptance: t3's commit action",
         "files": [
           "src/greeting.txt"
         ]
       },
-      "ms": 4728
+      "ms": 5110
     },
-    "ms": 36804
+    "ms": 70491
   },
-  "totalMs": 42446,
+  "totalMs": 76545,
   "failures": [],
   "ok": true
 }
