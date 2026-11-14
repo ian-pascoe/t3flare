@@ -40,7 +40,7 @@ describe("endpointStore", () => {
     expect(known).toMatchObject({ id: "gpt-5-mini", name: "GPT-5 Mini", reasoning: true, known: true });
     expect(known.cost.output).toBeGreaterThan(0);
     expect(endpoint!.models[1]).toMatchObject({ id: "my-tuned", name: "Mine", reasoning: true, known: false, contextWindow: 128_000, cost: { input: 0, output: 0 } });
-    expect(await store.apiKey("openai")).toBe("sk-test-openai-1");
+    expect((await store.resolve("openai"))?.apiKey).toBe("sk-test-openai-1");
     expect(JSON.stringify([...kv.map.entries()])).not.toContain("sk-test-openai-1");
     // The Harness settings and the Environment settings are other entities: their revisions do not move.
     expect(harnessStore(kv).load().revision).toBe(0);
@@ -53,11 +53,11 @@ describe("endpointStore", () => {
     const edited = await store.save({ ...OPENAI, label: "OpenAI (work)", models: ["gpt-5"] }, {});
     expect(edited).toMatchObject({ ok: true, added: false });
     expect(store.load()).toMatchObject({ revision: 2, endpoints: [{ label: "OpenAI (work)", models: [{ id: "gpt-5" }] }] });
-    expect(await store.apiKey("openai")).toBe("sk-first");
-    const before = store.keyMark("openai").fingerprint;
+    expect((await store.resolve("openai"))?.apiKey).toBe("sk-first");
+    const before = (await store.keyStatus("openai")).fingerprint;
     await store.save(OPENAI, { apiKey: "sk-second" });
-    expect(await store.apiKey("openai")).toBe("sk-second");
-    expect(store.keyMark("openai").fingerprint).not.toBe(before);
+    expect((await store.resolve("openai"))?.apiKey).toBe("sk-second");
+    expect((await store.keyStatus("openai")).fingerprint).not.toBe(before);
   });
 
   it("refuses an API-key endpoint without a key, and any key without a credentials key", async () => {
@@ -73,11 +73,11 @@ describe("endpointStore", () => {
     const { store } = setup();
     await store.save(OPENAI, { apiKey: "sk-first" });
     await store.save({ ...OPENAI, auth: "none" }, {});
-    expect(store.keyMark("openai").set).toBe(false);
+    expect((await store.keyStatus("openai")).set).toBe(false);
     await store.save(OPENAI, { apiKey: "sk-again" });
     expect(store.remove("openai")).toMatchObject({ ok: true, removed: { id: "openai" } });
     expect(store.load()).toMatchObject({ revision: 4, endpoints: [] });
-    expect(await store.apiKey("openai")).toBeUndefined();
+    expect((await store.resolve("openai"))?.apiKey).toBeUndefined();
     expect(store.remove("openai")).toMatchObject({ ok: false });
   });
 
@@ -87,6 +87,40 @@ describe("endpointStore", () => {
     expect(await store.save({ ...OPENAI, headers: { Authorization: "Bearer x" } }, { apiKey: "k" })).toMatchObject({ ok: false, error: expect.stringMatching(/credential/) });
     expect(await store.save({ ...OPENAI, baseUrl: "http://api.openai.com/v1" }, { apiKey: "k" })).toMatchObject({ ok: false, error: expect.stringMatching(/https/) });
     expect(store.load().revision).toBe(0);
+  });
+
+  it("refuses to keep a saved key for an edit that moves the API or the base URL, and takes one given with it", async () => {
+    const { store } = setup();
+    await store.save(OPENAI, { apiKey: "sk-first" });
+    for (const moved of [{ baseUrl: "https://evil.example/v1" }, { api: "openai-completions" }]) {
+      expect(await store.save({ ...OPENAI, ...moved }, {})).toMatchObject({ ok: false, error: expect.stringMatching(/API key entered again/) });
+    }
+    expect(store.load()).toMatchObject({ revision: 1, endpoints: [{ baseUrl: "https://api.openai.com/v1", api: "openai-responses" }] });
+    expect(await store.save({ ...OPENAI, baseUrl: "https://other.example/v1" }, { apiKey: "sk-other" })).toMatchObject({ ok: true });
+    expect(await store.resolve("openai")).toMatchObject({ endpoint: { baseUrl: "https://other.example/v1" }, apiKey: "sk-other" });
+  });
+
+  it("refuses an IP literal, localhost or an internal host as the base URL", async () => {
+    const { store } = setup();
+    for (const baseUrl of ["https://127.0.0.1/v1", "https://[::1]/v1", "https://localhost/v1", "https://api.localhost/v1", "https://llm.internal/v1"]) {
+      expect(await store.save({ ...OPENAI, baseUrl }, { apiKey: "k" })).toMatchObject({ ok: false, error: expect.stringMatching(/public host name/) });
+    }
+  });
+
+  it("marks a key the credentials key no longer opens as unreadable, and resolves it as such", async () => {
+    const kv = memory();
+    await endpointStore(kv, sealedStore(kv, KEY)).save(OPENAI, { apiKey: "sk-old" });
+    const rotated = endpointStore(kv, sealedStore(kv, "e".repeat(64)));
+    expect(await rotated.keyStatus("openai")).toMatchObject({ set: true, readable: false });
+    expect(await rotated.resolve("openai")).toMatchObject({ apiKey: undefined, unreadable: true });
+    expect(await endpointStore(kv, sealedStore(kv, KEY)).keyStatus("openai")).toMatchObject({ set: true, readable: true });
+  });
+
+  it("loses no update when two saves interleave", async () => {
+    const { store } = setup();
+    await Promise.all([store.save(OPENAI, { apiKey: "sk-a" }), store.save({ ...OPENAI, id: "other", label: "Other" }, { apiKey: "sk-b" })]);
+    expect(store.load()).toMatchObject({ revision: 2 });
+    expect(store.load().endpoints.map((endpoint) => endpoint.id).sort()).toEqual(["openai", "other"]);
   });
 
   it("resolves an endpoint with its key for a caller that uses it", async () => {

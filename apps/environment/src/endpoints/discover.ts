@@ -5,7 +5,7 @@
 // fills in what the list does not say (store.ts). A failure is reported as its HTTP status, never its body (which may
 // echo the key).
 import { parseList, realIdOf } from "@t3flare/models/catalog";
-import type { EndpointApi, EndpointModelInput } from "@t3flare/models/endpoints";
+import { type EndpointApi, type EndpointModelInput, isRecord } from "@t3flare/models/endpoints";
 
 const TIMEOUT_MS = 10_000;
 const MAX_PAGES = 10;
@@ -18,13 +18,14 @@ interface Target {
   readonly headers: Readonly<Record<string, string>>;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const count = (value: unknown): number | undefined => (typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined);
 
 class ListError extends Error {}
 
 const getJson = async (url: URL, headers: Record<string, string>, fetcher: typeof fetch, signal: AbortSignal): Promise<unknown> => {
-  const response = await fetcher(url, { headers: { accept: "application/json", ...headers }, signal });
+  // Never followed: a redirect would carry the key to wherever it points.
+  const response = await fetcher(url, { headers: { accept: "application/json", ...headers }, signal, redirect: "manual" });
+  if (response.status >= 300 && response.status < 400) throw new ListError(`the endpoint's model list redirected (HTTP ${response.status}): give the base URL it redirects to`);
   if (!response.ok) throw new ListError(`the endpoint's model list answered HTTP ${response.status}`);
   try {
     return await response.json();

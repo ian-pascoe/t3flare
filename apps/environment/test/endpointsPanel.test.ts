@@ -93,13 +93,29 @@ describe("Model endpoints on the Harness panel", () => {
     expect(html).not.toContain(SECRET);
   });
 
+  it("shows a key the credentials key no longer opens as one to enter again", async () => {
+    const kv = memory();
+    await endpointStore(kv, sealedStore(kv, "d".repeat(64), () => NOW)).save(ENDPOINT, { apiKey: SECRET });
+    const deps: HarnessDeps = {
+      caller: owner,
+      host: HOST,
+      store: harnessStore(kv),
+      now: () => NOW,
+      endpoints: { store: endpointStore(kv, sealedStore(kv, "f".repeat(64))), discover: async () => ({ ok: true, models: [] }) },
+    };
+    const listed = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/endpoints`), deps)).json();
+    expect(listed).toMatchObject({ endpoints: [{ id: "openai", key: { set: true, readable: false } }] });
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    expect(html).toContain("cannot be read: enter it again");
+  });
+
   it("removes an endpoint and its key, audited", async () => {
     const { store, endpoints, deps } = setup();
     await post(deps, "endpoints", { op: "save", endpoint: ENDPOINT, apiKey: SECRET }, await headersOf(store));
     const response = await post(deps, "endpoints", { op: "remove", id: "openai" }, await headersOf(store));
     expect(response.status).toBe(200);
     expect(endpoints.load()).toMatchObject({ revision: 2, endpoints: [] });
-    expect(await endpoints.apiKey("openai")).toBeUndefined();
+    expect((await endpoints.resolve("openai"))?.apiKey).toBeUndefined();
     expect(store.auditLog(1)).toMatchObject([{ entity: "endpoints", action: "endpoint.remove", target: "openai" }]);
   });
 
@@ -113,6 +129,24 @@ describe("Model endpoints on the Harness panel", () => {
       { baseUrl: "https://api.openai.com/v1", apiKey: "sk-typed" },
       { baseUrl: "https://api.openai.com/v1", apiKey: SECRET },
     ]);
+  });
+
+  it("never sends the saved key to another API or base URL, and refuses to rebind it on save", async () => {
+    const { store, endpoints, deps, discovered } = setup();
+    await post(deps, "endpoints", { op: "save", endpoint: ENDPOINT, apiKey: SECRET }, await headersOf(store));
+    const moved = await post(deps, "endpoints/discover", { endpoint: { ...ENDPOINT, baseUrl: "https://evil.example" } }, await headersOf(store));
+    expect(moved.status).toBe(400);
+    expect(await moved.text()).toMatch(/type the API key/);
+    const otherApi = await post(deps, "endpoints/discover", { endpoint: { ...ENDPOINT, api: "openai-completions" } }, await headersOf(store));
+    expect(otherApi.status).toBe(400);
+    expect(discovered).toEqual([]);
+    // A no-auth endpoint is read with no key at all.
+    await post(deps, "endpoints/discover", { endpoint: { ...ENDPOINT, auth: "none", baseUrl: "https://evil.example" } }, await headersOf(store));
+    expect(discovered).toEqual([{ baseUrl: "https://evil.example", apiKey: undefined }]);
+    const rebound = await post(deps, "endpoints", { op: "save", endpoint: { ...ENDPOINT, baseUrl: "https://evil.example" } }, await headersOf(store));
+    expect(rebound.status).toBe(400);
+    expect(endpoints.load().endpoints[0]?.baseUrl).toBe("https://api.openai.com/v1");
+    expect(store.auditLog(5).map((entry) => entry.action)).toEqual(["endpoint.add"]);
   });
 
   it("refuses a change without the page's token, from another origin, or form-encoded, and an invalid endpoint", async () => {

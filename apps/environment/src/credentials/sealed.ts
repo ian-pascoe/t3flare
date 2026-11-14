@@ -20,6 +20,11 @@ export interface SealedMark {
   readonly set: boolean;
   readonly setAt: number | null;
   readonly fingerprint: string | null;
+  /**
+   * Only from `inspect`: whether this Environment's credentials key opens the value. False for a value set before the
+   * key changed, or a damaged record: it must be entered again.
+   */
+  readonly readable?: boolean;
 }
 
 export class CredentialsKeyMissing extends Error {
@@ -37,10 +42,12 @@ export interface SealedStore {
   /** The value under `name`, or undefined (none, no key, or one this key does not open). */
   open(name: string): Promise<string | undefined>;
   mark(name: string): SealedMark;
+  /** The mark, with whether the value opens (`readable`). */
+  inspect(name: string): Promise<SealedMark>;
   remove(name: string): void;
 }
 
-interface Record {
+interface SealedRecord {
   readonly v: 1;
   readonly iv: string;
   readonly data: string;
@@ -70,30 +77,35 @@ export const sealedStore = (kv: KvStorage & { delete(key: string): unknown }, cr
     return keys;
   };
   const mark = (name: string): SealedMark => {
-    const record = kv.get<Record>(PREFIX + name);
+    const record = kv.get<SealedRecord>(PREFIX + name);
     return record === undefined ? { set: false, setAt: null, fingerprint: null } : { set: true, setAt: record.setAt, fingerprint: record.fingerprint };
+  };
+  const open = async (name: string): Promise<string | undefined> => {
+    const record = kv.get<SealedRecord>(PREFIX + name);
+    if (record === undefined || !available) return undefined;
+    try {
+      const { seal } = await keysOf();
+      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unbase64(record.iv), additionalData: encoder.encode(PREFIX + name) }, seal, unbase64(record.data));
+      return new TextDecoder().decode(plain);
+    } catch {
+      return undefined;
+    }
   };
   return {
     available,
     mark,
+    open,
+    inspect: async (name) => {
+      const marked = mark(name);
+      return marked.set ? { ...marked, readable: (await open(name)) !== undefined } : marked;
+    },
     put: async (name, value) => {
       const { seal, fingerprint } = await keysOf();
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const data = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(PREFIX + name) }, seal, encoder.encode(value)));
       const print = hex(new Uint8Array(await crypto.subtle.sign("HMAC", fingerprint, encoder.encode(value)))).slice(0, 8);
-      kv.put<Record>(PREFIX + name, { v: 1, iv: base64(iv), data: base64(data), setAt: now(), fingerprint: print });
+      kv.put<SealedRecord>(PREFIX + name, { v: 1, iv: base64(iv), data: base64(data), setAt: now(), fingerprint: print });
       return mark(name);
-    },
-    open: async (name) => {
-      const record = kv.get<Record>(PREFIX + name);
-      if (record === undefined || !available) return undefined;
-      try {
-        const { seal } = await keysOf();
-        const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unbase64(record.iv), additionalData: encoder.encode(PREFIX + name) }, seal, unbase64(record.data));
-        return new TextDecoder().decode(plain);
-      } catch {
-        return undefined;
-      }
     },
     remove: (name) => void kv.delete(PREFIX + name),
   };

@@ -1,6 +1,7 @@
 // What pi-ai's own catalog knows of a model (SPI-1162): its name, limits, reasoning, thinking levels and price, for a model
-// a Model endpoint serves. Only the catalogs of the vendors whose APIs an endpoint is likely to be are read (their JSON is
-// bundled where this is imported). The catalog of the endpoint's own host is tried first, then the others in order.
+// a Model endpoint serves. Only the catalogs of the vendors an endpoint is likely to be are read: pi-ai's catalog modules
+// (their JSON plus the small `model-catalog.js`), no provider code, bundled where this is imported. The catalog of the
+// endpoint's own host is tried first, then the others in order.
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
 import { DEEPSEEK_MODELS } from "@earendil-works/pi-ai/providers/deepseek.models";
@@ -11,7 +12,7 @@ import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
 import { OPENROUTER_MODELS } from "@earendil-works/pi-ai/providers/openrouter.models";
 import { XAI_MODELS } from "@earendil-works/pi-ai/providers/xai.models";
 
-import type { KnownModel } from "./endpoints.ts";
+import type { EndpointApi, KnownModel } from "./endpoints.ts";
 
 type Catalog = Readonly<Record<string, Model<Api>>>;
 
@@ -39,7 +40,7 @@ const hostOf = (baseUrl: string): string | undefined => {
  * pi-ai's metadata for `id` at an endpoint of `api` at `baseUrl`, or undefined when no catalog read here has it. The
  * model's compatibility overrides come along only from a catalog entry of the same API.
  */
-export const knownModel = (id: string, endpoint: { readonly api: string; readonly baseUrl: string }): KnownModel | undefined => {
+export const knownModel = (id: string, endpoint: { readonly api: EndpointApi; readonly baseUrl: string }): KnownModel | undefined => {
   const host = hostOf(endpoint.baseUrl);
   const ordered = [...CATALOGS.filter((catalog) => catalog.host === host), ...CATALOGS.filter((catalog) => catalog.host !== host)];
   for (const catalog of ordered) {

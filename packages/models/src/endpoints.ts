@@ -130,6 +130,15 @@ export interface EndpointInput {
   readonly models: ReadonlyArray<EndpointModelInput>;
 }
 
+/**
+ * An endpoint's key as the Environment answers a Session (`endpointCredential`): the key, or null with why. `unreadable`:
+ * a key is stored but this Environment's credentials key does not open it (the key changed, or the record is damaged).
+ */
+export interface EndpointCredential {
+  readonly apiKey: string | null;
+  readonly unreadable?: boolean;
+}
+
 /** What pi-ai's catalog knows of a model (`known.ts`). */
 export type KnownModel = Omit<EndpointModel, "id" | "known">;
 
@@ -150,7 +159,8 @@ export const endpointModelOf = (input: EndpointModelInput, known: KnownModel | u
   ...(known?.compat === undefined ? {} : { compat: known.compat }),
 });
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+/** A JSON object (not an array, not null). */
+export const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const positive = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 100_000_000;
 
 const modelInputOf = (value: unknown): EndpointModelInput | string => {
@@ -175,17 +185,26 @@ const modelInputOf = (value: unknown): EndpointModelInput | string => {
   };
 };
 
-/** The base URL as stored: https, no credentials, query or fragment, no trailing slash. */
-const baseUrlOf = (value: unknown): string | undefined => {
-  if (typeof value !== "string") return undefined;
+/**
+ * The base URL as stored, or why not: https, a public host name (no IP literal, `localhost` or `.internal`, as a direct
+ * MCP server's URL, harness-registry's `directUrlProblem`), no credentials, query or fragment, no trailing slash. The key
+ * goes there, from a Worker.
+ */
+const baseUrlOf = (value: unknown): { readonly url: string } | { readonly problem: string } => {
+  if (typeof value !== "string") return { problem: "baseUrl is an https URL" };
   let url: URL;
   try {
     url = new URL(value.trim());
   } catch {
-    return undefined;
+    return { problem: "baseUrl is an https URL" };
   }
-  if (url.protocol !== "https:" || url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") return undefined;
-  return url.toString().replace(/\/+$/, "");
+  if (url.protocol !== "https:") return { problem: "baseUrl is https only" };
+  if (url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") return { problem: "baseUrl has no credentials, query or fragment" };
+  const host = url.hostname.toLowerCase();
+  if (/^[\d.]+$/.test(host) || host.startsWith("[") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) {
+    return { problem: "baseUrl's host is a public host name, not an address" };
+  }
+  return { url: url.toString().replace(/\/+$/, "") };
 };
 
 /** Checks an endpoint as the panel's API receives it. */
@@ -197,8 +216,9 @@ export const validateEndpoint = (value: unknown): { readonly ok: true; readonly 
   const label = typeof value.label === "string" ? value.label.trim() : "";
   if (label === "" || label.length > 60) return { ok: false, error: "label is 1–60 characters" };
   if (typeof value.api !== "string" || !(ENDPOINT_APIS as ReadonlyArray<string>).includes(value.api)) return { ok: false, error: `api is one of ${ENDPOINT_APIS.join(", ")}` };
-  const baseUrl = baseUrlOf(value.baseUrl);
-  if (baseUrl === undefined) return { ok: false, error: "baseUrl is an https URL without credentials, query or fragment" };
+  const base = baseUrlOf(value.baseUrl);
+  if ("problem" in base) return { ok: false, error: base.problem };
+  const baseUrl = base.url;
   const auth = value.auth ?? "api-key";
   if (auth !== "api-key" && auth !== "none") return { ok: false, error: "auth is api-key or none" };
   const headers: Record<string, string> = {};

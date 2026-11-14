@@ -180,7 +180,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         status: statusOf(deps),
         mcp: await mcpOverview(deps),
         ...(deps.skills === undefined ? {} : { skills: skillsOverview(deps.skills) }),
-        ...(deps.endpoints === undefined ? {} : { endpoints: endpointsOverview(deps.endpoints) }),
+        ...(deps.endpoints === undefined ? {} : { endpoints: await endpointsOverview(deps.endpoints) }),
       });
       return new Response(html, { headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp() } });
     }
@@ -198,7 +198,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === `${HARNESS_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
     if (path === `${HARNESS_PATH}/api/skills` && deps.skills !== undefined) return json(skillsOverview(deps.skills));
     if (path === `${HARNESS_PATH}/api/skills/view` && deps.skills !== undefined) return skillsResponse(viewSkill(deps.skills, url.searchParams.get("name") ?? ""));
-    if (path === `${HARNESS_PATH}${ENDPOINTS_PATHS.list}` && deps.endpoints !== undefined) return json(endpointsOverview(deps.endpoints));
+    if (path === `${HARNESS_PATH}${ENDPOINTS_PATHS.list}` && deps.endpoints !== undefined) return json(await endpointsOverview(deps.endpoints));
     return refused(404, "Not found");
   }
   if (request.method !== "POST") return refused(405, "Method not allowed");

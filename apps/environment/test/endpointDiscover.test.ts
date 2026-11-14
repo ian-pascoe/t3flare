@@ -54,6 +54,18 @@ describe("discoverModels", () => {
     expect(seen[0]!.headers["x-goog-api-key"]).toBe("g-key");
   });
 
+  it("never follows a redirect with the key", async () => {
+    const seen: Array<RequestInit | undefined> = [];
+    const fetcher = (async (_input: URL, init?: RequestInit) => {
+      seen.push(init);
+      return new Response(null, { status: 302, headers: { location: "https://evil.example/models" } });
+    }) as typeof fetch;
+    const found = await discoverModels({ api: "openai-responses", baseUrl: "https://api.openai.com/v1", headers: {} }, "sk-1", fetcher);
+    expect(found).toMatchObject({ ok: false, error: expect.stringMatching(/redirected \(HTTP 302\)/) });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.redirect).toBe("manual");
+  });
+
   it("says why a list could not be read, without the key", async () => {
     const { fetcher } = fake(() => ({ error: { message: "Incorrect API key provided: sk-secret" } }), 401);
     const found = await discoverModels({ api: "openai-completions", baseUrl: "https://example.test/v1", headers: {} }, "sk-secret", fetcher);

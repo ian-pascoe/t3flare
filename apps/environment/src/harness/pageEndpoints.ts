@@ -21,6 +21,7 @@ type Escape = (text: string) => string;
 const keyFact = (escape: Escape, endpoint: EndpointsView["endpoints"][number]): string => {
   if (endpoint.auth === "none") return "None";
   if (!endpoint.key.set) return '<span class="pill pill-warn">no key</span>';
+  if (endpoint.key.readable === false) return '<span class="pill pill-err" title="This Environment\'s credentials key no longer opens it">cannot be read: enter it again</span>';
   return `Set${endpoint.key.fingerprint === null ? "" : ` <span class="ident" title="Fingerprint: an HMAC of the key, never the key">#${escape(endpoint.key.fingerprint)}</span>`}`;
 };
 
@@ -131,12 +132,13 @@ if (endpointForm !== null) {
     button.addEventListener("click", () => { fill(JSON.parse(button.dataset.endpointEdit), true); endpointForm.scrollIntoView(); input("label").focus(); });
   }
   endpointForm.querySelector("[data-endpoint-reset]").addEventListener("click", () => fill({ api: "openai-completions" }, false));
-  endpointForm.querySelector("[data-endpoint-discover]").addEventListener("click", async (event) => {
+  const discover = endpointForm.querySelector("[data-endpoint-discover]");
+  discover.addEventListener("click", async () => {
     let endpoint;
     try { endpoint = endpointOf(); } catch (error) { notify("err", error.message); return; }
     note.textContent = "Reading the model list…";
-    const response = await post("/_t3flare/harness/api/endpoints/discover", { endpoint, apiKey: input("apiKey").value }, event.currentTarget);
-    busy(event.currentTarget, false);
+    const response = await post("/_t3flare/harness/api/endpoints/discover", { endpoint, apiKey: input("apiKey").value }, discover);
+    busy(discover, false);
     if (response === undefined) { note.textContent = ""; return; }
     const answer = await response.json();
     if (!answer.ok) { note.textContent = "Could not read it: " + answer.error; return; }

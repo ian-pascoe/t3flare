@@ -5,16 +5,16 @@
 //   GET  /api/endpoints            the entity, each endpoint with its key's mark (never the key), the presets and APIs
 //   POST /api/endpoints            { op: "save", endpoint, apiKey? } or { op: "remove", id }
 //   POST /api/endpoints/discover   { endpoint, apiKey? }: the endpoint's model list with pi-ai's metadata, read with the
-//                                  key given, else the saved endpoint's own
+//                                  key given, else the saved endpoint's own, but only at its saved API and base URL
 //
 // Every change bumps the endpoints' own revision and is audited under the entity `endpoints`, with the key's mark and the
 // headers' names only.
-import { ENDPOINT_APIS, ENDPOINT_PRESETS, type ModelEndpoint, validateEndpoint } from "@t3flare/models/endpoints";
+import { ENDPOINT_APIS, ENDPOINT_PRESETS, isRecord, type ModelEndpoint, validateEndpoint } from "@t3flare/models/endpoints";
 
 import type { SealedMark } from "../credentials/sealed.ts";
 import type { AuditEntry } from "../harness/store.ts";
 import type { Discovery } from "./discover.ts";
-import { type EndpointStore, modelsWithMetadata } from "./store.ts";
+import { type EndpointStore, modelsWithMetadata, sameTarget } from "./store.ts";
 
 export interface EndpointsApiDeps {
   readonly store: EndpointStore;
@@ -27,8 +27,6 @@ export interface EndpointsApiDeps {
 export type EndpointsAnswer = { readonly status: number; readonly json: unknown } | { readonly status: number; readonly text: string };
 
 export const ENDPOINTS_PATHS = { list: "/api/endpoints", discover: "/api/endpoints/discover" } as const;
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** An endpoint as audited: no key, and its headers' names only. */
 const audited = (endpoint: ModelEndpoint | undefined, key?: SealedMark) =>
@@ -44,13 +42,13 @@ const audited = (endpoint: ModelEndpoint | undefined, key?: SealedMark) =>
         ...(key === undefined || !key.set ? {} : { key }),
       };
 
-/** The entity as the panel shows it. */
-export const endpointsOverview = (deps: Pick<EndpointsApiDeps, "store">) => {
+/** The entity as the panel shows it: each key's mark, with whether it still opens. */
+export const endpointsOverview = async (deps: Pick<EndpointsApiDeps, "store">) => {
   const { revision, endpoints } = deps.store.load();
   return {
     revision,
     credentialsKey: deps.store.sealing,
-    endpoints: endpoints.map((endpoint) => ({ ...endpoint, key: deps.store.keyMark(endpoint.id) })),
+    endpoints: await Promise.all(endpoints.map(async (endpoint) => ({ ...endpoint, key: await deps.store.keyStatus(endpoint.id) }))),
     presets: ENDPOINT_PRESETS,
     apis: ENDPOINT_APIS,
   };
@@ -82,7 +80,19 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
   const valid = validateEndpoint({ ...given, id: typeof given.id === "string" && given.id !== "" ? given.id : "unsaved", label: typeof given.label === "string" && given.label.trim() !== "" ? given.label : "unsaved", models: [] });
   if (!valid.ok) return { status: 400, text: valid.error };
   const typed = typeof body.apiKey === "string" && body.apiKey !== "" ? body.apiKey : undefined;
-  const apiKey = valid.endpoint.auth === "none" ? undefined : (typed ?? (await deps.store.apiKey(valid.endpoint.id)));
+  let apiKey: string | undefined;
+  if (valid.endpoint.auth === "api-key") {
+    if (typed !== undefined) apiKey = typed;
+    else {
+      // The saved key goes only to the API and base URL it was saved with.
+      const saved = await deps.store.resolve(valid.endpoint.id);
+      if (saved === undefined || saved.endpoint.auth === "none" || !sameTarget(saved.endpoint, valid.endpoint)) {
+        return { status: 400, text: "type the API key: a saved key is sent only to the API and base URL it was saved with" };
+      }
+      if (saved.apiKey === undefined) return { status: 400, text: "the saved API key cannot be read: enter it again" };
+      apiKey = saved.apiKey;
+    }
+  }
   const found = await deps.discover(valid.endpoint, apiKey);
   if (!found.ok) return { status: 200, json: found };
   return { status: 200, json: { ok: true, models: modelsWithMetadata(valid.endpoint, found.models) } };

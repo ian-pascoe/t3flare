@@ -33,7 +33,7 @@ import { harnessSecrets } from "./harness/secrets.ts";
 import { harnessStore } from "./harness/store.ts";
 import { sealedStore } from "./credentials/sealed.ts";
 import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
-import type { ModelEndpoints } from "@t3flare/models/endpoints";
+import type { EndpointCredential, ModelEndpoints } from "@t3flare/models/endpoints";
 import type { SkillsApiDeps } from "./skills/api.ts";
 import { githubReader, readAccessFor } from "./skills/contents.ts";
 import { type SkillStore, skillStore } from "./skills/store.ts";
@@ -413,11 +413,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   /**
    * A Model endpoint's API key for a Session's request (SPI-1162; ADR-0018: the Session asks at use time and keeps it in
-   * memory only). Null for an endpoint with none, or that is gone. Never boots t3.
+   * memory only). Null for an endpoint with none, or that is gone; `unreadable` for a stored key this Environment's
+   * credentials key no longer opens. Never boots t3.
    */
-  async endpointCredential(input: { readonly endpointId: string }): Promise<{ readonly apiKey: string | null }> {
+  async endpointCredential(input: { readonly endpointId: string }): Promise<EndpointCredential> {
     const resolved = await this.#endpointStore().resolve(String(input.endpointId));
-    return { apiKey: resolved?.apiKey ?? null };
+    return { apiKey: resolved?.apiKey ?? null, ...(resolved?.unreadable === true ? { unreadable: true } : {}) };
   }
 
   /**
