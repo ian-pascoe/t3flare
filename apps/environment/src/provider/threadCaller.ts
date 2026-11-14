@@ -10,7 +10,7 @@
 //   none, and writes are refused until the next turn writes it again. A CLI thread's modes are `cliThreadState`'s.
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 
-import type { ThreadLink, ThreadModes } from "../settings/server.ts";
+import type { ThreadLink, ThreadModes } from "../settings/caller.ts";
 
 /** The agent kind of a Durable Session's call (only Sessions call `EnvironmentDO.mcpCall`). */
 export const DURABLE_AGENT = "piDurable";
@@ -39,7 +39,10 @@ export const threadLinkIn = (sql: Pick<SqlStorage, "exec">, thread: string): Thr
     }
     if (row === undefined) return "unknown";
     if (row.origin !== null && row.origin !== undefined) return "linked";
-    current = typeof row.parent === "string" && row.parent !== "" ? row.parent : null;
+    // No parent is null (or absent); a parent of any other shape is a lineage this cannot follow (M3 review).
+    if (row.parent === null || row.parent === undefined) current = null;
+    else if (typeof row.parent === "string" && row.parent !== "") current = row.parent;
+    else return "unknown";
   }
   return "own";
 };
@@ -58,3 +61,23 @@ export const forgetDurableModes = (thread: string, owner: object): void => {
 
 /** A Durable thread's modes, or undefined when no live provider session recorded them. */
 export const durableModes = (thread: string): ThreadModes | undefined => records.get(thread)?.modes;
+
+/**
+ * One provider session's part of the record (plan D3): the adapter notes a thread's modes at `open` and at each
+ * `submitTurn`, and forgets every thread it noted when the session unregisters (its scope's finalizer). A newer session
+ * that took a thread over keeps its own record.
+ */
+export const durableModeRecord = () => {
+  const owner = {};
+  const noted = new Set<string>();
+  return {
+    note: (thread: string, modes: ThreadModes) => {
+      noted.add(thread);
+      noteDurableModes(thread, modes, owner);
+    },
+    forgetAll: () => {
+      for (const thread of noted) forgetDurableModes(thread, owner);
+      noted.clear();
+    },
+  };
+};
