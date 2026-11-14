@@ -1,6 +1,7 @@
 // The Global mise config's lay-down script (SPI-1150; apps/sandbox-image/src/globalMise.ts), run for real in bash with
-// stub `mise`, `git` and `gh` in an Ubuntu container (the image's base, with its `flock` and `timeout`); skipped without
-// Docker. The text goes in on stdin, as the Workspace DO sends it. The image's real mise is `mise.docker.test.ts`'s.
+// stub `mise`, `git` and `gh` in an Ubuntu container (the image's base, with its `flock` and `timeout`), pulled when
+// missing; skipped only without a Docker daemon. The text goes in on stdin, as the Workspace DO sends it. The image's
+// real mise is `mise.docker.test.ts`'s.
 // @effect-diagnostics nodeBuiltinImport:off
 import { spawnSync } from "node:child_process";
 
@@ -9,7 +10,13 @@ import { GLOBAL_MISE_SCRIPT, parseGlobalMiseAnswer, SYSTEM_GITCONFIG } from "@t3
 import { describe, expect, it } from "vitest";
 
 const IMAGE = "ubuntu:26.04";
-const docker = spawnSync("docker", ["image", "inspect", IMAGE], { encoding: "utf8" }).status === 0;
+/**
+ * Docker is there (CI's `ubuntu-latest` runners have it, so `pnpm run check` runs these in deploy-prod's check): the
+ * image is pulled when missing. Skipped only on a machine without a Docker daemon.
+ */
+const docker =
+  spawnSync("docker", ["info"], { encoding: "utf8", timeout: 20_000 }).status === 0 &&
+  (spawnSync("docker", ["image", "inspect", IMAGE], { encoding: "utf8" }).status === 0 || spawnSync("docker", ["pull", "-q", IMAGE], { encoding: "utf8", timeout: 300_000 }).status === 0);
 
 /**
  * The stubs: `mise install` records the config it was given and exits `STUB_INSTALL` (0 by default); `git` and `gh`
@@ -24,7 +31,9 @@ EOF
 for tool in git gh; do cat > /stub/$tool <<EOF
 #!/bin/bash
 echo "$tool auto=\\$MISE_AUTO_INSTALL/\\$MISE_EXEC_AUTO_INSTALL/\\$MISE_NOT_FOUND_AUTO_INSTALL" >> /t/calls
-grep -q BREAK_\${tool^^} "\\$MISE_GLOBAL_CONFIG_FILE" && exit 1
+code=\\$(grep -o "BREAK_\${tool^^}=[0-9]*" "\\$MISE_GLOBAL_CONFIG_FILE" | cut -d= -f2)
+[ -n "\\$code" ] && exit "\\$code"
+grep -q "BREAK_\${tool^^}\\b" "\\$MISE_GLOBAL_CONFIG_FILE" && exit 1
 exit 0
 EOF
 done
@@ -87,6 +96,15 @@ describe.skipIf(!docker)("the Global mise config's lay-down script", { timeout: 
     }
   });
 
+  it("reads each check's exit alone: 1 and 24 are failures, 124 or 137 from either a timeout", () => {
+    const result = run([{ text: `# BREAK_GIT=1\n# BREAK_GH=24\n${NODE}` }, { text: `# BREAK_GIT=124\n${NODE}`, revision: 2 }, { text: `# BREAK_GH=137\n${NODE}`, revision: 3 }]);
+    expect(result.answers.map((answer) => [answer?.laid, answer?.timedOut])).toEqual([
+      [false, false],
+      [false, true],
+      [false, true],
+    ]);
+  });
+
   it("still lays down a text whose install fails for another tool, when git and gh run", () => {
     const result = run([{ text: NODE, env: "STUB_INSTALL=1" }]);
     expect(result.answers[0]).toMatchObject({ laid: true, install: 1, timedOut: false });
@@ -143,7 +161,13 @@ trap 'echo "PINNED $(base64 -w0 < /root/.local/share/mise/installs/conda-git/2.4
 
 describe("parseGlobalMiseAnswer", () => {
   it("reads the last line of stdout, and nothing from text that is not an answer", () => {
-    expect(parseGlobalMiseAnswer('noise\n{"revision":1,"sha256":"x","source":"default","laid":false,"install":null,"timedOut":false,"ms":3,"bytes":0}\n')).toMatchObject({ laid: false });
+    const good = { revision: 1, sha256: "a".repeat(64), source: "default", laid: false, install: null, timedOut: false, ms: 3, bytes: 0 };
+    expect(parseGlobalMiseAnswer(`noise\n${JSON.stringify(good)}\n`)).toEqual(good);
+    // Every field is checked, not only \`laid\`.
+    for (const bad of [{ sha256: "x" }, { revision: -1 }, { install: "0" }, { timedOut: "no" }, { ms: 1.5 }, { bytes: undefined }, { locked: 1 }]) {
+      expect(parseGlobalMiseAnswer(JSON.stringify({ ...good, ...bad }))).toBeUndefined();
+    }
+    expect(parseGlobalMiseAnswer("[true]")).toBeUndefined();
     expect(parseGlobalMiseAnswer("mise ERROR something\n")).toBeUndefined();
     expect(parseGlobalMiseAnswer("")).toBeUndefined();
   });

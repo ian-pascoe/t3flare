@@ -80,7 +80,7 @@ else
   laid=false
   ${check("git")}; git_rc=$?
   ${check("gh")}; gh_rc=$?
-  case $git_rc$gh_rc in *124*|*137*) timed=true ;; esac
+  for rc in $git_rc $gh_rc; do case $rc in 124|137) timed=true ;; esac; done
   if [ $git_rc = 0 ] && [ $gh_rc = 0 ] && mv -f "$stage" "$global"; then laid=true; fi
   rm -f "$stage"
   # A git the owner pinned is not the image's: it gets the image's system gitconfig (the credential helper), as the
@@ -107,13 +107,39 @@ export const globalMiseArgv = (revision: number, sha256: string, source: string)
   source,
 ];
 
-/** The answer from the script's stdout (its last line), or undefined when there is none. */
+/** The answer from the script's stdout (its last line), or undefined when it is not one, field by field. */
 export const parseGlobalMiseAnswer = (stdout: string): GlobalMiseAnswer | undefined => {
-  const last = stdout.trim().split("\n").at(-1) ?? "";
+  let value: unknown;
   try {
-    const value = JSON.parse(last) as GlobalMiseAnswer;
-    return typeof value === "object" && value !== null && typeof value.laid === "boolean" ? value : undefined;
+    value = JSON.parse(stdout.trim().split("\n").at(-1) ?? "");
   } catch {
     return undefined;
   }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const answer = value as Record<string, unknown>;
+  const count = (field: unknown) => typeof field === "number" && Number.isInteger(field) && field >= 0;
+  const ok =
+    count(answer.revision) &&
+    typeof answer.sha256 === "string" &&
+    /^[0-9a-f]{64}$/.test(answer.sha256) &&
+    typeof answer.source === "string" &&
+    answer.source.length <= 32 &&
+    typeof answer.laid === "boolean" &&
+    (answer.install === null || (typeof answer.install === "number" && Number.isInteger(answer.install))) &&
+    typeof answer.timedOut === "boolean" &&
+    (answer.locked === undefined || typeof answer.locked === "boolean") &&
+    count(answer.ms) &&
+    count(answer.bytes);
+  if (!ok) return undefined;
+  return {
+    revision: answer.revision as number,
+    sha256: answer.sha256 as string,
+    source: answer.source as string,
+    laid: answer.laid as boolean,
+    install: answer.install as number | null,
+    timedOut: answer.timedOut as boolean,
+    ...(answer.locked === undefined ? {} : { locked: answer.locked as boolean }),
+    ms: answer.ms as number,
+    bytes: answer.bytes as number,
+  };
 };
