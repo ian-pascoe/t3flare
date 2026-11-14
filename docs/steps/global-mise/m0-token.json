@@ -1,8 +1,8 @@
 {
  "ok": true,
- "commit": "bc949c0",
- "image": "sha256:1562d6fb6a2b684bf127d2b8f2628a08a0e0dba1351895b9c366171c840f455a",
- "at": "2026-11-13T23:50:14.770Z",
+ "commit": "b04b74e",
+ "image": "sha256:86db19af3f3167d262699322f8a11017d9fb9724253898ccaaa98694048e32a1",
+ "at": "2026-11-14T01:02:18.031Z",
  "variables": {
   "MISE_GITHUB_GH_CLI_TOKENS": "false",
   "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
@@ -19,7 +19,7 @@
    "guards": [],
    "miseToken": "github.com: ghp_…0000 (source: gh CLI (hosts.yml))",
    "miseWarnings": [],
-   "fzf": "/usr/bin/bash: line 11: fzf: command not found",
+   "fzf": "bash: line 11: fzf: command not found",
    "apiGithubRequests": 12,
    "withAuthorization": 12,
    "authorizationKinds": [
@@ -35,7 +35,7 @@
    "guards": [],
    "miseToken": "github.com: ghs_…0000 (source: git credential fill)",
    "miseWarnings": [],
-   "fzf": "/usr/bin/bash: line 11: fzf: command not found",
+   "fzf": "bash: line 11: fzf: command not found",
    "apiGithubRequests": 12,
    "withAuthorization": 12,
    "authorizationKinds": [
@@ -56,12 +56,26 @@
    "authorizationKinds": []
   },
   {
+   "name": "control: the image's git helper (git outside the shims), a repo's file turns git credentials on, no guard",
+   "sources": {
+    "gitHelper": true,
+    "plainGit": true
+   },
+   "guards": [],
+   "miseToken": "github.com: ghs_…0000 (source: git credential fill)",
+   "miseWarnings": [],
+   "fzf": "0.56.3 (add1aec)",
+   "apiGithubRequests": 2,
+   "withAuthorization": 0,
+   "authorizationKinds": []
+  },
+  {
    "name": "control: owner's credential_command, no guard",
    "sources": {},
    "guards": [],
    "miseToken": "github.com: ghp_…0000 (source: credential_command)",
    "miseWarnings": [],
-   "fzf": "/usr/bin/bash: line 9: fzf: command not found",
+   "fzf": "bash: line 9: fzf: command not found",
    "apiGithubRequests": 12,
    "withAuthorization": 12,
    "authorizationKinds": [
@@ -135,6 +149,20 @@
   },
   "guards": [],
   "miseToken": "github.com: (none)",
+  "miseWarnings": [],
+  "fzf": "0.56.3 (add1aec)",
+  "apiGithubRequests": 2,
+  "withAuthorization": 0,
+  "authorizationKinds": []
+ },
+ "repoTurnsGitCredentialsOn": {
+  "name": "control: the image's git helper (git outside the shims), a repo's file turns git credentials on, no guard",
+  "sources": {
+   "gitHelper": true,
+   "plainGit": true
+  },
+  "guards": [],
+  "miseToken": "github.com: ghs_…0000 (source: git credential fill)",
   "miseWarnings": [],
   "fzf": "0.56.3 (add1aec)",
   "apiGithubRequests": 2,
