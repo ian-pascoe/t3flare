@@ -6,7 +6,8 @@ import { checkSkills, fetchSkills, type KeptForCheck, previewSkills, type RepoRe
 import { MAX_ENVIRONMENT_SKILLS, MAX_SET_BYTES } from "./checks.ts";
 import { parseSkillSource } from "./source.ts";
 import type { ReadAccess } from "./contents.ts";
-import type { EnvironmentSkillRow, SkillStore } from "./store.ts";
+import type { AuditActor } from "../harness/store.ts";
+import type { ChangeAnswer, EnvironmentSkillRow, SkillStore } from "./store.ts";
 
 /** How long one request may read GitHub for: the Environment DO also runs t3 (ADR-0004). */
 export const REQUEST_BUDGET_MS = 60_000;
@@ -23,8 +24,14 @@ export interface SkillsApiDeps {
   readonly reader: (repo: SkillRepo, deadline: number) => Promise<{ readonly reader: RepoReader; readonly how: ReadAccess["how"] }>;
   /** No installed repo is known: reads would be unauthenticated (shown on the page without minting, plan A9). */
   readonly unauthenticated: () => boolean;
-  readonly caller: string;
+  /** Who asked, as the audit log keeps it: a caller name, or every actor field (plan D15). */
+  readonly caller: string | AuditActor;
   readonly now: () => number;
+  /**
+   * The Environment settings' revision the change was made against (plan D15): a write refuses a moved one with 409 and
+   * never retries. An install of several skills expects it of the first, then each next one the revision the last left.
+   */
+  readonly expectedRevision?: number;
 }
 
 export type SkillsAnswer = { readonly status: number; readonly json: unknown } | { readonly status: number; readonly text: string };
@@ -33,6 +40,9 @@ const ok = (json: unknown): SkillsAnswer => ({ status: 200, json });
 const refuse = (status: number, text: string): SkillsAnswer => ({ status, text });
 
 const short = (commit: string) => commit.slice(0, 7);
+
+/** A store answer refused for a moved revision, as a 409 with the store's words. */
+const movedAnswer = (answer: ChangeAnswer): SkillsAnswer | undefined => (!answer.ok && answer.moved !== undefined ? refuse(409, answer.error) : undefined);
 
 /** A kept skill's GitHub URL for one of its files at its commit. */
 export const fileUrl = (row: Pick<EnvironmentSkillRow, "repo" | "path" | "commit">, file: string): string =>
@@ -103,8 +113,15 @@ const install = async (deps: SkillsApiDeps, body: Record<string, unknown>): Prom
   // Too many files is the request's own limit, not GitHub's failure.
   if (fetched.status === "failed") return refuse(fetched.kind === "too_many" ? 422 : 502, fetched.message);
   const results: Array<{ readonly name: string; readonly path: string; readonly action?: string; readonly error?: string }> = [];
+  let expected = deps.expectedRevision;
   for (const skill of fetched.skills) {
-    const answer = await deps.store.apply({ kind: "install", skill, source: { repo: source.repo, path: skill.path, ref: source.ref, commit } }, deps.caller, deps.now());
+    const answer = await deps.store.apply({ kind: "install", skill, source: { repo: source.repo, path: skill.path, ref: source.ref, commit } }, deps.caller, deps.now(), expected);
+    // Moved before anything was kept: the whole install is refused, as any other write is.
+    if (results.length === 0) {
+      const moved = movedAnswer(answer);
+      if (moved !== undefined) return moved;
+    }
+    if (answer.ok && expected !== undefined) expected = answer.revision;
     results.push(answer.ok ? { name: skill.name, path: skill.path, action: answer.action } : { name: skill.name, path: skill.path, error: answer.error });
   }
   for (const refused of fetched.refused) results.push({ name: refused.path.split("/").at(-1) || source.name, path: refused.path, error: refused.message });
@@ -169,8 +186,8 @@ const update = async (deps: SkillsApiDeps, body: Record<string, unknown>): Promi
   if (skill.name !== name) return refuse(422, `${name} was not updated: at ${short(commit)} its SKILL.md names it ${skill.name}. Install it under that name; removing ${name} is your choice.`);
   const before = new Map(deps.store.files(name).map((file) => [file.path, file.blob]));
   const after = new Map(Object.entries(skill.files).map(([path, file]) => [path, file.blob]));
-  const answer = await deps.store.apply({ kind: "install", skill, source: { repo: row.repo, path: row.path, ref: row.ref, commit } }, deps.caller, deps.now());
-  if (!answer.ok) return refuse(422, answer.error);
+  const answer = await deps.store.apply({ kind: "install", skill, source: { repo: row.repo, path: row.path, ref: row.ref, commit } }, deps.caller, deps.now(), deps.expectedRevision);
+  if (!answer.ok) return movedAnswer(answer) ?? refuse(422, answer.error);
   return ok({
     name,
     action: answer.action,
@@ -187,8 +204,8 @@ const update = async (deps: SkillsApiDeps, body: Record<string, unknown>): Promi
 const removeOrEnable = async (deps: SkillsApiDeps, body: Record<string, unknown>, op: "remove" | "enable"): Promise<SkillsAnswer> => {
   const name = stringField(body, "name") ?? "";
   if (op === "enable" && typeof body.enabled !== "boolean") return refuse(400, "the body is { name, enabled }");
-  const answer = await deps.store.apply(op === "remove" ? { kind: "remove", name } : { kind: "enable", name, enabled: body.enabled === true }, deps.caller, deps.now());
-  return answer.ok ? ok(answer) : refuse(404, `${answer.error}.`);
+  const answer = await deps.store.apply(op === "remove" ? { kind: "remove", name } : { kind: "enable", name, enabled: body.enabled === true }, deps.caller, deps.now(), deps.expectedRevision);
+  return answer.ok ? ok(answer) : (movedAnswer(answer) ?? refuse(404, `${answer.error}.`));
 };
 
 /** The write routes, by their path after `/api/skills`. */

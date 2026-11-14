@@ -27,11 +27,31 @@ export const AUDIT_KEPT = 1_000;
  */
 export type AuditEntity = "harness" | "environment" | (string & {});
 
-export interface AuditEntry {
+/**
+ * Who made a change and through which door (plan D15). Every field but `caller` is optional; an entry without `via` was
+ * made on the panel.
+ */
+export interface AuditActor {
+  /** `owner:<sub>`, `service-token`, `agent:<thread>` or `oauth`. */
+  readonly caller: string;
+  readonly via?: "panel" | "mcp";
+  /** The calling thread and its agent kind (t3flare's own agents). */
+  readonly thread?: string;
+  readonly agent?: string;
+  /** An Owner client's own label, unverified. */
+  readonly client?: { readonly name: string; readonly source: string };
+  readonly tier?: "free" | "asked";
+  /** The Open change's Elicitation mode, for an asked change. */
+  readonly mode?: "card" | "browser" | "native" | "model";
+  /** What answered an asked change. */
+  readonly answeredBy?: "card" | "page" | "client" | "agent";
+  /** The Open change's id. */
+  readonly change?: string;
+}
+
+export interface AuditEntry extends AuditActor {
   readonly at: number;
   readonly entity: AuditEntity;
-  /** `owner` (with the Access subject) or `service-token`. */
-  readonly caller: string;
   readonly action: string;
   readonly target: string;
   readonly before?: unknown;
@@ -76,7 +96,19 @@ export const harnessStore = (kv: KvStorage): HarnessStore => ({
     const log = kv.get<AuditEntry[]>(AUDIT_KEY) ?? [];
     kv.put(AUDIT_KEY, [...log, entry].slice(-AUDIT_KEPT));
     // One line per change for Workers Logs, never a value.
-    console.log(JSON.stringify({ t3flare: "harness-change", entity: entry.entity, caller: entry.caller.split(":")[0], action: entry.action, target: entry.target }));
+    console.log(
+      JSON.stringify({
+        t3flare: "harness-change",
+        entity: entry.entity,
+        caller: entry.caller.split(":")[0],
+        action: entry.action,
+        target: entry.target,
+        via: entry.via,
+        tier: entry.tier,
+        mode: entry.mode,
+        answeredBy: entry.answeredBy,
+      }),
+    );
   },
   auditLog: (limit) =>
     (kv.get<Array<Omit<AuditEntry, "entity"> & { readonly entity?: AuditEntity }>>(AUDIT_KEY) ?? [])
