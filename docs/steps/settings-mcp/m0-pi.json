@@ -1,0 +1,1865 @@
+{
+ "at": "2026-11-14T14:16:46.891Z",
+ "ticket": "SPI-1196",
+ "what": "P16: pi 1.5.2 in the stage's sandbox image (linux/amd64, run locally under Docker with the image's own pi and Node), launched as piLaunch does (PI_CODING_AGENT_DIR, PI_OFFLINE=1, PI_SKIP_VERSION_CHECK, PI_TELEMETRY=0, HOME=/root, --mode rpc, --no-approve, the profile's settings.json), with a scripted stand-in for the model (scripts/settings-spike/fakeModel.mjs: Anthropic Messages, tool calls from the prompt's CALL lines) and the spike's public probe as the MCP server. A probe extension stood in for t3's (the profile allows only t3's) to read what a tool_call hook can see",
+ "answers": {
+  "piOfflineStopsMcp": {
+   "answer": false,
+   "detail": "with PI_OFFLINE=1 pi connected (initialize, tools/list, GET stream, tools/call, DELETE at exit). Keep PI_OFFLINE; nothing to drop"
+  },
+  "rpcModeLoadsBuiltinMcp": {
+   "answer": true
+  },
+  "readsMcpJsonFromAgentDir": {
+   "answer": true,
+   "detail": "the only mcp.json was in $PI_CODING_AGENT_DIR (HOME=/root had none); its server connected"
+  },
+  "headerVariableExpands": {
+   "answer": true,
+   "detail": "Authorization: Bearer ${T3FLARE_TOOL_HANDLE} arrived as 'Bearer spike-… (34 chars)', the test value's length"
+  },
+  "heldCallFinishes": {
+   "answer": true,
+   "detail": "timeout 900: a call held 870 s and one held 960 s both finished; pi sends a progressToken and the probe sent notifications/progress every 15 s, which reset pi's timeout (pi docs: 'Progress notifications reset it'). The relay must send progress (or keep under 900 s) on its card waits"
+  },
+  "bashSeesHandle": {
+   "answer": true,
+   "detail": "pi's bash printed handle:set:34 and env lists the variable: the accepted residual of ADR-0028 (D4)"
+  },
+  "toolSourceLabel": {
+   "answer": "the tool_call event carries only type, toolName, toolCallId and input; pi.getAllTools() gives the MCP tool sourceInfo {path: 'builtin:mcp', source: 'builtin', scope: 'temporary', origin: 'top-level'}, namespace {name: 'mcp__<server>', aliases: ['<server>']}, the server's annotations and exposure. A Patch can return early for tools whose sourceInfo.path is 'builtin:mcp' (as t3's extension already checks 'builtin:tool-search' for tool_search)",
+   "hook": [
+    {
+     "toolName": "mcp__spike__spike_echo",
+     "eventKeys": [
+      "type",
+      "toolName",
+      "toolCallId",
+      "input"
+     ],
+     "sourceInfo": {
+      "path": "builtin:mcp",
+      "source": "builtin",
+      "scope": "temporary",
+      "origin": "top-level"
+     },
+     "namespace": {
+      "name": "mcp__spike",
+      "aliases": [
+       "spike"
+      ]
+     },
+     "annotations": {
+      "readOnlyHint": true
+     },
+     "exposure": "direct"
+    },
+    {
+     "toolName": "bash",
+     "eventKeys": [
+      "type",
+      "toolName",
+      "toolCallId",
+      "input"
+     ],
+     "sourceInfo": {
+      "path": "builtin:bash",
+      "source": "builtin",
+      "scope": "temporary",
+      "origin": "top-level"
+     },
+     "exposure": "direct"
+    },
+    {
+     "toolName": "mcp__spike__spike_ask_form",
+     "eventKeys": [
+      "type",
+      "toolName",
+      "toolCallId",
+      "input"
+     ],
+     "sourceInfo": {
+      "path": "builtin:mcp",
+      "source": "builtin",
+      "scope": "temporary",
+      "origin": "top-level"
+     },
+     "namespace": {
+      "name": "mcp__spike",
+      "aliases": [
+       "spike"
+      ]
+     },
+     "exposure": "direct"
+    },
+    {
+     "toolName": "mcp__spike__spike_ask_url",
+     "eventKeys": [
+      "type",
+      "toolName",
+      "toolCallId",
+      "input"
+     ],
+     "sourceInfo": {
+      "path": "builtin:mcp",
+      "source": "builtin",
+      "scope": "temporary",
+      "origin": "top-level"
+     },
+     "namespace": {
+      "name": "mcp__spike",
+      "aliases": [
+       "spike"
+      ]
+     },
+     "exposure": "direct"
+    }
+   ]
+  },
+  "forkLaunchHasNoMcp": {
+   "answer": true,
+   "detail": "with --no-extensions (the fork launch) the tool is 'not found' and the probe saw no connection from that case"
+  },
+  "protocolAndCapabilities": {
+   "answer": "pi 1.5.2 initializes 2025-11-25 with capabilities {roots: {}} (no elicitation), clientInfo {name: pi, version: 1.5.2}, User-Agent undici, Sec-Fetch-Mode: cors, no Origin and no Sec-Fetch-Site; it opens a GET stream and sends DELETE at exit"
+  },
+  "elicitationFallback": {
+   "answer": "with no elicitation declared, the form and URL tools answered their text fallbacks (D12: pi gets the link in the result)"
+  }
+ },
+ "evidence": {
+  "base": {
+   "case": "base",
+   "args": [
+    "--provider",
+    "anthropic",
+    "--model",
+    "claude-haiku-5-5",
+    "--extension",
+    "/work/ext/probe.ts",
+    "--no-approve"
+   ],
+   "why": "exit 0",
+   "seconds": 4.683,
+   "events": [
+    {
+     "t": 4.038,
+     "type": "response",
+     "command": "prompt",
+     "success": true,
+     "data": {
+      "disposition": "started"
+     }
+    },
+    {
+     "t": 4.04,
+     "type": "agent_start"
+    },
+    {
+     "t": 4.047,
+     "type": "message_end",
+     "role": "user",
+     "text": "[{\"type\":\"text\",\"text\":\"CALL mcp__spike__spike_echo {}\\nCALL bash {\\\"command\\\":\\\"echo handle:${T3FLARE_TOOL_HANDLE:+set}:${#T3FLARE_TOOL_HANDLE}; env | grep -c T3FLARE_TOOL_HANDLE\\\"}\\nCALL mcp__spike__spike_ask_form {}\\nCALL mcp__spike__spike_ask_url {}\"}]"
+    },
+    {
+     "t": 4.151,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"toolCall\",\"id\":\"toolu_1\",\"name\":\"mcp__spike__spike_echo\",\"arguments\":{}}]",
+     "stopReason": "toolUse"
+    },
+    {
+     "t": 4.151,
+     "type": "tool_execution_start",
+     "toolName": "mcp__spike__spike_echo",
+     "result": "\"\""
+    },
+    {
+     "t": 4.271,
+     "type": "tool_execution_end",
+     "toolName": "mcp__spike__spike_echo",
+     "isError": false,
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\n \\\"door\\\": \\\"pub\\\",\\n \\\"version\\\": \\\"2025-11-25\\\",\\n \\\"caps\\\": {\\n  \\\"roots\\\": {}\\n },\\n \\\"query\\\": \\\"?case=pi-base\\\",\\n \\\"headers\\\": {\\n  \\\"accept\\\": \\\"application/json, text/event-stream\\\",\\n  \\\"accept-encoding\\\": \\\"gzip, br\\\",\\n  \\\"accept-language\\\": \\\"*\\\",\\n  \\\"authorization\\\": \\\"Bearer spike-… (34 chars)\\\",\\n  \\\"cf-connecting-ip\\\": \\\"[ip]\\\",\\n  \\\"cf-ipcountry\\\": \\\"US\\\",\\n  \\\"cf-ray\\\": \\\"a5a687332e29d965\\\",\\n  \\\"cf-visitor\\\": \\\"{\\\\\\\"scheme\\\\\\\":\\\\\\\"https\\\\\\\"}\\\",\\n  \\\"connection\\\": \\\"Keep-Alive\\\",\\n  \\\"content-length\\\": \\\"120\\\",\\n  \\\"content-type\\\": \\\"application/json\\\",\\n  \\\"host\\\": \\\"t3flare-spub-psettings.ian-g-pascoe.workers.dev\\\",\\n  \\\"mc"
+    },
+    {
+     "t": 4.273,
+     "type": "message_end",
+     "role": "toolResult",
+     "text": "[{\"type\":\"text\",\"text\":\"{\\n \\\"door\\\": \\\"pub\\\",\\n \\\"version\\\": \\\"2025-11-25\\\",\\n \\\"caps\\\": {\\n  \\\"roots\\\": {}\\n },\\n \\\"query\\\": \\\"?case=pi-base\\\",\\n \\\"headers\\\": {\\n  \\\"accept\\\": \\\"application/json, text/event-stream\\\",\\n  \\\"accept-encoding\\\": \\\"gzip, br\\\",\\n  \\\"accept-language\\\": \\\"*\\\",\\n  \\\"authorization\\\": \\\"Bearer spike-… (34 chars)\\\",\\n  \\\"cf-connecting-ip\\\": \\\"[ip]\\\",\\n  \\\"cf-ipcountry\\\": \\\"US\\\",\\n  \\\"cf-ray\\\": \\\"a5a687332e29d965\\\",\\n  \\\"cf-visitor\\\": \\\"{\\\\\\\"scheme\\\\\\\":\\\\\\\"https\\\\\\\"}\\\",\\n  \\\"connection\\\": \\\"Keep-Alive\\\",\\n  \\\"content-length\\\": \\\"120\\\",\\n  \\\"content-type\\\": \\\"application/json\\\",\\n  \\\"host\\\": \\\"t3flare-spub-psettings.ian-g-pascoe.workers.dev\\\",\\n  \\\"mcp-protocol-"
+    },
+    {
+     "t": 4.273,
+     "type": "turn_end"
+    },
+    {
+     "t": 4.286,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"toolCall\",\"id\":\"toolu_2\",\"name\":\"bash\",\"arguments\":{\"command\":\"echo handle:${T3FLARE_TOOL_HANDLE:+set}:${#T3FLARE_TOOL_HANDLE}; env | grep -c T3FLARE_TOOL_HANDLE\"}}]",
+     "stopReason": "toolUse"
+    },
+    {
+     "t": 4.289,
+     "type": "tool_execution_start",
+     "toolName": "bash",
+     "result": "\"\""
+    },
+    {
+     "t": 4.29,
+     "type": "tool_execution_update",
+     "toolName": "bash",
+     "result": "{\"content\":[]}"
+    },
+    {
+     "t": 4.345,
+     "type": "tool_execution_update",
+     "toolName": "bash",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"handle:set:34\\n\"}],\"details\":{}}"
+    },
+    {
+     "t": 4.393,
+     "type": "tool_execution_update",
+     "toolName": "bash",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"handle:set:34\\n1\\n\"}],\"details\":{}}"
+    },
+    {
+     "t": 4.396,
+     "type": "tool_execution_end",
+     "toolName": "bash",
+     "isError": false,
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"handle:set:34\\n1\\n\"}],\"structuredContent\":{\"output\":\"handle:set:34\\n1\\n\",\"truncated\":false,\"exit_code\":0,\"wall_time_seconds\":0.1}}"
+    },
+    {
+     "t": 4.396,
+     "type": "message_end",
+     "role": "toolResult",
+     "text": "[{\"type\":\"text\",\"text\":\"handle:set:34\\n1\\n\"}]"
+    },
+    {
+     "t": 4.396,
+     "type": "turn_end"
+    },
+    {
+     "t": 4.413,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"toolCall\",\"id\":\"toolu_3\",\"name\":\"mcp__spike__spike_ask_form\",\"arguments\":{}}]",
+     "stopReason": "toolUse"
+    },
+    {
+     "t": 4.413,
+     "type": "tool_execution_start",
+     "toolName": "mcp__spike__spike_ask_form",
+     "result": "\"\""
+    },
+    {
+     "t": 4.489,
+     "type": "tool_execution_end",
+     "toolName": "mcp__spike__spike_ask_form",
+     "isError": false,
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"No form elicitation (2025-11-25, null).\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_ask_form\"},\"structuredContent\":{\"content\":[{\"type\":\"text\",\"text\":\"No form elicitation (2025-11-25, null).\"}]}}"
+    },
+    {
+     "t": 4.489,
+     "type": "message_end",
+     "role": "toolResult",
+     "text": "[{\"type\":\"text\",\"text\":\"No form elicitation (2025-11-25, null).\"}]"
+    },
+    {
+     "t": 4.491,
+     "type": "turn_end"
+    },
+    {
+     "t": 4.507,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"toolCall\",\"id\":\"toolu_4\",\"name\":\"mcp__spike__spike_ask_url\",\"arguments\":{}}]",
+     "stopReason": "toolUse"
+    },
+    {
+     "t": 4.507,
+     "type": "tool_execution_start",
+     "toolName": "mcp__spike__spike_ask_url",
+     "result": "\"\""
+    },
+    {
+     "t": 4.591,
+     "type": "tool_execution_end",
+     "toolName": "mcp__spike__spike_ask_url",
+     "isError": false,
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"Waiting for the owner at https://t3flare-spub-psettings.ian-g-pascoe.workers.dev/_spike/page/u167. (no URL elicitation: 2025-11-25)\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_ask_url\"},\"structuredContent\":{\"content\":[{\"type\":\"text\",\"text\":\"Waiting for the owner at https://t3flare-spub-psettings.ian-g-pascoe.workers.dev/_spike/page/u167. (no URL elicitation: 2025-11-25)\"}],\"structuredContent\":{\"status\":\"waiting\",\"url\":\"https://t3flare-spub-psettings.ian-g-pascoe.workers.dev/_spike/page/u167\"}}}"
+    },
+    {
+     "t": 4.592,
+     "type": "message_end",
+     "role": "toolResult",
+     "text": "[{\"type\":\"text\",\"text\":\"Waiting for the owner at https://t3flare-spub-psettings.ian-g-pascoe.workers.dev/_spike/page/u167. (no URL elicitation: 2025-11-25)\"}]"
+    },
+    {
+     "t": 4.592,
+     "type": "turn_end"
+    },
+    {
+     "t": 4.599,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"text\",\"text\":\"DONE Waiting for the owner at https://t3flare-spub-psettings.ian-g-pascoe.workers.dev/_spike/page/u167. (no URL elicitation: 2025-11-25)\"}]",
+     "stopReason": "stop"
+    },
+    {
+     "t": 4.6,
+     "type": "turn_end"
+    },
+    {
+     "t": 4.602,
+     "type": "agent_end"
+    },
+    {
+     "t": 4.604,
+     "type": "agent_settled"
+    }
+   ]
+  },
+  "fork": {
+   "case": "fork",
+   "args": [
+    "--provider",
+    "anthropic",
+    "--model",
+    "claude-haiku-5-5",
+    "--no-extensions",
+    "--no-approve"
+   ],
+   "why": "exit 0",
+   "seconds": 13.636,
+   "events": [
+    {
+     "t": 11.96,
+     "type": "response",
+     "command": "prompt",
+     "success": true,
+     "data": {
+      "disposition": "started"
+     }
+    },
+    {
+     "t": 11.961,
+     "type": "agent_start"
+    },
+    {
+     "t": 11.98,
+     "type": "message_end",
+     "role": "user",
+     "text": "[{\"type\":\"text\",\"text\":\"CALL mcp__spike__spike_echo {}\"}]"
+    },
+    {
+     "t": 13.273,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"toolCall\",\"id\":\"toolu_6\",\"name\":\"mcp__spike__spike_echo\",\"arguments\":{}}]",
+     "stopReason": "toolUse"
+    },
+    {
+     "t": 13.273,
+     "type": "tool_execution_start",
+     "toolName": "mcp__spike__spike_echo",
+     "result": "\"\""
+    },
+    {
+     "t": 13.273,
+     "type": "tool_execution_end",
+     "toolName": "mcp__spike__spike_echo",
+     "isError": true,
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"Tool mcp__spike__spike_echo not found\"}],\"details\":{}}"
+    },
+    {
+     "t": 13.274,
+     "type": "message_end",
+     "role": "toolResult",
+     "text": "[{\"type\":\"text\",\"text\":\"Tool mcp__spike__spike_echo not found\"}]"
+    },
+    {
+     "t": 13.274,
+     "type": "turn_end"
+    },
+    {
+     "t": 13.341,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"text\",\"text\":\"DONE Tool mcp__spike__spike_echo not found\"}]",
+     "stopReason": "stop"
+    },
+    {
+     "t": 13.342,
+     "type": "turn_end"
+    },
+    {
+     "t": 13.342,
+     "type": "agent_end"
+    },
+    {
+     "t": 13.342,
+     "type": "agent_settled"
+    }
+   ]
+  },
+  "hold870": {
+   "case": "hold",
+   "args": [
+    "--provider",
+    "anthropic",
+    "--model",
+    "claude-haiku-5-5",
+    "--extension",
+    "/work/ext/probe.ts",
+    "--no-approve"
+   ],
+   "why": "exit 0",
+   "seconds": 885.49,
+   "events": [
+    {
+     "t": 14.516,
+     "type": "response",
+     "command": "prompt",
+     "success": true,
+     "data": {
+      "disposition": "started"
+     }
+    },
+    {
+     "t": 14.518,
+     "type": "agent_start"
+    },
+    {
+     "t": 14.525,
+     "type": "message_end",
+     "role": "user",
+     "text": "[{\"type\":\"text\",\"text\":\"CALL mcp__spike__spike_hold {\\\"seconds\\\":870}\"}]"
+    },
+    {
+     "t": 15.158,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"toolCall\",\"id\":\"toolu_9\",\"name\":\"mcp__spike__spike_hold\",\"arguments\":{\"seconds\":870}}]",
+     "stopReason": "toolUse"
+    },
+    {
+     "t": 15.158,
+     "type": "tool_execution_start",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "\"\""
+    },
+    {
+     "t": 30.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 15 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 45.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 30 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 60.277,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 45 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 75.261,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 60 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 90.253,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 75 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 105.269,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 90 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 120.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 105 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 135.253,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 120 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 150.254,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 135 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 165.255,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 150 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 180.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 165 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 195.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 180 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 210.255,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 195 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 225.254,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 210 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 240.255,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 225 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 255.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 240 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 270.254,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 255 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 285.261,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 270 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 300.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 285 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 315.267,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 300 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 330.266,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 315 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 345.26,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 330 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 360.262,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 345 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 375.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 360 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 390.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 375 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 405.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 390 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 420.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 405 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 435.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 420 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 450.264,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 435 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 465.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 450 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 480.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 465 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 495.255,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 480 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 510.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 495 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 525.262,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 510 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 540.265,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 525 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 555.259,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 540 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 570.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 555 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 585.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 570 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 600.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 585 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 615.261,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 600 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 630.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 615 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 645.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 630 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 660.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 645 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 675.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 660 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 690.259,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 675 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 705.262,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 690 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 720.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 705 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 735.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 720 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 750.256,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 735 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 765.261,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 750 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 780.259,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 765 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 795.259,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 780 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 810.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 795 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 825.257,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 810 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 840.26,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 825 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 855.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 840 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 870.258,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 855 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 885.286,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 870 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 885.302,
+     "type": "tool_execution_end",
+     "toolName": "mcp__spike__spike_hold",
+     "isError": false,
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 870 s and answered\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"},\"structuredContent\":{\"content\":[{\"type\":\"text\",\"text\":\"held 870 s and answered\"}]}}"
+    },
+    {
+     "t": 885.31,
+     "type": "message_end",
+     "role": "toolResult",
+     "text": "[{\"type\":\"text\",\"text\":\"held 870 s and answered\"}]"
+    },
+    {
+     "t": 885.313,
+     "type": "turn_end"
+    },
+    {
+     "t": 885.358,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"text\",\"text\":\"DONE held 870 s and answered\"}]",
+     "stopReason": "stop"
+    },
+    {
+     "t": 885.359,
+     "type": "turn_end"
+    },
+    {
+     "t": 885.36,
+     "type": "agent_end"
+    },
+    {
+     "t": 885.362,
+     "type": "agent_settled"
+    }
+   ]
+  },
+  "hold960": {
+   "case": "hold960",
+   "args": [
+    "--provider",
+    "anthropic",
+    "--model",
+    "claude-haiku-5-5",
+    "--extension",
+    "/work/ext/probe.ts",
+    "--no-approve"
+   ],
+   "why": "exit 0",
+   "seconds": 975.991,
+   "events": [
+    {
+     "t": 15.15,
+     "type": "response",
+     "command": "prompt",
+     "success": true,
+     "data": {
+      "disposition": "started"
+     }
+    },
+    {
+     "t": 15.152,
+     "type": "agent_start"
+    },
+    {
+     "t": 15.211,
+     "type": "message_end",
+     "role": "user",
+     "text": "[{\"type\":\"text\",\"text\":\"CALL mcp__spike__spike_hold {\\\"seconds\\\":960}\"}]"
+    },
+    {
+     "t": 15.629,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"toolCall\",\"id\":\"toolu_8\",\"name\":\"mcp__spike__spike_hold\",\"arguments\":{\"seconds\":960}}]",
+     "stopReason": "toolUse"
+    },
+    {
+     "t": 15.63,
+     "type": "tool_execution_start",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "\"\""
+    },
+    {
+     "t": 30.766,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 15 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 45.767,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 30 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 60.767,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 45 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 75.759,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 60 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 90.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 75 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 105.783,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 90 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 120.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 105 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 135.759,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 120 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 150.758,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 135 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 165.816,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 150 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 180.758,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 165 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 195.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 180 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 210.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 195 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 225.759,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 210 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 240.762,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 225 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 255.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 240 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 270.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 255 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 285.77,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 270 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 300.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 285 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 315.762,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 300 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 330.778,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 315 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 345.79,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 330 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 360.77,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 345 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 375.762,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 360 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 390.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 375 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 405.761,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 390 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 420.761,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 405 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 435.762,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 420 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 450.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 435 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 465.761,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 450 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 480.762,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 465 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 495.759,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 480 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 510.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 495 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 525.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 510 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 540.767,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 525 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 555.772,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 540 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 570.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 555 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 585.764,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 570 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 600.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 585 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 615.761,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 600 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 630.766,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 615 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 645.762,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 630 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 660.765,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 645 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 675.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 660 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 690.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 675 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 705.76,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 690 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 720.759,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 705 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 735.768,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 720 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 750.762,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 735 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 765.896,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 750 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 780.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 765 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 795.77,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 780 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 810.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 795 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 825.764,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 810 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 840.764,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 825 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 855.761,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 840 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 870.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 855 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 885.768,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 870 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 900.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 885 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 915.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 900 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 930.761,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 915 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 945.763,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 930 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 960.766,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 945 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 975.787,
+     "type": "tool_execution_update",
+     "toolName": "mcp__spike__spike_hold",
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 960 s\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"}}"
+    },
+    {
+     "t": 975.803,
+     "type": "tool_execution_end",
+     "toolName": "mcp__spike__spike_hold",
+     "isError": false,
+     "result": "{\"content\":[{\"type\":\"text\",\"text\":\"held 960 s and answered\"}],\"details\":{\"server\":\"spike\",\"tool\":\"spike_hold\"},\"structuredContent\":{\"content\":[{\"type\":\"text\",\"text\":\"held 960 s and answered\"}]}}"
+    },
+    {
+     "t": 975.811,
+     "type": "message_end",
+     "role": "toolResult",
+     "text": "[{\"type\":\"text\",\"text\":\"held 960 s and answered\"}]"
+    },
+    {
+     "t": 975.814,
+     "type": "turn_end"
+    },
+    {
+     "t": 975.861,
+     "type": "message_end",
+     "role": "assistant",
+     "text": "[{\"type\":\"text\",\"text\":\"DONE held 960 s and answered\"}]",
+     "stopReason": "stop"
+    },
+    {
+     "t": 975.862,
+     "type": "turn_end"
+    },
+    {
+     "t": 975.863,
+     "type": "agent_end"
+    },
+    {
+     "t": 975.864,
+     "type": "agent_settled"
+    }
+   ]
+  },
+  "serverLog": [
+   {
+    "n": 161,
+    "at": "2026-11-14T13:57:54.451Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-base",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "161",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 1,
+     "method": "initialize",
+     "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+       "roots": {}
+      },
+      "clientInfo": {
+       "name": "pi",
+       "version": "1.5.2"
+      }
+     }
+    }
+   },
+   {
+    "n": 162,
+    "at": "2026-11-14T13:57:54.692Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-base",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "54",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-0352ce5d-8fca-4aee-9e27-06fecbb53be9",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "method": "notifications/initialized"
+    }
+   },
+   {
+    "n": 163,
+    "at": "2026-11-14T13:57:54.830Z",
+    "door": "pub",
+    "method": "GET",
+    "path": "/mcp",
+    "query": "?case=pi-base",
+    "headers": {
+     "accept": "text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-0352ce5d-8fca-4aee-9e27-06fecbb53be9",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    }
+   },
+   {
+    "n": 164,
+    "at": "2026-11-14T13:57:54.832Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-base",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "46",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-0352ce5d-8fca-4aee-9e27-06fecbb53be9",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 2,
+     "method": "tools/list"
+    }
+   },
+   {
+    "n": 165,
+    "at": "2026-11-14T13:57:56.371Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-base",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "120",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-0352ce5d-8fca-4aee-9e27-06fecbb53be9",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 3,
+     "method": "tools/call",
+     "params": {
+      "name": "spike_echo",
+      "arguments": {},
+      "_meta": {
+       "progressToken": 3
+      }
+     }
+    }
+   },
+   {
+    "n": 166,
+    "at": "2026-11-14T13:57:56.601Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-base",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "124",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-0352ce5d-8fca-4aee-9e27-06fecbb53be9",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 4,
+     "method": "tools/call",
+     "params": {
+      "name": "spike_ask_form",
+      "arguments": {},
+      "_meta": {
+       "progressToken": 4
+      }
+     }
+    }
+   },
+   {
+    "n": 167,
+    "at": "2026-11-14T13:57:56.704Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-base",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "123",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-0352ce5d-8fca-4aee-9e27-06fecbb53be9",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 5,
+     "method": "tools/call",
+     "params": {
+      "name": "spike_ask_url",
+      "arguments": {},
+      "_meta": {
+       "progressToken": 5
+      }
+     }
+    }
+   },
+   {
+    "n": 168,
+    "at": "2026-11-14T13:57:56.801Z",
+    "door": "pub",
+    "method": "DELETE",
+    "path": "/mcp",
+    "query": "?case=pi-base",
+    "headers": {
+     "accept": "*/*",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "0",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-0352ce5d-8fca-4aee-9e27-06fecbb53be9",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    }
+   },
+   {
+    "n": 169,
+    "at": "2026-11-14T13:58:32.763Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-hold960",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "161",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 1,
+     "method": "initialize",
+     "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+       "roots": {}
+      },
+      "clientInfo": {
+       "name": "pi",
+       "version": "1.5.2"
+      }
+     }
+    }
+   },
+   {
+    "n": 170,
+    "at": "2026-11-14T13:58:33.014Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-hold960",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "54",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-898eedba-2ab0-479c-a511-761076241388",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "method": "notifications/initialized"
+    }
+   },
+   {
+    "n": 171,
+    "at": "2026-11-14T13:58:33.418Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-hold960",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "46",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-898eedba-2ab0-479c-a511-761076241388",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 2,
+     "method": "tools/list"
+    }
+   },
+   {
+    "n": 172,
+    "at": "2026-11-14T13:58:33.426Z",
+    "door": "pub",
+    "method": "GET",
+    "path": "/mcp",
+    "query": "?case=pi-hold960",
+    "headers": {
+     "accept": "text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-898eedba-2ab0-479c-a511-761076241388",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    }
+   },
+   {
+    "n": 173,
+    "at": "2026-11-14T13:58:34.053Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-hold960",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "133",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-898eedba-2ab0-479c-a511-761076241388",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 3,
+     "method": "tools/call",
+     "params": {
+      "name": "spike_hold",
+      "arguments": {
+       "seconds": 960
+      },
+      "_meta": {
+       "progressToken": 3
+      }
+     }
+    }
+   },
+   {
+    "n": 174,
+    "at": "2026-11-14T13:58:34.564Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-hold",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "161",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 1,
+     "method": "initialize",
+     "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+       "roots": {}
+      },
+      "clientInfo": {
+       "name": "pi",
+       "version": "1.5.2"
+      }
+     }
+    }
+   },
+   {
+    "n": 175,
+    "at": "2026-11-14T13:58:35.086Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-hold",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "54",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-e9f075dc-13f5-4c70-a86b-4d57fe5991ee",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "method": "notifications/initialized"
+    }
+   },
+   {
+    "n": 176,
+    "at": "2026-11-14T13:58:35.328Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-hold",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "46",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-e9f075dc-13f5-4c70-a86b-4d57fe5991ee",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 2,
+     "method": "tools/list"
+    }
+   },
+   {
+    "n": 177,
+    "at": "2026-11-14T13:58:35.348Z",
+    "door": "pub",
+    "method": "GET",
+    "path": "/mcp",
+    "query": "?case=pi-hold",
+    "headers": {
+     "accept": "text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-e9f075dc-13f5-4c70-a86b-4d57fe5991ee",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    }
+   },
+   {
+    "n": 178,
+    "at": "2026-11-14T13:58:36.099Z",
+    "door": "pub",
+    "method": "POST",
+    "path": "/mcp",
+    "query": "?case=pi-hold",
+    "headers": {
+     "accept": "application/json, text/event-stream",
+     "accept-encoding": "gzip, br",
+     "accept-language": "*",
+     "authorization": "Bearer spike-… (34 chars)",
+     "cf-visitor": "{\"scheme\":\"https\"}",
+     "connection": "Keep-Alive",
+     "content-length": "133",
+     "content-type": "application/json",
+     "host": "t3flare-spub-psettings.ian-g-pascoe.workers.dev",
+     "mcp-protocol-version": "2025-11-25",
+     "mcp-session-id": "spike-e9f075dc-13f5-4c70-a86b-4d57fe5991ee",
+     "sec-fetch-mode": "cors",
+     "user-agent": "undici",
+     "x-forwarded-proto": "https"
+    },
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 3,
+     "method": "tools/call",
+     "params": {
+      "name": "spike_hold",
+      "arguments": {
+       "seconds": 870
+      },
+      "_meta": {
+       "progressToken": 3
+      }
+     }
+    }
+   }
+  ],
+  "oauthDiscovery": "m0-clients.json clients.pi.oauth"
+ }
+}

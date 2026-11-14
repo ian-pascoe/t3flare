@@ -891,14 +891,14 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   Access `sub` of the endpoint's assertion, which keys an Owner client's caps, Open changes and reads (`capKeyOf`,
   `owner:<sub>`) and decides who answers its Open changes on the Change page (`answererProblem` in
   `settings/openChanges.ts`: the page's `sub` must equal the asker's; P13, the same `sub` in an OAuth-derived and a
-  browser assertion, is pending owner step 1); and `apps/environment/src/settings/endpoint.ts`,
-  which hand-writes MCP 2026-07-28 (`server/discover`, `_meta` `io.modelcontextprotocol/*`, `resultType`,
-  `input_required` with `inputRequests` and `requestState`; `-32022` with `data.supported` and `requested`, `-32020` for
-  a missing or mismatched `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` (Base64 sentinel decoded), and 404 with
-  `-32601`, each checked against the spec's `schema/2026-07-28/schema.ts` and its Streamable HTTP page on 2026-11-14,
-  SPI-1200 review) and 2025-11-25 to 2024-11-05 (session id, an unknown `MCP-Protocol-Version` answered 400 and a
-  missing one read as 2025-03-26, `elicitation/create` with `mode: "url"` and `elicitationId` on the call's SSE stream,
-  the response POST answered 202). It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`,
+  browser assertion, is pending owner step 1); and `apps/environment/src/settings/endpoint.ts`, which hand-writes MCP
+  2026-07-28 (`server/discover`, `_meta` `io.modelcontextprotocol/*`, `resultType`, `input_required` with
+  `inputRequests` and `requestState`; `-32022` with `data.supported` and `requested`, `-32020` for a missing or
+  mismatched `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` (Base64 sentinel decoded), and 404 with `-32601`, each
+  checked against the spec's `schema/2026-07-28/schema.ts` and its Streamable HTTP page on 2026-11-14, SPI-1200 review)
+  and 2025-11-25 to 2024-11-05 (session id, an unknown `MCP-Protocol-Version` answered 400 and a missing one read as
+  2025-03-26, `elicitation/create` with `mode: "url"` and `elicitationId` on the call's SSE stream, the response POST
+  answered 202). It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`, copied from the
   spike branch `settings-mcp-m0-spike`): the more specific Access application wins a path; a token of one application is
   refused at another's (tested with a service-token stand-in only; the OAuth bearer case is owner step 1,
   `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4, so layout (B) is unproven until then); Access answers no root or
@@ -916,8 +916,9 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Detection**: `test/settingsEndpoint.test.ts` and `test/settingsModes.test.ts` pin our reading of the shapes, not a
   client's; `test/access.test.ts` the audiences and `test/workerRouting.test.ts` the Worker's branch (its order, the
   endpoint's audience, the panel's refused, local mode). `scripts/smoke.ts` asserts on every prod deploy, and
-  `scripts/acceptance.ts` step 2b on every acceptance run, that the host's root `/.well-known/oauth-authorization-server`
-  and `oauth-protected-resource` are still t3's (its issuer, its `/mcp` resource): nothing checks them between deploys. The `sub` (P13) is `m5a-stage-run.md` item 2 and
+  `scripts/acceptance.ts` step 2b on every acceptance run, that the host's root
+  `/.well-known/oauth-authorization-server` and `oauth-protected-resource` are still t3's (its issuer, its `/mcp`
+  resource): nothing checks them between deploys. The `sub` (P13) is `m5a-stage-run.md` item 2 and
   `test/openChanges.test.ts` ("page: an Owner client's change by the same sub only"); a later change of it is silent
   until a page answer is refused. **Silent** for Access's token scoping and real clients: the stage run of
   `m5a-settings-owner-browser.json` (a named client signs in, reads, makes a free and an asked change).
