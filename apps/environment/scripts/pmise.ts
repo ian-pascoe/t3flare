@@ -436,8 +436,8 @@ const gitGh = async () => {
   await writeEvidence("git-gh.json", { cases, ok: cases.every((entry) => entry.ok) });
 };
 
-/** A pin whose install takes more than a minute on a cpu-1 Container (measured in the file). */
-const LONG_PIN = '[tools]\nnode = "24.11.1"\nrust = "1.91.1"\ngo = "1.25.4"\npython = "3.12.8"\njava = "temurin-21.0.5+11.0.LTS"\ndeno = "2.1.4"\nzig = "0.13.0"\nterraform = "1.10.3"\n';
+/** A pin whose install takes more than a minute on a cpu-1 Container (one job at a time; measured in the file). */
+const LONG_PIN = '[settings]\njobs = 1\n\n[tools]\nnode = "24.11.1"\nrust = "1.91.1"\ngo = "1.25.4"\npython = "3.12.8"\njava = "temurin-21.0.5+11.0.LTS"\ndeno = "2.1.4"\nzig = "0.13.0"\nterraform = "1.10.3"\ndotnet = "9.0.101"\nkotlin = "2.1.0"\ngradle = "8.12"\n';
 
 const hold = async () => {
   cookie ||= await pair();

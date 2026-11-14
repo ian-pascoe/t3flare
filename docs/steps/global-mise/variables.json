@@ -1,303 +1,9 @@
 {
- "at": "2026-11-14T02:11:20.047Z",
+ "at": "2026-11-14T02:49:10.088Z",
  "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "8ef01cb97004",
+ "commit": "07f5343e4a1b",
  "note": "Each path ran `vars.sh` with a gh hosts.yml in its own home and the Global mise config `node = \"24.11.1\"` (the image has 26.13.0): the variables as its command has them (null: unset), mise's resolved settings and effective directories (`mise doctor`; ~ is /root), its XDG_* values, the pinned node with mise's auto-install off, any install under its own XDG_DATA_HOME, and the token mise would send.",
  "results": [
-  {
-   "who": "codex",
-   "how": "a shell command codex runs",
-   "detail": {
-    "threadId": "ffa77a1a-a141-418c-b359-06857f0160af",
-    "runs": [
-     {
-      "status": "completed",
-      "failure": null
-     }
-    ],
-    "answer": "done",
-    "tools": [
-     "/bin/bash -c 'bash /workspace/.pmise/vars.sh codex'"
-    ],
-    "outputs": [
-     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-codex\\n\",\"truncated\":false,\"running\":false}"
-    ],
-    "errors": [],
-    "ms": 17120
-   },
-   "ranAt": "2026-11-14T02:10:09.198Z",
-   "ran": true,
-   "home": "/root",
-   "env": {
-    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
-    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
-    "MISE_GITHUB_GH_CLI_TOKENS": "false",
-    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
-    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
-    "MISE_DISABLE_TOOLS": "",
-    "MISE_DISABLE_BACKENDS": ""
-   },
-   "settings": {
-    "github.gh_cli_tokens": "false",
-    "github.use_git_credentials": "false",
-    "github.credential_command": "",
-    "disable_tools": "[]",
-    "disable_backends": "[\"\"]"
-   },
-   "token": "github.com: (none)",
-   "miseDirs": {
-    "cache": "~/.cache/mise",
-    "config": "~/.config/mise",
-    "data": "~/.local/share/mise",
-    "shims": "~/.local/share/mise/shims",
-    "system_shims": "/usr/local/share/mise/shims",
-    "state": "~/.local/state/mise"
-   },
-   "xdg": {
-    "XDG_DATA_HOME": "",
-    "XDG_CACHE_HOME": "",
-    "XDG_STATE_HOME": "",
-    "XDG_CONFIG_HOME": ""
-   },
-   "pinned": {
-    "pinned-node": "v24.11.1",
-    "where-node": "/root/.local/share/mise/installs/node/24.11.1",
-    "other-data": "none"
-   },
-   "arrived": {
-    "MISE_GITHUB_GH_CLI_TOKENS": true,
-    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
-    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
-    "MISE_DISABLE_TOOLS": true,
-    "MISE_DISABLE_BACKENDS": true
-   },
-   "falseGuards": true,
-   "emptyGuards": true,
-   "noToken": true,
-   "sharesInstall": true,
-   "ok": true
-  },
-  {
-   "who": "claude",
-   "how": "a shell command claude runs",
-   "detail": {
-    "threadId": "49324158-1b83-4c29-b9d9-491dce913ede",
-    "runs": [
-     {
-      "status": "completed",
-      "failure": null
-     }
-    ],
-    "answer": "done",
-    "tools": [
-     "Terminal",
-     "bash /workspace/.pmise/vars.sh claude"
-    ],
-    "outputs": [
-     "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}",
-     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-claude\",\"truncated\":false,\"running\":false}"
-    ],
-    "errors": [],
-    "ms": 17279
-   },
-   "ranAt": "2026-11-14T02:10:09.198Z",
-   "ran": true,
-   "home": "/root",
-   "env": {
-    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
-    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
-    "MISE_GITHUB_GH_CLI_TOKENS": "false",
-    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
-    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
-    "MISE_DISABLE_TOOLS": "",
-    "MISE_DISABLE_BACKENDS": ""
-   },
-   "settings": {
-    "github.gh_cli_tokens": "false",
-    "github.use_git_credentials": "false",
-    "github.credential_command": "",
-    "disable_tools": "[]",
-    "disable_backends": "[\"\"]"
-   },
-   "token": "github.com: (none)",
-   "miseDirs": {
-    "cache": "~/.cache/mise",
-    "config": "~/.config/mise",
-    "data": "~/.local/share/mise",
-    "shims": "~/.local/share/mise/shims",
-    "system_shims": "/usr/local/share/mise/shims",
-    "state": "~/.local/state/mise"
-   },
-   "xdg": {
-    "XDG_DATA_HOME": "",
-    "XDG_CACHE_HOME": "",
-    "XDG_STATE_HOME": "",
-    "XDG_CONFIG_HOME": ""
-   },
-   "pinned": {
-    "pinned-node": "v24.11.1",
-    "where-node": "/root/.local/share/mise/installs/node/24.11.1",
-    "other-data": "none"
-   },
-   "arrived": {
-    "MISE_GITHUB_GH_CLI_TOKENS": true,
-    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
-    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
-    "MISE_DISABLE_TOOLS": true,
-    "MISE_DISABLE_BACKENDS": true
-   },
-   "falseGuards": true,
-   "emptyGuards": true,
-   "noToken": true,
-   "sharesInstall": true,
-   "ok": true
-  },
-  {
-   "who": "opencode",
-   "how": "a shell command opencode runs",
-   "detail": {
-    "threadId": "57c21725-97b0-48b1-968f-157a363a36da",
-    "runs": [
-     {
-      "status": "completed",
-      "failure": null
-     }
-    ],
-    "answer": "done",
-    "tools": [
-     "bash /workspace/.pmise/vars.sh opencode"
-    ],
-    "outputs": [
-     "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}"
-    ],
-    "errors": [],
-    "ms": 19348
-   },
-   "ranAt": "2026-11-14T02:10:09.199Z",
-   "ran": true,
-   "home": "/root",
-   "env": {
-    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
-    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
-    "MISE_GITHUB_GH_CLI_TOKENS": "false",
-    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
-    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
-    "MISE_DISABLE_TOOLS": "",
-    "MISE_DISABLE_BACKENDS": ""
-   },
-   "settings": {
-    "github.gh_cli_tokens": "false",
-    "github.use_git_credentials": "false",
-    "github.credential_command": "",
-    "disable_tools": "[]",
-    "disable_backends": "[\"\"]"
-   },
-   "token": "github.com: (none)",
-   "miseDirs": {
-    "cache": "~/.cache/mise",
-    "config": "~/.config/mise",
-    "data": "~/.local/share/mise",
-    "shims": "~/.local/share/mise/shims",
-    "system_shims": "/usr/local/share/mise/shims",
-    "state": "~/.local/state/mise"
-   },
-   "xdg": {
-    "XDG_DATA_HOME": "/var/lib/t3flare/cli/proc-c7c1df14-1c21-4dc6-af0e-8e006fa37a0f/data",
-    "XDG_CACHE_HOME": "/var/lib/t3flare/cli/proc-c7c1df14-1c21-4dc6-af0e-8e006fa37a0f/cache",
-    "XDG_STATE_HOME": "/var/lib/t3flare/cli/proc-c7c1df14-1c21-4dc6-af0e-8e006fa37a0f/state",
-    "XDG_CONFIG_HOME": "/var/lib/t3flare/cli/proc-c7c1df14-1c21-4dc6-af0e-8e006fa37a0f/config"
-   },
-   "pinned": {
-    "pinned-node": "v24.11.1",
-    "where-node": "/root/.local/share/mise/installs/node/24.11.1",
-    "other-data": "none"
-   },
-   "arrived": {
-    "MISE_GITHUB_GH_CLI_TOKENS": true,
-    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
-    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
-    "MISE_DISABLE_TOOLS": true,
-    "MISE_DISABLE_BACKENDS": true
-   },
-   "falseGuards": true,
-   "emptyGuards": true,
-   "noToken": true,
-   "sharesInstall": true,
-   "ok": true
-  },
-  {
-   "who": "pi",
-   "how": "a shell command pi runs",
-   "detail": {
-    "threadId": "3d36bc90-11b1-4185-88d1-75bfdb691cce",
-    "runs": [
-     {
-      "status": "completed",
-      "failure": null
-     }
-    ],
-    "answer": "done",
-    "tools": [
-     "bash /workspace/.pmise/vars.sh pi"
-    ],
-    "outputs": [
-     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-pi\\n\",\"truncated\":false,\"running\":false}"
-    ],
-    "errors": [],
-    "ms": 21157
-   },
-   "ranAt": "2026-11-14T02:10:09.199Z",
-   "ran": true,
-   "home": "/root",
-   "env": {
-    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
-    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
-    "MISE_GITHUB_GH_CLI_TOKENS": "false",
-    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
-    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
-    "MISE_DISABLE_TOOLS": "",
-    "MISE_DISABLE_BACKENDS": ""
-   },
-   "settings": {
-    "github.gh_cli_tokens": "false",
-    "github.use_git_credentials": "false",
-    "github.credential_command": "",
-    "disable_tools": "[]",
-    "disable_backends": "[\"\"]"
-   },
-   "token": "github.com: (none)",
-   "miseDirs": {
-    "cache": "~/.cache/mise",
-    "config": "~/.config/mise",
-    "data": "~/.local/share/mise",
-    "shims": "~/.local/share/mise/shims",
-    "system_shims": "/usr/local/share/mise/shims",
-    "state": "~/.local/state/mise"
-   },
-   "xdg": {
-    "XDG_DATA_HOME": "",
-    "XDG_CACHE_HOME": "",
-    "XDG_STATE_HOME": "",
-    "XDG_CONFIG_HOME": ""
-   },
-   "pinned": {
-    "pinned-node": "v24.11.1",
-    "where-node": "/root/.local/share/mise/installs/node/24.11.1",
-    "other-data": "none"
-   },
-   "arrived": {
-    "MISE_GITHUB_GH_CLI_TOKENS": true,
-    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
-    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
-    "MISE_DISABLE_TOOLS": true,
-    "MISE_DISABLE_BACKENDS": true
-   },
-   "falseGuards": true,
-   "emptyGuards": true,
-   "noToken": true,
-   "sharesInstall": true,
-   "ok": true
-  },
   {
    "who": "workspace-exec",
    "how": "the Workspace DO's exec (t3's git and the admin route take this path)",
@@ -306,7 +12,7 @@
     "stdout": "pmise-vars-done-workspace-exec\n",
     "stderr": ""
    },
-   "ranAt": "2026-11-14T02:11:20.045Z",
+   "ranAt": "2026-11-14T02:49:10.087Z",
    "ran": true,
    "home": "/root",
    "env": {
@@ -362,7 +68,7 @@
    "who": "durable",
    "how": "a Durable agent's bash on the Container",
    "detail": {
-    "threadId": "fd68fff2-de4e-46cf-8ce7-01d1a1df23ee",
+    "threadId": "8c71439e-7335-4496-bdaf-f775057b075a",
     "runs": [
      {
       "status": "completed",
@@ -377,9 +83,9 @@
      "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-durable\\n\",\"truncated\":false,\"running\":false}"
     ],
     "errors": [],
-    "ms": 10310
+    "ms": 9172
    },
-   "ranAt": "2026-11-14T02:11:20.045Z",
+   "ranAt": "2026-11-14T02:49:10.088Z",
    "ran": true,
    "home": "/root",
    "env": {
@@ -435,10 +141,304 @@
    "who": "terminal",
    "how": "a t3 Terminal",
    "detail": {
-    "ms": 270,
-    "tail": "bash /workspace/.pmise/vars.sh terminal; echo T3D$((265314485+1))\npmise-vars-done-terminal\nT3D265314486\n/w/pmise # "
+    "ms": 391,
+    "tail": "bash /workspace/.pmise/vars.sh terminal; echo T3D$((43661058+1))\npmise-vars-done-terminal\nT3D43661059\n/w/pmise # "
    },
-   "ranAt": "2026-11-14T02:11:20.046Z",
+   "ranAt": "2026-11-14T02:49:10.088Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "miseDirs": {
+    "cache": "~/.cache/mise",
+    "config": "~/.config/mise",
+    "data": "~/.local/share/mise",
+    "shims": "~/.local/share/mise/shims",
+    "system_shims": "/usr/local/share/mise/shims",
+    "state": "~/.local/state/mise"
+   },
+   "xdg": {
+    "XDG_DATA_HOME": "",
+    "XDG_CACHE_HOME": "",
+    "XDG_STATE_HOME": "",
+    "XDG_CONFIG_HOME": ""
+   },
+   "pinned": {
+    "pinned-node": "v24.11.1",
+    "where-node": "/root/.local/share/mise/installs/node/24.11.1",
+    "other-data": "none"
+   },
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "sharesInstall": true,
+   "ok": true
+  },
+  {
+   "who": "codex",
+   "how": "a shell command codex runs",
+   "detail": {
+    "threadId": "83626cd9-0c5a-406c-aa03-b4db240d8079",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "/bin/bash -c 'bash /workspace/.pmise/vars.sh codex'"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-codex\\n\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 20382
+   },
+   "ranAt": "2026-11-14T02:49:10.088Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "miseDirs": {
+    "cache": "~/.cache/mise",
+    "config": "~/.config/mise",
+    "data": "~/.local/share/mise",
+    "shims": "~/.local/share/mise/shims",
+    "system_shims": "/usr/local/share/mise/shims",
+    "state": "~/.local/state/mise"
+   },
+   "xdg": {
+    "XDG_DATA_HOME": "",
+    "XDG_CACHE_HOME": "",
+    "XDG_STATE_HOME": "",
+    "XDG_CONFIG_HOME": ""
+   },
+   "pinned": {
+    "pinned-node": "v24.11.1",
+    "where-node": "/root/.local/share/mise/installs/node/24.11.1",
+    "other-data": "none"
+   },
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "sharesInstall": true,
+   "ok": true
+  },
+  {
+   "who": "claude",
+   "how": "a shell command claude runs",
+   "detail": {
+    "threadId": "3a38a0f2-6316-4fd2-8147-d175f94fa16f",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "Terminal",
+     "bash /workspace/.pmise/vars.sh claude"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}",
+     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-claude\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 20810
+   },
+   "ranAt": "2026-11-14T02:49:10.088Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "miseDirs": {
+    "cache": "~/.cache/mise",
+    "config": "~/.config/mise",
+    "data": "~/.local/share/mise",
+    "shims": "~/.local/share/mise/shims",
+    "system_shims": "/usr/local/share/mise/shims",
+    "state": "~/.local/state/mise"
+   },
+   "xdg": {
+    "XDG_DATA_HOME": "",
+    "XDG_CACHE_HOME": "",
+    "XDG_STATE_HOME": "",
+    "XDG_CONFIG_HOME": ""
+   },
+   "pinned": {
+    "pinned-node": "v24.11.1",
+    "where-node": "/root/.local/share/mise/installs/node/24.11.1",
+    "other-data": "none"
+   },
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "sharesInstall": true,
+   "ok": true
+  },
+  {
+   "who": "opencode",
+   "how": "a shell command opencode runs",
+   "detail": {
+    "threadId": "4de714fa-fab2-486d-a15b-f600f0798f60",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "bash /workspace/.pmise/vars.sh opencode"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 20981
+   },
+   "ranAt": "2026-11-14T02:49:10.088Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "miseDirs": {
+    "cache": "~/.cache/mise",
+    "config": "~/.config/mise",
+    "data": "~/.local/share/mise",
+    "shims": "~/.local/share/mise/shims",
+    "system_shims": "/usr/local/share/mise/shims",
+    "state": "~/.local/state/mise"
+   },
+   "xdg": {
+    "XDG_DATA_HOME": "/var/lib/t3flare/cli/proc-2e82d61d-b944-4dd0-8b90-d6c68ec61eec/data",
+    "XDG_CACHE_HOME": "/var/lib/t3flare/cli/proc-2e82d61d-b944-4dd0-8b90-d6c68ec61eec/cache",
+    "XDG_STATE_HOME": "/var/lib/t3flare/cli/proc-2e82d61d-b944-4dd0-8b90-d6c68ec61eec/state",
+    "XDG_CONFIG_HOME": "/var/lib/t3flare/cli/proc-2e82d61d-b944-4dd0-8b90-d6c68ec61eec/config"
+   },
+   "pinned": {
+    "pinned-node": "v24.11.1",
+    "where-node": "/root/.local/share/mise/installs/node/24.11.1",
+    "other-data": "none"
+   },
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "sharesInstall": true,
+   "ok": true
+  },
+  {
+   "who": "pi",
+   "how": "a shell command pi runs",
+   "detail": {
+    "threadId": "d94ec010-cf50-4de9-a18a-823bc1fd4352",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "bash /workspace/.pmise/vars.sh pi"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-pi\\n\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 17437
+   },
+   "ranAt": "2026-11-14T02:49:10.088Z",
    "ran": true,
    "home": "/root",
    "env": {

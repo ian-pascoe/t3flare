@@ -1,0 +1,49 @@
+{
+ "at": "2026-11-14T02:46:51.957Z",
+ "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
+ "commit": "07f5343e4a1b",
+ "pin": "[tools]\nnode = \"24.11.1\"\n",
+ "passiveRead": {
+  "stdout": [
+   "global-absent",
+   "read-done"
+  ],
+  "exitCode": 0
+ },
+ "agent": {
+  "threadId": "a51ac14f-39ad-4723-a277-804426f9ebff",
+  "runs": [
+   {
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "answer": "The command ran once on the container backend and produced no output or error text. The tool returned nothing, so there is no text to quote. The Node version was redirected to `/workspace/.pmise/node-passive-first.txt`, which I did not read back.",
+  "tools": [
+   "node --version > /workspace/.pmise/node-passive-first.txt 2>&1"
+  ],
+  "outputs": [
+   "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}"
+  ],
+  "errors": [],
+  "ms": 14328
+ },
+ "node": "v24.11.1",
+ "globalMise": {
+  "runtime": "9bb2908d-9dfe-468f-9776-b33a717133d1",
+  "outcome": "laid",
+  "attempts": 1,
+  "answer": {
+   "revision": 1,
+   "sha256": "0eb09ceb981ac62b1ed4ebb30295ad081a471bb40b9ebda4eb48fcf45aae8cf3",
+   "source": "environment",
+   "laid": true,
+   "install": 0,
+   "timedOut": false,
+   "ms": 3866,
+   "bytes": 25
+  },
+  "at": 1794624400285
+ },
+ "ok": true
+}

@@ -141,8 +141,9 @@ owner's `mise.toml` text, which every Container's commands get as mise's global 
    a CLI profile that moves `XDG_*` (OpenCode's own home) still finds the lay-down's installs instead of installing
    the pins again.
 3. **Laid down per Container.** The Workspace DO runs the lay-down (`@t3flare/sandbox-image/globalMise`) on each new
-   Container, keyed by computer's runtime id, after the connect and before computer sends the first command; Terminals,
-   CLI processes and the Workspace DO's own commands wait for it too. It installs the owner's tools with the text as a
+   Container, keyed by computer's runtime id. Every command sent to the Container that is not a passive read waits for
+   it where it is sent, whoever sends it (a Durable agent's command, the Workspace DO's own); a Terminal or a CLI process
+   waits before its spawn. A passive read never runs it. It installs the owner's tools with the text as a
    staging global config (`mise install` from `/`), and keeps the file only when `git --version` and `gh --version`
    still run under it, with mise's auto-install off: invalid TOML fails every shim, git's included, so laying it down
    unchecked would break t3's git. The launch records the text, so a running Container keeps what it started with, a
@@ -151,13 +152,14 @@ owner's `mise.toml` text, which every Container's commands get as mise's global 
    counts from its end. The script bounds its lock (60 s), install (600 s, KILL 10 s later) and checks (20 s each); the
    Workspace DO waits their sum and a minute, then kills it and takes the file as not laid down, final for that
    Container. An exec that failed is tried again at once, then by the next command, Terminal, CLI process or alarm, at
-   most three times per Container. A connect only passive reads made never runs it; the alarm then runs it for a
-   Container that had none. The outcome is kept in the Workspace DO's storage,
-   so a new instance does not run a finished lay-down again; its answer is kept on the Container's disk by revision and
-   SHA-256, on the assumption that a Container's disk never outlives it (one that did would at worst skip laying down
-   the same text again). A Durable agent's command cut off while it waited (a timeout or an abort during the install)
-   is never sent afterwards: the Session hands its id to the Workspace DO when it stops it, and the Workspace DO refuses
-   to dispatch it once the connect returns; one already sent is killed as soon as it is.
+   most three times per Container; the alarm also runs it for a running Container only passive reads have reached. The
+   outcome is kept in the Workspace DO's storage, so a new instance does not run a finished lay-down again; its answer
+   is kept on the Container's disk by revision and SHA-256, on the assumption that a Container's disk never outlives it
+   (one that did would at worst skip laying down the same text again). A Durable agent's command cut off while it waited
+   (a timeout or an abort during the install) is never sent afterwards: the Session hands its id to the Workspace DO
+   when it stops it, and the Workspace DO refuses to dispatch it once the lay-down ends; one already sent is killed as
+   soon as it is. The lock's descriptor is closed for the install and the checks, so a child left after a timeout's KILL
+   never holds it.
 5. **No GitHub token.** `COMMAND_ENV` sets `MISE_GITHUB_GH_CLI_TOKENS=false`, `MISE_GITHUB_USE_GIT_CREDENTIALS=false`
    and an empty `MISE_GITHUB_CREDENTIAL_COMMAND`, and an environment variable beats the owner's and a repository's
    files: mise sends no token from gh's `hosts.yml`, git's credential helper (the Workspace's one-repo token) or a

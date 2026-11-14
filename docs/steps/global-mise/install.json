@@ -1,16 +1,16 @@
 {
- "at": "2026-11-14T02:13:06.107Z",
+ "at": "2026-11-14T02:50:17.986Z",
  "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "8ef01cb97004",
+ "commit": "07f5343e4a1b",
  "pin": "[tools]\nnode = \"24.11.1\"\n",
  "imageNode": "26.13.0",
- "status": "pmise at revision 1: laid down, 2026-11-14T02:13:02.429Z",
+ "status": "pmise at revision 1: laid down, 2026-11-14T02:50:15.426Z",
  "results": [
   {
    "name": "durable",
    "node": "v24.11.1",
    "globalMise": {
-    "runtime": "e2c9507a-5248-406d-9d7b-6b2b92819722",
+    "runtime": "596bd37f-18a2-4269-bb15-1a7fa3c0d705",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
@@ -20,10 +20,10 @@
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 4189,
+     "ms": 5470,
      "bytes": 25
     },
-    "at": 1794622340696
+    "at": 1794624581152
    },
    "launch": {
     "bytes": 25,
@@ -32,14 +32,14 @@
     "source": "environment"
    },
    "detail": {
-    "threadId": "599cbcf2-27f9-496b-84dc-c8b3b2e3994d",
+    "threadId": "a535421c-2ee8-46e2-866c-8c4ecfd750b6",
     "runs": [
      {
       "status": "completed",
       "failure": null
      }
     ],
-    "answer": "The command ran on the container backend and finished with no output and no error text. Its only effect was writing `node --version` output to `/workspace/.pmise/node-durable.txt`, so the file should hold the Node version (or an error message if Node is missing). I didn't read the file, since you asked for just the one command.",
+    "answer": "The tool returned no output. Its output is quoted exactly as: `\"\"` (empty). The command redirected both stdout and stderr into `/workspace/.pmise/node-durable.txt`, so the Node version or error text should be in that file rather than in the tool output. I did not read the file, since you asked for nothing else.",
     "tools": [
      "node --version > /workspace/.pmise/node-durable.txt 2>&1"
     ],
@@ -47,7 +47,7 @@
      "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}"
     ],
     "errors": [],
-    "ms": 16696
+    "ms": 17317
    },
    "ok": true
   },
@@ -55,7 +55,7 @@
    "name": "pi",
    "node": "v24.11.1",
    "globalMise": {
-    "runtime": "75c8f8dc-6ec3-46f9-9246-e16ab4c0ad27",
+    "runtime": "f4281dba-5ba9-4e9a-844e-4f124a85955e",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
@@ -65,10 +65,10 @@
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 4160,
+     "ms": 4409,
      "bytes": 25
     },
-    "at": 1794622358846
+    "at": 1794624595200
    },
    "launch": {
     "bytes": 25,
@@ -77,7 +77,7 @@
     "source": "environment"
    },
    "detail": {
-    "threadId": "34d2194b-9422-4e50-80b2-76f0a80f392c",
+    "threadId": "e253eb89-210a-4f40-9de2-82189409f13b",
     "runs": [
      {
       "status": "completed",
@@ -92,7 +92,7 @@
      "{\"kind\":\"replace\",\"text\":\"(no output)\",\"truncated\":false,\"running\":false}"
     ],
     "errors": [],
-    "ms": 19407
+    "ms": 17262
    },
    "ok": true
   },
@@ -100,7 +100,7 @@
    "name": "terminal",
    "node": "v24.11.1",
    "globalMise": {
-    "runtime": "1dfb8a5d-ceff-44e9-b660-6ccc3b4e7174",
+    "runtime": "de23257e-9f95-4c75-8766-9fa17327ee94",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
@@ -110,10 +110,10 @@
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 4407,
+     "ms": 4402,
      "bytes": 25
     },
-    "at": 1794622382429
+    "at": 1794624615426
    },
    "launch": {
     "bytes": 25,
@@ -122,7 +122,7 @@
     "source": "environment"
    },
    "detail": {
-    "ms": 81
+    "ms": 46
    },
    "ok": true
   }

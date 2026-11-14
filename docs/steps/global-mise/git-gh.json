@@ -1,7 +1,7 @@
 {
- "at": "2026-11-14T02:14:16.251Z",
+ "at": "2026-11-14T02:51:19.677Z",
  "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "8ef01cb97004",
+ "commit": "07f5343e4a1b",
  "cases": [
   {
    "name": "t3's git status, a commit, and gh, under a node pin",
@@ -46,7 +46,7 @@
    ],
    "stderr": "",
    "globalMise": {
-    "runtime": "f24ff7f6-107a-4bbe-9ba4-0f6cb45d1b3e",
+    "runtime": "893e01d6-2cde-4d0f-bb2f-02f2a1967eec",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
@@ -56,10 +56,10 @@
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 6011,
+     "ms": 6627,
      "bytes": 31
     },
-    "at": 1794622454389
+    "at": 1794624678578
    },
    "ok": true
   }

@@ -1,54 +1,59 @@
 {
- "at": "2026-11-14T02:18:36.479Z",
+ "at": "2026-11-14T03:00:28.679Z",
  "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "8ef01cb97004",
- "pin": "[tools]\nnode = \"24.11.1\"\nrust = \"1.91.1\"\ngo = \"1.25.4\"\npython = \"3.12.8\"\njava = \"temurin-21.0.5+11.0.LTS\"\ndeno = \"2.1.4\"\nzig = \"0.13.0\"\nterraform = \"1.10.3\"\n",
+ "commit": "07f5343e4a1b",
+ "pin": "[settings]\njobs = 1\n\n[tools]\nnode = \"24.11.1\"\nrust = \"1.91.1\"\ngo = \"1.25.4\"\npython = \"3.12.8\"\njava = \"temurin-21.0.5+11.0.LTS\"\ndeno = \"2.1.4\"\nzig = \"0.13.0\"\nterraform = \"1.10.3\"\ndotnet = \"9.0.101\"\nkotlin = \"2.1.0\"\ngradle = \"8.12\"\n",
  "idleMinutes": 1,
  "budget": 1,
- "installMs": 151894,
+ "installMs": 88201,
  "reclaimReasonDuringInstall": "in use",
  "otherWorkspaceStart": {
   "status": 500,
-  "answer": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected ex; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 priorExit=\\\"Container exited with unexpected exit code: 137\\\" lastError=t3flare: the Container cannot start: Container budget (1\",\"causes\":[\"ContainerBackend(container-shell): conn"
+  "answer": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"causes\":[\"ContainerBackend(container-shell): connect failed "
  },
  "samples": [
   {
-   "s": 1,
+   "s": 0,
    "running": false,
    "globalMise": "laid"
   },
   {
-   "s": 7,
+   "s": 5,
    "running": false,
    "globalMise": "laid"
   },
   {
-   "s": 12,
+   "s": 10,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 18,
+   "s": 16,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 24,
+   "s": 21,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 29,
+   "s": 26,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 35,
+   "s": 31,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 40,
+   "s": 36,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 42,
    "running": true,
    "globalMise": "laid"
   },
@@ -63,115 +68,60 @@
    "globalMise": "laid"
   },
   {
-   "s": 58,
+   "s": 57,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 63,
+   "s": 62,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 69,
+   "s": 67,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 74,
+   "s": 72,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 80,
+   "s": 78,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 86,
+   "s": 83,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 92,
+   "s": 88,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 97,
+   "s": 93,
    "running": true,
    "globalMise": "laid"
   },
   {
-   "s": 102,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 107,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 113,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 119,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 124,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 130,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 136,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 141,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 147,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 152,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 157,
-   "running": true,
-   "globalMise": "laid"
-  },
-  {
-   "s": 163,
+   "s": 98,
    "running": true,
    "globalMise": "laid"
   }
  ],
  "agent": {
-  "threadId": "bc59bf65-9a17-4544-b79e-592b3f450a66",
+  "threadId": "57630254-5d1f-49e0-b9ee-ab83c854c8ba",
   "runs": [
    {
     "status": "completed",
     "failure": null
    }
   ],
-  "answer": "The tool returned no output and no error text, so there is nothing to quote. The command redirects both stdout and stderr into `/workspace/.pmise/node-hold.txt`, so that file should hold the `node --version` result. I did not read the file back, since you asked for one call and nothing else.",
+  "answer": "The command ran and returned no output. The tool gave no output or error text, so there is nothing to quote. The output of `node --version` went to `/workspace/.pmise/node-hold.txt`, which I did not read.",
   "tools": [
    "node --version > /workspace/.pmise/node-hold.txt 2>&1"
   ],
@@ -179,24 +129,24 @@
    "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}"
   ],
   "errors": [],
-  "ms": 165177
+  "ms": 99843
  },
  "node": "v24.11.1",
  "globalMise": {
-  "runtime": "f31748be-9f1a-4310-bb91-1002e9681c03",
+  "runtime": "325958e9-359f-4af8-a7ff-eff0b6dfb575",
   "outcome": "laid",
   "attempts": 1,
   "answer": {
-   "revision": 7,
-   "sha256": "140488a92d76b01103d59d36466823a54f8ff58beae0f2fb9dd414cf0700eaa2",
+   "revision": 21,
+   "sha256": "ea83d5885b54f35c1c3a7c14d1a450c4380f68428545fa2c0080da6e56311118",
    "source": "environment",
    "laid": true,
    "install": 1,
    "timedOut": false,
-   "ms": 151894,
-   "bytes": 157
+   "ms": 88201,
+   "bytes": 230
   },
-  "at": 1794622701682
+  "at": 1794625222506
  },
  "ok": true
 }

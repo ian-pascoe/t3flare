@@ -36,11 +36,15 @@ Evidence: [`global-mise/`](global-mise/), from stage `pmise` (destroyed) and `te
   `ARG MISE_VERSION` that a bump re-runs `mise.docker.test.ts`.
 - **The Workspace DO** (`globalMise.ts`, `containerOnly.ts`, `containerLaunch.ts`, `stoppedExecs.ts`,
   `WorkspaceDO.ts`).
-  - `GlobalMise` runs the script once per Container, keyed by computer's runtime id, after every
-    `ContainerOnlyBackend.connect` and before computer gets the handle. It holds the Container (`#running`), notes
+  - `GlobalMise` runs the script once per Container, keyed by computer's runtime id. `GlobalMiseBackend` wraps the
+    Container's backend: every command sent that is not a passive read waits for it there, whoever sends it (a Durable
+    agent's command reaches computer through the Workspace stub, never `WorkspaceDO.exec`); `WorkspaceDO.exec` marks a
+    passive read in its environment, and the backend takes the mark out and sends it without waiting. Terminals and
+    CLI processes wait before their spawn (`readyForSpawn`), through an active `true` when this instance has not
+    connected yet. It holds the Container (`#running`), notes
     use when it ends, kills the exec at the deadline, retries a failed exec once at once and then from the next
-    command, Terminal, CLI process or the alarm, at most three times, and keeps the outcome in storage. A connect only
-    passive reads made never runs it; the alarm runs it for a running Container that had none. A start with no text
+    command, Terminal, CLI process or the alarm, at most three times, and keeps the outcome in storage. A passive read never
+    runs it; the alarm runs it for a running Container only passive reads have reached. A start with no text
     runs nothing and reports `none`, so Status stops showing an older start's file. Without a runtime id, or with a
     launch from before this change, it runs the idempotent script.
   - The launch records the text with its digest, revision and source (`withGlobalMise`); `containerState()` shows the
@@ -65,8 +69,10 @@ Evidence: [`global-mise/`](global-mise/), from stage `pmise` (destroyed) and `te
 | The setting: 16 KiB by bytes, NUL, CRLF, default, revision | `packages/harness-registry/src/environment.test.ts` |
 | mise's data, cache, state and config dirs are the lay-down's for every CLI profile | `apps/environment/test/miseDirs.test.ts` |
 | The panel: audit as digest, text area, Status, a malformed report refused | `apps/environment/test/environmentSettings.test.ts`, `harnessPage.test.ts` |
-| `GlobalMise`: key, joined runs, kept outcome across instances, hold, deadline, retries, a passive-only connect never runs it and the alarm catches up, no text reported as `none`, no runtime id | `apps/agents/test/globalMise.test.ts` |
-| `connect` runs the lay-down with the runtime id before the handle is given | `apps/agents/test/containerOnly.test.ts` |
+| `GlobalMise`: key, joined runs, kept outcome across instances, hold, deadline, retries, the alarm's catch-up, no text reported as `none`, no runtime id | `apps/agents/test/globalMise.test.ts` |
+| Every active command waits where it is sent, passive reads never: an agent's command while a passive read holds the connect, a Container a passive read started, a Terminal's start with a read in flight; `readyForSpawn` | `apps/agents/test/globalMiseGate.test.ts` |
+| `connect` passes the runtime id on | `apps/agents/test/containerOnly.test.ts` |
+| The Status line, a run with no text read as no Global mise config | `packages/harness-registry/src/globalMise.test.ts` |
 | The launch carries the text; `containerState` shows only its digest | `apps/agents/test/containerLaunch.test.ts` |
 | The script in bash with stub mise, git and gh: laid or not, 124/137, each check's exit alone, idempotence, no text, lock, gitconfig; the answer validated field by field | `apps/agents/test/globalMiseScript.test.ts` |
 | A stopped command is never sent | `apps/agents/test/stoppedExecs.test.ts` |
@@ -74,13 +80,15 @@ Evidence: [`global-mise/`](global-mise/), from stage `pmise` (destroyed) and `te
 | `COMMAND_ENV` under the Variables | `apps/agents/test/variables.test.ts` |
 | The image's own mise: layering, removers, requests, tokens | `apps/environment/test/docker/mise.docker.test.ts` (`test:docker`) |
 
-**Where the bash test runs.** `globalMiseScript.test.ts` runs the real script in `ubuntu:26.04` (the image's base,
-whose coreutils are uutils) and pulls the image when it is missing; it skips only without a Docker daemon. It is part
-of `pnpm run check`, so it runs on every machine with Docker and in deploy-prod's check on `ubuntu-latest`. It ran
-locally against `ubuntu:26.04` for this round. The script's coreutils were checked against uutils 0.10.0 there:
-`timeout` exits 124 on TERM and 137 after `-k`'s KILL, as GNU's does; `date +%s%N`, `wc -c <`, `mv -f`, `cp`,
-`dirname` and `tail -n 1` behave as GNU's; `flock` is util-linux's. The script uses no `sha256sum -c` (the digest is
-computed on the Workspace DO's side) and no `install`.
+**Where the bash test runs.** `globalMiseScript.test.ts` runs the real script in the Dockerfile's own base,
+`ubuntu:26.04` pinned by the same digest (uutils coreutils, util-linux's `flock`), pulled in `beforeAll`. It is part of
+`pnpm run check`, so it runs on every machine with a Docker daemon and in deploy-prod's check on `ubuntu-latest`; it
+skips only without a daemon, and with `CI` set a failed pull fails the suite. It ran locally on that image for this
+round. Two cases use the real `timeout` with short bounds: an install that sleeps exits 124, one that ignores TERM 137.
+uutils 0.10.0 against GNU, for what the script uses: `timeout` exits 124 on TERM and 137 after `-k`'s KILL as GNU's
+does, but KILLs the process alone, where GNU's kills its group (a case checks a child left that way does not hold the
+lock); `date +%s%N`, `wc -c <`, `mv -f`, `cp`, `dirname` and `tail -n 1` behave as GNU's. The script uses no
+`sha256sum -c` (the digest is computed on the Workspace DO's side) and no `install`.
 
 ## Evidence
 
@@ -121,9 +129,11 @@ script and `COMMAND_ENV` as at `8ef01cb`).
   gitconfig: the copy runs only in the lay-down.
 - **`disable_backends` reads `[""]`** with the variable empty (`variables.json`); M0 shows it disables no backend.
 - **No install cache**: a pinned start costs its install every time (`cost.json`).
-- **A Durable agent's command that reuses computer's cached handle does not retry a failed lay-down**, nor run one
-  that only passive reads skipped (a Container already running across a deploy); the alarm does, within a renewal
-  period, at most three times per Container.
+- **A failed lay-down is retried by the next active command** (each waits where it is sent) or the alarm, at most
+  three times per Container; after the third, commands run without it.
+- **A child of a timed-out install can outlive it.** uutils' `timeout` (Ubuntu 26.04) KILLs the install alone, where
+  GNU's kills its group, so a child that ignores TERM lives on. It holds neither the lock (its descriptor is closed for
+  the install) nor the exec's output (the install writes to `install.log`); it ends with the Container.
 - **`hold.json`'s samples** list the kept outcome of the earlier Container until the new one's lay-down ends.
 - **Checks.** `pnpm run check` passes at `639870a` (34/34); the commit after it changes only this line.
 

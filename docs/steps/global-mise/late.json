@@ -1,17 +1,17 @@
 {
- "at": "2026-11-14T02:21:54.026Z",
+ "at": "2026-11-14T02:56:41.954Z",
  "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "8ef01cb97004",
+ "commit": "07f5343e4a1b",
  "pin": "[tools]\nnode = \"24.11.1\"\nrust = \"1.91.1\"\ngo = \"1.25.4\"\npython = \"3.12.8\"\njava = \"temurin-21.0.5+11.0.LTS\"\ndeno = \"2.1.4\"\nzig = \"0.13.0\"\nterraform = \"1.10.3\"\n",
  "agent": {
-  "threadId": "57551ae5-b8d0-4aa7-9a1d-08ccdf799236",
+  "threadId": "3d9154c8-22ce-4485-a25f-e431bd79de31",
   "runs": [
    {
     "status": "completed",
     "failure": null
    }
   ],
-  "answer": "The tool's output was:\n\n\"t3flare: the command did not start: the Container was installing the Global mise config\n\n<harness>\n[error] Command timed out after 10 seconds\n</harness>\"",
+  "answer": "The tool returned this error, quoted exactly:\n\n```\nt3flare: the command did not start: the Container was installing the Global mise config\n\n<harness>\n[error] Command timed out after 10 seconds\n</harness>\n```\n\nThe command was not run, so `/workspace/.pmise/late-ran` was not created. I did not retry.",
   "tools": [
    "touch /workspace/.pmise/late-ran"
   ],
@@ -19,11 +19,11 @@
    "{\"kind\":\"replace\",\"text\":\"t3flare: the command did not start: the Container was installing the Global mise config\\n<harness>\\n[error] Command timed out after 10 seconds\\n</harness>\",\"truncated\":false,\"running\":false}"
   ],
   "errors": [],
-  "ms": 29517
+  "ms": 21344
  },
  "ranAfterwards": false,
  "globalMise": {
-  "runtime": "856143c6-cb1f-46e2-85bf-7c263ef1c693",
+  "runtime": "ad5b79c5-7063-4f7c-b9cc-e49c2572d227",
   "outcome": "laid",
   "attempts": 1,
   "answer": {
@@ -33,10 +33,10 @@
    "laid": true,
    "install": 1,
    "timedOut": false,
-   "ms": 48725,
+   "ms": 47457,
    "bytes": 157
   },
-  "at": 1794622888382
+  "at": 1794624979255
  },
  "ok": true
 }

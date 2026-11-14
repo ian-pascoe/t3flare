@@ -1,37 +1,37 @@
 {
- "at": "2026-11-14T02:19:48.328Z",
+ "at": "2026-11-14T02:54:55.621Z",
  "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
- "commit": "8ef01cb97004",
+ "commit": "07f5343e4a1b",
  "note": "No install cache: every start installs the owner's tools again.",
  "pin": "[tools]\nnode = \"24.11.1\"\n",
  "without": [
   {
-   "seconds": 1.68,
+   "seconds": 1.716,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "ab8502b6-277c-45e9-9a7f-7a045d013a14",
+    "runtime": "b116b521-afd4-40c5-b093-9cce924bc8d5",
     "outcome": "none",
     "attempts": 1,
-    "at": 1794622769408
+    "at": 1794624877865
    }
   },
   {
-   "seconds": 2.182,
+   "seconds": 1.985,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "8eb0f943-2ffd-4bf2-99c0-27d938ea00f5",
+    "runtime": "51f3764e-7072-4e5d-ab34-59f08ca400c3",
     "outcome": "none",
     "attempts": 1,
-    "at": 1794622772537
+    "at": 1794624880253
    }
   }
  ],
  "withPin": [
   {
-   "seconds": 5.921,
+   "seconds": 5.959,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "65cf6c00-5d9f-49f6-ac9b-b072c6a80112",
+    "runtime": "8b0fff5d-69db-411b-b408-5b8afb95e600",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
@@ -41,17 +41,17 @@
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 4112,
+     "ms": 4232,
      "bytes": 25
     },
-    "at": 1794622780577
+    "at": 1794624887367
    }
   },
   {
-   "seconds": 5.949,
+   "seconds": 6.235,
    "exitCode": 0,
    "globalMise": {
-    "runtime": "0a86e131-73e9-4b36-a639-4e2cb7faa9f2",
+    "runtime": "d40855a3-7f04-48f9-975b-4a2effb8737e",
     "outcome": "laid",
     "attempts": 1,
     "answer": {
@@ -61,10 +61,10 @@
      "laid": true,
      "install": 0,
      "timedOut": false,
-     "ms": 4120,
+     "ms": 4108,
      "bytes": 25
     },
-    "at": 1794622787418
+    "at": 1794624894802
    }
   }
  ],
