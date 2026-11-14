@@ -2,7 +2,7 @@
 // a model's ref is `{ provider: <endpointId>, modelId }` (its slug `<endpointId>/<modelId>`); each model with the
 // endpoint's API, base URL and the metadata stored with it; the key fetched at use time, never held by the provider.
 import { createModels } from "@earendil-works/pi-ai";
-import type { ModelEndpoints } from "@t3flare/models/endpoints";
+import type { EndpointCredential, ModelEndpoints } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
 import { endpointProviders } from "../src/session/models.ts";
@@ -34,7 +34,7 @@ const ENDPOINTS: ModelEndpoints = {
   ],
 };
 
-const modelsWith = (credential: (id: string) => Promise<string | undefined>) => {
+const modelsWith = (credential: (id: string) => Promise<EndpointCredential>) => {
   const models = createModels();
   for (const provider of endpointProviders(ENDPOINTS, { credential })) models.setProvider(provider);
   return models;
@@ -42,7 +42,7 @@ const modelsWith = (credential: (id: string) => Promise<string | undefined>) => 
 
 describe("endpointProviders", () => {
   it("makes one provider per endpoint, each model under the endpoint's id with its API, base URL and stored metadata", () => {
-    const models = modelsWith(async () => "k");
+    const models = modelsWith(async () => ({ apiKey: "k" }));
     expect(models.getProviders().map((provider) => provider.id)).toEqual(["openai", "commissary", "local"]);
     expect(models.getModel("openai", "gpt-5-mini")).toMatchObject({
       id: "gpt-5-mini",
@@ -65,7 +65,7 @@ describe("endpointProviders", () => {
     const asked: Array<string> = [];
     const models = modelsWith(async (id) => {
       asked.push(id);
-      return `key-of-${id}`;
+      return { apiKey: `key-of-${id}` };
     });
     expect(asked).toEqual([]);
     expect((await models.getAuth("openai"))?.auth).toMatchObject({ apiKey: "key-of-openai", baseUrl: "https://api.openai.com/v1" });
@@ -75,7 +75,12 @@ describe("endpointProviders", () => {
   });
 
   it("fails an API-key endpoint whose key is gone with a message that says so", async () => {
-    const models = modelsWith(async () => undefined);
+    const models = modelsWith(async () => ({ apiKey: null }));
     await expect(models.getAuth("openai")).rejects.toThrow(/Model endpoint "openai" has no API key/);
+  });
+
+  it("fails an endpoint whose stored key no longer opens with a message to enter it again", async () => {
+    const models = modelsWith(async () => ({ apiKey: null, unreadable: true }));
+    await expect(models.getAuth("openai")).rejects.toThrow(/can no longer be read .*enter it again/);
   });
 });

@@ -25,6 +25,7 @@ export default defineConfig({
                 SETTING_BUDGET: { className: "SettingContainerBudget", useSQLite: true },
                 VFS_PROBE: { className: "VfsProbe", useSQLite: true },
                 SKILL_SET_PROBE: { className: "SkillSetProbe", useSQLite: true },
+                ENDPOINTS_PROBE: { className: "EndpointsProbe", useSQLite: true },
               },
             },
           }),

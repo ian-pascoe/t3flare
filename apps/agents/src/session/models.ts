@@ -13,7 +13,7 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import type { CatalogModel } from "@t3flare/models";
 import type { Catalog, ModelProxy } from "@t3flare/models/catalog";
-import type { EndpointApi, EndpointModel, ModelEndpoint, ModelEndpoints } from "@t3flare/models/endpoints";
+import type { EndpointApi, EndpointCredential, EndpointModel, ModelEndpoint, ModelEndpoints } from "@t3flare/models/endpoints";
 
 export type { ModelProxy };
 
@@ -122,7 +122,7 @@ const TAKES_FETCH: ReadonlySet<EndpointApi> = new Set(["anthropic-messages", "op
 
 export interface EndpointAccess {
   /** The endpoint's API key at use time (the Environment's, ADR-0018): never stored by the Session. */
-  readonly credential: (endpointId: string) => Promise<string | undefined>;
+  readonly credential: (endpointId: string) => Promise<EndpointCredential>;
   /** Every model request's fetch, where the API takes one. */
   readonly fetch?: FetchFunction;
 }
@@ -159,8 +159,14 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
           name: `${endpoint.label} API key`,
           resolve: async () => {
             if (endpoint.auth === "none") return { auth: { baseUrl: endpoint.baseUrl }, source: "Model endpoint (no key)" };
-            const apiKey = await access.credential(endpoint.id);
-            if (apiKey === undefined) throw new Error(`The Model endpoint "${endpoint.id}" has no API key: set one in the Harness panel.`);
+            const { apiKey, unreadable } = await access.credential(endpoint.id);
+            if (apiKey === null) {
+              throw new Error(
+                unreadable === true
+                  ? `The Model endpoint "${endpoint.id}"'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`
+                  : `The Model endpoint "${endpoint.id}" has no API key: set one in the Harness panel.`,
+              );
+            }
             return { auth: { apiKey, baseUrl: endpoint.baseUrl }, source: "Model endpoint" };
           },
         },

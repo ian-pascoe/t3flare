@@ -112,3 +112,65 @@ export class SkillSetProbe extends DurableObject {
     return (await this.#workspace.fs.find(SKILLS_MOUNT).catch(() => [])).map((entry) => entry.path).sort();
   }
 }
+
+/**
+ * A Session's Model endpoints (SPI-1162) over a real Durable Object's storage: it takes one endpoint, makes one request
+ * through its provider (a fetch stub answers as Anthropic's Messages API), and reports what the stub was sent and every
+ * value the object stored, so a test can check the key was used and never kept.
+ */
+export class EndpointsProbe extends DurableObject {
+  async run(input: { readonly key: string }): Promise<{ readonly sentKey: string | null; readonly reply: string; readonly stored: string }> {
+    const { createModels } = await import("@earendil-works/pi-ai");
+    const { SessionEndpoints } = await import("../src/session/endpoints.ts");
+    let sentKey: string | null = null;
+    const sse = [
+      { type: "message_start", message: { id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "ready" } },
+      { type: "content_block_stop", index: 0 },
+      { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+      { type: "message_stop" },
+    ]
+      .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+      .join("");
+    const fetcher = (async (_url: unknown, init?: RequestInit) => {
+      sentKey = new Headers(init?.headers).get("x-api-key");
+      return new Response(sse, { headers: { "content-type": "text/event-stream" } });
+    }) as typeof fetch;
+    const models = createModels();
+    const endpoints = new SessionEndpoints({
+      kv: this.ctx.storage.kv,
+      models,
+      source: () => ({
+        modelEndpoints: async () => ({
+          revision: 1,
+          endpoints: [
+            {
+              id: "probe",
+              label: "Probe",
+              api: "anthropic-messages",
+              baseUrl: "https://endpoint.example",
+              auth: "api-key",
+              headers: {},
+              models: [{ id: "claude-haiku-5-5", name: "Claude Haiku 5.5", reasoning: false, input: ["text"], contextWindow: 200_000, maxTokens: 1_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: true }],
+            },
+          ],
+        }),
+        endpointCredential: async () => ({ apiKey: input.key }),
+      }),
+      fetch: fetcher,
+      readMs: 5_000,
+    });
+    await endpoints.take();
+    const model = models.getModel("probe", "claude-haiku-5-5");
+    if (model === undefined) throw new Error("no model");
+    const message = await models.completeSimple(model, { messages: [{ role: "user", content: "hi", timestamp: 0 }] });
+    const reply = message.content.map((block) => (block.type === "text" ? block.text : "")).join("") || String(message.errorMessage);
+    const kv = JSON.stringify([...this.ctx.storage.kv.list()]);
+    const tables = this.ctx.storage.sql
+      .exec<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '\\_cf\\_%' ESCAPE '\\' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'")
+      .toArray()
+      .map((row) => JSON.stringify(this.ctx.storage.sql.exec(`SELECT * FROM "${row.name}"`).toArray()));
+    return { sentKey, reply, stored: `${kv}\n${tables.join("\n")}` };
+  }
+}
