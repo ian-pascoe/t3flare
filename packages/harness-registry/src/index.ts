@@ -31,6 +31,11 @@ export interface ExtensionEntry {
   readonly settings: Readonly<Record<string, SettingEntry>>;
   /** Why the panel cannot change it at all. */
   readonly locked?: string;
+  /**
+   * A Guard (ADR-0034 §3, plan D5): it checks what agents do, so turning it off, or any change to its settings, is an
+   * asked Change tier.
+   */
+  readonly guard?: true;
 }
 
 /** The offered-tools presets (plan §2.2, OD-T4): which non-MCP tools the model is offered without a search. */
@@ -65,6 +70,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
         title: "Inline budget",
         description: "Estimated tokens the tool declarations in the code mode section may use; past it, scripts find tools with searchTools().",
         schema: { type: "integer", minimum: 500, maximum: 20_000, default: 2_000 },
+        tier: "free",
       },
     },
   },
@@ -86,6 +92,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
         title: "Preset",
         description: "core: about 14.5k tokens of declarations per request; codemode-only: about 3k; everything: every tool direct.",
         schema: { type: "enum", values: Object.keys(OFFERED_PRESETS), default: "core" },
+        tier: "free",
       },
     },
   },
@@ -100,6 +107,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
         title: "Web search",
         description: "Offer web_search. Off by default: each search is a model request on the proxy's spend.",
         schema: { type: "boolean", default: false },
+        tier: "down-free",
       },
       searchModel: {
         title: "Search model",
@@ -128,6 +136,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
         description:
           "When the context nears full, ask the agent to roll over with its own Handoff instead of a generated summary; a compaction that cannot wait uses the last saved Handoff. Off: pi-durable's own summary.",
         schema: { type: "boolean", default: true },
+        tier: "free",
       },
     },
   },
@@ -142,9 +151,10 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
         title: "Background jobs from bash",
         description: "Offer bash's background parameter: a command still running after 2 s becomes a Background job.",
         schema: { type: "boolean", default: true },
+        tier: "down-free",
       },
-      cols: { title: "Columns", description: "A Terminal's width.", schema: { type: "integer", minimum: 40, maximum: 400, default: 120 } },
-      rows: { title: "Rows", description: "A Terminal's height.", schema: { type: "integer", minimum: 10, maximum: 200, default: 40 } },
+      cols: { title: "Columns", description: "A Terminal's width.", schema: { type: "integer", minimum: 40, maximum: 400, default: 120 }, tier: "free" },
+      rows: { title: "Rows", description: "A Terminal's height.", schema: { type: "integer", minimum: 10, maximum: 200, default: 40 }, tier: "free" },
     },
   },
   {
@@ -153,6 +163,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     description:
       "A reviewer model judges risky tool calls (code mode's nested calls too) before they run and blocks the ones whose risk the owner did not authorize; t3 shows the reason. Beside the thread's approvals, never instead of them. Off by default: each review is a model request (SPI-1058).",
     default: "off",
+    guard: true,
     settings: {
       model: { title: "Model", description: "The Guardian model, through the proxy. A small, fast one: every reviewed call waits for it.", schema: { type: "enum", values: PROXY_CLAUDE_MODELS, default: "claude-haiku-5-5" } },
       thinkingLevel: { title: "Thinking", description: "The first pass's thinking; a would-be rejection is checked again at low or above.", schema: { type: "enum", values: THINKING_LEVELS, default: "off" } },
@@ -192,6 +203,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
         title: "Corrective continuations",
         description: "How often a blocker found as the agent answers continues the same turn to address it (0: never); later blockers wait for the next turn.",
         schema: { type: "integer", minimum: 0, maximum: 3, default: 1 },
+        tier: "down-free",
       },
     },
   },
@@ -212,6 +224,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     default: "always",
     settings: {},
     locked: "the thread's modes and the link fence depend on it",
+    guard: true,
   },
   { id: "ask-user", title: "Ask user", description: "ask_user: a question to the owner on the thread.", default: "always", settings: {}, locked: CORE_LOCK },
   { id: "t3-mcp", title: "T3 Code tools", description: "t3's own MCP tools (ADR-0022), through the Environment DO.", default: "always", settings: {}, locked: CORE_LOCK },
@@ -290,6 +303,23 @@ export const directUrlProblem = (url: string): string | undefined => {
   const host = parsed.hostname.toLowerCase();
   if (/^[\d.]+$/.test(host) || host.startsWith("[") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) return "a public host name, not an address";
   return undefined;
+};
+
+/**
+ * `url` without its query and fragment (plan D14): a Direct server's URL may carry a key in its query, so whatever shows
+ * it outside the panel shows this. Text that is not a URL is returned unchanged.
+ */
+export const withoutQuery = (url: string): string => {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (parsed.search === "" && parsed.hash === "") return url;
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.href;
 };
 
 /** `stored` with the MCP `change` applied and the revision bumped, or why it is refused. */
@@ -421,3 +451,4 @@ export { CARD_TEXT_MAX, cardText, visible } from "./cardText.ts";
 export { isDeniedT3Tool, T3_TOOL_DENYLIST } from "./t3Tools.ts";
 export { descriptionFor, guidanceFor, toolLikeNamesIn } from "./t3Guidance.ts";
 export * from "./globalMise.ts";
+export * from "./tiers.ts";
