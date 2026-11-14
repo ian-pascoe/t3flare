@@ -21,7 +21,7 @@ deployed, the stage and timestamps. Never record a header value, a token or a co
    `provider/adapter.ts`, so no provider module loads). Record the status, the time to first byte, and the log lines of
    that request.
 5. **The smoke check every prod deploy runs** (SPI-1195 review), on this stage: run
-   `node scripts/stage.ts run <stage> smoke <commit>` (from `apps/environment`). Record its output: `smoke: <url> ok`,
+   `node scripts/stage.ts run <stage> smoke <full 40-character commit sha>` (from `apps/environment`). Record its output: `smoke: <url> ok`,
    the health fields it prints (the build is the deployed commit, safe mode off), and no retry line naming the root
    OAuth documents (they are still t3's). It boots t3 in the Environment DO (the root documents are t3's), so run it on
    a deploy whose t3 boots: on a broken one its retries can count three failed boots and put the stage in safe mode.
