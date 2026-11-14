@@ -47,7 +47,7 @@ const b = GLOBAL_MISE_BOUNDS;
 
 /** The checks run with mise's auto-installs off, so a shim never starts an install of its own. */
 const check = (tool: "git" | "gh") =>
-  `MISE_GLOBAL_CONFIG_FILE="$stage" MISE_AUTO_INSTALL=false MISE_EXEC_AUTO_INSTALL=false MISE_NOT_FOUND_AUTO_INSTALL=false timeout -k ${b.checkKillAfter} ${b.check} ${tool} --version > /dev/null 2>&1`;
+  `MISE_GLOBAL_CONFIG_FILE="$stage" MISE_AUTO_INSTALL=false MISE_EXEC_AUTO_INSTALL=false MISE_NOT_FOUND_AUTO_INSTALL=false timeout -k ${b.checkKillAfter} ${b.check} ${tool} --version > /dev/null 2>&1 9>&-`;
 
 /** The lay-down: `bash -c <this> t3flare-global-mise <revision> <sha256> <source>`, the text on stdin. */
 export const GLOBAL_MISE_SCRIPT = `set -u
@@ -73,7 +73,9 @@ if [ "$bytes" -eq 0 ]; then
   rm -f "$stage" "$global"
   line=$(answer false null false 0)
 else
-  MISE_GLOBAL_CONFIG_FILE="$stage" timeout -k ${b.installKillAfter} ${b.install} mise install > "$dir/install.log" 2>&1
+  # The lock's fd is closed for the install and the checks: a child left after a timeout's KILL (uutils' timeout
+  # kills the process, not its group) must not hold the lock for the next lay-down.
+  MISE_GLOBAL_CONFIG_FILE="$stage" timeout -k ${b.installKillAfter} ${b.install} mise install > "$dir/install.log" 2>&1 9>&-
   install=$?
   timed=false
   case $install in 124|137) timed=true ;; esac
