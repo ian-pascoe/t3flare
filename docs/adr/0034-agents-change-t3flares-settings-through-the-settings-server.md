@@ -1,6 +1,7 @@
 # Agents change t3flare's settings through the Settings server
 
-Status: accepted (owner decisions, 2026-11-14; built through SPI-1201, the hostile run and report pending). Where the
+Status: accepted (owner decisions, 2026-11-14; built and unit-tested through SPI-1202, its stage runs owed: report
+[`docs/steps/settings-mcp.md`](../steps/settings-mcp.md)). Where the
 Owner-client endpoint lives:
 [ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md),
 conditional on the owner's sign-in probe. Plan:

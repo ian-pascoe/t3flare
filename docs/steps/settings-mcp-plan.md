@@ -854,9 +854,12 @@ Docs, at M6 unless already done with this plan:
 - a second ADR after M0 for the endpoint's Access application (it refines ADR-0010 and ADR-0026 §1–2, and ADR-0014 if
   (C)): done as ADR-0035 (layout (B), pending owner step 1; SPI-1200 review);
 - `docs/upstream-fragility.md`: pi's `mcp.json` shape and trust flags, the Patch, Access managed OAuth's beta behaviour,
-  the 2026-07-28 shapes the endpoint hand-writes;
-- both research files updated with M0's answers;
-- the report `docs/steps/settings-mcp.md`, including how to connect a client.
+  the 2026-07-28 shapes the endpoint hand-writes: done as U66-U69 with M2-M5b;
+- both research files updated with M0's answers: done at M6 ("M0's answers" in each);
+- the report `docs/steps/settings-mcp.md`, including how to connect a client: done at M6, its evidence owed.
+
+The hostile list's map (each line to its tests and its stage item) is in the report; what the stage run records is
+`docs/steps/settings-mcp/m6-stage-run.md`.
 
 ## 8. Facts an implementer must check
 

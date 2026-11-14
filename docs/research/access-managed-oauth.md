@@ -286,3 +286,38 @@ Every UNKNOWN maps to a probe:
 - Q7 workers.dev, CIMD, token bounds: [P9], [P10], [P11].
 - Q8 public-app precedence and cookie collision: [P8].
 - Q9 no unknowns (code-level answer).
+
+---
+
+## M0's answers (SPI-1196)
+
+Recorded on stage `psettings` (workers.dev only), 2026-11-14, by the spike on branch `settings-mcp-m0-spike`:
+`docs/steps/settings-mcp/m0-access-oauth.json` (probes P1-P13, P15) and `m0-clients.json` there, to be merged with this
+branch. "Owner step" refers to `docs/steps/settings-mcp-m0-owner-steps.md` on that branch. What was built on these
+answers: [ADR-0035](../adr/0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md).
+Each answer below replaces the matching UNKNOWN above.
+
+| Probe | Answer | Open |
+| -- | -- | -- |
+| P1 | Before managed OAuth, a path's 302 already carries `WWW-Authenticate: Cloudflare-Access resource_metadata=…/.well-known/cloudflare-access-protected-resource/<path>`, a document Access serves per path. t3's root AS and protected-resource documents answer 200 from the origin; path-inserted ones 404. | |
+| P2 | With managed OAuth on a path-scoped application, a non-browser request gets 401 `Bearer realm="OAuth", error="invalid_token", …, resource_metadata="https://<host>/.well-known/cloudflare-access-protected-resource/<request path>"`. That document gains `authentication_methods` oauth, `resource` `https://<host>/<path>` (query dropped) and `authorization_servers` [the team domain]. The AS metadata is the team's (every endpoint on `<team>.cloudflareaccess.com`, registration included, S256, `authorization_code` and `refresh_token`, no CIMD). **Access answers none of the root or path-inserted RFC 8414/9728 documents on the app's host**, so §0's conflict resolves to [AGENTS]'s shape. | |
+| P3 | Classification is by `Accept`: one that includes `text/html` gets the 302; `text/html` with `X-Requested-With: XMLHttpRequest` the Cloudflare-Access 401; every other the OAuth 401. `Sec-Fetch-*` and `User-Agent` change nothing. | |
+| P4 | A browser with no cookie still gets the 302 to the team login. | |
+| P5 | The service token still passes (an assertion with `common_name` and the application's `aud`); a wrong secret gets 401 under managed OAuth. Access forwards a `CF_Authorization` cookie to the origin and sets one with the application's path. | |
+| P6 | Dynamic registration works on the team endpoint (public client, `token_endpoint_auth_method: none`). Authorize without `resource` is 400 `invalid_target`; the endpoint's URL, with `?elicitation_mode=…` or a trailing slash, is accepted and resolves to the application; the host root and other paths are `invalid_target`. | the token exchange, `expires_in`, the token's `resource`, refresh rotation: owner step 1 |
+| P7 | Service-token assertions: `type: app`, the application's `aud`, `common_name`, `policy_id`, empty `sub`, no OAuth-specific claim. | an OAuth-derived assertion, and whether `Authorization` reaches the origin: owner step 1 |
+| P8 | The more specific application wins per path (`/_t3flare/mcp` and below are the endpoint's, `/_t3flare/mcpx` and the rest the admin application's). Both cookies are `CF_Authorization`, with `Path=/_t3flare/mcp` and `Path=/_t3flare` (the path-cookie attribute on both); Access reads the first one sent, and a browser sends the longer path first. | a real browser's cookies: owner step 5 |
+| P9 | The whole run was on workers.dev. On an application covering a whole workers.dev host Access serves the standard documents itself (`/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource[/<path>]`). | prod's custom domain: not probed (M5a item 4c) |
+| P10 | No CIMD: the team's AS metadata has no `client_id_metadata_document_supported`; pi, which prefers CIMD, registered dynamically. | |
+| P11 | The applications API stores any `access_token_lifetime` and `session_duration` unvalidated (1ns to 100000h read back verbatim). | what Access issues: owner step 1 checks `expires_in` under `15m` |
+| P12 | Stand-in only: a token issued by one application (the service token's `CF_Authorization` JWT, as a cookie, as `cf-access-token` and as a bearer) is refused at every other application's paths, in every direction. | **the OAuth bearer itself: owner step 1, the gate of layout (B)** |
+| P13 | Needs the owner's identity. | owner step 1 (the page's answerer check is `sub` until then) |
+| P15 | The query reaches the origin through Access; Access drops it from its discovery documents and accepts it inside `resource`. Claude Code, pi and Codex send `resource` without the query; OpenCode sends the configured URL with it. A custom header reaches the origin too (the fallback carrier). | the token's use at the URL with the query: owner step 1 |
+
+Redirect URIs registered (captured before sign-in): Claude Code 2.1.322 `http://localhost:<port>/callback`; pi 1.5.2
+`http://127.0.0.1:<port>/callback`; Codex 0.167.2 `http://127.0.0.1:<port>/callback/<random>`; OpenCode 2.2.7
+`http://127.0.0.1:<port>/callback`; all four followed the 401's `resource_metadata`. Cursor was not run (owner step 2;
+third-party reports: `http://localhost:8787/callback`, older `cursor://anysphere.cursor-mcp/oauth/callback`, web
+`https://www.cursor.com/agents/mcp/oauth/callback`). An unlisted custom scheme, https or non-loopback redirect is refused
+at registration with `invalid_client_metadata`; registration is team-wide and admits a redirect any of the team's
+applications allows, and authorize then enforces the application's own list.
