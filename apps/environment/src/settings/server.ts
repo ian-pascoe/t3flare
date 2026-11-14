@@ -68,6 +68,7 @@ import {
   APPLIED_CAP,
   APPLIED_WINDOW_MS,
   canonicalJson,
+  capKeyOf,
   CHANGE_TTL_MS,
   type ChangeCaller,
   changeHash,
@@ -95,6 +96,7 @@ import {
   type ChangesApi,
   closeOrSettle,
   openChangeSummary,
+  OWN_APPLYING_WAIT_MS,
   outcomeOf,
   waitForChange,
 } from "./openChanges.ts";
@@ -770,6 +772,9 @@ export const applyOpenChange = async (deps: SettingsServerDeps, record: ChangeRe
 };
 
 /** A closed change's answer to the agent (plan D11's statuses). */
+/** An own agent's close waits this long for an applying answer (`closeOrSettle`). */
+const OWN_WAIT = { waitMs: OWN_APPLYING_WAIT_MS } as const;
+
 const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "entity">, planned: Pick<Planned, "appliesAt">): McpCallAnswer => {
   const where = outcome.by === "page" ? " on the Change page" : outcome.by === "card" ? " on the card" : outcome.by === "client" ? " in the client's form" : outcome.by === "agent" ? " through resume" : "";
   const name = entityName(record.entity);
@@ -794,6 +799,11 @@ const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "ent
       });
     case "withdrawn":
       return written("withdrawn", `Not changed: the change was withdrawn${where === "" ? "" : ` (${where.trim()})`} before an answer.`, { changeId: record.id });
+    case "open":
+    case "applying":
+      // A close gave up waiting for an answer that is applying it (`closeOrSettle`'s bound): not a failure, an outcome
+      // not known yet (SPI-1201 review).
+      return written("waiting", `Not known yet: an answer is applying this change now. Do not repeat this call; read the settings to see whether it applied.`, { changeId: record.id });
     default:
       return written("refused", `Not changed: ${scrubText(outcome.error ?? "the change failed")}`, { changeId: record.id });
   }
@@ -1022,7 +1032,7 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
     if (current !== undefined && !isOpen(current)) return outcomeOf(current);
     const event = await Promise.race([closed, ended]);
     if (event.kind === "closed") return event.outcome;
-    return finalOf(await closeOrSettle(answers, id, event.kind === "stop" ? "withdrawn" : "expired", event.kind === "stop" ? "stop" : undefined));
+    return finalOf(await closeOrSettle(answers, id, event.kind === "stop" ? "withdrawn" : "expired", event.kind === "stop" ? "stop" : undefined, OWN_WAIT));
   };
   try {
     let waitingFor: Array<Promise<Event>> = [cardAnswer, closed, ended];
@@ -1036,7 +1046,7 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
       if (event.kind === "timeout" || event.kind === "stop") {
         // The change closes first (an answer applying meanwhile is waited for), then the card: a card withdrawn first
         // could be answered "cancel" by the asker before the change knows it was a Stop (SPI-1200 review).
-        const outcome = await closeOrSettle(answers, id, event.kind === "stop" ? "withdrawn" : "expired", event.kind === "stop" ? "stop" : undefined);
+        const outcome = await closeOrSettle(answers, id, event.kind === "stop" ? "withdrawn" : "expired", event.kind === "stop" ? "stop" : undefined, OWN_WAIT);
         await withdrawCard();
         return resultOf(finalOf(outcome), record, planned);
       }
@@ -1058,7 +1068,7 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
       // A cancel: the owner's on the card; the card withdrawn by the caller's Stop, turn end or going away (`stop`); or the
       // card closing otherwise (no live turn, the CLI's own wait).
       const closer = reason === undefined ? "card" : reason === "withdrawn" || reason === "the turn ended" ? "stop" : undefined;
-      const withdrawn = await closeOrSettle(answers, id, reason === "no answer in time" ? "expired" : "withdrawn", closer);
+      const withdrawn = await closeOrSettle(answers, id, reason === "no answer in time" ? "expired" : "withdrawn", closer, OWN_WAIT);
       return resultOf(finalOf(withdrawn), record, planned);
     }
   } finally {
@@ -1092,7 +1102,7 @@ interface Reader {
 }
 
 const ownReader = (deps: SettingsServerDeps, caller: OwnCaller): Reader => ({
-  key: caller.thread ?? "unknown",
+  key: capKeyOf("own", caller.thread ?? "unknown"),
   who: "this thread",
   log: { door: caller.door, agent: caller.agent, thread: caller.thread ?? null },
   mayNotWrite: () => mayNotWrite(deps, caller),
@@ -1154,7 +1164,7 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
   const key = caller.thread!;
   // An asked change always asks, in every mode (plan D7): an Open change, answered on the card or the Change page.
   if (planned.verdict.tier !== "free") return ask(deps, input, planned, expected, key);
-  if (deps.changes.appliedSince(key, deps.ops.now() - APPLIED_WINDOW_MS) >= APPLIED_CAP) return refuse("applied-cap", `Not changed: this thread made ${APPLIED_CAP} settings changes in the last hour, the most t3flare allows. Try again later, or ask the owner.`);
+  if (deps.changes.appliedSince(capKeyOf("own", key), deps.ops.now() - APPLIED_WINDOW_MS) >= APPLIED_CAP) return refuse("applied-cap", `Not changed: this thread made ${APPLIED_CAP} settings changes in the last hour, the most t3flare allows. Try again later, or ask the owner.`);
   // The thread's mode (plan D7): full access runs a free change; any other mode asks the owner on one card.
   const onCard = modes.runtimeMode !== "full-access";
   if (onCard) {
@@ -1186,7 +1196,7 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
   });
 };
 
-/** One read tool's answer, for either door: `openKey` is the caller's key, whose Open changes `get_status` lists. */
+/** One read tool's answer, for either door: `openKey` is the caller's cap key (`capKeyOf`), whose Open changes `get_status` lists: its own door's alone. */
 const runRead = async (deps: SettingsServerDeps, name: string, args: Readonly<Record<string, unknown>>, actor: AuditActor, openKey: string | undefined): Promise<McpCallAnswer> => {
   switch (name) {
     case "get_settings":
@@ -1237,7 +1247,7 @@ export const settingsCall = async (deps: SettingsServerDeps, input: SettingsCall
   const limited = readLimit(deps, ownReader(deps, input.caller), tool.name);
   if (limited !== undefined) return limited;
   const actor: AuditActor = { caller: input.caller.thread === undefined ? "agent" : `agent:${input.caller.thread}`, via: "mcp", ...(input.caller.thread === undefined ? {} : { thread: input.caller.thread }), agent: input.caller.agent };
-  return runRead(deps, tool.name, input.args, actor, input.caller.thread);
+  return runRead(deps, tool.name, input.args, actor, input.caller.thread === undefined ? undefined : capKeyOf("own", input.caller.thread));
 };
 
 // ── The Owner-client door (plan D11, D12; M5a, SPI-1200) ─────────────────────────────────────────────────────────
@@ -1257,7 +1267,7 @@ export interface OwnerCallInput {
 }
 
 const ownerReader = (deps: SettingsServerDeps, caller: OwnerCaller): Reader => ({
-  key: caller.key,
+  key: capKeyOf("owner", caller.key),
   who: "you",
   log: { door: "owner", principal: caller.kind },
   mayNotWrite: () => accessBar(deps),
@@ -1381,10 +1391,10 @@ const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned
     fullText: (view) => changeText(view),
     // A repeated call (a client that retried, or an agent that did not read `W`) finds its own change, not a second one.
     reuse: (hash) =>
-      deps.changes.openBy(caller.key).find((record) => record.state === "open" && record.hash === hash && record.expectedRevision === expected && record.mode === modeFor(input.mode, record.needsPage)),
+      deps.changes.openBy(capKeyOf("owner", caller.key)).find((record) => record.state === "open" && record.hash === hash && record.expectedRevision === expected && record.mode === modeFor(input.mode, record.needsPage)),
     // In `model` a refusal for "already open" names the `requestId` of a model-mode change to resume (plan D16).
     capped: (capped) => {
-      const open = input.mode === "model" && capped.reason === "open-owner" ? deps.changes.openBy(caller.key).filter((record) => record.mode === "model" && record.state === "open") : [];
+      const open = input.mode === "model" && capped.reason === "open-owner" ? deps.changes.openBy(capKeyOf("owner", caller.key)).filter((record) => record.mode === "model" && record.state === "open") : [];
       const resumable = open.find((record) => record.id === capped.changeId) ?? open[0];
       return resumable === undefined
         ? refusal(capped)
@@ -1410,7 +1420,7 @@ const ownerWrite = async (deps: SettingsServerDeps, input: OwnerCallInput): Prom
   if (prepared.kind === "result") return result(prepared.answer);
   const { planned, expected } = prepared;
   if (planned.verdict.tier !== "free") return ownerAsk(deps, input, planned, expected);
-  if (deps.changes.appliedSince(caller.key, deps.ops.now() - APPLIED_WINDOW_MS) >= APPLIED_CAP) return refuse("applied-cap", `Not changed: you made ${APPLIED_CAP} settings changes in the last hour, the most t3flare allows. Try again later.`);
+  if (deps.changes.appliedSince(capKeyOf("owner", caller.key), deps.ops.now() - APPLIED_WINDOW_MS) >= APPLIED_CAP) return refuse("applied-cap", `Not changed: you made ${APPLIED_CAP} settings changes in the last hour, the most t3flare allows. Try again later.`);
   return result(
     await applyFree(deps, {
       caller: ownerChangeCaller(caller),
@@ -1439,7 +1449,7 @@ export const settingsOwnerCall = async (deps: SettingsServerDeps, input: OwnerCa
   const limited = readLimit(deps, ownerReader(deps, input.caller), tool.name);
   if (limited !== undefined) return { kind: "result", answer: limited };
   const actor: AuditActor = { caller: ownerAuditCaller(input.caller), via: "mcp", ...(input.caller.client === undefined ? {} : { client: input.caller.client }) };
-  return { kind: "result", answer: await runRead(deps, tool.name, input.args, actor, input.caller.key) };
+  return { kind: "result", answer: await runRead(deps, tool.name, input.args, actor, capKeyOf("owner", input.caller.key)) };
 };
 
 /**
@@ -1464,7 +1474,7 @@ export const ownerResume = async (deps: SettingsServerDeps, input: { readonly ar
   }
   const record = isChangeId(requestId) ? deps.changes.get(requestId) : undefined;
   // Another identity's change is as unknown as a made-up one: nothing says it exists.
-  if (record === undefined || record.tier !== "asked" || record.caller.key !== caller.key) {
+  if (record === undefined || record.tier !== "asked" || record.caller.door !== "owner" || record.caller.key !== caller.key) {
     return refuse("unknown", "Not changed: no change of yours has that requestId (it may have closed long ago). To ask again, read the settings and call the original tool again.");
   }
   if (record.mode !== "model") {

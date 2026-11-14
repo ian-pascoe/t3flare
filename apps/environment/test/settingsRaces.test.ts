@@ -11,8 +11,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { McpCallAnswer } from "../src/mcp/host.ts";
 import { EARLY_STOP_MS, EARLY_STOPS_MAX, forgetEarlyStopsForTests, stopCall, stoppableCall, withCallStop } from "../src/mcp/callStops.ts";
-import { answerOpenChange, closeOrSettle, waitingOn } from "../src/settings/openChanges.ts";
-import { answerDepsOf } from "../src/settings/server.ts";
+import { answerOpenChange, APPLYING_WAIT_MS, closeOrSettle, OWN_APPLYING_WAIT_MS, waitingOn } from "../src/settings/openChanges.ts";
+import { REQUEST_BUDGET_MS } from "../src/skills/api.ts";
+import { answerDepsOf, ownerOutcome } from "../src/settings/server.ts";
 import { ASKED, bodyOf, endpointOf, modern, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
 import { settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
 
@@ -63,7 +64,18 @@ describe("an answer applying meanwhile is waited for", () => {
     // Forced to applying with nothing to finish it: the wait is bounded.
     const other = { ...record!, id: `${record!.id.slice(0, -1)}X`, hash: "other", state: "applying" as const };
     f.deps.changes.insert(other);
-    expect(await closeOrSettle(answerDepsOf(f.deps), other.id, "withdrawn", "stop", { waitMs: 20 })).toMatchObject({ state: "applying" });
+    const gaveUp = await closeOrSettle(answerDepsOf(f.deps), other.id, "withdrawn", "stop", { waitMs: 20 });
+    expect(gaveUp).toMatchObject({ state: "applying" });
+    // That is an outcome not known yet, never "the change failed" (SPI-1201 review).
+    const answer = ownerOutcome(gaveUp!, other);
+    expect(answer).toMatchObject({ kind: "result", isError: false, structured: { status: "waiting", changeId: other.id } });
+    expect(answer.kind === "result" ? answer.text : "").toContain("an answer is applying this change now");
+    expect(answer.kind === "result" ? answer.text : "").not.toContain("failed");
+  });
+
+  it("an own agent's close waits at least as long as the longest apply (a skills install within its request budget)", () => {
+    expect(OWN_APPLYING_WAIT_MS).toBeGreaterThan(REQUEST_BUDGET_MS);
+    expect(APPLYING_WAIT_MS).toBeLessThan(60_000);
   });
 
   it("an own agent's Stop while the page's approval applies answers applied", async () => {
