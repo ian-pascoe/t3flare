@@ -11,7 +11,9 @@ import { csrfToken } from "../src/harness/csrf.ts";
 import { addMcpServer } from "../src/harness/ops.ts";
 import { renderChangePage } from "../src/harness/changePage.ts";
 import { CHANGE_SCRIPT } from "../src/harness/changePageScript.ts";
-import { handleHarness, type HarnessCaller } from "../src/harness/panel.ts";
+import { CHANGES_API_PATH, changePagePath } from "../src/harness/paths.ts";
+import type { AccessCaller } from "../src/access.ts";
+import { handleHarness } from "../src/harness/panel.ts";
 import { CHANGE_TTL_MS, type ChangeRecord, newChangeId } from "../src/settings/changes.ts";
 import type { ChangeItem } from "../src/settings/render.ts";
 import { AUTHORIZATION_URL, HOST, NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
@@ -24,7 +26,7 @@ afterEach(() => {
 
 const HOSTILE = `<script>alert(1)</script>\u202Eevil'"&`;
 const SECRET = "typed-s3cr3t-header-value";
-const OWNER: HarnessCaller = { kind: "owner", subject: "owner-sub" };
+const OWNER: AccessCaller = { kind: "owner", subject: "owner-sub" };
 
 const record = (items: ReadonlyArray<ChangeItem>, extra: Partial<ChangeRecord> = {}): ChangeRecord => ({
   id: newChangeId(),
@@ -94,7 +96,7 @@ describe("the Change page renders every kind escaped, a hostile value inert", ()
     expect(closed).toContain("Declined");
     expect(closed).not.toContain('data-action="approve"');
     fixture = settingsFixture();
-    const response = await handleHarness(new Request(`https://${HOST}/_t3flare/harness/changes/${newChangeId()}`), fixture.panel());
+    const response = await handleHarness(new Request(`https://${HOST}${changePagePath(newChangeId())}`), fixture.panel());
     expect(response.status).toBe(404);
     expect(await response.text()).toContain("This change is gone");
     const bad = await handleHarness(new Request(`https://${HOST}/_t3flare/harness/changes/chg_short%3Cscript%3E`), fixture.panel());
@@ -103,8 +105,8 @@ describe("the Change page renders every kind escaped, a hostile value inert", ()
 });
 
 describe("the Change page's POST", () => {
-  const post = async (run: SettingsFixture, id: string, body: unknown, headers: Record<string, string>, caller: HarnessCaller = OWNER) =>
-    handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/changes/${id}`, { method: "POST", headers, body: typeof body === "string" ? body : JSON.stringify(body) }), run.panel(caller));
+  const post = async (run: SettingsFixture, id: string, body: unknown, headers: Record<string, string>, caller: AccessCaller = OWNER) =>
+    handleHarness(new Request(`https://${HOST}${CHANGES_API_PATH}/${id}`, { method: "POST", headers, body: typeof body === "string" ? body : JSON.stringify(body) }), run.panel(caller));
   const good = async (run: SettingsFixture) => ({
     "content-type": "application/json",
     origin: `https://${HOST}`,
@@ -125,7 +127,7 @@ describe("the Change page's POST", () => {
     expect((await post(run, id, { action: "approve" }, { ...headers, "sec-fetch-site": "cross-site" })).status).toBe(403);
     const { "x-t3flare-csrf": _csrf, ...noCsrf } = headers;
     expect((await post(run, id, { action: "approve" }, noCsrf)).status).toBe(403);
-    expect((await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/changes/${id}?action=approve`), run.panel())).status).toBe(404);
+    expect((await handleHarness(new Request(`https://${HOST}${CHANGES_API_PATH}/${id}?action=approve`), run.panel())).status).toBe(404);
     expect((await post(run, id, { action: "maybe" }, headers)).status).toBe(400);
     // The service token answers its own changes only, never an agent's.
     expect((await post(run, id, { action: "approve" }, { "content-type": "application/json" }, { kind: "service-token" })).status).toBe(403);
@@ -146,7 +148,7 @@ describe("the Change page's POST", () => {
     const pending = run.call(run.durable(), "change_mcp", { expectedRevision: 1, change: { op: "header-value", server: "keyed" } });
     await until(() => run.cards.length === 1);
     const [open] = run.deps.changes.open();
-    const page = await handleHarness(new Request(`https://${HOST}/_t3flare/harness/changes/${open!.id}`), run.panel());
+    const page = await handleHarness(new Request(`https://${HOST}${changePagePath(open!.id)}`), run.panel());
     const pageHtml = await page.text();
     expect(pageHtml).toContain('name="value"');
     const headers = await good(run);
@@ -192,7 +194,7 @@ describe("the Change page's CSP and the panel's list", () => {
     void run.call(run.durable(), "change_environment", { expectedRevision: 0, settings: { containerBudget: 4 } });
     await until(() => run.cards.length === 1);
     const [open] = run.deps.changes.open();
-    const response = await handleHarness(new Request(`https://${HOST}/_t3flare/harness/changes/${open!.id}`), run.panel());
+    const response = await handleHarness(new Request(`https://${HOST}${changePagePath(open!.id)}`), run.panel());
     expect(response.status).toBe(200);
     const csp = response.headers.get("content-security-policy") ?? "";
     const hash = createHash("sha256").update(CHANGE_SCRIPT).digest("base64");
@@ -210,8 +212,8 @@ describe("the Change page's CSP and the panel's list", () => {
     // The panel lists it, linking to its page, and so does its API.
     const panel = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), run.panel())).text();
     expect(panel).toContain('id="changes"');
-    expect(panel).toContain(`/_t3flare/harness/changes/${open!.id}`);
+    expect(panel).toContain(changePagePath(open!.id));
     const listed = (await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/changes`), run.panel())).json()) as { changes: Array<Record<string, unknown>> };
-    expect(listed.changes).toMatchObject([{ changeId: open!.id, thread: "thread-d", agent: "piDurable", url: `https://${HOST}/_t3flare/harness/changes/${open!.id}` }]);
+    expect(listed.changes).toMatchObject([{ changeId: open!.id, thread: "thread-d", agent: "piDurable", url: `https://${HOST}${changePagePath(open!.id)}` }]);
   });
 });

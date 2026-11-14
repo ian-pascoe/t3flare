@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { handleHarness } from "../src/harness/panel.ts";
 import { OWNER_ONLY_REFUSAL, refuseOwnerOnly } from "../src/mcp/ownerOnly.ts";
+import { CHANGES_API_PATH, changePagePath } from "../src/harness/paths.ts";
 import { HINT_TRUST_LINE } from "../src/settings/render.ts";
 import { addMcpServer } from "../src/harness/ops.ts";
 import { HOST, PANEL, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
@@ -27,7 +28,7 @@ const pagePost = async (run: SettingsFixture, id: string, body: Record<string, u
   const deps = run.panel();
   const csrf = await csrfToken(run.store.csrfKey(), "owner-sub", run.now());
   return handleHarness(
-    new Request(`https://${HOST}/_t3flare/harness/api/changes/${id}`, {
+    new Request(`https://${HOST}${CHANGES_API_PATH}/${id}`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: `https://${HOST}`, "sec-fetch-site": "same-origin", "x-t3flare-csrf": csrf },
       body: JSON.stringify(body),
@@ -66,7 +67,7 @@ describe("the asked change's card", () => {
     expect(prompt).toContain("It waits for the owner because:\n- containerBudget: 3 to 4 (turned up)");
     expect(prompt).toContain("Applies when each Workspace's Container next starts");
     expect(prompt).toContain("Asked by piDurable on thread thread-x.");
-    expect(prompt).toContain(`The Change page: ${PANEL}/changes/${record!.id}`);
+    expect(prompt).toContain(`The Change page: https://${HOST}${changePagePath(record!.id)}`);
     expect(prompt.indexOf("The agent's call: settings: change_environment")).toBeGreaterThan(prompt.indexOf("The Change page"));
   });
 

@@ -5,7 +5,8 @@
 import type { StoredHarness } from "@t3flare/harness-registry";
 import type { McpAsker, McpQuestionAnswer, McpQuestionCard } from "@t3flare/session-protocol";
 
-import type { HarnessCaller, HarnessDeps } from "../src/harness/panel.ts";
+import type { AccessCaller } from "../src/access.ts";
+import type { HarnessDeps } from "../src/harness/panel.ts";
 import { harnessSecrets } from "../src/harness/secrets.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { McpHost } from "../src/mcp/host.ts";
@@ -106,7 +107,7 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
   };
   const call = (caller: OwnCaller, tool: string, args: Record<string, unknown> = {}, extra: { readonly signal?: AbortSignal; readonly asker?: McpAsker } = {}) =>
     host.call({ server: "settings", tool, args, caller, asker: extra.asker ?? asker, ...(extra.signal === undefined ? {} : { signal: extra.signal }) });
-  const panel = (caller: HarnessCaller = { kind: "owner", subject: "owner-sub" }): HarnessDeps => ({
+  const panel = (caller: AccessCaller = { kind: "owner", subject: "owner-sub" }): HarnessDeps => ({
     caller,
     host: HOST,
     store,

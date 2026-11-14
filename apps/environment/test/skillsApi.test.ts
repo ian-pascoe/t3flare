@@ -3,7 +3,8 @@
 import { describe, expect, it } from "vitest";
 
 import { csrfToken } from "../src/harness/csrf.ts";
-import { CSRF_HEADER, handleHarness, type HarnessCaller } from "../src/harness/panel.ts";
+import type { AccessCaller } from "../src/access.ts";
+import { CSRF_HEADER, handleHarness } from "../src/harness/panel.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { OTHER_FILES_NOTE } from "../src/skills/api.ts";
 import { skillStore } from "../src/skills/store.ts";
@@ -12,14 +13,14 @@ import { fakeGithub, skillMd } from "./skillRepo.fixture.ts";
 
 const HOST = "t3-admin.example.dev";
 const NOW = Date.UTC(2026, 10, 14, 10, 30);
-const owner: HarnessCaller = { kind: "owner", subject: "owner-sub" };
+const owner: AccessCaller = { kind: "owner", subject: "owner-sub" };
 
 const memory = () => {
   const map = new Map<string, unknown>();
   return { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)) };
 };
 
-const setup = (caller: HarnessCaller = { kind: "service-token" }) => {
+const setup = (caller: AccessCaller = { kind: "service-token" }) => {
   const kv = memory();
   const store = harnessStore(kv);
   const skills = skillStore({ sql: nodeSqlStorage(), transactionSync: (closure) => closure(), harness: store, kv });

@@ -18,6 +18,7 @@
 //   body to the secret store alone; a sign-in's authorization URL is in its answer alone. `GET …/api/changes` lists them.
 import { describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, ignoredServersOf, type McpChange, resolveEnvironment, resolveHarness } from "@t3flare/harness-registry";
 
+import type { AccessCaller } from "../access.ts";
 import type { McpHost } from "../mcp/host.ts";
 import type { HarnessOAuth } from "./oauth.ts";
 import type { HarnessSecrets } from "./secrets.ts";
@@ -51,11 +52,9 @@ import type { AuditActor, HarnessStore } from "./store.ts";
 export { HARNESS_PATH } from "./paths.ts";
 export const CSRF_HEADER = "x-t3flare-csrf";
 
-/** Who the admin entrypoint admitted. */
-export type HarnessCaller = { readonly kind: "owner"; readonly subject: string } | { readonly kind: "service-token" };
 
 export interface HarnessDeps {
-  readonly caller: HarnessCaller;
+  readonly caller: AccessCaller;
   /** The t3 host as configured (`T3FLARE_HOST`): what `Origin` must name. */
   readonly host: string;
   readonly store: HarnessStore;
@@ -123,7 +122,7 @@ const SECURITY_HEADERS = {
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: SECURITY_HEADERS });
 const refused = (status: number, reason: string) => new Response(`${reason}\n`, { status, headers: { ...SECURITY_HEADERS, "content-type": "text/plain; charset=utf-8" } });
 
-const callerName = (caller: HarnessCaller) => (caller.kind === "owner" ? `owner:${caller.subject}` : "service-token");
+const callerName = (caller: AccessCaller) => (caller.kind === "owner" ? `owner:${caller.subject}` : "service-token");
 
 /** The panel's Status (the Settings server's `get_status` reads it too). */
 export const harnessStatus = (deps: Pick<HarnessDeps, "store" | "skills">) => {
@@ -303,7 +302,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
  * header value goes from the body to the apply alone; the answer never carries it. A sign-in's authorization URL is in
  * this answer alone.
  */
-const answerChange = async (changes: ChangesApi, id: string, body: Record<string, unknown> | undefined, caller: HarnessCaller): Promise<Response> => {
+const answerChange = async (changes: ChangesApi, id: string, body: Record<string, unknown> | undefined, caller: AccessCaller): Promise<Response> => {
   if (!isChangeId(id)) return refused(404, "no such change");
   if (body === undefined || (body.action !== "approve" && body.action !== "decline")) return refused(400, "the body is { action: approve | decline, value? }");
   if (body.value !== undefined && typeof body.value !== "string") return refused(400, "value is the header's value, a string");

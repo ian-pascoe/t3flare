@@ -32,6 +32,12 @@ export type Refusal =
 /** `subject`: the owner's Access `sub` (the harness panel binds its CSRF token to it); absent in local mode. */
 export type Caller = { readonly kind: "owner"; readonly subject?: string } | { readonly kind: "service-token" };
 
+/**
+ * Who the Worker admitted, as it hands a request to the Environment DO (the panel's `harness`, the Owner-client
+ * endpoint's `settingsMcp`): the owner with his Access `sub`, or the stage's service token.
+ */
+export type AccessCaller = { readonly kind: "owner"; readonly subject: string } | { readonly kind: "service-token" };
+
 export type Verdict =
   | { readonly admitted: true; readonly caller: Caller }
   | { readonly admitted: false; readonly reason: Refusal };

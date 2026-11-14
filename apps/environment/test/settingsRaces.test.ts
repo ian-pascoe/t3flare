@@ -10,8 +10,8 @@ import type { McpAsker } from "@t3flare/session-protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { McpCallAnswer } from "../src/mcp/host.ts";
-import { EARLY_STOP_MS, EARLY_STOPS_MAX, stopCall, stoppableCall, withCallStop } from "../src/mcp/callStops.ts";
-import { answerOpenChange, closeOrSettle } from "../src/settings/openChanges.ts";
+import { EARLY_STOP_MS, EARLY_STOPS_MAX, forgetEarlyStopsForTests, stopCall, stoppableCall, withCallStop } from "../src/mcp/callStops.ts";
+import { answerOpenChange, closeOrSettle, waitingOn } from "../src/settings/openChanges.ts";
 import { answerDepsOf } from "../src/settings/server.ts";
 import { ASKED, bodyOf, endpointOf, modern, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
 import { settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
@@ -21,6 +21,7 @@ const world = (options: Parameters<typeof settingsFixture>[0] = {}) => (fixture 
 afterEach(() => {
   fixture?.dispose();
   fixture = undefined;
+  forgetEarlyStopsForTests();
   vi.useRealTimers();
 });
 
@@ -40,9 +41,12 @@ const approveOnPage = (f: SettingsFixture, id: string) => {
   return { pending, release };
 };
 
-/** Releases a held apply once `call` has reached its wait (a macrotask later), then answers `call`'s result. */
-const releasedAfter = async <T>(call: Promise<T>, release: () => void): Promise<T> => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
+/**
+ * Releases a held apply once `call` waits on change `id`'s outcome (`waiters` callers wait then, the call's own included),
+ * then answers `call`'s result.
+ */
+const releasedAfter = async <T>(call: Promise<T>, release: () => void, id: string, waiters = 1): Promise<T> => {
+  await until(() => waitingOn(id) >= waiters);
   release();
   return call;
 };
@@ -54,12 +58,12 @@ describe("an answer applying meanwhile is waited for", () => {
     await until(() => f.cards.length === 1);
     const [record] = f.deps.changes.open();
     const { pending: applying, release } = approveOnPage(f, record!.id);
-    expect(await releasedAfter(closeOrSettle(answerDepsOf(f.deps), record!.id, "withdrawn", "stop"), release)).toMatchObject({ state: "applied", by: "page", revision: 7 });
+    expect(await releasedAfter(closeOrSettle(answerDepsOf(f.deps), record!.id, "withdrawn", "stop"), release, record!.id)).toMatchObject({ state: "applied", by: "page", revision: 7 });
     await applying;
     // Forced to applying with nothing to finish it: the wait is bounded.
     const other = { ...record!, id: `${record!.id.slice(0, -1)}X`, hash: "other", state: "applying" as const };
     f.deps.changes.insert(other);
-    expect(await closeOrSettle(answerDepsOf(f.deps), other.id, "withdrawn", "stop", 20)).toMatchObject({ state: "applying" });
+    expect(await closeOrSettle(answerDepsOf(f.deps), other.id, "withdrawn", "stop", { waitMs: 20 })).toMatchObject({ state: "applying" });
   });
 
   it("an own agent's Stop while the page's approval applies answers applied", async () => {
@@ -70,7 +74,8 @@ describe("an answer applying meanwhile is waited for", () => {
     const [record] = f.deps.changes.open();
     const { pending: applying, release } = approveOnPage(f, record!.id);
     stop.abort();
-    expect(structured(await releasedAfter(pending, release))).toMatchObject({ status: "applied", revision: 7 });
+    // The call's own card wait, and the Stop's wait for the applying answer.
+    expect(structured(await releasedAfter(pending, release, record!.id, 2))).toMatchObject({ status: "applied", revision: 7 });
     await applying;
   });
 
@@ -81,7 +86,7 @@ describe("an answer applying meanwhile is waited for", () => {
     const [record] = f.deps.changes.open();
     const { pending: applying, release } = approveOnPage(f, record!.id);
     const retry = modern("tools/call", { name: "change_environment", arguments: ASKED, requestState: first.result?.requestState, inputResponses: { change: { action: "decline" } } }, { id: 2 });
-    expect(await structuredOf(await releasedAfter(endpoint(retry), release))).toMatchObject({ status: "applied", revision: 7 });
+    expect(await structuredOf(await releasedAfter(endpoint(retry), release, record!.id))).toMatchObject({ status: "applied", revision: 7 });
     await applying;
   });
 
@@ -92,7 +97,7 @@ describe("an answer applying meanwhile is waited for", () => {
     const [record] = f.deps.changes.open();
     const { pending: applying, release } = approveOnPage(f, record!.id);
     const resume = modern("tools/call", { name: "resume", arguments: { requestId: record!.id, response: { action: "cancel" } } }, { query: "?elicitation_mode=model", id: 3 });
-    expect(await structuredOf(await releasedAfter(endpoint(resume), release))).toMatchObject({ status: "applied", revision: 7 });
+    expect(await structuredOf(await releasedAfter(endpoint(resume), release, record!.id))).toMatchObject({ status: "applied", revision: 7 });
     await applying;
   });
 });
@@ -165,8 +170,8 @@ describe("the call-stop registry (mcp/callStops.ts)", () => {
     expect(seen[0]?.aborted).toBe(true);
     release();
     await Promise.all([first, second]);
-    // Both ended: the id is free, and a stop now is remembered for the next call under it, not this one.
-    expect(await withCallStop("dup-2", async (signal) => signal?.aborted)).toBe(false);
+    // Both ended: the id is free, and the stop that aborted them is not carried to the next call under it.
+    expect(await withCallStop("dup-1", async (signal) => signal?.aborted)).toBe(false);
   });
 
   it("a stop before the call registers is remembered for EARLY_STOP_MS, then forgotten; at most EARLY_STOPS_MAX are kept", async () => {

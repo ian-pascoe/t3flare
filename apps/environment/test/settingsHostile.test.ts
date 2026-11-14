@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { csrfToken } from "../src/harness/csrf.ts";
 import { addMcpServer } from "../src/harness/ops.ts";
 import { handleHarness } from "../src/harness/panel.ts";
+import { changePagePath } from "../src/harness/paths.ts";
 import { pauseOf } from "../src/mcp/elicitation.ts";
 import type { McpCallAnswer } from "../src/mcp/host.ts";
 import { OWNER_ONLY_REFUSAL, refuseOwnerOnly } from "../src/mcp/ownerOnly.ts";
@@ -107,7 +108,7 @@ describe("hostile: a leak scan finds a typed secret nowhere but the secret store
     const pending = f.call(f.durable(), "change_mcp", { expectedRevision: 1, change: { op: "header-value", server: "keyed" } });
     await until(() => f.cards.length === 1);
     const [open] = f.deps.changes.open();
-    const page = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/changes/${open!.id}`), f.panel())).text();
+    const page = await (await handleHarness(new Request(`https://${HOST}${changePagePath(open!.id)}`), f.panel())).text();
     const answered = await panelPost(f, `/api/changes/${open!.id}`, { action: "approve", value: SECRET });
     expect(answered.status).toBe(200);
     const answerText = await answered.text();

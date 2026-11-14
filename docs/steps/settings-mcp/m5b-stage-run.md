@@ -44,9 +44,9 @@ showed (a screenshot or its transcript) and the tool result it got (`structuredC
    form itself (M0); record whether it did here, since that is ADR-0034's accepted risk made visible.
 7. **Decline** and **cancel** on the held stream: `declined` and `withdrawn`, `closed.by: client`.
 8. **A cut stream**: start an asked change and end the call from the client (Ctrl+C, or quit the client) before
-   answering. Record that the change closes `withdrawn` with `closed.by: stop` and the `settings-stream-cut` log line;
-   then answer the still-open dialog if the client keeps it (Claude Code did in M0): the POST is 202 and nothing
-   applies (revision unchanged).
+   answering. Record that the change closes `withdrawn` with `closed.by: stop` and its one `settings-refused` log line
+   carrying `cut: true`; then answer the still-open dialog if the client keeps it (Claude Code did in M0): the POST is
+   202 and nothing applies (revision unchanged).
 9. **2025-06-18** (if a named client negotiates it): the `elicitation/create` params have no `mode` key, and the client
    shows the form.
 

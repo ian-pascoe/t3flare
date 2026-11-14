@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import { csrfToken } from "../src/harness/csrf.ts";
 import { escapeHtml, renderPage } from "../src/harness/page.ts";
-import { CSRF_HEADER, handleHarness, type HarnessCaller } from "../src/harness/panel.ts";
+import type { AccessCaller } from "../src/access.ts";
+import { CSRF_HEADER, handleHarness } from "../src/harness/panel.ts";
 import { harnessSecrets } from "../src/harness/secrets.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { McpHost } from "../src/mcp/host.ts";
@@ -13,7 +14,7 @@ import { resolveHarness, EMPTY_HARNESS } from "@t3flare/harness-registry";
 
 const HOST = "t3-admin.example.dev";
 const NOW = Date.UTC(2026, 10, 12, 10, 30);
-const owner: HarnessCaller = { kind: "owner", subject: "owner-sub" };
+const owner: AccessCaller = { kind: "owner", subject: "owner-sub" };
 
 const memory = () => {
   const map = new Map<string, unknown>();
@@ -25,7 +26,7 @@ const memory = () => {
   };
 };
 
-const setup = (caller: HarnessCaller = owner) => {
+const setup = (caller: AccessCaller = owner) => {
   const store = harnessStore(memory());
   return { store, deps: { caller, host: HOST, store, now: () => NOW } };
 };
@@ -138,7 +139,7 @@ describe("harness panel", () => {
     const store = harnessStore(kv);
     const secrets = harnessSecrets(kv);
     const mcp = new McpHost({ kv, engine: undefined, settings: () => store.load() });
-    const deps = { caller: { kind: "service-token" } as HarnessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
+    const deps = { caller: { kind: "service-token" } as AccessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
     const VALUE = "s3cr3t-header-VALUE-1234";
     const add = await handleHarness(
       new Request(`https://${HOST}/_t3flare/harness/api/mcp/servers`, {

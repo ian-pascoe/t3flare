@@ -11,6 +11,7 @@
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import { MCP_ELICITATION_WAIT_MS } from "@cloudpid/mcp/types";
 import type { NeedsPage as TierNeedsPage } from "@t3flare/harness-registry";
+import { sha256Hex } from "@t3flare/skills";
 
 import { base64Url } from "../harness/keys.ts";
 import type { ChangeView } from "./render.ts";
@@ -62,8 +63,12 @@ export type NeedsPage = TierNeedsPage | "oversize";
 /** A change's state (plan D8). `open` and `applying` are open; the rest are closed. */
 export type ChangeState = "open" | "applying" | "applied" | "declined" | "withdrawn" | "expired" | "moved" | "failed";
 
+/** An Owner client's Elicitation modes (plan D12), as `?elicitation_mode=` names them. */
+export const OWNER_MODES = ["browser", "native", "model"] as const;
+export type OwnerMode = (typeof OWNER_MODES)[number];
+
 /** How an Open change is answered: on the owner-only card (own agents), or an Owner client's Elicitation mode (M5). */
-export type ChangeMode = "card" | "browser" | "native" | "model";
+export type ChangeMode = "card" | OwnerMode;
 
 /** What answered a change (plan D8): the card, the Change page, an Owner client's form (`native`), its agent's `resume` (`model`). */
 export type AnsweredBy = "card" | "page" | "client" | "agent";
@@ -105,7 +110,8 @@ export interface ChangeRecord {
   /** When an open change expires; a free row's is its creation. */
   readonly expiresAt?: number;
   readonly state: ChangeState;
-  readonly closed?: { readonly at: number; readonly by?: ClosedBy; readonly revision?: number; readonly error?: string };
+  /** `cut`: a `native` stream the client ended unanswered withdrew it (plan D12). */
+  readonly closed?: { readonly at: number; readonly by?: ClosedBy; readonly revision?: number; readonly error?: string; readonly cut?: true };
 }
 
 export const isOpen = (record: Pick<ChangeRecord, "state">): boolean => record.state === "open" || record.state === "applying";
@@ -158,10 +164,6 @@ export const changeHash = async (tool: string, args: Readonly<Record<string, unk
   return sha256Hex(canonicalJson({ tool, args: rest }));
 };
 
-/** SHA-256 of `text`'s UTF-8, in hex: of canonical JSON, for a change's hash and a `requestState`'s call digest. */
-export const sha256Hex = async (text: string): Promise<string> =>
-  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-
 /** A change's id (plan D8): `chg_` and 32 random bytes, base64url. */
 export const newChangeId = (): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -195,6 +197,7 @@ export const closedLine = (record: ChangeRecord): Record<string, unknown> => ({
   answeredBy: record.closed?.by ?? null,
   ...(record.closed?.revision === undefined ? {} : { revision: record.closed.revision }),
   ...(record.closed?.error === undefined ? {} : { error: record.closed.error }),
+  ...(record.closed?.cut === true ? { cut: true } : {}),
 });
 
 /**

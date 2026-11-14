@@ -25,17 +25,19 @@
 //   - `model` (M5b): the result is Executor's Pause at once (every version), and `resume`, listed in this mode alone,
 //     answers it. A change that needs the page gets the link, never a Pause.
 import { withoutHidden } from "@t3flare/harness-registry";
+import { sha256Hex } from "@t3flare/skills";
 
-import type { HarnessCaller } from "../harness/panel.ts";
+import type { AccessCaller } from "../access.ts";
 import type { McpCallAnswer } from "../mcp/host.ts";
 import type { OwnerCaller } from "./caller.ts";
-import { canonicalJson, type ChangeRecord, isChangeId, isOpen, type NeedsPage, sha256Hex } from "./changes.ts";
+import { canonicalJson, type ChangeRecord, isChangeId, isOpen, OWNER_MODES, type OwnerMode } from "./changes.ts";
 import { type ChangeOutcome, closeOrSettle, outcomeOf, waitForChange } from "./openChanges.ts";
 import {
   answerDepsOf,
   answerOwnerChange,
   changeUrlOf,
   EMPTY_SCHEMA,
+  modeFor,
   ownerListed,
   ownerMessage,
   ownerOutcome,
@@ -44,11 +46,12 @@ import {
   ownerWaiting,
   OFF_MESSAGE,
   READ_ONLY_REFUSAL,
-  settingsAccess,
+  accessSwitchOf,
   settingsOwnerCall,
   type SettingsServerDeps,
   withdrawOwnerChange,
 } from "./server.ts";
+import { PAGE_REASON } from "./render.ts";
 import { signToken, type TokenRefusal, verifyToken } from "./tokens.ts";
 import { OWNER_MODE_INSTRUCTIONS, RESUME_TOOL, SETTINGS_OWNER_INSTRUCTIONS, SETTINGS_TOOLS, settingsToolOf } from "./tools.ts";
 
@@ -71,8 +74,6 @@ export const HOLD_MS = 45_000;
 export const BEAT_MS = 15_000;
 /** How long a 2025 session token is honoured: the managed-OAuth session's own length (plan D13). */
 export const SESSION_TTL_MS = 168 * 60 * 60_000;
-export const ELICITATION_MODES = ["browser", "native", "model"] as const;
-export type ElicitationMode = (typeof ELICITATION_MODES)[number];
 export const SERVER_INFO = { name: "t3flare-settings", title: "t3flare Settings", version: "1" } as const;
 
 const META_VERSION = "io.modelcontextprotocol/protocolVersion";
@@ -82,7 +83,6 @@ const META_SERVER = "io.modelcontextprotocol/serverInfo";
 /** A 2026 listing's or discovery's cache hints: never cached, never shared (the tools follow the access switch). */
 const NO_CACHE = { ttlMs: 0, cacheScope: "private" } as const;
 const NO_STORE = { "cache-control": "no-store" } as const;
-
 
 export interface EndpointDeps {
   readonly server: SettingsServerDeps;
@@ -148,12 +148,12 @@ const declaredOf = (capabilities: unknown): Declared => {
 };
 
 /** The request's Elicitation mode (plan D12), or undefined when it is unknown, repeated or mis-cased. Absent is `browser`. */
-export const elicitationModeOf = (url: URL): ElicitationMode | undefined => {
+export const elicitationModeOf = (url: URL): OwnerMode | undefined => {
   const named = [...url.searchParams].filter(([key]) => key.toLowerCase() === "elicitation_mode");
   if (named.length === 0) return "browser";
   if (named.length > 1) return undefined;
   const [key, value] = named[0]!;
-  return key === "elicitation_mode" && (ELICITATION_MODES as ReadonlyArray<string>).includes(value) ? (value as ElicitationMode) : undefined;
+  return key === "elicitation_mode" && (OWNER_MODES as ReadonlyArray<string>).includes(value) ? (value as OwnerMode) : undefined;
 };
 
 /** The body, or undefined past `BODY_MAX` (counted as it is read, so no length header is trusted). */
@@ -194,14 +194,6 @@ const refusedResult = (text: string): McpCallAnswer => ({ kind: "result", isErro
 /** The digest a `requestState` binds: the call's tool and arguments, canonical (plan D12). */
 const callDigest = (tool: string, args: Json): Promise<string> => sha256Hex(canonicalJson({ tool, args }));
 
-/** Why a change asked in `native` or `model` waits on its Change page instead (plan D6, D12), said in its `W`. */
-const PAGE_NOTE: Readonly<Record<NeedsPage, string>> = {
-  secret: "This change takes a secret, typed only on its Change page, so it is answered there whatever the elicitation_mode.",
-  "sign-in": "This change starts a sign-in, only from its Change page, so it is answered there whatever the elicitation_mode.",
-  skills: "Only the Change page shows each skill's SKILL.md and files, so it is answered there whatever the elicitation_mode.",
-  oversize: "This change is too long to show in a question, so it is answered on its Change page whatever the elicitation_mode.",
-};
-
 const STATE_REFUSED: Readonly<Record<TokenRefusal | "other-call" | "gone", string>> = {
   malformed: "its requestState is not one this server wrote",
   "bad-signature": "its requestState is not one this server wrote",
@@ -212,11 +204,16 @@ const STATE_REFUSED: Readonly<Record<TokenRefusal | "other-call" | "gone", strin
   gone: "the change it names is gone",
 };
 
-/** A 2026 `Mcp-Name` value: plain, or the spec's Base64 sentinel `=?base64?…?=` (UTF-8). Undefined when malformed. */
+/** The 2026 spec's sentinel around a Base64 (UTF-8) header value: `=?base64?…?=`. */
+const BASE64_HEADER_OPEN = "=?base64?";
+const BASE64_HEADER_CLOSE = "?=";
+
+/** A 2026 `Mcp-Name` value: plain, or in the spec's Base64 sentinel. Undefined when malformed. */
 const headerValue = (raw: string): string | undefined => {
-  if (!raw.startsWith("=?base64?") || !raw.endsWith("?=")) return raw;
+  if (!raw.startsWith(BASE64_HEADER_OPEN) || !raw.endsWith(BASE64_HEADER_CLOSE)) return raw;
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(atob(raw.slice("=?base64?".length, -"?=".length)), (char) => char.charCodeAt(0)));
+    const encoded = raw.slice(BASE64_HEADER_OPEN.length, -BASE64_HEADER_CLOSE.length);
+    return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0)));
   } catch {
     return undefined;
   }
@@ -240,7 +237,7 @@ const headerMismatch = (headers: Headers, version: unknown, method: string, name
  * One request to the Owner-client endpoint (plan D11). `caller` is the Worker's verdict; nothing in the request names who
  * calls.
  */
-export const handleSettingsMcp = async (request: Request, caller: HarnessCaller, deps: EndpointDeps): Promise<Response> => {
+export const handleSettingsMcp = async (request: Request, caller: AccessCaller, deps: EndpointDeps): Promise<Response> => {
   const server = deps.server;
   const now = deps.now ?? server.ops.now;
   const key = caller.kind === "owner" ? caller.subject : "service-token";
@@ -288,7 +285,7 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
       // `native` (plan D12): the form's answer. `accept` applies the change (by `client`), `decline` declines it, `cancel`
       // withdraws it; the held call then writes its result. A response in another mode than the change's is refused.
       if (requested !== "native") return refuse(400, "other-mode", json(rpcError(null, -32600, "This question was asked in elicitation_mode=native."), 400));
-      if (action === "accept" || action === "decline") await answerOwnerChange(server, record.id, { kind: caller.kind, key }, "client", action);
+      if (action === "accept" || action === "decline") await answerOwnerChange(server, record, { kind: caller.kind, key }, "client", action);
       // `cancel`, or a JSON-RPC error in place of a result (the client could not ask): withdrawn, so the held call ends.
       else if (action === "cancel" || "error" in message) await withdrawOwnerChange(server, record.id);
       return new Response(null, { status: 202, headers: NO_STORE });
@@ -400,12 +397,12 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
   if (isResume) return reply(toolResult(await ownerResume(server, { args, caller: owner })));
   // The mode this request opens a change in (plan D12's fallbacks): `native` with no form elicitation declared is
   // `browser` for this request; a change that needs the page is `browser` whatever was asked (the server decides that).
-  const asked: ElicitationMode = requested === "native" && !context.elicitation.form ? "browser" : requested;
+  const asked: OwnerMode = requested === "native" && !context.elicitation.form ? "browser" : requested;
   const progressToken = meta?.progressToken;
   /** Why a change asked in another mode waits on the page instead, said in its `W`. */
   const noteOf = (record: ChangeRecord): string | undefined =>
     record.needsPage !== undefined && requested !== "browser"
-      ? PAGE_NOTE[record.needsPage]
+      ? `${PAGE_REASON[record.needsPage]("its Change page")} That holds whatever the elicitation_mode.`
       : requested === "native" && record.mode === "browser"
         ? "This client declared no form elicitation, so elicitation_mode=native falls back to the Change page."
         : undefined;
@@ -437,17 +434,25 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
 
   /**
    * A 2025 question on the call's own stream (plan D12): `question`, then a hold of up to `totalMs` with a heartbeat each
-   * beat (progress when the call carried a token, an SSE comment otherwise), then the call's result from `finish` and the
-   * stream's end. `onCut` runs when the client cuts the stream before an answer.
+   * beat (`waiting.progress` as progress when the call carried a token, `waiting.comment` as an SSE comment otherwise),
+   * then the call's result from `finish` and the stream's end. `onCut` runs when the client cuts the stream before an
+   * answer.
    */
-  const heldStream = (
-    record: ChangeRecord,
-    question: Json,
-    waiting: { readonly progress: string; readonly comment: string },
-    totalMs: number,
-    finish: (outcome: ChangeOutcome | undefined) => McpCallAnswer | Promise<McpCallAnswer>,
-    onCut?: () => Promise<void>,
-  ): Response => {
+  const heldStream = ({
+    record,
+    question,
+    waiting,
+    totalMs,
+    finish,
+    onCut,
+  }: {
+    readonly record: ChangeRecord;
+    readonly question: Json;
+    readonly waiting: { readonly progress: string; readonly comment: string };
+    readonly totalMs: number;
+    readonly finish: (outcome: ChangeOutcome | undefined) => McpCallAnswer | Promise<McpCallAnswer>;
+    readonly onCut?: () => Promise<void>;
+  }): Response => {
     const release = deps.work?.() ?? (() => undefined);
     const encoder = new TextEncoder();
     const stop = new AbortController();
@@ -517,13 +522,13 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
     // 2025-11-25 with URL elicitation: the question and then the call's result on the call's stream; a cut stream leaves
     // the change open for the page (plan D12).
     const elicitId = await signToken(tokenKey, { kind: "elicit", sub: key, exp: record.expiresAt ?? now(), change: record.id });
-    return heldStream(
+    return heldStream({
       record,
-      { jsonrpc: "2.0", id: elicitId, method: "elicitation/create", params: { mode: "url", message: text, url: page, elicitationId: record.id } },
-      { progress: "Waiting for the owner on the Change page", comment: "waiting for the owner" },
-      deps.holdMs ?? HOLD_MS,
-      (outcome) => (outcome === undefined ? ownerWaiting(record, page, note) : ownerOutcome(outcome, record)),
-    );
+      question: { jsonrpc: "2.0", id: elicitId, method: "elicitation/create", params: { mode: "url", message: text, url: page, elicitationId: record.id } },
+      waiting: { progress: "Waiting for the owner on the Change page", comment: "waiting for the owner" },
+      totalMs: deps.holdMs ?? HOLD_MS,
+      finish: (outcome) => (outcome === undefined ? ownerWaiting(record, page, note) : ownerOutcome(outcome, record)),
+    });
   };
 
   /**
@@ -536,22 +541,23 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
     if (context.modern) {
       return reply({ resultType: "input_required", inputRequests: { change: { method: "elicitation/create", params: { mode: "form", ...form } } }, requestState: await stateOf(record) });
     }
+    // Defensive, unreachable today: a native-mode change is opened only for a request that declared form elicitation,
+    // which a 2025 context has only at 2025-06-18 or 2025-11-25 (`asked` above), and a repeat reuses only a change of
+    // the request's own mode. Should that ever change, the client gets the link rather than a question it cannot show.
     if (!context.elicitation.form || (context.version !== URL_ELICITATION_VERSION && context.version !== FORM_ELICITATION_VERSION)) return reply(toolResult(ownerWaiting(record, page, noteOf(record))));
     const elicitId = await signToken(tokenKey, { kind: "elicit", sub: key, exp: record.expiresAt ?? now(), change: record.id });
     const untilExpiry = Math.max(0, (record.expiresAt ?? now()) - now());
-    return heldStream(
+    return heldStream({
       record,
       // 2025-06-18 has no `mode`.
-      { jsonrpc: "2.0", id: elicitId, method: "elicitation/create", params: context.version === FORM_ELICITATION_VERSION ? form : { mode: "form", ...form } },
-      { progress: "Waiting for the answer in the client's form", comment: "waiting for the form's answer" },
-      Math.min(untilExpiry, deps.formWaitMs ?? untilExpiry),
-      async (outcome) => ownerOutcome(outcome ?? (await closeOrSettle(answerDepsOf(server), record.id, "expired")) ?? { state: "expired" }, record),
-      async () => {
-        // The client went away unanswered: the change is withdrawn, and a response that arrives later applies nothing.
-        const outcome = await withdrawOwnerChange(server, record.id, "stop");
-        log({ t3flare: "settings-stream-cut", change: record.id, outcome: outcome?.state ?? null });
-      },
-    );
+      question: { jsonrpc: "2.0", id: elicitId, method: "elicitation/create", params: context.version === FORM_ELICITATION_VERSION ? form : { mode: "form", ...form } },
+      waiting: { progress: "Waiting for the answer in the client's form", comment: "waiting for the form's answer" },
+      totalMs: Math.min(untilExpiry, deps.formWaitMs ?? untilExpiry),
+      finish: async (outcome) => ownerOutcome(outcome ?? (await closeOrSettle(answerDepsOf(server), record.id, "expired")) ?? { state: "expired" }, record),
+      // The client went away unanswered: the change is withdrawn (its close line says `cut`), and a response that arrives
+      // later applies nothing.
+      onCut: async () => void (await withdrawOwnerChange(server, record.id, "stop", true)),
+    });
   };
 
   /** A call whose change is open, delivered in the change's mode. */
@@ -571,7 +577,7 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
   // A 2026 retry of a call that asked (plan D12): the access switch first (plan D2: off refuses every call, read-only
   // every write, naming the panel), then its state, before anything it names is read.
   if (context.modern && params.requestState !== undefined) {
-    const access = settingsAccess(server);
+    const access = accessSwitchOf(server);
     if (access !== "on") {
       log({ t3flare: "settings-refused", reason: access, tool: name });
       return reply(toolResult(refusedResult(access === "off" ? OFF_MESSAGE : READ_ONLY_REFUSAL)));
@@ -586,28 +592,20 @@ export const handleSettingsMcp = async (request: Request, caller: HarnessCaller,
       return reply(toolResult(refusedResult(`Not changed: ${STATE_REFUSED[problem ?? "gone"]}. Call ${name} again without requestState to ask afresh.`)));
     }
     // A retry in another mode than the change's is refused (plan D8: coherence, not a floor).
-    const mode = record.needsPage === undefined ? asked : "browser";
+    const mode = modeFor(asked, record.needsPage);
     if (record.mode !== mode) {
       log({ t3flare: "settings-refused", reason: "other-mode", tool: name, change: record.id });
       return reply(toolResult(refusedResult(`Not changed: this change was asked in elicitation_mode=${record.mode ?? "card"}, not ${mode}. Answer it in that mode, or call ${name} again without requestState to ask in this one.`)));
     }
     const action = objectOf(objectOf(params.inputResponses)?.change)?.action;
-    if (record.mode === "native" && action === "decline" && isOpen(record)) {
-      const answered = await answerOwnerChange(server, record.id, owner, "client", "decline");
-      return reply(toolResult(ownerOutcome(answered.ok ? answered.outcome : (answered.closed ?? outcomeOf(record)), record)));
-    }
+    if (record.mode === "native" && action === "decline" && isOpen(record)) return reply(toolResult(await answerOwnerChange(server, record, owner, "client", "decline")));
     // `browser`'s decline and cancel, and `native`'s cancel: the client withdraws its question.
     if (action === "decline" || action === "cancel") return reply(toolResult(ownerOutcome((await withdrawOwnerChange(server, record.id)) ?? outcomeOf(record), record)));
     if (!isOpen(record)) return reply(toolResult(ownerOutcome(outcomeOf(record), record)));
     // No answer to the question: ask it again, on the same Open change (MRTR: the server may ask again).
     if (action !== "accept") return deliver(record);
-    if (record.mode === "native") {
-      // `native`: the client's accept applies the change (plan D12), answered by `client`.
-      const answered = await answerOwnerChange(server, record.id, owner, "client", "accept");
-      if (answered.ok) return reply(toolResult(ownerOutcome(answered.outcome, record)));
-      if (answered.closed !== undefined) return reply(toolResult(ownerOutcome(answered.closed, record)));
-      return reply(toolResult(refusedResult(`Not changed: ${answered.error}.`)));
-    }
+    // `native`: the client's accept applies the change (plan D12), answered by `client`.
+    if (record.mode === "native") return reply(toolResult(await answerOwnerChange(server, record, owner, "client", "accept")));
     // `browser`: accept means only "opened it": hold for the page's answer.
     const page = changeUrlOf(server, record.id);
     const outcome = await hold(record.id, deps.holdMs ?? HOLD_MS);

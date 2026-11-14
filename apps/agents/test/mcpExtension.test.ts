@@ -191,7 +191,8 @@ describe("mcp extension", () => {
       await until(() => calls.length === 1, "the call");
       // The owner's Stop; the held call then returns, as the Environment answers a withdrawn change.
       const aborted = harness.abort();
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // A Settings server call is released once its Stop has been named; another server's call has nothing to wait for.
+      if (tool.startsWith("mcp__settings__")) await until(() => stopped.length === 1, "the stop");
       release();
       await aborted;
       return { calls, stopped };

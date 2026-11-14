@@ -80,6 +80,7 @@ import {
   NETWORK_READS,
   type NeedsPage,
   newChangeId,
+  type OwnerMode,
   READ_CAP,
   READ_WINDOW_MS,
   type SettingsChanges,
@@ -97,7 +98,7 @@ import {
   outcomeOf,
   waitForChange,
 } from "./openChanges.ts";
-import { askedByText, type ChangeItem, changeText, type ChangeView, environmentItems, extensionItems, mcpItems, shownSkill } from "./render.ts";
+import { askedByText, type ChangeItem, changeText, type ChangeView, environmentItems, extensionItems, mcpItems, PAGE_REASON, shownSkill } from "./render.ts";
 import { settingsToolOf } from "./tools.ts";
 
 export type { OwnCaller, OwnerCaller, ThreadLink, ThreadModes } from "./caller.ts";
@@ -182,9 +183,9 @@ const written = (status: WriteStatus, text: string, extra: Readonly<Record<strin
 });
 
 /** The Settings server's access switch (plan D2): what its stored entry says now. */
-export type SettingsAccess = "off" | "read-only" | "on";
+export type AccessSwitch = "off" | "read-only" | "on";
 
-export const settingsAccess = (deps: Pick<SettingsServerDeps, "ops">): SettingsAccess => {
+export const accessSwitchOf = (deps: Pick<SettingsServerDeps, "ops">): AccessSwitch => {
   const access = mcpServersOf(deps.ops.store.load())[SETTINGS_SERVER];
   if (access === undefined || !access.enabled) return "off";
   return access.writes === false ? "read-only" : "on";
@@ -192,7 +193,7 @@ export const settingsAccess = (deps: Pick<SettingsServerDeps, "ops">): SettingsA
 
 /** Why the access switch refuses a write now (off or read-only), or undefined when it is on. */
 const accessBar = (deps: Pick<SettingsServerDeps, "ops">): { readonly reason: string; readonly text: string } | undefined => {
-  const access = settingsAccess(deps);
+  const access = accessSwitchOf(deps);
   return access === "off" ? { reason: "off", text: OFF_MESSAGE } : access === "read-only" ? { reason: "read-only", text: READ_ONLY_REFUSAL } : undefined;
 };
 
@@ -667,13 +668,6 @@ const freeCard = (input: SettingsCallInput, planned: Planned, revision: number):
 const askedText = (view: ChangeView, input: SettingsCallInput, url: string | undefined): string =>
   [changeText(view), "", askedBy(input.caller), ...(url === undefined ? [] : [`The Change page: ${url}`]), "", callText(input.tool, input.args)].join("\n");
 
-/** Why a page-only change waits there, on its card (plan D6), by what it needs. */
-const PAGE_ONLY: Readonly<Record<Exclude<NeedsPage, "oversize">, (where: string) => string>> = {
-  secret: (where) => `It takes a secret, typed on ${where}.`,
-  "sign-in": (where) => `The sign-in starts in your browser on ${where}.`,
-  skills: (where) => `Each skill's SKILL.md text and files are shown on ${where}; review and approve them there.`,
-};
-
 /** The owner-only approval card for an asked change (plan D9); never a field, so no agent can answer it. */
 export const askedCard = (view: ChangeView, input: SettingsCallInput, url: string | undefined, needsPage: NeedsPage | undefined): McpQuestionCard => {
   const full = askedText(view, input, url);
@@ -681,7 +675,7 @@ export const askedCard = (view: ChangeView, input: SettingsCallInput, url: strin
   const prompt =
     needsPage === "oversize"
       ? [
-          `An agent asks to change ${view.subject} (revision ${view.revision}). The change is too long to show on a card, so it is answered on ${where}`,
+          `An agent asks to change ${view.subject} (revision ${view.revision}). ${PAGE_REASON.oversize(where)}`,
           "",
           askedBy(input.caller),
           `"Opened it" keeps the call waiting for the page; Decline and Cancel close it.`,
@@ -691,7 +685,7 @@ export const askedCard = (view: ChangeView, input: SettingsCallInput, url: strin
         : [
             full,
             "",
-            `${PAGE_ONLY[needsPage](where)} "Opened it" keeps the call waiting for the page.`,
+            `${PAGE_REASON[needsPage](where)} "Opened it" keeps the call waiting for the page.`,
           ].join("\n");
   return {
     id: newCardId(),
@@ -887,8 +881,11 @@ const applyFree = async (
   return written("applied", `Applied: the ${entityName(planned.entity)} settings are at revision ${revision}. ${planned.appliesAt}`, { revision, appliesAt: planned.appliesAt });
 };
 
-/** An asked change opened, or the result that ends the call (a cap, the network read cap, a failed description). */
-type Opened = { readonly kind: "open"; readonly record: ChangeRecord } | { readonly kind: "result"; readonly answer: McpCallAnswer };
+/**
+ * A write's answer that may leave a change open: an Open change (for the own agents' card, or for the endpoint to deliver
+ * in its mode), or a result that ends the call now (a cap, the network read cap, a failed description, a free change).
+ */
+export type OpenOrResult = { readonly kind: "open"; readonly record: ChangeRecord } | { readonly kind: "result"; readonly answer: McpCallAnswer };
 
 interface AskedInput {
   readonly caller: ChangeCaller;
@@ -914,16 +911,16 @@ interface AskedInput {
  * description, `needsPage`, and the insert, with the reuse and the caps checked again in the insert's synchronous block
  * (the description awaited: a skill's preview reads GitHub, so a parallel call may have opened one meanwhile).
  */
-const openAskedChange = async (deps: SettingsServerDeps, input: AskedInput): Promise<Opened> => {
+const openAskedChange = async (deps: SettingsServerDeps, input: AskedInput): Promise<OpenOrResult> => {
   const { caller, tool, planned, expected } = input;
   const hash = await changeHash(tool, planned.normalized);
   const log = (event: string, extra: Readonly<Record<string, unknown>>) => deps.log?.({ t3flare: event, via: "mcp", ...input.log, tool, ...extra });
-  const refused = (reason: string, answer: McpCallAnswer): Opened => {
+  const refused = (reason: string, answer: McpCallAnswer): OpenOrResult => {
     log("settings-refused", { outcome: "refused", reason });
     return { kind: "result", answer };
   };
-  const capAnswer = (capped: CapRefusal): Opened => refused(capped.reason, input.capped?.(capped) ?? refusal(capped));
-  const reused = (): Opened | undefined => {
+  const capAnswer = (capped: CapRefusal): OpenOrResult => refused(capped.reason, input.capped?.(capped) ?? refusal(capped));
+  const reused = (): OpenOrResult | undefined => {
     const same = input.reuse?.(hash);
     return same === undefined ? undefined : { kind: "open", record: same };
   };
@@ -985,7 +982,7 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
   });
   if (opened.kind === "result") return opened.answer;
   const { record } = opened;
-  const { id, needsPage, createdAt: now } = record;
+  const { id, needsPage, createdAt } = record;
   const url = changeUrlOf(deps, id);
   const answers = answerDepsOf(deps);
   const card = askedCard(record.shown!, input, url, needsPage);
@@ -994,7 +991,7 @@ const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: 
   let onAbort: (() => void) | undefined;
   type Event = { readonly kind: "card"; readonly answer: McpQuestionAnswer } | { readonly kind: "closed"; readonly outcome: ChangeOutcome } | { readonly kind: "timeout" } | { readonly kind: "stop" };
   const ended = new Promise<Event>((resolve) => {
-    timer = setTimeout(() => resolve({ kind: "timeout" }), Math.max(0, deps.cardWaitMs ?? record.expiresAt! - now));
+    timer = setTimeout(() => resolve({ kind: "timeout" }), Math.max(0, deps.cardWaitMs ?? record.expiresAt! - createdAt));
     if (input.signal !== undefined) {
       onAbort = () => resolve({ kind: "stop" });
       if (input.signal.aborted) onAbort();
@@ -1199,7 +1196,7 @@ const runRead = async (deps: SettingsServerDeps, name: string, args: Readonly<Re
     case "list_skills":
       return listSkills(deps, args);
     case "get_status": {
-      const access = settingsAccess(deps);
+      const access = accessSwitchOf(deps);
       return read({
         status: deps.status?.() ?? {},
         access: { enabled: access !== "off", writes: access === "on" },
@@ -1233,7 +1230,7 @@ const runRead = async (deps: SettingsServerDeps, name: string, args: Readonly<Re
  * host's: a result for the agent, or unavailable when the server is off.
  */
 export const settingsCall = async (deps: SettingsServerDeps, input: SettingsCallInput): Promise<McpCallAnswer> => {
-  if (settingsAccess(deps) === "off") return { kind: "unavailable", message: OFF_MESSAGE, mayHaveRun: false };
+  if (accessSwitchOf(deps) === "off") return { kind: "unavailable", message: OFF_MESSAGE, mayHaveRun: false };
   const tool = settingsToolOf(input.tool);
   if (tool === undefined) return { kind: "unavailable", message: `The Settings server has no tool ${input.tool}.`, mayHaveRun: false };
   if (tool.class === "write") return write(deps, input);
@@ -1251,15 +1248,12 @@ export const settingsCall = async (deps: SettingsServerDeps, input: SettingsCall
 // then delivers in the change's mode (D12: a page elicitation or the link, a form, or a Pause) and which the Change
 // page answers in every mode.
 
-/** What an Owner client's call answered: a result now, or an Open change for the endpoint to deliver in its mode. */
-export type OwnerCallAnswer = { readonly kind: "result"; readonly answer: McpCallAnswer } | { readonly kind: "open"; readonly record: ChangeRecord };
-
 export interface OwnerCallInput {
   readonly tool: string;
   readonly args: Readonly<Record<string, unknown>>;
   readonly caller: OwnerCaller;
   /** The Open change's mode: the request's Elicitation mode, after D12's fallbacks. */
-  readonly mode: Exclude<ChangeMode, "card">;
+  readonly mode: OwnerMode;
 }
 
 const ownerReader = (deps: SettingsServerDeps, caller: OwnerCaller): Reader => ({
@@ -1280,7 +1274,7 @@ const ownerChangeCaller = (caller: OwnerCaller): ChangeCaller => ({
 const ownerAuditCaller = (caller: OwnerCaller): string => (caller.kind === "owner" ? `owner:${caller.key}` : "service-token");
 
 /** How an Owner client's change is answered, by its mode: the last line of its message `M`. */
-const ANSWERED_HOW: Readonly<Record<Exclude<ChangeMode, "card">, (url: string | undefined) => string>> = {
+const ANSWERED_HOW: Readonly<Record<OwnerMode, (url: string | undefined) => string>> = {
   browser: () => "Approve or decline it on the Change page.",
   native: (url) => `Accept applies it; Decline refuses it. It can also be answered on its Change page${url === undefined ? "" : `: ${url}`}.`,
   model: (url) => `resume with accept applies it; decline refuses it; cancel withdraws it. It can also be answered on its Change page${url === undefined ? "" : `: ${url}`}.`,
@@ -1290,7 +1284,7 @@ const ANSWERED_HOW: Readonly<Record<Exclude<ChangeMode, "card">, (url: string | 
  * An Open change's message `M` (plan D12): the change as the server wrote it, who asked, and how it is answered in its
  * mode (`url`, the Change page's, is named in `native` and `model`, where the question itself carries no link).
  */
-export const ownerMessage = (view: ChangeView, caller: Pick<OwnerCaller, "kind" | "client">, mode: Exclude<ChangeMode, "card"> = "browser", url?: string): string =>
+export const ownerMessage = (view: ChangeView, caller: Pick<OwnerCaller, "kind" | "client">, mode: OwnerMode = "browser", url?: string): string =>
   cardText(
     [
       changeText(view),
@@ -1339,40 +1333,41 @@ export const ownerOutcome = (outcome: ChangeOutcome, record: ChangeRecord): McpC
  * Withdraws an Owner client's Open change (a `decline` or `cancel` in its client's answer to the page elicitation, plan
  * D12): answers the change's outcome, which is the earlier one when something answered it first.
  */
-export const withdrawOwnerChange = (deps: SettingsServerDeps, id: string, by: "client" | "agent" | "stop" = "client"): Promise<ChangeOutcome | undefined> =>
-  closeOrSettle(answerDepsOf(deps), id, "withdrawn", by);
+export const withdrawOwnerChange = (deps: SettingsServerDeps, id: string, by: "client" | "agent" | "stop" = "client", cut?: true): Promise<ChangeOutcome | undefined> =>
+  closeOrSettle(answerDepsOf(deps), id, "withdrawn", by, cut === undefined ? {} : { cut });
 
 /**
- * Answers an Owner client's Open change from the client (plan D8): `client` is `native`'s form, `agent` is `model`'s
- * `resume`. `answerOpenChange` checks the change's mode, the same identity and that it does not need the page. Answers
- * the change's outcome, or why nothing changed.
+ * Answers an Owner client's Open change `record` from the client (plan D8): `client` is `native`'s form, `agent` is
+ * `model`'s `resume`. `answerOpenChange` checks the change's mode, the same identity and that it does not need the page.
+ * Answers the call's result: the change's outcome (the earlier one when something answered it first), or why nothing
+ * changed.
  */
 export const answerOwnerChange = async (
   deps: SettingsServerDeps,
-  id: string,
+  record: ChangeRecord,
   caller: Pick<OwnerCaller, "kind" | "key">,
   by: "client" | "agent",
   action: "accept" | "decline",
-): Promise<{ readonly ok: true; readonly outcome: ChangeOutcome } | { readonly ok: false; readonly error: string; readonly closed?: ChangeOutcome }> => {
-  const answered = await answerOpenChange(answerDepsOf(deps), id, {
+): Promise<McpCallAnswer> => {
+  const answered = await answerOpenChange(answerDepsOf(deps), record.id, {
     by,
     answerer: caller.kind === "owner" ? { kind: "owner", subject: caller.key } : { kind: "service-token" },
     action: action === "accept" ? "approve" : "decline",
   });
-  if (answered.ok) return { ok: true, outcome: answered.outcome };
+  if (answered.ok) return ownerOutcome(answered.outcome, record);
   // Another answer is applying it (the page's): wait for that outcome rather than report this one refused.
-  if (deps.changes.get(id)?.state === "applying") {
-    const settled = await closeOrSettle(answerDepsOf(deps), id, "withdrawn", by);
-    if (settled !== undefined) return { ok: false, error: answered.error, closed: settled };
-  }
-  return { ok: false, error: answered.error, ...(answered.closed === undefined ? {} : { closed: answered.closed }) };
+  const settled = deps.changes.get(record.id)?.state === "applying" ? await closeOrSettle(answerDepsOf(deps), record.id, "withdrawn", by) : undefined;
+  const closed = settled ?? answered.closed;
+  if (closed !== undefined) return ownerOutcome(closed, record);
+  deps.log?.({ t3flare: "settings-refused", via: "mcp", door: "owner", principal: caller.kind, tool: record.tool, change: record.id, by, outcome: "refused", reason: "answer" });
+  return written("refused", `Not changed: ${answered.error}.`, { changeId: record.id });
 };
 
 /** The mode an Open change is answered in: a change that needs the page is answered there whatever was asked (plan D6, D12). */
-const modeFor = (asked: Exclude<ChangeMode, "card">, needsPage: NeedsPage | undefined): Exclude<ChangeMode, "card"> => (needsPage === undefined ? asked : "browser");
+export const modeFor = (asked: OwnerMode, needsPage: NeedsPage | undefined): OwnerMode => (needsPage === undefined ? asked : "browser");
 
 /** An asked change from an Owner client (plan D8, D16): opened in `mode`, or the caller's same change already open. */
-const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned: Planned, expected: number): Promise<OwnerCallAnswer> => {
+const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned: Planned, expected: number): Promise<OpenOrResult> => {
   const { caller, tool, args } = input;
   return openAskedChange(deps, {
     caller: ownerChangeCaller(caller),
@@ -1400,9 +1395,9 @@ const ownerAsk = async (deps: SettingsServerDeps, input: OwnerCallInput, planned
 };
 
 /** An Owner client's write (plan D7's last column): the access switch, validation, the revision, the tier, the caps. */
-const ownerWrite = async (deps: SettingsServerDeps, input: OwnerCallInput): Promise<OwnerCallAnswer> => {
+const ownerWrite = async (deps: SettingsServerDeps, input: OwnerCallInput): Promise<OpenOrResult> => {
   const { caller, tool, args } = input;
-  const result = (answer: McpCallAnswer): OwnerCallAnswer => ({ kind: "result", answer });
+  const result = (answer: McpCallAnswer): OpenOrResult => ({ kind: "result", answer });
   const log: WriteLog = (outcome, extra = {}) =>
     deps.log?.({ t3flare: outcome === "applied" || outcome === "unchanged" ? "settings-change" : "settings-refused", via: "mcp", door: "owner", principal: caller.kind, tool, outcome, ...extra });
   const refuse = (reason: string, why: string) => {
@@ -1433,8 +1428,8 @@ const ownerWrite = async (deps: SettingsServerDeps, input: OwnerCallInput): Prom
  * One call of the Settings server by an Owner client (the Owner-client endpoint, plan D11). The endpoint has checked the
  * tool exists. Off answers every call refused, naming the panel; read-only refuses every write.
  */
-export const settingsOwnerCall = async (deps: SettingsServerDeps, input: OwnerCallInput): Promise<OwnerCallAnswer> => {
-  if (settingsAccess(deps) === "off") {
+export const settingsOwnerCall = async (deps: SettingsServerDeps, input: OwnerCallInput): Promise<OpenOrResult> => {
+  if (accessSwitchOf(deps) === "off") {
     deps.log?.({ t3flare: "settings-refused", via: "mcp", door: "owner", principal: input.caller.kind, tool: input.tool, outcome: "refused", reason: "off" });
     return { kind: "result", answer: written("refused", OFF_MESSAGE) };
   }
@@ -1460,7 +1455,7 @@ export const ownerResume = async (deps: SettingsServerDeps, input: { readonly ar
     log("refused", { reason });
     return written("refused", text, extra);
   };
-  const barred = ownerReader(deps, caller).mayNotWrite();
+  const barred = accessBar(deps);
   if (barred !== undefined) return refuse(barred.reason, barred.text);
   const requestId = args.requestId;
   const action = objectArg(args.response)?.action;
@@ -1482,14 +1477,11 @@ export const ownerResume = async (deps: SettingsServerDeps, input: { readonly ar
     return { ...closed, isError: true, text: `${closed.text} This change is closed; to ask again, read the settings and call ${record.tool} again.` };
   }
   if (action === "cancel") return ownerOutcome((await withdrawOwnerChange(deps, record.id, "agent")) ?? outcomeOf(record), record);
-  const answered = await answerOwnerChange(deps, record.id, caller, "agent", action);
-  if (answered.ok) return ownerOutcome(answered.outcome, record);
-  if (answered.closed !== undefined) return ownerOutcome(answered.closed, record);
-  return refuse("answer", `Not changed: ${answered.error}.`, { changeId: record.id });
+  return answerOwnerChange(deps, record, caller, "agent", action);
 };
 
 /** Whether the Settings server lists `tool` to an Owner client now (plan D2's access switch): off lists none, read-only no write. */
 export const ownerListed = (deps: Pick<SettingsServerDeps, "ops">): ((tool: { readonly class: ToolClass }) => boolean) => {
-  const access = settingsAccess(deps);
+  const access = accessSwitchOf(deps);
   return (tool) => access === "on" || (access === "read-only" && tool.class === "read");
 };

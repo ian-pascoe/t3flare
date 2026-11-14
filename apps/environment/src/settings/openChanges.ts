@@ -121,6 +121,9 @@ export const waitForChange = (id: string): { readonly closed: Promise<ChangeOutc
   };
 };
 
+/** How many callers in this isolate wait on `id`'s outcome now: what a test waits for before it answers. */
+export const waitingOn = (id: string): number => waiters.get(id)?.size ?? 0;
+
 const settle = (id: string, outcome: ChangeOutcome) => {
   const set = waiters.get(id);
   waiters.delete(id);
@@ -242,13 +245,13 @@ export const answerOpenChange = async (deps: AnswerDeps, id: string, answer: Ans
  * Closes Open change `id` without an answer: `withdrawn` (the caller stopped, the card was cancelled, a stream was cut)
  * or `expired`. Answers its outcome, which is the earlier one when it had already closed.
  */
-export const closeOpenChange = (deps: Pick<AnswerDeps, "changes" | "now" | "log">, id: string, state: "withdrawn" | "expired", by?: ClosedBy): ChangeOutcome | undefined => {
+export const closeOpenChange = (deps: Pick<AnswerDeps, "changes" | "now" | "log">, id: string, state: "withdrawn" | "expired", by?: ClosedBy, cut?: true): ChangeOutcome | undefined => {
   const record = deps.changes.get(id);
   if (record === undefined) return undefined;
   if (record.state !== "open") return outcomeOf(record);
   const at = state === "expired" ? Math.min(deps.now(), record.expiresAt ?? deps.now()) : deps.now();
   return (
-    closeAs({ ...deps, revisionOf: () => 0, apply: async () => ({ ok: false, error: "" }) }, record, ["open"], state, { at, ...(by === undefined ? {} : { by }) }) ??
+    closeAs({ ...deps, revisionOf: () => 0, apply: async () => ({ ok: false, error: "" }) }, record, ["open"], state, { at, ...(by === undefined ? {} : { by }), ...(cut === undefined ? {} : { cut }) }) ??
     outcomeOf(deps.changes.get(id) ?? record)
   );
 };
@@ -259,21 +262,22 @@ export const APPLYING_WAIT_MS = 30_000;
 /**
  * Closes Open change `id` as `closeOpenChange` does, but when an answer is applying it (state `applying`), waits for that
  * outcome instead (SPI-1200 review): a decline, Stop or timeout landing meanwhile reports what the answer did, never a
- * failure it did not have. The wait is bounded (`waitMs`): an apply a reset stranded is the table's to close.
+ * failure it did not have. The wait is bounded (`waitMs`): an apply a reset stranded is the table's to close. `cut`
+ * marks a withdrawal by a cut stream, for the close's one log line.
  */
 export const closeOrSettle = async (
   deps: Pick<AnswerDeps, "changes" | "now" | "log">,
   id: string,
   state: "withdrawn" | "expired",
   by?: ClosedBy,
-  waitMs: number = APPLYING_WAIT_MS,
+  options: { readonly waitMs?: number; readonly cut?: true } = {},
 ): Promise<ChangeOutcome | undefined> => {
   const waiter = waitForChange(id);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const record = deps.changes.get(id);
-    if (record?.state !== "applying") return closeOpenChange(deps, id, state, by);
-    const gaveUp = new Promise<undefined>((resolve) => (timer = setTimeout(() => resolve(undefined), waitMs)));
+    if (record?.state !== "applying") return closeOpenChange(deps, id, state, by, options.cut);
+    const gaveUp = new Promise<undefined>((resolve) => (timer = setTimeout(() => resolve(undefined), options.waitMs ?? APPLYING_WAIT_MS)));
     return (await Promise.race([waiter.closed, gaveUp])) ?? outcomeOf(deps.changes.get(id) ?? record);
   } finally {
     clearTimeout(timer);
