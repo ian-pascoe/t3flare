@@ -125,7 +125,7 @@ script and `COMMAND_ENV` as at `8ef01cb`).
   that only passive reads skipped (a Container already running across a deploy); the alarm does, within a renewal
   period, at most three times per Container.
 - **`hold.json`'s samples** list the kept outcome of the earlier Container until the new one's lay-down ends.
-- **Checks.** `pnpm run check` passes at CHECK_SHA (34/34); the commit after it changes only this line.
+- **Checks.** `pnpm run check` passes at `639870a` (34/34); the commit after it changes only this line.
 
 ## Follow-ups
 
