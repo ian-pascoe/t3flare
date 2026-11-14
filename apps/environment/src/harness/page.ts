@@ -25,6 +25,7 @@ import type { AuditEntry } from "./store.ts";
 
 import { ICON_SPRITE, icon, type IconName } from "./pageIcons.ts";
 import { SCRIPT } from "./pageScript.ts";
+import { endpointsSection, type EndpointsView } from "./pageEndpoints.ts";
 import { STYLE } from "./pageStyle.ts";
 
 /** `text` safe in HTML text and in a double-quoted attribute. */
@@ -429,7 +430,7 @@ const statusSection = (status: Readonly<Record<string, string | number | null>>)
 };
 
 /** Each entity's name in the audit log; one this page does not know shows as stored. */
-const ENTITY_LABELS: Readonly<Record<string, string>> = { harness: "Harness", environment: "Environment" };
+const ENTITY_LABELS: Readonly<Record<string, string>> = { harness: "Harness", environment: "Environment", endpoints: "Model endpoints" };
 
 const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
   const body =
@@ -461,6 +462,8 @@ export interface PageInput {
   readonly status: Readonly<Record<string, string | number | null>>;
   /** The Environment skills (SPI-1148); the section is left out without them. */
   readonly skills?: SkillsView;
+  /** The Model endpoints (SPI-1162); the section is left out without them. */
+  readonly endpoints?: EndpointsView;
 }
 
 const navItem = (id: string, label: string, name: IconName, after = "") => `<a href="#${id}">${icon(name)}${label}${after}</a>`;
@@ -484,7 +487,7 @@ export const renderPage = (input: PageInput): string => {
 <nav class="nav" aria-label="Sections">
 ${navItem("extensions", "Extensions", "extensions", `<span class="count">${EXTENSIONS.length}</span>`)}
 ${navItem("mcp", "MCP servers", "server", failing > 0 ? `<span class="flag" role="img" aria-label="${plural(failing, "server", "servers")} failing"></span>` : `<span class="count">${rows.length}</span>`)}
-${navItem("environment", "Environment", "container")}
+${input.endpoints === undefined ? "" : `${navItem("endpoints", "Model endpoints", "key", `<span class="count">${input.endpoints.endpoints.length}</span>`)}\n`}${navItem("environment", "Environment", "container")}
 ${navItem("skills", "Skills", "skills")}
 ${navItem("status", "Status", "status")}
 ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.length}</span>`)}
@@ -496,7 +499,7 @@ ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.leng
 <div id="result" class="notice" role="status" aria-live="polite" hidden><span class="notice-ico-ok">${icon("check")}</span><span class="notice-ico-err">${icon("alert")}</span><p class="msg"></p><button type="button" class="btn btn-ghost btn-sm" data-dismiss aria-label="Dismiss">${icon("x")}</button></div>
 ${extensionsSection(input.resolved)}
 ${mcpSection(rows)}
-${environmentSection(environment, input.costs ?? containerCostTable(environment.containerBudget), input.running)}
+${endpointsSection(escapeHtml, input.endpoints)}${environmentSection(environment, input.costs ?? containerCostTable(environment.containerBudget), input.running)}
 ${skillsSection(input.skills)}
 ${statusSection(input.status)}
 ${auditSection(input.audit)}

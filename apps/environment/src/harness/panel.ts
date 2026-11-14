@@ -32,6 +32,7 @@ import type { HarnessOAuth } from "./oauth.ts";
 import type { HarnessSecrets } from "./secrets.ts";
 
 import { SKILLS_WRITE_ROUTES, skillsChange, type SkillsApiDeps, skillsOverview, viewSkill } from "../skills/api.ts";
+import { ENDPOINTS_PATHS, endpointsChange, endpointsDiscover, type EndpointsAnswer, type EndpointsApiDeps, endpointsOverview } from "../endpoints/api.ts";
 import { containerCostTable } from "./containerCost.ts";
 import { csrfToken, csrfValid } from "./csrf.ts";
 import { pageCsp, renderPage } from "./page.ts";
@@ -59,6 +60,8 @@ export interface HarnessDeps {
   readonly budget?: () => Promise<{ readonly max: number; readonly leases: ReadonlyArray<{ readonly holder: string; readonly workspace?: string | null }> }>;
   /** The Environment skills (SPI-1148): their store and GitHub reads. */
   readonly skills?: Omit<SkillsApiDeps, "caller" | "now">;
+  /** The Model endpoints (SPI-1162): their store, their model lists' read, and who to tell of a change. */
+  readonly endpoints?: EndpointsApiDeps;
 }
 
 /** The Containers running now, by their Workspaces (a holder's DO id when its Workspace is unknown); null without the budget. */
@@ -177,6 +180,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         status: statusOf(deps),
         mcp: await mcpOverview(deps),
         ...(deps.skills === undefined ? {} : { skills: skillsOverview(deps.skills) }),
+        ...(deps.endpoints === undefined ? {} : { endpoints: endpointsOverview(deps.endpoints) }),
       });
       return new Response(html, { headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp() } });
     }
@@ -194,12 +198,14 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === `${HARNESS_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
     if (path === `${HARNESS_PATH}/api/skills` && deps.skills !== undefined) return json(skillsOverview(deps.skills));
     if (path === `${HARNESS_PATH}/api/skills/view` && deps.skills !== undefined) return skillsResponse(viewSkill(deps.skills, url.searchParams.get("name") ?? ""));
+    if (path === `${HARNESS_PATH}${ENDPOINTS_PATHS.list}` && deps.endpoints !== undefined) return json(endpointsOverview(deps.endpoints));
     return refused(404, "Not found");
   }
   if (request.method !== "POST") return refused(405, "Method not allowed");
   const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/environment`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`, `${HARNESS_PATH}/api/mcp/servers`, `${HARNESS_PATH}/api/mcp/oauth`];
   const skillsRoute = SKILLS_WRITE_ROUTES.find((route) => path === `${HARNESS_PATH}/api/skills${route}`);
-  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined)) return refused(404, "Not found");
+  const endpointsRoute = deps.endpoints === undefined ? undefined : Object.values(ENDPOINTS_PATHS).find((route) => path === `${HARNESS_PATH}${route}`);
+  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined) return refused(404, "Not found");
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
     console.log(JSON.stringify({ t3flare: "harness-refused", reason: why, caller: deps.caller.kind }));
@@ -209,6 +215,13 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     const body = await bodyOf(request);
     if (body === undefined) return refused(400, "the body is a JSON object");
     return skillsResponse(await skillsChange({ ...deps.skills, caller: callerName(deps.caller), now: () => deps.now?.() ?? Date.now() }, skillsRoute, body));
+  }
+  if (endpointsRoute !== undefined && deps.endpoints !== undefined) {
+    const body = await bodyOf(request);
+    if (body === undefined) return refused(400, "the body is a JSON object");
+    const endpoints = deps.endpoints;
+    const audit: Parameters<typeof endpointsChange>[2] = (entry) => deps.store.audit({ ...entry, entity: "endpoints", at: deps.now?.() ?? Date.now(), caller: callerName(deps.caller) });
+    return endpointsResponse(endpointsRoute === ENDPOINTS_PATHS.discover ? await endpointsDiscover(endpoints, body) : await endpointsChange(endpoints, body, audit));
   }
   if (path === `${HARNESS_PATH}/api/environment`) return changeEnvironment(request, deps);
   if (path === `${HARNESS_PATH}/api/mcp/test`) return testServer(request, deps);
@@ -240,6 +253,8 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
 };
 
 const skillsResponse = (answer: Awaited<ReturnType<typeof skillsChange>>): Response => ("json" in answer ? json(answer.json, answer.status) : refused(answer.status, answer.text));
+
+const endpointsResponse = (answer: EndpointsAnswer): Response => ("json" in answer ? json(answer.json, answer.status) : refused(answer.status, answer.text));
 
 const bodyOf = async (request: Request): Promise<Record<string, unknown> | undefined> => {
   try {

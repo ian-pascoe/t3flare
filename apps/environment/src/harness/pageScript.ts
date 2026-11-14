@@ -1,6 +1,8 @@
 // The harness panel's one script (ADR-0026), allowed by its SHA-256 hash in the CSP, so it is a constant. It only turns
 // the page's controls into calls to the panel's JSON API (with the CSRF token from the page's meta tag) and shows their
 // progress and outcome. It writes server answers with `textContent`, never as HTML. Without it the page still reads.
+import { ENDPOINTS_SCRIPT } from "./pageEndpoints.ts";
+
 export const SCRIPT = `"use strict";
 const csrf = document.querySelector('meta[name="t3flare-csrf"]').getAttribute("content");
 const notice = document.getElementById("result");
@@ -356,4 +358,4 @@ if ("IntersectionObserver" in window) {
     if (first !== undefined) mark(first);
   }, { rootMargin: "-20% 0px -60% 0px" });
   for (const id of links.keys()) { const section = document.getElementById(id); if (section !== null) observer.observe(section); }
-}`;
+}` + ENDPOINTS_SCRIPT;
