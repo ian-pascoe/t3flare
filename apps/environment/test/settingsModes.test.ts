@@ -15,6 +15,7 @@ import { CHANGE_TTL_MS } from "../src/settings/changes.ts";
 import { waitingOn } from "../src/settings/openChanges.ts";
 import { changesApiOf, PAUSE_LINE } from "../src/settings/server.ts";
 import { signToken } from "../src/settings/tokens.ts";
+import { HOLDS_PER_CALLER, HOLDS_PER_CHANGE, streamHolds } from "../src/settings/endpoint.ts";
 import { ASKED, BOTH, bodyOf, endpointOf, initialize, KEY, legacy, modern, post, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
 import { skillMd } from "./skillRepo.fixture.ts";
 import { HOST, NOW, settingsFixture, type SettingsFixture, until } from "./settingsFixture.ts";
@@ -489,6 +490,88 @@ describe("native on 2025: the form on the call's held stream", () => {
     expect((await endpoint(answer(session, ask.id, { result: { action: "accept" } }))).status).toBe(202);
     expect(f.store.loadEnvironment().revision).toBe(0);
     expect(f.deps.changes.get(record.id)?.state).toBe("withdrawn");
+  });
+
+  // C2 (SPI-1201 review): an answer with no live stream to deliver its result applies nothing.
+  it("an accept POSTed when no stream holds the question (the Environment reset) withdraws the change by stop and applies nothing", async () => {
+    const { f, endpoint, session } = await setup();
+    const reader = (await endpoint(call(session))).body!.getReader();
+    const ask = await firstMessage(reader);
+    const { record } = openChange(f);
+    // Another isolate: the same storage, none of this one's streams.
+    f.reset();
+    const fresh = endpointOf(f, { beatMs: 30, holds: streamHolds() });
+    const posted = await fresh(answer(session, ask.id, { result: { action: "accept", content: {} } }));
+    expect(posted.status).toBe(202);
+    expect(f.deps.changes.get(record.id)).toMatchObject({ state: "withdrawn", closed: { by: "stop" } });
+    expect(f.store.loadEnvironment().revision).toBe(0);
+    expect(f.logs).toContainEqual(expect.objectContaining({ t3flare: "settings-refused", reason: "no-live-stream", change: record.id }));
+    await reader.cancel();
+  });
+
+  // C3 (SPI-1201 review): streams on one change are counted; the last cut withdraws it, and the caps bound them.
+  it("two streams on one change: cutting one leaves the other's question standing, and its accept applies", async () => {
+    const holds = streamHolds();
+    const { f, endpoint, session } = await setup("2025-11-25", { holds });
+    const first = (await endpoint(call(session))).body!.getReader();
+    await firstMessage(first);
+    const second = (await endpoint(call(session))).body!.getReader();
+    const ask = await firstMessage(second);
+    const { record } = openChange(f);
+    expect(f.deps.changes.open()).toHaveLength(1);
+    expect(holds.byChange.get(record.id)).toBe(2);
+    await first.cancel();
+    await until(() => holds.byChange.get(record.id) === 1);
+    expect(f.deps.changes.get(record.id)?.state).toBe("open");
+    expect((await endpoint(answer(session, ask.id, { result: { action: "accept", content: {} } }))).status).toBe(202);
+    const [result] = events(await rest(second));
+    expect(result).toMatchObject({ result: { structuredContent: { status: "applied", revision: 1, changeId: record.id } } });
+  });
+
+  it("the last of two cut streams withdraws the change", async () => {
+    const { f, endpoint, session } = await setup();
+    const readers = [(await endpoint(call(session))).body!.getReader(), (await endpoint(call(session))).body!.getReader()];
+    for (const reader of readers) await firstMessage(reader);
+    const { record } = openChange(f);
+    await readers[0]!.cancel();
+    await readers[1]!.cancel();
+    await until(() => f.deps.changes.get(record.id)?.state !== "open");
+    expect(f.deps.changes.get(record.id)).toMatchObject({ state: "withdrawn", closed: { by: "stop", cut: true } });
+  });
+
+  it(`at most ${HOLDS_PER_CHANGE} streams per change; past it, W saying why`, async () => {
+    let open = 0;
+    const { f, endpoint, session } = await setup("2025-11-25", {
+      work: () => {
+        open += 1;
+        return () => void (open -= 1);
+      },
+    });
+    const readers: Array<ReadableStreamDefaultReader<Uint8Array>> = [];
+    for (let index = 0; index < HOLDS_PER_CHANGE; index++) {
+      const reader = (await endpoint(call(session))).body!.getReader();
+      await firstMessage(reader);
+      readers.push(reader);
+    }
+    const third = await endpoint(call(session));
+    expect(third.headers.get("content-type")).toBe("application/json");
+    const body = await bodyOf(third);
+    expect(body.result).toMatchObject({ structuredContent: { status: "waiting", changeId: openChange(f).record.id } });
+    expect(JSON.stringify(body.result?.content)).toContain(`${HOLDS_PER_CHANGE} calls already wait on this change's question`);
+    expect(open).toBe(HOLDS_PER_CHANGE);
+    for (const reader of readers) await reader.cancel();
+    await until(() => open === 0);
+  });
+
+  it(`at most ${HOLDS_PER_CALLER} streams per caller; past it, W saying why`, async () => {
+    // Two open changes of two streams each stay under it today (OPEN_PER_OWNER): it is the backstop, so the caller's
+    // other streams are stood in for.
+    const holds = streamHolds();
+    holds.byCaller.set(SUB, HOLDS_PER_CALLER);
+    const { endpoint, session } = await setup("2025-11-25", { holds });
+    const past = await bodyOf(await endpoint(call(session)));
+    expect(past.result).toMatchObject({ structuredContent: { status: "waiting" } });
+    expect(JSON.stringify(past.result?.content)).toContain(`${HOLDS_PER_CALLER} of your calls already wait on a question`);
   });
 
   it("holds no longer than the change lives: unanswered, it expires and the call says so", async () => {

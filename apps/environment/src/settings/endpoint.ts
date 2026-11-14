@@ -98,7 +98,40 @@ export interface EndpointDeps {
   readonly work?: () => () => void;
   /** Keeps a held stream's writer running after the response is returned. */
   readonly background?: (work: Promise<unknown>) => void;
+  /** The held streams live in this isolate; the isolate's own by default (tests give each Environment its own). */
+  readonly holds?: StreamHolds;
 }
+
+/** Live held streams (a 2025 call's question on its own stream) per change and per caller, in this isolate. */
+export interface StreamHolds {
+  readonly byChange: Map<string, number>;
+  readonly byCaller: Map<string, number>;
+}
+
+export const streamHolds = (): StreamHolds => ({ byChange: new Map(), byCaller: new Map() });
+
+/**
+ * This isolate's held streams (SPI-1201 review, C2 and C3). In memory on purpose: a stream is a live response, so an
+ * Environment reset ends every one, and a 2025 `native` answer that arrives with none live must apply nothing (D12).
+ */
+const ISOLATE_HOLDS = streamHolds();
+
+/** At most this many live held streams on one Open change (a client's retry may open a second; SPI-1201 review). */
+export const HOLDS_PER_CHANGE = 2;
+/**
+ * At most this many live held streams per caller (an Access `sub`, or the service token), across its changes: a
+ * backstop, since `OPEN_PER_OWNER` changes of `HOLDS_PER_CHANGE` streams stay under it today.
+ */
+export const HOLDS_PER_CALLER = 8;
+
+const countUp = (counts: Map<string, number>, key: string): void => void counts.set(key, (counts.get(key) ?? 0) + 1);
+/** Counts one holder of `key` down; answers how many remain. */
+const countDown = (counts: Map<string, number>, key: string): number => {
+  const left = (counts.get(key) ?? 1) - 1;
+  if (left <= 0) counts.delete(key);
+  else counts.set(key, left);
+  return Math.max(0, left);
+};
 
 /** The elicitation kinds a client declared (plan D11: `{}` is form only). */
 interface Declared {
@@ -239,6 +272,7 @@ const headerMismatch = (headers: Headers, version: unknown, method: string, name
  */
 export const handleSettingsMcp = async (request: Request, caller: AccessCaller, deps: EndpointDeps): Promise<Response> => {
   const server = deps.server;
+  const holds = deps.holds ?? ISOLATE_HOLDS;
   const now = deps.now ?? server.ops.now;
   const key = caller.kind === "owner" ? caller.subject : "service-token";
   const log = (event: Record<string, unknown>) => server.log?.({ via: "mcp", door: "owner", principal: caller.kind, ...event });
@@ -285,6 +319,13 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
       // `native` (plan D12): the form's answer. `accept` applies the change (by `client`), `decline` declines it, `cancel`
       // withdraws it; the held call then writes its result. A response in another mode than the change's is refused.
       if (requested !== "native") return refuse(400, "other-mode", json(rpcError(null, -32600, "This question was asked in elicitation_mode=native."), 400));
+      // No stream of this isolate holds the question (the Environment reset since, or it ended unanswered): nobody waits
+      // for the result, so the answer applies nothing and the change is withdrawn by `stop` (plan D12; SPI-1201 review).
+      if ((holds.byChange.get(record.id) ?? 0) === 0) {
+        await withdrawOwnerChange(server, record.id, "stop");
+        log({ t3flare: "settings-refused", reason: "no-live-stream", change: record.id });
+        return new Response(null, { status: 202, headers: NO_STORE });
+      }
       if (action === "accept" || action === "decline") await answerOwnerChange(server, record, { kind: caller.kind, key }, "client", action);
       // `cancel`, or a JSON-RPC error in place of a result (the client could not ask): withdrawn, so the held call ends.
       else if (action === "cancel" || "error" in message) await withdrawOwnerChange(server, record.id);
@@ -458,7 +499,17 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     readonly finish: (outcome: ChangeOutcome | undefined) => McpCallAnswer | Promise<McpCallAnswer>;
     readonly onCut?: () => Promise<void>;
   }): Response => {
-    const release = deps.work?.() ?? (() => undefined);
+    const releaseWork = deps.work?.() ?? (() => undefined);
+    countUp(holds.byChange, record.id);
+    countUp(holds.byCaller, key);
+    let held = true;
+    /** Ends this stream's hold once; answers how many streams still hold its change. */
+    const releaseHold = (): number => {
+      if (!held) return holds.byChange.get(record.id) ?? 0;
+      held = false;
+      countDown(holds.byCaller, key);
+      return countDown(holds.byChange, record.id);
+    };
     const encoder = new TextEncoder();
     const stop = new AbortController();
     let controller!: ReadableStreamDefaultController<Uint8Array>;
@@ -492,7 +543,8 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
           else if (!closed) controller.enqueue(encoder.encode(`: ${waiting.comment}\n\n`));
         }
         if (closed && outcome === undefined) {
-          await onCut?.();
+          // Only the last stream holding the change withdraws it on its cut; another still shows the question (C3).
+          if (releaseHold() === 0) await onCut?.();
           return;
         }
         send({ jsonrpc: "2.0", id, result: toolResult(await finish(outcome)) });
@@ -507,12 +559,21 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
           controller.close();
         }
       } finally {
-        release();
+        releaseHold();
+        releaseWork();
       }
     })();
     deps.background?.(run);
     return new Response(stream, { status: 200, headers: { ...NO_STORE, "content-type": "text/event-stream", "x-accel-buffering": "no" } });
   };
+
+  /** Why a new held stream on `record` would pass a cap (C3), said in the `W` it gets instead; undefined when it may hold. */
+  const holdsFull = (record: ChangeRecord): string | undefined =>
+    (holds.byChange.get(record.id) ?? 0) >= HOLDS_PER_CHANGE
+      ? `${HOLDS_PER_CHANGE} calls already wait on this change's question; answer it there or on its Change page.`
+      : (holds.byCaller.get(key) ?? 0) >= HOLDS_PER_CALLER
+        ? `${HOLDS_PER_CALLER} of your calls already wait on a question; answer them, or this change on its Change page.`
+        : undefined;
 
   const stateOf = async (record: ChangeRecord) => signToken(tokenKey, { kind: "state", sub: key, exp: record.expiresAt ?? now(), change: record.id, digest: await callDigest(name, args) });
 
@@ -524,6 +585,8 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
       return reply({ resultType: "input_required", inputRequests: { change: { method: "elicitation/create", params: { mode: "url", message: text, url: page } } }, requestState: await stateOf(record) });
     }
     if (context.version !== URL_ELICITATION_VERSION) return reply(toolResult(ownerWaiting(record, page, note)));
+    const full = holdsFull(record);
+    if (full !== undefined) return reply(toolResult(ownerWaiting(record, page, full)));
     // 2025-11-25 with URL elicitation: the question and then the call's result on the call's stream; a cut stream leaves
     // the change open for the page (plan D12).
     const elicitId = await signToken(tokenKey, { kind: "elicit", sub: key, exp: record.expiresAt ?? now(), change: record.id });
@@ -550,6 +613,8 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     // which a 2025 context has only at 2025-06-18 or 2025-11-25 (`asked` above), and a repeat reuses only a change of
     // the request's own mode. Should that ever change, the client gets the link rather than a question it cannot show.
     if (!context.elicitation.form || (context.version !== URL_ELICITATION_VERSION && context.version !== FORM_ELICITATION_VERSION)) return reply(toolResult(ownerWaiting(record, page, noteOf(record))));
+    const full = holdsFull(record);
+    if (full !== undefined) return reply(toolResult(ownerWaiting(record, page, full)));
     const elicitId = await signToken(tokenKey, { kind: "elicit", sub: key, exp: record.expiresAt ?? now(), change: record.id });
     const untilExpiry = Math.max(0, (record.expiresAt ?? now()) - now());
     return heldStream({
