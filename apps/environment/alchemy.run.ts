@@ -9,7 +9,7 @@
 // The Worker is prebuilt by build.ts and uploaded with `bundle: false` (ADR-0020): alchemy 2.0.0-beta.85 drops
 // `build.input.plugins` on every update after the first deploy.
 //
-// A stage may also have a custom domain (`T3FLARE_DOMAIN`, a hostname in a Cloudflare zone of the account; prod's is
+// Prod alone has a custom domain (`T3FLARE_DOMAIN`; any other stage with one is refused below, a hostname in a Cloudflare zone of the account; prod's is
 // `t3.ianpascoe.dev`, from the GitHub environment `prod` in CI and the laptop's environment otherwise). When set, it is
 // attached as a Workers Custom Domain and becomes the stage's only host: its workers.dev URL and preview URLs are
 // turned off, so the domain's rate limit (below) cannot be sidestepped. A stage without a domain is served at workers.dev.
