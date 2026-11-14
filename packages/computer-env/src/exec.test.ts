@@ -79,7 +79,7 @@ describe("exec", () => {
   it("kills a command that timed out before it started as soon as it is dispatched, and hands it to the ledger again", async () => {
     const order = lateStart(800);
     const ledger = { started: vi.fn(), ended: vi.fn(), stopped: vi.fn() };
-    const result = await exec({ workspace: {} as never, backend: undefined, cwd: "/workspace/repo", spill: async () => undefined, running: new Set(), ledger }, "sleep 100", { timeout: 0.05 }, BACKGROUND_CONTEXT);
+    const result = await exec({ workspace: {} as never, backend: undefined, cwd: "/workspace/repo", spill: async () => undefined, running: new Set(), ledger, startingNote: async () => undefined }, "sleep 100", { timeout: 0.05 }, BACKGROUND_CONTEXT);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe("Command timed out before it started (the Container was starting)");
     expect(ledger.stopped).toHaveBeenCalledTimes(1);
@@ -102,4 +102,14 @@ describe("exec", () => {
     // In the output too: pi-durable's bash replaces a timeout's message with its own and keeps the output.
     expect(output).toEqual(["t3flare: the command did not start: the Container was installing the Global mise config\n"]);
   });
+
+  it("says nothing of a Container for a command cut off on the Worker Shell (no startingNote)", async () => {
+    lateStart(300);
+    const output: Array<string> = [];
+    const result = await exec({ workspace: {} as never, backend: undefined, cwd: "/workspace/repo", spill: async () => undefined, running: new Set() }, "true", { timeout: 0.05, onOutput: (text) => void output.push(text) }, BACKGROUND_CONTEXT);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toBe("Command timed out");
+    expect(output).toEqual([]);
+  });
 });
+

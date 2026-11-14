@@ -304,17 +304,13 @@ export const exec = async (
 
     if (callbackError !== undefined) return err(callbackError);
 
-    const note = stoppedBeforeStart ? await host.startingNote?.().catch(() => undefined) : undefined;
+    // Only a command on the Container waits for it (`startingNote` is the Container backend's): say what it waited for.
+    const waited = stoppedBeforeStart && host.startingNote !== undefined ? `the Container was ${(await host.startingNote().catch(() => undefined)) ?? "starting"}` : undefined;
     // The harness replaces a timeout's message with its own; the output it keeps says why the command never ran.
-    if (stoppedBeforeStart && callbackError === undefined) deliver(`t3flare: the command did not start: the Container was ${note ?? "starting"}\n`, "stderr");
-    const error = new ExecutionError(
-      stopped ?? "aborted",
-      stopped !== "timeout"
-        ? "aborted"
-        : !stoppedBeforeStart
-          ? "Command timed out"
-          : `Command timed out before it started (the Container was ${note ?? "starting"})`,
-    );
+    if (waited !== undefined) deliver(`t3flare: the command did not start: ${waited}\n`, "stderr");
+    let message = "aborted";
+    if (stopped === "timeout") message = waited === undefined ? "Command timed out" : `Command timed out before it started (${waited})`;
+    const error = new ExecutionError(stopped ?? "aborted", message);
 
     const spillPath = await spill.write(host.spill);
 
