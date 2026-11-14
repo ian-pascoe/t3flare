@@ -310,6 +310,33 @@ describe("D16's caps", () => {
     expect(capRefusal(w.deps().changes, OWNER, "hash-9", w.now())).toMatchObject({ reason: "strikes" });
   });
 
+  it(`SPI-1195 review: an Owner client's ${OPENED_CAP} opened in an hour, each cut off with its stream, refuse the next naming the panel until an hour after the first`, () => {
+    const w = world();
+    const first = w.now();
+    for (let index = 0; index < OPENED_CAP; index++) {
+      expect(capRefusal(w.deps().changes, OWNER, `hash-${index}`, w.now())).toBeUndefined();
+      const record = w.open(OWNER, { hash: `hash-${index}`, mode: "native" });
+      // The client went away unanswered: withdrawn, its close line `cut`. A cut stream counts as one opened.
+      expect(closeOpenChange(w.deps(), record.id, "withdrawn", "stop", true)).toMatchObject({ state: "withdrawn" });
+      expect(w.deps().changes.get(record.id)?.closed?.cut).toBe(true);
+      w.advance(60_000);
+    }
+    const refusal = capRefusal(w.deps().changes, OWNER, "hash-new", w.now(), "https://h/_t3flare/harness#changes");
+    expect(refusal).toMatchObject({ reason: "opened-cap" });
+    expect(refusal!.changeId).toBeUndefined();
+    expect(refusal!.text).toBe(
+      `Not changed: you asked for ${OPENED_CAP} changes in the last hour, answered or not, the most t3flare allows. Make the change on the Harness panel (https://h/_t3flare/harness#changes), or try again later.`,
+    );
+    // Per caller and per door: another sub, and an own thread whose key is this sub, are not capped.
+    expect(capRefusal(w.deps().changes, { ...OWNER, key: "sub-2" }, "hash-new", w.now())).toBeUndefined();
+    expect(capRefusal(w.deps().changes, { ...OWN, key: "sub-1", thread: "sub-1" }, "hash-new", w.now())).toBeUndefined();
+    // The window slides: the first falls out of it an hour after it opened, and the cap lifts.
+    w.advance(first + OPENED_WINDOW_MS - 1 - w.now());
+    expect(capRefusal(w.deps().changes, OWNER, "hash-new", w.now())).toMatchObject({ reason: "opened-cap" });
+    w.advance(2);
+    expect(capRefusal(w.deps().changes, OWNER, "hash-new", w.now())).toBeUndefined();
+  });
+
   it(`${APPLIED_CAP} applied changes of any tier per caller per hour`, () => {
     const w = world();
     const changes = w.deps().changes;
