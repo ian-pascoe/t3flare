@@ -13,6 +13,9 @@
 //   Environment settings', ADR-0032), and is written to the audit log with its entity. The changes themselves are the
 //   transport-free ops (ops.ts, plan D1); this file parses a request into one and answers its outcome. A body may carry
 //   `expectedRevision` (plan D15): a moved revision is refused with 409.
+// - The Change page (plan D10, M4): `GET …/changes/<id>` renders one Open change; `POST …/api/changes/<id>`
+//   `{ action, value? }`, behind the same write guard, answers it, and is what applies it. A header value goes from its
+//   body to the secret store alone; a sign-in's authorization URL is in its answer alone. `GET …/api/changes` lists them.
 import { describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, ignoredServersOf, type McpChange, resolveEnvironment, resolveHarness } from "@t3flare/harness-registry";
 
 import type { McpHost } from "../mcp/host.ts";
@@ -37,6 +40,10 @@ import {
   setMcpHeader,
   testMcpServer,
 } from "./ops.ts";
+import { isChangeId } from "../settings/changes.ts";
+import { type Answerer, type ChangesApi, openChangeSummary } from "../settings/openChanges.ts";
+import { renderChangePage, renderGonePage } from "./changePage.ts";
+import { CHANGE_SCRIPT } from "./changePageScript.ts";
 import { pageCsp, renderPage } from "./page.ts";
 import type { AuditActor, HarnessStore } from "./store.ts";
 
@@ -64,6 +71,8 @@ export interface HarnessDeps {
   readonly skills?: Omit<SkillsApiDeps, "caller" | "now">;
   /** The Model endpoints (SPI-1162): their store, their model lists' read, and who to tell of a change. */
   readonly endpoints?: EndpointsApiDeps;
+  /** The Open changes (plan D8, D10): the Change page, its answers, and the panel's list. */
+  readonly changes?: ChangesApi;
 }
 
 /** The Containers running now, by their Workspaces (a holder's DO id when its Workspace is unknown); null without the budget. */
@@ -187,8 +196,23 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         mcp: await mcpOverview(deps),
         ...(deps.skills === undefined ? {} : { skills: skillsOverview(deps.skills) }),
         ...(deps.endpoints === undefined ? {} : { endpoints: await endpointsOverview(deps.endpoints) }),
+        ...(deps.changes === undefined ? {} : { openChanges: deps.changes.list().map((record) => openChangeSummary(record, undefined)) }),
       });
       return new Response(html, { headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp() } });
+    }
+    if (path.startsWith(`${HARNESS_PATH}/changes/`) && deps.changes !== undefined) {
+      const id = path.slice(`${HARNESS_PATH}/changes/`.length);
+      const subject = deps.caller.kind === "owner" ? deps.caller.subject : "";
+      const csrf = subject === "" ? "" : await csrfToken(deps.store.csrfKey(), subject, deps.now?.() ?? Date.now());
+      const record = isChangeId(id) ? deps.changes.get(id) : undefined;
+      const html = record === undefined || record.tier !== "asked" ? renderGonePage(csrf) : renderChangePage(record, { csrf, now: deps.now?.() ?? Date.now() });
+      return new Response(html, {
+        status: record === undefined ? 404 : 200,
+        headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp(CHANGE_SCRIPT) },
+      });
+    }
+    if (path === `${HARNESS_PATH}/api/changes` && deps.changes !== undefined) {
+      return json({ changes: deps.changes.list().map((record) => openChangeSummary(record, `https://${deps.host}${HARNESS_PATH}/changes/${record.id}`)) });
     }
     if (path === `${HARNESS_PATH}/api/settings`) {
       const stored = deps.store.load();
@@ -211,12 +235,14 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/environment`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`, `${HARNESS_PATH}/api/mcp/servers`, `${HARNESS_PATH}/api/mcp/oauth`, `${HARNESS_PATH}/api/mcp/secret`];
   const skillsRoute = SKILLS_WRITE_ROUTES.find((route) => path === `${HARNESS_PATH}/api/skills${route}`);
   const endpointsRoute = deps.endpoints === undefined ? undefined : Object.values(ENDPOINTS_PATHS).find((route) => path === `${HARNESS_PATH}${route}`);
-  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined) return refused(404, "Not found");
+  const changeRoute = path.startsWith(`${HARNESS_PATH}/api/changes/`) && deps.changes !== undefined ? path.slice(`${HARNESS_PATH}/api/changes/`.length) : undefined;
+  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined && changeRoute === undefined) return refused(404, "Not found");
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
     console.log(JSON.stringify({ t3flare: "harness-refused", reason: why, caller: deps.caller.kind }));
     return refused(403, why);
   }
+  if (changeRoute !== undefined && deps.changes !== undefined) return answerChange(deps.changes, changeRoute, await bodyOf(request), deps.caller);
   const ops = opsOf(deps);
   if (skillsRoute !== undefined && deps.skills !== undefined) {
     const body = await bodyOf(request);
@@ -269,6 +295,27 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   if (path === `${HARNESS_PATH}/api/mcp/secret`) return answer(await setMcpHeader(ops, { server: typeof body?.server === "string" ? body.server : "", value: body?.value }, options));
   if (body === undefined || typeof body.extension !== "string") return refused(400, "the body is one change: { extension, enabled?, settings? }");
   return answer(changeExtension(ops, changeOf(body) as unknown as HarnessChange, options));
+};
+
+/**
+ * The Change page's answer (plan D10): approve or decline Open change `id` as the identity the panel admitted. The
+ * header value goes from the body to the apply alone; the answer never carries it. A sign-in's authorization URL is in
+ * this answer alone.
+ */
+const answerChange = async (changes: ChangesApi, id: string, body: Record<string, unknown> | undefined, caller: HarnessCaller): Promise<Response> => {
+  if (!isChangeId(id)) return refused(404, "no such change");
+  if (body === undefined || (body.action !== "approve" && body.action !== "decline")) return refused(400, "the body is { action: approve | decline, value? }");
+  if (body.value !== undefined && typeof body.value !== "string") return refused(400, "value is the header's value, a string");
+  const answerer: Answerer = caller.kind === "owner" ? { kind: "owner", subject: caller.subject } : { kind: "service-token" };
+  const answered = await changes.answer(id, { answerer, action: body.action, ...(typeof body.value === "string" && body.action === "approve" ? { secret: body.value } : {}) });
+  if (!answered.ok) return refused(answered.status, answered.error);
+  const { outcome } = answered;
+  return json({
+    status: outcome.state,
+    ...(outcome.revision === undefined ? {} : { revision: outcome.revision }),
+    ...(outcome.error === undefined ? {} : { error: outcome.error }),
+    ...(answered.authorizationUrl === undefined ? {} : { authorizationUrl: answered.authorizationUrl }),
+  });
 };
 
 const skillsResponse = (answer: SkillsAnswer): Response => ("json" in answer ? json(answer.json, answer.status) : refused(answer.status, answer.text));

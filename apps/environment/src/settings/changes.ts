@@ -1,18 +1,40 @@
 // @effect-diagnostics globalDate:off
 // The Settings server's changes table (plan D8, D16): `t3flare_settings_changes` in the Environment DO's SQLite, one row
-// per change, the record as JSON, indexed by caller key and hash. The caps count from it. M3 writes only applied free
-// changes, as already-closed rows (plan D16), for the applied cap; the Open changes of M4 (SPI-1199) are kept in the same
-// table. Rows are pruned lazily, on every read and write, an hour after they close (ADR-0003: no alarm is added).
+// per change, the record as JSON, indexed by caller key and hash. It is the Open change table (M4, SPI-1199): an asked
+// change waiting for its answer is a row in state `open` until it closes. A free change made through the server is kept
+// as an already-closed row (state `applied`, tier `free`), so the caps count every change from one place.
+//
+// Kept in storage, not memory: the Environment resets after about 60 s idle (ADR-0003), which can fall between the ask
+// and the owner's click. Rows expire and are pruned lazily, on every read and write of the table: an open row past its
+// `expiresAt` closes as `expired`, and a closed row goes an hour after it closed (the longest cap window). No alarm is
+// added (ADR-0003: one alarm).
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
+
+import type { ChangeView } from "./render.ts";
 
 export const CHANGES_TABLE = "t3flare_settings_changes";
 
 /** How long a closed row is kept: the longest cap window (plan D16). */
 export const CLOSED_KEPT_MS = 60 * 60_000;
 
+/** How long an Open change waits for its answer (plan D8: the MCP host's question wait, `QUESTION_WAIT_MS`). */
+export const CHANGE_TTL_MS = 10 * 60_000;
+
+/** An apply that never closed (the Environment reset while it ran) is closed as failed this long after its expiry. */
+export const APPLYING_GRACE_MS = 5 * 60_000;
+
 /** Applied changes of any tier, per caller, per hour (plan D16). */
 export const APPLIED_CAP = 30;
 export const APPLIED_WINDOW_MS = 60 * 60_000;
+
+/** A change's state (plan D8). `open` and `applying` are open; the rest are closed. */
+export type ChangeState = "open" | "applying" | "applied" | "declined" | "withdrawn" | "expired" | "moved" | "failed";
+
+/** How an Open change is answered: on the owner-only card (own agents), or an Owner client's Elicitation mode (M5). */
+export type ChangeMode = "card" | "browser" | "native" | "model";
+
+/** What answered or closed a change. */
+export type ClosedBy = "card" | "page" | "client" | "agent";
 
 /** Who asked, as a change records it (plan D8's `caller`). */
 export interface ChangeCaller {
@@ -22,27 +44,57 @@ export interface ChangeCaller {
   readonly principal: "agent" | "owner" | "service-token";
   readonly thread?: string;
   readonly agent?: string;
+  /** An Owner client's own label, unverified. */
+  readonly client?: { readonly name: string; readonly source: string };
 }
 
-/** A change as the table keeps it. M3's rows are applied free changes; M4 extends the record to the Open change's. */
+/** A change as the table keeps it: an Open change (tier `asked`), or a free change already applied. */
 export interface ChangeRecord {
   readonly id: string;
+  /** Whose revision. */
   readonly entity: "harness" | "environment";
+  readonly expectedRevision?: number;
+  /** The write tool's name. */
   readonly tool: string;
   /** The call's arguments, canonical JSON (never a secret: none is ever in them). */
   readonly args: unknown;
+  /** SHA-256 of the tool and its canonical arguments without `expectedRevision`. */
   readonly hash: string;
   readonly tier: "free" | "asked";
+  /** What the card and the Change page render (an asked change's). */
+  readonly shown?: ChangeView;
+  readonly needsPage?: "secret" | "sign-in" | "oversize";
+  readonly mode?: ChangeMode;
   readonly caller: ChangeCaller;
   readonly createdAt: number;
-  readonly state: "applied";
-  readonly closed: { readonly at: number; readonly revision: number };
+  /** When an open change expires; a free row's is its creation. */
+  readonly expiresAt?: number;
+  readonly state: ChangeState;
+  readonly closed?: { readonly at: number; readonly by?: ClosedBy; readonly revision?: number; readonly error?: string };
 }
 
+export const isOpen = (record: Pick<ChangeRecord, "state">): boolean => record.state === "open" || record.state === "applying";
+
 export interface SettingsChanges {
-  /** Applied changes by `key` since `since`. */
+  /** Applied changes by `key` since `since`, of any tier. */
   appliedSince(key: string, since: number): number;
+  /** Keeps a free change made through the server, already closed. */
   recordApplied(record: ChangeRecord): void;
+  /** Keeps a new Open change. */
+  insert(record: ChangeRecord): void;
+  /** A change by id (expired first when its time is up), or undefined when unknown or pruned. */
+  get(id: string): ChangeRecord | undefined;
+  /** Every open change, oldest first. */
+  open(): ReadonlyArray<ChangeRecord>;
+  /** The open changes of `key`, oldest first. */
+  openBy(key: string): ReadonlyArray<ChangeRecord>;
+  /** The closed asked changes of `key` that closed since `since`, newest first. */
+  closedBy(key: string, since: number): ReadonlyArray<ChangeRecord>;
+  /**
+   * Replaces `id`'s record with `next` when its state is still one of `from`, in one synchronous block; answers whether
+   * it did. Only this moves a change's state, so a second answer finds it already moved (plan D8: one answer).
+   */
+  replace(id: string, from: ReadonlyArray<ChangeState>, next: ChangeRecord): boolean;
 }
 
 /** Canonical JSON: keys sorted at every depth. */
@@ -70,8 +122,39 @@ export const newChangeId = (): string => {
   return `chg_${btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "")}`;
 };
 
+/** A well-formed change id, so a page path or a `resume` cannot name anything else. */
+export const isChangeId = (id: string): boolean => /^chg_[A-Za-z0-9_-]{43}$/.test(id);
+
+const parse = (text: unknown): ChangeRecord | undefined => {
+  try {
+    return typeof text === "string" ? (JSON.parse(text) as ChangeRecord) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number = Date.now): SettingsChanges => {
   let ready = false;
+  const write = (record: ChangeRecord) =>
+    sql.exec(
+      `INSERT OR REPLACE INTO ${CHANGES_TABLE} (id, caller_key, hash, state, created_at, closed_at, record) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      record.id,
+      record.caller.key,
+      record.hash,
+      record.state,
+      record.createdAt,
+      record.closed?.at ?? null,
+      JSON.stringify(record),
+    );
+  const rows = (where: string, ...params: Array<unknown>): Array<ChangeRecord> =>
+    sql
+      .exec<{ record: string }>(`SELECT record FROM ${CHANGES_TABLE} WHERE ${where}`, ...params)
+      .toArray()
+      .flatMap((row) => {
+        const record = parse(row.record);
+        return record === undefined ? [] : [record];
+      });
+  /** Creates the table once, closes what has expired, and prunes what closed over an hour ago. */
   const prepare = () => {
     if (!ready) {
       sql.exec(
@@ -81,7 +164,14 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
       sql.exec(`CREATE INDEX IF NOT EXISTS ${CHANGES_TABLE}_hash ON ${CHANGES_TABLE} (hash)`);
       ready = true;
     }
-    sql.exec(`DELETE FROM ${CHANGES_TABLE} WHERE closed_at IS NOT NULL AND closed_at < ?`, now() - CLOSED_KEPT_MS);
+    const at = now();
+    // At most the Environment-wide cap of open rows (plan D16), so reading them all is cheap.
+    for (const record of rows(`state IN ('open', 'applying')`)) {
+      const expiresAt = record.expiresAt ?? record.createdAt;
+      if (record.state === "open" && expiresAt <= at) write({ ...record, state: "expired", closed: { at: expiresAt } });
+      else if (record.state === "applying" && expiresAt + APPLYING_GRACE_MS <= at) write({ ...record, state: "failed", closed: { at, error: "the Environment restarted while the change applied; read the settings to see whether it did" } });
+    }
+    sql.exec(`DELETE FROM ${CHANGES_TABLE} WHERE closed_at IS NOT NULL AND closed_at < ?`, at - CLOSED_KEPT_MS);
   };
   return {
     appliedSince: (key, since) => {
@@ -91,16 +181,34 @@ export const settingsChanges = (sql: Pick<SqlStorage, "exec">, now: () => number
     },
     recordApplied: (record) => {
       prepare();
-      sql.exec(
-        `INSERT INTO ${CHANGES_TABLE} (id, caller_key, hash, state, created_at, closed_at, record) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        record.id,
-        record.caller.key,
-        record.hash,
-        record.state,
-        record.createdAt,
-        record.closed.at,
-        JSON.stringify(record),
-      );
+      write(record);
+    },
+    insert: (record) => {
+      prepare();
+      write(record);
+    },
+    get: (id) => {
+      prepare();
+      return rows(`id = ?`, id)[0];
+    },
+    open: () => {
+      prepare();
+      return rows(`state IN ('open', 'applying') ORDER BY created_at, id`);
+    },
+    openBy: (key) => {
+      prepare();
+      return rows(`caller_key = ? AND state IN ('open', 'applying') ORDER BY created_at, id`, key);
+    },
+    closedBy: (key, since) => {
+      prepare();
+      return rows(`caller_key = ? AND closed_at IS NOT NULL AND closed_at >= ? ORDER BY closed_at DESC, created_at DESC`, key, since).filter((record) => record.tier === "asked");
+    },
+    replace: (id, from, next) => {
+      prepare();
+      const current = rows(`id = ?`, id)[0];
+      if (current === undefined || !from.includes(current.state)) return false;
+      write(next);
+      return true;
     },
   };
 };

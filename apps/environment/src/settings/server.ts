@@ -1,21 +1,23 @@
 // @effect-diagnostics globalDate:off globalTimers:off
-// The Settings server (ADR-0034, plan D2, D3, D7, D14, D16, D17), pure over its deps: t3flare's own agents' door, M3
-// (SPI-1198). The MCP host calls it for the `settings` entry of the MCP server set, before any inventory or pausing
+// The Settings server (ADR-0034, plan D2, D3, D7, D8, D9, D14, D16, D17), pure over its deps: t3flare's own agents'
+// door, M3 (SPI-1198) and M4 (SPI-1199). The MCP host calls it for the `settings` entry of the MCP server set, before any inventory or pausing
 // logic, with the caller the Environment derived (never one the agent states) and the call's asker.
 //
 // - Reads run for every caller, linked work included, and never carry a secret value, a fingerprint, a URL's query or an
 //   authorization URL (D14).
 // - A write is judged here, once (D7), in this order: the access switch; Linked or unknown work (D3); plan mode (and no
-//   mode record); validation by the registry; the expected revision (D15); the Change tier (D5); the applied cap (D16);
-//   then run, or ask the owner on one owner-only approval card on the calling thread. The Session's `mcp` extension and
-//   the relay keep only the plan refusal for this server and raise no card of their own.
-// - Interim, M3 only (D17): an asked change is refused, naming the Harness panel. Open changes, their card and the
-//   Change page come in M4 (SPI-1199).
+//   mode record); validation by the registry; the expected revision (D15); the Change tier (D5); the caps (D16); then
+//   run, or ask the owner on one owner-only approval card on the calling thread. The Session's `mcp` extension and the
+//   relay keep only the plan refusal for this server and raise no card of their own.
+// - An asked change (D8, D9) always asks, in every mode: it becomes an Open change (openChanges.ts), shown on an
+//   owner-only approval card written here (never by the agent) and on the Change page, and the first answer wins. A
+//   change that needs the page (a secret, a sign-in, or text too long for a card, D6) is approved on the page alone.
 // - Every change goes through `ops.ts`, as the panel's do.
 import {
   applyChange,
   applyEnvironmentChange,
   applyMcpChange,
+  CARD_TEXT_MAX,
   cardText,
   classOf,
   ENVIRONMENT_SETTINGS,
@@ -31,17 +33,43 @@ import {
   type TierVerdict,
   tierOf,
   type ToolClass,
+  visible,
   withoutQuery,
 } from "@t3flare/harness-registry";
 import type { McpAsker, McpQuestionAnswer, McpQuestionCard } from "@t3flare/session-protocol";
 
 import { containerCostTable } from "../harness/containerCost.ts";
-import { changeEnvironment, changeExtension, changeMcp, changeSkills, type OpOptions, type OpsDeps, readAudit, testMcpServer } from "../harness/ops.ts";
+import {
+  addMcpServer,
+  beginMcpSignIn,
+  changeEnvironment,
+  changeExtension,
+  changeMcp,
+  changeSkills,
+  type OpOptions,
+  type OpsDeps,
+  readAudit,
+  setMcpHeader,
+  testMcpServer,
+} from "../harness/ops.ts";
 import type { AuditActor } from "../harness/store.ts";
 import { newCardId } from "../mcp/elicitation.ts";
 import type { McpCallAnswer, McpHost } from "../mcp/host.ts";
-import { viewSkill } from "../skills/api.ts";
-import { APPLIED_CAP, APPLIED_WINDOW_MS, changeHash, newChangeId, type SettingsChanges } from "./changes.ts";
+import { previewAtCommit, viewSkill } from "../skills/api.ts";
+import { APPLIED_CAP, APPLIED_WINDOW_MS, canonicalJson, CHANGE_TTL_MS, type ChangeRecord, changeHash, type ClosedBy, isOpen, newChangeId, type SettingsChanges } from "./changes.ts";
+import {
+  type AnswerDeps,
+  answerOpenChange,
+  type ApplyResult,
+  capRefusal,
+  type ChangeOutcome,
+  type ChangesApi,
+  closeOpenChange,
+  openChangeSummary,
+  outcomeOf,
+  waitForChange,
+} from "./openChanges.ts";
+import { type ChangeItem, changeText, type ChangeView, environmentItems, extensionItems, mcpItems, shownSkill } from "./render.ts";
 import { settingsToolOf } from "./tools.ts";
 
 /** How long the owner's card waits (the MCP host's question wait, `QUESTION_WAIT_MS`). */
@@ -93,8 +121,8 @@ export interface SettingsCallInput {
   readonly signal?: AbortSignal;
 }
 
-/** The status every write's result carries (plan D11's `structuredContent`; `waiting` comes with M4). */
-export type WriteStatus = "applied" | "unchanged" | "declined" | "withdrawn" | "moved" | "refused";
+/** The status every write's result carries (plan D11's `structuredContent`; `waiting` is an Owner client's, M5). */
+export type WriteStatus = "applied" | "unchanged" | "waiting" | "declined" | "withdrawn" | "expired" | "moved" | "refused";
 
 type Entity = "harness" | "environment";
 
@@ -134,7 +162,7 @@ const readError = (text: string): McpCallAnswer => ({ kind: "result", isError: t
 
 const written = (status: WriteStatus, text: string, extra: Readonly<Record<string, unknown>> = {}): McpCallAnswer => ({
   kind: "result",
-  isError: status !== "applied" && status !== "unchanged",
+  isError: status !== "applied" && status !== "unchanged" && status !== "waiting",
   text,
   structured: { status, ...extra },
 });
@@ -249,17 +277,31 @@ const skillsRead = async (deps: SettingsServerDeps, route: "/preview" | "/check"
 
 // ── Writes ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** A write made ready: its entity, tier, and how it runs through the ops (absent: only the owner can apply it, M4). */
+/** What running a planned write answered. `authorizationUrl` is a sign-in's, for the Change page's own response only. */
+type RunResult =
+  | { readonly ok: true; readonly unchanged?: boolean; readonly authorizationUrl?: string }
+  | { readonly ok: false; readonly error: string; readonly moved?: number };
+
+/** What an asked change shows (its items and fixed lines), or why it cannot be asked (a skill's preview failed). */
+type Described = { readonly items: ReadonlyArray<ChangeItem>; readonly lines: ReadonlyArray<string> } | { readonly refused: string };
+
+/** A write made ready: its entity, tier, what it shows when asked, and how it runs through the ops. */
 interface Planned {
   readonly entity: Entity;
+  readonly subject: string;
   readonly appliesAt: string;
   readonly verdict: TierVerdict;
-  readonly run?: (options: OpOptions) => Promise<{ readonly ok: true; readonly unchanged?: boolean } | { readonly ok: false; readonly error: string; readonly moved?: number }>;
+  /** Its items for the card and the page; may read GitHub (a skill's preview), so only an asked change calls it. */
+  readonly describe: () => Promise<Described>;
+  /** Runs it. `secret` is a header value typed on the Change page; `shown` the Open change's view (a skill's digests). */
+  readonly run: (options: OpOptions, extra?: { readonly secret?: string; readonly shown?: ChangeView }) => Promise<RunResult>;
 }
 
 type PlanOrRefusal = Planned | { readonly refused: string };
 
-const fromOutcome = (outcome: { readonly ok: boolean; readonly error?: string; readonly status?: number; readonly revision?: number; readonly unchanged?: true }) =>
+const SUBJECT = { harness: "the Harness settings", mcp: "the MCP server set (Harness settings)", environment: "the Environment settings", skills: "the Environment skills" } as const;
+
+const fromOutcome = (outcome: { readonly ok: boolean; readonly error?: string; readonly status?: number; readonly revision?: number; readonly unchanged?: true }): RunResult =>
   outcome.ok
     ? { ok: true as const, ...(outcome.unchanged === true ? { unchanged: true } : {}) }
     : { ok: false as const, error: outcome.error ?? "refused", ...(outcome.status === 409 && outcome.revision !== undefined ? { moved: outcome.revision } : {}) };
@@ -283,8 +325,10 @@ const planExtension = (deps: SettingsServerDeps, args: Readonly<Record<string, u
   if (!applied.ok) return { refused: applied.error };
   return {
     entity: "harness",
+    subject: SUBJECT.harness,
     appliesAt: APPLIES_AT.harness,
     verdict: tierOf({ entity: "extension", stored, change }),
+    describe: async () => extensionItems(stored, change),
     run: async (options) => fromOutcome(changeExtension(deps.ops, change, options)),
   };
 };
@@ -294,12 +338,21 @@ const planMcp = (deps: SettingsServerDeps, args: Readonly<Record<string, unknown
   if (change === undefined || typeof change.op !== "string" || typeof change.server !== "string") return { refused: "change is { op, server, … }" };
   const stored = deps.ops.store.load();
   const server = change.server;
+  const secretSet = (name: string) => deps.ops.secrets?.mark(name, "header").set === true;
   if (change.op === "header-value") {
     const setting = Object.hasOwn(mcpServersOf(stored), server) ? mcpServersOf(stored)[server] : undefined;
     if (setting === undefined || setting.kind !== "direct") return { refused: `No Direct server is named ${server}.` };
     if (setting.auth?.kind !== "header") return { refused: `${server} does not sign in with a header.` };
-    // Its value is typed on the Change page alone (plan D6, M4): never applied through a tool.
-    return { entity: "harness", appliesAt: APPLIES_AT.harness, verdict: tierOf({ entity: "mcp", stored, change: { op: "header-value", server } }) };
+    const tierChange = { op: "header-value", server } as const;
+    // Its value is typed on the Change page alone (plan D6): it reaches `run` from there, never from a tool.
+    return {
+      entity: "harness",
+      subject: SUBJECT.mcp,
+      appliesAt: APPLIES_AT.harness,
+      verdict: tierOf({ entity: "mcp", stored, change: tierChange }),
+      describe: async () => mcpItems(stored, tierChange, secretSet),
+      run: async (options, extra) => fromOutcome(await setMcpHeader(deps.ops, { server, value: extra?.secret }, options)),
+    };
   }
   if (change.op !== "server" && change.op !== "class" && change.op !== "add" && change.op !== "remove") return { refused: "op is server, class, add, remove or header-value" };
   if (change.op === "add") {
@@ -312,9 +365,21 @@ const planMcp = (deps: SettingsServerDeps, args: Readonly<Record<string, unknown
   const applied = applyMcpChange(stored, mcpChange);
   if (!applied.ok) return { refused: applied.error };
   const verdict = tierOf({ entity: "mcp", stored, change: mcpChange, hintedClass: hintedClass(deps) });
-  // A server is added on the Change page (M4): an add is always asked, and a header add takes its secret there.
-  if (mcpChange.op === "add") return { entity: "harness", appliesAt: APPLIES_AT.harness, verdict };
-  return { entity: "harness", appliesAt: APPLIES_AT.harness, verdict, run: async (options) => fromOutcome(changeMcp(deps.ops, mcpChange, options)) };
+  const describe = async () => mcpItems(stored, mcpChange, secretSet);
+  if (mcpChange.op === "add") {
+    // A header add takes its value on the Change page (plan D6): `run` gets it from there.
+    const add = mcpChange;
+    return {
+      entity: "harness",
+      subject: SUBJECT.mcp,
+      appliesAt: APPLIES_AT.harness,
+      verdict,
+      describe,
+      run: async (options, extra) =>
+        fromOutcome(await addMcpServer(deps.ops, { server: add.server, url: add.url, auth: add.auth, ...(extra?.secret === undefined ? {} : { value: extra.secret }) }, options)),
+    };
+  }
+  return { entity: "harness", subject: SUBJECT.mcp, appliesAt: APPLIES_AT.harness, verdict, describe, run: async (options) => fromOutcome(changeMcp(deps.ops, mcpChange, options)) };
 };
 
 const planSignIn = (deps: SettingsServerDeps, args: Readonly<Record<string, unknown>>): PlanOrRefusal => {
@@ -323,8 +388,19 @@ const planSignIn = (deps: SettingsServerDeps, args: Readonly<Record<string, unkn
   const setting = Object.hasOwn(mcpServersOf(stored), server) ? mcpServersOf(stored)[server] : undefined;
   if (setting === undefined || setting.kind !== "direct") return { refused: `No Direct server is named ${server}.` };
   if (setting.auth?.kind !== "oauth") return { refused: `${server} does not sign in with OAuth.` };
-  // The sign-in starts in the owner's browser on the Change page (plan D6, O8): never through a tool.
-  return { entity: "harness", appliesAt: APPLIES_AT.harness, verdict: tierOf({ entity: "mcp", stored, change: { op: "sign-in", server } }) };
+  const change = { op: "sign-in", server } as const;
+  // The sign-in starts in the owner's browser on the Change page (plan D6, O8): its authorization URL goes to the page alone.
+  return {
+    entity: "harness",
+    subject: SUBJECT.mcp,
+    appliesAt: APPLIES_AT.harness,
+    verdict: tierOf({ entity: "mcp", stored, change }),
+    describe: async () => mcpItems(stored, change, () => false),
+    run: async (options) => {
+      const begun = await beginMcpSignIn(deps.ops, server, options);
+      return begun.ok ? { ok: true, authorizationUrl: begun.authorizationUrl } : fromOutcome(begun);
+    },
+  };
 };
 
 const planEnvironment = (deps: SettingsServerDeps, args: Readonly<Record<string, unknown>>): PlanOrRefusal => {
@@ -335,48 +411,75 @@ const planEnvironment = (deps: SettingsServerDeps, args: Readonly<Record<string,
   if (!applied.ok) return { refused: applied.error };
   return {
     entity: "environment",
+    subject: SUBJECT.environment,
     appliesAt: APPLIES_AT.environment,
     verdict: tierOf({ entity: "environment", stored, change: { settings } }),
+    describe: async () => ({ items: environmentItems(stored, settings), lines: [] }),
     run: async (options) => fromOutcome(await changeEnvironment(deps.ops, settings, options)),
   };
 };
 
+/** The digests an Open change's skills were shown with, by folder (plan D8): the apply refuses others. */
+const digestsOf = (shown: ChangeView | undefined): Readonly<Record<string, string>> | undefined => {
+  const item = shown?.items.find((each) => each.kind === "skills");
+  return item?.kind === "skills" ? Object.fromEntries(item.skills.map((skill) => [skill.path, skill.digest])) : undefined;
+};
+
 const planSkills = (deps: SettingsServerDeps, args: Readonly<Record<string, unknown>>): PlanOrRefusal => {
-  if (deps.ops.skills === undefined) return { refused: "The Environment skills are not available here." };
+  const skills = deps.ops.skills;
+  if (skills === undefined) return { refused: "The Environment skills are not available here." };
   const op = stringArg(args, "op");
   const name = stringArg(args, "name");
-  const known = (wanted: string | undefined) => wanted !== undefined && deps.ops.skills?.store.get(wanted) !== undefined;
+  const row = name === undefined ? undefined : skills.store.get(name);
   const skillsRun =
     (route: "/install" | "/update" | "/remove" | "/enable", body: Record<string, unknown>) =>
-    async (options: OpOptions): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string; readonly moved?: number }> => {
-      const answer = await changeSkills(deps.ops, route, body, options);
-      if (answer.status === 200) return { ok: true };
+    async (options: OpOptions, extra?: { readonly shown?: ChangeView }): Promise<RunResult> => {
+      const digests = digestsOf(extra?.shown);
+      const answer = await changeSkills(deps.ops, route, { ...body, ...(digests === undefined ? {} : { digests }) }, options);
+      if (answer.status === 200) {
+        // An install answers each skill's own outcome: one kept is applied; none kept is a failure.
+        const results = "json" in answer ? (answer.json as { readonly results?: ReadonlyArray<{ readonly name: string; readonly error?: string }> }).results : undefined;
+        if (results !== undefined && results.length > 0 && results.every((result) => result.error !== undefined)) return { ok: false, error: results.map((result) => `${result.name}: ${result.error}`).join("; ") };
+        return { ok: true };
+      }
       const error = "text" in answer ? answer.text : json(answer.json);
       return answer.status === 409 ? { ok: false, error, moved: deps.ops.store.loadEnvironment().revision } : { ok: false, error };
     };
-  const planned = (verdict: TierVerdict, run?: Planned["run"]): Planned => ({ entity: "environment", appliesAt: APPLIES_AT.skills, verdict, ...(run === undefined ? {} : { run }) });
+  const planned = (verdict: TierVerdict, describe: Planned["describe"], run: Planned["run"]): Planned => ({ entity: "environment", subject: SUBJECT.skills, appliesAt: APPLIES_AT.skills, verdict, describe, run });
+  const preview = async (input: { readonly source: string; readonly commit: string; readonly folders: ReadonlyArray<string> }, op: "install" | "update", from?: string): Promise<Described> => {
+    const found = await previewAtCommit({ reader: skills.reader, now: deps.ops.now }, input);
+    if (!found.ok) return { refused: found.error };
+    const missing = input.folders.filter((folder) => !found.preview.skills.some((skill) => skill.path === folder));
+    if (missing.length > 0) return { refused: `no skill at ${missing.map((folder) => (folder === "" ? "the repo's root" : folder)).join(", ")} at ${input.commit.slice(0, 7)}; preview again` };
+    return {
+      items: [{ kind: "skills", op, source: input.source, repo: found.preview.repo, ref: found.preview.ref, commit: input.commit, ...(from === undefined ? {} : { from }), skills: found.preview.skills.map(shownSkill) }],
+      lines: [],
+    };
+  };
   switch (op) {
     case "install": {
       const source = stringArg(args, "source");
       const commit = stringArg(args, "commit");
       if (source === undefined || commit === undefined || !/^[0-9a-f]{40}$/.test(commit)) return { refused: "install names the source and the previewed 40-hex commit" };
       if (!Array.isArray(args.folders) || args.folders.length === 0 || !args.folders.every((folder) => typeof folder === "string")) return { refused: "install names at least one folder from the preview" };
-      return planned(tierOf({ entity: "skills", change: { op: "install" } }), skillsRun("/install", { source, commit, folders: args.folders }));
+      const folders = args.folders as ReadonlyArray<string>;
+      return planned(tierOf({ entity: "skills", change: { op: "install" } }), () => preview({ source, commit, folders }, "install"), skillsRun("/install", { source, commit, folders }));
     }
     case "update": {
       const commit = stringArg(args, "commit");
-      if (!known(name)) return { refused: `No Environment skill is named ${name ?? ""}.` };
+      if (row === undefined) return { refused: `No Environment skill is named ${name ?? ""}.` };
       if (commit === undefined || !/^[0-9a-f]{40}$/.test(commit)) return { refused: "update names the 40-hex commit check_skill_updates answered" };
-      return planned(tierOf({ entity: "skills", change: { op: "update", name: name! } }), skillsRun("/update", { name, commit }));
+      const source = `https://github.com/${row.repo}/tree/${commit}${row.path === "" ? "" : `/${row.path}`}`;
+      return planned(tierOf({ entity: "skills", change: { op: "update", name: row.name } }), () => preview({ source, commit, folders: [row.path] }, "update", row.commit), skillsRun("/update", { name, commit }));
     }
     case "remove":
-      if (!known(name)) return { refused: `No Environment skill is named ${name ?? ""}.` };
-      return planned(tierOf({ entity: "skills", change: { op: "remove", name: name! } }), skillsRun("/remove", { name }));
     case "enable":
     case "disable": {
-      if (!known(name)) return { refused: `No Environment skill is named ${name ?? ""}.` };
+      if (row === undefined) return { refused: `No Environment skill is named ${name ?? ""}.` };
+      const describe = async (): Promise<Described> => ({ items: [{ kind: "skill", op, name: row.name, repo: row.repo, commit: row.commit }], lines: [] });
+      if (op === "remove") return planned(tierOf({ entity: "skills", change: { op: "remove", name: row.name } }), describe, skillsRun("/remove", { name }));
       const enabled = op === "enable";
-      return planned(tierOf({ entity: "skills", change: { op: "enable", name: name!, enabled } }), skillsRun("/enable", { name, enabled }));
+      return planned(tierOf({ entity: "skills", change: { op: "enable", name: row.name, enabled } }), describe, skillsRun("/enable", { name, enabled }));
     }
     default:
       return { refused: "op is install, update, enable, disable or remove" };
@@ -402,30 +505,86 @@ const planWrite = (deps: SettingsServerDeps, tool: string, args: Readonly<Record
 
 const revisionOf = (deps: SettingsServerDeps, entity: Entity): number => (entity === "harness" ? deps.ops.store.load().revision : deps.ops.store.loadEnvironment().revision);
 
-/** The owner-only approval card for a write the thread's mode asks about (plan D7, D9's card without the page). */
-const writeCard = (input: SettingsCallInput, planned: Planned, revision: number): McpQuestionCard => {
-  const thread = input.caller.thread ?? "an unknown thread";
+/** The Change page's URL for `id` on the configured host, when known (plan D10). */
+export const changeUrlOf = (deps: Pick<SettingsServerDeps, "panelUrl">, id: string): string | undefined => {
+  const panel = deps.panelUrl();
+  return panel === undefined ? undefined : `${panel}/changes/${id}`;
+};
+
+/** The panel's Open changes list (plan D10, D16). */
+const openListOf = (deps: Pick<SettingsServerDeps, "panelUrl">): string | undefined => {
+  const panel = deps.panelUrl();
+  return panel === undefined ? undefined : `${panel}#changes`;
+};
+
+/** The calling thread and agent, as a card or page names them. */
+const askedBy = (caller: OwnCaller): string => `Asked by ${caller.agent} on thread ${caller.thread ?? "an unknown thread"}.`;
+
+/** The agent's call, as a card shows it last. */
+const callText = (tool: string, args: Readonly<Record<string, unknown>>): string => `The agent's call: settings: ${tool}\n${JSON.stringify(args, null, 2)}`;
+
+const APPROVAL_OPTIONS: NonNullable<McpQuestionCard["options"]> = [
+  { decision: "accept", label: "Approve" },
+  { decision: "decline", label: "Decline" },
+  { decision: "cancel", label: "Cancel" },
+];
+
+/** A change answered on the page (plan D9): "Opened it" only keeps the call waiting for the page. */
+const PAGE_OPTIONS: NonNullable<McpQuestionCard["options"]> = [
+  { decision: "accept", label: "Opened it" },
+  { decision: "decline", label: "Decline" },
+  { decision: "cancel", label: "Cancel" },
+];
+
+/** The owner-only approval card for a free write the thread's mode asks about (plan D7). */
+const freeCard = (input: SettingsCallInput, planned: Planned, revision: number): McpQuestionCard => {
   const prompt = [
-    `An agent asks to change t3flare's ${planned.entity === "harness" ? "Harness" : "Environment"} settings (revision ${revision}):`,
+    `An agent asks to change ${planned.subject} (revision ${revision}):`,
     ...planned.verdict.reasons.map((reason) => `- ${reason}`),
     "",
     planned.appliesAt,
-    `Asked by ${input.caller.agent} on thread ${thread}. This change is free (it narrows what agents have); this thread's mode asks for every write.`,
+    `${askedBy(input.caller)} This change is free (it narrows what agents have); this thread's mode asks for every write.`,
     "",
-    `The agent's call: settings: ${input.tool}`,
-    JSON.stringify(input.args, null, 2),
+    callText(input.tool, input.args),
   ].join("\n");
+  return { id: newCardId(), kind: "approval", server: SETTINGS_SERVER, title: cardText(`settings: ${input.tool}?`, 200), prompt: cardText(prompt), options: APPROVAL_OPTIONS };
+};
+
+/**
+ * The asked change's card text in full (plan D9): the change as the server resolved it, why it is asked, the fixed
+ * lines, when it applies, who asked, the Change page's link, and the agent's call last.
+ */
+const askedText = (view: ChangeView, input: SettingsCallInput, url: string | undefined): string =>
+  [changeText(view), "", askedBy(input.caller), ...(url === undefined ? [] : [`The Change page: ${url}`]), "", callText(input.tool, input.args)].join("\n");
+
+/** The owner-only approval card for an asked change (plan D9); never a field, so no agent can answer it. */
+export const askedCard = (view: ChangeView, input: SettingsCallInput, url: string | undefined, needsPage: ChangeRecord["needsPage"]): McpQuestionCard => {
+  const full = askedText(view, input, url);
+  const where = url === undefined ? "the Change page (its link is on the Harness panel's Open changes list)" : `the Change page: ${url}`;
+  const prompt =
+    needsPage === "oversize"
+      ? [
+          `An agent asks to change ${view.subject} (revision ${view.revision}). The change is too long to show on a card, so it is answered on ${where}`,
+          "",
+          askedBy(input.caller),
+          `"Opened it" keeps the call waiting for the page; Decline and Cancel close it.`,
+        ].join("\n")
+      : needsPage === undefined
+        ? full
+        : [
+            full,
+            "",
+            needsPage === "secret"
+              ? `It takes a secret, typed on ${where}. "Opened it" keeps the call waiting for the page.`
+              : `The sign-in starts in your browser on ${where}. "Opened it" keeps the call waiting for the page.`,
+          ].join("\n");
   return {
     id: newCardId(),
     kind: "approval",
     server: SETTINGS_SERVER,
     title: cardText(`settings: ${input.tool}?`, 200),
     prompt: cardText(prompt),
-    options: [
-      { decision: "accept", label: "Approve" },
-      { decision: "decline", label: "Decline" },
-      { decision: "cancel", label: "Cancel" },
-    ],
+    options: needsPage === undefined ? APPROVAL_OPTIONS : PAGE_OPTIONS,
   };
 };
 
@@ -454,6 +613,203 @@ const askOnCard = async (deps: SettingsServerDeps, asker: McpAsker, card: McpQue
   return answer;
 };
 
+/** The deps `answerOpenChange` runs over: the table, and the apply through the ops. */
+export const answerDepsOf = (deps: SettingsServerDeps): AnswerDeps => ({
+  changes: deps.changes,
+  now: deps.ops.now,
+  revisionOf: (entity) => revisionOf(deps, entity),
+  apply: (record, input) => applyOpenChange(deps, record, input),
+  ...(deps.log === undefined ? {} : { log: deps.log }),
+});
+
+/** The Change page's and the panel list's view of the Open changes (plan D10): answers there are by `page`. */
+export const changesApiOf = (deps: SettingsServerDeps): ChangesApi => ({
+  list: () => deps.changes.open(),
+  get: (id) => deps.changes.get(id),
+  answer: (id, input) => answerOpenChange(answerDepsOf(deps), id, { ...input, by: "page" }),
+});
+
+/** Who asked, as an asked change's audit entry keeps it (plan D15). */
+const actorOfChange = (record: ChangeRecord, by: ClosedBy): AuditActor => ({
+  caller: record.caller.principal === "agent" ? `agent:${record.caller.key}` : record.caller.principal === "owner" ? `owner:${record.caller.key}` : "service-token",
+  via: "mcp",
+  ...(record.caller.thread === undefined ? {} : { thread: record.caller.thread }),
+  ...(record.caller.agent === undefined ? {} : { agent: record.caller.agent }),
+  ...(record.caller.client === undefined ? {} : { client: record.caller.client }),
+  tier: "asked",
+  ...(record.mode === undefined ? {} : { mode: record.mode }),
+  answeredBy: by,
+  change: record.id,
+});
+
+/**
+ * Applies an answered Open change (plan D8): planned again from its tool and arguments against the settings as they are
+ * now (the registry validates it again), and run with its expected revision. A secret goes from the page to `run` alone.
+ */
+export const applyOpenChange = async (deps: SettingsServerDeps, record: ChangeRecord, input: { readonly by: ClosedBy; readonly secret?: string }): Promise<ApplyResult> => {
+  const planned = planWrite(deps, record.tool, (record.args ?? {}) as Readonly<Record<string, unknown>>);
+  if ("refused" in planned) return { ok: false, error: planned.refused };
+  const ran = await planned.run(
+    { actor: actorOfChange(record, input.by), ...(record.expectedRevision === undefined ? {} : { expectedRevision: record.expectedRevision }) },
+    { ...(input.secret === undefined ? {} : { secret: input.secret }), ...(record.shown === undefined ? {} : { shown: record.shown }) },
+  );
+  if (!ran.ok) return ran;
+  return { ok: true, revision: revisionOf(deps, planned.entity), ...(ran.authorizationUrl === undefined ? {} : { authorizationUrl: ran.authorizationUrl }) };
+};
+
+/** A closed change's answer to the agent (plan D11's statuses). */
+const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "entity">, planned: Pick<Planned, "appliesAt">): McpCallAnswer => {
+  const where = outcome.by === "page" ? " on the Change page" : outcome.by === "card" ? " on the card" : "";
+  const name = record.entity === "harness" ? "Harness" : "Environment";
+  switch (outcome.state) {
+    case "applied":
+      return written("applied", `Applied: the owner approved it${where}. The ${name} settings are at revision ${outcome.revision ?? "?"}. ${planned.appliesAt}`, {
+        ...(outcome.revision === undefined ? {} : { revision: outcome.revision }),
+        appliesAt: planned.appliesAt,
+        changeId: record.id,
+      });
+    case "declined":
+      return written("declined", `Not changed: the owner declined it${where}. Do not ask again for the same change.`, { changeId: record.id });
+    case "expired":
+      return written("expired", "Not changed: the owner did not answer within 10 minutes.", { changeId: record.id });
+    case "moved":
+      return written("moved", `Not changed: the ${name} settings moved to revision ${outcome.revision ?? "?"} before it applied; read them again.`, {
+        ...(outcome.revision === undefined ? {} : { revision: outcome.revision }),
+        changeId: record.id,
+      });
+    case "withdrawn":
+      return written("withdrawn", `Not changed: the change was withdrawn${where === "" ? "" : ` (${where.trim()})`} before an answer.`, { changeId: record.id });
+    default:
+      return written("refused", `Not changed: ${scrubText(outcome.error ?? "the change failed")}`, { changeId: record.id });
+  }
+};
+
+/**
+ * An own agent's asked change (plan D8, D9): opened as an Open change, shown on one owner-only approval card on the
+ * calling thread, and answered by the card or the Change page, whichever comes first. It waits at most the change's 10
+ * minutes; a Stop withdraws it.
+ */
+const ask = async (deps: SettingsServerDeps, input: SettingsCallInput, planned: Planned, expected: number, key: string): Promise<McpCallAnswer> => {
+  const { caller, tool, args } = input;
+  const now = deps.ops.now();
+  const hash = await changeHash(tool, args);
+  const changeCaller = { door: "own" as const, key, principal: "agent" as const, thread: key, agent: caller.agent };
+  const log = (outcome: string, extra: Record<string, unknown> = {}) => deps.log?.({ t3flare: "settings-refused", via: "mcp", door: "own", agent: caller.agent, thread: key, tool, outcome, ...extra });
+  const capped = capRefusal(deps.changes, changeCaller, hash, now, openListOf(deps));
+  if (capped !== undefined) {
+    log("refused", { reason: capped.reason });
+    return written("refused", capped.text, { tier: "asked", reason: capped.reason, ...(capped.changeId === undefined ? {} : { changeId: capped.changeId }) });
+  }
+  const described = await planned.describe();
+  if ("refused" in described) {
+    log("refused", { reason: "invalid" });
+    return written("refused", `Not changed: ${scrubText(described.refused)}`);
+  }
+  const view: ChangeView = { entity: planned.entity, subject: planned.subject, revision: expected, appliesAt: planned.appliesAt, reasons: planned.verdict.reasons, items: described.items, lines: described.lines };
+  const id = newChangeId();
+  const url = changeUrlOf(deps, id);
+  const needsPage = planned.verdict.needsPage ?? (visible(askedText(view, input, url)).length > CARD_TEXT_MAX ? "oversize" : undefined);
+  const record: ChangeRecord = {
+    id,
+    entity: planned.entity,
+    expectedRevision: expected,
+    tool,
+    args: JSON.parse(canonicalJson(args)) as unknown,
+    hash,
+    tier: "asked",
+    shown: view,
+    ...(needsPage === undefined ? {} : { needsPage }),
+    mode: "card",
+    caller: changeCaller,
+    createdAt: now,
+    expiresAt: now + CHANGE_TTL_MS,
+    state: "open",
+  };
+  deps.changes.insert(record);
+  deps.log?.({ t3flare: "settings-change", via: "mcp", door: "own", agent: caller.agent, thread: key, tool, outcome: "open", change: id, tier: "asked", mode: "card", needsPage: needsPage ?? null });
+  const answers = answerDepsOf(deps);
+  const card = askedCard(view, input, url, needsPage);
+  const waiter = waitForChange(id);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  type Event = { readonly kind: "card"; readonly answer: McpQuestionAnswer } | { readonly kind: "closed"; readonly outcome: ChangeOutcome } | { readonly kind: "timeout" } | { readonly kind: "stop" };
+  const ended = new Promise<Event>((resolve) => {
+    timer = setTimeout(() => resolve({ kind: "timeout" }), Math.max(0, deps.cardWaitMs ?? record.expiresAt! - now));
+    if (input.signal !== undefined) {
+      onAbort = () => resolve({ kind: "stop" });
+      if (input.signal.aborted) onAbort();
+      else input.signal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
+  const closed = waiter.closed.then((outcome): Event => ({ kind: "closed", outcome }));
+  let cardOpen = input.asker !== undefined;
+  const cardAnswer: Promise<Event> =
+    input.asker === undefined
+      ? new Promise<Event>(() => undefined)
+      : Promise.resolve()
+          .then(() => input.asker!.ask(card))
+          .then(
+            (answer): Event => ({ kind: "card", answer }),
+            (error: unknown): Event => ({ kind: "card", answer: { decision: "cancel", reason: `the card could not be shown: ${String(error).slice(0, 200)}` } }),
+          );
+  const withdrawCard = async () => {
+    if (!cardOpen || input.asker === undefined) return;
+    cardOpen = false;
+    await Promise.resolve(input.asker.withdraw(card.id)).catch(() => undefined);
+  };
+  /** The change's outcome now: `outcome` when this call closed it, else whatever closed it first. */
+  const finalOf = (outcome: ChangeOutcome | undefined): ChangeOutcome => outcome ?? outcomeOf(deps.changes.get(id) ?? { ...record, state: "failed" });
+  /** The card's answer came second: the outcome of the answer that came first, waiting for it while it applies. */
+  const settled = async (): Promise<ChangeOutcome> => {
+    const current = deps.changes.get(id);
+    if (current !== undefined && !isOpen(current)) return outcomeOf(current);
+    const event = await Promise.race([closed, ended]);
+    if (event.kind === "closed") return event.outcome;
+    return finalOf(closeOpenChange(answers, id, event.kind === "stop" ? "withdrawn" : "expired", event.kind === "stop" ? "agent" : undefined));
+  };
+  try {
+    let waitingFor: Array<Promise<Event>> = [cardAnswer, closed, ended];
+    for (;;) {
+      const event = await Promise.race(waitingFor);
+      if (event.kind === "closed") {
+        // Answered elsewhere first (the Change page): the card closes as cancelled, the path a timeout takes.
+        await withdrawCard();
+        return resultOf(event.outcome, record, planned);
+      }
+      if (event.kind === "timeout") {
+        await withdrawCard();
+        return resultOf(finalOf(closeOpenChange(answers, id, "expired")), record, planned);
+      }
+      if (event.kind === "stop") {
+        await withdrawCard();
+        return resultOf(finalOf(closeOpenChange(answers, id, "withdrawn", "agent")), record, planned);
+      }
+      cardOpen = false;
+      const { decision, reason } = event.answer;
+      if (decision === "accept" || decision === "acceptForSession") {
+        // "Opened it" on a change answered on the page: the call keeps waiting for the page.
+        if (needsPage !== undefined) {
+          waitingFor = [closed, ended];
+          continue;
+        }
+        const answered = await answerOpenChange(answers, id, { by: "card", answerer: { kind: "card" }, action: "approve" });
+        return resultOf(answered.ok ? answered.outcome : await settled(), record, planned);
+      }
+      if (decision === "decline") {
+        const answered = await answerOpenChange(answers, id, { by: "card", answerer: { kind: "card" }, action: "decline" });
+        return resultOf(answered.ok ? answered.outcome : await settled(), record, planned);
+      }
+      // A cancel: the owner's on the card, or the card closing (no live turn, the CLI's own wait).
+      const withdrawn = closeOpenChange(answers, id, reason === "no answer in time" ? "expired" : "withdrawn", reason === undefined ? "card" : undefined);
+      return resultOf(finalOf(withdrawn), record, planned);
+    }
+  } finally {
+    clearTimeout(timer);
+    if (onAbort !== undefined) input.signal?.removeEventListener("abort", onAbort);
+    waiter.cancel();
+  }
+};
+
 const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promise<McpCallAnswer> => {
   const { caller, tool, args } = input;
   const log = (outcome: string, extra: Record<string, unknown> = {}) =>
@@ -472,7 +828,7 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
   if (modes === undefined) return refuse("no-modes", NO_MODES_REFUSAL);
   if (modes.interactionMode === "plan") return refuse("plan", PLAN_REFUSAL);
   const planned = planWrite(deps, tool, args);
-  if ("refused" in planned) return refuse("invalid", `Not changed: ${planned.refused}`);
+  if ("refused" in planned) return refuse("invalid", `Not changed: ${scrubText(planned.refused)}`);
   const expected = args.expectedRevision;
   if (typeof expected !== "number" || !Number.isSafeInteger(expected) || expected < 0) return refuse("invalid", "Not changed: expectedRevision is the revision you read, a whole number.");
   const current = revisionOf(deps, planned.entity);
@@ -485,25 +841,15 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
     log("unchanged");
     return written("unchanged", `Nothing to change: the settings already say so (revision ${current}).`, { revision: current });
   }
-  if (planned.verdict.tier !== "free" || planned.run === undefined) {
-    const url = deps.panelUrl();
-    return refuse(
-      "asked",
-      [
-        `Not changed: this change widens what agents have or can do, so it waits for the owner, and this version of t3flare cannot ask him from here yet.`,
-        ...planned.verdict.reasons.map((reason) => `- ${reason}`),
-        `Ask the owner to make it on the Harness panel${url === undefined ? "" : `: ${url}`}.`,
-      ].join("\n"),
-      { tier: "asked", reasons: planned.verdict.reasons, ...(url === undefined ? {} : { url }) },
-    );
-  }
   const key = caller.thread!;
+  // An asked change always asks, in every mode (plan D7): an Open change, answered on the card or the Change page.
+  if (planned.verdict.tier !== "free") return ask(deps, input, planned, expected, key);
   const now = deps.ops.now();
   if (deps.changes.appliedSince(key, now - APPLIED_WINDOW_MS) >= APPLIED_CAP) return refuse("applied-cap", `Not changed: this thread made ${APPLIED_CAP} settings changes in the last hour, the most t3flare allows. Try again later, or ask the owner.`);
   // The thread's mode (plan D7): full access runs a free change; any other mode asks the owner on one card.
   if (modes.runtimeMode !== "full-access") {
     if (input.asker === undefined) return refuse("no-asker", "Not changed: this thread's mode asks the owner for every write, and this call has no way to ask him.");
-    const answer = await askOnCard(deps, input.asker, writeCard(input, planned, current), input.signal);
+    const answer = await askOnCard(deps, input.asker, freeCard(input, planned, current), input.signal);
     if (answer.decision === "decline") {
       log("declined");
       return written("declined", "Not changed: the owner declined it.");
@@ -519,9 +865,9 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
   if (!ran.ok) {
     if (ran.moved !== undefined) {
       log("moved", { revision: ran.moved });
-      return written("moved", `Not changed: ${ran.error}`, { revision: ran.moved });
+      return written("moved", `Not changed: ${scrubText(ran.error)}`, { revision: ran.moved });
     }
-    return refuse("invalid", `Not changed: ${ran.error}`);
+    return refuse("invalid", `Not changed: ${scrubText(ran.error)}`);
   }
   if (ran.unchanged === true) {
     log("unchanged");
@@ -530,12 +876,14 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
   deps.changes.recordApplied({
     id: newChangeId(),
     entity: planned.entity,
+    expectedRevision: expected,
     tool,
-    args,
+    args: JSON.parse(canonicalJson(args)) as unknown,
     hash: await changeHash(tool, args),
     tier: "free",
     caller: { door: "own", key, principal: "agent", thread: key, agent: caller.agent },
     createdAt: now,
+    expiresAt: now,
     state: "applied",
     closed: { at: deps.ops.now(), revision },
   });
@@ -568,8 +916,8 @@ export const settingsCall = async (deps: SettingsServerDeps, input: SettingsCall
       return read({
         status: deps.status?.() ?? {},
         access: { enabled: access.enabled, writes: access.writes ?? true },
-        // Open changes come with M4 (SPI-1199): an asked change is refused now, so none is ever open.
-        openChanges: [],
+        // This caller's Open changes (plan D8): its thread's.
+        openChanges: input.caller.thread === undefined ? [] : deps.changes.openBy(input.caller.thread).map((record) => openChangeSummary(record, changeUrlOf(deps, record.id))),
       });
     case "read_audit": {
       const limit = typeof input.args.limit === "number" ? input.args.limit : undefined;
