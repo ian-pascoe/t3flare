@@ -39,7 +39,16 @@ optional headers, and the models it serves.
    now. Otherwise the turn fails saying the endpoint changed and to retry. The Session keeps keys in memory only, by
    endpoint and target. The endpoint's headers go with every request; an endpoint with no auth sends a placeholder
    key, never a secret.
-5. **Expand, then cut.** Until SPI-1176 the Model proxy's models and settings keep working beside the endpoints. A
+5. **Text generation** (SPI-1163). Thread titles, commit messages and PR text on an endpoint's model are one pi-ai
+   request on the agents Worker (`EndpointTextGeneration`, the Environment's `TEXT_GENERATION` service binding), so the
+   Environment's bundle never holds pi-ai. The call carries the endpoint as stored now, secret-free; the agents Worker
+   asks for the key with `endpointCredential`, as a Session does, and builds the request with a Session's own provider
+   (`endpointProviders`), so a sign-in's credential reaches it the same way once the broker exists. A failure names the
+   endpoint and says what happened by the answer's status alone. The default text model is a small model (haiku, mini,
+   nano, flash, lite, small, tiny) of the first endpoint that has one, its cheapest by known price; until the hard cut,
+   the Model proxy's small model when no endpoint has one. While the owner has picked no model, the text-generation
+   setting names that default and follows it as the endpoints change.
+6. **Expand, then cut.** Until SPI-1176 the Model proxy's models and settings keep working beside the endpoints. A
    turn on a model whose endpoint was removed, or no longer lists it, fails with a message that says so.
 
 Consequences: Commissary is one endpoint among others (an Anthropic Messages endpoint at its URL with its key). Losing

@@ -1,0 +1,59 @@
+{
+  "at": "2026-11-14T19:58:43.875Z",
+  "openai": "Commissary's OpenAI Responses API",
+  "settingBefore": {
+    "instanceId": "piDurable",
+    "model": "anthropic/claude-haiku-5-5"
+  },
+  "saved": [
+    200,
+    200
+  ],
+  "settingDefault": {
+    "instanceId": "piDurable",
+    "model": "commissary/claude-haiku-5-5"
+  },
+  "anthropic": {
+    "slug": "commissary/claude-haiku-5-5",
+    "title": {
+      "outcome": "renamed",
+      "message": null,
+      "title": "Fix Date Parser Leap Day Test"
+    },
+    "commit": {
+      "failure": null,
+      "status": "created",
+      "subject": "Add isLeapYear helper in leap-anthropic module",
+      "head": "Add isLeapYear helper in leap-anthropic module"
+    }
+  },
+  "openaiResponses": {
+    "slug": "openai/gemini-3-flash",
+    "title": {
+      "outcome": "renamed",
+      "message": null,
+      "title": "Fix Date Parser Leap Year Bug"
+    },
+    "commit": {
+      "failure": null,
+      "status": "created",
+      "subject": "Add isLeapYear helper in leap-openai module",
+      "head": "Add isLeapYear helper in leap-openai module"
+    }
+  },
+  "wrongKey": {
+    "saved": 200,
+    "title": {
+      "outcome": "failed",
+      "message": "The Model endpoint \"wrong-key\" refused its API key (HTTP 401): check it in the Harness panel.",
+      "title": "New thread"
+    }
+  },
+  "removedEndpoint": {
+    "outcome": "failed",
+    "message": "The Model endpoint \"wrong-key\" was removed: pick another model for text generation.",
+    "title": "New thread"
+  },
+  "failures": [],
+  "ok": true
+}
