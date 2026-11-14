@@ -9,6 +9,8 @@ import { AUDIT_KEY, harnessStore } from "../src/harness/store.ts";
 
 const HOST = "t3-admin.example.dev";
 const NOW = Date.UTC(2026, 10, 13, 10, 30);
+/** sha256 of '[tools]\nnode = "24.11.1"\n' (`shasum -a 256`). */
+const SHA_OF_TEXT = "0eb09ceb981ac62b1ed4ebb30295ad081a471bb40b9ebda4eb48fcf45aae8cf3";
 const owner: HarnessCaller = { kind: "owner", subject: "owner-sub" };
 
 const memory = () => {
@@ -156,6 +158,45 @@ describe("Environment settings in the panel", () => {
     expect(html).toContain("With these settings, at most $0.22 an hour: 3 Containers of standard-1, every vCPU busy.");
     expect(html).toContain("data-budget-head>3 Containers, an hour<");
     expect(html).toContain("web-app");
+  });
+
+  it("audits the Global mise config as its size and SHA-256, never its text", async () => {
+    const { store, deps } = setup({ kind: "service-token" });
+    const text = '[tools]\nnode = "24.11.1"\n';
+    await post(deps, "environment", { settings: { globalMiseConfig: text } }, {});
+
+    expect(store.auditLog(1)).toEqual([
+      expect.objectContaining({
+        entity: "environment",
+        target: "globalMiseConfig",
+        before: { globalMiseConfig: { bytes: 0, sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" } },
+        after: { globalMiseConfig: { bytes: 25, sha256: SHA_OF_TEXT } },
+      }),
+    ]);
+    expect(JSON.stringify(store.auditLog(1))).not.toContain("24.11.1");
+  });
+
+  it("renders the Global mise config as a text area without maxlength, its first newline kept", async () => {
+    const { store, deps } = setup();
+    await post(deps, "environment", { settings: { globalMiseConfig: "\n[tools]\n" } }, await ownerHeaders(store));
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    const area = /<textarea[^>]*data-setting="globalMiseConfig"[^>]*>([\s\S]*?)<\/textarea>/.exec(html);
+    expect(area).not.toBeNull();
+    expect(area![0]).not.toContain("maxlength");
+    expect(area![0]).toContain('data-kind="file"');
+    // An HTML parser drops one newline right after <textarea>: the page writes one, so the text's own survives.
+    expect(area![1]).toBe("\n\n[tools]\n");
+    expect(html).toContain("put no secret in it");
+  });
+
+  it("shows the last Global mise lay-down in Status, and refuses a malformed one", async () => {
+    const { store, deps } = setup();
+    expect((await getJson(deps, "status"))["last Global mise lay-down"]).toBeNull();
+    const report = { workspace: "web-app", runtime: "r1", revision: 3, sha256: SHA_OF_TEXT, bytes: 25, source: "environment", outcome: "not-laid", install: 1, timedOut: false, ms: 900, at: NOW };
+    expect(store.noteGlobalMise(report)).toBe(true);
+    expect(store.noteGlobalMise({ ...report, workspace: "x".repeat(10_000) })).toBe(false);
+    expect(store.noteGlobalMise({ ...report, outcome: "maybe" })).toBe(false);
+    expect((await getJson(deps, "status"))["last Global mise lay-down"]).toBe("web-app at revision 3: not laid down (mise install exit 1), 2026-11-13T10:30:00.000Z");
   });
 });
 

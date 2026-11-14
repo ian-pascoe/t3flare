@@ -4,7 +4,7 @@
 // other's readers take it again. Sessions take a new Harness revision at a turn's start; Workspace DOs take a new
 // Environment revision before a Container start. One audit log for both, append-only, 1 000 entries kept, each with its
 // `entity`; it holds no secret value (parts 2-4's secrets are masked before an entry is written).
-import { EMPTY_ENVIRONMENT, EMPTY_HARNESS, type StoredEnvironment, type StoredHarness } from "@t3flare/harness-registry";
+import { EMPTY_ENVIRONMENT, EMPTY_HARNESS, type GlobalMiseReport, globalMiseReport, type StoredEnvironment, type StoredHarness } from "@t3flare/harness-registry";
 
 /** The Durable Object's synchronous key-value storage. */
 export interface KvStorage {
@@ -18,6 +18,7 @@ export const AUDIT_KEY = "t3flare:harness:audit";
 const CSRF_KEY = "t3flare:harness:csrf-key";
 const READ_KEY = "t3flare:harness:last-read";
 const ENVIRONMENT_READ_KEY = "t3flare:environment:last-read";
+const GLOBAL_MISE_KEY = "t3flare:environment:global-mise";
 export const AUDIT_KEPT = 1_000;
 
 /**
@@ -58,6 +59,12 @@ export interface HarnessStore {
   /** A Workspace DO took the Environment settings. */
   noteEnvironmentRead(revision: number, at: number): void;
   lastEnvironmentRead(): LastRead | undefined;
+  /**
+   * A Workspace DO's Global mise lay-down (SPI-1150): kept when it is a well-formed report, the last one only, across
+   * all Workspaces. Answers whether it was kept.
+   */
+  noteGlobalMise(report: unknown): boolean;
+  lastGlobalMise(): GlobalMiseReport | undefined;
 }
 
 export const harnessStore = (kv: KvStorage): HarnessStore => ({
@@ -86,5 +93,12 @@ export const harnessStore = (kv: KvStorage): HarnessStore => ({
   noteRead: (revision, at) => kv.put(READ_KEY, { revision, at }),
   lastRead: () => kv.get<LastRead>(READ_KEY),
   noteEnvironmentRead: (revision, at) => kv.put(ENVIRONMENT_READ_KEY, { revision, at }),
+  noteGlobalMise: (report) => {
+    const valid = globalMiseReport(report);
+    if (valid === undefined) return false;
+    kv.put(GLOBAL_MISE_KEY, valid);
+    return true;
+  },
+  lastGlobalMise: () => globalMiseReport(kv.get<unknown>(GLOBAL_MISE_KEY)),
   lastEnvironmentRead: () => kv.get<LastRead>(ENVIRONMENT_READ_KEY),
 });

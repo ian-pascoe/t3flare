@@ -15,12 +15,16 @@ import {
   applyChange,
   applyEnvironmentChange,
   applyMcpChange,
+  describeGlobalMise,
+  digestOf,
+  type EnvironmentKey,
   ENVIRONMENT_SETTINGS,
   EXTENSIONS,
   type HarnessChange,
   type McpChange,
   resolveEnvironment,
   resolveHarness,
+  type SettingEntry,
 } from "@t3flare/harness-registry";
 
 import type { McpHost } from "../mcp/host.ts";
@@ -110,6 +114,7 @@ const statusOf = (deps: HarnessDeps) => {
   const stored = deps.store.load();
   const read = deps.store.lastRead();
   const environmentRead = deps.store.lastEnvironmentRead();
+  const globalMise = deps.store.lastGlobalMise();
   return {
     "settings revision": stored.revision,
     "last taken by a Session (revision)": read?.revision ?? null,
@@ -117,6 +122,8 @@ const statusOf = (deps: HarnessDeps) => {
     "Environment settings revision": deps.store.loadEnvironment().revision,
     "last taken by a Workspace (revision)": environmentRead?.revision ?? null,
     "last taken by a Workspace (at)": environmentRead === undefined ? null : new Date(environmentRead.at).toISOString(),
+    // The last lay-down across all Workspaces (SPI-1150, ADR-0032's Global mise config refinement): a file not laid down shows here.
+    "last Global mise lay-down": globalMise === undefined ? null : describeGlobalMise(globalMise),
     Skills: skillsStatus(deps),
     "last Environment skill set refused": latestRefusal(deps) ?? null,
   };
@@ -260,15 +267,18 @@ const changeEnvironment = async (request: Request, deps: HarnessDeps): Promise<R
   if (applied.changed.length === 0) return json({ ok: true, unchanged: true, revision: applied.environment.revision, resolved });
   deps.store.saveEnvironment(applied.environment);
   const keys = applied.changed;
-  const pick = (from: ReturnType<typeof resolveEnvironment>) => Object.fromEntries(keys.map((key) => [key, from[key]]));
+  // A `file` setting (the Global mise config) is audited as its size and SHA-256, not its text: the log is one stored
+  // value of up to 1 000 entries (ADR-0032 §8, a departure from §3's values as resolved).
+  const shown = async (key: EnvironmentKey, value: unknown) => ((ENVIRONMENT_SETTINGS[key] as SettingEntry).schema.type === "file" ? digestOf(String(value)) : value);
+  const pick = async (from: ReturnType<typeof resolveEnvironment>) => Object.fromEntries(await Promise.all(keys.map(async (key) => [key, await shown(key, from[key])] as const)));
   deps.store.audit({
     entity: "environment",
     at: deps.now?.() ?? Date.now(),
     caller: callerName(deps.caller),
     action: "environment.change",
     target: keys.join(", "),
-    before: pick(resolveEnvironment(before)),
-    after: pick(resolved),
+    before: await pick(resolveEnvironment(before)),
+    after: await pick(resolved),
   });
   return json({ ok: true, revision: applied.environment.revision, resolved });
 };

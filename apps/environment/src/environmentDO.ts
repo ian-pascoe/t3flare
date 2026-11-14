@@ -584,6 +584,14 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     this.skills.noteRefusal({ workspace: String(input.workspace).slice(0, 200), hash: String(input.hash).slice(0, 64), message: String(input.message).slice(0, 2000), at: Date.now() });
   }
 
+  /**
+   * A Workspace DO's Global mise lay-down at a Container start (SPI-1150): the panel's Status shows the last one. A
+   * malformed report (another Worker's) is dropped. Never boots t3.
+   */
+  async noteGlobalMise(report: unknown): Promise<{ readonly kept: boolean }> {
+    return { kept: harnessStore(this.ctx.storage.kv).noteGlobalMise(report) };
+  }
+
   /** Diagnosis and the reboot check: this instance's channel. */
   get processChannel(): ProcessChannel {
     return this.#processes;

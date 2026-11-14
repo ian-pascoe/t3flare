@@ -94,6 +94,7 @@ section{display:flex;flex-direction:column;gap:.625rem;scroll-margin-top:1.5rem}
 input[type=text],input[type=url],input[type=password],input[type=number],select{height:2.25rem;padding:0 .625rem;border:1px solid var(--input);border-radius:var(--radius);background:var(--card);color:var(--fg);font:inherit;font-size:.875rem;transition:border-color .15s,box-shadow .15s}
 input[type=number]{width:7.5rem;font-variant-numeric:tabular-nums}
 textarea{min-height:5rem;width:100%;padding:.5rem .625rem;border:1px solid var(--input);border-radius:var(--radius);background:var(--card);color:var(--fg);font:inherit;font-size:.875rem;resize:vertical}
+textarea.file{font-family:var(--mono);font-size:.8125rem;line-height:1.5;white-space:pre;overflow-wrap:normal;overflow-x:auto;tab-size:2}
 .field input[type=text]{width:100%}
 select{padding-right:2rem;appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted-fg) 50%),linear-gradient(135deg,var(--muted-fg) 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px;background-repeat:no-repeat;min-width:10rem}
 input::placeholder{color:color-mix(in oklab,var(--muted-fg) 80%,transparent)}

@@ -84,6 +84,10 @@ const field = (extension: string, key: string, setting: EnvironmentSettingEntry,
       const rows = Object.entries(value !== null && typeof value === "object" ? (value as Readonly<Record<string, string>>) : {}).map(([name, text]) => variableRow(name, text));
       return `<fieldset class="field" ${attrs}><legend class="sr">${escapeHtml(setting.title)}</legend><div class="variables" data-variable-rows>${rows.join("")}</div><template data-variable-template>${variableRow("", "")}</template><div><button type="button" class="btn btn-sm" data-variable-add>${icon("plus")}Add a Variable</button></div>${hint}</fieldset>`;
     }
+    case "file":
+      // No maxlength (it counts UTF-16 units; the API's byte limit refuses, whole). The newline after the tag is the one
+      // an HTML parser drops, so a text that starts with one round-trips and an unrelated save changes nothing.
+      return `<div class="field"><label for="${id}">${escapeHtml(setting.title)}</label><textarea class="file" rows="12" spellcheck="false" autocapitalize="none" autocomplete="off" ${attrs}>\n${escapeHtml(typeof value === "string" ? value : "")}</textarea>${hint}</div>`;
   }
 };
 
@@ -165,15 +169,17 @@ const costTable = (costs: ContainerCostTable, size: string): string => {
 const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCostTable, running: PageInput["running"]): string => {
   const values: Readonly<Record<string, unknown>> = { ...environment };
   const entries = Object.entries(ENVIRONMENT_SETTINGS as Readonly<Record<string, EnvironmentSettingEntry>>);
-  // The scalar settings share the Containers row; a list (the Variables) gets a row of its own. One form, one Save.
-  const fields = entries.filter(([, setting]) => setting.schema.type !== "variables").map(([key, setting]) => field("environment", key, setting, values[key]));
+  // The scalar settings share the Containers row; a list (the Variables) and a file (the Global mise config) each get a
+  // row of their own. One form, one Save.
+  const ownRow = (setting: EnvironmentSettingEntry) => setting.schema.type === "variables" || setting.schema.type === "file";
+  const fields = entries.filter(([, setting]) => !ownRow(setting)).map(([key, setting]) => field("environment", key, setting, values[key]));
   const lists = entries
-    .filter(([, setting]) => setting.schema.type === "variables")
+    .filter(([, setting]) => ownRow(setting))
     .map(([key, setting]) => `<div class="row"><div class="row-title"><h3>${escapeHtml(setting.title)}</h3></div><div class="row-extra"><div class="fields list">${field("environment", key, setting, values[key])}</div></div></div>`);
   const save = `<div class="row"><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div></div>`;
   return `<section id="environment" aria-labelledby="environment-title">
 <div class="section-head"><h2 id="environment-title">${icon("container")}Environment</h2></div>
-<p class="section-desc">What every Workspace's Container gets. A change applies at each Workspace's next Container start; a running Container keeps its size, idle time and Variables, and a lower budget stops none.</p>
+<p class="section-desc">What every Workspace's Container gets. A change applies at each Workspace's next Container start; a running Container keeps its size, idle time, Variables and Global mise config, and a lower budget stops none.</p>
 <form class="group" data-environment aria-labelledby="environment-title" novalidate><div class="row"><div><div class="row-title"><h3>Containers</h3><span class="ident">revision ${environment.revision}</span></div><p class="desc">Their size, how long one may sit idle, and how many may run at once.</p></div>
 <div class="row-extra"><div class="fields">${fields.join("")}</div></div></div>${lists.join("")}${save}</form>
 <dl class="group kv"><div><dt>Running now</dt><dd>${
