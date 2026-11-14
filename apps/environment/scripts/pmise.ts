@@ -4,7 +4,7 @@
 // stage's service token and admin token (never printed):
 //
 //   node scripts/stage.ts run pmise pmise variables   the guard variables from every command path (variables.json; first)
-//   … install | override | git-gh | hold | restart | invalid | size | cost | empty | late | passive-first   (<case>.json)
+//   … install | override | git-gh | hold | restart | invalid | size | cost | empty | late | passive-first | passive-spawn   (<case>.json)
 //
 // Evidence goes to docs/steps/global-mise/, each file naming the deployed commit.
 import * as fs from "node:fs";
@@ -635,7 +635,38 @@ const passiveFirst = async () => {
   });
 };
 
-const commands: Record<string, () => Promise<void>> = { variables, install, override, "git-gh": gitGh, hold, restart, invalid, size, cost, empty, late, "passive-first": passiveFirst, "opencode-debug": opencodeDebug };
+/**
+ * A spawn on a running Container no lay-down ran for: a passive read starts it, then a t3 Terminal opens. The spawn's
+ * wait runs the lay-down without a command of its own (no restart: the Container's start time is unchanged).
+ */
+const passiveSpawn = async () => {
+  cookie ||= await pair();
+  const { root } = await ensureProject(cookie, WORKSPACE);
+  await setMise(NODE_PIN);
+  await stopAll();
+  const started = Date.now();
+  const read = callOn(WORKSPACE, { exec: { script: `test -f ${GLOBAL_FILE} && echo global-present || echo global-absent; sleep 25`, passive: true, timeoutMs: 180_000 } });
+  while (Date.now() - started < 120_000 && (await stateOf(WORKSPACE))?.running !== true) await sleep(1_000);
+  const before = await stateOf(WORKSPACE);
+  const terminal = await attachTerminal(cookie, { threadId: `pmise-${uuid()}`, terminalId: "default", cwd: root });
+  await terminal.until(/[$#] $/, 600_000);
+  const typed = await terminal.run("node --version", 120_000).catch((error: unknown) => ({ ms: -1, text: String(error).slice(0, 300) }));
+  await terminal.close(true).catch(() => undefined);
+  await terminal.detach().catch(() => undefined);
+  const readAnswer = await read;
+  const after = await stateOf(WORKSPACE);
+  const node = /v\d+\.\d+\.\d+/.exec(stripAnsi(typed.text))?.[0] ?? null;
+  await writeEvidence("passive-spawn.json", {
+    pin: NODE_PIN,
+    passiveRead: String(readAnswer.result?.stdout ?? "").trim(),
+    startedAt: { beforeSpawn: before?.startedAt ?? null, afterSpawn: after?.startedAt ?? null },
+    node,
+    globalMise: after?.globalMise ?? null,
+    ok: String(readAnswer.result?.stdout ?? "").includes("global-absent") && node === "v24.11.1" && before?.startedAt === after?.startedAt && after?.globalMise?.outcome === "laid",
+  });
+};
+
+const commands: Record<string, () => Promise<void>> = { variables, install, override, "git-gh": gitGh, hold, restart, invalid, size, cost, empty, late, "passive-first": passiveFirst, "passive-spawn": passiveSpawn, "opencode-debug": opencodeDebug };
 const command = commands[process.argv[2] ?? ""];
 if (command === undefined) {
   console.error(`usage: pmise.ts ${Object.keys(commands).join(" | ")}`);
