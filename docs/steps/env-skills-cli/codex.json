@@ -1,0 +1,216 @@
+{
+ "at": "2026-11-14T02:53:21.434Z",
+ "host": "t3flare-environment-pclienv.ian-g-pascoe.workers.dev",
+ "commit": "f0134ad05c84",
+ "project": {
+  "id": "pclienv-proj",
+  "root": "/w/pclienv-proj"
+ },
+ "ok": true,
+ "cli": "codex",
+ "model": "gpt-6-luna",
+ "expectedWinner": "both",
+ "checks": {
+  "composerListsEnvironmentSkill": true,
+  "composerFollowsCliPrecedence": true,
+  "noContainerForComposer": true,
+  "describedReadsSkill": true,
+  "mentionFollows": true,
+  "pairWinnerIsCli": true,
+  "linkedToMount": true,
+  "writeRefused": true,
+  "lateGoneFromMount": true,
+  "lateSeenByNewProcess": true
+ },
+ "composer": {
+  "container": {
+   "before": {
+    "running": false
+   },
+   "after": {
+    "running": false
+   }
+  },
+  "error": null,
+  "skills": [
+   {
+    "name": "fruit-code",
+    "description": "How to find the fruit code. Use whenever anyone asks for the fruit code.",
+    "path": "/w/pclienv-proj/.agents/skills/fruit-code/SKILL.md",
+    "scope": "project",
+    "enabled": true,
+    "userInvocationOnly": false
+   },
+   {
+    "name": "env-code",
+    "description": "How to find the environment code, the code the Cloud Environment keeps. Use whenever anyone asks for the environment code.",
+    "path": "/workspace/.agents/skills/env-code/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "userInvocationOnly": false
+   },
+   {
+    "name": "fruit-code",
+    "description": "The fruit code, as the Environment keeps it. Use whenever anyone asks for the fruit code.",
+    "path": "/workspace/.agents/skills/fruit-code/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "userInvocationOnly": false
+   }
+  ]
+ },
+ "threads": {
+  "described": "b97c9ac1-d9f2-40b1-bb56-4414f59b2d83",
+  "mentioned": "ab1208f5-8f23-48b1-8134-59aa5dd5f4ce",
+  "late": "7f93a3cd-dd78-44b3-853f-304d873b9007",
+  "fresh": "62930125-94bd-42a3-9556-87ff9043e49f"
+ },
+ "steps": {
+  "setup": {
+   "status": 200,
+   "skipped": "unchanged"
+  },
+  "described": {
+   "sent": "What is the environment code? Reply with the code alone.",
+   "status": "completed",
+   "failure": null,
+   "typed": "What is the environment code? Reply with the code alone.",
+   "answer": "MANGO-5",
+   "tools": [
+    "{\"ordinal\":1000003,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /var/lib/t3flare/cli/proc-e56f51ba-dfd5-4385-8103-1c948f399e52/codex/skills/t3flare-environment/env-code/SKILL.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}",
+    "{\"ordinal\":1000004,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /var/lib/t3flare/cli/proc-e56f51ba-dfd5-4385-8103-1c948f399e52/codex/skills/t3flare-environment/env-code/reference/code.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}"
+   ]
+  },
+  "mention": {
+   "sent": "$env-code",
+   "status": "completed",
+   "failure": null,
+   "typed": "$env-code",
+   "answer": "MANGO-5",
+   "tools": [
+    "{\"ordinal\":1000003,\"status\":\"failed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /w/pclienv-proj/.agents/skills/env-code/reference/code.md'\",\"outputOmitted\":true,\"outputIndicatesFailure\":true,\"exitCode\":1,\"completionWake\":\"always\"}",
+    "{\"ordinal\":1000005,\"status\":\"failed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c \\\"rg --files /w/pclienv-proj /workspace /var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills 2>/dev/null | rg 'env-code/.*/?code\\\\\\\\.md\\\"'$|env-code/SKILL'\\\"\\\\\\\\.md\\\"'$'\\\"'\\\"\",\"outputIndicatesFailure\":true,\"exitCode\":1,\"completionWake\":\"always\"}",
+    "{\"ordinal\":1000007,\"status\":\"failed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/.system/t3flare-environment/env-code/SKILL.md'\",\"outputOmitted\":true,\"outputIndicatesFailure\":true,\"exitCode\":1,\"completionWake\":\"always\"}",
+    "{\"ordinal\":1000008,\"status\":\"failed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c \\\"rg --files /var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills /w/pclienv-proj/.agents 2>/dev/null | rg 'env-code'\\\"\",\"outputIndicatesFailure\":true,\"exitCode\":1,\"completionWake\":\"always\"}",
+    "{\"ordinal\":1000009,\"status\":\"failed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'pwd && ls -la /workspace/.agents/skills/env-code /w/pclienv-proj/.agents/skills 2>/dev/null && rg --files /var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills'\",\"outputOmitted\":true,\"outputIndicatesFailure\":true,\"exitCode\":1,\"completionWake\":\"always\"}",
+    "{\"ordinal\":1000010,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /workspace/.agents/skills/env-code/reference/code.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}"
+   ]
+  },
+  "pair": {
+   "sent": "$fruit-code What is the fruit code? Reply with the code alone.",
+   "status": "completed",
+   "failure": null,
+   "typed": "$fruit-code What is the fruit code? Reply with the code alone.",
+   "answer": "KIWI-7",
+   "tools": [
+    "{\"ordinal\":2000003,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /w/pclienv-proj/.agents/skills/fruit-code/SKILL.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}",
+    "{\"ordinal\":2000004,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /w/pclienv-proj/.agents/skills/fruit-code/reference/code.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}"
+   ]
+  },
+  "pairWinner": "repo",
+  "linkedRoot": {
+   "at": "/var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment",
+   "target": "/workspace/.agents/skills",
+   "live": {
+    "exitCode": 0,
+    "stdout": "/var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment /workspace/.agents/skills\n",
+    "stderr": ""
+   }
+  },
+  "shellWrite": {
+   "exitCode": 0,
+   "stdout": "touch: refused: touch: cannot touch '/var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment/planted': Read-only file system\noverwrite: refused: touch: cannot touch '/var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment/planted': Read-only file system\nenv-code\nfruit-code\n",
+   "stderr": "/bin/sh: 6: cannot create /var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment/env-code/SKILL.md: Read-only file system\n"
+  },
+  "agentWrite": {
+   "sent": "Run exactly this shell command and reply with its error output verbatim: touch '/var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment/planted-by-agent'",
+   "status": "completed",
+   "failure": null,
+   "typed": "Run exactly this shell command and reply with its error output verbatim: touch '/var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment/planted-by-agent'",
+   "answer": "touch: cannot touch '/var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment/planted-by-agent': Read-only file system",
+   "tools": [
+    "{\"ordinal\":3000003,\"status\":\"failed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c \\\"touch '/var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills/t3flare-environment/planted-by-agent'\\\"\",\"outputOmitted\":true,\"outputIndicatesFailure\":true,\"exitCode\":1,\"completionWake\":\"always\"}"
+   ]
+  },
+  "afterWrites": {
+   "exitCode": 0,
+   "stdout": "/workspace/.agents/skills:\ntotal 0\ndrwxr-xr-x 1 root root 0 Nov 14 02:50 .\ndrwxr-xr-x 1 root root 0 Nov 14 02:31 ..\ndrwxr-xr-x 1 root root 0 Nov 14 02:50 env-code\ndrwxr-xr-x 1 root root 0 Nov 14 02:50 fruit-code\n\n/workspace/.agents/skills/env-code:\ntotal 0\ndrwxr-xr-x 1 root root   0 Nov 14 02:50 .\ndrwxr-xr-x 1 root root   0 Nov 14 02:50 ..\n-rw-r--r-- 1 root root 280 Nov 14 02:50 SKILL.md\ndrwxr-xr-x 1 root root   0 Nov 14 02:50 reference\n---\nname: env-code\ndescription: How to find the environment code, the code the Cloud Environment keeps. Use whenever anyone asks for the environment code.\n---\n\nThe environment code is written in reference/code.md, next to this file. Read that file and answer with the code alone.\n",
+   "stderr": ""
+  },
+  "lateInstall": {
+   "status": 200,
+   "commit": "b0e4cef998bf0a008191146ac276209f71646e55",
+   "folders": [
+    "late/late-code"
+   ]
+  },
+  "lateMention": {
+   "sent": "$late-code What is the late code? If you cannot find it, reply NONE.",
+   "status": "completed",
+   "failure": null,
+   "typed": "$late-code What is the late code? If you cannot find it, reply NONE.",
+   "answer": "LATE-8",
+   "tools": [
+    "{\"ordinal\":4000003,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c \\\"rg --files /workspace/.agents/skills /w/pclienv-proj/.agents/skills /var/lib/t3flare/cli/proc-6dfff268-d93b-45be-b52b-501b128a100e/codex/skills 2>/dev/null | rg '(\\\"'^|/)late-code(/|$)|late-code'\\\"'\\\"\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}",
+    "{\"ordinal\":4000004,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /workspace/.agents/skills/late-code/SKILL.md'\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}"
+   ]
+  },
+  "lateDescribed": {
+   "sent": "What is the late code? If you cannot find it, reply NONE.",
+   "status": "completed",
+   "failure": null,
+   "typed": "What is the late code? If you cannot find it, reply NONE.",
+   "answer": "LATE-8",
+   "tools": []
+  },
+  "lateStart": {
+   "sent": "Reply with the single word OK.",
+   "status": "completed",
+   "failure": null,
+   "typed": "Reply with the single word OK.",
+   "answer": "OK",
+   "tools": []
+  },
+  "lateRemove": 200,
+  "lateRemovedMention": {
+   "sent": "$late-code What is the late code? If you cannot find it, reply NONE.",
+   "status": "completed",
+   "failure": null,
+   "typed": "$late-code What is the late code? If you cannot find it, reply NONE.",
+   "answer": "NONE",
+   "tools": [
+    "{\"ordinal\":2000003,\"status\":\"failed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c 'cat /var/lib/t3flare/cli/proc-a2b96eb6-2008-48d9-895e-2139cc1198f7/codex/skills/t3flare-environment/late-code/SKILL.md'\",\"outputOmitted\":true,\"outputIndicatesFailure\":true,\"exitCode\":1,\"completionWake\":\"always\"}",
+    "{\"ordinal\":2000005,\"status\":\"failed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c \\\"rg --files /var/lib/t3flare/cli/proc-a2b96eb6-2008-48d9-895e-2139cc1198f7/codex/skills | rg '/late-code/SKILL\\\\\\\\.md\\\"'$'\\\"'\\\"\",\"outputIndicatesFailure\":true,\"exitCode\":1,\"completionWake\":\"always\"}",
+    "{\"ordinal\":2000007,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c \\\"ls -la /var/lib/t3flare/cli/proc-a2b96eb6-2008-48d9-895e-2139cc1198f7/codex/skills && find /w/pclienv-proj/.agents/skills -maxdepth 3 -iname '*late*' -o -path '*/late-code/*'\\\"\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}",
+    "{\"ordinal\":2000008,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c \\\"rg --files /workspace/.agents/skills | rg 'late-code|SKILL\\\\\\\\.md' | head -50\\\"\",\"outputOmitted\":true,\"exitCode\":0,\"completionWake\":\"always\"}",
+    "{\"ordinal\":2000009,\"status\":\"completed\",\"title\":null,\"type\":\"command_execution\",\"input\":\"/bin/bash -c \\\"find /var/lib/t3flare /workspace /w/pclienv-proj -path '*/late-code/SKILL.md' -o -iname '*late*code*' 2>/dev/null | head -80\\\"\",\"exitCode\":0,\"completionWake\":\"always\"}"
+   ]
+  },
+  "lateRemovedMount": {
+   "exitCode": 0,
+   "stdout": "env-code\nfruit-code\n",
+   "stderr": ""
+  },
+  "lateReinstall": {
+   "status": 200,
+   "commit": "b0e4cef998bf0a008191146ac276209f71646e55",
+   "folders": [
+    "late/late-code"
+   ]
+  },
+  "lateMentionNewProcess": {
+   "sent": "$late-code What is the late code? If you cannot find it, reply NONE.",
+   "status": "completed",
+   "failure": null,
+   "typed": "$late-code What is the late code? If you cannot find it, reply NONE.",
+   "answer": "LATE-8",
+   "tools": []
+  },
+  "catchUp": {
+   "installRunningMention": true,
+   "installRunningDescribed": true,
+   "removedRunningMention": false,
+   "installNewProcess": true
+  }
+ }
+}
