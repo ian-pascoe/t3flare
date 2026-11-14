@@ -4,7 +4,7 @@
 // withdraws the Open change its call holds, whether its card is still open or the owner chose "Opened it".
 //
 // In memory, per isolate: a call is a live RPC, so a restart ends it anyway (its Open change then expires).
-import { SETTINGS_SERVER } from "@t3flare/harness-registry";
+import { ownEntry } from "@t3flare/harness-registry";
 
 import type { McpCallAnswer, McpHost } from "./host.ts";
 
@@ -44,11 +44,13 @@ export const stoppableCall =
  * servers' calls run as before, with no signal.
  */
 export const sessionMcpCall = (
-  host: Pick<McpHost, "call">,
+  host: Pick<McpHost, "call" | "servers">,
   input: Omit<HostInput, "signal" | "caller"> & { readonly thread?: string; readonly stopId?: string },
   agent: string,
 ): Promise<McpCallAnswer> => {
   const { thread, stopId, ...call } = input;
   const caller = { door: "own" as const, thread: typeof thread === "string" && thread !== "" ? thread : undefined, agent };
-  return stoppableCall(host)({ ...call, caller, ...(call.server === SETTINGS_SERVER && stopId !== undefined ? { stopId } : {}) });
+  // The Settings server by its kind, as the relay judges it: a stored server under its name is not it.
+  const settings = ownEntry(host.servers(), call.server)?.kind === "settings";
+  return stoppableCall(host)({ ...call, caller, ...(settings && stopId !== undefined ? { stopId } : {}) });
 };

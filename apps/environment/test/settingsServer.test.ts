@@ -22,7 +22,7 @@ import { SETTINGS_TOOLS } from "../src/settings/tools.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
 const NOW = Date.UTC(2026, 10, 14, 12, 0);
-const PANEL = "https://t3.example.dev/_t3flare/harness";
+const ORIGIN = "https://t3.example.dev";
 const SECRET = "sekret-header-value-0042";
 
 const memory = () => {
@@ -93,7 +93,7 @@ const setup = (options: { links?: Record<string, ThreadLink>; answer?: McpQuesti
           // As the Environment DO wires it: a Durable thread's modes are the adapter's record, a CLI's its live session's.
           modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
           changes,
-          panelUrl: () => PANEL,
+          origin: () => ORIGIN,
           status: () => ({ "settings revision": store.load().revision }),
           running: async () => ({ count: 0, holders: [] }),
           log: (event) => void logs.push(event),

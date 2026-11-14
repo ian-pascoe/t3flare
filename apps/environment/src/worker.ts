@@ -6,7 +6,6 @@ import { OAUTH_PUBLIC_PATHS } from "./harness/oauth.ts";
 import * as Access from "./access.ts";
 import type { EnvironmentEnv } from "./environmentDO.ts";
 import { type HarnessCaller, isHarnessPath } from "./harness/panel.ts";
-import type { EndpointCaller } from "./settings/endpoint.ts";
 import { isSettingsMcpPath, SETTINGS_MCP_PATH } from "./settings/endpointLayout.ts";
 
 export { EnvironmentDO } from "./environmentDO.ts";
@@ -15,8 +14,11 @@ export { ContainerPreviews } from "./preview/containerPreviews.ts";
 
 export interface Env extends EnvironmentEnv {
   readonly ENVIRONMENT: {
-    getByName(name: string): { fetch(request: Request): Promise<Response>; harness(request: Request, caller: HarnessCaller): Promise<Response>; harnessPublic(request: Request): Promise<Response>;
-      settingsMcp(request: Request, caller: EndpointCaller): Promise<Response>;
+    getByName(name: string): {
+      fetch(request: Request): Promise<Response>;
+      harness(request: Request, caller: HarnessCaller): Promise<Response>;
+      harnessPublic(request: Request): Promise<Response>;
+      settingsMcp(request: Request, caller: HarnessCaller): Promise<Response>;
     };
   };
   readonly ASSETS: { fetch(request: Request): Promise<Response> };
@@ -76,7 +78,7 @@ export default {
         console.log(JSON.stringify({ t3flare: "settings-refused", via: "mcp", door: "owner", reason: verdict.admitted ? "path" : verdict.reason, path: url.pathname }));
         return new Response("Not found\n", { status: 404, headers: { "cache-control": "no-store" } });
       }
-      const caller: EndpointCaller = !local && verdict.caller.kind === "owner" ? { kind: "owner", subject: verdict.caller.subject ?? "" } : { kind: "service-token" };
+      const caller: HarnessCaller = !local && verdict.caller.kind === "owner" ? { kind: "owner", subject: verdict.caller.subject ?? "" } : { kind: "service-token" };
       return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).settingsMcp(request, caller);
     }
     // The harness panel (ADR-0026) at `/_t3flare/harness`, behind the `/_t3flare` Access application (owner, 2026-11-12,

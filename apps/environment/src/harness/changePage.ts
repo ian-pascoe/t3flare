@@ -14,7 +14,6 @@ import { escapeHtml, visibleHtml } from "./page.ts";
 import { OPEN_CHANGES_PATH } from "./paths.ts";
 import { STYLE } from "./pageStyle.ts";
 
-
 /** A value as JSON text, safe. */
 const value = (raw: unknown): string => (raw === undefined ? '<span class="desc">unset</span>' : `<code>${visibleHtml(typeof raw === "string" ? raw : JSON.stringify(raw))}</code>`);
 

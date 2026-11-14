@@ -16,16 +16,20 @@ export interface SettingsTool {
   readonly inputSchema: Readonly<Record<string, unknown>>;
 }
 
+/** What the server covers, said the same to both doors (plan D17). */
+const SETTINGS_SCOPE =
+  "t3flare's own settings: the Harness settings (Pi Durable's extensions and the MCP server set), the Environment settings (Container size, idle time, budget, Variables, Global mise config) and the Environment skills. These are not t3's preferences (t3_environment_preferences_update). Read tools run.";
+
 /** What agents are told about the server (plan D17): its instructions and its tools' descriptions, nothing else. */
 export const SETTINGS_INSTRUCTIONS =
-  `t3flare's own settings: the Harness settings (Pi Durable's extensions and the MCP server set), the Environment settings (Container size, idle time, budget, Variables, Global mise config) and the Environment skills. These are not t3's preferences (t3_environment_preferences_update). Read tools run. Every write names the expectedRevision it read, and the thread's mode rules it: plan mode refuses writes; outside full access a write waits for the owner's card; a change that widens what agents have or can do always waits for the owner's answer on a card or its Change page (at most ${durationText(CHANGE_TTL_MS)}, one at a time per thread). Do not repeat a declined change.`;
+  `${SETTINGS_SCOPE} Every write names the expectedRevision it read, and the thread's mode rules it: plan mode refuses writes; outside full access a write waits for the owner's card; a change that widens what agents have or can do always waits for the owner's answer on a card or its Change page (at most ${durationText(CHANGE_TTL_MS)}, one at a time per thread). Do not repeat a declined change.`;
 
 /**
  * The same for an Owner client (plan D11, D12): it has no thread mode, and its asked changes wait on the Change page in
  * its Elicitation mode.
  */
 export const SETTINGS_OWNER_INSTRUCTIONS =
-  `t3flare's own settings: the Harness settings (Pi Durable's extensions and the MCP server set), the Environment settings (Container size, idle time, budget, Variables, Global mise config) and the Environment skills. These are not t3's preferences. Read tools run. Every write names the expectedRevision it read. A change that narrows what agents have or can do applies at once; one that widens it waits for the owner's answer on its Change page (at most ${durationText(CHANGE_TTL_MS)}): open the link the result or the question gives, and do not repeat the call; read the settings to see whether it applied. Do not repeat a declined change.`;
+  `${SETTINGS_SCOPE} Every write names the expectedRevision it read. A change that narrows what agents have or can do applies at once; one that widens it waits for the owner's answer on its Change page (at most ${durationText(CHANGE_TTL_MS)}): open the link the result or the question gives, and do not repeat the call; read the settings to see whether it applied. Do not repeat a declined change.`;
 
 /** What an Owner client is told besides, by its Elicitation mode (plan D12). */
 export const OWNER_MODE_INSTRUCTIONS = {

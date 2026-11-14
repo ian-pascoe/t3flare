@@ -223,11 +223,11 @@ export const verifyHarnessRequest = async (
 };
 
 /**
- * The Owner-client endpoint's check (ADR-0034, plan D13), M5a: the same callers as the panel's, against the endpoint's
- * own Access application (`config.audience` is its `aud`, never the panel's): the owner's assertion alone, with a `sub`
- * (an OAuth client cannot send the admin token, and the endpoint takes no cookie-borne write: its guards refuse a
- * browser), a non-empty `sub`, or the stage's service token with the admin token. An assertion for the panel's application is refused
- * here, as this application's is at the panel. Never throws.
+ * The Owner-client endpoint's check (ADR-0035, plan D13), M5a: the same callers as the panel's, against the endpoint's
+ * own Access application (`config.audience` is its `aud`, never the panel's). Admitted: the owner's assertion alone,
+ * with a non-empty `sub` (an OAuth client cannot send the admin token, and the endpoint takes no cookie-borne write: its
+ * guards refuse a browser), or the stage's service token with the admin token. An assertion for the panel's application
+ * is refused here, as this application's is at the panel. Never throws.
  */
 export const verifySettingsRequest = async (request: Request, config: GuardConfig, keys: TeamKeyLookup, nowSeconds: number = Math.floor(Date.now() / 1000)): Promise<Verdict> => {
   const verdict = await verifyHarnessRequest(request, config, keys, nowSeconds);

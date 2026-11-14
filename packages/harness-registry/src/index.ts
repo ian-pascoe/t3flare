@@ -487,7 +487,7 @@ export const applyChange = (
     harness: { ...stored, revision: stored.revision + 1, global: { extensions: { ...stored.global.extensions, [entry.id]: next } } },
   };
 };
-export { CARD_TEXT_MAX, cardText, visible } from "./cardText.ts";
+export { CARD_TEXT_MAX, cardText, visible, withoutHidden } from "./cardText.ts";
 export { isDeniedT3Tool, T3_TOOL_DENYLIST } from "./t3Tools.ts";
 export { descriptionFor, guidanceFor, toolLikeNamesIn } from "./t3Guidance.ts";
 export * from "./globalMise.ts";

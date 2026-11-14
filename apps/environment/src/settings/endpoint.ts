@@ -24,9 +24,12 @@
 //     stream, held until the response POST, the stream's end (which withdraws the change) or the change's expiry.
 //   - `model` (M5b): the result is Executor's Pause at once (every version), and `resume`, listed in this mode alone,
 //     answers it. A change that needs the page gets the link, never a Pause.
+import { withoutHidden } from "@t3flare/harness-registry";
+
+import type { HarnessCaller } from "../harness/panel.ts";
 import type { McpCallAnswer } from "../mcp/host.ts";
 import type { OwnerCaller } from "./caller.ts";
-import { canonicalJson, type ChangeRecord, isChangeId, isOpen, type NeedsPage } from "./changes.ts";
+import { canonicalJson, type ChangeRecord, isChangeId, isOpen, type NeedsPage, sha256Hex } from "./changes.ts";
 import { type ChangeOutcome, closeOpenChange, outcomeOf, waitForChange } from "./openChanges.ts";
 import {
   answerDepsOf,
@@ -48,8 +51,14 @@ import { OWNER_MODE_INSTRUCTIONS, RESUME_TOOL, SETTINGS_OWNER_INSTRUCTIONS, SETT
 
 /** The 2026 version: per-request metadata, questions in results (MRTR). */
 export const MODERN_VERSION = "2026-07-28";
+/** The 2025 version with URL elicitation (the `browser` question on the call's stream). */
+export const URL_ELICITATION_VERSION = "2025-11-25";
+/** The first version with elicitation, form only and without `mode` in its params. */
+export const FORM_ELICITATION_VERSION = "2025-06-18";
+/** Tools with no elicitation: what a request with no session (or a forged one) reads as. */
+export const NO_ELICITATION_VERSION = "2025-03-26";
 /** The `initialize` versions, newest first. */
-export const LEGACY_VERSIONS: ReadonlyArray<string> = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+export const LEGACY_VERSIONS: ReadonlyArray<string> = [URL_ELICITATION_VERSION, FORM_ELICITATION_VERSION, NO_ELICITATION_VERSION, "2024-11-05"];
 export const SUPPORTED_VERSIONS: ReadonlyArray<string> = [MODERN_VERSION, ...LEGACY_VERSIONS];
 /** The largest body read (plan D11). */
 export const BODY_MAX = 256 * 1024;
@@ -66,10 +75,11 @@ export const SERVER_INFO = { name: "t3flare-settings", title: "t3flare Settings"
 const META_VERSION = "io.modelcontextprotocol/protocolVersion";
 const META_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities";
 const META_CLIENT = "io.modelcontextprotocol/clientInfo";
+const META_SERVER = "io.modelcontextprotocol/serverInfo";
+/** A 2026 listing's or discovery's cache hints: never cached, never shared (the tools follow the access switch). */
+const NO_CACHE = { ttlMs: 0, cacheScope: "private" } as const;
 const NO_STORE = { "cache-control": "no-store" } as const;
 
-/** Who the Worker admitted (plan D13): the owner's Access identity, or the stage's service token with the admin token. */
-export type EndpointCaller = { readonly kind: "owner"; readonly subject: string } | { readonly kind: "service-token" };
 
 export interface EndpointDeps {
   readonly server: SettingsServerDeps;
@@ -113,10 +123,8 @@ const plain = (status: number, text: string, headers: Readonly<Record<string, st
 
 const rpcError = (id: unknown, code: number, message: string, data?: unknown) => ({ jsonrpc: "2.0", id: id ?? null, error: { code, message, ...(data === undefined ? {} : { data }) } });
 
-/** A client's own label (plan D11): display only, never trusted; cut to 60 characters with no control or format character. */
-const labelOf = (text: string): string =>
-  // oxlint-disable-next-line no-control-regex -- the point is to drop them
-  text.replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, "").slice(0, 60);
+/** A client's own label (plan D11): display only, never trusted; no hidden character, cut to 60 characters. */
+const labelOf = (text: string): string => withoutHidden(text).slice(0, 60);
 
 const clientOf = (info: unknown, source: string): Context["client"] => {
   const fields = objectOf(info);
@@ -125,14 +133,16 @@ const clientOf = (info: unknown, source: string): Context["client"] => {
   return name === "" ? undefined : { name, source };
 };
 
+const withClient = (client: Context["client"]): { readonly client?: NonNullable<Context["client"]> } => (client === undefined ? {} : { client });
+
+const NONE: Declared = { form: false, url: false };
+
 const declaredOf = (capabilities: unknown): Declared => {
   const elicitation = objectOf(objectOf(capabilities)?.elicitation);
-  if (elicitation === undefined) return { form: false, url: false };
+  if (elicitation === undefined) return NONE;
   if (Object.keys(elicitation).length === 0) return { form: true, url: false };
   return { form: elicitation.form !== undefined, url: elicitation.url !== undefined };
 };
-
-const NONE: Declared = { form: false, url: false };
 
 /** The request's Elicitation mode (plan D12), or undefined when it is unknown, repeated or mis-cased. Absent is `browser`. */
 export const elicitationModeOf = (url: URL): ElicitationMode | undefined => {
@@ -179,10 +189,7 @@ const toolResult = (answer: McpCallAnswer): Json =>
 const refusedResult = (text: string): McpCallAnswer => ({ kind: "result", isError: true, text, structured: { status: "refused" } });
 
 /** The digest a `requestState` binds: the call's tool and arguments, canonical (plan D12). */
-const callDigest = async (tool: string, args: Json): Promise<string> => {
-  const bytes = new TextEncoder().encode(canonicalJson({ tool, args }));
-  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-};
+const callDigest = (tool: string, args: Json): Promise<string> => sha256Hex(canonicalJson({ tool, args }));
 
 /** Why a change asked in `native` or `model` waits on its Change page instead (plan D6, D12), said in its `W`. */
 const PAGE_NOTE: Readonly<Record<NeedsPage, string>> = {
@@ -206,7 +213,7 @@ const STATE_REFUSED: Readonly<Record<TokenRefusal | "other-call" | "gone", strin
  * One request to the Owner-client endpoint (plan D11). `caller` is the Worker's verdict; nothing in the request names who
  * calls.
  */
-export const handleSettingsMcp = async (request: Request, caller: EndpointCaller, deps: EndpointDeps): Promise<Response> => {
+export const handleSettingsMcp = async (request: Request, caller: HarnessCaller, deps: EndpointDeps): Promise<Response> => {
   const server = deps.server;
   const now = deps.now ?? server.ops.now;
   const key = caller.kind === "owner" ? caller.subject : "service-token";
@@ -288,7 +295,7 @@ export const handleSettingsMcp = async (request: Request, caller: EndpointCaller
     const header = request.headers.get("mcp-protocol-version");
     if (session.ok) {
       const kept = session.payload;
-      const version = typeof kept.protocolVersion === "string" && LEGACY_VERSIONS.includes(kept.protocolVersion) ? kept.protocolVersion : "2025-03-26";
+      const version = typeof kept.protocolVersion === "string" && LEGACY_VERSIONS.includes(kept.protocolVersion) ? kept.protocolVersion : NO_ELICITATION_VERSION;
       const elicitation = objectOf(kept.elicitation);
       const client = objectOf(kept.client);
       context = {
@@ -299,13 +306,13 @@ export const handleSettingsMcp = async (request: Request, caller: EndpointCaller
       };
     } else {
       // A missing, invalid or other identity's session reads as no elicitation declared (plan D11).
-      context = { modern: false, version: header !== null && LEGACY_VERSIONS.includes(header) ? header : "2025-03-26", elicitation: NONE, ...withClient(fromAgent) };
+      context = { modern: false, version: header !== null && LEGACY_VERSIONS.includes(header) ? header : NO_ELICITATION_VERSION, elicitation: NONE, ...withClient(fromAgent) };
     }
   }
 
   const instructions = `${SETTINGS_OWNER_INSTRUCTIONS}${OWNER_MODE_INSTRUCTIONS[requested]}`;
   const reply = (result: Json, headers: Readonly<Record<string, string>> = {}) =>
-    json({ jsonrpc: "2.0", id, result: context.modern ? { resultType: "complete", ...result, _meta: { "io.modelcontextprotocol/serverInfo": SERVER_INFO } } : result }, 200, headers);
+    json({ jsonrpc: "2.0", id, result: context.modern ? { resultType: "complete", ...result, _meta: { [META_SERVER]: SERVER_INFO } } : result }, 200, headers);
 
   switch (method) {
     case "initialize": {
@@ -313,7 +320,7 @@ export const handleSettingsMcp = async (request: Request, caller: EndpointCaller
       const version = typeof asked === "string" && LEGACY_VERSIONS.includes(asked) ? asked : LEGACY_VERSIONS[0]!;
       // 2025-06-18 has form elicitation only; 2025-03-26 and older have none.
       const declared = declaredOf(params.capabilities);
-      const elicitation = version === "2025-11-25" ? declared : version === "2025-06-18" ? { form: declared.form, url: false } : NONE;
+      const elicitation = version === URL_ELICITATION_VERSION ? declared : version === FORM_ELICITATION_VERSION ? { form: declared.form, url: false } : NONE;
       const info = objectOf(params.clientInfo);
       const at = now();
       const session = await signToken(tokenKey, {
@@ -332,14 +339,14 @@ export const handleSettingsMcp = async (request: Request, caller: EndpointCaller
       );
     }
     case "server/discover":
-      return reply({ supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER_INFO, instructions, ttlMs: 0, cacheScope: "private" });
+      return reply({ supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER_INFO, instructions, ...NO_CACHE });
     case "ping":
       return reply({});
     case "tools/list": {
       const listed = ownerListed(server);
       // `resume` in `model` alone (plan D12), and only while writes are listed: it applies changes.
       const tools = [...SETTINGS_TOOLS, ...(requested === "model" ? [RESUME_TOOL] : [])].filter(listed).map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, annotations: { readOnlyHint: tool.class === "read" } }));
-      return reply(context.modern ? { tools, ttlMs: 0, cacheScope: "private" } : { tools });
+      return reply(context.modern ? { tools, ...NO_CACHE } : { tools });
     }
     case "tools/call":
       break;
@@ -371,7 +378,7 @@ export const handleSettingsMcp = async (request: Request, caller: EndpointCaller
   const messageOf = (record: ChangeRecord, page: string | undefined): string =>
     record.shown === undefined ? "A change waits for you on the Change page." : ownerMessage(record.shown, owner, record.mode === "native" || record.mode === "model" ? record.mode : "browser", page);
 
-  /** Holds up to `ms` for change `id`'s answer; its outcome, or undefined when still open. */
+  /** Holds up to `ms` for Open change `change`'s answer; its outcome, or undefined when still open. */
   const hold = async (change: string, ms: number, signal?: AbortSignal): Promise<ChangeOutcome | undefined> => {
     const waiter = waitForChange(change);
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -472,7 +479,7 @@ export const handleSettingsMcp = async (request: Request, caller: EndpointCaller
     if (context.modern) {
       return reply({ resultType: "input_required", inputRequests: { change: { method: "elicitation/create", params: { mode: "url", message: text, url: page } } }, requestState: await stateOf(record) });
     }
-    if (context.version !== "2025-11-25") return reply(toolResult(ownerWaiting(record, page, note)));
+    if (context.version !== URL_ELICITATION_VERSION) return reply(toolResult(ownerWaiting(record, page, note)));
     // 2025-11-25 with URL elicitation: the question and then the call's result on the call's stream; a cut stream leaves
     // the change open for the page (plan D12).
     const elicitId = await signToken(tokenKey, { kind: "elicit", sub: key, exp: record.expiresAt ?? now(), change: record.id });
@@ -495,13 +502,13 @@ export const handleSettingsMcp = async (request: Request, caller: EndpointCaller
     if (context.modern) {
       return reply({ resultType: "input_required", inputRequests: { change: { method: "elicitation/create", params: { mode: "form", ...form } } }, requestState: await stateOf(record) });
     }
-    if (!context.elicitation.form || (context.version !== "2025-11-25" && context.version !== "2025-06-18")) return reply(toolResult(ownerWaiting(record, page, noteOf(record))));
+    if (!context.elicitation.form || (context.version !== URL_ELICITATION_VERSION && context.version !== FORM_ELICITATION_VERSION)) return reply(toolResult(ownerWaiting(record, page, noteOf(record))));
     const elicitId = await signToken(tokenKey, { kind: "elicit", sub: key, exp: record.expiresAt ?? now(), change: record.id });
     const untilExpiry = Math.max(0, (record.expiresAt ?? now()) - now());
     return heldStream(
       record,
       // 2025-06-18 has no `mode`.
-      { jsonrpc: "2.0", id: elicitId, method: "elicitation/create", params: context.version === "2025-06-18" ? form : { mode: "form", ...form } },
+      { jsonrpc: "2.0", id: elicitId, method: "elicitation/create", params: context.version === FORM_ELICITATION_VERSION ? form : { mode: "form", ...form } },
       { progress: "Waiting for the answer in the client's form", comment: "waiting for the form's answer" },
       Math.min(untilExpiry, deps.formWaitMs ?? untilExpiry),
       (outcome) => ownerOutcome(outcome ?? closeOpenChange(answerDepsOf(server), record.id, "expired") ?? { state: "expired" }, record),
@@ -572,4 +579,3 @@ export const handleSettingsMcp = async (request: Request, caller: EndpointCaller
   return deliver(answered.record);
 };
 
-const withClient = (client: Context["client"]): { readonly client?: NonNullable<Context["client"]> } => (client === undefined ? {} : { client });

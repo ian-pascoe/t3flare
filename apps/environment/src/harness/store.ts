@@ -6,6 +6,8 @@
 // `entity`; it holds no secret value (parts 2-4's secrets are masked before an entry is written).
 import { EMPTY_ENVIRONMENT, EMPTY_HARNESS, type GlobalMiseReport, globalMiseReport, type StoredEnvironment, type StoredHarness } from "@t3flare/harness-registry";
 
+import { keptKey } from "./keys.ts";
+
 /** The Durable Object's synchronous key-value storage. */
 export interface KvStorage {
   get<T>(key: string): T | undefined;
@@ -115,13 +117,7 @@ export const harnessStore = (kv: KvStorage): HarnessStore => ({
       .slice(-limit)
       .reverse()
       .map((entry) => ({ ...entry, entity: entry.entity ?? "harness" })),
-  csrfKey: () => {
-    const kept = kv.get<ArrayBuffer>(CSRF_KEY);
-    if (kept !== undefined) return new Uint8Array(kept);
-    const key = crypto.getRandomValues(new Uint8Array(32));
-    kv.put(CSRF_KEY, key.buffer);
-    return key;
-  },
+  csrfKey: () => keptKey(kv, CSRF_KEY),
   noteRead: (revision, at) => kv.put(READ_KEY, { revision, at }),
   lastRead: () => kv.get<LastRead>(READ_KEY),
   noteEnvironmentRead: (revision, at) => kv.put(ENVIRONMENT_READ_KEY, { revision, at }),

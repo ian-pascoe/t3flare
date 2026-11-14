@@ -92,6 +92,8 @@ export const restartingHarness = async (extensions: ReadonlyArray<Extension>, re
       current = await open();
       current.resume();
     },
+    /** The owner's Stop: aborts the root conversation's running turn, its tools' signals included. */
+    abort: async () => (await current.conversation(root.id, context))?.abort(context),
     /** The root conversation's entries, newest first, as their messages' roles and texts. */
     messages: async () => {
       const conversation = await current.conversation(root.id, context);

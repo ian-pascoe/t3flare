@@ -5,6 +5,7 @@
 // Every payload names its `kind`, the Access `sub` it was issued to and when it expires, so one kind cannot stand in for
 // another, another identity's token is refused, and none lives forever. A token says only what the server wrote into
 // it; the server still reads the Open change it names before it does anything (MRTR: `requestState` is attacker input).
+import { base64Url, fromBase64Url, keptKey } from "../harness/keys.ts";
 import type { KvStorage } from "../harness/store.ts";
 
 /** Where the DO keeps the key. */
@@ -25,32 +26,10 @@ export type TokenRefusal = "malformed" | "bad-signature" | "wrong-kind" | "other
 
 const encoder = new TextEncoder();
 
-const base64Url = (bytes: Uint8Array): string =>
-  btoa(String.fromCharCode(...bytes))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/, "");
-
-const fromBase64Url = (text: string): Uint8Array<ArrayBuffer> | undefined => {
-  if (!/^[A-Za-z0-9_-]*$/.test(text)) return undefined;
-  const padded = text.replaceAll("-", "+").replaceAll("_", "/");
-  try {
-    return Uint8Array.from(atob(padded + "=".repeat((4 - (padded.length % 4)) % 4)), (char) => char.charCodeAt(0));
-  } catch {
-    return undefined;
-  }
-};
-
 const hmacKey = (key: Uint8Array<ArrayBuffer>, usage: "sign" | "verify") => crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, [usage]);
 
 /** The DO's key, made on first use. */
-export const settingsStateKey = (kv: KvStorage): Uint8Array<ArrayBuffer> => {
-  const kept = kv.get<ArrayBuffer>(STATE_KEY);
-  if (kept !== undefined) return new Uint8Array(kept);
-  const key = crypto.getRandomValues(new Uint8Array(32));
-  kv.put(STATE_KEY, key.buffer);
-  return key;
-};
+export const settingsStateKey = (kv: KvStorage): Uint8Array<ArrayBuffer> => keptKey(kv, STATE_KEY);
 
 /** `payload`, signed. */
 export const signToken = async (key: Uint8Array<ArrayBuffer>, payload: TokenPayload): Promise<string> => {
