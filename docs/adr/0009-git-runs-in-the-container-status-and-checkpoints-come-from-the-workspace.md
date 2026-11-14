@@ -82,7 +82,9 @@ seven shapes) for the Workspace never primed: without it, a commit after the Con
 read with no answer, every time. The rest of the draft runs on a temporary index and object directory that the process
 router bridges into the Workspace's harness `tmp/` (`apps/environment/src/agents/gitBridge.ts`).
 
-Evidence: `docs/steps/spi-1186/stopped.json` (primed: neither read ran in the Container), `fresh.json` (never primed).
+Evidence: `docs/steps/spi-1186/stopped.json` and `fresh.json` (primed, the latter by t3's status refresh on a new
+clone: neither read ran in the Container). The allow-list path itself (a never-primed Workspace) ran only in
+`apps/agents/test/gitDirReads.test.ts`.
 
 ## Refinement (SPI-1004): automatic fetch is off, and why
 

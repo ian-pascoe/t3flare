@@ -6,7 +6,7 @@
 //   node scripts/stage.ts run pgitobj pgitobj commit    t3 commits picked files, with a message and with a drafted one (commit.json)
 //   … cleanup                                           the bridged folders are gone once the drafts end (cleanup.json)
 //   … stopped                                           a primed Workspace, its Container stopped: the draft's reads start nothing (stopped.json)
-//   … fresh                                             a Workspace never primed, its Container stopped: the commit still works (fresh.json)
+//   … fresh                                             a new clone, watched once, its Container stopped: the commit works, leftovers swept (fresh.json)
 //
 // Evidence goes to docs/steps/spi-1186/, each file naming the deployed commit.
 import * as path from "node:path";
@@ -46,9 +46,15 @@ const stop = async (id: string) => {
 /** The repo back at origin/main, clean (the Workspace's git, starting its Container). */
 const reset = (id: string) => workspaceGit(id, ["reset", "-q", "--hard", "origin/main"]).then(() => workspaceGit(id, ["clean", "-fdq"]));
 
-/** The router trace's git commands in `cwd`, as the evidence keeps them. */
+/**
+ * The router trace's git commands in `cwd`, as the evidence keeps them, in the order they started: the trace appends an
+ * entry when its command ends, so a long one (t3's upstream fetch) is listed after the reads that ran while it did.
+ */
 const gitIn = (entries: Array<any>, cwd: string) =>
-  entries.filter((entry) => entry.command === "git" && entry.cwd === cwd).map((entry) => ({ argv: entry.argv.join(" "), route: entry.route, exitCode: entry.exitCode, detail: entry.detail ?? null }));
+  entries
+    .filter((entry) => entry.command === "git" && entry.cwd === cwd)
+    .toSorted((left, right) => left.at - right.at)
+    .map((entry) => ({ at: entry.at, ms: entry.ms, argv: entry.argv.join(" "), route: entry.route, exitCode: entry.exitCode, detail: entry.detail ?? null }));
 
 const DRAFT_READS = ["rev-parse --git-path index --git-path objects", "count-objects -v"];
 
@@ -123,10 +129,13 @@ const cleanup = async () => {
   await reset(WORKSPACE);
 };
 
-/** t3's commit with the Container stopped: which command started it, and that the draft's reads did not. */
+/**
+ * t3's commit with the Container stopped: which command ran in the Container first (by start time: what started it, as
+ * no passive read may), and that the draft's two first reads did not run there.
+ */
 const commitWhileStopped = async (id: string, root: string, primed: boolean) => {
-  // A routed action primes the allow-listed reads while the Container runs, as an agent's work would; a fresh clone has
-  // had none.
+  // A routed action primes the allow-listed reads while the Container runs, as an agent's work would. A fresh clone has
+  // had none of its own, but t3's status refresh below runs an upstream fetch (an action), which primes them too.
   if (primed) {
     await reset(id);
     await sleep(5_000);
@@ -145,15 +154,24 @@ const commitWhileStopped = async (id: string, root: string, primed: boolean) => 
   const done = await t3Commit(cookie, { id, cwd: root, filePaths: ["while-stopped.txt"], message: `pgitobj: committed while stopped ${stamp}` });
   const commands = gitIn((await trace(true)).entries, root);
   const draftReads = commands.filter((entry) => DRAFT_READS.includes(entry.argv));
-  const starter = commands.find((entry) => /started the Container|^action/.test(String(entry.detail)));
-  return { runningWhenWatched: watched?.running ?? null, stopped, afterPoll, report: done, draftReads, firstToRun: starter ?? null, commands, ok: stopped && afterPoll?.running === false && committed(done, ["while-stopped.txt"]) };
+  const firstInContainer = commands.find((entry) => entry.route === "container") ?? null;
+  return {
+    runningWhenWatched: watched?.running ?? null,
+    stopped,
+    afterPoll,
+    report: done,
+    draftReads,
+    firstInContainer,
+    commands,
+    ok: stopped && afterPoll?.running === false && committed(done, ["while-stopped.txt"]) && (firstInContainer === null || String(firstInContainer.detail).startsWith("action")),
+  };
 };
 
 const stoppedCase = async () => {
   cookie ||= await pair();
   const { root } = await ensureProject(cookie, WORKSPACE);
   const result = await commitWhileStopped(WORKSPACE, root, true);
-  // Primed: neither of the draft's first reads ran in the Container; the first action (its index) started it.
+  // Primed: neither of the draft's first reads ran in the Container; an action started it (checked in the result).
   const ok = result.ok && result.draftReads.length === 2 && result.draftReads.every((entry) => entry.route !== "container" && !String(entry.detail).includes("started the Container"));
   await evidence("stopped.json", { root, ...result, ok });
   await reset(WORKSPACE);
@@ -174,7 +192,8 @@ const fresh = async () => {
   const result = await commitWhileStopped(id, root, false);
   const after = (((await call(id, { fs: { op: "readdir", path: TMP } }))?.result?.ok ?? []) as Array<{ name: string }>).map((entry) => entry.name);
   const sweep = { before, after, ok: after.includes("keep.bundle") && !after.some((name) => /^(index|objects)-/.test(name)) };
-  // Never primed: one of the draft's first reads may start the Container (the allow-list), and the commit goes through.
+  // Its draft reads have answers by now (the refresh's fetch primed them), so the allow-list path does not run here: it
+  // runs in apps/agents/test/gitDirReads.test.ts only.
   await evidence("fresh.json", { root, ...result, sweep, ok: result.ok && sweep.ok });
   await admin("POST", `/_t3flare/agents/workspace-remove?id=${id}`);
 };

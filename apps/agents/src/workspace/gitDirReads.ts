@@ -21,7 +21,7 @@ const equals = (args: ReadonlyArray<string>, expected: ReadonlyArray<string>) =>
   args.length === expected.length && args.every((arg, at) => arg === expected[at]);
 
 const COMMIT_GIT_PATHS = ["rev-parse", "--git-path", "index", "--git-path", "objects"];
-const COMMIT_ALTERNATES = ["count-objects", "-v"];
+const COUNT_OBJECTS_ARGV = ["count-objects", "-v"];
 
 export const FIRST_READ_ALLOWED: ReadonlyArray<AllowedRead> = [
   {
@@ -59,7 +59,7 @@ export const FIRST_READ_ALLOWED: ReadonlyArray<AllowedRead> = [
   {
     name: "commit-alternates",
     caller: "GitVcsDriverCore.prepareCommitContext.alternates (the draft's alternates list)",
-    matches: (args) => equals(args, COMMIT_ALTERNATES),
+    matches: (args) => equals(args, COUNT_OBJECTS_ARGV),
   },
 ];
 
@@ -106,7 +106,7 @@ export const primeArgvs = (refs: ReadonlyArray<string>): ReadonlyArray<ReadonlyA
   ["remote"],
   ["config", "--get", "checkout.workers"],
   COMMIT_GIT_PATHS,
-  COMMIT_ALTERNATES,
+  COUNT_OBJECTS_ARGV,
   ...refs.filter((ref) => ref.startsWith("refs/heads/")).slice(0, 100).map((ref) => ["for-each-ref", UPSTREAM_FORMAT, ref]),
   ...refs
     .filter((ref) => ref.startsWith("refs/remotes/") && !ref.endsWith("/HEAD"))

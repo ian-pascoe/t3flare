@@ -13,9 +13,14 @@ const DRAFT = "/tmp/t3code-commit-index-abc";
 const harness = (state: Map<string, "file" | "dir"> = new Map([[DRAFT, "dir"], [`${DRAFT}/index`, "file"], [`${DRAFT}/objects`, "dir"]])) => {
   const ops: Array<{ readonly id: string } & FsOp> = [];
   const files = new Map<string, Set<string>>();
+  const logs: Array<Record<string, unknown>> = [];
+  /** File operations the fake Workspace DO answers with an error, as the real one does (it does not throw). */
+  const failing = new Set<string>();
+  const parentOf = (path: string) => path.slice(0, path.lastIndexOf("/")) || "/";
   const bridge = makeGitBridge({
     fs: async (id, op) => {
       ops.push({ id, ...op });
+      if (failing.has(`${op.op} ${op.path}`) || failing.has(op.op)) return { error: "EIO", message: "the Workspace refused" };
       const own = files.get(id) ?? new Set<string>();
       files.set(id, own);
       if (op.op === "readdir") {
@@ -27,14 +32,16 @@ const harness = (state: Map<string, "file" | "dir"> = new Map([[DRAFT, "dir"], [
       if (op.op === "remove") for (const name of own) if (name === op.path || name.startsWith(`${op.path}/`)) own.delete(name);
       return { ok: null };
     },
+    // processRouter's rule, over the fake State directory.
+    onT3Side: (path) => path.startsWith("/") && !path.startsWith("/w/") && (state.has(path) || (parentOf(path) !== "/" && state.has(parentOf(path)))),
     stateEntry: (path) => {
       const kind = state.get(path);
       return kind === undefined ? undefined : { kind };
     },
     readStateFile: (path) => new TextEncoder().encode(`index of ${path}`),
-    log: () => undefined,
+    log: (line) => logs.push(line),
   });
-  return { bridge, ops, files, state };
+  return { bridge, ops, files, state, failing, logs };
 };
 
 const draftEnv = {
@@ -132,5 +139,40 @@ describe("the git bridge", () => {
     expect(left.some((path) => path.includes("000000000000000000000000") || path.includes("111111111111111111111111"))).toBe(false);
     expect(left).toEqual(expect.arrayContaining([`${TMP}/seed.bundle`, `${TMP}/wt-x.bundle`, env.GIT_INDEX_FILE]));
     expect(left.some((path) => path.startsWith(env.GIT_OBJECT_DIRECTORY!))).toBe(true);
+  });
+
+  it("fails a command whose folder the Workspace refused, and makes it again on the draft's next command", async () => {
+    const { bridge, failing, ops } = harness();
+    failing.add("write");
+    await expect(bridge.bridge("a", draftEnv)).rejects.toThrow(/write .* EIO/);
+    // Not registered: nothing live, so nothing points git at a folder that is not there.
+    expect(bridge.live()).toEqual([]);
+    failing.clear();
+    ops.splice(0);
+    const env = await bridge.bridge("a", draftEnv);
+    expect(env.GIT_OBJECT_DIRECTORY).toMatch(new RegExp(`^${TMP}/objects-`));
+    expect(ops.filter((op) => op.op === "write").map((op) => op.path)).toEqual(expect.arrayContaining([env.GIT_INDEX_FILE, `${env.GIT_OBJECT_DIRECTORY}/info/t3flare-draft`]));
+    expect(bridge.live()).toHaveLength(2);
+  });
+
+  it("fails on a refused mkdir too", async () => {
+    const { bridge, failing } = harness();
+    failing.add("mkdir");
+    await expect(bridge.bridge("a", { GIT_OBJECT_DIRECTORY: `${DRAFT}/objects` })).rejects.toThrow(/mkdir .* EIO/);
+    expect(bridge.live()).toEqual([]);
+  });
+
+  it("keeps a bridge whose folder could not be removed, logs it, and removes it at the next reap", async () => {
+    const { bridge, failing, files, logs, state } = harness();
+    const env = await bridge.bridge("a", { GIT_OBJECT_DIRECTORY: `${DRAFT}/objects` });
+    state.clear();
+    failing.add(`remove ${env.GIT_OBJECT_DIRECTORY}`);
+    expect(await bridge.reap()).toEqual([]);
+    expect(bridge.live()).toHaveLength(1);
+    expect(logs).toEqual(expect.arrayContaining([expect.objectContaining({ t3flare: "git-bridge-reap-failed", folder: env.GIT_OBJECT_DIRECTORY })]));
+    failing.clear();
+    expect(await bridge.reap()).toEqual([env.GIT_OBJECT_DIRECTORY]);
+    expect(bridge.live()).toEqual([]);
+    expect([...files.get("a")!].some((path) => path.startsWith(env.GIT_OBJECT_DIRECTORY!))).toBe(false);
   });
 });

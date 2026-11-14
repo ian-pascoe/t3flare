@@ -3,7 +3,7 @@
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is
 // a missing binary, as in step 1. Every routed command is kept in a short trace (admin `GET /_t3flare/agents/router-trace`).
-import { describeFailure, fromWorkspaceText, normalize, REPO_ROOT, startRefusal, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
+import { describeFailure, fromWorkspaceText, isUnderW, normalize, REPO_ROOT, startRefusal, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
 import { containerGitHubPermissions, ENVIRONMENT_GITHUB_PERMISSIONS } from "@t3flare/github-app/permissions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -159,15 +159,27 @@ export const workspaceGitHubToken = async (
  */
 export const gitBridge = makeGitBridge({
   fs: (id, op) => workspaceRpc(id).fs(op),
+  onT3Side: (path) => onT3Side(path),
   stateEntry: (path) => StateStore.get(path),
   readStateFile: (path) => StateStore.readFile(path),
 });
 
+/**
+ * Whether a path git is handed is t3's own, which the Container cannot see: absolute, outside `/w`, and held by the State
+ * directory, or a file t3 has yet to make in a folder it holds (a draft's index when the repo has none). The bridge
+ * and the alternates list use this one rule.
+ */
+const onT3Side = (path: string): boolean => {
+  if (!path.startsWith("/") || isUnderW(path)) return false;
+  if (StateStore.get(path) !== undefined) return true;
+  const parent = StateStore.parentOf(StateStore.normalize(path));
+  return parent !== "/" && StateStore.get(parent) !== undefined;
+};
+
 /** git's environment for Workspace `id`: translated (`gitEnvOf`), its alternates checked, t3's temp material bridged. */
-const gitEnvInto = async (id: string, env: Readonly<Record<string, unknown>> | undefined): Promise<Record<string, string>> => {
+const bridgedGitEnv = async (id: string, env: Readonly<Record<string, unknown>> | undefined): Promise<Record<string, string>> => {
   const dropped: Array<string> = [];
-  // An alternate in the State directory (t3's side) is one the Container cannot see.
-  const translated = gitEnvOf(id, env, { onT3Side: (entry) => StateStore.get(entry) !== undefined, dropped });
+  const translated = gitEnvOf(id, env, { onT3Side, dropped });
   if (dropped.length > 0) console.warn(JSON.stringify({ t3flare: "git-alternate-dropped", id, dropped: dropped.map((entry) => entry.slice(0, 300)) }));
   return gitBridge.bridge(id, translated);
 };
@@ -191,7 +203,7 @@ const git = async (
     .git({
       argv: args.map((arg) => intoWorkspace(at.id, arg)),
       cwd: at.inner,
-      env: await gitEnvInto(at.id, env),
+      env: await bridgedGitEnv(at.id, env),
       ...(stdin === undefined ? {} : { stdin }),
       startContainer,
       readScope: readScopeOf(args),
