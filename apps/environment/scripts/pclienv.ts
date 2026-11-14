@@ -14,8 +14,9 @@
 // - pair: `$fruit-code` on that thread: the CLI's winner (PLUM-9 the Environment's, KIWI-7 the Repo's);
 // - write: a write through the CLI's linked root (pi: its flag's directory) refused, from the Container's shell and from
 //   the agent's own tool, nothing planted;
-// - catch-up: late-code installed while the process runs, then a mention and a described turn on that process, then a
-//   mention on a new process (the Container stopped); late-code removed, then a mention on the running process.
+// - catch-up, each on a thread whose history never held the late code: late-code installed while the process runs,
+//   then a mention and a described turn on it; removed while a process that started with it runs, then a mention; and
+//   installed again, then a mention on a new process (the Container stopped).
 //
 //   node scripts/stage.ts run pclienv pclienv fixture
 //   node scripts/stage.ts run pclienv pclienv [codex|pi|claude|opencode …]
@@ -283,29 +284,37 @@ const probeCli = async (cli: Cli) => {
     !steps.afterWrites.stdout.includes("planted") &&
     steps.afterWrites.stdout.includes("name: env-code");
 
-  // Catch-up: installed while this process runs.
+  // Catch-up, each on a thread whose history never held the late code. Installed while this process runs:
   steps.lateInstall = await install("late");
-  steps.lateMention = await turn(mentioned, "$late-code What is the late code? Reply with the code alone.");
-  steps.lateDescribed = await turn(mentioned, "What is the late code? Reply with the code alone.");
-  // A new process (the Container stopped; the thread resumes).
+  steps.lateMention = await turn(mentioned, "$late-code What is the late code? If you cannot find it, reply NONE.");
+  steps.lateDescribed = await turn(mentioned, "What is the late code? If you cannot find it, reply NONE.");
+  // A new process (the Container stopped), on a fresh thread; its first turn does not name the late code.
   await stopContainer();
-  steps.lateMentionNewProcess = await turn(mentioned, "$late-code What is the late code? Reply with the code alone.");
-  checks.lateSeenByNewProcess = steps.lateMentionNewProcess.answer.includes("LATE-8");
-  // Removed while that process runs.
+  const late = await newThread(cli, `spi-1153 ${cli}: catch-up`);
+  steps.lateStart = await turn(late, "Reply with the single word OK.");
   steps.lateRemove = await remove("late-code");
-  steps.lateRemovedMention = await turn(mentioned, "$late-code What is the late code? If you cannot find it, reply NONE.");
+  // Removed while that process runs (it started with late-code installed). The turn has the Workspace take the set
+  // first: the mount holds no late-code from then on, whatever the process kept.
+  steps.lateRemovedMention = await turn(late, "$late-code What is the late code? If you cannot find it, reply NONE.");
   steps.lateRemovedMount = await sh(`ls '${MOUNT}'`);
   checks.lateGoneFromMount = !steps.lateRemovedMount.stdout.includes("late-code");
+  // And installed again, then a new process on another fresh thread.
+  steps.lateReinstall = await install("late");
+  await stopContainer();
+  const fresh = await newThread(cli, `spi-1153 ${cli}: new process`);
+  steps.lateMentionNewProcess = await turn(fresh, "$late-code What is the late code? If you cannot find it, reply NONE.");
+  checks.lateSeenByNewProcess = steps.lateMentionNewProcess.answer.includes("LATE-8");
+  await remove("late-code");
   steps.catchUp = {
     installRunningMention: steps.lateMention.answer.includes("LATE-8"),
     installRunningDescribed: steps.lateDescribed.answer.includes("LATE-8"),
+    removedRunningMention: steps.lateRemovedMention.answer.includes("LATE-8"),
     installNewProcess: steps.lateMentionNewProcess.answer.includes("LATE-8"),
-    removedRunningMention: steps.lateRemovedMention.answer.includes("LATE-8") ? "still answered LATE-8" : "not answered",
   };
 
   const ok = Object.values(checks).every(Boolean);
   console.log(`${cli}: ${ok ? "ok" : "FAIL"} ${JSON.stringify(checks)} catch-up ${JSON.stringify(steps.catchUp)}`);
-  return { ok, cli, model: spec.model, expectedWinner: spec.winner, checks, composer: { container: { before, after }, ...snapshot }, threads: { described: described.threadId, mentioned: mentioned.threadId }, steps };
+  return { ok, cli, model: spec.model, expectedWinner: spec.winner, checks, composer: { container: { before, after }, ...snapshot }, threads: { described: described.threadId, mentioned: mentioned.threadId, late: late.threadId, fresh: fresh.threadId }, steps };
 };
 
 const asked = process.argv.slice(2);
