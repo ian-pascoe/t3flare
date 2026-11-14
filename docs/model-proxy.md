@@ -11,7 +11,7 @@ The proxy t3flare is built and tested against is **[Commissary](https://github.c
 | Durable agent turns | A Session DO in the `agents` Worker, through pi-ai's `anthropic` provider | `POST {MODEL_PROXY_URL}/v1/messages?beta=true`, streaming |
 | Text generation on the proxy's models (`anthropic/<id>`): thread titles, commit messages, PR titles and bodies | The Environment DO in the `environment` Worker, plain `fetch` | `POST {MODEL_PROXY_URL}/v1/messages`, one non-streaming request, no tools. A Model endpoint's model goes to that endpoint instead, through pi-ai on the agents Worker (ADR-0034 §5) |
 | The model list: the picker's models, each one's name, thinking levels and context window; the Session's models | Both Workers, each keeping its own copy | `GET {MODEL_PROXY_URL}/v1/models`, twice (see below) |
-| The nightly bump job's real turn ([ADR-0017](adr/0017-upstream-is-tracked-by-nightly-tag-with-an-automated-bump.md)) | The `bump` stage, deployed by CI with the same two settings | A Durable agent turn and text generation, as above |
+| The nightly bump job's real turn ([ADR-0017](adr/0017-upstream-is-tracked-by-nightly-tag-with-an-automated-bump.md)) | The `bump` stage, deployed by CI with the same two settings | A Durable agent turn and text generation, as above, until the `bump` environment has `T3FLARE_MODEL_ENDPOINT`; then on that Model endpoint ([below](#the-stages-model-endpoint)) |
 
 Nothing else calls a model today. A Container never sees the URL or the key; they are settings of the two Workers only. The CLI agents of step 4 (Codex, Claude Code, OpenCode, pi) call the proxy from their Containers, each through its own base-URL setting, with `COMMISSARY_CONTAINER_API_KEY` given on demand ([CLI agents](#cli-agents-steps-4a-4b), [ADR-0016](adr/0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)).
 
@@ -134,13 +134,35 @@ Put them in `~/.config/t3flare/dev.env` (stages) or the GitHub environment `prod
    MODEL_PROXY_API_KEY=cms_…
    ```
 
-   `apps/environment/scripts/stage.ts` reads the file (shell variables of the same name win) and binds them as Worker settings and secrets of both Workers. It refuses to deploy a stage when either is missing, and never prints them.
-5. **CI (the nightly bump).** The `bump` GitHub environment needs the variable `MODEL_PROXY_URL` and the secret `MODEL_PROXY_API_KEY`.
+   `apps/environment/scripts/stage.ts` reads the file (shell variables of the same name win) and binds them as Worker settings and secrets of both Workers, and never prints them. Until the hard cut (SPI-1176) both are optional: a stage deployed without them, or with `--no-model-proxy`, has no Model proxy and reaches models through its Model endpoints alone ([below](#the-stages-model-endpoint)).
+5. **CI (the nightly bump).** The `bump` GitHub environment needs the variable `MODEL_PROXY_URL` and the secret `MODEL_PROXY_API_KEY` (and, for its Model endpoint, `T3FLARE_MODEL_ENDPOINT`, [below](#the-stages-model-endpoint)).
    - `pnpm --filter @t3flare/infra run ci:setup` creates the variable, reading `MODEL_PROXY_URL` from `~/.config/t3flare/dev.env`.
    - It does not set the key. Set it yourself, once and again after a rotation: `gh secret set MODEL_PROXY_API_KEY --env bump --repo <owner>/<repo>` (the value on stdin).
    - [`.github/workflows/bump.yml`](../.github/workflows/bump.yml) passes both to the deploy.
 
 An Environment started without them answers text generation on the proxy's models (`anthropic/…`) with "The model proxy is not configured." and lists only the static models; a Session cannot run a turn on them. Text generation on a Model endpoint's model does not need them.
+
+## The stages' Model endpoint
+
+SPI-1175. After each deploy, `stage.ts` saves one **Model endpoint** through the Harness panel's own API (`/_t3flare/harness/api/endpoints`, with the stage's Access service token and admin token, as a script reaches the panel), and the acceptance test does the same before its turns. The acceptance test's real turn then runs on that endpoint's small model, and text generation follows the endpoints' default (ADR-0034 §5), which on a fresh stage is that same model. A stage, the nightly bump and prod need no Model proxy for this.
+
+The endpoint is one setting, `T3FLARE_MODEL_ENDPOINT`, a JSON object holding its key ([`apps/environment/scripts/lib/modelEndpointSpec.ts`](../apps/environment/scripts/lib/modelEndpointSpec.ts)):
+
+```sh
+T3FLARE_MODEL_ENDPOINT='{"id":"openai","label":"OpenAI","api":"openai-responses","baseUrl":"https://api.openai.com/v1","apiKey":"sk-…","models":["gpt-5-mini"]}'
+```
+
+- `id`, `baseUrl` and `apiKey` are required; `label` defaults to the id, `api` to `anthropic-messages`, `headers` to none.
+- Without `models`, the endpoint's own list is read through the panel, keeping the ids the regular expression `match` matches, when given.
+- The panel validates the rest as it does the owner's form: an https URL at a public host, an id that is not reserved.
+
+Where it comes from:
+
+- **A laptop:** `T3FLARE_MODEL_ENDPOINT` in the environment or `~/.config/t3flare/dev.env`. Without it, `stage.ts` and the acceptance test make Commissary's endpoint from `MODEL_PROXY_URL` and `MODEL_PROXY_API_KEY`: id `commissary`, Anthropic Messages at the proxy's URL with its key, its `claude-…` models.
+- **CI:** the GitHub secret `T3FLARE_MODEL_ENDPOINT` on the `bump` and `prod` environments. `pnpm --filter @t3flare/infra run ci:setup` sets it on both from `dev.env`, deriving Commissary's as above when `dev.env` has no `T3FLARE_MODEL_ENDPOINT`. Run `ci:setup` again after changing the endpoint or rotating its key. CI derives nothing: until the secret is set, a deploy and the acceptance test skip the endpoint and say so, and the bump's real turn runs on the Model proxy.
+- **prod** gets the endpoint only when it has none of that id: what the owner changes in the panel stays, so a rotated key reaches prod's endpoint only when entered in the panel. A removed one comes back at the next deploy while the secret is set; delete the secret to stop that. A test stage saves it again on each deploy.
+
+A setting that is set but unusable fails the deploy before the Workers are built. A setup that fails after the deploy (the panel not answering within five minutes, the model list unreadable, the panel refusing the endpoint) fails the command, saying why; no message carries the key.
 
 ## CLI agents (steps 4a, 4b)
 
