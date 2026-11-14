@@ -24,7 +24,13 @@ export const AUTHORIZATION_URL = "https://auth.example/authorize?state=s3cr3t-st
 
 export const memory = () => {
   const map = new Map<string, unknown>();
-  return { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)), delete: (key: string) => map.delete(key) };
+  return {
+    get: <T>(key: string) => map.get(key) as T | undefined,
+    put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)),
+    delete: (key: string) => map.delete(key),
+    /** Every key and value kept (the leak scan, settingsHostile.test.ts). */
+    entries: () => [...map.entries()],
+  };
 };
 
 export interface FixtureOptions {

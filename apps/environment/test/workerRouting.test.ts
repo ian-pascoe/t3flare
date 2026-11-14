@@ -101,6 +101,23 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
     expect(await w.call("/_t3flare/mcp", { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) })).toEqual({ status: 404, seen: [] });
   });
 
+  // Plan §5's hostile list (M6, SPI-1202): an agent that knows a Change page's URL (it is in the card and in the agent's
+  // own tool result) holds no panel assertion; at the edge Access answers it with a login (m6-stage-run.md), and behind
+  // the edge the Worker never hands the page to the Environment without the owner's assertion for the panel.
+  it("the Change page and its API: nothing but the panel's own assertion reaches them", async () => {
+    const w = world();
+    const id = `chg_${"A".repeat(43)}`;
+    for (const path of [`/_t3flare/harness/changes/${id}`, `/_t3flare/harness/api/changes/${id}`, "/_t3flare/harness/api/changes"]) {
+      expect(await w.call(path), path).toEqual({ status: 404, seen: [] });
+      expect(await w.call(path, { authorization: `Bearer ${ADMIN}` }), path).toEqual({ status: 404, seen: [] });
+      expect(await w.call(path, { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) }), path).toEqual({ status: 404, seen: [] });
+      expect(await w.call(path, { "cf-access-jwt-assertion": await assertion(PANEL_AUD, { email: "someone@example.com", sub: "other-sub" }) }), path).toEqual({ status: 404, seen: [] });
+      // The panel has no local-mode branch: the admin token on loopback is nothing there.
+      expect(await world({ T3FLARE_LOCAL_MODE: "true" } as Partial<Env>).call(path, { authorization: `Bearer ${ADMIN}` }, "localhost:8791"), path).toEqual({ status: 404, seen: [] });
+      expect((await w.call(path, { "cf-access-jwt-assertion": await assertion(PANEL_AUD) })).seen, path).toEqual([{ method: "harness", caller: { kind: "owner", subject: "owner-sub" } }]);
+    }
+  });
+
   it("local mode: the admin token alone on loopback, as the service-token caller; not off loopback, not without it", async () => {
     const w = world({ T3FLARE_LOCAL_MODE: "true" } as Partial<Env>);
     expect(await w.call("/_t3flare/mcp", { authorization: `Bearer ${ADMIN}` }, "localhost:8791")).toEqual({ status: 200, seen: [{ method: "settingsMcp", caller: { kind: "service-token" } }] });
