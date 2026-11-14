@@ -23,14 +23,17 @@ An own agent's asked change, end to end, for a Durable thread and for at least o
    closes it `moved` with the new revision and applies nothing.
 6. **A secret through the page**: `change_mcp` `{ op: "header-value" }` on a header Direct server; the card offers only
    "Opened it" / Decline / Cancel; the value typed on the page reaches the server (its next call authenticates), and a
-   leak scan (`/_t3flare/check/peer-leak`) finds it in no audit entry, log line, Open change row or tool result.
+   leak scan (`/_t3flare/check/peer-leak`) finds it in no audit entry, log line, Open change row or tool result. The
+   scan reads the Container and the Sessions itself; the rest goes in its `text` (Workers Logs, the panel's
+   `/api/audit` and `/api/changes`, the tool results), as `m6-stage-run.md` item 3 does.
 7. **A sign-in through the page**: `start_mcp_sign_in` on an OAuth Direct server; "Approve and sign in" sends the browser
    to the authorization server, the sign-in completes, and the agent's result and the logs carry no authorization URL.
 8. **The panel's list**: the Open changes section and `GET /_t3flare/harness/api/changes` list an open change with its
    thread and link; `get_status.openChanges` lists it for its own thread only.
 9. **Caps**: a second asked call on a thread with one open is refused naming the open one; three in a row declined or
    expired lock the thread's asked changes for an hour.
-10. **A Stop**: interrupting the turn while the card is open withdraws the Open change (`closed.by: agent`) and the card.
+10. **A Stop**: interrupting the turn while the card is open withdraws the Open change (`closed.by: stop`; `agent` is
+    model-mode `resume`'s alone, SPI-1199 review) and the card; also after "Opened it" on a change that needs the page.
 11. **Restart**: the Environment idles out (or is restarted) between the ask and the page's Approve; the page still
     applies it (the record is in SQLite).
 
