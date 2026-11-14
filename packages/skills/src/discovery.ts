@@ -84,20 +84,27 @@ const frontmatterOf = (text: string): string | undefined => {
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** `text`'s frontmatter as YAML fields, or why it has none: what a `SKILL.md` declares (also SPI-1148's install). */
+export const frontmatterFields = (text: string): { readonly ok: true; readonly fields: Readonly<Record<string, unknown>> } | { readonly ok: false; readonly reason: string } => {
+  const source = frontmatterOf(text);
+  if (source === undefined) return { ok: false, reason: "no frontmatter" };
+  let fields: unknown;
+  try {
+    fields = parse(source);
+  } catch {
+    return { ok: false, reason: "the frontmatter is not YAML" };
+  }
+  return isRecord(fields) ? { ok: true, fields } : { ok: false, reason: "the frontmatter is not YAML" };
+};
+
 /**
  * The Skill a `SKILL.md` at `filePath` declares, or why it is not one. A skill without a `name` takes its directory's;
  * `allowed-tools` and every other field are ignored (a Skill grants no permission).
  */
 export const parseSkill = (filePath: string, text: string): Skill | { readonly reason: string } => {
-  const source = frontmatterOf(text);
-  if (source === undefined) return { reason: "no frontmatter" };
-  let fields: unknown;
-  try {
-    fields = parse(source);
-  } catch {
-    return { reason: "the frontmatter is not YAML" };
-  }
-  if (!isRecord(fields)) return { reason: "the frontmatter is not YAML" };
+  const read = frontmatterFields(text);
+  if (!read.ok) return { reason: read.reason };
+  const { fields } = read;
   const description = fields.description;
   if (typeof description !== "string" || description.trim() === "") return { reason: "no description" };
   const declared = fields.name;
