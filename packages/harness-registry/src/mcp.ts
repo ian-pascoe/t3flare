@@ -10,6 +10,13 @@ export type RuntimeModeName = "approval-required" | "auto-accept-edits" | "full-
  */
 export type CallVerdict = { readonly kind: "run" } | { readonly kind: "ask" } | { readonly kind: "refuse"; readonly reason: string };
 
+/**
+ * `record[key]` when `key` is the record's own key, else undefined: a user-supplied key (a tool's or server's name)
+ * never reads `Object.prototype` (`toString`, `constructor`, `__proto__`) (M3 review).
+ */
+export const ownEntry = <T>(record: Readonly<Record<string, T>> | undefined, key: string): T | undefined =>
+  record !== undefined && record !== null && Object.hasOwn(record, key) ? record[key] : undefined;
+
 export const PLAN_REFUSAL = "Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.";
 
 export const decideCall = (input: {

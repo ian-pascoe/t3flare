@@ -9,6 +9,7 @@ import {
   EXTENSIONS,
   type HarnessChange,
   mcpServersOf,
+  ownEntry,
   resolveEnvironment,
   resolveHarness,
   settingOf,
@@ -176,7 +177,7 @@ export const mcpItems = (stored: StoredHarness, change: McpTierChange, secretSet
     case "sign-in":
       return { items: [{ kind: "sign-in", server: change.server, url: current?.url === undefined ? "" : withoutQuery(current.url) }], lines: [] };
     case "class":
-      return { items: [{ kind: "scalar", name: `${change.server}/${change.tool}: class`, before: current?.classes?.[change.tool] ?? "its own hint", after: change.class ?? "its own hint" }], lines: [] };
+      return { items: [{ kind: "scalar", name: `${change.server}/${change.tool}: class`, before: ownEntry(current?.classes, change.tool) ?? "its own hint", after: change.class ?? "its own hint" }], lines: [] };
     case "server": {
       const items: Array<ChangeItem> = [];
       if (current === undefined) return { items, lines: [] };
@@ -186,7 +187,7 @@ export const mcpItems = (stored: StoredHarness, change: McpTierChange, secretSet
       }
       if (change.exposure !== undefined && change.exposure !== current.exposure) items.push({ kind: "scalar", name: `${change.server}: Exposure`, before: current.exposure, after: change.exposure });
       for (const [tool, exposure] of Object.entries(change.toolExposure ?? {})) {
-        const before = current.toolExposure?.[tool] ?? null;
+        const before = ownEntry(current.toolExposure, tool) ?? null;
         if (before === exposure) continue;
         items.push({ kind: "scalar", name: `${change.server}/${tool}: Exposure`, before: before ?? `the server's (${current.exposure})`, after: exposure ?? `the server's (${change.exposure ?? current.exposure})` });
       }
