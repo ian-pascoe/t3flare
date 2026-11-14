@@ -5,6 +5,7 @@
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { terminalRc } from "@t3flare/sandbox-image/terminal";
 import { credentialSegment, REFUSED_EXACT, REFUSED_LOADER_HOOKS, REFUSED_PREFIXES, SET_BY_T3FLARE, variableNameProblem } from "@t3flare/harness-registry";
+import { MODEL_HANDLE_ENV } from "@t3flare/models/relay";
 import { describe, expect, it } from "vitest";
 
 import { claudeManagedSettings } from "../src/agents/acpProfiles.ts";
@@ -66,6 +67,8 @@ const derived = (): ReadonlyArray<string> => [
     ...Object.keys(TERMINAL_BASE_ENV),
     ...terminalRcNames(),
     NONCE_ENV,
+    // SPI-1167: the Workspace DO puts the model handle in a CLI process's environment.
+    MODEL_HANDLE_ENV,
   ]),
 ];
 
@@ -82,7 +85,7 @@ describe("the names t3flare sets itself", () => {
     const names = derived();
     // Spot checks against each source, so an empty derivation cannot pass.
     expect(names).toEqual(
-      expect.arrayContaining(["ANTHROPIC_BASE_URL", "HTTPS_PROXY", "MISE_GLOBAL_CONFIG_FILE", "BASH_ENV", "CODEX_HOME", "T3FLARE_TOOL_HANDLE", "T3FLARE_MODEL_KEY_NONCE", "T3FLARE_EXEC", "TERM", "HISTFILE", "PS1"]),
+      expect.arrayContaining(["ANTHROPIC_BASE_URL", "HTTPS_PROXY", "MISE_GLOBAL_CONFIG_FILE", "BASH_ENV", "CODEX_HOME", "T3FLARE_TOOL_HANDLE", "T3FLARE_MODEL_KEY_NONCE", "T3FLARE_MODEL_HANDLE", "T3FLARE_EXEC", "TERM", "HISTFILE", "PS1"]),
     );
     expect(names.filter((name) => variableNameProblem(name) === undefined)).toEqual([]);
   });

@@ -4,6 +4,10 @@
 // K5), `feedback/*` and `account/*` (a vendor upload and a vendor sign-in, K3), and each turn's approval and sandbox
 // policy, which come from t3's own mode table with a fallback when the Container has no working sandbox.
 // (Until the cut, methods and thread config keys were allowlisted, and `auto` ran as approval-required.)
+//
+// SPI-1167: a model of a Model endpoint is `<endpointId>/<modelId>` in t3; Codex gets the model's own id and the
+// endpoint's provider (`codexModelRoute`), named by the guard on every thread request. A thread stays on its provider:
+// a turn on a model of another provider is refused (Codex's `turn/start` cannot move a thread to another provider).
 
 /** Refused with their own reason (review F5): `feedback/*` uploads logs to the vendor, `account/*` is a vendor login. */
 const REFUSED_PREFIXES: ReadonlyArray<[string, string]> = [
@@ -29,13 +33,33 @@ const isPinnedConfigKey = (key: string): boolean =>
 
 export type RuntimeMode = "approval-required" | "auto-accept-edits" | "auto" | "full-access";
 
+/** Where a model of t3's goes in Codex: its provider and the id Codex sends. */
+export interface CodexModelRoute {
+  readonly provider: string;
+  readonly model: string;
+}
+
 export interface TurnContext {
   /** The thread's runtime mode as the wrapper saw it at the turn's start; undefined runs as approval-required. */
   readonly runtimeMode?: string;
   readonly interactionMode?: string;
   /** Whether bubblewrap works in the process's Container (P2: yes on Cloudflare; probed at each start). */
   readonly sandbox: boolean;
+  /** SPI-1167: where t3's model slug goes; absent, models pass as sent and the process's default provider applies. */
+  readonly route?: (model: string) => CodexModelRoute;
+  /** The provider the request's thread runs on, when the client has seen it (its start, resume or fork). */
+  readonly threadProvider?: (threadId: string) => string | undefined;
 }
+
+/**
+ * A model's route (SPI-1167): a slug whose part before the first `/` is the id of an OpenAI Responses endpoint goes to
+ * that endpoint's provider with the rest as its id; anything else is the Model proxy's model, as sent.
+ */
+export const codexModelRoute = (model: string, endpointIds: ReadonlySet<string>, providerOf: (endpointId: string) => string, proxyProvider: string): CodexModelRoute => {
+  const slash = model.indexOf("/");
+  const endpointId = slash > 0 ? model.slice(0, slash) : "";
+  return endpointIds.has(endpointId) && slash < model.length - 1 ? { provider: providerOf(endpointId), model: model.slice(slash + 1) } : { provider: proxyProvider, model };
+};
 
 export interface TurnPolicy {
   readonly approvalPolicy: "untrusted" | "on-request" | "never";
@@ -62,11 +86,31 @@ export type Guarded = { readonly params: unknown } | { readonly refused: string 
 
 const record = (value: unknown): Record<string, unknown> => (value !== null && typeof value === "object" ? { ...(value as Record<string, unknown>) } : {});
 
-const threadParams = (params: unknown): Record<string, unknown> => {
+const threadParams = (params: unknown, context: TurnContext): Record<string, unknown> => {
   const next = record(params);
   for (const key of DROPPED_THREAD_PARAMS) delete next[key];
   if (next.config !== undefined) next.config = Object.fromEntries(Object.entries(record(next.config)).filter(([key]) => !isPinnedConfigKey(key)));
+  if (context.route !== undefined && typeof next.model === "string") {
+    const route = context.route(next.model);
+    next.model = route.model;
+    next.modelProvider = route.provider;
+  }
   return next;
+};
+
+/** A turn's model (and its collaboration mode's) as Codex knows it, or why the turn cannot run on it. */
+const turnModel = (next: Record<string, unknown>, context: TurnContext): string | undefined => {
+  if (context.route === undefined || typeof next.model !== "string") return undefined;
+  const route = context.route(next.model);
+  const threadProvider = typeof next.threadId === "string" ? context.threadProvider?.(next.threadId) : undefined;
+  if (threadProvider !== undefined && threadProvider !== route.provider) {
+    return `this Codex thread runs on another Model endpoint (or the Model proxy) than ${next.model}; Codex cannot move a thread between them: start a new thread for this model`;
+  }
+  next.model = route.model;
+  const mode = record(next.collaborationMode);
+  const settings = record(mode.settings);
+  if (typeof settings.model === "string") next.collaborationMode = { ...mode, settings: { ...settings, model: context.route(settings.model).model } };
+  return undefined;
 };
 
 /** What reaches the app-server for t3's request, or why it does not. */
@@ -76,11 +120,13 @@ export const guardRequest = (method: string, params: unknown, context: TurnConte
     case "thread/start":
     case "thread/resume":
     case "thread/fork":
-      return { params: threadParams(params) };
+      return { params: threadParams(params, context) };
     case "turn/start": {
       const next = record(params);
       const plan = record(next.collaborationMode).mode === "plan";
       const policy = turnPolicy(context, plan);
+      const refusal = turnModel(next, context);
+      if (refusal !== undefined) return { refused: `t3flare: ${refusal}` };
       // Codex's sandbox is per turn; anything else that could change it is not passed on.
       delete next.sandbox;
       return { params: { ...next, ...policy } };

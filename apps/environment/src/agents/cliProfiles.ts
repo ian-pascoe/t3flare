@@ -3,6 +3,7 @@
 // its only model provider with the key helper, and a home built fresh on the Container's own disk with only its session
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
+import { MODEL_HANDLE_ENV, modelRelayUrl } from "@t3flare/models/relay";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
@@ -26,6 +27,11 @@ export const PI_SESSIONS = `${HARNESS_ROOT}/pi/sessions`;
 export const PI_SESSION_RETENTION_DAYS = 60;
 /** Codex keeps this provider id in its rollouts and needs it unchanged to resume. */
 export const CODEX_PROVIDER_ID = "t3flare-proxy";
+/**
+ * The Codex provider of a Model endpoint (SPI-1167): derived from the endpoint's id, which never changes, so a rollout
+ * that names it resumes. Prefixed, so no endpoint id can take one of Codex's built-in ids (`openai`, `ollama`, …).
+ */
+export const codexEndpointProvider = (endpointId: string): string => `t3flare-endpoint-${endpointId}`;
 /** The variable the key helper sends as its nonce; Codex's shells never see it (review F4). */
 export const NONCE_ENV = "T3FLARE_MODEL_KEY_NONCE";
 
@@ -53,6 +59,13 @@ export interface ProfileContext {
    * into this process's environment (review H2: never a Container-wide file).
    */
   readonly relay?: { readonly handle: string; readonly servers: ReadonlyArray<string> };
+  /**
+   * The Model endpoints that speak OpenAI Responses (SPI-1167), as stored at the spawn: Codex gets one provider each,
+   * through the model relay. Absent: none.
+   */
+  readonly endpoints?: ReadonlyArray<{ readonly id: string; readonly label: string }>;
+  /** The model the CLI's session was opened with, when known (SPI-1167: Codex's process provider is its model's). */
+  readonly model?: string;
 }
 
 /** The relay's URL for `server` as the Container reaches it. */
@@ -65,6 +78,8 @@ export interface Launch {
   readonly links?: ReadonlyArray<{ readonly path: string; readonly target: string }>;
   readonly prune?: ReadonlyArray<{ readonly dir: string; readonly days: number }>;
   readonly thread?: string;
+  /** Whether the Workspace DO gives the process a model handle in `MODEL_HANDLE_ENV` (SPI-1167). */
+  readonly modelRelay?: boolean;
   /** Names of t3's env keys not passed on (for the log). */
   readonly droppedEnv: ReadonlyArray<string>;
 }
@@ -98,9 +113,41 @@ export const codexRelayOverrides = (servers: ReadonlyArray<string>): ReadonlyArr
       `mcp_servers.${server}={url=${tomlString(relayUrl(server))},bearer_token_env_var=${tomlString(TOOL_HANDLE_ENV)},default_tools_approval_mode="approve",tool_timeout_sec=${CLI_TOOL_TIMEOUT_SEC},startup_timeout_sec=20}`,
   );
 
+/**
+ * Codex's providers for the Model endpoints (SPI-1167): one per OpenAI Responses endpoint, at the model relay with the
+ * process's model handle as its key (`env_key`); the Workers swap it for the endpoint's credential. Codex's shells never
+ * see the handle (`shell_environment_policy.exclude`).
+ */
+export const codexEndpointOverrides = (endpoints: ReadonlyArray<{ readonly id: string; readonly label: string }>): ReadonlyArray<string> =>
+  endpoints.map((endpoint) => {
+    const provider = [
+      `name=${tomlString(endpoint.label)}`,
+      `base_url=${tomlString(modelRelayUrl(endpoint.id))}`,
+      `wire_api="responses"`,
+      `env_key=${tomlString(MODEL_HANDLE_ENV)}`,
+      "requires_openai_auth=false",
+      "supports_websockets=false",
+      "request_max_retries=1",
+      "stream_max_retries=1",
+    ].join(",");
+    return `model_providers.${codexEndpointProvider(endpoint.id)}={${provider}}`;
+  });
+
+/**
+ * The process's provider (SPI-1167): Codex runs a thread's turns only on its process's provider ("This chat uses <a>, but
+ * your current provider is <b>"), so it is the session's model's: its endpoint's for an endpoint's slug, else the Model
+ * proxy's when there is one (until the hard cut), else the first endpoint's.
+ */
+export const codexProcessProvider = (proxyUrl: string, endpoints: ReadonlyArray<{ readonly id: string }>, model: string | undefined): string => {
+  const slash = model?.indexOf("/") ?? -1;
+  const endpointId = model !== undefined && slash > 0 ? model.slice(0, slash) : undefined;
+  if (endpointId !== undefined && endpoints.some((endpoint) => endpoint.id === endpointId)) return codexEndpointProvider(endpointId);
+  return proxyUrl === "" && endpoints[0] !== undefined ? codexEndpointProvider(endpoints[0].id) : CODEX_PROVIDER_ID;
+};
+
 /** Codex's `-c` overrides (plan §4.3; M0: P3, P10, P11). Each value is TOML. */
-export const codexOverrides = (proxyUrl: string, key: string): ReadonlyArray<string> => {
-  const provider = [
+export const codexOverrides = (proxyUrl: string, key: string, endpoints: ReadonlyArray<{ readonly id: string; readonly label: string }> = [], model?: string): ReadonlyArray<string> => {
+  const proxy = [
     `name=${tomlString("Model proxy")}`,
     `base_url=${tomlString(`${proxyUrl}/v1`)}`,
     `wire_api="responses"`,
@@ -111,8 +158,9 @@ export const codexOverrides = (proxyUrl: string, key: string): ReadonlyArray<str
     `auth={command=${tomlString(`${CLI_BIN}/t3flare-model-key`)},args=["codex"],timeout_ms=30000,refresh_interval_ms=0}`,
   ].join(",");
   return [
-    `model_provider=${tomlString(CODEX_PROVIDER_ID)}`,
-    `model_providers.${CODEX_PROVIDER_ID}={${provider}}`,
+    `model_provider=${tomlString(codexProcessProvider(proxyUrl, endpoints, model))}`,
+    ...(proxyUrl === "" ? [] : [`model_providers.${CODEX_PROVIDER_ID}={${proxy}}`]),
+    ...codexEndpointOverrides(endpoints),
     // The process's own defaults (review F5; 0.167.2 refuses "untrusted" here, so every turn/start carries the guard's).
     `approval_policy="on-request"`,
     `sandbox_mode="read-only"`,
@@ -131,7 +179,7 @@ export const codexOverrides = (proxyUrl: string, key: string): ReadonlyArray<str
     // was turned off with M0 P10's batch, not for a vendor call of its own; its subagents use the thread's provider.
     "analytics.enabled=false",
     // Review F4: the nonce stays out of Codex's shells; the marker stays in them (part 2's kill script).
-    `shell_environment_policy.exclude=[${tomlString(NONCE_ENV)},${tomlString(TOOL_HANDLE_ENV)}]`,
+    `shell_environment_policy.exclude=[${tomlString(NONCE_ENV)},${tomlString(TOOL_HANDLE_ENV)},${tomlString(MODEL_HANDLE_ENV)}]`,
     `shell_environment_policy.set.T3FLARE_EXEC=${tomlString(key)}`,
   ];
 };
@@ -188,11 +236,12 @@ const codexLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer 
   const thread = input.env.T3CODE_THREAD_ID;
   const relay = context.relay;
   return {
-    argv: [`${CLI_BIN}/codex`, "app-server", ...[...codexOverrides(context.proxyUrl, input.key), ...codexRelayOverrides(relay?.servers ?? [])].flatMap((value) => ["-c", value])],
+    argv: [`${CLI_BIN}/codex`, "app-server", ...[...codexOverrides(context.proxyUrl, input.key, context.endpoints ?? [], context.model), ...codexRelayOverrides(relay?.servers ?? [])].flatMap((value) => ["-c", value])],
     env: { HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: `${home}/codex`, CODEX_SQLITE_HOME: `${home}/sqlite`, ...(relay === undefined ? {} : { [TOOL_HANDLE_ENV]: relay.handle }) },
     files: [{ path: `${home}/codex/config.toml`, text: "# t3flare: every setting comes from the command line (-c)\n" }],
     links: [{ path: `${home}/codex/sessions`, target: CODEX_SESSIONS }, environmentSkillsLink(`${home}/${CODEX_ENVIRONMENT_SKILLS}`)],
     ...(thread === undefined ? {} : { thread }),
+    ...((context.endpoints ?? []).length === 0 ? {} : { modelRelay: true }),
     droppedEnv: dropped(input.env),
   };
 };

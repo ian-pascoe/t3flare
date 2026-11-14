@@ -3,7 +3,7 @@
 // `auto` with its reviewer included), with the no-sandbox fallback; plan read-only. Expected policies written out.
 import { describe, expect, it } from "vitest";
 
-import { declinesInPlan, guardRequest, turnPolicy } from "../src/provider/cli/codexGuard.ts";
+import { codexModelRoute, declinesInPlan, guardRequest, turnPolicy } from "../src/provider/cli/codexGuard.ts";
 
 const sandboxed = { sandbox: true } as const;
 
@@ -92,5 +92,36 @@ describe("the Codex request guard", () => {
   it("declines file changes in plan mode", () => {
     expect(declinesInPlan("item/fileChange/requestApproval")).toBe(true);
     expect(declinesInPlan("item/commandExecution/requestApproval")).toBe(false);
+  });
+
+  describe("Model endpoints (SPI-1167)", () => {
+    const route = (model: string) => codexModelRoute(model, new Set(["openai", "work"]), (id) => `t3flare-endpoint-${id}`, "t3flare-proxy");
+
+    it("routes an endpoint's slug to its provider with the model's own id, and anything else to the proxy as sent", () => {
+      expect(route("openai/gpt-5-mini")).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
+      expect(route("work/org/model-a")).toEqual({ provider: "t3flare-endpoint-work", model: "org/model-a" });
+      expect(route("gpt-6-luna")).toEqual({ provider: "t3flare-proxy", model: "gpt-6-luna" });
+      expect(route("other/x")).toEqual({ provider: "t3flare-proxy", model: "other/x" });
+      expect(route("openai/")).toEqual({ provider: "t3flare-proxy", model: "openai/" });
+    });
+
+    it("names each thread's provider from its model, over anything t3 or a config sent", () => {
+      for (const method of ["thread/start", "thread/resume", "thread/fork"]) {
+        expect(guardRequest(method, { model: "openai/gpt-5-mini", modelProvider: "evil", config: { model_provider: "evil" } }, { ...sandboxed, route })).toEqual({
+          params: { model: "gpt-5-mini", modelProvider: "t3flare-endpoint-openai", config: {} },
+        });
+      }
+      expect(guardRequest("thread/resume", { threadId: "t1" }, { ...sandboxed, route })).toEqual({ params: { threadId: "t1" } });
+    });
+
+    it("gives a turn the model's own id, and refuses a turn on another provider than its thread's", () => {
+      const context = { ...sandboxed, route, threadProvider: (thread: string) => (thread === "t1" ? "t3flare-endpoint-openai" : undefined) };
+      const answer = guardRequest("turn/start", { threadId: "t1", model: "openai/gpt-5-mini", collaborationMode: { mode: "default", settings: { model: "openai/gpt-5-mini" } } }, context);
+      expect(answer).toMatchObject({ params: { model: "gpt-5-mini", collaborationMode: { mode: "default", settings: { model: "gpt-5-mini" } } } });
+      expect(guardRequest("turn/start", { threadId: "t1", model: "gpt-6-luna" }, context)).toHaveProperty("refused");
+      expect(guardRequest("turn/start", { threadId: "t1", model: "work/m" }, context)).toHaveProperty("refused");
+      // A thread the client has not seen yet is not judged.
+      expect(guardRequest("turn/start", { threadId: "t2", model: "work/m" }, context)).toMatchObject({ params: { model: "m" } });
+    });
   });
 });

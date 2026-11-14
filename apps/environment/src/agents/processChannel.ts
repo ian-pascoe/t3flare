@@ -284,6 +284,8 @@ export interface ChannelStart {
   readonly thread?: string;
   /** The process's tool handle for the MCP relay (ADR-0028). */
   readonly toolHandle?: string;
+  /** Whether the Workspace DO gives the process a model handle for the model relay (SPI-1167). */
+  readonly modelRelay?: boolean;
   /** Made by the caller when it needs the key before the start (the profile's per-process home). */
   readonly key?: string;
 }
@@ -350,6 +352,7 @@ export class ProcessChannel {
         ...(input.prune === undefined ? {} : { prune: input.prune }),
         ...(input.thread === undefined ? {} : { thread: input.thread }),
         ...(input.toolHandle === undefined ? {} : { toolHandle: input.toolHandle }),
+        ...(input.modelRelay === true ? { modelRelay: true } : {}),
       });
     } catch (error) {
       process.finish(129);

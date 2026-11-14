@@ -50,7 +50,7 @@ describe("Codex's profile", () => {
         "features.plugin_discovery_prefetch=false",
         "features.remote_plugin=false",
         "features.plugin_sharing=false",
-        'shell_environment_policy.exclude=["T3FLARE_MODEL_KEY_NONCE","T3FLARE_TOOL_HANDLE"]',
+        'shell_environment_policy.exclude=["T3FLARE_MODEL_KEY_NONCE","T3FLARE_TOOL_HANDLE","T3FLARE_MODEL_HANDLE"]',
         'shell_environment_policy.set.T3FLARE_EXEC="proc-1"',
         'approval_policy="on-request"',
         'sandbox_mode="read-only"',
@@ -67,6 +67,47 @@ describe("Codex's profile", () => {
     ]);
     expect(answer.thread).toBe("thread-1");
     expect(answer.droppedEnv.toSorted()).toEqual(["CODEX_HOME", "OPENAI_API_KEY"]);
+  });
+
+  it("gets one provider per OpenAI Responses endpoint through the model relay, its id from the endpoint's (SPI-1167)", () => {
+    const endpoints = [
+      { id: "openai", label: "OpenAI" },
+      { id: "work-gw", label: "Work \"gateway\"" },
+    ];
+    const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, { ...context, endpoints });
+    if ("refused" in answer) throw new Error(answer.refused);
+    const overrides = answer.argv.filter((_, index) => answer.argv[index - 1] === "-c");
+    expect(overrides).toContain('model_provider="t3flare-proxy"');
+    expect(overrides).toContain(
+      'model_providers.t3flare-endpoint-openai={name="OpenAI",base_url="http://computer.internal/t3flare/model/openai",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
+    );
+    expect(overrides).toContain(
+      'model_providers.t3flare-endpoint-work-gw={name="Work \\"gateway\\"",base_url="http://computer.internal/t3flare/model/work-gw",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
+    );
+    // The Workspace DO makes the handle and puts it in the process's environment; the profile only asks for one.
+    expect(answer.modelRelay).toBe(true);
+    expect(JSON.stringify(answer.env)).not.toContain("T3FLARE_MODEL_HANDLE");
+  });
+
+  it("runs on its session's model's provider: Codex runs a thread's turns only on its process's provider", () => {
+    const endpoints = [{ id: "openai", label: "OpenAI" }];
+    const providerFor = (model: string | undefined) => {
+      const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, { ...context, endpoints, ...(model === undefined ? {} : { model }) });
+      if ("refused" in answer) throw new Error(answer.refused);
+      return answer.argv.find((value) => value.startsWith("model_provider="));
+    };
+    expect(providerFor("openai/gpt-5-mini")).toBe('model_provider="t3flare-endpoint-openai"');
+    expect(providerFor("gpt-6-luna")).toBe('model_provider="t3flare-proxy"');
+    expect(providerFor("other/x")).toBe('model_provider="t3flare-proxy"');
+    expect(providerFor(undefined)).toBe('model_provider="t3flare-proxy"');
+  });
+
+  it("defaults to the first endpoint's provider when there is no Model proxy", () => {
+    const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, { ...context, proxyUrl: "", endpoints: [{ id: "openai", label: "OpenAI" }] });
+    if ("refused" in answer) throw new Error(answer.refused);
+    const overrides = answer.argv.filter((_, index) => answer.argv[index - 1] === "-c");
+    expect(overrides).toContain('model_provider="t3flare-endpoint-openai"');
+    expect(overrides.some((value) => value.startsWith("model_providers.t3flare-proxy="))).toBe(false);
   });
 
   it("refuses any other Codex argv", () => {

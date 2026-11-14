@@ -34,6 +34,8 @@ import * as TextGenerationOperations from "@t3tools/provider-core/server/textGen
 import { runText } from "../textGeneration.ts";
 import { withCodexInvestigation } from "./codexInvestigation.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
+import { codexModelsOf, codexRouteFor, codexSelectionTransition } from "./codexEndpoints.ts";
+import { onEndpointsChanged } from "../../endpoints/changes.ts";
 import { cliSnapshotForCwdOf } from "../skills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
@@ -60,28 +62,51 @@ export type CodexCliDriverEnv =
   | ProviderContinuationRequests.ProviderContinuationRequests
   | ServerConfig;
 
-/** The catalog's models as Codex lists them: the real id is the slug Codex sends (M0 P3: every family drives tools). */
-export const codexModels = (): ReadonlyArray<ServerProviderModel> =>
-  environmentServices()
-    .catalog.current()
+/**
+ * The catalog's models as Codex lists them: the real id is the slug Codex sends (M0 P3: every family drives tools).
+ * Then the OpenAI Responses endpoints' models as `<endpointId>/<modelId>` (SPI-1167), reached through the model relay.
+ */
+export const codexModels = (): ReadonlyArray<ServerProviderModel> => {
+  const services = environmentServices();
+  const proxy = services.catalog
+    .current()
     .models.map((model) => ({ slug: model.id, name: model.name, subProvider: model.vendor, isCustom: false, capabilities: { optionDescriptors: [] } }));
+  return codexModelsOf(proxy, services.modelEndpoints?.());
+};
+
+/** The thread request methods whose answer names the thread's provider. */
+const THREAD_OPENERS = new Set(["thread/start", "thread/resume", "thread/fork"]);
 
 const refusedError = (method: string, why: string) => new CodexErrors.CodexAppServerRequestError({ code: -32601, errorMessage: why, method });
 
 /** The client t3's adapter talks to: every request through the guard, plan mode's file changes declined. */
 export const guardClient = (client: CodexClient.CodexAppServerClient["Service"], session: CliSession): CodexClient.CodexAppServerClient["Service"] => {
+  // SPI-1167: each thread's provider, as Codex answered its start, resume or fork.
+  const providers = new Map<string, string>();
+  const route = codexRouteFor(() => environmentServices().modelEndpoints?.());
   const context = () => ({
     ...(session.runtimeMode === undefined ? {} : { runtimeMode: session.runtimeMode }),
     ...(session.interactionMode === undefined ? {} : { interactionMode: session.interactionMode }),
     sandbox: session.process?.sandbox === true,
+    route,
+    threadProvider: (threadId: string) => providers.get(threadId),
   });
+  const remember = (answer: unknown) => {
+    const { thread, modelProvider } = (answer ?? {}) as { thread?: { id?: unknown }; modelProvider?: unknown };
+    if (typeof thread?.id === "string" && typeof modelProvider === "string") providers.set(thread.id, modelProvider);
+  };
   const guarded = <A, E>(method: string, params: unknown, send: (params: never) => Effect.Effect<A, E>) => {
     const answer = guardRequest(method, params, context());
     if ("refused" in answer) {
       console.warn(JSON.stringify({ t3flare: "codex-request-refused", method }));
       return Effect.fail(refusedError(method, answer.refused));
     }
-    const sent = send(answer.params as never);
+    const opened = send(answer.params as never);
+    const sent = THREAD_OPENERS.has(method) ? opened.pipe(Effect.tap((result) => Effect.sync(() => remember(result)))) : opened;
+    if (method === "turn/start") {
+      // SPI-1167: a turn Codex refuses to start names why in the Environment's log (t3 shows a generic failure).
+      return sent.pipe(Effect.tapError((error) => Effect.sync(() => console.warn(JSON.stringify({ t3flare: "codex-turn-start-failed", error: String(error).slice(0, 300) })))));
+    }
     // The resume proof (M5): Codex resumed this native thread itself, not a handoff.
     if (method !== "thread/resume") return sent;
     const threadId = (answer.params as { threadId?: unknown }).threadId;
@@ -166,6 +191,10 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       ),
     }).pipe(Effect.orDie);
     yield* Effect.forkScoped(snapshot.refresh);
+    // SPI-1167: a change to the Model endpoints reaches Codex's model list at once, as it does Pi Durable's picker.
+    const services = yield* Effect.context<never>();
+    const stopHearing = onEndpointsChanged(() => void Effect.runForkWith(services)(snapshot.refresh));
+    yield* Effect.addFinalizer(() => Effect.sync(stopHearing));
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
     const sessions: CliSessions = new Map();
@@ -197,7 +226,9 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       snapshot,
       // SPI-1151: the Workspace's Repo skills at Codex's roots, from the Workspace DO (never a spawn in the project).
       snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: CODEX_DRIVER, instanceId, agent: "codex" }),
-      orchestrationAdapter: wrapCliAdapter(adapter, { sessions }),
+      // SPI-1167: a model of another provider (another endpoint, or the proxy) needs a process on that provider; t3
+      // restarts the session and Codex resumes the thread there.
+      orchestrationAdapter: wrapCliAdapter(adapter, { sessions, selectionTransition: codexSelectionTransition(codexRouteFor(() => environmentServices().modelEndpoints?.())) }),
       // The proxy's text generation; a review guide's investigation runs `codex exec` read-only in the checkout (G7).
       textGeneration: TextGenerationOperations.fromRunner("CodexTextGeneration", withCodexInvestigation(spawner, fileSystem, runText)),
     } satisfies ProviderInstance;

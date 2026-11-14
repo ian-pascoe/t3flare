@@ -86,7 +86,10 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     const key = channel.newKey();
     // The opening session (the wrapper's), when t3's adapter spawns inside `openSession`.
     const session = yield* CliSpawn;
-    if (services.modelProxy === undefined && name !== "t3flare-probe") return yield* refused(name, "this Environment has no model proxy");
+    // SPI-1167: the Model endpoints Codex reaches through the model relay (OpenAI Responses), as stored now.
+    const responsesEndpoints = (services.modelEndpoints?.().endpoints ?? []).filter((endpoint) => endpoint.api === "openai-responses").map((endpoint) => ({ id: endpoint.id, label: endpoint.label }));
+    const endpointsOnly = name === "codex" && responsesEndpoints.length > 0;
+    if (services.modelProxy === undefined && name !== "t3flare-probe" && !endpointsOnly) return yield* refused(name, "this Environment has no model proxy or Model endpoint for it");
     // ADR-0028: the process's tool handle for the relay's third-party servers (the session's; pi spawns outside the
     // session's fiber and gets one of its own).
     const toolHandle = session?.toolHandle ?? newToolHandle();
@@ -108,6 +111,8 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
         },
         piExtensionSource: PI_T3_MCP_EXTENSION_SOURCE,
         relay: { handle: toolHandle, servers: services.relayServers() },
+        endpoints: responsesEndpoints,
+        ...(session?.model === undefined ? {} : { model: session.model }),
       },
     );
     if ("refused" in launch) {
@@ -128,6 +133,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       ...(launch.prune === undefined ? {} : { prune: launch.prune }),
       ...(session !== undefined ? { thread: session.thread } : launch.thread !== undefined ? { thread: launch.thread } : {}),
       toolHandle,
+      ...(launch.modelRelay === true ? { modelRelay: true } : {}),
     };
     // SPI-1153: the Workspace takes the Environment skill set first, so a CLI that reads its Skills at start (through
     // its link, or pi's flag) reads the current set. Bounded, and never the spawn's failure.

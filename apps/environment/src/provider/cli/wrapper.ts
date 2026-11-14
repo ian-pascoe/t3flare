@@ -31,6 +31,7 @@ import {
 } from "@t3tools/contracts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import type { ProviderSelectionTransitionInput, ProviderSelectionTransitionPlan } from "@t3tools/provider-core/server/selectionTransition";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -58,6 +59,8 @@ export interface CliSession {
   capFiber: Fiber.Fiber<void> | undefined;
   /** The session's process's tool handle for the MCP relay (ADR-0028): 256 random bits, never logged. */
   readonly toolHandle: string;
+  /** The model the session was opened with (SPI-1167: Codex's process provider is its model's). */
+  model?: string;
 }
 
 /** A new tool handle (ADR-0028): 32 random bytes, hex. */
@@ -104,6 +107,11 @@ export interface WrapOptions {
    * (`takeEnvironmentSkillsAt`) unless a test replaces it: every CLI driver gets it without asking.
    */
   readonly takeEnvironmentSkills?: (cwd: string | null) => Effect.Effect<void>;
+  /**
+   * SPI-1167: the driver's own plan for a model change, where it differs from the adapter's (Codex: another provider
+   * needs a new process); undefined leaves it to the adapter.
+   */
+  readonly selectionTransition?: (input: ProviderSelectionTransitionInput) => ProviderSelectionTransitionPlan | undefined;
 }
 
 /**
@@ -159,12 +167,16 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
     instanceId: adapter.instanceId,
     driver: adapter.driver,
     getCapabilities: () => adapter.getCapabilities().pipe(Effect.map(cliCapabilities)),
-    planSelectionTransition: (input) => adapter.planSelectionTransition(input),
+    planSelectionTransition: (input) => {
+      const own = options.selectionTransition?.(input);
+      return own === undefined ? adapter.planSelectionTransition(input) : Effect.succeed(own);
+    },
     openSession: (input) =>
       Effect.gen(function* () {
         const session = sessionFor(sessions, input.providerSessionId, input.runtimePolicy.cwd, input.threadId);
         session.runtimeMode = input.runtimePolicy.runtimeMode;
         session.interactionMode = input.runtimePolicy.interactionMode;
+        session.model = input.modelSelection.model;
         const runtime = yield* adapter.openSession(input).pipe(Effect.provideService(CliSpawn, session));
         yield* Effect.addFinalizer(() => Effect.sync(() => sessions.delete(input.providerSessionId)));
         // G11: `mcpApps` passes through (Codex's App rendering, MCP apps through the relay); upload feedback stays off.
