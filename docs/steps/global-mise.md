@@ -97,7 +97,7 @@ lock); `date +%s%N`, `wc -c <`, `mv -f`, `cp`, `dirname` and `tail -n 1` behave 
 
 Every stage file names the deployed commit (`/_t3flare/health`): **`07f5343`**, after review round 2's fixes, on
 SPI-1148 (`5bc4bb7`), except `passive-first.json` and `passive-spawn.json`, taken at **`892f816`** after review round
-3's change to a spawn's wait (the only behaviour that changed). Commits after `07f5343` but that one change only the
+3's change to a spawn's wait (the only behaviour that changed). The other commits after `07f5343` change only the
 stage harness, the docs and the evidence. `variables.json` ran first. The `m0-*.json` files name the commit `test:docker` ran at.
 
 | File | Shows |
@@ -144,7 +144,7 @@ stage harness, the docs and the evidence. `variables.json` ran first. The `m0-*.
   GNU's kills its group, so a child that ignores TERM lives on. It holds neither the lock (its descriptor is closed for
   the install) nor the exec's output (the install writes to `install.log`); it ends with the Container.
 - **`hold.json`'s samples** list the kept outcome of the earlier Container until the new one's lay-down ends.
-- **Checks.** `pnpm run check` passes at `867e885` (34/34); the commit after it changes only this line.
+- **Checks.** `pnpm run check` passes at `90487cb` (34/34); the commit after it changes only this line.
 
 ## Follow-ups
 
