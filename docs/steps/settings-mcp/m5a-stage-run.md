@@ -3,9 +3,10 @@
 M5a's code and unit tests (T-endpoint, T-guards, T-state, and T-modes' `browser` cases) landed without a deploy. Its
 evidence, `m5a-settings-owner-browser.json`, needs a deployed workers.dev stage (`psettings`, now in `STAGES`; never
 `prod`) and the owner signing in. Prod is deployed without the endpoint (`OWNER_ENDPOINT_EXCLUDED_STAGES`, ADR-0035)
-until items 1-4 pass and this file is recorded; enabling it then is removing `prod` from that list. Record each item with the commit deployed, the stage, timestamps, the client and its
-version, and the change ids. Never record a token, a cookie, an authorization code or a header value; record an
-assertion by its decoded claims with `sub` and `email` reduced to "same as …" comparisons.
+until items 1-4 pass and this file is recorded; enabling it then is removing `prod` from that list. Record each item
+with the commit deployed, the stage, timestamps, the client and its version, and the change ids. Never record a token, a
+cookie, an authorization code or a header value; record an assertion by its decoded claims with `sub` and `email`
+reduced to "same as …" comparisons.
 
 ## Before the run
 
