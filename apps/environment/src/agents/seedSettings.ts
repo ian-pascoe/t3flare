@@ -46,9 +46,10 @@ export const syncTextGenerationDefault = Effect.gen(function* () {
   const model = defaultTextModel(services.modelEndpoints?.() ?? EMPTY_ENDPOINTS) ?? (services.modelProxy === undefined ? "default" : SMALL_MODEL_SLUG);
   const record = Effect.sync(() => services.seededTextModel.set(model));
   if (current.instanceId === instanceId && current.model === model) return yield* record;
-  // Recorded only once the setting holds it, and always then: the record is the write's exit handler, which runs even if
-  // an interrupt (a timeout, the runtime's disposal) arrives the moment the write lands. A failed or interrupted write
-  // records nothing. The write itself stays interruptible, so a hung one never holds the permit past the timeout.
+  // Recorded only once the setting holds it: the record is the write's exit handler, and a failed or interrupted write
+  // records nothing. Known gap: t3's `updateSettings` writes inside an uninterruptible region, so a write that outlasts
+  // the timeout (or the runtime's disposal) can land while the exit reads as interrupted. The new default then goes
+  // unrecorded and reads as the owner's pick, and stops following the endpoints until the owner picks again.
   yield* settings.updateSettings({ textGenerationModelSelection: { instanceId, model } }).pipe(Effect.onExit((exit) => (Exit.isSuccess(exit) ? record : Effect.void)));
   yield* Effect.logInfo("t3flare: text generation's default model", { model, replaced: `${current.instanceId}/${current.model}` });
 }).pipe(Effect.timeout(SYNC_TIMEOUT_MS), syncing.withPermits(1));

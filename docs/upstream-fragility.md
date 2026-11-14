@@ -14,7 +14,7 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
    | find the newest nightly tag (`:98`) | t3 changed its tag format: `NIGHTLY` at `bump.ts:80` |
    | regenerate the workspace and install (`:157`) | t3 added a workspace setting ("classify it") or changed its lock's layout: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); a patch no longer applies or matches nothing, or t3's lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
    | lock matches t3's, one effect (`:161`) | a t3 importer installs other versions than in t3's lock, a second `effect`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030), [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
-   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163) |
+   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `provider/textGeneration.ts` and `endpointTextGeneration.test.ts` [U68](#u68-text-generation-names-the-endpoint-on-t3s-own-failures-spi-1163) |
    | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)) |
    | deploy the bump stage (`:176`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
    | acceptance test (`:180`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
@@ -731,6 +731,27 @@ pick, each failure saying which.
 - **Blast radius**: generated titles and commit text run on t3's stock model, or fail (no such instance), instead of the
   endpoints' default.
 - **Fix**: diff `DEFAULT_SERVER_SETTINGS.textGenerationModelSelection` and `resolveTextGenerationProvider` between tags.
+
+### U68. Text generation names the endpoint on t3's own failures (SPI-1163)
+
+Ranked with U64 to U67: a break leaves titles and commit text working; only an error's wording loses its endpoint.
+
+- **Where**: `makePiDurableTextGeneration` in `apps/environment/src/provider/textGeneration.ts` wraps each of
+  `ProviderTextGeneration`'s six operations (`namingEndpoint`), so a failure on an endpoint's model is prefixed
+  `The Model endpoint "e" (model m): …`. It leans on t3's `TextGenerationOperations`
+  (`packages/provider-core/src/server/textGenerationOperations.ts`) in three ways:
+  - **The six operations** of `ProviderTextGeneration` are listed by hand.
+  - **The failures after the reply** are only `generatedThreadTitle`'s placeholder title and
+    `withoutInvestigation`'s refusal; both are prefixed by the wrapper.
+  - **The sanitizers cannot fail**: `sanitizeCommitSubject`, `sanitizePrTitle`, `sanitizeFeatureBranchName` and
+    `formatGeneratedBranchName` are plain string functions with fallbacks.
+- **Breaks when**: t3 adds an operation, or adds a step after decoding that can fail.
+- **Detection**: a new operation fails typecheck (the returned object must be a `ProviderTextGeneration`). **Silent**: a
+  new failing step after decoding goes through the wrapper, so it is still named; a failure the wrapper never sees (a
+  new runner outside `fromRunner`) is not. `apps/environment/test/endpointTextGeneration.test.ts` covers the two known
+  failures.
+- **Blast radius**: an error text that doesn't name the endpoint.
+- **Fix**: diff `textGenerationOperations.ts` between tags and wrap any new operation or failure.
 
 ## Gaps in detection
 

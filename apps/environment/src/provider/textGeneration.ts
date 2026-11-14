@@ -138,8 +138,7 @@ const endpointModelOf = (selection: ModelSelection): { readonly endpointId: stri
 const namedFailure = (error: TextGenerationError, selection: ModelSelection): TextGenerationError => {
   const at = endpointModelOf(selection);
   if (at === undefined || error.detail.includes('Model endpoint "')) return error;
-  const detail = error.detail.charAt(0).toLowerCase() + error.detail.slice(1);
-  return new TextGenerationError({ operation: error.operation, detail: `${modelLabel(at.endpointId, at.modelId)}: ${detail}`, cause: error });
+  return new TextGenerationError({ operation: error.operation, detail: `${modelLabel(at.endpointId, at.modelId)}: ${error.detail}`, cause: error });
 };
 
 const namingEndpoint =
