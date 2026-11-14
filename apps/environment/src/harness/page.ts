@@ -25,7 +25,7 @@ import {
 import { type ContainerCostTable, containerCostTable } from "./containerCost.ts";
 import { CHANGE_TTL_MS, durationText } from "../settings/changes.ts";
 import type { PageReason } from "../settings/types.ts";
-import { type AskedBy, askedByText } from "../settings/render.ts";
+import { type AskedBy, askedByText, sizeText } from "../settings/render.ts";
 import type { AuditEntry } from "./store.ts";
 
 import { ICON_SPRITE, icon, type IconName } from "./pageIcons.ts";
@@ -66,8 +66,11 @@ export const pageCsp = async (pageScript: string = SCRIPT): Promise<string> => {
   ].join("; ");
 };
 
-/** A UTC time the script rewrites into the reader's own zone; readable as is without it. */
-const time = (at: number): string => {
+/**
+ * A UTC time the script rewrites into the reader's own zone; readable as is without it. The panel's and the Change
+ * page's.
+ */
+export const time = (at: number): string => {
   const iso = new Date(at).toISOString();
   return `<time datetime="${iso}" data-local>${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC</time>`;
 };
@@ -424,8 +427,6 @@ export interface SkillsView {
   readonly unauthenticated: boolean;
 }
 
-/** A size as the page shows it: KiB below a MiB. */
-const mib = (bytes: number) => (bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1024 / 1024).toFixed(2)} MiB`);
 
 /** One kept skill: its source at its commit, its switch, and its actions; the script fills its output area. */
 const skillRow = (skill: SkillsView["skills"][number]): string => {
@@ -434,7 +435,7 @@ const skillRow = (skill: SkillsView["skills"][number]): string => {
   const where = `${skill.repo}${skill.path === "" ? "" : `/${skill.path}`}`;
   return `<div class="row" data-skill-row="${name}"><div><div class="row-title"><h3 id="${id}">${name}</h3><span class="ident">${escapeHtml(skill.commit.slice(0, 7))}</span>${skill.enabled ? "" : '<span class="pill">Disabled</span>'}</div>
 <p class="desc">${escapeHtml(skill.description)}</p>
-<p class="desc">From <code>${escapeHtml(where)}</code>${skill.ref === null ? " on the default branch" : ` at <code>${escapeHtml(skill.ref)}</code>`}, ${plural(skill.files, "file", "files")}, ${mib(skill.bytes)}, saved ${time(skill.savedAt)}.</p></div>
+<p class="desc">From <code>${escapeHtml(where)}</code>${skill.ref === null ? " on the default branch" : ` at <code>${escapeHtml(skill.ref)}</code>`}, ${plural(skill.files, "file", "files")}, ${sizeText(skill.bytes)}, saved ${time(skill.savedAt)}.</p></div>
 <div class="row-control"><input type="checkbox" class="switch" role="switch" data-skill-enable="${name}" aria-labelledby="${id}"${skill.enabled ? " checked" : ""}></div>
 <div class="skill-extra"><div class="skill-actions"><button type="button" class="btn btn-sm" data-skill-view="${name}">${icon("play")}View</button><button type="button" class="btn btn-sm" data-skill-check="${name}">Check for updates</button><span class="spacer"></span><button type="button" class="btn btn-sm btn-danger" data-skill-remove="${name}" aria-label="Remove ${name}">${icon("trash")}Remove</button></div><div class="skill-out" data-skill-out="${name}" aria-live="polite"></div></div></div>`;
 };
@@ -453,7 +454,7 @@ const skillsSection = (view: SkillsView | undefined): string => {
   return `<section id="skills" aria-labelledby="skills-title">
 <div class="section-head"><h2 id="skills-title">${icon("skills")}Skills</h2>${view.skills.length === 0 ? "" : '<button type="button" class="btn btn-sm" data-skill-check="">Check all for updates</button>'}</div>
 <p class="section-desc">Environment skills, offered to Durable agents in every Project and served read-only in every Workspace at <code>/workspace/.agents/skills</code>. Each is pinned to the commit it was installed at, and beats a Repo skill of the same name. A change applies at each thread's next turn; the composer shows it at once. Repo skills load from each Workspace's own files, switched by the Skills extension above.</p>
-<p class="section-desc" data-skill-totals>${plural(totals.count, "skill", "skills")} (${totals.enabled} enabled, ${totals.disabled} disabled) of ${totals.maxSkills}; ${mib(totals.bytes)} of ${mib(totals.maxBytes)}${totals.disabled === 0 ? "" : `, ${mib(totals.disabledBytes)} of it disabled`}. Disabled skills count toward the limits.</p>
+<p class="section-desc" data-skill-totals>${plural(totals.count, "skill", "skills")} (${totals.enabled} enabled, ${totals.disabled} disabled) of ${totals.maxSkills}; ${sizeText(totals.bytes)} of ${sizeText(totals.maxBytes)}${totals.disabled === 0 ? "" : `, ${sizeText(totals.disabledBytes)} of it disabled`}. Disabled skills count toward the limits.</p>
 ${view.unauthenticated ? `<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>Reads from GitHub are unauthenticated</strong><p>No repository with the GitHub App is a Project here, so public repos are read from GitHub's shared limit of 60 an hour for this Worker's address. Install the GitHub App on a repository and add it as a Project to read with its own limit.</p></div></div>` : ""}
 <div class="group">${list}</div>
 <form class="group add" id="install-skill" data-skill-install autocomplete="off" aria-labelledby="install-title">
