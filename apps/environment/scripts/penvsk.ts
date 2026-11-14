@@ -463,7 +463,7 @@ const shoot = async () => {
   await harness("POST", "skills/enable", { name: "grill-me", enabled: false });
   const page = new URL("/_t3flare/harness", HARNESS).toString();
   for (const scheme of ["light", "dark"]) {
-    for (const [name, width, height, scale] of [["desktop", 1280, 1100, 1], ["phone", 390, 844, 2]] as const) {
+    for (const [name, width, height, scale] of [["desktop", 1280, 1600, 1], ["phone", 390, 1800, 2]] as const) {
       browser("--headers", JSON.stringify(scriptHeaders), "--color-scheme", scheme, "open", page);
       browser("set", "viewport", String(width), String(height), String(scale));
       browser("set", "media", scheme);
@@ -474,7 +474,7 @@ const shoot = async () => {
       browser("eval", `document.getElementById('skills').scrollIntoView()`);
       spawnSync("sleep", ["0.5"]);
       const file = path.join(OUT, `skills-${name}-${scheme}.png`);
-      browser("screenshot", "--full", file);
+      browser("screenshot", file);
       const widthOf = () => Number(/pixelWidth: (\d+)/.exec(spawnSync("sips", ["-g", "pixelWidth", file], { encoding: "utf8" }).stdout)?.[1]);
       if (widthOf() > 1400) spawnSync("sips", ["--resampleWidth", "1400", file], { stdio: "ignore" });
       console.log(`wrote ${path.relative(process.cwd(), file)}`);

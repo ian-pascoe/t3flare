@@ -374,9 +374,9 @@ const skillRow = (skill: SkillsView["skills"][number]): string => {
   const where = `${skill.repo}${skill.path === "" ? "" : `/${skill.path}`}`;
   return `<div class="row" data-skill-row="${name}"><div><div class="row-title"><h3 id="${id}">${name}</h3><span class="ident">${escapeHtml(skill.commit.slice(0, 7))}</span>${skill.enabled ? "" : '<span class="pill">Disabled</span>'}</div>
 <p class="desc">${escapeHtml(skill.description)}</p>
-<p class="hint">From <code>${escapeHtml(where)}</code>${skill.ref === null ? " on the default branch" : ` at <code>${escapeHtml(skill.ref)}</code>`}, ${plural(skill.files, "file", "files")}, ${mib(skill.bytes)}, saved ${time(skill.savedAt)}.</p></div>
+<p class="desc">From <code>${escapeHtml(where)}</code>${skill.ref === null ? " on the default branch" : ` at <code>${escapeHtml(skill.ref)}</code>`}, ${plural(skill.files, "file", "files")}, ${mib(skill.bytes)}, saved ${time(skill.savedAt)}.</p></div>
 <div class="row-control"><input type="checkbox" class="switch" role="switch" data-skill-enable="${name}" aria-labelledby="${id}"${skill.enabled ? " checked" : ""}></div>
-<div class="row-extra"><div class="server-actions"><button type="button" class="btn btn-sm" data-skill-view="${name}">${icon("play")}View</button><button type="button" class="btn btn-sm" data-skill-check="${name}">Check for updates</button><span class="spacer"></span><button type="button" class="btn btn-sm btn-danger" data-skill-remove="${name}" aria-label="Remove ${name}">${icon("trash")}Remove</button></div><div class="skill-out" data-skill-out="${name}" aria-live="polite"></div></div></div>`;
+<div class="skill-extra"><div class="skill-actions"><button type="button" class="btn btn-sm" data-skill-view="${name}">${icon("play")}View</button><button type="button" class="btn btn-sm" data-skill-check="${name}">Check for updates</button><span class="spacer"></span><button type="button" class="btn btn-sm btn-danger" data-skill-remove="${name}" aria-label="Remove ${name}">${icon("trash")}Remove</button></div><div class="skill-out" data-skill-out="${name}" aria-live="polite"></div></div></div>`;
 };
 
 /**
