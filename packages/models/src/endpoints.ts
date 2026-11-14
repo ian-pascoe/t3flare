@@ -70,7 +70,7 @@ export const MAX_ENDPOINT_MODELS = 200;
 const MAX_HEADERS = 16;
 const HEADER_NAME = /^[A-Za-z0-9-]{1,64}$/;
 /** Headers that carry a credential: the key goes in its sealed field, never here. */
-const CREDENTIAL_HEADERS = new Set(["authorization", "x-api-key", "api-key", "x-goog-api-key", "proxy-authorization", "cookie"]);
+const CREDENTIAL_HEADERS = new Set(["authorization", "x-api-key", "api-key", "x-goog-api-key", "proxy-authorization", "cookie", "cf-aig-authorization"]);
 
 /** A model's slug: `<endpointId>/<modelId>`. */
 export const endpointSlug = (endpointId: string, modelId: string): string => `${endpointId}/${modelId}`;

@@ -12,7 +12,6 @@ const MAX_PAGES = 10;
 
 export type Discovery = { readonly ok: true; readonly models: ReadonlyArray<EndpointModelInput> } | { readonly ok: false; readonly error: string };
 
-
 const count = (value: unknown): number | undefined => (typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined);
 
 class ListError extends Error {}

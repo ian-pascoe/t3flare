@@ -111,6 +111,8 @@ describe("endpointStore", () => {
     }
     // Two header names that differ only in case are one header given twice.
     expect(await store.save({ ...OPENAI, headers: { "X-Org": "a", "x-org": "b" } }, { apiKey: "sk-first" })).toMatchObject({ ok: false, error: expect.stringMatching(/given twice/) });
+    // A gateway's auth header carries a credential too, in any case.
+    expect(await store.save({ ...OPENAI, headers: { "CF-AIG-Authorization": "Bearer x" } }, { apiKey: "sk-first" })).toMatchObject({ ok: false, error: expect.stringMatching(/carries a credential/) });
     // The same headers under other-cased names are the same target.
     expect(await store.save({ ...OPENAI, headers: { "x-org": "a" } }, {})).toMatchObject({ ok: true });
   });
