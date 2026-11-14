@@ -359,7 +359,12 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
                       ? await rpc.killExecs(body.killExecs as never)
                       : "probeProcess" in body
                         ? await rpc.probeProcess(body.probeProcess as never)
-                        : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess" };
+                        : // SPI-1148: the Environment skill set taken now (the hash a turn would carry), and the discovery with it.
+                          "takeSkills" in body
+                          ? await rpc.takeEnvironmentSkills(environment.skills.hash())
+                          : "skills" in body
+                            ? await rpc.skills(String(body.skills), body.repoOnly === true ? { repoOnly: true } : undefined)
+                            : { error: "one of fs, git, checkpoint, exec, credentialHelper, killExecs, probeProcess, takeSkills, skills" };
         return json({ ms: Date.now() - started, result, container: await rpc.containerState() });
       }
       case "POST /_t3flare/check/connect-leak": {
