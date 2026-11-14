@@ -1,0 +1,68 @@
+{
+ "at": "2026-11-14T01:37:52.805Z",
+ "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
+ "commit": "1d55bd1c6833",
+ "cases": [
+  {
+   "name": "t3's git status, a commit, and gh, under a node pin",
+   "gh": [
+    "gh version 2.103.3 (2026-10-26)",
+    "git version 2.56.0",
+    "v24.11.1"
+   ],
+   "status": "{\"isRepo\":true,\"sourceControlProvider\":{\"kind\":\"github\",\"name\":\"GitHub\",\"baseUrl\":\"https://github.com\"},\"hasPrimaryRemote\":true,\"isDefaultRef\":true,\"refName\":\"main\",\"hasWorkingTreeChanges\":false,\"workingTree\":{\"rootPath\":\"/w/pmise\",\"files\":[],\"insertions\":0,\"deletions\":0},\"branchChanges\":{\"baseRef\":",
+   "t3CommitAction": {
+    "control": {
+     "events": [
+      null
+     ],
+     "failure": "GitCommandError: Git command failed in GitVcsDriver.prepareCommitContext.expandSplitIndex (/w/pmise): Git command exited with a non-zero status. (not_a_repository)",
+     "head": "Fixture for t3flare's acceptance tests"
+    },
+    "underPin": {
+     "events": [
+      null
+     ],
+     "failure": "GitCommandError: Git command failed in GitVcsDriver.prepareCommitContext.expandSplitIndex (/w/pmise): Git command exited with a non-zero status. (not_a_repository)",
+     "head": "Fixture for t3flare's acceptance tests"
+    },
+    "note": "t3's commit action fails the same way with no Global mise config: t3's temporary object directory is on its own side (not this change)"
+   },
+   "workspaceGit": {
+    "add": 0,
+    "commit": 0,
+    "head": "pmise: the Workspace's git under the node pin"
+   },
+   "ok": true
+  },
+  {
+   "name": "an owner-pinned conda:git has the credential helper, and a credentialed fetch works",
+   "pin": "[tools]\n\"conda:git\" = \"2.49.0\"\n",
+   "stdout": [
+    "git version 2.49.0",
+    "helper 1",
+    "password 1",
+    "fetched"
+   ],
+   "stderr": "",
+   "globalMise": {
+    "runtime": "1f5a7431-7a9c-4b19-a8b1-8a382a3f7901",
+    "outcome": "laid",
+    "attempts": 1,
+    "answer": {
+     "revision": 27,
+     "sha256": "5374ac4200041356ddda8d12b42aa2d52aed647c14f3db2419989cea8104c112",
+     "source": "environment",
+     "laid": true,
+     "install": 0,
+     "timedOut": false,
+     "ms": 7970,
+     "bytes": 31
+    },
+    "at": 1794620270176
+   },
+   "ok": true
+  }
+ ],
+ "ok": true
+}

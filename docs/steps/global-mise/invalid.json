@@ -1,0 +1,29 @@
+{
+ "at": "2026-11-14T01:40:00.807Z",
+ "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
+ "commit": "1d55bd1c6833",
+ "text": "this is = = not toml\n",
+ "stdout": [
+  "git version 2.56.0",
+  "gh version 2.103.3 (2026-10-26)",
+  "not-laid"
+ ],
+ "globalMise": {
+  "runtime": "1aa15920-5614-46c7-ba0d-0aa82cfbccc2",
+  "outcome": "not-laid",
+  "attempts": 1,
+  "answer": {
+   "revision": 33,
+   "sha256": "7a45a181a854f97af3d230b3115783c2720c3270080c75e278eb7cf43e11ccf7",
+   "source": "environment",
+   "laid": false,
+   "install": 1,
+   "timedOut": false,
+   "ms": 512,
+   "bytes": 21
+  },
+  "at": 1794620399044
+ },
+ "status": "pmise at revision 33: not laid down (mise install exit 1), 2026-11-14T01:39:59.044Z",
+ "ok": true
+}

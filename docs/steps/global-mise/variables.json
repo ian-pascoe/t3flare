@@ -1,0 +1,355 @@
+{
+ "at": "2026-11-14T01:35:41.176Z",
+ "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
+ "commit": "1d55bd1c6833",
+ "note": "Each path ran `vars.sh` with a gh hosts.yml in its own home: the variables as its command has them (null: unset), mise's resolved settings, and the token mise would send.",
+ "results": [
+  {
+   "who": "workspace-exec",
+   "how": "the Workspace DO's exec (t3's git and the admin route take this path)",
+   "detail": {
+    "exitCode": 0,
+    "stdout": "pmise-vars-done-workspace-exec\n",
+    "stderr": ""
+   },
+   "ranAt": "2026-11-14T01:35:41.172Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "ok": true
+  },
+  {
+   "who": "durable",
+   "how": "a Durable agent's bash on the Container",
+   "detail": {
+    "threadId": "7a757f0e-394c-40dd-9a35-9cd621ebeb66",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "bash /workspace/.pmise/vars.sh durable"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-durable\\n\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 10895
+   },
+   "ranAt": "2026-11-14T01:35:41.174Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "ok": true
+  },
+  {
+   "who": "terminal",
+   "how": "a t3 Terminal",
+   "detail": {
+    "ms": 148,
+    "tail": "bash /workspace/.pmise/vars.sh terminal; echo T3D$((660229362+1))\npmise-vars-done-terminal\nT3D660229363\n/w/pmise # "
+   },
+   "ranAt": "2026-11-14T01:35:41.174Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "ok": true
+  },
+  {
+   "who": "codex",
+   "how": "a shell command codex runs",
+   "detail": {
+    "threadId": "2e77dac0-8376-4199-a77f-3cb440784479",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "/bin/bash -c 'bash /workspace/.pmise/vars.sh codex'"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-codex\\n\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 144351
+   },
+   "ranAt": "2026-11-14T01:35:41.174Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "ok": true
+  },
+  {
+   "who": "claude",
+   "how": "a shell command claude runs",
+   "detail": {
+    "threadId": "6fad15c0-71d2-469a-b6f2-144de0bbb6b4",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "Terminal",
+     "bash /workspace/.pmise/vars.sh claude"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}",
+     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-claude\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 99844
+   },
+   "ranAt": "2026-11-14T01:35:41.174Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "ok": true
+  },
+  {
+   "who": "opencode",
+   "how": "a shell command opencode runs",
+   "detail": {
+    "threadId": "18b99e58-a064-4bd1-b295-a0bf39a2cd68",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "bash /workspace/.pmise/vars.sh opencode"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 131810
+   },
+   "ranAt": "2026-11-14T01:35:41.174Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "ok": true
+  },
+  {
+   "who": "pi",
+   "how": "a shell command pi runs",
+   "detail": {
+    "threadId": "28902a81-3b27-4a12-a1ad-77d598629339",
+    "runs": [
+     {
+      "status": "completed",
+      "failure": null
+     }
+    ],
+    "answer": "done",
+    "tools": [
+     "bash /workspace/.pmise/vars.sh pi"
+    ],
+    "outputs": [
+     "{\"kind\":\"replace\",\"text\":\"pmise-vars-done-pi\\n\",\"truncated\":false,\"running\":false}"
+    ],
+    "errors": [],
+    "ms": 74045
+   },
+   "ranAt": "2026-11-14T01:35:41.174Z",
+   "ran": true,
+   "home": "/root",
+   "env": {
+    "MISE_SYSTEM_CONFIG_FILE": "/usr/local/share/cloudpid/mise.toml",
+    "MISE_GLOBAL_CONFIG_FILE": "/var/lib/t3flare/mise/config.toml",
+    "MISE_GITHUB_GH_CLI_TOKENS": "false",
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": "false",
+    "MISE_GITHUB_CREDENTIAL_COMMAND": "",
+    "MISE_DISABLE_TOOLS": "",
+    "MISE_DISABLE_BACKENDS": ""
+   },
+   "settings": {
+    "github.gh_cli_tokens": "false",
+    "github.use_git_credentials": "false",
+    "github.credential_command": "",
+    "disable_tools": "[]",
+    "disable_backends": "[\"\"]"
+   },
+   "token": "github.com: (none)",
+   "arrived": {
+    "MISE_GITHUB_GH_CLI_TOKENS": true,
+    "MISE_GITHUB_USE_GIT_CREDENTIALS": true,
+    "MISE_GITHUB_CREDENTIAL_COMMAND": true,
+    "MISE_DISABLE_TOOLS": true,
+    "MISE_DISABLE_BACKENDS": true
+   },
+   "falseGuards": true,
+   "emptyGuards": true,
+   "noToken": true,
+   "ok": true
+  }
+ ],
+ "ok": true
+}

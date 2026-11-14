@@ -1,0 +1,127 @@
+{
+ "at": "2026-11-14T01:39:30.969Z",
+ "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
+ "commit": "1d55bd1c6833",
+ "pin": "[tools]\nnode = \"24.11.1\"\nrust = \"1.91.1\"\ngo = \"1.25.4\"\npython = \"3.12.8\"\njava = \"temurin-21.0.5+11.0.LTS\"\ndeno = \"2.1.4\"\nzig = \"0.13.0\"\nterraform = \"1.10.3\"\n",
+ "idleMinutes": 1,
+ "budget": 1,
+ "installMs": 60891,
+ "reclaimReasonDuringInstall": "in use",
+ "otherWorkspaceStart": {
+  "status": 500,
+  "answer": "{\"status\":500,\"error\":\"WorkspaceTransportError: Workspace backend \\\"container-shell\\\": shell.exec failed after 1 reconnect retry: initial=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start:; last=ContainerBackend(container-shell): connect failed at stage=start port=8080 attempt=1/2 restarts=0 timeoutMs=60000 lastError=t3flare: the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment\",\"causes\":[\"ContainerBackend(container-shell): connect failed "
+ },
+ "samples": [
+  {
+   "s": 0,
+   "running": false,
+   "globalMise": "laid"
+  },
+  {
+   "s": 5,
+   "running": false,
+   "globalMise": "laid"
+  },
+  {
+   "s": 11,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 16,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 21,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 26,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 32,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 37,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 42,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 48,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 53,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 58,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 64,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 69,
+   "running": true,
+   "globalMise": "laid"
+  },
+  {
+   "s": 74,
+   "running": true,
+   "globalMise": "laid"
+  }
+ ],
+ "agent": {
+  "threadId": "4cfad445-c595-4d34-be3f-39fd7932d1f2",
+  "runs": [
+   {
+    "status": "completed",
+    "failure": null
+   }
+  ],
+  "answer": "The command ran with no output and no error text, so there is nothing to quote. The tool returned an empty result.",
+  "tools": [
+   "node --version > /workspace/.pmise/node-hold.txt 2>&1"
+  ],
+  "outputs": [
+   "{\"kind\":\"replace\",\"text\":\"\",\"truncated\":false,\"running\":false}"
+  ],
+  "errors": [],
+  "ms": 74944
+ },
+ "node": "v24.11.1",
+ "globalMise": {
+  "runtime": "f77c9511-ac19-406c-afc9-12674a178a9d",
+  "outcome": "laid",
+  "attempts": 1,
+  "answer": {
+   "revision": 29,
+   "sha256": "140488a92d76b01103d59d36466823a54f8ff58beae0f2fb9dd414cf0700eaa2",
+   "source": "environment",
+   "laid": true,
+   "install": 1,
+   "timedOut": false,
+   "ms": 60891,
+   "bytes": 157
+  },
+  "at": 1794620362499
+ },
+ "ok": true
+}

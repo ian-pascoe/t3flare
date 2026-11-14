@@ -1,0 +1,18 @@
+{
+ "at": "2026-11-14T01:40:14.687Z",
+ "host": "t3flare-environment-pmise.ian-g-pascoe.workers.dev",
+ "commit": "1d55bd1c6833",
+ "bytes": 16384,
+ "revision": 34,
+ "oneByteMore": {
+  "status": 400,
+  "answer": "globalMiseConfig: is longer than 16 KiB of UTF-8\n"
+ },
+ "read": {
+  "bytes": 16384,
+  "sha256": "9d883e4ef75959b98a22c0d571b4bb25bf125f804d5963fcddbef55fb18363a8",
+  "node": "v24.11.1"
+ },
+ "expectedSha256": "9d883e4ef75959b98a22c0d571b4bb25bf125f804d5963fcddbef55fb18363a8",
+ "ok": true
+}
