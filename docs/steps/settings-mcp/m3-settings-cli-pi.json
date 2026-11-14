@@ -1,0 +1,179 @@
+{
+ "file": "m3-settings-cli-pi.json",
+ "stage": "psmcp",
+ "host": "t3flare-environment-psmcp.ian-g-pascoe.workers.dev",
+ "items": {
+  "1-read": {
+   "at": "2026-11-14T18:00:22.242Z",
+   "commit": "24f4a01a90e6",
+   "name": "pi: get_settings (environment) runs without a card",
+   "threadId": "b4d534fc-5c1a-4be0-ac1f-5fde2dce7417",
+   "status": "completed",
+   "cards": [],
+   "reply": "My last turn finished normally, so there's nothing to resume. I only ran read-only calls: a tool search to load the settings tools, and one `get_settings` call for the environment. I made no changes, started no commands, and nothing is still running.\n\nThe result was:\n\n{\"revision\": 14, \"containerBudget\": 3}",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "tool_search",
+     "status": "completed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "get settings",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 30434,
+   "result": "My last turn finished normally, so there's nothing to resume. I only ran read-only calls: a tool search to load the settings tools, and one `get_settings` call for the environment. I made no changes, started no commands, and nothing is still running.\n\nThe result was:\n\n{\"revision\": 14, \"containerBudget\": 3}",
+   "verdict": "pass"
+  },
+  "2-free-full-access": {
+   "at": "2026-11-14T18:00:50.048Z",
+   "commit": "24f4a01a90e6",
+   "name": "pi: a free change (containerIdleMinutes lowered) runs in full access without a card",
+   "before": {
+    "revision": 14,
+    "containerIdleMinutes": 2
+   },
+   "after": {
+    "revision": 15,
+    "containerIdleMinutes": 1
+   },
+   "threadId": "85988b74-e5d0-4b9c-8535-3453b8ecd11f",
+   "status": "completed",
+   "cards": [],
+   "reply": "Applied: the Environment settings are at revision 15. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "tool_search",
+     "status": "completed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 24637,
+   "result": "Applied: the Environment settings are at revision 15. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.",
+   "audit": {
+    "caller": "agent:85988b74-e5d0-4b9c-8535-3453b8ecd11f",
+    "via": "mcp",
+    "thread": "85988b74-e5d0-4b9c-8535-3453b8ecd11f",
+    "agent": "pi",
+    "tier": "free",
+    "entity": "environment",
+    "action": "environment.change",
+    "target": "containerIdleMinutes",
+    "before": {
+     "containerIdleMinutes": 2
+    },
+    "after": {
+     "containerIdleMinutes": 1
+    },
+    "at": 1794679240606
+   },
+   "verdict": "pass"
+  },
+  "3-free-approval-required": {
+   "at": "2026-11-14T18:01:20.091Z",
+   "commit": "24f4a01a90e6",
+   "name": "pi: a free change in approval-required asks on one card; approved, applied (audit mode card, answeredBy card)",
+   "threadId": "5c4ae097-0a00-4d50-b7b6-89625f04f8da",
+   "status": "completed",
+   "cards": [
+    {
+     "id": "runtime-request:pi:t3flare-ask:t3flare-elicit-2668bbf5-186f-4b02-9526-07c689da1574",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "An agent asks to change the Environment settings (revision 16):\n- containerIdleMinutes: 2 to 1 (free in either direction)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\nAsked by pi on thread 5c4ae097-0a00-4d50-b7b6-89625f04f8da. This change is free (it narrows what agents have); this thread's mode asks for every write.\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 16,\n  \"settings\": {\n    \"containerIdleMinutes\": 1\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "reply": "Applied: the Environment settings are at revision 17. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "tool_search",
+     "status": "completed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 26363,
+   "result": "Applied: the Environment settings are at revision 17. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.",
+   "audit": {
+    "caller": "agent:5c4ae097-0a00-4d50-b7b6-89625f04f8da",
+    "via": "mcp",
+    "thread": "5c4ae097-0a00-4d50-b7b6-89625f04f8da",
+    "agent": "pi",
+    "tier": "free",
+    "mode": "card",
+    "answeredBy": "card",
+    "entity": "environment",
+    "action": "environment.change",
+    "target": "containerIdleMinutes",
+    "before": {
+     "containerIdleMinutes": 2
+    },
+    "after": {
+     "containerIdleMinutes": 1
+    },
+    "at": 1794679266788
+   },
+   "verdict": "pass"
+  },
+  "4-plan": {
+   "at": "2026-11-14T18:01:40.743Z",
+   "commit": "24f4a01a90e6",
+   "name": "pi: plan mode refuses the write; no card, no revision moved",
+   "revisions": {
+    "before": 18,
+    "after": 18
+   },
+   "threadId": "ebaedc41-708f-4074-b7e4-9de9c8e212b8",
+   "status": "completed",
+   "cards": [],
+   "reply": "Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "tool_search",
+     "status": "completed",
+     "output": "null"
+    },
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "failed",
+     "output": "null"
+    }
+   ],
+   "ms": 18235,
+   "result": "Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.",
+   "verdict": "pass"
+  },
+  "5-linked": {
+   "commit": "24f4a01a90e6",
+   "name": "pi: a Linked thread's write is refused",
+   "verdict": "not-run",
+   "why": "as claude's: the check is the Environment's, run on Durable and Codex"
+  }
+ }
+}

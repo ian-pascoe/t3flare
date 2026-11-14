@@ -1,0 +1,185 @@
+{
+ "file": "m3-settings-cli-codex.json",
+ "stage": "psmcp",
+ "host": "t3flare-environment-psmcp.ian-g-pascoe.workers.dev",
+ "items": {
+  "1-read": {
+   "at": "2026-11-14T17:59:46.131Z",
+   "commit": "24f4a01a90e6",
+   "name": "codex: get_settings (environment) runs without a card",
+   "threadId": "40201fe8-18e8-4943-b000-1666e9709c8f",
+   "status": "completed",
+   "cards": [],
+   "reply": "{\"revision\": null, \"containerBudget\": null}",
+   "toolItems": [],
+   "ms": 25172,
+   "result": "{\"revision\": null, \"containerBudget\": null}",
+   "verdict": "pass"
+  },
+  "2-free-full-access": {
+   "at": "2026-11-14T17:58:00.597Z",
+   "commit": "24f4a01a90e6",
+   "name": "codex: a free change (containerIdleMinutes lowered) runs in full access without a card",
+   "before": {
+    "revision": 10,
+    "containerIdleMinutes": 2
+   },
+   "after": {
+    "revision": 11,
+    "containerIdleMinutes": 1
+   },
+   "threadId": "f0809dc2-b97a-4f40-bffd-d24b95cc80f0",
+   "status": "completed",
+   "cards": [],
+   "reply": "{\"status\":\"applied\",\"revision\":11,\"appliesAt\":\"Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"}",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 14546,
+   "result": "{\"status\":\"applied\",\"revision\":11,\"appliesAt\":\"Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"}",
+   "audit": {
+    "caller": "agent:f0809dc2-b97a-4f40-bffd-d24b95cc80f0",
+    "via": "mcp",
+    "thread": "f0809dc2-b97a-4f40-bffd-d24b95cc80f0",
+    "agent": "codex",
+    "tier": "free",
+    "entity": "environment",
+    "action": "environment.change",
+    "target": "containerIdleMinutes",
+    "before": {
+     "containerIdleMinutes": 2
+    },
+    "after": {
+     "containerIdleMinutes": 1
+    },
+    "at": 1794679072339
+   },
+   "verdict": "pass"
+  },
+  "3-free-approval-required": {
+   "at": "2026-11-14T17:58:33.753Z",
+   "commit": "24f4a01a90e6",
+   "name": "codex: a free change in approval-required asks on one card; approved, applied (audit mode card, answeredBy card)",
+   "threadId": "115cacf2-7cc4-494e-9a10-118f66518247",
+   "status": "completed",
+   "cards": [
+    {
+     "id": "runtime-request:codex:t3flare-ask:t3flare-elicit-40fd872d-1fb2-4cda-8aef-152c3475e25e",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "An agent asks to change the Environment settings (revision 12):\n- containerIdleMinutes: 2 to 1 (free in either direction)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\nAsked by codex on thread 115cacf2-7cc4-494e-9a10-118f66518247. This change is free (it narrows what agents have); this thread's mode asks for every write.\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 12,\n  \"settings\": {\n    \"containerIdleMinutes\": 1\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "reply": "{\"status\":\"applied\",\"revision\":13,\"appliesAt\":\"Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"}",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "completed",
+     "output": "null"
+    }
+   ],
+   "ms": 30312,
+   "result": "{\"status\":\"applied\",\"revision\":13,\"appliesAt\":\"Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"}",
+   "audit": {
+    "caller": "agent:115cacf2-7cc4-494e-9a10-118f66518247",
+    "via": "mcp",
+    "thread": "115cacf2-7cc4-494e-9a10-118f66518247",
+    "agent": "codex",
+    "tier": "free",
+    "mode": "card",
+    "answeredBy": "card",
+    "entity": "environment",
+    "action": "environment.change",
+    "target": "containerIdleMinutes",
+    "before": {
+     "containerIdleMinutes": 2
+    },
+    "after": {
+     "containerIdleMinutes": 1
+    },
+    "at": 1794679096716
+   },
+   "verdict": "pass"
+  },
+  "4-plan": {
+   "at": "2026-11-14T17:58:53.730Z",
+   "commit": "24f4a01a90e6",
+   "name": "codex: plan mode refuses the write; no card, no revision moved",
+   "revisions": {
+    "before": 14,
+    "after": 14
+   },
+   "threadId": "289d0e75-d269-4cfe-9c45-d03db65c2ed2",
+   "status": "completed",
+   "cards": [],
+   "reply": "Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.",
+   "toolItems": [
+    {
+     "type": "dynamic_tool",
+     "title": "change environment",
+     "status": "failed",
+     "output": "null"
+    }
+   ],
+   "ms": 16741,
+   "result": "Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.",
+   "verdict": "pass"
+  },
+  "5-linked": {
+   "at": "2026-11-14T18:20:38.001Z",
+   "commit": "24f4a01a90e6",
+   "name": "codex: a Linked thread (launched through a peer link) reads; its write is refused (reason linked), no revision moved",
+   "threadId": "mcp:launch:a8703c186e0570a5d2f05d0d7213360b60125c9ce886c6609f3955a2ec893e44",
+   "cards": [],
+   "output": "",
+   "reply": "The environment revision is **26**.\n\nThe change tool’s full answer was:\n\n`{\"status\":\"refused\"}`",
+   "settingsLines": [
+    {
+     "t3flare": "settings-refused",
+     "via": "mcp",
+     "door": "own",
+     "agent": "codex",
+     "thread": "mcp:launch:a8703c186e0570a5d2f05d0d7213360b60125c9ce886c6609f3955a2ec893e44",
+     "tool": "change_environment",
+     "outcome": "refused",
+     "reason": "linked"
+    }
+   ],
+   "revisions": {
+    "before": 26,
+    "after": 26
+   },
+   "verdict": "pass"
+  },
+  "6-unknown-thread": {
+   "at": "2026-11-14T18:19:20.857Z",
+   "commit": "24f4a01a90e6",
+   "name": "codex: a write whose thread is not in t3's projection (deleted while its process lived; its handle replayed from the Container) is refused, no revision moved",
+   "threadId": "254d77bd-10b6-408e-900c-620e52137029",
+   "firstTurn": {
+    "status": "completed",
+    "reply": "1-14T18:18:47.702Z\",\"last Global mise lay-down\":\"smcp-cli at revision 26: no Global mise config, 2026-11-14T18:18:50.019Z\",\"Skills\":\"Repo skills on; 0 Environment skills, 0 enabled, set e3b0c44298fc\",\"last Environment skill set refused\":null},\"access\":{\"enabled\":true,\"writes\":true},\"openChanges\":[]}"
+   },
+   "relayAnswer": "none\n401\nt3flare: the relay needs this process's tool handle as its bearer\n",
+   "revisions": {
+    "before": 26,
+    "after": 26
+   },
+   "verdict": "not-run",
+   "why": "t3 ends a thread's provider session when the thread is deleted: no live Codex process held a handle afterwards, so no call from an unknown thread could be made (the replayed request found no handle and the relay answered 401). Covered by settingsCaller.test.ts (T-caller)."
+  }
+ }
+}
