@@ -14,6 +14,7 @@ import { DEFAULT_SERVER_SETTINGS, defaultInstanceIdForDriver } from "@t3tools/co
 import { SMALL_MODEL_SLUG } from "@t3flare/models";
 import { defaultTextModel, EMPTY_ENDPOINTS } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
 import * as ServerSettings from "t3/src/serverSettings.ts";
@@ -25,6 +26,8 @@ import { environmentServices } from "./bindings.ts";
 
 /** One sync at a time, per isolate (the Environment DO is the only object in it). */
 const syncing = Semaphore.makeUnsafe(1);
+/** How long one sync may hold the permit: a hung settings read or write never blocks a later boot's sync for good. */
+export const SYNC_TIMEOUT_MS = 30_000;
 
 /** Points an unset text-generation setting at text generation's default model now. */
 export const syncTextGenerationDefault = Effect.gen(function* () {
@@ -41,21 +44,24 @@ export const syncTextGenerationDefault = Effect.gen(function* () {
     (current.instanceId === instanceId && (current.model === "default" || current.model === seeded || (seeded === undefined && current.model === SMALL_MODEL_SLUG)));
   if (!unset) return;
   const model = defaultTextModel(services.modelEndpoints?.() ?? EMPTY_ENDPOINTS) ?? (services.modelProxy === undefined ? "default" : SMALL_MODEL_SLUG);
-  if (current.instanceId !== instanceId || current.model !== model) {
-    yield* settings.updateSettings({ textGenerationModelSelection: { instanceId, model } });
-    yield* Effect.logInfo("t3flare: text generation's default model", { model, replaced: `${current.instanceId}/${current.model}` });
-  }
-  // Recorded only once the setting holds it: a failed write leaves the record naming what the setting still holds.
-  services.seededTextModel.set(model);
-}).pipe(syncing.withPermits(1));
+  const record = Effect.sync(() => services.seededTextModel.set(model));
+  if (current.instanceId === instanceId && current.model === model) return yield* record;
+  // Recorded only once the setting holds it, and always then: the record is the write's exit handler, which runs even if
+  // an interrupt (a timeout, the runtime's disposal) arrives the moment the write lands. A failed or interrupted write
+  // records nothing. The write itself stays interruptible, so a hung one never holds the permit past the timeout.
+  yield* settings.updateSettings({ textGenerationModelSelection: { instanceId, model } }).pipe(Effect.onExit((exit) => (Exit.isSuccess(exit) ? record : Effect.void)));
+  yield* Effect.logInfo("t3flare: text generation's default model", { model, replaced: `${current.instanceId}/${current.model}` });
+}).pipe(Effect.timeout(SYNC_TIMEOUT_MS), syncing.withPermits(1));
 
 export const layerSeedTextGenerationModel = Layer.effectDiscard(
   Effect.gen(function* () {
     const sync = syncTextGenerationDefault.pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: text generation's default model was not set", cause)));
     yield* sync;
-    // A changed endpoint list can change the default: an unset setting follows it at once.
+    // A changed endpoint list can change the default: an unset setting follows it at once. Each sync is forked into the
+    // layer's scope, so the runtime's disposal interrupts one still running; the listener stops first.
     const context = yield* Effect.context<ServerSettings.ServerSettingsService | ProviderInstanceRegistry.ProviderInstanceRegistry>();
-    const stopHearing = onEndpointsChanged(() => void Effect.runForkWith(context)(sync));
+    const scope = yield* Effect.scope;
+    const stopHearing = onEndpointsChanged(() => void Effect.runForkWith(context)(Effect.forkIn(sync, scope)));
     yield* Effect.addFinalizer(() => Effect.sync(stopHearing));
   }),
 );

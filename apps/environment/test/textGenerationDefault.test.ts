@@ -4,7 +4,9 @@
 import { ProviderInstanceId } from "@t3tools/contracts";
 import type { EndpointModel, ModelEndpoints } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Scope from "effect/Scope";
 import * as ProviderInstanceRegistry from "t3/src/provider/ProviderInstanceRegistry.ts";
 import * as ServerSettings from "t3/src/serverSettings.ts";
 import { describe, expect, it } from "vitest";
@@ -186,8 +188,7 @@ describe("the sync's record and its order", () => {
     const selection = await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const context = yield* Layer.build(layerSeedTextGenerationModel);
-          void context;
+          yield* Layer.build(layerSeedTextGenerationModel);
           const service = yield* ServerSettings.ServerSettingsService;
           expect((yield* service.getSettings).textGenerationModelSelection.model).toBe("openai/gpt-5-mini");
           state.endpoints = withModels("gpt-5-nano");
@@ -198,5 +199,31 @@ describe("the sync's record and its order", () => {
       ).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES }), registry))) as Effect.Effect<{ readonly model: string }>,
     );
     expect(selection.model).toBe("openai/gpt-5-nano");
+  });
+
+  it("interrupts a hung sync it forked when the layer's scope closes, so a later boot's sync runs", async () => {
+    const state = environment(withModels("gpt-5-mini"));
+    const outcome = await Effect.runPromise(
+      Effect.gen(function* () {
+        const inner = yield* ServerSettings.ServerSettingsService;
+        // After the boot's sync, every settings read hangs (a stuck storage read).
+        let reads = 0;
+        const hanging: Settings = { ...inner, getSettings: Effect.suspend(() => (reads++ < 1 ? inner.getSettings : Effect.never)) };
+        const scope = yield* Scope.make();
+        yield* Layer.buildWithScope(layerSeedTextGenerationModel.pipe(Layer.provide(Layer.succeed(ServerSettings.ServerSettingsService, hanging))), scope);
+        state.endpoints = withModels("gpt-5-nano");
+        endpointsChanged();
+        yield* Effect.sleep(20);
+        // The runtime's disposal closes the layer's scope.
+        yield* Scope.close(scope, Exit.void);
+        // A later boot's sync (a fresh settings service) gets the permit and runs.
+        return yield* syncTextGenerationDefault.pipe(
+          Effect.as("ran"),
+          Effect.timeout(1_000),
+          Effect.catchCause(() => Effect.succeed("blocked")),
+        );
+      }).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES }), registry))) as Effect.Effect<string>,
+    );
+    expect(outcome).toBe("ran");
   });
 });
