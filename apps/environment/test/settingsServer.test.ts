@@ -20,15 +20,12 @@ import { APPLIED_CAP, settingsChanges } from "../src/settings/changes.ts";
 import { LINKED_REFUSAL, NO_MODES_REFUSAL, OFF_MESSAGE, type OwnCaller, READ_ONLY_REFUSAL, settingsCall, type ThreadLink, UNKNOWN_REFUSAL } from "../src/settings/server.ts";
 import { SETTINGS_TOOLS } from "../src/settings/tools.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
+import { memory, structured, textOf } from "./settingsFixture.ts";
 
 const NOW = Date.UTC(2026, 10, 14, 12, 0);
 const ORIGIN = "https://t3.example.dev";
 const SECRET = "sekret-header-value-0042";
 
-const memory = () => {
-  const map = new Map<string, unknown>();
-  return { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)), delete: (key: string) => map.delete(key) };
-};
 
 const MODES = {
   plan: { runtimeMode: "full-access", interactionMode: "plan" },
@@ -106,11 +103,6 @@ const setup = (options: { links?: Record<string, ThreadLink>; answer?: McpQuesti
   return { kv, store, secrets, oauth, host, call, cards, withdrawn, logs, advance: (ms: number) => (now += ms) };
 };
 
-const structured = (answer: McpCallAnswer) => {
-  if (answer.kind !== "result") throw new Error(`not a result: ${answer.message}`);
-  return answer.structured as { status?: string; revision?: number; url?: string };
-};
-const textOf = (answer: McpCallAnswer) => (answer.kind === "result" ? answer.text : answer.message);
 
 const durable = (thread = "thread-d"): OwnCaller => ({ door: "own", thread, agent: DURABLE_AGENT });
 const relayed = (thread = "thread-c"): OwnCaller => ({ door: "own", thread, agent: "codex" });

@@ -9,7 +9,7 @@ import type { AccessCaller } from "../src/access.ts";
 import type { HarnessDeps } from "../src/harness/panel.ts";
 import { harnessSecrets } from "../src/harness/secrets.ts";
 import { harnessStore } from "../src/harness/store.ts";
-import { McpHost } from "../src/mcp/host.ts";
+import { type McpCallAnswer, McpHost } from "../src/mcp/host.ts";
 import { cliThreadState } from "../src/provider/cli/cliAsk.ts";
 import { DURABLE_AGENT, durableModes, forgetDurableModes, noteDurableModes } from "../src/provider/threadCaller.ts";
 import { settingsChanges } from "../src/settings/changes.ts";
@@ -33,6 +33,15 @@ export const memory = () => {
     entries: () => [...map.entries()],
   };
 };
+
+/**
+ * A Settings call's structured result, or `{ unavailable }` with the host's message when the call reached no tool (the
+ * server off, a hidden tool, no caller).
+ */
+export const structured = (answer: McpCallAnswer): Record<string, any> => (answer.kind === "result" ? (answer.structured as Record<string, any>) : { unavailable: answer.message });
+
+/** A Settings call's text: its result's, or the host's message. */
+export const textOf = (answer: McpCallAnswer): string => (answer.kind === "result" ? answer.text : answer.message);
 
 export interface FixtureOptions {
   /** The owner's answer on each card: a value, or a function of the card (a never-settling promise leaves it open). */

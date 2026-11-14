@@ -6,18 +6,15 @@
 // read-then-write round-trips unchanged.
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { McpCallAnswer } from "../src/mcp/host.ts";
 import { DURABLE_AGENT, forgetDurableModes, noteDurableModes } from "../src/provider/threadCaller.ts";
 import { NETWORK_READ_CAP, READ_CAP } from "../src/settings/changes.ts";
 import { LINKED_REFUSAL, NO_MODES_REFUSAL, UNKNOWN_REFUSAL } from "../src/settings/server.ts";
-import { settingsFixture, type SettingsFixture } from "./settingsFixture.ts";
+import { settingsFixture, type SettingsFixture, structured, textOf } from "./settingsFixture.ts";
 import { skillMd } from "./skillRepo.fixture.ts";
 
 let fixture: SettingsFixture | undefined;
 afterEach(() => fixture?.dispose());
 
-const structured = (answer: McpCallAnswer) => (answer.kind === "result" ? (answer.structured as Record<string, any>) : undefined);
-const textOf = (answer: McpCallAnswer) => (answer.kind === "result" ? answer.text : answer.message);
 
 describe("reads leave the audit log alone and are capped", () => {
   it("test_mcp_server through the server writes no audit entry, however often it runs", async () => {
