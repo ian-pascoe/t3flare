@@ -7,6 +7,7 @@ import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAns
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 import type { GlobalMiseReport, McpRelayAnswer, McpRelayInput, ResolvedEnvironment, ResolvedHarness } from "@t3flare/harness-registry";
 import type { SkillSet } from "@t3flare/skills";
+import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import type { McpCallAnswer, McpView } from "./extensions/mcp.ts";
 
 export interface EnvironmentRpc {
@@ -26,6 +27,10 @@ export interface EnvironmentRpc {
   terminalOutput(push: TerminalPush): Promise<TerminalPushAnswer>;
   /** The harness settings, resolved and secret-free (ADR-0026): read at a turn's start. Never boots t3. */
   harnessSettings(input: { readonly projectId?: string }): Promise<ResolvedHarness>;
+  /** The Model endpoints (SPI-1162), secret-free: read at a turn's start. Never boots t3. */
+  modelEndpoints(): Promise<ModelEndpoints>;
+  /** A Model endpoint's API key at use time (ADR-0018), null when it has none. Never boots t3. */
+  endpointCredential(input: { readonly endpointId: string }): Promise<{ readonly apiKey: string | null }>;
   /** The Environment settings, resolved (ADR-0032): read before a Container start. Never boots t3. */
   environmentSettings(): Promise<ResolvedEnvironment>;
   /**

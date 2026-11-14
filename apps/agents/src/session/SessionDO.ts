@@ -82,7 +82,8 @@ import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
-import { proxyModels } from "./models.ts";
+import { endpointProviders, proxyModels } from "./models.ts";
+import { EMPTY_ENDPOINTS, type ModelEndpoints } from "@t3flare/models/endpoints";
 import { SUGGESTION_MODEL, suggestPrompt } from "./promptSuggestion.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
@@ -133,6 +134,10 @@ const MCP_CHUNK_CHARS = 100_000;
 const TERMCTRL_USED_KEY = "t3flare:termctrl-used";
 /** How long a turn's start waits for the Environment's harness settings before it keeps the ones it has. */
 const HARNESS_READ_MS = 5_000;
+/** The Model endpoints the Session last took (SPI-1162), secret-free, so a restart has the same providers. */
+const ENDPOINTS_KEY = "t3flare:model-endpoints";
+/** How long an endpoint's key is kept in memory before it is asked for again (never stored). */
+const ENDPOINT_KEY_TTL_MS = 5 * 60 * 1000;
 /** A test's model proxy fault (stages only). */
 const FAULT_KEY = "t3flare:proxy-fault";
 /** The most a Stop (or the object's start) waits for an aborted command's processes to be killed. */
@@ -189,6 +194,12 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #registryWriter: ReturnType<typeof createRegistry>;
   /** The Advisor (SPI-1059), while the harness settings turn it on; one per object, so a Review under way survives a settings read. */
   #advisor: AdvisorObserver | undefined;
+  /** The Session's models: the proxy's provider and one per Model endpoint (SPI-1162), changed in place as they change. */
+  readonly #models: ReturnType<typeof proxyModels>;
+  /** The endpoints whose providers `#models` has. */
+  #endpointIds: ReadonlySet<string> = new Set();
+  /** Endpoints' keys, in memory only (ADR-0018: fetched at use time from the Environment). */
+  readonly #endpointKeys = new Map<string, { readonly apiKey: string | undefined; readonly at: number }>();
   /** Prompt suggestions' models (SPI-996): the proxy without the turns' usage-limit records; made at the first one. */
   #suggestionModels: ReturnType<typeof proxyModels> | undefined;
 
@@ -243,6 +254,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (mcp !== undefined) registry.install(this.#mcpExtension(mcp));
     this.#installHarness(ctx.storage.kv.get<ResolvedHarness>(HARNESS_KEY) ?? resolveHarness(EMPTY_HARNESS));
     this.#registry = registry;
+    this.#models = compactionLimits(proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current(), this.#proxyFetch), this.#limits);
+    this.#installEndpoints(ctx.storage.kv.get<ModelEndpoints>(ENDPOINTS_KEY) ?? EMPTY_ENDPOINTS);
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {
         try {
@@ -256,10 +269,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
           const harness = await Harness.open(
             storage,
             {
-              models: compactionLimits(
-                proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current(), this.#proxyFetch),
-                this.#limits,
-              ),
+              models: this.#models,
               registry: this.#registry,
               settings: { retry: { enabled: true, maxRetries: 3 } },
               env: (target) => this.#envAt(target.cwd),
@@ -547,6 +557,49 @@ export class SessionDO extends DurableObject<SessionEnv> {
   }
 
   // -------------------------------------------------------------------------------------------------------------------
+  // Model endpoints (SPI-1162)
+
+  /** One provider per endpoint in `#models`, in place: a removed endpoint's goes, so its models fail as unavailable. */
+  #installEndpoints(endpoints: ModelEndpoints): void {
+    const providers = endpointProviders(endpoints, { credential: (id) => this.#endpointKey(id), fetch: this.#proxyFetch });
+    const next = new Set(providers.map((provider) => provider.id));
+    for (const id of this.#endpointIds) if (!next.has(id)) this.#models.deleteProvider(id);
+    for (const provider of providers) this.#models.setProvider(provider);
+    this.#endpointIds = next;
+    this.#endpointKeys.clear();
+  }
+
+  /** An endpoint's key, from memory while fresh, else from the Environment. */
+  async #endpointKey(endpointId: string): Promise<string | undefined> {
+    const kept = this.#endpointKeys.get(endpointId);
+    if (kept !== undefined && Date.now() - kept.at < ENDPOINT_KEY_TTL_MS) return kept.apiKey;
+    const { apiKey } = await environmentStub(this.env.ENVIRONMENT).endpointCredential({ endpointId });
+    this.#endpointKeys.set(endpointId, { apiKey: apiKey ?? undefined, at: Date.now() });
+    return apiKey ?? undefined;
+  }
+
+  /**
+   * The Environment's Model endpoints at a turn's start: a new revision is kept (secret-free) and its providers installed,
+   * so a changed model list or a removed endpoint is in force from this turn. Bounded; on failure the Session keeps what
+   * it has. Never fails the turn.
+   */
+  async #takeEndpoints(): Promise<void> {
+    try {
+      const endpoints = await Promise.race([
+        environmentStub(this.env.ENVIRONMENT).modelEndpoints(),
+        new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), HARNESS_READ_MS)),
+      ]);
+      if (endpoints === undefined) return console.warn(JSON.stringify({ t3flare: "model-endpoints-timeout" }));
+      if ((this.ctx.storage.kv.get<ModelEndpoints>(ENDPOINTS_KEY) ?? EMPTY_ENDPOINTS).revision === endpoints.revision) return;
+      this.ctx.storage.kv.put(ENDPOINTS_KEY, endpoints);
+      this.#installEndpoints(endpoints);
+      console.log(JSON.stringify({ t3flare: "model-endpoints", revision: endpoints.revision, endpoints: endpoints.endpoints.length }));
+    } catch (error) {
+      console.warn(JSON.stringify({ t3flare: "model-endpoints-failed", error: String(error).slice(0, 300) }));
+    }
+  }
+
+  // -------------------------------------------------------------------------------------------------------------------
   // Storage helpers
 
   #meta(): Meta | undefined {
@@ -759,11 +812,12 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     await this.#takeT3Mcp(input.t3Mcp);
     await this.#takeHarness();
+    await this.#takeEndpoints();
     // SPI-1148: the turn's Environment skill set, in the Workspace before the agent runs (bounded; never fails the turn).
     await takeSkillsForTurn(input.environmentSkillsHash, this.#skillsTaker());
     await this.#takeMcp();
     // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
-    if (this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
+    if (input.model.provider === "anthropic" && this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
     const conversation = await this.#conversation(input.model, input.thinking);
     await conversation.configure({ model: input.model, thinkingLevel: input.thinking ?? null }, context);
     const startedAt = Date.now();
