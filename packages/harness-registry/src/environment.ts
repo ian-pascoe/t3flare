@@ -91,12 +91,14 @@ export const ENVIRONMENT_SETTINGS = {
     title: "Idle time (minutes)",
     description: "A Container stops after this long without a command. Applies at each Workspace's next Container start.",
     schema: { type: "integer", minimum: 1, maximum: 60, default: 2 },
+    tier: "free",
   },
   containerBudget: {
     title: "Container budget",
     description:
       "How many Containers may run at once across the Environment. Applies at the next start; lowering it stops no running Container, and new starts wait until fewer run.",
     schema: { type: "integer", minimum: 1, maximum: MAX_CONTAINER_BUDGET, default: DEFAULT_CONTAINER_BUDGET },
+    tier: "down-free",
   },
   variables: {
     title: "Variables",

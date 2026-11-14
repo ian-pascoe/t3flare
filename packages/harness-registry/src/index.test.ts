@@ -3,7 +3,7 @@
 // cloudpid ADR-0027's merge (keyed settings merged key by key, lists replaced whole) for the later per-Project overrides.
 import { describe, expect, it } from "vitest";
 
-import { applyChange, EMPTY_HARNESS, extensionOf, EXTENSIONS, resolveHarness } from "./index.ts";
+import { applyChange, EMPTY_HARNESS, extensionOf, EXTENSIONS, resolveHarness, withoutQuery } from "./index.ts";
 
 describe("resolveHarness", () => {
   it("gives the defaults for empty settings: code mode on, tool search on, the core preset offered", () => {
@@ -93,5 +93,13 @@ describe("applyChange", () => {
 
   it("refuses to turn an extension without a switch on or off", () => {
     expect(applyChange(EMPTY_HARNESS, { extension: "offered-tools", enabled: false })).toEqual({ ok: false, error: "offered-tools: cannot be turned off" });
+  });
+});
+
+describe("withoutQuery", () => {
+  it("drops a URL's query and fragment (a key an owner put there), and leaves other text alone", () => {
+    expect(withoutQuery("https://mcp.example/mcp?connection=conn_1&key=s3cr3t#frag")).toBe("https://mcp.example/mcp");
+    expect(withoutQuery("https://mcp.example/mcp")).toBe("https://mcp.example/mcp");
+    expect(withoutQuery("not a url ?key=x")).toBe("not a url ?key=x");
   });
 });

@@ -27,10 +27,17 @@ export type SettingValue = boolean | number | string;
 /** A value an Environment setting may hold: a Harness setting's, or a set of Variables (SPI-1152). */
 export type EnvironmentValue = SettingValue | Readonly<Record<string, string>>;
 
+/**
+ * A setting's Change tier rule (ADR-0034 §3, plan D5): `free` in either direction; `down-free` free when a boolean is
+ * set to false or an integer lowered, asked the other way. Absent: every change to it is asked.
+ */
+export type SettingTier = "free" | "down-free";
+
 export interface SettingEntry {
   readonly title: string;
   readonly description: string;
   readonly schema: FieldSchema;
+  readonly tier?: SettingTier;
 }
 
 /** An Environment setting: a `SettingEntry` whose schema may also be Variables. */
@@ -38,6 +45,7 @@ export interface EnvironmentSettingEntry {
   readonly title: string;
   readonly description: string;
   readonly schema: EnvironmentFieldSchema;
+  readonly tier?: SettingTier;
 }
 
 const utf8 = new TextEncoder();
