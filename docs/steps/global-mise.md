@@ -135,7 +135,7 @@ and the evidence. `variables.json` ran first. The `m0-*.json` files name the com
   GNU's kills its group, so a child that ignores TERM lives on. It holds neither the lock (its descriptor is closed for
   the install) nor the exec's output (the install writes to `install.log`); it ends with the Container.
 - **`hold.json`'s samples** list the kept outcome of the earlier Container until the new one's lay-down ends.
-- **Checks.** `pnpm run check` passes at `639870a` (34/34); the commit after it changes only this line.
+- **Checks.** `pnpm run check` passes at `867e885` (34/34); the commit after it changes only this line.
 
 ## Follow-ups
 
