@@ -68,6 +68,11 @@ export type ComputerExecutionEnvOptions = {
   readonly containerEnv?: Readonly<Record<string, string>>;
   /** t3flare: who keeps the ids of the commands run on the Container (step 2a part 2; `exec.ts`'s `ExecLedger`). */
   readonly ledger?: ExecLedger;
+  /**
+   * t3flare (SPI-1150): what the Container was doing while a command cut off before it started waited for it, from the
+   * Workspace DO (the Global mise config's install), for the command's message.
+   */
+  readonly startingNote?: () => Promise<string | undefined>;
 };
 
 /** A backend a command is sent to: its id in the Workspace, and how a command is made to run in bash on it. */
@@ -390,6 +395,7 @@ export class ComputerExecutionEnv implements ExecutionEnv {
         cwd: this.cwd,
         running: this.#running,
         ledger: this.#backend?.id === BACKENDS.container.id ? this.#options.ledger : undefined,
+        startingNote: this.#backend?.id === BACKENDS.container.id ? this.#options.startingNote : undefined,
         // The spill of a command that was aborted is still written, so it runs outside the caller's context.
         spill: async (output) => {
           const path = await this.createTempFile({ suffix: ".log" }, BACKGROUND_CONTEXT);

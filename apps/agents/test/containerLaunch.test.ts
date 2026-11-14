@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ResolvedEnvironment } from "@t3flare/harness-registry";
 
-import { launchOf, takeEnvironment } from "../src/workspace/containerLaunch.ts";
+import { launchOf, shownLaunch, takeEnvironment, withGlobalMise } from "../src/workspace/containerLaunch.ts";
 
 const CPU_1 = { vcpu: 1, memoryMib: 3072, diskMb: 12000 };
 const DEFAULTS: ResolvedEnvironment = { revision: 0, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {}, globalMiseConfig: "" };
@@ -83,5 +83,20 @@ describe("launchOf", () => {
     expect(launchOf({ settings: copy, source: "kept" }).budget).toBeUndefined();
     expect(launchOf({ settings: DEFAULTS, source: "default" }).budget).toBeUndefined();
     expect(launchOf({ settings: copy, source: "kept" }).instance).toBe("standard-2");
+  });
+});
+
+describe("the launch's Global mise config", () => {
+  const taken = { settings: { revision: 7, containerSize: "cpu-1" as const, containerIdleMinutes: 2, containerBudget: 3, globalMiseConfig: '[tools]\nnode = "24.11.1"\n' }, source: "kept" as const };
+
+  it("carries the start's text, its size and SHA-256, its revision and where the settings came from", async () => {
+    const launch = await withGlobalMise(launchOf(taken), taken);
+    expect(launch.globalMise).toEqual({ text: '[tools]\nnode = "24.11.1"\n', bytes: 25, sha256: "0eb09ceb981ac62b1ed4ebb30295ad081a471bb40b9ebda4eb48fcf45aae8cf3", revision: 7, source: "kept" });
+  });
+
+  it("is shown by its digest only, never its text", async () => {
+    const shown = shownLaunch(await withGlobalMise(launchOf(taken), taken));
+    expect(shown.globalMise).toEqual({ bytes: 25, sha256: "0eb09ceb981ac62b1ed4ebb30295ad081a471bb40b9ebda4eb48fcf45aae8cf3", revision: 7, source: "kept" });
+    expect(JSON.stringify(shown)).not.toContain("24.11.1");
   });
 });

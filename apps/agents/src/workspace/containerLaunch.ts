@@ -6,11 +6,14 @@
 import {
   type ContainerInstance,
   containerInstance,
+  digestOf,
   type ContainerSize,
   EMPTY_ENVIRONMENT,
   type ResolvedEnvironment,
   resolveEnvironment,
 } from "@t3flare/harness-registry";
+
+import type { GlobalMiseLaunch } from "./globalMise.ts";
 
 /** How long a Container start waits for the Environment's settings before it starts with the ones it kept. */
 export const ENVIRONMENT_READ_MS = 5_000;
@@ -78,7 +81,25 @@ export interface ContainerLaunch {
    * recorded before them has none.
    */
   readonly variables?: Readonly<Record<string, string>>;
+  /**
+   * The Global mise config this start lays down (SPI-1150), with its digest and where the settings came from. Absent in
+   * a launch recorded before SPI-1150; `containerState()` shows only its digest.
+   */
+  readonly globalMise?: GlobalMiseLaunch;
 }
+
+/** `launch` with the Global mise config of `taken` (its digest is async, so apart from `launchOf`). */
+export const withGlobalMise = async (launch: ContainerLaunch, { settings, source }: TakenEnvironment): Promise<ContainerLaunch> => ({
+  ...launch,
+  globalMise: { text: settings.globalMiseConfig, ...(await digestOf(settings.globalMiseConfig)), revision: settings.revision, source },
+});
+
+/** A launch as `containerState()` shows it: the Global mise config's digest, never its text. */
+export const shownLaunch = (launch: ContainerLaunch): Omit<ContainerLaunch, "globalMise"> & { readonly globalMise?: Omit<GlobalMiseLaunch, "text"> } => {
+  if (launch.globalMise === undefined) return launch;
+  const { text: _text, ...digest } = launch.globalMise;
+  return { ...launch, globalMise: digest };
+};
 
 /** The launch for the settings `taken` (`takeEnvironment`'s, already read against this Worker's schema). */
 export const launchOf = ({ settings, source }: TakenEnvironment): ContainerLaunch => ({

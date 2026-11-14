@@ -120,6 +120,11 @@ export type ExecHost = {
   /** Executions still running, so `cleanup()` can kill them. */
   readonly running: Set<string>;
   readonly ledger?: ExecLedger | undefined;
+  /**
+   * t3flare (SPI-1150): what the Container was doing while a command that was cut off before it started waited for it
+   * (the Global mise config's install), for its message; undefined when nothing to say.
+   */
+  readonly startingNote?: (() => Promise<string | undefined>) | undefined;
 };
 
 /** Run `command` on the host's backend, streaming its output to `options.onOutput`. */
@@ -159,9 +164,12 @@ export const exec = async (
   let callbackError: ExecutionError | undefined;
   const stop = Promise.withResolvers<void>();
 
+  /** Cut off while it still waited for the Container, before computer had dispatched it. */
+  let stoppedBeforeStart = false;
   const kill = (reason: ExecutionErrorCode) => {
     if (stopped !== undefined) return;
     stopped = reason;
+    stoppedBeforeStart = !started;
     stop.resolve();
   };
 
@@ -201,6 +209,14 @@ export const exec = async (
     );
 
     started = true;
+
+    // Cut off (timed out, aborted) while it waited for the Container (its start, the Global mise config's install):
+    // computer dispatched it anyway once its connect returned, after the kill loop below had given up. It is killed now,
+    // and handed to the ledger again so its processes are killed by their marker too.
+    if (stopped !== undefined) {
+      await workspace.runtime.killExec(id).catch(() => undefined);
+      host.ledger?.stopped(id);
+    }
 
     let exitCode: number | undefined;
 
@@ -288,9 +304,14 @@ export const exec = async (
 
     if (callbackError !== undefined) return err(callbackError);
 
+    const note = stoppedBeforeStart ? await host.startingNote?.().catch(() => undefined) : undefined;
     const error = new ExecutionError(
       stopped ?? "aborted",
-      stopped === "timeout" ? "Command timed out" : "aborted",
+      stopped !== "timeout"
+        ? "aborted"
+        : !stoppedBeforeStart
+          ? "Command timed out"
+          : `Command timed out before it started (the Container was ${note ?? "starting"})`,
     );
 
     const spillPath = await spill.write(host.spill);
