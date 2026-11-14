@@ -20,6 +20,9 @@ export interface AllowedRead {
 const equals = (args: ReadonlyArray<string>, expected: ReadonlyArray<string>) =>
   args.length === expected.length && args.every((arg, at) => arg === expected[at]);
 
+const COMMIT_GIT_PATHS = ["rev-parse", "--git-path", "index", "--git-path", "objects"];
+const COMMIT_ALTERNATES = ["count-objects", "-v"];
+
 export const FIRST_READ_ALLOWED: ReadonlyArray<AllowedRead> = [
   {
     name: "git-common-dir",
@@ -45,6 +48,18 @@ export const FIRST_READ_ALLOWED: ReadonlyArray<AllowedRead> = [
     name: "checkout-workers",
     caller: "GitVcsDriverCore.createWorktree (readConfigValue checkout.workers)",
     matches: (args) => equals(args, ["config", "--get", "checkout.workers"]),
+  },
+  // SPI-1186: t3's commit action (the git panel's Commit) drafts its commit with these two reads before its first
+  // write; a Workspace whose Container stopped before it was ever primed would otherwise refuse the commit.
+  {
+    name: "commit-git-paths",
+    caller: "GitVcsDriverCore.prepareCommitContext.gitPaths (the draft's index and objects)",
+    matches: (args) => equals(args, COMMIT_GIT_PATHS),
+  },
+  {
+    name: "commit-alternates",
+    caller: "GitVcsDriverCore.prepareCommitContext.alternates (the draft's alternates list)",
+    matches: (args) => equals(args, COMMIT_ALTERNATES),
   },
 ];
 
@@ -90,6 +105,8 @@ export const primeArgvs = (refs: ReadonlyArray<string>): ReadonlyArray<ReadonlyA
   ["rev-parse", "--git-common-dir"],
   ["remote"],
   ["config", "--get", "checkout.workers"],
+  COMMIT_GIT_PATHS,
+  COMMIT_ALTERNATES,
   ...refs.filter((ref) => ref.startsWith("refs/heads/")).slice(0, 100).map((ref) => ["for-each-ref", UPSTREAM_FORMAT, ref]),
   ...refs
     .filter((ref) => ref.startsWith("refs/remotes/") && !ref.endsWith("/HEAD"))

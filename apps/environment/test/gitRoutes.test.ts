@@ -240,6 +240,9 @@ describe("readScopeOf", () => {
     expect(readScopeOf(["--git-dir", "/w/a/.git", "for-each-ref", "--format=%(refname)", "refs/heads"])).toBe("git-dir");
     expect(readScopeOf(["rev-parse", "--show-toplevel"])).toBe("git-dir");
     expect(readScopeOf(["config", "--get", "remote.origin.url"])).toBe("git-dir");
+    // t3's commit draft: its paths and the object store's alternates (SPI-1186; primed with the Workspace DO's reads).
+    expect(readScopeOf(["rev-parse", "--git-path", "index", "--git-path", "objects"])).toBe("git-dir");
+    expect(readScopeOf(["count-objects", "-v"])).toBe("git-dir");
   });
 
   it("keys working-tree reads on the whole repo", () => {

@@ -1,0 +1,11 @@
+# primeScript (apps/agents/src/workspace/gitDirReads.ts) with SPI-1186's two reads, in ubuntu:26.04 (uutils coreutils), 2026-11-14T11:58:23Z
+# each primed answer (exit code, stdout base64) compared with the same git command run directly
+lrwxrwxrwx 1 root root 33 Mar 30  2026 /usr/bin/base64 -> ../lib/cargo/bin/coreutils/base64
+lrwxrwxrwx 1 root root 33 Mar 30  2026 /usr/bin/mktemp -> ../lib/cargo/bin/coreutils/mktemp
+ok 0 rev-parse --git-common-dir
+ok 1 remote
+ok 2 config --get checkout.workers
+ok 3 rev-parse --git-path index --git-path objects
+ok 4 count-objects -v
+ok 5 for-each-ref --format=%(refname)	%(upstream:remotename)	%(upstream:remoteref) refs/heads/main
+ok 6 rev-parse --verify --quiet refs/remotes/origin/main^{commit}

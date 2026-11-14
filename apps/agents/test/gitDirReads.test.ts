@@ -19,6 +19,9 @@ describe("the allow-list", () => {
     expect(allowedRead(["for-each-ref", UPSTREAM_FORMAT, "refs/heads/main"], REPO)?.name).toBe("base-upstream");
     expect(allowedRead(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/main^{commit}"], REPO)?.name).toBe("remote-commit");
     expect(allowedRead(["config", "--get", "checkout.workers"], REPO)?.name).toBe("checkout-workers");
+    // t3's commit draft (SPI-1186), before its first write.
+    expect(allowedRead(["rev-parse", "--git-path", "index", "--git-path", "objects"], REPO)?.name).toBe("commit-git-paths");
+    expect(allowedRead(["count-objects", "-v"], REPO)?.name).toBe("commit-alternates");
     // t3's status poll and branch list are not on it.
     for (const argv of [
       ["status", "--porcelain=2", "--branch", "-z"],
@@ -26,6 +29,9 @@ describe("the allow-list", () => {
       ["config", "--get", "remote.origin.url"],
       ["--git-dir", "/w/other/.git", "remote"],
       ["rev-parse", "--show-toplevel"],
+      // The review diff's index path, and count-objects in another shape.
+      ["rev-parse", "--git-path", "index"],
+      ["count-objects"],
     ]) {
       expect(allowedRead(argv, REPO), argv.join(" ")).toBeUndefined();
     }
@@ -73,7 +79,8 @@ describe("priming", () => {
       run(repo, ["branch", "--track", "feature", "origin/main"]);
       const refs = run(repo, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"]).stdout.split("\n").filter(Boolean);
       const argvs = primeArgvs(refs);
-      expect(argvs.length).toBeGreaterThanOrEqual(6);
+      expect(argvs.length).toBeGreaterThanOrEqual(8);
+      expect(argvs).toEqual(expect.arrayContaining([["rev-parse", "--git-path", "index", "--git-path", "objects"], ["count-objects", "-v"]]));
       const primed = spawnSync("bash", ["-c", primeScript(argvs)], { cwd: repo, encoding: "utf8", env });
       const answers = parsePrimed(primed.stdout);
       expect(answers).toHaveLength(argvs.length);

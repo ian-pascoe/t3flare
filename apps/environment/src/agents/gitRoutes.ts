@@ -103,6 +103,7 @@ const GIT_DIR_ONLY = new Set([
   "describe",
   "name-rev",
   "diff-tree",
+  "count-objects",
 ]);
 
 /**
