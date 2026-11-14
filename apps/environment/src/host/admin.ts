@@ -22,7 +22,7 @@
 //   POST /_t3flare/agents/session-restart?thread=<id>  a test's fault: the Session DO restarts (as an eviction does)
 //   POST /_t3flare/agents/proxy-fault?thread=<id> a test's fault (stages only; the Session refuses on prod): its model
 //                                               requests get {"fixture","resetAt"}'s answer until that reset
-//   GET  /_t3flare/agents/router-trace?clear=1   the process router's recent commands (git, gh, missing binaries)
+//   GET  /_t3flare/agents/router-trace?clear=1   the process router's recent commands (git, gh, missing binaries), and its live git bridges
 //   GET  /_t3flare/agents/workspaces            the Workspace registry, each with its Container's and terminals' state
 //   POST /_t3flare/agents/workspace-stop?id=<id>  stop a Workspace's Container now
 //   POST /_t3flare/agents/workspace-remove?id=<id> purge a Workspace (step 2b: its DO's files with it; forced)
@@ -272,11 +272,12 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         return json(await byName(environment.agents.SESSIONS, `thread:${thread}`, "SESSIONS").proxyFault(body));
       }
       case "GET /_t3flare/agents/router-trace": {
-        const { routerTrace, clearRouterTrace } = await import("../agents/processRouter.ts");
+        const { routerTrace, clearRouterTrace, gitBridge } = await import("../agents/processRouter.ts");
         const entries = routerTrace();
         const { workspacePathAccesses } = await import("../platform/stateStore.ts");
         if (url.searchParams.get("clear") === "1") clearRouterTrace();
-        return json({ entries, nodeFsWorkspacePaths: workspacePathAccesses() });
+        // SPI-1186: t3's temporary git material bridged into Workspaces, while its draft is in flight.
+        return json({ entries, nodeFsWorkspacePaths: workspacePathAccesses(), gitBridges: gitBridge.live() });
       }
       case "GET /_t3flare/agents/workspaces": {
         const { environmentServices } = await import("../agents/bindings.ts");

@@ -407,7 +407,12 @@ const gitGh = async () => {
     name: "t3's git status, a commit, and gh, under a node pin",
     gh: gh.stdout.trim().split("\n"),
     status: JSON.stringify(statusAnswer).slice(0, 300),
-    t3CommitAction: { control, underPin, note: "t3's commit action fails the same way with no Global mise config: t3's temporary object directory is on its own side (not this change)" },
+    t3CommitAction: {
+      control,
+      underPin,
+      // SPI-1186 bridged t3's commit draft (its temporary object directory and alternates); before it, both failed alike.
+      note: underPin.failure === null ? "t3's commit action commits, with and without a Global mise config (SPI-1186)" : "t3's commit action fails the same way with no Global mise config (SPI-1186)",
+    },
     workspaceGit: { add: add.result?.exitCode ?? null, commit: commit.result?.exitCode ?? null, head: head.stdout.trim().split("\n")[0] ?? "" },
     ok:
       gh.stdout.startsWith("gh version") &&
