@@ -99,7 +99,8 @@ export interface WrapOptions {
   readonly rewriteTurnText?: (text: string, cwd: string | null) => Effect.Effect<string>;
   /**
    * SPI-1153: has the thread's Workspace take the Environment skill set before the turn, bounded and never failing it,
-   * so the set the CLI reads through its link is current when the turn runs. The Environment's own take
+   * so the mount behind the CLI's link holds the current set when the turn runs (a running CLI process still lists
+   * what it read at its start). The Environment's own take
    * (`takeEnvironmentSkillsAt`) unless a test replaces it: every CLI driver gets it without asking.
    */
   readonly takeEnvironmentSkills?: (cwd: string | null) => Effect.Effect<void>;

@@ -23,7 +23,8 @@ const homeOf = (key: string) => `${CLI_HOMES}/${key}`;
 
 /**
  * SPI-1153: the Environment skill set in a CLI's user-level Skill root, linked to the Workspace's read-only mount, never
- * copied, so the CLI reads the set the Workspace holds now. The launcher makes the link in the process's fresh home;
+ * copied, so a CLI process lists the set the Workspace holds when it starts (all four CLIs list skills only at process
+ * start; a running Claude Code or OpenCode keeps serving what it cached). The launcher makes the link in the process's fresh home;
  * nothing writes through it (the mount is read-only from the Container's first command, SPI-1148's lock). Every
  * profile's (`cliProfiles.ts` imports it from here).
  */

@@ -104,9 +104,11 @@ Review round 1 redeployed the stage at `35b29d5` (the deployed code is `b03ad58`
 (SPI-1150): `35b29d5` is a pre-rebase sha, kept only by the evidence; its change is the rebased `9312aad`, and
 `b03ad58`'s is `745d604`, which also hold `main`'s SPI-1150 (the same change, not the same build). SPI-1150 adds a wait
 for the Global mise config before a spawn, in the Workspace; of this change's files it also edits `SessionDO.ts`,
-`GLOSSARY.md`, `upstream-fragility.md` and `stage.ts`, all merged without a conflict but `STAGES`, and none of the CLI
-paths the evidence exercises (the profiles, the spawner, the wrapper, `provider/skills.ts`, `@t3flare/skills`). The
-stage was not run again after the rebase. The first run's files (at `f0134ad`, rebased `e5511fc`) are replaced. The fixture: SPI-1151's `cli-skills` written into
+`GLOSSARY.md`, `upstream-fragility.md` and `stage.ts`, all merged without a conflict but `STAGES`. It edits none of this change's CLI files (the profiles, the spawner, the
+wrapper, `provider/skills.ts`, `@t3flare/skills`), but it does change paths every `pclienv` turn runs through: the
+spawn's `beforeStart` wait, the process env (`COMMAND_ENV`) and `WorkspaceDO.exec`. That combination has unit coverage
+only (`miseDirs.test.ts`, `cliSkillsTake.test.ts`, `globalMiseGate.test.ts`); the stage was not run again after the
+rebase. `pnpm run check` passes at the rebased head. The first run's files (at `f0134ad`, rebased `e5511fc`) are replaced. The fixture: SPI-1151's `cli-skills` written into
 a clone of the fixture project, and a `pair-<word>` Skill in each CLI Repo root (`.agents/skills` amber,
 `.codex/skills` birch, `.pi/skills` cedar, `.claude/skills` dune, `.opencode/skills` ember, `.opencode/skill` fjord;
 the Repo's says `REPO-<WORD>`); the Environment skills from `ian-pascoe/t3flare-fixture` branch `spi1153-env`
