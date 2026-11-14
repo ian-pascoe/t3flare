@@ -5,20 +5,26 @@
 // else `default` (which fails saying to pick one). It is written at each boot and again whenever the endpoints change.
 //
 // "No model set" is: t3's own default (Codex's model, even where the CLI agents register a `codex` instance), an
-// instance this Environment does not have, `default`, or the model this sync wrote
-// last (kept in the Environment DO's storage). A setting written by the earlier seed (the proxy's small model, with no
-// record kept) counts as unset too. Any other model is the owner's, and is never replaced.
+// instance this Environment does not have, `default`, or the model this sync wrote last (kept in the Environment DO's
+// storage, recorded only once the setting holds it). A setting written by the earlier seed (the proxy's small model, with
+// no record kept) counts as unset too. Any other model is the owner's, and is never replaced; an owner who picks exactly
+// one of those values is read as unset (upstream-fragility U67). One sync runs at a time, so two endpoint changes in a row
+// never read the setting before the other has written it.
 import { DEFAULT_SERVER_SETTINGS, defaultInstanceIdForDriver } from "@t3tools/contracts";
 import { SMALL_MODEL_SLUG } from "@t3flare/models";
 import { defaultTextModel, EMPTY_ENDPOINTS } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Semaphore from "effect/Semaphore";
 import * as ServerSettings from "t3/src/serverSettings.ts";
 import * as ProviderInstanceRegistry from "t3/src/provider/ProviderInstanceRegistry.ts";
 
 import { onEndpointsChanged } from "../endpoints/changes.ts";
 import { PI_DURABLE_DRIVER } from "../provider/capabilities.ts";
 import { environmentServices } from "./bindings.ts";
+
+/** One sync at a time, per isolate (the Environment DO is the only object in it). */
+const syncing = Semaphore.makeUnsafe(1);
 
 /** Points an unset text-generation setting at text generation's default model now. */
 export const syncTextGenerationDefault = Effect.gen(function* () {
@@ -35,11 +41,13 @@ export const syncTextGenerationDefault = Effect.gen(function* () {
     (current.instanceId === instanceId && (current.model === "default" || current.model === seeded || (seeded === undefined && current.model === SMALL_MODEL_SLUG)));
   if (!unset) return;
   const model = defaultTextModel(services.modelEndpoints?.() ?? EMPTY_ENDPOINTS) ?? (services.modelProxy === undefined ? "default" : SMALL_MODEL_SLUG);
+  if (current.instanceId !== instanceId || current.model !== model) {
+    yield* settings.updateSettings({ textGenerationModelSelection: { instanceId, model } });
+    yield* Effect.logInfo("t3flare: text generation's default model", { model, replaced: `${current.instanceId}/${current.model}` });
+  }
+  // Recorded only once the setting holds it: a failed write leaves the record naming what the setting still holds.
   services.seededTextModel.set(model);
-  if (current.instanceId === instanceId && current.model === model) return;
-  yield* settings.updateSettings({ textGenerationModelSelection: { instanceId, model } });
-  yield* Effect.logInfo("t3flare: text generation's default model", { model, replaced: `${current.instanceId}/${current.model}` });
-});
+}).pipe(syncing.withPermits(1));
 
 export const layerSeedTextGenerationModel = Layer.effectDiscard(
   Effect.gen(function* () {
