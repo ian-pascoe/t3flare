@@ -133,14 +133,11 @@ describe("GlobalMise", () => {
     expect(t.storage.get(GLOBAL_MISE_KEY)).toBeUndefined();
   });
 
-  it("never runs the lay-down for a connect that only passive reads made, and the alarm catches the Container up", async () => {
+  it("the alarm catches up a running Container no lay-down ran for (only passive reads reached it)", async () => {
     const t = setup([{ stdout: answer(true) }]);
-    expect(await t.mise.connected("r1", { passiveOnly: true })).toBeUndefined();
-    expect(t.calls).toHaveLength(0);
     expect(t.mise.catchUp("r1")).toBe(true);
     await vi.waitFor(() => expect(t.mise.state()).toMatchObject({ runtime: "r1", outcome: "laid" }));
     expect(t.mise.catchUp("r1")).toBe(false);
-    expect(await t.mise.connected("r1", { passiveOnly: false })).toMatchObject({ outcome: "laid" });
     expect(t.calls).toHaveLength(1);
   });
 

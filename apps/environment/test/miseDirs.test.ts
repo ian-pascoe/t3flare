@@ -1,7 +1,8 @@
-// mise's own directories on every command path (SPI-1150, review round 1): the lay-down installs the Global mise config's
-// tools once per Container, under COMMAND_ENV with the image's HOME, and every later command must find them there. A
-// CLI profile that moves XDG_* (OpenCode's own home) would otherwise send mise to another data directory, where a
-// command reinstalls the pins (or, with auto-install off, finds none) and an owner-pinned git has no credential helper.
+// mise's own directories on every command path (SPI-1150, ADR-0032's Global mise config refinement): the lay-down
+// installs the Global mise config's tools once per Container, under COMMAND_ENV with the image's HOME, and every later
+// command must find them there. A CLI profile that moves XDG_* (OpenCode's own home) would otherwise send mise to
+// another data directory, where a command reinstalls the pins (or, with auto-install off, finds none) and an
+// owner-pinned git has no credential helper.
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { describe, expect, it } from "vitest";
 

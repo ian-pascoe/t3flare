@@ -107,17 +107,8 @@ export class GlobalMise {
   }
 
   /**
-   * A connect to Container `runtime`: its lay-down runs (or is joined) before the connection is used, unless only passive
-   * reads made the connect (t3's status polls, the reclaim's and idle stop's usage), which never run it.
-   */
-  async connected(runtime: string | undefined, options: { readonly passiveOnly: boolean }): Promise<GlobalMiseState | undefined> {
-    if (options.passiveOnly) return undefined;
-    return this.ensure(runtime);
-  }
-
-  /**
    * The alarm's catch-up (not awaited): the running Container's lay-down when none ran for it (only passive reads
-   * connected to it), or when its exec failed with attempts left. Answers whether it started one.
+   * reached it), or when its exec failed with attempts left. Answers whether it started one.
    */
   catchUp(runtime: string | undefined): boolean {
     if (runtime === undefined || this.#running.has(runtime)) return false;

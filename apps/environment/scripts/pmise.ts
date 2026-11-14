@@ -578,7 +578,7 @@ const empty = async () => {
   });
 };
 
-/** C1: a Durable agent's command cut off while the Container installs never runs afterwards. */
+/** A Durable agent's command cut off while the Container installs never runs afterwards. */
 const late = async () => {
   cookie ||= await pair();
   const { projectId } = await ensureProject(cookie, WORKSPACE);

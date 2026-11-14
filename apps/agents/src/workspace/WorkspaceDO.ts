@@ -51,6 +51,7 @@ import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, shownLaunch, takeEnvironment, withGlobalMise } from "./containerLaunch.ts";
 import { GlobalMise, type GlobalMiseState } from "./globalMise.ts";
 import { StoppedExecs, StoppedExecsBackend } from "./stoppedExecs.ts";
+import { GlobalMiseBackend, PASSIVE_MARKER, readyForSpawn } from "./globalMiseGate.ts";
 import { commandEnv, VariablesBackend } from "./variables.ts";
 import { reclaimFor } from "./reclaim.ts";
 import { killInRunningContainer } from "./containerKill.ts";
@@ -272,9 +273,6 @@ export class WorkspaceDO extends ContainerHost {
   readonly #stoppedExecs = new StoppedExecs(() => Date.now());
   /** The Global mise config's lay-down, once per Container (SPI-1150, ADR-0032's Global mise config refinement). */
   readonly #globalMise: GlobalMise;
-  /** Commands in flight by kind: a connect for passive reads alone never retries a failed lay-down. */
-  #passiveExecs = 0;
-  #activeExecs = 0;
   /** The runtime id of the Container computer last connected to (its lay-down's key). */
   #runtime: string | undefined;
   /** Whether bubblewrap works in the running Container (review F5): probed once per Container start. */
@@ -333,11 +331,9 @@ export class WorkspaceDO extends ContainerHost {
         if (this.ctx.container?.running === true) await this.ctx.container.destroy();
       },
       log: (event) => console.log(JSON.stringify({ ...event, workspace: this.#workspaceId() ?? null })),
-      // Every connect: the Container's lay-down before computer sends it a command (SPI-1150).
+      // Every connect: the Container's runtime id, its lay-down's key (`GlobalMiseBackend` runs it before a command).
       connected: async (handle) => {
         this.#runtime = handle.runtimeId;
-        // A connect only passive reads made never runs the lay-down (the alarm catches such a Container up).
-        await this.#globalMise.connected(handle.runtimeId, { passiveOnly: this.#activeExecs === 0 && this.#passiveExecs > 0 });
       },
     });
     this.#globalMise = new GlobalMise({
@@ -385,7 +381,7 @@ export class WorkspaceDO extends ContainerHost {
       // hash replaces the copy (`takeEnvironmentSkills`).
       mounts: { [SKILLS_MOUNT]: skillSetMount(skillSet) },
       // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
-      backends: [this.#withVariables(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx })), this.#withVariables(new StoppedExecsBackend(this.#container, this.#stoppedExecs))],
+      backends: [this.#withVariables(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx })), this.#withVariables(new GlobalMiseBackend(new StoppedExecsBackend(this.#container, this.#stoppedExecs), (runtime) => this.#globalMise.ensure(runtime)))],
     });
     // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
     this.#host = new WorkspaceEnvHost(this.#workspace, {
@@ -924,11 +920,6 @@ export class WorkspaceDO extends ContainerHost {
     const started = Date.now();
     const backend = input.backend === "worker-shell" ? WORKER_SHELL_BACKEND : CONTAINER_BACKEND;
     if (backend === CONTAINER_BACKEND && input.passive !== true) await this.#restartForSubmodules().catch(() => undefined);
-    // A passive exec (t3's reads, the reclaim's and the idle stop's usage) never runs or retries the lay-down.
-    if (backend === CONTAINER_BACKEND && input.passive !== true) await this.#ensureGlobalMise();
-    const passive = backend === CONTAINER_BACKEND && input.passive === true;
-    if (passive) this.#passiveExecs++;
-    else this.#activeExecs++;
     this.#running++;
     try {
       await this.#ready();
@@ -944,7 +935,8 @@ export class WorkspaceDO extends ContainerHost {
         backend,
         cwd: input.cwd ?? WORKSPACE_ROOT,
         encoding: "utf8",
-        env: backend === CONTAINER_BACKEND ? { ...COMMAND_ENV, ...input.env } : { ...input.env },
+        // A passive read is marked so the Container's backend sends it without waiting for the lay-down (ADR-0032's Global mise config refinement).
+        env: backend === CONTAINER_BACKEND ? { ...COMMAND_ENV, ...input.env, ...(input.passive === true ? { [PASSIVE_MARKER]: "1" } : {}) } : { ...input.env },
         ...(input.stdin === undefined ? {} : { stdin: input.stdin }),
         timeoutMs: input.timeoutMs ?? 120_000,
       });
@@ -959,8 +951,6 @@ export class WorkspaceDO extends ContainerHost {
       };
     } finally {
       this.#running--;
-      if (passive) this.#passiveExecs--;
-      else this.#activeExecs--;
       if (backend === CONTAINER_BACKEND && input.passive !== true) {
         this.#lastCommandAt = Date.now();
         await this.#noteUse();
@@ -1813,13 +1803,17 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /**
-   * The running Container's lay-down, before a Terminal's or a CLI process's spawn and a command's run: joined while it
-   * runs, a no-op once done, and run again after an exec failure (the retry of ADR-0032's Global mise config refinement). A Container being started gets
-   * its own at its connect.
+   * Before a Terminal's or a CLI process's spawn: the running Container's lay-down has ended (`readyForSpawn`), joined
+   * while it runs and run again after an exec failure. A Container this instance has not connected to is reached by an
+   * active `true`, which waits for it as every active command does (`GlobalMiseBackend`).
    */
   async #ensureGlobalMise(): Promise<void> {
-    if (!this.containerRunning() || this.#runtime === undefined) return;
-    await this.#globalMise.ensure(this.#runtime).catch(() => undefined);
+    await readyForSpawn({
+      running: () => this.containerRunning(),
+      runtime: () => this.#runtime,
+      start: () => this.exec({ script: "true", timeoutMs: 180_000 }),
+      ensure: (runtime) => this.#globalMise.ensure(runtime),
+    });
   }
 
   /** What a command cut off before it started waited for (computer-env's message): the Global mise config's install. */

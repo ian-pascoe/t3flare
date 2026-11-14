@@ -1,4 +1,4 @@
-// A command the Session stopped before it started is never sent (SPI-1150, C1 of the plan's re-review): computer
+// A command the Session stopped before it started is never sent (SPI-1150, ADR-0032's Global mise config refinement): computer
 // dispatches it once the Container's connect (and the Global mise config's install) returns; the backend refuses it.
 import type { BackendHandle, WorkspaceBackend } from "@cloudflare/computer";
 import { describe, expect, it } from "vitest";
