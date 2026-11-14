@@ -1804,8 +1804,8 @@ export class WorkspaceDO extends ContainerHost {
 
   /**
    * Before a Terminal's or a CLI process's spawn: the running Container's lay-down has ended (`readyForSpawn`), joined
-   * while it runs and run again after an exec failure. No command and no connect: the runtime is the last connect's, or
-   * computer's stored one on a fresh instance.
+   * while it runs and run again after an exec failure. No command and no connect: the runtime is computer's stored one
+   * (`spawnRuntime`), falling back to the last connect's when the key is cleared.
    */
   async #ensureGlobalMise(): Promise<void> {
     await readyForSpawn({
