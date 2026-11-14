@@ -1,8 +1,8 @@
 # SPI-1150: Global mise config in Environment settings — plan
 
-Status: revised after review (2026-11-14): the review of `eb82395` approved it with changes; this revision folds in
-its four blocking items, its decisions on D1–D6 and its advisories (see **Review changelog**), for a short re-review
-before Build. M0 done 2026-11-13. Ticket: SPI-1150, a sibling under SPI-1001's triage; its decisions are
+Status: building (2026-11-14). The review of `eb82395` approved it with changes (folded in, **Review changelog**);
+the re-review of `8a9f1d4` approved it with changes C1–C6 (folded in during Build, **Re-review changelog**, which wins
+over any section below it). M0 done 2026-11-13. Ticket: SPI-1150, a sibling under SPI-1001's triage; its decisions are
 settled and not reopened here. Base: `main` at `660f922` (SPI-1149). Branch `spi-1150-global-mise`. Stage `pmise`.
 Report (after Build): `docs/steps/global-mise.md`. Background: [`spi-1001-research-mise.md`](spi-1001-research-mise.md).
 
@@ -23,6 +23,18 @@ Where a section below disagrees with this table, the section is the revised one;
 | D5 | Accepted. The text area has no `maxlength` (it counts UTF-16 units); the server's byte check is the limit. |
 | D6 | Accepted. |
 | Advisories folded in | `flock` around the script, a unique staging name, `mv` checked; the answer keyed by revision and SHA-256 (and the disk-outlives-a-start assumption noted in the ADR); `containerState()` returns the text's size and hash, not the text; the panel says the file is readable by agents and not for secrets; `source` in the log line and the answer; a first `bash` that times out during the install names it; a bash test of the real script with stub mise, git and gh, the text on stdin; a full 16 KiB text on the stage; CRLF normalised to LF and a newline after `<textarea>`; an owner-pinned `conda:git` gets the system gitconfig's credential helper, with a credentialed fetch under such a pin in `git-gh.json`; a note beside `ARG MISE_VERSION`; an unguarded row with a repo's file turning `use_git_credentials` on; `mitmproxy/mitmproxy` pinned by digest; SPI-1152's overlap (§8); the install-cache follow-up carried in the report, filing pending with the orchestrator. |
+
+## Re-review changelog (re-review of `8a9f1d4`, folded in during Build)
+
+| Item | Change |
+| -- | -- |
+| C1: a first command cut short during the install still runs afterwards | computer-env's `exec` covers only the wait in `connect`; once `stopped` is set before the command has started, it now kills the command as soon as `runtime.exec` returns and calls `ledger.stopped(id)` again, so the Session's kill loop finds it. The "while the Container installed the Global mise config" message is built with it. `exec.test.ts` case and a stage case (`late.json`). |
+| C2: the retry depended on who calls next | `alarm()` starts the retry of a runtime recorded as failed (not awaited, at most 3 attempts per runtime). Exec-failed and deadline-killed runs are sent to `noteGlobalMise` too. |
+| C3: passive execs | A `passive: true` exec (`#usage`, from the reclaim and the idle stop) never calls `ensure`. |
+| C4: bounds | The script's constants are exported (`GLOBAL_MISE_BOUNDS`: lock 60 s, install 600 + 10 s, each check 20 + 5 s) and the DO's deadline is derived from them plus a 60 s margin (780 s). `timeout -k` exits 124 on TERM and 137 on KILL; both are `timedOut`. |
+| C5: build order | Stage `pmise` is deployed and `variables.json` run right after step 4's `COMMAND_ENV` change, before the tests and docker rows that assert `COMMAND_ENV`. |
+| C6: `hold.json` | The install is started from a Durable agent's `bash` (not `WorkspaceDO.exec`, which holds by itself); the reclaim is tried more than 30 s after the start and its reason, "in use", recorded. |
+| Advisories | The per-runtime outcome is kept in kv (`t3flare:global-mise`), so a new DO instance does not rerun a deadline-killed run. A handle without a `runtimeId`, or a launch from before this change without `globalMise`, runs the idempotent script with no text (nothing laid; the answer says so). `noteGlobalMise` goes through `ctx.waitUntil`, and the Environment DO validates its shape and size; Status keeps only the last lay-down across all Workspaces. If a CLI drops one of the two `false` guards and has no way to set it back, Build stops and escalates. Limit: a git that mise installs lazily after the lay-down gets no system gitconfig. SPI-1152's launch Variables reach the lay-down (they are refused under `MISE_`, `GIT_`, `GH_`, `GITHUB_` and the proxy's names, so none re-enables a token source). The answer is parsed from the last line of stdout (`BASH_ENV`'s EXIT trap prints on stderr). |
 
 ## M0: what the image's own mise does
 
@@ -185,7 +197,7 @@ file lasts until its Container stops. `containerState()` returns the launch with
 No Node imports, so the agents Worker imports it. Run through the platform's exec (`ctx.container.exec`, as the leak
 scan runs) as `bash -c <script> -- <revision> <sha256>`, under `COMMAND_ENV`, **the text on stdin**:
 
-1. `exec 9>/var/lib/t3flare/mise/.lock; flock -w 660 9`: one lay-down at a time per Container, so two Workspace DO
+1. `exec 9>/var/lib/t3flare/mise/.lock; flock -w 60 9`: one lay-down at a time per Container, so two Workspace DO
    instances across a deploy never overlap.
 2. If `answer.json` exists and names this revision and SHA-256, print it and stop (the same text was already laid
    down on this disk).
@@ -230,8 +242,8 @@ scan runs) as `bash -c <script> -- <revision> <sha256>`, under `COMMAND_ENV`, **
 - **Hold.** A run raises `#running` (through a `hold()` callback that returns its release) for its whole length, so
   `alarm()` does not idle-stop the Container and `#notReclaimable` answers "in use" to another Workspace's reclaim.
   When it ends, it notes use and reschedules the alarm, so the idle time counts from the end of the install.
-- **Deadline.** The DO waits at most 11 minutes for the exec (the script's own bounds: 660 s for the lock, 600 + 10 s
-  for the install, 2 × 25 s for the checks, all inside it). Past it the DO kills the exec, logs, and treats the run as
+- **Deadline.** The DO waits at most the script's own bounds plus a 60 s margin: 60 s for the lock, 600 + 10 s for the
+  install, 2 × 25 s for the checks, 780 s in all (C4). Past it the DO kills the exec, logs, and treats the run as
   not laid; it is final for that runtime.
 - **A first command that times out during the install** (a Durable agent's `bash` with a short timeout, which waits in
   `connect`) names it: computer-env's timeout message (`exec.ts`, "Command timed out") gains "while the Container
@@ -327,7 +339,8 @@ Then the stage is destroyed.
 1. Rebase onto SPI-1152 if it has landed (§8).
 2. The setting: the `file` field type, CRLF, the entry, its tests (`environment.test.ts`).
 3. The panel: the renderer, the audit's `{ bytes, sha256 }`, the Status line and `noteGlobalMise`, their tests.
-4. The script and its bash test; `COMMAND_ENV`; the Dockerfile note.
+4. The script and its bash test; `COMMAND_ENV`; the Dockerfile note. Then deploy `pmise` and run `variables.json`
+   (C5); settle D4 and the `credential_command` guard before anything asserts `COMMAND_ENV`.
 5. `GlobalMise` (key, hold, deadline, retry) and its tests; the launch's `globalMise`; `containerState()`.
 6. Wiring: `ContainerOnlyBackend.connect`, `WorkspaceDO.exec`, `beforeSpawn`, `beforeStart`; the timeout's naming.
 7. `mise.docker.test.ts` on the real script and variables, mitmproxy by digest, the extra row; re-run, its files
