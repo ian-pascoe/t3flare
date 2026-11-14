@@ -152,6 +152,11 @@ printf 'github.com:\\n    oauth_token: ghp_pmisehostsyml000000000000000000000000
 echo "home=$HOME"
 for n in ${NAMES.join(" ")}; do if [ -n "\${!n+x}" ]; then echo "env $n=[\${!n}]"; else echo "env $n unset"; fi; done
 for s in ${SETTINGS.join(" ")}; do echo "setting $s=[$(mise settings get $s 2>&1 | tr '\\n' ' ' | sed 's/ $//')]"; done
+mise doctor 2>/dev/null | sed -n '/^dirs:/,/^$/p' | sed -n -E 's/^  ([a-z_]+): (.*)$/dir \\1=[\\2]/p'
+for n in XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_CONFIG_HOME; do echo "xdg $n=[\${!n:-}]"; done
+echo "pinned-node [$(MISE_AUTO_INSTALL=false MISE_EXEC_AUTO_INSTALL=false MISE_NOT_FOUND_AUTO_INSTALL=false node --version 2>&1 | head -1)]"
+echo "where-node [$(MISE_AUTO_INSTALL=false mise where node 2>&1 | head -1)]"
+echo "other-data [$(ls -d "\${XDG_DATA_HOME:-/nonexistent}/mise/installs" 2>/dev/null || echo none)]"
 echo "token [$(mise token github 2>&1 | tr '\\n' ' ' | sed -E 's/(gh[a-z]_[A-Za-z0-9]{4})[A-Za-z0-9]+/\\1…/g; s/ $//')]"
 } > ${VARS_DIR}/vars-$who.txt 2>&1
 echo pmise-vars-done-$who
@@ -162,6 +167,9 @@ const parseVars = (text: string) => {
   const settings: Record<string, string> = {};
   let token: string | null = null;
   let home: string | null = null;
+  const dirs: Record<string, string> = {};
+  const xdg: Record<string, string> = {};
+  const probe: Record<string, string> = {};
   for (const line of text.split("\n")) {
     let match = /^env (\w+)=\[(.*)\]$/.exec(line);
     if (match !== null) env[match[1]!] = match[2]!;
@@ -171,10 +179,16 @@ const parseVars = (text: string) => {
     if (match !== null) settings[match[1]!] = match[2]!;
     match = /^token \[(.*)\]$/.exec(line);
     if (match !== null) token = match[1]!;
+    match = /^dir (\w+)=\[(.*)\]$/.exec(line);
+    if (match !== null) dirs[match[1]!] = match[2]!;
+    match = /^xdg (\w+)=\[(.*)\]$/.exec(line);
+    if (match !== null) xdg[match[1]!] = match[2]!;
+    match = /^(pinned-node|where-node|other-data) \[(.*)\]$/.exec(line);
+    if (match !== null) probe[match[1]!] = match[2]!;
     match = /^home=(.*)$/.exec(line);
     if (match !== null) home = match[1]!;
   }
-  return { home, env, settings, token };
+  return { home, env, settings, token, miseDirs: dirs, xdg, pinned: probe };
 };
 
 /** What the guards must look like from a command, by name: the two `false` ones (the ticket's) and the empty three. */
@@ -190,6 +204,8 @@ const variables = async () => {
   cookie ||= await pair();
   const { projectId, root } = await ensureProject(cookie, WORKSPACE);
   await enableAll();
+  // A pin the image lacks: each path must see the lay-down's install with mise's auto-install off.
+  await setEnvironment({ globalMiseConfig: NODE_PIN });
   const written = await execOn(WORKSPACE, `mkdir -p ${VARS_DIR} && cat > ${VARS_DIR}/vars.sh <<'PMISE_EOF'\n${VARS_SCRIPT}PMISE_EOF\necho ok`);
   if (!written.stdout.includes("ok")) throw new Error(`could not write the check: ${JSON.stringify(written)}`);
   const paths: Array<{ who: string; how: string; detail: unknown }> = [];
@@ -249,12 +265,12 @@ const variables = async () => {
     const arrived = Object.fromEntries(Object.entries(EXPECTED_ENV).map(([name, value]) => [name, parsed.env[name] === value]));
     const falseGuards = arrived.MISE_GITHUB_GH_CLI_TOKENS === true && arrived.MISE_GITHUB_USE_GIT_CREDENTIALS === true;
     const emptyGuards = arrived.MISE_GITHUB_CREDENTIAL_COMMAND === true && arrived.MISE_DISABLE_TOOLS === true && arrived.MISE_DISABLE_BACKENDS === true;
-    return { ...entry, ranAt: new Date().toISOString(), ran: true, ...parsed, arrived, falseGuards, emptyGuards, noToken: parsed.token !== null && parsed.token.includes("(none)"), ok: falseGuards && emptyGuards && parsed.token?.includes("(none)") === true };
+    return { ...entry, ranAt: new Date().toISOString(), ran: true, ...parsed, arrived, falseGuards, emptyGuards, noToken: parsed.token !== null && parsed.token.includes("(none)"), sharesInstall: parsed.pinned["pinned-node"] === "v24.11.1" && parsed.miseDirs.data === "~/.local/share/mise" && parsed.pinned["other-data"] === "none", ok: falseGuards && emptyGuards && parsed.token?.includes("(none)") === true && parsed.pinned["pinned-node"] === "v24.11.1" && parsed.miseDirs.data === "~/.local/share/mise" && parsed.pinned["other-data"] === "none" };
   });
   const earlier: Array<any> = only.length === 0 || !fs.existsSync(path.join(OUT, "variables.json")) ? [] : JSON.parse(fs.readFileSync(path.join(OUT, "variables.json"), "utf8")).results ?? [];
   const merged = [...earlier.filter((entry) => !only.includes(entry.who)), ...results];
   await writeEvidence("variables.json", {
-    note: "Each path ran `vars.sh` with a gh hosts.yml in its own home: the variables as its command has them (null: unset), mise's resolved settings, and the token mise would send.",
+    note: "Each path ran `vars.sh` with a gh hosts.yml in its own home and the Global mise config `node = \"24.11.1\"` (the image has 26.13.0): the variables as its command has them (null: unset), mise's resolved settings and effective directories (`mise doctor`; ~ is /root), its XDG_* values, the pinned node with mise's auto-install off, any install under its own XDG_DATA_HOME, and the token mise would send.",
     results: merged,
     ok: merged.every((entry) => entry.ok),
   });
