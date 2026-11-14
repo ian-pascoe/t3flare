@@ -8,6 +8,9 @@ ADR-0033 (new).
 Revision 2, after the plan review of 1fdd389 (approved with changes). The changes are marked **(r2)**. The review's
 escalation decisions are recorded in §10.
 
+Revision 3, folded in during the build after the re-review of d939265 (approved with changes, no further plan review).
+The changes are marked **(r3)**, with the review's item (C1 to C3, A1 to A9).
+
 ## 0. Goal
 
 The owner installs Skills from GitHub on the Harness panel. Each is pinned to a commit, kept whole in the Environment DO,
@@ -172,7 +175,7 @@ enabling one never fails (E3).
 | The set | 8 MiB and 100 Environment skills |
 | A description | 1,024 characters |
 | A name | 64 characters |
-| **(r2)** A file's path under the mount (`<name>/<path>`) | 512 UTF-8 bytes, and §3.1's path rule |
+| **(r2)** A file's path under the mount (`<name>/<path>`) | 512 UTF-8 bytes, each segment at most 255 **(r3, A6)**, and §3.1's path rule |
 | `SKILL.md` candidates in one listing | 200 |
 
 ## 3. Fetch (M1)
@@ -241,16 +244,25 @@ request:
   other file. A candidate's file count and bytes come from the tree's sizes.
 - **Install and update** check each chosen skill's file count, its bytes, the paths and the set's limits from the tree's
   entries **before reading any blob**. Then they read the blobs.
-- **The blob cap.** At most 1,000 blob reads per request: twice the largest skill (500 files), and a tenth of the 10,000
-  subrequests a paid Worker invocation may make (Cloudflare's limits page, read 2026-11-13). The mint, the commit and
-  the tree are a few more. The cap bounds the request's wall time and GitHub's secondary limits, not only the platform
-  limit. A selection that needs more is refused before any read: "These skills hold N files; install at most 1,000
-  files at a time."
+- **(r3, C3) The blob cap.** At most 500 blob reads per request, the largest single skill. GitHub's secondary limit is
+  900 points a minute per REST endpoint (a GET is 1 point), so 500 reads plus the commit and the tree stay under it in
+  any minute; 1,000 would not. The 10,000 subrequests a paid Worker invocation may make are far above either. A
+  selection that needs more is refused before any read: "These skills hold N files; install at most 500 files at a
+  time."
+- **(r3, C3) Secondary limits.** A 403 or 429 from GitHub with `retry-after` (or a secondary-limit message) is a plain
+  refusal that names the wait ("GitHub asked t3flare to slow down: try again in N seconds") and stores nothing.
 - **Check for updates** groups the kept skills by `(repo, ref)`: one commit and one tree per group, and no blobs. At most
   40 groups per request; past that, it checks the first 40 and says so.
 - **Bounds.** Six blob reads at a time. Each GitHub request is bounded at 15 s and the whole request at 60 s. A request
   that runs out answers what it finished and stores nothing.
 - **CPU and memory.** Hashing and checking 8 MiB is the most one request does. Content is held only until the commit.
+
+**(r3, A9) The unauthenticated pre-check** reads `/rate_limit` before the commit, and again after the tree is read,
+before the blobs. The panel's note that reads are unauthenticated comes from the Workspace registry (no installed
+repo), never from minting a token at render.
+
+**(r3, A8) Preview** runs the content checks (UTF-8, credential patterns) only on `SKILL.md`. It says so: "Other files are
+checked when the skill is installed."
 
 ### 3.4 Updates (r2)
 
@@ -296,11 +308,27 @@ request:
   - It never fails the turn. A timeout or failure is logged, and the turn runs with the set the Workspace holds.
 - **(r2) A running Container.** When the Container is running as the set changes, `takeEnvironmentSkills` waits for
   the Container's copy before it returns:
-  - It runs one passive command that checks, with `sha256sum -c`, every path whose content changed and every removed
-    path's absence, retrying every 200 ms for up to 5 s.
+  - **(r3, C2)** It checks every path the new set adds or changes (by sha256) and every path it removes (absent). The
+    list goes to `sha256sum -c` on the command's **stdin** (`ExecInput.stdin`), never in the script text, since Linux
+    caps one argv string at 128 KiB. Removed paths go on stdin too.
+  - **(r3, C1)** The command shape is probed on the stage before it is built on: one passive command that loops every
+    200 ms for up to 5 s, for a size-changing edit and a same-size edit. If one command does not converge (its own
+    reads keeping the stale view), the wait is instead up to N separate passive commands, 500 ms apart, within the same
+    5 s. The build uses whichever the probe shows converging (`env-update.json` records it).
   - It answers whether the Container caught up. A copy still stale at 5 s is logged with its paths.
-  - A stopped Container is not started: the next start gets the Workspace's files (`env-sync.json`, the fresh rows).
-- **Steers.** A steer carries no hash. It joins a running turn, and the set changes only at a turn's start.
+  - **(r3, C2)** The wait runs **after** `blockConcurrencyWhile` returns: inside it, the exec's own RPCs to this object
+    would wait for it, and hang.
+  - **(r3, C2)** A stopped Container is not started. `containerRunning()` is checked and the exec is called in the same
+    tick, with nothing awaited between them: computer's connect goes through `#budgeted.start`, which starts a stopped
+    Container, and after an eviction of this object it renews the lease and resets the idle clock. The next start gets
+    the Workspace's files (`env-sync.json`, the fresh rows).
+- **(r3, A2) A refused set is not retried every turn.** The Workspace remembers the last hash it refused and answers that
+  refusal again, without reading the set, until the Environment's hash differs.
+- **(r3, A1) For SPI-1153.** Only the Pi Durable adapter carries the hash. A CLI agent's thread takes no set at its
+  turn: SPI-1153's CLI adapter must carry the hash too, or the Container start must take the set.
+- **Steers.** A steer carries no hash. It joins a running turn, and the set changes only at a turn's start. **(r3, A4)**
+  That is any thread's turn start in that Workspace: threads share a Workspace, so one thread's turn can change the set
+  under another's running turn.
 
 ### 4.3 The Container's copy: read-only from the first command (r2)
 
@@ -328,8 +356,12 @@ Terminal and CLI spawns call `container.exec` directly. They run only after one 
 A hook after `api.start` in the lease wrapper does not work: computerd's FUSE mount is not up when `start` returns.
 
 **Failure.** It is best effort, as in cloudpid. A failure (no `mount` permission, as under a local `alchemy dev`)
-leaves the command running, and the Workspace logs it once per launch. The Workspace's own copy stays authoritative
-either way.
+leaves the command running. The Workspace's own copy stays authoritative either way.
+
+**(r3, A5) Logging a failure once per launch.** The snippet prints nothing. On failure it writes the reason to a marker
+file in the Container, `/tmp/t3flare-skills-lock.failed`. The take's passive command (§4.2) reads the marker when it is
+there, and the Workspace logs it once per launch (`{"t3flare":"skills-lock-failed"}`, keyed by the launch's start
+time). A command's own output and exit status are untouched.
 
 **What the bind is.** It guards against accident; it is **not a security boundary**. The agent runs as root in the
 Container and could remount the directory read-write. Even then, its writes never reach the Workspace (computer skips
@@ -385,6 +417,9 @@ snapshot and no expansion. The mount is still delivered as inert files.
 - A Workspace that refuses or cannot mount a set reports it to the Environment DO: a new RPC,
   `skillSetRefused({ workspace, hash, message })`, best effort.
 - The Environment keeps the last one per Workspace (at most 50) and drops it when that Workspace takes a set.
+- **(r3, A3)** The Environment learns of a take from `environmentSkillSet({ workspace })`: the Workspace names itself when
+  it asks. A refusal reported after that read replaces it; a read with no later refusal is the take, and the refusal is
+  dropped then.
 - Status shows the latest refusal and its Workspace.
 - **Version skew is tested both ways:**
   - an Environment without `skillSetRefused` or `environmentSkillSet` gives a logged failure, never a failed turn;
@@ -425,7 +460,8 @@ View shows `SKILL.md` as text in a `<pre>`; the script never writes it as HTML.
 the page script: the description, the file paths, the ref, the echoed source, and refusal text.
 
 Status shows the count, the enabled count, the set's short hash and the latest Workspace refusal (§4.5), in place of
-"Environment skills deferred". The CSP stays hash-only.
+"Environment skills deferred". **(r3, A7)** The Environment section's revision line, which says the Environment revision
+is applied at each Container's next start, says too that Environment skills apply at a thread's next turn. The CSP stays hash-only.
 
 ### Audit
 
@@ -457,7 +493,7 @@ CLI agents are SPI-1153's, built on `/workspace/.agents/skills`.
 
 | M | Builds | Unit tests (each file run alone as it lands) |
 | -- | -- | -- |
-| M1 | §3 | cloudpid's ported tests; each check row and limit; the added rules (letter, symlink, submodule, path rule and length, `name` required); token choice 1/2/3 with a mocked minter; the early rate-limit refusal; both refusal variants, whole; §3.3's bounds (no blob read before the size checks, the 1,000 cap, the update check's grouping) |
+| M1 | §3 | cloudpid's ported tests; each check row and limit; the added rules (letter, symlink, submodule, path rule and length, `name` required); token choice 1/2/3 with a mocked minter; the early rate-limit refusal; both refusal variants, whole; §3.3's bounds (no blob read before the size checks, the 500 cap, a secondary-limit refusal, the update check's grouping) |
 | M2 | §2, §5's API, the probe code removed | store: rows, hash, revision, audit without content, limits after a change, unchanged, one synchronous commit with an interleaved install; every set the store emits passes `skillSetProblem`; API guards (CSRF, Origin, form body); preview, install, check, update, remove and enable; §3.4's cases |
 | M3 | §4 | `skillSetProblem`; the store's replace; the memory rule; the mount-failure fallback to the empty set; `withEnvironmentSkills` (shadow, un-shadow on remove and on disable); `repoOnly`; the slot's parse; `SessionDO` taking the set on a hash change only, bounded; the Container wait; the snippet in both wrappers; §4.5 and version skew; snapshot scope `user` and paths; expansion from rows |
 | M4 | §5's section | the render; escaping in both places; the switch; confirm on remove; totals with disabled skills; the placeholder gone |
@@ -475,7 +511,7 @@ CLI agents are SPI-1153's, built on `/workspace/.agents/skills`.
 | `env-probe.json`, `env-sync.json` | M0 and its re-probe, above |
 | `env-install-public.json` | `mattpocock/skills` at a pinned commit: the preview, the install, the listing's location under the mount, a `$name` turn, and **(r2)** what the chip's "View instructions" shows |
 | `env-install-private.json` | A skill folder in the fixture repo outside any discovered root, on a branch the script moves; installed at the old commit |
-| `env-update.json` | Check, update, the new commit; **(r2)** the changed file read by the agent's `bash` in a Container that was **running** across the update, and its sha256 against the new blob |
+| `env-update.json` | Check, update, the new commit; **(r2)** the changed file read by the agent's `bash` in a Container that was **running** across the update, and its sha256 against the new blob; **(r3, C1)** the wait's command shape for a size-changing and a same-size edit |
 | `env-remove.json` | Gone from the snapshot, the mount and a running Container; `$name` left untouched; **(r2)** the Repo skill of that name back at once |
 | `env-precedence.json` | The Repo `fruit-code` says `KIWI-7` and the Environment's says `PLUM-9`; the turn answers `PLUM-9`, and `skipped` names the Repo skill |
 | `env-no-container.json` | An install, then a turn that reads the skill; the Container never starts |
@@ -497,7 +533,8 @@ owner". It records:
 - whole files kept in the Environment DO and served read-only in every Workspace with no Container, plus the
   Container's lock and what it is not;
 - that an Environment skill beats a Repo skill;
-- that no agent tool changes them.
+- that no agent tool changes them;
+- **(r3, A4)** that "the set changes only at a turn's start" means any thread's turn start in that Workspace.
 
 Its considered options:
 
