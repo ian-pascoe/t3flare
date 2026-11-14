@@ -39,9 +39,12 @@ Evidence: [`global-mise/`](global-mise/), from stage `pmise` (destroyed) and `te
   - `GlobalMise` runs the script once per Container, keyed by computer's runtime id. `GlobalMiseBackend` wraps the
     Container's backend: every command sent that is not a passive read waits for it there, whoever sends it (a Durable
     agent's command reaches computer through the Workspace stub, never `WorkspaceDO.exec`); `WorkspaceDO.exec` marks a
-    passive read in its environment, and the backend takes the mark out and sends it without waiting. Terminals and
-    CLI processes wait before their spawn (`readyForSpawn`), through an active `true` when this instance has not
-    connected yet. It holds the Container (`#running`), notes
+    passive read in its environment (`commandEnvOf`, which drops a caller's own mark), and the backend takes the mark
+    out and sends it without waiting. Terminals and CLI processes wait before their spawn (`readyForSpawn`) with no
+    command, connect or start of their own: the runtime is the last connect's, else the one computer keeps in the
+    Workspace DO's storage (`computer:container-runtime-identity`, checked by a test against the installed package); a
+    stopped Container is started by the spawn's own `true`, which waits as every active command does. A runtime it
+    cannot learn, or a failed lay-down, is logged and the spawn goes on. It holds the Container (`#running`), notes
     use when it ends, kills the exec at the deadline, retries a failed exec once at once and then from the next
     command, Terminal, CLI process or the alarm, at most three times, and keeps the outcome in storage. A passive read never
     runs it; the alarm runs it for a running Container only passive reads have reached. A start with no text
@@ -70,7 +73,7 @@ Evidence: [`global-mise/`](global-mise/), from stage `pmise` (destroyed) and `te
 | mise's data, cache, state and config dirs are the lay-down's for every CLI profile | `apps/environment/test/miseDirs.test.ts` |
 | The panel: audit as digest, text area, Status, a malformed report refused | `apps/environment/test/environmentSettings.test.ts`, `harnessPage.test.ts` |
 | `GlobalMise`: key, joined runs, kept outcome across instances, hold, deadline, retries, the alarm's catch-up, no text reported as `none`, no runtime id | `apps/agents/test/globalMise.test.ts` |
-| Every active command waits where it is sent, passive reads never: an agent's command while a passive read holds the connect, a Container a passive read started, a Terminal's start with a read in flight; `readyForSpawn` | `apps/agents/test/globalMiseGate.test.ts` |
+| Every active command waits where it is sent, passive reads never: an agent's command while a passive read holds the connect, a Container a passive read started, a Terminal's start with a read in flight; `readyForSpawn` (a fresh instance waits from storage with no command, a stopped Container is not started, failures logged); `commandEnvOf` | `apps/agents/test/globalMiseGate.test.ts` |
 | `connect` passes the runtime id on | `apps/agents/test/containerOnly.test.ts` |
 | The Status line, a run with no text read as no Global mise config | `packages/harness-registry/src/globalMise.test.ts` |
 | The launch carries the text; `containerState` shows only its digest | `apps/agents/test/containerLaunch.test.ts` |
@@ -93,8 +96,9 @@ lock); `date +%s%N`, `wc -c <`, `mv -f`, `cp`, `dirname` and `tail -n 1` behave 
 ## Evidence
 
 Every stage file names the deployed commit (`/_t3flare/health`): **`07f5343`**, after review round 2's fixes, on
-SPI-1148 (`5bc4bb7`). Commits after it change only the stage harness (`hold.json`'s pin, run at that deploy), the docs
-and the evidence. `variables.json` ran first. The `m0-*.json` files name the commit `test:docker` ran at.
+SPI-1148 (`5bc4bb7`), except `passive-first.json` and `passive-spawn.json`, taken at **`892f816`** after review round
+3's change to a spawn's wait (the only behaviour that changed). Commits after `07f5343` but that one change only the
+stage harness, the docs and the evidence. `variables.json` ran first. The `m0-*.json` files name the commit `test:docker` ran at.
 
 | File | Shows |
 | -- | -- |
@@ -103,6 +107,7 @@ and the evidence. `variables.json` ran first. The `m0-*.json` files name the com
 | `override.json` | A repo's `node = "22.12.0"` wins in the repo; the global `github:junegunn/fzf` stays; outside the repo node is the global 24.11.1. |
 | `git-gh.json` | Under the pin: t3's status, a commit through the Workspace's git, `gh --version`. An owner-pinned `conda:git` 2.49.0 has the credential helper, `git credential fill` gives a password, and `git fetch` works. t3's own commit action fails as its control without a Global mise config does (SPI-1186). |
 | `passive-first.json` | A passive read starts the stopped Container and holds it for 25 s, and finds no global file (it never waits for the lay-down); a Durable agent's `bash` sent meanwhile through computer waits for the lay-down (3.9 s) and answers `v24.11.1`. |
+| `passive-spawn.json` | A passive read starts the stopped Container (no global file) and holds it; a t3 Terminal opened meanwhile waits for the lay-down (4.5 s) with no command of its own: the Container's start time is the same before and after the spawn, and `node --version` answers `v24.11.1`. |
 | `hold.json` | Idle time 1 minute, budget 1, an install of 88 s (the pin sets `jobs = 1`) started from a Durable agent's `bash`: after 35 s the reclaim's reason is "in use", a second Workspace's start is refused with the budget's reason, the Container never stops, and the command answers `v24.11.1`. |
 | `restart.json` | A change while the Container runs leaves its file and launch alone; an agent's edit is gone at the next start, which has the new text. |
 | `invalid.json` | Invalid TOML is not laid down; git and gh run; Status reads "not laid down (mise install exit 1)". |
@@ -131,6 +136,10 @@ and the evidence. `variables.json` ran first. The `m0-*.json` files name the com
 - **No install cache**: a pinned start costs its install every time (`cost.json`).
 - **A failed lay-down is retried by the next active command** (each waits where it is sent) or the alarm, at most
   three times per Container; after the third, commands run without it.
+- **How long one wait can last.** The Workspace DO's deadline (780 s) bounds the exec's output only: starting the
+  exec (`container.exec`) and writing the text to its stdin are outside it. After an exec failure the run is retried
+  at once, so one `ensure` can take up to about 2 × 780 s. computer pushes the Workspace's files to the Container
+  before a command is sent, so that push runs before the command's wait, not after it.
 - **A child of a timed-out install can outlive it.** uutils' `timeout` (Ubuntu 26.04) KILLs the install alone, where
   GNU's kills its group, so a child that ignores TERM lives on. It holds neither the lock (its descriptor is closed for
   the install) nor the exec's output (the install writes to `install.log`); it ends with the Container.
