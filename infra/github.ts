@@ -16,10 +16,13 @@
  *   GITHUB_REPOSITORY  owner/name (default: ian-pascoe/t3flare)
  *   MODEL_PROXY_URL, MODEL_PROXY_API_KEY, T3FLARE_GITHUB_APP_ID, T3FLARE_GITHUB_APP_PRIVATE_KEY,
  *   COMMISSARY_CONTAINER_API_KEY (the CLI agents' own proxy key, step 4a)   (required)
+ *   T3FLARE_MODEL_ENDPOINT  the Model endpoint CI's stages set up through the panel's API (SPI-1175; the format is in
+ *                      apps/environment/scripts/lib/modelEndpointSpec.ts); unset, Commissary's from MODEL_PROXY_URL and
+ *                      MODEL_PROXY_API_KEY. Set as the secret T3FLARE_MODEL_ENDPOINT on `bump` and `prod`.
  *   T3FLARE_PROD_ENV_FILE  prod's bootstrap and admin tokens, the laptop's (default:
  *                      ../apps/environment/.alchemy/stages/prod.env.json; set it when running from a worktree)
  *
- * Run ci:setup again after rotating any of those (prod's tokens, the proxy key, the GitHub App's key).
+ * Run ci:setup again after rotating any of those (prod's tokens, the proxy key, the GitHub App's key, the endpoint's key).
  *
  * Rotate the token: `pnpm --filter @t3flare/infra run ci:destroy`, then `ci:setup` again. The `bump` environment is retained on
  * destroy, so anything set on it by hand survives.
@@ -33,6 +36,8 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as fs from "node:fs";
 import * as path from "node:path";
+
+import { MODEL_ENDPOINT_VAR, modelEndpointSecret, modelEndpointSpec } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
 
 /** Account-scoped "Access: Apps and Policies Write" (the catalog name is shared with a zone-scoped group). */
 const ACCESS_APPS_AND_POLICIES_WRITE = { id: "1e13c5124ca64b72b1969a67e8829049" };
@@ -130,6 +135,14 @@ export default Alchemy.Stack(
       value: modelProxyUrl,
     });
 
+    // SPI-1175: the Model endpoint both workflows' stages set up through the panel's API, one JSON secret holding its key:
+    // dev.env's T3FLARE_MODEL_ENDPOINT, else Commissary's from the Model proxy's settings. Never printed.
+    const endpoint = modelEndpointSpec(process.env, { derive: true });
+    if (!endpoint.ok && endpoint.invalid) return yield* Effect.die(new Error(endpoint.reason));
+    const endpointSecret = endpoint.ok ? Redacted.make(modelEndpointSecret(endpoint.spec)) : undefined;
+    if (endpointSecret === undefined) yield* Effect.logWarning(`ci:setup: no ${MODEL_ENDPOINT_VAR} secret: ${endpoint.ok ? "" : endpoint.reason}`);
+    else yield* GitHub.Secret("BumpModelEndpoint", { ...repo, environment: bump, name: MODEL_ENDPOINT_VAR, value: endpointSecret });
+
     // prod (deploy-prod.yml): deployable from main only, retained on destroy like `bump`. Its own token, with the same
     // permissions (a prod deploy touches the same kinds of resource; Cloudflare cannot scope these groups to a stage),
     // plus its custom domain's zone permissions.
@@ -176,6 +189,7 @@ export default Alchemy.Stack(
       T3FLARE_GITHUB_APP_PRIVATE_KEY: yield* Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),
       T3_BOOTSTRAP_TOKEN: fromProdEnvFile("T3_BOOTSTRAP_TOKEN"),
       T3FLARE_ADMIN_TOKEN: fromProdEnvFile("T3FLARE_ADMIN_TOKEN"),
+      ...(endpointSecret === undefined ? {} : { [MODEL_ENDPOINT_VAR]: endpointSecret }),
     };
     for (const [name, value] of Object.entries(prodSecrets)) {
       yield* GitHub.Secret(`Prod${name}`, { ...repo, environment: prod, name, value });
