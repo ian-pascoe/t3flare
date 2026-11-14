@@ -165,9 +165,14 @@ export const flush = async (times = 20) => {
   for (let index = 0; index < times; index++) await Promise.resolve();
 };
 
-/** Waits until `check` holds (a held call reached its card), polling the microtask queue and then timers. */
+/**
+ * Waits until `check` holds (a held call reached its card): first by draining the microtask queue, which is all most
+ * flows need, and only then by yielding to timers (a held stream's or a real fetch's work), up to `tries` times.
+ */
 export const until = async (check: () => boolean, tries = 200) => {
   for (let index = 0; index < tries; index++) {
+    if (check()) return;
+    await flush();
     if (check()) return;
     await new Promise((resolve) => setTimeout(resolve, 1));
   }

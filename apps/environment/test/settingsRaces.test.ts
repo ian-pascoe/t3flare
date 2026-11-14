@@ -62,7 +62,11 @@ describe("an answer applying meanwhile is waited for", () => {
     // Forced to applying with nothing to finish it: the wait is bounded.
     const other = { ...record!, id: `${record!.id.slice(0, -1)}X`, hash: "other", state: "applying" as const };
     f.deps.changes.insert(other);
-    const gaveUp = await closeOrSettle(answerDepsOf(f.deps), other.id, "withdrawn", "stop", { waitMs: 20 });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const giving = closeOrSettle(answerDepsOf(f.deps), other.id, "withdrawn", "stop", { waitMs: 20 });
+    await vi.advanceTimersByTimeAsync(20);
+    const gaveUp = await giving;
+    vi.useRealTimers();
     expect(gaveUp).toMatchObject({ state: "applying" });
     // That is an outcome not known yet, never "the change failed" (SPI-1201 review).
     const answer = ownerOutcome(gaveUp!, other);
