@@ -10,6 +10,8 @@ export { SessionDO } from "./session/SessionDO.ts";
 export { WorkspaceDO } from "./workspace/WorkspaceDO.ts";
 // G11 (ADR-0031): Container previews, reached only by the Environment Worker's service binding.
 export { WorkspaceContainerPreviews } from "./workspacePreviews.ts";
+// SPI-1163: text generation on a Model endpoint's model, reached only by the Environment Worker's service binding.
+export { EndpointTextGeneration } from "./endpointTextGeneration.ts";
 
 export default {
   fetch(): Response {

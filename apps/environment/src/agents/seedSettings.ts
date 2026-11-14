@@ -1,28 +1,52 @@
-// Text generation's model (risk R12): t3's default `textGenerationModelSelection` names the `codex` instance, which the
-// Cloud Environment does not have, and t3's fallback only applies to an instance it has. While the setting still names
-// an instance that is not registered, it is pointed at the Durable agent provider's small model, once per boot.
+// Text generation's model (risk R12; SPI-1163): t3's default `textGenerationModelSelection` names the `codex` instance,
+// which the Cloud Environment does not have, and t3's fallback only applies to an instance it has. While the owner has
+// set no model, the setting names text generation's default, so the setting says which model that is: a small model of
+// the first Model endpoint that has one (`defaultTextModel`), else the Model proxy's small model until the hard cut,
+// else `default` (which fails saying to pick one). It is written at each boot and again whenever the endpoints change.
+//
+// "No model set" is: an instance this Environment does not have (t3's default), `default`, or the model this sync wrote
+// last (kept in the Environment DO's storage). A setting written by the earlier seed (the proxy's small model, with no
+// record kept) counts as unset too. Any other model is the owner's, and is never replaced.
 import { defaultInstanceIdForDriver } from "@t3tools/contracts";
 import { SMALL_MODEL_SLUG } from "@t3flare/models";
+import { defaultTextModel, EMPTY_ENDPOINTS } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ServerSettings from "t3/src/serverSettings.ts";
 import * as ProviderInstanceRegistry from "t3/src/provider/ProviderInstanceRegistry.ts";
 
+import { onEndpointsChanged } from "../endpoints/changes.ts";
 import { PI_DURABLE_DRIVER } from "../provider/capabilities.ts";
 import { environmentServices } from "./bindings.ts";
 
+/** Points an unset text-generation setting at text generation's default model now. */
+export const syncTextGenerationDefault = Effect.gen(function* () {
+  const settings = yield* ServerSettings.ServerSettingsService;
+  const registry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
+  const services = environmentServices();
+  const current = (yield* settings.getSettings).textGenerationModelSelection;
+  const instanceId = defaultInstanceIdForDriver(PI_DURABLE_DRIVER);
+  const seeded = services.seededTextModel.get();
+  const unset =
+    (yield* registry.getInstance(current.instanceId)) === undefined ||
+    (current.instanceId === instanceId && (current.model === "default" || current.model === seeded || (seeded === undefined && current.model === SMALL_MODEL_SLUG)));
+  if (!unset) return;
+  const model = defaultTextModel(services.modelEndpoints?.() ?? EMPTY_ENDPOINTS) ?? (services.modelProxy === undefined ? "default" : SMALL_MODEL_SLUG);
+  services.seededTextModel.set(model);
+  if (current.instanceId === instanceId && current.model === model) return;
+  yield* settings.updateSettings({ textGenerationModelSelection: { instanceId, model } });
+  yield* Effect.logInfo("t3flare: text generation's default model", { model, replaced: `${current.instanceId}/${current.model}` });
+});
+
 export const layerSeedTextGenerationModel = Layer.effectDiscard(
   Effect.gen(function* () {
-    const settings = yield* ServerSettings.ServerSettingsService;
-    const registry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
-    const current = yield* settings.getSettings;
-    const named = current.textGenerationModelSelection.instanceId;
-    if ((yield* registry.getInstance(named)) !== undefined) return;
-    yield* settings.updateSettings({
-      textGenerationModelSelection: { instanceId: defaultInstanceIdForDriver(PI_DURABLE_DRIVER), model: SMALL_MODEL_SLUG },
-    });
-    yield* Effect.logInfo("t3flare: text generation now uses the Durable agent provider", { replaced: named });
-  }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: text generation's model was not seeded", cause))),
+    const sync = syncTextGenerationDefault.pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: text generation's default model was not set", cause)));
+    yield* sync;
+    // A changed endpoint list can change the default: an unset setting follows it at once.
+    const context = yield* Effect.context<ServerSettings.ServerSettingsService | ProviderInstanceRegistry.ProviderInstanceRegistry>();
+    const stopHearing = onEndpointsChanged(() => void Effect.runForkWith(context)(sync));
+    yield* Effect.addFinalizer(() => Effect.sync(stopHearing));
+  }),
 );
 
 /**

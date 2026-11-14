@@ -1,6 +1,7 @@
 // The environment Worker's view of the agents Worker's Durable Objects (ADR-0014): their RPC methods, typed here so
 // this Worker never imports the agents Worker's code (which is typed against the Workers globals, not Node's).
 import type { ContainerInstance } from "@t3flare/harness-registry";
+import type { EndpointTextAnswer, EndpointTextRequest } from "@t3flare/models/endpoints";
 import type { PortScan } from "@t3flare/sandbox-image/ports";
 import type { CliAgent, PromptTemplate, SkillDiscovery } from "@t3flare/skills";
 import type {
@@ -174,10 +175,16 @@ export interface Namespace<T> {
   get(id: unknown): T;
 }
 
+/** SPI-1163: the agents Worker's `EndpointTextGeneration` entrypoint, one pi-ai request on a Model endpoint's model. */
+export interface EndpointTextGenerationRpc {
+  generate(request: EndpointTextRequest): Promise<EndpointTextAnswer>;
+}
+
 export interface AgentsBindings {
   readonly SESSIONS?: Namespace<SessionRpc>;
   readonly WORKSPACES?: Namespace<WorkspaceRpc>;
   readonly CONTAINER_BUDGET?: Namespace<BudgetRpc>;
+  readonly TEXT_GENERATION?: EndpointTextGenerationRpc;
 }
 
 export const byName = <T>(namespace: Namespace<T> | undefined, name: string, what: string): T => {

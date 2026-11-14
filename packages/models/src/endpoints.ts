@@ -91,6 +91,39 @@ export const findEndpointModel = (endpoints: ModelEndpoints, slug: string): { re
   return endpoint === undefined || model === undefined ? undefined : { endpoint, model };
 };
 
+/** The small models' families: `haiku`, `mini`, `nano`, `flash`, `lite`, `small`, `tiny`, as a word of the model id. */
+const SMALL_MODEL = /(?:^|[-_./:])(?:haiku|mini|nano|flash|lite|small|tiny)(?:$|[-_.:])/i;
+
+/**
+ * Text generation's default model (SPI-1163): a small model of the first endpoint, in the owner's order, that has one.
+ * Of that endpoint's small models, the cheapest by its known output price, else the first listed. Undefined when no
+ * endpoint has a small model.
+ */
+export const defaultTextModel = (endpoints: ModelEndpoints): string | undefined => {
+  for (const endpoint of endpoints.endpoints) {
+    const small = endpoint.models.filter((model) => SMALL_MODEL.test(model.id));
+    if (small.length === 0) continue;
+    const priced = small.filter((model) => model.known);
+    const pick = priced.length === 0 ? small[0]! : priced.reduce((best, model) => (model.cost.output < best.cost.output ? model : best));
+    return endpointSlug(endpoint.id, pick.id);
+  }
+  return undefined;
+};
+
+/**
+ * One text-generation request on an endpoint's model (SPI-1163): the Environment DO's call of the agents Worker's
+ * `EndpointTextGeneration`. The endpoint is the secret-free copy the Environment holds now; the agents Worker asks the
+ * Environment for its key (`endpointCredential`) for that endpoint's target, as a Session does.
+ */
+export interface EndpointTextRequest {
+  readonly endpoint: ModelEndpoint;
+  readonly modelId: string;
+  readonly prompt: string;
+}
+
+/** Its answer: the model's text, or a failure that names the endpoint and never holds a vendor's body or a key. */
+export type EndpointTextAnswer = { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string };
+
 /** A preset fills the panel's form; the owner may change any field before saving. */
 export interface EndpointPreset {
   readonly preset: string;

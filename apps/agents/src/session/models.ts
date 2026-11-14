@@ -130,6 +130,14 @@ export interface EndpointAccess {
   readonly fetch?: FetchFunction;
 }
 
+/** Why the Environment gave no key for an endpoint, as the turn (or the text generation) says it. */
+export const credentialProblem = (endpointId: string, { unreadable, changed }: EndpointCredential): string =>
+  changed === true
+    ? `The Model endpoint "${endpointId}" changed or was removed since this Session took it: retry the turn.`
+    : unreadable === true
+      ? `The Model endpoint "${endpointId}"'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`
+      : `The Model endpoint "${endpointId}" has no API key: set one in the Harness panel.`;
+
 const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api> => ({
   id: model.id,
   name: model.name,
@@ -168,17 +176,9 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
             // pi-ai's APIs refuse a request without a key, so an endpoint with no auth sends a placeholder, never a secret.
             if (endpoint.auth === "none") return { auth: { apiKey: NO_KEY, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint (no key)" };
             // The key is asked for the target this provider sends it to; the Environment gives none for an old one.
-            const { apiKey, unreadable, changed } = await access.credential(endpoint.id, targetOf(endpoint));
-            if (apiKey === null) {
-              throw new Error(
-                changed === true
-                  ? `The Model endpoint "${endpoint.id}" changed or was removed since this Session took it: retry the turn.`
-                  : unreadable === true
-                    ? `The Model endpoint "${endpoint.id}"'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`
-                    : `The Model endpoint "${endpoint.id}" has no API key: set one in the Harness panel.`,
-              );
-            }
-            return { auth: { apiKey, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint" };
+            const credential = await access.credential(endpoint.id, targetOf(endpoint));
+            if (credential.apiKey === null) throw new Error(credentialProblem(endpoint.id, credential));
+            return { auth: { apiKey: credential.apiKey, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint" };
           },
         },
       },

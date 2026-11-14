@@ -304,6 +304,8 @@ export default Alchemy.Stack(
               CONTAINER_BUDGET: Cloudflare.DurableObject("ContainerBudget", { className: "ContainerBudget", scriptName: agentsName }),
               // G11 (ADR-0031): the Container previews' way in, one method of the Workspace DO (`WorkspaceContainerPreviews`).
               WORKSPACE_PREVIEWS: Cloudflare.WorkerEntrypoint(agents as never, "WorkspaceContainerPreviews"),
+              // SPI-1163: text generation on a Model endpoint's model, one pi-ai request (`EndpointTextGeneration`).
+              TEXT_GENERATION: Cloudflare.WorkerEntrypoint(agents as never, "EndpointTextGeneration"),
             }),
         T3FLARE_GITHUB_APP_ID: Config.String("T3FLARE_GITHUB_APP_ID"),
         T3FLARE_GITHUB_APP_PRIVATE_KEY: Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),

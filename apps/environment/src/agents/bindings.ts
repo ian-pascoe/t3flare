@@ -29,6 +29,8 @@ export interface EnvironmentServices {
   readonly sweep: SweepSettings;
   /** One-time marks in the Environment DO's storage (step 3: a setting seeded once, L1). */
   readonly marks: { has(key: string): boolean; set(key: string): void };
+  /** SPI-1163: the model the text-generation setting was last pointed at as its default (`seedSettings.ts`). */
+  readonly seededTextModel: { get(): string | undefined; set(slug: string): void };
   /** Step 4a: this instance's CLI processes (review F6: never module state). */
   readonly processes: ProcessChannel;
   /** Test stages: stage-only probes and faults answer. */

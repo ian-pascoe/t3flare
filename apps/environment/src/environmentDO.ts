@@ -47,6 +47,9 @@ import type { ContainerPreviewProps } from "./preview/containerPreviews.ts";
 import { closeLeftoverSessions } from "./preview/sessions.ts";
 import { previewStore } from "./preview/store.ts";
 
+/** SPI-1163: the model the text-generation setting was last pointed at as its default. */
+const SEEDED_TEXT_MODEL_KEY = "t3flare:text-generation-default";
+
 /** The loopback bindings of this Worker's entry (`worker.ts`) the Environment DO hands Browser Run (G11). */
 interface EnvironmentExports {
   readonly ContainerPreviews: (options: { readonly props: ContainerPreviewProps }) => BrowserRunFetcher;
@@ -223,6 +226,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         graceMs: Number(env.T3FLARE_SWEEP_GRACE_MS) > 0 ? Number(env.T3FLARE_SWEEP_GRACE_MS) : GRACE_MS,
       },
       marks: { has: (key) => ctx.storage.kv.get(key) !== undefined, set: (key) => ctx.storage.kv.put(key, Date.now()) },
+      seededTextModel: { get: () => ctx.storage.kv.get<string>(SEEDED_TEXT_MODEL_KEY), set: (slug) => ctx.storage.kv.put(SEEDED_TEXT_MODEL_KEY, slug) },
       processes: this.#processes,
       faults: env.T3FLARE_FAULTS === "1",
       relayServers: () =>
