@@ -85,6 +85,10 @@ const RELAY_TOOL = "mcp__settings__change_environment";
 const TOOLS: ReadonlyArray<ToolInfo> = [
   { name: RELAY_TOOL, sourceInfo: { path: "builtin:mcp", source: "builtin" } },
   { name: "mcp__commissary__search", sourceInfo: { path: "builtin:mcp" } },
+  // A hyphenated Direct server: pi names its tools with `-` as `_` (pi 1.5.2, docs/mcp.md).
+  { name: "mcp__my_docs__search", sourceInfo: { path: "builtin:mcp" } },
+  // A server whose name only starts like a relayed one is another server.
+  { name: "mcp__my_docs2__search", sourceInfo: { path: "builtin:mcp" } },
   // A built-in MCP tool of a server the relay does not serve this process (another source added it).
   { name: "mcp__stranger__write", sourceInfo: { path: "builtin:mcp" } },
   // A tool of another extension that takes an MCP-shaped name.
@@ -118,7 +122,7 @@ describe("Patch 0006: pi's relay tools are judged by the relay", () => {
     delete process.env.T3_MCP_BEARER_TOKEN;
     delete process.env.T3_PI_MCP_EXTENSION_PATH;
     // The profile names the relayed servers (cliProfiles.ts); the extension reads them when it loads.
-    process.env.T3FLARE_RELAY_SERVERS = "commissary,settings";
+    process.env.T3FLARE_RELAY_SERVERS = "commissary,settings,my-docs";
     const source = await extensionSource(true);
     expect(source).not.toBe(PI_T3_MCP_EXTENSION_SOURCE);
     patched = await toolCallHook(source, "patched", () => TOOLS);
@@ -139,6 +143,12 @@ describe("Patch 0006: pi's relay tools are judged by the relay", () => {
       expect(await asks(patched, mode, RELAY_TOOL)).toBe(false);
       expect(await asks(patched, mode, "mcp__commissary__search")).toBe(false);
     }
+  });
+
+  it("matches a hyphenated server by pi's name for it (my-docs is mcp__my_docs__), and only that server", async () => {
+    expect(await asks(patched, "approval-required", "mcp__my_docs__search")).toBe(false);
+    expect(await asks(patched, "approval-required", "mcp__my_docs2__search")).toBe(true);
+    expect(await asks(stock, "approval-required", "mcp__my_docs__search")).toBe(true);
   });
 
   it("asks, as stock t3 does, for every tool not from pi's built-in MCP client", async () => {

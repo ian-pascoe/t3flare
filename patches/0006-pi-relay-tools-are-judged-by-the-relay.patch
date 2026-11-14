@@ -1,24 +1,25 @@
 diff --git a/packages/provider-pi/src/server/mcpExtensionSource.ts b/packages/provider-pi/src/server/mcpExtensionSource.ts
-index 48aeff2437..93c4ca5709 100644
+index 48aeff2437..2893376235 100644
 --- a/packages/provider-pi/src/server/mcpExtensionSource.ts
 +++ b/packages/provider-pi/src/server/mcpExtensionSource.ts
-@@ -358,10 +358,24 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
+@@ -358,10 +358,25 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
        NodePath.resolve(tool.sourceInfo.path) === NodePath.resolve(extensionPath));
    };
  
 +  // t3flare: a server tool of Pi's built-in MCP client is judged, and asked about on the
 +  // thread, by t3flare's MCP relay, when its server is one the relay serves this process
 +  // (T3FLARE_RELAY_SERVERS, the servers the profile's mcp.json names; project trust stays
-+  // off). Asking here too would ask twice. Every other tool is asked as before.
-+  const relayedServers = new Set((env("T3FLARE_RELAY_SERVERS") ?? "").split(",").filter((server) => server !== ""));
-+  const serverOfMcpTool = (name: string) => (name.startsWith("mcp__") ? name.slice("mcp__".length).split("__")[0] : undefined);
-+  const isRelayedMcpTool = (name: string) => {
-+    const server = serverOfMcpTool(name);
-+    return server !== undefined &&
-+      relayedServers.has(server) &&
-+      typeof pi.getAllTools === "function" &&
-+      pi.getAllTools().some((tool) => tool.name === name && tool.sourceInfo?.path === "builtin:mcp");
-+  };
++  // off). Asking here too would ask twice. Every other tool is asked as before. Pi names a
++  // server's tool mcp__<server>__<tool> with every character but letters, digits and _
++  // replaced by _ (so my-docs is mcp__my_docs__...): the server is matched the same way.
++  const relayedPrefixes = (env("T3FLARE_RELAY_SERVERS") ?? "")
++    .split(",")
++    .filter((server) => server !== "")
++    .map((server) => "mcp__" + server.replace(/[^A-Za-z0-9_]/g, "_") + "__");
++  const isRelayedMcpTool = (name: string) =>
++    relayedPrefixes.some((prefix) => name.startsWith(prefix)) &&
++    typeof pi.getAllTools === "function" &&
++    pi.getAllTools().some((tool) => tool.name === name && tool.sourceInfo?.path === "builtin:mcp");
 +
    pi.on("tool_call", async (event, ctx) => {
      const mode = runtimeMode();
