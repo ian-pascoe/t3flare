@@ -1,7 +1,8 @@
 // Pi Durable's text generation on Model endpoints (SPI-1163): an `<endpointId>/<modelId>` selection runs as one request on
 // the agents Worker (`TEXT_GENERATION`), named by ids only, with no key; `default` is a small model of the
 // first endpoint that has one; the Model proxy's `anthropic/…` models keep their own path until the hard cut. Every
-// failure names the endpoint.
+// failure on an endpoint's model names the endpoint and the model: `runText`'s own, and those t3's operations add after
+// the reply (a placeholder title) or before it (no investigation), through `makePiDurableTextGeneration`.
 import { ProviderInstanceId } from "@t3tools/contracts";
 import type { EndpointModel, EndpointTextAnswer, EndpointTextRequest, ModelEndpoint, ModelEndpoints } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
@@ -10,7 +11,7 @@ import * as Schema from "effect/Schema";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
-import { runText } from "../src/provider/textGeneration.ts";
+import { makePiDurableTextGeneration, runText } from "../src/provider/textGeneration.ts";
 
 const COST = { input: 1, output: 5, cacheRead: 0, cacheWrite: 0 };
 const model = (id: string): EndpointModel => ({ id, name: id, reasoning: false, input: ["text"], contextWindow: 100_000, maxTokens: 8_000, cost: COST, known: true });
@@ -84,7 +85,7 @@ describe("runText on Model endpoints", () => {
 
   it("names the endpoint when the agents Worker cannot be reached, without its error's text", async () => {
     bind(() => Promise.reject(new Error("internal error; reference = 0123")));
-    expect(detailOf(await run("openai/gpt-5-mini"))).toBe('Text generation on the Model endpoint "openai" failed: the agents Worker could not be reached.');
+    expect(detailOf(await run("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" could not be used for text generation: the agents Worker could not be reached.');
   });
 
   it("says when the endpoint no longer lists the model, or is gone, and calls nothing", async () => {
@@ -96,7 +97,7 @@ describe("runText on Model endpoints", () => {
 
   it("says when the Environment has no text generation binding", async () => {
     bind(() => ({ ok: true, text: "{}" }), { bound: false });
-    expect(detailOf(await run("openai/gpt-5-mini"))).toBe('Text generation on the Model endpoint "openai" failed: this Environment has no binding to the agents Worker for it.');
+    expect(detailOf(await run("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" could not be used for text generation: this Environment has no binding to the agents Worker for it.');
   });
 
   it("keeps the Model proxy's path for its `anthropic/…` models", async () => {
@@ -114,5 +115,39 @@ describe("runText on Model endpoints", () => {
   it("says what to do when no endpoint has a small model and there is no Model proxy", async () => {
     bindEnvironmentServices({ agents: {}, modelProxy: undefined, modelEndpoints: () => ({ revision: 1, endpoints: [BIG] }) } as unknown as EnvironmentServices);
     expect(detailOf(await run("default"))).toBe("No Model endpoint has a small model for text generation: pick a model for it in Settings.");
+  });
+
+  it("names the endpoint and model when t3 refuses the reply after decoding it (a placeholder title)", async () => {
+    bind(() => ({ ok: true, text: '{"title":"title"}' }));
+    const textGeneration = makePiDurableTextGeneration();
+    const title = (model: string) =>
+      Effect.runPromise(Effect.exit(textGeneration.generateThreadTitle({ cwd: "/w/x", message: "Fix the build", modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model } })));
+    expect(detailOf(await title("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" (model gpt-5-mini): the model returned the placeholder title "title".');
+    expect(detailOf(await title("default"))).toBe('The Model endpoint "openai" (model gpt-5-mini): the model returned the placeholder title "title".');
+  });
+
+  it("names the endpoint and model when t3 refuses the operation before the request (no investigation)", async () => {
+    const calls = bind(() => ({ ok: true, text: "{}" }));
+    const guide = makePiDurableTextGeneration().generateReviewGuide({
+      cwd: "/w/x",
+      number: 7,
+      title: "Fix the build",
+      description: "",
+      baseBranch: "main",
+      baseCommit: "abc123",
+      settledReview: "",
+      modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model: "openai/gpt-5-mini" },
+    });
+    expect(detailOf(await Effect.runPromise(Effect.exit(guide)))).toMatch(/^The Model endpoint "openai" \(model gpt-5-mini\): pi Durable cannot investigate/);
+    expect(calls).toEqual([]);
+  });
+
+  it("leaves a failure that already names the endpoint, and the proxy's, as they are", async () => {
+    bind(() => ({ ok: false, error: 'The Model endpoint "openai" failed (HTTP 503).' }));
+    const title = makePiDurableTextGeneration().generateThreadTitle({ cwd: "/w/x", message: "m", modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model: "openai/gpt-5-mini" } });
+    expect(detailOf(await Effect.runPromise(Effect.exit(title)))).toBe('The Model endpoint "openai" failed (HTTP 503).');
+    vi.stubGlobal("fetch", async () => Response.json({ content: [{ type: "text", text: '{"title":"title"}' }] }));
+    const proxied = makePiDurableTextGeneration().generateThreadTitle({ cwd: "/w/x", message: "m", modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model: "anthropic/claude-haiku-5-5" } });
+    expect(detailOf(await Effect.runPromise(Effect.exit(proxied)))).toBe('The model returned the placeholder title "title".');
   });
 });

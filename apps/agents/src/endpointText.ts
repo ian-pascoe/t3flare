@@ -11,6 +11,7 @@ import {
   type EndpointTarget,
   type EndpointTextAnswer,
   type EndpointTextRequest,
+  endpointLabel,
   isRecord,
   jsonOnlyPrompt,
   type ModelEndpoint,
@@ -22,7 +23,7 @@ import { credentialProblem, endpointProviders } from "./session/models.ts";
 /** How long the one request may take, inside the Environment's own bound (120 s). */
 const TIMEOUT_MS = 110_000;
 /** Enough for a title or a PR body, and for a reasoning model's thinking before it; never above the model's own limit. */
-export const MAX_TEXT_TOKENS = 8_192;
+const MAX_TEXT_TOKENS = 8_192;
 
 export interface EndpointTextAccess {
   /** The Environment's endpoints now (`modelEndpoints`), secret-free. */
@@ -32,7 +33,7 @@ export interface EndpointTextAccess {
   /**
    * The request's fetch (tests); the global one otherwise. Its answer's status names the failure, for the APIs whose pi-ai
    * implementation takes a fetch (Anthropic Messages, OpenAI Responses and Completions); Mistral's reports its status
-   * through `onResponse`; Google's reports none, so its failures say less.
+   * through `onResponse`; Google's reports none, so its failures say only that the endpoint failed.
    */
   readonly fetch?: FetchFunction;
   /** The request's bound, shorter in tests. */
@@ -54,7 +55,7 @@ interface Observed {
 
 /** The failure's text by the endpoint's answer status: never its body. */
 const statusProblem = (endpoint: ModelEndpoint, modelId: string, status: number): string => {
-  const named = `The Model endpoint "${endpoint.id}"`;
+  const named = endpointLabel(endpoint.id);
   if (status === 401 || status === 403) {
     return endpoint.auth === "none"
       ? `${named} refused the request without a credential (HTTP ${status}): check its auth in the Harness panel.`
@@ -68,7 +69,7 @@ const statusProblem = (endpoint: ModelEndpoint, modelId: string, status: number)
 };
 
 const failureOf = (endpoint: ModelEndpoint, modelId: string, observed: Observed): EndpointTextAnswer => {
-  const named = `The Model endpoint "${endpoint.id}"`;
+  const named = endpointLabel(endpoint.id);
   if (observed.refused !== undefined) {
     // The endpoint was read from the Environment just now, so a changed target is a save that landed meanwhile.
     return {
@@ -78,14 +79,15 @@ const failureOf = (endpoint: ModelEndpoint, modelId: string, observed: Observed)
   }
   if (observed.status !== undefined) return { ok: false, error: statusProblem(endpoint, modelId, observed.status) };
   if (observed.unreachable) return { ok: false, error: `${named} could not be reached.` };
-  return { ok: false, error: `${named} did not answer.` };
+  // An error with no status this code can read (Google's adapter reports none): the endpoint failed, how is not known.
+  return { ok: false, error: `${named} failed (its API reports no status here).` };
 };
 
 export const generateEndpointText = async (input: unknown, access: EndpointTextAccess): Promise<EndpointTextAnswer> => {
   const request = endpointTextRequestOf(input);
   if (request === undefined) return { ok: false, error: "The text generation request was malformed: it names no Model endpoint, model and prompt." };
   const { endpointId, modelId } = request;
-  const named = `The Model endpoint "${endpointId}"`;
+  const named = endpointLabel(endpointId);
   let endpoints: ModelEndpoints;
   try {
     endpoints = await access.endpoints();
@@ -117,7 +119,7 @@ export const generateEndpointText = async (input: unknown, access: EndpointTextA
   const model = models.getModel(endpoint.id, modelId);
   if (model === undefined) return { ok: false, error: `${named} does not list the model ${modelId}.` };
   const signal = AbortSignal.timeout(access.timeoutMs ?? TIMEOUT_MS);
-  const late = { ok: false, error: `${named} did not answer in time.` } as const;
+  const timedOut = { ok: false, error: `${named} did not answer in time.` } as const;
   let message;
   try {
     message = await models.completeSimple(
@@ -133,9 +135,9 @@ export const generateEndpointText = async (input: unknown, access: EndpointTextA
       },
     );
   } catch {
-    return signal.aborted ? late : failureOf(endpoint, modelId, observed);
+    return signal.aborted ? timedOut : failureOf(endpoint, modelId, observed);
   }
-  if (message.stopReason === "aborted" || signal.aborted) return late;
+  if (message.stopReason === "aborted" || signal.aborted) return timedOut;
   if (message.stopReason === "error" || (observed.status !== undefined && observed.status >= 400)) return failureOf(endpoint, modelId, observed);
   const text = message.content
     .flatMap((block) => (block.type === "text" ? [block.text] : []))

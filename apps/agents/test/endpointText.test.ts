@@ -4,7 +4,7 @@
 import type { EndpointCredential, EndpointTarget, ModelEndpoint } from "@t3flare/models/endpoints";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { type EndpointTextAccess, generateEndpointText, MAX_TEXT_TOKENS } from "../src/endpointText.ts";
+import { type EndpointTextAccess, generateEndpointText } from "../src/endpointText.ts";
 
 const COST = { input: 1, output: 5, cacheRead: 0, cacheWrite: 0 };
 const KEY = "sk-secret-123";
@@ -79,13 +79,12 @@ describe("generateEndpointText", () => {
   it("asks for at most 8192 tokens, and never more than the model's own limit", async () => {
     for (const [limit, sent] of [
       [4_000, 4_000],
-      [128_000, MAX_TEXT_TOKENS],
+      [128_000, 8_192],
     ] as const) {
       const wire = recorder(() => anthropicOk("ok"));
       await generate(endpoint("anthropic-messages", "api-key", limit), { credential: keyFor().credential, fetch: wire.fetch });
       expect((JSON.parse(wire.sent[0]!.body) as { max_tokens: number }).max_tokens).toBe(sent);
     }
-    expect(MAX_TEXT_TOKENS).toBe(8_192);
   });
 
   it("sends the placeholder key, and asks for none, on an endpoint with no auth", async () => {
@@ -129,6 +128,14 @@ describe("generateEndpointText", () => {
     const error = errorOf(await generate(endpoint("mistral-conversations"), { credential: keyFor().credential }));
     expect(error).toBe('The Model endpoint "gw" refused its API key (HTTP 401): check it in the Harness panel.');
     expect(wire.sent).toHaveLength(1);
+  });
+
+  it("says a Google endpoint failed when it answered an error, though its adapter reports no status", async () => {
+    const wire = recorder(() => Response.json({ error: { code: 401, message: VENDOR_BODY, status: "UNAUTHENTICATED" } }, { status: 401 }));
+    vi.stubGlobal("fetch", wire.fetch);
+    const error = errorOf(await generate(endpoint("google-generative-ai"), { credential: keyFor().credential }));
+    expect(error).toBe('The Model endpoint "gw" failed (its API reports no status here).');
+    expect(wire.sent.length).toBeGreaterThan(0);
   });
 
   it("says the endpoint could not be reached when the request never got an answer", async () => {

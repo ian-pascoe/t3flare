@@ -8,11 +8,14 @@
 // - `default` is a small model of the first endpoint that has one (`defaultTextModel`), else the Model proxy's.
 // - The Model proxy's `anthropic/<id>` models keep their plain Anthropic Messages request until the hard cut (SPI-1176).
 //
-// Every failure says which endpoint (or the proxy) failed, and never holds a vendor's body or a key.
-import { TextGenerationError } from "@t3tools/contracts";
+// Every failure says which endpoint (or the proxy) failed, and never holds a vendor's body or a key. On an endpoint's
+// model, a failure t3's own operations add after the reply (`fromRunner`: `generatedThreadTitle`'s placeholder title, and
+// `withoutInvestigation`'s refusal) is named too (`namingEndpoint`).
+import { type ModelSelection, TextGenerationError } from "@t3tools/contracts";
+import type { ProviderTextGeneration } from "@t3tools/provider-core/server/textGeneration";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import { SMALL_MODEL_SLUG } from "@t3flare/models";
-import { defaultTextModel, EMPTY_ENDPOINTS, jsonOnlyPrompt, type ModelEndpoint, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { defaultTextModel, EMPTY_ENDPOINTS, endpointLabel, jsonOnlyPrompt, type ModelEndpoint, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
 import { classifyProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
 import * as Effect from "effect/Effect";
 
@@ -37,9 +40,9 @@ export const textModelOf = (selected: string, endpoints: ModelEndpoints, proxy: 
   const parsed = parseEndpointSlug(slug);
   if (parsed === undefined || parsed.endpointId === PROXY_PROVIDER) return { kind: "proxy", modelId: parsed?.modelId ?? slug };
   const endpoint = endpoints.endpoints.find((entry) => entry.id === parsed.endpointId);
-  if (endpoint === undefined) return { kind: "none", detail: `The Model endpoint "${parsed.endpointId}" was removed: pick another model for text generation.` };
+  if (endpoint === undefined) return { kind: "none", detail: `${endpointLabel(parsed.endpointId)} was removed: pick another model for text generation.` };
   if (!endpoint.models.some((model) => model.id === parsed.modelId)) {
-    return { kind: "none", detail: `The Model endpoint "${endpoint.id}" no longer lists the model ${parsed.modelId}: pick another model for text generation.` };
+    return { kind: "none", detail: `${endpointLabel(endpoint.id)} no longer lists the model ${parsed.modelId}: pick another model for text generation.` };
   }
   return { kind: "endpoint", endpoint, modelId: parsed.modelId };
 };
@@ -47,7 +50,7 @@ export const textModelOf = (selected: string, endpoints: ModelEndpoints, proxy: 
 /** One request on an endpoint's model, on the agents Worker: the model's text. */
 const endpointText = (operation: TextGenerationOperations.Operation, prompt: string, endpoint: ModelEndpoint, modelId: string) =>
   Effect.gen(function* () {
-    const named = `Text generation on the Model endpoint "${endpoint.id}" failed`;
+    const named = `${endpointLabel(endpoint.id)} could not be used for text generation`;
     const binding = environmentServices().agents.TEXT_GENERATION;
     if (binding === undefined) return yield* fail(operation, `${named}: this Environment has no binding to the agents Worker for it.`);
     const answer = yield* Effect.tryPromise({
@@ -55,7 +58,7 @@ const endpointText = (operation: TextGenerationOperations.Operation, prompt: str
       // The binding's own error text is the platform's, not the endpoint's: kept as the cause only.
       catch: (cause) => fail(operation, `${named}: the agents Worker could not be reached.`, cause),
     }).pipe(
-      Effect.timeoutOrElse({ duration: TIMEOUT_MS, orElse: () => Effect.fail(fail(operation, `The Model endpoint "${endpoint.id}" did not answer in time.`)) }),
+      Effect.timeoutOrElse({ duration: TIMEOUT_MS, orElse: () => Effect.fail(fail(operation, `${endpointLabel(endpoint.id)} did not answer in time.`)) }),
     );
     if (!answer.ok) return yield* fail(operation, answer.error);
     return answer.text;
@@ -113,11 +116,45 @@ export const runText: TextGenerationOperations.Runner = (request) =>
     if (target.kind === "endpoint") {
       const text = yield* endpointText(request.operation, request.prompt, target.endpoint, target.modelId);
       // Every failure names the endpoint and its model, an unusable reply's too.
-      return yield* TextGenerationOperations.decodeJsonReply(request, `The Model endpoint "${target.endpoint.id}" (model ${target.modelId})`, text);
+      return yield* TextGenerationOperations.decodeJsonReply(request, modelLabel(target.endpoint.id, target.modelId), text);
     }
     const text = yield* proxyText(request.operation, request.prompt, target.modelId);
     return yield* TextGenerationOperations.decodeJsonReply(request, "Pi Durable", text);
   });
 
-export const makePiDurableTextGeneration = () =>
-  TextGenerationOperations.fromRunner("PiDurableTextGeneration", TextGenerationOperations.withoutInvestigation("Pi Durable", runText));
+/** How a failure names an endpoint's model: `The Model endpoint "<id>" (model <modelId>)`. */
+const modelLabel = (endpointId: string, modelId: string): string => `${endpointLabel(endpointId)} (model ${modelId})`;
+
+/** The endpoint and model a selection runs on, when it is an endpoint's (`default` resolved as `runText` does). */
+const endpointModelOf = (selection: ModelSelection): { readonly endpointId: string; readonly modelId: string } | undefined => {
+  const services = environmentServices();
+  const target = textModelOf(selection.model, services.modelEndpoints?.() ?? EMPTY_ENDPOINTS, services.modelProxy !== undefined);
+  if (target.kind === "endpoint") return { endpointId: target.endpoint.id, modelId: target.modelId };
+  const parsed = target.kind === "none" ? parseEndpointSlug(selection.model) : undefined;
+  return parsed === undefined || parsed.endpointId === PROXY_PROVIDER ? undefined : parsed;
+};
+
+/** A failure on an endpoint's model that does not name it yet, named: `The Model endpoint "e" (model m): <detail>`. */
+const namedFailure = (error: TextGenerationError, selection: ModelSelection): TextGenerationError => {
+  const at = endpointModelOf(selection);
+  if (at === undefined || error.detail.includes('Model endpoint "')) return error;
+  const detail = error.detail.charAt(0).toLowerCase() + error.detail.slice(1);
+  return new TextGenerationError({ operation: error.operation, detail: `${modelLabel(at.endpointId, at.modelId)}: ${detail}`, cause: error });
+};
+
+const namingEndpoint =
+  <I extends { readonly modelSelection: ModelSelection }, A>(operation: (input: I) => Effect.Effect<A, TextGenerationError>) =>
+  (input: I): Effect.Effect<A, TextGenerationError> =>
+    operation(input).pipe(Effect.mapError((error) => namedFailure(error, input.modelSelection)));
+
+export const makePiDurableTextGeneration = (): ProviderTextGeneration => {
+  const base = TextGenerationOperations.fromRunner("PiDurableTextGeneration", TextGenerationOperations.withoutInvestigation("Pi Durable", runText));
+  return {
+    generateTranscriptionPostProcessing: namingEndpoint(base.generateTranscriptionPostProcessing),
+    generateCommitMessage: namingEndpoint(base.generateCommitMessage),
+    generatePrContent: namingEndpoint(base.generatePrContent),
+    generateBranchName: namingEndpoint(base.generateBranchName),
+    generateThreadTitle: namingEndpoint(base.generateThreadTitle),
+    generateReviewGuide: namingEndpoint(base.generateReviewGuide),
+  };
+};

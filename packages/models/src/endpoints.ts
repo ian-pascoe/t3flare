@@ -121,6 +121,9 @@ export interface EndpointTextRequest {
   readonly prompt: string;
 }
 
+/** How a message names an endpoint: `The Model endpoint "<id>"`. */
+export const endpointLabel = (endpointId: string): string => `The Model endpoint "${endpointId}"`;
+
 /** A text-generation prompt as sent to a model, on every path: t3's prompt, then the ask for its JSON object only. */
 export const jsonOnlyPrompt = (prompt: string): string => `${prompt}\n\nAnswer with the JSON object only.`;
 

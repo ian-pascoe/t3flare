@@ -13,7 +13,7 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import type { CatalogModel } from "@t3flare/models";
 import type { Catalog, ModelProxy } from "@t3flare/models/catalog";
-import { type EndpointApi, type EndpointCredential, type EndpointModel, type EndpointTarget, type ModelEndpoint, type ModelEndpoints, targetOf } from "@t3flare/models/endpoints";
+import { type EndpointApi, type EndpointCredential, type EndpointModel, endpointLabel, type EndpointTarget, type ModelEndpoint, type ModelEndpoints, targetOf } from "@t3flare/models/endpoints";
 
 export type { ModelProxy };
 
@@ -133,10 +133,10 @@ export interface EndpointAccess {
 /** Why the Environment gave no key for an endpoint, as the turn (or the text generation) says it. */
 export const credentialProblem = (endpointId: string, { unreadable, changed }: EndpointCredential): string =>
   changed === true
-    ? `The Model endpoint "${endpointId}" changed or was removed since this Session took it: retry the turn.`
+    ? `${endpointLabel(endpointId)} changed or was removed since this Session took it: retry the turn.`
     : unreadable === true
-      ? `The Model endpoint "${endpointId}"'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`
-      : `The Model endpoint "${endpointId}" has no API key: set one in the Harness panel.`;
+      ? `${endpointLabel(endpointId)}'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`
+      : `${endpointLabel(endpointId)} has no API key: set one in the Harness panel.`;
 
 const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api> => ({
   id: model.id,
