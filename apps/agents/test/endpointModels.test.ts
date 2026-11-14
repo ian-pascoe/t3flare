@@ -102,7 +102,7 @@ describe("endpointProviders", () => {
         await models.completeSimple(models.getModel("gw", "m1")!, { messages: [{ role: "user", content: "hi", timestamp: 0 }] });
         expect(sent.length).toBeGreaterThan(0);
         expect(sent[0]).toMatchObject({ "x-org": "acme", "helicone-target-url": "https://upstream.example" });
-        expect(sent[0]!.url.startsWith("https://gw.example/v1")).toBe(true);
+        expect(sent[0]?.url?.startsWith("https://gw.example/v1")).toBe(true);
         expect(Object.values(sent[0]!).some((value) => value.includes("sk-wire"))).toBe(auth === "api-key");
       });
     }

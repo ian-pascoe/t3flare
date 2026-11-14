@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off
 // A Session's Model endpoint keys follow the endpoint's target (SPI-1162 review): each request for a key names the target
 // the Session holds, and the Environment gives one only for the endpoint's target now. After the owner moves an endpoint
 // to a new host with a new key, a Session still holding the old target (a long turn past the key's time in memory, or a
