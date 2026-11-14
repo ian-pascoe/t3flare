@@ -480,10 +480,10 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * changes live in this object's SQLite.
    */
   async #settingsDeps(): Promise<SettingsServerDeps> {
-    const [{ settingsChanges }, { harnessStatus, runningContainers }, { threadLinkOf }, { durableModes }, { cliThreadState }] = await Promise.all([
+    // threadCaller.ts, not provider/adapter.ts: the panel's GET on a cold object must not load the provider modules.
+    const [{ settingsChanges }, { harnessStatus, runningContainers }, { threadLinkIn, durableModes }, { cliThreadState }] = await Promise.all([
       import("./settings/changes.ts"),
       import("./harness/panel.ts"),
-      import("./provider/adapter.ts"),
       import("./provider/threadCaller.ts"),
       import("./provider/cli/cliAsk.ts"),
     ]);
@@ -492,7 +492,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return {
       ops: { store, mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth, skills, now: () => Date.now() },
       oauthStatus: (server) => this.harnessOAuth.status(server),
-      link: (thread) => threadLinkOf(thread),
+      link: (thread) => threadLinkIn(this.ctx.storage.sql, thread),
       // A Durable thread's modes are the adapter's record; a CLI thread's are its live session's (plan D3).
       modes: (caller) => (caller.thread === undefined ? undefined : caller.agent === DURABLE_AGENT ? durableModes(caller.thread) : cliThreadState(caller.thread)),
       changes: settingsChanges(this.ctx.storage.sql, Date.now, (event) => console.log(JSON.stringify(event))),

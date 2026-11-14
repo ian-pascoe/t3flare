@@ -110,7 +110,7 @@ export interface SettingsServerDeps {
   readonly ops: OpsDeps & { readonly mcp: Pick<McpHost, "servers" | "inventory" | "tools" | "list"> };
   /** An OAuth server's sign-in state (never a token). */
   readonly oauthStatus?: (server: string) => { readonly signedIn: boolean; readonly expiresAt: number | null; readonly refreshable: boolean };
-  /** The thread's Linked work (`threadLinkOf`). */
+  /** The thread's Linked work (`threadLinkIn`, provider/threadCaller.ts): fails closed, `"unknown"` with no projection row. */
   readonly link: (thread: string) => ThreadLink;
   /** The thread's modes: the adapter's record for a Durable agent, `cliThreadState` for a CLI agent. */
   readonly modes: (caller: OwnCaller) => ThreadModes | undefined;
