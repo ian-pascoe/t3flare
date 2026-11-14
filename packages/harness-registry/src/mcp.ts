@@ -123,6 +123,12 @@ export const CLI_TOOL_TIMEOUT_SEC = 900;
 /** The variable a CLI process reads its tool handle from (Codex's `bearer_token_env_var`). */
 export const TOOL_HANDLE_ENV = "T3FLARE_TOOL_HANDLE";
 
+/**
+ * The variable the pi CLI's process names its relayed servers in, comma-separated (SPI-1076, Patch 0006): t3's pi
+ * extension lets a built-in MCP tool through unasked only when its server is one of these.
+ */
+export const RELAY_SERVERS_ENV = "T3FLARE_RELAY_SERVERS";
+
 /** A CLI process's MCP message, as the Workspace DO passes it to the Environment DO (the caller from the handle). */
 export interface McpRelayInput {
   readonly workspace: string;
