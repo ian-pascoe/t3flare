@@ -47,7 +47,7 @@ describe("the Container backend made again when the patterns change", () => {
     let failures = failFirst === undefined ? 0 : 1;
     const backend = new ContainerOnlyBackend({
       initial: ["/a"],
-      ...(connected === undefined ? {} : { connected: (handle: { readonly runtimeId?: string | undefined }) => connected({ ...(handle.runtimeId === undefined ? {} : { runtimeId: handle.runtimeId }) }) }),
+      ...(connected === undefined ? {} : { connected: (handle: { readonly runtimeId?: string | undefined }) => connected(handle.runtimeId === undefined ? {} : { runtimeId: handle.runtimeId }) }),
       patterns: () => Promise.resolve(needed.shift() ?? ["/a"]),
       stop: () => {
         stops++;

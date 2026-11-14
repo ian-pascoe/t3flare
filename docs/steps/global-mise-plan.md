@@ -1,10 +1,11 @@
 # SPI-1150: Global mise config in Environment settings — plan
 
-Status: building (2026-11-14). The review of `eb82395` approved it with changes (folded in, **Review changelog**);
-the re-review of `8a9f1d4` approved it with changes C1–C6 (folded in during Build, **Re-review changelog**, which wins
-over any section below it). M0 done 2026-11-13. Ticket: SPI-1150, a sibling under SPI-1001's triage; its decisions are
-settled and not reopened here. Base: `main` at `660f922` (SPI-1149). Branch `spi-1150-global-mise`. Stage `pmise`.
-Report (after Build): `docs/steps/global-mise.md`. Background: [`spi-1001-research-mise.md`](spi-1001-research-mise.md).
+Status: built (2026-11-14); report [`global-mise.md`](global-mise.md), which records where Build departed from this
+plan. The review of `eb82395` approved it with changes (folded in, **Review changelog**); the re-review of `8a9f1d4`
+approved it with changes C1–C6 (folded in during Build, **Re-review changelog**, which wins over any section below it).
+M0 done 2026-11-13. Ticket: SPI-1150, a sibling under SPI-1001's triage; its decisions are settled and not reopened
+here. Base: `main` at `660f922` (SPI-1149). Branch `spi-1150-global-mise`. Stage `pmise`. Report (after Build):
+`docs/steps/global-mise.md`. Background: [`spi-1001-research-mise.md`](spi-1001-research-mise.md).
 
 ## Review changelog (review of `eb82395`)
 
