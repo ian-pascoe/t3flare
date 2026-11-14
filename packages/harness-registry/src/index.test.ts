@@ -83,6 +83,14 @@ describe("applyChange", () => {
       error: "offered-tools.preset: one of core, codemode-only, everything",
     });
     expect(applyChange(EMPTY_HARNESS, { extension: "nope", enabled: true })).toEqual({ ok: false, error: "nope: no such extension" });
+    expect(applyChange(EMPTY_HARNESS, { extension: "codemode", settings: { constructor: 1 } })).toEqual({ ok: false, error: "codemode.constructor: no such setting" });
+  });
+
+  it("refuses a switch that is not true or false: a stored null would resolve to the default, on", () => {
+    const off = applyChange(EMPTY_HARNESS, { extension: "codemode", enabled: false });
+    if (!off.ok) throw new Error(off.error);
+    expect(applyChange(off.harness, { extension: "codemode", enabled: null as unknown as boolean })).toEqual({ ok: false, error: "enabled: true or false" });
+    expect(applyChange(off.harness, { extension: "codemode", enabled: "no" as unknown as boolean })).toEqual({ ok: false, error: "enabled: true or false" });
   });
 
   it("refuses to change a locked extension: permissions can never be turned off", () => {

@@ -133,6 +133,14 @@ describe("tierOf: extensions", () => {
     expect(tier({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "nope", enabled: false } })).toBe("asked");
     expect(tier({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "codemode", settings: { nope: 1 } } })).toBe("asked");
   });
+
+  it("a switch that is not true or false is asked, whatever is stored (it would resolve to the default)", () => {
+    const off = applyChange(EMPTY_HARNESS, { extension: "codemode", enabled: false });
+    if (!off.ok) throw new Error(off.error);
+    for (const enabled of [null, "false", 0]) {
+      expect(tier({ entity: "extension", stored: off.harness, change: { extension: "codemode", enabled: enabled as unknown as boolean } })).toBe("asked");
+    }
+  });
 });
 
 describe("tierOf: the MCP server set", () => {
@@ -156,6 +164,14 @@ describe("tierOf: the MCP server set", () => {
     expect(mcp(withDirect({ enabled: false }), covered({ op: "server", server: "fixture", enabled: true }))).toBe("asked");
     expect(mcp(withDirect(), { op: "server", server: "fixture", enabled: false })).toBe("free");
     expect(mcp(withDirect(), { op: "server", server: "fixture", enabled: true })).toBe("unchanged");
+    expect(mcp(withDirect({ enabled: false }), { op: "server", server: "fixture", enabled: null as unknown as boolean })).toBe("asked");
+  });
+
+  it("a name inherited from Object.prototype is not a server in the set (asked)", () => {
+    for (const server of ["constructor", "toString", "__proto__"]) {
+      expect(mcp(withDirect(), { op: "server", server, enabled: false })).toBe("asked");
+      expect(applyMcpChange(withDirect(), { op: "server", server, enabled: false })).toEqual({ ok: false, error: `${server}: no such server` });
+    }
   });
 
   it("Exposure up asked, down and sideways free, server-wide and per tool against the tool's effective Exposure", () => {
