@@ -904,6 +904,37 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   replacing `ownerDoor.ts`, the worker branch and `SettingsAccess` (plan D13); for a client, compare with the spec's
   `schema.ts` for the version and the client's traffic.
 
+### U69. The Owner-client endpoint's `native` and `model` modes: client forms and Executor's pause (SPI-1201)
+
+- **Where**: `apps/environment/src/settings/endpoint.ts` (`deliverNative`, `heldStream`, the response POST's `native`
+  branch, the `requestState` retry's `native` branch, `resume`) and `server.ts` (`ownerPause`, `ownerResume`,
+  `EMPTY_SCHEMA`, `PAUSE_LINE`), `tools.ts` (`RESUME_TOOL`). `native` asks a form with an empty `requestedSchema`
+  (`{ type: "object", properties: {} }`) and reads only the answer's `action`: 2026 as `input_required` with
+  `mode: "form"`; 2025-11-25 and 2025-06-18 (no `mode` key there) as `elicitation/create` on the call's SSE stream, held
+  until the client's response POST, the stream's end or the change's expiry, with `notifications/progress` (when the
+  call carried `_meta.progressToken`) or an SSE comment every 15 s. It rests on M0's P14 (`m0-clients.json`, spike
+  branch): Claude Code 2.1.322 shows an empty form as Accept / Decline on both versions, posts the 2025 answer as its
+  own JSON-RPC response, and keeps the dialog open when the server cuts the stream (then posts a stale answer, which
+  finds the change withdrawn); OpenCode 2.2.7 accepts an empty form by itself under `permission: allow`. `model`
+  copies Executor's pause (U52) so that a host with ADR-0028's pausing rule reads it: `structuredContent.status`
+  `approval-required`, `requestId`, `elicitation { mode: "form", message, requestedSchema }`, `expiresAt`, and a
+  `resume` whose input has `requestId` and `response { action, content }` (`isPausingServer`); M0 saw Claude Code's
+  agent read such a result, not call `resume` itself, and ask the user.
+- **Breaks when**: a client starts rendering an empty `requestedSchema` as nothing to answer, or refuses it (plan §9:
+  `native` would need a one-boolean form); a client stops posting the 2025 answer as its own POST (it would hold to
+  the change's expiry), or drops its form when a stream has been held a while; the spec moves the 2026 form to other
+  keys; Executor changes its pause or `resume` shape, so hosts built for it (ours, U52, included) stop reading this
+  server's Pause as one.
+- **Detection**: `test/settingsModes.test.ts` pins our side of each shape, and imports `pauseOf` and
+  `isPausingServer`, so a change to our own reading of Executor's shape fails there. **Silent** for real clients: the
+  stage run of `m5b-settings-owner-modes.json` (`docs/steps/settings-mcp/m5b-stage-run.md`).
+- **Blast radius**: `native` or `model` with that client: the question is not shown or not answered, and the change
+  waits on its Change page until it expires (the page still answers it, so nothing applies unseen). `browser`, own
+  agents and the panel are unaffected.
+- **Fix**: for a client, compare its traffic with the spec's `schema.ts` and M0's capture; if an empty form is the
+  problem, ask a one-boolean form (`{ approve: { type: "boolean" } }`) and read `content.approve` with `accept`; for
+  Executor, follow U52's fix in `ownerPause` and `RESUME_TOOL` too.
+
 ## Gaps in detection
 
 Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).

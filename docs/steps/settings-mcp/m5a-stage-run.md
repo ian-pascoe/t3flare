@@ -61,7 +61,8 @@ Configure the client with `<settingsMcpUrl>?elicitation_mode=browser` (and once 
 10. **The link fallback**: pi 1.5.2 (no elicitation) makes an asked change: the result is `waiting` with the link, and
     the page applies it.
 11. **`native` and `model` until M5b**: a client configured with `?elicitation_mode=native` and `=model` connects, lists
-    no `resume`, and its asked change behaves as `browser` with the result saying so.
+    no `resume`, and its asked change behaves as `browser` with the result saying so. Only at commits before M5b: from
+    M5b (SPI-1201) on, the two modes are `m5b-stage-run.md`'s, and this item is not run.
 12. **Guards from outside**: with the service token and the admin token (so Access admits the request), record 405 for
     GET, 415 for `text/plain`, 403 with an `Origin` and with `Sec-Fetch-Site`, 413 for 300 KiB, and 400 for
     `?elicitation_mode=natve`, each with `cache-control: no-store` and no `access-control-*` header. Without Access
