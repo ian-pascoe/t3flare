@@ -10,7 +10,8 @@
     "./process": "./src/process.ts",
     "./clis": "./src/clis.ts",
     "./leakscan": "./src/leakscan.ts",
-    "./ports": "./src/ports.ts"
+    "./ports": "./src/ports.ts",
+    "./globalMise": "./src/globalMise.ts"
   },
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit"

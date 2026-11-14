@@ -11,6 +11,8 @@
 # Keep in step with the version of @cloudflare/computer the Workspace DO runs (apps/environment/test/cliManifest.test.ts
 # fails when they differ): the Workspace and computerd speak a sync protocol that is not stable across releases.
 ARG COMPUTERD_VERSION=0.11.2
+# On a mise bump, run apps/environment/test/docker/mise.docker.test.ts (the nightly test:docker does): the Global mise
+# config leans on its layering, its token sources and how it reads an empty variable, which move between versions.
 ARG MISE_VERSION=v2026.11.2
 ARG MISE_SHA256=62cad463c1413f05398ca339168a8f655120b6f0b0b8adce3bc6758bafaf0602
 # The CLI agents (step 4a; apps/sandbox-image/src/clis.ts holds the same values, apps/environment/test/cliManifest.test.ts keeps them equal).
