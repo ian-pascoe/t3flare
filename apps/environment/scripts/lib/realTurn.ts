@@ -14,7 +14,7 @@ import { committed, headCommit, t3Commit } from "./t3Commit.ts";
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 // T3FLARE_REAL_TURN_MODEL names another model of the proxy (a Claude model gets a thinking level, any other none).
 const SLUG = process.env.T3FLARE_REAL_TURN_MODEL ?? "anthropic/claude-haiku-5-5";
-const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
+const modelOf = (slug: string) => ({ instanceId: "piDurable", model: slug, options: /claude/.test(slug) ? [{ id: "thinking", value: "low" }] : [] });
 
 export interface RealTurnReport {
   readonly ok: boolean;
@@ -22,7 +22,9 @@ export interface RealTurnReport {
   readonly [key: string]: unknown;
 }
 
-export const realTurn = async (cookie: string, options: { readonly push: boolean }): Promise<RealTurnReport> => {
+export const realTurn = async (cookie: string, options: { readonly push: boolean; readonly model?: string }): Promise<RealTurnReport> => {
+  // SPI-1162: a Model endpoint's model (`<endpointId>/<modelId>`) by option, else the env's or the default.
+  const MODEL = modelOf(options.model ?? SLUG);
   const failures: Array<string> = [];
   const check = (name: string, ok: boolean, detail?: unknown) => {
     if (!ok) failures.push(`${name}${detail === undefined ? "" : `: ${JSON.stringify(detail).slice(0, 500)}`}`);
