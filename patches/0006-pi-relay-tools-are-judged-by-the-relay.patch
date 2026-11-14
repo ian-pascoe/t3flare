@@ -1,8 +1,8 @@
 diff --git a/packages/provider-pi/src/server/mcpExtensionSource.ts b/packages/provider-pi/src/server/mcpExtensionSource.ts
-index 48aeff2437..2893376235 100644
+index 48aeff2437..216edbe57c 100644
 --- a/packages/provider-pi/src/server/mcpExtensionSource.ts
 +++ b/packages/provider-pi/src/server/mcpExtensionSource.ts
-@@ -358,10 +358,25 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
+@@ -358,10 +358,32 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
        NodePath.resolve(tool.sourceInfo.path) === NodePath.resolve(extensionPath));
    };
  
@@ -16,8 +16,15 @@ index 48aeff2437..2893376235 100644
 +    .split(",")
 +    .filter((server) => server !== "")
 +    .map((server) => "mcp__" + server.replace(/[^A-Za-z0-9_]/g, "_") + "__");
++  // After the prefix comes the tool's own name: one that starts with _ or holds __ may be the
++  // tool of another server whose name only starts like a relayed one (settings--x and
++  // settings__x are mcp__settings__x__..., settings- is mcp__settings___...), so it is asked.
++  const isRelayedName = (name: string, prefix: string) => {
++    const rest = name.slice(prefix.length);
++    return name.startsWith(prefix) && rest !== "" && !rest.startsWith("_") && !rest.includes("__");
++  };
 +  const isRelayedMcpTool = (name: string) =>
-+    relayedPrefixes.some((prefix) => name.startsWith(prefix)) &&
++    relayedPrefixes.some((prefix) => isRelayedName(name, prefix)) &&
 +    typeof pi.getAllTools === "function" &&
 +    pi.getAllTools().some((tool) => tool.name === name && tool.sourceInfo?.path === "builtin:mcp");
 +

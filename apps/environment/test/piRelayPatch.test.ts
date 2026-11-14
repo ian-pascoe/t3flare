@@ -89,6 +89,11 @@ const TOOLS: ReadonlyArray<ToolInfo> = [
   { name: "mcp__my_docs__search", sourceInfo: { path: "builtin:mcp" } },
   // A server whose name only starts like a relayed one is another server.
   { name: "mcp__my_docs2__search", sourceInfo: { path: "builtin:mcp" } },
+  // C4 (SPI-1201 review): servers whose pi names only start like a relayed one's: `settings--x` and `settings__x`
+  // (mcp__settings__x__…), `settings-` (mcp__settings___…) and `commissary_` (mcp__commissary___…).
+  { name: "mcp__settings__x__write", sourceInfo: { path: "builtin:mcp" } },
+  { name: "mcp__settings___write", sourceInfo: { path: "builtin:mcp" } },
+  { name: "mcp__commissary___search", sourceInfo: { path: "builtin:mcp" } },
   // A built-in MCP tool of a server the relay does not serve this process (another source added it).
   { name: "mcp__stranger__write", sourceInfo: { path: "builtin:mcp" } },
   // A tool of another extension that takes an MCP-shaped name.
@@ -149,6 +154,14 @@ describe("Patch 0006: pi's relay tools are judged by the relay", () => {
     expect(await asks(patched, "approval-required", "mcp__my_docs__search")).toBe(false);
     expect(await asks(patched, "approval-required", "mcp__my_docs2__search")).toBe(true);
     expect(await asks(stock, "approval-required", "mcp__my_docs__search")).toBe(true);
+  });
+
+  it("asks for a tool whose name only starts like a relayed server's: settings--x, settings__x, settings-, commissary_", async () => {
+    for (const tool of ["mcp__settings__x__write", "mcp__settings___write", "mcp__commissary___search"]) {
+      expect([tool, await asks(patched, "approval-required", tool)]).toEqual([tool, true]);
+    }
+    // The relayed servers' own tools still pass.
+    expect(await asks(patched, "approval-required", RELAY_TOOL)).toBe(false);
   });
 
   it("asks, as stock t3 does, for every tool not from pi's built-in MCP client", async () => {

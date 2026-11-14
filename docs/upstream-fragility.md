@@ -856,7 +856,9 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   not serve this process. A relayed server matches as pi names its tools: `mcp__<server>__` with every character but
   letters, digits and `_` replaced by `_` (pi 1.5.2 `docs/mcp.md`; the code is `createMcpToolName` in
   `@earendil-works/pi-mcp`'s `src/naming.ts`, bundled into pi, `.replace(/[^A-Za-z0-9_]/g, "_")`), so `my-docs` is
-  `mcp__my_docs__…` (SPI-1200 review; server names are `[a-z0-9-]{1,20}`, `SERVER_NAME`).
+  `mcp__my_docs__…` (SPI-1200 review; server names are `[a-z0-9-]{1,20}`, `SERVER_NAME`). After the prefix, a name whose
+  rest starts with `_` or holds `__` is asked: it may be the tool of a server whose name only starts like a relayed one
+  (`settings--x` and `settings__x` give `mcp__settings__x__…`, `settings-` gives `mcp__settings___…`; SPI-1201 review).
 - **Breaks when**: pi renames `mcp.json` or its keys, drops `${VAR}` expansion in headers, changes the `builtin:mcp`
   source path or `getAllTools`' `sourceInfo`, lets `PI_OFFLINE` stop MCP, stops turning MCP off with `--no-extensions`,
   or reads a project's `mcp.json` without trust; pi changes how it names a server's tool (`mcp__<server>__<tool>`, the
@@ -865,12 +867,13 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Detection**: the Patch failing to apply (`check:patches`, loud); `test/piRelayPatch.test.ts` applies the Patch as
   `build.ts` does and runs the hook against a stand-in for pi's API (the relay's tools pass; bash, write, t3's tools, a
   look-alike extension tool, a resource tool, an unlisted tool, a `builtin:mcp` tool of an unnamed server, and every
-  tool when no server is named are asked; a hyphenated server matches by pi's `_` name and a longer name does not);
-  `test/cliProfiles.test.ts` T-pi-1 pins the file, the environment (the handle and `T3FLARE_RELAY_SERVERS`) and the
-  fork. **Silent**: a renamed source path (pi asks the extension's "Allow …?" before the relay's card: more asks, fail
-  closed); a changed `mcp.json` shape or expansion (pi lists none of the relay's tools). Cheapest check:
-  `scripts/tools.ts cli-mcp pi` on a stage (the read raises no request, the write only the relay's card); or a
-  `test:docker` case running the image's pi against a relay stand-in (not built).
+  tool when no server is named are asked; a hyphenated server matches by pi's `_` name and a longer name does not, nor
+  `settings--x`, `settings__x`, `settings-` or `commissary_`); `test/cliProfiles.test.ts` T-pi-1 pins the file, the
+  environment (the handle and `T3FLARE_RELAY_SERVERS`) and the fork. **Silent**: a renamed source path (pi asks the
+  extension's "Allow …?" before the relay's card: more asks, fail closed); a changed `mcp.json` shape or expansion (pi
+  lists none of the relay's tools). Cheapest check: `scripts/tools.ts cli-mcp pi` on a stage (the read raises no
+  request, the write only the relay's card); or a `test:docker` case running the image's pi against a relay stand-in
+  (not built).
 - **Blast radius**: a moved source label or tool-name shape: an extra ask per relay call (fail closed). A `builtin:mcp`
   server from elsewhere is asked as any tool is, unless it takes a relayed server's name, which pi's own config keeps
   unique per name and project trust (off) would be needed to override.
