@@ -100,7 +100,8 @@ const install = async (deps: SkillsApiDeps, body: Record<string, unknown>): Prom
   const { source } = parsed;
   const { reader } = await deps.reader({ owner: source.owner, name: source.name }, deps.now() + REQUEST_BUDGET_MS);
   const fetched = await fetchSkills(reader, { repo: { owner: source.owner, name: source.name }, commit, folders });
-  if (fetched.status === "failed") return refuse(502, fetched.message);
+  // Too many files is the request's own limit, not GitHub's failure.
+  if (fetched.status === "failed") return refuse(fetched.kind === "too_many" ? 422 : 502, fetched.message);
   const results: Array<{ readonly name: string; readonly path: string; readonly action?: string; readonly error?: string }> = [];
   for (const skill of fetched.skills) {
     const answer = await deps.store.apply({ kind: "install", skill, source: { repo: source.repo, path: skill.path, ref: source.ref, commit } }, deps.caller, deps.now());

@@ -92,11 +92,12 @@ const containerOf = async () => {
   return { running: row?.container?.running ?? null, startedAt: row?.container?.startedAt ?? null };
 };
 const stopContainer = async () => {
-  await admin("POST", `/_t3flare/agents/workspace-stop?id=${PROJECT}`);
   const started = Date.now();
-  while (Date.now() - started < 120_000) {
+  // Asked again while it runs: a command that was still finishing can hold the first stop off.
+  while (Date.now() - started < 240_000) {
+    await admin("POST", `/_t3flare/agents/workspace-stop?id=${PROJECT}`);
     if ((await containerOf()).running === false) return;
-    await sleep(2000);
+    await sleep(5000);
   }
   throw new Error("the Container did not stop");
 };
@@ -389,7 +390,8 @@ const readonly = async () => {
   const checks = {
     writeToolRefused: writeTool.tools.some((tool) => /read-only|EROFS|EIO|cannot modify/i.test(tool)) && writeTool.tools.every((tool) => !/"ok":true/.test(tool) || !tool.includes("planted.md")),
     freshFirstCommand: before.running === false && after.running === true,
-    agentBashRefused: bashFirst.tools.some((tool) => tool.includes("Read-only file system")),
+    // t3 keeps a command's output out of its item (`outputOmitted`); the agent's answer is the output, as asked.
+    agentBashRefused: [...bashFirst.tools, bashFirst.answer].some((text) => text.includes("Read-only file system")) && bashFirst.answer.includes("exit=1"),
     runningRefused: running.stdout.includes("exit=2") || running.stdout.includes("exit=1"),
     nothingPlanted: !running.stdout.includes("planted") && !running.stdout.includes("also.txt"),
   };
@@ -405,7 +407,7 @@ const remove = async () => {
   await sh("true");
   const removed = await harness("POST", "skills/remove", { name: "fruit-code" });
   const snapshot = await composerSnapshot();
-  const answer = await turn(thread, "Without reading any file or running any command, reply with exactly the text after the colon, unchanged: $fruit-code-gone and then the code the Repo's fruit-code skill gives: $fruit-code");
+  const answer = await turn(thread, "$fruit-code What is the fruit code? Reply with the code alone.");
   const mount = await call({ fs: { op: "stat", path: `${MOUNT}/fruit-code/SKILL.md` } });
   const container = await sh(`ls ${MOUNT}/fruit-code 2>&1; echo "exit=$?"`);
   const unknown = await turn(thread, "Reply with exactly the text after the colon, unchanged: $plum-gone");
@@ -440,7 +442,7 @@ const refusals = async () => {
     symlink: String(problems.linked).includes("run.sh: a link or a submodule"),
     oversize: String(problems.big).includes("more than the 4194304 a Skill may be"),
     badPath: String(problems.badpath).includes("backslash"),
-    blobCap: (cases.installOverBlobCap as any).status === 502 && String((cases.installOverBlobCap as any).json).includes("install at most 500 files at a time"),
+    blobCap: (cases.installOverBlobCap as any).status === 422 && String((cases.installOverBlobCap as any).json).includes("install at most 500 files at a time"),
     nothingKept: ((await harness("GET", "skills")).json.skills as Array<any>).every((skill) => !["leaky", "linked", "big", "badpath", "many-a", "many-b"].includes(skill.name)),
   };
   await writeEvidence("env-refusals.json", { ok: Object.values(checks).every(Boolean), checks, cases });

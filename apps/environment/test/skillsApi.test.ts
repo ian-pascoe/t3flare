@@ -118,6 +118,18 @@ describe("Environment skills API", () => {
     expect(skills.get("a")?.commit).toBe(first);
   });
 
+  it("refuses an install over the request's 500 files as the request's own limit (422), keeping nothing", async () => {
+    const { github, deps, skills } = setup();
+    const files: Record<string, string> = {};
+    for (const skill of ["a", "b"]) {
+      files[`skills/${skill}/SKILL.md`] = skillMd(skill);
+      for (let index = 0; index < 300; index++) files[`skills/${skill}/f${index}.md`] = `${skill}${index}`;
+    }
+    const commit = github.push("o/r", files);
+    expect(await postJson(deps, "install", { source: "o/r", commit, folders: ["skills/a", "skills/b"] })).toEqual({ status: 422, body: "These skills hold 602 files; install at most 500 files at a time.\n" });
+    expect(skills.list()).toEqual([]);
+  });
+
   it("removes and switches a skill, each audited", async () => {
     const { github, deps, store } = setup();
     const commit = github.push("o/r", { "skills/a/SKILL.md": skillMd("a") });
