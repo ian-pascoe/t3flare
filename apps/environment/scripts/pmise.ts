@@ -11,7 +11,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { ensureProject } from "./lib/cliTurn.ts";
-import { admin, DEFAULT_MODEL, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, SETTLED, sleep, threadWindow, uuid, wsCall, wsStream } from "./lib/client.ts";
+import { admin, DEFAULT_MODEL, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, SETTLED, sleep, threadWindow, uuid, wsCall, wsFirst, wsStream } from "./lib/client.ts";
 import { tailing } from "./lib/tail.ts";
 import { attachTerminal, stripAnsi } from "./lib/terminal.ts";
 
@@ -114,6 +114,12 @@ const turn = async (projectId: string, model: { instanceId: string; model: strin
     runs: runsOf(view).map((run: any) => ({ status: run.status, failure: run.failure ?? null })),
     answer: String(items.filter((item: any) => item.type === "assistant_message").at(-1)?.text ?? "").slice(-400),
     tools: items.filter((item: any) => item.type === "command_execution").map((item: any) => String(item.input ?? "").slice(0, 200)),
+    // A command's output as t3's client expands it (the thread window omits it): what the agent's tool returned.
+    outputs: await Promise.all(
+      items
+        .filter((item: any) => item.type === "command_execution")
+        .map(async (item: any) => JSON.stringify(await wsFirst(cookie, "orchestration.subscribeCommandOutput", { threadId, itemId: item.id }).catch((error: unknown) => ({ error: String(error).slice(0, 200) }))).slice(0, 800)),
+    ),
     errors: items.filter((item: any) => item.type === "error").map((item: any) => String(item.detail ?? item.message ?? item.text ?? JSON.stringify(item)).slice(-1200)),
     ms: Date.now() - started,
   };
@@ -336,7 +342,7 @@ const override = async () => {
   const repo = '[tools]\nnode = "22.12.0"\n';
   const run = await execOn(
     WORKSPACE,
-    `cd /workspace/repo && printf '${repo.replaceAll("\n", "\\n")}' > mise.toml && echo "node $(node --version)" && echo "fzf $(fzf --version)" && echo "outside $(cd / && node --version)" && mise ls --current 2>/dev/null | awk '{print $1, $2, $3}'; rm -f mise.toml`,
+    `cd /workspace/repo && printf '${repo.replaceAll("\n", "\\n")}' > mise.toml && echo "node $(node --version)" && echo "fzf $(fzf --version)" && echo "outside $(cd / && node --version)" && mise ls --current 2>/dev/null | awk '{print $1, $2, $3}'; rm -f mise.toml mise.lock`,
     600_000,
   );
   const line = (name: string) => new RegExp(`^${name} (.*)$`, "m").exec(run.stdout)?.[1] ?? null;
@@ -352,25 +358,45 @@ const override = async () => {
   });
 };
 
+/** t3's commit action (the git panel's Commit) of one new file, and the commit it made; the repo reset after. */
+const t3Commit = async (root: string, label: string) => {
+  await execOn(WORKSPACE, `cd /workspace/repo && git reset -q --hard origin/main && git clean -fdq && echo "${label} $(date +%s)" > pmise-commit.txt`);
+  const events = (await wsStream(cookie, "git.runStackedAction", { actionId: uuid(), cwd: root, action: "commit", commitMessage: `pmise: ${label}`, filePaths: ["pmise-commit.txt"] }).catch((error: unknown) => [{ error: String(error).slice(0, 400) }])) as Array<any>;
+  const head = await execOn(WORKSPACE, "cd /workspace/repo && git log -1 --format=%s && git reset -q --hard origin/main && git clean -fdq");
+  const failed = events.find((event) => event?.kind === "action_failed" || event?.error !== undefined);
+  return { events: events.map((event) => event?.kind ?? null), failure: failed === undefined ? null : String(failed.error ?? JSON.stringify(failed)).slice(0, 400), head: head.stdout.trim().split("\n")[0] ?? "" };
+};
+
 const gitGh = async () => {
   cookie ||= await pair();
   const { root } = await ensureProject(cookie, WORKSPACE);
   const cases: Array<Case> = [];
-  // Under the node pin: t3's own status and commit, and gh.
+  // With no Global mise config: t3's commit action as main's code gives it (the control).
+  await setMise("");
+  await stopAll();
+  const control = await t3Commit(root, "control without a Global mise config");
+  // Under the node pin: t3's own status and commit action, a commit through the Workspace's git, and gh.
   await setMise(NODE_PIN);
   await stopAll();
-  const gh = await execOn(WORKSPACE, "gh --version | head -1; git --version");
+  const gh = await execOn(WORKSPACE, "gh --version | head -1; git --version; node --version");
   const statusAnswer = await wsCall(cookie, "vcs.refreshStatus", { cwd: root }).catch((error: unknown) => ({ error: String(error).slice(0, 300) }));
+  const underPin = await t3Commit(root, "under the node pin");
   await execOn(WORKSPACE, `cd /workspace/repo && echo "pmise $(date +%s)" > pmise-commit.txt`);
-  const commit = await wsStream(cookie, "git.runStackedAction", { actionId: uuid(), cwd: root, action: "commit", commitMessage: "pmise: a commit under the Global mise config", filePaths: ["pmise-commit.txt"] }).catch((error: unknown) => [{ error: String(error).slice(0, 400) }]);
-  const head = await execOn(WORKSPACE, "cd /workspace/repo && git log -1 --format=%s && git reset -q --hard HEAD~1");
+  const add = await callOn(WORKSPACE, { git: { argv: ["add", "pmise-commit.txt"], cwd: "/workspace/repo", startContainer: true } });
+  const commit = await callOn(WORKSPACE, { git: { argv: ["-c", "user.name=pmise", "-c", "user.email=pmise@example.invalid", "commit", "-q", "-m", "pmise: the Workspace's git under the node pin"], cwd: "/workspace/repo", startContainer: true } });
+  const head = await execOn(WORKSPACE, "cd /workspace/repo && git log -1 --format=%s && git reset -q --hard origin/main && git clean -fdq");
   cases.push({
-    name: "t3's git status and commit, and gh, under a node pin",
+    name: "t3's git status, a commit, and gh, under a node pin",
     gh: gh.stdout.trim().split("\n"),
-    status: JSON.stringify(statusAnswer).slice(0, 400),
-    commitEvents: (commit as Array<any>).map((event) => event?.kind ?? event?.error ?? null).slice(-4),
-    head: head.stdout.trim(),
-    ok: gh.stdout.startsWith("gh version") && !JSON.stringify(statusAnswer).includes('"error"') && head.stdout.startsWith("pmise: a commit under the Global mise config"),
+    status: JSON.stringify(statusAnswer).slice(0, 300),
+    t3CommitAction: { control, underPin, note: "t3's commit action fails the same way with no Global mise config: t3's temporary object directory is on its own side (not this change)" },
+    workspaceGit: { add: add.result?.exitCode ?? null, commit: commit.result?.exitCode ?? null, head: head.stdout.trim().split("\n")[0] ?? "" },
+    ok:
+      gh.stdout.startsWith("gh version") &&
+      gh.stdout.includes("v24.11.1") &&
+      !JSON.stringify(statusAnswer).includes('"error"') &&
+      head.stdout.startsWith("pmise: the Workspace's git under the node pin") &&
+      (underPin.failure === null ? underPin.head === "pmise: under the node pin" : underPin.failure === control.failure),
   });
   // An owner-pinned conda:git: the lay-down gives it the image's system gitconfig (the credential helper).
   const pinned = '[tools]\n"conda:git" = "2.49.0"\n';
@@ -393,7 +419,7 @@ const gitGh = async () => {
 };
 
 /** A pin whose install takes more than a minute on a cpu-1 Container (measured in the file). */
-const LONG_PIN = '[tools]\nnode = "24.11.1"\nrust = "1.91.1"\ngo = "1.25.4"\n';
+const LONG_PIN = '[tools]\nnode = "24.11.1"\nrust = "1.91.1"\ngo = "1.25.4"\npython = "3.12.8"\njava = "temurin-21.0.5+11.0.LTS"\ndeno = "2.1.4"\nzig = "0.13.0"\nterraform = "1.10.3"\n';
 
 const hold = async () => {
   cookie ||= await pair();
@@ -413,11 +439,11 @@ const hold = async () => {
   while (Date.now() - started < 12 * 60_000) {
     const state = await stateOf(WORKSPACE);
     samples.push({ s: Math.round((Date.now() - started) / 1000), running: state?.running ?? null, globalMise: state?.globalMise?.outcome ?? null });
-    if (reason === null && state?.running === true && Date.now() - started > 40_000) {
+    if (reason === null && state?.running === true && Date.now() - started > 35_000) {
       reason = (await callOn(WORKSPACE, { reclaimReason: true })).result;
       // A second Workspace's start at a budget of 1: refused, and the reclaim leaves this one alone.
       const answer = await callOn(other, { exec: { script: "true", timeoutMs: 120_000 } });
-      refused = { status: answer.status, text: String(answer.text ?? JSON.stringify(answer.result)).slice(0, 400) };
+      refused = { status: answer.status, answer: JSON.stringify(answer).slice(0, 600) };
     }
     if (state?.globalMise?.outcome !== undefined && state.globalMise.at > started) break;
     await sleep(5_000);
@@ -554,7 +580,7 @@ const late = async () => {
     agent: turned,
     ranAfterwards: ran !== null,
     globalMise: (await stateOf(WORKSPACE))?.globalMise ?? null,
-    ok: ran === null && JSON.stringify(turned).includes("installing the Global mise config"),
+    ok: ran === null && turned.outputs.some((output) => output.includes("the Container was installing the Global mise config")),
   });
 };
 

@@ -305,6 +305,8 @@ export const exec = async (
     if (callbackError !== undefined) return err(callbackError);
 
     const note = stoppedBeforeStart ? await host.startingNote?.().catch(() => undefined) : undefined;
+    // The harness replaces a timeout's message with its own; the output it keeps says why the command never ran.
+    if (stoppedBeforeStart && callbackError === undefined) deliver(`t3flare: the command did not start: the Container was ${note ?? "starting"}\n`, "stderr");
     const error = new ExecutionError(
       stopped ?? "aborted",
       stopped !== "timeout"

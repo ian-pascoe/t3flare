@@ -1,4 +1,4 @@
-// The Global mise config's lay-down at a Container start (SPI-1150, ADR-0032 §8): the bash the Workspace DO runs on the
+// The Global mise config's lay-down at a Container start (SPI-1150, ADR-0032's Global mise config refinement): the bash the Workspace DO runs on the
 // Container through the platform's exec, under COMMAND_ENV, with the owner's text on stdin. No Node imports: the agents
 // Worker imports it.
 //

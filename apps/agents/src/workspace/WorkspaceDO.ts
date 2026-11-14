@@ -50,6 +50,7 @@ import { EMPTY_ENVIRONMENT, fitVariables, type McpRelayAnswer, type ResolvedEnvi
 import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, shownLaunch, takeEnvironment, withGlobalMise } from "./containerLaunch.ts";
 import { GlobalMise, type GlobalMiseState } from "./globalMise.ts";
+import { StoppedExecs, StoppedExecsBackend } from "./stoppedExecs.ts";
 import { commandEnv, VariablesBackend } from "./variables.ts";
 import { reclaimFor } from "./reclaim.ts";
 import { killInRunningContainer } from "./containerKill.ts";
@@ -267,7 +268,9 @@ export class WorkspaceDO extends ContainerHost {
   readonly #tokenPatterns: Array<CredentialPattern> = [];
   /** The token the credential helper is given, until shortly before it expires. */
   #token: { readonly token: string; readonly expiresAt: number } | undefined;
-  /** The Global mise config's lay-down, once per Container (SPI-1150, ADR-0032 §8). */
+  /** Commands the Session stopped before they were sent (during a start's install): never sent (`stoppedExecs.ts`). */
+  readonly #stoppedExecs = new StoppedExecs(() => Date.now());
+  /** The Global mise config's lay-down, once per Container (SPI-1150, ADR-0032's Global mise config refinement). */
   readonly #globalMise: GlobalMise;
   /** Commands in flight by kind: a connect for passive reads alone never retries a failed lay-down. */
   #passiveExecs = 0;
@@ -352,7 +355,7 @@ export class WorkspaceDO extends ContainerHost {
         };
       },
       launch: () => ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY)?.globalMise,
-      // The lay-down counts as a command: no idle stop, and "in use" to a reclaim (ADR-0032 §8).
+      // The lay-down counts as a command: no idle stop, and "in use" to a reclaim (ADR-0032's Global mise config refinement).
       hold: () => {
         this.#running++;
         let released = false;
@@ -382,7 +385,7 @@ export class WorkspaceDO extends ContainerHost {
       // hash replaces the copy (`takeEnvironmentSkills`).
       mounts: { [SKILLS_MOUNT]: skillSetMount(skillSet) },
       // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
-      backends: [this.#withVariables(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx })), this.#withVariables(this.#container)],
+      backends: [this.#withVariables(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx })), this.#withVariables(new StoppedExecsBackend(this.#container, this.#stoppedExecs))],
     });
     // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
     this.#host = new WorkspaceEnvHost(this.#workspace, {
@@ -973,6 +976,8 @@ export class WorkspaceDO extends ContainerHost {
    * Container has no processes.
    */
   async killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }> {
+    // A command not sent yet (its Container still starting) is never sent now.
+    this.#stoppedExecs.stopped(execIds);
     const result = await killInRunningContainer(this.ctx.container, execIds);
     if (result === undefined) return { running: false, signalled: 0, survivors: 0 };
     const answer = /\{"signalled":(\d+),"survivors":(\d+)\}/.exec(result.stdout);
@@ -1809,7 +1814,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /**
    * The running Container's lay-down, before a Terminal's or a CLI process's spawn and a command's run: joined while it
-   * runs, a no-op once done, and run again after an exec failure (ADR-0032 §8's retry). A Container being started gets
+   * runs, a no-op once done, and run again after an exec failure (the retry of ADR-0032's Global mise config refinement). A Container being started gets
    * its own at its connect.
    */
   async #ensureGlobalMise(): Promise<void> {
@@ -1893,7 +1898,7 @@ export class WorkspaceDO extends ContainerHost {
       await this.stopContainer();
       return;
     }
-    // A lay-down whose exec failed is tried again here, not awaited, whoever calls next (ADR-0032 §8).
+    // A lay-down whose exec failed is tried again here, not awaited, whoever calls next (ADR-0032's Global mise config refinement).
     if (this.#globalMise.retryFailed(this.#runtime)) console.log(JSON.stringify({ t3flare: "global-mise-retry", workspace: this.#workspaceId() ?? null }));
     const renewed = await this.#budget().renew(this.ctx.id.toString());
     if (!renewed.ok) console.warn(JSON.stringify({ t3flare: "container-lease-lost", reason: renewed.reason }));

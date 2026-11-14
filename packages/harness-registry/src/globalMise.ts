@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off
 // The Global mise config's lay-down as the Workspace DO reports it and the panel's Status shows it (SPI-1150,
-// ADR-0032 §8): one answer per Container start, sent to the Environment DO, which keeps the last across all Workspaces.
+// ADR-0032's Global mise config refinement): one answer per Container start, sent to the Environment DO, which keeps the last across all Workspaces.
 // Imported by both Workers.
 
 /** A text's size and SHA-256: what the audit, the logs and `containerState()` show of a `file` setting, never the text. */

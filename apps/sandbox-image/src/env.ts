@@ -7,7 +7,7 @@ export const GLOBAL_MISE_DIR = "/var/lib/t3flare/mise";
 
 /**
  * mise's global config: the owner's Global mise config, laid down at each Container start when git and gh run under it
- * (`globalMise.ts`, ADR-0032 §8). Absent when there is none, and mise then resolves as from the base file alone.
+ * (`globalMise.ts`, ADR-0032's Global mise config refinement). Absent when there is none, and mise then resolves as from the base file alone.
  */
 export const GLOBAL_MISE_CONFIG = `${GLOBAL_MISE_DIR}/config.toml`;
 

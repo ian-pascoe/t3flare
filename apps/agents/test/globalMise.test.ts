@@ -1,5 +1,5 @@
 // @effect-diagnostics globalTimers:off globalDate:off
-// The Global mise config's lay-down as the Workspace DO runs it (SPI-1150, ADR-0032 §8; `GlobalMise`), with a fake
+// The Global mise config's lay-down as the Workspace DO runs it (SPI-1150, ADR-0032's Global mise config refinement; `GlobalMise`), with a fake
 // exec and clock: once per Container (its runtime id), held while it runs, bounded by a deadline, retried after an exec
 // failure, and reported. The script itself is `globalMiseScript.test.ts`'s.
 import type { GlobalMiseReport } from "@t3flare/harness-registry";

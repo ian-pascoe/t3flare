@@ -90,13 +90,16 @@ describe("exec", () => {
 
   it("names the Global mise config's install when the Workspace says one ran while the command waited", async () => {
     lateStart(300);
+    const output: Array<string> = [];
     const result = await exec(
       { workspace: {} as never, backend: undefined, cwd: "/workspace/repo", spill: async () => undefined, running: new Set(), startingNote: async () => "installing the Global mise config" },
       "node --version",
-      { timeout: 0.05 },
+      { timeout: 0.05, onOutput: (text) => void output.push(text) },
       BACKGROUND_CONTEXT,
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe("Command timed out before it started (the Container was installing the Global mise config)");
+    // In the output too: pi-durable's bash replaces a timeout's message with its own and keeps the output.
+    expect(output).toEqual(["t3flare: the command did not start: the Container was installing the Global mise config\n"]);
   });
 });

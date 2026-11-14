@@ -151,7 +151,9 @@ owner's `mise.toml` text, which every Container's commands get as mise's global 
    most three times per Container; a passive read never retries it. The outcome is kept in the Workspace DO's storage,
    so a new instance does not run a finished lay-down again; its answer is kept on the Container's disk by revision and
    SHA-256, on the assumption that a Container's disk never outlives it (one that did would at worst skip laying down
-   the same text again).
+   the same text again). A Durable agent's command cut off while it waited (a timeout or an abort during the install)
+   is never sent afterwards: the Session hands its id to the Workspace DO when it stops it, and the Workspace DO refuses
+   to dispatch it once the connect returns; one already sent is killed as soon as it is.
 5. **No GitHub token.** `COMMAND_ENV` sets `MISE_GITHUB_GH_CLI_TOKENS=false`, `MISE_GITHUB_USE_GIT_CREDENTIALS=false`
    and an empty `MISE_GITHUB_CREDENTIAL_COMMAND`, and an environment variable beats the owner's and a repository's
    files: mise sends no token from gh's `hosts.yml`, git's credential helper (the Workspace's one-repo token) or a

@@ -268,7 +268,7 @@ const changeEnvironment = async (request: Request, deps: HarnessDeps): Promise<R
   deps.store.saveEnvironment(applied.environment);
   const keys = applied.changed;
   // A `file` setting (the Global mise config) is audited as its size and SHA-256, not its text: the log is one stored
-  // value of up to 1 000 entries (ADR-0032 §8, a departure from §3's values as resolved).
+  // value of up to 1 000 entries (ADR-0032's Global mise config refinement, a departure from §3's values as resolved).
   const shown = async (key: EnvironmentKey, value: unknown) => ((ENVIRONMENT_SETTINGS[key] as SettingEntry).schema.type === "file" ? digestOf(String(value)) : value);
   const pick = async (from: ReturnType<typeof resolveEnvironment>) => Object.fromEntries(await Promise.all(keys.map(async (key) => [key, await shown(key, from[key])] as const)));
   deps.store.audit({
