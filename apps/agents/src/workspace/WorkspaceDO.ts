@@ -6,7 +6,7 @@
 //
 // It is a plain DurableObject: computer reaches it through `__getWorkspaceStub()` with raw Workers RPC, and its Worker
 // Shell calls back into it through `WorkspaceServiceProxy` (exported by the Worker's entry).
-import { Workspace as ComputerWorkspace, type WorkspaceStub } from "@cloudflare/computer";
+import { Workspace as ComputerWorkspace, type WorkspaceBackend, type WorkspaceStub } from "@cloudflare/computer";
 import {
   ContainerBackend,
   type ContainerLaunchSpec,
@@ -314,7 +314,7 @@ export class WorkspaceDO extends ContainerHost {
     this.#workspace = new ComputerWorkspace({
       storage: ctx.storage,
       // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
-      backends: [new VariablesBackend(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx }), () => this.#variables()), new VariablesBackend(this.#container, () => this.#variables())],
+      backends: [this.#withVariables(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx })), this.#withVariables(this.#container)],
     });
     // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
     this.#host = new WorkspaceEnvHost(this.#workspace, {
@@ -353,7 +353,7 @@ export class WorkspaceDO extends ContainerHost {
       spawn: async (argv, options) => {
         const container = this.ctx.container;
         if (container === undefined) throw new Error("no Container binding");
-        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: commandEnv(this.#variables(), options.env) });
+        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: this.#envWithVariables(options.env) });
       },
       kill: (markers) => this.#killMarkers(markers),
       push: async (push) => {
@@ -380,7 +380,7 @@ export class WorkspaceDO extends ContainerHost {
       spawn: async (argv, options) => {
         const container = this.ctx.container;
         if (container === undefined) throw new Error("no Container binding");
-        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: commandEnv(this.#variables(), options.env) });
+        return container.exec([...argv], { pty: { cols: options.cols, rows: options.rows }, stdin: "pipe", env: this.#envWithVariables(options.env) });
       },
       kill: (markers) => this.#killMarkers(markers),
       push: (push) => Promise.resolve({ unknown: this.#agentTerminals.frames(push.frames) }),
@@ -418,7 +418,7 @@ export class WorkspaceDO extends ContainerHost {
       spawn: async (argv, env) => {
         const container = this.ctx.container;
         if (container === undefined) throw new Error("no Container binding");
-        return container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: commandEnv(this.#variables(), env) });
+        return container.exec([...argv], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: this.#envWithVariables(env) });
       },
       kill: (markers) => this.#killMarkers(markers),
       baseEnv: terminalEnv,
@@ -739,6 +739,16 @@ export class WorkspaceDO extends ContainerHost {
    */
   #variables(): Readonly<Record<string, string>> {
     return fitVariables(this.ctx.storage.kv.get<ContainerLaunch>(LAUNCH_KEY)?.variables);
+  }
+
+  /** `backend` with the Variables under every command it is sent (`VariablesBackend`). */
+  #withVariables(backend: WorkspaceBackend): WorkspaceBackend {
+    return new VariablesBackend(backend, () => this.#variables());
+  }
+
+  /** A spawn's environment with the Variables under it (`commandEnv`): Terminals and CLI processes. */
+  #envWithVariables(env: Readonly<Record<string, string>> | undefined): Record<string, string> {
+    return commandEnv(this.#variables(), env);
   }
 
   /** The idle time the running Container started with (ADR-0032). */
