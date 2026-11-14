@@ -98,6 +98,12 @@ export const githubReader = (options: GithubReaderOptions): RepoReader => {
   const { access } = options;
   const now = options.now ?? (() => Date.now());
   let checkedAtStart = false;
+  /** Before the request's first read (a commit, or an install's tree): the commit and the tree. */
+  const atStart = async () => {
+    if (checkedAtStart) return;
+    checkedAtStart = true;
+    await ensureLeft(2);
+  };
 
   const ask = async (path: string, accept: string): Promise<Response> => {
     if (options.deadline !== undefined && now() > options.deadline) {
@@ -164,17 +170,14 @@ export const githubReader = (options: GithubReaderOptions): RepoReader => {
 
   return {
     commit: async (repo, ref) => {
-      if (!checkedAtStart) {
-        checkedAtStart = true;
-        // The commit and the tree.
-        await ensureLeft(2);
-      }
+      await atStart();
       const response = await read(repo, `/commits/${ref === null ? "HEAD" : refPath(ref)}`, "application/vnd.github.sha", ref === null ? gone(repo) : `${gone(repo)} Or it has no ref ${JSON.stringify(ref)} (a branch, a tag or a commit).`);
       const sha = (await response.text()).trim();
       if (!/^[0-9a-f]{40}$/.test(sha)) throw new GithubReadError("failed", "GitHub's answer to the commit was not a SHA");
       return sha;
     },
     tree: async (repo, commit): Promise<RepoTree> => {
+      await atStart();
       const response = await read(repo, `/git/trees/${segment(commit)}?recursive=1`, "application/vnd.github+json");
       const body = (await response.json().catch(() => null)) as { truncated?: unknown; tree?: unknown } | null;
       if (body === null || typeof body.truncated !== "boolean" || !Array.isArray(body.tree)) throw new GithubReadError("failed", "GitHub's answer to the tree was not a tree");

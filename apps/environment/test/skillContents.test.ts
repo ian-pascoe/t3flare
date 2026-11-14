@@ -131,6 +131,12 @@ describe("githubReader", () => {
     expect(enough.seen.some((request) => request.token)).toBe(false);
   });
 
+  it("unauthenticated, reads /rate_limit before an install's first read, its tree", async () => {
+    const github = fakeFetch({ "/rate_limit": rateLimit(1), [`/repos/o/r/git/trees/${SHA}?recursive=1`]: () => Response.json({ truncated: false, tree: [] }) });
+    await expect(githubReader({ fetch: github.fetch, access: unauthenticated, now: () => NOW }).tree(repo, SHA)).rejects.toMatchObject({ kind: "rate_limited" });
+    expect(github.seen.map((request) => request.path)).toEqual(["/rate_limit"]);
+  });
+
   it("with a token, never asks /rate_limit", async () => {
     const github = fakeFetch({ "/repos/o/r/commits/HEAD": () => new Response(SHA) });
     const reader = githubReader({ fetch: github.fetch, access: installed });

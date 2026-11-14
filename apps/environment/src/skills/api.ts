@@ -130,11 +130,13 @@ const check = async (deps: SkillsApiDeps, body: Record<string, unknown>): Promis
   }
   const deadline = deps.now() + REQUEST_BUDGET_MS;
   const results: Array<Record<string, unknown>> = [];
+  const hows = new Set<ReadAccess["how"]>();
   const keys = [...groups.keys()];
   for (const key of keys.slice(0, MAX_CHECK_GROUPS)) {
     const group = groups.get(key)!;
     const [owner = "", name = ""] = group[0]!.repo.split("/");
-    const { reader } = await deps.reader({ owner, name }, deadline);
+    const { reader, how } = await deps.reader({ owner, name }, deadline);
+    hows.add(how);
     const checked = await checkSkills(reader, { repo: { owner, name }, ref: group[0]!.ref, kept: group.map((row) => keptForCheck(deps, row)) });
     if (checked.status === "failed") {
       for (const row of group) results.push({ name: row.name, status: "failed", message: checked.message });
@@ -146,7 +148,9 @@ const check = async (deps: SkillsApiDeps, body: Record<string, unknown>): Promis
     }
   }
   const skipped = keys.slice(MAX_CHECK_GROUPS).flatMap((key) => groups.get(key)!.map((row) => row.name));
-  return ok({ results, ...(skipped.length === 0 ? {} : { note: `Checked the first ${MAX_CHECK_GROUPS} repositories and refs; check again for ${skipped.join(", ")}.` }) });
+  // Said as the preview says it (plan §3.2): reads from GitHub's shared unauthenticated limit, when any were.
+  const how = hows.has("unauthenticated") ? "unauthenticated" : hows.has("installation") ? "installation" : hows.size === 0 ? undefined : "repo";
+  return ok({ results, ...(how === undefined ? {} : { how }), ...(skipped.length === 0 ? {} : { note: `Checked the first ${MAX_CHECK_GROUPS} repositories and refs; check again for ${skipped.join(", ")}.` }) });
 };
 
 /** `POST …/skills/update` `{ name, commit }`: the kept skill's folder at that commit, under the same name. */

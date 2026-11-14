@@ -324,7 +324,8 @@ for (const button of document.querySelectorAll("button[data-skill-check]")) {
       });
       show(out, el("p", "An update: " + result.from + " → " + result.to + ". " + (parts.length === 0 ? "" : parts.join("; ") + ".")), update);
     }
-    if (answer.note !== undefined) notify("ok", answer.note);
+    if (answer.how === "unauthenticated") notify("ok", "Checked without a token, from GitHub's shared limit of 60 an hour." + (answer.note === undefined ? "" : " " + answer.note));
+    else if (answer.note !== undefined) notify("ok", answer.note);
   });
 }
 for (const button of document.querySelectorAll("button[data-skill-remove]")) {

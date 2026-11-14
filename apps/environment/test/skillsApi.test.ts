@@ -96,8 +96,17 @@ describe("Environment skills API", () => {
     ]);
     // One group: one commit and one tree.
     expect(github.requests).toHaveLength(2);
+    expect(checked.body.how).toBe("installation");
     const updated = await postJson(deps, "update", { name: "a", commit: second });
     expect(updated.body).toMatchObject({ name: "a", action: "skill-update", from: first, to: second, added: [], changed: ["x.md"], removed: [] });
+  });
+
+  it("says when an update check read without a token, as the preview does (plan §3.2)", async () => {
+    const { github, deps } = setup();
+    const commit = github.push("o/r", { "skills/a/SKILL.md": skillMd("a") });
+    await postJson(deps, "install", { source: "o/r", commit, folders: ["skills/a"] });
+    const unauthenticated = { ...deps, skills: { ...deps.skills, reader: async () => ({ reader: github.reader, how: "unauthenticated" as const }) } };
+    expect((await postJson(unauthenticated, "check", {})).body).toMatchObject({ how: "unauthenticated", results: [{ name: "a", status: "current" }] });
   });
 
   it("refuses an update whose folder is gone or whose name changed, keeping the skill", async () => {
