@@ -1,0 +1,463 @@
+{
+  "at": "2026-11-15T12:11:51.684Z",
+  "stage": "p1168",
+  "models": {
+    "discovered": true,
+    "first": "comm/claude-haiku-5-5",
+    "second": "comm2/claude-sonnet-5-5"
+  },
+  "checks": [
+    {
+      "name": "Commissary's Anthropic API lists the first model",
+      "ok": true
+    },
+    {
+      "name": "both endpoints saved",
+      "ok": true
+    },
+    {
+      "name": "Claude Code lists the Anthropic Messages endpoints' models by slug, first (t3's registry keeps the proxy's it listed before, after them)",
+      "ok": true
+    },
+    {
+      "name": "a Claude Code turn with tools ran on comm's model through the relay",
+      "ok": true
+    },
+    {
+      "name": "its tool requests were asked and accepted",
+      "ok": true
+    },
+    {
+      "name": "the managed settings: the model-routed relay URL, the handle helper, the endpoints' slugs",
+      "ok": true
+    },
+    {
+      "name": "the background model is the text-generation model (an Anthropic Messages endpoint's)",
+      "ok": true
+    },
+    {
+      "name": "a model switch to the other endpoint's model and back: each turn completes and knows the code word",
+      "ok": true
+    },
+    {
+      "name": "the same native Claude session throughout (no handoff)",
+      "ok": true
+    },
+    {
+      "name": "the canary endpoint saved (after the process started)",
+      "ok": true
+    },
+    {
+      "name": "only the launch chain's start environments hold the handle (setsid and claude-agent-acp; not claude's, not a shell's)",
+      "ok": true
+    },
+    {
+      "name": "no file holds the handle",
+      "ok": true
+    },
+    {
+      "name": "the handle helper prints the handle",
+      "ok": true
+    },
+    {
+      "name": "the handle reaches both endpoints through the model-routed URL (200)",
+      "ok": true
+    },
+    {
+      "name": "a forged handle and no handle are refused (401)",
+      "ok": true
+    },
+    {
+      "name": "an endpoint saved after the process started, named in the body, is refused (403)",
+      "ok": true
+    },
+    {
+      "name": "a model without an endpoint is refused (400)",
+      "ok": true
+    },
+    {
+      "name": "a Claude shell's environment has no model handle (its marker shows it was the process's)",
+      "ok": true
+    },
+    {
+      "name": "the leak scan finds no endpoint key and scanned every key (DO files, Container files, process environments and command lines)",
+      "ok": true
+    },
+    {
+      "name": "the leak scan finds an endpoint key planted in the Container",
+      "ok": true
+    },
+    {
+      "name": "the canary endpoint removed",
+      "ok": true
+    },
+    {
+      "name": "Claude's requests went through the model-routed URL to both endpoints",
+      "ok": true
+    },
+    {
+      "name": "no handle or key in the agents Worker's log",
+      "ok": true
+    }
+  ],
+  "endpoints": {
+    "saved": {
+      "comm": 200,
+      "comm2": 200
+    },
+    "baseUrl": "<MODEL_PROXY_URL>"
+  },
+  "claudeModels": {
+    "first": [
+      {
+        "slug": "comm/claude-haiku-5-5",
+        "group": "Commissary"
+      },
+      {
+        "slug": "comm2/claude-sonnet-5-5",
+        "group": "Commissary (second)"
+      },
+      {
+        "slug": "canary/claude-haiku-5-5",
+        "group": "Canary"
+      }
+    ],
+    "total": 124,
+    "proxyRetained": 121
+  },
+  "textGenerationModel": {
+    "instanceId": "piDurable",
+    "model": "comm2/claude-sonnet-5-5"
+  },
+  "turn": {
+    "threadId": "5456ddf4-fc34-435d-b2e9-f58b224c980f",
+    "root": "/w/relay-claude-mwhso6qx",
+    "model": "comm/claude-haiku-5-5",
+    "runs": [
+      {
+        "id": "run:thread:5456ddf4-fc34-435d-b2e9-f58b224c980f:ordinal:1",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "items": [
+      {
+        "type": "user_message",
+        "status": "completed",
+        "title": null,
+        "fileName": null,
+        "input": null
+      },
+      {
+        "type": "dynamic_tool",
+        "status": "completed",
+        "title": "Read /w/relay-claude-mwhso6qx/src/greeting.txt",
+        "fileName": null,
+        "input": null
+      },
+      {
+        "type": "file_change",
+        "status": "completed",
+        "title": "Edit src/greeting.txt",
+        "fileName": "/w/relay-claude-mwhso6qx/src/greeting.txt",
+        "input": null
+      },
+      {
+        "type": "dynamic_tool",
+        "status": "completed",
+        "title": "Action required",
+        "fileName": null,
+        "input": null
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "title": null,
+        "fileName": null,
+        "input": null
+      },
+      {
+        "type": "command_execution",
+        "status": "completed",
+        "title": "Terminal",
+        "fileName": null,
+        "input": "Terminal"
+      },
+      {
+        "type": "command_execution",
+        "status": "completed",
+        "title": "bash test.sh; echo \"exit=$?\"",
+        "fileName": null,
+        "input": "bash test.sh; echo \"exit=$?\""
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "title": null,
+        "fileName": null,
+        "input": null
+      },
+      {
+        "type": "assistant_message",
+        "status": "completed",
+        "title": null,
+        "fileName": null,
+        "input": null
+      },
+      {
+        "type": "checkpoint",
+        "status": "completed",
+        "title": null,
+        "fileName": null,
+        "input": null
+      }
+    ],
+    "proposedPlan": [],
+    "text": "Noted: OSPREY-41 is your code word, and I'll keep it for this conversation. I added `Hello from the CLI.` as the last line of [greeting.txt](/w/relay-claude-mwhso6qx/src/greeting.txt) with the edit tool, and `bash test.sh` passed (\"all checks passed\").",
+    "requests": [
+      {
+        "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A77023837-2584-4b2c-bc56-ae9250d5cd09%253Aturn%253A1:native-request:toolu_01WHMAvDSk9sbqkY1hKXqyGJ:30a82580-1043-4303-aad3-d0c0a03bf19c",
+        "kind": "file-change",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": "accept",
+        "options": []
+      },
+      {
+        "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A77023837-2584-4b2c-bc56-ae9250d5cd09%253Aturn%253A1:native-request:toolu_01WKUVgAVBAr5RFJoPWaw3ky:1f7a15b3-eab5-4280-95bf-b24bade7db3e",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": "accept",
+        "options": []
+      }
+    ],
+    "providerThreads": [
+      {
+        "id": "provider-thread:provider:claudeAgent:native-thread:pending%3Arun%3Athread%3A5456ddf4-fc34-435d-b2e9-f58b224c980f%3Aordinal%3A1",
+        "nativeThreadRef": {
+          "driver": "claudeAgent",
+          "nativeId": "77023837-2584-4b2c-bc56-ae9250d5cd09",
+          "strength": "strong"
+        },
+        "providerInstanceId": "claudeAgent"
+      }
+    ],
+    "ms": 72667
+  },
+  "managedSettings": {
+    "apiKeyHelper": "/opt/t3flare/bin/t3flare-claude-handle",
+    "availableModels": [
+      "comm/claude-haiku-5-5",
+      "comm2/claude-sonnet-5-5"
+    ],
+    "baseUrl": "http://computer.internal/t3flare/model/_",
+    "backgroundModel": "comm2/claude-sonnet-5-5"
+  },
+  "switch": {
+    "toComm2": {
+      "runs": [
+        {
+          "id": "run:thread:5456ddf4-fc34-435d-b2e9-f58b224c980f:ordinal:2",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "text": "OSPREY-41",
+      "native": [
+        "77023837-2584-4b2c-bc56-ae9250d5cd09"
+      ]
+    },
+    "back": {
+      "runs": [
+        {
+          "id": "run:thread:5456ddf4-fc34-435d-b2e9-f58b224c980f:ordinal:3",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "text": "OSPREY-41",
+      "native": [
+        "77023837-2584-4b2c-bc56-ae9250d5cd09"
+      ]
+    },
+    "first": [
+      "77023837-2584-4b2c-bc56-ae9250d5cd09"
+    ]
+  },
+  "handle": {
+    "found": true,
+    "holders": " setsid --wait /opt/t3flare/bin/claude-agent-acp | /usr/local/share/mise/installs/node/26.13.0/bin/node --require /opt/t3flare/share/claude-handle-unset.cjs /opt/t3flare/claude/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js |",
+    "claudeProcesses": "3",
+    "claudeWithHandle": "0",
+    "files": "0",
+    "helper": "1",
+    "valid": "200",
+    "validOther": "200",
+    "forged": "401",
+    "none": "401",
+    "unconfigured": "403",
+    "noSlug": "400",
+    "stderr": "/bin/sh: 5: cannot open /proc/997/environ: No such file\n"
+  },
+  "shellEnv": {
+    "runs": [
+      {
+        "id": "run:thread:5456ddf4-fc34-435d-b2e9-f58b224c980f:ordinal:4",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "counts": "handle=0\nexec=1"
+  },
+  "leak": {
+    "do": [],
+    "container": {
+      "hits": [],
+      "files": 612,
+      "bytes": 10161361,
+      "ms": 284
+    },
+    "flagged": null,
+    "notScanned": []
+  },
+  "leakControl": {
+    "hits": [
+      {
+        "name": "endpoint:canary",
+        "path": "/tmp/p1168-canary.txt"
+      }
+    ]
+  },
+  "relayLog": {
+    "entries": 12,
+    "byStatus": {
+      "200": 12
+    },
+    "claude": {
+      "entries": 12,
+      "endpoints": [
+        "comm",
+        "comm2"
+      ],
+      "routed": true,
+      "statuses": [
+        200
+      ]
+    },
+    "claudeDropped": [
+      "accept-encoding",
+      "anthropic-dangerous-direct-browser-access",
+      "authorization",
+      "connection",
+      "host",
+      "user-agent",
+      "x-api-key",
+      "x-app",
+      "x-claude-code-session-id",
+      "x-stainless-arch",
+      "x-stainless-lang",
+      "x-stainless-os",
+      "x-stainless-package-version",
+      "x-stainless-retry-count",
+      "x-stainless-runtime",
+      "x-stainless-runtime-version",
+      "x-stainless-timeout"
+    ],
+    "routedRefusals": [],
+    "sample": [
+      {
+        "t3flare": "model-relay",
+        "endpoint": "comm",
+        "routed": true,
+        "status": 200,
+        "handle": "proc-310f6409-2d22-4f95-b9cc-124e4fea4bfd",
+        "cli": "claude",
+        "workspace": "relay-claude-mwhso6qx",
+        "method": "POST",
+        "ms": 2339,
+        "dropped": [
+          "accept-encoding",
+          "anthropic-dangerous-direct-browser-access",
+          "authorization",
+          "connection",
+          "host",
+          "user-agent",
+          "x-api-key",
+          "x-app",
+          "x-claude-code-session-id",
+          "x-stainless-arch",
+          "x-stainless-lang",
+          "x-stainless-os",
+          "x-stainless-package-version",
+          "x-stainless-retry-count",
+          "x-stainless-runtime",
+          "x-stainless-runtime-version",
+          "x-stainless-timeout"
+        ]
+      },
+      {
+        "t3flare": "model-relay",
+        "endpoint": "comm2",
+        "routed": true,
+        "status": 200,
+        "handle": "proc-310f6409-2d22-4f95-b9cc-124e4fea4bfd",
+        "cli": "claude",
+        "workspace": "relay-claude-mwhso6qx",
+        "method": "POST",
+        "ms": 891,
+        "dropped": [
+          "accept-encoding",
+          "anthropic-dangerous-direct-browser-access",
+          "authorization",
+          "connection",
+          "host",
+          "user-agent",
+          "x-api-key",
+          "x-app",
+          "x-claude-code-session-id",
+          "x-stainless-arch",
+          "x-stainless-lang",
+          "x-stainless-os",
+          "x-stainless-package-version",
+          "x-stainless-retry-count",
+          "x-stainless-runtime",
+          "x-stainless-runtime-version",
+          "x-stainless-timeout"
+        ]
+      },
+      {
+        "t3flare": "model-relay",
+        "endpoint": "comm",
+        "routed": true,
+        "status": 200,
+        "handle": "proc-310f6409-2d22-4f95-b9cc-124e4fea4bfd",
+        "cli": "claude",
+        "workspace": "relay-claude-mwhso6qx",
+        "method": "POST",
+        "ms": 2264,
+        "dropped": [
+          "accept-encoding",
+          "anthropic-dangerous-direct-browser-access",
+          "authorization",
+          "connection",
+          "host",
+          "user-agent",
+          "x-api-key",
+          "x-app",
+          "x-claude-code-session-id",
+          "x-stainless-arch",
+          "x-stainless-lang",
+          "x-stainless-os",
+          "x-stainless-package-version",
+          "x-stainless-retry-count",
+          "x-stainless-runtime",
+          "x-stainless-runtime-version",
+          "x-stainless-timeout"
+        ]
+      }
+    ]
+  },
+  "failures": [],
+  "ok": true
+}

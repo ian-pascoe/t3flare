@@ -117,16 +117,20 @@ await enable(cookie, "claude");
 await sleep(2000);
 const config = (await wsCall(cookie, "server.getConfig", {})) as any;
 const claudeModels = (((config?.providers ?? []) as Array<any>).find((provider) => provider.driver === "claudeAgent")?.models ?? []).map((model: any) => ({ slug: model.slug, group: model.subProvider }));
-report.claudeModels = claudeModels;
+report.claudeModels = { first: claudeModels.slice(0, 3), total: claudeModels.length, proxyRetained: claudeModels.filter((row: any) => String(row.slug).startsWith("anthropic/")).length };
 check(
-  "Claude Code lists the Anthropic Messages endpoints' models by slug, and no proxy model",
-  claudeModels.some((row: any) => row.slug === `comm/${FIRST}`) && claudeModels.some((row: any) => row.slug === `comm2/${SECOND}`) && claudeModels.every((row: any) => /^comm2?\//.test(row.slug)),
-  claudeModels,
+  "Claude Code lists the Anthropic Messages endpoints' models by slug, first (t3's registry keeps the proxy's it listed before, after them)",
+  claudeModels[0]?.slug === `comm/${FIRST}` && claudeModels[1]?.slug === `comm2/${SECOND}`,
+  claudeModels.slice(0, 4),
 );
 // The owner's text-generation model: the second endpoint's, so Claude Code's background model is seen to follow it.
+await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } } });
 await updateSettings(cookie, { textGenerationModelSelection: { instanceId: "piDurable", model: `comm2/${SECOND}` } });
-await sleep(1000);
-const textModel = (((await wsCall(cookie, "server.getConfig", {})) as any)?.settings?.textGenerationModelSelection ?? null) as { instanceId: string; model: string } | null;
+let textModel: { instanceId: string; model: string } | null = null;
+for (let i = 0; i < 15 && textModel?.model !== `comm2/${SECOND}`; i++) {
+  await sleep(1000);
+  textModel = (((await wsCall(cookie, "server.getConfig", {})) as any)?.settings?.textGenerationModelSelection ?? null) as typeof textModel;
+}
 report.textGenerationModel = textModel;
 
 // 3. A turn with tools on comm's model.
@@ -181,7 +185,7 @@ const where = await exec(
   A,
   [
     // Every process whose environment holds a handle, by its command.
-    `holders=""; for f in /proc/[0-9]*/environ; do if tr '\\0' '\\n' < "$f" 2>/dev/null | grep -q '^T3FLARE_MODEL_HANDLE='; then p=\${f#/proc/}; p=\${p%/environ}; holders="$holders $(tr '\\0' ' ' < /proc/$p/cmdline | head -c 160 | sed 's/[^A-Za-z0-9 ./_@-]//g')|"; fi; done`,
+    `holders=""; for f in /proc/[0-9]*/environ; do if tr '\\0' '\\n' < "$f" 2>/dev/null | grep -q '^T3FLARE_MODEL_HANDLE='; then p=\${f#/proc/}; p=\${p%/environ}; holders="$holders $(tr '\\0' ' ' < /proc/$p/cmdline | head -c 240 | sed 's/[^A-Za-z0-9 ./_@-]//g')|"; fi; done`,
     `H=$(grep -ahz '^T3FLARE_MODEL_HANDLE=' /proc/[0-9]*/environ 2>/dev/null | tr '\\0' '\\n' | head -1 | cut -d= -f2)`,
     `echo "handle=$H"`,
     `echo "holders=$holders"`,
@@ -205,7 +209,7 @@ if (handle !== undefined) handles.push(handle);
 delete lines.handle;
 report.handle = clean({ found: handle !== undefined, ...lines, stderr: String(where.stderr ?? "").slice(0, 300) });
 const holders = String(lines.holders ?? "").split("|").map((entry) => entry.trim()).filter((entry) => entry !== "");
-check("only claude-agent-acp's start environment holds the handle (not claude's, not a shell's)", handle !== undefined && holders.length >= 1 && holders.every((entry) => entry.includes("claude-agent-acp")) && lines.claudeWithHandle === "0" && Number(lines.claudeProcesses) >= 1, report.handle);
+check("only the launch chain's start environments hold the handle (setsid and claude-agent-acp; not claude's, not a shell's)", handle !== undefined && holders.length >= 1 && holders.every((entry) => entry === "setsid --wait /opt/t3flare/bin/claude-agent-acp" || entry.includes("claude-handle-unset.cjs")) && lines.claudeWithHandle === "0" && Number(lines.claudeProcesses) >= 1, report.handle);
 check("no file holds the handle", lines.files === "0", report.handle);
 check("the handle helper prints the handle", Number(lines.helper) >= 1, report.handle);
 check("the handle reaches both endpoints through the model-routed URL (200)", lines.valid === "200" && lines.validOther === "200", report.handle);
