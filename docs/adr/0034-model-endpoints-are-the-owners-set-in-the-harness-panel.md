@@ -54,7 +54,9 @@ optional headers, and the models it serves.
 7. **CLI agents through the model relay** (SPI-1167): a CLI agent reaches an endpoint whose API it speaks at
    `computer.internal/t3flare/model/<endpointId>` with a per-process Handle; the Workers swap it for the key from
    `resolve` and stream the request to the endpoint unchanged ([ADR-0016](0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)'s
-   model relay refinement). Codex is the first; its provider id is the endpoint's (`t3flare-endpoint-<id>`).
+   model relay refinement). Codex is the first; its provider id is the endpoint's (`t3flare-endpoint-<id>`). Claude Code
+   (SPI-1168) reaches every Anthropic Messages endpoint through one model-routed URL (`…/t3flare/model/_`), the
+   endpoint chosen by the request's model slug, so a thread can switch between endpoints' models.
 
 Consequences: Commissary is one endpoint among others (an Anthropic Messages endpoint at its URL with its key). Losing
 a stage's alchemy state loses its credentials key, and the owner enters the endpoints' keys again.
