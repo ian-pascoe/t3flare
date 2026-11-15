@@ -123,7 +123,7 @@ describe("verifyAdminRequest", () => {
   });
 });
 
-describe("verifySettingsRequest (ADR-0034, plan D13): the Owner-client endpoint's own Access application", () => {
+describe("verifySettingsRequest (ADR-0035, plan D13): the Owner-client endpoint's own Access application", () => {
   const SETTINGS_AUD = "the-settings-aud";
   const settings: GuardConfig = { ...config, audience: SETTINGS_AUD };
   const at = (path: string, headers: Record<string, string>) => new Request(`https://env.example${path}`, { method: "POST", headers });

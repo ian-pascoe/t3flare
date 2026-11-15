@@ -89,10 +89,10 @@ cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's 
   the path is outside `/w/<id>` (U64).
 - Installs and checks spend the installation's GitHub limit; with no installed repo, the shared unauthenticated one.
 
-## Refinement (ADR-0034, 2026-11-14): an agent may ask for a change
+## Refinement (ADR-0035, 2026-11-14): an agent may ask for a change
 
 §7 ("No agent tool changes them") is refined by
-[ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md); this ADR's title predates it. Plan:
+[ADR-0035](0035-agents-change-t3flares-settings-through-the-settings-server.md); this ADR's title predates it. Plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md).
 
 - An agent may preview a Skill source and check for updates (reads), and ask to install, update, enable or remove an

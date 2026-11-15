@@ -3,7 +3,7 @@
 M5a's code and unit tests (T-endpoint, T-guards, T-state, and T-modes' `browser` cases) landed without a deploy. Its
 evidence, `m5a-settings-owner-browser.json`, needs a deployed workers.dev stage (`psettings`, now in `STAGES`; never
 `prod`, nor `bump`) and the owner signing in. Prod is deployed without the endpoint (`OWNER_ENDPOINT_EXCLUDED_STAGES`,
-ADR-0035) until items 1-4 pass and this file is recorded; enabling it then is removing `prod` from that list. `bump`, the
+ADR-0036) until items 1-4 pass and this file is recorded; enabling it then is removing `prod` from that list. `bump`, the
 nightly job's stage, stays on it (its CI token is not known to be allowed to create a managed-OAuth application). Record each item
 with the commit deployed, the stage, timestamps, the client and its version, and the change ids. Never record a token, a
 cookie, an authorization code or a header value; record an assertion by its decoded claims with `sub` and `email`
@@ -31,7 +31,7 @@ override, and none may be added; `m6-stage-run.md` item 1.4 records the cap itse
 ### Access, layout (B)
 
 Layout (B) is unproven until items 1-4 pass: M0 tested that one application's token is refused at the other's paths with
-a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bearer case.
+a service-token stand-in only (ADR-0036). Items 1-4 are owner step 1's OAuth bearer case.
 
 1. **M0's open conditions (owner step 1)**: the owner signs in from a named client (Claude Code first). Record that the
    token exchange works for the path `resource` (P6), the claims of the OAuth-derived assertion the origin receives
@@ -39,7 +39,7 @@ a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bea
    of the admin application is refused (P12, as a bearer and as `cf-access-token`). Record the token response's
    `expires_in` (P11): it must be 900 (the `15m` of `SETTINGS_OAUTH_GRANT`) or less; a longer one means Access ignored
    the setting, and the grant's lifetime must be fixed before the endpoint is trusted. If the exchange or P12 fails,
-   layout (B) is out: stop, and move to (C) (ADR-0035; replace `src/settings/endpointLayout.ts`, the worker branch and
+   layout (B) is out: stop, and move to (C) (ADR-0036; replace `src/settings/endpointLayout.ts`, the worker branch and
    `SettingsAccess`).
 2. **P13**: compare the `sub` of the endpoint's OAuth-derived assertion with the owner's browser assertion at the panel
    (the Change page). The page lets only the asking `sub` answer an Owner client's change (`openChanges.ts`); if the two
@@ -54,7 +54,7 @@ a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bea
    - **4b. Cursor (owner step 2)**: the redirect allowlist's one custom scheme,
      `cursor://anysphere.cursor-mcp/oauth/callback`, comes from third-party reports. Record the `redirect_uri` Cursor
      registers (decoded from Access's sign-in URL, before signing in) and whether registration succeeds. If Cursor uses
-     another scheme, change `SETTINGS_OAUTH_REDIRECT_URIS` (one constant) and ADR-0035; if it uses `localhost`, the
+     another scheme, change `SETTINGS_OAUTH_REDIRECT_URIS` (one constant) and ADR-0036; if it uses `localhost`, the
      scheme may be dropped.
    - **4c. Prod's custom domain shape** (no deploy to prod; nothing changes there): M0 probed workers.dev only. Without
      touching prod's Access applications, record from prod's host (`t3.ianpascoe.dev`) as it is today: what
@@ -75,7 +75,7 @@ a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bea
 ### A named client, end to end (Claude Code 2.1.322 on 2026-07-28; then OpenCode or Claude Code forced to 2025-11-25)
 
 Configure the client with the plain `<settingsMcpUrl>`, no query (from 2026-11-15: Claude Code 2.1.322 cannot sign in
-with a query on the URL; ADR-0034's refinement). It is listed under Owner clients on the panel's Settings server card at
+with a query on the URL; ADR-0035's refinement). It is listed under Owner clients on the panel's Settings server card at
 its first request, in `browser`, which is this file's mode.
 
 5. **Sign-in and discovery**: the client follows `resource_metadata`, registers dynamically, the owner signs in, and the

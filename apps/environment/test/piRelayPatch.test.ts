@@ -1,4 +1,4 @@
-// Patch 0006 (settings-mcp plan D4, SPI-1076): t3's pi extension lets a server tool of pi's built-in MCP client through
+// Patch 0007 (settings-mcp plan D4, SPI-1076): t3's pi extension lets a server tool of pi's built-in MCP client through
 // its `tool_call` hook when its server is one the relay serves this process (`T3FLARE_RELAY_SERVERS`, SPI-1199 review),
 // since t3flare's MCP relay judges and asks for those; every other tool is asked as before. The
 // Patch is applied here as build.ts applies it (`git apply` to a copy of the pinned file), and the extension it yields
@@ -15,7 +15,7 @@ import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../t3code/packages/provider-pi
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const T3 = path.resolve(here, "../../../t3code");
-const PATCH = path.resolve(here, "../../../patches/0006-pi-relay-tools-are-judged-by-the-relay.patch");
+const PATCH = path.resolve(here, "../../../patches/0007-pi-relay-tools-are-judged-by-the-relay.patch");
 const SOURCE = "packages/provider-pi/src/server/mcpExtensionSource.ts";
 
 interface ToolInfo {
@@ -24,7 +24,7 @@ interface ToolInfo {
 }
 type Hook = (event: unknown, ctx: unknown) => Promise<{ block?: boolean } | undefined>;
 
-const work = fs.mkdtempSync(path.join(os.tmpdir(), "t3flare-patch-0006-"));
+const work = fs.mkdtempSync(path.join(os.tmpdir(), "t3flare-patch-0007-"));
 
 /** Replaces `from` exactly once in `text`: a t3 bump that moves it fails here, loudly. */
 const replaceOnce = (text: string, from: string, to: string): string => {
@@ -114,7 +114,7 @@ const asks = async (hook: Hook, mode: string, toolName: string): Promise<boolean
   return confirm.mock.calls.length > 0;
 };
 
-describe("Patch 0006: pi's relay tools are judged by the relay", () => {
+describe("Patch 0007: pi's relay tools are judged by the relay", () => {
   const saved = { ...process.env };
   let patched: Hook;
   let stock: Hook;

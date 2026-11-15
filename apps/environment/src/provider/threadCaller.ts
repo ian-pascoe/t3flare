@@ -1,4 +1,4 @@
-// Who a Settings server call comes from, as the Environment derives it (ADR-0034 §5, plan D3): never what the caller
+// Who a Settings server call comes from, as the Environment derives it (ADR-0035 §5, plan D3): never what the caller
 // states. Two facts per thread, both failing closed:
 //
 // - Linked work (`threadLinkIn`): from t3's projection. `"own"` only when the thread's row, and every ancestor's row up

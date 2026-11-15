@@ -2,7 +2,7 @@
 // hint or the owner's override; every enabled server for every thread: owner, 2026-11-12, back to stock), calls (disabled
 // servers, failures that may have run), and the target it hands the engine (the header value, and nothing else, to
 // redact). Commissary is an ordinary direct server the owner adds with its `x-api-key` header (SPI-1160).
-import { applyMcpChange, EMPTY_HARNESS, type StoredHarness } from "@t3flare/harness-registry";
+import { applyMcpChange, defaultSettingsServer, EMPTY_HARNESS, type StoredHarness } from "@t3flare/harness-registry";
 import { describe, expect, it } from "vitest";
 
 import { McpHost, type McpEngineBinding } from "../src/mcp/host.ts";
@@ -75,23 +75,27 @@ describe("McpHost", () => {
     ]);
   });
 
-  it("offers no server the owner has not added", async () => {
+  it("offers no server the owner has not added, beside the Settings server's implied entry", async () => {
     const run = setup(() => [tool("fixture_echo", true)], undefined, EMPTY_HARNESS);
-    expect(run.host.servers()).toEqual({});
-    expect((await run.host.view()).servers).toEqual([]);
+    expect(Object.keys(run.host.servers())).toEqual(["settings"]);
+    expect((await run.host.view()).servers.map((server) => server.name)).toEqual(["settings"]);
   });
 
   it("a stored settings document that still names the built-in commissary server loads without it, and the name is free", async () => {
     const fixture = { kind: "direct", url: "https://fixture.example/mcp", auth: { kind: "none" }, enabled: true, exposure: "deferred" };
     const stored = { revision: 7, global: {}, overrides: {}, mcp: { servers: { commissary: { kind: "commissary", enabled: true, exposure: "deferred" }, fixture } } } as unknown as StoredHarness;
     const run = setup(() => [tool("fixture_echo", true)], undefined, stored);
-    expect(Object.keys(run.host.servers())).toEqual(["fixture"]);
-    expect((await run.host.view()).servers.map((server) => server.name)).toEqual(["fixture"]);
+    expect(Object.keys(run.host.servers())).toEqual(["fixture", "settings"]);
+    expect((await run.host.view()).servers.map((server) => server.name)).toEqual(["fixture", "settings"]);
     expect(await run.host.call({ server: "commissary", tool: "fixture_echo", args: {} })).toMatchObject({ kind: "unavailable", mayHaveRun: false });
     expect(run.seen.filter((call) => call.op === "request")).toEqual([]);
     const added = applyMcpChange(stored, { op: "add", server: "commissary", url: COMMISSARY_URL, auth: { kind: "header", header: "x-api-key" } });
     if (!added.ok) throw new Error(added.error);
-    expect(added.harness.mcp?.servers).toEqual({ fixture, commissary: { kind: "direct", url: COMMISSARY_URL, auth: { kind: "header", header: "x-api-key" }, enabled: true, exposure: "deferred" } });
+    expect(added.harness.mcp?.servers).toEqual({
+      fixture,
+      settings: defaultSettingsServer(),
+      commissary: { kind: "direct", url: COMMISSARY_URL, auth: { kind: "header", header: "x-api-key" }, enabled: true, exposure: "deferred" },
+    });
   });
 
   it("a tool's class follows its hint as it changes, and the owner's override wins until cleared", async () => {
@@ -285,7 +289,7 @@ describe("McpHost and MCP apps (G11, review L10)", () => {
   });
 });
 
-// The Settings server (ADR-0034, plan D2), M3: a member of the set with static tools, reached without the engine.
+// The Settings server (ADR-0035, plan D2), M3: a member of the set with static tools, reached without the engine.
 describe("McpHost and the Settings server", () => {
   it("lists its static tools without the engine, never stale; a call without the Environment's caller or server is refused", async () => {
     const run = setup(() => []);

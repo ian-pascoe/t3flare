@@ -1,4 +1,4 @@
-// The Settings server's tools (ADR-0034, plan §3 "The tools"): static definitions, the same for every caller and both
+// The Settings server's tools (ADR-0035, plan §3 "The tools"): static definitions, the same for every caller and both
 // doors, so the list changes only with a deploy. Input schemas are generated from the registry (extension ids, setting
 // names and their limits, sizes, Exposures); server and skill names are validated at call time. Every tool's class is
 // fixed: reads are `read`, writes are `write` (plan D7), and `readOnlyHint` says so.

@@ -208,7 +208,7 @@ switch (command) {
         ...deploySecrets([MODEL_ENDPOINT_VAR]),
         T3_URL: access.url,
         T3FLARE_HARNESS_URL: access.url,
-        // The Settings server's Owner-client endpoint (ADR-0034, plan D13), for the stage's MCP clients.
+        // The Settings server's Owner-client endpoint (ADR-0035, plan D13), for the stage's MCP clients.
         ...(access.settingsMcpUrl === undefined ? {} : { T3FLARE_SETTINGS_MCP_URL: access.settingsMcpUrl }),
         T3FLARE_ACCESS_CLIENT_ID: access.clientId,
         T3FLARE_ACCESS_CLIENT_SECRET: access.clientSecret,

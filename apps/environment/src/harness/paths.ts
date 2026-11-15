@@ -1,4 +1,4 @@
-// The Harness panel's paths on the t3 host (ADR-0026), and the Change page's under them (ADR-0034, plan D10): one place,
+// The Harness panel's paths on the t3 host (ADR-0026), and the Change page's under them (ADR-0035, plan D10): one place,
 // so the panel's routes, its page, the Change page, its script and the Settings server's links cannot drift apart.
 
 /** The panel, behind the `/_t3flare` Access application. */

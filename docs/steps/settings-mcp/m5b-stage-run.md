@@ -32,7 +32,7 @@ added; `m6-stage-run.md` item 1.4 records the cap itself.
 ### `native` on 2026-07-28 (Claude Code 2.1.322, the plain `<settingsMcpUrl>`, set to `native` on the panel)
 
 From 2026-11-15 every client here is added with the plain URL (Claude Code 2.1.322 cannot sign in with a query on it;
-ADR-0034's refinement) and its mode is set on the panel (the Settings server's card, Owner clients, the client's row).
+ADR-0035's refinement) and its mode is set on the panel (the Settings server's card, Owner clients, the client's row).
 One entry per client is enough: its row's mode is what each item below names. A mode change applies at the client's
 next request; a change already open keeps its mode.
 
@@ -54,7 +54,7 @@ next request; a change already open keeps its mode.
    (`mode: "form"`, no `elicitationId`); the client's answer arrives as its own POST (answered 202, no body); the stream
    then carries the result `applied`. Record heartbeat lines seen while it held (progress with OpenCode's
    `progressToken`, or `: waiting for the form's answer`). Note: OpenCode under `permission: allow` accepts the empty
-   form itself (M0); record whether it did here, since that is ADR-0034's accepted risk made visible.
+   form itself (M0); record whether it did here, since that is ADR-0035's accepted risk made visible.
    - **The Environment stays alive for a long hold**: once more, answering only after 10 minutes less a few seconds
      (the change's whole life; with a client whose timeout allows it, or Claude Code, which backgrounds the call).
      Record that the stream kept its heartbeat to the end, that no `settings-refused` line with `no-live-stream`
@@ -112,4 +112,4 @@ next request; a change already open keeps its mode.
 
 Write `m5b-settings-owner-modes.json` beside the M5a evidence, with a `verdict` per item (pass, fail, or not run with
 why). A failure in items 2, 6, 8 or 11 that comes from the client, not the endpoint, goes to
-`docs/upstream-fragility.md` U69 and to the report's deviations (M6), with that client's version.
+`docs/upstream-fragility.md` U73 and to the report's deviations (M6), with that client's version.

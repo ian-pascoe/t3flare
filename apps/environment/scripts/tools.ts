@@ -757,7 +757,7 @@ const cliMcp = async (cli: RelayCli) => {
     return { name, mode, plan, run: result.runs.at(-1) ?? null, cards: result.requests.filter(card), requests: result.requests, text: result.text, items: result.items.filter((item: any) => /mcp|tool/i.test(item.type)).slice(0, 8), notesAdded: added };
   };
   const only = "Do not run any shell command; use only that MCP tool.";
-  // SPI-1076 (settings-mcp plan D4): pi reaches the relay through its built-in MCP client, and Patch 0006 keeps t3's pi
+  // SPI-1076 (settings-mcp plan D4): pi reaches the relay through its built-in MCP client, and Patch 0007 keeps t3's pi
   // extension from asking for the relay's tools, so pi's read raises no request at all and its write only the relay's
   // card (without the Patch, each would add the extension's "Allow …?").
   const noOwnAsk = (r: { requests: ReadonlyArray<unknown>; cards: ReadonlyArray<unknown> }) => cli !== "pi" || r.requests.length === r.cards.length;

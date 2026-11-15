@@ -229,7 +229,7 @@ export const verifyHarnessRequest = async (
 };
 
 /**
- * The Owner-client endpoint's check (ADR-0035, plan D13), M5a: the same callers as the panel's, against the endpoint's
+ * The Owner-client endpoint's check (ADR-0036, plan D13), M5a: the same callers as the panel's, against the endpoint's
  * own Access application (`config.audience` is its `aud`, never the panel's). Admitted: the owner's assertion alone,
  * with a non-empty `sub` (an OAuth client cannot send the admin token, and the endpoint takes no cookie-borne write: its
  * guards refuse a browser), or the stage's service token with the admin token. An assertion for the panel's application

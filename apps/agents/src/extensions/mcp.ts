@@ -56,7 +56,7 @@ export interface McpHostOfSession {
     readonly args: Readonly<Record<string, unknown>>;
     readonly judged: ToolClass;
     readonly asker?: McpAsker;
-    /** The tool call's id, by which `stop` names it (the Settings server's calls, ADR-0034 plan D9). */
+    /** The tool call's id, by which `stop` names it (the Settings server's calls, ADR-0035 plan D9). */
     readonly callId?: string;
   }) => Promise<McpCallAnswer>;
   /** The call `callId` was stopped (Stop): the Environment withdraws the Settings server's Open change it holds (plan D9). */
@@ -85,7 +85,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
       });
       if (verdict.kind === "refuse") return result(verdict.reason, true, details);
       if (tool.class === "write" && (await api.memo<boolean>(STARTED_MEMO, context)) === true) return cutOffResult();
-      // The Settings server judges its own writes and asks with one card of its own (ADR-0034, plan D7): this tool keeps
+      // The Settings server judges its own writes and asks with one card of its own (ADR-0035, plan D7): this tool keeps
       // only plan mode's refusal for it, and raises no card.
       if (verdict.kind === "ask" && server.kind !== "settings") {
         const declined = await askOwner(

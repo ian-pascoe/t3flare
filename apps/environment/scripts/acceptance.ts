@@ -9,7 +9,7 @@
 //     Model proxy's settings: Commissary); the text-generation setting then names its default, and the real turn runs on
 //     its small model. Without a setting (CI before `ci:setup`), skipped and said so, and the real turn uses the proxy.
 // 2. Auth: the descriptor reports `remote-reachable`; the root `/.well-known/oauth-authorization-server` and
-//    `oauth-protected-resource` documents are t3's, not Access's (ADR-0035); the bootstrap token is refused until pairing
+//    `oauth-protected-resource` documents are t3's, not Access's (ADR-0036); the bootstrap token is refused until pairing
 //    is armed, pairs while armed (what the web client's /pair#token=… does), and is refused again once disarmed.
 // 3. A stock-protocol client over /ws (t3's own WsRpcGroup): create a project and threads, list them, open one.
 // 4. Turn-item fixtures written through t3's EventSink (admin route), then t3's heavy queries on them: the
@@ -130,7 +130,7 @@ const descriptor = (await (await fetch(new URL("/.well-known/t3/environment", ba
 const session = (await (await fetch(new URL("/api/auth/session", base))).json()) as Record<string, any>;
 report.auth = { machine: descriptor.platform?.machine, label: descriptor.label, policy: session.auth?.policy };
 check("auth descriptor remote-reachable", session.auth?.policy === "remote-reachable", session.auth);
-// 2b. The host's root OAuth documents are still t3's (ADR-0035, plan D13): with managed OAuth on the Owner-client
+// 2b. The host's root OAuth documents are still t3's (ADR-0036, plan D13): with managed OAuth on the Owner-client
 // endpoint's Access application (layout (B)), drift in Access (a beta) answering them would send t3's own MCP clients
 // to Access's authorization server. Public, no credential.
 const wellKnown = async (pathname: string) => {

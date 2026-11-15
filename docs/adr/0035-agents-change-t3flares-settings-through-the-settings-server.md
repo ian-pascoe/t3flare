@@ -3,7 +3,7 @@
 Status: accepted (owner decisions, 2026-11-14; built and unit-tested through SPI-1202, its stage runs owed: report
 [`docs/steps/settings-mcp.md`](../steps/settings-mcp.md)). Where the
 Owner-client endpoint lives:
-[ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md),
+[ADR-0036](0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md),
 conditional on the owner's sign-in probe. Plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md). Supersedes
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §8 ("the agent
@@ -19,9 +19,10 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
 
 1. **One server, two doors.** The Settings server covers the Harness settings, the Environment settings and the
    Environment skills, through the same functions the panel calls.
-   - t3flare's own agents (Durable agents, and the CLI agents through the MCP relay) reach it as a third kind of member
-     of the MCP server set, served in-process by the MCP host, with no Access and no OAuth. It is on by default, with
-     Exposure `deferred`.
+   - t3flare's own agents (Durable agents, and the CLI agents through the MCP relay) reach it as a member
+     of the MCP server set of its own kind, beside the Direct servers (since SPI-1160 the only other kind; Commissary is
+     one of them), served in-process by the MCP host, with no Access and no OAuth. It is on by default, with Exposure
+     `deferred`, and `settings` is reserved with `t3` and `t3-code`.
    - **Owner clients**, MCP clients outside t3flare that the owner signed in, reach it at an HTTP endpoint behind an
      Access application of its own with managed OAuth.
 2. **Panel parity.** An agent may ask for any change the panel can make, including the Guardian's switch and settings, a
@@ -57,7 +58,8 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
 10. **Every write names the revision it expects**, and a moved revision refuses it.
 11. **Every change is audited** with the door it came through, who asked, its tier, its mode and what answered it.
 12. **The pi CLI gets the relay's servers.** Its built-in MCP client reads entries t3flare writes into its per-process
-    agent directory, so Commissary, Direct servers and the Settings server reach it as they reach the other CLI agents.
+    agent directory, so the Direct servers (Commissary among them, since SPI-1160) and the Settings server reach it as
+    they reach the other CLI agents.
 
 ## Considered options
 
@@ -100,7 +102,7 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
 - The Global mise config and the Variables reach every Workspace of every Project, so an approved change made from one
   thread runs in another Project's Container.
 - Where the Owner-client endpoint lives is
-  [ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md):
+  [ADR-0036](0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md):
   a second Access application on the t3 host at `/_t3flare/mcp` (layout (B)), pending the owner's sign-in probe, with
   a Worker on its own host (layout (C)) as the fallback.
 - ADR-0033's title still says Environment skills are "changed only by the owner"; an agent may now ask for a change, and
@@ -111,7 +113,7 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
 §8's carrier changes; its three modes, their meaning and their fallbacks do not. A live stage run showed Claude Code
 2.1.322 failing to sign in with any query on the endpoint's URL: its OAuth discovery then falls back to the origin's
 root authorization server instead of following Access's per-path protected-resource metadata, and Access answers no
-root document (ADR-0035). The same URL without the query signs in. Access's consent page is not ours, so the mode cannot
+root document (ADR-0036). The same URL without the query signs in. Access's consent page is not ours, so the mode cannot
 be picked there either. So, as Executor keeps a connection's mode on its own page:
 
 - **An Owner client's mode is a setting the owner edits on the Harness panel**, kept per Owner caller's key (the Access

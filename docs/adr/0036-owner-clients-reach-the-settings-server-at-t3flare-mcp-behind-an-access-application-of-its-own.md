@@ -13,7 +13,7 @@ nightly job's `bump` stage is on that list for good. Plan:
 [ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) ("Access only on the admin path"),
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §1-2 (one
 Access application, no second one; its SPI-1200 refinement) and
-[ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md) §1, which left where the Owner-client
+[ADR-0035](0035-agents-change-t3flares-settings-through-the-settings-server.md) §1, which left where the Owner-client
 endpoint lives to this record.
 
 An **Owner client** (the owner's Claude Code, pi, Cursor, Codex, OpenCode on his laptop) signs in to the Settings server
@@ -93,7 +93,7 @@ Moving costs the clients' URL and nothing in the DO: `src/settings/endpointLayou
   (the admin application) and on `/_t3flare/mcp` (the endpoint's, with managed OAuth); everything else stays public
   behind t3's own auth.
 - Managed OAuth is a Cloudflare beta. Drift in its discovery or token scoping breaks Owner clients' sign-in under (B)
-  and, at worst, t3's own MCP sign-in; `docs/upstream-fragility.md` U68 says how it is detected.
+  and, at worst, t3's own MCP sign-in; `docs/upstream-fragility.md` U72 says how it is detected.
 - Prod is excluded until owner step 1 passes and M5a's stage evidence (`m5a-settings-owner-browser.json`) is recorded:
   on prod there is no Owner-client endpoint, the `/_t3flare` application has no path-cookie attribute, and Owner clients
   cannot connect. Enabling prod then is a one-line change (`OWNER_ENDPOINT_EXCLUDED_STAGES`).
@@ -120,6 +120,6 @@ on discovery, and the consent page is Access's.
 
 So Owner clients are added with the plain endpoint URL, `https://<host>/_t3flare/mcp`, and each client's Elicitation
 mode is a setting on the Harness panel, per Access identity and client name
-([ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md)'s refinement of the same date). The
+([ADR-0035](0035-agents-change-t3flares-settings-through-the-settings-server.md)'s refinement of the same date). The
 endpoint still honours `?elicitation_mode=` as an override, for scripts and for clients that keep a query, so the
-layout and every probe above are unchanged. `docs/upstream-fragility.md` U70 records the client behaviour.
+layout and every probe above are unchanged. `docs/upstream-fragility.md` U74 records the client behaviour.

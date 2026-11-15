@@ -248,7 +248,7 @@ describe("harness page", () => {
   });
 });
 
-// The Settings server's row (ADR-0034, plan D2), M3 (SPI-1198): one three-way access control, fixed classes, no Test,
+// The Settings server's row (ADR-0035, plan D2), M3 (SPI-1198): one three-way access control, fixed classes, no Test,
 // no Remove.
 describe("the Settings server's row", () => {
   const row = (setting: Partial<McpRow["setting"]>): McpRow => ({

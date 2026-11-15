@@ -1,4 +1,4 @@
-// The Owner-client endpoint's signed tokens (ADR-0034, plan D11), M5a (SPI-1200): the 2025 session id, the 2026
+// The Owner-client endpoint's signed tokens (ADR-0035, plan D11), M5a (SPI-1200): the 2025 session id, the 2026
 // `requestState`, and the 2025 elicitation request's id. Each is `v1.<base64url(JSON payload)>.<base64url(HMAC-SHA-256)>`
 // under a key only the Environment DO holds (`t3flare:settings:state-key`, made on first use as the panel's CSRF key is).
 //

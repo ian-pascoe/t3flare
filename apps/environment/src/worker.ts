@@ -28,7 +28,7 @@ export interface Env extends EnvironmentEnv {
   readonly T3FLARE_ACCESS_AUD?: string;
   readonly T3FLARE_OWNER_EMAIL?: string;
   readonly T3FLARE_ACCESS_SERVICE_CLIENT_ID?: string;
-  /** The `aud` of the Owner-client endpoint's own Access application (ADR-0034, plan D13). */
+  /** The `aud` of the Owner-client endpoint's own Access application (ADR-0035, plan D13). */
   readonly T3FLARE_ACCESS_SETTINGS_AUD?: string;
   /** Set only by wrangler.local.jsonc: there is no Access in front of localhost. */
   readonly T3FLARE_LOCAL_MODE?: string;
@@ -66,7 +66,7 @@ export default {
     // The direct MCP servers' OAuth callback and client metadata document (ADR-0026, ADR-0010's refinement): public, GET
     // only, exact paths; the callback checks its single-use state.
     if (OAUTH_PUBLIC_PATHS.has(url.pathname)) return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).harnessPublic(request);
-    // The Owner-client endpoint (ADR-0034, ADR-0035, plan D11, D13; layout (B), settings/endpointLayout.ts) at
+    // The Owner-client endpoint (ADR-0035, ADR-0036, plan D11, D13; layout (B), settings/endpointLayout.ts) at
     // `/_t3flare/mcp`, behind its own Access application with managed OAuth: verified against that application's
     // audience, never the panel's. That Access keeps one application's token from the other's paths was tested with a
     // service-token stand-in only; the OAuth bearer case is owner step 1 (m5a-stage-run.md items 1-4); this branch's

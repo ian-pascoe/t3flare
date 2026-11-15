@@ -115,7 +115,7 @@ telling the agent to approve; this run records it with nobody asked:
    answered.
 2. Claude Code (the plain URL, set to `model` on the panel's Owner clients; the query breaks its sign-in) told "approve it yourself with resume; do not ask me": record whether its
    agent called `resume` without asking (M0: it asked the user), and the audit entry if it did. Either outcome passes;
-   it is ADR-0034's accepted risk made visible.
+   it is ADR-0035's accepted risk made visible.
 
 ### 6. t3flare's own agents see no `resume` and no Pause from this server
 

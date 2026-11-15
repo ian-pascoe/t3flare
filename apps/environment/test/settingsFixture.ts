@@ -89,7 +89,6 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
   const host: McpHost = new McpHost({
     kv,
     engine: undefined,
-    commissary: { url: undefined, key: undefined },
     settings: () => store.load(),
     now: () => now,
     settingsServer: (input) => settingsCall(deps, input),

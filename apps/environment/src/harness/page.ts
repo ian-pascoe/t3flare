@@ -314,8 +314,8 @@ const toolsTable = (row: McpRow): string => {
 <div class="table-wrap"><table class="stacked tools-table"><thead><tr><th scope="col">Tool</th><th scope="col">Class</th><th scope="col">Exposure</th><th scope="col"><span class="sr">Change</span></th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
 };
 
-/** The kind's tag on a server's card. */
-const KIND_TAGS: Readonly<Record<string, string>> = { direct: "Direct", settings: "Settings server" };
+/** The Settings server's tag on its card; a Direct server, the owner's own, has none (SPI-1160). */
+const kindTag = (kind: string): string => (kind === "settings" ? `<span class="tag">Settings server</span>` : "");
 
 /**
  * The Settings server's access switch (plan D2): one three-way control, off, read-only and read-write, for both doors.
@@ -336,7 +336,7 @@ const settingsAccess = (row: McpRow): string => {
     .join("")}</div>`;
 };
 
-/** The Owner clients as the Settings server's card shows them (ADR-0034's 2026-11-15 refinement). */
+/** The Owner clients as the Settings server's card shows them (ADR-0035's 2026-11-15 refinement). */
 export interface OwnerClientsView {
   /** The Owner-client endpoint's URL, when it is deployed. */
   readonly endpoint?: string;
@@ -410,7 +410,7 @@ const serverCard = (row: McpRow, owner?: OwnerClientsView): string => {
       : "";
   const remove = action("Remove", { op: "remove", server: row.name }, { className: "btn-sm btn-danger", ariaLabel: `Remove ${row.name}`, icon: "trash" });
   return `<article class="group server" aria-labelledby="${id}">
-<div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3><span class="tag">${escapeHtml(KIND_TAGS[row.setting.kind] ?? row.setting.kind)}</span>${statusPill(row)}</div>${
+<div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3>${kindTag(row.setting.kind)}${statusPill(row)}</div>${
     row.setting.url === undefined ? "" : `<p class="server-url">${escapeHtml(row.setting.url)}</p>`
   }${row.setting.kind === "settings" ? `<p class="server-url">t3flare's own settings, for agents: reads, and changes that wait for you when they widen what agents have.</p>` : ""}</div>
 ${

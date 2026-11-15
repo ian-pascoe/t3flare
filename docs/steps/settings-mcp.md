@@ -2,15 +2,15 @@
 
 Report for SPI-1195 and its milestones SPI-1196 to SPI-1202, with SPI-1076 as M2. Plan, with every review's changes
 recorded in place: [`settings-mcp-plan.md`](settings-mcp-plan.md). Decision records:
-[ADR-0034](../adr/0034-agents-change-t3flares-settings-through-the-settings-server.md) (the server, its tiers, its
-modes) and [ADR-0035](../adr/0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
+[ADR-0035](../adr/0035-agents-change-t3flares-settings-through-the-settings-server.md) (the server, its tiers, its
+modes) and [ADR-0036](../adr/0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
 (where the Owner-client endpoint lives). Evidence: [`settings-mcp/`](settings-mcp/).
 
 **State, 2026-11-15: built, unit-tested and stage-run on `psmcp` on branch `settings-mcp`, rebased on `origin/main` at
-96ee913.** Machine evidence passes for M1-M4 and M6. The owner's checklist ([`owner-stage-run.md`](settings-mcp/owner-stage-run.md))
+10b8617 (over SPI-1160 to SPI-1175; deviation 31).** Machine evidence passes for M1-M4 and M6. The owner's checklist ([`owner-stage-run.md`](settings-mcp/owner-stage-run.md))
 passed Block A and owner step 1 (the OAuth gate for layout (B)). Its remaining client tests were skipped by the owner's
 decision (the "Evidence" section). Prod and the nightly job's `bump` stage are still deployed without the Owner-client
-endpoint (ADR-0035; one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES`); turning it on for prod is a follow-up.
+endpoint (ADR-0036; one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES`); turning it on for prod is a follow-up.
 
 ## What was built
 
@@ -50,9 +50,9 @@ possible.
 - `piLaunch` writes `$PI_CODING_AGENT_DIR/mcp.json`, one entry per relay server (the relay's URL,
   `Authorization: Bearer ${T3FLARE_TOOL_HANDLE}`, timeout 900, Exposure `deferred`), and sets the handle and
   `T3FLARE_RELAY_SERVERS` in the process's environment. The fork launch (`--no-extensions`) gets neither.
-- **Patch 0006** (`patches/0006-pi-relay-tools-are-judged-by-the-relay.patch`): t3's pi extension does not ask "Allow
+- **Patch 0007** (`patches/0007-pi-relay-tools-are-judged-by-the-relay.patch`): t3's pi extension does not ask "Allow
   …?" for a tool of pi's built-in MCP client whose server is one the relay serves this process; the relay judges and
-  asks. Recorded in ADR-0001's counts (Patches 6) and `docs/upstream-fragility.md` U67.
+  asks. Recorded in ADR-0001's counts (Patches 7) and `docs/upstream-fragility.md` U71.
 - Tests: `cliProfiles.test.ts` (T-pi-1), `piRelayPatch.test.ts` (the Patch applied to t3's extension source and run).
   `scripts/tools.ts` `cli-mcp` gained pi.
 
@@ -64,7 +64,7 @@ possible.
 - `apps/environment/src/settings/server.ts` (tools in `tools.ts`): thirteen static tools, reads, free changes through
   `ops.ts`, D7's table (one owner-only card outside full access), served in-process by `McpHost` with no engine call.
 - The caller (D3): the Session passes its thread to `mcpCall`; `provider/threadCaller.ts` derives Linked work
-  (`threadLinkIn`, reading the thread projection's `linkOrigin` and `lineage.parentThreadId`, U66) and the Durable mode
+  (`threadLinkIn`, reading the thread projection's `linkOrigin` and `lineage.parentThreadId`, U70) and the Durable mode
   record (`durableModeRecord`, noted at `open` and `submitTurn`, forgotten at unregister); a CLI's modes are its live
   session's. Linked, unknown and mode-less callers read only.
 - The Session's `mcp` extension and the relay keep plan mode's refusal for this server and raise no card of their own.
@@ -110,7 +110,7 @@ possible.
   closed and unknown ids refused; the access switch refuses it.
 - D12's fallbacks toward `browser`, each with its reason in the `waiting` result.
 - **What `native` and `model` may approve.** Every asked change that does not need the page, including turning a Guard
-  off or changing its settings, marking a tool `read`, and changing the Settings server's own entry: ADR-0034 §8 and
+  off or changing its settings, marking a tool `read`, and changing the Settings server's own entry: ADR-0035 §8 and
   its first consequence, and plan D6, which makes only a secret, a sign-in, a skills install or update, and text too
   long to show page-only. Whatever holds an Owner client's token can therefore turn the Guardian off through `model`
   with no person involved; the audit's `mode` and `answeredBy` are the only trace. This is the owner's decision (O5,
@@ -131,7 +131,7 @@ possible.
     `stop` and applies nothing;
   - live held streams are counted per change and per caller: only the last one cut withdraws the change, and at most
     2 per change and 8 per caller hold (past either, `W` saying why);
-  - Patch 0006 asks for a tool whose name only starts like a relayed server's (`settings--x`, `settings__x`,
+  - Patch 0007 asks for a tool whose name only starts like a relayed server's (`settings--x`, `settings__x`,
     `settings-`, `commissary_`);
   - an Owner client's `oversize` is judged on the message actually sent in its mode, not the change's text alone;
   - the declined-repeat hash drops a URL's fragment and empty query, takes an install's source as its repo alone and
@@ -172,7 +172,7 @@ and Open change rows (it reads the Container and the Sessions; the rest must be 
 applied after an Environment reset with nobody holding the result; one cut stream withdrew a change another stream
 still showed, and held streams were unbounded; a close that gave up on an applying answer said "the change failed";
 an Owner client's form or Pause could carry a cut message without the change being page-only; a thread whose id equalled
-an Access `sub` shared that client's caps and showed in its `get_status`; Patch 0006 let a tool of a look-alike server
+an Access `sub` shared that client's caps and showed in its `get_status`; Patch 0007 let a tool of a look-alike server
 (`settings--x`) through unasked; respellings slipped past the declined-repeat hash; a 2026 header without a body
 version answered the wrong error code.
 
@@ -187,9 +187,9 @@ loaded the provider modules on a cold Environment (`m1-stage-run.md` item 4 chec
 Changes the reviews made are recorded in the plan itself; each is listed here with its reason.
 
 1. **A second Access application** contradicts ADR-0026 §1 and its "Back to stock" (no second application). It is
-   recorded there as a refinement pointing at ADR-0035: an Owner client's managed-OAuth token on the `/_t3flare`
+   recorded there as a refinement pointing at ADR-0036: an Owner client's managed-OAuth token on the `/_t3flare`
    application would be admitted at the panel and the Change page, so the endpoint needs an application of its own.
-2. **Layout (B) is conditional** (D13, ADR-0035). M0 showed Access routing `/_t3flare/mcp` and `/_t3flare` apart and
+2. **Layout (B) is conditional** (D13, ADR-0036). M0 showed Access routing `/_t3flare/mcp` and `/_t3flare` apart and
    leaving the root well-known documents alone, but that one application's token is refused at the other's paths was
    tested with a service-token stand-in only. The OAuth bearer case is owner step 1 (M5a items 1-4); if it fails, the
    layout moves to (C). No `apps/settings-worker` was built.
@@ -205,7 +205,7 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
    import no `settings/server.ts`.
 6. **The Linked-work check reads the parent too** (D3, §9's last row): `threadLinkIn` treats a child of a linked thread
    as linked even without the origin, and a parent id that is present but not a thread id as unknown (SPI-1198 review).
-7. **Patch 0006 is narrower than D4 wrote** (SPI-1199 and SPI-1200 reviews): it lets a built-in MCP tool through unasked
+7. **Patch 0007 is narrower than D4 wrote** (SPI-1199 and SPI-1200 reviews): it lets a built-in MCP tool through unasked
    only when its server is one the relay serves this process (`T3FLARE_RELAY_SERVERS`, set by `piLaunch`), matched as pi
    names its tools (`mcp__<server>__` with every character but letters, digits and `_` replaced; `my-docs` is
    `mcp__my_docs__`). Reason: a server from anywhere else, or a look-alike name, must still be asked.
@@ -217,7 +217,7 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
 9. **Only the MCP server set is scrubbed of URL queries** (D14, SPI-1198 review): Variables, the Global mise config and
    a `SKILL.md` read as they are, so writing back what was read is `unchanged`.
 10. **A card-approved free change is audited with `mode: card` and `answeredBy: card`** (D15 said `answeredBy` is absent
-    for a free change; SPI-1198 review, ADR-0034 §11). Reason: outside full access a free change is answered on a card,
+    for a free change; SPI-1198 review, ADR-0035 §11). Reason: outside full access a free change is answered on a card,
     and the audit says what answered. In full access a free change has neither.
 11. **Skill install and update need the page** (D6, SPI-1199 review): only the page shows each skill's `SKILL.md` and
     files.
@@ -263,8 +263,8 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
 26. **Behaviour the SPI-1201 spec review added beyond the plan**: held streams counted and capped (2 per change, 8 per
     caller), the last cut alone withdrawing; a native answer with no live stream withdrawn by `stop`; caps keyed by
     door; the own door's longer wait for an applying answer and `waiting` when any wait runs out; the hash's further
-    canonicalisation; Patch 0006's rest-of-name rule. Each is recorded in the plan (D4, D6, D8, D12, D16) and U67.
-27. **Prod, and `bump`, are deployed without the Owner-client endpoint** (D13, ADR-0035; SPI-1195 review): the plan
+    canonicalisation; Patch 0007's rest-of-name rule. Each is recorded in the plan (D4, D6, D8, D12, D16) and U71.
+27. **Prod, and `bump`, are deployed without the Owner-client endpoint** (D13, ADR-0036; SPI-1195 review): the plan
     put layout (B) on every stage. Until owner step 1 passes and M5a's evidence is recorded, `OWNER_ENDPOINT_EXCLUDED_STAGES` holds
     `prod`: no `SettingsAccess`, the admin application exactly as on `main`, no `T3FLARE_ACCESS_SETTINGS_AUD`, so
     `/_t3flare/mcp` answers 404 `not_configured`. Enabling prod is removing it from that list. Reason: (B) is unproven,
@@ -289,13 +289,29 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     override, so the stage runs stay under it (a new thread per item on the own door; the owner's items spread across
     hours on the Owner door; each stage-run doc says how), and M6 item 1.4 records it.
 30. **An Owner client's Elicitation mode is set on the Harness panel, per client** (D12, O6; the owner's decision of
-    2026-11-15; ADR-0034's and ADR-0035's refinements): the plan read it from `?elicitation_mode=` alone. On the psmcp
+    2026-11-15; ADR-0035's and ADR-0036's refinements): the plan read it from `?elicitation_mode=` alone. On the psmcp
     stage Claude Code 2.1.322 could not sign in with any query on the URL (its OAuth discovery falls back to the
     origin's root authorization server instead of Access's per-path protected-resource metadata), and the plan's
     fallback, a request header, does not reach discovery either. The mode is now kept per Access `sub` (or service
     token) and `clientInfo.name` in `t3flare_settings_clients`, set only by the panel's CSRF-guarded POST (audited,
     entity `owner-clients`), and read by the endpoint when the URL names none; the query still overrides, with its 400.
-    Clients are added with the plain URL. U70.
+    Clients are added with the plain URL. U74.
+31. **Rebased over SPI-1160, with SPI-1162 to SPI-1175** (2026-11-15; SPI-1195). The plan and the stage runs predate
+    SPI-1160, which retired the built-in `commissary` server kind: Commissary is now a Direct server the owner adds
+    (ADR-0028's SPI-1160 refinement). The branch follows it:
+    - The server kinds are `direct` and `settings`. `mcpServersOf` keeps the stored `direct` entries, drops any other
+      kind (the retired `commissary` among them), and sets the Settings server's entry, stored or implied, after that
+      filter, so a new Environment's set holds the Settings server alone. A Direct server stored under `settings` is
+      still ignored and named on the panel.
+    - The reserved names are `settings`, `t3` and `t3-code`; `commissary` is free. The Settings server alone has an
+      implied entry, cannot be removed and carries a kind tag on the panel (a Direct server has none, as on main).
+    - The pi CLI gets the relay's servers, now the enabled Direct servers and the Settings server. `scripts/settings.ts`
+      `setup` and `m2` use the Direct server named `commissary` the owner added (`scripts/commissaryMcp.ts add`).
+    - Tests that leaned on the built-in entry use a Direct server instead.
+    - Numbers taken on `origin/main` meanwhile were renumbered here: the ADRs are 0035 (was 0034) and 0036 (was 0035),
+      the Patch is `0007-pi-relay-tools-are-judged-by-the-relay.patch` (was 0006), and the upstream-fragility entries
+      are U70 to U74 (were U66 to U70). The evidence JSONs keep the old numbers, as they were recorded. Commit shas
+      named in this report and the plan are of the branch before this rebase (`settings-mcp-pre-rebase2`, 386d73a).
 
 ## Evidence
 
@@ -307,7 +323,7 @@ signed in only.
 | --- | --- | --- |
 | M0 | `m0-access-oauth.json`, `m0-clients.json`, `m0-pi.json` | **done** on the spike branch (41b823a), copied unchanged |
 | M1 | `m1-panel-safety.json` | **pass** (5/5) |
-| M2 | `m2-cli-pi.json` | **pass** 2. **Fail** 1: Commissary through pi; the engine rejects Commissary's `tools[14].inputSchema.type`. This is not this branch's code; follow-up ticket |
+| M2 | `m2-cli-pi.json` | **pass** 2. **Fail** 1: Commissary through pi; the engine rejects Commissary's `tools[14].inputSchema.type`. This is not this branch's code; follow-up ticket. That item ran against the old built-in `commissary` kind, retired by SPI-1160 (deviation 31), and is superseded: a rerun would use the Direct server the owner adds |
 | M3 | `m3-settings-own.json`, `m3-settings-cli-{codex,claude,opencode,pi}.json` | **pass** (22). The linked and unknown-thread refusals were not run on the stage; unit-tested |
 | M4 | `m4-settings-asked.json`, `m4-change-page-safety.json` | **pass** (22). The browser items were in the owner's browser |
 | M5a | `m5a-settings-owner-browser.json` | **pass**: owner step 1 (P6, P11 900 s, P12, P13), the layout probes, the guards, the access switch (scripted), and Claude Code's sign-in with the plain URL. The query-carried mode broke Claude Code's discovery, which led to deviation 30. Every other item is **skipped** |
@@ -326,12 +342,12 @@ commands run):
 1. **Step 1, the OAuth flow end to end: PASSED 2026-11-15** (M5a 1-scripted: P6, P11 900 s, P12 refused at every
    admin path as bearer and as cf-access-token, P13 same sub). Prod stays excluded until the owner turns it on. **Gated layout (B)**: an Owner client's
    OAuth token must be refused at `/_t3flare/harness` and `/_t3flare/echo`, and the token exchange must work for the
-   path `resource`. If either fails, ADR-0035 is superseded by one for layout (C). It also decides the page's answerer
+   path `resource`. If either fails, ADR-0036 is superseded by one for layout (C). It also decides the page's answerer
    check (`sub`, or the email if `sub` differs across applications, P13). Taken over by M5a items 1-4. Prod gets the
    endpoint only after it passes (`OWNER_ENDPOINT_EXCLUDED_STAGES`).
 2. **Step 2, Cursor (still open; Cursor not installed)**: confirms the `redirect_uri` Cursor registers. If it is neither
    `cursor://anysphere.cursor-mcp/oauth/callback` nor a `localhost` one, change `SETTINGS_OAUTH_REDIRECT_URIS` (one
-   constant) and ADR-0035. M5a item 4b.
+   constant) and ADR-0036. M5a item 4b.
 3. Step 3, Claude Code's Accept and "I'm done, continue" by hand (neither submitted from a scripted terminal): refines
    M5b items 2 and 7.
 4. Step 4, Codex's tool calls (M0 had no model key for Codex): refines D12's holds for Codex.
@@ -342,7 +358,7 @@ commands run):
 The endpoint is `https://<host>/_t3flare/mcp`: on a stage, `settingsMcpUrl` in its credentials file; on prod
 `https://t3.ianpascoe.dev/_t3flare/mcp`, once prod is enabled after owner step 1 (until then it answers 404); the
 Settings server's card on the Harness panel shows it too. Add it **as it is, with no query**: Claude Code's sign-in
-fails with a query on the URL (U70). The first call sends the client to sign in through Access (dynamic registration, a
+fails with a query on the URL (U74). The first call sends the client to sign in through Access (dynamic registration, a
 `localhost` or loopback redirect) as the owner. For example:
 
 - Claude Code: `claude mcp add --transport http t3flare-settings 'https://<host>/_t3flare/mcp'`
@@ -360,20 +376,20 @@ from `model`: the server declares `listChanged: false`, and a 2025 client reads 
 `resume`) once, at `initialize`, so `resume` shows or hides only after the reconnect. `?elicitation_mode=` on the URL
 still overrides the panel, for scripts and for clients that keep a query.
 
-What each mode means is ADR-0034 §8, and its first consequence: `native` and `model` do not prove the owner answered.
+What each mode means is ADR-0035 §8, and its first consequence: `native` and `model` do not prove the owner answered.
 To cut every client off at once, set the Settings server off or read-only on the Harness panel; to cut one off, revoke
 its grant in the Access dashboard.
 
 ## Docs
 
-- With the plan and through the milestones: ADR-0034; ADR-0035 (layout (B), conditional); refinements of ADR-0001
-  (Patch 0006), ADR-0010 (two Access applications), ADR-0026 (agents' changes; and, from the SPI-1201 review, the
+- With the plan and through the milestones: ADR-0035; ADR-0036 (layout (B), conditional); refinements of ADR-0001
+  (Patch 0007), ADR-0010 (two Access applications), ADR-0026 (agents' changes; and, from the SPI-1201 review, the
   SPI-1200 refinement that flags `SettingsAccess` as contradicting its §1 and "Back to stock", one Access
   application), ADR-0028, ADR-0032 and ADR-0033; `GLOSSARY.md` (Settings server, Door, Owner client, Settings change,
   Change tier, Open change, Change page, Elicitation mode, Guardian, Guard, and the MCP server, Direct server, Pause
-  and Pausing server entries); `docs/steps/tools.md`'s stale pi lines; `docs/upstream-fragility.md` U66-U69.
-- At M6: ADR-0034's status; both research files' "M0's answers"; `docs/parity.md` and `docs/pi-parity.md` (the pi
+  and Pausing server entries); `docs/steps/tools.md`'s stale pi lines; `docs/upstream-fragility.md` U70-U73.
+- At M6: ADR-0035's status; both research files' "M0's answers"; `docs/parity.md` and `docs/pi-parity.md` (the pi
   CLI's relay servers, the Settings server); `README.md`'s pi line; `m4-stage-run.md` items 6 and 10.
-- At the SPI-1195 review: ADR-0035, ADR-0010's refinement, the plan (D13, D16, §10), U68 and `m5a-stage-run.md` (prod
-  excluded until owner step 1; `scripts/smoke.ts` as the detection; U68's dependence on Access's `sub`);
-  `m1-stage-run.md`; M0's evidence copied here; ADR-0001's Patch 0006 entry; ADR-0034's consequences.
+- At the SPI-1195 review: ADR-0036, ADR-0010's refinement, the plan (D13, D16, §10), U72 and `m5a-stage-run.md` (prod
+  excluded until owner step 1; `scripts/smoke.ts` as the detection; U72's dependence on Access's `sub`);
+  `m1-stage-run.md`; M0's evidence copied here; ADR-0001's Patch 0007 entry; ADR-0035's consequences.

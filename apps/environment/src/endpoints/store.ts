@@ -27,7 +27,7 @@ import {
 import { knownModel } from "@t3flare/models/known";
 
 import { CredentialsKeyMissing, type SealedMark, type SealedStore } from "../credentials/sealed.ts";
-import type { KvStorage } from "../harness/store.ts";
+import type { KvStorage } from "../harness/keys.ts";
 
 export const ENDPOINTS_KEY = "t3flare:endpoints:settings";
 

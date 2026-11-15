@@ -3,7 +3,7 @@
 // and calls through the MCP host as a Session does, with the same `decideCall`; a write that asks raises t3's card on
 // the calling thread (`approveCliTool`) while the HTTP request is held.
 //
-// The Settings server (ADR-0034, plan D7) judges its own writes with a card of its own: for it the relay keeps only plan
+// The Settings server (ADR-0035, plan D7) judges its own writes with a card of its own: for it the relay keeps only plan
 // mode's refusal, raises no card, and passes the calling thread and CLI as the caller (plan D3).
 //
 // A server's question during a call (SPI-1079) is the MCP host's to turn into a card; the relay hands it the calling
