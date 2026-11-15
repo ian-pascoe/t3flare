@@ -133,6 +133,9 @@ export default Alchemy.Stack(
     const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {
       name: `${name}-admin`,
       duration: "8760h",
+      // Prod's secret was rotated on 2026-11-15, after it was printed in an agent's session; the old one stopped working
+      // within the hour. Bump the version to rotate again.
+      ...(stage === "prod" ? { clientSecretVersion: 2, previousClientSecretExpiresAt: "2026-11-15T13:00:00Z" } : {}),
     });
     const admin = yield* Cloudflare.Access.Application("AdminAccess", {
       name: `${name} admin`,
