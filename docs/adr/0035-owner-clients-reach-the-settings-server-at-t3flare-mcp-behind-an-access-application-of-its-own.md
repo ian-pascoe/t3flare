@@ -40,7 +40,9 @@ tested with a service-token stand-in only, and the OAuth bearer case is owner st
 4. **The `/_t3flare` application is otherwise unchanged**: still no managed OAuth, so t3's root
    `/.well-known/oauth-*` documents stay t3's own and t3's `/mcp` sign-in is unaffected.
 5. **The Elicitation mode travels in the URL's query** (`?elicitation_mode=`): Access's protected-resource document and
-   every named client's `resource` ignore or accept it, and it reaches the origin.
+   every named client's `resource` ignore or accept it, and it reaches the origin. **Superseded 2026-11-15** (below):
+   Claude Code's discovery does not survive the query; the mode is set per client on the Harness panel and the URL is
+   added without a query.
 
 What this rests on, from M0 on a workers.dev stage:
 
@@ -106,3 +108,18 @@ Moving costs the clients' URL and nothing in the DO: `src/settings/endpointLayou
 - Dynamic registrations from probes and clients stay in the team's managed-OAuth client list; they hold no grant.
 - Until owner step 1 is recorded, the M5a stage run (`docs/steps/settings-mcp/m5a-stage-run.md` item 1) is the gate: if
   it fails, this ADR is superseded by one for layout (C).
+
+## Refinement: the URL carries no query (SPI-1201, 2026-11-15)
+
+§5 held in M0 for authorize (P6) but not for a whole sign-in. On the psmcp stage, Claude Code 2.1.322 added with
+`…/_t3flare/mcp?elicitation_mode=…` failed to sign in: with a query on the URL its OAuth discovery falls back to the
+origin's root authorization server instead of the 401's per-path `resource_metadata`, and Access answers no root
+document here (the reason t3's own root documents stay t3's). The same URL without the query signed in. Neither the
+request-header fallback under Considered options nor Access's consent page helps: Claude Code sends no configured header
+on discovery, and the consent page is Access's.
+
+So Owner clients are added with the plain endpoint URL, `https://<host>/_t3flare/mcp`, and each client's Elicitation
+mode is a setting on the Harness panel, per Access identity and client name
+([ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md)'s refinement of the same date). The
+endpoint still honours `?elicitation_mode=` as an override, for scripts and for clients that keep a query, so the
+layout and every probe above are unchanged. `docs/upstream-fragility.md` U70 records the client behaviour.

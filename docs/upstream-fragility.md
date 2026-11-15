@@ -904,8 +904,9 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
   refused at another's (tested with a service-token stand-in only; the OAuth bearer case is owner step 1,
   `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4, so layout (B) is unproven until then); Access answers no root or
   path-inserted well-known document, so clients find the authorization server only from the 401's `WWW-Authenticate`
-  `resource_metadata`; `resource` is accepted with or without the query; the query reaches the origin; and Claude Code
-  2.1.322's 2026 traffic as captured (P17).
+  `resource_metadata`; `resource` is accepted with or without the query at authorize; the query reaches the origin
+  (no longer relied on by the named clients: Claude Code's discovery fails with one, U70); and Claude Code 2.1.322's
+  2026 traffic as captured (P17).
 - **Breaks when**: Access (in beta) starts answering the host's root `/.well-known/oauth-*` documents (t3's own `/mcp`
   sign-in would find Access's server instead of t3's), changes how path-scoped applications nest or how it scopes
   tokens and cookies, or refuses a path-scoped or queried `resource`; alchemy renames `oauthConfiguration` or
@@ -959,6 +960,27 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Fix**: for a client, compare its traffic with the spec's `schema.ts` and M0's capture; if an empty form is the
   problem, ask a one-boolean form (`{ approve: { type: "boolean" } }`) and read `content.approve` with `accept`; for
   Executor, follow U52's fix in `ownerPause` and `RESUME_TOOL` too.
+
+### U70. Owner clients' URL without a query, and the mode keyed by `clientInfo.name` (SPI-1201)
+
+- **Where**: `apps/environment/src/settings/clients.ts` (the kept modes, by Access `sub` or `service-token` and the
+  client's `clientInfo.name`), `endpoint.ts` (`modeOf`: the query, else the kept mode, else `browser`; the name from
+  2026 `_meta` `io.modelcontextprotocol/clientInfo`, from `initialize`'s `clientInfo`, or from the 2025 session token
+  that kept it), the Settings server's card on the panel (`page.ts` `ownerClientsBlock`, `panel.ts` `changeClient`).
+  It rests on the psmcp stage run of 2026-11-15: Claude Code 2.1.322 added with `…/_t3flare/mcp?elicitation_mode=…`
+  could not sign in (its OAuth discovery, with a query on the URL, fell back to the origin's root authorization server
+  instead of the 401's per-path `resource_metadata`), and signed in with the plain URL. ADR-0035's refinement of that
+  date.
+- **Breaks when**: a client changes its `clientInfo.name` between releases (its kept mode no longer applies: it is
+  listed again in `browser`, the safe default), sends none (always `browser`), or two clients send the same name (they
+  share a mode); a client stops sending `clientInfo` in 2026 `_meta`; Claude Code fixes its discovery (nothing breaks:
+  the query becomes usable again, and the panel still decides without one).
+- **Detection**: `test/settingsClients.test.ts` pins our side (the resolution order, keys, the cap, the throttle, the
+  panel's guard, no other writer). **Silent** for a client's name change: the panel's list shows a new row in
+  `browser` and the client asks in `browser` until the owner sets it.
+- **Blast radius**: a client in the wrong mode, always toward `browser` for an unknown name; nothing applies unseen.
+- **Fix**: set the new name's mode on the panel and remove the old row; if a client's discovery starts tolerating the
+  query and the owner prefers it, the override still works as it did.
 
 ## Gaps in detection
 

@@ -323,3 +323,13 @@ third-party reports: `http://localhost:8787/callback`, older `cursor://anysphere
 `https://www.cursor.com/agents/mcp/oauth/callback`). An unlisted custom scheme, https or non-loopback redirect is refused
 at registration with `invalid_client_metadata`; registration is team-wide and admits a redirect any of the team's
 applications allows, and authorize then enforces the application's own list.
+
+## After M0: a query on the URL breaks Claude Code's sign-in (SPI-1201, 2026-11-15)
+
+P6 showed Access accepting the endpoint's URL with `?elicitation_mode=…` as `resource` at authorize, and P15 assumed
+that was enough. The psmcp stage run showed otherwise for a whole sign-in: Claude Code 2.1.322 added with
+`…/_t3flare/mcp?elicitation_mode=…` failed to sign in, because with a query on the URL its discovery fell back to the
+origin's root authorization server instead of the 401's per-path `resource_metadata` (Access answers no root document
+here). The same URL without the query signed in. So the mode no longer travels in the URL: it is a per-client setting
+on the Harness panel (ADR-0034's and ADR-0035's refinements of this date; `docs/upstream-fragility.md` U70), and the
+query is only an override.

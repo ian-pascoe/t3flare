@@ -41,7 +41,8 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
    calling thread, which no agent can answer, with the change written by the server and a link to the **Change page**.
    The page can answer it too; the first answer wins.
 8. **An Owner client's Elicitation mode is its own choice.** `?elicitation_mode=` on the endpoint's URL, with Executor's
-   names, read on every request and trusted as sent:
+   names, read on every request and trusted as sent (refined 2026-11-15: set per client on the Harness panel, the query
+   kept as an override; see the refinement below):
    - `browser` (the default): the client is sent to the Change page, and the page applies the change;
    - `native`: the client shows a form, and its `accept` applies the change;
    - `model`: the result is a Pause, and the client's agent applies the change by calling `resume`.
@@ -104,3 +105,33 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
   a Worker on its own host (layout (C)) as the fallback.
 - ADR-0033's title still says Environment skills are "changed only by the owner"; an agent may now ask for a change, and
   its §7 is refined.
+
+## Refinement: an Owner client's mode is set on the panel, per client (SPI-1201, 2026-11-15)
+
+§8's carrier changes; its three modes, their meaning and their fallbacks do not. A live stage run showed Claude Code
+2.1.322 failing to sign in with any query on the endpoint's URL: its OAuth discovery then falls back to the origin's
+root authorization server instead of following Access's per-path protected-resource metadata, and Access answers no
+root document (ADR-0035). The same URL without the query signs in. Access's consent page is not ours, so the mode cannot
+be picked there either. So, as Executor keeps a connection's mode on its own page:
+
+- **An Owner client's mode is a setting the owner edits on the Harness panel**, kept per Owner caller's key (the Access
+  `sub`, or the service token) and the client's own `clientInfo.name` (no version), in the Environment DO's SQLite
+  (`t3flare_settings_clients`, `apps/environment/src/settings/clients.ts`). The Settings server's card on the panel
+  lists each client the endpoint has seen, with its last request, a mode select and Remove, and shows the plain
+  endpoint URL to add.
+- **A request's mode**: an explicit `?elicitation_mode=` still wins (and an unknown, repeated or mis-cased one is still
+  400); otherwise the client's kept mode; otherwise `browser`. A request with no client name is `browser`. §8's
+  fallbacks toward `browser` apply after it, as before.
+- **The endpoint records a client as seen**, in `browser`, at its first request with a name, and writes its last-seen
+  time at most once an hour. At most 50 clients per key; a new name past that evicts the least recently seen, so a
+  client cannot grow the table by sending random names. A name is cut to 60 characters, stripped of hidden characters
+  and rendered escaped.
+- **Only the panel sets a mode**, with the panel's write guard (JSON, same Origin, the CSRF token for a browser), and
+  each change is audited (entity `owner-clients`). No MCP door and no Settings tool reaches it: the endpoint is handed
+  the store's read-and-record function alone. A client in `model` cannot move itself to another mode.
+- **A mode change applies at the client's next request.** An Open change keeps the mode it was asked in: a retry or a
+  form answer in another mode is refused as before, and the Change page still answers it.
+
+The client name is the client's own label and carries no security weight. That changes nothing in the Consequences
+above: the mode was always the client's choice, trusted as sent (E1); a client that names itself as another gets that
+client's mode, which it could already have asked for with the query.

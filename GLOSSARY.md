@@ -266,7 +266,8 @@ _Avoid_: entrypoint, channel (a Process channel is another thing), transport
 
 **Owner client**:
 An MCP client outside t3flare, such as Claude Code or Cursor on the owner's laptop, that the owner signed in to the
-Settings server through Access. It chooses its own Elicitation mode.
+Settings server through Access. Its Elicitation mode is the owner's setting for it on the Harness panel, by its own
+name (`clientInfo.name`), which is a label, never proof of which client calls.
 _Avoid_: external agent, laptop client (the Laptop Environment is t3's), remote client
 
 **Settings change**:
@@ -290,9 +291,10 @@ typed or a Direct server's sign-in is started for a change an agent asked.
 _Avoid_: confirm page, approval page
 
 **Elicitation mode**:
-How an Owner client's asked change is answered, chosen in the Settings server's URL: `browser` (the owner, on the
-Change page), `native` (a form in the client) or `model` (the client's agent, by calling `resume`). Executor's names and
-meanings. t3flare's own agents have none: theirs is always a Server question.
+How an Owner client's asked change is answered: `browser` (the owner, on the Change page), `native` (a form in the
+client) or `model` (the client's agent, by calling `resume`). Executor's names and meanings. Set per Owner client on the
+Harness panel (`browser` until the owner changes it); `?elicitation_mode=` on the URL overrides it, for clients that keep
+a query. t3flare's own agents have none: theirs is always a Server question.
 _Avoid_: approval mode, form mode, URL mode (an elicitation is a form or a page)
 
 **Guardian**:
