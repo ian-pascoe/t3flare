@@ -4,13 +4,13 @@
  "host": "t3flare-environment-psmcp.ian-g-pascoe.workers.dev",
  "items": {
   "1-read": {
-   "at": "2026-11-14T17:56:42.346Z",
-   "commit": "24f4a01a90e6",
+   "at": "2026-11-15T12:57:40.460Z",
+   "commit": "85990dbc67b0",
    "name": "durable: get_settings (environment) runs without a card",
-   "threadId": "a4cfac55-5c00-4eed-b853-b4a9e8b78893",
+   "threadId": "192afd96-a091-4209-b854-3334fe93f6b1",
    "status": "completed",
    "cards": [],
-   "reply": "    \\\"perContainerHour\\\": 0.07401600000000001,\\n        \\\"budgetHour\\\": 0.22204800000000002\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-2\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 6144,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.129024,\\n        \\\"budgetHour\\\": 0.38707199999999997\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-2\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 6144,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.129024,\\n        \\\"budgetHour\\\": 0.38707199999999997\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-3\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 2,\\n          \\\"memoryMib\\\": 8192,\\n          \\\"diskMb\\\": 16000\\n        },\\n        \\\n\nI made an error at the end: I padded the output with a duplicated \"standard-2\" block and cut it off partway. The tool's actual output, cut off at the same 4000-character limit the script applied, is:\n\n```\n\"{\\n  \\\"entity\\\": \\\"environment\\\",\\n  \\\"revision\\\": 6,\\n  \\\"settings\\\": [\\n    {\\n      \\\"key\\\": \\\"containerSize\\\", ... \\\"size\\\": \\\"standard-3\\\",\\n      \\\"default\\\": false,\\n      \\\"resources\\\": {\\n          \\\"vcpu\\\": 2,\\n          \\\"memoryMib\\\": 8192,\\n          \\\"diskMb\\\": 16000\\n        },\\n        \\\n```\n\nUse the first block above as the output, ignoring the duplicate \"standard-2\" entry I added.",
+   "reply": "\\n        \\\"default\\\": 2\\n      },\\n      \\\"tier\\\": \\\"free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerBudget\\\",\\n      \\\"title\\\": \\\"Container budget\\\",\\n      \\\"description\\\": \\\"How many Containers may run at once across the Environment. Applies at the next start; lowering it stops no running Container, and new starts wait until fewer run.\\\",\\n      \\\"value\\\": 3,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 10,\\n        \\\"default\\\": 3\\n      },\\n      \\\"tier\\\": \\\"down-free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"variables\\\",\\n      \\\"title\\\": \\\"Variables\\\",\\n      \\\"description\\\": \\\"Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a credential. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most 50. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": {},\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"variables\\\",\\n        \\\"default\\\": {}\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"globalMiseConfig\\\",\\n      \\\"title\\\": \\\"Global mise config\\\",\\n      \\\"description\\\": \\\"A mise.toml every Container's commands get, under a repository's own and over the image's base tools. Laid down and installed at each Workspace's next Container start; a running Container keeps what it started with. Kept only if git and gh still run under it. disable_tools and disable_backends are ignored. Agents can read this file: put no secret in it, [env] included.\\\",\\n      \\\"value\\\": \\\"\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"file\\\",\\n        \\\"maxBytes\\\": 16384,\\n        \\\"default\\\": \\\"\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    }\\n  ],\\n  \\\"running\\\": {\\n    \\\"count\\\": 0,\\n    \\\"holders\\\": []\\n  },\\n  \\\"costs\\\": {\\n    \\\"budget\\\": 3,\\n    \\\"rows\\\": [\\n      {\\n        \\\"size\\\": \\\"cpu-1\\\",\\n        \\\"default\\\": true,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 3072,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.10202400000000002,\\n        \\\"budgetHour\\\": 0.30607200000000007\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-1\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 0.5,\\n          \\\"memoryMib\\\": 4096,\\n          \\\"diskMb\\\": 8000\\n        },\\n        \\\"perContainerHour\\\": 0.07401600000000001,\\n        \\\"budgetHour\\\": 0.22204800000000002\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-2\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 6144,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.129024,\\n        \\\"budgetHour\\\": 0.38707199999999997\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-3\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 2,\\n          \\\"memoryMib\\\": 8192,\\n          \\\"diskMb\\\": 16000\\n        },\\n        \\\"perContainerHour\\\": 0.220032\"",
    "toolItems": [
     {
      "type": "dynamic_tool",
@@ -25,27 +25,27 @@
      "output": "null"
     }
    ],
-   "ms": 18341,
-   "output": "Script completed\nWall time 0.3 seconds\nOutput:\n\"{\\n  \\\"entity\\\": \\\"environment\\\",\\n  \\\"revision\\\": 6,\\n  \\\"settings\\\": [\\n    {\\n      \\\"key\\\": \\\"containerSize\\\",\\n      \\\"title\\\": \\\"Container size\\\",\\n      \\\"description\\\": \\\"The vCPU, memory and disk a Workspace's Container starts with. Applies at each Workspace's next Container start; a running Container keeps its size.\\\",\\n      \\\"value\\\": \\\"cpu-1\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"enum\\\",\\n        \\\"values\\\": [\\n          \\\"cpu-1\\\",\\n          \\\"standard-1\\\",\\n          \\\"standard-2\\\",\\n          \\\"standard-3\\\",\\n          \\\"standard-4\\\"\\n        ],\\n        \\\"default\\\": \\\"cpu-1\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerIdleMinutes\\\",\\n      \\\"title\\\": \\\"Idle time (minutes)\\\",\\n      \\\"description\\\": \\\"A Container stops after this long without a command. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": 2,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 60,\\n        \\\"default\\\": 2\\n      },\\n      \\\"tier\\\": \\\"free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerBudget\\\",\\n      \\\"title\\\": \\\"Container budget\\\",\\n      \\\"description\\\": \\\"How many Containers may run at once across the Environment. Applies at the next start; lowering it stops no running Container, and new starts wait until fewer run.\\\",\\n      \\\"value\\\": 3,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 10,\\n        \\\"default\\\": 3\\n      },\\n      \\\"tier\\\": \\\"down-free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"variables\\\",\\n      \\\"title\\\": \\\"Variables\\\",\\n      \\\"description\\\": \\\"Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a credential. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most 50. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": {},\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"variables\\\",\\n        \\\"default\\\": {}\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"globalMiseConfig\\\",\\n      \\\"title\\\": \\\"Global mise config\\\",\\n      \\\"description\\\": \\\"A mise.toml every Container's commands get, under a repository's own and over the image's base tools. Laid down and installed at each Workspace's next Container start; a running Container keeps what it started with. Kept only if git and gh still run under it. disable_tools and disable_backends are ignored. Agents can read this file: put no secret in it, [env] included.\\\",\\n      \\\"value\\\": \\\"\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"file\\\",\\n        \\\"maxBytes\\\": 16384,\\n        \\\"default\\\": \\\"\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    }\\n  ],\\n  \\\"running\\\": {\\n    \\\"count\\\": 1,\\n    \\\"holders\\\": [\\n      \\\"smcp-durable\\\"\\n    ]\\n  },\\n  \\\"costs\\\": {\\n    \\\"budget\\\": 3,\\n    \\\"rows\\\": [\\n      {\\n        \\\"size\\\": \\\"cpu-1\\\",\\n        \\\"default\\\": true,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 3072,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.10202400000000002,\\n        \\\"budgetHour\\\": 0.30607200000000007\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-1\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 0.5,\\n          \\\"memoryMib\\\": 4096,\\n          \\\"diskMb\\\": 8000\\n        },\\n        \\\"perContainerHour\\\": 0.07401600000000001,\\n        \\\"budgetHour\\\": 0.22204800000000002\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-2\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 6144,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.129024,\\n        \\\"budgetHour\\\": 0.38707199999999997\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-3\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 2,\\n          \\\"memoryMib\\\": 8192,\\n   ",
-   "result": "Script completed\nWall time 0.3 seconds\nOutput:\n\"{\\n  \\\"entity\\\": \\\"environment\\\",\\n  \\\"revision\\\": 6,\\n  \\\"settings\\\": [\\n    {\\n      \\\"key\\\": \\\"containerSize\\\",\\n      \\\"title\\\": \\\"Container size\\\",\\n      \\\"description\\\": \\\"The vCPU, memory and disk a Workspace's Container starts with. Applies at each Workspace's next Container start; a running Container keeps its size.\\\",\\n      \\\"value\\\": \\\"cpu-1\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"enum\\\",\\n        \\\"values\\\": [\\n          \\\"cpu-1\\\",\\n          \\\"standard-1\\\",\\n          \\\"standard-2\\\",\\n          \\\"standard-3\\\",\\n          \\\"standard-4\\\"\\n        ],\\n        \\\"default\\\": \\\"cpu-1\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerIdleMinutes\\\",\\n      \\\"title\\\": \\\"Idle time (minutes)\\\",\\n      \\\"description\\\": \\\"A Container stops after this long without a command. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": 2,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 60,\\n        \\\"default\\\": 2\\n      },\\n      \\\"tier\\\": \\\"free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerBudget\\\",\\n      \\\"title\\\": \\\"Container budget\\\",\\n      \\\"description\\\": \\\"How many Containers may run at once across the Environment. Applies at the next start; lowering it stops no running Container, and new starts wait until fewer run.\\\",\\n      \\\"value\\\": 3,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 10,\\n        \\\"default\\\": 3\\n      },\\n      \\\"tier\\\": \\\"down-free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"variables\\\",\\n      \\\"title\\\": \\\"Variables\\\",\\n      \\\"description\\\": \\\"Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a credential. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most 50. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": {},\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"variables\\\",\\n        \\\"default\\\": {}\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"globalMiseConfig\\\",\\n      \\\"title\\\": \\\"Global mise config\\\",\\n      \\\"description\\\": \\\"A mise.toml every Container's commands get, under a repository's own and over the image's base tools. Laid down and installed at each Workspace's next Container start; a running Container keeps what it started with. Kept only if git and gh still run under it. disable_tools and disable_backends are ignored. Agents can read this file: put no secret in it, [env] included.\\\",\\n      \\\"value\\\": \\\"\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"file\\\",\\n        \\\"maxBytes\\\": 16384,\\n        \\\"default\\\": \\\"\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    }\\n  ],\\n  \\\"running\\\": {\\n    \\\"count\\\": 1,\\n    \\\"holders\\\": [\\n      \\\"smcp-durable\\\"\\n    ]\\n  },\\n  \\\"costs\\\": {\\n    \\\"budget\\\": 3,\\n    \\\"rows\\\": [\\n      {\\n        \\\"size\\\": \\\"cpu-1\\\",\\n        \\\"default\\\": true,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 3072,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.10202400000000002,\\n        \\\"budgetHour\\\": 0.30607200000000007\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-1\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 0.5,\\n          \\\"memoryMib\\\": 4096,\\n          \\\"diskMb\\\": 8000\\n        },\\n        \\\"perContainerHour\\\": 0.07401600000000001,\\n        \\\"budgetHour\\\": 0.22204800000000002\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-2\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 6144,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.129024,\\n        \\\"budgetHour\\\": 0.38707199999999997\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-3\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 2,\\n          \\\"memoryMib\\\": 8192,\\n   ",
+   "ms": 15424,
+   "output": "Script completed\nWall time 0.2 seconds\nOutput:\n\"{\\n  \\\"entity\\\": \\\"environment\\\",\\n  \\\"revision\\\": 64,\\n  \\\"settings\\\": [\\n    {\\n      \\\"key\\\": \\\"containerSize\\\",\\n      \\\"title\\\": \\\"Container size\\\",\\n      \\\"description\\\": \\\"The vCPU, memory and disk a Workspace's Container starts with. Applies at each Workspace's next Container start; a running Container keeps its size.\\\",\\n      \\\"value\\\": \\\"cpu-1\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"enum\\\",\\n        \\\"values\\\": [\\n          \\\"cpu-1\\\",\\n          \\\"standard-1\\\",\\n          \\\"standard-2\\\",\\n          \\\"standard-3\\\",\\n          \\\"standard-4\\\"\\n        ],\\n        \\\"default\\\": \\\"cpu-1\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerIdleMinutes\\\",\\n      \\\"title\\\": \\\"Idle time (minutes)\\\",\\n      \\\"description\\\": \\\"A Container stops after this long without a command. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": 2,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 60,\\n        \\\"default\\\": 2\\n      },\\n      \\\"tier\\\": \\\"free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerBudget\\\",\\n      \\\"title\\\": \\\"Container budget\\\",\\n      \\\"description\\\": \\\"How many Containers may run at once across the Environment. Applies at the next start; lowering it stops no running Container, and new starts wait until fewer run.\\\",\\n      \\\"value\\\": 3,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 10,\\n        \\\"default\\\": 3\\n      },\\n      \\\"tier\\\": \\\"down-free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"variables\\\",\\n      \\\"title\\\": \\\"Variables\\\",\\n      \\\"description\\\": \\\"Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a credential. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most 50. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": {},\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"variables\\\",\\n        \\\"default\\\": {}\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"globalMiseConfig\\\",\\n      \\\"title\\\": \\\"Global mise config\\\",\\n      \\\"description\\\": \\\"A mise.toml every Container's commands get, under a repository's own and over the image's base tools. Laid down and installed at each Workspace's next Container start; a running Container keeps what it started with. Kept only if git and gh still run under it. disable_tools and disable_backends are ignored. Agents can read this file: put no secret in it, [env] included.\\\",\\n      \\\"value\\\": \\\"\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"file\\\",\\n        \\\"maxBytes\\\": 16384,\\n        \\\"default\\\": \\\"\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    }\\n  ],\\n  \\\"running\\\": {\\n    \\\"count\\\": 0,\\n    \\\"holders\\\": []\\n  },\\n  \\\"costs\\\": {\\n    \\\"budget\\\": 3,\\n    \\\"rows\\\": [\\n      {\\n        \\\"size\\\": \\\"cpu-1\\\",\\n        \\\"default\\\": true,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 3072,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.10202400000000002,\\n        \\\"budgetHour\\\": 0.30607200000000007\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-1\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 0.5,\\n          \\\"memoryMib\\\": 4096,\\n          \\\"diskMb\\\": 8000\\n        },\\n        \\\"perContainerHour\\\": 0.07401600000000001,\\n        \\\"budgetHour\\\": 0.22204800000000002\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-2\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 6144,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.129024,\\n        \\\"budgetHour\\\": 0.38707199999999997\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-3\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 2,\\n          \\\"memoryMib\\\": 8192,\\n          \\\"diskMb\\\": 16000\\n   ",
+   "result": "Script completed\nWall time 0.2 seconds\nOutput:\n\"{\\n  \\\"entity\\\": \\\"environment\\\",\\n  \\\"revision\\\": 64,\\n  \\\"settings\\\": [\\n    {\\n      \\\"key\\\": \\\"containerSize\\\",\\n      \\\"title\\\": \\\"Container size\\\",\\n      \\\"description\\\": \\\"The vCPU, memory and disk a Workspace's Container starts with. Applies at each Workspace's next Container start; a running Container keeps its size.\\\",\\n      \\\"value\\\": \\\"cpu-1\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"enum\\\",\\n        \\\"values\\\": [\\n          \\\"cpu-1\\\",\\n          \\\"standard-1\\\",\\n          \\\"standard-2\\\",\\n          \\\"standard-3\\\",\\n          \\\"standard-4\\\"\\n        ],\\n        \\\"default\\\": \\\"cpu-1\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerIdleMinutes\\\",\\n      \\\"title\\\": \\\"Idle time (minutes)\\\",\\n      \\\"description\\\": \\\"A Container stops after this long without a command. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": 2,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 60,\\n        \\\"default\\\": 2\\n      },\\n      \\\"tier\\\": \\\"free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"containerBudget\\\",\\n      \\\"title\\\": \\\"Container budget\\\",\\n      \\\"description\\\": \\\"How many Containers may run at once across the Environment. Applies at the next start; lowering it stops no running Container, and new starts wait until fewer run.\\\",\\n      \\\"value\\\": 3,\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"integer\\\",\\n        \\\"minimum\\\": 1,\\n        \\\"maximum\\\": 10,\\n        \\\"default\\\": 3\\n      },\\n      \\\"tier\\\": \\\"down-free\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"variables\\\",\\n      \\\"title\\\": \\\"Variables\\\",\\n      \\\"description\\\": \\\"Plain NAME=value pairs every command in a Workspace starts with: agents' commands, Terminals and CLI agents. Agents can read them, so never a credential. Anything t3flare, t3, mise's [env] or the command itself sets wins over them. At most 50. Applies at each Workspace's next Container start.\\\",\\n      \\\"value\\\": {},\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"variables\\\",\\n        \\\"default\\\": {}\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    },\\n    {\\n      \\\"key\\\": \\\"globalMiseConfig\\\",\\n      \\\"title\\\": \\\"Global mise config\\\",\\n      \\\"description\\\": \\\"A mise.toml every Container's commands get, under a repository's own and over the image's base tools. Laid down and installed at each Workspace's next Container start; a running Container keeps what it started with. Kept only if git and gh still run under it. disable_tools and disable_backends are ignored. Agents can read this file: put no secret in it, [env] included.\\\",\\n      \\\"value\\\": \\\"\\\",\\n      \\\"schema\\\": {\\n        \\\"type\\\": \\\"file\\\",\\n        \\\"maxBytes\\\": 16384,\\n        \\\"default\\\": \\\"\\\"\\n      },\\n      \\\"tier\\\": \\\"asked\\\"\\n    }\\n  ],\\n  \\\"running\\\": {\\n    \\\"count\\\": 0,\\n    \\\"holders\\\": []\\n  },\\n  \\\"costs\\\": {\\n    \\\"budget\\\": 3,\\n    \\\"rows\\\": [\\n      {\\n        \\\"size\\\": \\\"cpu-1\\\",\\n        \\\"default\\\": true,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 3072,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.10202400000000002,\\n        \\\"budgetHour\\\": 0.30607200000000007\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-1\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 0.5,\\n          \\\"memoryMib\\\": 4096,\\n          \\\"diskMb\\\": 8000\\n        },\\n        \\\"perContainerHour\\\": 0.07401600000000001,\\n        \\\"budgetHour\\\": 0.22204800000000002\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-2\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 1,\\n          \\\"memoryMib\\\": 6144,\\n          \\\"diskMb\\\": 12000\\n        },\\n        \\\"perContainerHour\\\": 0.129024,\\n        \\\"budgetHour\\\": 0.38707199999999997\\n      },\\n      {\\n        \\\"size\\\": \\\"standard-3\\\",\\n        \\\"default\\\": false,\\n        \\\"resources\\\": {\\n          \\\"vcpu\\\": 2,\\n          \\\"memoryMib\\\": 8192,\\n          \\\"diskMb\\\": 16000\\n   ",
    "verdict": "pass"
   },
   "2-free-full-access": {
-   "at": "2026-11-14T17:56:51.305Z",
-   "commit": "24f4a01a90e6",
+   "at": "2026-11-15T12:57:49.028Z",
+   "commit": "85990dbc67b0",
    "name": "durable: a free change (containerIdleMinutes lowered) runs in full access without a card",
    "before": {
-    "revision": 6,
+    "revision": 64,
     "containerIdleMinutes": 2
    },
    "after": {
-    "revision": 7,
+    "revision": 65,
     "containerIdleMinutes": 1
    },
-   "threadId": "f18f6447-420d-4682-8237-536e7af0ecf1",
+   "threadId": "14d6f841-f7c8-4e8f-bdc1-4a74f463d73e",
    "status": "completed",
    "cards": [],
-   "reply": "Applied: the Environment settings are at revision 7. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.",
+   "reply": "\"Applied: the Environment settings are at revision 65. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
    "toolItems": [
     {
      "type": "dynamic_tool",
@@ -60,13 +60,13 @@
      "output": "null"
     }
    ],
-   "ms": 7260,
-   "output": "Script completed\nWall time 0.3 seconds\nOutput:\n\"Applied: the Environment settings are at revision 7. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
-   "result": "Script completed\nWall time 0.3 seconds\nOutput:\n\"Applied: the Environment settings are at revision 7. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
+   "ms": 7000,
+   "output": "Script completed\nWall time 0.3 seconds\nOutput:\n\"Applied: the Environment settings are at revision 65. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
+   "result": "Script completed\nWall time 0.3 seconds\nOutput:\n\"Applied: the Environment settings are at revision 65. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
    "audit": {
-    "caller": "agent:f18f6447-420d-4682-8237-536e7af0ecf1",
+    "caller": "agent:14d6f841-f7c8-4e8f-bdc1-4a74f463d73e",
     "via": "mcp",
-    "thread": "f18f6447-420d-4682-8237-536e7af0ecf1",
+    "thread": "14d6f841-f7c8-4e8f-bdc1-4a74f463d73e",
     "agent": "piDurable",
     "tier": "free",
     "entity": "environment",
@@ -78,22 +78,22 @@
     "after": {
      "containerIdleMinutes": 1
     },
-    "at": 1794679008333
+    "at": 1794747466611
    },
    "verdict": "pass"
   },
   "3-free-approval-required": {
-   "at": "2026-11-14T17:57:02.474Z",
-   "commit": "24f4a01a90e6",
+   "at": "2026-11-15T12:58:00.201Z",
+   "commit": "85990dbc67b0",
    "name": "durable: a free change in approval-required asks on one card; approved, applied (audit mode card, answeredBy card)",
-   "threadId": "b2114b7d-a1f9-48ab-8aa3-d8173761d893",
+   "threadId": "54374ce1-7353-456f-997f-7076c6b92ff8",
    "status": "completed",
    "cards": [
     {
-     "id": "runtime-request:piDurable:thread:b2114b7d-a1f9-48ab-8aa3-d8173761d893:approval:t3flare-elicit-ebbabe78-c7eb-4cb0-b13f-dcadff9320da",
+     "id": "runtime-request:piDurable:thread:54374ce1-7353-456f-997f-7076c6b92ff8:approval:t3flare-elicit-67197473-cf81-4855-aca8-4e3355f66a1d",
      "kind": "mcp-elicitation",
      "requestKind": "mcp-elicitation",
-     "prompt": "An agent asks to change the Environment settings (revision 8):\n- containerIdleMinutes: 2 to 1 (free in either direction)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\nAsked by piDurable on thread b2114b7d-a1f9-48ab-8aa3-d8173761d893. This change is free (it narrows what agents have); this thread's mode asks for every write.\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 8,\n  \"settings\": {\n    \"containerIdleMinutes\": 1\n  }\n}",
+     "prompt": "An agent asks to change the Environment settings (revision 66):\n- containerIdleMinutes: 2 to 1 (free in either direction)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\nAsked by piDurable on thread 54374ce1-7353-456f-997f-7076c6b92ff8. This change is free (it narrows what agents have); this thread's mode asks for every write.\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 66,\n  \"settings\": {\n    \"containerIdleMinutes\": 1\n  }\n}",
      "options": [
       "accept:Approve",
       "decline:Decline",
@@ -103,7 +103,7 @@
      "decision": "accept"
     }
    ],
-   "reply": "Applied: the Environment settings are at revision 9. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.",
+   "reply": "Applied: the Environment settings are at revision 67. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.",
    "toolItems": [
     {
      "type": "dynamic_tool",
@@ -118,13 +118,13 @@
      "output": "null"
     }
    ],
-   "ms": 9467,
-   "output": "Script completed\nWall time 2.5 seconds\nOutput:\n\"Applied: the Environment settings are at revision 9. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
-   "result": "Script completed\nWall time 2.5 seconds\nOutput:\n\"Applied: the Environment settings are at revision 9. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
+   "ms": 9166,
+   "output": "Script completed\nWall time 1.1 seconds\nOutput:\n\"Applied: the Environment settings are at revision 67. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
+   "result": "Script completed\nWall time 1.1 seconds\nOutput:\n\"Applied: the Environment settings are at revision 67. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
    "audit": {
-    "caller": "agent:b2114b7d-a1f9-48ab-8aa3-d8173761d893",
+    "caller": "agent:54374ce1-7353-456f-997f-7076c6b92ff8",
     "via": "mcp",
-    "thread": "b2114b7d-a1f9-48ab-8aa3-d8173761d893",
+    "thread": "54374ce1-7353-456f-997f-7076c6b92ff8",
     "agent": "piDurable",
     "tier": "free",
     "mode": "card",
@@ -138,19 +138,19 @@
     "after": {
      "containerIdleMinutes": 1
     },
-    "at": 1794679019142
+    "at": 1794747476836
    },
    "verdict": "pass"
   },
   "4-plan": {
-   "at": "2026-11-14T17:57:11.321Z",
-   "commit": "24f4a01a90e6",
+   "at": "2026-11-15T12:58:08.768Z",
+   "commit": "85990dbc67b0",
    "name": "durable: plan mode refuses the write; no card, no revision moved",
    "revisions": {
-    "before": 10,
-    "after": 10
+    "before": 68,
+    "after": 68
    },
-   "threadId": "8c5366ef-e88d-4fa2-9805-45e937e19ffd",
+   "threadId": "5e6c511c-8c1f-46bf-b6db-4e2d04de0fee",
    "status": "completed",
    "cards": [],
    "reply": "{\"threw\":\"Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.\"}",
@@ -168,7 +168,7 @@
      "output": "null"
     }
    ],
-   "ms": 7153,
+   "ms": 6981,
    "output": "Script completed\nWall time 0.2 seconds\nOutput:\n{\"threw\":\"Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.\"}",
    "result": "Script completed\nWall time 0.2 seconds\nOutput:\n{\"threw\":\"Refused: this thread is in plan mode, which is read-only; this tool may change things outside it.\"}",
    "verdict": "pass"
