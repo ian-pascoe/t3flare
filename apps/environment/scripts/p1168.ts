@@ -126,7 +126,7 @@ check(
 // The owner's text-generation model: the second endpoint's, so Claude Code's background model is seen to follow it.
 await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } } });
 await updateSettings(cookie, { textGenerationModelSelection: { instanceId: "piDurable", model: `comm2/${SECOND}` } });
-let textModel: { instanceId: string; model: string } | null = null;
+let textModel = null as { instanceId: string; model: string } | null;
 for (let i = 0; i < 15 && textModel?.model !== `comm2/${SECOND}`; i++) {
   await sleep(1000);
   textModel = (((await wsCall(cookie, "server.getConfig", {})) as any)?.settings?.textGenerationModelSelection ?? null) as typeof textModel;
