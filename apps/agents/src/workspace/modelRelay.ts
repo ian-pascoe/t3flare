@@ -184,15 +184,15 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
       log(413, { handleId: null }, { why: `the body is over ${MAX_ROUTED_BODY_BYTES} bytes` });
       return plain(413, `the body is over ${MAX_ROUTED_BODY_BYTES} bytes`);
     }
-    const known = await ask(null);
-    if (known instanceof Response) return known;
-    const routedAt = await routedRequest(request);
-    if ("why" in routedAt) {
-      log(routedAt.status, known, { why: routedAt.why });
-      return plain(routedAt.status, routedAt.why);
+    const liveHandle = await ask(null);
+    if (liveHandle instanceof Response) return liveHandle;
+    const routedOrRefused = await routedRequest(request);
+    if ("why" in routedOrRefused) {
+      log(routedOrRefused.status, liveHandle, { why: routedOrRefused.why });
+      return plain(routedOrRefused.status, routedOrRefused.why);
     }
-    endpointId = routedAt.endpointId;
-    routedBody = routedAt.body;
+    endpointId = routedOrRefused.endpointId;
+    routedBody = routedOrRefused.body;
   }
   const granted = await ask(endpointId);
   if (granted instanceof Response) return granted;

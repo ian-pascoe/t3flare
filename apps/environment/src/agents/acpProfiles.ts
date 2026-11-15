@@ -59,6 +59,12 @@ export interface ClaudeRelay {
   readonly endpoints: ReadonlyArray<string>;
   readonly models: ReadonlyArray<string>;
   readonly backgroundModel: string | undefined;
+  /**
+   * The slugs Claude Code's `opus` and `sonnet` aliases resolve to (its own default model and its subagents' aliases):
+   * each a slug, as the routed URL needs. Undefined: no model to give.
+   */
+  readonly opusModel: string | undefined;
+  readonly sonnetModel: string | undefined;
 }
 /** The `claude` binary the image installs (the SDK's linux-x64 platform package). */
 export const CLAUDE_EXECUTABLE = "/opt/t3flare/claude/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude";
@@ -112,28 +118,43 @@ export const CLAUDE_PINNED_EMPTY: ReadonlyArray<string> = [
  * Where Claude Code gets its models (SPI-1168): the Model proxy's URL, models and key helper, or the model relay's
  * routed URL, the endpoints' slugs and the handle helper, with the endpoints its handle is for.
  */
-export interface ClaudeMode {
-  readonly baseUrl: string;
-  readonly backgroundModel: string | undefined;
-  readonly keyHelper: string;
-  readonly availableModels: ReadonlyArray<string>;
-  /** The endpoints the process's model handle is for; undefined on the proxy (no handle). */
-  readonly modelRelay: ReadonlyArray<string> | undefined;
-}
+export type ClaudeMode =
+  | { readonly kind: "proxy"; readonly baseUrl: string; readonly keyHelper: string; readonly availableModels: ReadonlyArray<string>; readonly aliases: Readonly<Record<string, string>> }
+  | {
+      readonly kind: "relay";
+      readonly baseUrl: string;
+      readonly keyHelper: string;
+      readonly availableModels: ReadonlyArray<string>;
+      readonly aliases: Readonly<Record<string, string>>;
+      /** The endpoints the process's model handle is for. */
+      readonly endpoints: ReadonlyArray<string>;
+    };
+
+/** The alias variables set, by their model (an undefined model leaves Claude Code's own). */
+const aliasesOf = (models: Readonly<Record<string, string | undefined>>): Readonly<Record<string, string>> =>
+  Object.fromEntries(Object.entries(models).filter((entry): entry is [string, string] => entry[1] !== undefined));
 
 /** Claude Code's mode for a profile's context: the relay's when it has a `claudeRelay`, else the proxy's. */
 export const claudeModeOf = (context: Pick<ProfileContext, "proxyUrl" | "models" | "claudeRelay">): ClaudeMode => {
   const relay = context.claudeRelay;
   if (relay === undefined) {
-    return { baseUrl: context.proxyUrl, backgroundModel: idOf(SMALL_MODEL_SLUG), keyHelper: CLAUDE_KEY_HELPER, availableModels: context.models.map((model) => model.id), modelRelay: undefined };
+    return { kind: "proxy", baseUrl: context.proxyUrl, keyHelper: CLAUDE_KEY_HELPER, availableModels: context.models.map((model) => model.id), aliases: { ANTHROPIC_DEFAULT_HAIKU_MODEL: idOf(SMALL_MODEL_SLUG) } };
   }
-  return { baseUrl: modelRoutedRelayUrl, backgroundModel: relay.backgroundModel, keyHelper: CLAUDE_HANDLE_HELPER, availableModels: relay.models, modelRelay: relay.endpoints };
+  return {
+    kind: "relay",
+    baseUrl: modelRoutedRelayUrl,
+    keyHelper: CLAUDE_HANDLE_HELPER,
+    availableModels: relay.models,
+    // Every alias Claude Code resolves on its own is a slug: the routed URL refuses any other model (400).
+    aliases: aliasesOf({ ANTHROPIC_DEFAULT_HAIKU_MODEL: relay.backgroundModel, ANTHROPIC_DEFAULT_SONNET_MODEL: relay.sonnetModel, ANTHROPIC_DEFAULT_OPUS_MODEL: relay.opusModel }),
+    endpoints: relay.endpoints,
+  };
 };
 
 /** The variables Claude Code gets from both its launch environment and the managed `env` (M0 P1, P3). */
 const claudeSwitches = (mode: ClaudeMode): Record<string, string> => ({
   ANTHROPIC_BASE_URL: mode.baseUrl,
-  ...(mode.backgroundModel === undefined ? {} : { ANTHROPIC_DEFAULT_HAIKU_MODEL: mode.backgroundModel }),
+  ...mode.aliases,
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
   DISABLE_TELEMETRY: "1",
   DISABLE_ERROR_REPORTING: "1",
@@ -197,7 +218,7 @@ const claudeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer
     links: [{ path: `${home}/claude/projects`, target: CLAUDE_PROJECTS }, environmentSkillsLink(`${home}/claude/skills`)],
     ...(thread === undefined ? {} : { thread }),
     // SPI-1168: the Workspace DO gives the process a model handle for these endpoints, in its environment only.
-    ...(mode.modelRelay === undefined ? {} : { modelRelay: [...mode.modelRelay] }),
+    ...(mode.kind === "relay" ? { modelRelay: [...mode.endpoints] } : {}),
     droppedEnv: dropped(input.env),
   } satisfies Launch;
 };

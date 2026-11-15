@@ -76,6 +76,9 @@ try {
   }));
   const session = await request("session/new", { cwd: scenario.cwd, mcpServers: [] });
   summary.sessionId = session?.sessionId ?? null;
+  // The models the session offers: ACP v1's model state, or v2's `model` config option.
+  const modelOption = (session?.configOptions ?? []).find((option) => option.id === "model" || option.category === "model");
+  summary.models = session?.models?.availableModels?.map((entry) => entry.modelId) ?? (modelOption?.options ?? []).flatMap((entry) => ("value" in entry ? [entry.value] : (entry.options ?? []).map((choice) => choice.value)));
   // The session's model, as t3's adapter writes it before a turn (its `model` config option).
   if (scenario.model !== undefined && summary.sessionId !== null) {
     await request("session/set_config_option", { sessionId: summary.sessionId, configId: "model", value: scenario.model }).catch((error) => summary.errors.push({ setModel: error.rpc ?? String(error) }));

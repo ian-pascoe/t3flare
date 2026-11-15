@@ -21,7 +21,7 @@ const bind = (options: { readonly proxy: boolean; readonly endpoints: ModelEndpo
     environmentSkills: () => ({ hash: () => undefined }),
     modelProxy: options.proxy ? { url: "https://proxy.example", apiKey: "k" } : undefined,
     modelEndpoints: () => options.endpoints,
-    catalog: { current: () => ({ models: [] }) },
+    catalog: { current: () => ({ models: [{ id: "claude-sonnet-5-5", slug: "anthropic/claude-sonnet-5-5" }] }) },
     faults: false,
     relayServers: () => [],
     processes: {
@@ -59,7 +59,7 @@ describe("spawnCli for Claude Code", () => {
     const start = started[0]!;
     expect(start.modelRelay).toBeUndefined();
     expect(start.env.ANTHROPIC_BASE_URL).toBe("https://proxy.example");
-    expect(settingsOf(start).apiKeyHelper).toBe("/opt/t3flare/bin/t3flare-claude-key");
+    expect(settingsOf(start)).toMatchObject({ apiKeyHelper: "/opt/t3flare/bin/t3flare-claude-key", availableModels: ["claude-sonnet-5-5"] });
   });
 
   it("refuses it with neither", async () => {

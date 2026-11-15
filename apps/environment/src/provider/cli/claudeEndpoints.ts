@@ -30,6 +30,18 @@ const backgroundModelOf = (own: ReadonlyArray<ModelEndpoint>, textModel: string 
   return defaultTextModel(scoped) ?? (first === undefined ? undefined : endpointSlug(first.id, first.models[0]!.id));
 };
 
+/** A model family's word (`opus`, `sonnet`) in a model id. */
+const familyOf = (family: string) => new RegExp(`(?:^|[-_./:])${family}(?:$|[-_.:])`, "i");
+
+/**
+ * The slug Claude Code's `opus` or `sonnet` alias resolves to: the first model of that family in the owner's order, else
+ * the first model listed (so the alias still names a slug the relay routes, never Claude Code's own id).
+ */
+const familyModelOf = (own: ReadonlyArray<ModelEndpoint>, family: "opus" | "sonnet"): string | undefined => {
+  const slugs = own.flatMap((endpoint) => endpoint.models.map((model) => ({ slug: endpointSlug(endpoint.id, model.id), id: model.id })));
+  return (slugs.find((entry) => familyOf(family).test(entry.id)) ?? slugs[0])?.slug;
+};
+
 /** Claude Code's relay configuration for the endpoints as stored now, or undefined for the Model proxy (no such endpoint). */
 export const claudeRelayOf = (endpoints: ModelEndpoints | undefined, textModel: string | undefined): ClaudeRelay | undefined => {
   const own = claudeEndpoints(endpoints);
@@ -38,6 +50,8 @@ export const claudeRelayOf = (endpoints: ModelEndpoints | undefined, textModel: 
     endpoints: own.map((endpoint) => endpoint.id),
     models: own.flatMap((endpoint) => endpoint.models.map((model) => endpointSlug(endpoint.id, model.id))),
     backgroundModel: backgroundModelOf(own, textModel),
+    opusModel: familyModelOf(own, "opus"),
+    sonnetModel: familyModelOf(own, "sonnet"),
   };
 };
 
@@ -51,10 +65,12 @@ export const claudeModelsOf = (proxy: ReadonlyArray<ServerProviderModel>, endpoi
   if (own.length === 0) return proxy;
   const labels = new Map<string, number>();
   for (const endpoint of own) labels.set(endpoint.label, (labels.get(endpoint.label) ?? 0) + 1);
-  return own.flatMap((endpoint) => {
+  const listed = own.flatMap((endpoint) => {
     const group = (labels.get(endpoint.label) ?? 0) > 1 ? `${endpoint.label} · ${endpoint.id}` : endpoint.label;
     return endpoint.models.map((model) => ({ slug: endpointSlug(endpoint.id, model.id), name: model.name, subProvider: group, isCustom: false, capabilities: acpModelCapabilities(model.reasoning) }));
   });
+  // The picker's default for a new thread: the first, so it is never a proxy model t3 keeps listed (U70).
+  return listed.map((model, at) => (at === 0 ? { ...model, isDefault: true } : model));
 };
 
 /** The model as Claude Code names it: an Anthropic Messages endpoint's by its slug (the relay routes by it), the proxy's by its id. */

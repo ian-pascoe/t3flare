@@ -64,6 +64,8 @@ const derived = (): ReadonlyArray<string> => [
     ...launchNames(),
     ...codexShellNames(),
     ...Object.keys(claudeManagedSettings(claudeModeOf({ proxyUrl: context.proxyUrl, models: [] })).env),
+    // SPI-1168: on the model relay, every alias Claude Code resolves is pinned too.
+    ...Object.keys(claudeManagedSettings(claudeModeOf({ proxyUrl: "", models: [], claudeRelay: { endpoints: ["e"], models: ["e/m"], backgroundModel: "e/m", opusModel: "e/m", sonnetModel: "e/m" } })).env),
     ...Object.keys(TERMINAL_BASE_ENV),
     ...terminalRcNames(),
     NONCE_ENV,

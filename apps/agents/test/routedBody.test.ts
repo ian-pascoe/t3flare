@@ -41,10 +41,9 @@ describe("the model-routed body's scan", () => {
     for (const body of ['{"model":"claude"}', '{"model":"_/m"}', '{"model":"A/m"}', '{"model":"comm/"}']) expect(routeBody(bytes(body)), body).toBeUndefined();
   });
 
-  it("reads a body into one buffer, refusing a declared length or a stream over the cap", async () => {
+  it("reads a body into one buffer, refusing a stream over the cap (a declared length over it is the route's 413)", async () => {
     expect(text(((await readCapped(streamOf('{"model":', '"comm/a"}'), undefined)) as { bytes: Uint8Array }).bytes)).toBe('{"model":"comm/a"}');
     expect(text(((await readCapped(streamOf("ab", "cd"), 2)) as { bytes: Uint8Array }).bytes)).toBe("abcd");
-    expect(await readCapped(streamOf("x"), MAX_ROUTED_BODY_BYTES + 1)).toEqual({ tooLarge: true });
     expect(await readCapped(streamOf("x".repeat(MAX_ROUTED_BODY_BYTES), "y"), undefined)).toEqual({ tooLarge: true });
   });
 });

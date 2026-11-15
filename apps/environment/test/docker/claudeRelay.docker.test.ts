@@ -2,7 +2,9 @@
 // SPI-1168 in `pnpm run test:docker`: Claude Code on the model relay, launched as the Workspace DO launches it (the
 // profile with a `claudeRelay`, the handle in the process's environment) in the image's CLI layer, against the stand-in
 // `computer.internal`'s model relay (keyhost.mjs; no model is called). The real launcher, preload and handle helper:
-// - Claude Code's requests reach the routed URL with the endpoint's slug and the handle in its key headers;
+// - Claude Code's requests reach the routed URL with the endpoint's slug and the handle in its key headers, with no
+//   model set on the session (Claude Code's own default resolves through the pinned aliases to a slug);
+// - the session offers only `default` and the endpoints' slugs (t3's adapter refuses a stale non-slug before any request);
 // - a Bash command Claude Code runs has `T3FLARE_EXEC` and no handle in its environment;
 // - only the launch chain (setsid, claude-agent-acp) holds the handle; the `claude` processes do not;
 // - the handle helper refuses a launcher record that names another process, or the right pid with another start time.
@@ -32,7 +34,7 @@ it("Claude Code reaches the model relay with its handle, which no Claude process
     const marker = `proc-${randomUUID()}`;
     const answer = profileLaunch(
       { cli: "claude", args: [], key: marker, cwd: T3_PATH, env: {}, allowProbe: false },
-      { proxyUrl: "", models: [], readStateFile: () => undefined, piExtensionSource: "", claudeRelay: { endpoints: ["comm"], models: ["comm/claude-haiku-5-5"], backgroundModel: "comm/claude-haiku-5-5" } },
+      { proxyUrl: "", models: [], readStateFile: () => undefined, piExtensionSource: "", claudeRelay: { endpoints: ["comm"], models: ["comm/claude-haiku-5-5"], backgroundModel: "comm/claude-haiku-5-5", opusModel: "comm/claude-haiku-5-5", sonnetModel: "comm/claude-haiku-5-5" } },
     );
     if ("refused" in answer) throw new Error(answer.refused);
     // The watcher runs without the handle: once Claude's Bash has written its environment, it records which processes
@@ -63,7 +65,7 @@ it("Claude Code reaches the model relay with its handle, which no Claude process
       workspace,
       setup: "(env -u T3FLARE_MODEL_HANDLE bash /workspace/watch.sh > /workspace/watch.log 2>&1 &)",
     });
-    const result = drive("acp-rpc.mjs", { cwd: T3_PATH, waitMs: 30_000, settleMs: 3000, timeoutMs: 180_000, model: "comm/claude-haiku-5-5", prompt: "Write your environment to a file.", lingerMs: 10_000 }, command);
+    const result = drive("acp-rpc.mjs", { cwd: T3_PATH, waitMs: 30_000, settleMs: 3000, timeoutMs: 180_000, prompt: "Write your environment to a file.", lingerMs: 10_000 }, command);
     const read = (name: string) => (fs.existsSync(path.join(workspace, name)) ? fs.readFileSync(path.join(workspace, name), "utf8") : "");
     const relayed = docker(["logs", "t3flare-claude-relay-keyhost"]).stdout
       .split("\n")
@@ -71,10 +73,12 @@ it("Claude Code reaches the model relay with its handle, which no Claude process
       .map((line) => JSON.parse(line) as { path: string; model: string; apiKeyIsHandle: boolean; bearerIsHandle: boolean; bash: boolean });
     const shellEnv = read("shell-env.txt");
     const holders = read("holders.txt").split("\n").map((line) => line.trim()).filter((line) => line !== "");
-    const report = { shellEnvWritten: shellEnv !== "", watchLog: read("watch.log").slice(-600), stopReason: result.stopReason, errors: result.errors, toolCalls: result.toolCalls, relayed, holders, claude: read("claude-count.txt").trim(), forgedOther: read("forged-other.txt"), forgedStart: read("forged-start.txt"), helperBytes: read("helper-bytes.txt").trim() };
+    const report = { models: result.models, shellEnvWritten: shellEnv !== "", watchLog: read("watch.log").slice(-600), stopReason: result.stopReason, errors: result.errors, toolCalls: result.toolCalls, relayed, holders, claude: read("claude-count.txt").trim(), forgedOther: read("forged-other.txt"), forgedStart: read("forged-start.txt"), helperBytes: read("helper-bytes.txt").trim() };
     const text = JSON.stringify(report);
     expect(text.includes(handle), "the handle reached the report").toBe(false);
     expect(relayed.length, text).toBeGreaterThan(0);
+    // Claude Code's `default` (its own default, through the pinned aliases) and the slugs: never a non-slug id.
+    expect(report.models, text).toEqual(["default", "comm/claude-haiku-5-5"]);
     expect(relayed.every((entry) => entry.path.startsWith("/t3flare/model/_/") && entry.model === "comm/claude-haiku-5-5" && entry.apiKeyIsHandle && entry.bearerIsHandle), text).toBe(true);
     expect(relayed.some((entry) => entry.bash), text).toBe(true);
     expect(shellEnv.includes("T3FLARE_EXEC="), text).toBe(true);

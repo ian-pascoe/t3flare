@@ -106,7 +106,7 @@ describe("Claude Code's profile", () => {
 describe("Claude Code on the Model endpoints through the model relay (SPI-1168)", () => {
   const relayed: ProfileContext = {
     ...context,
-    claudeRelay: { endpoints: ["comm", "comm2"], models: ["comm/claude-haiku-5-5", "comm2/claude-sonnet-5-5"], backgroundModel: "comm/claude-haiku-5-5" },
+    claudeRelay: { endpoints: ["comm", "comm2"], models: ["comm/claude-haiku-5-5", "comm2/claude-sonnet-5-5"], backgroundModel: "comm/claude-haiku-5-5", opusModel: "comm2/claude-sonnet-5-5", sonnetModel: "comm2/claude-sonnet-5-5" },
   };
   const relayedLaunch = () => profileLaunch({ cli: "claude", args: [], key: "proc-7", cwd: "/w/demo", env: { T3FLARE_MODEL_HANDLE: "a".repeat(64) }, allowProbe: false }, relayed);
 
@@ -130,6 +130,10 @@ describe("Claude Code on the Model endpoints through the model relay (SPI-1168)"
     const env = json.env as Record<string, string>;
     expect(env.ANTHROPIC_BASE_URL).toBe("http://computer.internal/t3flare/model/_");
     expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("comm/claude-haiku-5-5");
+    // Claude Code's own aliases (its default model, its subagents') resolve to slugs, never to an id the relay refuses.
+    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("comm2/claude-sonnet-5-5");
+    expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("comm2/claude-sonnet-5-5");
+    expect(answer.env).toMatchObject({ ANTHROPIC_DEFAULT_SONNET_MODEL: "comm2/claude-sonnet-5-5", ANTHROPIC_DEFAULT_OPUS_MODEL: "comm2/claude-sonnet-5-5" });
     for (const name of ["HTTPS_PROXY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_CUSTOM_HEADERS"]) expect(env[name], name).toBe("");
     // Nothing of the Model proxy's: its URL and its key helper are not this process's.
     expect(answer.files?.map((file) => file.text).join("")).not.toContain("proxy.example");

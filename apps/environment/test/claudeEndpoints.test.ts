@@ -28,7 +28,13 @@ const proxy = [{ slug: "anthropic/claude-haiku-5-5", name: "Claude Haiku 5.5", s
 
 describe("Claude Code's Model endpoints", () => {
   it("runs on the Anthropic Messages endpoints when there is one: their ids, their models' slugs, the background model", () => {
-    expect(claudeRelayOf(endpoints, "openai/gpt-5-mini")).toEqual({ endpoints: ["comm", "comm2"], models: ["comm/claude-sonnet-5-5", "comm/claude-haiku-5-5", "comm2/claude-opus-5-5"], backgroundModel: "comm/claude-haiku-5-5" });
+    expect(claudeRelayOf(endpoints, "openai/gpt-5-mini")).toEqual({
+      endpoints: ["comm", "comm2"],
+      models: ["comm/claude-sonnet-5-5", "comm/claude-haiku-5-5", "comm2/claude-opus-5-5"],
+      backgroundModel: "comm/claude-haiku-5-5",
+      opusModel: "comm2/claude-opus-5-5",
+      sonnetModel: "comm/claude-sonnet-5-5",
+    });
     expect(claudeRelayOf({ revision: 1, endpoints: [endpoints.endpoints[0]!] }, undefined)).toBeUndefined();
     expect(claudeRelayOf(undefined, undefined)).toBeUndefined();
   });
@@ -49,6 +55,12 @@ describe("Claude Code's Model endpoints", () => {
     expect(claudeRelayOf(big, undefined)?.backgroundModel).toBe("comm2/claude-opus-5-5");
   });
 
+  it("points Claude Code's opus and sonnet aliases at a slug of that family, else at the first model", () => {
+    const haikuOnly: ModelEndpoints = { revision: 1, endpoints: [{ ...endpoints.endpoints[1]!, models: [model("claude-haiku-5-5"), model("my-sonnetish")] }] };
+    // `sonnetish` is not the family's word; the first model stands in.
+    expect(claudeRelayOf(haikuOnly, undefined)).toMatchObject({ opusModel: "comm/claude-haiku-5-5", sonnetModel: "comm/claude-haiku-5-5" });
+  });
+
   it("lists the endpoints' models by slug, grouped by endpoint, with the effort picker on reasoning models; the proxy's without an endpoint", () => {
     const listed = claudeModelsOf(proxy, endpoints);
     expect(listed.map((row) => [row.slug, row.subProvider, row.name])).toEqual([
@@ -58,6 +70,8 @@ describe("Claude Code's Model endpoints", () => {
     ]);
     expect(listed[0]!.capabilities?.optionDescriptors?.map((option) => option.id)).toEqual(["effort"]);
     expect(listed[1]!.capabilities?.optionDescriptors).toEqual([]);
+    // The picker's default for a new thread is the first endpoint model, whatever proxy model t3 keeps listed.
+    expect(listed.filter((row) => row.isDefault === true).map((row) => row.slug)).toEqual(["comm/claude-sonnet-5-5"]);
     expect(claudeModelsOf(proxy, { revision: 1, endpoints: [endpoints.endpoints[0]!] })).toEqual(proxy);
     expect(claudeModelsOf(proxy, undefined)).toEqual(proxy);
   });

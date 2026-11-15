@@ -1,7 +1,8 @@
 // The model relay's model-routed body (SPI-1168): a request to `…/t3flare/model/_` names its endpoint in its JSON body's
 // top-level `model` (`<endpointId>/<modelId>`). The body is read into one buffer, scanned as bytes (JSON's structure is
 // ASCII, so UTF-8 needs no decoding to find it), and the model's own id is written over the slug in place: the rest of
-// the body is passed byte for byte, and the relay holds one copy of it. Pure.
+// the body is passed byte for byte. With a declared length the relay holds one copy; without one, the buffer doubles as
+// it fills, briefly holding the old and the new (under twice the cap). Pure.
 import { ENDPOINT_ID, parseEndpointSlug } from "@t3flare/models/endpoints";
 
 /**
@@ -138,14 +139,8 @@ export const routeBody = (bytes: Uint8Array): RoutedBody | undefined => {
   if (model === undefined || slug === undefined || !ENDPOINT_ID.test(slug.endpointId)) return undefined;
   const id = new TextEncoder().encode(JSON.stringify(slug.modelId));
   const removed = model.end - model.start - id.length;
-  if (removed < 0) {
-    // Not reached (`"<id>/<model>"` is longer than `"<model>"` in any encoding), but never wrong if it were.
-    const body = new Uint8Array(bytes.length - removed);
-    body.set(bytes.subarray(0, model.start));
-    body.set(id, model.start);
-    body.set(bytes.subarray(model.end), model.start + id.length);
-    return { endpointId: slug.endpointId, body };
-  }
+  // `"<model>"` is shorter than `"<endpointId>/<model>"` in any encoding: JSON.stringify's is the shortest of its value.
+  if (removed <= 0) throw new Error("t3flare: a model id is not shorter than its slug");
   bytes.set(id, model.start);
   bytes.copyWithin(model.start + id.length, model.end);
   return { endpointId: slug.endpointId, body: bytes.subarray(0, bytes.length - removed) };
@@ -157,11 +152,13 @@ export const declaredLength = (headers: Headers): number | undefined => {
   return value !== null && /^\d{1,15}$/.test(value) ? Number(value) : undefined;
 };
 
-/** A body read into one buffer, or `tooLarge` once it passes the cap (the rest is not read). */
+/**
+ * A body read into one buffer, sized by its declared length when there is one (the caller refuses one over the cap),
+ * or `tooLarge` once what it streams passes the cap (the rest is not read).
+ */
 export const readCapped = async (body: ReadableStream<Uint8Array> | null, declared: number | undefined): Promise<{ readonly bytes: Uint8Array } | { readonly tooLarge: true }> => {
-  if (declared !== undefined && declared > MAX_ROUTED_BODY_BYTES) return { tooLarge: true };
   if (body === null) return { bytes: new Uint8Array(0) };
-  let buffer = new Uint8Array(declared ?? 64 * 1024);
+  let buffer = new Uint8Array(Math.min(declared ?? 64 * 1024, MAX_ROUTED_BODY_BYTES));
   let size = 0;
   const reader = body.getReader();
   for (;;) {
