@@ -142,11 +142,14 @@ Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/
    `modelOverrides` only maps ids), and t3 resumes a thread in the running process on a model change (SPI-1167's
    measurement). So the relay has a **model-routed URL**, `http://computer.internal/t3flare/model/_` (`_` is never an
    endpoint id): the request's JSON body names its model as `<endpointId>/<modelId>`, and the relay sends it to that
-   endpoint with the model's own id in its place. The rest of the body is passed byte for byte (the top-level `model`
-   member is found by a scan, not a parse; a body with none, two, or a model without an endpoint is 400; over 32 MiB is
-   413). The handle's scope judges the endpoint as it judges one in the path. This is the one place the relay reads a
-   body: routing, not protocol translation. A model switch between two Anthropic endpoints stays in the thread's process.
-2. **Claude Code's configuration.** With an Anthropic Messages endpoint, every Claude Code process runs on those
+   endpoint with the model's own id in its place. The handle is checked first (a forged or revoked handle gets 401 with
+   the body unread; a declared length over the cap gets 413 before anyone is asked). The body is then read into one
+   buffer of at most 16 MiB (413 over it), its one top-level `model` found by a scan of its bytes (no parse; at most
+   512 levels of nesting), and the model's id written over the slug in place, so the relay holds one copy and passes
+   every other byte unchanged. A body with no model, two, or a model without an endpoint is 400. The handle's scope then
+   judges the endpoint as it judges one in the path. This is the one place the relay reads a body: routing, not
+   protocol translation. A model switch between two Anthropic endpoints stays in the thread's process.
+2. **Claude Code's configuration.** With an Anthropic Messages endpoint that lists a model, every Claude Code process runs on those
    endpoints through the relay (not the Model proxy): base URL the model-routed URL, `availableModels` the endpoints'
    slugs, its background model (`ANTHROPIC_DEFAULT_HAIKU_MODEL`) the text-generation model when that is one of their
    models (else their small model), its handle requested for those endpoints (`modelRelay`). The choice is the
@@ -154,13 +157,20 @@ Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/
    Claude process in it, so nothing in them is one process's. Without such an endpoint, the Model proxy as before.
 3. **Where the handle is.** The Workspace DO puts it in the process's environment (as for Codex). The launcher
    (`t3flare-claude-agent-acp`) execs claude-agent-acp with a preload that deletes it from `process.env` before
-   anything runs, so `claude`, its Bash, hooks and helpers never inherit it; the kernel's copy of the start environment
-   (`/proc/<pid>/environ`) keeps it. `apiKeyHelper` is `t3flare-claude-handle`, which reads it there by the launcher's
-   pid (kept in the process's home; the pid, not the handle). No file holds it. Measured on p1168: only the launch
-   chain's start environments (`setsid` and claude-agent-acp) hold it; `claude`'s environment, a Bash turn's `env` and
-   every file in the home, `/etc/claude-code`, `/root`, `/tmp` and the repo do not. This is Codex's exposure
-   (`/proc/<pid>/environ` of the CLI's own process, readable by root), not more. Claude Code sends the handle in both
-   `x-api-key` and `authorization`; the relay takes it from either and forwards neither.
+   anything runs, so `claude`, its Bash, hooks and helpers do not **inherit** it; the kernel's copy of the start
+   environment (`/proc/<pid>/environ`) keeps it. `apiKeyHelper` is `t3flare-claude-handle`, which reads it there by the
+   launcher's pid and start time (kept in the process's home; not the handle), after checking that the pid is still
+   that claude-agent-acp (its start time and command line). No file holds it.
+   **This keeps the handle out of environments and files, not out of reach.** `/proc/<pid>/environ` is readable by any
+   process of the same uid, and every process in the Container is root. Claude's Bash keeps `T3FLARE_EXEC`, so a command
+   it runs can run `t3flare-claude-handle` and print the handle, or read the launcher's environ itself; it can also set
+   `T3FLARE_EXEC` to another Claude process's directory and get that process's handle. This is the same class as
+   Codex's (a Codex shell can read its parent's `/proc/<pid>/environ`), not wider: in both, any command in the
+   Container can spend through any live process's handle, for that process's endpoints, until it exits, and no command
+   can take an endpoint's key out of the Container. Measured on p1168 (and in `test:docker`): only the launch chain
+   (`setsid` and claude-agent-acp) holds the handle in its environment; `claude`'s environment, a Bash command's `env`
+   and every file in the process homes, `/etc/claude-code`, `/root`, `/tmp` and the repo do not. Claude Code sends the
+   handle in both `x-api-key` and `authorization`; the relay takes it from either and forwards neither.
 4. **Headers.** Nothing Claude Code needs is dropped: `anthropic-version` and `anthropic-beta` pass; the dropped names
    are its client's own (`x-stainless-*`, `x-app`, `x-claude-code-session-id`, `user-agent`,
    `anthropic-dangerous-direct-browser-access`), and its turns work without them. The allowlist is unchanged.

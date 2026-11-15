@@ -162,7 +162,7 @@ What t3flare passes to t3's generic ACP adapter (`makeAcpAdapterV2`) to run Clau
 _Avoid_: ACP driver, registry agent (t3's ACP Registry driver is another thing, refused)
 
 **Managed settings**:
-Claude Code's highest settings source, `/etc/claude-code/managed-settings.json`, written per process by the image's launcher: the proxy as the only endpoint, the key helper, and the permission, hook, MCP and plugin locks a repository's `.claude/` cannot override. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`.
+Claude Code's highest settings source, `/etc/claude-code/managed-settings.json`, installed by the image's launcher at each process's start and shared by every Claude process in the Container: its one endpoint and its key, and the permissions a repository's `.claude/` cannot override. The endpoint is the Model relay's model-routed URL with the handle helper as its key, when an Anthropic Messages Model endpoint lists a model; else the Model proxy with the key helper. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`.
 
 ## Tools
 
@@ -357,6 +357,10 @@ _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 **Model relay**:
 How a CLI agent reaches a Model endpoint without holding its credential: the agent presents a Handle, and the endpoint's own credential is used in its place.
 _Avoid_: model proxy (that is the Model proxy), gateway, intercept
+
+**Model-routed URL**:
+The Model relay's one base URL for every endpoint a process may use, `computer.internal/t3flare/model/_`: each request's body names its model as `<endpointId>/<modelId>`, and the relay sends it to that endpoint with the model's own id. For a CLI with one base URL per process (Claude Code).
+_Avoid_: router, catch-all endpoint, wildcard endpoint
 
 **Subscription**:
 The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key. Connected in the Model proxy, never held by t3flare.

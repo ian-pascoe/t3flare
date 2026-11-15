@@ -815,8 +815,11 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 
 ### U70. Claude Code on Model endpoints through the model relay (SPI-1168)
 
-Ranked after U69, which it extends: a break fails Claude Code turns on endpoints, or puts the model handle in Claude's
-shells. The Model proxy path is untouched.
+Ranked after U69, which it extends: a break fails Claude Code turns on endpoints, or puts the model handle in the
+environment of Claude's shells. The Model proxy path is untouched. The handle is never out of reach of the
+Container's commands (ADR-0016's SPI-1168 refinement, item 3): Claude's Bash can run the handle helper, or read the
+launcher's `/proc/<pid>/environ`, as a Codex shell can read its parent's. What this entry guards is that no
+environment or file holds it beyond that.
 
 - **Where**: `apps/environment/src/agents/acpProfiles.ts` (`claudeManagedSettings` with a `ClaudeRelay`),
   `provider/cli/claudeEndpoints.ts`, `provider/cli/acpDriver.ts` (`resolveModelId`, the model list), the image's
@@ -829,26 +832,36 @@ shells. The Model proxy path is untouched.
     thinking and context-management betas for `comm2/claude-sonnet-4-5`).
   - **`apiKeyHelper`'s output is sent as `x-api-key` and `authorization: Bearer`**; the relay takes either.
   - **claude-agent-acp starts `claude` with its own `process.env`**: the preload's delete keeps the handle out of
-    `claude`'s environment, and so out of its Bash, hooks and helpers.
+    `claude`'s environment, and so out of the environment of its Bash, hooks and helpers.
+  - **Claude Code's own default model is not a slug** (`claude-opus-5-5`): a session whose model nobody sets sends it,
+    and the routed URL refuses it (400). t3's ACP adapter always writes the session's model before a turn
+    (`session/set_config_option`, `model`), which Claude Code checks with one non-streaming request to the relay.
   - **The managed settings file is the Container's** (`/etc/claude-code/managed-settings.json`): every Claude process
     in a Container shares it, so it holds nothing of one process's.
   - **t3's provider registry keeps a Claude snapshot's earlier models** (`ProviderRegistry.ts`
     `shouldRetainMissingProviderModels` is true for `claudeAgent`): the proxy's models listed before the first
     Anthropic endpoint stay in the picker after the endpoints' (124 rows on p1168, 121 of them the proxy's). Picking
     one in relay mode is refused by Claude Code (`availableModels`) with t3's "The agent did not accept the model".
-- **Breaks when**: Claude Code reads its base URL per model, or rewrites or validates a model id with a `/` (the relay
+- **Breaks when**: t3 starts a Claude turn without writing the session's model (the first request is refused);
+  Claude Code reads its base URL per model, or rewrites or validates a model id with a `/` (the relay
   sees no slug: 400); stops sending the helper's key in either header; claude-agent-acp starts `claude` with an
-  environment it saved before the preload ran (the handle reaches Claude's shells), or Node starts overwriting the
-  start environment's memory (`process.title`; the helper then finds no handle and Claude has no key); Claude Code
+  environment it saved before the preload ran (the handle reaches the environment of Claude's shells), or Node starts
+  overwriting the start environment's memory (`process.title`; the helper then finds no handle and Claude has no key),
+  or claude-agent-acp's command line changes (the helper's launcher check fails closed: Claude has no key); Claude Code
   starts calling a body-less endpoint it needs (`GET /v1/models`: the routed URL answers 400, logged with `routed`
   and a null endpoint); or Claude Code starts requiring a header the allowlist drops (the relay log's `dropped` names
   it; p1168's list is in `docs/steps/spi-1168/p1168.json`).
-- **Detection**: `test/acpProfiles.test.ts`, `test/claudeEndpoints.test.ts`, `apps/agents/test/modelRelayRoute.test.ts`
-  (the routed URL); `scripts/p1168.ts` on a stage (the turn, the switch, the handle's holders, the shell's `env`, the
-  leak scan, the relay log). **Silent**: the handle reaching Claude's shells (only the stage script's holder and shell
-  checks see it); a new dropped header Claude needs for a feature but not for a turn.
-- **Blast radius**: Claude Code turns on endpoints fail, or the model handle in Claude's shells (any command could
-  spend through the endpoints while the process lives).
+- **Detection**: `test/acpProfiles.test.ts`, `test/claudeEndpoints.test.ts`, `test/claudeSpawn.test.ts`,
+  `apps/agents/test/modelRelayRoute.test.ts` and `routedBody.test.ts` (the routed URL);
+  `test/docker/claudeRelay.docker.test.ts` in `test:docker` (the real launcher, preload and helper: the routed
+  requests with the handle, a Bash command's environment, the processes holding the handle, the helper's refusal of
+  a forged launcher record); `scripts/p1168.ts` on a stage (the turn, the switch, the holders, the shell's `env`, the
+  leak scan, the relay log). **Silent**: the handle reaching the environment of Claude's shells between `test:docker`
+  runs (only it and the stage script check holders); a new dropped header Claude needs for a feature but not for a
+  turn. Not detectable, by design: a command reading the handle through the helper or `/proc` (the residual above).
+- **Blast radius**: Claude Code turns on endpoints fail, or the model handle in the environment of Claude's shells
+  (inherited by every command and child, where today a command must go and read it); either way spending stays
+  bounded to the process's endpoints and life.
 - **Fix**: on a Claude Code bump, re-run `p1168.ts`; diff claude-agent-acp's spawn of `claude` (its `env` option) and
   Claude Code's settings schema (`availableModels`, `apiKeyHelper`, `modelOverrides`).
 
