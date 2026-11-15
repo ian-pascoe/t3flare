@@ -396,7 +396,9 @@ already verified Access (D13). It never boots t3. Hand-written JSON-RPC in the E
   every result. Take the 2026 shapes from the spec's `schema.ts` (URL in the research file), cross-checked against the
   vendored client's types (`vendor/cloudpid/mcp/src/connection.ts`) and a real client's traffic captured in M0. Anything
   else answers `-32601`.
-- **Stateless.** No stored session.
+- **Stateless.** No stored session. The one thing the endpoint records is a row per client in `t3flare_settings_clients`
+  (`seen`: first and last seen, and the mode the owner set on the panel; `settings/clients.ts`, deviation 30), never a
+  session.
   - 2026: capabilities come on each request in `params._meta["io.modelcontextprotocol/clientCapabilities"]`.
   - 2025: capabilities and `clientInfo` come once, at `initialize`. The response sets `Mcp-Session-Id` to a signed
     token carrying `{ sub, protocolVersion, elicitation: { form, url }, client: { name, version }, iat }`. Later requests
@@ -818,6 +820,20 @@ Unit tests live beside the existing ones (`apps/environment/test`, `packages/har
 - Every row of D12's fallback table, and `elicitation_mode=natve` answering 400 at `initialize`.
 - A change that needs the page, in `native` and in `model`, gets the link and no form or Pause.
 
+**T-clients** (`settingsClients.test.ts`)
+- The kept mode decides when the URL names none; `?elicitation_mode=` overrides it and a bad one is still 400; an
+  unknown client, and a request with no client name, are `browser`.
+- A 2025 session takes its client's name from `initialize`; a 2025 `native` answer takes its mode from its session's
+  client name: 202 and applied while `native`; 400 `other-mode` (the change stays open) after the mode moved off
+  `native`, after the row was removed, and with no `Mcp-Session-Id`.
+- Keys isolated; at most 50 per key, the least recently seen `browser` row evicted first, then the least recently seen
+  of any mode; `lastSeen` written at most once an hour; names cut and matched cut.
+- Only the panel's CSRF-guarded POST sets or removes a mode (audited, entity `owner-clients`, no key in the entry); no
+  tool of either door reaches `setMode` or `remove`, and in the sources only `harness/panel.ts` calls them.
+- `read_audit` on both doors carries no Access `sub` after a client-mode change and a client-remove.
+- The panel lists each client escaped with its mode and Remove; with no `ownerEndpoint` and no client it shows the
+  "not deployed" line alone.
+
 **T-pi** (`cliProfiles.test.ts`)
 - T-pi-1: `mcp.json` has one entry per relay server with the URL, header, timeout and Exposure of D4; the handle is in
   the environment and in no file; the fork launch has no `mcp.json`.
@@ -961,7 +977,7 @@ check it still holds before building on it.
 | Access leaves the host's root well-known documents alone, prefers the more specific path, and accepts a path-scoped `resource` (P2, P6, P8) | layout (C) |
 | A token for one application is refused at another's path (P12) | (B) is out; with (C) the hosts differ, so it holds by construction |
 | `sub` is the same across applications (P13) | the page checks the email |
-| A query parameter survives OAuth under Access (P15) | the mode travels in a header |
+| A query parameter survives OAuth under Access (P15) | the mode travels in a header (superseded by deviation 30 of `settings-mcp.md`: the panel keeps it per client) |
 | The named clients declare the elicitation kinds the research file lists, and tolerate D12's holds (P14) | per-client fallbacks to the link in the result |
 | An empty `requestedSchema` is shown as accept and decline by the named clients | `native` needs a one-boolean form; decide in M5b from P14 |
 | pi's built-in MCP runs under the profile (`PI_OFFLINE`, `--mode rpc`) (P16) | drop `PI_OFFLINE`; if RPC mode cannot load it, stop and report |

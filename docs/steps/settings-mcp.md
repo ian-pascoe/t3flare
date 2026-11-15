@@ -25,7 +25,8 @@ commands still run on the spike branch). Its answers are summarised in both rese
 ([`access-managed-oauth.md`](../research/access-managed-oauth.md#m0s-answers-spi-1196),
 [`mcp-elicitation-server.md`](../research/mcp-elicitation-server.md#m0s-answers-spi-1196)).
 
-Decisions: layout (B), conditional on owner step 1; the Elicitation mode in the URL's query; the redirect allowlist any
+Decisions: layout (B), conditional on owner step 1; the Elicitation mode in the URL's query (superseded by deviation 30:
+the panel keeps it per client); the redirect allowlist any
 `localhost` and loopback URI plus `cursor://anysphere.cursor-mcp/oauth/callback` (pending owner step 2); `PI_OFFLINE`
 kept (it does not stop pi's MCP); pi's built-in MCP tools carry `sourceInfo.path: "builtin:mcp"`, so the Patch is
 possible.
@@ -114,6 +115,15 @@ possible.
   long to show page-only. Whatever holds an Owner client's token can therefore turn the Guardian off through `model`
   with no person involved; the audit's `mode` and `answeredBy` are the only trace. This is the owner's decision (O5,
   O6), not a gap.
+- `settings/clients.ts` (SPI-1201, deviation 30): `ownerClients(sql)`, the per-client table `t3flare_settings_clients`
+  in the Environment DO's SQLite (one instance on the DO, so its DDL runs once). One row per Owner caller's key (the
+  Access `sub`, or `service-token`) and `clientInfo.name` (cut to `CLIENT_NAME_MAX`, stripped of hidden characters), its
+  mode (`browser` until the owner sets it), first and last seen. The endpoint is handed `seen` alone: it records a
+  client at its first request and writes `lastSeen` at most once an hour. At most 50 per key: past it the least
+  recently seen `browser` row goes first, then the least recently seen of any mode, so a flood of names never drops a
+  mode the owner set. `setMode` and `remove` are called from `harness/panel.ts` alone (a source-level test checks it).
+  The panel's audit entries (entity `owner-clients`) carry the client's name as target and `{ mode }` before and after,
+  never the key, so `read_audit` shows no Access `sub` (D14).
 - The SPI-1201 spec review then changed (each tested):
   - a close that gave up waiting on an applying answer answers `waiting`, not "the change failed"; an own agent's
     close waits `OWN_APPLYING_WAIT_MS` (the skills request budget and 15 s) for it;
@@ -150,6 +160,7 @@ Plan §5, line by line: where each is tested now, and what the stage run adds.
 | In `model`, an agent approving its own change is applied and audited with `answeredBy: "agent"` | `settingsModes.test.ts`: "resume with accept answers it, closed by agent" | item 5; M5b item 12 |
 | Own agents, by Session and by each CLI, see no `resume` and no Pause | `settingsHostile.test.ts`: "a Durable Session: …" and "a CLI (codex, claudeCode, opencode, pi) through the relay: …" (every mode; approved, declined, cancelled; a change that needs the page; `resume` by name); `settingsServer.test.ts`: "on: … resume never", the reads' "no result is a Pause"; `apps/agents/test/mcpExtension.test.ts` | item 6 |
 | A parent agent cannot answer a child's card | `settingsHostile.test.ts`: "the child's asked change raises its card on the child's thread alone; the parent's t3_pending_request on it is refused"; `settingsCard.test.ts`; `mcpElicitation.test.ts`: `refuseOwnerOnly` | item 7 (t3's own refusal to answer an approval card is stage only) |
+| Only the panel sets a client's mode: no MCP door, Settings tool or other panel route does, and `read_audit` never carries the owner's `sub` | `settingsClients.test.ts`: "no MCP door, no Settings tool and no other panel route sets or removes one: a model-mode client cannot promote itself", "in the sources, the table's setMode and remove are called from harness/panel.ts alone", "is refused without the CSRF token, …", "read_audit never carries the owner's Access subject (plan D14)" (client-mode and client-remove, both doors) | items 12.3, 13, 14, 15 (the owner sets each mode on the panel) |
 | Turning the access switch off through the server; only the panel turns it back | `settingsHostile.test.ts`: "off: the next call by any door finds no server, nothing reaches it to turn it on, and the panel does", "read-only: no agent's write turns writes back on, through either door"; `settingsServer.test.ts`, `settingsEndpoint.test.ts`, `settingsModes.test.ts` (the switch in `model`) | item 8 |
 
 **Bugs found by the hostile tests: none.** Every new case passed against the code as it stood at ecb5477. Two errors
@@ -343,8 +354,10 @@ fails with a query on the URL (U70). The first call sends the client to sign in 
 
 After its first request the client is listed on the Settings server's card on the Harness panel ("Owner clients"), by
 its own name, in `browser`. Pick its mode there (`browser`, `native` or `model`); the change applies at its next
-request, and a change it already asked keeps the mode it was asked in. `?elicitation_mode=` on the URL still overrides
-the panel, for scripts and for clients that keep a query.
+request, and a change it already asked keeps the mode it was asked in. A client must **reconnect** after a change to or
+from `model`: the server declares `listChanged: false`, and a 2025 client reads the instructions (which tell it about
+`resume`) once, at `initialize`, so `resume` shows or hides only after the reconnect. `?elicitation_mode=` on the URL
+still overrides the panel, for scripts and for clients that keep a query.
 
 What each mode means is ADR-0034 §8, and its first consequence: `native` and `model` do not prove the owner answered.
 To cut every client off at once, set the Settings server off or read-only on the Harness panel; to cut one off, revoke
