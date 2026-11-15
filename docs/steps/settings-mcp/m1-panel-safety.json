@@ -100,8 +100,8 @@
    "verdict": "pass"
   },
   "2": {
-   "at": "2026-11-14T17:51:23.434Z",
-   "commit": "24f4a01a90e6",
+   "at": "2026-11-15T12:57:21.462Z",
+   "commit": "85990dbc67b0",
    "name": "expectedRevision: current applies, stale 409 moving nothing, malformed 400; skills routes included",
    "results": [
     {
@@ -110,9 +110,9 @@
      "status": 200,
      "body": {
       "ok": true,
-      "revision": 1,
+      "revision": 63,
       "resolved": {
-       "revision": 1,
+       "revision": 63,
        "containerSize": "cpu-1",
        "containerIdleMinutes": 3,
        "containerBudget": 3,
@@ -125,9 +125,9 @@
      "route": "environment",
      "case": "stale revision: 409, nothing moved",
      "status": 409,
-     "body": "the Environment settings are at revision 1, not 0; read them again\n",
-     "revisionBefore": 1,
-     "revisionAfter": 1
+     "body": "the Environment settings are at revision 63, not 62; read them again\n",
+     "revisionBefore": 63,
+     "revisionAfter": 63
     },
     {
      "route": "environment",
@@ -139,21 +139,21 @@
      "route": "extensions",
      "case": "current revision applies",
      "status": 200,
-     "revision": 9
+     "revision": 24
     },
     {
      "route": "extensions",
      "case": "stale: 409, nothing moved",
      "status": 409,
-     "body": "the Harness settings are at revision 9, not 8; read them again\n",
-     "revisionAfter": 9,
-     "revisionBefore": 9
+     "body": "the Harness settings are at revision 24, not 23; read them again\n",
+     "revisionAfter": 24,
+     "revisionBefore": 24
     },
     {
      "route": "mcp",
      "case": "stale: 409",
      "status": 409,
-     "body": "the Harness settings are at revision 9, not 8; read them again\n"
+     "body": "the Harness settings are at revision 24, not 23; read them again\n"
     },
     {
      "route": "mcp",
@@ -165,7 +165,7 @@
      "route": "skills/install",
      "case": "stale: 409",
      "status": 409,
-     "body": "the Environment settings are at revision 2, not 1; read them again\n"
+     "body": "the Environment settings are at revision 64, not 63; read them again\n"
     },
     {
      "route": "skills/remove",
@@ -177,17 +177,17 @@
    "verdict": "pass"
   },
   "3": {
-   "at": "2026-11-14T17:51:23.915Z",
-   "commit": "24f4a01a90e6",
+   "at": "2026-11-15T12:57:22.161Z",
+   "commit": "85990dbc67b0",
    "name": "set-header route: sets the value (the next call authenticates), audited mcp.secret.set with the mark, no revision moved",
    "set": {
     "status": 200,
     "body": {
      "ok": true,
-     "revision": 9,
+     "revision": 24,
      "secret": {
       "set": true,
-      "setAt": 1794678683587
+      "setAt": 1794747441576
      }
     }
    },
@@ -197,11 +197,11 @@
     "error": null,
     "tools": 10,
     "refused": 0,
-    "ms": 21
+    "ms": 222
    },
    "mark": {
     "set": true,
-    "setAt": 1794678683587
+    "setAt": 1794747441576
    },
    "audit": {
     "caller": "service-token",
@@ -211,19 +211,19 @@
     "after": {
      "secret": {
       "set": true,
-      "setAt": 1794678683587
+      "setAt": 1794747441576
      }
     },
-    "at": 1794678683587
+    "at": 1794747441576
    },
    "revisions": {
     "before": {
-     "harness": 9,
-     "environment": 2
+     "harness": 24,
+     "environment": 64
     },
     "after": {
-     "harness": 9,
-     "environment": 2
+     "harness": 24,
+     "environment": 64
     }
    },
    "verdict": "pass"
