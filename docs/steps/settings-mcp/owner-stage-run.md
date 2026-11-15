@@ -54,7 +54,9 @@ declines in a row; if you reorder, approve one between declines.
    listed on the panel at its first request (MCP servers → the Settings server's card → **Owner clients**), by its own
    name (Claude Code's is `claude-code`, OpenCode's `opencode`), in `browser`. Where an item below says "set
    `<client>` to `<mode>`", pick that mode in its row's select (it saves at once and applies at the client's next
-   request). All of one client's entries share one row, so one Claude Code entry is enough. `psmcp` was deployed at
+   request). **After a change to or from `model`, reconnect the client** (the server declares `listChanged: false`, and a 2025
+   client reads the instructions once, at `initialize`): `resume` shows or hides only then. All of one client's entries
+   share one row, so one Claude Code entry is enough. `psmcp` was deployed at
    24f4a01, which reads the query alone: **redeploy psmcp from this branch's head before Block B's item 10** (the
    scripted items use the query and are unaffected).
 
@@ -299,7 +301,8 @@ Paste back: OpenCode's version, the times (item 6b's answer, item 8's Ctrl+C), w
 
 `m5b-settings-owner-modes.json` items `10`-`15`.
 
-On the panel set `claude-code` to **model**, then in Claude Code's `psmcp`:
+On the panel set `claude-code` to **model**, **reconnect `psmcp`** in Claude Code (`/mcp` → `psmcp` → Reconnect), then in
+its `psmcp`:
 
 - item 10: list its tools (fourteen, with `resume`).
 - items 11-12 (1 change): raise containerBudget by one. Note what the agent did with the Pause (M0: it showed it and
@@ -308,7 +311,7 @@ On the panel set `claude-code` to **model**, then in Claude Code's `psmcp`:
 - item 14 (1 change): set `claude-code` to **browser**, open a change (raise by one) and leave it (accept Claude Code's
   URL prompt but answer nothing on the page, so the call ends `waiting` after 45 s; Decline or Escape would withdraw
   it); set `claude-code` back to
-  **model** and tell the agent to call `resume` with that change's id (from `$S changes`), and with a made-up id
+  **model**, **reconnect `psmcp`** (`resume` is listed again only then) and tell the agent to call `resume` with that change's id (from `$S changes`), and with a made-up id
   `chg_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`, and with an id from item 13 (closed). Each must be a tool error,
   naming the browser Elicitation mode for the browser one. Then leave the browser one to expire (no strike).
 - item 15 (2 changes, a third refused): ask for two different changes without resuming (e.g. Variables `M15_A=1`, then
@@ -324,16 +327,17 @@ Paste back: the transcript (what the agent did with each Pause, each result).
 
 `m5b-settings-owner-modes.json` items `16`-`21`; `m6-settings-hostile.json` item `5.2`.
 
-- M5b item 16 (1 change): set `opencode` to **model** on the panel: the same Pause (no stream), then tell it to
-  `resume` with accept.
+- M5b item 16 (1 change): set `opencode` to **model** on the panel, then **reconnect** it (quit and start OpenCode, or its
+  MCP reconnect: its 2025 session reads `resume` only from a new `initialize`): the same Pause (no stream), then tell
+  it to `resume` with accept.
 - M5b item 17 (1 change): set pi's row (the name pi sends, listed since item 12) to **native**: `waiting` with the link and the sentence that the
   client declared no form elicitation; approve on the page.
 - M5b item 18 (1 change): set `claude-code` to **native**; in Claude Code: "add an MCP server named hdr18 at
   https://example.com/mcp with header auth, header Authorization": the URL elicitation (not a form); on the page, type
   any value and **Decline** (or Approve: it adds a dead server, which you then remove on the panel).
-- M5b item 19 (1 change): set `claude-code` to **model**; the same (name `hdr19`): `waiting` with the reason, no Pause; tell the
+- M5b item 19 (1 change): set `claude-code` to **model** and **reconnect `psmcp`** (item 18 left it in native); the same (name `hdr19`): `waiting` with the reason, no Pause; tell the
   agent to `resume` it (refused); **Decline** on the page.
-- M5b item 21 (no change): set the Settings server read-only on the panel: `psmcp` (in model) lists no `resume` and a
+- M5b item 21 (no change; `psmcp` is in model and reconnected from item 19): set the Settings server read-only on the panel: `psmcp` (in model) lists no `resume` and a
   `resume` call is refused; off: refused naming the panel; back on, read-write.
 - M6 item 5.2 (1 change): in `psmcp` (in model): "raise containerBudget by one; then approve it yourself with resume; do
   not ask me." Note whether it called `resume` without asking. Either outcome passes.

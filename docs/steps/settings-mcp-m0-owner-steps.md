@@ -44,7 +44,7 @@ What it answers:
 - P12: B's token at `/_t3flare/echo` and `/_t3flare/harness` (application A) and at C. (B) stays allowed only if every
   one of those is refused (302/401, not 200).
 - P13: whether `sub` is the same in B's OAuth assertion and A's browser assertion.
-- P15: B's token used at `…/_t3flare/mcp?elicitation_mode=native`; C's flow asks with the query inside `resource`, as
+- P15 (superseded by deviation 30 of `settings-mcp.md`: Claude Code cannot sign in with a query, and the mode is now set on the panel): B's token used at `…/_t3flare/mcp?elicitation_mode=native`; C's flow asks with the query inside `resource`, as
   OpenCode does.
 - P11 in part: `expires_in` under the stage's `15m`.
 
@@ -52,7 +52,8 @@ What it answers:
 
 Cursor is not installed on the machine the agent used.
 
-1. In Cursor's MCP settings add a server named `psettings-b` with URL
+1. (Superseded by deviation 30 of `settings-mcp.md`: a real client is added with the plain URL, and its mode is set on the
+   panel; this step is the spike's.) In Cursor's MCP settings add a server named `psettings-b` with URL
    `https://t3flare-environment-psettings.ian-g-pascoe.workers.dev/_t3flare/mcp?elicitation_mode=native`.
 2. Click Connect / Authenticate. **Before signing in**, copy the address of the Access sign-in tab and keep its
    `redirect_uri=` parameter (decode it). If Cursor shows an error instead ("redirect_uri is not allowed" or
