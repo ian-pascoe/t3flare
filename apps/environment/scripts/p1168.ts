@@ -19,7 +19,7 @@
 //    the headers Claude sends that the allowlist drops; no handle or key.
 //
 // No key or handle is printed or kept: every answer kept is scanned for them first.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -43,7 +43,9 @@ const canaryKey = `sk-canary-${randomBytes(24).toString("hex")}`;
 const secrets = [proxyKey, canaryKey].filter((value) => value.length >= 8);
 const handles: Array<string> = [];
 const failures: Array<string> = [];
-const report: Record<string, unknown> = { at: new Date().toISOString(), stage };
+// The code the evidence covers: the commit deployed (the working tree must be clean for it to be that commit).
+const git = (...args: Array<string>) => spawnSync("git", args, { encoding: "utf8" }).stdout.trim();
+const report: Record<string, unknown> = { at: new Date().toISOString(), stage, head: git("rev-parse", "HEAD"), clean: git("status", "--porcelain") === "" };
 /** Throws if a key or a handle is in `value`; a value kept as evidence goes through here. */
 function clean<T>(value: T): T {
   const text = JSON.stringify(value) ?? "";
@@ -155,7 +157,19 @@ check("its tool requests were asked and accepted", first.requests.length > 0 && 
 // The managed settings Claude Code runs with (the Container's): the relay, the handle helper, the background model.
 const managed = await exec(A, "cat /etc/claude-code/managed-settings.json");
 const settings = JSON.parse(String(managed.stdout ?? "{}")) as any;
-report.managedSettings = clean({ apiKeyHelper: settings.apiKeyHelper, availableModels: settings.availableModels, baseUrl: settings.env?.ANTHROPIC_BASE_URL, backgroundModel: settings.env?.ANTHROPIC_DEFAULT_HAIKU_MODEL });
+report.managedSettings = clean({
+  apiKeyHelper: settings.apiKeyHelper,
+  availableModels: settings.availableModels,
+  baseUrl: settings.env?.ANTHROPIC_BASE_URL,
+  backgroundModel: settings.env?.ANTHROPIC_DEFAULT_HAIKU_MODEL,
+  sonnetModel: settings.env?.ANTHROPIC_DEFAULT_SONNET_MODEL,
+  opusModel: settings.env?.ANTHROPIC_DEFAULT_OPUS_MODEL,
+});
+check(
+  "Claude Code's sonnet and opus aliases are slugs (sonnet: the endpoints' sonnet; opus: none, so the first model)",
+  settings.env?.ANTHROPIC_DEFAULT_SONNET_MODEL === `comm2/${SECOND}` && settings.env?.ANTHROPIC_DEFAULT_OPUS_MODEL === `comm/${FIRST}`,
+  report.managedSettings,
+);
 check(
   "the managed settings: the model-routed relay URL, the handle helper, the endpoints' slugs",
   settings.apiKeyHelper === "/opt/t3flare/bin/t3flare-claude-handle" && settings.env?.ANTHROPIC_BASE_URL === "http://computer.internal/t3flare/model/_" && JSON.stringify(settings.availableModels) === JSON.stringify([`comm/${FIRST}`, `comm2/${SECOND}`]),
@@ -268,6 +282,7 @@ report.relayLog = {
   routedRefusals: relayLogs.filter((entry) => entry.routed === true && entry.endpoint === null).map((entry) => ({ status: entry.status, method: entry.method, why: entry.why })),
   sample: claudeLogs.slice(0, 3),
 };
+check("the routed URL refused none of Claude's requests (every model it sent was a slug)", (report.relayLog as any).routedRefusals.length === 0 && claudeLogs.every((entry) => entry.status === 200), report.relayLog);
 check("Claude's requests went through the model-routed URL to both endpoints", claudeLogs.length >= 3 && claudeLogs.every((entry) => entry.routed === true) && claudeLogs.some((entry) => entry.endpoint === "comm") && claudeLogs.some((entry) => entry.endpoint === "comm2"), report.relayLog);
 check("no handle or key in the agents Worker's log", [...secrets, ...handles].every((value) => !raw.includes(value)));
 finish();
