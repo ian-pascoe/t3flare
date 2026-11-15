@@ -811,6 +811,7 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Fix**: diff `CodexAdapterV2.ts` (`codexThreadRuntimeParams`, `buildCodexTurnStartParams`, `planSelectionTransition`)
   and the app-server schema (`ThreadStartParams`, `ThreadStartResponse`, `TurnStartParams`) between tags; update the
   guard, `codexProcessProvider` and the exclusion; re-run `p1167.ts`.
+
 ### U70. The Settings server's caller: `threadLinkIn` reads the thread projection (SPI-1198)
 
 - **Where**: `apps/environment/src/provider/threadCaller.ts` `threadLinkIn` (through `threadLinkOf`,

@@ -7,10 +7,14 @@ modes) and [ADR-0036](../adr/0036-owner-clients-reach-the-settings-server-at-t3f
 (where the Owner-client endpoint lives). Evidence: [`settings-mcp/`](settings-mcp/).
 
 **State, 2026-11-15: built, unit-tested and stage-run on `psmcp` on branch `settings-mcp`, rebased on `origin/main` at
-10b8617 (over SPI-1160 to SPI-1175; deviation 31).** Machine evidence passes for M1-M4 and M6. The owner's checklist ([`owner-stage-run.md`](settings-mcp/owner-stage-run.md))
-passed Block A and owner step 1 (the OAuth gate for layout (B)). Its remaining client tests were skipped by the owner's
-decision (the "Evidence" section). Prod and the nightly job's `bump` stage are still deployed without the Owner-client
-endpoint (ADR-0036; one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES`); turning it on for prod is a follow-up.
+10b8617 (over SPI-1160 to SPI-1175; deviation 31).** The stage runs ran on `psmcp` at 24f4a01, before the rebase.
+Machine evidence passes for M1-M4 and M6. The owner's checklist ([`owner-stage-run.md`](settings-mcp/owner-stage-run.md))
+passed Block A and owner step 1 on 2026-11-15 (the OAuth gate for layout (B): P6, P11 at 900 s, P12, P13 the same `sub`);
+owner step 2 (Cursor) stays open. Its remaining client tests were skipped by the owner's decision (the "Evidence"
+section). The rebased head 85990db was deployed to `psmcp`, and a smoke check passed there: Claude Code connected with
+the plain URL, and the panel's client list and the MCP servers loaded. Prod and
+the nightly job's `bump` stage are still deployed without the Owner-client endpoint (ADR-0036; one switch,
+`OWNER_ENDPOINT_EXCLUDED_STAGES`) until the owner turns it on; turning it on for prod is a follow-up.
 
 ## What was built
 
@@ -25,7 +29,7 @@ commands still run on the spike branch). Its answers are summarised in both rese
 ([`access-managed-oauth.md`](../research/access-managed-oauth.md#m0s-answers-spi-1196),
 [`mcp-elicitation-server.md`](../research/mcp-elicitation-server.md#m0s-answers-spi-1196)).
 
-Decisions: layout (B), conditional on owner step 1; the Elicitation mode in the URL's query (superseded by deviation 30:
+Decisions: layout (B), confirmed by owner step 1; the Elicitation mode in the URL's query (superseded by deviation 30:
 the panel keeps it per client); the redirect allowlist any
 `localhost` and loopback URI plus `cursor://anysphere.cursor-mcp/oauth/callback` (pending owner step 2); `PI_OFFLINE`
 kept (it does not stop pi's MCP); pi's built-in MCP tools carry `sourceInfo.path: "builtin:mcp"`, so the Patch is
@@ -96,7 +100,7 @@ possible.
 - Layout (B) (`settings/endpointLayout.ts`, `worker.ts`, `alchemy.run.ts`): `SettingsAccess` on `<host>/_t3flare/mcp`
   with managed OAuth, the path-cookie attribute on both applications, `T3FLARE_ACCESS_SETTINGS_AUD`,
   `verifySettingsRequest`, the endpoint's URL (`settingsMcpUrl`) in the stage's credentials file; stage `psettings` in
-  `STAGES`. On every stage but prod and `bump`: prod gets none of it until owner step 1 passes, `bump` none at all
+  `STAGES`. On every stage but prod and `bump`: prod gets none of it until the owner turns it on, `bump` none at all
   (`OWNER_ENDPOINT_EXCLUDED_STAGES`), so their admin applications are as on `main` and `/_t3flare/mcp` answers 404
   `not_configured`. `scripts/acceptance.ts`
   step 2b, and `scripts/smoke.ts` on every prod deploy, assert the host's root OAuth documents are still t3's.
@@ -191,8 +195,8 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
    application would be admitted at the panel and the Change page, so the endpoint needs an application of its own.
 2. **Layout (B) is conditional** (D13, ADR-0036). M0 showed Access routing `/_t3flare/mcp` and `/_t3flare` apart and
    leaving the root well-known documents alone, but that one application's token is refused at the other's paths was
-   tested with a service-token stand-in only. The OAuth bearer case is owner step 1 (M5a items 1-4); if it fails, the
-   layout moves to (C). No `apps/settings-worker` was built.
+   tested with a service-token stand-in only. The OAuth bearer case was owner step 1 (M5a items 1-4), which passed on
+   2026-11-15; had it failed, the layout would have moved to (C). No `apps/settings-worker` was built.
 3. **Cursor's redirect is from third-party reports** (D13): `cursor://anysphere.cursor-mcp/oauth/callback` is in the
    allowlist pending owner step 2; Cursor was not installed where M0 ran.
 4. **Access lifetimes are set explicitly** (D13): M0's P11 showed the applications API stores any value unvalidated, so
@@ -265,7 +269,7 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     door; the own door's longer wait for an applying answer and `waiting` when any wait runs out; the hash's further
     canonicalisation; Patch 0007's rest-of-name rule. Each is recorded in the plan (D4, D6, D8, D12, D16) and U71.
 27. **Prod, and `bump`, are deployed without the Owner-client endpoint** (D13, ADR-0036; SPI-1195 review): the plan
-    put layout (B) on every stage. Until owner step 1 passes and M5a's evidence is recorded, `OWNER_ENDPOINT_EXCLUDED_STAGES` holds
+    put layout (B) on every stage. Until the owner turns it on (owner step 1 passed and M5a's evidence is recorded), `OWNER_ENDPOINT_EXCLUDED_STAGES` holds
     `prod`: no `SettingsAccess`, the admin application exactly as on `main`, no `T3FLARE_ACCESS_SETTINGS_AUD`, so
     `/_t3flare/mcp` answers 404 `not_configured`. Enabling prod is removing it from that list. Reason: (B) is unproven,
     and a prod deploy is not where to find that out. The switch is unit-tested; `alchemy.run.ts` itself needs
@@ -311,11 +315,17 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     - Numbers taken on `origin/main` meanwhile were renumbered here: the ADRs are 0035 (was 0034) and 0036 (was 0035),
       the Patch is `0007-pi-relay-tools-are-judged-by-the-relay.patch` (was 0006), and the upstream-fragility entries
       are U70 to U74 (were U66 to U70). The evidence JSONs keep the old numbers, as they were recorded. Commit shas
-      named in this report and the plan are of the branch before this rebase (`settings-mcp-pre-rebase2`, 386d73a).
+      named in this report and the plan are of the branch before this rebase: they resolve in the branch
+      `settings-mcp-pre-rebase2` (386d73a; it will be pushed), except 41b823a, which is on the branch
+      `settings-mcp-m0-spike`.
+    - Model endpoints (SPI-1162, ADR-0034) are panel-only: the Settings server neither reads nor changes them, so "the
+      Settings server covers everything the panel edits" holds but for them, and `read_audit` shows their entries
+      without key fingerprints.
 
 ## Evidence
 
-Stage `psmcp`, deployed from 24f4a01 for the runs. The per-client mode check was rerun at 4f6fd98. Machine items were
+Stage `psmcp`, deployed from 24f4a01 for the runs (before the rebase; the rebased head 85990db was deployed there for a
+smoke check only, see the State line). The per-client mode check was rerun at 4f6fd98. Machine items were
 run by `scripts/settings.ts`. The owner's items were driven by the agent in the owner's signed-in browser, and the owner
 signed in only.
 
@@ -356,7 +366,7 @@ commands run):
 ## How to connect an Owner client
 
 The endpoint is `https://<host>/_t3flare/mcp`: on a stage, `settingsMcpUrl` in its credentials file; on prod
-`https://t3.ianpascoe.dev/_t3flare/mcp`, once prod is enabled after owner step 1 (until then it answers 404); the
+`https://t3.ianpascoe.dev/_t3flare/mcp`, once the owner enables prod (until then it answers 404); the
 Settings server's card on the Harness panel shows it too. Add it **as it is, with no query**: Claude Code's sign-in
 fails with a query on the URL (U74). The first call sends the client to sign in through Access (dynamic registration, a
 `localhost` or loopback redirect) as the owner. For example:
@@ -391,5 +401,5 @@ its grant in the Access dashboard.
 - At M6: ADR-0035's status; both research files' "M0's answers"; `docs/parity.md` and `docs/pi-parity.md` (the pi
   CLI's relay servers, the Settings server); `README.md`'s pi line; `m4-stage-run.md` items 6 and 10.
 - At the SPI-1195 review: ADR-0036, ADR-0010's refinement, the plan (D13, D16, §10), U72 and `m5a-stage-run.md` (prod
-  excluded until owner step 1; `scripts/smoke.ts` as the detection; U72's dependence on Access's `sub`);
+  excluded until the owner turns the endpoint on; `scripts/smoke.ts` as the detection; U72's dependence on Access's `sub`);
   `m1-stage-run.md`; M0's evidence copied here; ADR-0001's Patch 0007 entry; ADR-0035's consequences.
