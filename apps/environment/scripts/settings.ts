@@ -1740,7 +1740,8 @@ const ownPage = async (label: string, tool: string, args: unknown, instructions:
     changeId = (await openChanges()).find((c) => JSON.stringify(c).includes(threadId))?.id;
     if (changeId === undefined) await sleep(1500);
   }
-  banner([`OWNER, ${label}: open this Change page in the browser where you are signed in to the panel:`, "", `   ${T3}/_t3flare/harness/changes/${changeId}`, "", ...instructions.map((line) => `   ${line}`), "", "The script waits (up to the change's 10 minutes) and records what happens."]);
+  if (changeId === undefined) banner([`${label}: no Open change for this thread (the call was answered without one); the script records its result.`]);
+  else banner([`OWNER, ${label}: open this Change page in the browser where you are signed in to the panel:`, "", `   ${T3}/_t3flare/harness/changes/${changeId}`, "", ...instructions.map((line) => `   ${line}`), "", "The script waits (up to the change's 10 minutes) and records what happens."]);
   if (changeId !== undefined) await options.afterOpen?.(changeId);
   const run = await running;
   const projection = projectionOf(await threadWindow(cookie, threadId));
@@ -1821,7 +1822,7 @@ const ownerItem = async (item: string) => {
       markAfter: after?.secret ?? null,
       nextCall: tested,
       leakScan: leak,
-      verdict: ok6 && Array.isArray(leak?.leaked) && leak.leaked.length === 0 ? "pass" : "fail",
+      verdict: ok6 && leak?.leaked === 0 ? "pass" : "fail",
     });
     await record("m6-settings-hostile.json", "3", {
       name: "a leak scan finds a typed secret nowhere but the secret store: the canary typed on the Change page; the next call authenticates; peer-leak over the Container, the Session and the text (Workers Logs tail, the page before and after, the panel's audit and changes APIs, the agent's read_audit, list_mcp_servers and get_status, the thread's transcript)",
@@ -1831,7 +1832,7 @@ const ownerItem = async (item: string) => {
       textBytes: text.length,
       tailedWorkers: tail.workers,
       leakScan: leak,
-      verdict: out.status === "applied" && tested?.status === "ok" && Array.isArray(leak?.leaked) && leak.leaked.length === 0 && Array.isArray(leak?.checked) && leak.checked.length > 0 ? "pass" : "fail",
+      verdict: out.status === "applied" && tested?.status === "ok" && leak?.leaked === 0 && Array.isArray(leak?.checked) && leak.checked.length > 0 ? "pass" : "fail",
     });
     return;
   }
@@ -1839,10 +1840,11 @@ const ownerItem = async (item: string) => {
     // A sign-in through the page: the fixture's OAuth server (its authorize approves at once).
     const rows = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []) as Array<any>;
     if (!rows.some((r) => r.name === "fixture-oauth")) await harness("POST", "/_t3flare/harness/api/mcp/servers", { server: "fixture-oauth", url: `${FIXTURE_URL}/oauth-mcp`, auth: { kind: "oauth" } });
+    const revision = await harnessRevision();
     const tail = await tailing(WORKERS, () =>
-      ownPage("M4 item 7 (a sign-in through the page)", "start_mcp_sign_in", { expectedRevision: 0, server: "fixture-oauth" }, ["The harness presses Opened it on the card.", "On the page click 'Approve and sign in'. The fixture's authorization server approves at once and sends you back."], { openedIt: true }),
+      ownPage("M4 item 7 (a sign-in through the page)", "start_mcp_sign_in", { expectedRevision: revision, server: "fixture-oauth" }, ["The harness presses Opened it on the card.", "On the page click 'Approve and sign in'. The fixture's authorization server approves at once and sends you back."], { openedIt: true }),
     );
-    // start_mcp_sign_in's expectedRevision is the Harness revision: the call above names 0 only if it is 0; retried with the current one when moved.
+    // start_mcp_sign_in's expectedRevision is the Harness revision, read just before; retried once should it move meanwhile.
     let out = tail.result;
     if (out.status === "refused" && /revision/.test(out.result)) {
       out = await ownPage("M4 item 7 again (the revision had moved)", "start_mcp_sign_in", { expectedRevision: await harnessRevision(), server: "fixture-oauth" }, ["On the page click 'Approve and sign in'."], { openedIt: true });
