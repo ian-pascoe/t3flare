@@ -16,6 +16,9 @@
 // - The Change page (plan D10, M4): `GET …/changes/<id>` renders one Open change; `POST …/api/changes/<id>`
 //   `{ action, value? }`, behind the same write guard, answers it, and is what applies it. A header value goes from its
 //   body to the secret store alone; a sign-in's authorization URL is in its answer alone. `GET …/api/changes` lists them.
+// - The Owner clients' Elicitation modes (ADR-0034's 2026-11-15 refinement): `GET …/api/mcp/clients` lists them and
+//   `POST …/api/mcp/clients` `{ key, clientName, mode }` or `{ key, clientName, remove: true }`, behind the same write
+//   guard, changes one, audited. This is the only place a client's mode is set: the endpoint only reads it.
 import { describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, ignoredServersOf, type McpChange, resolveEnvironment, resolveHarness } from "@t3flare/harness-registry";
 
 import type { AccessCaller } from "../access.ts";
@@ -42,6 +45,7 @@ import {
   testMcpServer,
 } from "./ops.ts";
 import { isChangeId } from "../settings/changes.ts";
+import { clientNameOf, isOwnerMode, type OwnerClients } from "../settings/clients.ts";
 import { type Answerer, type ChangesApi, openChangeSummary } from "../settings/openChanges.ts";
 import { renderChangePage, renderGonePage } from "./changePage.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
@@ -72,7 +76,13 @@ export interface HarnessDeps {
   readonly endpoints?: EndpointsApiDeps;
   /** The Open changes (plan D8, D10): the Change page, its answers, and the panel's list. */
   readonly changes?: ChangesApi;
+  /** The Owner clients' Elicitation modes (clients.ts): listed, set and removed here alone. */
+  readonly clients?: OwnerClients;
+  /** The Owner-client endpoint's URL, when it is deployed (ADR-0035): what the owner adds to his clients. */
+  readonly ownerEndpoint?: string;
 }
+
+export const CLIENTS_API_PATH = `${HARNESS_PATH}/api/mcp/clients`;
 
 /** The Containers running now, by their Workspaces (a holder's DO id when its Workspace is unknown); null without the budget. */
 export const runningContainers = async (deps: Pick<HarnessDeps, "budget">): Promise<{ readonly count: number; readonly holders: ReadonlyArray<string> } | null> => {
@@ -196,6 +206,9 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         ...(deps.skills === undefined ? {} : { skills: skillsOverview(deps.skills) }),
         ...(deps.endpoints === undefined ? {} : { endpoints: await endpointsOverview(deps.endpoints) }),
         ...(deps.changes === undefined ? {} : { openChanges: deps.changes.list().map((record) => openChangeSummary(record, undefined)) }),
+        ...(deps.clients === undefined && deps.ownerEndpoint === undefined
+          ? {}
+          : { ownerClients: { ...(deps.ownerEndpoint === undefined ? {} : { endpoint: deps.ownerEndpoint }), clients: deps.clients?.list() ?? [], viewer: subject } }),
       });
       return new Response(html, { headers: { ...SECURITY_HEADERS, "content-type": "text/html; charset=utf-8", "content-security-policy": await pageCsp() } });
     }
@@ -225,6 +238,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === `${HARNESS_PATH}/api/status`) return json(harnessStatus(deps));
     if (path === `${HARNESS_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });
     if (path === `${HARNESS_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
+    if (path === CLIENTS_API_PATH && deps.clients !== undefined) return json({ clients: deps.clients.list() });
     if (path === `${HARNESS_PATH}/api/skills` && deps.skills !== undefined) return json(skillsOverview(deps.skills));
     if (path === `${HARNESS_PATH}/api/skills/view` && deps.skills !== undefined) return skillsResponse(viewSkill(deps.skills, url.searchParams.get("name") ?? ""));
     if (path === `${HARNESS_PATH}${ENDPOINTS_PATHS.list}` && deps.endpoints !== undefined) return json(await endpointsOverview(deps.endpoints));
@@ -235,13 +249,15 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   const skillsRoute = SKILLS_WRITE_ROUTES.find((route) => path === `${HARNESS_PATH}/api/skills${route}`);
   const endpointsRoute = deps.endpoints === undefined ? undefined : Object.values(ENDPOINTS_PATHS).find((route) => path === `${HARNESS_PATH}${route}`);
   const changeRoute = path.startsWith(`${CHANGES_API_PATH}/`) && deps.changes !== undefined ? path.slice(`${CHANGES_API_PATH}/`.length) : undefined;
-  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined && changeRoute === undefined) return refused(404, "Not found");
+  const clientsRoute = path === CLIENTS_API_PATH && deps.clients !== undefined;
+  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined && changeRoute === undefined && !clientsRoute) return refused(404, "Not found");
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
     console.log(JSON.stringify({ t3flare: "harness-refused", reason: why, caller: deps.caller.kind }));
     return refused(403, why);
   }
   if (changeRoute !== undefined && deps.changes !== undefined) return answerChange(deps.changes, changeRoute, await bodyOf(request), deps.caller);
+  if (clientsRoute && deps.clients !== undefined) return changeClient(deps, deps.clients, await bodyOf(request));
   const ops = opsOf(deps);
   if (skillsRoute !== undefined && deps.skills !== undefined) {
     const body = await bodyOf(request);
@@ -315,6 +331,32 @@ const answerChange = async (changes: ChangesApi, id: string, body: Record<string
     ...(outcome.error === undefined ? {} : { error: outcome.error }),
     ...(answered.authorizationUrl === undefined ? {} : { authorizationUrl: answered.authorizationUrl }),
   });
+};
+
+/**
+ * An Owner client's mode set or the client forgotten (ADR-0034's 2026-11-15 refinement), as the identity the panel
+ * admitted; audited as the panel's other changes are (entity `owner-clients`). It applies at the client's next request;
+ * an Open change keeps the mode it was asked in.
+ */
+const changeClient = (deps: HarnessDeps, clients: OwnerClients, body: Record<string, unknown> | undefined): Response => {
+  const key = body?.key;
+  const clientName = clientNameOf(body?.clientName);
+  if (typeof key !== "string" || key === "" || clientName === undefined || clientName !== body?.clientName) {
+    return refused(400, "the body is { key, clientName, mode: browser | native | model } or { key, clientName, remove: true }");
+  }
+  const audit = (action: string, before: unknown, after: unknown) =>
+    deps.store.audit({ at: deps.now?.() ?? Date.now(), entity: "owner-clients", ...actorOf(deps), action, target: clientName, before, after });
+  if (body?.remove === true) {
+    if (!clients.remove(key, clientName)) return refused(404, "no such client");
+    audit("client-remove", { key }, null);
+    return json({ removed: true, key, clientName });
+  }
+  const mode = body?.mode;
+  if (!isOwnerMode(mode)) return refused(400, "mode is browser, native or model");
+  const before = clients.setMode(key, clientName, mode);
+  if (before === undefined) return refused(404, "no such client: a client is listed at its first request to the Owner-client endpoint");
+  if (before !== mode) audit("client-mode", { key, mode: before }, { key, mode });
+  return json({ key, clientName, mode });
 };
 
 const skillsResponse = (answer: SkillsAnswer): Response => ("json" in answer ? json(answer.json, answer.status) : refused(answer.status, answer.text));

@@ -26,7 +26,7 @@ export const endpointOf =
   (request: Request, caller: AccessCaller = OWNER) => {
     const holds = holdsOf.get(f) ?? streamHolds();
     holdsOf.set(f, holds);
-    return handleSettingsMcp(request, caller, { server: f.deps, stateKey: () => KEY, now: f.now, holdMs: 80, beatMs: 30, holds, ...extra });
+    return handleSettingsMcp(request, caller, { server: f.deps, stateKey: () => KEY, now: f.now, holdMs: 80, beatMs: 30, holds, clients: { seen: (key, clientName) => f.clients.seen(key, clientName) }, ...extra });
   };
 
 export const post = (body: unknown, options: { readonly query?: string; readonly headers?: Readonly<Record<string, string>> } = {}) =>

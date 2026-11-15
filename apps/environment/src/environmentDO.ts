@@ -60,6 +60,8 @@ interface EnvironmentExports {
 
 export interface EnvironmentEnv extends AgentsBindings {
   readonly T3_BOOTSTRAP_TOKEN?: string;
+  /** Set when the Owner-client endpoint is deployed (ADR-0035): the panel then shows its URL and its clients. */
+  readonly T3FLARE_ACCESS_SETTINGS_AUD?: string;
   /** The GitHub App (ADR-0013): only this Worker holds its key; the Environment DO mints every token. */
   readonly T3FLARE_GITHUB_APP_ID?: string;
   readonly T3FLARE_GITHUB_APP_PRIVATE_KEY?: string;
@@ -387,7 +389,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * Never boots t3. Not reachable through `fetch`.
    */
   async harness(request: Request, caller: AccessCaller): Promise<Response> {
-    const [{ handleHarness }, { changesApiOf }] = await Promise.all([import("./harness/panel.ts"), import("./settings/server.ts")]);
+    const [{ handleHarness }, { changesApiOf }, { ownerClients }, { settingsMcpUrl }] = await Promise.all([
+      import("./harness/panel.ts"),
+      import("./settings/server.ts"),
+      import("./settings/clients.ts"),
+      import("./settings/endpointLayout.ts"),
+    ]);
     return handleHarness(request, {
       caller,
       host: this.#configuredHost(),
@@ -405,6 +412,9 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       },
       // The Open changes (plan D10): the Change page answers them through the Settings server's own apply.
       changes: changesApiOf(await this.#settingsDeps()),
+      // The Owner clients' modes (ADR-0034's 2026-11-15 refinement): set here alone, read by the endpoint.
+      clients: ownerClients(this.ctx.storage.sql),
+      ...(this.env.T3FLARE_ACCESS_SETTINGS_AUD === undefined ? {} : { ownerEndpoint: settingsMcpUrl(this.#configuredHost()) }),
     });
   }
 
@@ -445,9 +455,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async settingsMcp(request: Request, caller: AccessCaller): Promise<Response> {
     Idle.requestStarted();
     try {
-      const [{ handleSettingsMcp }, { settingsStateKey }] = await Promise.all([import("./settings/endpoint.ts"), import("./settings/tokens.ts")]);
+      const [{ handleSettingsMcp }, { settingsStateKey }, { ownerClients }] = await Promise.all([import("./settings/endpoint.ts"), import("./settings/tokens.ts"), import("./settings/clients.ts")]);
+      const clients = ownerClients(this.ctx.storage.sql);
       return await handleSettingsMcp(request, caller, {
         server: await this.#settingsDeps(),
+        // The client's kept mode, read and recorded as seen; never set through this door.
+        clients: { seen: (key, clientName) => clients.seen(key, clientName) },
         stateKey: () => settingsStateKey(this.ctx.storage.kv),
         now: () => Date.now(),
         work: () => {

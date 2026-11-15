@@ -11,8 +11,13 @@
 //   `initialize`, carried in a signed `Mcp-Session-Id`), and 2025-03-26 and 2024-11-05 (tools, never a question). The
 //   version only decides how a question is delivered.
 // - Guards before the body is parsed (plan D11): POST only, JSON only, no `Origin` and no `Sec-Fetch-Site` (no client
-//   sends them, M0; a browser does), at most 256 KiB, and `elicitation_mode` one of three exact values. No CORS header
-//   is ever sent; every answer is `no-store`. Any other query parameter is ignored (OpenCode adds `codemode=false`).
+//   sends them, M0; a browser does), at most 256 KiB, and `elicitation_mode`, when given, one of three exact values. No
+//   CORS header is ever sent; every answer is `no-store`. Any other query parameter is ignored (OpenCode adds
+//   `codemode=false`).
+// - The request's Elicitation mode (plan D12; ADR-0034's 2026-11-15 refinement): an explicit `?elicitation_mode=`, else
+//   the mode the owner set on the Harness panel for this caller's key and the client's `clientInfo.name` (clients.ts),
+//   else `browser`; a request with no client name is `browser`. Every request with a client name records it as seen.
+//   Nothing here, and no tool, changes a client's mode: only the panel does.
 // - An asked change is an Open change (openChanges.ts) in the request's Elicitation mode (plan D12), after its fallbacks
 //   toward `browser`: `native` with no form elicitation declared, and any change that needs the page (D6), are `browser`.
 //   The Change page answers every mode; the first answer wins.
@@ -32,6 +37,7 @@ import { canonicalJson } from "../mcp/canonical.ts";
 import type { McpCallAnswer } from "../mcp/host.ts";
 import { OFF_MESSAGE, type OwnerCaller } from "./caller.ts";
 import { type ChangeRecord, isChangeId, isOpen, OWNER_MODES, type OwnerMode } from "./changes.ts";
+import { clientNameOf, type OwnerClients } from "./clients.ts";
 import { type ChangeOutcome, closeOrSettle, outcomeOf, waitForChange } from "./openChanges.ts";
 import {
   answerDepsOf,
@@ -102,6 +108,11 @@ export interface EndpointDeps {
   readonly background?: (work: Promise<unknown>) => void;
   /** The held streams live in this isolate; the isolate's own by default (tests give each Environment its own). */
   readonly holds?: StreamHolds;
+  /**
+   * The Owner clients' kept modes (clients.ts): `seen` alone, so this door can read a mode and record a client but never
+   * set one (only the panel does). Without it every request with no `?elicitation_mode=` is `browser`.
+   */
+  readonly clients?: Pick<OwnerClients, "seen">;
 }
 
 /** Live held streams (a 2025 call's question on its own stream) per change and per caller, in this isolate. */
@@ -147,6 +158,8 @@ interface Context {
   readonly version: string;
   readonly elicitation: Declared;
   readonly client?: { readonly name: string; readonly source: string };
+  /** The client's own `clientInfo.name` (no version, never the User-Agent): what its kept mode is keyed by. */
+  readonly clientName?: string;
 }
 
 type Json = Readonly<Record<string, unknown>>;
@@ -173,6 +186,11 @@ const clientOf = (info: unknown, source: string): Context["client"] => {
 
 const withClient = (client: Context["client"]): { readonly client?: NonNullable<Context["client"]> } => (client === undefined ? {} : { client });
 
+const withName = (name: unknown): { readonly clientName?: string } => {
+  const clientName = clientNameOf(name);
+  return clientName === undefined ? {} : { clientName };
+};
+
 const NONE: Declared = { form: false, url: false };
 
 const declaredOf = (capabilities: unknown): Declared => {
@@ -182,10 +200,13 @@ const declaredOf = (capabilities: unknown): Declared => {
   return { form: elicitation.form !== undefined, url: elicitation.url !== undefined };
 };
 
-/** The request's Elicitation mode (plan D12), or undefined when it is unknown, repeated or mis-cased. Absent is `browser`. */
-export const elicitationModeOf = (url: URL): OwnerMode | undefined => {
+/**
+ * The request's explicit Elicitation mode (plan D12): `null` when the URL names none (the client's kept mode decides),
+ * undefined when it is unknown, repeated or mis-cased (400).
+ */
+export const elicitationModeOf = (url: URL): OwnerMode | null | undefined => {
   const named = [...url.searchParams].filter(([key]) => key.toLowerCase() === "elicitation_mode");
-  if (named.length === 0) return "browser";
+  if (named.length === 0) return null;
   if (named.length > 1) return undefined;
   const [key, value] = named[0]!;
   return key === "elicitation_mode" && (OWNER_MODES as ReadonlyArray<string>).includes(value) ? (value as OwnerMode) : undefined;
@@ -289,10 +310,23 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
   if (type !== "application/json") return refuse(415, "content-type", plain(415, "The Settings server takes application/json."));
   if (request.headers.has("origin") || request.headers.has("sec-fetch-site")) return refuse(403, "browser", plain(403, "The Settings server answers MCP clients, not browsers."));
   const url = new URL(request.url);
-  const requested = elicitationModeOf(url);
-  if (requested === undefined) {
-    return refuse(400, "elicitation-mode", json(rpcError(null, -32602, "elicitation_mode is browser, native or model: once, in lowercase (absent means browser)."), 400));
+  const explicit = elicitationModeOf(url);
+  if (explicit === undefined) {
+    return refuse(
+      400,
+      "elicitation-mode",
+      json(rpcError(null, -32602, "elicitation_mode is browser, native or model: once, in lowercase (absent means the client's mode on the Harness panel, browser until the owner sets it)."), 400),
+    );
   }
+  /**
+   * The request's Elicitation mode (plan D12): the query's, else the panel's for this key and client name, else
+   * `browser`. Records the client as seen either way.
+   */
+  const modeOf = (clientInfoName: unknown): OwnerMode => {
+    const clientName = clientNameOf(clientInfoName);
+    const kept = clientName === undefined ? undefined : deps.clients?.seen(key, clientName);
+    return explicit ?? kept ?? "browser";
+  };
   const raw = await readBody(request);
   if (raw === undefined) return refuse(413, "too-large", plain(413, `The Settings server reads at most ${BODY_MAX} bytes.`));
 
@@ -319,8 +353,13 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     const action = objectOf(message.result)?.action;
     if (record !== undefined && record.caller.door === "owner" && record.caller.key === key && record.mode === "native") {
       // `native` (plan D12): the form's answer. `accept` applies the change (by `client`), `decline` declines it, `cancel`
-      // withdraws it; the held call then writes its result. A response in another mode than the change's is refused.
-      if (requested !== "native") return refuse(400, "other-mode", json(rpcError(null, -32600, "This question was asked in elicitation_mode=native."), 400));
+      // withdraws it; the held call then writes its result. A response in another mode than the change's is refused:
+      // the mode is this request's (its session's client name), so a client the owner moved off `native` since cannot
+      // answer, and the change waits on its Change page.
+      const session = await verifyToken(tokenKey, request.headers.get("mcp-session-id"), { kind: "session", sub: key, now: now() });
+      if (modeOf(session.ok ? objectOf(session.payload.client)?.name : undefined) !== "native") {
+        return refuse(400, "other-mode", json(rpcError(null, -32600, "This question was asked in the native Elicitation mode, and this client is in another now (its mode on the Harness panel, or ?elicitation_mode=). Answer it on its Change page."), 400));
+      }
       // No stream of this isolate holds the question (the Environment reset since, or it ended unanswered): nobody waits
       // for the result, so the answer applies nothing and the change is withdrawn by `stop` (plan D12; SPI-1201 review).
       if ((holds.byChange.get(record.id) ?? 0) === 0) {
@@ -358,7 +397,13 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     // every request and `Mcp-Name` on `tools/call`, each present and equal to the body's value, else `-32020` with 400.
     const mismatch = headerMismatch(request.headers, metaVersion, method, method === "tools/call" ? params.name : undefined);
     if (mismatch !== undefined) return json(rpcError(id, -32020, `Header mismatch: ${mismatch}`), 400);
-    context = { modern: true, version: MODERN_VERSION, elicitation: declaredOf(meta?.[META_CAPABILITIES]), ...withClient(clientOf(meta?.[META_CLIENT], "clientInfo in _meta") ?? fromAgent) };
+    context = {
+      modern: true,
+      version: MODERN_VERSION,
+      elicitation: declaredOf(meta?.[META_CAPABILITIES]),
+      ...withClient(clientOf(meta?.[META_CLIENT], "clientInfo in _meta") ?? fromAgent),
+      ...withName(objectOf(meta?.[META_CLIENT])?.name),
+    };
   } else {
     const session = await verifyToken(tokenKey, request.headers.get("mcp-session-id"), { kind: "session", sub: key, now: now() });
     const header = request.headers.get("mcp-protocol-version");
@@ -382,6 +427,7 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
         version,
         elicitation: { form: elicitation?.form === true, url: elicitation?.url === true },
         ...withClient((client === undefined ? undefined : clientOf(client, "clientInfo at initialize")) ?? fromAgent),
+        ...withName(client?.name),
       };
     } else {
       // A missing, invalid or other identity's session reads as no elicitation declared (plan D11).
@@ -389,6 +435,8 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     }
   }
 
+  // `initialize` carries the client's name in its body; every other request in `_meta` (2026) or its session (2025).
+  const requested = modeOf(method === "initialize" ? objectOf(params.clientInfo)?.name : context.clientName);
   const instructions = `${SETTINGS_OWNER_INSTRUCTIONS}${OWNER_MODE_INSTRUCTIONS[requested]}`;
   const reply = (result: Json, headers: Readonly<Record<string, string>> = {}) =>
     json({ jsonrpc: "2.0", id, result: context.modern ? { resultType: "complete", ...result, _meta: { [META_SERVER]: SERVER_INFO } } : result }, 200, headers);
@@ -450,9 +498,9 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
   /** Why a change asked in another mode waits on the page instead, said in its `W`. */
   const noteOf = (record: ChangeRecord): string | undefined =>
     record.needsPage !== undefined && requested !== "browser"
-      ? `${PAGE_REASON[record.needsPage]("its Change page")} That holds whatever the elicitation_mode.`
+      ? `${PAGE_REASON[record.needsPage]("its Change page")} That holds in every Elicitation mode.`
       : requested === "native" && record.mode === "browser"
-        ? "This client declared no form elicitation, so elicitation_mode=native falls back to the Change page."
+        ? "This client declared no form elicitation, so its native Elicitation mode falls back to the Change page."
         : undefined;
   const messageOf = (record: ChangeRecord, page: string | undefined): string =>
     record.shown === undefined ? "A change waits for you on the Change page." : ownerMessage(record.shown, owner, record.mode === "native" || record.mode === "model" ? record.mode : "browser", page);
@@ -672,7 +720,13 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     const mode = modeFor(asked, record.needsPage);
     if (record.mode !== mode) {
       log({ t3flare: "settings-refused", reason: "other-mode", tool: name, change: record.id });
-      return reply(toolResult(refusedResult(`Not changed: this change was asked in elicitation_mode=${record.mode ?? "card"}, not ${mode}. Answer it in that mode, or call ${name} again without requestState to ask in this one.`)));
+      return reply(
+        toolResult(
+          refusedResult(
+            `Not changed: this change was asked in the ${record.mode ?? "card"} Elicitation mode, not ${mode} (the client's mode on the Harness panel, or ?elicitation_mode=, changed since). Answer it in that mode or on its Change page, or call ${name} again without requestState to ask in this one.`,
+          ),
+        ),
+      );
     }
     const action = objectOf(objectOf(params.inputResponses)?.change)?.action;
     if (record.mode === "native" && action === "decline" && isOpen(record)) return reply(toolResult(await answerOwnerChange(server, record, owner, "client", "decline")));

@@ -389,7 +389,7 @@ describe("native on 2026-07-28: the form in input_required, answered by the retr
     const first = await bodyOf(await endpoint(askedCall({ query: NATIVE })));
     const body = await bodyOf(await endpoint(retry(first.result?.requestState, "accept", "?elicitation_mode=browser")));
     expect(body.result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
-    expect(JSON.stringify(body.result?.content)).toContain("elicitation_mode=native");
+    expect(JSON.stringify(body.result?.content)).toContain("asked in the native Elicitation mode");
     expect(openChange(f).record.state).toBe("open");
     expect(f.store.loadEnvironment().revision).toBe(0);
   });
@@ -703,7 +703,7 @@ describe("model: Executor's Pause, and resume", () => {
     const browser = f.deps.changes.open().find((record) => record.mode === "browser")!;
     const other = await bodyOf(await endpoint(resume(browser.id, "accept")));
     expect(other.result).toMatchObject({ isError: true, structuredContent: { status: "refused", changeId: browser.id } });
-    expect(JSON.stringify(other.result?.content)).toContain("elicitation_mode=browser");
+    expect(JSON.stringify(other.result?.content)).toContain("asked in the browser Elicitation mode");
     expect(f.deps.changes.get(browser.id)?.state).toBe("open");
     // Unknown and malformed ids.
     for (const id of ["chg_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "not-an-id", 5]) {
@@ -852,7 +852,7 @@ describe("D12's fallbacks for native and model", () => {
     expect(record).toMatchObject({ mode: "browser", needsPage });
     expect(body.result).toMatchObject({ resultType: "complete", structuredContent: { status: "waiting", url } });
     expect(pauseOf(body.result)).toBeUndefined();
-    expect(JSON.stringify(body.result?.content)).toContain("whatever the elicitation_mode");
+    expect(JSON.stringify(body.result?.content)).toContain("in every Elicitation mode");
     expect(await structuredOf(await endpoint(modern("tools/call", { name: "resume", arguments: { requestId: record.id, response: { action: "accept" } } }, { query: MODEL, id: 3 })))).toMatchObject({ status: "refused" });
     expect(f.deps.changes.get(record.id)?.state).toBe("open");
   });

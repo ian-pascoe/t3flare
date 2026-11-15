@@ -1483,7 +1483,8 @@ export const settingsOwnerCall = async (deps: SettingsServerDeps, input: OwnerCa
 
 /**
  * `resume` (plan D12's `model`): the client's agent answers its own model-mode Open change. Listed and called only on the
- * Owner-client endpoint with `elicitation_mode=model`; the in-process server never has it. It is a write: the access
+ * Owner-client endpoint for a client in the `model` mode (set on the panel, or `?elicitation_mode=model`); the in-process
+ * server never has it. It is a write: the access
  * switch refuses it as it refuses every write. `accept` applies (answered by `agent`), `decline` closes it declined,
  * `cancel` withdraws it (closed by `agent`: model-mode resume is the only `agent` closer, SPI-1199 review).
  */
@@ -1507,7 +1508,7 @@ export const ownerResume = async (deps: SettingsServerDeps, input: { readonly ar
     return refuse("unknown", "Not changed: no change of yours has that requestId (it may have closed long ago). To ask again, read the settings and call the original tool again.");
   }
   if (record.mode !== "model") {
-    return refuse("other-mode", `Not changed: ${record.id} was asked in elicitation_mode=${record.mode ?? "card"}, and resume answers only model-mode changes. Answer it the way it was asked, or call the original tool again in this mode.`, { changeId: record.id });
+    return refuse("other-mode", `Not changed: ${record.id} was asked in the ${record.mode ?? "card"} Elicitation mode, and resume answers only model-mode changes. Answer it the way it was asked, or call the original tool again in this mode.`, { changeId: record.id });
   }
   if (!isOpen(record)) {
     const closed = ownerOutcome(outcomeOf(record), record);

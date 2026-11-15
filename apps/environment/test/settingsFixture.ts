@@ -13,6 +13,7 @@ import { type McpCallAnswer, McpHost } from "../src/mcp/host.ts";
 import { cliThreadState } from "../src/provider/cli/cliAsk.ts";
 import { DURABLE_AGENT, durableModes, forgetDurableModes, noteDurableModes } from "../src/provider/threadCaller.ts";
 import { settingsChanges } from "../src/settings/changes.ts";
+import { ownerClients } from "../src/settings/clients.ts";
 import type { OwnCaller, ThreadLink } from "../src/settings/caller.ts";
 import { changesApiOf, settingsCall, type SettingsServerDeps } from "../src/settings/server.ts";
 import { skillStore } from "../src/skills/store.ts";
@@ -95,6 +96,8 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
   });
   /** A new table over the same SQLite: an Environment reset between the ask and the answer. */
   const changes = () => settingsChanges(sql, () => now, (event) => void logs.push(event));
+  /** The Owner clients' modes, over the same SQLite (the panel sets them; the endpoint reads them). */
+  const clients = ownerClients(sql, () => now);
   deps = {
     ops: { store, mcp: host, secrets, oauth, skills, now: () => now },
     oauthStatus: oauth.status,
@@ -127,6 +130,8 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
     now: () => now,
     skills,
     changes: changesApiOf(deps),
+    clients,
+    ownerEndpoint: `https://${HOST}/_t3flare/mcp`,
   });
   return {
     kv,
@@ -138,6 +143,7 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
     github,
     skills,
     host,
+    clients,
     get deps() {
       return deps;
     },

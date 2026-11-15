@@ -54,6 +54,20 @@ for (const select of document.querySelectorAll("select[data-mcp-exposure]")) {
     else select.value = select.querySelector("option[selected]").value;
   });
 }
+// The Owner clients' modes (ADR-0034's 2026-11-15 refinement): set here alone, at the client's next request.
+for (const select of document.querySelectorAll("select[data-client-mode]")) {
+  select.addEventListener("change", async () => {
+    const body = { key: select.dataset.clientKey, clientName: select.dataset.clientName, mode: select.value };
+    if (await post("/_t3flare/harness/api/mcp/clients", body, select)) done();
+    else select.value = select.querySelector("option[selected]").value;
+  });
+}
+for (const button of document.querySelectorAll("button[data-client-remove]")) {
+  button.addEventListener("click", async () => {
+    if (!confirm("Forget the client " + button.dataset.clientName + "? It is listed again, in browser, at its next request.")) return;
+    if (await post("/_t3flare/harness/api/mcp/clients", { key: button.dataset.clientKey, clientName: button.dataset.clientName, remove: true }, button)) done();
+  });
+}
 for (const button of document.querySelectorAll("button[data-mcp-test]")) {
   button.addEventListener("click", async () => {
     const server = button.dataset.mcpTest;

@@ -31,12 +31,15 @@ export const SETTINGS_INSTRUCTIONS =
 export const SETTINGS_OWNER_INSTRUCTIONS =
   `${SETTINGS_SCOPE} Every write names the expectedRevision it read. A change that narrows what agents have or can do applies at once; one that widens it waits for the owner's answer on its Change page (at most ${durationText(CHANGE_TTL_MS)}): open the link the result or the question gives, and do not repeat the call; read the settings to see whether it applied. Do not repeat a declined change.`;
 
-/** What an Owner client is told besides, by its Elicitation mode (plan D12). */
+/**
+ * What an Owner client is told besides, by its Elicitation mode (plan D12): the mode the owner set for this client on the
+ * Harness panel, or the URL's `?elicitation_mode=` override.
+ */
 export const OWNER_MODE_INSTRUCTIONS = {
   browser: "",
-  native: " In elicitation_mode=native such a change is asked as a form in your client: its Accept applies it.",
+  native: " This client is in the native Elicitation mode (set by the owner on the Harness panel): such a change is asked as a form in your client, and its Accept applies it.",
   model:
-    " In elicitation_mode=model such a change answers approval-required with a requestId: show it to the user, then call resume with the requestId and their answer. A change that takes a secret, starts a sign-in or installs or updates skills waits on its Change page instead.",
+    " This client is in the model Elicitation mode (set by the owner on the Harness panel): such a change answers approval-required with a requestId: show it to the user, then call resume with the requestId and their answer. A change that takes a secret, starts a sign-in or installs or updates skills waits on its Change page instead.",
 } as const;
 
 const ASKED_NOTE = "Changes that widen what agents have or can do (the Change tier `asked`) wait for the owner's answer, on his card or the Change page, before they apply; turning things down is `free`.";
