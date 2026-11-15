@@ -1,0 +1,10 @@
+{
+ "at": "2026-11-15T11:20:19.158Z",
+ "op": "logout",
+ "provider": "github-copilot",
+ "result": {
+  "status": 200,
+  "provider": "github-copilot",
+  "attempts": []
+ }
+}

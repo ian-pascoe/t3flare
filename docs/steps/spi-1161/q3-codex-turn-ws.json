@@ -1,0 +1,111 @@
+{
+ "at": "2026-11-15T10:57:44.905Z",
+ "op": "turn",
+ "provider": "openai-codex",
+ "arg": "gpt-6-luna",
+ "result": {
+  "status": 200,
+  "ok": false,
+  "model": "openai-codex/gpt-6-luna",
+  "api": "openai-codex-responses",
+  "steps": [
+   {
+    "step": 0,
+    "ms": 3,
+    "stopReason": "error",
+    "error": "<html>\n  <head>\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <style global>body{font-family:Arial,Helvetica,sans-serif}.container{align-items:center;display:flex;flex-direction:column;height:100%;justify-content:center;width:100%}@keyframes enlarge-appear{0%{opacity:0;transform:scale(75%) rotate(-90deg)}to{opacity:1;transform:scale(100%) rotate(0deg)}}.logo{color:#8e8ea0;padding-bottom:1.5rem}.scale-appear{animation:enlarge-appear .4s ease-out}@media (min-width:768px){.scale-appear{height:48px;width:48px}}.data:empty{display:none}.data{border-radius:5px;color:",
+    "content": [],
+    "usage": {
+     "input": 0,
+     "output": 0,
+     "cacheRead": 0
+    }
+   }
+  ],
+  "responses": [
+   {
+    "status": 403,
+    "headerNames": [
+     "cache-control",
+     "cf-ray",
+     "connection",
+     "content-type",
+     "cross-origin-opener-policy",
+     "date",
+     "expires",
+     "nel",
+     "referrer-policy",
+     "report-to",
+     "server",
+     "set-cookie",
+     "strict-transport-security",
+     "transfer-encoding",
+     "x-content-type-options",
+     "x-frame-options"
+    ]
+   }
+  ],
+  "storeWritesDuringTurn": 0,
+  "stored": {
+   "type": "oauth",
+   "fields": [
+    "access",
+    "accountId",
+    "expires",
+    "refresh",
+    "type"
+   ],
+   "access": {
+    "length": 1790,
+    "jwt": true,
+    "claims": {
+     "claimNames": [
+      "aud",
+      "client_id",
+      "exp",
+      "https://api.openai.com/auth",
+      "https://api.openai.com/mfa",
+      "https://api.openai.com/profile",
+      "iat",
+      "iss",
+      "jti",
+      "nbf",
+      "pwd_auth_time",
+      "scp",
+      "session_id",
+      "sl",
+      "sub"
+     ],
+     "lifetimeSeconds": 864000,
+     "nestedClaimNames": {
+      "https://api.openai.com/auth": [
+       "amr",
+       "chatgpt_account_id",
+       "chatgpt_account_user_id",
+       "chatgpt_compute_residency",
+       "chatgpt_plan_type",
+       "chatgpt_user_id",
+       "poid",
+       "user_id"
+      ],
+      "https://api.openai.com/mfa": [
+       "required"
+      ],
+      "https://api.openai.com/profile": [
+       "email",
+       "email_verified",
+       "name"
+      ]
+     }
+    },
+    "knownPrefix": "eyJ"
+   },
+   "refresh": {
+    "length": 196,
+    "jwt": false,
+    "knownPrefix": null
+   },
+   "expiresInSeconds": 863760
+  }
+ }
+}

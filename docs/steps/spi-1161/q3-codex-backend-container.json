@@ -1,0 +1,11 @@
+{
+ "at": "2026-11-15T11:20:00Z",
+ "from": "p1161 Workspace Container (computer egress mode direct), via the admin route /_t3flare/agents/workspace-call exec; unauthenticated POST {} to each backend, so no credential entered the Container",
+ "egress": { "colo": "ATL", "loc": "US", "warp": "off", "ip": "[redacted]" },
+ "cases": [
+  { "url": "https://chatgpt.com/backend-api/codex/responses", "status": 401, "contentType": "application/json", "body": "{\"detail\":\"Unauthorized\"}", "reading": "reached OpenAI's origin: no Cloudflare challenge" },
+  { "url": "https://api.anthropic.com/v1/messages", "status": 401, "contentType": "application/json", "body": "authentication_error: x-api-key header is required" },
+  { "url": "https://api.openai.com/v1/responses", "status": 401, "contentType": "application/json", "body": "invalid_request_error: Missing bearer or basic authentication in header" }
+ ],
+ "compare": "From the agents Worker the same host answered 403 text/html (a Cloudflare challenge page, with set-cookie and cf-ray) to authenticated requests with every header combination (q3-codex-turn-sse.json, q3-codex-turn-ws.json, q4-codex-header-matrix-worker.json); from the laptop the same token got 200 and response.completed (q3-codex-backend-laptop.json)."
+}

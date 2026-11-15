@@ -1,0 +1,141 @@
+{
+ "at": "2026-11-15T11:09:44.957Z",
+ "op": "turn",
+ "provider": "anthropic",
+ "arg": "claude-haiku-5-5",
+ "result": {
+  "status": 200,
+  "ok": true,
+  "model": "anthropic/claude-haiku-5-5",
+  "api": "anthropic-messages",
+  "steps": [
+   {
+    "step": 0,
+    "ms": 1133,
+    "stopReason": "toolUse",
+    "content": [
+     {
+      "type": "toolCall",
+      "name": "add",
+      "arguments": {
+       "a": 1234,
+       "b": 4321
+      }
+     }
+    ],
+    "usage": {
+     "input": 4,
+     "output": 68,
+     "cacheRead": 0
+    }
+   },
+   {
+    "step": 1,
+    "ms": 1898,
+    "stopReason": "stop",
+    "content": [
+     {
+      "type": "text",
+      "text": "5555"
+     }
+    ],
+    "usage": {
+     "input": 2,
+     "output": 4,
+     "cacheRead": 539
+    }
+   }
+  ],
+  "responses": [
+   {
+    "status": 200,
+    "headerNames": [
+     "anthropic-organization-id",
+     "anthropic-ratelimit-unified-7d-reset",
+     "anthropic-ratelimit-unified-7d-status",
+     "anthropic-ratelimit-unified-7d-surpassed-threshold",
+     "anthropic-ratelimit-unified-7d-utilization",
+     "anthropic-ratelimit-unified-fallback-percentage",
+     "anthropic-ratelimit-unified-overage-disabled-reason",
+     "anthropic-ratelimit-unified-overage-status",
+     "anthropic-ratelimit-unified-representative-claim",
+     "anthropic-ratelimit-unified-reset",
+     "anthropic-ratelimit-unified-status",
+     "anthropic-ratelimit-unified-upgrade-paths",
+     "anthropic-workspace-id",
+     "cache-control",
+     "cf-cache-status",
+     "cf-ray",
+     "connection",
+     "content-security-policy",
+     "content-type",
+     "date",
+     "request-id",
+     "server",
+     "server-timing",
+     "strict-transport-security",
+     "traceresponse",
+     "transfer-encoding",
+     "vary",
+     "x-accel-buffering",
+     "x-robots-tag"
+    ]
+   },
+   {
+    "status": 200,
+    "headerNames": [
+     "anthropic-organization-id",
+     "anthropic-ratelimit-unified-7d-reset",
+     "anthropic-ratelimit-unified-7d-status",
+     "anthropic-ratelimit-unified-7d-surpassed-threshold",
+     "anthropic-ratelimit-unified-7d-utilization",
+     "anthropic-ratelimit-unified-fallback-percentage",
+     "anthropic-ratelimit-unified-overage-disabled-reason",
+     "anthropic-ratelimit-unified-overage-status",
+     "anthropic-ratelimit-unified-representative-claim",
+     "anthropic-ratelimit-unified-reset",
+     "anthropic-ratelimit-unified-status",
+     "anthropic-ratelimit-unified-upgrade-paths",
+     "anthropic-workspace-id",
+     "cache-control",
+     "cf-cache-status",
+     "cf-ray",
+     "connection",
+     "content-security-policy",
+     "content-type",
+     "date",
+     "request-id",
+     "server",
+     "server-timing",
+     "strict-transport-security",
+     "traceresponse",
+     "transfer-encoding",
+     "vary",
+     "x-accel-buffering",
+     "x-robots-tag"
+    ]
+   }
+  ],
+  "storeWritesDuringTurn": 0,
+  "stored": {
+   "type": "oauth",
+   "fields": [
+    "access",
+    "expires",
+    "refresh",
+    "type"
+   ],
+   "access": {
+    "length": 108,
+    "jwt": false,
+    "knownPrefix": "sk-ant-oat01-"
+   },
+   "refresh": {
+    "length": 108,
+    "jwt": false,
+    "knownPrefix": "sk-ant-ort01-"
+   },
+   "expiresInSeconds": 27949
+  }
+ }
+}

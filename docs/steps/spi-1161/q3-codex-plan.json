@@ -1,0 +1,15 @@
+{
+ "at": "2026-11-15T11:10:35.708Z",
+ "op": "plan",
+ "result": {
+  "status": 200,
+  "chatgptPlanType": "free",
+  "computeResidency": "no_constraint",
+  "scp": [
+   "openid",
+   "profile",
+   "email",
+   "offline_access"
+  ]
+ }
+}

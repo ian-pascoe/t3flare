@@ -1,0 +1,31 @@
+{
+ "at": "2026-11-14T17:34:39.440Z",
+ "op": "start",
+ "provider": "anthropic",
+ "arg": "browser",
+ "result": {
+  "status": 200,
+  "provider": "anthropic",
+  "method": "browser",
+  "state": "awaiting_paste",
+  "startedAt": 1794677679403,
+  "events": [
+   {
+    "type": "prompt:select",
+    "at": 0,
+    "message": "Select Anthropic login method:"
+   },
+   {
+    "type": "auth_url",
+    "at": 0,
+    "url": "https://claude.ai/oauth/authorize?code=[redacted]&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A53692%2Fcallback&scope=org%3Acreate_api_key+user%3Aprofile+user%3Ainference+user%3Asessions%3Aclaude_code+user%3Amcp_servers+user%3Afile_upload&code_challenge=[redacted]&code_challenge_method=S256&state=[redacted]",
+    "redirectUri": "http://localhost:53692/callback"
+   },
+   {
+    "type": "prompt:manual_code",
+    "at": 0,
+    "message": "Complete login in your browser, or paste the authorization code / redirect URL here:"
+   }
+  ]
+ }
+}

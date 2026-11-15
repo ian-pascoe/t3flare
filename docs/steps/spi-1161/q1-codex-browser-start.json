@@ -1,0 +1,31 @@
+{
+ "at": "2026-11-14T17:34:37.650Z",
+ "op": "start",
+ "provider": "openai-codex",
+ "arg": "browser",
+ "result": {
+  "status": 200,
+  "provider": "openai-codex",
+  "method": "browser",
+  "state": "awaiting_paste",
+  "startedAt": 1794677677579,
+  "events": [
+   {
+    "type": "prompt:select",
+    "at": 0,
+    "message": "Select OpenAI Codex login method:"
+   },
+   {
+    "type": "auth_url",
+    "at": 0,
+    "url": "https://auth.openai.com/oauth/authorize?response_type=code&client_id=app_EMoamEEZ73f0CkXaXp7hrann&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback&scope=openid+profile+email+offline_access&code_challenge=[redacted]&code_challenge_method=S256&state=[redacted]&id_token_add_organizations=true&codex_cli_simplified_flow=true&originator=t3flare",
+    "redirectUri": "http://localhost:1455/auth/callback"
+   },
+   {
+    "type": "prompt:manual_code",
+    "at": 0,
+    "message": "Complete login in your browser, or paste the authorization code / redirect URL here:"
+   }
+  ]
+ }
+}

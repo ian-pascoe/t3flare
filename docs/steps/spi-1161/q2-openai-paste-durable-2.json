@@ -1,0 +1,54 @@
+{
+ "at": "2026-11-15T11:02:50.214Z",
+ "op": "paste-durable",
+ "provider": "openai",
+ "arg": "/Users/ianpascoe/.t3/userdata/secrets/files/3b816c0c315a9afba1af4d23dd761be5",
+ "result": {
+  "status": 200,
+  "ok": false,
+  "flow": {
+   "provider": "openai",
+   "method": "durable-paste",
+   "state": "failed",
+   "startedAt": 1794740252403,
+   "events": [
+    {
+     "type": "auth_url",
+     "at": 0
+    },
+    {
+     "type": "paste",
+     "at": 182266,
+     "waitedSeconds": 182
+    },
+    {
+     "type": "paste-shape",
+     "at": 317546,
+     "hasScheme": true,
+     "startsWith127": true,
+     "hasQuery": true,
+     "bareQuery": false,
+     "length": 2109
+    },
+    {
+     "type": "callback-params",
+     "at": 317546,
+     "names": [
+      "client_id",
+      "code",
+      "scope",
+      "state"
+     ],
+     "clientIdPrefix": "oaiapp_"
+    },
+    {
+     "type": "paste",
+     "at": 317753,
+     "waitedSeconds": 318
+    }
+   ],
+   "completedAt": 1794740570156,
+   "error": "exchange 400: {\n  \"error\": \"invalid_grant\"\n}"
+  }
+ }
+}

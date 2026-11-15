@@ -1,0 +1,19 @@
+{
+ "at": "2026-11-15T11:20:05.474Z",
+ "op": "replay",
+ "provider": "openai-codex",
+ "result": {
+  "status": 200,
+  "sameRefreshAsCurrent": false,
+  "replayOldRefresh": {
+   "ok": true,
+   "ms": 194,
+   "rotated": true
+  },
+  "thenCurrentRefresh": {
+   "ok": true,
+   "ms": 234,
+   "rotated": true
+  }
+ }
+}

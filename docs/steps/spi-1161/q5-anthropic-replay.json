@@ -1,0 +1,19 @@
+{
+ "at": "2026-11-15T11:20:03.349Z",
+ "op": "replay",
+ "provider": "anthropic",
+ "result": {
+  "status": 200,
+  "sameRefreshAsCurrent": false,
+  "replayOldRefresh": {
+   "ok": false,
+   "ms": 198,
+   "error": "Error: Anthropic token refresh request failed. url=https:[redacted]; details=Error: HTTP request failed. status=400; url=https:[redacted]; body={\"error\": \"invalid_grant\", \"error_description\": \"Refresh token not found or invalid\"}; stack=Error: HTTP request failed. status=400; url=https:[redacted]; body={\"error\": \"invalid_grant\", \"error_description\": \"Refresh token not found or invalid\"}\n    at postJson (worker.js:4005:4761)\n    at async refreshAnthropicToken (worker.js:4005:7534)\n    at async attempt (worker.js:4005:123385)\n    at async SigninProbe.replayOld (worker.js:4005:123559)\n    at asyn"
+  },
+  "thenCurrentRefresh": {
+   "ok": true,
+   "ms": 183,
+   "rotated": true
+  }
+ }
+}

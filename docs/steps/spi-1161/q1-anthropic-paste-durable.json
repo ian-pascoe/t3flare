@@ -1,0 +1,66 @@
+{
+ "at": "2026-11-15T11:00:33.704Z",
+ "op": "paste-durable",
+ "provider": "anthropic",
+ "arg": "/Users/ianpascoe/.t3/userdata/secrets/files/b93272ee994ec507b4292264ae3792f8",
+ "result": {
+  "status": 200,
+  "ok": true,
+  "flow": {
+   "provider": "anthropic",
+   "method": "durable-paste",
+   "state": "complete",
+   "startedAt": 1794740251461,
+   "events": [
+    {
+     "type": "auth_url",
+     "at": 0
+    },
+    {
+     "type": "token-response-fields",
+     "at": 182182,
+     "fields": [
+      "access_token",
+      "account",
+      "expires_in",
+      "organization",
+      "refresh_token",
+      "refresh_token_expires_in",
+      "scope",
+      "token_type",
+      "token_uuid"
+     ],
+     "expiresIn": 28800,
+     "scope": "user:file_upload user:inference user:mcp_servers user:profile user:sessions:claude_code",
+     "tokenType": "Bearer"
+    },
+    {
+     "type": "paste",
+     "at": 182182,
+     "waitedSeconds": 182
+    }
+   ],
+   "credential": {
+    "type": "oauth",
+    "fields": [
+     "access",
+     "expires",
+     "refresh",
+     "type"
+    ],
+    "access": {
+     "length": 108,
+     "jwt": false,
+     "knownPrefix": "sk-ant-oat01-"
+    },
+    "refresh": {
+     "length": 108,
+     "jwt": false,
+     "knownPrefix": "sk-ant-ort01-"
+    },
+    "expiresInSeconds": 28500
+   },
+   "completedAt": 1794740433643
+  }
+ }
+}

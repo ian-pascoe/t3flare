@@ -1,0 +1,10 @@
+{
+ "at": "2026-11-15T11:20:19.729Z",
+ "op": "logout",
+ "provider": "openai",
+ "result": {
+  "status": 200,
+  "provider": "openai",
+  "attempts": []
+ }
+}
