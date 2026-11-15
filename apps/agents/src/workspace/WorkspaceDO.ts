@@ -79,7 +79,7 @@ import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, wit
 import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { ModelKeyGate } from "./modelKey.ts";
-import { authorizeModelRelay, type ModelRelayGrant } from "./modelRelay.ts";
+import { authorizeModelRelay, type ModelRelayAsk, type ModelRelayGrant } from "./modelRelay.ts";
 import { EndpointKeyPatterns, leakTargets } from "./endpointKeys.ts";
 import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
@@ -1973,7 +1973,7 @@ export class WorkspaceDO extends ContainerHost {
    * endpoint's target with its credential. The credential is remembered by hash for the sync guard, never kept or
    * logged; `WorkspaceProxy` sends the request and logs it. Never logs the handle.
    */
-  async modelRelay(input: { readonly handle: string | null; readonly endpointId: string }): Promise<ModelRelayGrant> {
+  async modelRelay(input: ModelRelayAsk): Promise<ModelRelayGrant> {
     return authorizeModelRelay(input, {
       workspace: this.#workspaceId() ?? null,
       destroyed: this.#isDestroyed(),

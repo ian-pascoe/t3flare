@@ -22,7 +22,7 @@ const granted: ModelRelayGrant = {
 };
 
 const harness = (options: { grant?: ModelRelayGrant; upstream?: (request: Request) => Promise<Response>; authorizeFails?: boolean } = {}) => {
-  const asked: Array<{ handle: string | null; endpointId: string }> = [];
+  const asked: Array<{ handle: string | null; endpointId: string | null }> = [];
   const sent: Array<Request> = [];
   const logs: Array<Record<string, unknown>> = [];
   let now = 1_000;
@@ -268,18 +268,41 @@ describe("the model-routed relay URL (SPI-1168: one base URL for every endpoint 
     cli: "claude",
     target: { api: "anthropic-messages", baseUrl: `https://${endpointId}.example/v1`, headers: { "x-api-key": KEY } },
   });
-  const routedHarness = () => {
+  /** The Workspace DO as it answers: `known` for a live handle asked with no endpoint, the endpoint's target otherwise. */
+  const routedHarness = (live = true) => {
     const h = harness();
-    h.deps = { ...h.deps, authorize: async (input) => (h.asked.push(input), anthropic(input.endpointId)) } as ModelRelayDeps;
+    h.deps = {
+      ...h.deps,
+      authorize: async (input) => {
+        h.asked.push(input);
+        if (!live) return { kind: "refused", status: 401, message: "unknown or revoked model handle", handleId: null, workspace: "ws-1" };
+        return input.endpointId === null ? { kind: "known", handleId: "proc-1", cli: "claude", workspace: "ws-1" } : anthropic(input.endpointId);
+      },
+    };
     return h;
   };
+  /** A body whose stream records whether anyone read it. */
+  const watched = (text: string) => {
+    const state = { pulled: false };
+    const body = new ReadableStream<Uint8Array>({
+      pull: (controller) => {
+        state.pulled = true;
+        controller.enqueue(new TextEncoder().encode(text));
+        controller.close();
+      },
+    }, { highWaterMark: 0 });
+    return { state, request: new Request(ROUTED, { method: "POST", headers: { "content-type": "application/json", "x-api-key": HANDLE }, body, ...({ duplex: "half" } as RequestInit) }) };
+  };
 
-  it("sends a request to the endpoint its body's model slug names, with the model's own id in the body and the rest of the body byte for byte", async () => {
+  it("checks the handle, then sends the request to the endpoint its body's model slug names, with the model's own id and the rest of the body byte for byte", async () => {
     const h = routedHarness();
-    const body = '{"max_tokens":9007199254740993,"model" : "comm2/claude-sonnet-4-5","messages":[{"role":"user","content":"the \\"model\\": \\"x/y\\" text"}],"metadata":{"model":"comm/other"},"stream":true}';
-    const response = await handleModelRelay(post(body, { "x-api-key": HANDLE, "content-length": String(body.length), "anthropic-version": "2023-06-01" }, ROUTED), h.deps);
+    const body = '{"max_tokens":9007199254740993,"model" : "comm2/claude-sonnet-4-5","messages":[{"role":"user","content":"the \\"model\\": \\"x/y\\" text é"}],"metadata":{"model":"comm/other"},"stream":true}';
+    const response = await handleModelRelay(post(body, { "x-api-key": HANDLE, "content-length": String(new TextEncoder().encode(body).length), "anthropic-version": "2023-06-01" }, ROUTED), h.deps);
     expect(response.status).toBe(200);
-    expect(h.asked).toEqual([{ handle: HANDLE, endpointId: "comm2" }]);
+    expect(h.asked).toEqual([
+      { handle: HANDLE, endpointId: null },
+      { handle: HANDLE, endpointId: "comm2" },
+    ]);
     const upstream = h.sent[0]!;
     expect(upstream.url).toBe("https://comm2.example/v1/v1/messages?beta=true");
     expect(await upstream.text()).toBe(body.replace('"comm2/claude-sonnet-4-5"', '"claude-sonnet-4-5"'));
@@ -290,15 +313,30 @@ describe("the model-routed relay URL (SPI-1168: one base URL for every endpoint 
     expect(h.logs[0]).toMatchObject({ endpoint: "comm2", routed: true, status: 200, handle: "proc-1" });
   });
 
+  it("refuses an unknown or revoked handle (401) without reading the body", async () => {
+    const h = routedHarness(false);
+    const { state, request } = watched('{"model":"comm/claude-haiku-5-5"}');
+    expect((await handleModelRelay(request, h.deps)).status).toBe(401);
+    expect(state.pulled).toBe(false);
+    expect(h.asked).toEqual([{ handle: HANDLE, endpointId: null }]);
+    // A live handle's body is read.
+    const live = routedHarness();
+    const read = watched('{"model":"comm/claude-haiku-5-5"}');
+    expect((await handleModelRelay(read.request, live.deps)).status).toBe(200);
+    expect(read.state.pulled).toBe(true);
+  });
+
   it("lets the handle's scope judge the endpoint the body names", async () => {
     const h = harness({ grant: { kind: "refused", status: 403, message: "not for this endpoint", handleId: "proc-1", workspace: "ws-1" } });
+    h.deps = { ...h.deps, authorize: async (input) => (h.asked.push(input), input.endpointId === null ? { kind: "known", handleId: "proc-1", cli: "claude", workspace: "ws-1" } : { kind: "refused", status: 403, message: "not for this endpoint", handleId: "proc-1", workspace: "ws-1" }) };
     expect((await handleModelRelay(post('{"model":"other/m"}', {}, ROUTED), h.deps)).status).toBe(403);
-    expect(h.asked).toEqual([{ handle: HANDLE, endpointId: "other" }]);
+    expect(h.asked.map((input) => input.endpointId)).toEqual([null, "other"]);
     expect(h.sent).toEqual([]);
   });
 
-  it("refuses a body that names no endpoint's model, or names one ambiguously, before asking anyone (400)", async () => {
+  it("refuses a body that names no endpoint's model, or names one ambiguously (400), asking for no endpoint", async () => {
     const h = routedHarness();
+    const deep = `{"a":${"[".repeat(600)}${"]".repeat(600)},"model":"comm/a"}`;
     for (const body of [
       "",
       "not json",
@@ -309,28 +347,37 @@ describe("the model-routed relay URL (SPI-1168: one base URL for every endpoint 
       '{"model":"Not_An_Id/m"}',
       '{"model":"comm/"}',
       '{"model":42}',
-      // Two top-level models: an upstream may read either one.
+      // Two top-level models, one escaped: an upstream may read either one.
       '{"model":"comm/a","model":"comm2/b"}',
+      '{"mod\\u0065l":"comm/a","model":"comm2/b"}',
       // Malformed around the model: unterminated, or brackets that do not match.
       '{"model":"comm/a',
       '{"a":{"x":[1}],"model":"comm/a"}',
       '{"model":"comm/a"} trailing',
+      // A byte-order mark is not JSON; nesting past MAX_NESTING is refused.
+      '\ufeff{"model":"comm/a"}',
+      deep,
     ]) {
-      expect((await handleModelRelay(post(body, {}, ROUTED), h.deps)).status, body).toBe(400);
+      expect((await handleModelRelay(post(body, {}, ROUTED), h.deps)).status, body.slice(0, 40)).toBe(400);
     }
     // A request without a body (a GET) names no model either.
     expect((await handleModelRelay(new Request("http://computer.internal/t3flare/model/_/v1/models", { headers: { "x-api-key": HANDLE } }), h.deps)).status).toBe(400);
-    expect(h.asked).toEqual([]);
+    expect(h.asked.every((input) => input.endpointId === null)).toBe(true);
     expect(h.sent).toEqual([]);
     expect(h.logs.every((entry) => entry.status === 400 && entry.routed === true && entry.endpoint === null)).toBe(true);
   });
 
-  it("refuses a handle-less request before reading its body, and a body over the cap (413)", async () => {
+  it("refuses a handle-less request, and a declared length over the cap before asking anyone; a body over the cap (413)", async () => {
     const h = routedHarness();
     expect((await handleModelRelay(new Request(ROUTED, { method: "POST", body: '{"model":"comm/a"}' }), h.deps)).status).toBe(401);
+    const { state, request } = watched('{"model":"comm/a"}');
+    request.headers.set("content-length", String(MAX_ROUTED_BODY_BYTES + 1));
+    expect((await handleModelRelay(request, h.deps)).status).toBe(413);
+    expect(state.pulled).toBe(false);
+    expect(h.asked).toEqual([]);
     const big = `{"model":"comm/a","pad":"${"x".repeat(MAX_ROUTED_BODY_BYTES)}"}`;
     expect((await handleModelRelay(post(big, {}, ROUTED), h.deps)).status).toBe(413);
-    expect(h.asked).toEqual([]);
+    expect(h.sent).toEqual([]);
   });
 
   it("is never an endpoint's id", () => {
@@ -372,6 +419,14 @@ describe("the Workspace DO's check of a model handle", () => {
       target: { api: "openai-responses", baseUrl: "https://api.example.com/v1", headers: { authorization: `Bearer ${KEY}` } },
     });
     expect(d.remembered).toEqual([["openai", KEY]]);
+  });
+
+  it("with no endpoint, says only whether the handle is live, asking the Environment nothing", async () => {
+    const d = deps();
+    expect(await authorizeModelRelay({ handle: HANDLE, endpointId: null }, d.value)).toEqual({ kind: "known", handleId: "proc-1", cli: "codex", workspace: "ws-1" });
+    expect(await authorizeModelRelay({ handle: "f".repeat(64), endpointId: null }, d.value)).toMatchObject({ kind: "refused", status: 401 });
+    expect(await authorizeModelRelay({ handle: HANDLE, endpointId: null }, deps({ destroyed: true }).value)).toMatchObject({ kind: "refused", status: 410 });
+    expect([...d.asked, ...d.remembered]).toEqual([]);
   });
 
   it("refuses an unknown or revoked handle (401), an endpoint the process is not configured for (403), and a deleted Workspace (410), asking no one", async () => {
