@@ -23,7 +23,8 @@ import {
 } from "@t3flare/harness-registry";
 
 import { type ContainerCostTable, containerCostTable } from "./containerCost.ts";
-import { CHANGE_TTL_MS, durationText } from "../settings/changes.ts";
+import { CHANGE_TTL_MS, durationText, OWNER_MODES, type OwnerMode } from "../settings/changes.ts";
+import type { OwnerClientEntry } from "../settings/clients.ts";
 import type { PageReason } from "../settings/types.ts";
 import { type AskedBy, askedByText, sizeText } from "../settings/render.ts";
 import type { AuditEntry } from "./store.ts";
@@ -335,7 +336,53 @@ const settingsAccess = (row: McpRow): string => {
     .join("")}</div>`;
 };
 
-const serverCard = (row: McpRow): string => {
+/** The Owner clients as the Settings server's card shows them (ADR-0034's 2026-11-15 refinement). */
+export interface OwnerClientsView {
+  /** The Owner-client endpoint's URL, when it is deployed. */
+  readonly endpoint?: string;
+  readonly clients: ReadonlyArray<OwnerClientEntry>;
+  /** The panel's own Access `sub` (empty for the service token): its clients read as "you". */
+  readonly viewer: string;
+}
+
+/** What each Elicitation mode means for the owner (plan D12), beside the mode select. */
+export const MODE_MEANINGS: Readonly<Record<OwnerMode, string>> = {
+  browser: "the client sends you to the change's page (a link it opens, or one in its answer); you approve there. Works with every client.",
+  native: "the client shows its own Accept / Decline form, and Accept applies the change. A client that declares no form gets the page instead.",
+  model: "the client's agent gets a requestId, asks you in the chat and answers with resume. Only for a client whose agent you trust to relay your answer.",
+};
+
+/** Who a client's key names: you, the stage's service token, or another Access identity. */
+const keyText = (key: string, viewer: string): string => (key === "service-token" ? "the service token" : key === viewer ? "you" : `Access identity ${key}`);
+
+/**
+ * The Owner clients on the Settings server's card: how to add one (the plain endpoint URL), and each client seen, with
+ * its mode (set here alone; it applies at the client's next request) and Remove. Names are the clients' own labels.
+ */
+const ownerClientsBlock = (view: OwnerClientsView): string => {
+  const add =
+    view.endpoint === undefined
+      ? `<p class="empty-tools">The Owner-client endpoint is not deployed on this Environment.</p>`
+      : `<p class="desc">To add an Owner client (Claude Code, pi, Cursor, Codex, OpenCode), give it <code>${escapeHtml(view.endpoint)}</code> as a remote MCP server over streamable HTTP and sign in with Access when it asks. Use the URL as it is: no query. The client appears here at its first request, in browser; pick its mode below.</p>`;
+  const meanings = `<ul class="desc">${OWNER_MODES.map((mode) => `<li><strong>${mode}</strong>: ${escapeHtml(MODE_MEANINGS[mode])}</li>`).join("")}</ul>
+<p class="desc">A mode applies from the client's next request; a change it already asked keeps the mode it was asked in. A change that needs a secret, a sign-in or a skills install is approved on its page in every mode. <code>?elicitation_mode=</code> on the URL still overrides this, for clients that keep a query.</p>`;
+  const rows = view.clients
+    .map((client) => {
+      const attrs = `data-client-key="${escapeHtml(client.key)}" data-client-name="${escapeHtml(client.clientName)}"`;
+      const label = `${client.clientName} mode`;
+      const select = `<select class="sel-sm" data-client-mode ${attrs} aria-label="${visibleHtml(label)}">${OWNER_MODES.map((mode) => `<option value="${mode}"${mode === client.mode ? " selected" : ""}>${mode}</option>`).join("")}</select>`;
+      return `<tr><td class="tool" data-label="Client"><code>${visibleHtml(client.clientName)}</code> <span class="src">unverified label</span></td><td data-label="Who"><div>${escapeHtml(keyText(client.key, view.viewer))}</div></td><td data-label="Last seen"><div>${time(client.lastSeen)}</div></td><td class="exp" data-label="Mode"><div>${select}</div></td><td class="actions" data-label="Remove"><div><button type="button" class="btn btn-sm btn-danger" data-client-remove ${attrs} aria-label="${visibleHtml(`Remove ${client.clientName}`)}">${icon("trash")}Remove</button></div></td></tr>`;
+    })
+    .join("");
+  const table =
+    view.clients.length === 0
+      ? `<p class="empty-tools">No Owner client has called yet.</p>`
+      : `<div class="table-wrap"><table class="stacked tools-table"><thead><tr><th scope="col">Client</th><th scope="col">Who</th><th scope="col">Last seen</th><th scope="col">Mode</th><th scope="col"><span class="sr">Remove</span></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<details class="tools" open data-owner-clients><summary>${icon("chevron")}Owner clients <span>${plural(view.clients.length, "client", "clients")}</span></summary>
+${add}${meanings}${table}</details>`;
+};
+
+const serverCard = (row: McpRow, owner?: OwnerClientsView): string => {
   const id = escapeHtml(`srv-${row.name}`);
   const name = escapeHtml(row.name);
   const facts = [
@@ -371,7 +418,7 @@ ${
 }
 <dl class="facts">${facts}</dl></div>${error}${refused}
 <div class="server-actions">${row.setting.kind === "settings" ? "" : `<button type="button" class="btn btn-sm" data-mcp-test="${name}">${icon("play")}Test</button>`}${oauth}<label class="exposure">Exposure ${exposureSelect(row, row.setting.exposure)}</label><p class="test-result" data-test-result="${name}" role="status" aria-live="polite"></p><span class="spacer"></span>${remove}</div>
-${toolsTable(row)}</article>`;
+${toolsTable(row)}${row.setting.kind === "settings" && owner !== undefined ? ownerClientsBlock(owner) : ""}</article>`;
 };
 
 /**
@@ -396,13 +443,13 @@ const ADD_SERVER = `<form class="group add" id="add-server" data-mcp-add autocom
 <div class="form-foot"><p>${icon("key")}Secrets go to the Environment's secret store.</p><button type="submit" class="btn btn-primary">${icon("plus")}Add server</button></div>
 </form>`;
 
-const mcpSection = (rows: ReadonlyArray<McpRow>): string => `<section id="mcp" aria-labelledby="mcp-title">
+const mcpSection = (rows: ReadonlyArray<McpRow>, owner?: OwnerClientsView): string => `<section id="mcp" aria-labelledby="mcp-title">
 <div class="section-head"><h2 id="mcp-title">${icon("server")}MCP servers</h2><a class="btn btn-sm" href="#add-server">${icon("plus")}Add server</a></div>
 <p class="section-desc">Servers whose tools agents get, read at each call. Test lists a server's tools now.</p>
 <div class="stack">${
   rows.length === 0
     ? `<div class="group"><div class="empty"><span class="empty-icon">${icon("server")}</span><h3>No MCP servers</h3><p>Add a remote server below. Agents get its tools at their next turn.</p></div></div>`
-    : rows.map(serverCard).join("\n")
+    : rows.map((row) => serverCard(row, owner)).join("\n")
 }
 ${ADD_SERVER}</div>
 </section>`;
@@ -484,7 +531,7 @@ const statusSection = (status: Readonly<Record<string, string | number | null>>)
 };
 
 /** Each entity's name in the audit log; one this page does not know shows as stored. */
-const ENTITY_LABELS: Readonly<Record<string, string>> = { harness: "Harness", environment: "Environment", endpoints: "Model endpoints" };
+const ENTITY_LABELS: Readonly<Record<string, string>> = { harness: "Harness", environment: "Environment", endpoints: "Model endpoints", "owner-clients": "Owner clients" };
 
 const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
   const body =
@@ -553,6 +600,8 @@ export interface PageInput {
   readonly endpoints?: EndpointsView;
   /** The Open changes (plan D10); the section is left out without them. */
   readonly openChanges?: ReadonlyArray<OpenChangeRow>;
+  /** The Owner clients and the endpoint's URL; shown on the Settings server's card when given. */
+  readonly ownerClients?: OwnerClientsView;
 }
 
 const navItem = (id: string, label: string, name: IconName, after = "") => `<a href="#${id}">${icon(name)}${label}${after}</a>`;
@@ -587,7 +636,7 @@ ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.leng
 <header class="page-head"><div><h1>Harness</h1><p>t3flare's own settings for this Cloud Environment: the Harness settings (Pi Durable's extensions and MCP servers, applied at each thread's next turn) and the Environment settings (what every Container gets, applied at its next start).</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
 <div id="result" class="notice" role="status" aria-live="polite" hidden><span class="notice-ico-ok">${icon("check")}</span><span class="notice-ico-err">${icon("alert")}</span><p class="msg"></p><button type="button" class="btn btn-ghost btn-sm" data-dismiss aria-label="Dismiss">${icon("x")}</button></div>
 ${input.openChanges === undefined ? "" : `${openChangesSection(input.openChanges)}\n`}${extensionsSection(input.resolved)}
-${mcpSection(rows)}
+${mcpSection(rows, input.ownerClients)}
 ${endpointsSection(escapeHtml, input.endpoints)}${environmentSection(environment, input.costs ?? containerCostTable(environment.containerBudget), input.running)}
 ${skillsSection(input.skills)}
 ${statusSection(input.status)}
