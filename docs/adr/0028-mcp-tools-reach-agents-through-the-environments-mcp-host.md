@@ -141,6 +141,7 @@ Part of **Model endpoints** (owner, 2026-11-13): t3flare stops depending on the 
 **Considered**: keeping the old entry inert (listed, disabled, unremovable) until the owner removes it. Rejected: it would hold the name the owner re-adds Commissary under, and an entry with no URL can never work again.
 
 **Consequences**: after the deploy, an Environment that used Commissary's tools has none until the owner adds the server; threads see the tools gone at their next turn, as for a removed server.
+
 ## Refinement (ADR-0035, 2026-11-14): the Settings server beside Direct servers, and the pi CLI gets the relay
 
 Plan: [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md) (written before SPI-1160, when Commissary's

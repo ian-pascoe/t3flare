@@ -1,10 +1,10 @@
 # Agents change t3flare's settings through the Settings server
 
-Status: accepted (owner decisions, 2026-11-14; built and unit-tested through SPI-1202, its stage runs owed: report
+Status: accepted (owner decisions, 2026-11-14; built and unit-tested through SPI-1202, stage-run on `psmcp`: report
 [`docs/steps/settings-mcp.md`](../steps/settings-mcp.md)). Where the
 Owner-client endpoint lives:
 [ADR-0036](0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md),
-conditional on the owner's sign-in probe. Plan:
+whose sign-in probe (owner step 1) passed on 2026-11-15. Plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md). Supersedes
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §8 ("the agent
 gets no settings tools", OD-T9). Refines ADR-0026, [ADR-0028](0028-mcp-tools-reach-agents-through-the-environments-mcp-host.md),
@@ -14,8 +14,10 @@ gets no settings tools", OD-T9). Refines ADR-0026, [ADR-0028](0028-mcp-tools-rea
 ADR-0026 kept settings away from agents: Linked work and prompt injection made an agent that edits its own MCP server
 set a larger target, and t3 had no surface for such changes. The owner reversed that: "the whole point is that the agent
 can modify its own environment", and later "make everything configurable by the agent. Since we are using elicitation,
-it's not a big deal to expose these." So everything the Harness panel edits is changeable through one MCP server, the
-**Settings server**, and what widens an agent's reach waits for an answer.
+it's not a big deal to expose these." So everything the Harness panel edits, but its Model endpoints, is changeable through one MCP server, the
+**Settings server**, and what widens an agent's reach waits for an answer. Model endpoints
+([ADR-0034](0034-model-endpoints-are-the-owners-set-in-the-harness-panel.md)) are panel-only: the Settings server neither reads
+nor changes them, and `read_audit` shows their entries without key fingerprints.
 
 1. **One server, two doors.** The Settings server covers the Harness settings, the Environment settings and the
    Environment skills, through the same functions the panel calls.
@@ -25,7 +27,7 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
      `deferred`, and `settings` is reserved with `t3` and `t3-code`.
    - **Owner clients**, MCP clients outside t3flare that the owner signed in, reach it at an HTTP endpoint behind an
      Access application of its own with managed OAuth.
-2. **Panel parity.** An agent may ask for any change the panel can make, including the Guardian's switch and settings, a
+2. **Panel parity.** An agent may ask for any change the panel can make (the Model endpoints, panel-only, apart), including the Guardian's switch and settings, a
    tool's class, and the Settings server's own entry. What the panel cannot change (a locked registry entry) nobody can.
 3. **Two Change tiers, by direction.** A change is `free` when it narrows (turning something off, hiding a tool,
    lowering a budget, marking a tool write) and `asked` when it widens, spends, puts new text or code in front of agents,
@@ -103,8 +105,8 @@ it's not a big deal to expose these." So everything the Harness panel edits is c
   thread runs in another Project's Container.
 - Where the Owner-client endpoint lives is
   [ADR-0036](0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md):
-  a second Access application on the t3 host at `/_t3flare/mcp` (layout (B)), pending the owner's sign-in probe, with
-  a Worker on its own host (layout (C)) as the fallback.
+  a second Access application on the t3 host at `/_t3flare/mcp` (layout (B)), confirmed by the owner's sign-in probe (owner step 1, 2026-11-15; Cursor's redirect, step 2, is open),
+  with a Worker on its own host (layout (C)) as the fallback.
 - ADR-0033's title still says Environment skills are "changed only by the owner"; an agent may now ask for a change, and
   its §7 is refined.
 
