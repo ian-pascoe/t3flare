@@ -408,7 +408,8 @@ const serverCard = (row: McpRow, owner?: OwnerClientsView): string => {
     row.setting.auth?.kind === "oauth"
       ? `<button type="button" class="btn btn-sm${row.oauth?.signedIn === true ? "" : " btn-primary"}" data-mcp-oauth="${name}">${icon("login")}${row.oauth?.signedIn === true ? "Sign in again" : "Sign in"}</button>`
       : "";
-  const remove = action("Remove", { op: "remove", server: row.name }, { className: "btn-sm btn-danger", ariaLabel: `Remove ${row.name}`, icon: "trash" });
+  const remove =
+    row.setting.kind === "settings" ? "" : action("Remove", { op: "remove", server: row.name }, { className: "btn-sm btn-danger", ariaLabel: `Remove ${row.name}`, icon: "trash" });
   return `<article class="group server" aria-labelledby="${id}">
 <div class="server-head"><div><div class="server-name"><h3 id="${id}">${name}</h3>${kindTag(row.setting.kind)}${statusPill(row)}</div>${
     row.setting.url === undefined ? "" : `<p class="server-url">${escapeHtml(row.setting.url)}</p>`

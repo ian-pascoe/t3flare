@@ -324,6 +324,24 @@ describe("reads outside the panel", () => {
     expect(all).toContain("https://docs.example/?page=2");
   });
 
+  it("the audit log drops a Model endpoint key's fingerprint, and keeps the entry", () => {
+    const env = setup();
+    env.store.audit({
+      entity: "endpoints",
+      at: NOW,
+      caller: "owner:owner-sub",
+      action: "endpoints.set",
+      target: "acme",
+      before: { key: { set: false, setAt: null, fingerprint: null } },
+      after: { baseUrl: "https://models.example/v1", key: { set: true, setAt: NOW, fingerprint: "ab12" } },
+    });
+    expect(JSON.stringify(env.store.auditLog(1))).toContain("ab12");
+    const shown = readAudit(env.ops, { limit: 50 });
+    expect(JSON.stringify(shown)).not.toContain("fingerprint");
+    expect(JSON.stringify(shown)).not.toContain("ab12");
+    expect(shown.entries[0]).toMatchObject({ entity: "endpoints", caller: "owner", target: "acme", after: { baseUrl: "https://models.example/v1", key: { set: true, setAt: NOW } } });
+  });
+
   it("the Workers Logs line names the door, tier, mode and answer, and never a value", () => {
     const env = setup();
     const logged: Array<string> = [];

@@ -280,7 +280,7 @@ describe("the Settings server's row", () => {
       expect(html.match(/aria-pressed="true"/g)?.length).toBe(1);
       expect(html).not.toContain('role="switch"');
       expect(html).not.toContain("data-mcp-test");
-      expect(html).not.toContain('"op":"remove"');
+      expect(html).not.toContain(escapeHtml('"op":"remove"'));
       expect(html).not.toContain(escapeHtml('"op":"class"'));
     }
   });

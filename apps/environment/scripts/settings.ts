@@ -549,9 +549,9 @@ const m2 = async () => {
   const FILE = "m2-cli-pi.json";
   await enableKind("pi");
   const rows = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []) as Array<any>;
-  await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" });
+  // Commissary is a Direct server the owner adds (SPI-1160): test it only when this stage has one.
+  if (rows.some((row) => row.name === "commissary")) await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" });
   const commissary = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((row: any) => row.name === "commissary");
-  void rows;
   const readTool = (commissary?.tools ?? []).find((tool: any) => tool.class === "read");
   // Commissary through pi, in each runtime mode pi has (no plan mode: piDriver refuses plan turns).
   if (process.argv[3] === "t-pi-2") {

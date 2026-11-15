@@ -368,7 +368,7 @@ describe("layout (B): the endpoint's paths (settings/endpointLayout.ts)", () => 
     for (const path of ["/_t3flare/mcpx", "/_t3flare/harness", "/_t3flare", "/mcp", "/_t3flare/mc"]) expect(isSettingsMcpPath(path)).toBe(false);
   });
 
-  it("SPI-1195 review: prod is deployed without the endpoint until owner step 1 passes, and bump (the nightly job's) without it; every other stage with it", () => {
+  it("SPI-1195 review: prod is deployed without the endpoint until the owner turns it on, and bump (the nightly job's) without it; every other stage with it", () => {
     // alchemy.run.ts creates `SettingsAccess`, the admin application's path cookie and `T3FLARE_ACCESS_SETTINGS_AUD` only
     // when `ownerEndpointOn(stage)`; the stack itself needs Cloudflare's providers, so this switch is what is tested.
     expect(OWNER_ENDPOINT_EXCLUDED_STAGES).toEqual(["prod", "bump"]);

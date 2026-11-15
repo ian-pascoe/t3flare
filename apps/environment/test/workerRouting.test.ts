@@ -96,7 +96,7 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
     expect(await w.call("/_t3flare/mcpx", settings)).toEqual({ status: 404, seen: [] });
   });
 
-  it("refuses everything when the endpoint's audience is not configured (prod until owner step 1, ADR-0036)", async () => {
+  it("refuses everything when the endpoint's audience is not configured (prod until the owner turns it on, ADR-0036)", async () => {
     const w = world({ T3FLARE_ACCESS_SETTINGS_AUD: undefined } as Partial<Env>);
     expect(await w.call("/_t3flare/mcp", { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) })).toEqual({ status: 404, seen: [] });
     // Without `SettingsAccess` the admin application covers `/_t3flare/mcp`; its assertion and the admin token reach nothing there.
