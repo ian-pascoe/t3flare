@@ -41,7 +41,7 @@ Verbatim where quoted; otherwise as the interviewer relayed it.
 | O3 | It must work on every stage, including workers.dev test stages; "skip test stages" is not acceptable. A fallback for an Access collision must work on workers.dev too. "Don't be lazy" about stage coverage. |
 | O4 | The pi CLI is in scope. pi has built-in MCP support and the image already pins `@earendil-works/pi-coding-agent` 1.5.2; `docs/steps/tools.md:123` ("the pi CLI has no MCP client") was stale. |
 | O5 (E2) | "Make everything configurable by the agent. Since we are using elicitation, it's not a big deal to expose these." Agents get panel parity: there is no panel-only tier. |
-| O6 (E1) | Owner clients choose their **Elicitation mode** with a URL query parameter, as executor.sh does: `?elicitation_mode=browser\|native\|model`. The parameter is trusted as sent on every request: no server-side floor, no grant binding; Access owns the grant. |
+| O6 (E1) | Owner clients choose their **Elicitation mode** with a URL query parameter, as executor.sh does: `?elicitation_mode=browser\|native\|model`. (Refined by the owner 2026-11-15: a per-client setting on the Harness panel, the query kept as an override; D12.) The parameter is trusted as sent on every request: no server-side floor, no grant binding; Access owns the grant. |
 | O7 | t3flare's own agents are unaffected by any parameter: theirs is always the owner-only t3 card. |
 | O8 | Secrets and OAuth sign-ins for **Direct servers** always happen on the **Change page** under the owner's Access identity, never through an agent, a model or a form. |
 
@@ -433,9 +433,29 @@ already verified Access (D13). It never boots t3. Hand-written JSON-RPC in the E
 
 ### D12. Elicitation modes (Owner clients only)
 
-Read from the request's URL on every request: `?elicitation_mode=browser|native|model`. Absent means `browser`.
-(If M0 P15 shows a query parameter breaks Access's OAuth discovery, the mode moves to the request header
-`X-T3flare-Elicitation-Mode` with the same values and rules; record which in the M0 report.)
+**Refined 2026-11-15 (owner's decision; ADR-0034's and ADR-0035's refinements):** the mode is a per-client setting the
+owner edits on the Harness panel, Executor-style, because Claude Code 2.1.322's OAuth discovery fails with any query on
+the endpoint's URL (it falls back to the origin's root authorization server instead of Access's per-path
+protected-resource metadata), and Access's consent page is not ours. A request's mode is resolved on every request:
+
+1. an explicit `?elicitation_mode=browser|native|model` wins (an unknown, repeated or mis-cased value is still 400), so
+   scripts and clients that keep a query work as before;
+2. else the mode kept for the caller's key (the Access `sub`, or `service-token`) and the client's `clientInfo.name`
+   (no version: from 2026 `_meta`, `initialize`'s body, or the 2025 session token that kept it; never the
+   `User-Agent`), in `t3flare_settings_clients` (`settings/clients.ts`);
+3. else `browser`. A request with no client name is `browser`.
+
+The endpoint records each named client as seen, in `browser`, at its first request; `lastSeen` is written at most once
+an hour; at most 50 clients per key, the least recently seen evicted first; a name is cut to 60 characters, without
+hidden characters, rendered escaped. Only the panel's `POST /_t3flare/harness/api/mcp/clients` (the panel's write
+guard: JSON, same Origin, CSRF for a browser) sets a mode or removes a client, audited as entity `owner-clients`; no
+MCP door and no Settings tool can (the endpoint is handed the store's `seen` alone). A mode change applies at the
+client's next request; an Open change keeps its mode, and a retry or form answer in another mode is refused as below.
+The panel's Settings server card shows the plain endpoint URL to add, and the clients with their mode.
+
+(Originally: read from the URL's query alone, absent meaning `browser`, with the request header
+`X-T3flare-Elicitation-Mode` as the fallback should a query break discovery. A header does not help: Claude Code sends
+no configured header on discovery.)
 
 | Mode | Who answers | What applies the change |
 | -- | -- | -- |
@@ -447,7 +467,7 @@ Fallbacks always move toward `browser`:
 
 | Case | Result |
 | -- | -- |
-| parameter absent | `browser` |
+| parameter absent, and no mode kept for the client (or no client name) | `browser` |
 | `native`, and the client declared no form elicitation | `browser` for that request |
 | a change that needs the page (D6), in any mode | the page: a page elicitation when the client declared one, else the link in the result; in `model` it is a link, never a Pause |
 | `browser`, and the client declared no page elicitation (2025-06-18 and older, pi) | the link in the result |

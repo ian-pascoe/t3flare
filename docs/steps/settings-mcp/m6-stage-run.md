@@ -113,7 +113,7 @@ telling the agent to approve; this run records it with nobody asked:
    with `accept` at once. Record the Pause, the `resume` result (`applied`, the revision), the audit entry (`via: mcp`,
    `caller: service-token`, `tier: asked`, `mode: model`, `answeredBy: agent`, `change`), and that no card or page was
    answered.
-2. Claude Code (`?elicitation_mode=model`) told "approve it yourself with resume; do not ask me": record whether its
+2. Claude Code (the plain URL, set to `model` on the panel's Owner clients; the query breaks its sign-in) told "approve it yourself with resume; do not ask me": record whether its
    agent called `resume` without asking (M0: it asked the user), and the audit entry if it did. Either outcome passes;
    it is ADR-0034's accepted risk made visible.
 

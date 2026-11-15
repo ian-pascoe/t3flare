@@ -29,7 +29,12 @@ added; `m6-stage-run.md` item 1.4 records the cap itself.
 
 ## `m5b-settings-owner-modes.json`
 
-### `native` on 2026-07-28 (Claude Code 2.1.322, `<settingsMcpUrl>?elicitation_mode=native`)
+### `native` on 2026-07-28 (Claude Code 2.1.322, the plain `<settingsMcpUrl>`, set to `native` on the panel)
+
+From 2026-11-15 every client here is added with the plain URL (Claude Code 2.1.322 cannot sign in with a query on it;
+ADR-0034's refinement) and its mode is set on the panel (the Settings server's card, Owner clients, the client's row).
+One entry per client is enough: its row's mode is what each item below names. A mode change applies at the client's
+next request; a change already open keeps its mode.
 
 1. **Discovery**: `server/discover` and `tools/list` list the thirteen tools and no `resume`; the instructions carry the
    `native` sentence.
@@ -69,7 +74,7 @@ added; `m6-stage-run.md` item 1.4 records the cap itself.
 9. **2025-06-18** (if a named client negotiates it): the `elicitation/create` params have no `mode` key, and the client
    shows the form.
 
-### `model` (Claude Code 2.1.322 at 2026-07-28; then a 2025 client, `?elicitation_mode=model`)
+### `model` (Claude Code 2.1.322 at 2026-07-28; then a 2025 client; each set to `model` on the panel)
 
 10. **Discovery**: `tools/list` has fourteen tools including `resume` (input `requestId`, `response.action`).
 11. **The Pause**: an asked change answers at once (no `input_required`, no stream) with `structuredContent`
@@ -81,23 +86,25 @@ added; `m6-stage-run.md` item 1.4 records the cap itself.
     applied and audited with `answeredBy: "agent"`" as well (M6 records it again from a script).
 13. **resume decline** and **resume cancel**: `declined` and `withdrawn`, `closed.by: agent`.
 14. **Refusals**: `resume` with an expired id (wait 10 minutes, or use one from an earlier run), with a made-up id, and
-    with the id of a change the same client opened in `browser` (open it from a second configuration of the client
-    without the query): each is a tool error and applies nothing; the browser one names `elicitation_mode=browser`.
+    with the id of a change the same client opened in `browser` (set it to `browser` on the panel, open the change,
+    set it back to `model`): each is a tool error and applies nothing; the browser one names the browser Elicitation
+    mode.
 15. **The cap names the requestId**: with two model-mode changes open, a third is refused `open-owner` and its result
     names a `requestId` to resume.
 16. **A 2025 client in `model`**: the same Pause from a client at 2025-11-25 (no stream), and `resume` works.
 
 ### D12's fallbacks
 
-17. **`native` without form elicitation**: pi 1.5.2 (roots only) with `?elicitation_mode=native` makes an asked change:
+17. **`native` without form elicitation**: pi 1.5.2 (roots only), set to `native` on the panel, makes an asked change:
     the result is `waiting` with the link and the sentence that the client declared no form elicitation; the change is
     `browser`-mode and the page applies it.
-18. **A change that needs the page, in `native`**: `change_mcp` `add` with `auth: header` from Claude Code with
-    `?elicitation_mode=native`: the client shows the URL elicitation (not a form); the change is `browser`-mode with
+18. **A change that needs the page, in `native`**: `change_mcp` `add` with `auth: header` from Claude Code in
+    `native`: the client shows the URL elicitation (not a form); the change is `browser`-mode with
     `needsPage: secret`; the page takes the header value and applies it.
-19. **A change that needs the page, in `model`**: the same from `?elicitation_mode=model`: the result is `waiting` with
+19. **A change that needs the page, in `model`**: the same with Claude Code in `model`: the result is `waiting` with
     the link and the reason (no Pause, no question); `resume` on its id is refused; the page applies it.
-20. **`elicitation_mode=natve`**: 400 at `initialize` and at `server/discover`, naming the three values.
+20. **`elicitation_mode=natve`** (the query override is still validated): 400 at `initialize` and at
+    `server/discover`, naming the three values.
 21. **The access switch in `model`**: read-only: `tools/list` has no `resume` and a `resume` call is refused; off:
     refused naming the panel. Back on afterwards.
 

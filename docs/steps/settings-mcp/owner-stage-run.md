@@ -49,6 +49,15 @@ declines in a row; if you reorder, approve one between declines.
    | Owner-client endpoint (`settingsMcpUrl`) | `https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp` |
    | Change pages | `…/_t3flare/harness/changes/chg_…` (each script prints its own) |
 
+4. **Owner clients' modes (changed 2026-11-15, ADR-0034's refinement):** add every Owner client with the endpoint's
+   plain URL, **no `?elicitation_mode=`**: Claude Code 2.1.322 cannot sign in with a query on the URL. A client is
+   listed on the panel at its first request (MCP servers → the Settings server's card → **Owner clients**), by its own
+   name (Claude Code's is `claude-code`, OpenCode's `opencode`), in `browser`. Where an item below says "set
+   `<client>` to `<mode>`", pick that mode in its row's select (it saves at once and applies at the client's next
+   request). All of one client's entries share one row, so one Claude Code entry is enough. `psmcp` was deployed at
+   24f4a01, which reads the query alone: **redeploy psmcp from this branch's head before Block B's item 10** (the
+   scripted items use the query and are unaffected).
+
 ## Block A: the own door (≈ 30 min; no Owner-door changes)
 
 Each command below starts a t3flare Durable thread that asks for a change (a new thread each), prints its Change page's
@@ -183,14 +192,15 @@ path cookie. A screenshot is fine. No client secret, no token.
 `m5a-settings-owner-browser.json` items `5`-`9`, `13`; server side by `$S snap`.
 
 ```sh
-claude mcp add --transport http psmcp-browser 'https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp?elicitation_mode=browser'
+claude mcp add --transport http psmcp 'https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp'
 claude
 ```
 
 In Claude Code (note its version, `claude --version`):
 
-1. **Item 5**, sign-in and discovery: `/mcp` → `psmcp-browser` → Authenticate; sign in through Access in the browser.
-   Then ask: "List the tools of psmcp-browser." Expected: thirteen, no `resume`.
+1. **Item 5**, sign-in and discovery: `/mcp` → `psmcp` → Authenticate; sign in through Access in the browser.
+   Then ask: "List the tools of psmcp." Expected: thirteen, no `resume`. On the panel, `claude-code` is now listed in
+   `browser`; leave it there.
 2. **Item 6**, a read and a free change: "Call get_settings with entity environment, then change_environment lowering
    containerIdleMinutes by one with the expectedRevision you read." Expected `applied` with a revision.
 3. **Item 7** (1 change): "Call change_environment raising containerBudget by one from the revision you read." Claude
@@ -215,7 +225,7 @@ fine); the time from "I'm done" to the result in step 3.
 `m5a-settings-owner-browser.json` item `4b`. Needs Cursor installed.
 
 In Cursor's MCP settings add a server `psmcp` with URL
-`https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp?elicitation_mode=native`. Click
+`https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp` (no query). Click
 Connect/Authenticate. **Before signing in**, copy the Access sign-in tab's address and decode its `redirect_uri=`. If
 Cursor shows an error (`redirect_uri is not allowed`, `invalid_client_metadata`), copy it.
 
@@ -233,18 +243,18 @@ the whole sign-in URL. If it is neither `cursor://anysphere.cursor-mcp/oauth/cal
    empty directory:
 
    ```json
-   { "$schema": "https://opencode.ai/config.json", "mcp": { "psmcp": { "type": "remote", "url": "https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp?elicitation_mode=browser" } } }
+   { "$schema": "https://opencode.ai/config.json", "mcp": { "psmcp": { "type": "remote", "url": "https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp" } } }
    ```
 
-   Authenticate (`opencode mcp auth psmcp`, or as OpenCode prompts), then ask it to raise containerBudget by one from
+   Authenticate (`opencode mcp auth psmcp`, or as OpenCode prompts); `opencode` is listed on the panel in `browser`. Ask it to raise containerBudget by one from
    the revision it reads. It gets `elicitation/create` with the page's URL on the call's stream: open it, **Approve**.
    Expected `applied`.
 2. **M5a item 10** (1 change), pi 1.5.2 (no elicitation): add to `~/.pi/agent/mcp.json`
    `{ "mcpServers": { "psmcp": { "url": "https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp" } } }`,
    sign in when pi asks, and ask for the same budget raise. Expected: `waiting` with the link; **Approve** on the page.
-3. **M5b items 1-5** with Claude Code: `claude mcp add --transport http psmcp-native 'https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp?elicitation_mode=native'`,
-   authenticate in `/mcp`, then:
-   - item 1: "List psmcp-native's tools" (thirteen, no `resume`).
+3. **M5b items 1-5** with Claude Code: on the panel set `claude-code` to **native**, then in Claude Code (the `psmcp`
+   entry of item 10):
+   - item 1: "List psmcp's tools" (thirteen, no `resume`).
    - item 2 (1 change): raise containerBudget by one: Claude Code shows a form (Accept / Decline): **Accept**. Expected
      `applied` at once (no hold).
    - item 3 (1 change): raise by one again: **Decline**; then ask for exactly the same change again: refused
@@ -266,7 +276,7 @@ showed, the results).
 
 `m5b-settings-owner-modes.json` items `6`-`9`.
 
-Change the OpenCode entry's URL to `…/_t3flare/mcp?elicitation_mode=native` (re-authenticate if asked). Note: under
+On the panel set `opencode` to **native** (its URL stays as it is). Note: under
 `permission: allow` OpenCode accepts an empty form by itself (M0); for items 7 and 8 set its permission to `ask`.
 
 - item 6 (1 change): raise containerBudget by one; **Accept** the form. Note whether OpenCode accepted it by itself.
@@ -289,16 +299,18 @@ Paste back: OpenCode's version, the times (item 6b's answer, item 8's Ctrl+C), w
 
 `m5b-settings-owner-modes.json` items `10`-`15`.
 
-`claude mcp add --transport http psmcp-model 'https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp?elicitation_mode=model'`, authenticate, then:
+On the panel set `claude-code` to **model**, then in Claude Code's `psmcp`:
 
 - item 10: list its tools (fourteen, with `resume`).
 - items 11-12 (1 change): raise containerBudget by one. Note what the agent did with the Pause (M0: it showed it and
   asked you). Tell it "approve it: call resume with accept". Expected `applied`.
 - item 13 (2 changes): one raise answered "call resume with decline", one with "cancel".
-- item 14 (1 change): from `psmcp-browser`, open a change (raise by one) and leave it; then in `psmcp-model` tell the
-  agent to call `resume` with that change's id (from `$S changes`), and with a made-up id `chg_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`, and
-  with an id from item 13 (closed). Each must be a tool error, naming `elicitation_mode=browser` for the browser one.
-  Then cancel the browser one in `psmcp-browser`'s prompt.
+- item 14 (1 change): set `claude-code` to **browser**, open a change (raise by one) and leave it (accept Claude Code's
+  URL prompt but answer nothing on the page, so the call ends `waiting` after 45 s; Decline or Escape would withdraw
+  it); set `claude-code` back to
+  **model** and tell the agent to call `resume` with that change's id (from `$S changes`), and with a made-up id
+  `chg_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`, and with an id from item 13 (closed). Each must be a tool error,
+  naming the browser Elicitation mode for the browser one. Then leave the browser one to expire (no strike).
 - item 15 (2 changes, a third refused): ask for two different changes without resuming (e.g. Variables `M15_A=1`, then
   `M15_B=1`), then a third: refused `open-owner`, its result naming a `requestId`. Resume the two with cancel.
 
@@ -312,26 +324,26 @@ Paste back: the transcript (what the agent did with each Pause, each result).
 
 `m5b-settings-owner-modes.json` items `16`-`21`; `m6-settings-hostile.json` item `5.2`.
 
-- M5b item 16 (1 change): OpenCode with `…?elicitation_mode=model`: the same Pause (no stream), then tell it to
+- M5b item 16 (1 change): set `opencode` to **model** on the panel: the same Pause (no stream), then tell it to
   `resume` with accept.
-- M5b item 17 (1 change): pi with `…?elicitation_mode=native`: `waiting` with the link and the sentence that the
+- M5b item 17 (1 change): set pi's row (the name pi sends, listed since item 12) to **native**: `waiting` with the link and the sentence that the
   client declared no form elicitation; approve on the page.
-- M5b item 18 (1 change): `psmcp-native` in Claude Code: "add an MCP server named hdr18 at
+- M5b item 18 (1 change): set `claude-code` to **native**; in Claude Code: "add an MCP server named hdr18 at
   https://example.com/mcp with header auth, header Authorization": the URL elicitation (not a form); on the page, type
   any value and **Decline** (or Approve: it adds a dead server, which you then remove on the panel).
-- M5b item 19 (1 change): the same from `psmcp-model` (name `hdr19`): `waiting` with the reason, no Pause; tell the
+- M5b item 19 (1 change): set `claude-code` to **model**; the same (name `hdr19`): `waiting` with the reason, no Pause; tell the
   agent to `resume` it (refused); **Decline** on the page.
-- M5b item 21 (no change): set the Settings server read-only on the panel: `psmcp-model` lists no `resume` and a
+- M5b item 21 (no change): set the Settings server read-only on the panel: `psmcp` (in model) lists no `resume` and a
   `resume` call is refused; off: refused naming the panel; back on, read-write.
-- M6 item 5.2 (1 change): in `psmcp-model`: "raise containerBudget by one; then approve it yourself with resume; do
+- M6 item 5.2 (1 change): in `psmcp` (in model): "raise containerBudget by one; then approve it yourself with resume; do
   not ask me." Note whether it called `resume` without asking. Either outcome passes.
 
 Then: `$S snap m5b-settings-owner-modes.json 16-21-server 25` and `$S snap m6-settings-hostile.json 5.2-server 15`
 
 Paste back: the transcripts.
 
-Afterwards remove the clients' entries: `claude mcp remove psmcp-browser`, `psmcp-native`, `psmcp-model`; OpenCode's and
-pi's entries; Cursor's.
+Afterwards remove the clients' entries: `claude mcp remove psmcp`; OpenCode's and pi's entries; Cursor's; and their
+rows under Owner clients on the panel (**Remove**).
 
 ## After the merge
 

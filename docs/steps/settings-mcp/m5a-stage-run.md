@@ -74,7 +74,9 @@ a service-token stand-in only (ADR-0035). Items 1-4 are owner step 1's OAuth bea
 
 ### A named client, end to end (Claude Code 2.1.322 on 2026-07-28; then OpenCode or Claude Code forced to 2025-11-25)
 
-Configure the client with `<settingsMcpUrl>?elicitation_mode=browser` (and once with no query).
+Configure the client with the plain `<settingsMcpUrl>`, no query (from 2026-11-15: Claude Code 2.1.322 cannot sign in
+with a query on the URL; ADR-0034's refinement). It is listed under Owner clients on the panel's Settings server card at
+its first request, in `browser`, which is this file's mode.
 
 5. **Sign-in and discovery**: the client follows `resource_metadata`, registers dynamically, the owner signs in, and the
    client lists the thirteen tools (no `resume`). Record `server/discover` (2026) or `initialize` (2025) and the
@@ -96,12 +98,13 @@ Configure the client with `<settingsMcpUrl>?elicitation_mode=browser` (and once 
    the page later still applies it (`get_settings` shows the new revision).
 10. **The link fallback**: pi 1.5.2 (no elicitation) makes an asked change: the result is `waiting` with the link, and
     the page applies it.
-11. **`native` and `model` until M5b**: a client configured with `?elicitation_mode=native` and `=model` connects, lists
+11. **`native` and `model` until M5b**: a client configured with `?elicitation_mode=native` and `=model` (as the
+    commits before M5b read the mode) connects, lists
     no `resume`, and its asked change behaves as `browser` with the result saying so. Only at commits before M5b: from
     M5b (SPI-1201) on, the two modes are `m5b-stage-run.md`'s, and this item is not run.
 12. **Guards from outside**: with the service token and the admin token (so Access admits the request), record 405 for
     GET, 415 for `text/plain`, 403 with an `Origin` and with `Sec-Fetch-Site`, 413 for 300 KiB, and 400 for
-    `?elicitation_mode=natve`, each with `cache-control: no-store` and no `access-control-*` header. Without Access
+    `?elicitation_mode=natve` (the query is still read, as an override), each with `cache-control: no-store` and no `access-control-*` header. Without Access
     credentials the endpoint answers Access's 401, never the origin.
 13. **The access switch**: on the panel, set the Settings server read-only (the client lists reads only and a write is
     refused naming the panel), then off (the client lists nothing; every call is refused naming the panel), then back on.

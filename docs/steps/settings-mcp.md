@@ -277,6 +277,14 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
     an agent asking and dropping. Refused naming the Harness panel, for each door (own thread, Owner `sub`). It has no
     override, so the stage runs stay under it (a new thread per item on the own door; the owner's items spread across
     hours on the Owner door; each stage-run doc says how), and M6 item 1.4 records it.
+30. **An Owner client's Elicitation mode is set on the Harness panel, per client** (D12, O6; the owner's decision of
+    2026-11-15; ADR-0034's and ADR-0035's refinements): the plan read it from `?elicitation_mode=` alone. On the psmcp
+    stage Claude Code 2.1.322 could not sign in with any query on the URL (its OAuth discovery falls back to the
+    origin's root authorization server instead of Access's per-path protected-resource metadata), and the plan's
+    fallback, a request header, does not reach discovery either. The mode is now kept per Access `sub` (or service
+    token) and `clientInfo.name` in `t3flare_settings_clients`, set only by the panel's CSRF-guarded POST (audited,
+    entity `owner-clients`), and read by the endpoint when the URL names none; the query still overrides, with its 400.
+    Clients are added with the plain URL. U70.
 
 ## Evidence
 
@@ -320,18 +328,23 @@ commands run):
 ## How to connect an Owner client
 
 The endpoint is `https://<host>/_t3flare/mcp`: on a stage, `settingsMcpUrl` in its credentials file; on prod
-`https://t3.ianpascoe.dev/_t3flare/mcp`, once prod is enabled after owner step 1 (until then it answers 404). Add
-`?elicitation_mode=browser|native|model` to choose who answers an asked change; without it the mode is `browser`. The
-first call sends the client to sign in through Access (dynamic registration, a `localhost` or loopback redirect) as the
-owner. For example:
+`https://t3.ianpascoe.dev/_t3flare/mcp`, once prod is enabled after owner step 1 (until then it answers 404); the
+Settings server's card on the Harness panel shows it too. Add it **as it is, with no query**: Claude Code's sign-in
+fails with a query on the URL (U70). The first call sends the client to sign in through Access (dynamic registration, a
+`localhost` or loopback redirect) as the owner. For example:
 
-- Claude Code: `claude mcp add --transport http t3flare-settings 'https://<host>/_t3flare/mcp?elicitation_mode=browser'`
+- Claude Code: `claude mcp add --transport http t3flare-settings 'https://<host>/_t3flare/mcp'`
 - Codex: `codex mcp add t3flare-settings --url 'https://<host>/_t3flare/mcp'`
 - pi: an entry in its `mcp.json`, `{ "mcpServers": { "t3flare-settings": { "url": "https://<host>/_t3flare/mcp" } } }`.
   pi declares no elicitation, so every asked change answers with the Change page's link.
 - OpenCode: `"mcp": { "t3flare-settings": { "type": "remote", "url": "https://<host>/_t3flare/mcp" } }` in its config.
   Under `permission: allow` OpenCode accepts an empty form by itself (M0), so `native` there answers without a person.
 - Cursor: a server with the URL in its MCP settings, after owner step 2.
+
+After its first request the client is listed on the Settings server's card on the Harness panel ("Owner clients"), by
+its own name, in `browser`. Pick its mode there (`browser`, `native` or `model`); the change applies at its next
+request, and a change it already asked keeps the mode it was asked in. `?elicitation_mode=` on the URL still overrides
+the panel, for scripts and for clients that keep a query.
 
 What each mode means is ADR-0034 §8, and its first consequence: `native` and `model` do not prove the owner answered.
 To cut every client off at once, set the Settings server off or read-only on the Harness panel; to cut one off, revoke
