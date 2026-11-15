@@ -4,7 +4,10 @@
 // @effect-diagnostics globalTimers:off newPromise:off
 import { describe, expect, it } from "vitest";
 
-import { authorizeModelRelay, handleModelRelay, isModelRelayPath, type ModelRelayDeps, type ModelRelayGrant } from "../src/workspace/modelRelay.ts";
+import { ENDPOINT_ID } from "@t3flare/models/endpoints";
+import { MODEL_ROUTED_ID, modelRoutedRelayUrl } from "@t3flare/models/relay";
+
+import { authorizeModelRelay, handleModelRelay, isModelRelayPath, MAX_ROUTED_BODY_BYTES, type ModelRelayDeps, type ModelRelayGrant } from "../src/workspace/modelRelay.ts";
 
 const HANDLE = "a".repeat(64);
 const KEY = "sk-endpoint-secret-1";
@@ -255,6 +258,84 @@ describe("the model relay route", () => {
     ]);
     expect(JSON.stringify(logs)).not.toContain(HANDLE);
     expect(JSON.stringify(logs)).not.toContain(KEY);
+  });
+});
+
+describe("the model-routed relay URL (SPI-1168: one base URL for every endpoint of a CLI's API)", () => {
+  const ROUTED = "http://computer.internal/t3flare/model/_/v1/messages?beta=true";
+  const anthropic = (endpointId: string): ModelRelayGrant => ({
+    ...granted,
+    cli: "claude",
+    target: { api: "anthropic-messages", baseUrl: `https://${endpointId}.example/v1`, headers: { "x-api-key": KEY } },
+  });
+  const routedHarness = () => {
+    const h = harness();
+    h.deps = { ...h.deps, authorize: async (input) => (h.asked.push(input), anthropic(input.endpointId)) } as ModelRelayDeps;
+    return h;
+  };
+
+  it("sends a request to the endpoint its body's model slug names, with the model's own id in the body and the rest of the body byte for byte", async () => {
+    const h = routedHarness();
+    const body = '{"max_tokens":9007199254740993,"model" : "comm2/claude-sonnet-4-5","messages":[{"role":"user","content":"the \\"model\\": \\"x/y\\" text"}],"metadata":{"model":"comm/other"},"stream":true}';
+    const response = await handleModelRelay(post(body, { "x-api-key": HANDLE, "content-length": String(body.length), "anthropic-version": "2023-06-01" }, ROUTED), h.deps);
+    expect(response.status).toBe(200);
+    expect(h.asked).toEqual([{ handle: HANDLE, endpointId: "comm2" }]);
+    const upstream = h.sent[0]!;
+    expect(upstream.url).toBe("https://comm2.example/v1/v1/messages?beta=true");
+    expect(await upstream.text()).toBe(body.replace('"comm2/claude-sonnet-4-5"', '"claude-sonnet-4-5"'));
+    // The Container's length was the slug's: the body's own goes instead.
+    expect(upstream.headers.get("content-length")).toBeNull();
+    expect(upstream.headers.get("anthropic-version")).toBe("2023-06-01");
+    expect(upstream.headers.get("x-api-key")).toBe(KEY);
+    expect(h.logs[0]).toMatchObject({ endpoint: "comm2", routed: true, status: 200, handle: "proc-1" });
+  });
+
+  it("lets the handle's scope judge the endpoint the body names", async () => {
+    const h = harness({ grant: { kind: "refused", status: 403, message: "not for this endpoint", handleId: "proc-1", workspace: "ws-1" } });
+    expect((await handleModelRelay(post('{"model":"other/m"}', {}, ROUTED), h.deps)).status).toBe(403);
+    expect(h.asked).toEqual([{ handle: HANDLE, endpointId: "other" }]);
+    expect(h.sent).toEqual([]);
+  });
+
+  it("refuses a body that names no endpoint's model, or names one ambiguously, before asking anyone (400)", async () => {
+    const h = routedHarness();
+    for (const body of [
+      "",
+      "not json",
+      "[]",
+      '{"messages":[]}',
+      '{"model":"claude-sonnet-4-5"}',
+      '{"model":"/m"}',
+      '{"model":"Not_An_Id/m"}',
+      '{"model":"comm/"}',
+      '{"model":42}',
+      // Two top-level models: an upstream may read either one.
+      '{"model":"comm/a","model":"comm2/b"}',
+      // Malformed around the model: unterminated, or brackets that do not match.
+      '{"model":"comm/a',
+      '{"a":{"x":[1}],"model":"comm/a"}',
+      '{"model":"comm/a"} trailing',
+    ]) {
+      expect((await handleModelRelay(post(body, {}, ROUTED), h.deps)).status, body).toBe(400);
+    }
+    // A request without a body (a GET) names no model either.
+    expect((await handleModelRelay(new Request("http://computer.internal/t3flare/model/_/v1/models", { headers: { "x-api-key": HANDLE } }), h.deps)).status).toBe(400);
+    expect(h.asked).toEqual([]);
+    expect(h.sent).toEqual([]);
+    expect(h.logs.every((entry) => entry.status === 400 && entry.routed === true && entry.endpoint === null)).toBe(true);
+  });
+
+  it("refuses a handle-less request before reading its body, and a body over the cap (413)", async () => {
+    const h = routedHarness();
+    expect((await handleModelRelay(new Request(ROUTED, { method: "POST", body: '{"model":"comm/a"}' }), h.deps)).status).toBe(401);
+    const big = `{"model":"comm/a","pad":"${"x".repeat(MAX_ROUTED_BODY_BYTES)}"}`;
+    expect((await handleModelRelay(post(big, {}, ROUTED), h.deps)).status).toBe(413);
+    expect(h.asked).toEqual([]);
+  });
+
+  it("is never an endpoint's id", () => {
+    expect(ENDPOINT_ID.test(MODEL_ROUTED_ID)).toBe(false);
+    expect(modelRoutedRelayUrl).toBe("http://computer.internal/t3flare/model/_");
   });
 });
 

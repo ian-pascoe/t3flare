@@ -15,6 +15,16 @@ export const MODEL_HANDLE_ENV = "T3FLARE_MODEL_HANDLE";
 export const modelRelayUrl = (endpointId: string): string => `http://computer.internal${MODEL_RELAY_PREFIX}${endpointId}`;
 
 /**
+ * The relay's id for a request routed by its body's model (SPI-1168): a CLI that takes one base URL per process (Claude
+ * Code's `ANTHROPIC_BASE_URL`) names its model as `<endpointId>/<modelId>`, and the relay sends the request to that
+ * endpoint with the model's own id in the body. Never an endpoint's id (`ENDPOINT_ID` has no `_`).
+ */
+export const MODEL_ROUTED_ID = "_";
+
+/** The model-routed base URL: every endpoint the process's handle is for, chosen per request by the body's model slug. */
+export const modelRoutedRelayUrl = modelRelayUrl(MODEL_ROUTED_ID);
+
+/**
  * What a CLI profile reads of an endpoint it configures for the relay: its id (the route's and the CLI's provider's) and
  * label. A `ModelEndpoint` is one; the narrow type keeps the profiles from reading anything else.
  */

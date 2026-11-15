@@ -8,8 +8,12 @@
 // the Container can route the key elsewhere at a header-routed gateway (ADR-0034 §4). Redirects are not followed. Every
 // request is logged with its endpoint, status and the handle's id (its process's key), never a value. Pure, deps
 // injected; a CLI adds only its own config.
-import { ENDPOINT_ID, type EndpointApi } from "@t3flare/models/endpoints";
-import { forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, type ModelRelayTarget } from "@t3flare/models/relay";
+//
+// SPI-1168: a CLI with one base URL per process (Claude Code) uses the model-routed id `_`: the request's JSON body names
+// its model as `<endpointId>/<modelId>`, and the relay sends it to that endpoint with the model's own id in its place,
+// the rest of the body byte for byte. The handle's scope judges the endpoint as it judges one in the path.
+import { ENDPOINT_ID, type EndpointApi, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget } from "@t3flare/models/relay";
 import { HANDLE } from "@t3flare/workspace-client";
 
 import type { HandleCaller } from "./processHost.ts";
@@ -105,17 +109,162 @@ const upstreamHeaders = (incoming: Headers, target: { readonly api: EndpointApi;
   return { headers, dropped };
 };
 
+/** The largest body a model-routed request may have (Anthropic's own request limit): it is read whole to find its model. */
+export const MAX_ROUTED_BODY_BYTES = 32 * 1024 * 1024;
+
+const WHITESPACE = new Set([" ", "\t", "\n", "\r"]);
+const CLOSING: Readonly<Record<string, string>> = { "{": "}", "[": "]" };
+
+/** The index after the JSON string starting at `at` (its opening quote), or -1 when it does not end. */
+const stringEnd = (text: string, at: number): number => {
+  for (let i = at + 1; i < text.length; i++) {
+    if (text[i] === "\\") i++;
+    else if (text[i] === '"') return i + 1;
+  }
+  return -1;
+};
+
+/** The index after the JSON value starting at `at`, or -1 when it is cut off or its brackets do not match. */
+const valueEnd = (text: string, at: number): number => {
+  const first = text[at];
+  if (first === '"') return stringEnd(text, at);
+  if (first === "{" || first === "[") {
+    const open: Array<string> = [];
+    for (let i = at; i < text.length; i++) {
+      const char = text[i]!;
+      if (char === '"') {
+        i = stringEnd(text, i) - 1;
+        if (i < 0) return -1;
+      } else if (char === "{" || char === "[") open.push(CLOSING[char]!);
+      else if (char === "}" || char === "]") {
+        if (open.pop() !== char) return -1;
+        if (open.length === 0) return i + 1;
+      }
+    }
+    return -1;
+  }
+  let i = at;
+  while (i < text.length && !WHITESPACE.has(text[i]!) && text[i] !== "," && text[i] !== "}" && text[i] !== "]") i++;
+  return i === at ? -1 : i;
+};
+
+/**
+ * Where a JSON object's one top-level `model` member's string value is (`start` to `end`, quotes included), read
+ * without parsing the body (it may be tens of megabytes): its top-level members only, strings and brackets skipped.
+ * Undefined when the text is not one object, its `model` is not a string, or it has none or two.
+ */
+export const topLevelModel = (text: string): { readonly start: number; readonly end: number; readonly value: string } | undefined => {
+  let i = 0;
+  const skip = () => {
+    while (i < text.length && WHITESPACE.has(text[i]!)) i++;
+  };
+  skip();
+  if (text[i] !== "{") return undefined;
+  i++;
+  let found: { start: number; end: number; value: string } | undefined;
+  let models = 0;
+  skip();
+  if (text[i] === "}") return undefined;
+  for (;;) {
+    skip();
+    if (text[i] !== '"') return undefined;
+    const keyEnd = stringEnd(text, i);
+    if (keyEnd < 0) return undefined;
+    let key: unknown;
+    try {
+      key = JSON.parse(text.slice(i, keyEnd));
+    } catch {
+      return undefined;
+    }
+    i = keyEnd;
+    skip();
+    if (text[i] !== ":") return undefined;
+    i++;
+    skip();
+    const start = i;
+    const end = valueEnd(text, i);
+    if (end < 0) return undefined;
+    if (key === "model") {
+      models++;
+      let value: unknown;
+      try {
+        value = JSON.parse(text.slice(start, end));
+      } catch {
+        return undefined;
+      }
+      if (typeof value !== "string") return undefined;
+      found = { start, end, value };
+    }
+    i = end;
+    skip();
+    if (text[i] === ",") {
+      i++;
+      continue;
+    }
+    if (text[i] !== "}") return undefined;
+    i++;
+    skip();
+    return i === text.length && models === 1 ? found : undefined;
+  }
+};
+
+/** A body read whole (`text` undefined when it is not UTF-8), or `tooLarge` once it passes the cap. */
+const readCapped = async (request: Request): Promise<{ readonly text: string | undefined } | { readonly tooLarge: true }> => {
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (declared > MAX_ROUTED_BODY_BYTES) return { tooLarge: true };
+  if (request.body === null) return { text: "" };
+  const chunks: Array<Uint8Array> = [];
+  let size = 0;
+  const reader = request.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_ROUTED_BODY_BYTES) {
+      void reader.cancel().catch(() => undefined);
+      return { tooLarge: true };
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  try {
+    return { text: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes) };
+  } catch {
+    return { text: undefined };
+  }
+};
+
+/** A model-routed request's endpoint and its body with the model's own id, or why not (400, 413). */
+const routedBody = async (request: Request): Promise<{ readonly endpointId: string; readonly body: string } | { readonly status: number; readonly why: string }> => {
+  const named = "a model-routed request's JSON body names its model as <endpointId>/<modelId>";
+  if (request.method === "GET" || request.method === "HEAD") return { status: 400, why: named };
+  const read = await readCapped(request);
+  if ("tooLarge" in read) return { status: 413, why: `the body is over ${MAX_ROUTED_BODY_BYTES} bytes` };
+  const { text } = read;
+  const model = text === undefined ? undefined : topLevelModel(text);
+  const slug = model === undefined ? undefined : parseEndpointSlug(model.value);
+  if (text === undefined || model === undefined || slug === undefined || !ENDPOINT_ID.test(slug.endpointId)) return { status: 400, why: named };
+  return { endpointId: slug.endpointId, body: `${text.slice(0, model.start)}${JSON.stringify(slug.modelId)}${text.slice(model.end)}` };
+};
+
 /** One relayed request: the endpoint's answer streamed back, or the relay's own refusal. */
 export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): Promise<Response> => {
   const started = deps.now();
   const url = new URL(request.url);
   const match = PATH.exec(url.pathname);
-  const endpointId = match?.[1] !== undefined && ENDPOINT_ID.test(match[1]) ? match[1] : null;
+  const routed = match?.[1] === MODEL_ROUTED_ID;
+  let endpointId = match?.[1] !== undefined && ENDPOINT_ID.test(match[1]) ? match[1] : null;
   const rest = match?.[2] ?? "";
   const log = (status: number, grant: { readonly handleId: string | null; readonly workspace?: string | null; readonly cli?: string }, extra: Record<string, unknown> = {}) =>
     deps.log({
       t3flare: "model-relay",
       endpoint: endpointId,
+      ...(routed ? { routed: true } : {}),
       status,
       handle: grant.handleId,
       ...(grant.cli === undefined ? {} : { cli: grant.cli }),
@@ -124,7 +273,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
       ms: deps.now() - started,
       ...extra,
     });
-  if (endpointId === null) {
+  if (endpointId === null && !routed) {
     log(404, { handleId: null }, { why: "not a model relay path" });
     return plain(404, "not a model relay path (/t3flare/model/<endpointId>/…)");
   }
@@ -137,6 +286,17 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
     log(401, { handleId: null }, { why: "no model handle" });
     return plain(401, "the model relay needs this process's model handle as its key");
   }
+  let routedText: string | undefined;
+  if (routed) {
+    const found = await routedBody(request);
+    if ("why" in found) {
+      log(found.status, { handleId: null }, { why: found.why });
+      return plain(found.status, found.why);
+    }
+    endpointId = found.endpointId;
+    routedText = found.body;
+  }
+  if (endpointId === null) return plain(404, "not a model relay path");
   let grant: ModelRelayGrant;
   try {
     grant = await deps.authorize({ handle, endpointId });
@@ -151,13 +311,15 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   const target = new URL(`${grant.target.baseUrl}${rest}${url.search}`);
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const { headers, dropped } = upstreamHeaders(request.headers, grant.target);
+  // A routed body changed length with its model: its own length goes instead of the Container's.
+  if (routedText !== undefined) headers.delete("content-length");
   let upstream: Response;
   try {
     upstream = await deps.fetch(
       new Request(target, {
         method: request.method,
         headers,
-        body: hasBody ? request.body : null,
+        body: routedText ?? (hasBody ? request.body : null),
         redirect: "manual",
         signal: request.signal,
         // Node's fetch needs this for a streamed body; workerd ignores it.
