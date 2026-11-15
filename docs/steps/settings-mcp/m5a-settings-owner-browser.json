@@ -9,12 +9,6 @@
    "pending": "owner-stage-run.md items 8 and 10",
    "verdict": "pending"
   },
-  "1-scripted": {
-   "commit": "24f4a01a90e6",
-   "name": "owner step 1 with a scripted Owner client: token exchange for the path resource (P6), expires_in <= 900 (P11), the token refused at the admin application's paths (P12), P13 by caller key",
-   "pending": "owner-stage-run.md item 8",
-   "verdict": "pending"
-  },
   "2": {
    "commit": "24f4a01a90e6",
    "name": "P13: the endpoint's OAuth sub against the browser's at the panel",
@@ -117,6 +111,295 @@
    "verdict": "pass",
    "reviewNote": "The layout behaves as (B) intends: /_t3flare/mcpx is the admin application's (302 to its Access login; with the service token the Worker's 404), /_t3flare/mcp/anything is the endpoint's (401 Bearer realm=OAuth with resource_metadata; admitted, 404). The script's check expected no WWW-Authenticate at all on the admin application's path, as m5a-stage-run.md item 4 implies; Access sends `Cloudflare-Access resource_metadata=…` with its 302 login on a non-OAuth application too (prod's /_t3flare/harness does, item 4c). The two applications are told apart by 302 login (scheme Cloudflare-Access) versus 401 (scheme Bearer realm=OAuth)."
   },
+  "5": {
+   "commit": "24f4a01a90e6",
+   "name": "a named client signs in and discovers: thirteen tools, no resume",
+   "pending": "owner-stage-run.md item 10",
+   "verdict": "pending"
+  },
+  "6": {
+   "commit": "24f4a01a90e6",
+   "name": "a read and a free change from the named client",
+   "pending": "owner-stage-run.md item 10",
+   "verdict": "pending"
+  },
+  "7": {
+   "commit": "24f4a01a90e6",
+   "name": "an asked change approved on the page, 2026 (input_required, I'm done, applied within 45 s)",
+   "pending": "owner-stage-run.md item 10",
+   "verdict": "pending"
+  },
+  "8": {
+   "commit": "24f4a01a90e6",
+   "name": "declined on the page; the client's own URL prompt declined (withdrawn, closed.by client)",
+   "pending": "owner-stage-run.md item 10",
+   "verdict": "pending"
+  },
+  "9": {
+   "commit": "24f4a01a90e6",
+   "name": "the 45 s hold running out (waiting with the link), then applied from the page",
+   "pending": "owner-stage-run.md item 10",
+   "verdict": "pending"
+  },
+  "10": {
+   "commit": "24f4a01a90e6",
+   "name": "the link fallback: pi 1.5.2 (no elicitation)",
+   "pending": "owner-stage-run.md item 12",
+   "verdict": "pending"
+  },
+  "11": {
+   "commit": "24f4a01a90e6",
+   "name": "native and model until M5b",
+   "verdict": "not-run",
+   "why": "this stage runs M5b's commit: the two modes are m5b-settings-owner-modes.json's (m5a-stage-run.md item 11 says it is not run from M5b on)"
+  },
+  "12": {
+   "at": "2026-11-14T19:02:19.811Z",
+   "commit": "24f4a01a90e6",
+   "name": "guards from outside (service token with the admin token): 405 GET, 415 text/plain, 403 Origin and Sec-Fetch-Site, 413 300 KiB, 400 natve, each no-store with no access-control-*; without Access, Access's 401",
+   "answers": {
+    "get": {
+     "status": 405,
+     "noStore": true
+    },
+    "textPlain": {
+     "status": 415,
+     "noStore": true
+    },
+    "origin": {
+     "status": 403,
+     "noStore": true
+    },
+    "secFetchSite": {
+     "status": 403,
+     "noStore": true
+    },
+    "body300KiB": {
+     "status": 413,
+     "noStore": true
+    },
+    "natve": {
+     "status": 400,
+     "noStore": true,
+     "error": {
+      "code": -32602,
+      "message": "elicitation_mode is browser, native or model: once, in lowercase (absent means browser)."
+     }
+    },
+    "withoutAccess": {
+     "status": 401,
+     "wwwAuthenticate": "Bearer realm=\"OAuth\", error=\"invalid_token\", error_description=\"Missing or invalid access token\", resource_metadata=\"https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/.well-known/cloudflare-access-protected-resource/_t3flare/mcp\"",
+     "originAnswered": false
+    }
+   },
+   "verdict": "pass"
+  },
+  "13": {
+   "commit": "24f4a01a90e6",
+   "name": "the access switch as the named client sees it (read-only, off, back on)",
+   "pending": "owner-stage-run.md item 10",
+   "verdict": "pending"
+  },
+  "1-scripted": {
+   "at": "2026-11-15T11:40:46.780Z",
+   "commit": "24f4a01a90e6",
+   "name": "owner step 1 with a scripted Owner client (the owner signs in in his browser): the token exchange for the path resource (P6), expires_in at most 900 (P11), the token refused at the admin application's paths as a bearer and as cf-access-token (P12), 200 at the endpoint; P13 by caller key",
+   "discovered": {
+    "resource": "https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp",
+    "authorization_servers": [
+     "https://spirit-led-software.cloudflareaccess.com"
+    ]
+   },
+   "registration": {
+    "status": 201,
+    "clientRegistered": true
+   },
+   "callback": {
+    "keys": [
+     "code",
+     "state"
+    ],
+    "stateMatches": true,
+    "error": null
+   },
+   "tokenResponse": {
+    "status": 200,
+    "keys": [
+     "access_token",
+     "token_type",
+     "expires_in",
+     "scope",
+     "resource",
+     "refresh_token"
+    ],
+    "token_type": "[redacted]",
+    "expires_in": 900,
+    "scope": "",
+    "hasRefresh": true,
+    "error": null
+   },
+   "tokenClaims": "[redacted]",
+   "atEndpoint": {
+    "discover": 200,
+    "tools": [
+     "get_settings",
+     "list_mcp_servers",
+     "list_skills",
+     "get_status",
+     "read_audit",
+     "test_mcp_server",
+     "preview_skills",
+     "check_skill_updates",
+     "change_extension",
+     "change_mcp",
+     "start_mcp_sign_in",
+     "change_environment",
+     "change_skills"
+    ]
+   },
+   "freeChange": {
+    "status": 200,
+    "structured": {
+     "status": "applied",
+     "revision": 61,
+     "appliesAt": "Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it."
+    },
+    "audit": {
+     "caller": "owner:…",
+     "via": "mcp",
+     "client": {
+      "name": "t3flare-owner-oauth 1",
+      "source": "clientInfo in _meta"
+     },
+     "tier": "free",
+     "entity": "environment",
+     "action": "environment.change",
+     "target": "containerIdleMinutes",
+     "before": {
+      "containerIdleMinutes": 2
+     },
+     "after": {
+      "containerIdleMinutes": 1
+     },
+     "at": 1794742845278
+    }
+   },
+   "P13": {
+    "endpointCaller": "owner:…",
+    "browserCaller": "owner:…",
+    "sameSub": true,
+    "note": "the endpoint's OAuth-derived caller key against the owner's browser key at the panel (an audit entry he made on the panel or the Change page); null when he had made none yet"
+   },
+   "P12": [
+    {
+     "path": "/_t3flare/harness",
+     "header": "bearer",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness",
+     "header": "cf-access-token",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/api/settings",
+     "header": "bearer",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/api/settings",
+     "header": "cf-access-token",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/health",
+     "header": "bearer",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/health",
+     "header": "cf-access-token",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/changes/chg_<open>",
+     "header": "bearer",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/changes/chg_<open>",
+     "header": "cf-access-token",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/api/changes/chg_<open>",
+     "header": "bearer",
+     "method": "POST",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/api/changes/chg_<open>",
+     "header": "cf-access-token",
+     "method": "POST",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    }
+   ],
+   "openChange": {
+    "id": "chg_kqqS7PtF27c57HqnH8EufqqU7HODk_1THgBGgKwxi4U",
+    "rowAfterProbes": {
+     "id": "chg_kqqS7PtF27c57HqnH8EufqqU7HODk_1THgBGgKwxi4U",
+     "entity": "environment",
+     "expectedRevision": 62,
+     "tool": "change_environment",
+     "tier": "asked",
+     "mode": "browser",
+     "caller": {
+      "door": "owner",
+      "key": "owner:…",
+      "principal": "owner",
+      "client": {
+       "name": "t3flare-owner-oauth 1",
+       "source": "clientInfo in _meta"
+      }
+     },
+     "createdAt": 1794742845724,
+     "expiresAt": 1794743445724,
+     "state": "open"
+    }
+   },
+   "endpointControl": {
+    "status": 200
+   },
+   "verdict": "pass"
+  },
   "4b": {
    "commit": "24f4a01a90e6",
    "name": "Cursor's registered redirect_uri",
@@ -215,99 +498,10 @@
    "verdict": "recorded",
    "reviewNote": "Baseline recorded. Expectation partly wrong in m5a-stage-run.md item 4c and the report's deviation 27: /_t3flare/mcp on prod does get the admin application's Access login (302, same kid as /_t3flare/harness), but it does carry a `WWW-Authenticate: Cloudflare-Access resource_metadata=\".../_t3flare/mcp\"` header, as every path of that application does (/_t3flare/harness too). Access adds it to non-OAuth applications; it is not SettingsAccess. The discriminator after the first prod deploy with SettingsAccess is 401 with `Bearer realm=\"OAuth\"` (the endpoint's) instead of 302 (the admin application's)."
   },
-  "5": {
-   "commit": "24f4a01a90e6",
-   "name": "a named client signs in and discovers: thirteen tools, no resume",
-   "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
-  },
-  "6": {
-   "commit": "24f4a01a90e6",
-   "name": "a read and a free change from the named client",
-   "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
-  },
-  "7": {
-   "commit": "24f4a01a90e6",
-   "name": "an asked change approved on the page, 2026 (input_required, I'm done, applied within 45 s)",
-   "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
-  },
   "7-2025": {
    "commit": "24f4a01a90e6",
    "name": "the same on 2025-11-25 (elicitation/create on the call's stream)",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
-  },
-  "8": {
-   "commit": "24f4a01a90e6",
-   "name": "declined on the page; the client's own URL prompt declined (withdrawn, closed.by client)",
-   "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
-  },
-  "9": {
-   "commit": "24f4a01a90e6",
-   "name": "the 45 s hold running out (waiting with the link), then applied from the page",
-   "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
-  },
-  "10": {
-   "commit": "24f4a01a90e6",
-   "name": "the link fallback: pi 1.5.2 (no elicitation)",
-   "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
-  },
-  "11": {
-   "commit": "24f4a01a90e6",
-   "name": "native and model until M5b",
-   "verdict": "not-run",
-   "why": "this stage runs M5b's commit: the two modes are m5b-settings-owner-modes.json's (m5a-stage-run.md item 11 says it is not run from M5b on)"
-  },
-  "12": {
-   "at": "2026-11-14T19:02:19.811Z",
-   "commit": "24f4a01a90e6",
-   "name": "guards from outside (service token with the admin token): 405 GET, 415 text/plain, 403 Origin and Sec-Fetch-Site, 413 300 KiB, 400 natve, each no-store with no access-control-*; without Access, Access's 401",
-   "answers": {
-    "get": {
-     "status": 405,
-     "noStore": true
-    },
-    "textPlain": {
-     "status": 415,
-     "noStore": true
-    },
-    "origin": {
-     "status": 403,
-     "noStore": true
-    },
-    "secFetchSite": {
-     "status": 403,
-     "noStore": true
-    },
-    "body300KiB": {
-     "status": 413,
-     "noStore": true
-    },
-    "natve": {
-     "status": 400,
-     "noStore": true,
-     "error": {
-      "code": -32602,
-      "message": "elicitation_mode is browser, native or model: once, in lowercase (absent means browser)."
-     }
-    },
-    "withoutAccess": {
-     "status": 401,
-     "wwwAuthenticate": "Bearer realm=\"OAuth\", error=\"invalid_token\", error_description=\"Missing or invalid access token\", resource_metadata=\"https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/.well-known/cloudflare-access-protected-resource/_t3flare/mcp\"",
-     "originAnswered": false
-    }
-   },
-   "verdict": "pass"
-  },
-  "13": {
-   "commit": "24f4a01a90e6",
-   "name": "the access switch as the named client sees it (read-only, off, back on)",
-   "pending": "owner-stage-run.md item 10",
    "verdict": "pending"
   },
   "13-scripted": {

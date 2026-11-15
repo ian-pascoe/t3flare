@@ -285,100 +285,109 @@
    "logCapture": "wrangler tail kept the relay's close lines (Codex: settings-change applied) but not the Durable Session's (EnvironmentDO.mcpCall); the audit entries are the record. See owner-stage-run.md item 17."
   },
   "2": {
+   "at": "2026-11-15T11:15:38.847Z",
    "commit": "24f4a01a90e6",
-   "name": "approved by page while the card is open",
-   "pending": "owner-stage-run.md item 4",
-   "verdict": "pending"
-  },
-  "3-card": {
-   "at": "2026-11-14T18:43:28.179Z",
-   "commit": "24f4a01a90e6",
-   "name": "declined on the card: status declined, no revision moved; the same call again is refused declined-repeat with no card",
-   "threadId": "3fbe1230-d4ae-4bfb-8019-2b41543ae541",
-   "before": {
-    "revision": 34,
-    "containerBudget": 3
+   "name": "approved by page while the card is open: the card closes as withdrawn (t3 shows it cancelled); the result names the Change page; answeredBy page",
+   "threadId": "ea6f0cc8-63ab-4b17-a6d9-43781cd9246f",
+   "changeId": "chg_GBPz9Z8yGoc4tPD7KU_pYxsX_Ut_uQ0JD-cJZ_eoVR8",
+   "startedAt": "2026-11-15T11:15:07.253Z",
+   "ms": 21207,
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:ea6f0cc8-63ab-4b17-a6d9-43781cd9246f:approval:t3flare-elicit-59b9da24-32d7-48cf-abdd-1030fe8071f8",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "A change to the Environment settings (revision 56):\n- containerBudget: 3 to 4\n\nIt waits for the owner because:\n- containerBudget: 3 to 4 (turned up)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\n\nAsked by piDurable on thread ea6f0cc8-63ab-4b17-a6d9-43781cd9246f.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_GBPz9Z8yGoc4tPD7KU_pYxsX_Ut_uQ0JD-cJZ_eoVR8\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 56,\n  \"settings\": {\n    \"containerBudget\": 4\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "cancelled"
+    }
+   ],
+   "cardsAfter": [
+    {
+     "id": "runtime-request:piDurable:thread:ea6f0cc8-63ab-4b17-a6d9-43781cd9246f:approval:t3flare-elicit-59b9da24-32d7-48cf-abdd-1030fe8071f8",
+     "status": "cancelled",
+     "decision": null
+    }
+   ],
+   "result": "Script completed\nWall time 13.5 seconds\nOutput:\n\"Applied: the owner approved it on the Change page. The Environment settings are at revision 57. Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\"",
+   "status": "applied",
+   "row": {
+    "id": "chg_GBPz9Z8yGoc4tPD7KU_pYxsX_Ut_uQ0JD-cJZ_eoVR8",
+    "entity": "environment",
+    "expectedRevision": 56,
+    "tool": "change_environment",
+    "tier": "asked",
+    "mode": "card",
+    "caller": {
+     "door": "own",
+     "key": "ea6f0cc8-63ab-4b17-a6d9-43781cd9246f",
+     "principal": "agent",
+     "thread": "ea6f0cc8-63ab-4b17-a6d9-43781cd9246f",
+     "agent": "piDurable"
+    },
+    "createdAt": 1794741311851,
+    "expiresAt": 1794741911851,
+    "state": "applied",
+    "closed": {
+     "at": 1794741325084,
+     "by": "page",
+     "revision": 57
+    }
    },
-   "after": 34,
-   "first": {
-    "threadId": "3fbe1230-d4ae-4bfb-8019-2b41543ae541",
-    "status": "completed",
-    "cards": [
-     {
-      "id": "runtime-request:piDurable:thread:3fbe1230-d4ae-4bfb-8019-2b41543ae541:approval:t3flare-elicit-46f69bca-d9e1-4978-a95a-154da9a95ef0",
-      "kind": "mcp-elicitation",
-      "requestKind": "mcp-elicitation",
-      "prompt": "A change to the Environment settings (revision 34):\n- containerBudget: 3 to 4\n\nIt waits for the owner because:\n- containerBudget: 3 to 4 (turned up)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\n\nAsked by piDurable on thread 3fbe1230-d4ae-4bfb-8019-2b41543ae541.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_aeAVSo80Da91ZPpUNKhAFJDpU4QZcMuLIDm6JkEKx0Q\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 34,\n  \"settings\": {\n    \"containerBudget\": 4\n  }\n}",
-      "options": [
-       "accept:Approve",
-       "decline:Decline",
-       "cancel:Cancel"
-      ],
-      "status": "resolved",
-      "decision": "decline"
-     }
-    ],
-    "reply": "{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}",
-    "toolItems": [
-     {
-      "type": "dynamic_tool",
-      "title": "Code mode",
-      "status": "completed",
-      "output": "null"
+   "audit": [
+    {
+     "caller": "agent:ea6f0cc8-63ab-4b17-a6d9-43781cd9246f",
+     "via": "mcp",
+     "thread": "ea6f0cc8-63ab-4b17-a6d9-43781cd9246f",
+     "agent": "piDurable",
+     "tier": "asked",
+     "mode": "card",
+     "answeredBy": "page",
+     "change": "chg_GBPz9Z8yGoc4tPD7KU_pYxsX_Ut_uQ0JD-cJZ_eoVR8",
+     "entity": "environment",
+     "action": "environment.change",
+     "target": "containerBudget",
+     "before": {
+      "containerBudget": 3
      },
-     {
-      "type": "dynamic_tool",
-      "title": "change environment",
-      "status": "failed",
-      "output": "null"
-     }
-    ],
-    "ms": 9793,
-    "output": "Script completed\nWall time 1.6 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}",
-    "result": "Script completed\nWall time 1.6 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}"
-   },
-   "second": {
-    "threadId": "3fbe1230-d4ae-4bfb-8019-2b41543ae541",
-    "status": "completed",
-    "cards": [],
-    "reply": "{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}{\"threw\":\"Not changed: the owner declined this same change less than 10 minutes ago. Do not ask again; ask him in the thread what he wants instead.\"}",
-    "toolItems": [
-     {
-      "type": "dynamic_tool",
-      "title": "Code mode",
-      "status": "completed",
-      "output": "null"
+     "after": {
+      "containerBudget": 4
      },
-     {
-      "type": "dynamic_tool",
-      "title": "change environment",
-      "status": "failed",
-      "output": "null"
-     },
-     {
-      "type": "dynamic_tool",
-      "title": "Code mode",
-      "status": "completed",
-      "output": "null"
-     },
-     {
-      "type": "dynamic_tool",
-      "title": "change environment",
-      "status": "failed",
-      "output": "null"
-     }
-    ],
-    "ms": 7444,
-    "output": "Script completed\nWall time 0.1 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined this same change less than 10 minutes ago. Do not ask again; ask him in the thread what he wants instead.\"}",
-    "result": "Script completed\nWall time 0.1 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined this same change less than 10 minutes ago. Do not ask again; ask him in the thread what he wants instead.\"}"
-   },
+     "at": 1794741325084
+    }
+   ],
+   "settingsLines": [
+    {
+     "t3flare": "settings-change",
+     "via": "mcp",
+     "door": "own",
+     "tool": "change_environment",
+     "change": "chg_GBPz9Z8yGoc4tPD7KU_pYxsX_Ut_uQ0JD-cJZ_eoVR8",
+     "tier": "asked",
+     "mode": "card",
+     "outcome": "applied",
+     "answeredBy": "page",
+     "revision": 57
+    },
+    {
+     "t3flare": "settings-change",
+     "via": "mcp",
+     "door": "own",
+     "agent": "piDurable",
+     "thread": "ea6f0cc8-63ab-4b17-a6d9-43781cd9246f",
+     "tool": "change_environment",
+     "outcome": "open",
+     "change": "chg_GBPz9Z8yGoc4tPD7KU_pYxsX_Ut_uQ0JD-cJZ_eoVR8",
+     "tier": "asked",
+     "mode": "card",
+     "needsPage": null
+    }
+   ],
    "verdict": "pass"
-  },
-  "3-page": {
-   "commit": "24f4a01a90e6",
-   "name": "declined on the page",
-   "pending": "owner-stage-run.md item 4",
-   "verdict": "pending"
   },
   "4": {
    "at": "2026-11-14T18:38:37.242Z",
@@ -418,12 +427,6 @@
    },
    "verdict": "pass",
    "note": "Recorded from the second run (18:28-18:38, alone on the stage). A first run (18:21-18:26), concurrent with other harness runs, had its waiting call cut after 293 s with 'Durable Object reset because its code was updated' and the Environment DO constructed anew at 18:27:15: another harness run's start reset t3 (its pairing window closing, or a provider-instance upsert); the harness now avoids both (settings.ts: T3FLARE_PROVIDERS_ON, the hour-long window). Not a Settings server fault; the Open change stayed in SQLite as plan D8 says."
-  },
-  "4-page": {
-   "commit": "24f4a01a90e6",
-   "name": "expired: the page then shows Expired and its POST answers 409 (the owner's browser)",
-   "pending": "owner-stage-run.md item 2",
-   "verdict": "pending"
   },
   "5": {
    "at": "2026-11-14T18:43:54.347Z",
@@ -514,16 +517,234 @@
    "verdict": "pass"
   },
   "6": {
+   "at": "2026-11-15T11:26:31.235Z",
    "commit": "24f4a01a90e6",
-   "name": "a secret through the page (fixture-keyed), and its leak scan",
-   "pending": "owner-stage-run.md item 3",
-   "verdict": "pending"
+   "name": "a secret through the page: change_mcp header-value on fixture-keyed; the card offers only Opened it / Decline / Cancel; the value typed on the page reaches the server (its next call authenticates); the leak scan finds it nowhere",
+   "threadId": "f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5",
+   "changeId": "chg_KIFVuzHMrZjH2kqdRpmHW2SKx8TWNBDdj-0v1HUU4j4",
+   "startedAt": "2026-11-15T11:24:56.502Z",
+   "ms": 42567,
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5:approval:t3flare-elicit-5ac1b937-98fb-49a3-a30e-ef413ffbf3d1",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "A change to the MCP server set (Harness settings) (revision 23):\n- Set the value of fixture-keyed's header Authorization (one is set now). The value is typed on the Change page.\n\nIt waits for the owner because:\n- fixture-keyed: its header value set\n\nApplies at each thread's next turn, this one included. A CLI agent's server list changes at its next process.\n\nAsked by piDurable on thread f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_KIFVuzHMrZjH2kqdRpmHW2SKx8TWNBDdj-0v1HUU4j4\n\nThe agent's call: settings: change_mcp\n{\n  \"expectedRevision\": 23,\n  \"change\": {\n    \"op\": \"header-value\",\n    \"server\": \"fixture-keyed\"\n  }\n}\n\nIt takes a secret, typed only on the Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_KIFVuzHMrZjH2kqdRpmHW2SKx8TWNBDdj-0v1HUU4j4. \"Opened it\" keeps the call waiting for the page.",
+     "options": [
+      "accept:Opened it",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "cardsAfter": [
+    {
+     "id": "runtime-request:piDurable:thread:f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5:approval:t3flare-elicit-5ac1b937-98fb-49a3-a30e-ef413ffbf3d1",
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "result": "Script completed\nWall time 34.5 seconds\nOutput:\n\"Applied: the owner approved it on the Change page. The Harness settings are at revision 23. Applies at each thread's next turn, this one included. A CLI agent's server list changes at its next process.\"",
+   "status": "applied",
+   "row": {
+    "id": "chg_KIFVuzHMrZjH2kqdRpmHW2SKx8TWNBDdj-0v1HUU4j4",
+    "entity": "harness",
+    "expectedRevision": 23,
+    "tool": "change_mcp",
+    "tier": "asked",
+    "needsPage": "secret",
+    "mode": "card",
+    "caller": {
+     "door": "own",
+     "key": "f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5",
+     "principal": "agent",
+     "thread": "f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5",
+     "agent": "piDurable"
+    },
+    "createdAt": 1794741901375,
+    "expiresAt": 1794742501375,
+    "state": "applied",
+    "closed": {
+     "at": 1794741935550,
+     "by": "page",
+     "revision": 23
+    }
+   },
+   "audit": [
+    {
+     "caller": "agent:f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5",
+     "via": "mcp",
+     "thread": "f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5",
+     "agent": "piDurable",
+     "tier": "asked",
+     "mode": "card",
+     "answeredBy": "page",
+     "change": "chg_KIFVuzHMrZjH2kqdRpmHW2SKx8TWNBDdj-0v1HUU4j4",
+     "entity": "harness",
+     "action": "mcp.secret.set",
+     "target": "fixture-keyed",
+     "after": {
+      "secret": {
+       "set": true,
+       "setAt": 1794741935550
+      }
+     },
+     "at": 1794741935550
+    }
+   ],
+   "markBefore": {
+    "set": true,
+    "setAt": 1794678524672
+   },
+   "markAfter": {
+    "set": true,
+    "setAt": 1794741935550
+   },
+   "nextCall": {
+    "server": "fixture-keyed",
+    "status": "ok",
+    "error": null,
+    "tools": 10,
+    "refused": 0,
+    "ms": 19
+   },
+   "leakScan": {
+    "checked": [
+     "ALCHEMY_CLOUDFLARE_ACCOUNT_ID",
+     "ALCHEMY_WORKER_NAME",
+     "COMMISSARY_ACCESS_CLIENT_ID",
+     "COMMISSARY_ACCESS_CLIENT_SECRET",
+     "COMMISSARY_MANAGEMENT_KEY",
+     "COMMISSARY_MANAGEMENT_URL",
+     "COMMISSARY_USAGE_PRINCIPALS",
+     "MODEL_PROXY_API_KEY",
+     "MODEL_PROXY_URL",
+     "T3FLARE_ACCESS_AUD",
+     "T3FLARE_ACCESS_SERVICE_CLIENT_ID",
+     "T3FLARE_ACCESS_SETTINGS_AUD",
+     "T3FLARE_ACCESS_TEAM_DOMAIN",
+     "T3FLARE_ADMIN_TOKEN",
+     "T3FLARE_GITHUB_APP_PRIVATE_KEY",
+     "T3FLARE_HOST",
+     "T3FLARE_OWNER_EMAIL",
+     "T3_BOOTSTRAP_TOKEN",
+     "github-token-0",
+     "mcp-header:fixture",
+     "mcp-header:fixture-keyed",
+     "mcp-oauth-access:fixture-oauth",
+     "mcp-oauth-refresh:fixture-oauth",
+     "t3-mcp-credential:f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5"
+    ],
+    "credentialsFound": 1,
+    "container": {
+     "exitCode": 0,
+     "bytes": 13207,
+     "files": 23,
+     "leaked": []
+    },
+    "sessions": [
+     {
+      "thread": "f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5",
+      "bytes": 62071,
+      "leaked": []
+     }
+    ],
+    "text": {
+     "bytes": 712291,
+     "leaked": [
+      "ALCHEMY_WORKER_NAME",
+      "T3FLARE_HOST"
+     ]
+    },
+    "leaked": 2
+   },
+   "verdict": "fail"
   },
   "7": {
+   "at": "2026-11-15T11:23:12.158Z",
    "commit": "24f4a01a90e6",
-   "name": "a sign-in through the page (fixture-oauth)",
-   "pending": "owner-stage-run.md item 5",
-   "verdict": "pending"
+   "name": "a sign-in through the page: Approve and sign in sends the browser to the authorization server, the sign-in completes; the agent's result and the logs carry no authorization URL",
+   "threadId": "4d074f17-554d-414e-a6f1-2ea891cebf6a",
+   "changeId": "chg_o6kGfpAfDYlDqUCX6534A7kuID8KquNNNzdVPRhTLjw",
+   "startedAt": "2026-11-15T11:22:59.907Z",
+   "ms": 11856,
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:4d074f17-554d-414e-a6f1-2ea891cebf6a:approval:t3flare-elicit-461c8e22-b002-4efa-a66f-e897062919de",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "A change to the MCP server set (Harness settings) (revision 23):\n- Start an OAuth sign-in to fixture-oauth at https://t3flare-mcpfixture-psmcp.ian-g-pascoe.workers.dev/oauth-mcp, in the owner's browser on the Change page.\n\nIt waits for the owner because:\n- fixture-oauth: an OAuth sign-in started\n\nApplies at each thread's next turn, this one included. A CLI agent's server list changes at its next process.\n\nAsked by piDurable on thread 4d074f17-554d-414e-a6f1-2ea891cebf6a.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_o6kGfpAfDYlDqUCX6534A7kuID8KquNNNzdVPRhTLjw\n\nThe agent's call: settings: start_mcp_sign_in\n{\n  \"expectedRevision\": 23,\n  \"server\": \"fixture-oauth\"\n}\n\nIts sign-in starts in the owner's browser, only from the Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_o6kGfpAfDYlDqUCX6534A7kuID8KquNNNzdVPRhTLjw. \"Opened it\" keeps the call waiting for the page.",
+     "options": [
+      "accept:Opened it",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "cardsAfter": [
+    {
+     "id": "runtime-request:piDurable:thread:4d074f17-554d-414e-a6f1-2ea891cebf6a:approval:t3flare-elicit-461c8e22-b002-4efa-a66f-e897062919de",
+     "status": "resolved",
+     "decision": "accept"
+    }
+   ],
+   "result": "Script completed\nWall time 5.3 seconds\nOutput:\n\"Applied: the owner approved it on the Change page. The Harness settings are at revision 23. Applies at each thread's next turn, this one included. A CLI agent's server list changes at its next process.\"",
+   "status": "applied",
+   "row": {
+    "id": "chg_o6kGfpAfDYlDqUCX6534A7kuID8KquNNNzdVPRhTLjw",
+    "entity": "harness",
+    "expectedRevision": 23,
+    "tool": "start_mcp_sign_in",
+    "tier": "asked",
+    "needsPage": "sign-in",
+    "mode": "card",
+    "caller": {
+     "door": "own",
+     "key": "4d074f17-554d-414e-a6f1-2ea891cebf6a",
+     "principal": "agent",
+     "thread": "4d074f17-554d-414e-a6f1-2ea891cebf6a",
+     "agent": "piDurable"
+    },
+    "createdAt": 1794741784402,
+    "expiresAt": 1794742384402,
+    "state": "applied",
+    "closed": {
+     "at": 1794741789427,
+     "by": "page",
+     "revision": 23
+    }
+   },
+   "audit": [
+    {
+     "caller": "agent:4d074f17-554d-414e-a6f1-2ea891cebf6a",
+     "via": "mcp",
+     "thread": "4d074f17-554d-414e-a6f1-2ea891cebf6a",
+     "agent": "piDurable",
+     "tier": "asked",
+     "mode": "card",
+     "answeredBy": "page",
+     "change": "chg_o6kGfpAfDYlDqUCX6534A7kuID8KquNNNzdVPRhTLjw",
+     "entity": "harness",
+     "action": "mcp.oauth.start",
+     "target": "fixture-oauth",
+     "after": {
+      "registration": "dcr"
+     },
+     "at": 1794741789427
+    }
+   ],
+   "oauth": {
+    "signedIn": true,
+    "expiresAt": 1794741909723,
+    "refreshable": true
+   },
+   "authorizeUrlInResult": false,
+   "authorizeUrlInLogLines": false,
+   "verdict": "pass"
   },
   "8": {
    "at": "2026-11-14T18:44:28.640Z",
@@ -575,67 +796,6 @@
     ]
    },
    "note": "get_status on the asking thread itself while its change is open cannot run (its turn waits on the card); the other thread's get_status shows none of it",
-   "verdict": "pass"
-  },
-  "9a": {
-   "at": "2026-11-14T18:45:05.159Z",
-   "commit": "24f4a01a90e6",
-   "name": "a second asked call on a thread with one open is refused naming the open one (one script, two calls; the first's card then cancelled)",
-   "threadId": "99b3821b-e689-49f0-8a8c-bce3308e0874",
-   "cards": [
-    {
-     "id": "runtime-request:piDurable:thread:99b3821b-e689-49f0-8a8c-bce3308e0874:approval:t3flare-elicit-07860cf7-0d81-4dba-ab31-92376fa4eded",
-     "kind": "mcp-elicitation",
-     "requestKind": "mcp-elicitation",
-     "prompt": "A change to the Environment settings (revision 36):\n- containerBudget: 3 to 4\n\nIt waits for the owner because:\n- containerBudget: 3 to 4 (turned up)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\n\nAsked by piDurable on thread 99b3821b-e689-49f0-8a8c-bce3308e0874.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_-_g0Vw3knlBzMyC6uZ3CooHzTOR3x6UQxuQ2UEot0i8\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 36,\n  \"settings\": {\n    \"containerBudget\": 4\n  }\n}",
-     "options": [
-      "accept:Approve",
-      "decline:Decline",
-      "cancel:Cancel"
-     ],
-     "status": "resolved",
-     "decision": "cancel"
-    }
-   ],
-   "output": "Script completed\nWall time 23.0 seconds\nOutput:\n==> text 1/2 <==\n{\"second\":{\"threw\":\"Not changed: this thread already has a change waiting for the owner (chg_-_g0Vw3knlBzMyC6uZ3CooHzTOR3x6UQxuQ2UEot0i8); ask for one at a time. Wait for its answer, or read get_status.\"}}\n==> text 2/2 <==\n{\"first\":{\"threw\":\"Not changed: the change was withdrawn (on the card) before an answer.\"}}",
-   "status": "completed",
-   "verdict": "pass"
-  },
-  "9b": {
-   "at": "2026-11-14T18:45:40.340Z",
-   "commit": "24f4a01a90e6",
-   "name": "three declined in a row lock the thread's asked changes for an hour: the fourth is refused (strikes) with no card",
-   "threadId": "fb5b1ec9-f643-4ab9-adae-c048dc329ccd",
-   "runs": [
-    {
-     "n": 1,
-     "cards": 1,
-     "status": "declined",
-     "reason": null,
-     "result": "Script completed\nWall time 2.0 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}"
-    },
-    {
-     "n": 2,
-     "cards": 1,
-     "status": "declined",
-     "reason": null,
-     "result": "Script completed\nWall time 1.9 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}"
-    },
-    {
-     "n": 3,
-     "cards": 1,
-     "status": "declined",
-     "reason": null,
-     "result": "Script completed\nWall time 1.4 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}"
-    },
-    {
-     "n": 4,
-     "cards": 0,
-     "status": "refused",
-     "reason": null,
-     "result": "Script completed\nWall time 0.1 seconds\nOutput:\n{\"threw\":\"Not changed: your last 3 asked changes were declined or unanswered, so t3flare refuses your asked changes until 2026-11-14T19:45:29.599Z (an hour after the last). Ask the owner in the thread what he wants.\"}"
-    }
-   ],
    "verdict": "pass"
   },
   "10": {
@@ -826,10 +986,342 @@
    "logCapture": "the open lines are in the tail; the close (by stop) is read from the change's row (read-only SQL), since the tail dropped the cancelAsk invocation's lines."
   },
   "11": {
+   "at": "2026-11-15T11:23:55.877Z",
    "commit": "24f4a01a90e6",
-   "name": "restart between the ask and the page's Approve",
-   "pending": "owner-stage-run.md item 6",
+   "name": "restart: the Environment reset (POST /_t3flare/restart?mode=abort) between the ask and the page's Approve; the page still applies it",
+   "threadId": "8504f717-29e0-4abc-9267-bd7b25116680",
+   "changeId": "chg_Vcuw44F1EFLU8bsGLJALBmkWydDiF5wnTGQQsUaYUyk",
+   "startedAt": "2026-11-15T11:23:29.630Z",
+   "ms": 8676,
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:8504f717-29e0-4abc-9267-bd7b25116680:approval:t3flare-elicit-6d0ed257-d9ad-4d51-a890-2ef20d873eeb",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "A change to the Environment settings (revision 58):\n- containerBudget: 3 to 4\n\nIt waits for the owner because:\n- containerBudget: 3 to 4 (turned up)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\n\nAsked by piDurable on thread 8504f717-29e0-4abc-9267-bd7b25116680.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_Vcuw44F1EFLU8bsGLJALBmkWydDiF5wnTGQQsUaYUyk\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 58,\n  \"settings\": {\n    \"containerBudget\": 4\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "expired"
+    }
+   ],
+   "cardsAfter": [
+    {
+     "id": "runtime-request:piDurable:thread:8504f717-29e0-4abc-9267-bd7b25116680:approval:t3flare-elicit-6d0ed257-d9ad-4d51-a890-2ef20d873eeb",
+     "status": "expired",
+     "decision": null
+    }
+   ],
+   "result": "",
+   "status": null,
+   "row": {
+    "id": "chg_Vcuw44F1EFLU8bsGLJALBmkWydDiF5wnTGQQsUaYUyk",
+    "entity": "environment",
+    "expectedRevision": 58,
+    "tool": "change_environment",
+    "tier": "asked",
+    "mode": "card",
+    "caller": {
+     "door": "own",
+     "key": "8504f717-29e0-4abc-9267-bd7b25116680",
+     "principal": "agent",
+     "thread": "8504f717-29e0-4abc-9267-bd7b25116680",
+     "agent": "piDurable"
+    },
+    "createdAt": 1794741814935,
+    "expiresAt": 1794742414935,
+    "state": "open"
+   },
+   "audit": [],
+   "rowAfter": {
+    "id": "chg_Vcuw44F1EFLU8bsGLJALBmkWydDiF5wnTGQQsUaYUyk",
+    "entity": "environment",
+    "expectedRevision": 58,
+    "tool": "change_environment",
+    "tier": "asked",
+    "mode": "card",
+    "caller": {
+     "door": "own",
+     "key": "8504f717-29e0-4abc-9267-bd7b25116680",
+     "principal": "agent",
+     "thread": "8504f717-29e0-4abc-9267-bd7b25116680",
+     "agent": "piDurable"
+    },
+    "createdAt": 1794741814935,
+    "expiresAt": 1794742414935,
+    "state": "applied",
+    "closed": {
+     "at": 1794741835093,
+     "by": "page",
+     "revision": 59
+    }
+   },
+   "budget": {
+    "before": 3,
+    "after": 4
+   },
+   "verdict": "pass"
+  },
+  "3-card": {
+   "at": "2026-11-14T18:43:28.179Z",
+   "commit": "24f4a01a90e6",
+   "name": "declined on the card: status declined, no revision moved; the same call again is refused declined-repeat with no card",
+   "threadId": "3fbe1230-d4ae-4bfb-8019-2b41543ae541",
+   "before": {
+    "revision": 34,
+    "containerBudget": 3
+   },
+   "after": 34,
+   "first": {
+    "threadId": "3fbe1230-d4ae-4bfb-8019-2b41543ae541",
+    "status": "completed",
+    "cards": [
+     {
+      "id": "runtime-request:piDurable:thread:3fbe1230-d4ae-4bfb-8019-2b41543ae541:approval:t3flare-elicit-46f69bca-d9e1-4978-a95a-154da9a95ef0",
+      "kind": "mcp-elicitation",
+      "requestKind": "mcp-elicitation",
+      "prompt": "A change to the Environment settings (revision 34):\n- containerBudget: 3 to 4\n\nIt waits for the owner because:\n- containerBudget: 3 to 4 (turned up)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\n\nAsked by piDurable on thread 3fbe1230-d4ae-4bfb-8019-2b41543ae541.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_aeAVSo80Da91ZPpUNKhAFJDpU4QZcMuLIDm6JkEKx0Q\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 34,\n  \"settings\": {\n    \"containerBudget\": 4\n  }\n}",
+      "options": [
+       "accept:Approve",
+       "decline:Decline",
+       "cancel:Cancel"
+      ],
+      "status": "resolved",
+      "decision": "decline"
+     }
+    ],
+    "reply": "{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}",
+    "toolItems": [
+     {
+      "type": "dynamic_tool",
+      "title": "Code mode",
+      "status": "completed",
+      "output": "null"
+     },
+     {
+      "type": "dynamic_tool",
+      "title": "change environment",
+      "status": "failed",
+      "output": "null"
+     }
+    ],
+    "ms": 9793,
+    "output": "Script completed\nWall time 1.6 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}",
+    "result": "Script completed\nWall time 1.6 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}"
+   },
+   "second": {
+    "threadId": "3fbe1230-d4ae-4bfb-8019-2b41543ae541",
+    "status": "completed",
+    "cards": [],
+    "reply": "{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}{\"threw\":\"Not changed: the owner declined this same change less than 10 minutes ago. Do not ask again; ask him in the thread what he wants instead.\"}",
+    "toolItems": [
+     {
+      "type": "dynamic_tool",
+      "title": "Code mode",
+      "status": "completed",
+      "output": "null"
+     },
+     {
+      "type": "dynamic_tool",
+      "title": "change environment",
+      "status": "failed",
+      "output": "null"
+     },
+     {
+      "type": "dynamic_tool",
+      "title": "Code mode",
+      "status": "completed",
+      "output": "null"
+     },
+     {
+      "type": "dynamic_tool",
+      "title": "change environment",
+      "status": "failed",
+      "output": "null"
+     }
+    ],
+    "ms": 7444,
+    "output": "Script completed\nWall time 0.1 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined this same change less than 10 minutes ago. Do not ask again; ask him in the thread what he wants instead.\"}",
+    "result": "Script completed\nWall time 0.1 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined this same change less than 10 minutes ago. Do not ask again; ask him in the thread what he wants instead.\"}"
+   },
+   "verdict": "pass"
+  },
+  "3-page": {
+   "at": "2026-11-15T11:16:00.758Z",
+   "commit": "24f4a01a90e6",
+   "name": "declined on the page: status declined, no revision moved",
+   "threadId": "354e1b60-4446-4e36-8cdf-f2f1f5c59e55",
+   "changeId": "chg_SJMyHcKHUAg7AI1r387vsLZu158t6jIYoVLRq1anNb4",
+   "startedAt": "2026-11-15T11:15:48.641Z",
+   "ms": 11672,
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:354e1b60-4446-4e36-8cdf-f2f1f5c59e55:approval:t3flare-elicit-33307ecd-7990-494f-919d-9804780abdd1",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "A change to the Environment settings (revision 58):\n- containerBudget: 3 to 4\n\nIt waits for the owner because:\n- containerBudget: 3 to 4 (turned up)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\n\nAsked by piDurable on thread 354e1b60-4446-4e36-8cdf-f2f1f5c59e55.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_SJMyHcKHUAg7AI1r387vsLZu158t6jIYoVLRq1anNb4\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 58,\n  \"settings\": {\n    \"containerBudget\": 4\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "cancelled"
+    }
+   ],
+   "cardsAfter": [
+    {
+     "id": "runtime-request:piDurable:thread:354e1b60-4446-4e36-8cdf-f2f1f5c59e55:approval:t3flare-elicit-33307ecd-7990-494f-919d-9804780abdd1",
+     "status": "cancelled",
+     "decision": null
+    }
+   ],
+   "result": "Script completed\nWall time 5.3 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the Change page. Do not ask again for the same change.\"}",
+   "status": "declined",
+   "row": {
+    "id": "chg_SJMyHcKHUAg7AI1r387vsLZu158t6jIYoVLRq1anNb4",
+    "entity": "environment",
+    "expectedRevision": 58,
+    "tool": "change_environment",
+    "tier": "asked",
+    "mode": "card",
+    "caller": {
+     "door": "own",
+     "key": "354e1b60-4446-4e36-8cdf-f2f1f5c59e55",
+     "principal": "agent",
+     "thread": "354e1b60-4446-4e36-8cdf-f2f1f5c59e55",
+     "agent": "piDurable"
+    },
+    "createdAt": 1794741353167,
+    "expiresAt": 1794741953167,
+    "state": "declined",
+    "closed": {
+     "at": 1794741358088,
+     "by": "page"
+    }
+   },
+   "audit": [],
+   "verdict": "pass"
+  },
+  "4-page": {
+   "at": "2026-11-15T11:37:00.546Z",
+   "commit": "24f4a01a90e6",
+   "name": "expired: the page then shows Expired and its POST answers 409 (the owner's browser)",
+   "threadId": "0f5bb99c-3091-4b37-8fcf-0327415c4bba",
+   "changeId": "chg_d6YKUedbbFVhn7EkcSNF7IJ_Kj4I0M7s7JYUKcqnWxU",
+   "startedAt": "2026-11-15T11:26:51.524Z",
+   "ms": 608758,
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:0f5bb99c-3091-4b37-8fcf-0327415c4bba:approval:t3flare-elicit-77b02506-4357-443c-9c7b-7824b96c5f2f",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "A change to the Environment settings (revision 60):\n- containerBudget: 3 to 4\n\nIt waits for the owner because:\n- containerBudget: 3 to 4 (turned up)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\n\nAsked by piDurable on thread 0f5bb99c-3091-4b37-8fcf-0327415c4bba.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_d6YKUedbbFVhn7EkcSNF7IJ_Kj4I0M7s7JYUKcqnWxU\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 60,\n  \"settings\": {\n    \"containerBudget\": 4\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "cancelled"
+    }
+   ],
+   "cardsAfter": [
+    {
+     "id": "runtime-request:piDurable:thread:0f5bb99c-3091-4b37-8fcf-0327415c4bba:approval:t3flare-elicit-77b02506-4357-443c-9c7b-7824b96c5f2f",
+     "status": "cancelled",
+     "decision": null
+    }
+   ],
+   "result": "Script completed\nWall time 600.3 seconds\nOutput:\n{\"threw\":\"Not changed: the owner did not answer within 10 minutes.\"}",
+   "status": "expired",
+   "row": {
+    "id": "chg_d6YKUedbbFVhn7EkcSNF7IJ_Kj4I0M7s7JYUKcqnWxU",
+    "entity": "environment",
+    "expectedRevision": 60,
+    "tool": "change_environment",
+    "tier": "asked",
+    "mode": "card",
+    "caller": {
+     "door": "own",
+     "key": "0f5bb99c-3091-4b37-8fcf-0327415c4bba",
+     "principal": "agent",
+     "thread": "0f5bb99c-3091-4b37-8fcf-0327415c4bba",
+     "agent": "piDurable"
+    },
+    "createdAt": 1794742016090,
+    "expiresAt": 1794742616090,
+    "state": "expired",
+    "closed": {
+     "at": 1794742616090
+    }
+   },
+   "audit": [],
+   "ownerSaw": {
+    "pending": "owner-stage-run.md item 2: what the page said after Approve, and after a reload"
+   },
    "verdict": "pending"
+  },
+  "9a": {
+   "at": "2026-11-14T18:45:05.159Z",
+   "commit": "24f4a01a90e6",
+   "name": "a second asked call on a thread with one open is refused naming the open one (one script, two calls; the first's card then cancelled)",
+   "threadId": "99b3821b-e689-49f0-8a8c-bce3308e0874",
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:99b3821b-e689-49f0-8a8c-bce3308e0874:approval:t3flare-elicit-07860cf7-0d81-4dba-ab31-92376fa4eded",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "A change to the Environment settings (revision 36):\n- containerBudget: 3 to 4\n\nIt waits for the owner because:\n- containerBudget: 3 to 4 (turned up)\n\nApplies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.\n\nAsked by piDurable on thread 99b3821b-e689-49f0-8a8c-bce3308e0874.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_-_g0Vw3knlBzMyC6uZ3CooHzTOR3x6UQxuQ2UEot0i8\n\nThe agent's call: settings: change_environment\n{\n  \"expectedRevision\": 36,\n  \"settings\": {\n    \"containerBudget\": 4\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "resolved",
+     "decision": "cancel"
+    }
+   ],
+   "output": "Script completed\nWall time 23.0 seconds\nOutput:\n==> text 1/2 <==\n{\"second\":{\"threw\":\"Not changed: this thread already has a change waiting for the owner (chg_-_g0Vw3knlBzMyC6uZ3CooHzTOR3x6UQxuQ2UEot0i8); ask for one at a time. Wait for its answer, or read get_status.\"}}\n==> text 2/2 <==\n{\"first\":{\"threw\":\"Not changed: the change was withdrawn (on the card) before an answer.\"}}",
+   "status": "completed",
+   "verdict": "pass"
+  },
+  "9b": {
+   "at": "2026-11-14T18:45:40.340Z",
+   "commit": "24f4a01a90e6",
+   "name": "three declined in a row lock the thread's asked changes for an hour: the fourth is refused (strikes) with no card",
+   "threadId": "fb5b1ec9-f643-4ab9-adae-c048dc329ccd",
+   "runs": [
+    {
+     "n": 1,
+     "cards": 1,
+     "status": "declined",
+     "reason": null,
+     "result": "Script completed\nWall time 2.0 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}"
+    },
+    {
+     "n": 2,
+     "cards": 1,
+     "status": "declined",
+     "reason": null,
+     "result": "Script completed\nWall time 1.9 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}"
+    },
+    {
+     "n": 3,
+     "cards": 1,
+     "status": "declined",
+     "reason": null,
+     "result": "Script completed\nWall time 1.4 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the card. Do not ask again for the same change.\"}"
+    },
+    {
+     "n": 4,
+     "cards": 0,
+     "status": "refused",
+     "reason": null,
+     "result": "Script completed\nWall time 0.1 seconds\nOutput:\n{\"threw\":\"Not changed: your last 3 asked changes were declined or unanswered, so t3flare refuses your asked changes until 2026-11-14T19:45:29.599Z (an hour after the last). Ask the owner in the thread what he wants.\"}"
+    }
+   ],
+   "verdict": "pass"
   }
  }
 }

@@ -81,10 +81,80 @@
    },
    "verdict": "pass"
   },
-  "3-4-browser": {
+  "5": {
+   "at": "2026-11-14T19:07:56.745Z",
    "commit": "24f4a01a90e6",
-   "name": "in the owner's browser: no script but the page's own (no CSP violation); a POST without the CSRF token is 403",
-   "pending": "owner-stage-run.md item 7",
+   "name": "a closed and an unknown change id: the closed one shows its outcome without Approve; the unknown one is gone (404)",
+   "closed": {
+    "changeId": "chg_TGinHx0sS7ChZv38ZnRg3INWnO9huAQDkZIvFQYOIxA",
+    "status": 200,
+    "approveShown": false,
+    "outcomeShown": "Withdrawn"
+   },
+   "closedBy": "withdrawn",
+   "unknown": {
+    "status": 404,
+    "gone": true
+   },
+   "verdict": "pass"
+  },
+  "3-4-browser": {
+   "at": "2026-11-15T11:24:31.901Z",
+   "commit": "24f4a01a90e6",
+   "name": "in the owner's browser: the hostile page runs no script but its own (no CSP violation), and a POST without the CSRF token is 403",
+   "threadId": "1a871518-5841-4624-953e-448d7a878bc1",
+   "changeId": "chg_WINJCpbhvkr73I1N0oA9AjoiJ7NWKWYSpqHaZqk3jsY",
+   "startedAt": "2026-11-15T11:24:08.077Z",
+   "ms": 23232,
+   "cards": [
+    {
+     "id": "runtime-request:piDurable:thread:1a871518-5841-4624-953e-448d7a878bc1:approval:t3flare-elicit-96c34ec1-c099-4fcd-833d-5b93597e9d33",
+     "kind": "mcp-elicitation",
+     "requestKind": "mcp-elicitation",
+     "prompt": "A change to the MCP server set (Harness settings) (revision 23):\n- Add the MCP server hostile-url at https://example.com/<script>alert(1)</script>\\u{202e}evil/mcp (host example.com), signing in with nothing.\n\nIt waits for the owner because:\n- hostile-url: a new server\n\nIts tools' own read-only hints are trusted: a tool it marks read runs without a card.\n\nApplies at each thread's next turn, this one included. A CLI agent's server list changes at its next process.\n\nAsked by piDurable on thread 1a871518-5841-4624-953e-448d7a878bc1.\nThe Change page: https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/harness/changes/chg_WINJCpbhvkr73I1N0oA9AjoiJ7NWKWYSpqHaZqk3jsY\n\nThe agent's call: settings: change_mcp\n{\n  \"expectedRevision\": 23,\n  \"change\": {\n    \"op\": \"add\",\n    \"server\": \"hostile-url\",\n    \"url\": \"https://example.com/<script>alert(1)</script>\\u{202e}evil/mcp\",\n    \"auth\": {\n      \"kind\": \"none\"\n    }\n  }\n}",
+     "options": [
+      "accept:Approve",
+      "decline:Decline",
+      "cancel:Cancel"
+     ],
+     "status": "cancelled"
+    }
+   ],
+   "cardsAfter": [
+    {
+     "id": "runtime-request:piDurable:thread:1a871518-5841-4624-953e-448d7a878bc1:approval:t3flare-elicit-96c34ec1-c099-4fcd-833d-5b93597e9d33",
+     "status": "cancelled",
+     "decision": null
+    }
+   ],
+   "result": "Script completed\nWall time 15.1 seconds\nOutput:\n{\"threw\":\"Not changed: the owner declined it on the Change page. Do not ask again for the same change.\"}",
+   "status": "declined",
+   "row": {
+    "id": "chg_WINJCpbhvkr73I1N0oA9AjoiJ7NWKWYSpqHaZqk3jsY",
+    "entity": "harness",
+    "expectedRevision": 23,
+    "tool": "change_mcp",
+    "tier": "asked",
+    "mode": "card",
+    "caller": {
+     "door": "own",
+     "key": "1a871518-5841-4624-953e-448d7a878bc1",
+     "principal": "agent",
+     "thread": "1a871518-5841-4624-953e-448d7a878bc1",
+     "agent": "piDurable"
+    },
+    "createdAt": 1794741853169,
+    "expiresAt": 1794742453169,
+    "state": "declined",
+    "closed": {
+     "at": 1794741868033,
+     "by": "page"
+    }
+   },
+   "audit": [],
+   "ownerSaw": {
+    "pending": "owner-stage-run.md item 7: the Console's lines"
+   },
    "verdict": "pending"
   },
   "4-add-server": {
@@ -115,23 +185,6 @@
    "rawBidiInHtml": false,
    "bidiShownAsEscape": true,
    "closed": "withdrawn",
-   "verdict": "pass"
-  },
-  "5": {
-   "at": "2026-11-14T19:07:56.745Z",
-   "commit": "24f4a01a90e6",
-   "name": "a closed and an unknown change id: the closed one shows its outcome without Approve; the unknown one is gone (404)",
-   "closed": {
-    "changeId": "chg_TGinHx0sS7ChZv38ZnRg3INWnO9huAQDkZIvFQYOIxA",
-    "status": 200,
-    "approveShown": false,
-    "outcomeShown": "Withdrawn"
-   },
-   "closedBy": "withdrawn",
-   "unknown": {
-    "status": 404,
-    "gone": true
-   },
    "verdict": "pass"
   },
   "probe-hostile": {
