@@ -86,13 +86,19 @@ export const peerLinkSecrets = Effect.gen(function* () {
 export const leakedIn = (text: string, secrets: ReadonlyArray<Secret>): Array<string> =>
   secrets.filter(({ value }) => text.includes(value) || value.split("\n").some((line) => line.length >= 16 && text.includes(line))).map(({ name }) => name);
 
+/**
+ * Bindings that are public by design: the Worker's name and its hostname are in every URL the scan reads (the page, the
+ * logs, the transcript), so counting them would flag every run. They are names, not secrets.
+ */
+const PUBLIC_BINDINGS: ReadonlySet<string> = new Set(["ALCHEMY_WORKER_NAME", "T3FLARE_HOST"]);
+
 export const peerLeakCheck = async (
   environment: EnvironmentDO,
   input: { readonly workspace: string; readonly threads: ReadonlyArray<string>; readonly extra?: ReadonlyArray<Secret>; readonly text?: string },
 ) => {
   const env = (environment as unknown as { readonly env: Record<string, unknown> }).env;
   const secrets: Array<Secret> = [];
-  for (const [name, value] of Object.entries(env)) if (typeof value === "string" && value.length >= 8) secrets.push({ name, value });
+  for (const [name, value] of Object.entries(env)) if (typeof value === "string" && value.length >= 8 && !PUBLIC_BINDINGS.has(name)) secrets.push({ name, value });
   environment.github.live().forEach((value, at) => secrets.push({ name: `github-token-${at}`, value }));
   const runtime = await environment.boot("check-peer-leak");
   secrets.push(...(await runtime.run(connectSecrets)));

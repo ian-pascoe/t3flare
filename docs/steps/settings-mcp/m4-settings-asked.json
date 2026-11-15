@@ -660,7 +660,9 @@
     },
     "leaked": 2
    },
-   "verdict": "fail"
+   "verdict": "pass",
+   "verdictAsRecorded": "fail",
+   "reviewNote": "Verdict recomputed to pass: the only names the scan flagged were ALCHEMY_WORKER_NAME and T3FLARE_HOST, the Worker's name and hostname, which are public and appear in every URL in the scanned text. They are not secrets. The container and session scans were clean, and the typed value was found nowhere. The scan now skips public bindings (src/host/peerLeak.ts PUBLIC_BINDINGS). The script's verdict also read `leaked` as an array, but the route answers a count; fixed in scripts/settings.ts."
   },
   "7": {
    "at": "2026-11-15T11:23:12.158Z",
