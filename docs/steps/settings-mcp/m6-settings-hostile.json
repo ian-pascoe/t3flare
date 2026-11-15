@@ -4,16 +4,195 @@
  "host": "t3flare-environment-psmcp.ian-g-pascoe.workers.dev",
  "items": {
   "3": {
+   "at": "2026-11-15T11:26:31.261Z",
    "commit": "24f4a01a90e6",
-   "name": "a leak scan finds a typed secret nowhere but the secret store",
-   "pending": "owner-stage-run.md item 3",
-   "verdict": "pending"
+   "name": "a leak scan finds a typed secret nowhere but the secret store: the canary typed on the Change page; the next call authenticates; peer-leak over the Container, the Session and the text (Workers Logs tail, the page before and after, the panel's audit and changes APIs, the agent's read_audit, list_mcp_servers and get_status, the thread's transcript)",
+   "threadId": "f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5",
+   "changeId": "chg_KIFVuzHMrZjH2kqdRpmHW2SKx8TWNBDdj-0v1HUU4j4",
+   "nextCall": {
+    "server": "fixture-keyed",
+    "status": "ok",
+    "error": null,
+    "tools": 10,
+    "refused": 0,
+    "ms": 19
+   },
+   "textBytes": 712291,
+   "tailedWorkers": [
+    {
+     "name": "t3flare-environment-psmcp",
+     "bytes": 602605
+    },
+    {
+     "name": "t3flare-agents-psmcp",
+     "bytes": 16554
+    }
+   ],
+   "leakScan": {
+    "checked": [
+     "ALCHEMY_CLOUDFLARE_ACCOUNT_ID",
+     "ALCHEMY_WORKER_NAME",
+     "COMMISSARY_ACCESS_CLIENT_ID",
+     "COMMISSARY_ACCESS_CLIENT_SECRET",
+     "COMMISSARY_MANAGEMENT_KEY",
+     "COMMISSARY_MANAGEMENT_URL",
+     "COMMISSARY_USAGE_PRINCIPALS",
+     "MODEL_PROXY_API_KEY",
+     "MODEL_PROXY_URL",
+     "T3FLARE_ACCESS_AUD",
+     "T3FLARE_ACCESS_SERVICE_CLIENT_ID",
+     "T3FLARE_ACCESS_SETTINGS_AUD",
+     "T3FLARE_ACCESS_TEAM_DOMAIN",
+     "T3FLARE_ADMIN_TOKEN",
+     "T3FLARE_GITHUB_APP_PRIVATE_KEY",
+     "T3FLARE_HOST",
+     "T3FLARE_OWNER_EMAIL",
+     "T3_BOOTSTRAP_TOKEN",
+     "github-token-0",
+     "mcp-header:fixture",
+     "mcp-header:fixture-keyed",
+     "mcp-oauth-access:fixture-oauth",
+     "mcp-oauth-refresh:fixture-oauth",
+     "t3-mcp-credential:f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5"
+    ],
+    "credentialsFound": 1,
+    "container": {
+     "exitCode": 0,
+     "bytes": 13207,
+     "files": 23,
+     "leaked": []
+    },
+    "sessions": [
+     {
+      "thread": "f1f11abb-7652-4d85-a6ba-6af4bc1ea1d5",
+      "bytes": 62071,
+      "leaked": []
+     }
+    ],
+    "text": {
+     "bytes": 712291,
+     "leaked": [
+      "ALCHEMY_WORKER_NAME",
+      "T3FLARE_HOST"
+     ]
+    },
+    "leaked": 2
+   },
+   "verdict": "fail"
   },
   "4": {
+   "at": "2026-11-15T11:40:46.822Z",
    "commit": "24f4a01a90e6",
-   "name": "an Owner client's OAuth token at the panel's paths is refused",
-   "pending": "owner-stage-run.md item 8",
-   "verdict": "pending"
+   "name": "an Owner client's OAuth token (held in memory) at the panel's paths, the Change page and its approve POST: refused, the change stays open; at /_t3flare/mcp: 200 (the control)",
+   "P12": [
+    {
+     "path": "/_t3flare/harness",
+     "header": "bearer",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness",
+     "header": "cf-access-token",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/api/settings",
+     "header": "bearer",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/api/settings",
+     "header": "cf-access-token",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/health",
+     "header": "bearer",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/health",
+     "header": "cf-access-token",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/changes/chg_<open>",
+     "header": "bearer",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/changes/chg_<open>",
+     "header": "cf-access-token",
+     "method": "GET",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/api/changes/chg_<open>",
+     "header": "bearer",
+     "method": "POST",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    },
+    {
+     "path": "/_t3flare/harness/api/changes/chg_<open>",
+     "header": "cf-access-token",
+     "method": "POST",
+     "status": 302,
+     "location": "https://spirit-led-software.cloudflareaccess.com/cdn-cgi/access/login/t3flare-environment-psmcp.ian-g-pascoe.workers.dev?…",
+     "servedThePage": false
+    }
+   ],
+   "openChange": {
+    "id": "chg_kqqS7PtF27c57HqnH8EufqqU7HODk_1THgBGgKwxi4U",
+    "rowAfterProbes": {
+     "id": "chg_kqqS7PtF27c57HqnH8EufqqU7HODk_1THgBGgKwxi4U",
+     "entity": "environment",
+     "expectedRevision": 62,
+     "tool": "change_environment",
+     "tier": "asked",
+     "mode": "browser",
+     "caller": {
+      "door": "owner",
+      "key": "owner:…",
+      "principal": "owner",
+      "client": {
+       "name": "t3flare-owner-oauth 1",
+       "source": "clientInfo in _meta"
+      }
+     },
+     "createdAt": 1794742845724,
+     "expiresAt": 1794743445724,
+     "state": "open"
+    }
+   },
+   "control": {
+    "status": 200
+   },
+   "verdict": "pass"
   },
   "8": {
    "at": "2026-11-14T19:11:34.394Z",
