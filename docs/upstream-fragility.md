@@ -833,23 +833,35 @@ environment or file holds it beyond that.
   - **`apiKeyHelper`'s output is sent as `x-api-key` and `authorization: Bearer`**; the relay takes either.
   - **claude-agent-acp starts `claude` with its own `process.env`**: the preload's delete keeps the handle out of
     `claude`'s environment, and so out of the environment of its Bash, hooks and helpers.
-  - **Claude Code's own default model is not a slug** (`claude-opus-5-5`): a session whose model nobody sets sends it,
-    and the routed URL refuses it (400). t3's ACP adapter always writes the session's model before a turn
-    (`session/set_config_option`, `model`), which Claude Code checks with one non-streaming request to the relay.
+  - **Claude Code resolves its own aliases through `ANTHROPIC_DEFAULT_{HAIKU,SONNET,OPUS}_MODEL`**: its `default` model
+    (`claude-opus-5-5` unpinned) and its subagents' `sonnet`/`opus` are pinned to slugs, so every request the routed URL
+    gets names one (`test:docker` runs a session whose model nobody sets; p1168's log has no routed refusal). The
+    session's model list is `default` plus `availableModels`.
+  - **t3's ACP adapter refuses a model not in that list before any request** (`validateModelSelection`: "The requested
+    model is not available in this session"), so a stale non-slug (t3's stock `claudeAgent` default `claude-opus-5-5`
+    from `DEFAULT_MODEL_BY_PROVIDER`, a draft's or thread's earlier proxy model) fails with t3's "The agent did not
+    accept the model" and spends nothing. A model switch is checked by Claude Code with one non-streaming request.
+  - **The web picker's default is the first `isDefault` model** (`getDefaultProviderInstanceModel`): the endpoints'
+    first, which `claudeModelsOf` marks, ahead of the proxy models t3 keeps listed.
   - **The managed settings file is the Container's** (`/etc/claude-code/managed-settings.json`): every Claude process
     in a Container shares it, so it holds nothing of one process's.
   - **t3's provider registry keeps a Claude snapshot's earlier models** (`ProviderRegistry.ts`
     `shouldRetainMissingProviderModels` is true for `claudeAgent`): the proxy's models listed before the first
     Anthropic endpoint stay in the picker after the endpoints' (124 rows on p1168, 121 of them the proxy's). Picking
     one in relay mode is refused by Claude Code (`availableModels`) with t3's "The agent did not accept the model".
-- **Breaks when**: t3 starts a Claude turn without writing the session's model (the first request is refused);
-  Claude Code reads its base URL per model, or rewrites or validates a model id with a `/` (the relay
+- **Breaks when**: Claude Code adds an alias or a model id it resolves without these variables (the routed URL
+  refuses it, 400: the relay log names `routed` with a null endpoint); t3's adapter stops validating the model against
+  the session's list (a stale non-slug then reaches the relay and gets its 400 instead of t3's message); Claude Code
+  reads its base URL per model, or rewrites or validates a model id with a `/` (the relay
   sees no slug: 400); stops sending the helper's key in either header; claude-agent-acp starts `claude` with an
   environment it saved before the preload ran (the handle reaches the environment of Claude's shells), or Node starts
   overwriting the start environment's memory (`process.title`; the helper then finds no handle and Claude has no key),
   or claude-agent-acp's command line changes (the helper's launcher check fails closed: Claude has no key); Claude Code
   starts calling a body-less endpoint it needs (`GET /v1/models`: the routed URL answers 400, logged with `routed`
-  and a null endpoint); or Claude Code starts requiring a header the allowlist drops (the relay log's `dropped` names
+  and a null endpoint); a thread's request grows past the routed URL's 16 MiB cap: it gets 413, and so does every later
+  turn of that thread, compaction included, since Claude Code re-sends the history (a new thread is the way out; the
+  cap is `MAX_ROUTED_BODY_BYTES` in `routedBody.ts`, the body held whole while it is scanned: one buffer with a declared
+  length, under twice the cap while a buffer without one grows); or Claude Code starts requiring a header the allowlist drops (the relay log's `dropped` names
   it; p1168's list is in `docs/steps/spi-1168/p1168.json`).
 - **Detection**: `test/acpProfiles.test.ts`, `test/claudeEndpoints.test.ts`, `test/claudeSpawn.test.ts`,
   `apps/agents/test/modelRelayRoute.test.ts` and `routedBody.test.ts` (the routed URL);

@@ -145,14 +145,21 @@ Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/
    endpoint with the model's own id in its place. The handle is checked first (a forged or revoked handle gets 401 with
    the body unread; a declared length over the cap gets 413 before anyone is asked). The body is then read into one
    buffer of at most 16 MiB (413 over it), its one top-level `model` found by a scan of its bytes (no parse; at most
-   512 levels of nesting), and the model's id written over the slug in place, so the relay holds one copy and passes
+   512 levels of nesting), and the model's id written over the slug in place, so the relay holds one copy (under twice
+   the cap while a buffer with no declared length grows) and passes
    every other byte unchanged. A body with no model, two, or a model without an endpoint is 400. The handle's scope then
    judges the endpoint as it judges one in the path. This is the one place the relay reads a body: routing, not
    protocol translation. A model switch between two Anthropic endpoints stays in the thread's process.
 2. **Claude Code's configuration.** With an Anthropic Messages endpoint that lists a model, every Claude Code process runs on those
    endpoints through the relay (not the Model proxy): base URL the model-routed URL, `availableModels` the endpoints'
    slugs, its background model (`ANTHROPIC_DEFAULT_HAIKU_MODEL`) the text-generation model when that is one of their
-   models (else their small model), its handle requested for those endpoints (`modelRelay`). The choice is the
+   models (else their small model), its handle requested for those endpoints (`modelRelay`). Every alias Claude Code
+   resolves on its own is pinned to a slug, since the routed URL refuses any other model: `ANTHROPIC_DEFAULT_SONNET_MODEL`
+   and `ANTHROPIC_DEFAULT_OPUS_MODEL` are the first model of that family in the owner's order, else the first model
+   (Claude Code's own `default` and its subagents' `sonnet`/`opus` resolve through them). A model t3 names that is not
+   a slug (t3's stock Claude default `claude-opus-5-5`, an earlier proxy model) is not in the session's model list, and
+   t3's ACP adapter refuses it before any request ("The agent did not accept the model"); it is never mapped to another
+   model, so the owner is never billed for a model they did not pick. The choice is the
    Environment's, not the session's: the managed settings (`/etc/claude-code`) are the Container's, shared by every
    Claude process in it, so nothing in them is one process's. Without such an endpoint, the Model proxy as before.
 3. **Where the handle is.** The Workspace DO puts it in the process's environment (as for Codex). The launcher

@@ -162,7 +162,7 @@ What t3flare passes to t3's generic ACP adapter (`makeAcpAdapterV2`) to run Clau
 _Avoid_: ACP driver, registry agent (t3's ACP Registry driver is another thing, refused)
 
 **Managed settings**:
-Claude Code's highest settings source, `/etc/claude-code/managed-settings.json`, installed by the image's launcher at each process's start and shared by every Claude process in the Container: its one endpoint and its key, and the permissions a repository's `.claude/` cannot override. The endpoint is the Model relay's model-routed URL with the handle helper as its key, when an Anthropic Messages Model endpoint lists a model; else the Model proxy with the key helper. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`.
+Claude Code's highest settings source, shared by every Claude process in a Container: where its requests go and how it gets its key, and the permissions a repository's `.claude/` cannot override. Its requests go to the Model relay's Model-routed URL with the process's Handle as its key when an Anthropic Messages Model endpoint lists a model; otherwise to the Model proxy. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`.
 
 ## Tools
 
@@ -359,7 +359,7 @@ How a CLI agent reaches a Model endpoint without holding its credential: the age
 _Avoid_: model proxy (that is the Model proxy), gateway, intercept
 
 **Model-routed URL**:
-The Model relay's one base URL for every endpoint a process may use, `computer.internal/t3flare/model/_`: each request's body names its model as `<endpointId>/<modelId>`, and the relay sends it to that endpoint with the model's own id. For a CLI with one base URL per process (Claude Code).
+The Model relay's one base URL for every Model endpoint a process may use: the endpoint is chosen per request, from the model the request names. For a CLI agent that takes one base URL per process.
 _Avoid_: router, catch-all endpoint, wildcard endpoint
 
 **Subscription**:
