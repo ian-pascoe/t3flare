@@ -8,7 +8,7 @@
 // Write-only to everything but `open`: what is shown is that a value is set, when, and a fingerprint (an HMAC under a
 // second derived key, never the value). Without a credentials key (or with a short one) nothing is stored; a record the
 // key cannot open reads as nothing (losing or rotating the key means entering the credentials again).
-import type { KvStorage } from "../harness/store.ts";
+import type { KvStorage } from "../harness/keys.ts";
 
 const PREFIX = "t3flare/sealed/";
 const SEAL_INFO = "t3flare/credentials/seal/v1";

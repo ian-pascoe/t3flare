@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// T-modes (plan §5; ADR-0034, plan D12), M5a's part (SPI-1200): `browser`. The 2026 `input_required` shape and its
+// T-modes (plan §5; ADR-0035, plan D12), M5a's part (SPI-1200): `browser`. The 2026 `input_required` shape and its
 // retry; the 45 s hold answering `applied`, `declined` and `waiting`; the 2025-11-25 page elicitation on the call's
 // stream, a late `decline` withdrawing; the link-in-result fallback for every client that declared no page elicitation;
 // the signed `requestState` and elicitation id refused when they are not this call's. M5b's part (SPI-1201): `native`

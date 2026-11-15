@@ -4,6 +4,7 @@
 // tightly; `preview_skills` (it mints a GitHub App token) is for a caller that may write; and only what describes the MCP
 // server set is scrubbed of URL queries, so Variables, the Global mise config and a SKILL.md read as they are and a
 // read-then-write round-trips unchanged.
+import { applyMcpChange, EMPTY_HARNESS, type StoredHarness } from "@t3flare/harness-registry";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { DURABLE_AGENT, forgetDurableModes, noteDurableModes } from "../src/provider/threadCaller.ts";
@@ -15,20 +16,27 @@ import { skillMd } from "./skillRepo.fixture.ts";
 let fixture: SettingsFixture | undefined;
 afterEach(() => fixture?.dispose());
 
+/** A Direct server the owner added: the server `test_mcp_server` reaches. */
+const withDocs = (): StoredHarness => {
+  const added = applyMcpChange(EMPTY_HARNESS, { op: "add", server: "docs", url: "https://docs.example/mcp", auth: { kind: "none" } });
+  if (!added.ok) throw new Error(added.error);
+  return added.harness;
+};
+
 
 describe("reads leave the audit log alone and are capped", () => {
   it("test_mcp_server through the server writes no audit entry, however often it runs", async () => {
-    fixture = settingsFixture();
+    fixture = settingsFixture({ harness: withDocs() });
     const run = fixture;
-    for (let index = 0; index < 5; index++) await run.call(run.durable(), "test_mcp_server", { server: "commissary" });
+    for (let index = 0; index < 5; index++) await run.call(run.durable(), "test_mcp_server", { server: "docs" });
     expect(run.store.auditLog(1_000)).toEqual([]);
   });
 
   it(`at most ${NETWORK_READ_CAP} reads that reach the network and ${READ_CAP} reads in all, per thread per hour`, async () => {
-    fixture = settingsFixture();
+    fixture = settingsFixture({ harness: withDocs() });
     const run = fixture;
-    for (let index = 0; index < NETWORK_READ_CAP; index++) expect(structured(await run.call(run.durable(), "test_mcp_server", { server: "commissary" }))).toBeDefined();
-    const capped = await run.call(run.durable(), "test_mcp_server", { server: "commissary" });
+    for (let index = 0; index < NETWORK_READ_CAP; index++) expect(structured(await run.call(run.durable(), "test_mcp_server", { server: "docs" }))).toBeDefined();
+    const capped = await run.call(run.durable(), "test_mcp_server", { server: "docs" });
     expect(capped).toMatchObject({ kind: "result", isError: true });
     expect(textOf(capped)).toContain(`${NETWORK_READ_CAP} reads that reach GitHub or an MCP server`);
     // Other reads still run, until the overall cap.

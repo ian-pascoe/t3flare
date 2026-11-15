@@ -213,6 +213,8 @@ describe("pi's profile", () => {
   // T-pi-1 (settings-mcp plan §5, D4; SPI-1076): the relay's servers through pi's built-in MCP.
   describe("the MCP relay's entries", () => {
     const HANDLE = "tool-handle-0123456789abcdef";
+    // The relay's servers: Direct servers the owner added (`commissary` and `docs`; no built-in kind since SPI-1160) and
+    // the Settings server.
     const relayed = (args: ReadonlyArray<string>, servers: ReadonlyArray<string> = ["commissary", "settings", "docs"]) =>
       profileLaunch({ cli: "pi", args, key: "proc-1", cwd: "/w/demo", env: { T3_PI_RUNTIME_MODE: "approval-required" }, allowProbe: false }, { ...context, relay: { handle: HANDLE, servers } });
 
@@ -241,7 +243,7 @@ describe("pi's profile", () => {
       const answer = relayed(rpc);
       if ("refused" in answer) throw new Error(answer.refused);
       expect(answer.env.T3FLARE_TOOL_HANDLE).toBe(HANDLE);
-      // Patch 0006 lets a built-in MCP tool through unasked only for these servers.
+      // Patch 0007 lets a built-in MCP tool through unasked only for these servers.
       expect(answer.env.T3FLARE_RELAY_SERVERS).toBe("commissary,settings,docs");
       for (const file of answer.files ?? []) expect(file.text).not.toContain(HANDLE);
       expect(answer.argv.join(" ")).not.toContain(HANDLE);

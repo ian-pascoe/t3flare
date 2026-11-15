@@ -52,7 +52,7 @@ describe("tool names", () => {
   });
 });
 
-// The Settings server's entry (ADR-0034, plan D2): implied on every stage, its name reserved, its kind its own.
+// The Settings server's entry (ADR-0035, plan D2): implied on every stage, its name reserved, its kind its own.
 describe("the Settings server's entry", () => {
   it("is implied on, deferred and read-write until a change stores one", () => {
     expect(mcpServersOf(EMPTY_HARNESS).settings).toEqual({ kind: "settings", enabled: true, exposure: "deferred", writes: true });
@@ -71,7 +71,7 @@ describe("the Settings server's entry", () => {
     expect(ignoredServersOf(stale)).toEqual(["settings"]);
     expect(ignoredServersOf(EMPTY_HARNESS)).toEqual([]);
     // A change to the set stores the Settings server's entry over it; its URL is gone from storage.
-    const next = applyMcpChange(stale, { op: "server", server: "settings", enabled: true });
+    const next = applyMcpChange(stale, { op: "add", server: "docs", url: "https://docs.example/mcp", auth: { kind: "none" } });
     if (!next.ok) throw new Error(next.error);
     expect(next.harness.mcp?.servers.settings).toEqual(defaultSettingsServer());
     expect(ignoredServersOf(next.harness)).toEqual([]);

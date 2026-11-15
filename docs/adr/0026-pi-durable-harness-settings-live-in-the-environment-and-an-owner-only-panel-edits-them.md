@@ -51,10 +51,10 @@ The page now edits two entities. What this ADR calls the harness settings are th
 each Workspace DO before a Container start, and share this page, its guards and its audit log, whose entries now carry
 an `entity`. See [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md).
 
-## Refinement: agents ask for changes through the Settings server (ADR-0034, 2026-11-14)
+## Refinement: agents ask for changes through the Settings server (ADR-0035, 2026-11-14)
 
 §8 ("the agent gets no settings tools", OD-T9) is superseded by
-[ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md) (owner, 2026-11-14: "the whole point is
+[ADR-0035](0035-agents-change-t3flares-settings-through-the-settings-server.md) (owner, 2026-11-14: "the whole point is
 that the agent can modify its own environment"). Everything this panel edits is changeable through the Settings server,
 by t3flare's own agents and by Owner clients.
 
@@ -74,6 +74,6 @@ server's Owner-client endpoint at `/_t3flare/mcp`, which needs managed OAuth; a 
 application, so on the `/_t3flare` application an Owner client's token would be admitted at this panel and its Change
 page on the owner's assertion alone. The endpoint therefore gets an Access application of its own, `SettingsAccess`, on
 that narrower path, and the Worker verifies its audience apart from the panel's.
-[ADR-0035](0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
+[ADR-0036](0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
 records the layout, the conditions it rests on (one still pending the owner's sign-in), and its fallback, a Worker on a
 host of its own. The back-to-stock reasons (no forwarder, no admin host) still hold for the panel.

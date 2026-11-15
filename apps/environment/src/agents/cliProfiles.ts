@@ -406,7 +406,7 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     if (relay !== undefined && relay.servers.length > 0) {
       files.push({ path: `${home}/agent/mcp.json`, text: piMcpJson(relay.servers) });
       env[TOOL_HANDLE_ENV] = relay.handle;
-      // Patch 0006: t3's extension lets a built-in MCP tool through unasked only when its server is one of these.
+      // Patch 0007: t3's extension lets a built-in MCP tool through unasked only when its server is one of these.
       env[RELAY_SERVERS_ENV] = relay.servers.join(",");
     }
     // SPI-1039: t3's MCP server as stock t3 hands it, t3's public `/mcp` with t3's per-thread bearer (relayedMcp.ts;

@@ -1,4 +1,4 @@
-// Where the Owner-client endpoint lives: ADR-0035 (layout (B), its Access application, and when to move to (C)); plan
+// Where the Owner-client endpoint lives: ADR-0036 (layout (B), its Access application, and when to move to (C)); plan
 // D13; M5a (SPI-1200), chosen by M0 (SPI-1196, `docs/steps/settings-mcp/m0-access-oauth.json`). Everything that knows
 // the layout is here, in `worker.ts`'s one branch, and in `alchemy.run.ts`'s `SettingsAccess` application, so layout
 // (C) (a Worker on its own host serving its own well-known documents, which calls `EnvironmentDO.settingsMcp` the same
@@ -14,7 +14,7 @@
 // layout (B) is unproven, and prod is kept out of it (`OWNER_ENDPOINT_EXCLUDED_STAGES`), as is the nightly job's `bump`.
 
 /**
- * The stages deployed without the Owner-client endpoint (ADR-0035): no `SettingsAccess` application, the admin
+ * The stages deployed without the Owner-client endpoint (ADR-0036): no `SettingsAccess` application, the admin
  * application exactly as before layout (B) (no path-cookie attribute), and no `T3FLARE_ACCESS_SETTINGS_AUD`, so
  * `/_t3flare/mcp` stays under the admin application and the Worker answers it 404 `not_configured` (src/access.ts).
  * Prod is here until owner step 1 passes and M5a's stage evidence is recorded (`docs/steps/settings-mcp/m5a-stage-run.md`

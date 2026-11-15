@@ -1,11 +1,11 @@
 // @effect-diagnostics globalDate:off
-// The Change page (ADR-0034, plan D10), M4 (SPI-1199): one Open change, server-rendered from its `shown` (render.ts), at
+// The Change page (ADR-0035, plan D10), M4 (SPI-1199): one Open change, server-rendered from its `shown` (render.ts), at
 // `/_t3flare/harness/changes/<id>` under the panel's Access check, hash-only CSP and security headers. Every string that
 // is not a literal here is made visible (control and bidi characters shown as `\u{…}`) and then HTML-escaped, so a
 // hostile setting, server name, URL or SKILL.md is inert. No script computes a diff: the line diff is rendered here.
 //
 // It is the only place a header value is typed for an agent's change, and the only place a sign-in's authorization URL
-// goes (in the POST's own answer, to this page's script): ADR-0034, O8.
+// goes (in the POST's own answer, to this page's script): ADR-0035, O8.
 import { type ChangeRecord, CLOSED_KEPT_MS, type ClosedBy, durationText } from "../settings/changes.ts";
 import { askedByText, lineDiff, sizeText } from "../settings/render.ts";
 import type { ChangeItem, ShownSkill } from "../settings/types.ts";

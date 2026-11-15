@@ -296,7 +296,7 @@ Recorded on stage `psettings` (workers.dev only), 2026-11-14, by the spike on br
 `settings-mcp`. "Owner step" refers to
 [`docs/steps/settings-mcp-m0-owner-steps.md`](../steps/settings-mcp-m0-owner-steps.md) (copied from that branch). What
 was built on these answers:
-[ADR-0035](../adr/0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md).
+[ADR-0036](../adr/0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md).
 Each answer below replaces the matching UNKNOWN above.
 
 | Probe | Answer | Open |
@@ -331,5 +331,5 @@ that was enough. The psmcp stage run showed otherwise for a whole sign-in: Claud
 `…/_t3flare/mcp?elicitation_mode=…` failed to sign in, because with a query on the URL its discovery fell back to the
 origin's root authorization server instead of the 401's per-path `resource_metadata` (Access answers no root document
 here). The same URL without the query signed in. So the mode no longer travels in the URL: it is a per-client setting
-on the Harness panel (ADR-0034's and ADR-0035's refinements of this date; `docs/upstream-fragility.md` U70), and the
+on the Harness panel (ADR-0035's and ADR-0036's refinements of this date; `docs/upstream-fragility.md` U74), and the
 query is only an override.

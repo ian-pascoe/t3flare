@@ -28,7 +28,7 @@ export type SettingValue = boolean | number | string;
 export type EnvironmentValue = SettingValue | Readonly<Record<string, string>>;
 
 /**
- * A setting's Change tier rule (ADR-0034 §3, plan D5): `free` in either direction; `down-free` free when a boolean is
+ * A setting's Change tier rule (ADR-0035 §3, plan D5): `free` in either direction; `down-free` free when a boolean is
  * set to false or an integer lowered, asked the other way. Absent: every change to it is asked.
  */
 export type SettingTier = "free" | "down-free";

@@ -251,12 +251,12 @@ from that branch). What was built on them: plan D11 and D12, `apps/environment/s
   - A 2025 form on a held stream shows the same dialog; Escape posts `cancel` as its own POST.
   - A stream the server cuts with the form open: Claude Code shows nothing, keeps the dialog and later posts its answer;
     the call moves to the background as an MCP task. The server's withdrawal on a cut stream (D12) holds; Claude Code
-    then shows a stale form (U69).
+    then shows a stale form (U73).
   - A 50 s held call (progress every 15 s) finished; one unanswered after 120 s went to the background.
   - `model`: its agent read the Pause, did not call `resume` itself, and asked the user.
 - **OpenCode 2.2.7**: `initialize` 2025-11-25 with `{ elicitation: { form: {}, url: {} }, roots: {} }`, `progressToken`
   on `tools/call`, a GET stream; it appends `codemode=false` to the server URL's query. Under `permission: allow` it
-  accepted an empty form by itself in about 0.1 s: `native` does not prove a person (ADR-0034). A 70 s held call
+  accepted an empty form by itself in about 0.1 s: `native` does not prove a person (ADR-0035). A 70 s held call
   finished.
 - **pi 1.5.2**: `initialize` 2025-11-25 with `{ roots: {} }` only, so no elicitation: the form and URL fallbacks (the
   link in the result) apply. `User-Agent: undici`, `Sec-Fetch-Mode: cors`.
@@ -268,4 +268,4 @@ from that branch). What was built on them: plan D11 and D12, `apps/environment/s
   MCP; `mcp.json` is read from `PI_CODING_AGENT_DIR`; `${T3FLARE_TOOL_HANDLE}` expands in a header; calls held 870 s and
   960 s under `timeout: 900` finished (pi sends a `progressToken`, and progress resets its timer); pi's `bash` sees the
   handle (ADR-0028's accepted residual); the `tool_call` event carries no source, but `pi.getAllTools()` gives a built-in
-  MCP tool `sourceInfo.path: "builtin:mcp"` (Patch 0006's test); the fork launch (`--no-extensions`) loads no MCP.
+  MCP tool `sourceInfo.path: "builtin:mcp"` (Patch 0007's test); the fork launch (`--no-extensions`) loads no MCP.

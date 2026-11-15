@@ -1,4 +1,4 @@
-// Who calls the Settings server, as the Environment derives it (ADR-0034, plan D3): the types the MCP host, the relay
+// Who calls the Settings server, as the Environment derives it (ADR-0035, plan D3): the types the MCP host, the relay
 // and the provider share with the server, kept apart so none of them imports the server itself (SPI-1198 review).
 
 /** A thread's Linked work as the Environment establishes it. */
@@ -13,7 +13,7 @@ export interface ThreadModes {
 /**
  * t3flare's own agent calling, as the Environment derived it: its thread (undefined when the caller sent none: judged as
  * unknown work) and its agent kind (`piDurable`, or the CLI's name from the relay's tool handle). It comes through the
- * own agents' door (ADR-0034 §1; GLOSSARY: Door).
+ * own agents' door (ADR-0035 §1; GLOSSARY: Door).
  */
 export interface OwnCaller {
   readonly door: "own";

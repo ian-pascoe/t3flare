@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// Owner clients' Elicitation modes (ADR-0034's 2026-11-15 refinement, plan D12): one row per Owner caller's key and
+// Owner clients' Elicitation modes (ADR-0035's 2026-11-15 refinement, plan D12): one row per Owner caller's key and
 // client name in `t3flare_settings_clients`, in the Environment DO's SQLite next to the Settings server's changes table.
 //
 // - The key is the endpoint's caller key (the Access `sub`, or `service-token`); the client name is the client's own

@@ -49,7 +49,7 @@ declines in a row; if you reorder, approve one between declines.
    | Owner-client endpoint (`settingsMcpUrl`) | `https://t3flare-environment-psmcp.ian-g-pascoe.workers.dev/_t3flare/mcp` |
    | Change pages | `…/_t3flare/harness/changes/chg_…` (each script prints its own) |
 
-4. **Owner clients' modes (changed 2026-11-15, ADR-0034's refinement):** add every Owner client with the endpoint's
+4. **Owner clients' modes (changed 2026-11-15, ADR-0035's refinement):** add every Owner client with the endpoint's
    plain URL, **no `?elicitation_mode=`**: Claude Code 2.1.322 cannot sign in with a query on the URL. A client is
    listed on the panel at its first request (MCP servers → the Settings server's card → **Owner clients**), by its own
    name (Claude Code's is `claude-code`, OpenCode's `opencode`), in `browser`. Where an item below says "set
@@ -175,7 +175,7 @@ public client, exchanges the code for `resource=<settingsMcpUrl>` (P6), records 
 the endpoint (200), presents the token at `/_t3flare/harness`, `/_t3flare/harness/api/settings`, `/_t3flare/health`, an
 Open change's page and its approve POST, as `Authorization: Bearer` and as `cf-access-token` (P12: none may answer
 200), compares the caller keys of the endpoint and of your browser (P13: same or different; never the `sub`), then
-cancels its one change. The token stays in memory. **If P6 or P12 fails, layout (B) is out (ADR-0035): stop here and
+cancels its one change. The token stays in memory. **If P6 or P12 fails, layout (B) is out (ADR-0036): stop here and
 tell me.** Nothing to paste back.
 
 ### Item 9. M5a "before the run" 2: the applications as Access shows them (≈ 5 min)
@@ -233,7 +233,7 @@ Cursor shows an error (`redirect_uri is not allowed`, `invalid_client_metadata`)
 
 Paste back: Cursor's version, the `redirect_uri` (it is not a secret), and whether sign-in then succeeded. Don't paste
 the whole sign-in URL. If it is neither `cursor://anysphere.cursor-mcp/oauth/callback` nor a localhost URI, the fix is
-`SETTINGS_OAUTH_REDIRECT_URIS` (one constant) and ADR-0035.
+`SETTINGS_OAUTH_REDIRECT_URIS` (one constant) and ADR-0036.
 
 ## Block C, hour 2, at least 60 min after item 8 started (≈ 30 min; 6 changes)
 

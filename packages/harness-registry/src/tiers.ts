@@ -1,4 +1,4 @@
-// Change tiers (ADR-0034 §3, plan D5): whether a Settings change runs on its own (`free`) or waits for an answer
+// Change tiers (ADR-0035 §3, plan D5): whether a Settings change runs on its own (`free`) or waits for an answer
 // (`asked`). Decided by direction: what narrows what agents have, reach, spend or run is free; what widens it, puts new
 // text or code in front of them, destroys something, turns off a Guard, or touches the Settings server's own entry is
 // asked. Fails closed: anything this function does not know (an unknown extension, setting, key or operation, a setting

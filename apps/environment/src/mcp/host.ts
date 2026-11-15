@@ -135,7 +135,7 @@ export interface McpHostDeps {
   /** The t3 host as deployed: a page question that sends the owner there is declined (SPI-1079). */
   readonly ownHost?: () => string | undefined;
   /**
-   * The Settings server (ADR-0034, plan D2): a call to the `settings` entry goes here, with the caller the Environment
+   * The Settings server (ADR-0035, plan D2): a call to the `settings` entry goes here, with the caller the Environment
    * derived and the call's asker, before any inventory or pausing logic. Absent, its calls are refused.
    */
   readonly settingsServer?: (input: {

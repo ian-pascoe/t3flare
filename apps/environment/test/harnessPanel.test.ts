@@ -10,7 +10,7 @@ import { CSRF_HEADER, handleHarness } from "../src/harness/panel.ts";
 import { harnessSecrets } from "../src/harness/secrets.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { McpHost } from "../src/mcp/host.ts";
-import { resolveHarness, EMPTY_HARNESS } from "@t3flare/harness-registry";
+import { defaultSettingsServer, resolveHarness, EMPTY_HARNESS } from "@t3flare/harness-registry";
 
 const HOST = "t3-admin.example.dev";
 const NOW = Date.UTC(2026, 10, 12, 10, 30);
@@ -179,7 +179,7 @@ describe("harness panel", () => {
     const mcp = new McpHost({ kv, engine: undefined, settings: () => store.load() });
     const deps = { caller: { kind: "service-token" } as HarnessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
     const overview = async () => (await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/mcp`), deps)).json()) as { servers: Array<{ name: string; setting: unknown }> };
-    expect((await overview()).servers).toEqual([]);
+    expect((await overview()).servers.map((server) => server.name)).toEqual(["settings"]);
     expect((await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), { ...deps, caller: owner })).status).toBe(200);
     const url = "https://api.commissary.example/mcp?toolkits=fixture";
     const add = await handleHarness(
@@ -191,8 +191,14 @@ describe("harness panel", () => {
       deps,
     );
     expect(add.status).toBe(200);
-    expect((await overview()).servers).toMatchObject([{ name: "commissary", setting: { kind: "direct", url, auth: { kind: "header", header: "x-api-key" }, enabled: true } }]);
-    expect(store.load().mcp?.servers).toEqual({ commissary: { kind: "direct", url, auth: { kind: "header", header: "x-api-key" }, enabled: true, exposure: "deferred" } });
+    expect((await overview()).servers).toMatchObject([
+      { name: "commissary", setting: { kind: "direct", url, auth: { kind: "header", header: "x-api-key" }, enabled: true } },
+      { name: "settings", setting: { kind: "settings" } },
+    ]);
+    expect(store.load().mcp?.servers).toEqual({
+      settings: defaultSettingsServer(),
+      commissary: { kind: "direct", url, auth: { kind: "header", header: "x-api-key" }, enabled: true, exposure: "deferred" },
+    });
     expect(secrets.read("commissary", "header")).toBe("cms-key");
   });
 

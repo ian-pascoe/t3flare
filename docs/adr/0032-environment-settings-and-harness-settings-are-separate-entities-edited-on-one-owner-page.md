@@ -185,9 +185,9 @@ Considered and rejected:
 - **Putting the file under the Workspace.** It would sync, and an agent's edit would outlive the Container.
 - **An empty `MISE_GITHUB_TOKEN` alone.** mise falls through to the next source.
 
-## Refinement (ADR-0034, 2026-11-14): the Settings server changes both entities
+## Refinement (ADR-0035, 2026-11-14): the Settings server changes both entities
 
-[ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md); plan:
+[ADR-0035](0035-agents-change-t3flares-settings-through-the-settings-server.md); plan:
 [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md). Agents may ask for changes to the Harness settings
 and the Environment settings through the Settings server, which calls the same functions as the page.
 

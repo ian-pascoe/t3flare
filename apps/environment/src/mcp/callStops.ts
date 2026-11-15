@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// The stop of a call that crosses into the Environment (ADR-0034, plan D9): Workers RPC carries no cancellation, so a
+// The stop of a call that crosses into the Environment (ADR-0035, plan D9): Workers RPC carries no cancellation, so a
 // caller that stops (a Session's Stop or turn end; a CLI whose relayed HTTP request went away) says so by id through
 // `EnvironmentDO.cancelAsk`, and the call running under that id sees its signal abort. The Settings server then
 // withdraws the Open change its call holds, whether its card is still open or the owner chose "Opened it".

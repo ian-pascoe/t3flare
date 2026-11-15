@@ -34,7 +34,7 @@ export interface ExtensionEntry {
   /** Why the panel cannot change it at all. */
   readonly locked?: string;
   /**
-   * A Guard (ADR-0034 §3, plan D5): it checks what agents do, so turning it off, or any change to its settings, is an
+   * A Guard (ADR-0035 §3, plan D5): it checks what agents do, so turning it off, or any change to its settings, is an
    * asked Change tier.
    */
   readonly guard?: true;

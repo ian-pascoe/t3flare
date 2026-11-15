@@ -112,7 +112,6 @@ describe("a Settings server write from a caller the Environment cannot vouch for
     const host: McpHost = new McpHost({
       kv,
       engine: undefined,
-      commissary: { url: undefined, key: undefined },
       settings: () => store.load(),
       settingsServer: (input) =>
         settingsCall(

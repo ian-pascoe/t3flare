@@ -1,7 +1,7 @@
 // @effect-diagnostics globalDate:off globalTimers:off
-// The Owner-client endpoint (ADR-0034, plan D11, D12), M5a and M5b (SPI-1200, SPI-1201): the Settings server's second
+// The Owner-client endpoint (ADR-0035, plan D11, D12), M5a and M5b (SPI-1200, SPI-1201): the Settings server's second
 // door, for the owner's own MCP clients (Claude Code, pi, Cursor, Codex, OpenCode) signed in through the endpoint's
-// Access application with managed OAuth (ADR-0035; where it lives is `endpointLayout.ts`). `EnvironmentDO.settingsMcp`
+// Access application with managed OAuth (ADR-0036; where it lives is `endpointLayout.ts`). `EnvironmentDO.settingsMcp`
 // calls it with the caller the Worker already verified; it never boots t3.
 //
 // Hand-written JSON-RPC, stateless but for the one row it records per client (clients.ts: the client's mode, set on the
@@ -15,7 +15,7 @@
 //   sends them, M0; a browser does), at most 256 KiB, and `elicitation_mode`, when given, one of three exact values. No
 //   CORS header is ever sent; every answer is `no-store`. Any other query parameter is ignored (OpenCode adds
 //   `codemode=false`).
-// - The request's Elicitation mode (plan D12; ADR-0034's 2026-11-15 refinement): an explicit `?elicitation_mode=`, else
+// - The request's Elicitation mode (plan D12; ADR-0035's 2026-11-15 refinement): an explicit `?elicitation_mode=`, else
 //   the mode the owner set on the Harness panel for this caller's key and the client's `clientInfo.name` (clients.ts),
 //   else `browser`; a request with no client name is `browser`. Every request with a client name records it as seen.
 //   Nothing here, and no tool, changes a client's mode: only the panel does.

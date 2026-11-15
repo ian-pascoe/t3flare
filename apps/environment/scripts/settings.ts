@@ -10,7 +10,7 @@
 // same redaction as the other harnesses (SECRET_KEYS); a secret's mark is kept as { set, setAt } only, a requestState or
 // session id as "present".
 //
-//   node scripts/stage.ts run psmcp settings setup            the fixture servers (fixture, fixture-keyed) and Commissary
+//   node scripts/stage.ts run psmcp settings setup            the fixture servers (fixture, fixture-keyed) and Commissary's test
 //   node scripts/stage.ts run psmcp settings m1               m1-panel-safety.json items 2-4 (item 1 is tools.ts panel)
 //   node scripts/stage.ts run psmcp settings m2               m2-cli-pi.json: Commissary through pi, T-pi-2
 //   node scripts/stage.ts run psmcp settings m3 <kind>        m3-settings-own.json (durable) or m3-settings-cli-<kind>.json
@@ -20,6 +20,9 @@
 //   node scripts/stage.ts run psmcp settings m5b              m5b-settings-owner-modes.json's scripted items
 //   node scripts/stage.ts run psmcp settings m6 <item>        m6-settings-hostile.json
 //   node scripts/stage.ts run psmcp settings changes          the Open changes list (ids, states), for a person
+//
+// Commissary is no built-in server since SPI-1160: `setup` and `m2` use the Direct server named `commissary` the owner
+// added, as `node scripts/stage.ts run <stage> commissaryMcp add` adds it (docs/model-proxy.md); without one they say so.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -421,8 +424,11 @@ const shape = (answer: { status: number; json: any; contentType: string | null; 
 // setup
 
 const setup = async () => {
-  const commissary = await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" });
   const rows = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []) as Array<any>;
+  // Commissary is a Direct server the owner adds (SPI-1160); `commissaryMcp add` adds it on a stage.
+  const commissary = rows.some((row) => row.name === "commissary")
+    ? await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" })
+    : { status: null, json: "no Direct server named commissary: add it with `node scripts/stage.ts run <stage> commissaryMcp add`" };
   // fixture-keyed (m6 item 3, m4 item 6): a header Direct server on the stage's fixture Worker, with a placeholder value
   // the fixture refuses (an add needs one): the owner types the real one on the Change page.
   let keyed: any = { existed: true };
@@ -535,7 +541,7 @@ const m1Cold = async () => {
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
-// M2: Commissary through pi, and T-pi-2
+// M2: Commissary (the Direct server the owner added, SPI-1160) through pi, and T-pi-2
 
 const exec = async (workspace: string, script: string, timeoutMs = 60_000) => ((await admin("POST", `/_t3flare/agents/workspace-call?id=${workspace}`, { exec: { script, timeoutMs } })).json as any)?.result ?? {};
 
@@ -551,7 +557,7 @@ const m2 = async () => {
   if (process.argv[3] === "t-pi-2") {
     // only T-pi-2
   } else if (readTool === undefined) {
-    await record(FILE, "commissary", { name: "pi lists and calls Commissary through the relay", commissary: { status: commissary?.status ?? null, error: commissary?.error ?? null, tools: (commissary?.tools ?? []).length }, verdict: "fail", why: "Commissary lists no tools on this stage: the MCP host's list of it fails (its error above), so pi has nothing of Commissary's to list or call; not a Settings server or relay fault (the same host lists every other server)" });
+    await record(FILE, "commissary", { name: "pi lists and calls Commissary through the relay", commissary: { status: commissary?.status ?? null, error: commissary?.error ?? null, tools: (commissary?.tools ?? []).length }, verdict: "fail", why: commissary === undefined ? "no Direct server named commissary on this stage (no built-in since SPI-1160): add it with `node scripts/stage.ts run <stage> commissaryMcp add`" : "Commissary lists no tools on this stage: the MCP host's list of it fails (its error above), so pi has nothing of Commissary's to list or call; not a Settings server or relay fault (the same host lists every other server)" });
   } else {
     const cases: Array<any> = [];
     for (const mode of ["approval-required", "auto-accept-edits", "full-access"]) {
@@ -560,7 +566,7 @@ const m2 = async () => {
       cases.push({ mode, tool: readTool.upstream, status: run.status, cards: run.cards, reply: run.reply.slice(-400), toolItems: run.toolItems });
       await stopCliProcesses();
     }
-    await record(FILE, "commissary", { name: "pi lists and calls Commissary through the relay, each runtime mode; a read raises no card (Patch 0006: no ask from t3's extension)", cases, verdict: cases.every((c) => c.status === "completed" && c.cards.length === 0) ? "pass" : "fail" });
+    await record(FILE, "commissary", { name: "pi lists and calls Commissary through the relay, each runtime mode; a read raises no card (Patch 0007: no ask from t3's extension)", cases, verdict: cases.every((c) => c.status === "completed" && c.cards.length === 0) ? "pass" : "fail" });
   }
   // T-pi-2: a repository's .pi/mcp.json naming `settings` at another URL changes nothing, and nothing reaches it.
   {

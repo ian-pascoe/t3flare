@@ -33,7 +33,7 @@ export const decideCall = (input: {
 };
 
 /**
- * Where a server comes from: added in the panel (Route B), or the Settings server (ADR-0034, plan D2), served
+ * Where a server comes from: added in the panel (Route B), or the Settings server (ADR-0035, plan D2), served
  * in-process by the MCP host. The built-in `commissary` kind is retired (SPI-1160).
  */
 export type ServerKind = "direct" | "settings";
@@ -124,7 +124,7 @@ export const CLI_TOOL_TIMEOUT_SEC = 900;
 export const TOOL_HANDLE_ENV = "T3FLARE_TOOL_HANDLE";
 
 /**
- * The variable the pi CLI's process names its relayed servers in, comma-separated (SPI-1076, Patch 0006): t3's pi
+ * The variable the pi CLI's process names its relayed servers in, comma-separated (SPI-1076, Patch 0007): t3's pi
  * extension lets a built-in MCP tool through unasked only when its server is one of these.
  */
 export const RELAY_SERVERS_ENV = "T3FLARE_RELAY_SERVERS";

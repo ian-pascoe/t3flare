@@ -123,7 +123,7 @@ describe("expectedRevision", () => {
     });
     expect(await addMcpServer(ops, { server: "x", url: "https://x.example/mcp", auth: { kind: "header", header: "Authorization" }, value: "v" }, stale)).toMatchObject({ ok: false, status: 409, revision: 1 });
     expect(secrets.read("x", "header")).toBeUndefined();
-    expect(changeMcp(ops, { op: "server", server: "commissary", enabled: false }, stale)).toMatchObject({ ok: false, status: 409, revision: 1 });
+    expect(changeMcp(ops, { op: "server", server: "settings", writes: false }, stale)).toMatchObject({ ok: false, status: 409, revision: 1 });
     expect(await changeEnvironment(ops, { containerIdleMinutes: 9 }, { actor: agent, expectedRevision: 3 })).toMatchObject({ ok: false, status: 409, revision: 0 });
     expect(store.load().revision).toBe(1);
     expect(store.loadEnvironment().revision).toBe(0);
@@ -140,7 +140,7 @@ describe("expectedRevision", () => {
     expect(await stale.text()).toBe("the Harness settings are at revision 1, not 0; read them again\n");
     expect((await post(env, "extensions", { extension: "tool-search", enabled: true, expectedRevision: "1" })).status).toBe(400);
     expect((await post(env, "environment", { settings: { containerIdleMinutes: 9 }, expectedRevision: 1 })).status).toBe(409);
-    expect((await post(env, "mcp", { op: "server", server: "commissary", enabled: false, expectedRevision: 0 })).status).toBe(409);
+    expect((await post(env, "mcp", { op: "server", server: "settings", writes: false, expectedRevision: 0 })).status).toBe(409);
     expect((await post(env, "skills/remove", { name: "a", expectedRevision: 5 })).status).toBe(409);
     expect((await post(env, "extensions", { extension: "tool-search", enabled: true })).status).toBe(200);
     // The change stored is the change alone, never the revision it named.
@@ -231,12 +231,12 @@ describe("the set-header op", () => {
     }
   });
 
-  it("refuses an unknown server, Commissary, a server with another sign-in, an empty value and a stale revision, storing nothing", async () => {
+  it("refuses an unknown server, the Settings server, a server with another sign-in, an empty value and a stale revision, storing nothing", async () => {
     const env = setup();
     await addMcpServer(env.ops, { server: "open", url: "https://open.example/mcp", auth: { kind: "oauth" } }, viaAgent);
     await addMcpServer(env.ops, { server: "keyed", url: "https://keyed.example/mcp", auth: { kind: "header", header: "X-Key" }, value: "k" }, viaAgent);
     expect(await setMcpHeader(env.ops, { server: "nope", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 404, error: "no such direct server" });
-    expect(await setMcpHeader(env.ops, { server: "commissary", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 404, error: "no such direct server" });
+    expect(await setMcpHeader(env.ops, { server: "settings", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 404, error: "no such direct server" });
     expect(await setMcpHeader(env.ops, { server: "open", value: VALUE }, viaAgent)).toEqual({ ok: false, status: 400, error: "open does not sign in with a header" });
     expect(await setMcpHeader(env.ops, { server: "keyed", value: "" }, viaAgent)).toEqual({ ok: false, status: 400, error: "a header sign-in needs its value" });
     expect(await setMcpHeader(env.ops, { server: "keyed", value: 7 }, viaAgent)).toEqual({ ok: false, status: 400, error: "a header sign-in needs its value" });
@@ -265,7 +265,7 @@ describe("a stale Direct entry named settings (SPI-1198 review)", () => {
     const env = setup();
     env.store.save({ ...env.store.load(), mcp: { servers: { settings: { kind: "direct", url: "https://old.example/mcp", auth: { kind: "header", header: "X-Key" }, enabled: true, exposure: "deferred" } } } });
     await env.secrets.put("settings", "header", "stale-value");
-    expect(changeMcp(env.ops, { op: "server", server: "commissary", enabled: false }, viaAgent)).toMatchObject({ ok: true });
+    expect(changeMcp(env.ops, { op: "server", server: "settings", writes: false }, viaAgent)).toMatchObject({ ok: true });
     expect(env.store.load().mcp?.servers?.settings?.kind).toBe("settings");
     expect(env.secrets.read("settings", "header")).toBeUndefined();
     expect(env.forgotten).toEqual(["settings"]);
@@ -290,7 +290,7 @@ describe("reads outside the panel", () => {
       enabled: true,
       exposure: "deferred",
     });
-    expect(redactServer({ kind: "commissary", enabled: true, exposure: "deferred" })).toEqual({ kind: "commissary", enabled: true, exposure: "deferred" });
+    expect(redactServer({ kind: "settings", enabled: true, exposure: "deferred", writes: true })).toEqual({ kind: "settings", enabled: true, exposure: "deferred", writes: true });
   });
 
   it("the audit log drops every URL's query and the owner's Access subject, and pages newest first", async () => {

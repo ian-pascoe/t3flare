@@ -65,7 +65,8 @@ describes the branch after the cut.
     none in this step (SPI-1076).
     - Note (2026-11-14): the reason first given here, "no MCP client in the image", was wrong. The image's pi 1.5.2 has
       built-in MCP support; this step did not write its entries. SPI-1076 is now part of the Settings server work
-      (`docs/steps/settings-mcp-plan.md`, D4).
+      (`docs/steps/settings-mcp-plan.md`, D4): the pi CLI gets the relay's servers, the Direct servers (Commissary
+      among them since SPI-1160, no longer a server of its own kind) and the Settings server.
 - **t3's tools for CLI agents (SPI-1039)**, as stock t3 hands them: t3's per-thread bearer at t3's public `/mcp`; only
   the endpoint is rewritten (`relayedMcp.ts`). All four CLIs.
 - **t3's guidance filter (SPI-1060's rule)** moved to `packages/harness-registry/src/t3Guidance.ts`; it applies to

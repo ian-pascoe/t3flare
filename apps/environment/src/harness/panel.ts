@@ -16,7 +16,7 @@
 // - The Change page (plan D10, M4): `GET …/changes/<id>` renders one Open change; `POST …/api/changes/<id>`
 //   `{ action, value? }`, behind the same write guard, answers it, and is what applies it. A header value goes from its
 //   body to the secret store alone; a sign-in's authorization URL is in its answer alone. `GET …/api/changes` lists them.
-// - The Owner clients' Elicitation modes (ADR-0034's 2026-11-15 refinement): `GET …/api/mcp/clients` lists them and
+// - The Owner clients' Elicitation modes (ADR-0035's 2026-11-15 refinement): `GET …/api/mcp/clients` lists them and
 //   `POST …/api/mcp/clients` `{ key, clientName, mode }` or `{ key, clientName, remove: true }`, behind the same write
 //   guard, changes one, audited. This is the only place a client's mode is set: the endpoint only reads it.
 import { describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, ignoredServersOf, type McpChange, resolveEnvironment, resolveHarness } from "@t3flare/harness-registry";
@@ -78,7 +78,7 @@ export interface HarnessDeps {
   readonly changes?: ChangesApi;
   /** The Owner clients' Elicitation modes (clients.ts): listed, set and removed here alone. */
   readonly clients?: OwnerClients;
-  /** The Owner-client endpoint's URL, when it is deployed (ADR-0035): what the owner adds to his clients. */
+  /** The Owner-client endpoint's URL, when it is deployed (ADR-0036): what the owner adds to his clients. */
   readonly ownerEndpoint?: string;
 }
 
@@ -334,7 +334,7 @@ const answerChange = async (changes: ChangesApi, id: string, body: Record<string
 };
 
 /**
- * An Owner client's mode set or the client forgotten (ADR-0034's 2026-11-15 refinement), as the identity the panel
+ * An Owner client's mode set or the client forgotten (ADR-0035's 2026-11-15 refinement), as the identity the panel
  * admitted; audited as the panel's other changes are (entity `owner-clients`, target the client's name, the mode alone
  * before and after: the caller's key is the owner's Access subject, which `read_audit` must not carry, plan D14). It
  * applies at the client's next request (a change to or from `model` shows at its reconnect); an Open change keeps the

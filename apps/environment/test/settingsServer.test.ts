@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// T-own (plan §5; ADR-0034, plan D2, D7, D14, D16, D17), M3 (SPI-1198): the Settings server for t3flare's own agents,
+// T-own (plan §5; ADR-0035, plan D2, D7, D14, D16, D17), M3 (SPI-1198): the Settings server for t3flare's own agents,
 // through the MCP host as the Environment wires it. D7's mode table, every cell, for a Durable caller (modes from the
 // adapter's record) and a relayed CLI caller (modes from its live session); the access switch; no `resume` and no Pause;
 // reads that carry no secret value, fingerprint, URL query or authorization URL; the applied cap. Since M4 (SPI-1199) an
@@ -79,7 +79,6 @@ const setup = (options: { links?: Record<string, ThreadLink>; answer?: McpQuesti
   const host: McpHost = new McpHost({
     kv,
     engine: undefined,
-    commissary: { url: undefined, key: undefined },
     settings: () => store.load(),
     now: () => now,
     settingsServer: (input) =>
@@ -193,7 +192,7 @@ describe("the Settings server's card for a free change", () => {
     expect(late.store.loadEnvironment().revision).toBe(0);
   });
 
-  it("a card-approved free change is audited with mode card and answeredBy card; in full access with neither (ADR-0034 §11)", async () => {
+  it("a card-approved free change is audited with mode card and answeredBy card; in full access with neither (ADR-0035 §11)", async () => {
     const run = setup();
     recordModes(durable(), "approval-required");
     await run.call(durable(), "change_environment", FREE);
@@ -286,19 +285,22 @@ describe("the Settings server's write checks", () => {
   });
 
   it("a free MCP change runs; turning a server on, adding one and changing the Settings server's own entry are asked", async () => {
-    const run = setup({ answer: { decision: "decline" } });
+    // A Direct server the owner added (revision 1).
+    const added = applyMcpChange(EMPTY_HARNESS, { op: "add", server: "docs", url: "https://docs.example/mcp", auth: { kind: "none" } });
+    if (!added.ok) throw new Error(added.error);
+    const run = setup({ answer: { decision: "decline" }, harness: added.harness });
     recordModes(durable(), "full-access");
-    const off = await run.call(durable(), "change_mcp", { expectedRevision: 0, change: { op: "server", server: "commissary", enabled: false } });
-    expect(structured(off)).toMatchObject({ status: "applied", revision: 1 });
+    const off = await run.call(durable(), "change_mcp", { expectedRevision: 1, change: { op: "server", server: "docs", enabled: false } });
+    expect(structured(off)).toMatchObject({ status: "applied", revision: 2 });
     for (const args of [
-      { expectedRevision: 1, change: { op: "server", server: "commissary", enabled: true } },
-      { expectedRevision: 1, change: { op: "add", server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "none" } } },
-      { expectedRevision: 1, change: { op: "server", server: "settings", exposure: "hidden" } },
+      { expectedRevision: 2, change: { op: "server", server: "docs", enabled: true } },
+      { expectedRevision: 2, change: { op: "add", server: "fixture", url: "https://fixture.example/mcp", auth: { kind: "none" } } },
+      { expectedRevision: 2, change: { op: "server", server: "settings", exposure: "hidden" } },
     ]) {
       expect(structured(await run.call(durable(), "change_mcp", args)), JSON.stringify(args)).toMatchObject({ status: "declined" });
     }
     expect(run.cards.length).toBe(3);
-    expect(run.store.load().revision).toBe(1);
+    expect(run.store.load().revision).toBe(2);
   });
 
   it(`at most ${APPLIED_CAP} applied changes per caller per hour`, async () => {
@@ -341,7 +343,6 @@ describe("the Settings server's access switch", () => {
     const host = new McpHost({
       kv: run.kv,
       engine: undefined,
-      commissary: { url: undefined, key: undefined },
       settings: () => run.store.load(),
       settingsServer: async () => {
         reached++;

@@ -54,7 +54,7 @@ for (const select of document.querySelectorAll("select[data-mcp-exposure]")) {
     else select.value = select.querySelector("option[selected]").value;
   });
 }
-// The Owner clients' modes (ADR-0034's 2026-11-15 refinement): set here alone, at the client's next request.
+// The Owner clients' modes (ADR-0035's 2026-11-15 refinement): set here alone, at the client's next request.
 for (const select of document.querySelectorAll("select[data-client-mode]")) {
   select.addEventListener("change", async () => {
     const body = { key: select.dataset.clientKey, clientName: select.dataset.clientName, mode: select.value };

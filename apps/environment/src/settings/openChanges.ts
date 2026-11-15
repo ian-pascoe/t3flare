@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalTimers:off
-// Open changes (ADR-0034, plan D8, D16), M4 (SPI-1199): an asked Settings change waiting for its answer, kept in the
+// Open changes (ADR-0035, plan D8, D16), M4 (SPI-1199): an asked Settings change waiting for its answer, kept in the
 // changes table (changes.ts). This file holds what every door shares, pure over its deps:
 //
 // - the caps (D16), counted from the table, checked before a change is opened;

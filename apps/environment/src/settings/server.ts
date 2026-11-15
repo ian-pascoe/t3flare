@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalTimers:off
-// The Settings server (ADR-0034, plan D2, D3, D7, D8, D9, D14, D16, D17), pure over its deps: t3flare's own agents'
+// The Settings server (ADR-0035, plan D2, D3, D7, D8, D9, D14, D16, D17), pure over its deps: t3flare's own agents'
 // door, M3 (SPI-1198) and M4 (SPI-1199). The MCP host calls it for the `settings` entry of the MCP server set, before
 // any inventory or pausing logic, with the caller the Environment derived (never one the agent states) and the call's
 // asker.
@@ -797,7 +797,7 @@ const OWN_WAIT = { waitMs: OWN_APPLYING_WAIT_MS } as const;
 const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "entity">, planned: Pick<Planned, "appliesAt">): McpCallAnswer => {
   const where = outcome.by === "page" ? " on the Change page" : outcome.by === "card" ? " on the card" : outcome.by === "client" ? " in the client's form" : outcome.by === "agent" ? " through resume" : "";
   const name = entityName(record.entity);
-  // `native` and `model` prove no person answered (ADR-0034, plan §10): their texts name what answered, not the owner.
+  // `native` and `model` prove no person answered (ADR-0035, plan §10): their texts name what answered, not the owner.
   const approved = outcome.by === "client" || outcome.by === "agent" ? `it was accepted${where}` : `the owner approved it${where}`;
   const declined = outcome.by === "client" || outcome.by === "agent" ? `it was declined${where}` : `the owner declined it${where}`;
   switch (outcome.state) {
@@ -1208,7 +1208,7 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
     args,
     planned,
     expected,
-    // A card-approved free change records how it was answered (ADR-0034 §11).
+    // A card-approved free change records how it was answered (ADR-0035 §11).
     actor: { caller: `agent:${key}`, via: "mcp", thread: key, agent: caller.agent, tier: "free", ...(onCard ? { mode: "card" as const, answeredBy: "card" as const } : {}) },
     log,
     applied: { asked: onCard },

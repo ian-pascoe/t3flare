@@ -141,23 +141,27 @@ Part of **Model endpoints** (owner, 2026-11-13): t3flare stops depending on the 
 **Considered**: keeping the old entry inert (listed, disabled, unremovable) until the owner removes it. Rejected: it would hold the name the owner re-adds Commissary under, and an entry with no URL can never work again.
 
 **Consequences**: after the deploy, an Environment that used Commissary's tools has none until the owner adds the server; threads see the tools gone at their next turn, as for a removed server.
-## Refinement (ADR-0034, 2026-11-14): a third server kind, and the pi CLI gets the relay
+## Refinement (ADR-0035, 2026-11-14): the Settings server beside Direct servers, and the pi CLI gets the relay
 
-Plan: [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md).
+Plan: [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md) (written before SPI-1160, when Commissary's
+was a built-in kind; this refinement follows the SPI-1160 refinement above).
 
-1. **The MCP server set has a third kind**, beside Commissary's and Direct servers: the **Settings server**
-   ([ADR-0034](0034-agents-change-t3flares-settings-through-the-settings-server.md)). The MCP host serves it in-process:
-   no engine call, no inventory, no credential. Its entry is implied and enabled, as Commissary's is, with Exposure
-   `deferred`; `settings` is a reserved name.
+1. **The MCP server set has a second kind** beside Direct servers: the **Settings server**
+   ([ADR-0035](0035-agents-change-t3flares-settings-through-the-settings-server.md)). The MCP host serves it in-process:
+   no engine call, no inventory, no credential. Its entry is implied and enabled, with Exposure `deferred`, so a new
+   Environment offers it before the owner adds any server: SPI-1160's "nothing else" (item 1 above) excepts it.
+   `settings` is a reserved name, beside `t3` and `t3-code`. SPI-1160's item 4 still drops any other stored kind on
+   load; the Settings server's entry, stored or implied, is set after that filter (`mcpServersOf`), and a Direct server
+   stored under its name is ignored.
 2. **It judges its own writes.** For this server the Session's `mcp` extension and the relay keep `decideCall`'s plan
    refusal and raise no write card of their own; the Settings server raises one card, with the change written by itself.
    Item 5 ("one decision for every caller") is unchanged for every other server.
 3. **The caller reaches the host.** A Session's call now names its thread; the Environment derives the thread's modes
    and whether it is Linked work itself. A linked thread still sees every enabled server; the Settings server refuses
    its writes inside the call.
-4. **The pi CLI gets the relay's servers** (SPI-1076): one entry per server in its per-process `mcp.json`, with the
-   Tool handle from its environment. This strikes the consequence above, "The pi CLI gets t3's tools only", and item 7's
-   list of CLI agents now includes pi. t3flare grants pi no project trust, so a repository's `.pi/mcp.json` cannot
+4. **The pi CLI gets the relay's servers** (SPI-1076), the enabled Direct servers and the Settings server, as every CLI
+   agent does: one entry per server in its per-process `mcp.json`, with the Tool handle from its environment. This
+   strikes the consequence above, "The pi CLI gets t3's tools only", and item 7's list of CLI agents now includes pi. t3flare grants pi no project trust, so a repository's `.pi/mcp.json` cannot
    replace an entry.
 5. **The pausing rule (SPI-1079 §7) is unchanged.** The Settings server is a Pausing server only to an Owner client that
    chose the `model` mode, at its own endpoint; to t3flare's agents it lists no `resume` and returns no pause. Its pause

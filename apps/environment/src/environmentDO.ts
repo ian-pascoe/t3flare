@@ -61,7 +61,7 @@ interface EnvironmentExports {
 
 export interface EnvironmentEnv extends AgentsBindings {
   readonly T3_BOOTSTRAP_TOKEN?: string;
-  /** Set when the Owner-client endpoint is deployed (ADR-0035): the panel then shows its URL and its clients. */
+  /** Set when the Owner-client endpoint is deployed (ADR-0036): the panel then shows its URL and its clients. */
   readonly T3FLARE_ACCESS_SETTINGS_AUD?: string;
   /** The GitHub App (ADR-0013): only this Worker holds its key; the Environment DO mints every token. */
   readonly T3FLARE_GITHUB_APP_ID?: string;
@@ -415,7 +415,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       },
       // The Open changes (plan D10): the Change page answers them through the Settings server's own apply.
       changes: changesApiOf(await this.#settingsDeps()),
-      // The Owner clients' modes (ADR-0034's 2026-11-15 refinement): set here alone, read by the endpoint.
+      // The Owner clients' modes (ADR-0035's 2026-11-15 refinement): set here alone, read by the endpoint.
       clients,
       ...(this.env.T3FLARE_ACCESS_SETTINGS_AUD === undefined ? {} : { ownerEndpoint: settingsMcpUrl(this.#configuredHost()) }),
     });
@@ -452,7 +452,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /**
-   * The Owner-client endpoint (ADR-0034, plan D11), RPC from the Worker after it verified the endpoint's own Access
+   * The Owner-client endpoint (ADR-0035, plan D11), RPC from the Worker after it verified the endpoint's own Access
    * application (D13). Never boots t3. Open work while it runs, and while a held stream is open (plan D17).
    */
   async settingsMcp(request: Request, caller: AccessCaller): Promise<Response> {
@@ -500,7 +500,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /**
-   * The Settings server's deps (ADR-0034, plan D2, D8): its writes go through the same ops as the panel's, and its Open
+   * The Settings server's deps (ADR-0035, plan D2, D8): its writes go through the same ops as the panel's, and its Open
    * changes live in this object's SQLite.
    */
   async #settingsDeps(): Promise<SettingsServerDeps> {

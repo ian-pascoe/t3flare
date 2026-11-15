@@ -4,7 +4,7 @@
 // and is not in safe mode. Prints only non-secret health fields. Retries for six minutes: an active Environment DO (an
 // open client socket) keeps its old code until it hibernates or Cloudflare's default code-update delay of 5 minutes ends.
 //
-// It also checks that the host's root OAuth documents are still t3's (ADR-0035, plan D13; acceptance step 2b's two
+// It also checks that the host's root OAuth documents are still t3's (ADR-0036, plan D13; acceptance step 2b's two
 // assertions): with managed OAuth on the Owner-client endpoint's Access application (layout (B)), drift in Access (a
 // beta) answering them would send t3's own MCP clients to Access's authorization server, and this is the check every
 // prod deploy runs. Public, no credential; t3 answers them, so they boot it in the Environment DO (no Container).
