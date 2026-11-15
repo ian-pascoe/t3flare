@@ -7,13 +7,15 @@
    "commit": "24f4a01a90e6",
    "name": "M0's open conditions from a named client (Claude Code): sign-in and the token's use",
    "pending": "owner-stage-run.md items 8 and 10",
-   "verdict": "pending"
+   "verdict": "pass",
+   "ownerRun": "2026-11-15: Claude Code 2.1.322 signed in through Access managed OAuth (consent 'Claude Code (psmcp-plain)', Allow, 'Authentication successful') and `claude mcp list` shows Connected. With `?elicitation_mode=` on the URL, its discovery fell back to t3's root authorization server and sign-in failed, so the mode moved to the panel (deviation 30, U70). Re-checked at 4f6fd98: the plain URL connects, and the panel lists `claude-code` in browser mode; switching it to native on the panel saved and was audited."
   },
   "2": {
    "commit": "24f4a01a90e6",
    "name": "P13: the endpoint's OAuth sub against the browser's at the panel",
    "pending": "owner-stage-run.md item 8 (compared by caller key)",
-   "verdict": "pending"
+   "verdict": "pass",
+   "ownerRun": "Covered by 1-scripted's P13: the same sub at the endpoint's application and at the panel's."
   },
   "3": {
    "at": "2026-11-14T19:02:19.014Z",
@@ -115,43 +117,50 @@
    "commit": "24f4a01a90e6",
    "name": "a named client signs in and discovers: thirteen tools, no resume",
    "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "6": {
    "commit": "24f4a01a90e6",
    "name": "a read and a free change from the named client",
    "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "7": {
    "commit": "24f4a01a90e6",
    "name": "an asked change approved on the page, 2026 (input_required, I'm done, applied within 45 s)",
    "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "8": {
    "commit": "24f4a01a90e6",
    "name": "declined on the page; the client's own URL prompt declined (withdrawn, closed.by client)",
    "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "9": {
    "commit": "24f4a01a90e6",
    "name": "the 45 s hold running out (waiting with the link), then applied from the page",
    "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "10": {
    "commit": "24f4a01a90e6",
    "name": "the link fallback: pi 1.5.2 (no elicitation)",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "11": {
    "commit": "24f4a01a90e6",
    "name": "native and model until M5b",
-   "verdict": "not-run",
-   "why": "this stage runs M5b's commit: the two modes are m5b-settings-owner-modes.json's (m5a-stage-run.md item 11 says it is not run from M5b on)"
+   "verdict": "skipped",
+   "why": "this stage runs M5b's commit: the two modes are m5b-settings-owner-modes.json's (m5a-stage-run.md item 11 says it is not run from M5b on)",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "12": {
    "at": "2026-11-14T19:02:19.811Z",
@@ -198,7 +207,8 @@
    "commit": "24f4a01a90e6",
    "name": "the access switch as the named client sees it (read-only, off, back on)",
    "pending": "owner-stage-run.md item 10",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "1-scripted": {
    "at": "2026-11-15T11:40:46.780Z",
@@ -404,7 +414,8 @@
    "commit": "24f4a01a90e6",
    "name": "Cursor's registered redirect_uri",
    "pending": "owner-stage-run.md item 11",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint). Cursor is not installed."
   },
   "4c": {
    "at": "2026-11-14T17:55:26.678Z",
@@ -502,7 +513,8 @@
    "commit": "24f4a01a90e6",
    "name": "the same on 2025-11-25 (elicitation/create on the call's stream)",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "13-scripted": {
    "at": "2026-11-14T19:02:20.815Z",
@@ -616,7 +628,8 @@
    "commit": "24f4a01a90e6",
    "name": "the applications as Access shows them: SettingsAccess's domain, policies, OAuth configuration, path cookie; the admin application's policies unchanged",
    "pending": "owner-stage-run.md item 9",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint). The Access dashboard check (owner item 9) was skipped too."
   }
  }
 }

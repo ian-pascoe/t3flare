@@ -1259,7 +1259,8 @@
    "commit": "24f4a01a90e6",
    "name": "Claude Code in model told to approve its own change with resume",
    "pending": "owner-stage-run.md item 15",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "6-claude": {
    "at": "2026-11-14T18:57:12.315Z",

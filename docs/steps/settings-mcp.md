@@ -6,11 +6,11 @@ recorded in place: [`settings-mcp-plan.md`](settings-mcp-plan.md). Decision reco
 modes) and [ADR-0035](../adr/0035-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
 (where the Owner-client endpoint lives). Evidence: [`settings-mcp/`](settings-mcp/).
 
-**State, 2026-11-14: built and unit-tested through M6 on branch `settings-mcp`, rebased on `origin/main` at 96ee913;
-nothing pushed, deployed or run on a stage after M0.** Every milestone's stage evidence is owed (the "Evidence"
-section), and two owner steps gate parts of it. Prod is deployed without the Owner-client endpoint until owner step 1
-passes and M5a's stage evidence is recorded, and the nightly job's `bump` stage without it for good (ADR-0035; one
-switch, `OWNER_ENDPOINT_EXCLUDED_STAGES`).
+**State, 2026-11-15: built, unit-tested and stage-run on `psmcp` on branch `settings-mcp`, rebased on `origin/main` at
+96ee913.** Machine evidence passes for M1-M4 and M6. The owner's checklist ([`owner-stage-run.md`](settings-mcp/owner-stage-run.md))
+passed Block A and owner step 1 (the OAuth gate for layout (B)). Its remaining client tests were skipped by the owner's
+decision (the "Evidence" section). Prod and the nightly job's `bump` stage are still deployed without the Owner-client
+endpoint (ADR-0035; one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES`); turning it on for prod is a follow-up.
 
 ## What was built
 
@@ -299,36 +299,37 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
 
 ## Evidence
 
-Only M0's files exist on this branch, copied from the spike branch. Every other file is owed from a stage run.
+Stage `psmcp`, deployed from 24f4a01 for the runs. The per-client mode check was rerun at 4f6fd98. Machine items were
+run by `scripts/settings.ts`. The owner's items were driven by the agent in the owner's signed-in browser, and the owner
+signed in only.
 
-| Milestone | File | How | State |
-| --- | --- | --- | --- |
-| M0 | `m0-access-oauth.json`, `m0-clients.json`, `m0-pi.json` | the spike's probes on `psettings` | **done** (on the spike branch, 41b823a; copied here unchanged) |
-| M1 | `m1-panel-safety.json` | [`m1-stage-run.md`](settings-mcp/m1-stage-run.md): `scripts/tools.ts panel` re-run, written as `m1-…`: the panel behaves as before, with `expectedRevision` and the set-header route, and answers on a cold DO | **owed** |
-| M2 | `m2-cli-pi.json` | `scripts/tools.ts cli-mcp` with pi: pi lists and calls Commissary and a Direct server through the relay in every runtime mode; T-pi-2 (a repository's `.pi/mcp.json` naming `settings` at another URL changes nothing, and nothing reaches that URL); a relay read with no ask from t3's extension (the Patch) | **owed** |
-| M3 | `m3-settings-own.json`, `m3-settings-cli-{codex,claude,opencode,pi}.json` | a Durable thread and each CLI read and make a free change; plan, linked and unknown-thread refusals hold | **owed** |
-| M4 | `m4-settings-asked.json`, `m4-change-page-safety.json` | [`m4-stage-run.md`](settings-mcp/m4-stage-run.md) | **owed** |
-| M5a | `m5a-settings-owner-browser.json` | [`m5a-stage-run.md`](settings-mcp/m5a-stage-run.md); items 1-4 are owner step 1 and gate layout (B) | **owed** |
-| M5b | `m5b-settings-owner-modes.json` | [`m5b-stage-run.md`](settings-mcp/m5b-stage-run.md); the owner at the keyboard | **owed** |
-| M6 | `m6-settings-hostile.json` | [`m6-stage-run.md`](settings-mcp/m6-stage-run.md) | **owed** |
+| Milestone | File | State |
+| --- | --- | --- |
+| M0 | `m0-access-oauth.json`, `m0-clients.json`, `m0-pi.json` | **done** on the spike branch (41b823a), copied unchanged |
+| M1 | `m1-panel-safety.json` | **pass** (5/5) |
+| M2 | `m2-cli-pi.json` | **pass** 2. **Fail** 1: Commissary through pi; the engine rejects Commissary's `tools[14].inputSchema.type`. This is not this branch's code; follow-up ticket |
+| M3 | `m3-settings-own.json`, `m3-settings-cli-{codex,claude,opencode,pi}.json` | **pass** (22). The linked and unknown-thread refusals were not run on the stage; unit-tested |
+| M4 | `m4-settings-asked.json`, `m4-change-page-safety.json` | **pass** (22). The browser items were in the owner's browser |
+| M5a | `m5a-settings-owner-browser.json` | **pass**: owner step 1 (P6, P11 900 s, P12, P13), the layout probes, the guards, the access switch (scripted), and Claude Code's sign-in with the plain URL. The query-carried mode broke Claude Code's discovery, which led to deviation 30. Every other item is **skipped** |
+| M5b | `m5b-settings-owner-modes.json` | scripted items **pass** (3). The client items are **skipped** |
+| M6 | `m6-settings-hostile.json` | **pass** (18), including the leak scan once its public-name false positive was removed (aac2a32). 5.2 is **skipped**. 1.1 and 1.2 were not exercised |
 
-No stage harness for M1-M6 was written on this branch; the run that produces these files writes it (`scripts/tools.ts`
-and `scripts/spi1079.ts` are the patterns). `pnpm run check` passes at the PR's head.
-
-<!-- Placeholder: when the runs are done, put each file's commit and verdicts in the State column, and add any
-failure to "Deviations from the plan". -->
+**Skipped (the owner's decision, 2026-11-15):** M5a items 5-10 and 13, 7-2025, 4b (Cursor, not installed), and
+before-2 (the Access dashboard). All of M5b's client items. M6 5.2. Their behaviour is unit-tested
+(`settingsModes`, `settingsClients`, `settingsEndpoint`, `settingsRaces`). `pnpm run check` passes at the PR's head.
 
 ## Owner steps still open
 
 From [`settings-mcp-m0-owner-steps.md`](settings-mcp-m0-owner-steps.md) (copied from the spike branch, where its
 commands run):
 
-1. **Step 1, the OAuth flow end to end** (P6, P7, P12, P13, P15, P11 in part). **Gates layout (B)**: an Owner client's
+1. **Step 1, the OAuth flow end to end: PASSED 2026-11-15** (M5a 1-scripted: P6, P11 900 s, P12 refused at every
+   admin path as bearer and as cf-access-token, P13 same sub). Prod stays excluded until the owner turns it on. **Gated layout (B)**: an Owner client's
    OAuth token must be refused at `/_t3flare/harness` and `/_t3flare/echo`, and the token exchange must work for the
    path `resource`. If either fails, ADR-0035 is superseded by one for layout (C). It also decides the page's answerer
    check (`sub`, or the email if `sub` differs across applications, P13). Taken over by M5a items 1-4. Prod gets the
    endpoint only after it passes (`OWNER_ENDPOINT_EXCLUDED_STAGES`).
-2. **Step 2, Cursor**: confirms the `redirect_uri` Cursor registers. If it is neither
+2. **Step 2, Cursor (still open; Cursor not installed)**: confirms the `redirect_uri` Cursor registers. If it is neither
    `cursor://anysphere.cursor-mcp/oauth/callback` nor a `localhost` one, change `SETTINGS_OAUTH_REDIRECT_URIS` (one
    constant) and ADR-0035. M5a item 4b.
 3. Step 3, Claude Code's Accept and "I'm done, continue" by hand (neither submitted from a scripted terminal): refines

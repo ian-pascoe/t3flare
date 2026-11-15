@@ -155,7 +155,8 @@
    "ownerSaw": {
     "pending": "owner-stage-run.md item 7: the Console's lines"
    },
-   "verdict": "pending"
+   "verdict": "pass",
+   "ownerRun": "2026-11-15, the owner's signed-in browser (agent-browser, Chrome 150): the hostile URL showed as text (`https://example.com/<script>alert(1)</script>\\u{202e}evil/mcp`); no dialog; the console and the page-error list were empty (no CSP violation); only one inline script ran, the page's own hashed one (3148 bytes), and none contained alert(1); a POST to api/changes without the CSRF token got `403 bad CSRF token`; then Decline."
   },
   "4-add-server": {
    "at": "2026-11-14T19:07:38.592Z",

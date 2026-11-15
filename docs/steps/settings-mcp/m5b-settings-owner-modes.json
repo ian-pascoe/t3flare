@@ -7,7 +7,8 @@
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 1",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "1-10-scripted": {
    "at": "2026-11-14T17:54:58.918Z",
@@ -88,109 +89,127 @@
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 2",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "3": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 3",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "4": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 4",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "5": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 5",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "6": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 6",
    "pending": "owner-stage-run.md item 13",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "7": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 7",
    "pending": "owner-stage-run.md item 13",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "8": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 8",
    "pending": "owner-stage-run.md item 13",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "9": {
    "commit": "24f4a01a90e6",
    "name": "2025-06-18 (no mode key in elicitation/create)",
-   "verdict": "not-run",
-   "why": "no named client negotiates 2025-06-18 (Claude Code 2026-07-28, OpenCode 2025-11-25); covered by settingsModes.test.ts"
+   "verdict": "skipped",
+   "why": "no named client negotiates 2025-06-18 (Claude Code 2026-07-28, OpenCode 2025-11-25); covered by settingsModes.test.ts",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "10": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 10",
    "pending": "owner-stage-run.md item 14",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "11": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 11",
    "pending": "owner-stage-run.md item 14",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "12": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 12",
    "pending": "owner-stage-run.md item 14",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "13": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 13",
    "pending": "owner-stage-run.md item 14",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "14": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 14",
    "pending": "owner-stage-run.md item 14",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "15": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 15",
    "pending": "owner-stage-run.md item 14",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "16": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 16",
    "pending": "owner-stage-run.md item 15",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "17": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 17",
    "pending": "owner-stage-run.md item 15",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "18": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 18",
    "pending": "owner-stage-run.md item 15",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "19": {
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 19",
    "pending": "owner-stage-run.md item 15",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "20": {
    "at": "2026-11-14T17:54:58.709Z",
@@ -228,7 +247,8 @@
    "commit": "24f4a01a90e6",
    "name": "m5b-stage-run.md item 21",
    "pending": "owner-stage-run.md item 15",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   },
   "before-1": {
    "commit": "24f4a01a90e6",
@@ -245,7 +265,8 @@
    "commit": "24f4a01a90e6",
    "name": "get_settings (environment): containerBudget and the revision before the run",
    "pending": "owner-stage-run.md item 12",
-   "verdict": "pending"
+   "verdict": "skipped",
+   "skipNote": "Skipped by the owner's decision (2026-11-15): the remaining client tests were not run before landing; the unit tests cover the behaviour (settingsModes, settingsClients, settingsEndpoint)."
   }
  }
 }
