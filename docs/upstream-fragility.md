@@ -847,7 +847,7 @@ environment or file holds it beyond that.
     in a Container shares it, so it holds nothing of one process's.
   - **t3's provider registry keeps a Claude snapshot's earlier models** (`ProviderRegistry.ts`
     `shouldRetainMissingProviderModels` is true for `claudeAgent`): the proxy's models listed before the first
-    Anthropic endpoint stay in the picker after the endpoints' (124 rows on p1168, 121 of them the proxy's). Picking
+    Anthropic endpoint stay in the picker after the endpoints' (123 rows on p1168, 121 of them the proxy's). Picking
     one in relay mode is refused by Claude Code (`availableModels`) with t3's "The agent did not accept the model".
 - **Breaks when**: Claude Code adds an alias or a model id it resolves without these variables (the routed URL
   refuses it, 400: the relay log names `routed` with a null endpoint); t3's adapter stops validating the model against

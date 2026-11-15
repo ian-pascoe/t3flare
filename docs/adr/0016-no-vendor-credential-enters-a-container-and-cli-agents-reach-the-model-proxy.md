@@ -158,8 +158,9 @@ Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/
    and `ANTHROPIC_DEFAULT_OPUS_MODEL` are the first model of that family in the owner's order, else the first model
    (Claude Code's own `default` and its subagents' `sonnet`/`opus` resolve through them). A model t3 names that is not
    a slug (t3's stock Claude default `claude-opus-5-5`, an earlier proxy model) is not in the session's model list, and
-   t3's ACP adapter refuses it before any request ("The agent did not accept the model"); it is never mapped to another
-   model, so the owner is never billed for a model they did not pick. The choice is the
+   t3's ACP adapter refuses it before any request ("The agent did not accept the model"). Until the hard cut
+   (SPI-1176, which owns the fallback of old selections to the default model) it is not mapped to another model, so
+   the owner is not billed for a model they did not pick. The choice is the
    Environment's, not the session's: the managed settings (`/etc/claude-code`) are the Container's, shared by every
    Claude process in it, so nothing in them is one process's. Without such an endpoint, the Model proxy as before.
 3. **Where the handle is.** The Workspace DO puts it in the process's environment (as for Codex). The launcher
