@@ -120,7 +120,8 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
   };
   const call = (caller: OwnCaller, tool: string, args: Record<string, unknown> = {}, extra: { readonly signal?: AbortSignal; readonly asker?: McpAsker } = {}) =>
     host.call({ server: "settings", tool, args, caller, asker: extra.asker ?? asker, ...(extra.signal === undefined ? {} : { signal: extra.signal }) });
-  const panel = (caller: AccessCaller = { kind: "owner", subject: "owner-sub" }): HarnessDeps => ({
+  /** The panel's deps; `ownerEndpoint: false` is a stage without the Owner-client endpoint (no `ownerEndpoint`). */
+  const panel = (caller: AccessCaller = { kind: "owner", subject: "owner-sub" }, panelOptions: { readonly ownerEndpoint?: boolean } = {}): HarnessDeps => ({
     caller,
     host: HOST,
     store,
@@ -131,7 +132,7 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
     skills,
     changes: changesApiOf(deps),
     clients,
-    ownerEndpoint: `https://${HOST}/_t3flare/mcp`,
+    ...(panelOptions.ownerEndpoint === false ? {} : { ownerEndpoint: `https://${HOST}/_t3flare/mcp` }),
   });
   return {
     kv,

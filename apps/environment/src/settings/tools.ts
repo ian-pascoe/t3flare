@@ -33,13 +33,13 @@ export const SETTINGS_OWNER_INSTRUCTIONS =
 
 /**
  * What an Owner client is told besides, by its Elicitation mode (plan D12): the mode the owner set for this client on the
- * Harness panel, or the URL's `?elicitation_mode=` override.
+ * Harness panel, or the URL's `?elicitation_mode=` override (so the text does not say which).
  */
 export const OWNER_MODE_INSTRUCTIONS = {
   browser: "",
-  native: " This client is in the native Elicitation mode (set by the owner on the Harness panel): such a change is asked as a form in your client, and its Accept applies it.",
+  native: " This client is in the native Elicitation mode: such a change is asked as a form in your client, and its Accept applies it.",
   model:
-    " This client is in the model Elicitation mode (set by the owner on the Harness panel): such a change answers approval-required with a requestId: show it to the user, then call resume with the requestId and their answer. A change that takes a secret, starts a sign-in or installs or updates skills waits on its Change page instead.",
+    " This client is in the model Elicitation mode: such a change answers approval-required with a requestId: show it to the user, then call resume with the requestId and their answer. A change that takes a secret, starts a sign-in or installs or updates skills waits on its Change page instead.",
 } as const;
 
 const ASKED_NOTE = "Changes that widen what agents have or can do (the Change tier `asked`) wait for the owner's answer, on his card or the Change page, before they apply; turning things down is `free`.";

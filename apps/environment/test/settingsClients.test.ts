@@ -4,12 +4,15 @@
 // endpoint's URL. The kept mode decides when the URL names none; `?elicitation_mode=` still overrides; an unknown client
 // and a request with no client name are `browser`. Keys are isolated; the table is capped per key and `lastSeen` is
 // throttled. Only the panel's CSRF-guarded POST changes a mode: no MCP door, no Settings tool, no other panel route.
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { csrfToken } from "../src/harness/csrf.ts";
 import { HARNESS_PATH } from "../src/harness/paths.ts";
 import { CLIENTS_API_PATH, handleHarness } from "../src/harness/panel.ts";
 import { CLIENT_NAME_MAX, CLIENTS_PER_KEY, SEEN_EVERY_MS } from "../src/settings/clients.ts";
+import { readAudit } from "../src/harness/ops.ts";
 import { MODERN_VERSION } from "../src/settings/endpoint.ts";
 import { OWNER_MODE_INSTRUCTIONS, RESUME_TOOL, SETTINGS_TOOLS } from "../src/settings/tools.ts";
 import { ASKED, BOTH, bodyOf, CLAUDE_INFO, endpointOf, initialize, legacy, modern, post, SUB } from "./settingsEndpointFixture.ts";
@@ -82,7 +85,8 @@ describe("the kept mode decides when the URL names none", () => {
     await setMode(f, "model");
     const discovered = await bodyOf(await endpoint(modern("server/discover")));
     expect(discovered.result?.instructions).toContain(OWNER_MODE_INSTRUCTIONS.model);
-    expect(OWNER_MODE_INSTRUCTIONS.model).toContain("Harness panel");
+    // The mode may come from the panel or from the query, so the text does not say which.
+    expect(OWNER_MODE_INSTRUCTIONS.model).not.toContain("Harness panel");
     expect(OWNER_MODE_INSTRUCTIONS.native).not.toContain("elicitation_mode");
   });
 
@@ -192,6 +196,41 @@ describe("the table: keys isolated, capped per key, lastSeen throttled", () => {
     expect(f.clients.list().filter((entry) => entry.key === "service-token")).toHaveLength(1);
   });
 
+  it("evicts the least recently seen browser row first: a flood of names never drops a mode the owner set", async () => {
+    const f = world();
+    for (let index = 0; index < CLIENTS_PER_KEY; index++) {
+      f.advance(1000);
+      f.clients.seen(SUB, `client-${index}`);
+    }
+    // The oldest and the newest rows are the owner's; every other row is browser.
+    await setMode(f, "model", "client-0");
+    await setMode(f, "native", `client-${CLIENTS_PER_KEY - 1}`);
+    for (let index = 0; index < CLIENTS_PER_KEY * 2; index++) {
+      f.advance(1000);
+      f.clients.seen(SUB, `flood-${index}`);
+    }
+    const mine = f.clients.list().filter((entry) => entry.key === SUB);
+    expect(mine).toHaveLength(CLIENTS_PER_KEY);
+    expect(modeOf(f, "client-0")).toBe("model");
+    expect(modeOf(f, `client-${CLIENTS_PER_KEY - 1}`)).toBe("native");
+    expect(mine.filter((entry) => entry.mode !== "browser").map((entry) => entry.clientName).sort((a, b) => a.localeCompare(b))).toEqual(["client-0", `client-${CLIENTS_PER_KEY - 1}`]);
+  });
+
+  it("with no browser row left, evicts the least recently seen of any mode", async () => {
+    const f = world();
+    for (let index = 0; index < CLIENTS_PER_KEY; index++) {
+      f.advance(1000);
+      f.clients.seen(SUB, `client-${index}`);
+      await setMode(f, "model", `client-${index}`);
+    }
+    f.advance(1000);
+    expect(f.clients.seen(SUB, "newcomer")).toBe("browser");
+    const mine = f.clients.list().filter((entry) => entry.key === SUB);
+    expect(mine).toHaveLength(CLIENTS_PER_KEY);
+    expect(mine.map((entry) => entry.clientName)).not.toContain("client-0");
+    expect(modeOf(f, "client-1")).toBe("model");
+  });
+
   it("cuts a name to its maximum and matches it cut", async () => {
     const f = world();
     const long = `x${"y".repeat(CLIENT_NAME_MAX + 20)}`;
@@ -230,7 +269,7 @@ describe("only the panel's CSRF-guarded POST changes a mode", () => {
     expect(modeOf(f)).toBe("browser");
     expect((await panelPost(f, body)).status).toBe(200);
     expect(modeOf(f)).toBe("model");
-    expect(f.store.auditLog(1)[0]).toMatchObject({ entity: "owner-clients", caller: `owner:${SUB}`, action: "client-mode", target: "claude-code", before: { key: SUB, mode: "browser" }, after: { key: SUB, mode: "model" } });
+    expect(f.store.auditLog(1)[0]).toMatchObject({ entity: "owner-clients", caller: `owner:${SUB}`, action: "client-mode", target: "claude-code", before: { mode: "browser" }, after: { mode: "model" } });
   });
 
   it("refuses an unknown client, a bad mode and a malformed body; removes a client, audited", async () => {
@@ -242,7 +281,7 @@ describe("only the panel's CSRF-guarded POST changes a mode", () => {
     expect((await panelPost(f, { key: SUB, clientName: "x".repeat(CLIENT_NAME_MAX + 1), mode: "model" })).status).toBe(400);
     expect((await panelPost(f, { key: SUB, clientName: "claude-code", remove: true })).status).toBe(200);
     expect(f.clients.list()).toEqual([]);
-    expect(f.store.auditLog(1)[0]).toMatchObject({ entity: "owner-clients", action: "client-remove", target: "claude-code" });
+    expect(f.store.auditLog(1)[0]).toMatchObject({ entity: "owner-clients", action: "client-remove", target: "claude-code", before: { mode: "browser" }, after: null });
     expect((await panelPost(f, { key: SUB, clientName: "claude-code", remove: true })).status).toBe(404);
   });
 
@@ -286,7 +325,138 @@ describe("only the panel's CSRF-guarded POST changes a mode", () => {
     expect(html).toMatch(/data-client-mode data-client-key="owner-sub" data-client-name="claude-code"[^>]*><option value="browser">browser<\/option><option value="native" selected>/);
     expect(html).toContain("data-client-remove");
     for (const mode of ["browser", "native", "model"]) expect(html).toContain(`<li><strong>${mode}</strong>: `);
+    // `model` is learned at the connect (instructions and the tool list are read once), so a change to or from it needs a reconnect.
+    expect(html).toContain("must reconnect after a change to or from <strong>model</strong>");
     const listed = (await (await handleHarness(new Request(`https://${HOST}${CLIENTS_API_PATH}`), f.panel())).json()) as { clients: Array<{ clientName: string }> };
     expect(listed.clients.map((client) => client.clientName)).toContain("claude-code");
+  });
+});
+
+describe("a 2025 native form answer takes its mode from its session's client name", () => {
+  const OPENCODE = "opencode";
+  const answerBody = (id: unknown) => ({ jsonrpc: "2.0", id, result: { action: "accept", content: {} } });
+  const eventsOf = (text: string): Array<Record<string, unknown>> =>
+    text
+      .split("\n\n")
+      .flatMap((block) => block.split("\n").filter((line) => line.startsWith("data: ")))
+      .map((line) => JSON.parse(line.slice("data: ".length)) as Record<string, unknown>);
+
+  /** A native-mode client with a 2025-11-25 session, and its change held open on a form (no query anywhere). */
+  const asked = async () => {
+    const f = world();
+    const endpoint = endpointOf(f, { beatMs: 30 });
+    const { session } = await initialize(endpoint, "2025-11-25");
+    await setMode(f, "native", OPENCODE);
+    const held = await endpoint(legacy("tools/call", { name: "change_environment", arguments: ASKED }, { session, id: 7 }));
+    expect(held.headers.get("content-type")).toBe("text/event-stream");
+    const reader = held.body!.getReader();
+    let text = "";
+    while (!text.includes("\n\n")) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += new TextDecoder().decode(value);
+    }
+    const ask = eventsOf(text)[0]!;
+    const [record] = f.deps.changes.open();
+    expect(record).toMatchObject({ mode: "native", state: "open" });
+    const answer = (withSession: boolean) => endpoint(post(answerBody(ask.id), { headers: withSession ? { "mcp-session-id": session } : {} }));
+    return { f, reader, record: record!, answer };
+  };
+
+  it("native on the panel, a session, no query: 202, and the change applies", async () => {
+    const { f, reader, record, answer } = await asked();
+    const posted = await answer(true);
+    expect(posted.status).toBe(202);
+    await reader.cancel();
+    expect(f.deps.changes.get(record.id)).toMatchObject({ state: "applied", closed: { by: "client" } });
+    expect(f.store.loadEnvironment().revision).toBe(1);
+  });
+
+  it("the mode moved to browser on the panel: 400 other-mode, and the change stays open", async () => {
+    const { f, reader, record, answer } = await asked();
+    await setMode(f, "browser", OPENCODE);
+    const posted = await answer(true);
+    expect(posted.status).toBe(400);
+    expect(JSON.stringify(await posted.json())).toContain("this client is in another now");
+    await reader.cancel();
+    expect(f.deps.changes.get(record.id)?.state).toBe("open");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+    expect(f.logs).toContainEqual(expect.objectContaining({ t3flare: "settings-refused", reason: "other-mode" }));
+  });
+
+  it("the client's row removed on the panel: 400 other-mode, and the change stays open", async () => {
+    const { f, reader, record, answer } = await asked();
+    expect((await panelPost(f, { key: SUB, clientName: OPENCODE, remove: true })).status).toBe(200);
+    const posted = await answer(true);
+    expect(posted.status).toBe(400);
+    await reader.cancel();
+    expect(f.deps.changes.get(record.id)?.state).toBe("open");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+    // The answer's request recorded the client again, in browser: the owner's mode went with the row.
+    expect(modeOf(f, OPENCODE)).toBe("browser");
+  });
+
+  it("no Mcp-Session-Id: 400 other-mode saying so, and the change stays open", async () => {
+    const { f, reader, record, answer } = await asked();
+    const posted = await answer(false);
+    expect(posted.status).toBe(400);
+    const text = JSON.stringify(await posted.json());
+    expect(text).toContain("Mcp-Session-Id");
+    expect(text).not.toContain("this client is in another now");
+    await reader.cancel();
+    expect(f.deps.changes.get(record.id)?.state).toBe("open");
+    expect(f.store.loadEnvironment().revision).toBe(0);
+  });
+});
+
+describe("read_audit never carries the owner's Access subject (plan D14)", () => {
+  it("after a client-mode change and a client-remove, on the Owner endpoint and the own agents' door", async () => {
+    const f = world();
+    const endpoint = endpointOf(f);
+    await endpoint(modern("ping"));
+    await setMode(f, "model");
+    await setMode(f, "native");
+    expect((await panelPost(f, { key: SUB, clientName: "claude-code", remove: true })).status).toBe(200);
+    expect(f.store.auditLog(10).filter((entry) => entry.entity === "owner-clients").map((entry) => entry.action)).toEqual(["client-remove", "client-mode", "client-mode"]);
+    // The stored entries carry the client's name and mode only; the subject is only in `caller`, which `read_audit` redacts.
+    expect(JSON.stringify(f.store.auditLog(10).map(({ caller: _caller, ...entry }) => entry))).not.toContain(SUB);
+
+    const viaEndpoint = JSON.stringify(await bodyOf(await endpoint(modern("tools/call", { name: "read_audit", arguments: {} }))));
+    const viaOwn = JSON.stringify(await f.call(f.durable(), "read_audit", {}));
+    for (const read of [viaEndpoint, viaOwn, JSON.stringify(readAudit(f.deps.ops))]) {
+      expect(read).toContain("client-remove");
+      expect(read).toContain("client-mode");
+      expect(read).not.toContain(SUB);
+    }
+  });
+});
+
+describe("the excluded-stage panel (no Owner-client endpoint)", () => {
+  it("renders the not-deployed line alone: no URL, no mode meanings, no query note", async () => {
+    const f = world();
+    const html = await (await handleHarness(new Request(`https://${HOST}${HARNESS_PATH}`), f.panel(undefined, { ownerEndpoint: false }))).text();
+    const block = /<details class="tools" open data-owner-clients>[\s\S]*?<\/details>/.exec(html)?.[0] ?? "";
+    expect(block).toContain("The Owner-client endpoint is not deployed on this Environment.");
+    expect(html).not.toContain("/_t3flare/mcp");
+    expect(block).not.toContain("<li><strong>");
+    expect(block).not.toContain("elicitation_mode");
+    expect(block).not.toContain("reconnect");
+  });
+});
+
+describe("only the panel writes a client's mode", () => {
+  it("in the sources, the table's setMode and remove are called from harness/panel.ts alone", () => {
+    const root = join(import.meta.dirname, "..", "src");
+    const files = (dir: string): Array<string> => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? files(join(dir, entry.name)) : entry.name.endsWith(".ts") ? [join(dir, entry.name)] : []));
+    const called = files(root)
+      .filter((file) => /\b[cC]lients\)?\??\.(?:setMode|remove)\b|\bownerClients\([^)]*\)\.(?:setMode|remove)\b/.test(readFileSync(file, "utf8")))
+      .map((file) => file.slice(root.length + 1));
+    expect(called).toEqual(["harness/panel.ts"]);
+    // `setMode` as a name: the table's own module, and the panel that calls it, only (acpFlavor's is another thing).
+    const named = files(root)
+      .filter((file) => /\bsetMode\b/.test(readFileSync(file, "utf8")) && !file.endsWith("acpFlavor.ts"))
+      .map((file) => file.slice(root.length + 1))
+      .sort((a, b) => a.localeCompare(b));
+    expect(named).toEqual(["harness/panel.ts", "settings/clients.ts"]);
   });
 });

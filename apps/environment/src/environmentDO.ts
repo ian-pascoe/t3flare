@@ -36,6 +36,7 @@ import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
 import { type ModelRelayTarget, relayTargetOf } from "@t3flare/models/relay";
 import type { SkillsApiDeps } from "./skills/api.ts";
+import type { OwnerClients } from "./settings/clients.ts";
 import type { SettingsServerDeps } from "./settings/server.ts";
 import { githubReader, readAccessFor } from "./skills/contents.ts";
 import { type SkillStore, skillStore } from "./skills/store.ts";
@@ -172,6 +173,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   #reraised: Promise<unknown> = Promise.resolve();
   /** Step 4a: this instance's CLI processes in the Workspaces' Containers. */
   readonly #processes: ProcessChannel;
+  /** The Owner clients' table (settings/clients.ts), one per instance so its DDL runs once, not per request. */
+  #ownerClients: OwnerClients | undefined;
 
   constructor(ctx: DurableObjectState, env: EnvironmentEnv) {
     super(ctx, env);
@@ -389,10 +392,10 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * Never boots t3. Not reachable through `fetch`.
    */
   async harness(request: Request, caller: AccessCaller): Promise<Response> {
-    const [{ handleHarness }, { changesApiOf }, { ownerClients }, { settingsMcpUrl }] = await Promise.all([
+    const [{ handleHarness }, { changesApiOf }, clients, { settingsMcpUrl }] = await Promise.all([
       import("./harness/panel.ts"),
       import("./settings/server.ts"),
-      import("./settings/clients.ts"),
+      this.#clientsTable(),
       import("./settings/endpointLayout.ts"),
     ]);
     return handleHarness(request, {
@@ -413,7 +416,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       // The Open changes (plan D10): the Change page answers them through the Settings server's own apply.
       changes: changesApiOf(await this.#settingsDeps()),
       // The Owner clients' modes (ADR-0034's 2026-11-15 refinement): set here alone, read by the endpoint.
-      clients: ownerClients(this.ctx.storage.sql),
+      clients,
       ...(this.env.T3FLARE_ACCESS_SETTINGS_AUD === undefined ? {} : { ownerEndpoint: settingsMcpUrl(this.#configuredHost()) }),
     });
   }
@@ -455,8 +458,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async settingsMcp(request: Request, caller: AccessCaller): Promise<Response> {
     Idle.requestStarted();
     try {
-      const [{ handleSettingsMcp }, { settingsStateKey }, { ownerClients }] = await Promise.all([import("./settings/endpoint.ts"), import("./settings/tokens.ts"), import("./settings/clients.ts")]);
-      const clients = ownerClients(this.ctx.storage.sql);
+      const [{ handleSettingsMcp }, { settingsStateKey }, clients] = await Promise.all([import("./settings/endpoint.ts"), import("./settings/tokens.ts"), this.#clientsTable()]);
       return await handleSettingsMcp(request, caller, {
         server: await this.#settingsDeps(),
         // The client's kept mode, read and recorded as seen; never set through this door.
@@ -486,6 +488,15 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     const state = await byName(services.agents.CONTAINER_BUDGET, "budget", "CONTAINER_BUDGET").state();
     const names = new Map(services.workspaces.list().map((ws) => [String(services.agents.WORKSPACES?.idFromName(ws.id)), ws.id]));
     return { max: state.max, leases: state.leases.map((lease) => ({ holder: lease.holder, workspace: names.get(lease.holder) ?? null })) };
+  }
+
+  /** The Owner clients' table: the one instance of this object (its DDL runs on its first call). */
+  async #clientsTable(): Promise<OwnerClients> {
+    if (this.#ownerClients === undefined) {
+      const { ownerClients } = await import("./settings/clients.ts");
+      this.#ownerClients ??= ownerClients(this.ctx.storage.sql);
+    }
+    return this.#ownerClients;
   }
 
   /**
