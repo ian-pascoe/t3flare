@@ -36,5 +36,7 @@ RUN cd /opt/t3flare/claude && npm ci --omit=dev --ignore-scripts --no-audit --no
  && test -x $sdk/claude-agent-sdk-linux-x64/claude
 COPY --chmod=755 t3flare-claude-agent-acp /opt/t3flare/bin/claude-agent-acp
 COPY --chmod=755 t3flare-claude-key /opt/t3flare/bin/t3flare-claude-key
+COPY --chmod=755 t3flare-claude-handle /opt/t3flare/bin/t3flare-claude-handle
+COPY claude-handle-unset.cjs /opt/t3flare/share/claude-handle-unset.cjs
 COPY --chmod=755 t3flare-opencode /opt/t3flare/bin/opencode
 COPY opencode-key-plugin /opt/t3flare/share/opencode-key-plugin

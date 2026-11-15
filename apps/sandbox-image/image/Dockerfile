@@ -137,6 +137,8 @@ RUN cd /opt/t3flare/claude \
 COPY --from=opencode --chown=0:0 /opencode /opt/t3flare/opencode/opencode
 COPY --chmod=755 t3flare-claude-agent-acp /opt/t3flare/bin/claude-agent-acp
 COPY --chmod=755 t3flare-claude-key /opt/t3flare/bin/t3flare-claude-key
+COPY --chmod=755 t3flare-claude-handle /opt/t3flare/bin/t3flare-claude-handle
+COPY claude-handle-unset.cjs /opt/t3flare/share/claude-handle-unset.cjs
 COPY --chmod=755 t3flare-opencode /opt/t3flare/bin/opencode
 COPY opencode-key-plugin /opt/t3flare/share/opencode-key-plugin
 

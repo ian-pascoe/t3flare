@@ -17,6 +17,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
 import * as ServerSettings from "t3/src/serverSettings.ts";
 import * as ProviderInstanceRegistry from "t3/src/provider/ProviderInstanceRegistry.ts";
 
@@ -65,6 +66,23 @@ export const layerSeedTextGenerationModel = Layer.effectDiscard(
     const stopHearing = onEndpointsChanged(() => void Effect.runForkWith(context)(Effect.forkIn(sync, scope)));
     yield* Effect.addFinalizer(() => Effect.sync(stopHearing));
   }),
+);
+
+/** The text-generation setting's model, as the settings hold it now (`layerFollowTextGenerationModel`). */
+let textGenerationModel: string | undefined;
+
+/** The text-generation setting's model now, for a CLI spawn (SPI-1168: Claude Code's background model); undefined before t3 boots. */
+export const currentTextGenerationModel = (): string | undefined => textGenerationModel;
+
+/** Keeps `currentTextGenerationModel` current: the setting at boot, then each change, for the runtime's life. */
+export const layerFollowTextGenerationModel = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const settings = yield* ServerSettings.ServerSettingsService;
+    // Subscribed before the read, so no change between them is missed.
+    const changes = yield* settings.subscribeChanges;
+    textGenerationModel = (yield* settings.getSettings).textGenerationModelSelection.model;
+    yield* Effect.forkScoped(Stream.runForEach(changes, (next) => Effect.sync(() => void (textGenerationModel = next.textGenerationModelSelection.model))));
+  }).pipe(Effect.catchCause((cause) => Effect.logWarning("t3flare: the text-generation model is not followed", cause))),
 );
 
 /**

@@ -6,7 +6,6 @@
 // never a spawning probe; t3's MCP credential is withheld (OD-3); text generation is the proxy's; 4a's wrapper runs
 // around the adapter (one process per session, the hold, the 2 h cap).
 import { type ChatAttachment, type ProviderDriverKind, type ProviderInstanceId, type ServerProvider, type ServerProviderModel } from "@t3tools/contracts";
-import { createModelCapabilities } from "@t3tools/shared/model";
 import type { Catalog } from "@t3flare/models/catalog";
 import { defaultProviderContinuationIdentity, type ProviderInstance } from "@t3tools/provider-core/server/driver";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -42,6 +41,7 @@ import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import {
   type AcpCli,
+  acpModelCapabilities,
   cliModelId,
   cliPermissionDisposition,
   cliPromptFailure,
@@ -52,6 +52,9 @@ import {
   PINNED_MODE,
 } from "./acpFlavor.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
+import { claudeModelId, claudeModelsOf } from "./claudeEndpoints.ts";
+import { refreshOnEndpointsChanged } from "../../endpoints/changes.ts";
+import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { CliSpawn, CliTurn, type CliSessions, wrapCliAdapter } from "./wrapper.ts";
 import { relayUrl } from "../../agents/cliProfiles.ts";
 
@@ -64,25 +67,10 @@ export type AcpCliDriverEnv =
   | ProviderHost.ProviderHost
   | SecureRandom.SecureRandom;
 
-/** The effort levels both agents offer as their `effort` config option (M0 P1, P2). */
-const EFFORTS = [
-  { id: "default", label: "Default", isDefault: true },
-  { id: "low", label: "Low" },
-  { id: "medium", label: "Medium" },
-  { id: "high", label: "High" },
-  { id: "xhigh", label: "Extra high" },
-  { id: "max", label: "Max" },
-] as const;
-
 /** The catalog's models, with the agents' `effort` picker for reasoning models (t3's adapter sets it by id). */
 export const acpSnapshotModels = (catalog: Catalog): ReadonlyArray<ServerProviderModel> => {
   const reasoning = new Set(catalog.models.filter((model) => model.reasoning).map((model) => model.slug));
-  return snapshotModels(catalog).map((model) => ({
-    ...model,
-    capabilities: createModelCapabilities({
-      optionDescriptors: reasoning.has(model.slug) ? [{ id: "effort", label: "Effort", type: "select", options: EFFORTS.map((effort) => ({ ...effort })) }] : [],
-    }),
-  }));
+  return snapshotModels(catalog).map((model) => ({ ...model, capabilities: acpModelCapabilities(reasoning.has(model.slug)) }));
 };
 
 /**
@@ -167,7 +155,7 @@ export interface AcpCliDriverSpec {
 
 /** The snapshot's note on what of t3's settings form is ignored here (plan §3.1). */
 const IGNORED_SETTINGS: Readonly<Record<AcpCli, string>> = {
-  claude: "Runs Claude Code in the Workspace's Container on the model proxy; the binary, home, launch arguments and custom models settings are not used.",
+  claude: "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints (else the model proxy); the binary, home, launch arguments and custom models settings are not used.",
   opencode: "Runs OpenCode in the Workspace's Container on the model proxy; the binary, server URL, password and custom models settings are not used.",
 };
 
@@ -178,7 +166,8 @@ const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
       presentation: spec.presentation,
       enabled,
       checkedAt,
-      models: acpSnapshotModels(environmentServices().catalog.current()),
+      // SPI-1168: Claude Code's are the Anthropic Messages endpoints' when there is one.
+      models: spec.cli === "claude" ? claudeModelsOf(acpSnapshotModels(environmentServices().catalog.current()), environmentServices().modelEndpoints?.()) : acpSnapshotModels(environmentServices().catalog.current()),
       // SPI-1151: the built-ins that run here (none: t3's ACP adapter refuses `/compact` without a compacting flavor).
       slashCommands: CLI_BUILT_IN_COMMANDS[spec.cli],
       probe: { installed: true, version: spec.version, status: "ready", auth: { status: "authenticated" }, message: IGNORED_SETTINGS[spec.cli] },
@@ -189,6 +178,8 @@ export interface AcpFlavorOptions {
   readonly buildPrompt?: AcpAdapterV2Flavor["buildPrompt"];
   /** The unguarded runtime (tests replay a recorded agent); by default the CLI through the process channel. */
   readonly spawn?: AcpAdapterV2Flavor["makeRuntime"];
+  /** SPI-1168: the Model endpoints as stored now, for Claude Code's model ids (an endpoint's by its slug). Absent: none. */
+  readonly modelEndpoints?: () => ModelEndpoints | undefined;
 }
 
 /** The flavor: plan §3.2's table, back to t3's own modes (owner, 2026-11-12). Every runtime is wrapped (`guardedRuntime`). */
@@ -205,7 +196,7 @@ export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpF
   permissionDisposition: cliPermissionDisposition,
   promptFailure: (cause) => cliPromptFailure(cause),
   requiresSignIn: () => false,
-  resolveModelId: (selection) => cliModelId(cli, selection.model),
+  resolveModelId: (selection) => (cli === "claude" ? claudeModelId(selection.model, options.modelEndpoints?.()) : cliModelId(cli, selection.model)),
   ...(options.buildPrompt === undefined ? {} : { buildPrompt: options.buildPrompt }),
   // Review F1: the plan is captured when Claude asks to leave plan mode (guardedRuntime), not after the turn settles.
   registerExtensions: ({ runtime, captureProposedPlan }) =>
@@ -292,6 +283,8 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
     ),
   }).pipe(Effect.orDie);
   yield* Effect.forkScoped(snapshot.refresh);
+  // SPI-1168: Claude Code's model list follows the Model endpoints at once, as Codex's does.
+  if (spec.cli === "claude") yield* refreshOnEndpointsChanged(snapshot.refresh);
   const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
   const sessions: CliSessions = new Map();
   // t3's own tools with t3's per-thread bearer, as stock t3 hands them, at t3's public `/mcp` (owner, 2026-11-12, back
@@ -303,7 +296,7 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   // SPI-1151: a picked Skill reaches the CLI as its own: Claude Code's mention rewritten (the wrapper), OpenCode's embedded.
   const skillsAccess = environmentSkillsAccess();
   const buildPrompt = acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? skillsAccess : undefined);
-  const adapter = yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { buildPrompt }), continuationRequests)).pipe(
+  const adapter = yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { buildPrompt, modelEndpoints: () => environmentServices().modelEndpoints?.() }), continuationRequests)).pipe(
     Effect.provideService(McpProviderSessions.McpProviderSessions, relayed),
   );
   return {

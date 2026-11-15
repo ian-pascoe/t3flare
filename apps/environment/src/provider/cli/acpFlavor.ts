@@ -18,6 +18,7 @@ import { classifyProxyFailure, proxyFailureMessage, type ProxyFailure } from "@t
 import type { AcpPermissionDisposition } from "@t3tools/provider-acp/server/clientPolicy";
 import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
+import { createModelCapabilities } from "@t3tools/shared/model";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -63,6 +64,22 @@ export const cliRuntimeModeForSessionMode =
   (cli: AcpCli) =>
   (modeId: string): RuntimeMode | undefined =>
     modeId === PINNED_MODE[cli] || modeId === "plan" ? "approval-required" : cli === "claude" && modeId === CLAUDE_AUTO_MODE ? "auto" : undefined;
+
+/** The effort levels both agents offer as their `effort` config option (M0 P1, P2). */
+const EFFORTS = [
+  { id: "default", label: "Default", isDefault: true },
+  { id: "low", label: "Low" },
+  { id: "medium", label: "Medium" },
+  { id: "high", label: "High" },
+  { id: "xhigh", label: "Extra high" },
+  { id: "max", label: "Max" },
+] as const;
+
+/** A model's capabilities in the agents' pickers: the `effort` picker for a reasoning model (t3's adapter sets it by id). */
+export const acpModelCapabilities = (reasoning: boolean) =>
+  createModelCapabilities({
+    optionDescriptors: reasoning ? [{ id: "effort", label: "Effort", type: "select", options: EFFORTS.map((effort) => ({ ...effort })) }] : [],
+  });
 
 /** The catalog id of a model slug (`anthropic/<id>`), as each CLI names it. */
 export const cliModelId = (cli: AcpCli, slug: string): string => {

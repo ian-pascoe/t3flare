@@ -194,6 +194,7 @@ import { layerPeerLinksWithoutCause } from "./peerLinks.ts";
 import * as ConnectService from "../connect/service.ts";
 import { makePublishRecorder } from "../connect/recorder.ts";
 import {
+  layerFollowTextGenerationModel,
   layerPinFastWorktreeCheckoutOff,
   layerSeedLinkedEnvironmentsOn,
   layerSeedTextGenerationModel,
@@ -618,6 +619,8 @@ export const make = (options: CompositionOptions) => {
     Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),
     // t3flare: text generation's model points at the Durable agent provider (step 2a, R12).
     layerSeedTextGenerationModel,
+    // t3flare: the setting's model for Claude Code's background model at a spawn (SPI-1168).
+    layerFollowTextGenerationModel,
     // t3flare: every worktree is a Workspace of its own (step 2b): no fast checkout cache.
     layerPinFastWorktreeCheckoutOff,
     // t3flare: the laptop links to the cloud (step 3, L1, once). Agent browser access is the owner's setting, with

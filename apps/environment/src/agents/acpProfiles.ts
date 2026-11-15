@@ -9,8 +9,15 @@
 // one provider, the key set by the image's server plugin, every home on local disk.
 // Each honours the repository's own configuration otherwise, as stock t3's CLIs do (owner, 2026-11-12, back to stock):
 // hooks, MCP servers, agents, skills, plugins, marketplaces. What stays pinned is K5: the endpoint and the key.
+//
+// SPI-1168: with an Anthropic Messages Model endpoint, Claude Code runs on the endpoints through the model relay instead
+// (`ClaudeRelay`): its one base URL is the relay's model-routed URL, its models are the endpoints' slugs (the relay
+// sends each request to its model's endpoint), and its key is the process's model handle, which `apiKeyHelper` reads
+// from the launcher's environment (`CLAUDE_HANDLE_HELPER`). The managed settings are the Container's, shared by every
+// Claude process in it, so nothing in them is one process's.
 import type { CatalogModel } from "@t3flare/models";
 import { SMALL_MODEL_SLUG, DEFAULT_MODEL_SLUG } from "@t3flare/models";
+import { modelRoutedRelayUrl } from "@t3flare/models/relay";
 import { CLI_HOMES } from "@t3flare/sandbox-image/process";
 import { SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT } from "@t3flare/workspace-client";
@@ -38,6 +45,21 @@ export const OPENCODE_SNAPSHOT_DIR = `${HARNESS_ROOT}/opencode`;
 export const OPENCODE_KEY_PLUGIN = "/opt/t3flare/share/opencode-key-plugin";
 /** The helper Claude Code runs for its key: the image's, reading this process's nonce from its home. */
 export const CLAUDE_KEY_HELPER = `${CLI_BIN}/t3flare-claude-key`;
+/**
+ * The helper Claude Code runs for its key on the model relay (SPI-1168): the image's, printing this process's model
+ * handle from the environment its launcher started claude-agent-acp with; no file and no Claude environment holds it.
+ */
+export const CLAUDE_HANDLE_HELPER = `${CLI_BIN}/t3flare-claude-handle`;
+
+/**
+ * Claude Code on the Model endpoints (SPI-1168, `provider/cli/claudeEndpoints.ts` `claudeRelayOf`): the Anthropic
+ * Messages endpoints its handle is for, their models' slugs, and the background model's slug.
+ */
+export interface ClaudeRelay {
+  readonly endpoints: ReadonlyArray<string>;
+  readonly models: ReadonlyArray<string>;
+  readonly backgroundModel: string | undefined;
+}
 /** The `claude` binary the image installs (the SDK's linux-x64 platform package). */
 export const CLAUDE_EXECUTABLE = "/opt/t3flare/claude/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude";
 
@@ -86,10 +108,21 @@ export const CLAUDE_PINNED_EMPTY: ReadonlyArray<string> = [
   "ANTHROPIC_SMALL_FAST_MODEL",
 ];
 
+/** Claude Code's base URL and background model: the Model proxy's, or the model relay's (SPI-1168). */
+interface ClaudeEndpoint {
+  readonly baseUrl: string;
+  readonly backgroundModel: string | undefined;
+}
+
+const claudeEndpointOf = (context: Pick<ProfileContext, "proxyUrl" | "claudeRelay">): ClaudeEndpoint =>
+  context.claudeRelay === undefined
+    ? { baseUrl: context.proxyUrl, backgroundModel: idOf(SMALL_MODEL_SLUG) }
+    : { baseUrl: modelRoutedRelayUrl, backgroundModel: context.claudeRelay.backgroundModel };
+
 /** The variables Claude Code gets from both its launch environment and the managed `env` (M0 P1, P3). */
-const claudeSwitches = (proxyUrl: string): Record<string, string> => ({
-  ANTHROPIC_BASE_URL: proxyUrl,
-  ANTHROPIC_DEFAULT_HAIKU_MODEL: idOf(SMALL_MODEL_SLUG),
+const claudeSwitches = (endpoint: ClaudeEndpoint): Record<string, string> => ({
+  ANTHROPIC_BASE_URL: endpoint.baseUrl,
+  ...(endpoint.backgroundModel === undefined ? {} : { ANTHROPIC_DEFAULT_HAIKU_MODEL: endpoint.backgroundModel }),
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
   DISABLE_TELEMETRY: "1",
   DISABLE_ERROR_REPORTING: "1",
@@ -112,14 +145,15 @@ const relayNames = (context: ProfileContext): ReadonlyArray<string> => (context.
  * Claude Code's managed settings (`/etc/claude-code/managed-settings.json`): the endpoint and the key (K5), and the
  * asking mode the flavor pins (`acpFlavor.ts`). `relayServers`: the MCP relay's servers (ADR-0028; the entries
  * themselves, with the process's handle, come per session over ACP, review H2), allowed without Claude's own prompt
- * because the relay decides and asks. The repository's `.claude/` is honoured for everything else.
+ * because the relay decides and asks. The repository's `.claude/` is honoured for everything else. `claudeRelay`: on
+ * the Model endpoints through the model relay (SPI-1168), not the proxy.
  */
-export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = []) => ({
-  apiKeyHelper: CLAUDE_KEY_HELPER,
+export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = [], claudeRelay?: ClaudeRelay) => ({
+  apiKeyHelper: claudeRelay === undefined ? CLAUDE_KEY_HELPER : CLAUDE_HANDLE_HELPER,
   // Review F3: only the endpoint the managed env pins is admitted.
   allowedProviders: ["customEndpoint"],
-  availableModels: models.map((model) => model.id),
-  env: { ...Object.fromEntries(CLAUDE_PINNED_EMPTY.map((name) => [name, ""])), ...claudeSwitches(proxyUrl) },
+  availableModels: claudeRelay === undefined ? models.map((model) => model.id) : [...claudeRelay.models],
+  env: { ...Object.fromEntries(CLAUDE_PINNED_EMPTY.map((name) => [name, ""])), ...claudeSwitches(claudeEndpointOf({ proxyUrl, ...(claudeRelay === undefined ? {} : { claudeRelay }) })) },
   skipWebFetchPreflight: true,
   disableClaudeAiConnectors: true,
   cleanupPeriodDays: 60,
@@ -144,12 +178,14 @@ const claudeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer
       CLAUDE_CODE_EXECUTABLE: CLAUDE_EXECUTABLE,
       // Ask the helper at start and after a 401, not every 5 minutes (M0 P1: one grant per process).
       CLAUDE_CODE_API_KEY_HELPER_TTL_MS: String(24 * 3_600_000),
-      ...claudeSwitches(context.proxyUrl),
+      ...claudeSwitches(claudeEndpointOf(context)),
     },
-    files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(context.proxyUrl, context.models, relayNames(context)), null, 1)}\n` }],
+    files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(context.proxyUrl, context.models, relayNames(context), context.claudeRelay), null, 1)}\n` }],
     // SPI-1153: the Environment skill set as Claude Code's user-level root (`$CLAUDE_CONFIG_DIR/skills`).
     links: [{ path: `${home}/claude/projects`, target: CLAUDE_PROJECTS }, environmentSkillsLink(`${home}/claude/skills`)],
     ...(thread === undefined ? {} : { thread }),
+    // SPI-1168: the Workspace DO gives the process a model handle for these endpoints, in its environment only.
+    ...(context.claudeRelay === undefined ? {} : { modelRelay: [...context.claudeRelay.endpoints] }),
     droppedEnv: dropped(input.env),
   } satisfies Launch;
 };

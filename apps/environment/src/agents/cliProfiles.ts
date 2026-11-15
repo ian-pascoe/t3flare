@@ -9,7 +9,7 @@ import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, RELAY_SERVERS_ENV, TOOL_HANDLE_
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
 
-import { acpProfileLaunch, environmentSkillsLink } from "./acpProfiles.ts";
+import { acpProfileLaunch, type ClaudeRelay, environmentSkillsLink } from "./acpProfiles.ts";
 
 /**
  * The CLIs the channel runs; `probe` is M1's test program (stages only). Step 4b: Claude Code and OpenCode over ACP. A
@@ -67,6 +67,11 @@ export interface ProfileContext {
   readonly endpoints?: ReadonlyArray<RelayedEndpoint>;
   /** The model the CLI's session was opened with, when known (SPI-1167: Codex's process provider is its model's). */
   readonly model?: string;
+  /**
+   * SPI-1168: Claude Code on the Anthropic Messages endpoints through the model relay (`claudeRelayOf`), instead of the
+   * Model proxy. Absent: the proxy.
+   */
+  readonly claudeRelay?: ClaudeRelay;
 }
 
 /** The relay's URL for `server` as the Container reaches it. */

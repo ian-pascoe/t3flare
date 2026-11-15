@@ -19,6 +19,8 @@ import { type ChannelProcess, type ChannelStart, ProcessRefused } from "./proces
 import { type CliName, profileLaunch } from "./cliProfiles.ts";
 import { CliSpawn } from "../provider/cli/wrapper.ts";
 import { takeEnvironmentSkillsAt } from "../provider/cli/environmentSkillsTake.ts";
+import { claudeRelayOf } from "../provider/cli/claudeEndpoints.ts";
+import { currentTextGenerationModel } from "./seedSettings.ts";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import * as StateStore from "../platform/stateStore.ts";
 
@@ -89,7 +91,9 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     const session = yield* CliSpawn;
     // SPI-1167: the Model endpoints Codex reaches through the model relay (OpenAI Responses), as stored now.
     const responsesEndpoints = endpointsOfApi(services.modelEndpoints?.(), "openai-responses");
-    const endpointsOnly = name === "codex" && responsesEndpoints.length > 0;
+    // SPI-1168: Claude Code on the Anthropic Messages endpoints through the relay, when there is one (else the proxy).
+    const claudeRelay = name === "claude-agent-acp" ? claudeRelayOf(services.modelEndpoints?.(), currentTextGenerationModel()) : undefined;
+    const endpointsOnly = (name === "codex" && responsesEndpoints.length > 0) || claudeRelay !== undefined;
     if (services.modelProxy === undefined && name !== "t3flare-probe" && !endpointsOnly) return yield* refused(name, "this Environment has no model proxy or Model endpoint for it");
     // ADR-0028: the process's tool handle for the relay's third-party servers (the session's; pi spawns outside the
     // session's fiber and gets one of its own).
@@ -114,6 +118,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
         relay: { handle: toolHandle, servers: services.relayServers() },
         endpoints: responsesEndpoints,
         ...(session?.model === undefined ? {} : { model: session.model }),
+        ...(claudeRelay === undefined ? {} : { claudeRelay }),
       },
     );
     if ("refused" in launch) {

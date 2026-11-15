@@ -97,6 +97,50 @@ describe("Claude Code's profile", () => {
     }
     for (const name of ["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_UPDATES"]) expect(env[name], name).toBe("1");
     expect(env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe("0");
+    // On the proxy, no model handle is asked for.
+    const answer = launch("claude", []);
+    expect("refused" in answer ? undefined : answer.modelRelay).toBeUndefined();
+  });
+});
+
+describe("Claude Code on the Model endpoints through the model relay (SPI-1168)", () => {
+  const relayed: ProfileContext = {
+    ...context,
+    claudeRelay: { endpoints: ["comm", "comm2"], models: ["comm/claude-haiku-5-5", "comm2/claude-sonnet-5-5"], backgroundModel: "comm/claude-haiku-5-5" },
+  };
+  const relayedLaunch = () => profileLaunch({ cli: "claude", args: [], key: "proc-7", cwd: "/w/demo", env: { T3FLARE_MODEL_HANDLE: "a".repeat(64) }, allowProbe: false }, relayed);
+
+  it("asks for a model handle for the Anthropic Messages endpoints, and never takes one from t3's environment", () => {
+    const answer = relayedLaunch();
+    if ("refused" in answer) throw new Error(answer.refused);
+    expect(answer.modelRelay).toEqual(["comm", "comm2"]);
+    expect(JSON.stringify(answer)).not.toContain("a".repeat(64));
+  });
+
+  it("points Claude Code at the model-routed relay URL, its models by slug, the handle from the handle helper, the background model the text model", () => {
+    const answer = relayedLaunch();
+    if ("refused" in answer) throw new Error(answer.refused);
+    expect(answer.env).toMatchObject({ ANTHROPIC_BASE_URL: "http://computer.internal/t3flare/model/_", ANTHROPIC_DEFAULT_HAIKU_MODEL: "comm/claude-haiku-5-5" });
+    const { json } = fileOf(answer, "/managed-settings.json");
+    expect(json).toMatchObject({
+      apiKeyHelper: "/opt/t3flare/bin/t3flare-claude-handle",
+      allowedProviders: ["customEndpoint"],
+      availableModels: ["comm/claude-haiku-5-5", "comm2/claude-sonnet-5-5"],
+    });
+    const env = json.env as Record<string, string>;
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://computer.internal/t3flare/model/_");
+    expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("comm/claude-haiku-5-5");
+    for (const name of ["HTTPS_PROXY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_CUSTOM_HEADERS"]) expect(env[name], name).toBe("");
+    // Nothing of the Model proxy's: its URL and its key helper are not this process's.
+    expect(answer.files?.map((file) => file.text).join("")).not.toContain("proxy.example");
+    expect(JSON.stringify(answer.env)).not.toContain("proxy.example");
+  });
+
+  it("leaves Claude Code's own background model when there is none to give", () => {
+    const answer = profileLaunch({ cli: "claude", args: [], key: "proc-7", cwd: "/w/demo", env: {}, allowProbe: false }, { ...relayed, claudeRelay: { ...relayed.claudeRelay!, backgroundModel: undefined } });
+    if ("refused" in answer) throw new Error(answer.refused);
+    expect(answer.env).not.toHaveProperty("ANTHROPIC_DEFAULT_HAIKU_MODEL");
+    expect(fileOf(answer, "/managed-settings.json").json.env).not.toHaveProperty("ANTHROPIC_DEFAULT_HAIKU_MODEL");
   });
 });
 
