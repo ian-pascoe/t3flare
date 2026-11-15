@@ -292,23 +292,23 @@ export const changeSkills = async (deps: OpsDeps, route: (typeof SKILLS_WRITE_RO
 /** A Direct server's setting with its URL's query dropped (plan D14): what any reader but the panel is shown. */
 export const redactServer = (setting: McpServerSetting): McpServerSetting => (setting.url === undefined ? setting : { ...setting, url: withoutQuery(setting.url) });
 
-/** Every http(s) URL in `value` without its query, and every secret's `fingerprint` dropped, at any depth. */
-const redactMcp = (value: unknown): unknown => {
-  if (typeof value === "string") return /^https?:\/\//i.test(value) ? withoutQuery(value) : value;
-  if (Array.isArray(value)) return value.map(redactMcp);
+/** `value` without any `fingerprint` property, at any depth (a secret's mark, whichever entity wrote it); with `urls`, every http(s) URL also loses its query. */
+const redactDeep = (value: unknown, urls: boolean): unknown => {
+  if (typeof value === "string") return urls && /^https?:\/\//i.test(value) ? withoutQuery(value) : value;
+  if (Array.isArray(value)) return value.map((inner) => redactDeep(inner, urls));
   if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).flatMap(([key, inner]) => (key === "fingerprint" ? [] : [[key, redactMcp(inner)]])));
+    return Object.fromEntries(Object.entries(value).flatMap(([key, inner]) => (key === "fingerprint" ? [] : [[key, redactDeep(inner, urls)]])));
   }
   return value;
 };
 
 /**
  * An audit entry as a reader other than the panel sees it (plan D14): the owner's Access subject dropped (`owner:<sub>`
- * reads `owner`), and in a Harness entry every URL without its query and no secret's fingerprint. The Environment
- * settings' Variables keep their values, as on the page.
+ * reads `owner`), no secret's fingerprint in any entry (a Model endpoint's key mark included), and in a Harness entry
+ * every URL without its query. The Environment settings' Variables keep their values, as on the page.
  */
 export const redactAudit = (entry: AuditEntry): AuditEntry => {
-  const redact = entry.entity === "harness" ? redactMcp : (value: unknown) => value;
+  const redact = (value: unknown) => redactDeep(value, entry.entity === "harness");
   return {
     ...entry,
     caller: entry.caller.startsWith("owner:") ? "owner" : entry.caller,

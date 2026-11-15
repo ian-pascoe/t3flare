@@ -98,7 +98,12 @@ export const peerLeakCheck = async (
 ) => {
   const env = (environment as unknown as { readonly env: Record<string, unknown> }).env;
   const secrets: Array<Secret> = [];
-  for (const [name, value] of Object.entries(env)) if (typeof value === "string" && value.length >= 8 && !PUBLIC_BINDINGS.has(name)) secrets.push({ name, value });
+  const notScanned: Array<string> = [];
+  for (const [name, value] of Object.entries(env)) {
+    if (typeof value !== "string" || value.length < 8) continue;
+    if (PUBLIC_BINDINGS.has(name)) notScanned.push(name);
+    else secrets.push({ name, value });
+  }
   environment.github.live().forEach((value, at) => secrets.push({ name: `github-token-${at}`, value }));
   const runtime = await environment.boot("check-peer-leak");
   secrets.push(...(await runtime.run(connectSecrets)));
@@ -125,6 +130,8 @@ export const peerLeakCheck = async (
   const text = input.text === undefined ? undefined : { bytes: input.text.length, leaked: leakedIn(input.text, secrets) };
   return {
     checked: secrets.map(({ name }) => name).toSorted(),
+    /** The public-by-design bindings left out of the scan (names, never values). */
+    notScanned: notScanned.toSorted(),
     credentialsFound: credentials.length,
     container,
     sessions,

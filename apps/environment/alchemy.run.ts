@@ -19,7 +19,7 @@
 // token (for the acceptance test and the bump job). The Worker verifies the assertion itself against the application's
 // `aud` (src/access.ts), and also requires the admin token. `<host>/_t3flare/mcp`, the Settings server's Owner-client
 // endpoint (ADR-0035), has an application of its own with managed OAuth (`SettingsAccess` below) on every stage but
-// prod, which stays out of layout (B) until owner step 1 passes, and `bump`, the nightly job's (ADR-0036;
+// prod, which stays out of layout (B) until the owner turns it on, and `bump`, the nightly job's (ADR-0036;
 // `ownerEndpointOn`).
 //
 // A stage with a domain also rate-limits t3's credential-presenting auth routes on that host (ADR-0010), as the
@@ -140,8 +140,7 @@ export default Alchemy.Stack(
     // A test stage's way to replace the codemode sandbox's code (its objects reset), for the sandbox-loss probe (M0 P14).
     const sandboxGeneration = yield* Config.String("T3FLARE_SANDBOX_GEN").pipe(Config.withDefault(""));
 
-    // The Owner-client endpoint (layout (B), ADR-0036) on this stage: every stage but prod (until owner step 1 passes and
-    // M5a's stage evidence is recorded) and `bump` (the nightly job's CI token); one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES` in src/settings/endpointLayout.ts.
+    // The Owner-client endpoint (layout (B), ADR-0036) on this stage: every stage but prod (until the owner turns it on) and `bump` (the nightly job's CI token); one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES` in src/settings/endpointLayout.ts.
     const ownerEndpoint = ownerEndpointOn(stage);
 
     const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {
@@ -161,7 +160,7 @@ export default Alchemy.Stack(
       sessionDuration: "24h",
       appLauncherVisible: false,
       // Its cookie is scoped to `/_t3flare`, so it never meets the Owner-client endpoint's (below; ADR-0035, plan D13).
-      // Not on a stage without the endpoint (prod until owner step 1, and bump): its admin application stays as it was.
+      // Not on a stage without the endpoint (prod until the owner turns it on, and bump): its admin application stays as it was.
       ...(ownerEndpoint ? { pathCookieAttribute: true } : {}),
       policies: [
         { name: "owner", decision: "allow", include: [{ email: ownerEmail }] },
@@ -171,8 +170,8 @@ export default Alchemy.Stack(
     // The Owner-client endpoint's own Access application (ADR-0036, plan D13; layout (B), src/settings/endpointLayout.ts),
     // on every stage but prod and bump (`ownerEndpoint`): `<host>/_t3flare/mcp` with managed OAuth, so the owner's MCP clients sign
     // in to it. The more specific path wins over the application above (M0, P8). That its tokens are refused at the panel
-    // and the Change page was tested with a service-token stand-in only; the OAuth bearer case is owner step 1
-    // (m5a-stage-run.md items 1-4). Same policies as the admin application. Access does not bound the grant's lifetimes,
+    // and the Change page was tested with a service-token stand-in and an OAuth bearer (owner step 1, passed 2026-11-15;
+    // m5a-stage-run.md items 1-4). Same policies as the admin application. Access does not bound the grant's lifetimes,
     // so they are set here (M0 P11; `expires_in` is m5a-stage-run.md item 1). The redirect allowlist is any loopback port
     // plus Cursor's custom scheme, pending owner step 2; no https redirect.
     const settingsAccess = ownerEndpoint

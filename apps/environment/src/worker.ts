@@ -69,8 +69,8 @@ export default {
     // The Owner-client endpoint (ADR-0035, ADR-0036, plan D11, D13; layout (B), settings/endpointLayout.ts) at
     // `/_t3flare/mcp`, behind its own Access application with managed OAuth: verified against that application's
     // audience, never the panel's. That Access keeps one application's token from the other's paths was tested with a
-    // service-token stand-in only; the OAuth bearer case is owner step 1 (m5a-stage-run.md items 1-4); this branch's
-    // own check is test/workerRouting.test.ts. Before the generic `/_t3flare` branch, which would ask for the admin
+    // service-token stand-in and then with an OAuth bearer (owner step 1, passed 2026-11-15; m5a-stage-run.md items 1-4);
+    // this branch's own check is test/workerRouting.test.ts. Before the generic `/_t3flare` branch, which would ask for the admin
     // token.
     if (isSettingsMcpPath(url.pathname)) {
       const config = { ...guardConfig(env), audience: env.T3FLARE_ACCESS_SETTINGS_AUD };
