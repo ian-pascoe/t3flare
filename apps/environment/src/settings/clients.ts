@@ -7,8 +7,10 @@
 //   with no security weight: the mode was always the client's own choice (E1), now kept on the panel instead of in the
 //   client's URL, whose query Claude Code's OAuth discovery does not survive.
 // - The endpoint records a client as seen, in `browser`, on its first request (`seen`); `lastSeen` is written at most
-//   once per `SEEN_EVERY_MS`, so a chatty client costs one read per request. At most `CLIENTS_PER_KEY` per key: a new
-//   name past that evicts the least recently seen, so random names cannot grow the table.
+//   once per `SEEN_EVERY_MS`, so a chatty client costs one read per request once the table exists (the Environment DO
+//   keeps one `ownerClients`, which creates it on its first call). At most `CLIENTS_PER_KEY` per key: a new name past
+//   that evicts the least recently seen `browser` row first, and only then the least recently seen of any mode, so a flood
+//   of names cannot grow the table or drop a mode the owner set while a `browser` row is left to go.
 // - Only the Harness panel's CSRF-guarded POST (harness/panel.ts) changes a mode or removes a row (`setMode`, `remove`).
 //   No MCP door, and no Settings server tool, reaches them: the endpoint holds this behind `seen` alone.
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
@@ -17,7 +19,7 @@ import { withoutHidden } from "@t3flare/harness-registry";
 import { OWNER_MODES, type OwnerMode } from "./changes.ts";
 
 export const CLIENTS_TABLE = "t3flare_settings_clients";
-/** At most this many clients per Owner caller's key; a new one past it evicts the least recently seen. */
+/** At most this many clients per Owner caller's key; a new one past it evicts the least recently seen `browser` one first. */
 export const CLIENTS_PER_KEY = 50;
 /** A client's name as kept: at most this many characters (an Owner client's label, plan D11). */
 export const CLIENT_NAME_MAX = 60;
@@ -91,11 +93,13 @@ export const ownerClients = (sql: Pick<SqlStorage, "exec">, now: () => number = 
         if (at - Number(row.last_seen) >= SEEN_EVERY_MS) sql.exec(`UPDATE ${CLIENTS_TABLE} SET last_seen = ? WHERE key = ? AND client_name = ?`, at, key, clientName);
         return entryOf(row).mode;
       }
-      // Room for the new one first: the least recently seen of this key go.
+      // Room for the new one first: this key's least recently seen `browser` rows go, then the least recently seen of any
+      // mode (a row the owner set, `native` or `model`, sorts after every `browser` one).
+      const spare = `ORDER BY (mode IN ('native', 'model')) ASC, last_seen ASC, first_seen ASC, client_name ASC LIMIT ?`;
       const count = Number(sql.exec<{ count: number }>(`SELECT COUNT(*) AS count FROM ${CLIENTS_TABLE} WHERE key = ?`, key).toArray()[0]?.count ?? 0);
       if (count >= CLIENTS_PER_KEY) {
         sql.exec(
-          `DELETE FROM ${CLIENTS_TABLE} WHERE key = ? AND client_name IN (SELECT client_name FROM ${CLIENTS_TABLE} WHERE key = ? ORDER BY last_seen ASC, first_seen ASC, client_name ASC LIMIT ?)`,
+          `DELETE FROM ${CLIENTS_TABLE} WHERE key = ? AND client_name IN (SELECT client_name FROM ${CLIENTS_TABLE} WHERE key = ? ${spare})`,
           key,
           key,
           count - CLIENTS_PER_KEY + 1,

@@ -335,8 +335,10 @@ const answerChange = async (changes: ChangesApi, id: string, body: Record<string
 
 /**
  * An Owner client's mode set or the client forgotten (ADR-0034's 2026-11-15 refinement), as the identity the panel
- * admitted; audited as the panel's other changes are (entity `owner-clients`). It applies at the client's next request;
- * an Open change keeps the mode it was asked in.
+ * admitted; audited as the panel's other changes are (entity `owner-clients`, target the client's name, the mode alone
+ * before and after: the caller's key is the owner's Access subject, which `read_audit` must not carry, plan D14). It
+ * applies at the client's next request (a change to or from `model` shows at its reconnect); an Open change keeps the
+ * mode it was asked in.
  */
 const changeClient = (deps: HarnessDeps, clients: OwnerClients, body: Record<string, unknown> | undefined): Response => {
   const key = body?.key;
@@ -347,15 +349,16 @@ const changeClient = (deps: HarnessDeps, clients: OwnerClients, body: Record<str
   const audit = (action: string, before: unknown, after: unknown) =>
     deps.store.audit({ at: deps.now?.() ?? Date.now(), entity: "owner-clients", ...actorOf(deps), action, target: clientName, before, after });
   if (body?.remove === true) {
+    const was = clients.list().find((entry) => entry.key === key && entry.clientName === clientName)?.mode;
     if (!clients.remove(key, clientName)) return refused(404, "no such client");
-    audit("client-remove", { key }, null);
+    audit("client-remove", was === undefined ? null : { mode: was }, null);
     return json({ removed: true, key, clientName });
   }
   const mode = body?.mode;
   if (!isOwnerMode(mode)) return refused(400, "mode is browser, native or model");
   const before = clients.setMode(key, clientName, mode);
   if (before === undefined) return refused(404, "no such client: a client is listed at its first request to the Owner-client endpoint");
-  if (before !== mode) audit("client-mode", { key, mode: before }, { key, mode });
+  if (before !== mode) audit("client-mode", { mode: before }, { mode });
   return json({ key, clientName, mode });
 };
 

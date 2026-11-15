@@ -346,8 +346,8 @@ export interface OwnerClientsView {
 }
 
 /** What each Elicitation mode means for the owner (plan D12), beside the mode select. */
-export const MODE_MEANINGS: Readonly<Record<OwnerMode, string>> = {
-  browser: "the client sends you to the change's page (a link it opens, or one in its answer); you approve there. Works with every client.",
+const MODE_MEANINGS: Readonly<Record<OwnerMode, string>> = {
+  browser: "the client sends you to the Change page (a link it opens, or one in its answer); you approve there. Works with every client.",
   native: "the client shows its own Accept / Decline form, and Accept applies the change. A client that declares no form gets the page instead.",
   model: "the client's agent gets a requestId, asks you in the chat and answers with resume. Only for a client whose agent you trust to relay your answer.",
 };
@@ -365,7 +365,9 @@ const ownerClientsBlock = (view: OwnerClientsView): string => {
       ? `<p class="empty-tools">The Owner-client endpoint is not deployed on this Environment.</p>`
       : `<p class="desc">To add an Owner client (Claude Code, pi, Cursor, Codex, OpenCode), give it <code>${escapeHtml(view.endpoint)}</code> as a remote MCP server over streamable HTTP and sign in with Access when it asks. Use the URL as it is: no query. The client appears here at its first request, in browser; pick its mode below.</p>`;
   const meanings = `<ul class="desc">${OWNER_MODES.map((mode) => `<li><strong>${mode}</strong>: ${escapeHtml(MODE_MEANINGS[mode])}</li>`).join("")}</ul>
-<p class="desc">A mode applies from the client's next request; a change it already asked keeps the mode it was asked in. A change that needs a secret, a sign-in or a skills install is approved on its page in every mode. <code>?elicitation_mode=</code> on the URL still overrides this, for clients that keep a query.</p>`;
+<p class="desc">A mode applies from the client's next request; a change it already asked keeps the mode it was asked in. The client must reconnect after a change to or from <strong>model</strong>: it learns of <code>resume</code> once, when it connects. A change that needs a secret, a sign-in or a skills install is approved on its page in every mode. <code>?elicitation_mode=</code> on the URL still overrides this, for clients that keep a query.</p>`;
+  // No endpoint and no client kept: nothing to add and nothing to explain, so the "not deployed" line alone.
+  if (view.endpoint === undefined && view.clients.length === 0) return `<details class="tools" open data-owner-clients><summary>${icon("chevron")}Owner clients <span>${plural(0, "client", "clients")}</span></summary>\n${add}</details>`;
   const rows = view.clients
     .map((client) => {
       const attrs = `data-client-key="${escapeHtml(client.key)}" data-client-name="${escapeHtml(client.clientName)}"`;

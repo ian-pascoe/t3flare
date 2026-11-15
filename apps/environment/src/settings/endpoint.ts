@@ -4,7 +4,8 @@
 // Access application with managed OAuth (ADR-0035; where it lives is `endpointLayout.ts`). `EnvironmentDO.settingsMcp`
 // calls it with the caller the Worker already verified; it never boots t3.
 //
-// Hand-written JSON-RPC, stateless (the MCP SDK stays in the MCP Worker):
+// Hand-written JSON-RPC, stateless but for the one row it records per client (clients.ts: the client's mode, set on the
+// Harness panel alone; the MCP SDK stays in the MCP Worker):
 //
 // - Versions 2026-07-28 (`server/discover`, capabilities and client info in each request's `_meta`, `resultType` on every
 //   result, questions as `input_required` with a signed `requestState`), 2025-11-25 and 2025-06-18 (capabilities from
@@ -37,7 +38,7 @@ import { canonicalJson } from "../mcp/canonical.ts";
 import type { McpCallAnswer } from "../mcp/host.ts";
 import { OFF_MESSAGE, type OwnerCaller } from "./caller.ts";
 import { type ChangeRecord, isChangeId, isOpen, OWNER_MODES, type OwnerMode } from "./changes.ts";
-import { clientNameOf, type OwnerClients } from "./clients.ts";
+import { CLIENT_NAME_MAX, clientNameOf, type OwnerClients } from "./clients.ts";
 import { type ChangeOutcome, closeOrSettle, outcomeOf, waitForChange } from "./openChanges.ts";
 import {
   answerDepsOf,
@@ -175,7 +176,7 @@ const plain = (status: number, text: string, headers: Readonly<Record<string, st
 const rpcError = (id: unknown, code: number, message: string, data?: unknown) => ({ jsonrpc: "2.0", id: id ?? null, error: { code, message, ...(data === undefined ? {} : { data }) } });
 
 /** A client's own label (plan D11): display only, never trusted; no hidden character, cut to 60 characters. */
-const labelOf = (text: string): string => withoutHidden(text).slice(0, 60);
+const labelOf = (text: string): string => withoutHidden(text).slice(0, CLIENT_NAME_MAX);
 
 const clientOf = (info: unknown, source: string): Context["client"] => {
   const fields = objectOf(info);
@@ -358,7 +359,10 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
       // answer, and the change waits on its Change page.
       const session = await verifyToken(tokenKey, request.headers.get("mcp-session-id"), { kind: "session", sub: key, now: now() });
       if (modeOf(session.ok ? objectOf(session.payload.client)?.name : undefined) !== "native") {
-        return refuse(400, "other-mode", json(rpcError(null, -32600, "This question was asked in the native Elicitation mode, and this client is in another now (its mode on the Harness panel, or ?elicitation_mode=). Answer it on its Change page."), 400));
+        const why = session.ok
+          ? "this client is in another now (its mode on the Harness panel, or ?elicitation_mode=)"
+          : "this request carries no valid Mcp-Session-Id, so its client is unknown here and the mode is browser (send the answer on the session that was asked, or add ?elicitation_mode=native)";
+        return refuse(400, "other-mode", json(rpcError(null, -32600, `This question was asked in the native Elicitation mode, and ${why}. Answer it on its Change page.`), 400));
       }
       // No stream of this isolate holds the question (the Environment reset since, or it ended unanswered): nobody waits
       // for the result, so the answer applies nothing and the change is withdrawn by `stop` (plan D12; SPI-1201 review).
