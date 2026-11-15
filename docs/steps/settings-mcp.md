@@ -12,7 +12,8 @@ Machine evidence passes for M1-M4 and M6. The owner's checklist ([`owner-stage-r
 passed Block A and owner step 1 on 2026-11-15 (the OAuth gate for layout (B): P6, P11 at 900 s, P12, P13 the same `sub`);
 owner step 2 (Cursor) stays open. Its remaining client tests were skipped by the owner's decision (the "Evidence"
 section). The rebased head 85990db was deployed to `psmcp`, and a smoke check passed there: Claude Code connected with
-the plain URL, and the panel's client list and the MCP servers loaded. Prod and
+the plain URL, and the panel's client list and the MCP servers loaded. `settings setup`, `m1` (items 2-3), `m3 durable` and
+`m3 pi` (items 1-4 each, the pi relay included) were re-run there and pass (17b9a21). Prod and
 the nightly job's `bump` stage are still deployed without the Owner-client endpoint (ADR-0036; one switch,
 `OWNER_ENDPOINT_EXCLUDED_STAGES`) until the owner turns it on; turning it on for prod is a follow-up.
 
@@ -324,8 +325,8 @@ Changes the reviews made are recorded in the plan itself; each is listed here wi
 
 ## Evidence
 
-Stage `psmcp`, deployed from 24f4a01 for the runs (before the rebase; the rebased head 85990db was deployed there for a
-smoke check only, see the State line). The per-client mode check was rerun at 4f6fd98. Machine items were
+Stage `psmcp`, deployed from 24f4a01 for the runs (before the rebase; at the rebased head 85990db, a smoke check plus
+M1 2-3 and M3 for Durable and pi were re-run and pass, see the State line). The per-client mode check was rerun at 4f6fd98. Machine items were
 run by `scripts/settings.ts`. The owner's items were driven by the agent in the owner's signed-in browser, and the owner
 signed in only.
 
