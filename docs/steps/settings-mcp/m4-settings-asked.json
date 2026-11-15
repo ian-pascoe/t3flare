@@ -1262,7 +1262,8 @@
    "ownerSaw": {
     "pending": "owner-stage-run.md item 2: what the page said after Approve, and after a reload"
    },
-   "verdict": "pending"
+   "verdict": "pass",
+   "ownerRun": "2026-11-15, agent-driven in the owner's signed-in browser (agent-browser, Chrome 150), run alone: the page was kept open past 10 minutes; once expired, Approve answered 'Refused (409): this change is already expired'; a reload showed State 'Expired' with no Approve or Decline buttons. The first attempt was cut short by a concurrent script run that restarted t3's bootstrap window (a harness trap, not the code)."
   },
   "9a": {
    "at": "2026-11-14T18:45:05.159Z",
