@@ -1,13 +1,13 @@
 {
   "url": "https://t3flare-environment-p1175.ian-g-pascoe.workers.dev",
-  "startedAt": "2026-11-14T21:11:30.742Z",
+  "startedAt": "2026-11-15T11:50:34.598Z",
   "adminGuard": {
     "wrongToken": 404,
     "withAccessAndToken": 200,
     "build": {
-      "t3": "v0.1.10-nightly.20261112.4606",
-      "commit": "4b3eff2e82be",
-      "builtAt": "2026-11-14T21:09:18.870Z"
+      "t3": "v0.1.10-nightly.20261112.4606\nwarning: unable to find all commit-graph files",
+      "commit": "a366befb6f73",
+      "builtAt": "2026-11-15T11:47:31.465Z"
     }
   },
   "modelEndpoint": {
@@ -25,9 +25,9 @@
   },
   "pairing": {
     "refusedBeforeArming": 401,
-    "armedUntil": "2026-11-14T21:21:33.227Z",
+    "armedUntil": "2026-11-15T12:00:37.418Z",
     "paired": 200,
-    "ms": 3481,
+    "ms": 4045,
     "refusedAfterDisarming": 401
   },
   "textGeneration": {
@@ -36,9 +36,9 @@
     "model": "commissary/claude-haiku-5-5"
   },
   "project": {
-    "projectId": "34808198-3282-4099-bb3e-05d021079f23",
+    "projectId": "b4a03e71-5c4c-4a78-b740-069561c91606",
     "threads": 12,
-    "ms": 6374
+    "ms": 6622
   },
   "fixtures": {
     "threads": 12,
@@ -49,7 +49,7 @@
     "eventSink": "fresh"
   },
   "shellSnapshot": {
-    "ms": 1192,
+    "ms": 615,
     "bytes": 21303,
     "listedFixtureThreads": 12
   },
@@ -57,16 +57,16 @@
     "threads": 12,
     "allOk": true,
     "minItems": 20,
-    "maxMs": 127,
+    "maxMs": 197,
     "maxBytes": 46534
   },
   "subscribeThread": {
-    "ms": 62,
+    "ms": 58,
     "bytes": 46473,
     "items": 20
   },
   "search": {
-    "ms": 50,
+    "ms": 56,
     "matches": 12,
     "threads": 12
   },
@@ -86,8 +86,8 @@
     "ctesMaterialized": 0,
     "materializeFailures": 0,
     "rowsWritten": 10686,
-    "rowsRead": 43036,
-    "databaseSize": 4050944,
+    "rowsRead": 43038,
+    "databaseSize": 4091904,
     "refusedStatements": 0,
     "pragmaRefusals": 0
   },
@@ -104,7 +104,7 @@
         "module": "packages/shared/src/observability.ts",
         "name": "generatedServiceInstanceId",
         "initial": "undefined",
-        "now": "string:df4d6efb-5303-455f-a71c-352ff30b667f"
+        "now": "string:92ada331-3a37-4ade-8275-1032e7e3e5bc"
       },
       {
         "module": "apps/server/src/mcp/McpSessionRegistry.ts",
@@ -123,13 +123,13 @@
     "fixture": "ian-pascoe/t3flare-fixture",
     "model": "commissary/claude-haiku-5-5",
     "clone": {
-      "destination": "/w/acceptance-mwgwi845",
-      "ms": 39660,
-      "cwd": "/w/acceptance-mwgwi845",
+      "destination": "/w/acceptance-mwhrwpc7",
+      "ms": 71528,
+      "cwd": "/w/acceptance-mwhrwpc7",
       "error": null
     },
     "turn": {
-      "threadId": "a836431a-d82b-4109-bfd0-decceecb39da",
+      "threadId": "2ef4a13f-0aa5-40db-98a2-de10591588b0",
       "runs": [
         "completed"
       ],
@@ -146,11 +146,11 @@
         }
       ],
       "edit": {
-        "fileName": "/w/acceptance-mwgwi845/src/greeting.txt",
+        "fileName": "/w/acceptance-mwhrwpc7/src/greeting.txt",
         "status": "completed"
       },
       "bash": {
-        "input": "cd /w/acceptance-mwgwi845 && bash test.sh",
+        "input": "cd /w/acceptance-mwhrwpc7 && bash test.sh",
         "status": "completed",
         "exitCode": 0
       },
@@ -162,7 +162,7 @@
           "deletions": 0
         }
       ],
-      "ms": 56079
+      "ms": 88599
     },
     "checkpointOps": [
       "has:do",
@@ -184,30 +184,30 @@
       "failure": null,
       "result": {
         "status": "created",
-        "commitSha": "0559c275e332a552571214dd187dc8118b1f8185",
+        "commitSha": "23779d1b2945a7171bf3f59bd188f8df264995b9",
         "subject": "acceptance: t3's commit action"
       },
       "head": {
-        "sha": "0559c275e332a552571214dd187dc8118b1f8185",
+        "sha": "23779d1b2945a7171bf3f59bd188f8df264995b9",
         "subject": "acceptance: t3's commit action",
         "files": [
           "src/greeting.txt"
         ]
       },
-      "ms": 5703
+      "ms": 4652
     },
-    "ms": 62771
+    "ms": 94375
   },
   "step2b": {
     "ok": true,
     "failures": [],
     "terminal": {
-      "ms": 1100,
+      "ms": 1028,
       "echoed": true
     },
     "worktree": {
-      "ms": 11921,
-      "path": "/w/.wt/acc2b-mwgwjkjv/t3-f41840da-b45884211521f17e",
+      "ms": 10789,
+      "path": "/w/.wt/acc2b-mwhryq63/t3-f32de027-08fd4d543675966b",
       "stages": [
         "fetch:skipped",
         "checkout:done",
@@ -227,7 +227,7 @@
       "actions": 2
     }
   },
-  "totalMs": 135660,
+  "totalMs": 127721,
   "failures": [],
   "ok": true
 }

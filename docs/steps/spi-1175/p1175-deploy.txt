@@ -1,11 +1,17 @@
-# p1175 deploy: `node scripts/stage.ts deploy p1175 --no-model-proxy` on a freshly destroyed stage (SPI-1175)
+# p1175 deploy at a366bef: `node scripts/stage.ts deploy p1175 --no-model-proxy` on a fresh stage (empty state) (SPI-1175)
+# Before it: `env | grep -c T3FLARE_DOMAIN` printed 0; dev.env was not sourced.
 # stage.ts's own lines:
-t3flare: deploying without the Model proxy (no MODEL_PROXY_URL)
+t3flare: deploying without the Model proxy (--no-model-proxy)
 t3flare: Durable Object class not found; retrying in two passes (the first without cross-Worker bindings)
 t3flare: Model endpoint "commissary" created (from MODEL_PROXY_URL, 23 models; its small model commissary/claude-haiku-5-5)
-# The bindings alchemy wrote on the final pass, by Worker (names only):
+# alchemy's plans (no resource adopted):
+Plan: 10 to create, 40 binding changes
+Plan: 2 to create, 1 to update, 14 binding changes
+Plan: 2 to update, 7 binding changes
+# The bindings alchemy wrote after the class-not-found retry, by Worker (names only):
 Agents: CODEMODE_SANDBOX COMMISSARY_CONTAINER_API_KEY CONTAINER_BUDGET ENVIRONMENT LOADER SESSIONS T3FLARE_FAULTS WORKSPACES
 CodemodeSandbox: CODEMODE_SANDBOX
 Environment: BROWSER COMMISSARY_ACCESS_CLIENT_ID COMMISSARY_ACCESS_CLIENT_SECRET COMMISSARY_MANAGEMENT_KEY COMMISSARY_MANAGEMENT_URL COMMISSARY_USAGE_PRINCIPALS CONTAINER_BUDGET ENVIRONMENT MCP_ENGINE MCP_OAUTH SESSIONS T3FLARE_ACCESS_AUD T3FLARE_ACCESS_SERVICE_CLIENT_ID T3FLARE_ACCESS_TEAM_DOMAIN T3FLARE_ADMIN_TOKEN T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN T3FLARE_CONNECT_SERVICE_TOKEN T3FLARE_CREDENTIALS_KEY T3FLARE_FAULTS T3FLARE_GITHUB_APP_ID T3FLARE_GITHUB_APP_PRIVATE_KEY T3FLARE_HOST T3FLARE_OWNER_EMAIL T3FLARE_SWEEP_PURGE T3_BOOTSTRAP_TOKEN TEXT_GENERATION WORKSPACES WORKSPACE_PREVIEWS
 McpFixture: FIXTURE_BEARER LOG
 # MODEL_PROXY_* bindings in the whole deploy log: 0
+# AuthRateLimit, adopt or a custom domain in the whole deploy log: 0
