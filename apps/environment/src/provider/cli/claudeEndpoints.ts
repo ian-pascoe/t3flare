@@ -12,8 +12,12 @@ import { endpointsOfApi } from "@t3flare/models/relay";
 import type { ClaudeRelay } from "../../agents/acpProfiles.ts";
 import { acpModelCapabilities, cliModelId } from "./acpFlavor.ts";
 
-/** The endpoints Claude Code reaches through the model relay: those that speak Anthropic Messages. */
-export const claudeEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => endpointsOfApi(endpoints, "anthropic-messages");
+/**
+ * The endpoints Claude Code reaches through the model relay: those that speak Anthropic Messages and list a model (its
+ * `availableModels` come from them; an endpoint with none adds nothing, and none with a model leaves the proxy).
+ */
+export const claudeEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> =>
+  endpointsOfApi(endpoints, "anthropic-messages").filter((endpoint) => endpoint.models.length > 0);
 
 /**
  * The background model: the text-generation model when it is one of these endpoints' models, else their own small
@@ -22,7 +26,7 @@ export const claudeEndpoints = (endpoints: ModelEndpoints | undefined): Readonly
 const backgroundModelOf = (own: ReadonlyArray<ModelEndpoint>, textModel: string | undefined): string | undefined => {
   const scoped: ModelEndpoints = { revision: 0, endpoints: own };
   if (textModel !== undefined && findEndpointModel(scoped, textModel) !== undefined) return textModel;
-  const first = own.find((endpoint) => endpoint.models.length > 0);
+  const first = own[0];
   return defaultTextModel(scoped) ?? (first === undefined ? undefined : endpointSlug(first.id, first.models[0]!.id));
 };
 

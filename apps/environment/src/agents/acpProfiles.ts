@@ -108,21 +108,32 @@ export const CLAUDE_PINNED_EMPTY: ReadonlyArray<string> = [
   "ANTHROPIC_SMALL_FAST_MODEL",
 ];
 
-/** Claude Code's base URL and background model: the Model proxy's, or the model relay's (SPI-1168). */
-interface ClaudeEndpoint {
+/**
+ * Where Claude Code gets its models (SPI-1168): the Model proxy's URL, models and key helper, or the model relay's
+ * routed URL, the endpoints' slugs and the handle helper, with the endpoints its handle is for.
+ */
+export interface ClaudeMode {
   readonly baseUrl: string;
   readonly backgroundModel: string | undefined;
+  readonly keyHelper: string;
+  readonly availableModels: ReadonlyArray<string>;
+  /** The endpoints the process's model handle is for; undefined on the proxy (no handle). */
+  readonly modelRelay: ReadonlyArray<string> | undefined;
 }
 
-const claudeEndpointOf = (context: Pick<ProfileContext, "proxyUrl" | "claudeRelay">): ClaudeEndpoint =>
-  context.claudeRelay === undefined
-    ? { baseUrl: context.proxyUrl, backgroundModel: idOf(SMALL_MODEL_SLUG) }
-    : { baseUrl: modelRoutedRelayUrl, backgroundModel: context.claudeRelay.backgroundModel };
+/** Claude Code's mode for a profile's context: the relay's when it has a `claudeRelay`, else the proxy's. */
+export const claudeModeOf = (context: Pick<ProfileContext, "proxyUrl" | "models" | "claudeRelay">): ClaudeMode => {
+  const relay = context.claudeRelay;
+  if (relay === undefined) {
+    return { baseUrl: context.proxyUrl, backgroundModel: idOf(SMALL_MODEL_SLUG), keyHelper: CLAUDE_KEY_HELPER, availableModels: context.models.map((model) => model.id), modelRelay: undefined };
+  }
+  return { baseUrl: modelRoutedRelayUrl, backgroundModel: relay.backgroundModel, keyHelper: CLAUDE_HANDLE_HELPER, availableModels: relay.models, modelRelay: relay.endpoints };
+};
 
 /** The variables Claude Code gets from both its launch environment and the managed `env` (M0 P1, P3). */
-const claudeSwitches = (endpoint: ClaudeEndpoint): Record<string, string> => ({
-  ANTHROPIC_BASE_URL: endpoint.baseUrl,
-  ...(endpoint.backgroundModel === undefined ? {} : { ANTHROPIC_DEFAULT_HAIKU_MODEL: endpoint.backgroundModel }),
+const claudeSwitches = (mode: ClaudeMode): Record<string, string> => ({
+  ANTHROPIC_BASE_URL: mode.baseUrl,
+  ...(mode.backgroundModel === undefined ? {} : { ANTHROPIC_DEFAULT_HAIKU_MODEL: mode.backgroundModel }),
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
   DISABLE_TELEMETRY: "1",
   DISABLE_ERROR_REPORTING: "1",
@@ -145,15 +156,15 @@ const relayNames = (context: ProfileContext): ReadonlyArray<string> => (context.
  * Claude Code's managed settings (`/etc/claude-code/managed-settings.json`): the endpoint and the key (K5), and the
  * asking mode the flavor pins (`acpFlavor.ts`). `relayServers`: the MCP relay's servers (ADR-0028; the entries
  * themselves, with the process's handle, come per session over ACP, review H2), allowed without Claude's own prompt
- * because the relay decides and asks. The repository's `.claude/` is honoured for everything else. `claudeRelay`: on
- * the Model endpoints through the model relay (SPI-1168), not the proxy.
+ * because the relay decides and asks. The repository's `.claude/` is honoured for everything else. `mode`: the proxy's
+ * or the model relay's (SPI-1168, `claudeModeOf`).
  */
-export const claudeManagedSettings = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = [], claudeRelay?: ClaudeRelay) => ({
-  apiKeyHelper: claudeRelay === undefined ? CLAUDE_KEY_HELPER : CLAUDE_HANDLE_HELPER,
+export const claudeManagedSettings = (mode: ClaudeMode, relayServers: ReadonlyArray<string> = []) => ({
+  apiKeyHelper: mode.keyHelper,
   // Review F3: only the endpoint the managed env pins is admitted.
   allowedProviders: ["customEndpoint"],
-  availableModels: claudeRelay === undefined ? models.map((model) => model.id) : [...claudeRelay.models],
-  env: { ...Object.fromEntries(CLAUDE_PINNED_EMPTY.map((name) => [name, ""])), ...claudeSwitches(claudeEndpointOf({ proxyUrl, ...(claudeRelay === undefined ? {} : { claudeRelay }) })) },
+  availableModels: [...mode.availableModels],
+  env: { ...Object.fromEntries(CLAUDE_PINNED_EMPTY.map((name) => [name, ""])), ...claudeSwitches(mode) },
   skipWebFetchPreflight: true,
   disableClaudeAiConnectors: true,
   cleanupPeriodDays: 60,
@@ -168,6 +179,7 @@ const claudeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer
   if (input.args.length !== 0) return { refused: `Claude Code runs here only as \`claude-agent-acp\` (not with ${input.args.join(" ")})` };
   const home = homeOf(input.key);
   const thread = input.env.T3CODE_THREAD_ID;
+  const mode = claudeModeOf(context);
   return {
     argv: [`${CLI_BIN}/claude-agent-acp`],
     env: {
@@ -178,14 +190,14 @@ const claudeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer
       CLAUDE_CODE_EXECUTABLE: CLAUDE_EXECUTABLE,
       // Ask the helper at start and after a 401, not every 5 minutes (M0 P1: one grant per process).
       CLAUDE_CODE_API_KEY_HELPER_TTL_MS: String(24 * 3_600_000),
-      ...claudeSwitches(claudeEndpointOf(context)),
+      ...claudeSwitches(mode),
     },
-    files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(context.proxyUrl, context.models, relayNames(context), context.claudeRelay), null, 1)}\n` }],
+    files: [{ path: `${home}/managed-settings.json`, text: `${JSON.stringify(claudeManagedSettings(mode, relayNames(context)), null, 1)}\n` }],
     // SPI-1153: the Environment skill set as Claude Code's user-level root (`$CLAUDE_CONFIG_DIR/skills`).
     links: [{ path: `${home}/claude/projects`, target: CLAUDE_PROJECTS }, environmentSkillsLink(`${home}/claude/skills`)],
     ...(thread === undefined ? {} : { thread }),
     // SPI-1168: the Workspace DO gives the process a model handle for these endpoints, in its environment only.
-    ...(context.claudeRelay === undefined ? {} : { modelRelay: [...context.claudeRelay.endpoints] }),
+    ...(mode.modelRelay === undefined ? {} : { modelRelay: [...mode.modelRelay] }),
     droppedEnv: dropped(input.env),
   } satisfies Launch;
 };

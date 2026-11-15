@@ -8,7 +8,7 @@ import { credentialSegment, REFUSED_EXACT, REFUSED_LOADER_HOOKS, REFUSED_PREFIXE
 import { MODEL_HANDLE_ENV } from "@t3flare/models/relay";
 import { describe, expect, it } from "vitest";
 
-import { claudeManagedSettings } from "../src/agents/acpProfiles.ts";
+import { claudeManagedSettings, claudeModeOf } from "../src/agents/acpProfiles.ts";
 import { CLI_PROFILE_NAMES, codexExecArgs, codexOverrides, type CliName, type LaunchInput, NONCE_ENV, profileLaunch, type ProfileContext } from "../src/agents/cliProfiles.ts";
 import { TERMINAL_BASE_ENV } from "../src/terminal/layer.ts";
 
@@ -63,7 +63,7 @@ const derived = (): ReadonlyArray<string> => [
     ...Object.keys(COMMAND_ENV),
     ...launchNames(),
     ...codexShellNames(),
-    ...Object.keys(claudeManagedSettings(context.proxyUrl, []).env),
+    ...Object.keys(claudeManagedSettings(claudeModeOf({ proxyUrl: context.proxyUrl, models: [] })).env),
     ...Object.keys(TERMINAL_BASE_ENV),
     ...terminalRcNames(),
     NONCE_ENV,

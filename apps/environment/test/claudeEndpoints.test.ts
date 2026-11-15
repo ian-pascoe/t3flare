@@ -33,6 +33,13 @@ describe("Claude Code's Model endpoints", () => {
     expect(claudeRelayOf(undefined, undefined)).toBeUndefined();
   });
 
+  it("ignores an Anthropic Messages endpoint that lists no model: alone, it leaves Claude Code on the proxy", () => {
+    const empty = { ...endpoints.endpoints[1]!, id: "empty", models: [] };
+    expect(claudeRelayOf({ revision: 1, endpoints: [empty] }, undefined)).toBeUndefined();
+    expect(claudeRelayOf({ revision: 1, endpoints: [empty, endpoints.endpoints[2]!] }, undefined)?.endpoints).toEqual(["comm2"]);
+    expect(claudeModelsOf(proxy, { revision: 1, endpoints: [empty] })).toEqual(proxy);
+  });
+
   it("takes the text-generation model as the background model when it is an Anthropic Messages endpoint's model", () => {
     expect(claudeRelayOf(endpoints, "comm2/claude-opus-5-5")?.backgroundModel).toBe("comm2/claude-opus-5-5");
     // Another API's model, a model the endpoint no longer lists, or the proxy's: the endpoints' own small model.

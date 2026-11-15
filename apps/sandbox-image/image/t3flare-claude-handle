@@ -1,12 +1,23 @@
 #!/bin/sh
 # Claude Code's apiKeyHelper on the model relay (SPI-1168): prints this Claude process's model handle, which its launcher
-# (claude-agent-acp) holds only in the environment it started with. Found by the process's marker: the launcher's pid in
-# the process's home, then that pid's /proc environ. Writes no file and logs nothing; fails when there is no handle.
+# (claude-agent-acp) holds only in the environment it started with. Found by the process's marker: the launcher's pid
+# and start time in the process's home, then that pid's /proc environ, once the pid is checked to be that same
+# claude-agent-acp (its start time, and its command line). Writes no file and logs nothing; fails closed otherwise.
 set -eu
-pid=$(cat "/var/lib/t3flare/cli/${T3FLARE_EXEC:?}/acp.pid")
-handle=$(tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^T3FLARE_MODEL_HANDLE=//p' | head -n 1)
-if [ -z "$handle" ]; then
-  echo "t3flare: this Claude Code process has no model handle" >&2
+fail() {
+  echo "t3flare: $1" >&2
   exit 1
-fi
+}
+home=/var/lib/t3flare/cli/${T3FLARE_EXEC:?}
+read -r pid started < "$home/acp.pid" || fail "this Claude Code process has no launcher record"
+case "$pid" in '' | *[!0-9]*) fail "this Claude Code process's launcher record is not a pid" ;; esac
+# The start time (/proc/<pid>/stat's 22nd field; the command name, field 2, may hold spaces and parentheses).
+now=$(sed 's/.*) //' "/proc/$pid/stat" 2> /dev/null | cut -d' ' -f20) || now=""
+[ -n "$now" ] && [ "$now" = "${started:-}" ] || fail "the launcher of this Claude Code process is gone"
+case "$(tr '\0' ' ' < "/proc/$pid/cmdline")" in
+  *" --require /opt/t3flare/share/claude-handle-unset.cjs /opt/t3flare/claude/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js"*) ;;
+  *) fail "the launcher record names another process" ;;
+esac
+handle=$(tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^T3FLARE_MODEL_HANDLE=//p' | head -n 1)
+[ -n "$handle" ] || fail "this Claude Code process has no model handle"
 printf '%s\n' "$handle"

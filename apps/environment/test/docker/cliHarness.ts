@@ -43,7 +43,7 @@ export const piLaunchOf = (key: string): Launch =>
   launchOf({ cli: "pi", args: ["--mode", "rpc", "--extension", EXTENSION, "--provider", "anthropic", "--model", "claude-haiku-5-5"], key, env: { T3_PI_RUNTIME_MODE: "approval-required" } });
 
 /** The image built, and the stand-in key host up on its internal network; `stop` removes both containers' network. */
-export const startHarness = (name: string, nonces: ReadonlyArray<string>) => {
+export const startHarness = (name: string, nonces: ReadonlyArray<string>, options: { readonly modelHandle?: string } = {}) => {
   const keyhost = `${name}-keyhost`;
   const network = `${name}-int`;
   const stop = () => {
@@ -58,8 +58,9 @@ export const startHarness = (name: string, nonces: ReadonlyArray<string>) => {
     imageContext,
   ]);
   docker(["network", "create", "--internal", network]);
-  // The stand-in `computer.internal`: a key for any of the probe's nonces (no model is called), NXDOMAIN for every name.
-  docker(["run", "-d", "--name", keyhost, "--network", network, "--network-alias", "computer.internal", "-e", "KEYHOST_MODEL_KEY=probe-key", "-e", `KEYHOST_NONCES=${nonces.join(",")}`, "-v", `${here}:/k:ro`, "node:26.13.0-bookworm-slim", "node", "/k/keyhost.mjs"]);
+  // The stand-in `computer.internal`: a key for any of the probe's nonces (no model is called), NXDOMAIN for every name;
+  // with `modelHandle`, a stand-in model relay too (SPI-1168).
+  docker(["run", "-d", "--name", keyhost, "--network", network, "--network-alias", "computer.internal", "-e", "KEYHOST_MODEL_KEY=probe-key", "-e", `KEYHOST_NONCES=${nonces.join(",")}`, ...(options.modelHandle === undefined ? [] : ["-e", `KEYHOST_MODEL_HANDLE=${options.modelHandle}`]), "-v", `${here}:/k:ro`, "node:26.13.0-bookworm-slim", "node", "/k/keyhost.mjs"]);
   const keyhostIp = docker(["inspect", "-f", `{{(index .NetworkSettings.Networks "${network}").IPAddress}}`, keyhost]).stdout.trim();
   return { network, keyhostIp, stop };
 };

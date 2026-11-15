@@ -162,12 +162,14 @@ const IGNORED_SETTINGS: Readonly<Record<AcpCli, string>> = {
 const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
   Effect.gen(function* () {
     const checkedAt = DateTime.formatIso(yield* DateTime.now);
+    const services = environmentServices();
+    const proxy = acpSnapshotModels(services.catalog.current());
     return buildServerProvider({
       presentation: spec.presentation,
       enabled,
       checkedAt,
       // SPI-1168: Claude Code's are the Anthropic Messages endpoints' when there is one.
-      models: spec.cli === "claude" ? claudeModelsOf(acpSnapshotModels(environmentServices().catalog.current()), environmentServices().modelEndpoints?.()) : acpSnapshotModels(environmentServices().catalog.current()),
+      models: spec.cli === "claude" ? claudeModelsOf(proxy, services.modelEndpoints?.()) : proxy,
       // SPI-1151: the built-ins that run here (none: t3's ACP adapter refuses `/compact` without a compacting flavor).
       slashCommands: CLI_BUILT_IN_COMMANDS[spec.cli],
       probe: { installed: true, version: spec.version, status: "ready", auth: { status: "authenticated" }, message: IGNORED_SETTINGS[spec.cli] },

@@ -2,7 +2,7 @@
 // container), runs `initialize` and `session/new`, keeps every `available_commands_update` until `settleMs` passes
 // without one (after the first), optionally sends one prompt, answers the agent's requests with an error (no client
 // file system, no terminal), logs every line to $LOG and prints a summary JSON.
-//   node acp-rpc.mjs '<json {cwd, settleMs?, waitMs?, prompt?, timeoutMs?}>' -- <command…>
+//   node acp-rpc.mjs '<json {cwd, settleMs?, waitMs?, model?, prompt?, lingerMs?, timeoutMs?}>' -- <command…>
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 
@@ -76,6 +76,10 @@ try {
   }));
   const session = await request("session/new", { cwd: scenario.cwd, mcpServers: [] });
   summary.sessionId = session?.sessionId ?? null;
+  // The session's model, as t3's adapter writes it before a turn (its `model` config option).
+  if (scenario.model !== undefined && summary.sessionId !== null) {
+    await request("session/set_config_option", { sessionId: summary.sessionId, configId: "model", value: scenario.model }).catch((error) => summary.errors.push({ setModel: error.rpc ?? String(error) }));
+  }
   // The commands come after `session/new`; wait for the first, then until they settle.
   const waitUntil = Date.now() + (scenario.waitMs ?? 60_000);
   while (Date.now() < Math.min(waitUntil, deadline) && summary.exit === undefined) {
@@ -88,6 +92,8 @@ try {
       sleep(Math.max(deadline - Date.now(), 0)).then(() => ({ stopReason: "probe timeout" })),
     ]);
     summary.stopReason = result?.stopReason ?? null;
+    // The container stays up a while after the prompt, for a watcher inside it (claudeRelay.docker.test.ts).
+    if (scenario.lingerMs !== undefined) await sleep(scenario.lingerMs);
   }
 } catch (error) {
   summary.errors.push(error.rpc ?? String(error));
