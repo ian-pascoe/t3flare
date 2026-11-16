@@ -23,8 +23,8 @@ export type BuiltInUsageReadersEnv = ProviderUsageReaderEnv<typeof PiDurableDriv
 
 /**
  * t3's Usage page, one reader per t3 usage provider (`usage/readers.ts`): Pi (the Durable agent, text generation, the pi
- * CLI), Codex, Claude Code and OpenCode. Each reads t3flare's own usage records of the Model endpoints (SPI-1173), then,
- * while Commissary's management API is configured, the model proxy's request log (parity G8, SPI-999; ADR-0012).
+ * CLI), Codex, Claude Code and OpenCode, each reading t3flare's own usage records (SPI-1173). Until then they read the
+ * model proxy's request log from Commissary's management API (parity G8, SPI-999), which now feeds the limit meters only.
  */
 export const BUILT_IN_USAGE_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv, BuiltInUsageReadersEnv>> = [
   { ...PiDurableDriver, usage: usageReader("pi") },

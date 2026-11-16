@@ -8,7 +8,9 @@ import type { UsageEntry } from "@t3flare/models/usage";
 import { describe, expect, it } from "vitest";
 
 import { generateEndpointText } from "../src/endpointText.ts";
-import { SessionEndpoints } from "../src/session/endpoints.ts";
+import { durableUsage, SessionEndpoints } from "../src/session/endpoints.ts";
+import { proxyModels } from "../src/session/models.ts";
+import { mergeLists } from "@t3flare/models/catalog";
 
 const model = (id: string, cost: { input: number; output: number; cacheRead: number; cacheWrite: number }) => ({
   id,
@@ -102,6 +104,20 @@ describe("a Session's usage records", () => {
     await settle();
     expect(recorded).toMatchObject([{ agent: "durable", modelId: "house-model", input: 30, output: 7, costUsd: null }]);
     expect(recorded).toHaveLength(1);
+  });
+
+  it("records an answer on the Model proxy too, under its own id (`anthropic`), until the hard cut", async () => {
+    const recorded: Array<UsageEntry> = [];
+    const catalog = { models: mergeLists([{ id: "claude-haiku-5-5" }], undefined), fetchedAt: 1 };
+    const models = proxyModels(
+      { url: "https://proxy.example", apiKey: "cms_key" },
+      () => catalog,
+      (async () => answer("claude-haiku-5-5", { input_tokens: 20, output_tokens: 4 })) as unknown as typeof fetch,
+      durableUsage({ session: () => "session-9", record: (entry) => void recorded.push(entry) }, () => 1),
+    );
+    await models.completeSimple(models.getModel("anthropic", "claude-haiku-5-5")!, { messages: [{ role: "user", content: "hi", timestamp: 0 }] });
+    await settle();
+    expect(recorded).toMatchObject([{ agent: "durable", endpointId: "anthropic", modelId: "claude-haiku-5-5", session: "session-9", input: 20, output: 4 }]);
   });
 
   it("text generation records its own answer, under text generation", async () => {

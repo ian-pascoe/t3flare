@@ -54,6 +54,14 @@ export interface SessionEndpointsOptions {
   readonly usage?: { readonly session: () => string; readonly record: (entry: UsageEntry) => void };
 }
 
+/** What a Session records of an answer on `endpointId` (an endpoint's, or the Model proxy's `anthropic`): the Durable agent's usage. */
+export const durableUsage =
+  (usage: NonNullable<SessionEndpointsOptions["usage"]>, now: () => number) =>
+  (message: Parameters<typeof usageOfPiAnswer>[0], endpointId: string): void => {
+    const entry = usageOfPiAnswer(message, { agent: "durable", endpointId, session: usage.session(), now: now() });
+    if (entry !== undefined) usage.record(entry);
+  };
+
 export class SessionEndpoints {
   readonly #options: SessionEndpointsOptions;
   /** The endpoints whose providers the models have. */
@@ -83,20 +91,13 @@ export class SessionEndpoints {
         } else if (this.#failing.delete(id)) this.#options.onCredential?.(undefined);
       },
       ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }),
-      ...(this.#options.usage === undefined ? {} : { answered: (message, endpointId) => this.#answered(message, endpointId) }),
+      ...(this.#options.usage === undefined ? {} : { answered: durableUsage(this.#options.usage, this.#options.now ?? Date.now) }),
     });
     const next = new Set(providers.map((provider) => provider.id));
     for (const id of this.#ids) if (!next.has(id)) this.#options.models.deleteProvider(id);
     for (const provider of providers) this.#options.models.setProvider(provider);
     this.#ids = next;
     this.#keys.clear();
-  }
-
-  #answered(message: Parameters<typeof usageOfPiAnswer>[0], endpointId: string): void {
-    const usage = this.#options.usage;
-    if (usage === undefined) return;
-    const entry = usageOfPiAnswer(message, { agent: "durable", endpointId, session: usage.session(), now: (this.#options.now ?? Date.now)() });
-    if (entry !== undefined) usage.record(entry);
   }
 
   /** An endpoint's key for `target`, from memory while fresh, else from the Environment (a refusal is never kept). */

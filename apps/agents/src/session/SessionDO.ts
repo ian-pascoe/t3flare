@@ -82,8 +82,9 @@ import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
+import type { UsageEntry } from "@t3flare/models/usage";
 import { proxyModels } from "./models.ts";
-import { SessionEndpoints } from "./endpoints.ts";
+import { durableUsage, SessionEndpoints } from "./endpoints.ts";
 import { noteTurnProvider, runsOn } from "./signOut.ts";
 import { SUGGESTION_MODEL, suggestPrompt } from "./promptSuggestion.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
@@ -249,7 +250,24 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (mcp !== undefined) registry.install(this.#mcpExtension(mcp));
     this.#installHarness(ctx.storage.kv.get<ResolvedHarness>(HARNESS_KEY) ?? resolveHarness(EMPTY_HARNESS));
     this.#registry = registry;
-    this.#models = compactionLimits(proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current(), this.#proxyFetch), this.#limits);
+    // SPI-1173: each answer on an endpoint (a turn's, compaction's, an extension's), and on the Model proxy until the hard
+    // cut, kept by the Environment for t3's Usage page. Sent after the answer; a failed send loses the record only.
+    const usage = {
+      session: () => ctx.id.name ?? ctx.id.toString(),
+      record: (entry: UsageEntry) =>
+        ctx.waitUntil(
+          environmentStub(env.ENVIRONMENT)
+            .recordUsage({ entries: [entry] })
+            .then(
+              () => undefined,
+              (error: unknown) => console.warn(JSON.stringify({ t3flare: "usage-record-failed", agent: entry.agent, endpoint: entry.endpointId, error: error instanceof Error ? error.name : "error" })),
+            ),
+        ),
+    };
+    this.#models = compactionLimits(
+      proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current(), this.#proxyFetch, durableUsage(usage, Date.now)),
+      this.#limits,
+    );
     this.#endpoints = new SessionEndpoints({
       kv: ctx.storage.kv,
       models: this.#models,
@@ -263,20 +281,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
           const { credential: _cleared, ...rest } = record;
           return rest;
         }),
-      // SPI-1173: each answer on an endpoint (a turn's, compaction's, an extension's), kept by the Environment for t3's
-      // Usage page. Sent after the answer; a failed send loses the record only.
-      usage: {
-        session: () => ctx.id.name ?? ctx.id.toString(),
-        record: (entry) =>
-          ctx.waitUntil(
-            environmentStub(env.ENVIRONMENT)
-              .recordUsage({ entries: [entry] })
-              .then(
-                () => undefined,
-                (error: unknown) => console.warn(JSON.stringify({ t3flare: "usage-record-failed", agent: entry.agent, endpoint: entry.endpointId, error: error instanceof Error ? error.name : "error" })),
-              ),
-          ),
-      },
+      usage,
     });
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {

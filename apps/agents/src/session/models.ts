@@ -77,12 +77,17 @@ export const modelOf = (entry: CatalogModel, known: ReadonlyArray<AnthropicModel
   };
 };
 
+/** The proxy's pi-ai provider id, and the first segment of its models' slugs (`anthropic/<id>`). */
+export const PROXY_PROVIDER_ID = "anthropic";
+
 /**
  * pi-ai `Models` whose one provider, `anthropic`, goes through the model proxy and lists the catalog `catalog` gives at
  * each lookup: a catalog the Session has read again is in force from its next request. `fetch`, when given, makes every
  * model request (the Session's recording fetch: it sees each answer's status and `retry-after`, which pi-ai drops).
+ * `answered`, when given, gets each final answer, under the proxy's provider id `anthropic` (SPI-1173's usage records,
+ * until the hard cut).
  */
-export const proxyModels = (proxy: ModelProxy, catalog: () => Catalog, fetch?: FetchFunction): MutableModels => {
+export const proxyModels = (proxy: ModelProxy, catalog: () => Catalog, fetch?: FetchFunction, answered?: EndpointAccess["answered"]): MutableModels => {
   const models = createModels();
   const base = anthropicProvider();
   const known = base.getModels();
@@ -97,7 +102,7 @@ export const proxyModels = (proxy: ModelProxy, catalog: () => Catalog, fetch?: F
     }
     return listed;
   };
-  models.setProvider({
+  const provider: Provider = {
     ...base,
     baseUrl: proxy.url,
     auth: {
@@ -116,7 +121,8 @@ export const proxyModels = (proxy: ModelProxy, catalog: () => Catalog, fetch?: F
           streamSimple: (model: AnthropicModel, context: Parameters<typeof base.streamSimple>[1], options?: Parameters<typeof base.streamSimple>[2]) =>
             base.streamSimple(model, context, { ...options, fetch }),
         }),
-  });
+  };
+  models.setProvider(answering(provider, PROXY_PROVIDER_ID, answered));
   return models;
 };
 
