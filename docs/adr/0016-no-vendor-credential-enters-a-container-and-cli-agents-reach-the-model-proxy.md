@@ -232,8 +232,8 @@ Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/
 
 Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/spi-1170/p1170.json`.
 
-1. **A provider per endpoint, every API.** pi takes a base URL per provider (`models.json`), so each endpoint that lists
-   a model is its own provider, `t3flare-endpoint-<endpointId>` (prefixed, so no endpoint id changes one of pi's
+1. **A provider per endpoint, every API.** pi takes a base URL per provider (`models.json`), so each endpoint the
+   relay carries (no sign-in endpoint until SPI-1171, `relayedEndpoints`) that lists a model is its own provider, `t3flare-endpoint-<endpointId>` (prefixed, so no endpoint id changes one of pi's
    built-in providers), with the endpoint's API and the relay's per-endpoint URL, every model pinned to both. pi is
    pi-ai's coding agent and an endpoint's base URL follows pi-ai's convention, so every endpoint API is pi's (Anthropic
    Messages, OpenAI Responses and Completions, Google Generative AI, Mistral) and pi-ai appends each API's own path. The
@@ -265,10 +265,15 @@ Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/
    is the profile's laid over the Workspace's command environment and the owner's Variables, so an owner's
    `HTTP_PROXY` Variable would reach pi's HTTP client (undici's `EnvHttpProxyAgent`) and carry the relay's cleartext
    request, handle included, through that proxy: the launcher adds the relay's host to `no_proxy` and `NO_PROXY`,
-   keeping the owner's own entries (review round 1, `test:docker`).
-7. **Absolute paths.** The launcher and the handle command run every program by its absolute path: the image puts
-   mise's shims first on PATH and trusts `/workspace`'s mise configuration, so a project's `env` would otherwise start
-   pi with the handle, or its `tr` be handed the holder's environment (review round 1, `test:docker`).
+   each keeping its own entries, and leaves a list that is `*` as it is (review rounds 1 and 2, `test:docker`).
 6. **Headers.** pi's own (`x-stainless-*`, `user-agent`, `accept-language`, `anthropic-dangerous-direct-browser-access`,
    Google's `x-goog-api-client`, and the prompt-cache affinity hints `session-id`, `x-client-request-id` and Mistral's
    `x-affinity`) are dropped; its turns need none of them. The allowlist is unchanged.
+7. **Absolute paths.** The launcher and the handle command run every program by its absolute path: the image puts
+   mise's shims first on PATH and trusts `/workspace`'s mise configuration, so a project's `env` would otherwise start
+   pi with the handle, or its `tr` be handed the holder's environment (review round 1, `test:docker`). **Residual**:
+   this closes it for pi's own launcher and handle command only. The process command that starts every CLI process
+   (`processCommand`, `apps/sandbox-image/src/process.ts`) still runs `setsid`, `mkdir`, `grep`, `base64`, `find` and
+   others by name, under that PATH, with the handle in its environment, for pi as for Claude Code and OpenCode; a
+   project's shim named so would get the handle (or, as `setsid`, become its holder). Not fixed here: filed as a
+   follow-up by the orchestrator.

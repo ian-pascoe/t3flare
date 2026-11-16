@@ -14,8 +14,8 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
    | find the newest nightly tag (`:98`) | t3 changed its tag format: `NIGHTLY` at `bump.ts:80` |
    | regenerate the workspace and install (`:157`) | t3 added a workspace setting ("classify it") or changed its lock's layout: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); a patch no longer applies or matches nothing, or t3's lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
    | lock matches t3's, one effect (`:161`) | a t3 importer installs other versions than in t3's lock, a second `effect`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030), [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
-   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `provider/textGeneration.ts` and `endpointTextGeneration.test.ts` [U68](#u68-text-generation-names-the-endpoint-on-t3s-own-failures-spi-1163); `provider/cli/codexGuard.ts`, `codexEndpoints.ts`, `codexDriver.ts`, `cliProfiles.test.ts`'s Codex cases [U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167); `provider/cli/claudeEndpoints.ts`, `acpProfiles.test.ts`'s relay cases [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168); `provider/cli/opencodeEndpoints.ts`, `relayModels.ts`, `acpProfiles.test.ts`'s OpenCode relay cases [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169); `credentials/*`, agents' `session/planUsage.ts`, `sessionSignIn.test.ts` [U77](#u77-sign-ins-on-pi-ai-chatgpt-plan-usages-request-rules-and-the-credential-broker-spi-1164) |
-   | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)); `claudeRelay.docker.test.ts` and `opencodeRelay.docker.test.ts`: a CLI's path, key header or handle holders on the model relay ([U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168), [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169)) |
+   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `provider/textGeneration.ts` and `endpointTextGeneration.test.ts` [U68](#u68-text-generation-names-the-endpoint-on-t3s-own-failures-spi-1163); `provider/cli/codexGuard.ts`, `codexEndpoints.ts`, `codexDriver.ts`, `cliProfiles.test.ts`'s Codex cases [U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167); `provider/cli/claudeEndpoints.ts`, `acpProfiles.test.ts`'s relay cases [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168); `provider/cli/opencodeEndpoints.ts`, `relayModels.ts`, `acpProfiles.test.ts`'s OpenCode relay cases [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169); `credentials/*`, agents' `session/planUsage.ts`, `sessionSignIn.test.ts` [U77](#u77-sign-ins-on-pi-ai-chatgpt-plan-usages-request-rules-and-the-credential-broker-spi-1164); `provider/cli/piEndpoints.ts`, `cliProcess.ts`'s line maps, `cliProfiles.test.ts`'s pi relay cases, `piSpawn.test.ts`, `piDriver.test.ts`, `piHandleCommand.test.ts` [U78](#u78-pi-on-model-endpoints-through-the-model-relay-spi-1170) |
+   | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)); `claudeRelay.docker.test.ts`, `opencodeRelay.docker.test.ts` and `piRelay.docker.test.ts`: a CLI's path, key header or handle holders on the model relay ([U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168), [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169), [U78](#u78-pi-on-model-endpoints-through-the-model-relay-spi-1170)) |
    | deploy the bump stage (`:176`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
    | acceptance test (`:180`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `text generation names the Model endpoints' default` and the report's `modelEndpoint`/`textGeneration` (SPI-1175) [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
    | stock t3 nightly links and forwards (step 3) | the laptop half of [U7](#u7-client-version-skew-desktop-mobile-laptop) |
@@ -811,7 +811,7 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Fix**: diff `CodexAdapterV2.ts` (`codexThreadRuntimeParams`, `buildCodexTurnStartParams`, `planSelectionTransition`)
   and the app-server schema (`ThreadStartParams`, `ThreadStartResponse`, `TurnStartParams`) between tags; update the
   guard, `codexProcessProvider` and the exclusion; re-run `p1167.ts`.
-- Claude Code's leans on the relay, and the model-routed URL, are [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168); OpenCode's are [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169).
+- Claude Code's leans on the relay, and the model-routed URL, are [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168); OpenCode's are [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169); pi's are [U78](#u78-pi-on-model-endpoints-through-the-model-relay-spi-1170).
 
 ### U70. The Settings server's caller: `threadLinkIn` reads the thread projection (SPI-1198)
 
@@ -1175,6 +1175,84 @@ anyway, or loosens how its tokens are held. Nothing here reaches t3; the leans a
 - **Fix**: on a pi-ai bump, diff `api/openai-responses.js` (`isChatGPTSignIn`, `buildParams`, `getConfigurationUpdateEffort`)
   and `openai-responses-shared.js` (`additional_tools`) against `planUsage.ts`; on an OpenAI change, its "Preview
   limitations" and "Errors and recovery" pages.
+
+### U78. pi on Model endpoints through the model relay (SPI-1170)
+
+Ranked after U76, which it parallels: a break fails pi turns on endpoints, or puts the model handle in the environment
+of pi's shells. The Model proxy path keeps its `models.json` (U30, U32). As for the other CLIs, the handle is never out
+of reach of the Container's commands (ADR-0016's SPI-1170 refinement): a command pi's bash tool runs can run the
+handle command or read setsid's `/proc/<pid>/environ`. What this entry guards is that no other environment or file
+holds it, and that it goes into no request but the relay's.
+
+- **Where**: `apps/environment/src/agents/cliProfiles.ts` (`piRelayModelsJson`, `piRelaySettings`, `PI_HANDLE_COMMAND`,
+  `PI_HANDLE_HOLDERS`), `provider/cli/piEndpoints.ts` (the endpoints, the list, the RPC line maps),
+  `agents/cliProcess.ts` (`handleOf`'s `LineMaps`), `provider/cli/piDriver.ts`, and the image's `t3flare-pi` and
+  `t3flare-pi-handle`. It leans on pi 1.5.2 (`@earendil-works/pi-coding-agent`, its bundled pi-ai) and on t3's Pi
+  adapter (`t3code/packages/provider-pi/src/server/adapter.ts`, `rpc.ts`) in these ways:
+  - **Which endpoints**: the relay's (`relayedEndpoints`, no sign-in until SPI-1171) that list a model (`piServes`).
+  - **`models.json` from the agent directory alone** (`dist/core/model-runtime.js` `ModelRuntime.create`,
+    `agent-session-services.js`): a provider's `baseUrl`, `api` and `apiKey`, and a model's own `baseUrl` and `api`,
+    which win (`provider-composer.js` `modelFromJson`). No project `models.json`; a repository's `.pi/extensions`,
+    `.pi/settings.json` (`extensions`, `packages`) load only under project trust, off here (`test:docker`'s hostile
+    `.pi/`). An extension's `registerProvider` would win over `models.json`: only t3's extension is passed.
+  - **An API key's `!command` runs per request, uncached** (`provider-composer.js` `composeApiKeyAuth`'s `resolve` →
+    `resolve-config-value.js` `resolveConfigValueUncached`; `model-runtime.js` `prepareRequest`), with pi's
+    environment, through `/bin/sh`, its stdout trimmed; the availability check does not run it. A failing command
+    fails the request ("Failed to resolve API key … from shell command").
+  - **pi-ai's paths and key headers by API**: the relay URL plus `/v1/messages` (`x-api-key`; a key holding
+    `sk-ant-oat` would go as a Bearer), `/responses` and `/chat/completions` (Bearer), `/models/<model>:streamGenerateContent`
+    (`x-goog-api-key`), `/v1/chat/completions` for Mistral (Bearer); each in the relay's `KEY_HEADERS`.
+  - **pi's RPC names a model as `{ provider, modelId }`**: t3's adapter sends `set_model` with the slug split at its
+    first `/` (or the pair pi reported), and reads `provider` in responses (`get_available_models`, `get_state`,
+    `set_model`) and in `message_end`'s message. `piLineToPi` and `piLineFromPi` map exactly these. pi's session files
+    keep its own ids (`t3flare-endpoint-<id>`), so a session resumes in a new process (`switch_session`).
+  - **The launch chain**: `setsid --wait /opt/t3flare/bin/pi --mode rpc …` → the launcher → `env -u
+    T3FLARE_MODEL_HANDLE` → Node running pi (which titles itself `pi`). The handle command walks up its own ancestry
+    to the first process whose command line starts `setsid --wait /opt/t3flare/bin/pi` and checks its marker. This
+    needs setsid to fork, as U76 says (`setsid --wait` forks only when its caller is a process-group leader; otherwise
+    no process holds the handle and every request fails closed). `test:docker`'s setsid is PID 1, which the walk
+    includes.
+  - **pi's HTTP client honours the proxy variables** (`dist/core/http-dispatcher.js`: undici's `EnvHttpProxyAgent`,
+    which reads `no_proxy` before `NO_PROXY`, with `proxyTunnel: true`). An owner's `HTTP_PROXY` Variable reaches pi's
+    environment, so the launcher adds the relay's host (`computer.internal`) to both no-proxy variables, each keeping its
+    own entries, and leaves `*` as it is (`piHandleCommand.test.ts` pins the cases); `test:docker` sets the proxy and
+    sees no CONNECT. If pi changes its client or how it reads them, the relay's request, with the
+    handle, may go through the owner's proxy (`test:docker`'s proxy check fails).
+  - **PATH**: the launcher and the handle command name every program by its absolute path (`/usr/bin/env`, `tr`,
+    `head`, `sed`, `cut`, `grep`); they need those paths in the image (merged `/usr`; Ubuntu's uutils and Debian's
+    coreutils both have them). `test:docker` puts hostile ones first on PATH. The handle command takes only a process
+    marker's shape (`isProcessMarker`), so a marker holding a newline cannot match another line of the holder's
+    environment. **Not covered**: the process command that starts every CLI process (`processCommand`) runs `setsid`,
+    `mkdir`, `grep` and others by name, with the handle in its environment (a follow-up, ADR-0016's SPI-1170 item 7).
+  - **t3's registry replaces a ready pi snapshot's models** (`ProviderRegistry.ts` `shouldRetainMissingProviderModels`
+    keeps a `pi` snapshot's missing models only while it is not installed, ready and authenticated), so the proxy's
+    leave the picker when the endpoints' arrive.
+  - **A stale proxy model** (`anthropic/<id>`) names pi's built-in `anthropic` provider, which has no key here: pi
+    refuses `set_model` ("Model not found") before any request.
+- **Breaks when**: pi starts caching a command's key, or resolving it before a request (harmless while the handle is
+  fixed for the process's life), or stops running it (no key: every request fails); pi reads a `models.json` or
+  provider settings from a project without trust, or lets `modelOverrides` set a `baseUrl` (a repository could move an
+  endpoint's provider with the handle: the hostile `.pi/` in `test:docker` would see it); pi-ai changes an API's path
+  or key header (the relay log shows the new path, or the relay answers 401 for a header it does not read); pi adds an
+  RPC field carrying a provider that t3 reads (t3 shows `t3flare-endpoint-<id>/…` there; the turn still runs) or a
+  command naming a model that is not `set_model` (pi gets t3's endpoint id as a provider: "Model not found"); the
+  launcher loses its `env -u` (the handle reaches pi's environment and its shells': `test:docker` fails); a CLI header the allowlist drops becomes
+  required (the relay log's `dropped` names it; p1170's list is in `docs/steps/spi-1170/p1170.json`).
+- **Detection**: `test/cliProfiles.test.ts` (the relay cases), `test/piEndpoints.test.ts`, `test/piSpawn.test.ts`,
+  `test/piDriver.test.ts`,
+  `test/piHandleCommand.test.ts` (the launcher and the handle command against `MODEL_HANDLE_ENV`, `PI_HANDLE_HOLDERS`,
+  `HANDLE`, both Dockerfiles); `test/docker/piRelay.docker.test.ts` in `test:docker` (five APIs' paths and key
+  headers, a switch across them in one session with pi's bash tool, a stale proxy model, a hostile repository `.pi/`,
+  a bash command's environment, the holders, a resume in a new process with a new handle, hostile programs on PATH, a
+  proxy Variable, pi's real RPC lines mapped, the handle command's refusals); `scripts/p1170.ts` on a
+  stage. **Silent**: the handle reaching a shell's environment between `test:docker` runs; a new RPC provider field
+  t3 reads (cosmetic); a new dropped header pi needs for a feature but not for a turn. Not detectable, by design: a
+  command reading setsid's `/proc/<pid>/environ` or running the handle command (the residual).
+- **Blast radius**: pi turns on endpoints fail; or the model handle in the environment of pi's shells. Either way
+  spending stays bounded to the process's endpoints and life, and from inside the Container only.
+- **Fix**: on a pi bump, re-read `resolve-config-value.js`, `provider-composer.js` and `model-runtime.js` for the
+  key's resolution and the `baseUrl`'s sources, pi's `docs/models.md`, `docs/rpc.md` and `docs/security.md`; re-run
+  `piRelay.docker.test.ts` and `p1170.ts`.
 
 ## Gaps in detection
 
