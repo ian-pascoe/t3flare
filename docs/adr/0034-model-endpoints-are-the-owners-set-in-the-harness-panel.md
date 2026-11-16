@@ -79,7 +79,7 @@ refinement) or none, optional headers, and the models it serves.
    `retry-after`, a 401 or 403 by the endpoint's auth, overload and 5xx), never its prose. The Session classifies a
    Durable turn's or a compaction's answer once, records it on the turn with its own text naming the endpoint, and stops
    pi-durable's retries when none can help; t3 shows it, and a usage limit pauses the thread until its reset (auto-resume
-   when the owner has it on). A rate limit that resets within 60 s is retried in the run. Overload and 5xx are
+   when the owner has it on). A rate limit that resets within pi-durable's retries (14 s) is retried in the run. Overload and 5xx are
    retried and are never a usage limit (501 is not retried). **No fallback**: a turn's model is its endpoint's, so a
    limited endpoint's thread waits for that endpoint. Every failed answer replaces the turn's record. Text generation
    names the classified failure and its reset. The relay passes an error back in the vendor's own shape, its body
