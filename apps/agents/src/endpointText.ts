@@ -13,10 +13,10 @@ import {
   type EndpointTextRequest,
   endpointLabel,
   isRecord,
-  isSignIn,
   jsonOnlyPrompt,
   type ModelEndpoint,
   type ModelEndpoints,
+  signInOf,
 } from "@t3flare/models/endpoints";
 
 import { credentialProblem, endpointProviders } from "./session/models.ts";
@@ -57,11 +57,12 @@ interface Observed {
 /** The failure's text by the endpoint's answer status: never its body. */
 const statusProblem = (endpoint: ModelEndpoint, modelId: string, status: number): string => {
   const named = endpointLabel(endpoint.id);
+  const signIn = signInOf(endpoint.auth);
   if (status === 401 || status === 403) {
     return endpoint.auth === "none"
       ? `${named} refused the request without a credential (HTTP ${status}): check its auth in the Harness panel.`
-      : isSignIn(endpoint.auth)
-        ? `${named} refused its ChatGPT sign-in (HTTP ${status}): ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.`
+      : signIn !== undefined
+        ? `${named} refused its ${signIn.title} sign-in (HTTP ${status}): ${signIn.refused}`
         : `${named} refused its API key (HTTP ${status}): check it in the Harness panel.`;
   }
   if (status === 404) return `${named} does not serve the model ${modelId} (HTTP 404).`;
@@ -77,7 +78,7 @@ const failureOf = (endpoint: ModelEndpoint, modelId: string, observed: Observed)
     // The endpoint was read from the Environment just now, so a changed target is a save that landed meanwhile.
     return {
       ok: false,
-      error: observed.refused.changed === true ? `${named} changed or was removed while the text was being generated: try again.` : credentialProblem(endpoint.id, observed.refused),
+      error: observed.refused.changed === true ? `${named} changed or was removed while the text was being generated: try again.` : credentialProblem(endpoint, observed.refused),
     };
   }
   if (observed.status !== undefined) return { ok: false, error: statusProblem(endpoint, modelId, observed.status) };

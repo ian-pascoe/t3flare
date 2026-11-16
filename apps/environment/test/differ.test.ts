@@ -118,22 +118,14 @@ describe("differ", () => {
     expect(proxy.message).toBe("The model anthropic/claude-x is not available: the Model proxy no longer lists it. Pick another model.");
   });
 
-  it("shows a Model endpoint's own credential message, naming the sign-in, and nothing after it (SPI-1164)", () => {
-    const at = (detail: string) => failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail, startedAt: 0 }, now);
-    const signedOut = at(
-      'API key auth failed for provider chatgpt: The Model endpoint "chatgpt" is not signed in to ChatGPT (ChatGPT refused to renew the sign-in (invalid_grant): it is signed out): sign in with ChatGPT again in the Harness panel. trailing vendor text sk-secret',
-    );
-    expect(signedOut).toMatchObject({
-      class: "provider_error",
-      code: "signed_out",
-      retryable: false,
-      message: 'The Model endpoint "chatgpt" is not signed in to ChatGPT (ChatGPT refused to renew the sign-in (invalid_grant): it is signed out): sign in with ChatGPT again in the Harness panel.',
-    });
-    const passing = at('API key auth failed for provider chatgpt: The Model endpoint "chatgpt" could not get a ChatGPT token (its ChatGPT sign-in could not be renewed yet: retry the turn).');
-    expect(passing).toMatchObject({ code: "endpoint_credential", message: 'The Model endpoint "chatgpt" could not get a ChatGPT token (its ChatGPT sign-in could not be renewed yet: retry the turn).' });
-    expect(at('API key auth failed for provider gw: The Model endpoint "gw" changed or was removed since this Session took it: retry the turn.').message).toBe(
-      'The Model endpoint "gw" changed or was removed since this Session took it: retry the turn.',
-    );
+  it("shows a Model endpoint's credential failure as the Session recorded it, typed, never the error's text (SPI-1164)", () => {
+    const at = (credential: { endpointId: string; kind: "signed_out" | "unavailable"; message: string; retryable: boolean } | undefined, detail: string) =>
+      failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail, startedAt: 0, ...(credential === undefined ? {} : { proxy: { requests: 0, credential } }) }, now);
+    const message = 'The Model endpoint "chatgpt" is not signed in to ChatGPT (ChatGPT refused to renew the sign-in (invalid_grant)): sign in with ChatGPT again in the Harness panel.';
+    expect(at({ endpointId: "chatgpt", kind: "signed_out", message, retryable: false }, `API key auth failed for provider chatgpt: ${message} sk-secret`)).toMatchObject({ class: "provider_error", code: "signed_out", retryable: false, message });
+    expect(at({ endpointId: "chatgpt", kind: "unavailable", message: "m", retryable: true }, "")).toMatchObject({ code: "unavailable", retryable: true, message: "m" });
+    // Without the record, the text is never read for it: the generic model error.
+    expect(at(undefined, `API key auth failed for provider chatgpt: ${message}`).message).toBe("The model provider reported an error.");
   });
 
   describe("a model proxy failure the Session classified", () => {

@@ -3,7 +3,7 @@
 // refreshed token at its next request; it drops the token on a 401 and on the endpoint's sign-out; a turn on a signed-out
 // endpoint fails naming the sign-in. Its requests follow ChatGPT plan usage's rules (OpenAI's "Preview limitations").
 import { createModels } from "@earendil-works/pi-ai";
-import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoint } from "@t3flare/models/endpoints";
+import type { EndpointCredential, EndpointCredentialFailure, EndpointCredentialRequest, ModelEndpoint } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
 import { SessionEndpoints } from "../src/session/endpoints.ts";
@@ -42,7 +42,7 @@ interface Sent {
 }
 
 /** A Session's endpoints over a stand-in for the broker: `answer` is what `endpointCredential` gives at each ask. */
-const sessionWith = (answer: (asked: number) => EndpointCredential, reply: (sent: Sent) => Response = () => responsesStream("ok")) => {
+const sessionWith = (answer: (asked: number) => EndpointCredential, reply: (sent: Sent) => Response = () => responsesStream("ok"), endpoint: ModelEndpoint = CHATGPT) => {
   let clock = 1_000_000;
   let asked = 0;
   const sent: Array<Sent> = [];
@@ -54,22 +54,29 @@ const sessionWith = (answer: (asked: number) => EndpointCredential, reply: (sent
   }) as typeof fetch;
   const models = createModels();
   const map = new Map<string, unknown>();
+  const recorded: Array<EndpointCredentialFailure | undefined> = [];
   const endpoints = new SessionEndpoints({
+    onCredential: (failure) => void recorded.push(failure),
     kv: { get: <T>(key: string) => map.get(key) as T | undefined, put: (key, value) => void map.set(key, value) },
     models,
     fetch: fetcher,
     readMs: 50,
     now: () => clock,
     source: () => ({
-      modelEndpoints: async () => ({ revision: 1, endpoints: [CHATGPT] }),
+      modelEndpoints: async () => ({ revision: 1, endpoints: [endpoint] }),
       endpointCredential: async (_request: EndpointCredentialRequest) => answer((asked += 1)),
     }),
   });
-  const request = async (system?: string) => {
-    const message = await models.completeSimple(models.getModel("chatgpt", "gpt-6.1-sol")!, { ...(system === undefined ? {} : { systemPrompt: system }), messages: [{ role: "user", content: "hi", timestamp: 0 }] }, { maxTokens: 500, temperature: 0.2 });
+  const request = async (system?: string, extra: { readonly reasoning?: "high"; readonly tools?: boolean } = {}) => {
+    const tools = extra.tools === true ? [{ name: "read", description: "Read a file", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } }] : undefined;
+    const message = await models.completeSimple(
+      models.getModel("chatgpt", endpoint.models[0]!.id)!,
+      { ...(system === undefined ? {} : { systemPrompt: system }), messages: [{ role: "user", content: "hi", timestamp: 0 }], ...(tools === undefined ? {} : { tools: tools as never }) },
+      { maxTokens: 500, temperature: 0.2, ...(extra.reasoning === undefined ? {} : { reasoning: extra.reasoning }) },
+    );
     return message.errorMessage ?? message.content.map((block) => (block.type === "text" ? block.text : "")).join("");
   };
-  return { endpoints, request, sent, map, asked: () => asked, advance: (ms: number) => void (clock += ms), now: () => clock };
+  return { endpoints, request, sent, map, recorded, asked: () => asked, advance: (ms: number) => void (clock += ms), now: () => clock };
 };
 
 describe("a Session on a sign-in endpoint", () => {
@@ -132,6 +139,9 @@ describe("a Session on a sign-in endpoint", () => {
     const transient = sessionWith(() => ({ apiKey: null, problem: "its ChatGPT sign-in could not be renewed yet: retry the turn" }));
     await transient.endpoints.take();
     expect(await transient.request()).toMatch(/The Model endpoint "chatgpt" could not get a ChatGPT token \(its ChatGPT sign-in could not be renewed yet: retry the turn\)/);
+    // Each failure is recorded typed for the differ, and cleared once a request gets a token again.
+    expect(session.recorded).toEqual([{ endpointId: "chatgpt", kind: "signed_out", message: expect.stringMatching(/is not signed in to ChatGPT/), retryable: false }]);
+    expect(transient.recorded).toEqual([{ endpointId: "chatgpt", kind: "unavailable", message: expect.stringMatching(/retry the turn/), retryable: true }]);
   });
 
   it("keeps no token in its storage", async () => {
@@ -139,5 +149,32 @@ describe("a Session on a sign-in endpoint", () => {
     await session.endpoints.take();
     await session.request();
     expect(JSON.stringify([...session.map.entries()])).not.toContain("at-never-stored");
+  });
+
+  it("sends a reasoning model's thinking level as reasoning.effort, with no configuration_update item, and tools as additional_tools", async () => {
+    // gpt-6.1-sol as pi-ai's catalog has it (known.ts copies its compat): mid-conversation effort, additional_tools.
+    const sol: ModelEndpoint = {
+      ...CHATGPT,
+      models: [
+        {
+          ...CHATGPT.models[0]!,
+          reasoning: true,
+          known: true,
+          thinkingLevelMap: { off: null, minimal: null, low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: "max" },
+          compat: { supportsStrictMode: true, supportsOpenAIGrammarTools: true, supportsAdditionalTools: true, supportsToolSearch: true, supportsMidConvoSystemMessages: true, supportsExplicitPromptCacheMode: true, supportsMidConvoEffort: true },
+        },
+      ],
+    };
+    const session = sessionWith(() => ({ apiKey: "at-one", expiresAt: 1_000_000 + 3_600_000 }), undefined, sol);
+    await session.endpoints.take();
+    await session.request("Be brief.", { reasoning: "high", tools: true });
+    const body = session.sent[0]!.body;
+    const input = body.input as Array<Record<string, unknown>>;
+    expect(input.some((item) => item.type === "configuration_update")).toBe(false);
+    expect(body.reasoning).toMatchObject({ effort: "high" });
+    // pi-ai declares this catalog model's tools in an additional_tools item (OpenAI's documented form for plan usage).
+    expect(input.some((item) => item.type === "additional_tools")).toBe(true);
+    expect(JSON.stringify(body.tools ?? [])).not.toContain("tool_search");
+    for (const field of PLAN_USAGE_REFUSED_FIELDS) expect(body, field).not.toHaveProperty(field);
   });
 });

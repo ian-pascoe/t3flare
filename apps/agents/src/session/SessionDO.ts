@@ -84,6 +84,7 @@ import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
 import { proxyModels } from "./models.ts";
 import { SessionEndpoints } from "./endpoints.ts";
+import { noteTurnProvider, runsOn } from "./signOut.ts";
 import { SUGGESTION_MODEL, suggestPrompt } from "./promptSuggestion.ts";
 import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
@@ -255,6 +256,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
       source: () => environmentStub(env.ENVIRONMENT),
       fetch: this.#proxyFetch,
       readMs: HARNESS_READ_MS,
+      // SPI-1164: why the running turn's request got no credential, typed, for the differ.
+      onCredential: (failure) =>
+        this.#noteProxy((record) => {
+          if (failure !== undefined) return { ...record, credential: failure };
+          const { credential: _cleared, ...rest } = record;
+          return rest;
+        }),
     });
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {
@@ -786,6 +794,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (input.model.provider === "anthropic" && this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
     const conversation = await this.#conversation(input.model, input.thinking);
     await conversation.configure({ model: input.model, thinkingLevel: input.thinking ?? null }, context);
+    // SPI-1164: kept in storage, so a sign-out of this endpoint stops the turn even after a restart of either object.
+    noteTurnProvider(this.ctx.storage.kv, input.model.provider);
     const startedAt = Date.now();
     // Recorded with a placeholder before the submit, so the alarm armed below covers it if the process dies after it.
     const turns = this.#turns();
@@ -837,12 +847,15 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   /**
    * SPI-1164: a sign-in endpoint was signed out (the Environment's panel): any access token this Session holds for it is
-   * dropped, so nothing more is sent with it. The Environment stops the turns of a Session on the endpoint (`abort`).
+   * dropped, so nothing more is sent with it, and when its turns run on that endpoint (as its storage says) its live
+   * turns stop (`signed_out`).
    */
-  endpointSignedOut(input: { readonly endpointId: string }): Promise<{ readonly dropped: boolean }> {
-    const dropped = this.#endpoints.drop(String(input.endpointId));
-    console.log(JSON.stringify({ t3flare: "endpoint-signed-out", endpoint: String(input.endpointId), dropped }));
-    return Promise.resolve({ dropped });
+  async endpointSignedOut(input: { readonly endpointId: string }): Promise<{ readonly dropped: boolean; readonly stopped: boolean }> {
+    const endpointId = String(input.endpointId);
+    const dropped = this.#endpoints.drop(endpointId);
+    const stopped = runsOn(this.ctx.storage.kv, endpointId) ? (await this.abort({ all: true, reason: "signed_out" })).aborted : false;
+    console.log(JSON.stringify({ t3flare: "endpoint-signed-out", endpoint: endpointId, dropped, stopped }));
+    return { dropped, stopped };
   }
 
   async #abortTurn(providerTurnId: string, reason: string): Promise<void> {

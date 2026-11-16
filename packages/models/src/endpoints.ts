@@ -7,7 +7,7 @@
 // id never changes, so a slug stays valid as long as the endpoint keeps the model. A model id may itself hold a `/`
 // (OpenRouter's `anthropic/claude-…`): the slug splits at its first one.
 
-/** The pi-ai APIs an endpoint may speak. A sign-in fixes its endpoint's API (`SIGN_IN_TARGETS`). */
+/** The pi-ai APIs an endpoint may speak. A sign-in fixes its endpoint's API (`SIGN_IN_KINDS`). */
 export const ENDPOINT_APIS = ["anthropic-messages", "openai-responses", "openai-completions", "google-generative-ai", "mistral-conversations"] as const;
 export type EndpointApi = (typeof ENDPOINT_APIS)[number];
 
@@ -24,10 +24,43 @@ export type EndpointAuth = "api-key" | "none" | SignIn;
 /** Whether an endpoint's auth is a sign-in (its credential is the broker's), not a key or none. */
 export const isSignIn = (auth: EndpointAuth): auth is SignIn => (SIGN_INS as ReadonlyArray<string>).includes(auth);
 
-/** Where each sign-in's tokens may go: the endpoint's API and base URL are the sign-in's, never the owner's. */
-export const SIGN_IN_TARGETS: Readonly<Record<SignIn, { readonly api: EndpointApi; readonly baseUrl: string; readonly title: string }>> = {
-  chatgpt: { api: "openai-responses", baseUrl: "https://api.openai.com/v1", title: "ChatGPT" },
+/** A sign-in's own facts: where its tokens may go, and how the panel and a turn's failure name it. */
+export interface SignInKind {
+  readonly api: EndpointApi;
+  readonly baseUrl: string;
+  /** The vendor's name as messages use it: "is not signed in to <title>", "Sign in with <title>". */
+  readonly title: string;
+  /** The panel's plain note beside the sign-in (what is verified of it, and what it needs). */
+  readonly note: string;
+  /** What a refused request on it most likely means, after "refused its <title> sign-in (HTTP n): ". */
+  readonly refused: string;
+  /** What the panel says the sign-in is for. */
+  readonly about: string;
+  /** What the owner pastes back after approving, and how the panel asks for it. */
+  readonly paste: { readonly instructions: string; readonly placeholder: string };
+}
+
+/**
+ * Every sign-in's facts, by kind: the one table SPI-1165 and SPI-1166 add to. The endpoint's API and base URL are the
+ * sign-in's, never the owner's.
+ */
+export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
+  chatgpt: {
+    api: "openai-responses",
+    baseUrl: "https://api.openai.com/v1",
+    title: "ChatGPT",
+    note: "ChatGPT plan usage is unverified in t3flare: no working sign-in has been seen yet. OpenAI offers it to ChatGPT Plus or Pro plans, for open-source and locally hosted apps. If it fails, please report it with the message shown.",
+    refused: "ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.",
+    about: "Use your ChatGPT plan's usage for Pi Durable, on OpenAI's Responses API.",
+    paste: {
+      instructions: "Open the sign-in and approve. Your browser then lands on a 127.0.0.1 page that does not load: copy its whole address into the field, then Finish.",
+      placeholder: "http://127.0.0.1:1455/auth/callback?code=…",
+    },
+  },
 };
+
+/** An endpoint's sign-in facts, or undefined for a key or no auth. */
+export const signInOf = (auth: EndpointAuth): SignInKind | undefined => (isSignIn(auth) ? SIGN_IN_KINDS[auth] : undefined);
 
 // pi-ai's credential types, which the Credential broker implements (type-only: no pi-ai in the Environment's bundle).
 export type { Credential, CredentialStore, OAuthCredential } from "@earendil-works/pi-ai";
@@ -228,6 +261,18 @@ export interface EndpointCredential {
   readonly problem?: string;
 }
 
+/**
+ * Why a Session got no credential for an endpoint, typed (SPI-1164), as the Session records it on the turn for the
+ * differ: `signed_out` (sign in again), `changed` (retry), `unavailable` (a sign-in's passing failure: retry),
+ * `unreadable` and `no_key` (enter the key again). `message` is the Session's fixed text.
+ */
+export interface EndpointCredentialFailure {
+  readonly endpointId: string;
+  readonly kind: "signed_out" | "changed" | "unavailable" | "unreadable" | "no_key";
+  readonly message: string;
+  readonly retryable: boolean;
+}
+
 /** A Session's request for an endpoint's key: the endpoint, and the target it will send the key to. */
 export interface EndpointCredentialRequest {
   readonly endpointId: string;
@@ -320,7 +365,7 @@ export const validateEndpoint = (value: unknown): { readonly ok: true; readonly 
   if (auth !== "api-key" && auth !== "none" && !(SIGN_INS as ReadonlyArray<unknown>).includes(auth)) return { ok: false, error: `auth is api-key, none or a sign-in (${SIGN_INS.join(", ")})` };
   if (isSignIn(auth as EndpointAuth)) {
     // A sign-in's tokens go only to its own API at its own base URL, with no header of the owner's.
-    const target = SIGN_IN_TARGETS[auth as SignIn];
+    const target = SIGN_IN_KINDS[auth as SignIn];
     if (value.api !== target.api || baseUrl !== target.baseUrl) return { ok: false, error: `a ${target.title} sign-in's endpoint is ${target.api} at ${target.baseUrl}` };
     if (isRecord(value.headers) && Object.keys(value.headers).length > 0) return { ok: false, error: `a ${target.title} sign-in's endpoint has no headers of its own` };
   }

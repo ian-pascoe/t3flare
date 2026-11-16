@@ -7,7 +7,15 @@
 // the Environment gives it only for the endpoint's target now: a Session still holding an endpoint the owner moved gets no
 // key for the old target.
 import type { MutableModels, FetchFunction } from "@earendil-works/pi-ai";
-import { EMPTY_ENDPOINTS, type EndpointCredential, type EndpointCredentialRequest, type EndpointTarget, type ModelEndpoints, targetKey } from "@t3flare/models/endpoints";
+import {
+  EMPTY_ENDPOINTS,
+  type EndpointCredential,
+  type EndpointCredentialFailure,
+  type EndpointCredentialRequest,
+  type EndpointTarget,
+  type ModelEndpoints,
+  targetKey,
+} from "@t3flare/models/endpoints";
 
 import { endpointProviders } from "./models.ts";
 
@@ -36,6 +44,11 @@ export interface SessionEndpointsOptions {
   /** How long a turn's start waits for the endpoints. */
   readonly readMs: number;
   readonly now?: () => number;
+  /**
+   * A credential request failed (the typed failure), or one that had failed succeeded again (undefined): the Session
+   * records it on the running turn for the differ (SPI-1164). Called on a change only.
+   */
+  readonly onCredential?: (failure: EndpointCredentialFailure | undefined) => void;
 }
 
 export class SessionEndpoints {
@@ -47,6 +60,8 @@ export class SessionEndpoints {
    * never used for another.
    */
   readonly #keys = new Map<string, { readonly credential: EndpointCredential; readonly until: number; readonly endpointId: string }>();
+  /** The endpoints whose last credential request failed. */
+  readonly #failing = new Set<string>();
 
   constructor(options: SessionEndpointsOptions) {
     this.#options = options;
@@ -58,6 +73,12 @@ export class SessionEndpoints {
     const providers = endpointProviders(endpoints, {
       credential: (id, target) => this.#credential(id, target),
       refused: (id) => void this.drop(id),
+      outcome: (failure, id) => {
+        if (failure !== undefined) {
+          this.#failing.add(id);
+          this.#options.onCredential?.(failure);
+        } else if (this.#failing.delete(id)) this.#options.onCredential?.(undefined);
+      },
       ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }),
     });
     const next = new Set(providers.map((provider) => provider.id));
