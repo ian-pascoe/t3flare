@@ -1264,7 +1264,7 @@ is a pass-through observer: a vendor change that it cannot read loses records, a
   `answering`, the `answered` access field; `session/endpoints.ts`, `endpointText.ts`); the relay's reader
   (`workspace/relayUsage.ts`, wired in `modelRelay.ts` and `workspaceProxy.ts`); the one sender all three use
   (`environment.ts` `usageSender`); the Environment's `recordUsage` RPC (`usage/commissaryCount.ts` `usageRecorder`, `acceptUsage`), its
-  store (`usage/records.ts`) and the scan readers (`usage/readers.ts` `makeOwnUsageReader`, `usageReader`, in the Shadow's
+  store (`usage/records.ts`) and the scan readers (`usage/readers.ts` `usageReader`, in the Shadow's
   `BUILT_IN_USAGE_DRIVERS`, U11).
 - **Beside Commissary until the hard cut.** Each reader also reads Commissary's request log (U58), which alone sees the
   Model proxy's traffic. So that no request is counted twice, the Environment drops the records of every endpoint whose

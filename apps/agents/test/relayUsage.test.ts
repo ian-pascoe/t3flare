@@ -198,6 +198,26 @@ describe("the model relay's usage records", () => {
     expect(recorded).toEqual([{ ...call, at: 1, agent: "claude", modelId: "claude-x", input: 900, cacheRead: 50, cacheWrite: 0, output: 1, reasoning: 0 }]);
   });
 
+  it("cancels the endpoint's answer when the CLI cancels its stream", async () => {
+    const cancelled: Array<unknown> = [];
+    const upstream = new ReadableStream<Uint8Array>({
+      start: (controller) => controller.enqueue(new TextEncoder().encode(sse([{ type: "message_start", message: { model: "m", usage: { input_tokens: 3, output_tokens: 1 } } }]))),
+      cancel: (reason) => void cancelled.push(reason),
+    });
+    const deps: ModelRelayDeps = {
+      authorize: async () => grantOf("anthropic-messages", "claude"),
+      fetch: async () => new Response(upstream, { status: 200, headers: { "content-type": "text/event-stream" } }),
+      log: () => undefined,
+      now: () => 1,
+      usage: () => undefined,
+    };
+    const response = await handleModelRelay(new Request("http://computer.internal/t3flare/model/ep1/messages", { method: "POST", headers: { authorization: `Bearer ${HANDLE}` }, body: "{}" }), deps);
+    const reader = response.body!.getReader();
+    await reader.read();
+    await reader.cancel("the CLI hung up");
+    expect(cancelled).toEqual(["the CLI hung up"]);
+  });
+
   it("records what a stream that fails upstream had read, and passes the failure on", async () => {
     let push!: ReadableStreamDefaultController<Uint8Array>;
     const upstream = new ReadableStream<Uint8Array>({ start: (controller) => void (push = controller) });

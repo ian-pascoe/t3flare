@@ -10,7 +10,7 @@
 // the whole check fails, the call's entries are dropped: a missing record is safer than a doubled one.
 import type { EndpointStore } from "../endpoints/store.ts";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
-import { MAX_USAGE_ENTRIES } from "@t3flare/models/usage";
+import { MAX_USAGE_ENTRIES, usageEntryOf } from "@t3flare/models/usage";
 
 import { principalOfApiKey } from "./commissary.ts";
 import type { UsageStore } from "./records.ts";
@@ -64,7 +64,7 @@ export const acceptUsage = async (
   },
 ): Promise<{ readonly kept: number }> => {
   const raw = typeof input === "object" && input !== null ? (input as { readonly entries?: unknown }).entries : undefined;
-  const entries = Array.isArray(raw) ? raw.slice(0, MAX_USAGE_ENTRIES) : [];
+  const entries = (Array.isArray(raw) ? raw.slice(0, MAX_USAGE_ENTRIES) : []).flatMap((value: unknown) => usageEntryOf(value) ?? []);
   if (entries.length === 0) return { kept: 0 };
   let counted: ReadonlySet<string>;
   try {
@@ -72,10 +72,7 @@ export const acceptUsage = async (
   } catch {
     return { kept: 0 };
   }
-  const ours = entries.filter((entry) => {
-    const endpointId = (entry as { readonly endpointId?: unknown } | null)?.endpointId;
-    return !(typeof endpointId === "string" && counted.has(endpointId));
-  });
+  const ours = entries.filter((entry) => !counted.has(entry.endpointId));
   return { kept: deps.store.record(ours, deps.endpoints, deps.now()) };
 };
 

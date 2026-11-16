@@ -11,13 +11,14 @@ import { UsageAggregator } from "../../../t3code/apps/server/src/usage/usageAggr
 import { parseRateTable } from "../../../t3code/apps/server/src/usage/usagePricing.ts";
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
 import { commissaryManagementOf } from "../src/usage/commissary.ts";
-import { makeOwnUsageReader, usageReader } from "../src/usage/readers.ts";
+import { usageReader } from "../src/usage/readers.ts";
 import { acceptUsage, commissaryCountedCache, countedByCommissary, usageRecorder } from "../src/usage/commissaryCount.ts";
 import {
   listedModelOf,
   MAX_USAGE_ROWS,
   USAGE_RETENTION_MS,
   USAGE_SLOT_MS,
+  type UsageStore,
   usageStore,
 } from "../src/usage/records.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
@@ -58,9 +59,15 @@ const entry = (over: Partial<UsageEntry> = {}): UsageEntry => ({
   ...over,
 });
 
+/** t3's reader for `provider`, as the Shadow builds it, on `store` (no Commissary configured). */
+const readerOn = (store: UsageStore, provider: "pi" | "codex" | "claude" | "opencode") => {
+  bindEnvironmentServices({ usage: store, commissary: undefined } as unknown as EnvironmentServices);
+  return usageReader(provider);
+};
+
 const scanOf = (store: ReturnType<typeof usageStore>, provider: "pi" | "codex" | "claude" | "opencode", sinceMs = NOW - DAY) =>
   Effect.runPromise(
-    makeOwnUsageReader(provider, () => store).scan({ instances: [], settings: {} as never, windowStartMs: sinceMs, retentionCutoffMs: NOW - USAGE_RETENTION_MS, awaitRefresh: false }),
+    readerOn(store, provider).scan({ instances: [], settings: {} as never, windowStartMs: sinceMs, retentionCutoffMs: NOW - USAGE_RETENTION_MS, awaitRefresh: false }),
   );
 
 describe("the Environment's usage records", () => {
@@ -187,6 +194,12 @@ describe("the records' times and bounds", () => {
     expect(store.record([entry({ at: NOW - USAGE_RETENTION_MS - 60_000 }), entry({ at: NOW + 2 * 60 * 60_000 })], endpoints, NOW)).toBe(0);
   });
 
+  it("keeps 92 days, more than the page's widest range (90 days)", () => {
+    const store = usageStore(nodeSqlStorage());
+    expect(store.record([entry({ at: NOW - 91 * DAY })], endpoints, NOW)).toBe(1);
+    expect(store.record([entry({ at: NOW - 93 * DAY })], endpoints, NOW)).toBe(0);
+  });
+
   it("prunes at most once an hour", async () => {
     const store = usageStore(nodeSqlStorage(), { maxRows: 1 });
     store.record([entry({ at: NOW - 3 * USAGE_SLOT_MS }), entry({ at: NOW - 2 * USAGE_SLOT_MS })], endpoints, NOW);
@@ -202,7 +215,7 @@ describe("the records' times and bounds", () => {
   it("reports a table it cannot read as a failed source, never a failed page", async () => {
     const broken = { record: () => 0, read: () => { throw new Error("SQLITE_CORRUPT"); } };
     const scans = await Effect.runPromise(
-      makeOwnUsageReader("pi", () => broken).scan({ instances: [], settings: {} as never, windowStartMs: 0, retentionCutoffMs: 0, awaitRefresh: false }),
+      readerOn(broken, "pi").scan({ instances: [], settings: {} as never, windowStartMs: 0, retentionCutoffMs: 0, awaitRefresh: false }),
     );
     expect(scans.map((scan) => [scan.dir, scan.status, scan.files])).toEqual([
       ["t3flare://usage/durable", "failed", null],
@@ -281,6 +294,25 @@ describe("no request counted twice beside Commissary's log", () => {
     expect((await scanOf(store, "pi"))[0]!.files![0]!.records.map((record) => record.model)).toEqual(["mine/claude-sonnet-4-5"]);
     // Three API-key endpoints, opened once for the revision.
     expect(opened).toBe(3);
+  });
+
+  it("keeps the records of an endpoint whose key cannot be read, or whose read fails (it serves no request)", async () => {
+    const store = usageStore(nodeSqlStorage());
+    const record = usageRecorder({
+      usage: () => store,
+      principals: () => config.principals,
+      endpoints: {
+        load: () => two,
+        resolve: async (id) => {
+          if (id === "other") throw new Error("sealed store busy");
+          const endpoint = two.endpoints.find((entry) => entry.id === id)!;
+          // `comm`'s key, the proxy's, no longer opens (the credentials key changed).
+          return id === "comm" ? { endpoint, apiKey: undefined, unreadable: true } : { endpoint, apiKey: keys[id], unreadable: false };
+        },
+      },
+      now: () => NOW,
+    });
+    expect(await record({ entries: [entry({ endpointId: "comm" }), entry({ endpointId: "other" }), entry({ endpointId: "mine" })] })).toEqual({ kept: 3 });
   });
 
   it("opens the keys once per revision of the endpoints, and asks again after a failure", async () => {

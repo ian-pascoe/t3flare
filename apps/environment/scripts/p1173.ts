@@ -13,8 +13,8 @@
 // 2. A turn on each agent: the Durable agent on `comm`, its thread's title regenerated (text generation on `standin`),
 //    the Durable agent on `standin`; Codex on `resp` and on `standin-resp`; Claude Code on `comm` and on `standin-anth`
 //    (model-routed); then, in Claude Code's Container, a request through the relay with its process's handle that hangs
-//    up mid-stream (the stand-in's `slow-…` model), and whether it was recorded (observed: it is not); pi on `oai` and
-//    on `standin`;
+//    up mid-stream (the stand-in's `slow-…` model), and whether it was recorded (observed: yes, but as the whole answer,
+//    once the stand-in finished it a minute later, not at the hang-up); Pi on `oai` and on `standin`;
 //    OpenCode on `oai`.
 // 3. t3's usage summary (`server.getUsageSummary`, what the Usage page reads): our sources (`t3flare://usage/<agent>`)
 //    have the `standin` turns, priced by t3's rate table, and nothing of the Commissary endpoints; Commissary's half is
@@ -214,8 +214,8 @@ check("our records: text generation's title on the stand-in, under Pi", has("pi"
 check("our records: Pi's relayed turn on the stand-in, under Pi (its own source)", has("pi", "pi", SLUG.standin), table);
 check("our records: Codex's relayed turn on the stand-in's Responses, under Codex", has("codex", "codex", SLUG.standinResp), table);
 check("our records: Claude Code's model-routed turn on the stand-in's Anthropic Messages, under Claude", has("claude", "claude", SLUG.anth), table);
-// Observed, not checked (review 2's optional item): whether the Workers' cancel recorded the hung-up stream. p1173 found
-// it does not (the report's "Unproven"), so it is reported as it is.
+// Observed, not checked (review 2's optional item): whether the hung-up stream was recorded. On p1173 it was, as the whole
+// answer once the stand-in ended it, not by the Workers' cancel at the hang-up (the report's "Unproven").
 report.hangUpRecorded = table.some((row) => row.model === "standin-anth/slow-cancel");
 check("the stand-in's models, with no endpoint price, are priced by t3's rate table", [SLUG.standin, SLUG.anth, SLUG.standinResp].every((model) => table.some((row) => row.model === model) && table.filter((row) => row.model === model).every((row) => row.costSource === "modelPriced" && row.costUsd > 0)), table);
 check("no record of ours for an endpoint on the proxy's key (Commissary's log counts those)", !table.some((row) => /^(comm|oai|resp)\//.test(row.model)), table);

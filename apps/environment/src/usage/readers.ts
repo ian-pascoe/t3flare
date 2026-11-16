@@ -68,7 +68,7 @@ export const makeCommissaryUsageReader = <Config>(
   provider: CommissaryUsageProvider,
   read: SharedRead,
   config: () => CommissaryManagement | undefined = () => environmentServices().commissary,
-): ProviderUsageReader<Config, never> => ({
+): ScanReader<Config> => ({
   kind: "scan",
   provider,
   scan: Effect.fn("commissaryUsageReader.scan")(function* ({ windowStartMs, awaitRefresh }) {
@@ -85,7 +85,7 @@ const defaultRead = sharedRead(
 );
 
 /** The reader t3's usage service runs for `provider`. */
-export const commissaryUsageReader = <Config>(provider: CommissaryUsageProvider): ProviderUsageReader<Config, never> =>
+export const commissaryUsageReader = <Config>(provider: CommissaryUsageProvider): ScanReader<Config> =>
   makeCommissaryUsageReader<Config>(provider, defaultRead);
 
 // ---- t3flare's own records (SPI-1173) ----
@@ -94,7 +94,7 @@ export const commissaryUsageReader = <Config>(provider: CommissaryUsageProvider)
  * A reader of t3flare's own usage records (`records.ts`) for one of t3's providers: one source per agent counted under
  * it (Pi's: the Durable agent, text generation and Pi, the CLI agent), so the page's sources say which agent spent what.
  */
-export const makeOwnUsageReader = <Config>(provider: UsageProviderKind, store: () => UsageStore): ScanReader<Config> => ({
+const ownUsageReader = <Config>(provider: UsageProviderKind, store: () => UsageStore): ScanReader<Config> => ({
   kind: "scan",
   provider,
   scan: ({ windowStartMs }) =>
@@ -119,10 +119,10 @@ const isCommissaryProvider = (provider: UsageProviderKind): provider is Commissa
  * The reader t3's usage service runs for `provider`: t3flare's own records, then Commissary's request log for the
  * providers it attributes (`USAGE_PROVIDERS`). The two never count one request twice (`commissaryCount.ts`).
  */
-export const usageReader = <Config>(provider: UsageProviderKind, store: () => UsageStore = () => environmentServices().usage): ScanReader<Config> => {
-  const own = makeOwnUsageReader<Config>(provider, store);
+export const usageReader = <Config>(provider: UsageProviderKind): ScanReader<Config> => {
+  const own = ownUsageReader<Config>(provider, () => environmentServices().usage);
   if (!isCommissaryProvider(provider)) return own;
-  const commissary = commissaryUsageReader<Config>(provider) as ScanReader<Config>;
+  const commissary = commissaryUsageReader<Config>(provider);
   return {
     kind: "scan",
     provider,
