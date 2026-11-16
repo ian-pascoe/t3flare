@@ -604,13 +604,15 @@ export class WorkspaceDO extends ContainerHost {
     readonly flagged: unknown;
     /** Credentials left out of the Container's scan (too short to hash-scan), or of every search, by name only. */
     readonly notScanned: ReadonlyArray<{ readonly name: string; readonly where: "container" | "everywhere" }>;
+    /** Credentials looked for in the Container only, not in the DO's files (a sign-in's tokens, given as hashes). */
+    readonly containerOnly: ReadonlyArray<string>;
   }> {
     this.#alive();
     await this.#ready();
     const values: Array<readonly [string, string]> = [];
     const key = this.env.COMMISSARY_CONTAINER_API_KEY;
     if (key !== undefined && key !== "") values.push(["model-key", key]);
-    const { values: endpointValues, patterns: extra, skipped } = await leakTargets(input.credentials ?? [], input.patterns ?? []);
+    const { values: endpointValues, patterns: extra, skipped, containerOnly } = await leakTargets(input.credentials ?? [], input.patterns ?? []);
     values.push(...endpointValues);
     const found: Array<{ name: string; path: string }> = [];
     for (const [credential, value] of values) {
@@ -619,7 +621,7 @@ export class WorkspaceDO extends ContainerHost {
       for (const path of new Set(matches.map((match) => match.path))) found.push({ name: credential, path });
     }
     const container = (await this.#scan({ roots: ["/workspace", "/root", "/tmp", "/var/lib/t3flare", "/var/lib/computerd"], since: 0, procs: true, skip: [] }, extra).catch(() => undefined)) ?? null;
-    return { do: found, container, flagged: this.ctx.storage.kv.get(LEAK_FLAG_KEY) ?? null, notScanned: skipped };
+    return { do: found, container, flagged: this.ctx.storage.kv.get(LEAK_FLAG_KEY) ?? null, notScanned: skipped, containerOnly };
   }
 
   /** bubblewrap in the running Container (Codex's Linux sandbox needs user namespaces): once per Container start. */

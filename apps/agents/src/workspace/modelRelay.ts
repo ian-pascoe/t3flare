@@ -313,7 +313,9 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   const known = credentialValues(endpoint);
   const redact = (text: string) => redactSecrets(text, known);
   // SPI-1171: which of a sign-in's tokens went (a short hash, never the token), so a mid-thread renewal shows in the log.
-  const signedWith = isSignIn(endpoint.auth) && known.length > 0 ? { signIn: endpoint.auth, credential: await tokenLogHashPrefix(known[known.length - 1]!) } : {};
+  // `credentialValues` gives a bearer's header value, then its token: the token is the last.
+  const bearerToken = known.at(-1);
+  const signedWith = isSignIn(endpoint.auth) && bearerToken !== undefined ? { signIn: endpoint.auth, credential: await tokenLogHashPrefix(bearerToken) } : {};
   const classify = (status: number, body: string): DescribedFailure | undefined =>
     describeFailure({ status, headers: failureHeaders(upstream.headers), body, at: deps.now() }, { id: endpointId, api: endpoint.api, auth: endpoint.auth });
   const logged = (failure: DescribedFailure | undefined) =>

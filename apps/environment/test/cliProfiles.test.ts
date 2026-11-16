@@ -73,19 +73,24 @@ describe("Codex's profile", () => {
     const endpoints = [
       { id: "openai", label: "OpenAI" },
       { id: "work-gw", label: "Work \"gateway\"" },
+      // A label Codex reads as a vendor's ("OpenAI" turns on its remote compaction, "Azure" its Azure rules) never
+      // reaches Codex: the provider's name is its fixed id (SPI-1171 review 2).
+      { id: "az", label: "Azure" },
     ];
     const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, { ...context, endpoints });
     if ("refused" in answer) throw new Error(answer.refused);
     const overrides = answer.argv.filter((_, index) => answer.argv[index - 1] === "-c");
     expect(overrides).toContain('model_provider="t3flare-proxy"');
     expect(overrides).toContain(
-      'model_providers.t3flare-endpoint-openai={name="OpenAI",base_url="http://computer.internal/t3flare/model/openai",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
+      'model_providers.t3flare-endpoint-openai={name="t3flare-endpoint-openai",base_url="http://computer.internal/t3flare/model/openai",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
     );
     expect(overrides).toContain(
-      'model_providers.t3flare-endpoint-work-gw={name="Work \\"gateway\\"",base_url="http://computer.internal/t3flare/model/work-gw",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
+      'model_providers.t3flare-endpoint-work-gw={name="t3flare-endpoint-work-gw",base_url="http://computer.internal/t3flare/model/work-gw",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
     );
     // The Workspace DO makes the handle and puts it in the process's environment; the profile only asks for one.
-    expect(answer.modelRelay).toEqual(["openai", "work-gw"]);
+    expect(overrides.find((entry) => entry.startsWith("model_providers.t3flare-endpoint-az="))).toContain('name="t3flare-endpoint-az"');
+    expect(overrides.join("\n")).not.toMatch(/name="(?:OpenAI|Azure|Work)/);
+    expect(answer.modelRelay).toEqual(["openai", "work-gw", "az"]);
     expect(JSON.stringify(answer.env)).not.toContain("T3FLARE_MODEL_HANDLE");
   });
 

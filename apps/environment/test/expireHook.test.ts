@@ -7,7 +7,7 @@ import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { expireRoute } from "../src/endpoints/expireHook.ts";
+import { expireOnStage, expireRoute } from "../src/endpoints/expireHook.ts";
 
 const route = (query: string) => new URL(`https://env.example/_t3flare/check/sign-in-expire${query}`);
 
@@ -28,6 +28,19 @@ describe("the stage-only sign-in expire route", () => {
     expect(await answer.json()).toEqual({ expired: true });
     for (const query of ["", "?id=", "?id=../x", "?id=Claude", "?endpoint=claude"]) expect((await expireRoute(route(query), deps)).status, query).toBe(400);
     expect(asked).toEqual(["claude"]);
+  });
+
+  it("is refused by the Environment DO itself without the faults, whoever calls it (review 2)", async () => {
+    let calls = 0;
+    const expire = async () => (calls++, true);
+    for (const faults of [undefined, "", "0", "true", "1 "]) expect(await expireOnStage(faults, expire), String(faults)).toBe(false);
+    expect(calls).toBe(0);
+    expect(await expireOnStage("1", expire)).toBe(true);
+    expect(calls).toBe(1);
+    // The DO's RPC method is that check over the broker's expire, nothing else.
+    const environment = fs.readFileSync(path.resolve(import.meta.dirname, "../src/environmentDO.ts"), "utf8");
+    expect(environment).toContain("return expireOnStage(this.env.T3FLARE_FAULTS, () => this.#credentialBroker().expire(endpointId));");
+    expect(environment.match(/\.expire\(/g)).toHaveLength(1);
   });
 
   it("is the admin route, and has its faults bound on every stage but prod", () => {

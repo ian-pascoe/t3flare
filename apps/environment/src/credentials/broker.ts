@@ -30,6 +30,7 @@
 import { type Credential, type CredentialStore, SIGN_IN_KINDS, type SignIn } from "@t3flare/models/endpoints";
 import type { SignInRefusal } from "@t3flare/models/relay";
 
+import type { NamedSecret } from "../endpoints/leak.ts";
 import type { KvStorage } from "../harness/keys.ts";
 import { CredentialsKeyMissing, type SealedStore } from "./sealed.ts";
 import type { DeviceCode, PendingSignIn, SignInCredential, SignInRegistration, SignInVendor } from "./signIn.ts";
@@ -129,7 +130,7 @@ export interface CredentialBroker extends CredentialStore {
    * The sign-in's tokens as stored, access and refresh, by name (`sign-in:<id>:access`, `…:refresh`), for the admin leak
    * check to look for in a Container (SPI-1171); none when it is not signed in. Renews nothing.
    */
-  secrets(endpointId: string): Promise<ReadonlyArray<{ readonly name: string; readonly value: string }>>;
+  secrets(endpointId: string): Promise<ReadonlyArray<NamedSecret>>;
   /**
    * Marks the stored access token expired, so the next `access` renews it as at its real expiry (SPI-1171: a stage's hook
    * proves a mid-thread refresh; the admin route answers only on a stage). False when it is not signed in.

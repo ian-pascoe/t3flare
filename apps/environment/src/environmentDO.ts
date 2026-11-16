@@ -36,6 +36,8 @@ import { chatgptSignIn } from "./credentials/chatgpt.ts";
 import { claudeSignIn } from "./credentials/claude.ts";
 import { copilotSignIn } from "./credentials/copilot.ts";
 import { sealedStore } from "./credentials/sealed.ts";
+import { expireOnStage } from "./endpoints/expireHook.ts";
+import type { SignInLeakPatterns } from "./endpoints/leak.ts";
 import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
 import { type ModelRelayTarget, relayTargetOf } from "@t3flare/models/relay";
@@ -496,14 +498,21 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return relayTargetOf(await this.#endpointStore().resolve(endpointId), endpointId);
   }
 
-  /** A sign-in's tokens as the Credential broker holds them, for the admin leak check only (SPI-1171). Renews nothing. */
-  async signInSecrets(endpointId: string): Promise<ReadonlyArray<{ readonly name: string; readonly value: string }>> {
-    return this.#credentialBroker().secrets(endpointId);
+  /**
+   * A sign-in's tokens as the Credential broker holds them, hashed for the admin leak check (SPI-1171): no token leaves
+   * this object by value, and one too short to hash is only named. Renews nothing.
+   */
+  async signInLeakPatterns(endpointId: string): Promise<SignInLeakPatterns> {
+    const { signInLeakPatterns } = await import("./endpoints/leak.ts");
+    return signInLeakPatterns(await this.#credentialBroker().secrets(endpointId));
   }
 
-  /** Marks a sign-in's access token expired, so its next use renews it (SPI-1171; the admin route answers on a stage only). */
+  /**
+   * Marks a sign-in's access token expired, so its next use renews it (SPI-1171). Only where the faults are on (every
+   * stage but prod): elsewhere it touches nothing and answers false, whoever calls it.
+   */
   async expireSignIn(endpointId: string): Promise<boolean> {
-    return this.#credentialBroker().expire(endpointId);
+    return expireOnStage(this.env.T3FLARE_FAULTS, () => this.#credentialBroker().expire(endpointId));
   }
 
   /**

@@ -292,7 +292,10 @@ API-key one: the handle is swapped for the credential in the agents Worker, neve
    (`signInRequestTarget`, the Session's own rule: Copilot's token's host, else the endpoint's). The Workspace DO keeps
    only its hash for the sync guard.
    **Only the sign-in's inference calls are carried** (`SIGN_IN_RELAY_PATHS`, review round 1): a POST to `/v1/messages`
-   or `/v1/messages/count_tokens` on a Claude sign-in, to `/responses` on a ChatGPT or Copilot one. Any other path below
+   or `/v1/messages/count_tokens` on a Claude sign-in, to `/responses` on a ChatGPT or Copilot one, the path as written
+   (no case folding). These are the paths the CLIs build on their base URL (SPI-1168–1170's reports and `test:docker`;
+   Codex 0.167.2's source: compaction streams over `/responses`, and it lists no models from our base URL); the allowlist
+   has not run on a stage. Any other path below
    the vendor's base URL (an account's `/api/oauth/…`, a key-minting call) is refused (404) before the vendor is asked,
    so the subscription's token never goes there and no such answer comes back to the Container.
 3. **The sign-in's request rules are the Session's.** The relay applies `SIGN_IN_REQUESTS` (agents' `session/
@@ -315,7 +318,9 @@ API-key one: the handle is swapped for the credential in the agents Worker, neve
 5. **The log** of a sign-in's request names the sign-in and a short id of the token used (the first 8 hex digits of its
    SHA-256), so a renewal shows; never the token.
 6. **The leak check** also looks for each sign-in's access and refresh tokens as the broker holds them (a Copilot
-   sign-in's refresh token is its GitHub token), read without renewing, **by hash only**: the Environment hashes them
-   and the Workspace DO gets the patterns, which the Container's scan looks for. No sign-in token leaves the Environment
-   by value for the check. The DO's own files are not searched for them: their content comes from the Container through
-   the sync guard, which refuses a file holding a token the relay used.
+   sign-in's refresh token is its GitHub token), read without renewing, **by hash only**: the Environment DO hashes them
+   (one shorter than the scanner's 20-character minimum is dropped and named in `notScanned`) and the Workspace DO gets
+   the patterns, which the Container's scan looks for. No sign-in token leaves the Environment by value for the check.
+   **The DO's own files are not searched for them**, and the answer names them in `containerOnly` so the gap shows.
+   What reaches those files passes the sync guard, which looks only for the newest access token the relay used per
+   endpoint, kept in memory: never a refresh token, nor an access token the relay has not used in this DO's life.

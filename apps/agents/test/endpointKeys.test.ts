@@ -67,5 +67,7 @@ describe("the leak check's endpoint keys", () => {
       { name: "sign-in:x:access", where: "everywhere" },
       { name: "sign-in:y:access", where: "everywhere" },
     ]);
+    // The scanned one is named as looked for in the Container only (not in the DO's files), so the gap shows.
+    expect(targets.containerOnly).toEqual(["sign-in:claude:access"]);
   });
 });

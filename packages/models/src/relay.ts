@@ -141,8 +141,12 @@ export interface SignInRefusal {
 /** A sign-in's answer in an Environment with no Credential broker. */
 export const NO_CREDENTIAL_BROKER: SignInRefusal = { signedOut: true, problem: "this Environment has no Credential broker" };
 
-/** The relay's status for a sign-in's refusal: 401 signed out (sign in again), 503 a passing failure (retry). */
-export const signInRefusalStatus = (refusal: SignInRefusal): 401 | 503 => (refusal.signedOut ? 401 : 503);
+/**
+ * A sign-in's refusal at the relay, by the one switch (`signedOut`): 401 and `sign_in_refused` signed out (sign in
+ * again), 503 and `unavailable` a passing failure (retry); the codes are SPI-1172's table's.
+ */
+export const signInRefusalOutcome = (refusal: SignInRefusal): { readonly status: 401; readonly code: "sign_in_refused" } | { readonly status: 503; readonly code: "unavailable" } =>
+  refusal.signedOut ? { status: 401, code: "sign_in_refused" } : { status: 503, code: "unavailable" };
 
 /** A sign-in's refusal at the relay, with the endpoint's API (the error's shape) and kind (the text's name). */
 export interface RelaySignInRefusal extends SignInRefusal {
@@ -191,7 +195,7 @@ export const signInRelayAllows = (kind: SignIn, method: string, path: string): b
 const signInRelayTarget = (endpoint: ModelEndpoint, kind: SignIn, access: RelaySignInAccess): ModelRelayTarget => {
   if (!access.ok) {
     const signIn: RelaySignInRefusal = { api: endpoint.api, kind, signedOut: access.signedOut, problem: access.problem, ...(access.retryAt === undefined ? {} : { retryAt: access.retryAt }) };
-    return { ok: false, status: signInRefusalStatus(signIn), message: `the Model endpoint ${endpoint.id}'s sign-in gave no token (${access.problem})`, signIn };
+    return { ok: false, status: signInRefusalOutcome(signIn).status, message: `the Model endpoint ${endpoint.id}'s sign-in gave no token (${access.problem})`, signIn };
   }
   const sent = signInRequestTarget(endpoint, access);
   const credential = credentialHeaderFor(endpoint.api, kind, access.accessToken);

@@ -142,25 +142,6 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
     the owner's Copilot subscription had ended, so GitHub refused the Copilot token (403 `subscription_ended`) and no
     turn ran on it (SPI-1226).
 
-## Refinement (SPI-1171, 2026-11-16): the model relay is a caller too
-
-Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md); the relay's side is ADR-0016's SPI-1171 refinement.
-
-1. **The model relay asks at use time, per request.** `modelRelayTarget` gives a sign-in's access token for one relayed
-   request (the broker's `access`, renewed first under item 3's lock when near its expiry). The Workspace DO hands it
-   to the relay's route in the agents Worker and keeps only its hash; it never reaches the Container. A mid-thread
-   renewal is the next request's, without restarting the CLI.
-2. **A passing failure says when to try again.** `BrokerAccess` carries `retryAt` while a vendor's back-off holds
-   (`earliestRefreshAt`, item 11): no caller reaches the vendor before then, and the relay passes it to the CLI as
-   `retry-after`.
-3. **Two broker reads for checks only.** `secrets` gives the stored access and refresh tokens to the admin leak check
-   in the Environment, renewing nothing, which hashes them there: only their hashes go to the Workspace DO (ADR-0016's
-   SPI-1171 item 6). `expire` marks the stored token expired so its next use renews it, through an admin route that
-   answers only where the Environment's faults are on (`T3FLARE_FAULTS=1`, bound on every stage but prod;
-   `expireHook.test.ts` checks both).
-4. **Unverified live** (owner decision, 2026-11-16): no subscription was signed in on the stage, so no CLI turn on a
-   subscription, no live mid-thread renewal and no live sign-out ran through the relay. Each is unit-tested.
-
 Considered and not taken:
 
 - **ChatGPT's device code on the Codex backend** (the spike's go): its sign-in runs in a Worker, but every request from
@@ -177,3 +158,23 @@ Considered and not taken:
   the owner wants its Claude models.
 - **t3's `CodexChatGptAuth`** (step-2a2's plan): it is the same OAuth flow, but tied to t3's provider settings and secret
   store, which the panel's sign-ins do not use.
+
+## Refinement (SPI-1171, 2026-11-16): the model relay is a caller too
+
+Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md); the relay's side is ADR-0016's SPI-1171 refinement.
+
+1. **The model relay asks at use time, per request.** `modelRelayTarget` gives a sign-in's access token for one relayed
+   request (the broker's `access`, renewed first under item 3's lock when near its expiry). The Workspace DO hands it
+   to the relay's route in the agents Worker and keeps only its hash; it never reaches the Container. A mid-thread
+   renewal is the next request's, without restarting the CLI.
+2. **A passing failure says when to try again.** `BrokerAccess` carries `retryAt` while a vendor's back-off holds
+   (`earliestRefreshAt`, item 11): no caller reaches the vendor before then, and the relay passes it to the CLI as
+   `retry-after`.
+3. **Two broker reads for checks only.** `secrets` gives the stored access and refresh tokens, renewing nothing, only to
+   the Environment DO's `signInLeakPatterns`, which hashes them for the admin leak check: no RPC answers with a token,
+   one too short to hash is only named, and only hashes go to the Workspace DO (ADR-0016's SPI-1171 item 6;
+   `signInSecretsReach.test.ts` pins the one caller). `expire` marks the stored token expired so its next use renews
+   it; the Environment DO's `expireSignIn` runs it only where its faults are on (`T3FLARE_FAULTS=1`, bound on every
+   stage but prod), whoever calls it, and the admin route checks the same (`expireHook.test.ts`).
+4. **Unverified live** (owner decision, 2026-11-16): no subscription was signed in on the stage, so no CLI turn on a
+   subscription, no live mid-thread renewal and no live sign-out ran through the relay. Each is unit-tested.

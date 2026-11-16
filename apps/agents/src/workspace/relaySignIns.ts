@@ -16,7 +16,7 @@
 // - The log names which token went by a short hash prefix, never the token.
 import { isRecord, type SignIn } from "@t3flare/models/endpoints";
 import { type DescribedFailure, modelFailureOf } from "@t3flare/models/failures";
-import { type RelaySignInRefusal, signInRefusalStatus, signInRelayAllows } from "@t3flare/models/relay";
+import { type RelaySignInRefusal, signInRefusalOutcome, signInRelayAllows } from "@t3flare/models/relay";
 
 import { credentialFailure } from "../session/credentialFailure.ts";
 import { SIGN_IN_REQUESTS } from "../session/signInRequests.ts";
@@ -70,14 +70,14 @@ export const signInRequest = (kind: SignIn, bytes: Uint8Array | undefined, incom
 };
 
 /**
- * The relay's answer when a sign-in gave no token: its status (`signInRefusalStatus`), the API's error shape with the
+ * The relay's answer when a sign-in gave no token: its status and code (`signInRefusalOutcome`), the API's error shape with the
  * Session's text naming the sign-in, `retry-after` while the vendor's back-off holds, and the failure for t3 as SPI-1172's
  * table classes it (`sign_in_refused` signed out, `unavailable` a passing failure).
  */
 export const signInRefusal = (endpointId: string, refusal: RelaySignInRefusal, now: number): { readonly response: Response; readonly failure: DescribedFailure } => {
   const { message } = credentialFailure({ id: endpointId, auth: refusal.kind }, { apiKey: null, signedOut: refusal.signedOut, problem: refusal.problem });
-  const status = signInRefusalStatus(refusal);
-  const failure: DescribedFailure = { ...modelFailureOf(refusal.signedOut ? "sign_in_refused" : "unavailable"), message };
+  const { status, code } = signInRefusalOutcome(refusal);
+  const failure: DescribedFailure = { ...modelFailureOf(code), message };
   const headers: Record<string, string> = { "content-type": "application/json", "cache-control": "no-store" };
   if (!refusal.signedOut && refusal.retryAt !== undefined && refusal.retryAt > now) headers["retry-after"] = String(Math.ceil((refusal.retryAt - now) / 1000));
   return { response: new Response(relayErrorBody(refusal.api, status, `t3flare: ${message}`), { status, headers }), failure };

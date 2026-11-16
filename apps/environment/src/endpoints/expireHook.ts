@@ -11,6 +11,12 @@ export interface ExpireHookDeps {
   readonly expire: (endpointId: string) => Promise<boolean>;
 }
 
+/**
+ * The Environment DO's own check, whoever calls its `expireSignIn` (the route is one caller): `expire` runs only where
+ * `T3FLARE_FAULTS` is `"1"`; elsewhere nothing is touched and the answer is false.
+ */
+export const expireOnStage = async (faults: string | undefined, expire: () => Promise<boolean>): Promise<boolean> => (faults === "1" ? expire() : false);
+
 /** The admin route's answer for `url`. */
 export const expireRoute = async (url: URL, deps: ExpireHookDeps): Promise<Response> => {
   const answer = (value: unknown, status: number) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });

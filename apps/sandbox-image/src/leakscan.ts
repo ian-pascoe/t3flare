@@ -101,6 +101,12 @@ process.stdout.write(JSON.stringify({ hits, files, bytes, ms: Date.now() - start
 /** argv for the platform's exec: the image's Node running the scanner on `input`. */
 export const leakScanArgv = (input: LeakScanInput): ReadonlyArray<string> => [IMAGE_NODE, "-e", LEAKSCAN_JS, JSON.stringify(input)];
 
+/**
+ * The shortest credential scanned for by its pattern: a shorter one's unsalted hash, beside its prefix and length in the
+ * scanner's argv, could be reversed by search from what any process in the Container may read.
+ */
+export const MIN_SCANNED_LENGTH = 20;
+
 /** A credential's pattern: its first four characters, its length and its SHA-256 (hex), from Web Crypto. */
 export const patternOf = async (name: string, value: string): Promise<CredentialPattern> => {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));

@@ -1492,7 +1492,7 @@ subscription shapes, restated at the relay for requests pi-ai did not build, and
   body read whole, the rules applied, the token's short id logged), agents' `session/signInRequests.ts` (the `relay`
   parts), `session/claudeSignIn.ts`, `session/copilot.ts` (`copilotRelayHeaders`), `packages/models/src/claudeOAuth.ts`
   (`CLAUDE_CODE_IDENTITY`, `CLAUDE_OAUTH_BETAS`, `CLAUDE_OAUTH_HEADERS`), `@t3flare/models/relay` (`RELAYED_SIGN_INS`,
-  `credentialHeaderFor`, `signInRelayTarget`). It leans on:
+  `credentialHeaderFor`, `relayTargetOf`, `SIGN_IN_RELAY_PATHS`, `signInRelayAllows`). It leans on:
   - **pi-ai's Claude subscription shape** (U81's pins), restated for a CLI's API-key-shaped request: Bearer auth, Claude Code's
     betas before the CLI's, `user-agent: claude-cli/2.1.280`, `x-app: cli`, and the identity as the system's first
     block unless a block already opens with it (Claude Code's own requests carry it, SPI-1161 Q4). **Not restated:**
@@ -1504,14 +1504,17 @@ subscription shapes, restated at the relay for requests pi-ai did not build, and
     `include`, `prompt_cache_key`, flat `function` tools), OpenCode's AI SDK Responses package's, pi's. Plan usage's
     preview page wants function tools in namespaces or `additional_tools`; Codex and OpenCode send them flat.
   - **The paths each CLI calls** on a sign-in (`SIGN_IN_RELAY_PATHS`): a POST to `/v1/messages` (and Claude Code's
-    `/v1/messages/count_tokens`) on Claude, to `/responses` on ChatGPT and Copilot. Anything else is refused (404,
-    logged with its method and path) so the token reaches no other vendor call.
-- **Breaks when**: a CLI starts calling another path on a sign-in (a model list, Codex's `/responses/compact`): it gets
-  404 and the relay's log names the path; Anthropic refuses a subscription request whose tools are not Claude Code's names, or wants more of a
+    `/v1/messages/count_tokens`) on Claude, to `/responses` on ChatGPT and Copilot, as written. Taken from the paths the
+    CLIs build on their base URL (SPI-1168–1170's reports and `test:docker`'s stand-in) and Codex 0.167.2's source
+    (compaction v2 streams over `/responses`; no model list from our base URL). The allowlist has not run on a stage.
+    Anything else is refused (404, logged with its method and path) so the token reaches no other vendor call.
+- **Breaks when**: a future CLI version calls another path on a sign-in (a model list, a compaction or token-count
+  endpoint of its own): it gets 404 and the relay's log names the method and path; Anthropic refuses a subscription request whose tools are not Claude Code's names, or wants more of a
   non-Claude-Code client; Claude Code stops putting the identity in its system blocks; a CLI's Responses body carries a
   field plan usage refuses that `PLAN_USAGE_REFUSED_FIELDS` does not drop, or flat tools are refused; Copilot reads
   another header, or pi-ai changes `inferCopilotInitiator`; a pi-ai bump changes U81's or U82's shapes.
-- **Detection**: `apps/agents/test/modelRelaySignIns.test.ts` compares the relay's output for pi-ai's own API-key request
+- **Detection**: `apps/agents/test/modelRelaySignIns.test.ts` "refuses every path but the sign-in's inference calls…" and
+  "carries each sign-in's inference calls" pin `signInRelayAllows` (paths, POST only, no case folding, per kind); it also compares the relay's output for pi-ai's own API-key request
   with pi-ai's own request on the subscription's token (URL, headers, betas, system), checks plan usage's rules against the Session's
   `planUsagePayload`, and Copilot's headers; `claudeSignInShape.test.ts` pins the Claude constants to pi-ai's wire.
   **Silent**: everything on the vendor's side (a disguised 429 from Anthropic, a 400 from plan usage, Copilot's

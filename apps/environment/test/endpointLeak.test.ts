@@ -6,7 +6,11 @@ import type { ModelRelayTarget } from "@t3flare/models/relay";
 import { patternOf } from "@t3flare/sandbox-image/leakscan";
 import { describe, expect, it } from "vitest";
 
-import { endpointLeakCredentials } from "../src/endpoints/leak.ts";
+import { endpointLeakCredentials, signInLeakPatterns } from "../src/endpoints/leak.ts";
+
+// Realistic lengths: a Copilot token (`tid=…;exp=…;…`, well over 100 characters) and a GitHub token (`gho_` + 36).
+const COPILOT_TOKEN = `tid=${"a1b2c3d4".repeat(4)};exp=1795000000;sku=copilot_individual;proxy-ep=proxy.individual.githubcopilot.com`;
+const GITHUB_TOKEN = `gho_${"Z9y8X7w6".repeat(4)}abcd`;
 
 const endpoint = (id: string) => ({ id, label: id, api: "openai-responses" as const, baseUrl: `https://${id}.example.com/v1`, auth: "api-key" as const, headers: {}, models: [] });
 const endpoints: ModelEndpoints = { revision: 1, endpoints: [endpoint("openai"), endpoint("local"), endpoint("broken"), { ...endpoint("copilot"), auth: "copilot" }] };
@@ -28,16 +32,21 @@ describe("the leak check's endpoint keys", () => {
       },
       signIn: async (id) => {
         signIns.push(id);
-        return [
-          { name: `sign-in:${id}:access`, value: "tid=copilot-token-1" },
-          { name: `sign-in:${id}:refresh`, value: "gho_github-token-1" },
-        ];
+        return signInLeakPatterns([
+          { name: `sign-in:${id}:access`, value: COPILOT_TOKEN },
+          { name: `sign-in:${id}:refresh`, value: GITHUB_TOKEN },
+          { name: `sign-in:${id}:odd`, value: "short-token" },
+        ]);
       },
     });
     // A key by value; a sign-in's tokens only as their hashes (never a value leaves the Environment).
     expect(credentials.credentials).toEqual([{ name: "endpoint:openai", value: "sk-openai-key-1" }]);
-    expect(credentials.patterns).toEqual([await patternOf("sign-in:copilot:access", "tid=copilot-token-1"), await patternOf("sign-in:copilot:refresh", "gho_github-token-1")]);
-    expect(JSON.stringify(credentials)).not.toMatch(/copilot-token-1|github-token-1/);
+    expect(credentials.patterns).toEqual([await patternOf("sign-in:copilot:access", COPILOT_TOKEN), await patternOf("sign-in:copilot:refresh", GITHUB_TOKEN)]);
+    // One too short to hash is dropped before hashing: named, nothing of it sent (not its prefix, length or hash).
+    expect(credentials.notScanned).toEqual([{ name: "sign-in:copilot:odd", where: "everywhere" }]);
+    expect(credentials.patterns.map((pattern) => pattern.name)).not.toContain("sign-in:copilot:odd");
+    const text = JSON.stringify(credentials);
+    for (const value of [COPILOT_TOKEN, GITHUB_TOKEN, "short-token", COPILOT_TOKEN.slice(4, 30), GITHUB_TOKEN.slice(4)]) expect(text).not.toContain(value);
     // A sign-in's tokens are read as stored, never through the relay's target, which would renew one near its expiry.
     expect(asked).toEqual(["openai", "local", "broken"]);
     expect(signIns).toEqual(["copilot"]);

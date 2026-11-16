@@ -423,14 +423,15 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         // SPI-1167: every Model endpoint's key is looked for too (by value in the DO's files, by hash in the Container);
         // SPI-1171: every sign-in's access and refresh tokens, as stored.
         const { endpointLeakCredentials } = await import("../endpoints/leak.ts");
-        const { credentials, patterns } = await endpointLeakCredentials({
+        const { credentials, patterns, notScanned } = await endpointLeakCredentials({
           endpoints: () => environment.modelEndpoints(),
           target: (endpointId) => environment.modelRelayTarget({ endpointId }),
-          signIn: (endpointId) => environment.signInSecrets(endpointId),
+          signIn: (endpointId) => environment.signInLeakPatterns(endpointId),
         });
-        // The names looked for (never a value), so a scan's coverage shows.
+        // The names looked for (never a value), so a scan's coverage shows; a sign-in's token too short to hash is named.
         const lookedFor = [...credentials, ...patterns].map((credential) => credential.name);
-        return json({ ...(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck({ credentials, patterns })), lookedFor });
+        const scan = await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck({ credentials, patterns });
+        return json({ ...scan, notScanned: [...(scan.notScanned ?? []), ...notScanned], lookedFor });
       }
       case "POST /_t3flare/check/sign-in-expire": {
         // SPI-1171 (stages only): a sign-in's access token marked expired, so the next use renews it (expireHook.ts).

@@ -136,13 +136,15 @@ export const codexRelayOverrides = (servers: ReadonlyArray<string>): ReadonlyArr
 
 /**
  * Codex's providers for the Model endpoints (SPI-1167): one per OpenAI Responses endpoint, at the model relay with the
- * process's model handle as its key (`env_key`); the Workers swap it for the endpoint's credential. Codex's shells never
+ * process's model handle as its key (`env_key`), named by its id; the Workers swap it for the endpoint's credential. Codex's shells never
  * see the handle (`shell_environment_policy.exclude`).
  */
 export const codexEndpointOverrides = (endpoints: ReadonlyArray<RelayedEndpoint>): ReadonlyArray<string> =>
   endpoints.map((endpoint) => {
     const provider = [
-      `name=${tomlString(endpoint.label)}`,
+      // A fixed name, never the owner's label: Codex reads some names as a vendor's ("OpenAI" turns on its remote
+      // compaction, "Azure" its Azure rules), which no endpoint at the relay is (SPI-1171 review 2).
+      `name=${tomlString(endpointProviderId(endpoint.id))}`,
       `base_url=${tomlString(modelRelayUrl(endpoint.id))}`,
       `wire_api="responses"`,
       `env_key=${tomlString(MODEL_HANDLE_ENV)}`,

@@ -212,11 +212,18 @@ describe("a sign-in's paths on the model relay", () => {
       expect(response.status, path).toBe(404);
       expect(await response.text()).not.toContain(OAT);
     }
-    const get = await handleModelRelay(new Request("http://computer.internal/t3flare/model/claude/v1/messages", { headers: { authorization: `Bearer ${HANDLE}` } }), h.deps);
-    expect(get.status).toBe(404);
+    // Only a POST: no GET, HEAD, PUT or DELETE (review 2).
+    for (const method of ["GET", "HEAD", "PUT", "DELETE", "PATCH"]) {
+      const request = new Request("http://computer.internal/t3flare/model/claude/v1/messages", { method, headers: { authorization: `Bearer ${HANDLE}` }, ...(method === "GET" || method === "HEAD" ? {} : { body: "{}" }) });
+      expect((await handleModelRelay(request, h.deps)).status, method).toBe(404);
+    }
+    // The path as written: no case-folded match.
+    for (const path of ["claude/V1/messages", "claude/v1/Messages", "claude/v1/MESSAGES/count_tokens"]) expect((await handleModelRelay(post(path, "{}"), h.deps)).status, path).toBe(404);
     const chatgpt = harness([granted(target("chatgpt", "oai-access-1"))]);
     for (const path of ["chatgpt/models", "chatgpt/files", "chatgpt/chat/completions", "chatgpt/responses/compact"]) expect((await handleModelRelay(post(path, "{}"), chatgpt.deps)).status, path).toBe(404);
-    expect([...h.sent, ...chatgpt.sent]).toEqual([]);
+    const copilot = harness([granted(target("copilot", "tid=copilot-1"))]);
+    for (const path of ["copilot/chat/completions", "copilot/models", "copilot/v1/messages", "copilot/Responses"]) expect((await handleModelRelay(post(path, "{}"), copilot.deps)).status, path).toBe(404);
+    expect([...h.sent, ...chatgpt.sent, ...copilot.sent]).toEqual([]);
     expect(h.logs.at(-1)).toMatchObject({ status: 404 });
   });
 
