@@ -4,7 +4,7 @@
 // replace its endpoint. A model pi-ai does not know (a newer Claude, or any other model the proxy translates) is
 // a generic Anthropic Messages model with the limits the catalog gives it. Adapted from
 // cloudpid@ae5a7b73:apps/server/src/session/models.ts (`proxyModels`).
-import { type Api, type AssistantMessage, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type OpenAIResponsesCompat, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
+import { type Api, type AssistantMessage, type Context, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type OpenAIResponsesCompat, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
 import { mistralConversationsApi } from "@earendil-works/pi-ai/api/mistral-conversations.lazy";
@@ -28,6 +28,7 @@ import {
 } from "@t3flare/models/endpoints";
 import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 
+import { copilotHeaders, copilotPayload } from "./copilot.ts";
 import { PLAN_USAGE_COMPAT, planUsagePayload } from "./planUsage.ts";
 
 export type { ModelProxy };
@@ -209,9 +210,25 @@ export const credentialProblem = (endpoint: Pick<ModelEndpoint, "id" | "auth">, 
  *   shape itself: Bearer auth, its betas, user agent and identity block, and its tool names (anthropic-messages.js
  *   `isOAuthToken`). `claudeSignInShape.test.ts` pins that shape; an API key never takes it (the store refuses such a
  *   token as a key).
+ * - GitHub Copilot (SPI-1166): what pi-ai does for its own `github-copilot` provider, which a sign-in endpoint is not
+ *   (copilot.ts): the dynamic headers per request, and no thinking-off `reasoning`. Its base URL and editor headers are
+ *   its token's, from the Credential broker.
  */
-const SIGN_IN_REQUESTS: Readonly<Partial<Record<SignIn, { readonly payload: (params: unknown) => unknown; readonly compat: OpenAIResponsesCompat }>>> = {
+const SIGN_IN_REQUESTS: Readonly<
+  Partial<
+    Record<
+      SignIn,
+      {
+        readonly payload: (params: unknown) => unknown;
+        readonly compat?: OpenAIResponsesCompat;
+        /** Headers for this request's context, beside the auth's. */
+        readonly headers?: (context: Context) => Record<string, string>;
+      }
+    >
+  >
+> = {
   chatgpt: { payload: planUsagePayload, compat: PLAN_USAGE_COMPAT },
+  copilot: { payload: copilotPayload, headers: copilotHeaders },
 };
 
 const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api> => ({
@@ -281,7 +298,13 @@ const endpointProvider = (endpoint: ModelEndpoint, access: EndpointAccess): Prov
             throw new Error(failure.message);
           }
           access.outcome?.(undefined, endpoint.id);
-          return { auth: { apiKey: credential.apiKey, baseUrl: endpoint.baseUrl, headers }, source: isSignIn(endpoint.auth) ? "Model endpoint (sign-in)" : "Model endpoint" };
+          // A sign-in whose token names where it goes (Copilot's, SPI-1166) goes there, with the headers the broker gives
+          // beside it; the endpoint's own base URL is then only a stand-in. No other endpoint takes either.
+          const own = signInOf(endpoint.auth)?.baseUrlFromCredential === true;
+          return {
+            auth: { apiKey: credential.apiKey, baseUrl: (own ? credential.baseUrl : undefined) ?? endpoint.baseUrl, headers: own ? { ...headers, ...credential.headers } : headers },
+            source: isSignIn(endpoint.auth) ? "Model endpoint (sign-in)" : "Model endpoint",
+          };
         },
       },
     },
@@ -307,24 +330,27 @@ const endpointProvider = (endpoint: ModelEndpoint, access: EndpointAccess): Prov
  */
 const signInProvider = (base: Provider, kind: SignIn, endpoint: ModelEndpoint, access: EndpointAccess): Provider => {
   if (!TAKES_FETCH.has(endpoint.api)) return base;
-  const payload = SIGN_IN_REQUESTS[kind]?.payload;
+  const rules = SIGN_IN_REQUESTS[kind];
+  const payload = rules?.payload;
   const outer = access.fetch ?? (globalThis.fetch as FetchFunction);
   const fetch = access.refused === undefined ? outer : refusalWatch(outer, () => access.refused?.(endpoint.id));
   type Options = NonNullable<Parameters<Provider["streamSimple"]>[2]>;
-  const withRules = (options: Options | undefined): Options => {
-    if (payload === undefined) return { ...options, fetch };
+  const withRules = (context: Context, options: Options | undefined): Options => {
+    const headers = rules?.headers === undefined ? {} : { headers: { ...options?.headers, ...rules.headers(context) } };
+    if (payload === undefined) return { ...options, ...headers, fetch };
     const earlier = options?.onPayload;
     return {
       ...options,
+      ...headers,
       fetch,
       onPayload: async (params, model) => payload((earlier === undefined ? undefined : await earlier(params, model)) ?? params),
     };
   };
   return {
     ...base,
-    // SAFETY: as above, only `fetch` and `onPayload` are added, both fields of every API's stream options; the cast
+    // SAFETY: as above, only `fetch`, `headers` and `onPayload` are added, fields of every API's stream options; the cast
     // restores the generic `ApiStreamOptions<T>` the spread widens.
-    stream: (model, context, options) => base.stream(model, context, withRules(options as Options | undefined) as typeof options),
-    streamSimple: (model, context, options) => base.streamSimple(model, context, withRules(options)),
+    stream: (model, context, options) => base.stream(model, context, withRules(context, options as Options | undefined) as typeof options),
+    streamSimple: (model, context, options) => base.streamSimple(model, context, withRules(context, options)),
   } satisfies Provider;
 };
