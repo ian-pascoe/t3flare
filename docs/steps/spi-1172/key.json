@@ -1,0 +1,49 @@
+{
+  "step": "key",
+  "at": "2026-11-16T14:06:38.306Z",
+  "model": "commissary/claude-haiku-5-5",
+  "fault": {
+    "armed": {
+      "fixture": "anthropicKeyRefused",
+      "resetAt": 1794838129555
+    }
+  },
+  "threadId": "bbd0031c-2840-4ce6-a72b-08d54196fd46",
+  "first": {
+    "run": "failed",
+    "failure": {
+      "class": "permission_error",
+      "message": "The Model endpoint \"commissary\" refused its API key (HTTP 401): check it in the Harness panel.",
+      "code": "key_refused",
+      "retryable": false
+    },
+    "model": {
+      "requests": 1,
+      "endpointFailure": {
+        "endpointId": "commissary",
+        "class": "permission_error",
+        "code": "key_refused",
+        "message": "The Model endpoint \"commissary\" refused its API key (HTTP 401): check it in the Harness panel.",
+        "retryable": false,
+        "stop": true,
+        "at": 1794838013526
+      }
+    },
+    "detail": "t3flare model endpoint: key_refused",
+    "faultResetAt": "2026-11-16T14:08:49.555Z"
+  },
+  "echoedInThreadOrSession": [
+    0,
+    0
+  ],
+  "logs": {
+    "tailEvents": 17,
+    "echoed": [
+      0,
+      0
+    ],
+    "redactedMarks": 0
+  },
+  "failures": [],
+  "ok": true
+}

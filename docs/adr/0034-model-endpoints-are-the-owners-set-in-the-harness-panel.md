@@ -46,7 +46,7 @@ refinement) or none, optional headers, and the models it serves.
    `modelEndpoints` and asks for the key with `endpointCredential`, as a Session does, and builds the request with a
    Session's own provider (`endpointProviders`), so a sign-in's credential reaches it through the same code once the
    broker exists. A failure names the
-   endpoint and says what happened by the answer's status alone. The default text model is a small model (haiku, mini,
+   endpoint and says what happened, classified as a turn's is (item 8), else by the answer's status. The default text model is a small model (haiku, mini,
    nano, flash, lite, small, tiny) of the first endpoint that has one, its cheapest by known price; until the hard cut,
    the Model proxy's small model when no endpoint has one. While the owner has picked no model, the text-generation
    setting names that default and follows it as the endpoints change.
@@ -71,6 +71,21 @@ refinement) or none, optional headers, and the models it serves.
    per-endpoint path), so a thread switches between them, across APIs, without the routed URL. pi (SPI-1170) does the
    same for every endpoint: one provider per endpoint (`t3flare-endpoint-<id>`) in its `models.json`, whose key is a
    command that prints the process's handle.
+
+8. **Failures classified per API** (SPI-1172). A failed answer from an endpoint is classified by the endpoint's API and
+   auth (`@t3flare/models/failures`, one table of rows), from what the vendor documents as machine-readable: the status,
+   the error's type and code, and the reset headers and fields (Anthropic's unified limit and spend cap, OpenAI's quota
+   and rate-limit headers, ChatGPT's `usage_limit_reached` and plan usage's `subscription_sharing_*` codes, any 429's
+   `retry-after`, a 401 or 403 by the endpoint's auth, overload and 5xx), never its prose. The Session classifies a
+   Durable turn's or a compaction's answer once, records it on the turn with its own text naming the endpoint, and stops
+   pi-durable's retries when none can help; t3 shows it, and a usage limit pauses the thread until its reset (auto-resume
+   when the owner has it on). Overload and 5xx are retried and are never a usage limit. **No fallback**: a turn's model
+   is its endpoint's, so a limited endpoint's thread waits for that endpoint. Text generation names the classified
+   failure and its reset. The relay passes an error back in the vendor's own shape (the CLI pauses as it would on the
+   vendor), its body redacted, and logs the class. Error text is redacted by shape (vendor keys, bearer tokens,
+   JWT-shaped values, key headers and parameters) and by the endpoint's own credential before it reaches t3 or a log
+   (`@t3flare/models/redact`, also in the Environment's redacting Console). The Model proxy keeps its own classifier
+   (`proxyFailure.ts`) until the hard cut.
 
 Consequences: Commissary is one endpoint among others (an Anthropic Messages endpoint at its URL with its key). Losing
 a stage's alchemy state loses its credentials key, and the owner enters the endpoints' keys again.
