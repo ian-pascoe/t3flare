@@ -177,8 +177,16 @@ async function control(): Promise<void> {
       // Codex has no edit tool of its own name (it patches): SPI-1167's wording for it.
       const prompt = cli === "codex" ? "In src/greeting.txt add a new last line `Hello through the relay.` (edit the file), then run `bash test.sh` and tell me in one sentence whether it passed." : EDIT_AND_TEST;
       const turn = await turnOf(cli, { workspace, model, mode: "approval-required", plan: false, prompt });
-      turns[`${cli} control`] = clean({ model, runs: turn.runs.slice(-1), items: turn.items, text: turn.text });
-      check(`a ${cli} turn with tools ran through the relay on an API-key endpoint (${model})`, toolTurn(turn), turns[`${cli} control`]);
+      // What the turn left in the repo: its edit is there, whatever the projection's items show (t3's Codex items showed no
+      // file change or test run on p1171 while the file and the answer had both).
+      const line = cli === "codex" ? "Hello through the relay." : "Hello from the CLI.";
+      const repo = linesOf((await exec(workspace, `echo "edited=$(grep -cF '${line}' /workspace/repo/src/greeting.txt 2>/dev/null || echo 0)"`)).stdout);
+      turns[`${cli} control`] = clean({ model, runs: turn.runs.slice(-1), items: turn.items, text: turn.text, edited: repo.edited ?? null });
+      check(
+        `a ${cli} turn with tools ran through the relay on an API-key endpoint (${model}): the file edited, the test run`,
+        toolTurn(turn) || (turn.runs.at(-1)?.status === "completed" && repo.edited === "1" && turn.requests.length > 0 && /passed/i.test(turn.text)),
+        turns[`${cli} control`],
+      );
       const title = signIn === "chatgpt" ? "ChatGPT" : "Claude";
       const refused = await turnOf(cli, { workspace, model: SIGN_IN_MODEL[signIn], mode: "approval-required", plan: false, prompt: "Reply with the word ok." });
       // t3's failure as its error item carries it (the turn's own failure item).
