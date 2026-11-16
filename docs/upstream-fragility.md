@@ -1424,18 +1424,19 @@ the owner's terms-of-service risk (ADR-0018 item 10).
 
 ### U82. The GitHub Copilot sign-in on pi-ai: the device flow, the Copilot token and its request shape (SPI-1166)
 
-Ranked after U81, beside U77 and U81, which it parallels: a break fails every turn on a Copilot sign-in endpoint, or
-the sign-in. Nothing here reaches t3; the leans are on pi-ai 1.5.0 and on GitHub's undocumented Copilot token endpoint
-and API, used with the Copilot editor's public client, whose use outside GitHub's editors is the owner's
-terms-of-service risk (ADR-0018 item 11).
+Ranked after U81, beside U77 and U81, which it parallels: a break fails every turn on a Copilot sign-in endpoint, or the
+sign-in. Nothing here reaches t3; the leans are on pi-ai 1.5.0 and on GitHub's undocumented Copilot token endpoint and
+API, used with the Copilot editor's public client, whose use outside GitHub's editors is the owner's terms-of-service
+risk (ADR-0018 item 11).
 
-- **Where**: `packages/models/src/copilotOAuth.ts` (the client id, the device flow's and Copilot token's URLs, the scope,
-  the editor headers, the model list's API version, `copilotBaseUrl`), `apps/environment/src/credentials/copilot.ts`
-  (the start, the poll and its interval, the Copilot token, what ends a sign-in at renewal, no revocation, `use`),
-  `credentials/broker.ts` (`SignInVendor.use`: the base URL and headers given with each token), `endpoints/discover.ts`
-  (`copilotModels`, for a Copilot sign-in only), `known.ts` (Copilot's catalog, for its own host only), `apps/agents/src/session/copilot.ts` and
-  `session/models.ts` (`SIGN_IN_REQUESTS.copilot`; the credential's base URL and headers taken only when its kind's
-  `credentialBaseUrl`, `COPILOT_BASE_URL`, matches it), `SIGN_IN_KINDS.copilot`. It leans on pi-ai 1.5.0 and GitHub in these ways:
+- **Where**: `packages/models/src/copilotOAuth.ts` (the client id, the device flow's and Copilot token's URLs, the
+  scope, the editor headers, the model list's API version, `copilotBaseUrl`),
+  `apps/environment/src/credentials/copilot.ts` (the start, the poll and its interval, the Copilot token, what ends a
+  sign-in at renewal, no revocation, `use`), `credentials/broker.ts` (`SignInVendor.use`: the base URL and headers given
+  with each token), `endpoints/discover.ts` (`copilotModels`, for a Copilot sign-in only), `known.ts` (Copilot's
+  catalog, for its own host only), `apps/agents/src/session/copilot.ts` and `session/models.ts`
+  (`SIGN_IN_REQUESTS.copilot`; the credential's base URL and headers taken only when its kind's `credentialBaseUrl`,
+  `COPILOT_BASE_URL`, matches it), `SIGN_IN_KINDS.copilot`. It leans on pi-ai 1.5.0 and GitHub in these ways:
   - **pi-ai's flow** (`dist/auth/oauth/github-copilot.js`): `CLIENT_ID` (:9), `COPILOT_HEADERS` (:10-15),
     `COPILOT_API_VERSION` (:16), `getUrls` (:29-35), `getBaseUrlFromToken` (:41-49) and `getGitHubCopilotBaseUrl`
     (:50-61), the model list's rules (`parseGitHubCopilotModelCatalog`, :65-100), the device code request (:155-196),
@@ -1444,21 +1445,22 @@ terms-of-service risk (ADR-0018 item 11).
     expiry is kept, no model policy is switched on, a token naming a host outside `githubcopilot.com` is not used, and
     github.com only (no Enterprise domain).
   - **pi-ai's request shape for its `github-copilot` provider** (`dist/api/openai-responses.js`): the dynamic headers
-    (:210-217, `github-copilot-headers.js`'s `buildCopilotDynamicHeaders`, which the Session imports), and no thinking-off
-    `reasoning` (:297). Both key on `model.provider === "github-copilot"`, which a sign-in endpoint's provider (its own
-    id) is not, so the Session restates them; the editor headers are on every model of pi-ai's Copilot catalog
-    (`model.headers`), which a sign-in endpoint's models lack, so the broker gives them with the token.
+    (:210-217, `github-copilot-headers.js`'s `buildCopilotDynamicHeaders`, which the Session imports), and no
+    thinking-off `reasoning` (:297). Both key on `model.provider === "github-copilot"`, which a sign-in endpoint's
+    provider (its own id) is not, so the Session restates them; the editor headers are on every model of pi-ai's Copilot
+    catalog (`model.headers`), which a sign-in endpoint's models lack, so the broker gives them with the token.
   - **GitHub** (docs.github.com, "Device flow"; the rest undocumented, as pi-ai and the spike saw it): the poll answered
     200 with `authorization_pending`, `slow_down` (with `interval`), `expired_token`, `access_denied`; the Copilot token
     (`token` holding `proxy-ep=`, `expires_at` in epoch seconds); its refusals as GitHub API errors (`{ message }`,
     `error_details.notification_id`, e.g. `subscription_ended`, SPI-1161); rate limits as 403 or 429 with `retry-after`
-    or `x-ratelimit-remaining: 0`, or a message naming a rate limit or too many login attempts (a secondary limit;
-    another wording would read as a refusal and sign out); `/models`' `model_picker_enabled`, `policy.state`, `capabilities`,
-    `supported_endpoints`. No revocation for a public client.
+    or `x-ratelimit-remaining: 0`, or a 403 whose message names a rate limit, too many requests or too many login
+    attempts (a secondary limit; another wording would read as a refusal and sign out), each waited out (`retry-after`,
+    else `x-ratelimit-reset`, else a minute; at most 15) before the next renewal; `/models`' `model_picker_enabled`,
+    `policy.state`, `capabilities`, `supported_endpoints`. No revocation for a public client.
 - **Breaks when**: pi-ai changes the client, URLs, scope, editor headers or their versions, the API version, the base
   URL's derivation, the dynamic headers, or its Copilot reasoning rule; pi-ai keys the Copilot shape on something a
-  sign-in endpoint has (a double header), or moves `buildCopilotDynamicHeaders`; GitHub changes the token endpoint,
-  its answer or error bodies, the hosts it names, what it requires of a request (a newer editor version), or the model
+  sign-in endpoint has (a double header), or moves `buildCopilotDynamicHeaders`; GitHub changes the token endpoint, its
+  answer or error bodies, the hosts it names, what it requires of a request (a newer editor version), or the model
   list's fields; Copilot drops a model from its Responses API.
 - **Detection**: `apps/agents/test/copilotSignInShape.test.ts` runs pi-ai's own `login()`, `refresh()` and `toAuth()`
   and compares them with `copilotOAuth.ts`, checks the catalog's headers, and compares a request on a Copilot sign-in
@@ -1472,12 +1474,12 @@ terms-of-service risk (ADR-0018 item 11).
   refused the Copilot token (403 `subscription_ended`), so no Copilot token, model list or turn was seen. Whether
   Copilot's API accepts these requests from a Worker's egress, and what GitHub answers for a revoked grant, are not
   known (SPI-1226).
-- **Blast radius**: turns on the Copilot endpoint fail (shown as model errors, or `sign_in_refused` for a 401 or 403), or
-  the sign-in fails; a refused renewal signs the endpoint out (sign in again). No token leaves the Session or the broker
-  either way, and the GitHub token never leaves the broker.
+- **Blast radius**: turns on the Copilot endpoint fail (shown as model errors, or `sign_in_refused` for a 401 or 403),
+  or the sign-in fails; a refused renewal signs the endpoint out (sign in again). No token leaves the Session or the
+  broker either way, and the GitHub token never leaves the broker.
 - **Fix**: on a pi-ai bump, diff `auth/oauth/github-copilot.js` against `copilotOAuth.ts` and `credentials/copilot.ts`,
-  `api/openai-responses.js` and `api/github-copilot-headers.js` against `session/copilot.ts`; update the pins only once a
-  turn on a real Copilot sign-in passes with the new shape.
+  `api/openai-responses.js` and `api/github-copilot-headers.js` against `session/copilot.ts`; update the pins only once
+  a turn on a real Copilot sign-in passes with the new shape.
 
 ## Gaps in detection
 

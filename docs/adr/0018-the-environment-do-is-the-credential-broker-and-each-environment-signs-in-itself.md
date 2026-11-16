@@ -113,17 +113,20 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
     Sessions ask, and given to a Session with the base URL the token names (`proxy-ep`, as pi-ai derives it, only https
     on `githubcopilot.com`, one rule the Session checks again) and the editor headers Copilot requires. Neither the base
     URL nor the headers are the endpoint's stored config: the endpoint keeps a fixed stand-in base URL for the target
-    rule, and its requests go where the token says. The Session adds what pi-ai adds for its own `github-copilot` provider (the `X-Initiator` and `Openai-Intent`
-    headers; no thinking-off `reasoning`), pinned on the wire against pi-ai's own provider. The endpoint speaks
-    Copilot's Responses API only (one API per endpoint): Copilot's Claude and Gemini models, on its Messages and Chat
-    Completions APIs, are not listed on it.
+    rule, and its requests go where the token says. The Session adds what pi-ai adds for its own `github-copilot`
+    provider (the `X-Initiator` and `Openai-Intent` headers; no thinking-off `reasoning`), pinned on the wire against
+    pi-ai's own provider. The endpoint speaks Copilot's Responses API only (one API per endpoint): Copilot's Claude and
+    Gemini models, on its Messages and Chat Completions APIs, are not listed on it.
 
     **A refused renewal signs the endpoint out**, by item 10's rule: a 400, 401 or 403 whose body is an error object
-    (GitHub's `{ message }` or an OAuth error), unless it is a rate limit: `retry-after`, `x-ratelimit-remaining: 0`, or a
-    message naming a rate limit or too many sign-in attempts (GitHub answers its rate limits with 403 or 429, its
-    secondary limits sometimes with only the message). That is a revoked GitHub token, or an account whose Copilot plan
-    ended; anything else is passing trouble, retried and shown on the panel. The accepted cost is item 10's: an error
-    object at 401 or 403 during an incident at GitHub signs the owner out.
+    (GitHub's `{ message }` or an OAuth error), unless it is a rate limit: a 429, `retry-after`,
+    `x-ratelimit-remaining: 0`, or a 403 whose message names a rate limit, too many requests or too many login attempts
+    (GitHub answers its rate limits with 403 or 429, its secondary limits sometimes with only the message). That is a
+    revoked GitHub token, or an account whose Copilot plan ended; anything else is passing trouble, retried and shown on
+    the panel. A rate limit is retried only after the time GitHub names (`retry-after`, else the limit's
+    reset; at least a minute, at most 15), kept as the credential's `earliestRefreshAt`, so the Sessions asking
+    meanwhile get a retryable failure without each reaching GitHub. The accepted cost is item 10's: an error object at
+    401 or 403 during an incident at GitHub signs the owner out.
 
     **GitHub offers this client no revocation**: it revokes an app's token only with the app's client secret, which a
     public client has none of. Sign-out deletes the tokens here and stops the Sessions; the grant stays on the owner's
