@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type CredentialBroker, credentialBroker, signInStatusKey } from "../src/credentials/broker.ts";
+import { chatgptSignIn } from "../src/credentials/chatgpt.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
 import { type FakeOpenAI, fakeOpenAI } from "./fixtures/fakeOpenAIAuth.ts";
 
@@ -39,21 +40,21 @@ const setup = async (options: { readonly credentialsKey?: string } = {}) => {
   const now = () => clock;
   const vendor = await fakeOpenAI({ now });
   const kv = memory();
-  const broker = credentialBroker({ kv, sealed: sealedStore(kv, options.credentialsKey ?? KEY, now), vendor: { fetch: vendor.fetch, now }, now });
+  const broker = credentialBroker({ kv, sealed: sealedStore(kv, options.credentialsKey ?? KEY, now), vendors: { chatgpt: chatgptSignIn({ fetch: vendor.fetch, now }) }, now });
   return { kv, vendor, broker, advance: (ms: number) => void (clock += ms), now };
 };
 
 /** Signs `id` in through the broker, as the owner does: start, approve in the browser, paste the redirect. */
 const signIn = async (broker: CredentialBroker, vendor: FakeOpenAI, id = "chatgpt") => {
-  const { authorizeUrl } = await broker.start(id);
+  const { authorizeUrl } = await broker.start(id, "chatgpt");
   return broker.complete(id, vendor.approve(authorizeUrl, { sub: "user-7", email: "owner@example.com" }));
 };
 
-/** No token the fake issued is in the storage or anything logged. */
+/** Nothing secret the fake made or saw (tokens, codes, each attempt's state, nonce and verifier) is stored or logged. */
 const scan = (kv: ReturnType<typeof memory>, vendor: FakeOpenAI) => {
   const stored = JSON.stringify([...kv.map.entries()]);
   const output = logged.join("\n");
-  for (const token of vendor.issued) {
+  for (const token of vendor.secrets()) {
     expect(stored).not.toContain(token);
     expect(output).not.toContain(token);
   }
@@ -104,10 +105,12 @@ describe("the Credential broker", () => {
     kv.failWhen((key) => key.includes("endpoint/chatgpt/oauth"));
     const answer = await broker.access("chatgpt");
     expect(answer).toMatchObject({ ok: false, signedOut: false });
+    // OpenAI did renew it: a second access token exists, and it reached no caller.
     expect(vendor.counts.refreshes).toBe(1);
-    // The refreshed access token reached no caller.
-    const refreshedAccess = vendor.issued.at(-2)!;
-    expect(JSON.stringify(answer)).not.toContain(refreshedAccess);
+    expect(vendor.accessTokens).toHaveLength(2);
+    expect(JSON.stringify(answer)).not.toContain(vendor.accessTokens[1]!);
+    // The stored credential is still the first.
+    expect((await broker.read("chatgpt"))?.access).toBe(vendor.accessTokens[0]);
     kv.failWhen(undefined);
     scan(kv, vendor);
   });
@@ -128,6 +131,42 @@ describe("the Credential broker", () => {
     scan(kv, vendor);
   });
 
+  it("sends one refused renewal for many concurrent callers", async () => {
+    const { kv, vendor, broker, advance } = await setup();
+    await signIn(broker, vendor);
+    advance(HOUR);
+    vendor.options.refreshError = "invalid_grant";
+    let release!: () => void;
+    vendor.options.refreshGate = new Promise((resolve) => (release = resolve));
+    const asks = Promise.all(Array.from({ length: 5 }, () => broker.access("chatgpt")));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    release();
+    const answers = await asks;
+    expect(vendor.counts.refreshes).toBe(1);
+    expect(answers.every((answer) => !answer.ok && answer.signedOut)).toBe(true);
+    scan(kv, vendor);
+  });
+
+  it("keeps a sign-in completed while a refused renewal was in flight", async () => {
+    const { kv, vendor, broker, advance } = await setup();
+    await signIn(broker, vendor);
+    advance(HOUR);
+    vendor.options.refreshError = "invalid_grant";
+    let release!: () => void;
+    vendor.options.refreshGate = new Promise((resolve) => (release = resolve));
+    const refused = broker.access("chatgpt");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // The owner signs in again meanwhile; its write waits for the refusal's.
+    const again = signIn(broker, vendor);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    release();
+    expect(await refused).toMatchObject({ ok: false, signedOut: true });
+    expect(await again).toMatchObject({ ok: true });
+    expect(await broker.read("chatgpt")).toMatchObject({ access: vendor.accessTokens.at(-1) });
+    expect(broker.status("chatgpt").signedIn).toBe(true);
+    scan(kv, vendor);
+  });
+
   it("keeps a token that is still valid through a passing failure, and fails once it has expired", async () => {
     const { kv, vendor, broker, advance } = await setup();
     await signIn(broker, vendor);
@@ -141,17 +180,54 @@ describe("the Credential broker", () => {
     scan(kv, vendor);
   });
 
-  it("signs out by revoking at OpenAI, and the next sign-in reuses the issued client id", async () => {
+  it("signs out by removing the tokens, then the caller's step, then revoking at OpenAI; the next sign-in reuses the client id", async () => {
     const { kv, vendor, broker } = await setup();
     await signIn(broker, vendor);
     const clientId = broker.status("chatgpt").clientId;
-    expect(await broker.signOut("chatgpt")).toEqual({ signedOut: true, revoked: true });
+    const order: Array<string> = [];
+    const out = await broker.signOut("chatgpt", {
+      beforeRevoke: async () => {
+        order.push(`removed: ${(await broker.read("chatgpt")) === undefined}, revocations: ${vendor.counts.revocations}`);
+      },
+    });
+    expect(out).toEqual({ signedOut: true, revoked: true });
+    expect(order).toEqual(["removed: true, revocations: 0"]);
     expect(vendor.counts.revocations).toBe(1);
     expect(await broker.read("chatgpt")).toBeUndefined();
     expect(broker.status("chatgpt")).toMatchObject({ signedIn: false, clientId, email: "owner@example.com" });
     expect(await broker.access("chatgpt")).toMatchObject({ ok: false, signedOut: true });
-    const { authorizeUrl } = await broker.start("chatgpt");
+    const { authorizeUrl } = await broker.start("chatgpt", "chatgpt");
     expect(new URL(authorizeUrl).searchParams.get("client_id")).toBe(clientId);
+    scan(kv, vendor);
+  });
+
+  it("signs out after a refresh in flight, and revokes the refresh token that refresh left", async () => {
+    const { kv, vendor, broker, advance } = await setup();
+    await signIn(broker, vendor);
+    advance(HOUR);
+    let release!: () => void;
+    vendor.options.refreshGate = new Promise((resolve) => (release = resolve));
+    const refreshing = broker.access("chatgpt");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const out = broker.signOut("chatgpt");
+    release();
+    await refreshing;
+    expect(await out).toEqual({ signedOut: true, revoked: true });
+    // The rotated refresh token (the one OpenAI honours now) is the one revoked; nothing is left here.
+    expect(vendor.revoked.has(vendor.currentRefresh()!)).toBe(true);
+    expect(await broker.read("chatgpt")).toBeUndefined();
+    expect(await broker.access("chatgpt")).toMatchObject({ ok: false, signedOut: true });
+    scan(kv, vendor);
+  });
+
+  it("says a sign-out's revocation was not confirmed when OpenAI keeps failing it, and signs out here all the same", async () => {
+    const { kv, vendor, broker } = await setup();
+    await signIn(broker, vendor);
+    vendor.options.revokeStatus = 503;
+    expect(await broker.signOut("chatgpt")).toEqual({ signedOut: true, revoked: false });
+    // Tried three times (two retries), then given up.
+    expect(vendor.counts.revocations).toBe(3);
+    expect(await broker.read("chatgpt")).toBeUndefined();
     scan(kv, vendor);
   });
 
@@ -169,11 +245,11 @@ describe("the Credential broker", () => {
 
   it("keeps a sign-in waiting through a mistaken paste, and lets a stale one lapse", async () => {
     const { kv, vendor, broker, advance } = await setup();
-    const { authorizeUrl } = await broker.start("chatgpt");
+    const { authorizeUrl } = await broker.start("chatgpt", "chatgpt");
     const callback = vendor.approve(authorizeUrl);
     expect(await broker.complete("chatgpt", "not a url")).toMatchObject({ ok: false });
     expect(await broker.complete("chatgpt", callback)).toMatchObject({ ok: true });
-    const again = await broker.start("chatgpt");
+    const again = await broker.start("chatgpt", "chatgpt");
     advance(31 * 60_000);
     expect(await broker.complete("chatgpt", vendor.approve(again.authorizeUrl))).toMatchObject({ ok: false, problem: expect.stringMatching(/lapsed/) });
     scan(kv, vendor);
@@ -181,7 +257,7 @@ describe("the Credential broker", () => {
 
   it("refuses to start without a credentials key", async () => {
     const { broker } = await setup({ credentialsKey: "short" });
-    await expect(broker.start("chatgpt")).rejects.toThrow(/credentials key/);
+    await expect(broker.start("chatgpt", "chatgpt")).rejects.toThrow(/credentials key/);
   });
 
   it("serialises modify per endpoint, as pi-ai's CredentialStore asks", async () => {

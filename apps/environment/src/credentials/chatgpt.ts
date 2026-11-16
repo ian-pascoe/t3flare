@@ -10,10 +10,12 @@
 // in an isolate's memory.
 //
 // Where pi-ai 1.5.0's `openai-chatgpt` flow differs from OpenAI's docs, the docs win: the ID token is checked (signature
-// against OpenAI's JWKS, issuer, audience, expiry, nonce), a saved registration's client id is reused, the revocation
-// endpoint comes from discovery, and the redirect port is 1455 from the first registration onward.
+// against OpenAI's JWKS, issuer, audience, expiry, nonce) and then dropped (nothing here sends `id_token_hint`), the
+// redirect's `iss` is checked when present, a saved registration's client id is reused, the revocation endpoint comes from
+// discovery, and the redirect port is 1455 from the first registration onward.
 //
 // Every failure is one of our fixed texts: never a token, a code, a verifier, or the vendor's body.
+import type { SignInVendor } from "./signIn.ts";
 
 /** OpenAI's endpoints for this flow (the authorize and token URLs as the docs give them; the rest from discovery). */
 export interface ChatGptUrls {
@@ -83,8 +85,6 @@ export interface ChatGptCredential {
   readonly scopes: ReadonlyArray<string>;
   readonly subject: string;
   readonly email: string | null;
-  /** Kept for `id_token_hint`; never sent anywhere but OpenAI's authorize endpoint. */
-  readonly idToken?: string;
   /** OpenAI's `earliest_refresh_at` (ms): no refresh before it. */
   readonly earliestRefreshAt: number | null;
   readonly [key: string]: unknown;
@@ -149,11 +149,14 @@ export const startChatGptSignIn = async (input: {
   return { authorizeUrl: url.toString(), pending };
 };
 
+/** How the panel's texts describe the redirect. */
+const STARTS = `it starts ${CHATGPT_REDIRECT_URI}`;
+
 /** The pasted redirect as a URL: the whole address, without its scheme, or only its query (from a phone). */
 const pastedUrl = (pasted: string, redirectUri: string): URL | string => {
   const text = pasted.trim();
   const expected = new URL(redirectUri);
-  const whole = "Paste the whole address your browser landed on after ChatGPT's approval (it starts http://127.0.0.1:1455/auth/callback).";
+  const whole = `Paste the whole address your browser landed on after ChatGPT's approval (${STARTS}).`;
   if (!text.includes("=")) return whole;
   let url: URL;
   try {
@@ -163,7 +166,7 @@ const pastedUrl = (pasted: string, redirectUri: string): URL | string => {
     return whole;
   }
   if (url.hostname !== expected.hostname || url.pathname !== expected.pathname) {
-    return "That is not the address your browser landed on: it starts http://127.0.0.1:1455/auth/callback.";
+    return `That is not the address your browser landed on: ${STARTS}.`;
   }
   if (!url.searchParams.has("state") || (!url.searchParams.has("code") && !url.searchParams.has("error"))) return whole;
   return url;
@@ -259,6 +262,9 @@ export const completeChatGptSignIn = async (vendor: ChatGptVendor, pending: Pend
   if (typeof url === "string") return { ok: false, problem: url };
   const params = url.searchParams;
   if (params.get("state") !== pending.state) return { ok: false, problem: "This address does not belong to the sign-in in progress: start the sign-in again and paste the address it leads to." };
+  // RFC 9207: an authorization response that names its issuer must name OpenAI's.
+  const iss = params.get("iss");
+  if (iss !== null && iss !== ISSUER) return { ok: false, problem: "This address names another issuer than OpenAI: start the sign-in again." };
   const error = params.get("error");
   if (error !== null) {
     return {
@@ -308,7 +314,6 @@ export const completeChatGptSignIn = async (vendor: ChatGptVendor, pending: Pend
       scopes: answer.scopes,
       subject: identity.sub,
       email: identity.email,
-      idToken: answer.idToken,
       earliestRefreshAt: answer.earliestRefreshAt,
     },
   };
@@ -372,3 +377,13 @@ export const revokeChatGpt = async (vendor: ChatGptVendor, credential: Pick<Chat
   }
   return { confirmed: false };
 };
+
+/** ChatGPT plan usage as the Credential broker's vendor for the `chatgpt` sign-in. */
+export const chatgptSignIn = (vendor: ChatGptVendor): SignInVendor => ({
+  start: ({ hostId, registration, now }) => startChatGptSignIn({ hostId, now, ...(registration === undefined ? {} : { registration }), ...(vendor.urls === undefined ? {} : { urls: vendor.urls }) }),
+  // SAFETY: the broker hands back exactly the attempt `start` made (sealed in between), and only ever a credential this
+  // vendor made, so each is this module's own shape.
+  complete: (pending, pasted) => completeChatGptSignIn(vendor, pending as unknown as PendingChatGptSignIn, pasted),
+  refresh: (credential) => refreshChatGpt(vendor, credential as ChatGptCredential),
+  revoke: (credential) => revokeChatGpt(vendor, credential as ChatGptCredential),
+});

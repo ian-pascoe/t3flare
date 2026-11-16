@@ -51,6 +51,8 @@ describe("ChatGPT plan usage sign-in", () => {
       expect(result.credential.clientId).toMatch(/^oaiapp_/);
       expect(result.credential.scopes).toContain("chatgpt.tokens.use.direct");
       expect(result.credential.expires).toBeGreaterThan(Date.now() + 3_000_000);
+      // The ID token was checked, then dropped: nothing sends it on.
+      expect(result.credential).not.toHaveProperty("idToken");
       expect(vendor.counts.exchanges).toBe(1);
     }
   });
@@ -78,16 +80,43 @@ describe("ChatGPT plan usage sign-in", () => {
     }
   });
 
-  it("refuses an ID token for another nonce or audience", async () => {
+  it("refuses an ID token for another attempt's nonce", async () => {
     const vendor = await fakeOpenAI();
     const first = await startChatGptSignIn({ hostId: HOST });
     const second = await startChatGptSignIn({ hostId: HOST });
     const callback = vendor.approve(first.authorizeUrl);
-    // The code was issued for the first attempt's nonce; completing it as the second (same state forged) fails the nonce.
+    // The code was issued for the first attempt's nonce; completing it as the second (state and verifier forged) fails.
     const forged = { ...second.pending, state: first.pending.state, verifier: first.pending.verifier };
     const result = await completeChatGptSignIn({ fetch: vendor.fetch, now: Date.now }, forged, callback);
-    expect(result).toMatchObject({ ok: false });
-    if (!result.ok) expect(result.problem).toMatch(/could not be verified/);
+    expect(result).toMatchObject({ ok: false, problem: expect.stringMatching(/could not be verified/) });
+  });
+
+  // Each way an ID token can be wrong, on its own: the sign-in is refused, nothing is kept.
+  for (const wrong of ["bad-signature", "wrong-iss", "wrong-aud", "expired", "alg-hs256"] as const) {
+    it(`refuses an ID token with ${wrong}`, async () => {
+      const vendor = await fakeOpenAI({ idToken: wrong });
+      const { authorizeUrl, pending } = await startChatGptSignIn({ hostId: HOST });
+      const result = await completeChatGptSignIn({ fetch: vendor.fetch, now: Date.now }, pending, vendor.approve(authorizeUrl));
+      expect(result).toMatchObject({ ok: false, spent: true, problem: expect.stringMatching(/could not be verified/) });
+    });
+  }
+
+  it("refuses the sign-in when OpenAI's JWKS cannot be read", async () => {
+    const vendor = await fakeOpenAI({ jwksDown: true });
+    const { authorizeUrl, pending } = await startChatGptSignIn({ hostId: HOST });
+    const result = await completeChatGptSignIn({ fetch: vendor.fetch, now: Date.now }, pending, vendor.approve(authorizeUrl));
+    expect(result).toMatchObject({ ok: false, problem: expect.stringMatching(/could not be verified/) });
+  });
+
+  it("refuses a redirect that names another issuer, and takes OpenAI's", async () => {
+    const vendor = await fakeOpenAI();
+    const { authorizeUrl, pending } = await startChatGptSignIn({ hostId: HOST });
+    const callback = new URL(vendor.approve(authorizeUrl));
+    callback.searchParams.set("iss", "https://evil.example");
+    expect(await completeChatGptSignIn({ fetch: vendor.fetch, now: Date.now }, pending, callback.toString())).toMatchObject({ ok: false, problem: expect.stringMatching(/another issuer/) });
+    expect(vendor.counts.exchanges).toBe(0);
+    callback.searchParams.set("iss", "https://auth.openai.com");
+    expect(await completeChatGptSignIn({ fetch: vendor.fetch, now: Date.now }, pending, callback.toString())).toMatchObject({ ok: true });
   });
 
   it("refreshes with the rotated token, and names a refused refresh", async () => {

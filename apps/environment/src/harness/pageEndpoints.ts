@@ -3,10 +3,11 @@
 // one form that adds or edits an endpoint, filled from a preset or from the endpoint being edited. Every string is
 // escaped (page.ts's rule). Its behaviour is ENDPOINTS_SCRIPT, part of the page's one script.
 //
-// SPI-1164: "Sign in with ChatGPT" (ChatGPT plan usage): start, open the authorize link, paste the address the browser
-// lands on (a 127.0.0.1 page that does not load), and see the account or why it failed. A sign-in endpoint's card shows
-// its account and token expiry, with Sign out. The section says plainly that this is unverified and needs Plus or Pro.
-import { endpointSlug, type EndpointApi, type EndpointPreset, isSignIn, type ModelEndpoint } from "@t3flare/models/endpoints";
+// SPI-1164: one "Sign in with <title>" form per sign-in kind (`SIGN_IN_KINDS`; ChatGPT plan usage first): start, open
+// the authorize link, paste what it gives back (ChatGPT's: the 127.0.0.1 address the browser lands on, a page that does not
+// load), and see the account or why it failed. A sign-in endpoint's card shows its account and token expiry, with Sign
+// out. Each says plainly what is verified of it (its kind's `note`).
+import { endpointSlug, type EndpointApi, type EndpointPreset, isSignIn, type ModelEndpoint, SIGN_IN_KINDS, SIGN_INS, type SignIn } from "@t3flare/models/endpoints";
 
 import type { SignInStatus } from "../credentials/broker.ts";
 import type { SealedMark } from "../credentials/sealed.ts";
@@ -35,10 +36,6 @@ const keyFact = (escape: Escape, endpoint: EndpointsView["endpoints"][number]): 
 /** When, as the page shows times (UTC, to the minute). */
 const when = (ms: number): string => new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " UTC";
 
-/** The plain note beside every ChatGPT sign-in: it is unverified, and needs a paid plan. */
-export const CHATGPT_NOTE =
-  "ChatGPT plan usage is unverified in t3flare: no working sign-in has been seen yet. OpenAI offers it to ChatGPT Plus or Pro plans, for open-source and locally hosted apps. If it fails, please report it with the message shown.";
-
 /** A sign-in's facts: the account, the token's expiry, a sign-in waiting for its paste, the last problem. */
 const signInFacts = (escape: Escape, status: SignInStatus | undefined): string => {
   if (status === undefined) return "";
@@ -49,7 +46,7 @@ const signInFacts = (escape: Escape, status: SignInStatus | undefined): string =
 };
 
 const endpointCard = (escape: Escape, endpoint: EndpointsView["endpoints"][number]): string => {
-  if (isSignIn(endpoint.auth)) return signInCard(escape, endpoint);
+  if (isSignIn(endpoint.auth)) return signInCard(escape, endpoint, endpoint.auth);
   const id = escape(`endpoint-${endpoint.id}`);
   // What the form needs to edit it: never the key, which the endpoint keeps unless a new one is typed.
   const editable = { id: endpoint.id, label: endpoint.label, api: endpoint.api, baseUrl: endpoint.baseUrl, auth: endpoint.auth, headers: endpoint.headers, models: endpoint.models.map((model) => model.id) };
@@ -69,36 +66,39 @@ const endpointCard = (escape: Escape, endpoint: EndpointsView["endpoints"][numbe
 };
 
 /** A sign-in endpoint's card: its account and Sign out (or Sign in again), its models; no key, no Edit of its target. */
-const signInCard = (escape: Escape, endpoint: EndpointsView["endpoints"][number]): string => {
+const signInCard = (escape: Escape, endpoint: EndpointsView["endpoints"][number], kind: SignIn): string => {
+  const signIn = SIGN_IN_KINDS[kind];
   const id = escape(`endpoint-${endpoint.id}`);
   const editable = { id: endpoint.id, label: endpoint.label, api: endpoint.api, baseUrl: endpoint.baseUrl, auth: endpoint.auth, headers: {}, models: endpoint.models.map((model) => model.id) };
   const models = endpoint.models.map((model) => `<li><code>${escape(endpointSlug(endpoint.id, model.id))}</code> ${escape(model.name)}</li>`).join("");
-  const signedIn = endpoint.signIn?.signedIn === true;
-  const action = signedIn
-    ? `<button type="button" class="btn btn-sm" data-sign-in-out="${escape(endpoint.id)}">Sign out</button>`
-    : `<button type="button" class="btn btn-sm btn-primary" data-sign-in-start="${escape(endpoint.id)}" data-sign-in-label="${escape(endpoint.label)}">Sign in with ChatGPT</button>`;
+  const action =
+    endpoint.signIn?.signedIn === true
+      ? `<button type="button" class="btn btn-sm" data-sign-in-out="${escape(endpoint.id)}" data-sign-in-title="${escape(signIn.title)}">Sign out</button>`
+      : `<button type="button" class="btn btn-sm btn-primary" data-sign-in-start="${escape(endpoint.id)}" data-sign-in-kind="${escape(kind)}" data-sign-in-label="${escape(endpoint.label)}">Sign in with ${escape(signIn.title)}</button>`;
   return `<article class="group server" aria-labelledby="${id}" data-endpoint-row="${escape(endpoint.id)}">
-<div class="server-head"><div><div class="server-name"><h3 id="${id}">${escape(endpoint.label)}</h3><span class="ident">${escape(endpoint.id)}</span><span class="tag">ChatGPT plan usage</span></div><p class="server-url">${escape(endpoint.baseUrl)}</p></div>
+<div class="server-head"><div><div class="server-name"><h3 id="${id}">${escape(endpoint.label)}</h3><span class="ident">${escape(endpoint.id)}</span><span class="tag">${escape(signIn.title)} sign-in</span></div><p class="server-url">${escape(endpoint.baseUrl)}</p></div>
 <dl class="facts"><div><dt>Models</dt><dd>${endpoint.models.length}</dd></div>${signInFacts(escape, endpoint.signIn)}</dl></div>
-<p class="desc">${escape(CHATGPT_NOTE)}</p>
+<p class="desc">${escape(signIn.note)}</p>
 <div class="server-actions">${action}<button type="button" class="btn btn-sm" data-endpoint-edit="${escape(JSON.stringify(editable))}">Edit models</button><span class="spacer"></span><button type="button" class="btn btn-sm btn-danger" data-endpoint-remove="${escape(endpoint.id)}" aria-label="Remove ${escape(endpoint.label)}">${icon("trash")}Remove</button></div>
 <details class="tools"${endpoint.models.length <= 12 ? " open" : ""}><summary>${icon("chevron")}Models</summary><ul class="endpoint-models">${models}</ul></details></article>`;
 };
 
-/** "Sign in with ChatGPT": the id and label of its endpoint, the start, then the link to open and the paste field. */
-const signInForm = (escape: Escape, view: EndpointsView): string => {
+/** "Sign in with <title>", one per sign-in kind: its endpoint's id and label, the start, then the link and the paste field. */
+const signInForm = (escape: Escape, view: EndpointsView, kind: SignIn): string => {
   if (view.signIns === undefined) return "";
-  const waiting = Object.entries(view.signIns);
+  const signIn = SIGN_IN_KINDS[kind];
+  const waiting = Object.entries(view.signIns).filter(([, status]) => status.kind === kind || status.kind === null);
   const notes = waiting
     .map(([id, status]) => `<div class="field wide"><dl class="facts"><div><dt>Endpoint</dt><dd><code>${escape(id)}</code></dd></div>${signInFacts(escape, status)}</dl></div>`)
     .join("");
-  return `<form class="group add" id="sign-in-form" data-sign-in-form autocomplete="off" aria-labelledby="sign-in-title">
-<div class="row"><div><div class="row-title"><h3 id="sign-in-title">Sign in with ChatGPT</h3></div><p class="desc">Use your ChatGPT plan's usage for Pi Durable, on OpenAI's Responses API. Start, open the link and approve, then paste the address your browser lands on: a <code>127.0.0.1</code> page that does not load.</p>
-<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>Unverified</strong><p>${escape(CHATGPT_NOTE)}</p></div></div></div></div>
+  const at = (name: string) => escape(`sign-in-${kind}-${name}`);
+  return `<form class="group add" id="${at("form")}" data-sign-in-form data-sign-in-kind="${escape(kind)}" data-sign-in-steps="${escape(signIn.paste.instructions)}" autocomplete="off" aria-labelledby="${at("title")}">
+<div class="row"><div><div class="row-title"><h3 id="${at("title")}">Sign in with ${escape(signIn.title)}</h3></div><p class="desc">${escape(signIn.about)} Start, open the link and approve, then paste what it gives you back here.</p>
+<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>Unverified</strong><p>${escape(signIn.note)}</p></div></div></div></div>
 <div class="form-body">${notes}
-<div class="field"><label for="sign-in-id">Id</label><input id="sign-in-id" name="id" type="text" required pattern="[a-z0-9](?:[a-z0-9\\-]{0,30}[a-z0-9])?" value="${escape(waiting[0]?.[0] ?? "chatgpt")}" autocapitalize="none" spellcheck="false"></div>
-<div class="field"><label for="sign-in-label">Label</label><input id="sign-in-label" name="label" type="text" maxlength="60" value="ChatGPT"></div>
-<div class="field wide" data-sign-in-step${waiting.some(([, status]) => status.pendingSince !== null) ? "" : " hidden"}><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT's sign-in</a></p><label for="sign-in-paste">The address your browser landed on</label><textarea id="sign-in-paste" name="pasted" rows="3" spellcheck="false" placeholder="http://127.0.0.1:1455/auth/callback?code=…"></textarea><p class="hint">It holds a one-time code: paste it here only.</p></div>
+<div class="field"><label for="${at("id")}">Id</label><input id="${at("id")}" name="id" type="text" required pattern="[a-z0-9](?:[a-z0-9\\-]{0,30}[a-z0-9])?" value="${escape(waiting[0]?.[0] ?? kind)}" autocapitalize="none" spellcheck="false"></div>
+<div class="field"><label for="${at("label")}">Label</label><input id="${at("label")}" name="label" type="text" maxlength="60" value="${escape(signIn.title)}"></div>
+<div class="field wide" data-sign-in-step${waiting.some(([, status]) => status.pendingSince !== null) ? "" : " hidden"}><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer" hidden>Open the ${escape(signIn.title)} sign-in</a></p><label for="${at("paste")}">What the sign-in gave you</label><textarea id="${at("paste")}" name="pasted" rows="3" spellcheck="false" placeholder="${escape(signIn.paste.placeholder)}"></textarea><p class="hint">It holds a one-time code: paste it here only.</p></div>
 </div>
 <div class="form-foot"><p data-sign-in-note aria-live="polite"></p><button type="button" class="btn" data-sign-in-start>Start sign-in</button><button type="button" class="btn btn-primary" data-sign-in-finish>Finish sign-in</button></div>
 </form>`;
@@ -117,7 +117,7 @@ const form = (escape: Escape, view: EndpointsView): string => `<form class="grou
 <fieldset class="wide"><legend>Auth</legend><div class="choices">
 <label class="choice"><input type="radio" name="auth" value="api-key" checked><div><strong>API key</strong><span>Sealed, write-only</span></div></label>
 <label class="choice"><input type="radio" name="auth" value="none"><div><strong>None</strong><span>A server that takes no key</span></div></label>
-<label class="choice" hidden><input type="radio" name="auth" value="chatgpt"><div><strong>ChatGPT sign-in</strong><span>Its own sign-in, above</span></div></label>
+${SIGN_INS.map((kind) => `<label class="choice" hidden><input type="radio" name="auth" value="${escape(kind)}"><div><strong>${escape(SIGN_IN_KINDS[kind].title)} sign-in</strong><span>Its own sign-in, above</span></div></label>`).join("")}
 </div></fieldset>
 <div class="field wide" data-endpoint-key><label for="endpoint-key">API key</label><input id="endpoint-key" name="apiKey" type="password" autocomplete="new-password" aria-describedby="endpoint-key-hint"><p class="hint" id="endpoint-key-hint">Never shown again, only its fingerprint. Leave empty to keep the saved one.</p></div>
 <div class="field wide"><label for="endpoint-headers">Headers</label><textarea id="endpoint-headers" name="headers" rows="2" spellcheck="false" placeholder="Name: value, one a line" aria-describedby="endpoint-headers-hint"></textarea><p class="hint" id="endpoint-headers-hint">Sent with every request. Not for credentials: those go in the API key.</p></div>
@@ -140,7 +140,7 @@ export const endpointsSection = (escape: Escape, view: EndpointsView | undefined
 <div class="section-head"><h2 id="endpoints-title">${icon("key")}Model endpoints</h2><a class="btn btn-sm" href="#endpoint-form">${icon("plus")}Add endpoint</a></div>
 <p class="section-desc">Your own ways to reach models: an API pi-ai speaks, at a base URL, with an API key. Pi Durable's picker lists each endpoint's models, grouped by endpoint, beside the Model proxy's. Revision ${view.revision}.</p>
 ${missingKey}<div class="stack">${list}
-${signInForm(escape, view)}
+${SIGN_INS.map((kind) => signInForm(escape, view, kind)).join("\n")}
 ${form(escape, view)}</div>
 </section>`;
 };
@@ -221,56 +221,58 @@ if (endpointForm !== null) {
   });
   showKey();
 }
-const signInForm = document.querySelector("form[data-sign-in-form]");
-if (signInForm !== null) {
-  const field = (name) => signInForm.querySelector("[name=" + name + "]");
-  const note = signInForm.querySelector("[data-sign-in-note]");
-  const step = signInForm.querySelector("[data-sign-in-step]");
-  const link = signInForm.querySelector("[data-sign-in-link]");
+/** One step of a sign-in on the panel's route: its JSON answer, or undefined when the panel refused it (already shown). */
+const signInStep = async (body, control) => {
+  const response = await post("/_t3flare/harness/api/endpoints/sign-in", body, control);
+  busy(control, false);
+  return response === undefined ? undefined : response.json();
+};
+const signInForms = new Map();
+for (const form of document.querySelectorAll("form[data-sign-in-form]")) {
+  const kind = form.dataset.signInKind;
+  const field = (name) => form.querySelector("[name=" + name + "]");
+  const note = form.querySelector("[data-sign-in-note]");
+  const link = form.querySelector("[data-sign-in-link]");
   const start = async (id, label, control) => {
     note.textContent = "Starting…";
-    const response = await post("/_t3flare/harness/api/endpoints/sign-in", { op: "start", id, label }, control);
-    busy(control, false);
-    if (response === undefined) { note.textContent = ""; return; }
-    const answer = await response.json();
+    const answer = await signInStep({ op: "start", id, signIn: kind, label }, control);
+    if (answer === undefined) { note.textContent = ""; return; }
     field("id").value = id;
     field("label").value = label;
     link.href = answer.authorizeUrl;
     link.hidden = false;
-    step.hidden = false;
-    note.textContent = "Open ChatGPT's sign-in and approve. Your browser then lands on a 127.0.0.1 page that does not load: copy its whole address into the field, then Finish.";
-    signInForm.scrollIntoView();
+    form.querySelector("[data-sign-in-step]").hidden = false;
+    note.textContent = form.dataset.signInSteps;
+    form.scrollIntoView();
   };
-  signInForm.querySelector("button[data-sign-in-start]").addEventListener("click", (event) => {
-    if (!signInForm.reportValidity()) return;
+  signInForms.set(kind, start);
+  form.querySelector("button[data-sign-in-start]").addEventListener("click", (event) => {
+    if (!form.reportValidity()) return;
     void start(field("id").value.trim(), field("label").value.trim(), event.currentTarget);
   });
-  for (const button of document.querySelectorAll("article button[data-sign-in-start]")) {
-    button.addEventListener("click", () => void start(button.dataset.signInStart, button.dataset.signInLabel || "ChatGPT", button));
-  }
-  const finish = signInForm.querySelector("[data-sign-in-finish]");
+  const finish = form.querySelector("[data-sign-in-finish]");
   finish.addEventListener("click", async () => {
     const pasted = field("pasted").value.trim();
-    if (pasted === "") { note.textContent = "Paste the address your browser landed on first."; return; }
+    if (pasted === "") { note.textContent = "Paste what the sign-in gave you first."; return; }
     note.textContent = "Finishing the sign-in…";
-    const response = await post("/_t3flare/harness/api/endpoints/sign-in", { op: "complete", id: field("id").value.trim(), label: field("label").value.trim(), pasted }, finish);
-    busy(finish, false);
-    if (response === undefined) { note.textContent = ""; return; }
-    const answer = await response.json();
+    const answer = await signInStep({ op: "complete", id: field("id").value.trim(), label: field("label").value.trim(), pasted }, finish);
+    if (answer === undefined) { note.textContent = ""; return; }
     if (!answer.ok) { note.textContent = "The sign-in failed: " + answer.error; notify("err", "The sign-in failed: " + answer.error); return; }
     field("pasted").value = "";
-    notify("ok", "Signed in as " + (answer.email || "your ChatGPT account") + ": " + answer.models + " models." + (answer.modelsProblem ? " The model list could not be read (" + answer.modelsProblem + "): add models with Edit models." : ""));
+    notify("ok", "Signed in as " + (answer.email || "your account") + ": " + answer.models + " models." + (answer.modelsProblem ? " The model list could not be read (" + answer.modelsProblem + "): add models with Edit models." : ""));
     setTimeout(done, 1500);
   });
+}
+for (const button of document.querySelectorAll("article button[data-sign-in-start]")) {
+  button.addEventListener("click", () => void signInForms.get(button.dataset.signInKind)?.(button.dataset.signInStart, button.dataset.signInLabel, button));
 }
 for (const button of document.querySelectorAll("button[data-sign-in-out]")) {
   button.addEventListener("click", async () => {
     const id = button.dataset.signInOut;
-    if (!confirm("Sign " + id + " out of ChatGPT? Its token is revoked at OpenAI, and its running turns stop.")) return;
-    const response = await post("/_t3flare/harness/api/endpoints/sign-in", { op: "sign-out", id }, button);
-    if (response === undefined) return;
-    const answer = await response.json();
-    notify(answer.revoked ? "ok" : "err", answer.revoked ? "Signed out; OpenAI revoked the sign-in." : "Signed out here, but OpenAI did not confirm the revocation: disconnect t3flare in ChatGPT's settings.");
+    if (!confirm("Sign " + id + " out of " + button.dataset.signInTitle + "? Its running turns stop, and its sign-in is revoked where the vendor allows.")) return;
+    const answer = await signInStep({ op: "sign-out", id }, button);
+    if (answer === undefined) return;
+    notify(answer.revoked ? "ok" : "err", answer.revoked ? "Signed out; the vendor revoked the sign-in." : "Signed out here, but the vendor did not confirm the revocation: disconnect t3flare in your account's settings.");
     setTimeout(done, 1500);
   });
 }

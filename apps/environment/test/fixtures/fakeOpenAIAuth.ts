@@ -42,6 +42,12 @@ export interface FakeOpenAIOptions {
   refreshGate?: Promise<void> | undefined;
   /** A request to the token endpoint fails at the network. */
   tokenDown?: boolean;
+  /** The ID token is wrong in this one way. */
+  idToken?: "bad-signature" | "wrong-iss" | "wrong-aud" | "expired" | "alg-hs256" | undefined;
+  /** The JWKS cannot be fetched. */
+  jwksDown?: boolean;
+  /** Revocation answers this status instead of 200. */
+  revokeStatus?: number | undefined;
 }
 
 export interface FakeOpenAI {
@@ -52,6 +58,10 @@ export interface FakeOpenAI {
   readonly requests: Array<{ readonly url: string; readonly method: string; readonly body: string }>;
   /** Every token the fake issued (access, refresh and ID tokens), for leak scans. */
   readonly issued: Array<string>;
+  /** The access tokens it issued, in order. */
+  readonly accessTokens: Array<string>;
+  /** Everything secret it saw or made: tokens, codes, and each attempt's state, nonce and PKCE verifier. */
+  secrets(): ReadonlyArray<string>;
   readonly counts: { refreshes: number; exchanges: number; revocations: number };
   readonly revoked: Set<string>;
   /** The refresh token the fake honours now, by client. */
@@ -71,15 +81,25 @@ export const fakeOpenAI = async (options: FakeOpenAIOptions = {}): Promise<FakeO
   const refreshTokens = new Map<string, { readonly clientId: string; alive: boolean; readonly sub: string; readonly email: string; readonly scope: string }>();
   const requests: FakeOpenAI["requests"] = [];
   const issued: Array<string> = [];
+  const accessTokens: Array<string> = [];
+  const seen: Array<string> = [];
   const counts = { refreshes: 0, exchanges: 0, revocations: 0 };
   const revoked = new Set<string>();
   const accounts = new Map<string, { readonly sub: string; readonly email: string }>();
   let serial = 0;
   let current: string | undefined;
   const next = (prefix: string) => `${prefix}-${(serial += 1)}-${crypto.randomUUID()}`;
-  const idToken = async (claims: Record<string, unknown>): Promise<string> => {
-    const body = `${encodeJson({ alg: "RS256", kid: "fake-1", typ: "JWT" })}.${encodeJson(claims)}`;
+  const idToken = async (given: Record<string, unknown>): Promise<string> => {
+    const wrong = options.idToken;
+    const claims = {
+      ...given,
+      ...(wrong === "wrong-iss" ? { iss: "https://evil.example" } : {}),
+      ...(wrong === "wrong-aud" ? { aud: "oaiapp_someone-else" } : {}),
+      ...(wrong === "expired" ? { exp: Math.floor(now() / 1000) - 3600 } : {}),
+    };
+    const body = `${encodeJson({ alg: wrong === "alg-hs256" ? "HS256" : "RS256", kid: "fake-1", typ: "JWT" })}.${encodeJson(claims)}`;
     const signature = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", keys.privateKey, new TextEncoder().encode(body)));
+    if (wrong === "bad-signature") signature[0] = signature[0]! ^ 0xff;
     const token = `${body}.${base64url(signature)}`;
     issued.push(token);
     return token;
@@ -88,6 +108,7 @@ export const fakeOpenAI = async (options: FakeOpenAIOptions = {}): Promise<FakeO
     const access = next("at");
     const refresh = next("rt");
     issued.push(access, refresh);
+    accessTokens.push(access);
     refreshTokens.set(refresh, { clientId, sub: account.sub, email: account.email, scope, alive: true });
     current = refresh;
     const seconds = Math.floor(now() / 1000);
@@ -110,10 +131,12 @@ export const fakeOpenAI = async (options: FakeOpenAIOptions = {}): Promise<FakeO
     if (path === FAKE_URLS.discovery) {
       return Response.json({ issuer: ISSUER, authorization_endpoint: FAKE_URLS.authorize, token_endpoint: FAKE_URLS.token, jwks_uri: FAKE_URLS.jwks, revocation_endpoint: FAKE_URLS.revoke });
     }
-    if (path === FAKE_URLS.jwks) return Response.json({ keys: [jwk] });
+    if (path === FAKE_URLS.jwks) return options.jwksDown === true ? new Response("down", { status: 503 }) : Response.json({ keys: [jwk] });
     const form = new URLSearchParams(body);
+    for (const name of ["code", "code_verifier"]) if (form.get(name)) seen.push(form.get(name)!);
     if (path === FAKE_URLS.revoke && method === "POST") {
       counts.revocations += 1;
+      if (options.revokeStatus !== undefined) return new Response("down", { status: options.revokeStatus });
       const token = form.get("token") ?? "";
       revoked.add(token);
       const record = refreshTokens.get(token);
@@ -152,12 +175,15 @@ export const fakeOpenAI = async (options: FakeOpenAIOptions = {}): Promise<FakeO
     options,
     requests,
     issued,
+    accessTokens,
+    secrets: () => [...issued, ...seen, ...codes.keys()],
     counts,
     revoked,
     currentRefresh: () => current,
     approve: (authorizeUrl, account = {}) => {
       const url = new URL(authorizeUrl);
       const params = url.searchParams;
+      for (const name of ["state", "nonce", "code_challenge"]) if (params.get(name)) seen.push(params.get(name)!);
       const requested = params.get("client_id") ?? "";
       const clientId = requested === "dynamic_agent_client" ? `oaiapp_${next("client")}` : requested;
       accounts.set(clientId, { sub: account.sub ?? "user-1", email: account.email ?? "owner@example.com" });

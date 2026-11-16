@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { credentialBroker } from "../src/credentials/broker.ts";
+import { chatgptSignIn } from "../src/credentials/chatgpt.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
 import type { Discovery } from "../src/endpoints/discover.ts";
 import { endpointStore } from "../src/endpoints/store.ts";
@@ -41,7 +42,7 @@ const setup = async () => {
   const now = () => NOW;
   const vendor = await fakeOpenAI({ now });
   const sealed = sealedStore(kv, "e".repeat(64), now);
-  const signIns = credentialBroker({ kv, sealed, vendor: { fetch: vendor.fetch, now }, now });
+  const signIns = credentialBroker({ kv, sealed, vendors: { chatgpt: chatgptSignIn({ fetch: vendor.fetch, now }) }, now });
   const endpoints = endpointStore(kv, sealed, signIns);
   const discovered: Array<{ baseUrl: string; apiKey: string | undefined }> = [];
   const stopped: Array<string> = [];
@@ -77,14 +78,14 @@ const setup = async () => {
   /** Everything a token must never reach: the storage, the audit log, the console. */
   const leaks = () => {
     const places = [JSON.stringify([...kv.map.entries()]), JSON.stringify(store.auditLog(50)), logged.join("\n")];
-    return vendor.issued.filter((token) => places.some((place) => place.includes(token)));
+    return vendor.secrets().filter((token) => places.some((place) => place.includes(token)));
   };
   return { kv, store, vendor, signIns, endpoints, deps, post, page, discovered, stopped, leaks, changes: () => changes, list: (next: Discovery) => void (listed = next) };
 };
 
 /** Start and paste, as the owner does; the answers' texts. */
 const signIn = async (context: Awaited<ReturnType<typeof setup>>) => {
-  const started = await context.post({ op: "start", id: "chatgpt", label: "ChatGPT" });
+  const started = await context.post({ op: "start", id: "chatgpt", signIn: "chatgpt", label: "ChatGPT" });
   const { authorizeUrl } = JSON.parse(started.text) as { authorizeUrl: string };
   const done = await context.post({ op: "complete", id: "chatgpt", label: "ChatGPT", pasted: context.vendor.approve(authorizeUrl, { email: "owner@example.com" }) });
   return { started, done };
@@ -146,7 +147,7 @@ describe("ChatGPT plan usage on the Harness panel", () => {
     const context = await setup();
     await signIn(context);
     const out = await context.post({ op: "sign-out", id: "chatgpt" });
-    expect(JSON.parse(out.text)).toEqual({ ok: true, revoked: true });
+    expect(JSON.parse(out.text)).toEqual({ ok: true, signedOut: true, revoked: true });
     expect(context.vendor.counts.revocations).toBe(1);
     expect(context.stopped).toEqual(["chatgpt"]);
     const target = { api: "openai-responses" as const, baseUrl: "https://api.openai.com/v1", headers: {} };
@@ -154,6 +155,21 @@ describe("ChatGPT plan usage on the Harness panel", () => {
     // The endpoint stays, signed out, for a sign-in again.
     expect(context.endpoints.load().endpoints).toHaveLength(1);
     expect(await context.page()).toContain('data-sign-in-start="chatgpt"');
+    expect(context.leaks()).toEqual([]);
+  });
+
+  it("revokes a fresh grant whose endpoint cannot be saved (32 endpoints already), and says so", async () => {
+    const context = await setup();
+    for (let index = 0; index < 32; index += 1) {
+      const saved = await context.post({ op: "save", endpoint: { id: `e${index}`, label: `E${index}`, api: "openai-completions", baseUrl: "https://llm.example/v1", auth: "none", models: [] } }, "endpoints");
+      expect(saved.status).toBe(200);
+    }
+    const { done } = await signIn(context);
+    expect(JSON.parse(done.text)).toMatchObject({ ok: false, error: expect.stringMatching(/could not be saved \(at most 32 endpoints\), so the sign-in was revoked/) });
+    expect(context.vendor.counts.revocations).toBe(1);
+    expect(context.vendor.revoked.has(context.vendor.currentRefresh()!)).toBe(true);
+    expect(await context.signIns.read("chatgpt")).toBeUndefined();
+    expect(context.endpoints.load().endpoints.some((endpoint) => endpoint.id === "chatgpt")).toBe(false);
     expect(context.leaks()).toEqual([]);
   });
 
@@ -166,6 +182,12 @@ describe("ChatGPT plan usage on the Harness panel", () => {
     expect(context.stopped).toEqual(["chatgpt"]);
     expect(context.signIns.status("chatgpt").clientId).toBeNull();
     expect(context.leaks()).toEqual([]);
+  });
+
+  it("refuses to start without a known sign-in kind", async () => {
+    const context = await setup();
+    expect((await context.post({ op: "start", id: "chatgpt", label: "ChatGPT" })).text).toMatch(/signIn is one of chatgpt/);
+    expect((await context.post({ op: "start", id: "chatgpt", signIn: "nope", label: "ChatGPT" })).status).toBe(400);
   });
 
   it("keeps a sign-in endpoint's auth: no key, no headers, no other target, no switch to a key", async () => {
@@ -184,7 +206,7 @@ describe("ChatGPT plan usage on the Harness panel", () => {
   it("refuses a sign-in under an API-key endpoint's id", async () => {
     const context = await setup();
     await context.post({ op: "save", endpoint: { id: "openai", label: "OpenAI", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api-key", models: [] }, apiKey: "sk-key" }, "endpoints");
-    const started = await context.post({ op: "start", id: "openai", label: "ChatGPT" });
+    const started = await context.post({ op: "start", id: "openai", signIn: "chatgpt", label: "ChatGPT" });
     expect(started.status).toBe(400);
     expect(started.text).toMatch(/already an endpoint with an API key/);
   });
