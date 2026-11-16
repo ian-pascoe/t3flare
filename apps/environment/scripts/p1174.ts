@@ -64,6 +64,26 @@ const finish = (): never => {
 };
 const api = (method: string, pathname: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${pathname}`, body);
 
+// `--scan <dir>`: the leak scan of the evidence (every file in `dir`) for the stage's own secrets, which only this run's
+// environment holds; it prints only which secret names matched where, never a value.
+const scanDir = option("scan");
+if (scanDir !== undefined) {
+  const named = Object.entries({
+    probeKey,
+    adminToken: process.env.T3FLARE_ADMIN_TOKEN ?? "",
+    bootstrapToken: process.env.T3_BOOTSTRAP_TOKEN ?? "",
+    accessSecret: process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "",
+  }).filter(([, value]) => value.length >= 8);
+  const shapes = /sk-ant-[a-z0-9]|sk-proj-|eyJhbGci|Bearer [A-Za-z0-9._-]{20,}/;
+  const files = fs.readdirSync(scanDir).filter((name) => !name.endsWith(".png"));
+  const hits = files.flatMap((name) => {
+    const text = fs.readFileSync(`${scanDir}/${name}`, "utf8");
+    return [...named.filter(([, value]) => text.includes(value)).map(([key]) => `${name}: ${key}`), ...(shapes.test(text) ? [`${name}: a token shape`] : [])];
+  });
+  console.log(JSON.stringify({ scanned: files, secrets: named.map(([key]) => key), hits }, null, 2));
+  process.exit(hits.length === 0 ? 0 : 1);
+}
+
 if (probeKey === "") {
   failures.push("the stage needs its probe (deploy with T3FLARE_PROBE=1)");
   finish();
