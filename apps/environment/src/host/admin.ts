@@ -418,10 +418,23 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
       }
       case "POST /_t3flare/check/leak": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");
-        // SPI-1167: every Model endpoint's key is looked for too (by value in the DO's files, by hash in the Container).
+        // SPI-1167: every Model endpoint's key is looked for too (by value in the DO's files, by hash in the Container);
+        // SPI-1171: every sign-in's access and refresh tokens, as stored.
         const { endpointLeakCredentials } = await import("../endpoints/leak.ts");
-        const credentials = await endpointLeakCredentials({ endpoints: () => environment.modelEndpoints(), target: (endpointId) => environment.modelRelayTarget({ endpointId }) });
-        return json(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck({ credentials }));
+        const credentials = await endpointLeakCredentials({
+          endpoints: () => environment.modelEndpoints(),
+          target: (endpointId) => environment.modelRelayTarget({ endpointId }),
+          signIn: (endpointId) => environment.signInSecrets(endpointId),
+        });
+        // The names looked for (never a value), so a scan's coverage shows.
+        return json({ ...(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck({ credentials })), lookedFor: credentials.map((credential) => credential.name) });
+      }
+      case "POST /_t3flare/check/sign-in-expire": {
+        // SPI-1171 (stages only): a sign-in's access token marked expired, so the next use renews it: a mid-thread
+        // refresh shown without waiting for the token's real expiry. Answers whether it was signed in, never a token.
+        const { environmentServices } = await import("../agents/bindings.ts");
+        if (!environmentServices().faults) return json({ error: "stages only" }, 403);
+        return json({ expired: await environment.expireSignIn(url.searchParams.get("endpoint") ?? "") });
       }
       case "GET /_t3flare/agents/process-state": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");

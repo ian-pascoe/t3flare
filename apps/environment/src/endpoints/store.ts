@@ -34,7 +34,7 @@ import {
 } from "@t3flare/models/endpoints";
 import { knownModel } from "@t3flare/models/known";
 
-import type { CredentialBroker } from "../credentials/broker.ts";
+import type { BrokerAccess, CredentialBroker } from "../credentials/broker.ts";
 import { CredentialsKeyMissing, type SealedMark, type SealedStore } from "../credentials/sealed.ts";
 import type { KvStorage } from "../harness/keys.ts";
 
@@ -49,11 +49,16 @@ export type EndpointSave =
 
 export type EndpointRemove = { readonly ok: true; readonly endpoints: ModelEndpoints; readonly removed: ModelEndpoint } | { readonly ok: false; readonly error: string };
 
-/** An endpoint with its key; `unreadable` when a key is stored that this Environment's credentials key no longer opens. */
+/**
+ * An endpoint with its key; `unreadable` when a key is stored that this Environment's credentials key no longer opens. A
+ * sign-in endpoint's credential is the Credential broker's answer at this call (`signIn`, SPI-1171): its access token,
+ * renewed first when near its expiry, or why not.
+ */
 export interface ResolvedEndpoint {
   readonly endpoint: ModelEndpoint;
   readonly apiKey: string | undefined;
   readonly unreadable: boolean;
+  readonly signIn?: BrokerAccess;
 }
 
 export interface EndpointStore {
@@ -84,6 +89,9 @@ export const modelsWithMetadata = (endpoint: { readonly api: EndpointApi; readon
 
 /** The endpoint as stored. */
 const withMetadata = (input: EndpointInput): ModelEndpoint => ({ ...input, models: modelsWithMetadata(input, input.models) });
+
+/** A sign-in's answer in an Environment with no Credential broker. */
+const NO_BROKER = { ok: false, signedOut: true, problem: "this Environment has no Credential broker" } as const satisfies BrokerAccess;
 
 /** The save in flight, per storage. */
 const saving = new WeakMap<object, Promise<unknown>>();
@@ -169,8 +177,9 @@ export const endpointStore = (kv: KvStorage, sealed: SealedStore, signIns?: Pick
     resolve: async (id) => {
       const endpoint = load().endpoints.find((entry) => entry.id === id);
       if (endpoint === undefined) return undefined;
-      // A sign-in's token is not given here: its only callers are the relay and its leak check, which carry no sign-in
-      // yet (SPI-1171); `relayTargetOf` refuses it.
+      // A sign-in's token is the broker's, asked for now (SPI-1171: the model relay asks at every request, so a token
+      // renewed mid-thread is the next request's), never kept here.
+      if (isSignIn(endpoint.auth)) return { endpoint, apiKey: undefined, unreadable: false, signIn: signIns === undefined ? NO_BROKER : await signIns.access(id) };
       if (endpoint.auth !== "api-key") return { endpoint, apiKey: undefined, unreadable: false };
       const apiKey = await sealed.open(endpointKeyName(id));
       return { endpoint, apiKey, unreadable: apiKey === undefined && keyMark(id).set };
@@ -180,7 +189,7 @@ export const endpointStore = (kv: KvStorage, sealed: SealedStore, signIns?: Pick
       if (endpoint === undefined || !sameTarget(endpoint, target)) return { apiKey: null, changed: true };
       if (endpoint.auth === "none") return { apiKey: null };
       if (isSignIn(endpoint.auth)) {
-        if (signIns === undefined) return { apiKey: null, signedOut: true, problem: "this Environment has no Credential broker" };
+        if (signIns === undefined) return { apiKey: null, signedOut: true, problem: NO_BROKER.problem };
         const access = await signIns.access(endpointId);
         // Where the token goes and the headers it takes, when the token decides (Copilot's): the broker's, never stored here.
         return access.ok

@@ -207,4 +207,31 @@ describe("the Credential broker with a Claude sign-in", () => {
     expect(broker.status("claude")).toMatchObject({ signedIn: false, pendingSince: null });
     scan(kv, vendor);
   });
+
+  // SPI-1171: the leak check looks for a sign-in's tokens in the Container, as stored, without renewing them.
+  it("gives its tokens as stored for the leak check, renewing nothing, and none once signed out", async () => {
+    const { vendor, broker, advance } = setup();
+    await signIn(broker, vendor);
+    advance(HOURS_8 - 60_000);
+    const secrets = await broker.secrets("claude");
+    expect(secrets.map((entry) => entry.name)).toEqual(["sign-in:claude:access", "sign-in:claude:refresh"]);
+    expect(secrets[0]!.value).toBe(vendor.accessTokens[0]);
+    expect(vendor.secrets()).toContain(secrets[1]!.value);
+    expect(vendor.counts.refreshes).toBe(0);
+    await broker.signOut("claude");
+    expect(await broker.secrets("claude")).toEqual([]);
+  });
+
+  // SPI-1171: a stage's hook (`POST /_t3flare/check/sign-in-expire`) proves a mid-thread refresh without waiting 8 h.
+  it("renews at the next use a token marked expired, as at its real expiry", async () => {
+    const { vendor, broker } = setup();
+    await signIn(broker, vendor);
+    expect(await broker.expire("claude")).toBe(true);
+    expect(await broker.access("claude")).toMatchObject({ ok: true, accessToken: vendor.accessTokens[1] });
+    expect(vendor.counts.refreshes).toBe(1);
+    expect(await broker.access("claude")).toMatchObject({ ok: true, accessToken: vendor.accessTokens[1] });
+    expect(vendor.counts.refreshes).toBe(1);
+    await broker.signOut("claude");
+    expect(await broker.expire("claude")).toBe(false);
+  });
 });

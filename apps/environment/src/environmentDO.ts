@@ -496,6 +496,16 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return relayTargetOf(await this.#endpointStore().resolve(endpointId), endpointId);
   }
 
+  /** A sign-in's tokens as the Credential broker holds them, for the admin leak check only (SPI-1171). Renews nothing. */
+  async signInSecrets(endpointId: string): Promise<ReadonlyArray<{ readonly name: string; readonly value: string }>> {
+    return this.#credentialBroker().secrets(endpointId);
+  }
+
+  /** Marks a sign-in's access token expired, so its next use renews it (SPI-1171; the admin route answers on a stage only). */
+  async expireSignIn(endpointId: string): Promise<boolean> {
+    return this.#credentialBroker().expire(endpointId);
+  }
+
   /**
    * Usage records, RPC from the agents Worker (SPI-1173): a Session's, text generation's or the model relay's, each a
    * model answer's counts on a Model endpoint, kept for t3's Usage page (`usage/commissaryCount.ts` `usageRecorder`). Entries

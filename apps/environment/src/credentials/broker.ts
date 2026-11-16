@@ -91,8 +91,12 @@ export type BrokerAccess =
       readonly baseUrl?: string;
       readonly headers?: Readonly<Record<string, string>>;
     }
-  /** `signedOut`: there is no sign-in (sign in again); otherwise a passing failure (retry). */
-  | { readonly ok: false; readonly signedOut: boolean; readonly problem: string };
+  /**
+   * `signedOut`: there is no sign-in (sign in again); otherwise a passing failure (retry), with `retryAt` when the vendor
+   * asked to wait before the next renewal (`earliestRefreshAt`): nothing asks it again before then, so a caller that
+   * retries sooner gets this same answer (the model relay passes it on as `retry-after`, SPI-1171).
+   */
+  | { readonly ok: false; readonly signedOut: boolean; readonly problem: string; readonly retryAt?: number };
 
 /** `waiting`: a device sign-in the owner has not approved yet; ask again after its interval. */
 export type SignInCompletion = { readonly ok: true; readonly status: SignInStatus } | { readonly ok: false; readonly problem: string; readonly waiting?: boolean };
@@ -120,6 +124,16 @@ export interface CredentialBroker extends CredentialStore {
   /** Signs out and forgets everything of the endpoint's sign-in (the endpoint was removed). */
   forget(endpointId: string, options?: SignOutOptions): Promise<{ readonly revoked: boolean }>;
   status(endpointId: string): SignInStatus;
+  /**
+   * The sign-in's tokens as stored, access and refresh, by name (`sign-in:<id>:access`, `…:refresh`), for the admin leak
+   * check to look for in a Container (SPI-1171); none when it is not signed in. Renews nothing.
+   */
+  secrets(endpointId: string): Promise<ReadonlyArray<{ readonly name: string; readonly value: string }>>;
+  /**
+   * Marks the stored access token expired, so the next `access` renews it as at its real expiry (SPI-1171: a stage's hook
+   * proves a mid-thread refresh; the admin route answers only on a stage). False when it is not signed in.
+   */
+  expire(endpointId: string): Promise<boolean>;
   /** Every endpoint id with a sign-in status (signed in, waiting, or with a problem to show). */
   known(): ReadonlyArray<string>;
 }
@@ -228,8 +242,9 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     // Gone (signed out, or refused for a caller ahead of this one), or renewed by a caller ahead of this one.
     if (!isSignedIn(current)) return notSignedIn(endpointId);
     if (fresh(current)) return granted(current.signIn, current);
-    const keep = (problem: string): BrokerAccess => (current.expires > now() ? granted(current.signIn, current) : { ok: false, signedOut: false, problem });
-    if (typeof current.earliestRefreshAt === "number" && current.earliestRefreshAt > now()) return keep("its sign-in cannot be renewed yet");
+    const keep = (problem: string, retryAt?: number): BrokerAccess =>
+      current.expires > now() ? granted(current.signIn, current) : { ok: false, signedOut: false, problem, ...(retryAt === undefined ? {} : { retryAt }) };
+    if (typeof current.earliestRefreshAt === "number" && current.earliestRefreshAt > now()) return keep("its sign-in cannot be renewed yet", current.earliestRefreshAt);
     const vendor = vendors[current.signIn];
     if (vendor === undefined) return keep("this Environment cannot renew this sign-in");
     const renewed = await vendor.refresh(current);
@@ -246,7 +261,7 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
       }
       // Shown on the panel until a renewal succeeds, so it does not read "signed in, renews before" a time gone by.
       setStatus(endpointId, { problem: `${renewed.problem}: it is tried again at the next use`, problemAt: now() });
-      return keep(renewed.problem);
+      return keep(renewed.problem, renewed.retryAt);
     }
     try {
       // Saved before anyone gets the new access token: its rotated refresh token is the only one that works now.
@@ -413,6 +428,23 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     signOut,
     forget: async (endpointId, options) => ({ revoked: (await signOut(endpointId, { ...options, forget: true })).revoked }),
     status,
+    secrets: async (endpointId) => {
+      const stored = await read(endpointId);
+      return isSignedIn(stored)
+        ? [
+            { name: `sign-in:${endpointId}:access`, value: stored.access },
+            { name: `sign-in:${endpointId}:refresh`, value: stored.refresh },
+          ]
+        : [];
+    },
+    expire: (endpointId) =>
+      serial(endpointId, async () => {
+        const stored = await read(endpointId);
+        if (!isSignedIn(stored)) return false;
+        await write(endpointId, { ...stored, expires: now() });
+        log({ endpoint: endpointId, event: "expired-by-hook" });
+        return true;
+      }),
     known: () => kv.get<ReadonlyArray<string>>(INDEX_KEY) ?? [],
   };
 };
