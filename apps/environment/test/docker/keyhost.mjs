@@ -2,7 +2,8 @@
 // - the key route: the model key for the expected nonce only (as the Workspace DO's gate), 403 otherwise;
 // - a CONNECT proxy on :3128, the CLI network's only way out, logging every host it tunnels to;
 // - a resolver on :53 that logs every name asked and answers NXDOMAIN (the CLI network has no route out).
-// - with KEYHOST_MODEL_HANDLE (SPI-1168), a stand-in model relay and Anthropic endpoint under /t3flare/model/.
+// - with KEYHOST_MODEL_HANDLE (SPI-1168), a stand-in model relay and endpoint under /t3flare/model/: Anthropic Messages,
+//   and OpenAI Chat Completions and Responses (SPI-1169).
 // The key is in this process's environment only; every event is one JSON line on stdout, never the key.
 import dgram from "node:dgram";
 import http from "node:http";
@@ -11,13 +12,105 @@ import net from "node:net";
 const KEY = process.env.KEYHOST_MODEL_KEY ?? "";
 const NONCES = new Set((process.env.KEYHOST_NONCES ?? "").split(",").filter((nonce) => nonce !== ""));
 const log = (entry) => console.log(JSON.stringify({ at: Date.now(), ...entry }));
-/** SPI-1168: the model handle the stand-in model relay expects (claudeRelay.docker.test.ts); never logged. */
+/** SPI-1168: the model handle the stand-in model relay expects (claudeRelay and opencodeRelay docker tests); never logged. */
 const HANDLE = process.env.KEYHOST_MODEL_HANDLE ?? "";
 
+/** The shell tool each CLI offers: Claude Code's `Bash`, OpenCode's `shell`. */
+const SHELL_TOOLS = new Set(["Bash", "shell"]);
+const SHELL_INPUT = { command: "env > /workspace/shell-env.txt", description: "Write the environment" };
+
+/** The API a relayed request speaks, by its path: Anthropic Messages, OpenAI Chat Completions or OpenAI Responses. */
+const apiOf = (pathname) => (pathname.endsWith("/chat/completions") ? "completions" : pathname.endsWith("/responses") ? "responses" : "messages");
+
+/** The shell tool's name a request offers, if it offers one and its last message is not a tool result (a new turn). */
+const shellToolOf = (api, parsed) => {
+  const names = (parsed.tools ?? []).map((tool) => tool.name ?? tool.function?.name);
+  const last = api === "responses" ? (Array.isArray(parsed.input) ? parsed.input : []).at(-1) : (parsed.messages ?? []).at(-1);
+  const answered =
+    api === "messages"
+      ? Array.isArray(last?.content) && last.content.some((block) => block.type === "tool_result")
+      : api === "completions"
+        ? last?.role === "tool"
+        : last?.type === "function_call_output";
+  return answered ? undefined : names.find((name) => SHELL_TOOLS.has(name));
+};
+
+const sse = (res) => {
+  res.writeHead(200, { "content-type": "text/event-stream" });
+  return (type, data) => res.write(type === undefined ? `data: ${JSON.stringify(data)}\n\n` : `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
+};
+
+/** Anthropic Messages: the shell tool call, or the text PONG. */
+const answerMessages = (res, parsed, tool) => {
+  const id = `msg_${Date.now()}`;
+  if (parsed.stream !== true) {
+    // A request that does not stream (Claude Code's check of a model it is switched to): one text message.
+    const message = { id, type: "message", role: "assistant", model: parsed.model, content: [{ type: "text", text: "PONG" }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 5, output_tokens: 2 } };
+    return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(message));
+  }
+  const block = tool !== undefined ? { type: "tool_use", id: `toolu_${Date.now()}`, name: tool, input: {} } : { type: "text", text: "" };
+  const delta = tool !== undefined ? { type: "input_json_delta", partial_json: JSON.stringify(SHELL_INPUT) } : { type: "text_delta", text: "PONG" };
+  const event = sse(res);
+  event("message_start", { message: { id, type: "message", role: "assistant", model: parsed.model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 5, output_tokens: 1 } } });
+  event("content_block_start", { index: 0, content_block: block });
+  event("content_block_delta", { index: 0, delta });
+  event("content_block_stop", { index: 0 });
+  event("message_delta", { delta: { stop_reason: tool !== undefined ? "tool_use" : "end_turn", stop_sequence: null }, usage: { output_tokens: 2 } });
+  event("message_stop", {});
+  res.end();
+};
+
+/** OpenAI Chat Completions: the shell tool call, or the text PONG. */
+const answerCompletions = (res, parsed, tool) => {
+  const base = { id: `chatcmpl-${Date.now()}`, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: parsed.model };
+  const usage = { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 };
+  if (parsed.stream !== true) {
+    const message = tool !== undefined ? { role: "assistant", content: null, tool_calls: [{ id: `call_${Date.now()}`, type: "function", function: { name: tool, arguments: JSON.stringify(SHELL_INPUT) } }] } : { role: "assistant", content: "PONG" };
+    return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ...base, object: "chat.completion", choices: [{ index: 0, message, finish_reason: tool !== undefined ? "tool_calls" : "stop" }], usage }));
+  }
+  const event = sse(res);
+  const delta = tool !== undefined ? { role: "assistant", tool_calls: [{ index: 0, id: `call_${Date.now()}`, type: "function", function: { name: tool, arguments: JSON.stringify(SHELL_INPUT) } }] } : { role: "assistant", content: "PONG" };
+  event(undefined, { ...base, choices: [{ index: 0, delta, finish_reason: null }] });
+  event(undefined, { ...base, choices: [{ index: 0, delta: {}, finish_reason: tool !== undefined ? "tool_calls" : "stop" }], usage });
+  res.write("data: [DONE]\n\n");
+  res.end();
+};
+
+/** OpenAI Responses: the shell tool call, or the text PONG. */
+const answerResponses = (res, parsed, tool) => {
+  const id = `resp_${Date.now()}`;
+  const item =
+    tool !== undefined
+      ? { type: "function_call", id: `fc_${Date.now()}`, call_id: `call_${Date.now()}`, name: tool, arguments: JSON.stringify(SHELL_INPUT), status: "completed" }
+      : { type: "message", id: `msg_${Date.now()}`, role: "assistant", status: "completed", content: [{ type: "output_text", text: "PONG", annotations: [] }] };
+  const usage = { input_tokens: 5, output_tokens: 2, total_tokens: 7, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } };
+  const response = (status, output) => ({ id, object: "response", created_at: Math.floor(Date.now() / 1000), status, model: parsed.model, output, ...(status === "completed" ? { usage } : {}) });
+  if (parsed.stream !== true) return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(response("completed", [item])));
+  const event = sse(res);
+  let sequence = 0;
+  const send = (type, data) => event(type, { sequence_number: sequence++, ...data });
+  send("response.created", { response: response("in_progress", []) });
+  if (tool !== undefined) {
+    send("response.output_item.added", { output_index: 0, item: { ...item, arguments: "", status: "in_progress" } });
+    send("response.function_call_arguments.delta", { output_index: 0, item_id: item.id, delta: item.arguments });
+    send("response.function_call_arguments.done", { output_index: 0, item_id: item.id, arguments: item.arguments });
+  } else {
+    send("response.output_item.added", { output_index: 0, item: { ...item, content: [], status: "in_progress" } });
+    send("response.content_part.added", { output_index: 0, item_id: item.id, content_index: 0, part: { type: "output_text", text: "", annotations: [] } });
+    send("response.output_text.delta", { output_index: 0, item_id: item.id, content_index: 0, delta: "PONG" });
+    send("response.output_text.done", { output_index: 0, item_id: item.id, content_index: 0, text: "PONG" });
+    send("response.content_part.done", { output_index: 0, item_id: item.id, content_index: 0, part: item.content[0] });
+  }
+  send("response.output_item.done", { output_index: 0, item });
+  send("response.completed", { response: response("completed", [item]) });
+  res.end();
+};
+
 /**
- * A stand-in model relay and Anthropic Messages endpoint: logs the path, the body's model, whether each key header held
- * the handle; answers a request offering the Bash tool, with no tool result yet, by running
- * `env > /workspace/shell-env.txt` in Bash, and anything else with the text PONG.
+ * A stand-in model relay and endpoint (Anthropic Messages, OpenAI Chat Completions or Responses, by the path): logs the
+ * path, the body's model, the request's header names and whether each key header held the handle; answers a request
+ * offering a shell tool (`Bash`, `shell`), with no tool result yet, by running `env > /workspace/shell-env.txt` in it,
+ * and anything else with the text PONG.
  */
 const relay = (req, res, url) => {
   let body = "";
@@ -27,28 +120,13 @@ const relay = (req, res, url) => {
     try {
       parsed = JSON.parse(body);
     } catch {}
-    const messages = parsed.messages ?? [];
-    const answered = messages.some((message) => Array.isArray(message.content) && message.content.some((block) => block.type === "tool_result"));
-    const bash = parsed.stream === true && !answered && (parsed.tools ?? []).some((tool) => tool.name === "Bash");
-    log({ event: "model-relay", method: req.method, path: url.pathname, model: parsed.model ?? null, apiKeyIsHandle: req.headers["x-api-key"] === HANDLE, bearerIsHandle: req.headers.authorization === `Bearer ${HANDLE}`, bash });
+    const api = apiOf(url.pathname);
+    const tool = shellToolOf(api, parsed);
+    log({ event: "model-relay", method: req.method, path: url.pathname, api, model: parsed.model ?? null, headers: Object.keys(req.headers).sort(), apiKeyIsHandle: req.headers["x-api-key"] === HANDLE, bearerIsHandle: req.headers.authorization === `Bearer ${HANDLE}`, bash: tool !== undefined, tools: (parsed.tools ?? []).map((t) => t.name ?? t.function?.name) });
     if (url.pathname.endsWith("/count_tokens")) return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ input_tokens: 10 }));
-    const id = `msg_${Date.now()}`;
-    if (parsed.stream !== true) {
-      // A request that does not stream (Claude Code's check of a model it is switched to): one text message.
-      const message = { id, type: "message", role: "assistant", model: parsed.model, content: [{ type: "text", text: "PONG" }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 5, output_tokens: 2 } };
-      return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(message));
-    }
-    const block = bash ? { type: "tool_use", id: `toolu_${Date.now()}`, name: "Bash", input: {} } : { type: "text", text: "" };
-    const delta = bash ? { type: "input_json_delta", partial_json: JSON.stringify({ command: "env > /workspace/shell-env.txt", description: "Write the environment" }) } : { type: "text_delta", text: "PONG" };
-    res.writeHead(200, { "content-type": "text/event-stream" });
-    const event = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
-    event("message_start", { message: { id, type: "message", role: "assistant", model: parsed.model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 5, output_tokens: 1 } } });
-    event("content_block_start", { index: 0, content_block: block });
-    event("content_block_delta", { index: 0, delta });
-    event("content_block_stop", { index: 0 });
-    event("message_delta", { delta: { stop_reason: bash ? "tool_use" : "end_turn", stop_sequence: null }, usage: { output_tokens: 2 } });
-    event("message_stop", {});
-    res.end();
+    if (api === "completions") return answerCompletions(res, parsed, tool);
+    if (api === "responses") return answerResponses(res, parsed, tool);
+    answerMessages(res, parsed, tool);
   });
 };
 

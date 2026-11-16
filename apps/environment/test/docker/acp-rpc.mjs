@@ -2,7 +2,9 @@
 // container), runs `initialize` and `session/new`, keeps every `available_commands_update` until `settleMs` passes
 // without one (after the first), optionally sends one prompt, answers the agent's requests with an error (no client
 // file system, no terminal), logs every line to $LOG and prints a summary JSON.
-//   node acp-rpc.mjs '<json {cwd, settleMs?, waitMs?, model?, prompt?, lingerMs?, timeoutMs?}>' -- <command…>
+//   node acp-rpc.mjs '<json {cwd, settleMs?, waitMs?, model?, prompt?, turns?, lingerMs?, timeoutMs?}>' -- <command…>
+// `turns` (SPI-1169): prompts in the same session after the first, each on its own model (`{model, prompt}`); their stop
+// reasons and errors in `summary.turns`.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 
@@ -95,6 +97,21 @@ try {
       sleep(Math.max(deadline - Date.now(), 0)).then(() => ({ stopReason: "probe timeout" })),
     ]);
     summary.stopReason = result?.stopReason ?? null;
+    summary.turns = [];
+    for (const turn of scenario.turns ?? []) {
+      const entry = { model: turn.model, stopReason: null, error: null };
+      try {
+        await request("session/set_config_option", { sessionId: summary.sessionId, configId: "model", value: turn.model });
+        const answer = await Promise.race([
+          request("session/prompt", { sessionId: summary.sessionId, prompt: [{ type: "text", text: turn.prompt }] }),
+          sleep(Math.max(deadline - Date.now(), 0)).then(() => ({ stopReason: "probe timeout" })),
+        ]);
+        entry.stopReason = answer?.stopReason ?? null;
+      } catch (error) {
+        entry.error = error.rpc ?? String(error);
+      }
+      summary.turns.push(entry);
+    }
     // The container stays up a while after the prompt, for a watcher inside it (claudeRelay.docker.test.ts).
     if (scenario.lingerMs !== undefined) await sleep(scenario.lingerMs);
   }
