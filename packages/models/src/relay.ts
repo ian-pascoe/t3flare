@@ -3,7 +3,7 @@
 // their key. The Workers check the handle, swap in the endpoint's own credential and stream the request to the
 // endpoint's base URL unchanged. These are the pieces both Workers share: the route, the handle's variable, and what the
 // Environment answers for an endpoint (its target with the credential in its header). A CLI adds only its own config.
-import { ENDPOINT_APIS, type EndpointApi, type ModelEndpoint, type ModelEndpoints } from "./endpoints.ts";
+import { ENDPOINT_APIS, type EndpointApi, isSignIn, type ModelEndpoint, type ModelEndpoints } from "./endpoints.ts";
 
 /** The relay's path prefix in the Container's egress host. */
 export const MODEL_RELAY_PREFIX = "/t3flare/model/";
@@ -40,9 +40,12 @@ export interface RelayedEndpoint {
   readonly label: string;
 }
 
-/** The endpoints that speak `api`, in the owner's order: those a CLI that speaks it reaches through the relay. */
+/**
+ * The endpoints that speak `api`, in the owner's order: those a CLI that speaks it reaches through the relay. A sign-in
+ * endpoint (SPI-1164) is not among them: the relay carries no sign-in's token yet (SPI-1171).
+ */
 export const endpointsOfApi = (endpoints: ModelEndpoints | undefined, api: EndpointApi): ReadonlyArray<ModelEndpoint> =>
-  (endpoints?.endpoints ?? []).filter((endpoint) => endpoint.api === api);
+  (endpoints?.endpoints ?? []).filter((endpoint) => endpoint.api === api && !isSignIn(endpoint.auth));
 
 // What each API knows of keys and headers, in one place: the header its key goes in, and the request headers a CLI's
 // client sends that the endpoint needs. The relay takes a handle from the key headers and forwards only the allowed
@@ -94,6 +97,7 @@ export type ModelRelayTarget =
 export const relayTargetOf = (resolved: { readonly endpoint: ModelEndpoint; readonly apiKey: string | undefined; readonly unreadable: boolean } | undefined, endpointId: string): ModelRelayTarget => {
   if (resolved === undefined) return { ok: false, status: 404, message: `no Model endpoint ${endpointId}: it was removed, or never saved` };
   const { endpoint, apiKey } = resolved;
+  if (isSignIn(endpoint.auth)) return { ok: false, status: 501, message: `the Model endpoint ${endpointId} is a sign-in, which the model relay does not carry yet` };
   if (endpoint.auth === "none") return { ok: true, api: endpoint.api, baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers }, key: null };
   if (apiKey === undefined) {
     return {

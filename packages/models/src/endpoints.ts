@@ -7,11 +7,30 @@
 // id never changes, so a slug stays valid as long as the endpoint keeps the model. A model id may itself hold a `/`
 // (OpenRouter's `anthropic/claude-…`): the slug splits at its first one.
 
-/** The pi-ai APIs an endpoint may speak with an API key (or none). OAuth sign-ins' APIs are SPI-1164's. */
+/** The pi-ai APIs an endpoint may speak. A sign-in fixes its endpoint's API (`SIGN_IN_TARGETS`). */
 export const ENDPOINT_APIS = ["anthropic-messages", "openai-responses", "openai-completions", "google-generative-ai", "mistral-conversations"] as const;
 export type EndpointApi = (typeof ENDPOINT_APIS)[number];
 
-export type EndpointAuth = "api-key" | "none";
+/**
+ * The OAuth sign-ins an endpoint may have instead of a key (SPI-1164): the Credential broker (the Environment DO) holds
+ * the sign-in's tokens and is their only refresher; a Session asks it for an access token at use time.
+ * - `chatgpt`: ChatGPT plan usage through "Sign in with ChatGPT", on OpenAI's public Responses API.
+ */
+export const SIGN_INS = ["chatgpt"] as const;
+export type SignIn = (typeof SIGN_INS)[number];
+
+export type EndpointAuth = "api-key" | "none" | SignIn;
+
+/** Whether an endpoint's auth is a sign-in (its credential is the broker's), not a key or none. */
+export const isSignIn = (auth: EndpointAuth): auth is SignIn => (SIGN_INS as ReadonlyArray<string>).includes(auth);
+
+/** Where each sign-in's tokens may go: the endpoint's API and base URL are the sign-in's, never the owner's. */
+export const SIGN_IN_TARGETS: Readonly<Record<SignIn, { readonly api: EndpointApi; readonly baseUrl: string; readonly title: string }>> = {
+  chatgpt: { api: "openai-responses", baseUrl: "https://api.openai.com/v1", title: "ChatGPT" },
+};
+
+// pi-ai's credential types, which the Credential broker implements (type-only: no pi-ai in the Environment's bundle).
+export type { Credential, CredentialStore, OAuthCredential } from "@earendil-works/pi-ai";
 
 /** What a model costs, in dollars per million tokens (pi-ai's `ModelCost` without its tiers). */
 export interface EndpointModelCost {
@@ -201,6 +220,12 @@ export interface EndpointCredential {
   readonly apiKey: string | null;
   readonly unreadable?: boolean;
   readonly changed?: boolean;
+  /** A sign-in's access token: when it expires (ms). The Session keeps it no later than shortly before. */
+  readonly expiresAt?: number;
+  /** A sign-in endpoint that is not signed in (never, signed out, or its renewal refused): sign in again. */
+  readonly signedOut?: boolean;
+  /** Why a sign-in gave no token, as the broker says it (a fixed text, never a token). */
+  readonly problem?: string;
 }
 
 /** A Session's request for an endpoint's key: the endpoint, and the target it will send the key to. */
@@ -292,7 +317,13 @@ export const validateEndpoint = (value: unknown): { readonly ok: true; readonly 
   if ("problem" in base) return { ok: false, error: base.problem };
   const baseUrl = base.url;
   const auth = value.auth ?? "api-key";
-  if (auth !== "api-key" && auth !== "none") return { ok: false, error: "auth is api-key or none" };
+  if (auth !== "api-key" && auth !== "none" && !(SIGN_INS as ReadonlyArray<unknown>).includes(auth)) return { ok: false, error: `auth is api-key, none or a sign-in (${SIGN_INS.join(", ")})` };
+  if (isSignIn(auth as EndpointAuth)) {
+    // A sign-in's tokens go only to its own API at its own base URL, with no header of the owner's.
+    const target = SIGN_IN_TARGETS[auth as SignIn];
+    if (value.api !== target.api || baseUrl !== target.baseUrl) return { ok: false, error: `a ${target.title} sign-in's endpoint is ${target.api} at ${target.baseUrl}` };
+    if (isRecord(value.headers) && Object.keys(value.headers).length > 0) return { ok: false, error: `a ${target.title} sign-in's endpoint has no headers of its own` };
+  }
   const headers: Record<string, string> = {};
   const given = value.headers ?? {};
   if (!isRecord(given)) return { ok: false, error: "headers is an object of names to values" };
@@ -316,5 +347,5 @@ export const validateEndpoint = (value: unknown): { readonly ok: true; readonly 
     if (models.some((other) => other.id === model.id)) return { ok: false, error: `the model ${model.id} is listed twice` };
     models.push(model);
   }
-  return { ok: true, endpoint: { id, label, api: value.api as EndpointApi, baseUrl, auth, headers, models } };
+  return { ok: true, endpoint: { id, label, api: value.api as EndpointApi, baseUrl, auth: auth as EndpointAuth, headers, models } };
 };

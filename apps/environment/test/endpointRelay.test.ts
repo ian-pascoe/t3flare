@@ -51,6 +51,12 @@ describe("the model relay's target", () => {
     expect(await target(store, "local")).toEqual({ ok: true, api: "openai-responses", baseUrl: "https://models.example.com/v1", headers: {}, key: null });
   });
 
+  it("refuses a sign-in endpoint (SPI-1164): the relay carries no sign-in's token yet", async () => {
+    const { store } = setup();
+    await store.save({ id: "chatgpt", label: "ChatGPT", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "chatgpt", models: ["gpt-5-mini"] }, {});
+    expect(await target(store, "chatgpt")).toEqual({ ok: false, status: 501, message: expect.stringMatching(/sign-in/) });
+  });
+
   it("refuses an endpoint that is gone (404) or whose key no longer opens (503), naming no key", async () => {
     const { kv, store } = setup();
     expect(await target(store, "openai")).toMatchObject({ ok: false, status: 404 });

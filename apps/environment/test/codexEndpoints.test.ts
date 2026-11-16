@@ -12,6 +12,8 @@ const endpoints: ModelEndpoints = {
     { id: "openai", label: "OpenAI", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api-key", headers: {}, models: [model("gpt-5-mini")] },
     { id: "claude", label: "Anthropic", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "api-key", headers: {}, models: [model("claude-haiku-5-5")] },
     { id: "gw", label: "Anthropic", api: "openai-responses", baseUrl: "https://gw.example.com/v1", auth: "none", headers: {}, models: [model("m1")] },
+    // A sign-in endpoint is not relayed yet (SPI-1171): Codex does not list it.
+    { id: "chatgpt", label: "ChatGPT", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "chatgpt", headers: {}, models: [model("gpt-6.1-sol")] },
   ],
 };
 const proxy = [{ slug: "gemini-3-flash", name: "Gemini 3 Flash", subProvider: "Anthropic", isCustom: false, capabilities: { optionDescriptors: [] } }];
