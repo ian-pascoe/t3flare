@@ -58,9 +58,14 @@ export interface FakeOpenAI {
   currentRefresh(): string | undefined;
 }
 
+/** One RSA key pair for every fake in a test file: making one is slow, and the tests run side by side with others. */
+let kept: Promise<CryptoKeyPair> | undefined;
+const signingKeys = (): Promise<CryptoKeyPair> =>
+  (kept ??= crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]) as Promise<CryptoKeyPair>);
+
 export const fakeOpenAI = async (options: FakeOpenAIOptions = {}): Promise<FakeOpenAI> => {
   const now = options.now ?? Date.now;
-  const keys = (await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"])) as CryptoKeyPair;
+  const keys = await signingKeys();
   const jwk = { ...(await crypto.subtle.exportKey("jwk", keys.publicKey)), kid: "fake-1", alg: "RS256", use: "sig" };
   const codes = new Map<string, IssuedCode>();
   const refreshTokens = new Map<string, { readonly clientId: string; alive: boolean; readonly sub: string; readonly email: string; readonly scope: string }>();
