@@ -1,6 +1,7 @@
 // What the Credential broker (broker.ts) needs of each sign-in's vendor (SPI-1164): start an attempt, complete it with
-// the owner's paste, refresh, revoke. ChatGPT plan usage is the first (chatgpt.ts `chatgptSignIn`); Claude and Copilot
-// (SPI-1165, SPI-1166) add theirs, one entry each in the broker's `vendors`, keyed as `SIGN_IN_KINDS`.
+// the owner's paste, refresh, revoke. ChatGPT plan usage is the first (chatgpt.ts `chatgptSignIn`), a Claude plan the
+// second (claude.ts `claudeSignIn`, SPI-1165; its `revoke` never confirms: Anthropic offers no revocation); Copilot
+// (SPI-1166) adds its own, one entry each in the broker's `vendors`, keyed as `SIGN_IN_KINDS`.
 
 /**
  * A signed-in credential, in pi-ai's `OAuthCredential` shape (`{ type: "oauth", access, refresh, expires, …extras }`).

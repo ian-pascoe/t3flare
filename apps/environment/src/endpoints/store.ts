@@ -13,6 +13,7 @@
 // A sign-in endpoint (SPI-1164) has no key: its tokens are the Credential broker's (credentials/broker.ts), and a
 // Session's request for its credential gets the broker's access token, again only for the endpoint's target now. Its API
 // and base URL are the sign-in's own, it has no headers, and its auth never changes (remove it to change it).
+import { CLAUDE_OAUTH_TOKEN_MARK } from "@t3flare/models/claudeOAuth";
 import {
   EMPTY_ENDPOINTS,
   type EndpointApi,
@@ -103,7 +104,12 @@ export const endpointStore = (kv: KvStorage, sealed: SealedStore, signIns?: Pick
       }
       if (isSignIn(valid.endpoint.auth)) return given === undefined ? undefined : "a sign-in endpoint takes no API key: its credential is its sign-in";
       if (valid.endpoint.auth === "none") return given === undefined ? undefined : "an endpoint with no auth takes no API key";
-      if (given !== undefined) return given.length > 4096 || /\s/.test(given) ? "the API key is one word of up to 4096 characters" : undefined;
+      if (given !== undefined) {
+        if (given.length > 4096 || /\s/.test(given)) return "the API key is one word of up to 4096 characters";
+        // pi-ai sends such a token with Claude Code's request shape (SPI-1165), which only a Claude sign-in's requests take;
+        // and a subscription's token renews only through its sign-in here (ADR-0018: never copied in from elsewhere).
+        return given.includes(CLAUDE_OAUTH_TOKEN_MARK) ? "that is a Claude subscription's token, not an API key: use Sign in with Claude instead" : undefined;
+      }
       // Keyless: only an existing API-key endpoint keeps its key, and only at the same target.
       if (seen === undefined || seen.auth !== "api-key" || !keyMark(id).set) return "an API-key endpoint needs its API key";
       if (!sameTarget(seen, valid.endpoint)) return "a new API, base URL or header needs the API key entered again: the saved key goes only where it was saved for";

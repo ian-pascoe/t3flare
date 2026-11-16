@@ -15,8 +15,9 @@ export type EndpointApi = (typeof ENDPOINT_APIS)[number];
  * The OAuth sign-ins an endpoint may have instead of a key (SPI-1164): the Credential broker (the Environment DO) holds
  * the sign-in's tokens and is their only refresher; a Session asks it for an access token at use time.
  * - `chatgpt`: ChatGPT plan usage through "Sign in with ChatGPT", on OpenAI's public Responses API.
+ * - `claude`: a Claude Pro or Max plan through Claude Code's OAuth sign-in, on Anthropic's Messages API (SPI-1165).
  */
-export const SIGN_INS = ["chatgpt"] as const;
+export const SIGN_INS = ["chatgpt", "claude"] as const;
 export type SignIn = (typeof SIGN_INS)[number];
 
 export type EndpointAuth = "api-key" | "none" | SignIn;
@@ -30,6 +31,8 @@ export interface SignInKind {
   readonly baseUrl: string;
   /** The vendor's name as messages use it: "is not signed in to <title>", "Sign in with <title>". */
   readonly title: string;
+  /** The title of the panel's note: what the owner should weigh before signing in. */
+  readonly caution: string;
   /** The panel's plain note beside the sign-in (what is verified of it, and what it needs). */
   readonly note: string;
   /** What a refused request on it most likely means, after "refused its <title> sign-in (HTTP n): ". */
@@ -38,6 +41,13 @@ export interface SignInKind {
   readonly about: string;
   /** What the owner pastes back after approving, and how the panel asks for it. */
   readonly paste: { readonly instructions: string; readonly placeholder: string };
+  /**
+   * Null when sign-out revokes the grant at the vendor; otherwise the vendor offers no revocation, and this says where the
+   * owner removes the grant, which stays on the account until then.
+   */
+  readonly revocation: string | null;
+  /** Headers the vendor needs beside the bearer token to list the sign-in's models. */
+  readonly listHeaders: Readonly<Record<string, string>>;
 }
 
 /**
@@ -49,6 +59,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     api: "openai-responses",
     baseUrl: "https://api.openai.com/v1",
     title: "ChatGPT",
+    caution: "Unverified",
     note: "ChatGPT plan usage is unverified in t3flare: no working sign-in has been seen yet. OpenAI offers it to ChatGPT Plus or Pro plans, for open-source and locally hosted apps. If it fails, please report it with the message shown.",
     refused: "ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.",
     about: "Use your ChatGPT plan's usage for Pi Durable, on OpenAI's Responses API.",
@@ -56,8 +67,32 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
       instructions: "Open the sign-in and approve. Your browser then lands on a 127.0.0.1 page that does not load: copy its whole address into the field, then Finish.",
       placeholder: "http://127.0.0.1:1455/auth/callback?code=…",
     },
+    revocation: null,
+    listHeaders: {},
+  },
+  claude: {
+    api: "anthropic-messages",
+    baseUrl: "https://api.anthropic.com",
+    title: "Claude",
+    caution: "Your risk",
+    note: "This signs in as Claude Code, with its OAuth client, as pi-ai does. Anthropic's terms may not allow a Claude plan's usage outside its own apps: that risk is yours, chosen knowingly. It needs a Claude Pro or Max plan. Anthropic offers no revocation to apps, so signing out here does not end the grant: remove it at claude.ai, under Settings, Claude Code.",
+    refused: "a Claude Pro or Max plan is needed; otherwise sign in with Claude again in the Harness panel.",
+    about: "Use your Claude Pro or Max plan's usage for Pi Durable, on Anthropic's Messages API.",
+    paste: {
+      instructions: "Open the sign-in and approve. Anthropic then shows a code: copy all of it (it holds a #) into the field, then Finish.",
+      placeholder: "code#state",
+    },
+    revocation: "Anthropic offers no revocation to apps: the grant stays on your Claude account until you remove it at claude.ai, under Settings, Claude Code (Authorization tokens).",
+    // Anthropic takes a Claude sign-in's token as a bearer only with its OAuth beta (SPI-1161 Q4).
+    listHeaders: { "anthropic-beta": "oauth-2025-04-20" },
   },
 };
+
+/** The headers that carry a `kind` sign-in's access token to its vendor, for its model list. */
+export const signInHeaders = (kind: SignIn, accessToken: string): Readonly<Record<string, string>> => ({
+  ...SIGN_IN_KINDS[kind].listHeaders,
+  authorization: `Bearer ${accessToken}`,
+});
 
 /** An endpoint's sign-in facts, or undefined for a key or no auth. */
 export const signInOf = (auth: EndpointAuth): SignInKind | undefined => (isSignIn(auth) ? SIGN_IN_KINDS[auth] : undefined);

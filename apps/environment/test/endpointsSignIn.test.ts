@@ -7,12 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { credentialBroker } from "../src/credentials/broker.ts";
 import { chatgptSignIn } from "../src/credentials/chatgpt.ts";
+import { claudeSignIn } from "../src/credentials/claude.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
 import type { Discovery } from "../src/endpoints/discover.ts";
 import { endpointStore } from "../src/endpoints/store.ts";
 import { csrfToken } from "../src/harness/csrf.ts";
 import { CSRF_HEADER, handleHarness, type HarnessCaller, type HarnessDeps } from "../src/harness/panel.ts";
 import { harnessStore } from "../src/harness/store.ts";
+import { fakeAnthropic } from "./fixtures/fakeAnthropicAuth.ts";
 import { fakeOpenAI } from "./fixtures/fakeOpenAIAuth.ts";
 
 const HOST = "t3.example.dev";
@@ -41,10 +43,11 @@ const setup = async () => {
   const store = harnessStore(kv);
   const now = () => NOW;
   const vendor = await fakeOpenAI({ now });
+  const anthropic = fakeAnthropic();
   const sealed = sealedStore(kv, "e".repeat(64), now);
-  const signIns = credentialBroker({ kv, sealed, vendors: { chatgpt: chatgptSignIn({ fetch: vendor.fetch, now }) }, now });
+  const signIns = credentialBroker({ kv, sealed, vendors: { chatgpt: chatgptSignIn({ fetch: vendor.fetch, now }), claude: claudeSignIn({ fetch: anthropic.fetch, now }) }, now });
   const endpoints = endpointStore(kv, sealed, signIns);
-  const discovered: Array<{ baseUrl: string; apiKey: string | undefined }> = [];
+  const discovered: Array<{ baseUrl: string; apiKey: string | undefined; headers: Readonly<Record<string, string>> }> = [];
   const stopped: Array<string> = [];
   let listed: Discovery = { ok: true, models: [{ id: "gpt-6.1-sol", name: "GPT-6.1 Sol" }, { id: "gpt-5-mini" }] };
   let changes = 0;
@@ -57,7 +60,7 @@ const setup = async () => {
       store: endpoints,
       signIns,
       discover: async (target, apiKey) => {
-        discovered.push({ baseUrl: target.baseUrl, apiKey });
+        discovered.push({ baseUrl: target.baseUrl, apiKey, headers: target.headers });
         return listed;
       },
       changed: () => void changes++,
@@ -78,9 +81,9 @@ const setup = async () => {
   /** Everything a token must never reach: the storage, the audit log, the console. */
   const leaks = () => {
     const places = [JSON.stringify([...kv.map.entries()]), JSON.stringify(store.auditLog(50)), logged.join("\n")];
-    return vendor.secrets().filter((token) => places.some((place) => place.includes(token)));
+    return [...vendor.secrets(), ...anthropic.secrets()].filter((token) => places.some((place) => place.includes(token)));
   };
-  return { kv, store, vendor, signIns, endpoints, deps, post, page, discovered, stopped, leaks, changes: () => changes, list: (next: Discovery) => void (listed = next) };
+  return { kv, store, vendor, anthropic, signIns, endpoints, deps, post, page, discovered, stopped, leaks, changes: () => changes, list: (next: Discovery) => void (listed = next) };
 };
 
 /** Start and paste, as the owner does; the answers' texts. */
@@ -111,7 +114,7 @@ describe("ChatGPT plan usage on the Harness panel", () => {
     expect(endpoint).toMatchObject({ id: "chatgpt", label: "ChatGPT", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "chatgpt", headers: {} });
     expect(endpoint!.models.map((model) => model.id)).toEqual(["gpt-6.1-sol", "gpt-5-mini"]);
     // The list was read at OpenAI with the sign-in's access token.
-    expect(context.discovered).toEqual([{ baseUrl: "https://api.openai.com/v1", apiKey: context.vendor.issued[0] }]);
+    expect(context.discovered).toEqual([{ baseUrl: "https://api.openai.com/v1", apiKey: undefined, headers: { authorization: `Bearer ${context.vendor.issued[0]}` } }]);
     expect(context.changes()).toBe(1);
     const html = await context.page();
     expect(html).toContain("owner@example.com");
@@ -209,5 +212,112 @@ describe("ChatGPT plan usage on the Harness panel", () => {
     const started = await context.post({ op: "start", id: "openai", signIn: "chatgpt", label: "ChatGPT" });
     expect(started.status).toBe(400);
     expect(started.text).toMatch(/already an endpoint with an API key/);
+  });
+});
+
+/** Start and paste a Claude sign-in, as the owner does: the code Anthropic's page shows. */
+const claudeSignInFlow = async (context: Awaited<ReturnType<typeof setup>>) => {
+  const started = await context.post({ op: "start", id: "claude", signIn: "claude", label: "Claude" });
+  const { authorizeUrl } = JSON.parse(started.text) as { authorizeUrl: string };
+  const shown = context.anthropic.approve(authorizeUrl, { email: "owner@example.com" });
+  // While the attempt waits for its paste, nothing secret of it is on the page, in the audit or in the storage.
+  const waiting = await context.page();
+  expect(context.leaks()).toEqual([]);
+  for (const secret of context.anthropic.secrets()) expect(waiting).not.toContain(secret);
+  const done = await context.post({ op: "complete", id: "claude", label: "Claude", pasted: shown });
+  return { started, done, waiting };
+};
+
+const CLAUDE_TARGET = { api: "anthropic-messages" as const, baseUrl: "https://api.anthropic.com", headers: {} };
+
+describe("Claude on the Harness panel (SPI-1165)", () => {
+  it("offers the sign-in with its note: the owner's terms-of-service risk, a Pro or Max plan, no revocation", async () => {
+    const html = await (await setup()).page();
+    expect(html).toContain('data-sign-in-kind="claude"');
+    expect(html).toContain("Sign in with Claude");
+    expect(html).toContain("Your risk");
+    expect(html).toMatch(/Anthropic&#39;s terms may not allow|Anthropic's terms may not allow/);
+    expect(html).toMatch(/Pro or Max/);
+    expect(html).toMatch(/claude\.ai/);
+  });
+
+  it("starts at claude.ai, takes the pasted code, and saves a Claude endpoint with the models its token lists", async () => {
+    const context = await setup();
+    context.list({ ok: true, models: [{ id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5" }, { id: "claude-haiku-5-5" }] });
+    const { started, done, waiting } = await claudeSignInFlow(context);
+    expect(JSON.parse(started.text).authorizeUrl).toMatch(/^https:\/\/claude\.ai\/oauth\/authorize\?/);
+    expect(waiting).toMatch(/waiting for its paste/);
+    expect(JSON.parse(done.text)).toMatchObject({ ok: true, email: "owner@example.com", models: 2 });
+    const [endpoint] = context.endpoints.load().endpoints;
+    expect(endpoint).toMatchObject({ id: "claude", label: "Claude", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "claude", headers: {} });
+    // The list was read at Anthropic with the sign-in's token as a bearer, with its OAuth beta.
+    expect(context.discovered).toEqual([
+      { baseUrl: "https://api.anthropic.com", apiKey: undefined, headers: { authorization: `Bearer ${context.anthropic.accessTokens[0]}`, "anthropic-beta": "oauth-2025-04-20" } },
+    ]);
+    const html = await context.page();
+    expect(html).toContain("owner@example.com");
+    expect(html).toContain('data-sign-in-out="claude"');
+    expect(html).toContain("data-sign-in-revocation=");
+    expect(context.store.auditLog(5).map((entry) => entry.action)).toEqual(["endpoint.sign-in", "endpoint.sign-in.start"]);
+    expect(context.leaks()).toEqual([]);
+    for (const secret of context.anthropic.secrets()) expect(html + done.text).not.toContain(secret);
+    // The start's answer is the authorize URL (its state and challenge are the browser's to carry), and no token.
+    for (const token of context.anthropic.issued) expect(started.text).not.toContain(token);
+  });
+
+  it("gives a Session the token for the endpoint's target only", async () => {
+    const context = await setup();
+    await claudeSignInFlow(context);
+    expect(await context.endpoints.credential({ endpointId: "claude", target: CLAUDE_TARGET })).toEqual({ apiKey: context.anthropic.accessTokens[0], expiresAt: NOW + 28_800_000 });
+    expect(await context.endpoints.credential({ endpointId: "claude", target: { ...CLAUDE_TARGET, baseUrl: "https://gw.example" } })).toEqual({ apiKey: null, changed: true });
+    // The relay does not carry a sign-in yet (SPI-1171).
+    expect((await context.endpoints.resolve("claude"))?.apiKey).toBeUndefined();
+  });
+
+  it("refuses another attempt's code at once, and keeps the attempt waiting", async () => {
+    const context = await setup();
+    const first = JSON.parse((await context.post({ op: "start", id: "claude", signIn: "claude" })).text) as { authorizeUrl: string };
+    const stale = context.anthropic.approve(first.authorizeUrl);
+    await context.post({ op: "start", id: "claude", signIn: "claude" });
+    const done = await context.post({ op: "complete", id: "claude", pasted: stale });
+    expect(JSON.parse(done.text)).toMatchObject({ ok: false, error: expect.stringMatching(/does not belong to the sign-in in progress/) });
+    expect(context.anthropic.counts.exchanges).toBe(0);
+    expect(context.signIns.status("claude").pendingSince).not.toBeNull();
+    expect(context.leaks()).toEqual([]);
+  });
+
+  it("signs out: the tokens deleted here and the Sessions stopped; nothing sent to Anthropic, and the answer says where to remove the grant", async () => {
+    const context = await setup();
+    await claudeSignInFlow(context);
+    const sent = context.anthropic.requests.length;
+    const out = JSON.parse((await context.post({ op: "sign-out", id: "claude" })).text) as Record<string, unknown>;
+    expect(out).toMatchObject({ ok: true, signedOut: true, revoked: false, revocation: expect.stringMatching(/claude\.ai, under Settings, Claude Code/) });
+    expect(context.anthropic.requests).toHaveLength(sent);
+    expect(context.stopped).toEqual(["claude"]);
+    expect(await context.endpoints.credential({ endpointId: "claude", target: CLAUDE_TARGET })).toMatchObject({ apiKey: null, signedOut: true });
+    expect(await context.page()).toContain('data-sign-in-start="claude"');
+    expect(context.leaks()).toEqual([]);
+  });
+
+  it("removing a signed-in Claude endpoint signs it out and says the grant stays at claude.ai", async () => {
+    const context = await setup();
+    await claudeSignInFlow(context);
+    const removed = JSON.parse((await context.post({ op: "remove", id: "claude" }, "endpoints")).text) as Record<string, unknown>;
+    expect(removed).toMatchObject({ ok: true, revocation: expect.stringMatching(/claude\.ai/) });
+    expect(context.stopped).toEqual(["claude"]);
+    expect(await context.signIns.read("claude")).toBeUndefined();
+    expect(context.leaks()).toEqual([]);
+  });
+
+  it("refuses a Claude subscription's token as an API-key endpoint's key: only a Claude sign-in sends Claude Code's request shape", async () => {
+    const context = await setup();
+    const saved = await context.post(
+      { op: "save", endpoint: { id: "anthropic-api", label: "Anthropic", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "api-key", models: [] }, apiKey: "sk-ant-oat01-copied" },
+      "endpoints",
+    );
+    expect(saved.status).toBe(400);
+    expect(saved.text).toMatch(/Claude subscription's token, not an API key: use Sign in with Claude/);
+    expect(context.endpoints.load().endpoints).toEqual([]);
+    expect(JSON.stringify([...context.kv.map.entries()])).not.toContain("sk-ant-oat01-copied");
   });
 });

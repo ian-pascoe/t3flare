@@ -9,7 +9,9 @@
 //   POST /api/endpoints/sign-in    a sign-in (SPI-1164): { op: "start", id, label } gives the authorize URL;
 //                                  { op: "complete", id, label, pasted } finishes it with the address the browser
 //                                  landed on and saves the sign-in's endpoint with the models its token lists;
-//                                  { op: "sign-out", id } revokes and stops the endpoint's Sessions
+//                                  { op: "sign-out", id } revokes and stops the endpoint's Sessions; where the
+//                                  vendor offers no revocation (Claude, SPI-1165), the answer's `revocation` says
+//                                  where the owner removes the grant
 //
 // Every change bumps the endpoints' own revision and is audited under the entity `endpoints`, with the key's mark and the
 // headers' names only.
@@ -23,6 +25,7 @@ import {
   RESERVED_ENDPOINT_IDS,
   sameTarget,
   SIGN_IN_KINDS,
+  signInHeaders,
   SIGN_INS,
   type SignIn,
   validateEndpoint,
@@ -105,7 +108,8 @@ export const endpointsChange = async (deps: EndpointsApiDeps, body: Record<strin
     const signedOut = isSignIn(removed.removed.auth) && deps.signIns !== undefined ? await deps.signIns.forget(id, { beforeRevoke: async () => deps.signedOut?.(id) }) : undefined;
     audit({ action: "endpoint.remove", target: id, before: audited(removed.removed), ...(signedOut === undefined ? {} : { after: { revoked: signedOut.revoked } }) });
     deps.changed?.();
-    return { status: 200, json: { ok: true, revision: removed.endpoints.revision } };
+    const kept = signedOut !== undefined && !signedOut.revoked && isSignIn(removed.removed.auth) ? revocationNote(removed.removed.auth) : {};
+    return { status: 200, json: { ok: true, revision: removed.endpoints.revision, ...kept } };
   }
   if (body.op !== "save") return { status: 400, text: "the body is { op: \"save\", endpoint, apiKey? } or { op: \"remove\", id }" };
   if (body.apiKey !== undefined && typeof body.apiKey !== "string") return { status: 400, text: "apiKey is a string" };
@@ -124,13 +128,14 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
   if (!valid.ok) return { status: 400, text: valid.error };
   const typed = typeof body.apiKey === "string" && body.apiKey !== "" ? body.apiKey : undefined;
   let apiKey: string | undefined;
+  let target: Pick<ModelEndpoint, "api" | "baseUrl" | "headers"> = valid.endpoint;
   if (isSignIn(valid.endpoint.auth)) {
     // A sign-in's list is read with its own token, at its own target only.
     const saved = deps.store.load().endpoints.find((endpoint) => endpoint.id === valid.endpoint.id);
     if (deps.signIns === undefined || saved === undefined || !isSignIn(saved.auth)) return { status: 400, text: "sign in first: the list is read with the sign-in's token" };
     const access = await deps.signIns.access(saved.id);
     if (!access.ok) return { status: 200, json: { ok: false, error: access.problem } };
-    apiKey = access.accessToken;
+    target = signInTarget(saved.auth, access.accessToken);
   } else if (valid.endpoint.auth === "api-key") {
     if (typed !== undefined) apiKey = typed;
     else {
@@ -143,9 +148,22 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
       apiKey = saved.apiKey;
     }
   }
-  const found = await deps.discover(valid.endpoint, apiKey);
+  const found = await deps.discover(target, apiKey);
   if (!found.ok) return { status: 200, json: found };
   return { status: 200, json: { ok: true, models: modelsWithMetadata(valid.endpoint, found.models) } };
+};
+
+/** A sign-in's model list target: its own API and base URL, its token in the headers its vendor takes it in. */
+const signInTarget = (kind: SignIn, accessToken: string): Pick<ModelEndpoint, "api" | "baseUrl" | "headers"> => ({
+  api: SIGN_IN_KINDS[kind].api,
+  baseUrl: SIGN_IN_KINDS[kind].baseUrl,
+  headers: { ...signInHeaders(kind, accessToken) },
+});
+
+/** What a sign-out tells the owner beside `revoked`: where to remove a grant its vendor cannot revoke (none otherwise). */
+const revocationNote = (kind: SignIn | null | undefined): { readonly revocation?: string } => {
+  const text = kind === null || kind === undefined ? null : SIGN_IN_KINDS[kind].revocation;
+  return text === null ? {} : { revocation: text };
 };
 
 /** A label for a sign-in's endpoint: the given one, else the sign-in's title. */
@@ -181,7 +199,7 @@ const completeSignIn = async (
   let modelsProblem: string | undefined;
   if (saved === undefined) {
     const access = await signIns.access(id);
-    const found = access.ok ? await deps.discover({ api: target.api, baseUrl: target.baseUrl, headers: {} }, access.accessToken) : { ok: false as const, error: access.problem };
+    const found = access.ok ? await deps.discover(signInTarget(kind, access.accessToken), undefined) : { ok: false as const, error: access.problem };
     if (found.ok) models = found.models;
     else modelsProblem = found.error;
   }
@@ -193,7 +211,8 @@ const completeSignIn = async (
     // No endpoint holds the fresh grant: it is revoked, not left behind.
     const { revoked } = await signOutOf(deps, signIns, id);
     audit({ action: "endpoint.sign-in", target: id, after: { ok: false, saved: false, revoked } });
-    return { status: 200, json: { ok: false, error: `Signed in, but the endpoint could not be saved (${stored.error}), so the sign-in was ${revoked ? "revoked" : "dropped (its revocation was not confirmed)"}.` } };
+    const dropped = target.revocation === null ? "dropped (its revocation was not confirmed)" : `dropped here. ${target.revocation}`;
+    return { status: 200, json: { ok: false, error: `Signed in, but the endpoint could not be saved (${stored.error}), so the sign-in was ${revoked ? "revoked" : dropped}.` } };
   }
   audit({ action: "endpoint.sign-in", target: id, before: audited(stored.before), after: { ok: true, ...audited(stored.endpoint) } });
   deps.changed?.();
@@ -224,9 +243,10 @@ export const endpointsSignIn = async (deps: EndpointsApiDeps, body: Record<strin
   }
   if (body.op === "complete") return completeSignIn(deps, signIns, id, saved, body, audit);
   if (body.op === "sign-out") {
+    const kind = saved !== undefined && isSignIn(saved.auth) ? saved.auth : signIns.status(id).kind;
     const { signedOut, revoked } = await signOutOf(deps, signIns, id);
     audit({ action: "endpoint.sign-out", target: id, after: { signedOut, revoked } });
-    return { status: 200, json: { ok: true, signedOut, revoked } };
+    return { status: 200, json: { ok: true, signedOut, revoked, ...(revoked ? {} : revocationNote(kind)) } };
   }
   return { status: 400, text: 'the body is { op: "start", id, signIn, label }, { op: "complete", id, label, pasted } or { op: "sign-out", id }' };
 };

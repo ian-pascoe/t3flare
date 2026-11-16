@@ -56,6 +56,9 @@ describe("the model relay's target", () => {
     const { store } = setup();
     await store.save({ id: "chatgpt", label: "ChatGPT", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "chatgpt", models: ["gpt-5-mini"] }, {});
     expect(await target(store, "chatgpt")).toEqual({ ok: false, status: 501, message: expect.stringMatching(/sign-in/) });
+    // A Claude sign-in (SPI-1165) too, on the API Claude Code speaks.
+    await store.save({ id: "claude", label: "Claude", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "claude", models: ["claude-haiku-5-5"] }, {});
+    expect(await target(store, "claude")).toEqual({ ok: false, status: 501, message: expect.stringMatching(/sign-in/) });
   });
 
   it("refuses an endpoint that is gone (404) or whose key no longer opens (503), naming no key", async () => {

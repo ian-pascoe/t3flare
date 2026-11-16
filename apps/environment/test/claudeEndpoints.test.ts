@@ -40,8 +40,8 @@ describe("Claude Code's Model endpoints", () => {
   });
 
   it("never takes a sign-in endpoint, which the relay does not carry yet (SPI-1164)", () => {
-    // A sign-in on the Anthropic Messages API (Claude's, SPI-1165) is refused by the relay like ChatGPT's.
-    const signIn = { ...endpoints.endpoints[1]!, id: "claude-sub", auth: "chatgpt" as const };
+    // A Claude sign-in on the Anthropic Messages API (SPI-1165) is left out like ChatGPT's, until SPI-1171.
+    const signIn = { ...endpoints.endpoints[1]!, id: "claude", baseUrl: "https://api.anthropic.com", auth: "claude" as const };
     expect(claudeRelayOf({ revision: 1, endpoints: [signIn] }, undefined)).toBeUndefined();
     expect(claudeRelayOf({ revision: 1, endpoints: [signIn, endpoints.endpoints[2]!] }, undefined)?.endpoints).toEqual(["comm2"]);
   });

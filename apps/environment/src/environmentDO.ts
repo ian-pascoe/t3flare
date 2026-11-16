@@ -33,6 +33,7 @@ import { harnessSecrets } from "./harness/secrets.ts";
 import { harnessStore } from "./harness/store.ts";
 import { type CredentialBroker, credentialBroker } from "./credentials/broker.ts";
 import { chatgptSignIn } from "./credentials/chatgpt.ts";
+import { claudeSignIn } from "./credentials/claude.ts";
 import { sealedStore } from "./credentials/sealed.ts";
 import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
@@ -446,7 +447,10 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     this.#broker ??= credentialBroker({
       kv: this.ctx.storage.kv,
       sealed: sealedStore(this.ctx.storage.kv, this.env.T3FLARE_CREDENTIALS_KEY),
-      vendors: { chatgpt: chatgptSignIn({ fetch: (input, init) => fetch(input, init), now: () => Date.now() }) },
+      vendors: {
+        chatgpt: chatgptSignIn({ fetch: (input, init) => fetch(input, init), now: () => Date.now() }),
+        claude: claudeSignIn({ fetch: (input, init) => fetch(input, init), now: () => Date.now() }),
+      },
     });
     return this.#broker;
   }

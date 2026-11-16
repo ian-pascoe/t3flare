@@ -6,7 +6,8 @@
 // SPI-1164: one "Sign in with <title>" form per sign-in kind (`SIGN_IN_KINDS`; ChatGPT plan usage first): start, open
 // the authorize link, paste what it gives back (ChatGPT's: the 127.0.0.1 address the browser lands on, a page that does not
 // load), and see the account or why it failed. A sign-in endpoint's card shows its account and token expiry, with Sign
-// out. Each says plainly what is verified of it (its kind's `note`).
+// out. Each says plainly what is verified of it (its kind's `note`). SPI-1165 adds Claude, whose vendor offers no
+// revocation: its Sign out says where the owner removes the grant (its kind's `revocation`).
 import { endpointSlug, type EndpointApi, type EndpointPreset, isSignIn, type ModelEndpoint, SIGN_IN_KINDS, SIGN_INS, type SignIn } from "@t3flare/models/endpoints";
 
 import type { SignInStatus } from "../credentials/broker.ts";
@@ -73,7 +74,9 @@ const signInCard = (escape: Escape, endpoint: EndpointsView["endpoints"][number]
   const models = endpoint.models.map((model) => `<li><code>${escape(endpointSlug(endpoint.id, model.id))}</code> ${escape(model.name)}</li>`).join("");
   const action =
     endpoint.signIn?.signedIn === true
-      ? `<button type="button" class="btn btn-sm" data-sign-in-out="${escape(endpoint.id)}" data-sign-in-title="${escape(signIn.title)}">Sign out</button>`
+      ? `<button type="button" class="btn btn-sm" data-sign-in-out="${escape(endpoint.id)}" data-sign-in-title="${escape(signIn.title)}"${
+          signIn.revocation === null ? "" : ` data-sign-in-revocation="${escape(signIn.revocation)}"`
+        }>Sign out</button>`
       : `<button type="button" class="btn btn-sm btn-primary" data-sign-in-start="${escape(endpoint.id)}" data-sign-in-kind="${escape(kind)}" data-sign-in-label="${escape(endpoint.label)}">Sign in with ${escape(signIn.title)}</button>`;
   return `<article class="group server" aria-labelledby="${id}" data-endpoint-row="${escape(endpoint.id)}">
 <div class="server-head"><div><div class="server-name"><h3 id="${id}">${escape(endpoint.label)}</h3><span class="ident">${escape(endpoint.id)}</span><span class="tag">${escape(signIn.title)} sign-in</span></div><p class="server-url">${escape(endpoint.baseUrl)}</p></div>
@@ -94,7 +97,7 @@ const signInForm = (escape: Escape, view: EndpointsView, kind: SignIn): string =
   const at = (name: string) => escape(`sign-in-${kind}-${name}`);
   return `<form class="group add" id="${at("form")}" data-sign-in-form data-sign-in-kind="${escape(kind)}" data-sign-in-steps="${escape(signIn.paste.instructions)}" autocomplete="off" aria-labelledby="${at("title")}">
 <div class="row"><div><div class="row-title"><h3 id="${at("title")}">Sign in with ${escape(signIn.title)}</h3></div><p class="desc">${escape(signIn.about)} Start, open the link and approve, then paste what it gives you back here.</p>
-<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>Unverified</strong><p>${escape(signIn.note)}</p></div></div></div></div>
+<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>${escape(signIn.caution)}</strong><p>${escape(signIn.note)}</p></div></div></div></div>
 <div class="form-body">${notes}
 <div class="field"><label for="${at("id")}">Id</label><input id="${at("id")}" name="id" type="text" required pattern="[a-z0-9](?:[a-z0-9\\-]{0,30}[a-z0-9])?" value="${escape(waiting[0]?.[0] ?? kind)}" autocapitalize="none" spellcheck="false"></div>
 <div class="field"><label for="${at("label")}">Label</label><input id="${at("label")}" name="label" type="text" maxlength="60" value="${escape(signIn.title)}"></div>
@@ -269,10 +272,11 @@ for (const button of document.querySelectorAll("article button[data-sign-in-star
 for (const button of document.querySelectorAll("button[data-sign-in-out]")) {
   button.addEventListener("click", async () => {
     const id = button.dataset.signInOut;
-    if (!confirm("Sign " + id + " out of " + button.dataset.signInTitle + "? Its running turns stop, and its sign-in is revoked where the vendor allows.")) return;
+    const revocation = button.dataset.signInRevocation;
+    if (!confirm("Sign " + id + " out of " + button.dataset.signInTitle + "? Its running turns stop, and " + (revocation ? "its tokens are deleted here. " + revocation : "its sign-in is revoked where the vendor allows."))) return;
     const answer = await signInStep({ op: "sign-out", id }, button);
     if (answer === undefined) return;
-    notify(answer.revoked ? "ok" : "err", answer.revoked ? "Signed out; the vendor revoked the sign-in." : "Signed out here, but the vendor did not confirm the revocation: disconnect t3flare in your account's settings.");
+    notify(answer.revoked ? "ok" : "err", answer.revoked ? "Signed out; the vendor revoked the sign-in." : answer.revocation ? "Signed out here. " + answer.revocation : "Signed out here, but the vendor did not confirm the revocation: disconnect t3flare in your account's settings.");
     setTimeout(done, 1500);
   });
 }
@@ -280,6 +284,11 @@ for (const button of document.querySelectorAll("button[data-endpoint-remove]")) 
   button.addEventListener("click", async () => {
     const id = button.dataset.endpointRemove;
     if (!confirm("Remove the endpoint " + id + " and its key? A thread on one of its models fails its next turn until another model is picked.")) return;
-    if (await post("/_t3flare/harness/api/endpoints", { op: "remove", id }, button)) done();
+    const response = await post("/_t3flare/harness/api/endpoints", { op: "remove", id }, button);
+    if (response === undefined) return;
+    const answer = await response.json();
+    if (!answer.revocation) { done(); return; }
+    notify("err", "Removed here. " + answer.revocation);
+    setTimeout(done, 1500);
   });
 }`;
