@@ -41,11 +41,14 @@ export interface RelayedEndpoint {
 }
 
 /**
- * The endpoints that speak `api`, in the owner's order: those a CLI that speaks it reaches through the relay. A sign-in
- * endpoint (SPI-1164) is not among them: the relay carries no sign-in's token yet (SPI-1171).
+ * The endpoints the model relay carries: every one but a sign-in's (SPI-1164), whose token the relay does not carry yet
+ * (SPI-1171). Every CLI's list of endpoints starts here (Codex, Claude Code, OpenCode), so none lists one it cannot reach.
  */
+export const relayedEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => (endpoints?.endpoints ?? []).filter((endpoint) => !isSignIn(endpoint.auth));
+
+/** The relayed endpoints that speak `api`, in the owner's order: those a CLI that speaks it reaches through the relay. */
 export const endpointsOfApi = (endpoints: ModelEndpoints | undefined, api: EndpointApi): ReadonlyArray<ModelEndpoint> =>
-  (endpoints?.endpoints ?? []).filter((endpoint) => endpoint.api === api && !isSignIn(endpoint.auth));
+  relayedEndpoints(endpoints).filter((endpoint) => endpoint.api === api);
 
 // What each API knows of keys and headers, in one place: the header its key goes in, and the request headers a CLI's
 // client sends that the endpoint needs. The relay takes a handle from the key headers and forwards only the allowed
