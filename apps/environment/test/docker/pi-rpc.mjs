@@ -8,6 +8,8 @@ const sep = process.argv.indexOf("--");
 const scenario = JSON.parse(process.argv[2]);
 const command = process.argv.slice(sep + 1);
 const log = fs.createWriteStream(process.env.LOG ?? "/dev/null", { flags: "a" });
+/** SPI-1170: pi's stdout lines as pi wrote them, for a test that maps real output (`piRelay.docker.test.ts`). */
+const raw = process.env.PI_RPC_RAW;
 const started = Date.now();
 const note = (dir, msg) => log.write(`${JSON.stringify({ t: Date.now() - started, dir, msg })}\n`);
 const child = spawn(command[0], command.slice(1), { stdio: ["pipe", "pipe", "pipe"], env: process.env });
@@ -26,6 +28,7 @@ child.stdout.on("data", (chunk) => {
     const line = buffer.slice(0, nl);
     buffer = buffer.slice(nl + 1);
     if (line.trim() === "") continue;
+    if (raw !== undefined) fs.appendFileSync(raw, `${line}\n`);
     let msg;
     try {
       msg = JSON.parse(line);
@@ -36,7 +39,7 @@ child.stdout.on("data", (chunk) => {
     note("in", msg);
     summary.events[msg.type] = (summary.events[msg.type] ?? 0) + 1;
     if (msg.type === "response") {
-      summary.responses.push({ command: msg.command, success: msg.success, error: msg.error ?? null, data: msg.command === "get_state" ? { sessionFile: msg.data?.sessionFile, sessionId: msg.data?.sessionId, model: msg.data?.model?.id, provider: msg.data?.model?.provider } : msg.command === "get_commands" ? msg.data : msg.command === "set_model" ? { provider: msg.data?.provider, id: msg.data?.id } : msg.command === "get_available_models" ? (msg.data?.models ?? []).map((model) => `${model.provider}/${model.id}`) : undefined });
+      summary.responses.push({ command: msg.command, success: msg.success, error: msg.error ?? null, data: msg.command === "get_state" ? { sessionFile: msg.data?.sessionFile, sessionId: msg.data?.sessionId, model: msg.data?.model?.id, provider: msg.data?.model?.provider } : msg.command === "get_commands" ? msg.data : msg.command === "set_model" ? { provider: msg.data?.provider, id: msg.data?.id } : msg.command === "get_available_models" ? (msg.data?.models ?? []).map((model) => `${model.provider}/${model.id}`) : msg.command === "bash" ? { output: msg.data?.output, exitCode: msg.data?.exitCode } : undefined });
       if (waiter?.kind === "response" && msg.id === waiter.id) waiter.resolve();
     }
     if (msg.type === "extension_ui_request") {

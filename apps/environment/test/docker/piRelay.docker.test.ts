@@ -12,7 +12,11 @@
 //   provider to another URL, a `models.json`) loads nothing: no request goes anywhere but the relay;
 // - a bash command pi runs has `T3FLARE_EXEC` and no handle (pi starts without it);
 // - only the launch chain's setsid holds the handle;
-// - the session resumes in a new process (switch_session, as t3's adapter does), whose requests carry its own handle.
+// - the session resumes in a new process (switch_session, as t3's adapter does), whose requests carry its own handle;
+// - hostile `env`, `tr`, `head`, `sed`, `cut` and `grep` first on PATH are run by neither the launcher nor the handle
+//   command; an owner's HTTP_PROXY Variable never carries a relay request (the relay's host is added to no_proxy);
+// - pi's real RPC lines, mapped as the channel maps them, name each model's provider by its endpoint id;
+// - the handle command refuses a forged marker, a caller outside a pi launch chain, and a setsid that did not fork.
 import { spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import * as fs from "node:fs";
@@ -23,8 +27,8 @@ import { expect, it } from "vitest";
 
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import { PI_HANDLE_HOLDERS, profileLaunch } from "../../src/agents/cliProfiles.ts";
-import { piRelayOf } from "../../src/provider/cli/piEndpoints.ts";
-import { docker, drive, EXTENSION, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { piLineFromPi, piRelayOf } from "../../src/provider/cli/piEndpoints.ts";
+import { docker, drive, EXTENSION, IMAGE, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 
 const here = import.meta.dirname;
 
@@ -34,6 +38,8 @@ const endpoint = (id: string, api: EndpointApi, modelId: string): ModelEndpoint 
 /** The endpoints, one per API, each with one model: pi's provider ids and the model's own id. */
 const ENDPOINTS = [endpoint("anth", "anthropic-messages", "claude-haiku-5-5"), endpoint("oai", "openai-completions", "gpt-x"), endpoint("resp", "openai-responses", "gpt-r"), endpoint("gem", "google-generative-ai", "gemini-x"), endpoint("mis", "mistral-conversations", "mistral-x")];
 const provider = (id: string) => `t3flare-endpoint-${id}`;
+/** The programs the launcher and the handle command run, shadowed by hostile ones on PATH. */
+const SHIMMED = ["env", "tr", "head", "sed", "cut", "grep"];
 
 it("pi reaches each endpoint's provider at the model relay with its handle, which no shell inherits, and resumes in a new process", () => {
   const handles = [randomBytes(32).toString("hex"), randomBytes(32).toString("hex")];
@@ -73,8 +79,21 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
       "sleep 1",
       "for f in /proc/[0-9]*/environ; do p=${f#/proc/}; p=${p%/environ}; if tr '\\0' '\\n' < $f 2>/dev/null | grep -q '^T3FLARE_MODEL_HANDLE='; then tr '\\0' ' ' < /proc/$p/cmdline; echo; fi; done > /workspace/holders.txt",
       "ps -eo args > /workspace/ps.txt",
+      // The watcher outlives pi: it is an orphan of PID 1, the launch chain's `setsid --wait`, whose wait would take its
+      // exit for pi's and end the container mid-run.
+      "exec sleep 600",
     ].join("\n");
     fs.writeFileSync(path.join(workspace, "watch.sh"), `${watcher}\n`);
+    // Hostile programs first on PATH (as a project's mise shims would be): each notes who ran it, then runs the real one.
+    // The launcher and the handle command name theirs by absolute path, so none is run by either; the launch command's
+    // own shell and the watcher run them (so they are on PATH: the check is not vacuous).
+    fs.mkdirSync(path.join(workspace, "shims"));
+    for (const tool of SHIMMED) {
+      fs.writeFileSync(path.join(workspace, "shims", tool), `#!/bin/sh\necho "${tool}|$(/usr/bin/tr '\\0\\n' '  ' < /proc/$PPID/cmdline | /usr/bin/cut -c1-80)" >> /workspace/shims.txt\nexec /usr/bin/${tool} "$@"\n`, { mode: 0o755 });
+    }
+    const shims = ["cp /workspace/shims/* /usr/local/sbin/", "chmod 755 /usr/local/sbin/*"];
+    const rawLines = path.join(workspace, "pi-raw.jsonl");
+    process.env.PI_RPC_RAW = rawLines;
     const turn = (id: string, message: string) => [{ type: "set_model", provider: provider(id), modelId: ENDPOINTS.find((entry) => entry.id === id)!.models[0]!.id }, { type: "prompt", message }];
     const result = drive(
       "pi-rpc.mjs",
@@ -99,13 +118,17 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
       runCommand({
         harness,
         name: "t3flare-pi-relay",
-        launch: { ...first, env: { ...first.env, T3FLARE_MODEL_HANDLE: handles[0]! } },
+        // An owner's Variables under the profile's environment: a proxy for the agent's commands, and its own no_proxy.
+        launch: { ...first, env: { ...first.env, T3FLARE_MODEL_HANDLE: handles[0]!, HTTP_PROXY: "http://computer.internal:3128", HTTPS_PROXY: "http://computer.internal:3128", NO_PROXY: "example.org" } },
         marker: markers[0]!,
         nonce,
         workspace,
-        setup: "(env -u T3FLARE_MODEL_HANDLE bash /workspace/watch.sh > /workspace/watch.log 2>&1 &)",
+        setup: [...shims, "(env -u T3FLARE_MODEL_HANDLE bash /workspace/watch.sh > /workspace/watch.log 2>&1 &)"].join("\n"),
       }),
     );
+    delete process.env.PI_RPC_RAW;
+    // The first process's shell environment (the resumed process's turn writes the file again).
+    const firstShellEnv = fs.existsSync(path.join(workspace, "shell-env.txt")) ? fs.readFileSync(path.join(workspace, "shell-env.txt"), "utf8") : "";
     const states = (result.responses ?? []).filter((entry: { command: string }) => entry.command === "get_state");
     const sessionFile = states[0]?.data?.sessionFile as string | undefined;
     // The resume: a new process with its own handle switches to the session file, as t3's adapter does, and runs a turn.
@@ -121,8 +144,10 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     const relayed = logs.filter((line) => line.includes('"model-relay"')).map((line) => JSON.parse(line) as Relayed);
     const elsewhere = logs.filter((line) => line.includes('"event":"http"')).map((line) => JSON.parse(line) as { path: string; handle: number });
     const keyAsked = logs.filter((line) => line.includes('"model-key"')).length;
-    const shellEnv = read("shell-env.txt");
+    const shellEnv = firstShellEnv;
     const holders = read("holders.txt").split("\n").map((line) => line.trim()).filter((line) => line !== "");
+    const shimRuns = read("shims.txt").split("\n").filter((line) => line !== "");
+    const tunnels = logs.filter((line) => line.includes('"event":"connect"') || line.includes('"event":"proxy-http"'));
     const setModels = (result.responses ?? []).filter((entry: { command: string }) => entry.command === "set_model");
     const report = {
       responses: result.responses,
@@ -141,6 +166,8 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
       ps: read("ps.txt"),
       shellEnvWritten: shellEnv !== "",
       repoExtensionLoaded: read("repo-extension.txt") !== "",
+      shimRuns,
+      tunnels,
       watchLog: read("watch.log").slice(-600),
     };
     const text = JSON.stringify(report);
@@ -177,6 +204,28 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     // pi's bash: the marker, no handle, no nonce.
     expect(shellEnv.includes("T3FLARE_EXEC"), text).toBe(true);
     expect(shellEnv.includes("T3FLARE_MODEL_HANDLE"), text).toBe(false);
+    // pi's environment keeps the owner's no_proxy entries and adds the relay's host; nothing went through the proxy.
+    expect(shellEnv.split("\n").filter((line) => /^no_proxy=|^NO_PROXY=/.test(line)).sort(), text).toEqual(["NO_PROXY=example.org,computer.internal", "no_proxy=example.org,computer.internal"]);
+    expect(shellEnv.includes("HTTP_PROXY=http://computer.internal:3128"), text).toBe(true);
+    expect(tunnels, text).toEqual([]);
+    // No hostile program on PATH was run by the launcher (setsid's child) or the handle command; some were run.
+    expect(shimRuns.length, text).toBeGreaterThan(0);
+    expect(shimRuns.filter((line) => /\|setsid |t3flare-pi-handle/.test(line)), text).toEqual([]);
+    // pi's real RPC lines, mapped as the channel maps them: each model's provider is its endpoint's id.
+    const ids = new Set(ENDPOINTS.map((entry) => entry.id));
+    const modelLines = read("pi-raw.jsonl").split("\n").filter((line) => /"type":"(response|message_end)"/.test(line) && line.includes("t3flare-endpoint-"));
+    const providersOf = (line: string): ReadonlyArray<unknown> => {
+      const event = JSON.parse(line);
+      if (event.type === "message_end") return [event.message?.provider];
+      if (event.command === "set_model") return [event.data?.provider];
+      if (event.command === "get_state") return [event.data?.model?.provider];
+      if (event.command === "get_available_models") return (event.data?.models ?? []).map((model: { provider: string }) => model.provider);
+      return [];
+    };
+    const mapped = modelLines.flatMap((line) => providersOf(piLineFromPi(line, ids)));
+    expect(new Set(modelLines.map((line) => JSON.parse(line).command ?? JSON.parse(line).type)), text).toEqual(new Set(["get_state", "get_available_models", "set_model", "message_end"]));
+    expect(mapped.length, text).toBeGreaterThan(10);
+    expect(mapped.every((entry) => typeof entry === "string" && ids.has(entry)), JSON.stringify(mapped)).toBe(true);
     // The holders: only the launch chain's setsid, not pi.
     expect(holders.length, text).toBe(1);
     expect(holders[0]!.startsWith(PI_HANDLE_HOLDERS[0]!), text).toBe(true);
@@ -195,5 +244,42 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
   } finally {
     harness.stop();
     fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+it("the handle command prints the handle only to its own pi launch chain: not with a forged marker, outside one, or when setsid did not fork", () => {
+  const handle = randomBytes(32).toString("hex");
+  const harness = startHarness("t3flare-pi-handle", []);
+  try {
+    // pi's own RPC `bash` runs the handle command in pi's launch chain (only its length leaves the container).
+    const probe = [
+      "echo own=$(/opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)",
+      "echo forged=$(T3FLARE_EXEC=proc-another /opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)",
+      "echo inherited=$(env | grep -c '^T3FLARE_MODEL_HANDLE=')",
+    ].join("; ");
+    const pi = (launch: string) =>
+      drive(
+        "pi-rpc.mjs",
+        { commands: [{ type: "bash", command: probe }], timeoutMs: 120_000 },
+        ["docker", "run", "--rm", "-i", "--network", "none", "-e", "T3FLARE_EXEC=proc-own", "-e", `T3FLARE_MODEL_HANDLE=${handle}`, "-e", "PI_OFFLINE=1", IMAGE, "bash", "-c", launch],
+      );
+    const outputOf = (result: any): string => String((result.responses ?? []).find((entry: { command: string }) => entry.command === "bash")?.data?.output ?? JSON.stringify(result).slice(0, 1500));
+    // As the process command starts it: `exec setsid --wait` from a process-group leader (here PID 1), so setsid forks.
+    const forked = outputOf(pi("exec setsid --wait /opt/t3flare/bin/pi --mode rpc --no-session"));
+    // setsid run by a process that is not a group leader calls setsid() and execs in place: no process holds the handle.
+    const inPlace = outputOf(pi("setsid --wait /opt/t3flare/bin/pi --mode rpc --no-session; exit $?"));
+    // Outside any pi launch chain, with the handle in its own environment and the right marker.
+    const outside = docker(["run", "--rm", "--network", "none", "-e", "T3FLARE_EXEC=proc-own", "-e", `T3FLARE_MODEL_HANDLE=${handle}`, IMAGE, "bash", "-c", "echo outside=$(/opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)"]).stdout;
+    const text = JSON.stringify({ forked, inPlace, outside });
+    expect(text.includes(handle), "the handle reached the report").toBe(false);
+    // 64 hex digits and a newline to its own chain; nothing to a forged marker; pi itself inherits nothing.
+    expect(forked, text).toMatch(/own=65\b/);
+    expect(forked, text).toMatch(/forged=0\b/);
+    expect(forked, text).toMatch(/inherited=0\b/);
+    expect(inPlace, text).toMatch(/own=0\b/);
+    expect(inPlace, text).toMatch(/inherited=0\b/);
+    expect(outside, text).toMatch(/outside=0\b/);
+  } finally {
+    harness.stop();
   }
 });
