@@ -1347,9 +1347,13 @@ succeed; nothing in t3 is touched. The leans are on the vendors' error shapes, o
     limit resetting within their 14 s (`SHORT_RESET_MS`) is retried, a later one pauses at once.
   - **t3's adapter events** (U3): a failed `turn.terminal` and an `error` turn item carry `failure`, which the CLI
     wrapper replaces; a failure t3 raises outside the adapter's events (a session that fails to open) is not seen.
-  - **The vendors' stream error events**: Anthropic's `{"type":"error","error":{…}}`, OpenAI Responses' `error` and
-    `response.failed`, an OpenAI-compatible Completions chunk that is only `{"error":{…}}`, read line by line from a
-    `text/event-stream`.
+  - **The vendors' stream error events** (`relayFailures.ts`' `sseErrors`): Anthropic's `{"type":"error","error":{…}}`,
+    OpenAI Responses' `error` and `response.failed`, an OpenAI-compatible Completions chunk that is only
+    `{"error":{…}}`, Mistral Conversations' `conversation.response.error`, in a `text/event-stream` that passes on as it
+    comes. A `data:` line is held only while its opening, whitespace taken out, could still be one of these. The leans:
+    the event's `type` (or a Completions chunk's `error`) is its first key, as every vendor sends it, so an error
+    event that names another key first passes unredacted and unreported; and an event split over several `data:`
+    lines, or a stream ending its lines with a bare `\r`, passes the same way. No vendor sends either.
   - **One relay record per CLI process, for its turn** (`RelayFailures`). A CLI's requests are not all its turn's own (a
     title or summary on a small model), so a success clears only a passing failure and a passing failure never hides a
     stop. Residual: a background request's stop during the turn (its own usage limit) becomes the turn's failure; a stop

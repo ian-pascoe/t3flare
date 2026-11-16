@@ -1,4 +1,4 @@
-# node scripts/stage.ts destroy p1172, after review round 2's evidence runs: alchemy's deletes.
+# node scripts/stage.ts destroy p1172, after review round 3's runs: alchemy's deletes.
 INFO: Plan: 11 to delete, 41 binding changes
 INFO: [AdminAccess] delete
 INFO: [AdminServiceToken] delete
@@ -12,19 +12,19 @@ INFO: [SettingsAccess] delete
 INFO: [WorkspaceContainer] delete
 INFO: [Agents/WorkspaceDO-Containers] delete
 INFO: [CodemodeSandbox] Cloudflare Worker delete: deleting t3flare-codemode-p1172
-INFO: [McpFixture] Cloudflare Worker delete: deleting t3flare-mcpfixture-p1172
 INFO: [Environment] Cloudflare Worker delete: deleting t3flare-environment-p1172
-INFO: [CodemodeSandbox] deleted (1.3s)
+INFO: [McpFixture] Cloudflare Worker delete: deleting t3flare-mcpfixture-p1172
+INFO: [CodemodeSandbox] deleted (1.2s)
 INFO: [Environment] deleted (1.4s)
 INFO: [Agents] Cloudflare Worker delete: deleting t3flare-agents-p1172
+INFO: [McpFixture] deleted (1.6s)
+INFO: [CredentialsKey] deleted (321ms)
 INFO: [McpWorker] Cloudflare Worker delete: deleting t3flare-mcp-p1172
-INFO: [CredentialsKey] deleted (234ms)
-INFO: [McpFixture] deleted (1.9s)
-INFO: [Agents/WorkspaceDO-Containers] deleted (2.0s)
-INFO: [McpWorker] deleted (1.1s)
-INFO: [SettingsAccess] deleted (1.3s)
-INFO: [Agents] deleted (1.4s)
-INFO: [WorkspaceContainer] deleted (208ms)
-INFO: [AdminAccess] deleted (1.8s)
-INFO: [AdminServiceToken] deleted (788ms)
-INFO: Done: 11 succeeded (5.0s)
+INFO: [Agents/WorkspaceDO-Containers] deleted (1.9s)
+INFO: [SettingsAccess] deleted (1.1s)
+INFO: [McpWorker] deleted (1.5s)
+INFO: [Agents] deleted (1.8s)
+INFO: [AdminAccess] deleted (1.9s)
+INFO: [WorkspaceContainer] deleted (246ms)
+INFO: [AdminServiceToken] deleted (1.2s)
+INFO: Done: 11 succeeded (5.9s)

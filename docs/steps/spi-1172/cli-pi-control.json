@@ -1,0 +1,18 @@
+{
+  "step": "cli",
+  "at": "2026-11-16T16:12:58.383Z",
+  "model": "commissary/claude-haiku-5-5",
+  "cliAgent": "pi",
+  "control": {
+    "runs": [
+      {
+        "id": "run:thread:f672ae87-1c59-4b5d-b934-affa5cbdf245:ordinal:1",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "text": "pong"
+  },
+  "failures": [],
+  "ok": true
+}
