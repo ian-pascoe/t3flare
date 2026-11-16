@@ -8,13 +8,13 @@
 import type { ServerProviderModel } from "@t3tools/contracts";
 import { type ModelEndpoint, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
 
-import { OPENCODE_PACKAGES, opencodeEndpointModel, type OpenCodeRelay } from "../../agents/acpProfiles.ts";
+import { opencodeEndpointModel, type OpenCodeRelay, opencodeServes } from "../../agents/acpProfiles.ts";
 import { cliModelId } from "./acpFlavor.ts";
 import { relayPickerModels, relayTextModel } from "./relayModels.ts";
 
 /** The endpoints OpenCode reaches through the model relay: an API it has a provider package for, and a model. */
 export const opencodeEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> =>
-  (endpoints?.endpoints ?? []).filter((endpoint) => OPENCODE_PACKAGES[endpoint.api] !== undefined && endpoint.models.length > 0);
+  (endpoints?.endpoints ?? []).filter(opencodeServes);
 
 /** OpenCode's relay configuration for the endpoints as stored now, or undefined for the Model proxy (no such endpoint). */
 export const opencodeRelayOf = (endpoints: ModelEndpoints | undefined, textModel: string | undefined): OpenCodeRelay | undefined => {

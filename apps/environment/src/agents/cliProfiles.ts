@@ -28,11 +28,6 @@ export const PI_SESSIONS = `${HARNESS_ROOT}/pi/sessions`;
 export const PI_SESSION_RETENTION_DAYS = 60;
 /** Codex keeps this provider id in its rollouts and needs it unchanged to resume. */
 export const CODEX_PROVIDER_ID = "t3flare-proxy";
-/**
- * The Codex provider of a Model endpoint (SPI-1167): derived from the endpoint's id, which never changes, so a rollout
- * that names it resumes. Prefixed, so no endpoint id can take one of Codex's built-in ids (`openai`, `ollama`, …).
- */
-export const codexEndpointProvider = endpointProviderId;
 /** The variable the key helper sends as its nonce; Codex's shells never see it (review F4). */
 export const NONCE_ENV = "T3FLARE_MODEL_KEY_NONCE";
 
@@ -141,7 +136,7 @@ export const codexEndpointOverrides = (endpoints: ReadonlyArray<RelayedEndpoint>
       "request_max_retries=1",
       "stream_max_retries=1",
     ].join(",");
-    return `model_providers.${codexEndpointProvider(endpoint.id)}={${provider}}`;
+    return `model_providers.${endpointProviderId(endpoint.id)}={${provider}}`;
   });
 
 /**
@@ -151,8 +146,8 @@ export const codexEndpointOverrides = (endpoints: ReadonlyArray<RelayedEndpoint>
  */
 export const codexProcessProvider = (proxyUrl: string, endpoints: ReadonlyArray<{ readonly id: string }>, model: string | undefined): string => {
   const endpointId = model === undefined ? undefined : parseEndpointSlug(model)?.endpointId;
-  if (endpointId !== undefined && endpoints.some((endpoint) => endpoint.id === endpointId)) return codexEndpointProvider(endpointId);
-  return proxyUrl === "" && endpoints[0] !== undefined ? codexEndpointProvider(endpoints[0].id) : CODEX_PROVIDER_ID;
+  if (endpointId !== undefined && endpoints.some((endpoint) => endpoint.id === endpointId)) return endpointProviderId(endpointId);
+  return proxyUrl === "" && endpoints[0] !== undefined ? endpointProviderId(endpoints[0].id) : CODEX_PROVIDER_ID;
 };
 
 /** Codex's `-c` overrides (plan §4.3; M0: P3, P10, P11). Each value is TOML. */
