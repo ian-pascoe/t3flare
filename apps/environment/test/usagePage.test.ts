@@ -19,7 +19,8 @@ import * as ServerConfig from "../../../t3code/apps/server/src/config.ts";
 import * as ServerSettings from "../../../t3code/apps/server/src/serverSettings.ts";
 import * as UsageService from "../../../t3code/apps/server/src/usage/UsageService.ts";
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
-import { acceptUsage, usageStore } from "../src/usage/records.ts";
+import { acceptUsage } from "../src/usage/commissaryCount.ts";
+import { usageStore } from "../src/usage/records.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
 vi.mock("../../../t3code/apps/server/src/provider/builtInDrivers.ts", () => import("../src/shadows/builtInDrivers.ts"));

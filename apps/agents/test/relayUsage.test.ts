@@ -162,6 +162,22 @@ describe("the model relay's usage records", () => {
     expect((await relay({ api: "openai-responses", body: under, size: 512 * 1024 })).recorded).toMatchObject([{ input: 3, output: 1 }]);
   });
 
+  it("stops copying a JSON body, or a stream's last line with no newline, past MAX_USAGE_COPY_CHARS", async () => {
+    const pad = "x".repeat(MAX_USAGE_COPY_CHARS);
+    const body = JSON.stringify({ object: "response", model: "m", output: [{ text: pad }], usage: { input_tokens: 3, output_tokens: 1 } });
+    const json = await relay({ api: "openai-responses", body, contentType: "application/json", size: 512 * 1024 });
+    expect(json.text.length).toBe(body.length);
+    expect(json.recorded).toEqual([]);
+    const line = `data: ${JSON.stringify({ type: "response.completed", response: { model: "m", output: [{ text: pad }], usage: { input_tokens: 3, output_tokens: 1 } } })}`;
+    const unended = await relay({ api: "openai-responses", body: line, size: 512 * 1024 });
+    expect(unended.text.length).toBe(line.length);
+    expect(unended.recorded).toEqual([]);
+    // Under the cap, both are read: the cap is what kept them out.
+    const small = JSON.stringify({ object: "response", model: "m", usage: { input_tokens: 3, output_tokens: 1 } });
+    expect((await relay({ api: "openai-responses", body: small, contentType: "application/json", size: 512 * 1024 })).recorded).toHaveLength(1);
+    expect((await relay({ api: "openai-responses", body: `data: ${JSON.stringify({ type: "response.completed", response: { model: "m", usage: { input_tokens: 3, output_tokens: 1 } } })}`, size: 7 })).recorded).toHaveLength(1);
+  });
+
   it("records what a stream the CLI cancels had read (Anthropic's input), once", async () => {
     let push!: ReadableStreamDefaultController<Uint8Array>;
     const upstream = new ReadableStream<Uint8Array>({ start: (controller) => void (push = controller) });

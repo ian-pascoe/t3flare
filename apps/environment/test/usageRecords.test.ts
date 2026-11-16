@@ -12,10 +12,8 @@ import { parseRateTable } from "../../../t3code/apps/server/src/usage/usagePrici
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
 import { commissaryManagementOf } from "../src/usage/commissary.ts";
 import { makeOwnUsageReader, usageReader } from "../src/usage/readers.ts";
+import { acceptUsage, commissaryCountedCache, countedByCommissary, usageRecorder } from "../src/usage/commissaryCount.ts";
 import {
-  acceptUsage,
-  commissaryCountedCache,
-  countedByCommissary,
   listedModelOf,
   MAX_USAGE_ROWS,
   USAGE_RETENTION_MS,
@@ -86,7 +84,7 @@ describe("the Environment's usage records", () => {
     });
   });
 
-  it("splits by agent: each of t3's providers reads its own, the Durable agent, text generation and the pi CLI under Pi", async () => {
+  it("splits by agent: each of t3's providers reads its own, the Durable agent, text generation and Pi (the CLI agent) under Pi", async () => {
     const store = usageStore(nodeSqlStorage());
     store.record([entry(), entry({ agent: "text-generation", session: "" }), entry({ agent: "pi" }), entry({ agent: "codex" }), entry({ agent: "claude" }), entry({ agent: "opencode" })], endpoints, NOW);
     const pi = await scanOf(store, "pi");
@@ -170,6 +168,25 @@ describe("the records' times and bounds", () => {
     ]);
   });
 
+  it("puts a record in its quarter hour, by the clock: 12:14:59 in 12:00's, 12:15:00 in 12:15's", async () => {
+    const store = usageStore(nodeSqlStorage());
+    store.record([entry({ at: Date.parse("2026-11-16T11:14:59.999Z") }), entry({ at: Date.parse("2026-11-16T11:15:00Z") })], endpoints, NOW);
+    expect((await rows(store)).map((record) => new Date(record.timestampMs).toISOString())).toEqual(["2026-11-16T11:00:00.000Z", "2026-11-16T11:15:00.000Z"]);
+  });
+
+  it("reads from the start of the quarter hour the window starts in", async () => {
+    const store = usageStore(nodeSqlStorage());
+    store.record([entry({ at: Date.parse("2026-11-16T11:01:00Z") })], endpoints, NOW);
+    expect((await scanOf(store, "pi", Date.parse("2026-11-16T11:10:00Z")))[0]!.files![0]!.records).toHaveLength(1);
+    expect((await scanOf(store, "pi", Date.parse("2026-11-16T11:15:00Z")))[0]!.files![0]!.records).toHaveLength(0);
+  });
+
+  it("keeps an entry inside the retention window and up to an hour ahead of the clock, and drops the rest", () => {
+    const store = usageStore(nodeSqlStorage());
+    expect(store.record([entry({ at: NOW - USAGE_RETENTION_MS + 60_000 }), entry({ at: NOW + 30 * 60_000 })], endpoints, NOW)).toBe(2);
+    expect(store.record([entry({ at: NOW - USAGE_RETENTION_MS - 60_000 }), entry({ at: NOW + 2 * 60 * 60_000 })], endpoints, NOW)).toBe(0);
+  });
+
   it("prunes at most once an hour", async () => {
     const store = usageStore(nodeSqlStorage(), { maxRows: 1 });
     store.record([entry({ at: NOW - 3 * USAGE_SLOT_MS }), entry({ at: NOW - 2 * USAGE_SLOT_MS })], endpoints, NOW);
@@ -248,6 +265,22 @@ describe("no request counted twice beside Commissary's log", () => {
     expect(await acceptUsage({ entries: [entry()] }, { store, endpoints: two, countedByCommissary: () => Promise.reject(new Error("sealed store")), now: () => NOW })).toEqual({ kept: 0 });
     expect(await acceptUsage({ entries: Array.from({ length: 100 }, () => entry({ endpointId: "mine" })) }, { store, endpoints: two, countedByCommissary: counted, now: () => NOW })).toEqual({ kept: 64 });
     expect(await acceptUsage("junk", { store, endpoints: two, countedByCommissary: counted, now: () => NOW })).toEqual({ kept: 0 });
+  });
+
+  it("is what EnvironmentDO.recordUsage runs: the configured principals, the store's keys, the store's endpoints", async () => {
+    const store = usageStore(nodeSqlStorage());
+    let opened = 0;
+    const record = usageRecorder({
+      usage: () => store,
+      principals: () => config.principals,
+      endpoints: { load: () => two, resolve: async (id) => (opened++, { endpoint: two.endpoints.find((endpoint) => endpoint.id === id)!, apiKey: keys[id], unreadable: false }) },
+      now: () => NOW,
+    });
+    expect(await record({ entries: [entry({ endpointId: "comm" }), entry({ endpointId: "mine" })] })).toEqual({ kept: 1 });
+    expect(await record({ entries: [entry({ endpointId: "comm" })] })).toEqual({ kept: 0 });
+    expect((await scanOf(store, "pi"))[0]!.files![0]!.records.map((record) => record.model)).toEqual(["mine/claude-sonnet-4-5"]);
+    // Three API-key endpoints, opened once for the revision.
+    expect(opened).toBe(3);
   });
 
   it("opens the keys once per revision of the endpoints, and asks again after a failure", async () => {

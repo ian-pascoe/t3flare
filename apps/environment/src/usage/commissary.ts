@@ -216,7 +216,7 @@ export type CommissaryUsageProvider = (typeof USAGE_PROVIDERS)[number];
 /**
  * Which of t3flare's agents made a request, from what Commissary recorded of it: Codex by its session identity or the
  * Responses API, Claude Code by its session header, OpenCode by its affinity header. The rest is Pi: the Durable agent,
- * text generation (titles, commit and PR text) and the pi CLI, none of which marks its requests.
+ * text generation (titles, commit and PR text) and Pi (the CLI agent), none of which marks its requests.
  */
 export const usageProviderOf = (record: Pick<CommissaryUsageRecord, "session_id" | "endpoint">): CommissaryUsageProvider => {
   const session = record.session_id ?? "";

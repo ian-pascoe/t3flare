@@ -52,7 +52,8 @@ import type { BrowserRunBinding, BrowserRunFetcher } from "./preview/browserRun.
 import type { ContainerPreviewProps } from "./preview/containerPreviews.ts";
 import { closeLeftoverSessions } from "./preview/sessions.ts";
 import { previewStore } from "./preview/store.ts";
-import { acceptUsage, commissaryCountedCache, countedByCommissary, usageStore } from "./usage/records.ts";
+import { usageRecorder } from "./usage/commissaryCount.ts";
+import { usageStore } from "./usage/records.ts";
 
 /** SPI-1163: the model the text-generation setting was last pointed at as its default. */
 const SEEDED_TEXT_MODEL_KEY = "t3flare:text-generation-default";
@@ -178,8 +179,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   readonly #processes: ProcessChannel;
   /** The Owner clients' table (settings/clients.ts), one per instance so its DDL runs once, not per request. */
   #ownerClients: OwnerClients | undefined;
-  /** The endpoints whose usage Commissary's log counts, by the endpoints' revision (SPI-1173, until SPI-1176). */
-  #commissaryCounted: ((endpoints: ModelEndpoints) => Promise<ReadonlySet<string>>) | undefined;
+  /** `recordUsage`'s recorder, one per instance so the Commissary exclusion's keys are opened once per revision (SPI-1173). */
+  #usageRecorder: ((input: unknown) => Promise<{ readonly kept: number }>) | undefined;
 
   constructor(ctx: DurableObjectState, env: EnvironmentEnv) {
     super(ctx, env);
@@ -490,17 +491,20 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   /**
    * Usage records, RPC from the agents Worker (SPI-1173): a Session's, text generation's or the model relay's, each a
-   * model answer's counts on a Model endpoint, kept for t3's Usage page (`usage/records.ts` `acceptUsage`). Entries
+   * model answer's counts on a Model endpoint, kept for t3's Usage page (`usage/commissaryCount.ts` `usageRecorder`). Entries
    * that are not valid are dropped, and so are those on an endpoint Commissary's log already counts. Never boots t3.
    */
   async recordUsage(input: unknown): Promise<{ readonly kept: number }> {
     const { environmentServices } = await import("./agents/bindings.ts");
-    const services = environmentServices();
-    this.#commissaryCounted ??= commissaryCountedCache((endpoints) =>
-      countedByCommissary(endpoints, async (id) => (await this.#endpointStore().resolve(id))?.apiKey, services.commissary?.principals ?? []),
-    );
-    return acceptUsage(input, { store: services.usage, endpoints: this.#endpointStore().load(), countedByCommissary: this.#commissaryCounted, now: () => Date.now() });
+    this.#usageRecorder ??= usageRecorder({
+      usage: () => environmentServices().usage,
+      principals: () => environmentServices().commissary?.principals ?? [],
+      endpoints: this.#endpointStore(),
+      now: () => Date.now(),
+    });
+    return this.#usageRecorder(input);
   }
+
 
   /**
    * The Owner-client endpoint (ADR-0035, plan D11), RPC from the Worker after it verified the endpoint's own Access

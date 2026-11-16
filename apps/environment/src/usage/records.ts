@@ -18,9 +18,7 @@ import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import type { UsageProviderKind } from "@t3tools/contracts";
 import type { UsageRecord } from "@t3tools/provider-core/server/usage";
 import type { EndpointModel, EndpointModelCost, ModelEndpoints } from "@t3flare/models/endpoints";
-import { MAX_USAGE_ENTRIES, type UsageAgent, type UsageEntry, usageEntryOf } from "@t3flare/models/usage";
-
-import { principalOfApiKey } from "./commissary.ts";
+import { type UsageAgent, usageEntryOf, type UsageTokens } from "@t3flare/models/usage";
 
 export const USAGE_SLOT_MS = 15 * 60 * 1000;
 export const USAGE_RETENTION_DAYS = 92;
@@ -30,7 +28,7 @@ const PRUNE_EVERY_MS = 60 * 60 * 1000;
 /** An entry's time may be this far ahead of the Environment's clock (another isolate's); later ones are dropped. */
 const FUTURE_SLACK_MS = 60 * 60 * 1000;
 
-/** t3's usage provider each agent counts under: Pi's are the Durable agent, text generation and the pi CLI. */
+/** t3's usage provider each agent counts under: Pi's are the Durable agent, text generation and Pi (the CLI agent). */
 export const PROVIDER_OF: Readonly<Record<UsageAgent, UsageProviderKind>> = {
   durable: "pi",
   "text-generation": "pi",
@@ -44,18 +42,14 @@ export const PROVIDER_OF: Readonly<Record<UsageAgent, UsageProviderKind>> = {
 export const agentsOf = (provider: UsageProviderKind): ReadonlyArray<UsageAgent> =>
   (Object.keys(PROVIDER_OF) as Array<UsageAgent>).filter((agent) => PROVIDER_OF[agent] === provider);
 
-export interface StoredUsage {
+/** One row: a quarter hour of one session's answers on one model, its counts the sum of theirs. */
+export interface StoredUsage extends UsageTokens {
   readonly slot: number;
   readonly agent: UsageAgent;
   readonly endpoint: string;
   readonly model: string;
   readonly session: string;
   readonly requests: number;
-  readonly input: number;
-  readonly cacheRead: number;
-  readonly cacheWrite: number;
-  readonly output: number;
-  readonly reasoning: number;
   /** null: no price was known when it was written; t3's rate table prices it. */
   readonly costUsd: number | null;
 }
@@ -79,27 +73,18 @@ export const listedModelOf = (models: ReadonlyArray<EndpointModel>, modelId: str
   models.find((model) => model.id === modelId) ?? models.find((model) => modelId.startsWith(model.id) && DATED.test(modelId.slice(model.id.length)));
 
 /** What the tokens cost at the model's prices (dollars per million tokens), or null when it has none. */
-export const costAt = (cost: EndpointModelCost | undefined, entry: Pick<UsageEntry, "input" | "cacheRead" | "cacheWrite" | "output">): number | null => {
+export const costAt = (cost: EndpointModelCost | undefined, entry: UsageTokens): number | null => {
   if (cost === undefined) return null;
   const total = (entry.input * cost.input + entry.cacheRead * cost.cacheRead + entry.cacheWrite * cost.cacheWrite + entry.output * cost.output) / 1_000_000;
   return Number.isFinite(total) && total > 0 ? total : null;
 };
 
-type Row = {
-  slot: number;
-  agent: string;
-  endpoint: string;
-  model: string;
-  session: string;
-  priced: number;
-  requests: number;
-  input: number;
-  cache_read: number;
-  cache_write: number;
-  output: number;
-  reasoning: number;
-  cost_usd: number;
-};
+/** Each count's column. */
+const COLUMN: { readonly [K in keyof UsageTokens]: string } = { input: "input", cacheRead: "cache_read", cacheWrite: "cache_write", output: "output", reasoning: "reasoning" };
+const COUNTS = Object.keys(COLUMN) as ReadonlyArray<keyof UsageTokens>;
+const COUNT_COLUMNS = COUNTS.map((field) => COLUMN[field]);
+
+type Row = { slot: number; agent: string; endpoint: string; model: string; session: string; priced: number; requests: number; cost_usd: number } & Record<string, number>;
 
 let ready = new WeakSet<SqlStorage>();
 
@@ -108,8 +93,7 @@ const ensure = (sql: SqlStorage) => {
   sql.exec(
     `CREATE TABLE IF NOT EXISTS t3flare_usage (
       slot INTEGER NOT NULL, agent TEXT NOT NULL, endpoint TEXT NOT NULL, model TEXT NOT NULL, session TEXT NOT NULL, priced INTEGER NOT NULL,
-      requests INTEGER NOT NULL, input INTEGER NOT NULL, cache_read INTEGER NOT NULL, cache_write INTEGER NOT NULL, output INTEGER NOT NULL,
-      reasoning INTEGER NOT NULL, cost_usd REAL NOT NULL,
+      requests INTEGER NOT NULL, ${COUNT_COLUMNS.map((column) => `${column} INTEGER NOT NULL`).join(", ")}, cost_usd REAL NOT NULL,
       PRIMARY KEY (slot, agent, endpoint, model, session, priced))`,
   );
   ready.add(sql);
@@ -140,23 +124,18 @@ export const usageStore = (sql: SqlStorage, options: { readonly maxRows?: number
         const listed = listedModelOf(endpoints.endpoints.find((endpoint) => endpoint.id === entry.endpointId)?.models ?? [], entry.modelId);
         const cost = entry.costUsd ?? costAt(listed?.cost, entry);
         sql.exec(
-          `INSERT INTO t3flare_usage (slot, agent, endpoint, model, session, priced, requests, input, cache_read, cache_write, output, reasoning, cost_usd)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO t3flare_usage (slot, agent, endpoint, model, session, priced, requests, ${COUNT_COLUMNS.join(", ")}, cost_usd)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ${COUNT_COLUMNS.map(() => "?").join(", ")}, ?)
            ON CONFLICT (slot, agent, endpoint, model, session, priced) DO UPDATE SET
-             requests = requests + 1, input = input + excluded.input, cache_read = cache_read + excluded.cache_read,
-             cache_write = cache_write + excluded.cache_write, output = output + excluded.output,
-             reasoning = reasoning + excluded.reasoning, cost_usd = cost_usd + excluded.cost_usd`,
+             requests = requests + 1, ${COUNT_COLUMNS.map((column) => `${column} = ${column} + excluded.${column}`).join(", ")},
+             cost_usd = cost_usd + excluded.cost_usd`,
           Math.floor(entry.at / USAGE_SLOT_MS) * USAGE_SLOT_MS,
           entry.agent,
           entry.endpointId,
           listed?.id ?? entry.modelId,
           entry.session,
           cost === null ? 0 : 1,
-          entry.input,
-          entry.cacheRead,
-          entry.cacheWrite,
-          entry.output,
-          entry.reasoning,
+          ...COUNTS.map((field) => entry[field]),
           cost ?? 0,
         );
         kept += 1;
@@ -168,7 +147,7 @@ export const usageStore = (sql: SqlStorage, options: { readonly maxRows?: number
       ensure(sql);
       const rows = sql
         .exec<Row>(
-          "SELECT slot, agent, endpoint, model, session, priced, requests, input, cache_read, cache_write, output, reasoning, cost_usd FROM t3flare_usage WHERE slot >= ? ORDER BY slot",
+          `SELECT slot, agent, endpoint, model, session, priced, requests, ${COUNT_COLUMNS.join(", ")}, cost_usd FROM t3flare_usage WHERE slot >= ? ORDER BY slot`,
           Math.floor(sinceMs / USAGE_SLOT_MS) * USAGE_SLOT_MS,
         )
         .toArray();
@@ -179,11 +158,7 @@ export const usageStore = (sql: SqlStorage, options: { readonly maxRows?: number
         model: row.model,
         session: row.session,
         requests: Number(row.requests),
-        input: Number(row.input),
-        cacheRead: Number(row.cache_read),
-        cacheWrite: Number(row.cache_write),
-        output: Number(row.output),
-        reasoning: Number(row.reasoning),
+        ...(Object.fromEntries(COUNTS.map((field) => [field, Number(row[COLUMN[field]])])) as unknown as UsageTokens),
         costUsd: Number(row.priced) === 1 ? Number(row.cost_usd) : null,
       }));
     },
@@ -194,7 +169,7 @@ export const usageStore = (sql: SqlStorage, options: { readonly maxRows?: number
  * A row as t3's usage record: its model is the slug (`<endpointId>/<modelId>`, so the page tells endpoints apart) and its
  * rate model the endpoint's own id, which t3's rate table prices when the row's cost is not known.
  */
-export const toUsageRecord = (row: StoredUsage): UsageRecord => ({
+export const usageRecordOfRow = (row: StoredUsage): UsageRecord => ({
   provider: PROVIDER_OF[row.agent],
   timestampMs: row.slot,
   model: `${row.endpoint}/${row.model}`,
@@ -211,76 +186,3 @@ export const toUsageRecord = (row: StoredUsage): UsageRecord => ({
   speed: "standard",
   dedupeKey: null,
 });
-
-// ---- Commissary's own count, until the hard cut (SPI-1176) ----
-//
-// While Commissary's request log is read for the page (`readers.ts`), a request it logs under a principal it is read
-// for must not be counted again here. That is every request on an endpoint whose API key is such a principal's
-// (`key:<id>` of a `cms_` key: the Model proxy's own, or one listed in COMMISSARY_USAGE_PRINCIPALS), wherever its base
-// URL points (a `cms_` key opens nothing but Commissary). Its records are dropped as they arrive: the Session and the
-// relay send them as for any endpoint, and only the Environment, which holds the keys, decides. No key leaves it, and
-// the decision follows the key the endpoint has now. SPI-1176 removes this with the Commissary readers.
-
-/** The ids of the endpoints whose requests Commissary's log counts, from their keys (`apiKeyOf`). */
-export const countedByCommissary = async (
-  endpoints: ModelEndpoints,
-  apiKeyOf: (endpointId: string) => Promise<string | undefined>,
-  principals: ReadonlyArray<string>,
-): Promise<ReadonlySet<string>> => {
-  const counted = new Set<string>();
-  if (principals.length === 0) return counted;
-  for (const endpoint of endpoints.endpoints) {
-    if (endpoint.auth !== "api-key") continue;
-    const principal = principalOfApiKey(await apiKeyOf(endpoint.id).catch(() => undefined));
-    if (principal !== undefined && principals.includes(principal)) counted.add(endpoint.id);
-  }
-  return counted;
-};
-
-/**
- * `countedByCommissary`, worked out once per revision of the endpoints (every save, a key's included, makes a new one):
- * each key is opened once per revision, not once per record.
- */
-export const commissaryCountedCache = (work: (endpoints: ModelEndpoints) => Promise<ReadonlySet<string>>) => {
-  let held: { readonly revision: number; readonly counted: Promise<ReadonlySet<string>> } | undefined;
-  return (endpoints: ModelEndpoints): Promise<ReadonlySet<string>> => {
-    if (held?.revision !== endpoints.revision) {
-      const counted = work(endpoints);
-      held = { revision: endpoints.revision, counted };
-      // A failed read is not kept: the next record asks again.
-      counted.catch(() => {
-        if (held?.counted === counted) held = undefined;
-      });
-    }
-    return held.counted;
-  };
-};
-
-/**
- * The `recordUsage` RPC (SPI-1173): at most `MAX_USAGE_ENTRIES` entries kept, but none on an endpoint Commissary's log
- * counts. When that cannot be worked out, the entries are dropped too: a missing record is safer than a doubled one.
- */
-export const acceptUsage = async (
-  input: unknown,
-  deps: {
-    readonly store: UsageStore;
-    readonly endpoints: ModelEndpoints;
-    readonly countedByCommissary: (endpoints: ModelEndpoints) => Promise<ReadonlySet<string>>;
-    readonly now: () => number;
-  },
-): Promise<{ readonly kept: number }> => {
-  const raw = typeof input === "object" && input !== null ? (input as { readonly entries?: unknown }).entries : undefined;
-  const entries = Array.isArray(raw) ? raw.slice(0, MAX_USAGE_ENTRIES) : [];
-  if (entries.length === 0) return { kept: 0 };
-  let counted: ReadonlySet<string>;
-  try {
-    counted = await deps.countedByCommissary(deps.endpoints);
-  } catch {
-    return { kept: 0 };
-  }
-  const ours = entries.filter((entry) => {
-    const endpointId = (entry as { readonly endpointId?: unknown } | null)?.endpointId;
-    return !(typeof endpointId === "string" && counted.has(endpointId));
-  });
-  return { kept: deps.store.record(ours, deps.endpoints, deps.now()) };
-};
