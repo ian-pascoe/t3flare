@@ -142,8 +142,8 @@ const { text: raw } = await tailing([`t3flare-agents-${stage}`], async () => {
       `H=$(${HANDLE_OF})`,
       `echo "handle=$H"`,
       `echo "holders=$holders"`,
-      // pi's own process (node, titled "pi") runs without it.
-      `pis=0; with=0; for p in $(pgrep -f 'pi-coding-agent/dist/cli.js'); do pis=$((pis+1)); tr '\\0' '\\n' < /proc/$p/environ | grep -q '^T3FLARE_MODEL_HANDLE=' && with=$((with+1)); done; echo "piProcesses=$pis"; echo "piWithHandle=$with"`,
+      // pi's own process, the launch chain's setsid's child (node, which titles itself "pi"), runs without it.
+      `pis=0; with=0; for s in $(pgrep -f '^setsid --wait /opt/t3flare/bin/pi '); do for p in $(pgrep -P "$s"); do pis=$((pis+1)); title=$(tr '\\0' ' ' < /proc/$p/cmdline | cut -c1-20); tr '\\0' '\\n' < /proc/$p/environ | grep -q '^T3FLARE_MODEL_HANDLE=' && with=$((with+1)); done; done; echo "piProcesses=$pis"; echo "piTitle=$title"; echo "piWithHandle=$with"`,
       `echo "files=$( [ -n "$H" ] && grep -rlsF "$H" /var/lib/t3flare /root /tmp /workspace 2>/dev/null | wc -l)"`,
       // The handle command outside a pi process's launch chain (here, the admin route's shell) prints nothing.
       `echo "outside=$(T3FLARE_EXEC=$(ls /var/lib/t3flare/cli | head -1) /opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)"`,
@@ -164,7 +164,7 @@ const { text: raw } = await tailing([`t3flare-agents-${stage}`], async () => {
   const holders = String(lines.holders ?? "").split("|").map((entry) => entry.trim()).filter((entry) => entry !== "");
   check(
     "only the launch chain's setsid holds the handle (not pi, not a shell)",
-    handle !== undefined && holders.length === 1 && holders[0] === PI_HANDLE_HOLDERS[0] && lines.piWithHandle === "0" && Number(lines.piProcesses) >= 1,
+    handle !== undefined && holders.length === 1 && holders[0] === PI_HANDLE_HOLDERS[0] && lines.piWithHandle === "0" && lines.piProcesses === "1",
     report.handle,
   );
   check("no file holds the handle", lines.files === "0", report.handle);
