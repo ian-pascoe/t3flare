@@ -12,7 +12,8 @@
 //                                                       seconds (default 60) pass
 //   node scripts/stage.ts run p1166 p1166 status        the sign-in's status and the Copilot endpoint, as the panel lists them
 //   node scripts/stage.ts run p1166 p1166 models <id>…  sets the Copilot endpoint's models ("Edit models")
-//   node scripts/stage.ts run p1166 p1166 turn          a Durable turn with tools on the Copilot endpoint's small model
+//   node scripts/stage.ts run p1166 p1166 turn [id]     a Durable turn with tools on the Copilot endpoint's small model
+//                                                       (or endpoint id's, as a control)
 //   node scripts/stage.ts run p1166 p1166 sign-out      signs the Copilot endpoint out
 //   node scripts/stage.ts run p1166 p1166 scan          the page, status and audit hold no GitHub or Copilot token's form
 //
@@ -113,9 +114,10 @@ if (step === "page") {
 } else if (step === "turn") {
   const listed = await api("GET", "endpoints");
   const endpoints = (listed.json?.endpoints ?? []) as ModelEndpoints["endpoints"];
-  // The Copilot endpoint's small model, by text generation's rule.
-  const model = defaultTextModel({ revision: 0, endpoints: endpoints.filter((endpoint) => endpoint.id === ID) });
-  if (model === undefined) throw new Error("the Copilot endpoint has no small model");
+  // The endpoint's small model, by text generation's rule: the Copilot endpoint's, or another's named (a control).
+  const on = args[0] ?? ID;
+  const model = defaultTextModel({ revision: 0, endpoints: endpoints.filter((endpoint) => endpoint.id === on) });
+  if (model === undefined) throw new Error(`the endpoint ${on} has no small model`);
   const cookie = await pair();
   await admin("POST", "/_t3flare/disarm-bootstrap");
   const turn = await realTurn(cookie, { push: false, model });
