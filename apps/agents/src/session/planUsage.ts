@@ -5,6 +5,7 @@
 // items ("Sign in with ChatGPT rejects configuration_update items"), but only for a provider named `openai`
 // (`isChatGPTSignIn`); a Model endpoint's provider is its own id, so a sign-in endpoint's requests pass through this
 // instead (`onPayload`), and its models carry `PLAN_USAGE_COMPAT`. docs/upstream-fragility.md U77.
+import type { OpenAIResponsesCompat } from "@earendil-works/pi-ai";
 
 /** The request fields plan usage refuses (OpenAI's list), plus `prompt_cache_options`, which pi-ai drops for it too. */
 export const PLAN_USAGE_REFUSED_FIELDS: ReadonlyArray<string> = [
@@ -32,7 +33,7 @@ export const PLAN_USAGE_REFUSED_FIELDS: ReadonlyArray<string> = [
  * `reasoning.effort` (which plan usage takes) instead of `configuration_update` items with the effort pinned to medium;
  * and no Responses `tool_search`, which plan usage refuses.
  */
-export const PLAN_USAGE_COMPAT: Readonly<Record<string, unknown>> = { supportsMidConvoEffort: false, supportsToolSearch: false };
+export const PLAN_USAGE_COMPAT: OpenAIResponsesCompat = { supportsMidConvoEffort: false, supportsToolSearch: false };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 

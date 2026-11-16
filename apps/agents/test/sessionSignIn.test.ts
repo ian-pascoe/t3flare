@@ -3,7 +3,8 @@
 // refreshed token at its next request; it drops the token on a 401 and on the endpoint's sign-out; a turn on a signed-out
 // endpoint fails naming the sign-in. Its requests follow ChatGPT plan usage's rules (OpenAI's "Preview limitations").
 import { createModels } from "@earendil-works/pi-ai";
-import type { EndpointCredential, EndpointCredentialFailure, EndpointCredentialRequest, ModelEndpoint } from "@t3flare/models/endpoints";
+import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoint } from "@t3flare/models/endpoints";
+import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
 import { SessionEndpoints } from "../src/session/endpoints.ts";

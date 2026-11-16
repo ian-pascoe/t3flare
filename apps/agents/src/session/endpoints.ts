@@ -10,12 +10,12 @@ import type { MutableModels, FetchFunction } from "@earendil-works/pi-ai";
 import {
   EMPTY_ENDPOINTS,
   type EndpointCredential,
-  type EndpointCredentialFailure,
   type EndpointCredentialRequest,
   type EndpointTarget,
   type ModelEndpoints,
   targetKey,
 } from "@t3flare/models/endpoints";
+import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 
 import { endpointProviders } from "./models.ts";
 

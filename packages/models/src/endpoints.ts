@@ -261,18 +261,6 @@ export interface EndpointCredential {
   readonly problem?: string;
 }
 
-/**
- * Why a Session got no credential for an endpoint, typed (SPI-1164), as the Session records it on the turn for the
- * differ: `signed_out` (sign in again), `changed` (retry), `unavailable` (a sign-in's passing failure: retry),
- * `unreadable` and `no_key` (enter the key again). `message` is the Session's fixed text.
- */
-export interface EndpointCredentialFailure {
-  readonly endpointId: string;
-  readonly kind: "signed_out" | "changed" | "unavailable" | "unreadable" | "no_key";
-  readonly message: string;
-  readonly retryable: boolean;
-}
-
 /** A Session's request for an endpoint's key: the endpoint, and the target it will send the key to. */
 export interface EndpointCredentialRequest {
   readonly endpointId: string;

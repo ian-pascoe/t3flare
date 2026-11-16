@@ -327,13 +327,17 @@ export interface ProxyRecord {
   readonly failure?: ProxyFailureRecord;
   /**
    * SPI-1164: why the turn's last request got no credential from its Model endpoint (a sign-in signed out, a key gone),
-   * typed, so the differ shows it without reading the error's text. `@t3flare/models/endpoints`' `EndpointCredentialFailure`.
+   * typed, so the differ shows it without reading the error's text.
    */
-  readonly credential?: EndpointCredentialFailureRecord;
+  readonly credential?: EndpointCredentialFailure;
 }
 
-/** A Model endpoint's credential failure as the Session records it: the Session's own fixed text, never a vendor's. */
-export interface EndpointCredentialFailureRecord {
+/**
+ * Why a Session got no credential for a Model endpoint (SPI-1164), as it records it on the turn: `signed_out` (sign in
+ * again), `changed` (retry), `unavailable` (a sign-in's passing failure: retry), `unreadable` and `no_key` (enter the key
+ * again). `message` is the Session's own fixed text, never a vendor's.
+ */
+export interface EndpointCredentialFailure {
   readonly endpointId: string;
   readonly kind: "signed_out" | "changed" | "unavailable" | "unreadable" | "no_key";
   readonly message: string;

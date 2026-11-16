@@ -4,7 +4,7 @@
 // replace its endpoint. A model pi-ai does not know (a newer Claude, or any other model the proxy translates) is
 // a generic Anthropic Messages model with the limits the catalog gives it. Adapted from
 // cloudpid@ae5a7b73:apps/server/src/session/models.ts (`proxyModels`).
-import { type Api, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
+import { type Api, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type OpenAIResponsesCompat, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
 import { mistralConversationsApi } from "@earendil-works/pi-ai/api/mistral-conversations.lazy";
@@ -16,7 +16,6 @@ import type { Catalog, ModelProxy } from "@t3flare/models/catalog";
 import {
   type EndpointApi,
   type EndpointCredential,
-  type EndpointCredentialFailure,
   type EndpointModel,
   endpointLabel,
   type EndpointTarget,
@@ -27,6 +26,7 @@ import {
   signInOf,
   targetOf,
 } from "@t3flare/models/endpoints";
+import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 
 import { PLAN_USAGE_COMPAT, planUsagePayload } from "./planUsage.ts";
 
@@ -177,7 +177,7 @@ export const credentialProblem = (endpoint: Pick<ModelEndpoint, "id" | "auth">, 
  * compatibility overrides (ChatGPT plan usage: no `configuration_update` items, so the effort goes as `reasoning.effort`;
  * no Responses `tool_search`). A new sign-in adds its entry here.
  */
-const SIGN_IN_REQUESTS: Readonly<Record<SignIn, { readonly payload: (params: unknown) => unknown; readonly compat: Readonly<Record<string, unknown>> }>> = {
+const SIGN_IN_REQUESTS: Readonly<Record<SignIn, { readonly payload: (params: unknown) => unknown; readonly compat: OpenAIResponsesCompat }>> = {
   chatgpt: { payload: planUsagePayload, compat: PLAN_USAGE_COMPAT },
 };
 
@@ -195,8 +195,19 @@ const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api
   // SAFETY: both were copied from pi-ai's own catalog entry of this model (known.ts): `thinkingLevelMap` as pi-ai typed
   // it, `compat` only from an entry of the same API, so each is the type `Model<api>` declares; the stored copy widened them.
   ...(model.thinkingLevelMap === undefined ? {} : { thinkingLevelMap: model.thinkingLevelMap as NonNullable<Model<Api>["thinkingLevelMap"]> }),
-  ...(model.compat === undefined && !isSignIn(endpoint.auth) ? {} : { compat: { ...model.compat, ...(isSignIn(endpoint.auth) ? SIGN_IN_REQUESTS[endpoint.auth].compat : {}) } as never }),
+  ...compatOf(endpoint, model),
 });
+
+/**
+ * The model's compat: its catalog entry's, with its sign-in's overrides (`SIGN_IN_REQUESTS`, typed as its API's compat).
+ * The one cast: `Model<Api>["compat"]` is a conditional type over the generic API, which no runtime API value narrows,
+ * so TypeScript resolves it to `never`; the value is that API's compat (the catalog's same-API entry, the override's type).
+ */
+const compatOf = (endpoint: ModelEndpoint, model: EndpointModel): { readonly compat?: never } => {
+  const overrides = isSignIn(endpoint.auth) ? SIGN_IN_REQUESTS[endpoint.auth].compat : undefined;
+  if (model.compat === undefined && overrides === undefined) return {};
+  return { compat: { ...model.compat, ...overrides } as never };
+};
 
 /** A sign-in endpoint's fetch: a 401 tells the Session to drop the token it holds (it may have been revoked). */
 const refusalWatch = (fetch: FetchFunction, onRefused: () => void): FetchFunction =>
