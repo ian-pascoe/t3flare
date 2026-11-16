@@ -330,6 +330,26 @@ export interface ProxyRecord {
    * typed, so the differ shows it without reading the error's text.
    */
   readonly credential?: EndpointCredentialFailure;
+  /**
+   * SPI-1172: the turn's last failed answer from a Model endpoint, classified by the endpoint's API and auth when it came.
+   * Recording one clears `failure` (the proxy's), and the other way round: the last answer is the turn's.
+   */
+  readonly endpointFailure?: EndpointFailureRecord;
+}
+
+/**
+ * `@t3flare/models/failures`' `ModelFailure` for a Model endpoint (SPI-1172), with the endpoint, the Session's fixed text
+ * naming it (never the vendor's body), and the time of the answer (epoch ms).
+ */
+export interface EndpointFailureRecord {
+  readonly endpointId: string;
+  readonly class: "usage_limit" | "permission_error" | "provider_error";
+  readonly code: string;
+  readonly message: string;
+  readonly retryable: boolean;
+  readonly resetAt?: number;
+  readonly stop: boolean;
+  readonly at: number;
 }
 
 /**

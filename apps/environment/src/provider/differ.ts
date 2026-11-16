@@ -22,7 +22,7 @@ import {
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import type { ProviderAdapterV2Event } from "@t3tools/provider-core/server/ProviderAdapter";
-import { type ApprovalDecision, type ContentBlock, type PendingApproval, type PendingQuestion, PROPOSE_PLAN_TOOL, type PushedEntry, type SessionState, type TurnState } from "@t3flare/session-protocol";
+import { type ApprovalDecision, type ContentBlock, type EndpointFailureRecord, type PendingApproval, type PendingQuestion, PROPOSE_PLAN_TOOL, type PushedEntry, type SessionState, type TurnState } from "@t3flare/session-protocol";
 import { classifyProxyFailure, type ProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
 import * as DateTime from "effect/DateTime";
 
@@ -787,21 +787,29 @@ const emitRequests = (state: DifferState, out: Array<ProviderAdapterV2Event>, pe
 /** The least time after the turn's end a usage limit's reset is held to: t3 arms no resume for one not after it. */
 export const MIN_RESET_MS = 30_000;
 
+/** A usage limit's reset as t3 takes it: ISO, at least 30 s after `now`; null for another class or no reset. */
+const resetOf = (failure: { readonly class: string; readonly resetAt?: number }, now: DateTime.Utc): string | null =>
+  failure.class === "usage_limit" && failure.resetAt !== undefined
+    ? DateTime.formatIso(DateTime.makeUnsafe(Math.max(failure.resetAt, DateTime.toEpochMillis(now) + MIN_RESET_MS)))
+    : null;
+
 /** A model proxy failure as t3's: fixed text by its code, the reset held to at least 30 s after `now`. */
-const proxyFailureOf = (failure: ProxyFailure, now: DateTime.Utc): OrchestrationV2ProviderFailure => {
-  const nowMs = DateTime.toEpochMillis(now);
-  const resetAt =
-    failure.class === "usage_limit" && failure.resetAt !== undefined
-      ? DateTime.formatIso(DateTime.makeUnsafe(Math.max(failure.resetAt, nowMs + MIN_RESET_MS)))
-      : null;
-  return makeProviderFailure({
+const proxyFailureOf = (failure: ProxyFailure, now: DateTime.Utc): OrchestrationV2ProviderFailure =>
+  makeProviderFailure({
     class: failure.class,
     message: proxyFailureMessage(failure),
     code: failure.code,
     retryable: !(failure.class === "permission_error" || failure.code === "proxy_no_account"),
-    resetAt,
+    resetAt: resetOf(failure, now),
   });
-};
+
+/**
+ * A Model endpoint's failure as the Session classified it by the endpoint's API and auth (SPI-1172): its fixed text
+ * naming the endpoint, its code and whether a retry helps, the reset held as the proxy's is. A usage limit pauses the
+ * thread until it; nothing here (or in the Session) falls back to another endpoint.
+ */
+const endpointFailureOf = (failure: EndpointFailureRecord, now: DateTime.Utc): OrchestrationV2ProviderFailure =>
+  makeProviderFailure({ class: failure.class, message: failure.message, code: failure.code, retryable: failure.retryable, resetAt: resetOf(failure, now) });
 
 /**
  * A model error, classified (step 2a part 2 plan, section 3): the Session's record of the proxy's answer first, else the
@@ -815,6 +823,8 @@ export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2Pr
     // renewed, a key gone or changed): the Session's own fixed text, its kind as the code.
     const credential = turn.proxy?.credential;
     if (credential !== undefined) return makeProviderFailure({ class: "provider_error", message: credential.message, code: credential.kind, retryable: credential.retryable });
+    const endpointFailure = turn.proxy?.endpointFailure;
+    if (endpointFailure !== undefined) return endpointFailureOf(endpointFailure, now);
     const recorded = turn.proxy?.failure;
     if (recorded !== undefined) return proxyFailureOf(recorded as ProxyFailure, now);
     const classified = classifyProxyFailure({ status: 0, retryAfter: null, text: detail, at: turn.settledAt ?? DateTime.toEpochMillis(now) });

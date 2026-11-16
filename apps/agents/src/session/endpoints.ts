@@ -12,6 +12,7 @@ import {
   type EndpointCredential,
   type EndpointCredentialRequest,
   type EndpointTarget,
+  type ModelEndpoint,
   type ModelEndpoints,
   targetKey,
 } from "@t3flare/models/endpoints";
@@ -56,8 +57,8 @@ export interface SessionEndpointsOptions {
 
 export class SessionEndpoints {
   readonly #options: SessionEndpointsOptions;
-  /** The endpoints whose providers the models have. */
-  #ids: ReadonlySet<string> = new Set();
+  /** The endpoints whose providers the models have, by id. */
+  #endpoints: ReadonlyMap<string, ModelEndpoint> = new Map();
   /**
    * Keys in memory only, by endpoint and target: an answer for an old target (one that lands after a newer install) is
    * never used for another.
@@ -89,11 +90,19 @@ export class SessionEndpoints {
         if (entry !== undefined) usage.record(entry);
       },
     });
-    const next = new Set(providers.map((provider) => provider.id));
-    for (const id of this.#ids) if (!next.has(id)) this.#options.models.deleteProvider(id);
+    const next = new Map(endpoints.endpoints.map((endpoint) => [endpoint.id, endpoint]));
+    for (const id of this.#endpoints.keys()) if (!next.has(id)) this.#options.models.deleteProvider(id);
     for (const provider of providers) this.#options.models.setProvider(provider);
-    this.#ids = next;
+    this.#endpoints = next;
     this.#keys.clear();
+  }
+
+  /**
+   * The installed endpoint a model's provider names (secret-free), for classifying its failed answers by its API and
+   * auth (SPI-1172); undefined for the Model proxy's `anthropic` and for an endpoint no longer installed.
+   */
+  endpoint(id: string): ModelEndpoint | undefined {
+    return this.#endpoints.get(id);
   }
 
   /** An endpoint's key for `target`, from memory while fresh, else from the Environment (a refusal is never kept). */

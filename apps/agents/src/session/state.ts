@@ -9,6 +9,7 @@ import type {
   TurnState,
   UsageSlim,
 } from "@t3flare/session-protocol";
+import { redactSecrets } from "@t3flare/models/redact";
 import { NESTED_ARGS_BYTES, NESTED_OUTPUT_BYTES, TOOL_LIVE_OUTPUT_BYTES, TOOL_OUTPUT_BYTES } from "@t3flare/session-protocol";
 
 type Json = unknown;
@@ -94,7 +95,8 @@ export const pushedEntry = (
       role: "assistant",
       content: slimContent(message.content),
       ...opt("stopReason", str(message.stopReason)),
-      ...(str(message.errorMessage) ? { errorMessage: cut(str(message.errorMessage)!, 2048) } : {}),
+      // Redacted (SPI-1172): an error text may echo a credential; none goes into a push.
+      ...(str(message.errorMessage) ? { errorMessage: cut(redactSecrets(str(message.errorMessage)!), 2048) } : {}),
       ...(usage ? { usage } : {}),
     };
   }
@@ -180,7 +182,7 @@ export const liveOf = (doc: Json, turnOfTask: (taskId: string) => string | null)
         : {
             reason: str(failure.reason) ?? "unknown",
             taskId: idText(failure.taskId) ?? "",
-            ...(str(failure.detail) ? { detail: cut(str(failure.detail)!, 2048) } : {}),
+            ...(str(failure.detail) ? { detail: cut(redactSecrets(str(failure.detail)!), 2048) } : {}),
           },
   };
 };

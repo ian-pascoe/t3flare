@@ -9,18 +9,37 @@
 //
 // A test fault (`Fault`, stages only) answers in the proxy's place until its reset, so the limit path runs end to end
 // without exhausting real accounts. It counts as a request, as the proxy's answer would.
+//
+// SPI-1172: a Model endpoint's failed answer is classified by the endpoint's API and auth (`@t3flare/models/failures`),
+// from the status, the headers and the error body the recording fetch keeps (pi-ai keeps none of the headers, and only
+// some of the body), and recorded with the endpoint's own text; the proxy's `anthropic` keeps its own classifier until
+// the hard cut (SPI-1176). Every failed answer's text is redacted (`@t3flare/models/redact`) before pi-durable keeps it,
+// so no echoed key reaches the turn's detail, the push or t3. The fault route also answers in each API's vendor shapes
+// (`anthropicUsageLimit`, `openaiQuota`, …), the endpoint's own fetch never called.
 // @effect-diagnostics globalDate:off
 import { GenerationTask, defineExtension, type Extension, hook } from "@earendil-works/pi-durable";
+import type { EndpointApi, EndpointAuth } from "@t3flare/models/endpoints";
+import { classifyModelFailure, errorBodyOf, type FailedAnswer, failureHeaders, modelFailureDetail, modelFailureMessage } from "@t3flare/models/failures";
 import { classifyProxyFailure, proxyFailureDetail } from "@t3flare/models/proxyFailure";
-import type { ProxyFailureRecord } from "@t3flare/session-protocol";
+import { redactSecrets } from "@t3flare/models/redact";
+import type { EndpointFailureRecord, ProxyFailureRecord } from "@t3flare/session-protocol";
 import type { AssistantMessage, MutableModels } from "@earendil-works/pi-ai";
 
-/** The last answer the proxy (or a fault) gave: its status, `retry-after` and when it came. */
+/** The last answer the proxy, an endpoint (or a fault) gave: its status, `retry-after` and when it came. */
 export interface RecordedAnswer {
   readonly status: number;
   readonly retryAfter: string | null;
   readonly at: number;
+  /** The request's URL: which endpoint answered (SPI-1172). */
+  readonly url: string;
+  /** The headers the classifier reads (`retry-after*`, Anthropic's unified limit, OpenAI's `x-ratelimit-*`). */
+  readonly headers: Readonly<Record<string, string>>;
+  /** An error answer's body (status 400 and up), at most `ERROR_BODY_BYTES`. */
+  readonly body?: string;
 }
+
+/** The headers a failure's class reads. */
+
 
 /** A test's fault: every model request is answered with `fixture` until `resetAt` (epoch ms). */
 export interface Fault {
@@ -28,7 +47,22 @@ export interface Fault {
   readonly resetAt: number;
 }
 
-export const FAULT_FIXTURES = ["cooldown", "spendLimit", "invalidKey", "overloaded", "accountUnavailable"] as const;
+export const FAULT_FIXTURES = [
+  // Commissary's shapes (step 2a part 2), for the proxy.
+  "cooldown",
+  "spendLimit",
+  "invalidKey",
+  "overloaded",
+  "accountUnavailable",
+  // SPI-1172: vendors' shapes, for a Model endpoint of the API (packages/models/test/fixtures/vendors.json).
+  "anthropicUsageLimit",
+  "anthropicRateLimit",
+  "anthropicKeyRefused",
+  "openaiUsageLimit",
+  "openaiQuota",
+  "openaiKeyRefused",
+  "planUsageLimit",
+] as const;
 export type FaultFixture = (typeof FAULT_FIXTURES)[number];
 
 /** A Go duration of whole seconds, as Commissary's hint writes it (`2m0s`, `1h2m3s`). */
@@ -40,6 +74,17 @@ const goDuration = (seconds: number) => {
 };
 
 const anthropicError = (type: string, message: string) => JSON.stringify({ type: "error", error: { type, message } });
+const openaiError = (message: string, type: string, code: string) => JSON.stringify({ error: { message, type, param: null, code } });
+
+/**
+ * Made-up credentials a refused-key fault echoes in its body, as a careless vendor or gateway might: an Anthropic key, a
+ * bearer JWT and an OpenAI project key. None is real; the evidence and the tests look for each and must find none.
+ */
+export const FAULT_ECHOED_SECRETS = [
+  "sk-ant-api03-t3flareFAULTechoNotARealKey0000000000000000000000000000000000000000-AAAA",
+  "eyJhbGciOiJIUzI1NiJ9.eyJ0M2ZsYXJlIjoiZmF1bHQtZWNobyJ9.dDNmbGFyZS1mYXVsdC1zaWduYXR1cmU",
+  "sk-proj-t3flareFAULTechoNotARealKey000000000000000000000000",
+] as const;
 
 /** The answer Commissary gives for `fault.fixture` (the shapes of packages/models/test/fixtures/proxy.json), reset at its time. */
 export const faultAnswer = (fault: Fault, now: number, model: string): Response => {
@@ -64,6 +109,30 @@ export const faultAnswer = (fault: Fault, now: number, model: string): Response 
       return json(529, anthropicError("overloaded_error", "Overloaded"));
     case "accountUnavailable":
       return json(503, anthropicError("api_error", "no auth available"), seconds);
+    case "anthropicUsageLimit":
+      // Anthropic's unified limit, as Claude Code reads it: status rejected, the claim's reset in epoch seconds.
+      return new Response(anthropicError("rate_limit_error", "This request would exceed your account's rate limit. Please try again later."), {
+        status: 429,
+        headers: {
+          "content-type": "application/json",
+          "anthropic-ratelimit-unified-status": "rejected",
+          "anthropic-ratelimit-unified-reset": String(Math.ceil(fault.resetAt / 1000)),
+          "anthropic-ratelimit-unified-representative-claim": "five_hour",
+        },
+      });
+    case "anthropicRateLimit":
+      return json(429, anthropicError("rate_limit_error", "This request would exceed your organization's rate limit."), seconds);
+    case "anthropicKeyRefused":
+      return json(401, anthropicError("authentication_error", `invalid x-api-key: ${FAULT_ECHOED_SECRETS[0]} (Authorization: Bearer ${FAULT_ECHOED_SECRETS[1]})`));
+    case "openaiUsageLimit":
+      // ChatGPT's Codex backend: `usage_limit_reached` with `resets_at` in epoch seconds.
+      return json(429, JSON.stringify({ error: { type: "usage_limit_reached", message: "The usage limit has been reached", plan_type: "plus", resets_at: Math.ceil(fault.resetAt / 1000) } }));
+    case "openaiQuota":
+      return json(429, openaiError("You exceeded your current quota, please check your plan and billing details.", "insufficient_quota", "insufficient_quota"));
+    case "openaiKeyRefused":
+      return json(401, openaiError(`Incorrect API key provided: ${FAULT_ECHOED_SECRETS[2]}.`, "invalid_request_error", "invalid_api_key"));
+    case "planUsageLimit":
+      return json(429, openaiError("You have reached your ChatGPT usage limit.", "invalid_request_error", "subscription_sharing_usage_limit_exceeded"));
   }
 };
 
@@ -100,22 +169,68 @@ export const recordingFetch = (options: RecordingFetchOptions) => {
       if (fault !== undefined) options.clearFault();
       response = await options.fetch(input, init);
     }
-    last = { status: response.status, retryAfter: response.headers.get("retry-after"), at: options.now() };
+    const at = options.now();
+    const url = input instanceof Request ? input.url : String(input);
+    // An error answer's body, from a copy, so pi-ai still reads the answer whole.
+    const body = response.status >= 400 ? await errorBodyOf(response) : undefined;
+    last = { status: response.status, retryAfter: response.headers.get("retry-after"), at, url, headers: failureHeaders(response.headers), ...(body === undefined ? {} : { body }) };
     return response;
   }) as typeof globalThis.fetch;
   return { fetch: recording, last: () => last };
 };
+
+/** What the classifier needs of a Model endpoint: its API and auth, and its base URL (which answers are its). */
+export interface ClassifiedEndpoint {
+  readonly id: string;
+  readonly api: EndpointApi;
+  readonly auth: EndpointAuth;
+  readonly baseUrl: string;
+}
 
 export interface ProxyLimitsOptions {
   /** The answer of the request that ended in this response. */
   readonly last: () => RecordedAnswer | undefined;
   /** The classified failure, for the running turn. */
   readonly record: (failure: ProxyFailureRecord) => void;
+  /** SPI-1172: the Model endpoint a message's provider names; undefined for the proxy's `anthropic`. */
+  readonly endpoint?: (provider: string) => ClassifiedEndpoint | undefined;
+  /** SPI-1172: an endpoint's classified failure, for the running turn. */
+  readonly recordEndpoint?: (failure: EndpointFailureRecord) => void;
 }
+
+/**
+ * An endpoint's failed response (SPI-1172), classified by its API and auth from the recorded answer when the request
+ * was the endpoint's (an API whose pi-ai client takes no fetch leaves none: its text alone is read, as a stream's is).
+ */
+const classifyEndpoint = (message: AssistantMessage, errorMessage: string, endpoint: ClassifiedEndpoint, options: ProxyLimitsOptions): void => {
+  const recorded = options.last();
+  const answer = recorded !== undefined && recorded.url.startsWith(endpoint.baseUrl) ? recorded : undefined;
+  const failed: FailedAnswer =
+    answer !== undefined && answer.status >= 400
+      ? { status: answer.status, headers: answer.headers, body: answer.body ?? errorMessage, at: answer.at }
+      : { status: 200, headers: answer?.headers ?? {}, body: errorMessage, at: answer?.at ?? Date.now() };
+  const failure = classifyModelFailure(failed, endpoint);
+  if (failure === undefined) return;
+  options.recordEndpoint?.({
+    endpointId: endpoint.id,
+    class: failure.class,
+    code: failure.code,
+    message: modelFailureMessage(failure, endpoint, answer?.status),
+    retryable: failure.retryable,
+    ...(failure.resetAt === undefined ? {} : { resetAt: failure.resetAt }),
+    stop: failure.stop,
+    at: failed.at,
+  });
+  if (failure.stop) message.errorMessage = modelFailureDetail(failure);
+};
 
 /** Classify a failed response once, record it, and when no retry can succeed leave a text no retry pattern matches. */
 const classifyOnce = (message: AssistantMessage, options: ProxyLimitsOptions): void => {
   if (message.stopReason !== "error" || message.errorMessage === undefined) return;
+  // No echoed credential reaches pi-durable's record of the answer, the turn's detail, the push or t3 (SPI-1172).
+  message.errorMessage = redactSecrets(message.errorMessage);
+  const endpoint = options.endpoint?.(message.provider);
+  if (endpoint !== undefined) return classifyEndpoint(message, message.errorMessage, endpoint, options);
   const answer = options.last() ?? { status: 200, retryAfter: null, at: Date.now() };
   const failure = classifyProxyFailure({ ...answer, text: message.errorMessage });
   if (failure === undefined) return;

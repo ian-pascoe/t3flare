@@ -82,6 +82,7 @@ import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
+import { redactSecrets } from "@t3flare/models/redact";
 import { proxyModels } from "./models.ts";
 import { SessionEndpoints } from "./endpoints.ts";
 import { noteTurnProvider, runsOn } from "./signOut.ts";
@@ -217,7 +218,15 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.#proxyFetch = recorder.fetch;
     this.#execs = new RunningExecs(ctx.storage.kv, (ids) => this.#killExecs(ids));
     const registry = createRegistry();
-    this.#limits = { last: recorder.last, record: (failure) => this.#noteProxy((record) => ({ ...record, failure })) };
+    // The turn's last failed answer wins: a proxy failure clears an endpoint's, and an endpoint's clears the proxy's.
+    this.#limits = {
+      last: recorder.last,
+      record: (failure) =>
+        this.#noteProxy(({ endpointFailure: _endpoint, ...record }) => ({ ...record, failure })),
+      // SPI-1172: a Model endpoint's failed answer, classified by its API and auth.
+      endpoint: (provider) => this.#endpoints.endpoint(provider),
+      recordEndpoint: (endpointFailure) => this.#noteProxy(({ failure: _proxy, ...record }) => ({ ...record, endpointFailure })),
+    };
     registry.install(proxyLimits(this.#limits));
     registry.install(codingTools());
     registry.install(fileTools(() => this.#files()));
@@ -1116,7 +1125,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
         next = { ...turn, status: "answered", inputEntry: String(status.entry), settledAt: Date.now() };
       } else if (status.status === "unanswered") {
         const reason = String(status.reason);
-        const detail = typeof status.detail === "string" ? status.detail.slice(0, 2048) : undefined;
+        // Redacted again here (SPI-1172): a failure the hook did not see (a tool's, the run's) never carries a credential to t3.
+        const detail = typeof status.detail === "string" ? redactSecrets(status.detail).slice(0, 2048) : undefined;
         next = {
           ...turn,
           status: reason === "aborted" ? "aborted" : "failed",

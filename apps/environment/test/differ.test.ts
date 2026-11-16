@@ -128,6 +128,66 @@ describe("differ", () => {
     expect(at(undefined, `API key auth failed for provider chatgpt: ${message}`).message).toBe("The model provider reported an error.");
   });
 
+  describe("a Model endpoint's failure the Session classified by its API and auth (SPI-1172)", () => {
+    const nowMs = DateTime.toEpochMillis(now);
+    const failed = (endpointFailure: NonNullable<TurnState["proxy"]>["endpointFailure"], extra: Partial<NonNullable<TurnState["proxy"]>> = {}) =>
+      ({
+        submissionId: "1",
+        runId: "r",
+        attemptId: "a",
+        status: "failed",
+        reason: "model_error",
+        detail: "t3flare model endpoint: usage_limit",
+        startedAt: 0,
+        settledAt: nowMs,
+        proxy: { requests: 1, endpointFailure, ...extra },
+      }) as TurnState;
+
+    it("a usage limit pauses with its reset, the Session's text naming the endpoint", () => {
+      const resetAt = Date.parse("2026-11-10T23:20:00.000Z");
+      const message = 'The Model endpoint "claude" reached its usage limit.';
+      expect(failureOf(failed({ endpointId: "claude", class: "usage_limit", code: "usage_limit", message, retryable: true, resetAt, stop: true, at: nowMs }), now)).toEqual({
+        class: "usage_limit",
+        message,
+        code: "usage_limit",
+        retryable: true,
+        resetAt: "2026-11-10T23:20:00.000Z",
+      });
+    });
+
+    it("a reset held to at least 30 s after now; none when the vendor gave none", () => {
+      const soon = failureOf(failed({ endpointId: "e", class: "usage_limit", code: "throttled", message: "m", retryable: true, resetAt: nowMs + 1000, stop: true, at: nowMs }), now);
+      expect(soon.resetAt).toBe("2026-11-10T21:20:30.000Z");
+      const none = failureOf(failed({ endpointId: "e", class: "usage_limit", code: "usage_limit", message: "m", retryable: true, stop: true, at: nowMs }), now);
+      expect(none.resetAt ?? null).toBeNull();
+    });
+
+    it("a refused key is a permission error naming the endpoint, with no reset", () => {
+      const message = 'The Model endpoint "commissary" refused its API key (HTTP 401): check it in the Harness panel.';
+      expect(failureOf(failed({ endpointId: "commissary", class: "permission_error", code: "key_refused", message, retryable: false, stop: true, at: nowMs }), now)).toEqual({
+        class: "permission_error",
+        message,
+        code: "key_refused",
+        retryable: false,
+      });
+    });
+
+    it("an overload is a provider error, retryable, never a usage limit", () => {
+      expect(failureOf(failed({ endpointId: "e", class: "provider_error", code: "overloaded", message: "m", retryable: true, stop: false, at: nowMs }), now)).toMatchObject({
+        class: "provider_error",
+        code: "overloaded",
+        retryable: true,
+      });
+    });
+
+    it("a credential the Session could not get comes first; the record wins over the error's text", () => {
+      const credential = { endpointId: "e", kind: "no_key" as const, message: "no key", retryable: false };
+      expect(failureOf(failed({ endpointId: "e", class: "usage_limit", code: "usage_limit", message: "m", retryable: true, stop: true, at: nowMs }, { credential }), now).code).toBe("no_key");
+      const overText = { ...failed({ endpointId: "e", class: "permission_error", code: "key_refused", message: "m", retryable: false, stop: true, at: nowMs }), detail: '429 {"type":"error","error":{"type":"rate_limit_error","message":"x"}}' };
+      expect(failureOf(overText, now).code).toBe("key_refused");
+    });
+  });
+
   describe("a model proxy failure the Session classified", () => {
     const nowMs = DateTime.toEpochMillis(now);
     const failed = (failure: NonNullable<TurnState["proxy"]>["failure"], detail = "t3flare model proxy: x") =>
