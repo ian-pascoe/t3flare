@@ -261,7 +261,14 @@ Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/
    packages load only under project trust, which stays off) can set; `modelOverrides` cannot set one. A hostile
    repository `.pi/` (an extension moving an endpoint's provider, settings naming it and a package, a `models.json`)
    loaded nothing and sent nothing elsewhere (`test:docker`). So no placeholder or request-time hook is needed, unlike
-   OpenCode's. A root command can rewrite the home's `models.json`; it can read the handle already.
+   OpenCode's. A root command can rewrite the home's `models.json`; it can read the handle already. pi's environment
+   is the profile's laid over the Workspace's command environment and the owner's Variables, so an owner's
+   `HTTP_PROXY` Variable would reach pi's HTTP client (undici's `EnvHttpProxyAgent`) and carry the relay's cleartext
+   request, handle included, through that proxy: the launcher adds the relay's host to `no_proxy` and `NO_PROXY`,
+   keeping the owner's own entries (review round 1, `test:docker`).
+7. **Absolute paths.** The launcher and the handle command run every program by its absolute path: the image puts
+   mise's shims first on PATH and trusts `/workspace`'s mise configuration, so a project's `env` would otherwise start
+   pi with the handle, or its `tr` be handed the holder's environment (review round 1, `test:docker`).
 6. **Headers.** pi's own (`x-stainless-*`, `user-agent`, `accept-language`, `anthropic-dangerous-direct-browser-access`,
    Google's `x-goog-api-client`, and the prompt-cache affinity hints `session-id`, `x-client-request-id` and Mistral's
    `x-affinity`) are dropped; its turns need none of them. The allowlist is unchanged.
