@@ -803,6 +803,9 @@ const proxyFailureOf = (failure: ProxyFailure, now: DateTime.Utc): Orchestration
   });
 };
 
+/** A Session's message on a Model endpoint's credential (`credentialProblem`): from the endpoint's name to its last stop. */
+const ENDPOINT_PROBLEM = /The Model endpoint "[a-z0-9-]+"[^\n]*?(?:in the Harness panel|retry the turn\)?)\./;
+
 /**
  * A model error, classified (step 2a part 2 plan, section 3): the Session's record of the proxy's answer first, else the
  * error text (a push from before the record, or a failure the Session did not see), counted from the settle time.
@@ -811,6 +814,13 @@ export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2Pr
   const reason = turn.reason ?? "unknown";
   const detail = turn.detail ?? "";
   if (reason === "model_error") {
+    // A Model endpoint's own message on its credential (SPI-1162, SPI-1164: a key gone, a sign-in signed out or not
+    // renewed): our fixed text, shown as it is, never what follows it.
+    const endpointProblem = ENDPOINT_PROBLEM.exec(detail)?.[0];
+    if (endpointProblem !== undefined) {
+      const signedOut = endpointProblem.includes(" is not signed in to ");
+      return makeProviderFailure({ class: "provider_error", message: endpointProblem, code: signedOut ? "signed_out" : "endpoint_credential", retryable: !signedOut && /retry the turn/.test(endpointProblem) });
+    }
     const recorded = turn.proxy?.failure;
     if (recorded !== undefined) return proxyFailureOf(recorded as ProxyFailure, now);
     const classified = classifyProxyFailure({ status: 0, retryAfter: null, text: detail, at: turn.settledAt ?? DateTime.toEpochMillis(now) });

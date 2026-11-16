@@ -24,6 +24,19 @@ describe("discoverModels", () => {
     expect(seen[0]).toMatchObject({ url: "https://api.openai.com/v1/models", headers: { authorization: "Bearer sk-1", "x-org": "me" } });
   });
 
+  it("reads ChatGPT plan usage's catalog: the slugs listed for display, with their names (SPI-1164)", async () => {
+    const { seen, fetcher } = fake(() => ({
+      models: [
+        { slug: "gpt-6.1-sol", display_name: "GPT-6.1 Sol", visibility: "list" },
+        { slug: "gpt-internal", display_name: "Hidden", visibility: "hide" },
+        { slug: "gpt-5-mini", visibility: "list" },
+      ],
+    }));
+    const found = await discoverModels({ api: "openai-responses", baseUrl: "https://api.openai.com/v1", headers: {} }, "at-token", fetcher);
+    expect(found).toEqual({ ok: true, models: [{ id: "gpt-5-mini" }, { id: "gpt-6.1-sol", name: "GPT-6.1 Sol" }] });
+    expect(seen[0]).toMatchObject({ url: "https://api.openai.com/v1/models", headers: { authorization: "Bearer at-token" } });
+  });
+
   it("reads Anthropic's paged list with its key header, names and limits", async () => {
     const { seen, fetcher } = fake((url) =>
       url.searchParams.get("after_id") === null

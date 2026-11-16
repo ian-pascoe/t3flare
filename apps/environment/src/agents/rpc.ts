@@ -139,6 +139,8 @@ export interface SessionRpc {
   submitTurn(input: SubmitTurnInput): Promise<{ readonly submissionId: string }>;
   steer(input: SteerInput): Promise<{ readonly submissionId: string }>;
   abort(input: AbortInput): Promise<{ readonly aborted: boolean }>;
+  /** SPI-1164: a sign-in endpoint was signed out: the Session drops any token it holds for it. */
+  endpointSignedOut(input: { readonly endpointId: string }): Promise<{ readonly dropped: boolean }>;
   answer(input: AnswerInput): Promise<{ readonly applied: boolean }>;
   snapshot(input?: SnapshotInput): Promise<SessionState>;
   /** G6 (SPI-987): the conversation back to before the first dropped turn. */

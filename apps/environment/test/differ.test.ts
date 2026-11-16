@@ -118,6 +118,24 @@ describe("differ", () => {
     expect(proxy.message).toBe("The model anthropic/claude-x is not available: the Model proxy no longer lists it. Pick another model.");
   });
 
+  it("shows a Model endpoint's own credential message, naming the sign-in, and nothing after it (SPI-1164)", () => {
+    const at = (detail: string) => failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail, startedAt: 0 }, now);
+    const signedOut = at(
+      'API key auth failed for provider chatgpt: The Model endpoint "chatgpt" is not signed in to ChatGPT (ChatGPT refused to renew the sign-in (invalid_grant): it is signed out): sign in with ChatGPT again in the Harness panel. trailing vendor text sk-secret',
+    );
+    expect(signedOut).toMatchObject({
+      class: "provider_error",
+      code: "signed_out",
+      retryable: false,
+      message: 'The Model endpoint "chatgpt" is not signed in to ChatGPT (ChatGPT refused to renew the sign-in (invalid_grant): it is signed out): sign in with ChatGPT again in the Harness panel.',
+    });
+    const passing = at('API key auth failed for provider chatgpt: The Model endpoint "chatgpt" could not get a ChatGPT token (its ChatGPT sign-in could not be renewed yet: retry the turn).');
+    expect(passing).toMatchObject({ code: "endpoint_credential", message: 'The Model endpoint "chatgpt" could not get a ChatGPT token (its ChatGPT sign-in could not be renewed yet: retry the turn).' });
+    expect(at('API key auth failed for provider gw: The Model endpoint "gw" changed or was removed since this Session took it: retry the turn.').message).toBe(
+      'The Model endpoint "gw" changed or was removed since this Session took it: retry the turn.',
+    );
+  });
+
   describe("a model proxy failure the Session classified", () => {
     const nowMs = DateTime.toEpochMillis(now);
     const failed = (failure: NonNullable<TurnState["proxy"]>["failure"], detail = "t3flare model proxy: x") =>

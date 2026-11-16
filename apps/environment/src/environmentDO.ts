@@ -31,6 +31,7 @@ import { bindStateStorage } from "./platform/stateStore.ts";
 import type { AccessCaller } from "./access.ts";
 import { harnessSecrets } from "./harness/secrets.ts";
 import { harnessStore } from "./harness/store.ts";
+import { type CredentialBroker, credentialBroker } from "./credentials/broker.ts";
 import { sealedStore } from "./credentials/sealed.ts";
 import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
@@ -412,6 +413,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         store: this.#endpointStore(),
         discover: async (target, apiKey) => (await import("./endpoints/discover.ts")).discoverModels(target, apiKey),
         changed: () => void import("./endpoints/changes.ts").then(({ endpointsChanged }) => endpointsChanged()),
+        signIns: this.#credentialBroker(),
+        signedOut: (endpointId) => this.#stopSessionsOn(endpointId),
       },
       // The Open changes (plan D10): the Change page answers them through the Settings server's own apply.
       changes: changesApiOf(await this.#settingsDeps()),
@@ -423,7 +426,36 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   /** The Model endpoints (SPI-1162): their entity, and their keys sealed under the stage's credentials key. */
   #endpointStore(): EndpointStore {
-    return endpointStore(this.ctx.storage.kv, sealedStore(this.ctx.storage.kv, this.env.T3FLARE_CREDENTIALS_KEY));
+    return endpointStore(this.ctx.storage.kv, sealedStore(this.ctx.storage.kv, this.env.T3FLARE_CREDENTIALS_KEY), this.#credentialBroker());
+  }
+
+  #broker: CredentialBroker | undefined;
+
+  /**
+   * The Credential broker (SPI-1164; ADR-0018): the sign-ins' tokens, sealed under the stage's credentials key, refreshed
+   * here only. One per object, so its per-endpoint lock is one.
+   */
+  #credentialBroker(): CredentialBroker {
+    this.#broker ??= credentialBroker({
+      kv: this.ctx.storage.kv,
+      sealed: sealedStore(this.ctx.storage.kv, this.env.T3FLARE_CREDENTIALS_KEY),
+      vendor: { fetch: (input, init) => fetch(input, init), now: () => Date.now() },
+    });
+    return this.#broker;
+  }
+
+  /** A sign-in endpoint was signed out (SPI-1164): every open Session drops its token, and its turns on it stop. */
+  async #stopSessionsOn(endpointId: string): Promise<void> {
+    const [{ stopSessionsOn }, { registeredSessions }, { byName }, { environmentServices }] = await Promise.all([
+      import("./endpoints/sessions.ts"),
+      import("./agents/sessionSink.ts"),
+      import("./agents/rpc.ts"),
+      import("./agents/bindings.ts"),
+    ]);
+    await stopSessionsOn(endpointId, {
+      open: registeredSessions,
+      session: (name) => byName(environmentServices().agents.SESSIONS, name, "SESSIONS"),
+    });
   }
 
   /** The Model endpoints for a Session's turn (SPI-1162), secret-free. Never boots t3. */

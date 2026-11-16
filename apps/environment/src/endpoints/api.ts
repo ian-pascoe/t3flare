@@ -6,11 +6,27 @@
 //   POST /api/endpoints/discover   { endpoint, apiKey? }: the endpoint's model list with pi-ai's metadata, read with the
 //                                  key given, else the saved endpoint's own, but only at its saved target (API, base
 //                                  URL and headers)
+//   POST /api/endpoints/sign-in    a sign-in (SPI-1164): { op: "start", id, label } gives the authorize URL;
+//                                  { op: "complete", id, label, pasted } finishes it with the address the browser
+//                                  landed on and saves the sign-in's endpoint with the models its token lists;
+//                                  { op: "sign-out", id } revokes and stops the endpoint's Sessions
 //
 // Every change bumps the endpoints' own revision and is audited under the entity `endpoints`, with the key's mark and the
 // headers' names only.
-import { ENDPOINT_APIS, ENDPOINT_PRESETS, isRecord, type ModelEndpoint, sameTarget, validateEndpoint } from "@t3flare/models/endpoints";
+import {
+  ENDPOINT_APIS,
+  ENDPOINT_ID,
+  ENDPOINT_PRESETS,
+  isRecord,
+  isSignIn,
+  type ModelEndpoint,
+  RESERVED_ENDPOINT_IDS,
+  sameTarget,
+  SIGN_IN_TARGETS,
+  validateEndpoint,
+} from "@t3flare/models/endpoints";
 
+import type { CredentialBroker, SignInStatus } from "../credentials/broker.ts";
 import type { SealedMark } from "../credentials/sealed.ts";
 import type { AuditEntry } from "../harness/store.ts";
 import type { Discovery } from "./discover.ts";
@@ -22,11 +38,15 @@ export interface EndpointsApiDeps {
   readonly discover: (target: Pick<ModelEndpoint, "api" | "baseUrl" | "headers">, apiKey: string | undefined) => Promise<Discovery>;
   /** The endpoints changed: the Pi Durable picker reads them again. */
   readonly changed?: () => void;
+  /** The Credential broker (SPI-1164): the sign-ins' tokens. Without it no sign-in is offered. */
+  readonly signIns?: CredentialBroker;
+  /** A sign-in endpoint was signed out or removed: its Sessions drop its token and stop its turns. */
+  readonly signedOut?: (endpointId: string) => Promise<void>;
 }
 
 export type EndpointsAnswer = { readonly status: number; readonly json: unknown } | { readonly status: number; readonly text: string };
 
-export const ENDPOINTS_PATHS = { list: "/api/endpoints", discover: "/api/endpoints/discover" } as const;
+export const ENDPOINTS_PATHS = { list: "/api/endpoints", discover: "/api/endpoints/discover", signIn: "/api/endpoints/sign-in" } as const;
 
 /** An endpoint as audited: no key, and its headers' names only. */
 const audited = (endpoint: ModelEndpoint | undefined, key?: SealedMark) =>
@@ -42,13 +62,32 @@ const audited = (endpoint: ModelEndpoint | undefined, key?: SealedMark) =>
         ...(key === undefined || !key.set ? {} : { key }),
       };
 
-/** The entity as the panel shows it: each key's mark, with whether it still opens. */
-export const endpointsOverview = async (deps: Pick<EndpointsApiDeps, "store">) => {
+/** The entity as the panel shows it: each key's mark, with whether it still opens, and each sign-in's status. */
+export const endpointsOverview = async (deps: Pick<EndpointsApiDeps, "store" | "signIns">) => {
   const { revision, endpoints } = deps.store.load();
+  const signIns = deps.signIns;
   return {
     revision,
     credentialsKey: deps.store.sealing,
-    endpoints: await Promise.all(endpoints.map(async (endpoint) => ({ ...endpoint, key: await deps.store.keyStatus(endpoint.id) }))),
+    endpoints: await Promise.all(
+      endpoints.map(async (endpoint) => ({
+        ...endpoint,
+        key: await deps.store.keyStatus(endpoint.id),
+        ...(signIns !== undefined && isSignIn(endpoint.auth) ? { signIn: signIns.status(endpoint.id) } : {}),
+      })),
+    ),
+    // A sign-in under way for an endpoint not saved yet (its first), shown with its paste field.
+    ...(signIns === undefined
+      ? {}
+      : {
+          signIns: Object.fromEntries(
+            signIns
+              .known()
+              .filter((id) => !endpoints.some((endpoint) => endpoint.id === id))
+              .map((id) => [id, signIns.status(id)] as const)
+              .filter(([, status]) => status.pendingSince !== null || status.problem !== null),
+          ) as Record<string, SignInStatus>,
+        }),
     presets: ENDPOINT_PRESETS,
     apis: ENDPOINT_APIS,
   };
@@ -60,7 +99,10 @@ export const endpointsChange = async (deps: EndpointsApiDeps, body: Record<strin
     const id = typeof body.id === "string" ? body.id : "";
     const removed = deps.store.remove(id);
     if (!removed.ok) return { status: 404, text: removed.error };
-    audit({ action: "endpoint.remove", target: id, before: audited(removed.removed) });
+    // A removed sign-in endpoint is signed out first (revoked where the vendor allows), and its Sessions stopped.
+    const signedOut = isSignIn(removed.removed.auth) && deps.signIns !== undefined ? await deps.signIns.forget(id) : undefined;
+    if (signedOut !== undefined) await deps.signedOut?.(id);
+    audit({ action: "endpoint.remove", target: id, before: audited(removed.removed), ...(signedOut === undefined ? {} : { after: { revoked: signedOut.revoked } }) });
     deps.changed?.();
     return { status: 200, json: { ok: true, revision: removed.endpoints.revision } };
   }
@@ -81,7 +123,14 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
   if (!valid.ok) return { status: 400, text: valid.error };
   const typed = typeof body.apiKey === "string" && body.apiKey !== "" ? body.apiKey : undefined;
   let apiKey: string | undefined;
-  if (valid.endpoint.auth === "api-key") {
+  if (isSignIn(valid.endpoint.auth)) {
+    // A sign-in's list is read with its own token, at its own target only.
+    const saved = deps.store.load().endpoints.find((endpoint) => endpoint.id === valid.endpoint.id);
+    if (deps.signIns === undefined || saved === undefined || !isSignIn(saved.auth)) return { status: 400, text: "sign in first: the list is read with the sign-in's token" };
+    const access = await deps.signIns.access(saved.id);
+    if (!access.ok) return { status: 200, json: { ok: false, error: access.problem } };
+    apiKey = access.accessToken;
+  } else if (valid.endpoint.auth === "api-key") {
     if (typed !== undefined) apiKey = typed;
     else {
       // The saved key goes only to the target it was saved with: the same API, base URL and headers.
@@ -96,4 +145,60 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
   const found = await deps.discover(valid.endpoint, apiKey);
   if (!found.ok) return { status: 200, json: found };
   return { status: 200, json: { ok: true, models: modelsWithMetadata(valid.endpoint, found.models) } };
+};
+
+/** A label for a sign-in's endpoint: the given one, else the sign-in's title. */
+const signInLabel = (value: unknown): string => (typeof value === "string" && value.trim() !== "" ? value.trim().slice(0, 60) : SIGN_IN_TARGETS.chatgpt.title);
+
+/** A sign-in's steps (SPI-1164): start, complete with the pasted redirect, sign out. Each audited, none with a token. */
+export const endpointsSignIn = async (deps: EndpointsApiDeps, body: Record<string, unknown>, audit: (entry: Omit<AuditEntry, "at" | "caller" | "entity">) => void): Promise<EndpointsAnswer> => {
+  const signIns = deps.signIns;
+  if (signIns === undefined) return { status: 404, text: "this Environment offers no sign-in" };
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!ENDPOINT_ID.test(id) || RESERVED_ENDPOINT_IDS.includes(id)) return { status: 400, text: "id is 1–32 of a–z, 0–9 and -, not a reserved one" };
+  const saved = deps.store.load().endpoints.find((endpoint) => endpoint.id === id);
+  if (saved !== undefined && !isSignIn(saved.auth)) return { status: 400, text: `there is already an endpoint with an API key (or none) under the id ${id}: pick another id` };
+  if (body.op === "start") {
+    try {
+      const { authorizeUrl } = await signIns.start(id);
+      audit({ action: "endpoint.sign-in.start", target: id });
+      return { status: 200, json: { ok: true, authorizeUrl } };
+    } catch (error) {
+      return { status: 400, text: error instanceof Error ? error.message : "the sign-in could not start" };
+    }
+  }
+  if (body.op === "complete") {
+    if (typeof body.pasted !== "string" || body.pasted.length > 8192) return { status: 400, text: "pasted is the address your browser landed on" };
+    const result = await signIns.complete(id, body.pasted);
+    if (!result.ok) {
+      audit({ action: "endpoint.sign-in", target: id, after: { ok: false } });
+      // Answered as JSON, not a refusal: the panel shows why, next to the paste field.
+      return { status: 200, json: { ok: false, error: result.problem } };
+    }
+    const target = SIGN_IN_TARGETS.chatgpt;
+    // The models its token lists (OpenAI: read them with the same token); a re-sign-in keeps the owner's list.
+    let models: ReadonlyArray<{ readonly id: string; readonly name?: string }> = saved?.models ?? [];
+    let modelsProblem: string | undefined;
+    if (saved === undefined) {
+      const access = await signIns.access(id);
+      const found = access.ok ? await deps.discover({ api: target.api, baseUrl: target.baseUrl, headers: {} }, access.accessToken) : { ok: false as const, error: access.problem };
+      if (found.ok) models = found.models;
+      else modelsProblem = found.error;
+    }
+    const stored = await deps.store.save(
+      { id, label: saved?.label ?? signInLabel(body.label), api: target.api, baseUrl: target.baseUrl, auth: "chatgpt", headers: {}, models: models.map((model) => ({ id: model.id, ...(model.name === undefined ? {} : { name: model.name }) })) },
+      {},
+    );
+    if (!stored.ok) return { status: 200, json: { ok: false, error: `Signed in, but the endpoint could not be saved: ${stored.error}` } };
+    audit({ action: "endpoint.sign-in", target: id, before: audited(stored.before), after: { ok: true, ...audited(stored.endpoint) } });
+    deps.changed?.();
+    return { status: 200, json: { ok: true, email: result.status.email, models: stored.endpoint.models.length, ...(modelsProblem === undefined ? {} : { modelsProblem }) } };
+  }
+  if (body.op === "sign-out") {
+    const { signedOut, revoked } = await signIns.signOut(id);
+    await deps.signedOut?.(id);
+    audit({ action: "endpoint.sign-out", target: id, after: { signedOut, revoked } });
+    return { status: 200, json: { ok: true, revoked } };
+  }
+  return { status: 400, text: 'the body is { op: "start", id, label }, { op: "complete", id, label, pasted } or { op: "sign-out", id }' };
 };

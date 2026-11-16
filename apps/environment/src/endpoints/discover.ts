@@ -63,6 +63,15 @@ const anthropic = async (target: EndpointTarget, apiKey: string | undefined, fet
 
 const openai = async (target: EndpointTarget, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {
   const body = await getJson(new URL(`${target.baseUrl}/models`), keyedHeaders(target, apiKey), fetcher, signal);
+  // ChatGPT plan usage's catalog (SPI-1164; OpenAI's "Models and inference"): `{ models: [{ slug, display_name,
+  // visibility }] }`, of which those listed for display, in the server's order.
+  if (isRecord(body) && Array.isArray(body.models) && !Array.isArray(body.data)) {
+    return body.models.flatMap((entry): Array<EndpointModelInput> =>
+      isRecord(entry) && typeof entry.slug === "string" && entry.slug !== "" && (entry.visibility === undefined || entry.visibility === "list")
+        ? [{ id: entry.slug, ...(typeof entry.display_name === "string" && entry.display_name !== "" ? { name: entry.display_name } : {}) }]
+        : [],
+    );
+  }
   if (!isRecord(body) || !Array.isArray(body.data)) throw new ListError("the endpoint's answer is not a list of models");
   return body.data.flatMap((entry): Array<EndpointModelInput> => (isRecord(entry) && typeof entry.id === "string" && entry.id !== "" ? [{ id: entry.id }] : []));
 };

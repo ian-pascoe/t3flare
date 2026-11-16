@@ -27,7 +27,7 @@ import type { HarnessOAuth } from "./oauth.ts";
 import type { HarnessSecrets } from "./secrets.ts";
 
 import { SKILLS_WRITE_ROUTES, type SkillsAnswer, type SkillsApiDeps, skillsOverview, viewSkill } from "../skills/api.ts";
-import { ENDPOINTS_PATHS, endpointsChange, endpointsDiscover, type EndpointsAnswer, type EndpointsApiDeps, endpointsOverview } from "../endpoints/api.ts";
+import { ENDPOINTS_PATHS, endpointsChange, endpointsDiscover, type EndpointsAnswer, type EndpointsApiDeps, endpointsOverview, endpointsSignIn } from "../endpoints/api.ts";
 import { containerCostTable } from "./containerCost.ts";
 import { csrfToken, csrfValid } from "./csrf.ts";
 import {
@@ -271,7 +271,13 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (body === undefined) return refused(400, "the body is a JSON object");
     const endpoints = deps.endpoints;
     const audit: Parameters<typeof endpointsChange>[2] = (entry) => deps.store.audit({ ...entry, entity: "endpoints", at: deps.now?.() ?? Date.now(), caller: callerName(deps.caller) });
-    return endpointsResponse(endpointsRoute === ENDPOINTS_PATHS.discover ? await endpointsDiscover(endpoints, body) : await endpointsChange(endpoints, body, audit));
+    return endpointsResponse(
+      endpointsRoute === ENDPOINTS_PATHS.discover
+        ? await endpointsDiscover(endpoints, body)
+        : endpointsRoute === ENDPOINTS_PATHS.signIn
+          ? await endpointsSignIn(endpoints, body, audit)
+          : await endpointsChange(endpoints, body, audit),
+    );
   }
   const body = await bodyOf(request);
   const options = body === undefined ? { actor: actorOf(deps) } : optionsOf(deps, body);

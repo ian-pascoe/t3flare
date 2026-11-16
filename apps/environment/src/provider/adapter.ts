@@ -45,6 +45,7 @@ import { toWorkspace } from "@t3flare/workspace-client";
 import { environmentServices } from "../agents/bindings.ts";
 import { byName, type SessionRpc } from "../agents/rpc.ts";
 import { registerSession } from "../agents/sessionSink.ts";
+import { forgetSessionModel, noteSessionModel } from "../endpoints/sessions.ts";
 import { durableModeRecord } from "./threadCaller.ts";
 import { PI_DURABLE_DRIVER, PiDurableCapabilities } from "./capabilities.ts";
 import { type AttachmentReader, turnPrompt } from "./attachments.ts";
@@ -297,6 +298,7 @@ export const makePiDurableAdapter = (
         Effect.sync(() => {
           closed = true;
           unregister();
+          forgetSessionModel(sessionName);
           modes.forgetAll();
         }).pipe(Effect.andThen(Queue.end(events)), Effect.ignore),
       );
@@ -314,6 +316,8 @@ export const makePiDurableAdapter = (
       }) {
         const at = yield* DateTime.now;
         const { model, thinking } = modelOf(registerInput.modelSelection);
+        // SPI-1164: a sign-out stops the Sessions on its endpoint.
+        noteSessionModel(sessionName, model.provider);
         const credential = yield* t3Mcp;
         const linked = linkedWorkOf(registerInput.threadId);
         const opened = yield* call("open", () =>
@@ -419,6 +423,7 @@ export const makePiDurableAdapter = (
               completedAt: null,
             };
             const { model, thinking } = modelOf(turnInput.modelSelection);
+            noteSessionModel(sessionName, model.provider);
             const catalogModel = environmentServices().catalog.find(`${model.provider}/${model.modelId}`);
             // A model the catalog does not list yet gets the images: pi-durable shows a text-only model a placeholder.
             const acceptsImages = catalogModel === undefined || catalogModel.input.includes("image");
