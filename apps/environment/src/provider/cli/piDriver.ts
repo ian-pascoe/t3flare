@@ -69,22 +69,12 @@ const snapshotOf = (enabled: boolean) =>
     });
   });
 
-export const PiCliDriver: ProviderDriver<PiSettings, PiCliDriverEnv> = {
-  driverKind: PI_CLI_DRIVER,
-  metadata: { displayName: "Pi", supportsMultipleInstances: false, hasDefaultInstance: true },
-  configSchema: PiSettings,
-  defaultConfig: () => decodeSettings({}),
-  create: Effect.fn("PiCliDriver.create")(function* ({ instanceId, displayName, accentColor, enabled, config }) {
-    const continuationIdentity = defaultProviderContinuationIdentity({ driverKind: PI_CLI_DRIVER, instanceId });
-    const stamp = (draft: Omit<ServerProvider, "instanceId" | "driver">): ServerProvider => ({
-      ...draft,
-      instanceId,
-      driver: PI_CLI_DRIVER,
-      ...(displayName ? { displayName } : {}),
-      ...(accentColor ? { accentColor } : {}),
-      continuation: { groupKey: continuationIdentity.continuationKey },
-    });
-    const effective = { ...config, enabled };
+/**
+ * pi's managed snapshot (its model list): built from the catalog or the Model endpoints (`piModelsOf`), checked once at
+ * once, and again at each endpoint change (SPI-1170) while the caller's scope is open.
+ */
+export const piSnapshot = (effective: PiSettings, stamp: (draft: Omit<ServerProvider, "instanceId" | "driver">) => ServerProvider) =>
+  Effect.gen(function* () {
     const { catalog } = environmentServices();
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
     const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: PI_CLI_DRIVER, packageName: null });
@@ -102,6 +92,25 @@ export const PiCliDriver: ProviderDriver<PiSettings, PiCliDriverEnv> = {
     yield* Effect.forkScoped(snapshot.refresh);
     // SPI-1170: the list follows the endpoints at once, as the other drivers' do.
     yield* refreshOnEndpointsChanged(snapshot.refresh);
+    return snapshot;
+  });
+
+export const PiCliDriver: ProviderDriver<PiSettings, PiCliDriverEnv> = {
+  driverKind: PI_CLI_DRIVER,
+  metadata: { displayName: "Pi", supportsMultipleInstances: false, hasDefaultInstance: true },
+  configSchema: PiSettings,
+  defaultConfig: () => decodeSettings({}),
+  create: Effect.fn("PiCliDriver.create")(function* ({ instanceId, displayName, accentColor, enabled, config }) {
+    const continuationIdentity = defaultProviderContinuationIdentity({ driverKind: PI_CLI_DRIVER, instanceId });
+    const stamp = (draft: Omit<ServerProvider, "instanceId" | "driver">): ServerProvider => ({
+      ...draft,
+      instanceId,
+      driver: PI_CLI_DRIVER,
+      ...(displayName ? { displayName } : {}),
+      ...(accentColor ? { accentColor } : {}),
+      continuation: { groupKey: continuationIdentity.continuationKey },
+    });
+    const snapshot = yield* piSnapshot({ ...config, enabled }, stamp);
     const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
     const sessions: CliSessions = new Map();
     // t3's own tools with t3's per-thread bearer, as stock t3 hands them, at t3's public `/mcp` (owner, 2026-11-12, back
