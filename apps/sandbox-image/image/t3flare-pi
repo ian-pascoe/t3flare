@@ -8,8 +8,16 @@
 # launch chain's setsid, the process that started this script. No file holds it.
 # The relay's host is never proxied: pi's HTTP client (undici's EnvHttpProxyAgent) honours HTTP_PROXY, which an owner's
 # Variable may set for the agent's commands, and would send the relay's cleartext request, handle and all, through it.
-# The host is added to no_proxy and NO_PROXY (undici reads the lowercase one first), keeping the owner's own entries.
+# The host is added to no_proxy and to NO_PROXY (undici reads the lowercase one first), each keeping its own entries
+# (one that is unset starts from the other's), and a list that is `*` (no proxy for any host) is left as it is.
 relay_host=computer.internal
-no_proxy_list=${no_proxy:-${NO_PROXY:-}}
-no_proxy_list=${no_proxy_list:+$no_proxy_list,}$relay_host
-exec /usr/bin/env -u T3FLARE_MODEL_HANDLE no_proxy="$no_proxy_list" NO_PROXY="$no_proxy_list" /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js "$@"
+with_relay() {
+  case "$1" in
+    '*') printf '%s' "$1" ;;
+    '') printf '%s' "$relay_host" ;;
+    *) printf '%s,%s' "$1" "$relay_host" ;;
+  esac
+}
+lower=$(with_relay "${no_proxy-${NO_PROXY-}}")
+upper=$(with_relay "${NO_PROXY-${no_proxy-}}")
+exec /usr/bin/env -u T3FLARE_MODEL_HANDLE no_proxy="$lower" NO_PROXY="$upper" /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js "$@"

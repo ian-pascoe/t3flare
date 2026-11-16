@@ -13,6 +13,9 @@ fail() {
   exit 1
 }
 marker=${T3FLARE_EXEC:?}
+# A process's marker (`isProcessMarker`): anything else, a newline included, would match more than one line below.
+case "$marker" in proc-*) ;; *) fail "this process's marker is not a process marker" ;; esac
+case "$marker" in *[!A-Za-z0-9-]*) fail "this process's marker is not a process marker" ;; esac
 pid=$PPID
 while [ "$pid" -gt 0 ] 2> /dev/null; do
   # The first three words of the command line, NUL-separated: `setsid --wait /opt/t3flare/bin/pi`.

@@ -247,7 +247,7 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
   }
 });
 
-it("the handle command prints the handle only to its own pi launch chain: not with a forged marker, outside one, or when setsid did not fork", () => {
+it("the handle command prints the handle only to its own pi launch chain: not with a forged or multi-line marker, outside one, or when setsid did not fork", () => {
   const handle = randomBytes(32).toString("hex");
   const harness = startHarness("t3flare-pi-handle", []);
   try {
@@ -255,6 +255,8 @@ it("the handle command prints the handle only to its own pi launch chain: not wi
     const probe = [
       "echo own=$(/opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)",
       "echo forged=$(T3FLARE_EXEC=proc-another /opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)",
+      // A marker of two lines, the second the holder's own: `grep -F` would take either line as a pattern.
+      "echo multiline=$(T3FLARE_EXEC=\"$(printf 'proc-another\\nT3FLARE_EXEC=proc-own')\" /opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)",
       "echo inherited=$(env | grep -c '^T3FLARE_MODEL_HANDLE=')",
     ].join("; ");
     const pi = (launch: string) =>
@@ -275,6 +277,7 @@ it("the handle command prints the handle only to its own pi launch chain: not wi
     // 64 hex digits and a newline to its own chain; nothing to a forged marker; pi itself inherits nothing.
     expect(forked, text).toMatch(/own=65\b/);
     expect(forked, text).toMatch(/forged=0\b/);
+    expect(forked, text).toMatch(/multiline=0\b/);
     expect(forked, text).toMatch(/inherited=0\b/);
     expect(inPlace, text).toMatch(/own=0\b/);
     expect(inPlace, text).toMatch(/inherited=0\b/);

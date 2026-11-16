@@ -2,10 +2,12 @@
 // SPI-1170: the image's pi launcher and handle command (`apps/sandbox-image/image/t3flare-pi`, `t3flare-pi-handle`) are
 // shell, so what they restate is checked against its TypeScript sources here; what they do is `test:docker`'s
 // (`piRelay.docker.test.ts`) and the stage's (`scripts/p1170.ts`).
+import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { MODEL_HANDLE_ENV, modelRelayUrl } from "@t3flare/models/relay";
+import { isProcessMarker } from "@t3flare/sandbox-image/process";
 import { HANDLE } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
 
@@ -17,18 +19,48 @@ const read = (name: string) => fs.readFileSync(path.join(image, name), "utf8");
 describe("pi's launcher and handle command", () => {
   it("starts pi without the handle, by absolute paths, with the relay's host never proxied", () => {
     const script = read("t3flare-pi");
-    expect(script).toMatch(new RegExp(`^exec /usr/bin/env -u ${MODEL_HANDLE_ENV} no_proxy="\\$no_proxy_list" NO_PROXY="\\$no_proxy_list" /\\S+/node /\\S+/cli\\.js "\\$@"$`, "m"));
+    expect(script).toMatch(new RegExp(`^exec /usr/bin/env -u ${MODEL_HANDLE_ENV} no_proxy="\\$lower" NO_PROXY="\\$upper" /\\S+/node /\\S+/cli\\.js "\\$@"$`, "m"));
     expect(script).toContain(`relay_host=${new URL(modelRelayUrl("x")).hostname}`);
   });
 
-  it("names every program it runs by its absolute path", () => {
-    // Each pipeline stage and command substitution of the handle command starts with a builtin or an absolute path.
+  it("adds the relay's host to no_proxy and NO_PROXY, each keeping its own entries, and leaves `*` as it is", () => {
+    // The launcher with its last line (the exec) printing the two values it would set instead.
+    const script = read("t3flare-pi").replace(/^exec .*$/m, `printf '%s|%s' "$lower" "$upper"`);
+    const run = (env: Record<string, string>) => {
+      const result = spawnSync("/bin/sh", ["-c", script], { env: { PATH: "/usr/bin:/bin", ...env }, encoding: "utf8" });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout;
+    };
+    expect(run({})).toBe("computer.internal|computer.internal");
+    expect(run({ NO_PROXY: "example.org" })).toBe("example.org,computer.internal|example.org,computer.internal");
+    expect(run({ no_proxy: "a.example" })).toBe("a.example,computer.internal|a.example,computer.internal");
+    expect(run({ no_proxy: "a.example", NO_PROXY: "b.example,.c.example" })).toBe("a.example,computer.internal|b.example,.c.example,computer.internal");
+    expect(run({ NO_PROXY: "*" })).toBe("*|*");
+    expect(run({ no_proxy: "*", NO_PROXY: "b.example" })).toBe("*|b.example,computer.internal");
+    expect(run({ no_proxy: "", NO_PROXY: "b.example" })).toBe("computer.internal|b.example,computer.internal");
+  });
+
+  it("names every program they run by its absolute path: every command is a builtin, a keyword, an assignment or an absolute path", () => {
+    const SHELL = new Set(["set", "fail", "exit", "echo", "printf", "case", "esac", "if", "then", "fi", "else", "while", "do", "done", "in", "[", "{", "}", "exec", "with_relay"]);
+    for (const name of ["t3flare-pi", "t3flare-pi-handle"]) {
+      const lines = read(name)
+        .split("\n")
+        .map((line) => line.replace(/^\s*#.*$/, "").trim())
+        .filter((line) => line !== "" && !/^[^\s()]*\)\s/.test(line) && !/^'[^']*'\)/.test(line) && !line.startsWith("*)"));
+      // Command positions: a line's start, and after `$(`, `|`, `;`, `&&`, `||`, `then`, `do`, `else`, `exec`.
+      const words = lines.flatMap((line) => [...line.matchAll(/(?<=^|\$\(|\|\|?\s|;\s|&&\s|\bthen\s|\bdo\s|\belse\s|^exec\s)([^\s;|)(]+)/g)].map((match) => match[1]!));
+      const odd = words.filter((word) => !SHELL.has(word) && !word.startsWith("/") && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(word) && !/^[-'"*]/.test(word));
+      expect(odd, name).toEqual([]);
+    }
+    for (const tool of ["tr", "head", "sed", "cut", "grep"]) expect(read("t3flare-pi-handle")).toContain(`/usr/bin/${tool} `);
+  });
+
+  it("takes only a process marker's shape (`isProcessMarker`), so no newline can match another line", () => {
     const script = read("t3flare-pi-handle");
-    const BUILTINS = new Set(["printf", "echo", "fail", "exit", "case", "set", "[", "while", "if", "done", "fi", "esac"]);
-    const commands = [...script.matchAll(/(?:\$\(|\| |^\s*|; |\|\| )([A-Za-z/][\w./-]*)/gm)].map((match) => match[1]!);
-    const bare = commands.filter((command) => !command.startsWith("/") && !BUILTINS.has(command) && !/^[a-z_]+=/.test(command));
-    expect(bare.filter((command) => ["tr", "head", "sed", "cut", "grep", "env", "cat", "awk"].includes(command))).toEqual([]);
-    for (const tool of ["tr", "head", "sed", "cut", "grep"]) expect(script).toContain(`/usr/bin/${tool} `);
+    expect(script).toContain('case "$marker" in proc-*) ;;');
+    expect(script).toContain('case "$marker" in *[!A-Za-z0-9-]*) fail');
+    expect(isProcessMarker("proc-a-B-9")).toBe(true);
+    expect(isProcessMarker("proc-a\nT3FLARE_EXEC=x")).toBe(false);
   });
 
   it("takes the handle only from the holder whose command line starts as PI_HANDLE_HOLDERS says, of this process's marker", () => {
