@@ -1,12 +1,14 @@
 {
-  "at": "2026-11-16T14:59:04.276Z",
-  "head": "180506371013c86a3639cb2adbe104049a5611e9",
+  "at": "2026-11-16T15:21:17.177Z",
+  "head": "ec40608822ba52816b85d468aa8414532b90a386",
   "endpoints": {
     "saved": {
       "comm": 200,
       "oai": 200,
       "resp": 200,
-      "standin": 200
+      "standin": 200,
+      "standin-anth": 200,
+      "standin-resp": 200
     },
     "model": "claude-haiku-5-5",
     "standin": {
@@ -27,7 +29,7 @@
   },
   "checks": [
     {
-      "name": "the four endpoints saved",
+      "name": "the six endpoints saved",
       "ok": true
     },
     {
@@ -51,6 +53,10 @@
       "ok": true
     },
     {
+      "name": "a Codex turn on the stand-in's Responses, through the relay",
+      "ok": true
+    },
+    {
       "name": "a pi turn on Commissary's Chat Completions endpoint, through the relay",
       "ok": true
     },
@@ -60,6 +66,14 @@
     },
     {
       "name": "a Claude Code turn on Commissary's Anthropic Messages endpoint, model-routed through the relay",
+      "ok": true
+    },
+    {
+      "name": "a Claude Code turn on the stand-in's Anthropic Messages, model-routed through the relay",
+      "ok": true
+    },
+    {
+      "name": "a relayed stream hung up on mid-way (curl's timeout, exit 28)",
       "ok": true
     },
     {
@@ -75,11 +89,23 @@
       "ok": true
     },
     {
-      "name": "our records: pi's relayed turn on the stand-in, under Pi (the pi CLI's source)",
+      "name": "our records: Pi's relayed turn on the stand-in, under Pi (its own source)",
       "ok": true
     },
     {
-      "name": "the stand-in's model, with no endpoint price, is priced by t3's rate table",
+      "name": "our records: Codex's relayed turn on the stand-in's Responses, under Codex",
+      "ok": true
+    },
+    {
+      "name": "our records: Claude Code's model-routed turn on the stand-in's Anthropic Messages, under Claude",
+      "ok": true
+    },
+    {
+      "name": "our records: the hung-up stream, recorded with the input its first event gave (the Workers' cancel and waitUntil)",
+      "ok": false
+    },
+    {
+      "name": "the stand-in's models, with no endpoint price, are priced by t3's rate table",
       "ok": true
     },
     {
@@ -97,7 +123,7 @@
   ],
   "turns": {
     "durable": {
-      "threadId": "383c7ad0-b621-4fab-a491-b8be5ca8ea48",
+      "threadId": "98ecd17b-eeda-4d90-81ed-8f0991a81e87",
       "runs": [
         "completed",
         "completed"
@@ -105,14 +131,24 @@
       "title": {
         "status": "failed",
         "message": "The Model endpoint \"standin\" (model claude-fable-5-2) returned invalid structured output.",
-        "requestId": "5f2855ec-6ff2-4076-8fb4-22bea2813ed7",
-        "completedAt": "2026-11-16T14:59:18.701Z"
+        "requestId": "805f87d6-7da5-4fda-8b09-5dea607d6644",
+        "completedAt": "2026-11-16T15:21:32.050Z"
       }
     },
     "codex": {
       "runs": [
         {
-          "id": "run:thread:17c864b1-0a3c-43c4-be34-fa0f7aa8cd13:ordinal:1",
+          "id": "run:thread:6d4f2190-61c4-4a72-b87e-ae2057178eef:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "text": "ready"
+    },
+    "codexStandin": {
+      "runs": [
+        {
+          "id": "run:thread:046c6107-9f59-44e2-b656-a9b1e7a82dcd:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -122,7 +158,7 @@
     "pi": {
       "runs": [
         {
-          "id": "run:thread:af8702fe-401b-4968-8bd9-dc6fde80d826:ordinal:1",
+          "id": "run:thread:f753ea68-6995-4d87-88b6-3ace4db2c14f:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -132,7 +168,7 @@
     "piStandin": {
       "runs": [
         {
-          "id": "run:thread:49e0ffe5-7fe0-48cd-80d3-1e5f601dfe3f:ordinal:1",
+          "id": "run:thread:1e9f81b0-e80a-4a8a-a308-69c7c8aae3d6:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -142,17 +178,30 @@
     "claude": {
       "runs": [
         {
-          "id": "run:thread:ad3c78db-f676-4a61-8d45-56997b3345b2:ordinal:1",
+          "id": "run:thread:2d7273d3-7fa0-414f-914b-1765c3fa4e6d:ordinal:1",
           "status": "completed",
           "failure": null
         }
       ],
       "text": "ready"
     },
+    "claudeStandin": {
+      "runs": [
+        {
+          "id": "run:thread:b6415e26-891d-4f36-93e5-b3dd9b98c8fd:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "text": "ready"
+    },
+    "hangUp": {
+      "output": "handle=1\ncurl=200 exit 28"
+    },
     "opencode": {
       "runs": [
         {
-          "id": "run:thread:ada300a9-3e80-4ee7-aa6b-a3cd54008088:ordinal:1",
+          "id": "run:thread:af1150e3-169a-4fe3-9487-902d184309a6:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -163,48 +212,68 @@
   "usage": {
     "table": [
       {
+        "provider": "claude",
+        "source": "t3flare://usage/claude",
+        "model": "standin-anth/claude-fable-5-2",
+        "tokens": 2606,
+        "records": 1,
+        "costUsd": 0.01636,
+        "costSource": "modelPriced",
+        "sessions": 1
+      },
+      {
+        "provider": "codex",
+        "source": "t3flare://usage/codex",
+        "model": "standin-resp/gpt-5.1-codex",
+        "tokens": 1504,
+        "records": 1,
+        "costUsd": 0.0013525000000000002,
+        "costSource": "modelPriced",
+        "sessions": 1
+      },
+      {
         "provider": "opencode",
         "source": "t3flare://usage/opencode",
         "model": "standin/claude-fable-5-2",
-        "tokens": 2406,
-        "records": 2,
-        "costUsd": 0.01632,
+        "tokens": 1203,
+        "records": 1,
+        "costUsd": 0.00816,
         "costSource": "modelPriced",
-        "sessions": 2
+        "sessions": 1
       },
       {
         "provider": "pi",
         "source": "t3flare://usage/durable",
         "model": "standin/claude-fable-5-2",
-        "tokens": 2406,
-        "records": 2,
-        "costUsd": 0.01632,
+        "tokens": 1203,
+        "records": 1,
+        "costUsd": 0.00816,
         "costSource": "modelPriced",
-        "sessions": 2
+        "sessions": 1
       },
       {
         "provider": "pi",
         "source": "t3flare://usage/pi",
         "model": "standin/claude-fable-5-2",
-        "tokens": 2406,
-        "records": 2,
-        "costUsd": 0.01632,
+        "tokens": 1203,
+        "records": 1,
+        "costUsd": 0.00816,
         "costSource": "modelPriced",
-        "sessions": 2
+        "sessions": 1
       },
       {
         "provider": "pi",
         "source": "t3flare://usage/text-generation",
         "model": "standin/claude-fable-5-2",
-        "tokens": 2406,
+        "tokens": 1203,
         "records": 1,
-        "costUsd": 0.01632,
+        "costUsd": 0.00816,
         "costSource": "modelPriced",
         "sessions": 0
       }
     ],
     "commissaryLog": {
-      "since": "2026-11-16T14:59:06.867Z",
+      "since": "2026-11-16T15:21:20.840Z",
       "model": "claude-haiku-5-5",
       "requests": 8,
       "byProvider": {
@@ -218,7 +287,7 @@
         "source": "t3flare://usage/durable",
         "status": "ok",
         "scannedFiles": 1,
-        "distinctSessions": 2,
+        "distinctSessions": 1,
         "message": null
       },
       {
@@ -234,7 +303,7 @@
         "source": "t3flare://usage/pi",
         "status": "ok",
         "scannedFiles": 1,
-        "distinctSessions": 2,
+        "distinctSessions": 1,
         "message": null
       },
       {
@@ -249,8 +318,8 @@
         "provider": "codex",
         "source": "t3flare://usage/codex",
         "status": "ok",
-        "scannedFiles": 0,
-        "distinctSessions": 0,
+        "scannedFiles": 1,
+        "distinctSessions": 1,
         "message": null
       },
       {
@@ -265,8 +334,8 @@
         "provider": "claude",
         "source": "t3flare://usage/claude",
         "status": "ok",
-        "scannedFiles": 0,
-        "distinctSessions": 0,
+        "scannedFiles": 1,
+        "distinctSessions": 1,
         "message": null
       },
       {
@@ -282,7 +351,7 @@
         "source": "t3flare://usage/opencode",
         "status": "ok",
         "scannedFiles": 1,
-        "distinctSessions": 2,
+        "distinctSessions": 1,
         "message": null
       },
       {
@@ -295,12 +364,14 @@
       }
     ],
     "pricing": {
-      "status": "cached",
+      "status": "fresh",
       "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
-      "fetchedAt": "2026-11-16T14:58:49.394Z",
+      "fetchedAt": "2026-11-16T15:23:45.949Z",
       "knownModels": 5361
     }
   },
-  "failures": [],
-  "ok": true
+  "failures": [
+    "our records: the hung-up stream, recorded with the input its first event gave (the Workers' cancel and waitUntil): [{\"provider\":\"claude\",\"source\":\"t3flare://usage/claude\",\"model\":\"standin-anth/claude-fable-5-2\",\"tokens\":2606,\"records\":1,\"costUsd\":0.01636,\"costSource\":\"modelPriced\",\"sessions\":1},{\"provider\":\"codex\",\"source\":\"t3flare://usage/codex\",\"model\":\"standin-resp/gpt-5.1-codex\",\"tokens\":1504,\"records\":1,\"costUsd\":0.0013525000000000002,\"costSource\":\"modelPriced\",\"sessions\":1},{\"provider\":\"opencode\",\"source\":\"t3flare://usage/opencode\",\"model\":\"standin/claude-fable-5-2\",\"tokens\":1203,\"records\":1,\"costUsd\":0.00816,\"costSource\":\"modelPriced\",\"sessions\":1},{\"provider\":\"pi\",\"source\":\"t3flare://usage/durable\",\"model\":\"standin/claude-fable-5-2\",\"tokens\":1203,\"records\":1,\"costUsd\":0.00816,\"costSource\":\"modelPriced\",\"sessions\":1},{\"provider\":\"pi\",\"source\":\"t3flare://usage/pi\",\"model\":\"standin/claude-fable-5-"
+  ],
+  "ok": false
 }

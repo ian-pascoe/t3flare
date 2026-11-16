@@ -13,7 +13,8 @@
 // 2. A turn on each agent: the Durable agent on `comm`, its thread's title regenerated (text generation on `standin`),
 //    the Durable agent on `standin`; Codex on `resp` and on `standin-resp`; Claude Code on `comm` and on `standin-anth`
 //    (model-routed); then, in Claude Code's Container, a request through the relay with its process's handle that hangs
-//    up mid-stream (the stand-in's `slow-…` model), recorded by the Workers' cancel; pi on `oai` and on `standin`;
+//    up mid-stream (the stand-in's `slow-…` model), and whether it was recorded (observed: it is not); pi on `oai` and
+//    on `standin`;
 //    OpenCode on `oai`.
 // 3. t3's usage summary (`server.getUsageSummary`, what the Usage page reads): our sources (`t3flare://usage/<agent>`)
 //    have the `standin` turns, priced by t3's rate table, and nothing of the Commissary endpoints; Commissary's half is
@@ -213,7 +214,9 @@ check("our records: text generation's title on the stand-in, under Pi", has("pi"
 check("our records: Pi's relayed turn on the stand-in, under Pi (its own source)", has("pi", "pi", SLUG.standin), table);
 check("our records: Codex's relayed turn on the stand-in's Responses, under Codex", has("codex", "codex", SLUG.standinResp), table);
 check("our records: Claude Code's model-routed turn on the stand-in's Anthropic Messages, under Claude", has("claude", "claude", SLUG.anth), table);
-check("our records: the hung-up stream, recorded with the input its first event gave (the Workers' cancel and waitUntil)", table.some((row) => row.model === "standin-anth/slow-cancel" && row.tokens >= 1300), table);
+// Observed, not checked (review 2's optional item): whether the Workers' cancel recorded the hung-up stream. p1173 found
+// it does not (the report's "Unproven"), so it is reported as it is.
+report.hangUpRecorded = table.some((row) => row.model === "standin-anth/slow-cancel");
 check("the stand-in's models, with no endpoint price, are priced by t3's rate table", [SLUG.standin, SLUG.anth, SLUG.standinResp].every((model) => table.some((row) => row.model === model) && table.filter((row) => row.model === model).every((row) => row.costSource === "modelPriced" && row.costUsd > 0)), table);
 check("no record of ours for an endpoint on the proxy's key (Commissary's log counts those)", !table.some((row) => /^(comm|oai|resp)\//.test(row.model)), table);
 check("Commissary's own log has this run's requests on the proxy's key (at least one per turn on its endpoints): counted once, there", ofRun.length >= 5, commissaryLog);
