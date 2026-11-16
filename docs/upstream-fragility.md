@@ -1375,48 +1375,52 @@ succeed; nothing in t3 is touched. The leans are on the vendors' error shapes, o
 
 ### U81. The Claude sign-in on pi-ai: Claude Code's OAuth client and request shape (SPI-1165)
 
-Ranked after U80, beside U77 (ChatGPT plan usage), which it parallels: a break fails every turn on a Claude sign-in endpoint (Anthropic's disguised refusal is a 429
-`rate_limit_error`, SPI-1161 Q4), or a sign-in. Nothing here reaches t3; the leans are on pi-ai 1.5.0 and on Anthropic's
-undocumented OAuth for Claude Code, whose use outside Claude Code is the owner's terms-of-service risk (ADR-0018 item 10).
+Ranked after U80, beside U77 (ChatGPT plan usage), which it parallels: a break fails every turn on a Claude sign-in
+endpoint (Anthropic's disguised refusal is a 429 `rate_limit_error`, SPI-1161 Q4), or a sign-in. Nothing here reaches
+t3; the leans are on pi-ai 1.5.0 and on Anthropic's undocumented OAuth for Claude Code, whose use outside Claude Code is
+the owner's terms-of-service risk (ADR-0018 item 10).
 
 - **Where**: `packages/models/src/claudeOAuth.ts` (Claude Code's client id, the authorize, token and copy-code redirect
   URLs, the scopes, the `sk-ant-oat` token mark), `apps/environment/src/credentials/claude.ts` (the start, the pasted
-  `code#state`, the JSON exchange and refresh, the refresh-ending codes, no revocation), `SIGN_IN_KINDS.claude`
-  (`anthropic-messages` at `https://api.anthropic.com`, the model list's `anthropic-beta: oauth-2025-04-20`), agents'
-  `session/models.ts` (`SIGN_IN_REQUESTS.claude`: nothing of ours). It leans on pi-ai 1.5.0 and Anthropic in these ways:
+  `code#state`, the JSON exchange and refresh, what ends a sign-in at refresh, no revocation), `SIGN_IN_KINDS.claude`
+  (`anthropic-messages` at `https://api.anthropic.com`, the model list's `anthropic-beta: oauth-2025-04-20`). It leans
+  on pi-ai 1.5.0 and Anthropic in these ways:
   - **pi-ai's flow** (`dist/auth/oauth/anthropic.js`): `CLIENT_ID` (:11), `AUTHORIZE_URL` (:12), `TOKEN_URL` (:13),
     `COPY_CODE_REDIRECT_URI` (:20), `SCOPES` (:23), the authorize parameters (:174-183), the exchange's JSON body
     (:88-95) and the refresh's (:209-213). Ours departs on purpose: the attempt is sealed in the Environment DO, and the
     state is its own random value, not the verifier (pi-ai sends the verifier as the state).
   - **pi-ai's request shape for an OAuth token** (`dist/api/anthropic-messages.js`): `isOAuthToken` (:767, a key holding
-    `sk-ant-oat`) switches `createClient` (:787-801) to Bearer auth with `user-agent: claude-cli/2.1.280` and
-    `x-app: cli`, `getBetaFeatures` (:858) to `claude-code-20250219,oauth-2025-04-20`, `buildParams` (:911-926) to the
-    identity "You are Claude Code, Anthropic's official CLI for Claude." as the system's first block, and the tools to
-    Claude Code's names (`toClaudeCodeName`, :70). The requests go to `/v1/messages?beta=true`. t3flare adds nothing: the
-    shape follows from the token, so the store refuses such a token as an API key, and the broker refuses a sign-in whose
-    token lacks the mark.
+    `sk-ant-oat`) switches `createClient` (:787-801) to Bearer auth with `user-agent: claude-cli/2.1.280` and `x-app:
+    cli`, `getBetaFeatures` (:858) to `claude-code-20250219,oauth-2025-04-20`, `buildParams` (:911-926) to the identity
+    "You are Claude Code, Anthropic's official CLI for Claude." as the system's first block, and the tools to Claude
+    Code's names (`toClaudeCodeName`, :70). The requests go to `/v1/messages?beta=true`. t3flare adds nothing (no
+    `SIGN_IN_REQUESTS` entry): the shape follows from the token, so the store refuses such a token as an API key, and
+    the broker refuses a sign-in whose token lacks the mark.
   - **Anthropic** (the spike, SPI-1161): the token answer's fields (`access_token`, `refresh_token`, `expires_in` 28800,
     `scope`, `account.uuid`, `account.email_address`), a refresh token that rotates on every refresh and refuses a
-    replaced one with `invalid_grant` (a 400, 401 or 403 with a JSON body, but Anthropic's passing codes, is taken as
-    the end of the sign-in; the accepted cost: a JSON 400, 401 or 403 during an incident at Anthropic would sign the owner out (sign in again; the old grant stays at claude.ai), weighed against retrying a removed grant's refresh forever; what Anthropic answers for a removed grant is unverified), no revocation endpoint, and `GET /v1/models` with the bearer and the OAuth beta
-    for the model list.
-- **Breaks when**: pi-ai changes Claude Code's client, URLs or scopes, the exchange or refresh body, the token mark,
-  the headers, betas, user agent's version, identity text or tool names; Anthropic changes what it requires of an OAuth
-  request (the identity, a beta, a newer Claude Code version), its token form or answer, or adds a revocation endpoint.
+    replaced one with `invalid_grant`, no revocation endpoint, and `GET /v1/models` with the bearer and the OAuth beta
+    for the model list. A refresh refused at 400, 401 or 403 with an error object (an OAuth error or Anthropic's API
+    error) but a passing code ends the sign-in; any other body is retried (ADR-0018 item 10, with its accepted cost).
+- **Breaks when**: pi-ai changes Claude Code's client, URLs or scopes, the exchange or refresh body, the token mark, the
+  headers, betas, user agent's version, identity text or tool names; Anthropic changes what it requires of an OAuth
+  request (the identity, a beta, a newer Claude Code version), its token form or answer, its error bodies or the code
+  page's alphabet, or adds a revocation endpoint.
 - **Detection**: `apps/agents/test/claudeSignInShape.test.ts` runs pi-ai's own copy-code `login()` and `refresh()` and
   compares them with `claudeOAuth.ts`, and pins every header, the system blocks and a tool name on the wire (and their
   absence for an API key). `apps/environment/test/claudeSignIn.test.ts` and `claudeBroker.test.ts` run ours against a
-  fake of Anthropic. **Silent**: anything on Anthropic's side, which only a real sign-in and turn see (the fake is ours).
+  fake of Anthropic. **Silent**: anything on Anthropic's side, which only a real sign-in and turn see (the fake is
+  ours).
 - **Unverified until a real refresh runs**: whether Anthropic ends the replaced access token at a refresh. A Session
   keeps a token at most 5 minutes and never past 2 minutes before its expiry, and the broker renews with less than 5
   minutes left, so a Session may send the replaced access token for at most 3 minutes after a renewal. If Anthropic
-  refuses it there, the request's 401 is SPI-1172's `sign_in_refused` (not retried) and the Session drops the token,
-  so the next turn takes the renewed one; that turn fails once. The stage run ended before the 8-hour token's renewal.
+  refuses it there, the request's 401 is SPI-1172's `sign_in_refused` (not retried) and the Session drops the token, so
+  the next turn takes the renewed one; that turn fails once. The stage run ended before the 8-hour token's renewal.
 - **Blast radius**: turns on the Claude endpoint fail (429 or 401, shown as model errors), or the sign-in fails; a lost
-  rotation, or any refusal of a refresh, signs the endpoint out (sign in again). No token leaves the Session or the broker either way.
+  rotation, or a refused refresh, signs the endpoint out (sign in again). No token leaves the Session or the broker
+  either way.
 - **Fix**: on a pi-ai bump, diff `auth/oauth/anthropic.js` against `claudeOAuth.ts` and `credentials/claude.ts`, and
-  `api/anthropic-messages.js` (`isOAuthToken`, `createClient`, `getBetaFeatures`, `buildParams`) against the pins; update
-  the pins only once a turn on a real Claude sign-in passes with the new shape.
+  `api/anthropic-messages.js` (`isOAuthToken`, `createClient`, `getBetaFeatures`, `buildParams`) against the pins;
+  update the pins only once a turn on a real Claude sign-in passes with the new shape.
 
 ## Gaps in detection
 
