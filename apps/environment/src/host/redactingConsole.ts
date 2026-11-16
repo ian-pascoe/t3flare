@@ -11,16 +11,12 @@ import { redactSecrets } from "@t3flare/models/redact";
 
 /** t3's pairing-URL line: `  pairingUrl: http://…/pair#token=…`. */
 const PAIRING_LINE = /pairingUrl:/i;
-const TOKEN_PARAM = /([#?&](?:token|credential)=)[^&\s"'#]+/gi;
-const BEARER = /(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/g;
-
-const SENSITIVE = /pairingUrl:|[#?&](?:token|credential)=|Bearer\s+[A-Za-z0-9._~+/=-]{8,}/i;
 
 /**
- * The token and bearer forms first, then every credential shape a model's error text may echo (SPI-1172: vendor keys,
- * JWT-shaped values, key headers; `@t3flare/models/redact`, the one list the Session and the relay use too).
+ * Every credential shape `@t3flare/models/redact` knows (SPI-1172: its `?#&` token and credential parameters and bearer
+ * values took the place of this Console's own patterns), with its `[redacted]` placeholder.
  */
-export const redact = (text: string): string => redactSecrets(text.replace(TOKEN_PARAM, "$1<redacted>").replace(BEARER, "$1<redacted>"));
+export const redact = (text: string): string => redactSecrets(text);
 
 /** Counts what was dropped or redacted, for the admin health route. */
 export const redactions = { droppedPairingLines: 0, redactedArguments: 0 };
@@ -41,7 +37,7 @@ const redactArgument = (value: unknown): unknown => {
     }
     if (text === undefined) return value;
     const redacted = redact(text);
-    if (redacted === text && !SENSITIVE.test(text)) return value;
+    if (redacted === text) return value;
     redactions.redactedArguments++;
     return redacted;
   }

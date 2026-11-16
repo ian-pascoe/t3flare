@@ -75,7 +75,7 @@ describe("redacting Console", () => {
     expect(lines[0]).toEqual(["Authentication required. Open T3 Code using the pairing URL."]);
     expect(String(lines[1]![0])).not.toContain("SECRET123");
     expect(String(lines[1]![0])).not.toContain("abcdefghijklmnop");
-    expect(redact("see #token=abc and &credential=def")).toBe("see #token=<redacted> and &credential=<redacted>");
+    expect(redact("see #token=abc and &credential=def")).toBe("see #token=[redacted] and &credential=[redacted]");
   });
 
   it("redacts a model error's echoed key and JWT in a log record (SPI-1172)", () => {
