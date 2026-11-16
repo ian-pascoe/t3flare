@@ -85,4 +85,47 @@ describe("discoverModels", () => {
     expect(found).toMatchObject({ ok: false, error: expect.stringMatching(/HTTP 401/) });
     expect(JSON.stringify(found)).not.toContain("sk-secret");
   });
+
+  it("reads GitHub Copilot's catalog by pi-ai's rules: chat models with tools the picker shows, on the endpoint's API (SPI-1166)", async () => {
+    const entry = (id: string, extra: Record<string, unknown> = {}) => ({ id, name: id.toUpperCase(), model_picker_enabled: true, policy: { state: "enabled" }, capabilities: { type: "chat", supports: { tool_calls: true } }, ...extra });
+    const { seen, fetcher } = fake(() => ({
+      object: "list",
+      data: [
+        // On Responses in pi-ai's Copilot catalog.
+        entry("gpt-6.1-sol"),
+        // Copilot lists its endpoints: that wins.
+        entry("gpt-new", { supported_endpoints: ["/chat/completions", "/responses"] }),
+        entry("claude-sonnet-5.5", { supported_endpoints: ["/v1/messages", "/chat/completions"] }),
+        // On Messages or Chat Completions in pi-ai's catalog, or unknown to it: not on this endpoint.
+        entry("claude-haiku-4.5"),
+        entry("gemini-3.8-flash"),
+        entry("mystery-1"),
+        // Not shown, disabled, without tools, not chat.
+        entry("gpt-5.6-luna", { model_picker_enabled: false }),
+        entry("gpt-6-sol", { policy: { state: "disabled" } }),
+        entry("grok-4.7", { capabilities: { type: "chat", supports: { tool_calls: false } } }),
+        entry("text-embedding-3-small", { capabilities: { type: "embeddings", supports: {} } }),
+        // Unconfigured but shown: pi-ai lists it too.
+        entry("grok-4.6", { policy: { state: "unconfigured" } }),
+      ],
+    }));
+    const target = { api: "openai-responses" as const, baseUrl: "https://api.individual.githubcopilot.com", headers: { authorization: "Bearer tid=1", "Copilot-Integration-Id": "vscode-chat" } };
+    expect(await discoverModels(target, undefined, fetcher)).toEqual({
+      ok: true,
+      models: [
+        { id: "gpt-6.1-sol", name: "GPT-6.1-SOL" },
+        { id: "gpt-new", name: "GPT-NEW" },
+        { id: "grok-4.6", name: "GROK-4.6" },
+      ],
+    });
+    expect(seen[0]).toMatchObject({ url: "https://api.individual.githubcopilot.com/models", headers: { authorization: "Bearer tid=1", "copilot-integration-id": "vscode-chat" } });
+  });
+
+  it("falls back to an individual Copilot account's enabled policies when its picker shows none, as pi-ai does", async () => {
+    const entry = (id: string, state: string) => ({ id, model_picker_enabled: false, policy: { state }, capabilities: { type: "chat", supports: { tool_calls: true } } });
+    const { fetcher } = fake(() => ({ data: [entry("gpt-6.1-sol", "enabled"), entry("gpt-6-sol", "unconfigured")] }));
+    const individual = { api: "openai-responses" as const, baseUrl: "https://api.individual.githubcopilot.com", headers: {} };
+    expect(await discoverModels(individual, undefined, fetcher)).toEqual({ ok: true, models: [{ id: "gpt-6.1-sol" }] });
+    expect(await discoverModels({ ...individual, baseUrl: "https://api.business.githubcopilot.com" }, undefined, fetcher)).toEqual({ ok: true, models: [] });
+  });
 });

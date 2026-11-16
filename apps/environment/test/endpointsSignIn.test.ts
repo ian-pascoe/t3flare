@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { credentialBroker } from "../src/credentials/broker.ts";
 import { chatgptSignIn } from "../src/credentials/chatgpt.ts";
 import { claudeSignIn } from "../src/credentials/claude.ts";
+import { copilotSignIn } from "../src/credentials/copilot.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
 import type { Discovery } from "../src/endpoints/discover.ts";
 import { endpointStore } from "../src/endpoints/store.ts";
@@ -15,6 +16,7 @@ import { csrfToken } from "../src/harness/csrf.ts";
 import { CSRF_HEADER, handleHarness, type HarnessCaller, type HarnessDeps } from "../src/harness/panel.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { fakeAnthropic } from "./fixtures/fakeAnthropicAuth.ts";
+import { fakeGitHubCopilot } from "./fixtures/fakeGitHubCopilot.ts";
 import { fakeOpenAI } from "./fixtures/fakeOpenAIAuth.ts";
 
 const HOST = "t3.example.dev";
@@ -41,11 +43,18 @@ afterEach(() => vi.restoreAllMocks());
 const setup = async () => {
   const kv = memory();
   const store = harnessStore(kv);
-  const now = () => NOW;
+  let clock = NOW;
+  const now = () => clock;
   const vendor = await fakeOpenAI({ now });
   const anthropic = fakeAnthropic();
+  const github = fakeGitHubCopilot({}, now);
   const sealed = sealedStore(kv, "e".repeat(64), now);
-  const signIns = credentialBroker({ kv, sealed, vendors: { chatgpt: chatgptSignIn({ fetch: vendor.fetch, now }), claude: claudeSignIn({ fetch: anthropic.fetch, now }) }, now });
+  const signIns = credentialBroker({
+    kv,
+    sealed,
+    vendors: { chatgpt: chatgptSignIn({ fetch: vendor.fetch, now }), claude: claudeSignIn({ fetch: anthropic.fetch, now }), copilot: copilotSignIn({ fetch: github.fetch, now }) },
+    now,
+  });
   const endpoints = endpointStore(kv, sealed, signIns);
   const discovered: Array<{ baseUrl: string; apiKey: string | undefined; headers: Readonly<Record<string, string>> }> = [];
   const stopped: Array<string> = [];
@@ -81,9 +90,9 @@ const setup = async () => {
   /** Everything a token must never reach: the storage, the audit log, the console. */
   const leaks = () => {
     const places = [JSON.stringify([...kv.map.entries()]), JSON.stringify(store.auditLog(50)), logged.join("\n")];
-    return [...vendor.secrets(), ...anthropic.secrets()].filter((token) => places.some((place) => place.includes(token)));
+    return [...vendor.secrets(), ...anthropic.secrets(), ...github.secrets()].filter((token) => places.some((place) => place.includes(token)));
   };
-  return { kv, store, vendor, anthropic, signIns, endpoints, deps, post, page, discovered, stopped, leaks, changes: () => changes, list: (next: Discovery) => void (listed = next) };
+  return { kv, store, vendor, anthropic, github, advance: (ms: number) => void (clock += ms), signIns, endpoints, deps, post, page, discovered, stopped, leaks, changes: () => changes, list: (next: Discovery) => void (listed = next) };
 };
 
 /** Start and paste, as the owner does; the answers' texts. */
@@ -343,5 +352,122 @@ describe("Claude on the Harness panel (SPI-1165)", () => {
     expect(saved.text).toMatch(/Claude subscription's token, not an API key: use Sign in with Claude/);
     expect(context.endpoints.load().endpoints).toEqual([]);
     expect(JSON.stringify([...context.kv.map.entries()])).not.toContain("sk-ant-oat01-copied");
+  });
+});
+
+/** A Copilot sign-in as the owner does it: start, enter the code at GitHub and approve, the page asking until it is done. */
+const copilotSignInFlow = async (context: Awaited<ReturnType<typeof setup>>) => {
+  const started = await context.post({ op: "start", id: "copilot", signIn: "copilot", label: "Copilot" });
+  const { device } = JSON.parse(started.text) as { device: { userCode: string; intervalSeconds: number } };
+  // The page asks before the owner approved: still waiting, and nothing secret of the attempt anywhere.
+  context.advance(device.intervalSeconds * 1000);
+  const asked = await context.post({ op: "complete", id: "copilot", label: "Copilot" });
+  const waiting = await context.page();
+  expect(context.leaks()).toEqual([]);
+  for (const secret of context.github.secrets()) expect(waiting + asked.text).not.toContain(secret);
+  context.github.approve(device.userCode);
+  context.advance(device.intervalSeconds * 1000);
+  const done = await context.post({ op: "complete", id: "copilot", label: "Copilot" });
+  return { started, asked, waiting, done, userCode: device.userCode };
+};
+
+const COPILOT_TARGET = { api: "openai-responses" as const, baseUrl: "https://api.individual.githubcopilot.com", headers: {} };
+const EDITOR_HEADERS = { "User-Agent": "GitHubCopilotChat/0.35.0", "Editor-Version": "vscode/1.107.0", "Editor-Plugin-Version": "copilot-chat/0.35.0", "Copilot-Integration-Id": "vscode-chat" };
+
+describe("GitHub Copilot on the Harness panel (SPI-1166)", () => {
+  it("offers the device sign-in with its note: the owner's terms-of-service risk, a Copilot plan, no revocation; no paste field", async () => {
+    const html = await (await setup()).page();
+    const form = /<form[^>]*data-sign-in-kind="copilot"[\s\S]*?<\/form>/.exec(html)?.[0] ?? "";
+    expect(form).toContain("Sign in with GitHub Copilot");
+    expect(form).toContain("data-sign-in-device");
+    expect(form).toContain("data-sign-in-code");
+    expect(form).toContain("Check sign-in");
+    expect(form).not.toContain('name="pasted"');
+    expect(form).toContain("Your risk");
+    expect(form).toMatch(/Copilot plan/);
+    expect(form).toMatch(/github\.com, under Settings, Applications/);
+  });
+
+  it("starts GitHub's device flow, waits for the approval, and saves a Copilot endpoint whose base URL and headers stay the broker's", async () => {
+    const context = await setup();
+    context.list({ ok: true, models: [{ id: "gpt-6.1-sol" }, { id: "grok-4.7" }] });
+    const { started, asked, waiting, done, userCode } = await copilotSignInFlow(context);
+    expect(JSON.parse(started.text)).toEqual({ ok: true, authorizeUrl: "https://github.com/login/device", device: { userCode, expiresAt: NOW + 900_000, intervalSeconds: 5 } });
+    expect(JSON.parse(asked.text)).toEqual({ ok: false, waiting: true, error: "Waiting for you to enter the code at GitHub and approve." });
+    expect(waiting).toMatch(/waiting for approval at the vendor/);
+    expect(JSON.parse(done.text)).toMatchObject({ ok: true, models: 2 });
+    const [endpoint] = context.endpoints.load().endpoints;
+    // The stored endpoint holds the sign-in's stand-in base URL and no headers: the token's own are the broker's.
+    expect(endpoint).toMatchObject({ id: "copilot", label: "Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot", headers: {} });
+    // The list was read where the Copilot token says, with its bearer, the editor headers and the API version.
+    expect(context.discovered).toEqual([
+      {
+        baseUrl: "https://api.individual.githubcopilot.com",
+        apiKey: undefined,
+        headers: { ...EDITOR_HEADERS, "X-GitHub-Api-Version": "2026-06-01", authorization: `Bearer ${context.github.copilotTokens[0]}` },
+      },
+    ]);
+    const html = await context.page();
+    expect(html).toContain('data-sign-in-out="copilot"');
+    expect(html).toContain("https://api.individual.githubcopilot.com (from its GitHub Copilot token)");
+    // Only the start and the end are audited, not each ask.
+    expect(context.store.auditLog(5).map((entry) => entry.action)).toEqual(["endpoint.sign-in", "endpoint.sign-in.start"]);
+    expect(context.leaks()).toEqual([]);
+    for (const secret of context.github.secrets()) expect(html + done.text + started.text).not.toContain(secret);
+  });
+
+  it("gives a Session the Copilot token with the base URL its token names and the editor headers, for the endpoint's target only", async () => {
+    const context = await setup();
+    context.github.options.proxyHost = "proxy.business.githubcopilot.com";
+    await copilotSignInFlow(context);
+    const credential = await context.endpoints.credential({ endpointId: "copilot", target: COPILOT_TARGET });
+    expect(credential).toEqual({ apiKey: context.github.copilotTokens[0], expiresAt: Math.floor(NOW / 1000) * 1000 + 10_000 + 1_800_000, baseUrl: "https://api.business.githubcopilot.com", headers: EDITOR_HEADERS });
+    expect(await context.endpoints.credential({ endpointId: "copilot", target: { ...COPILOT_TARGET, baseUrl: "https://api.business.githubcopilot.com" } })).toEqual({ apiKey: null, changed: true });
+    // The GitHub token never leaves the broker; the relay does not carry a sign-in yet (SPI-1171).
+    expect(JSON.stringify(credential)).not.toContain(context.github.githubTokens[0]!);
+    expect((await context.endpoints.resolve("copilot"))?.apiKey).toBeUndefined();
+  });
+
+  it("reads a signed-in Copilot endpoint's model list again at its token's base URL", async () => {
+    const context = await setup();
+    await copilotSignInFlow(context);
+    const read = await context.post({ endpoint: { id: "copilot", label: "Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot" } }, "endpoints/discover");
+    expect(read.status).toBe(200);
+    expect(context.discovered.at(-1)).toMatchObject({ baseUrl: "https://api.individual.githubcopilot.com", headers: { authorization: `Bearer ${context.github.copilotTokens[0]}`, "Copilot-Integration-Id": "vscode-chat" } });
+    for (const token of context.github.issued) expect(read.text).not.toContain(token);
+  });
+
+  it("refuses an account without a Copilot plan at once, saves nothing, and says where to revoke the GitHub grant", async () => {
+    const context = await setup();
+    context.github.options.copilotStatus = 403;
+    context.github.options.copilotBody = { message: "Forbidden", error_details: { notification_id: "subscription_ended" } };
+    const { done } = await copilotSignInFlow(context);
+    expect(JSON.parse(done.text)).toMatchObject({ ok: false, error: expect.stringMatching(/subscription_ended\): this GitHub account needs a Copilot plan\. It could not be revoked here: revoke it at github\.com/) });
+    expect(context.endpoints.load().endpoints).toEqual([]);
+    expect(context.leaks()).toEqual([]);
+  });
+
+  it("signs out: the tokens deleted here and the Sessions stopped; nothing sent to GitHub, and the answer says where to revoke the grant", async () => {
+    const context = await setup();
+    await copilotSignInFlow(context);
+    const sent = context.github.requests.length;
+    const out = JSON.parse((await context.post({ op: "sign-out", id: "copilot" })).text) as Record<string, unknown>;
+    expect(out).toMatchObject({ ok: true, signedOut: true, revoked: false, revocation: expect.stringMatching(/github\.com, under Settings, Applications/) });
+    expect(context.github.requests).toHaveLength(sent);
+    expect(context.stopped).toEqual(["copilot"]);
+    expect(await context.endpoints.credential({ endpointId: "copilot", target: COPILOT_TARGET })).toMatchObject({ apiKey: null, signedOut: true });
+    const html = await context.page();
+    expect(html).toContain('data-sign-in-start="copilot"');
+    expect(html).toContain("set by its GitHub Copilot token");
+    expect(context.leaks()).toEqual([]);
+  });
+
+  it("keeps a Copilot endpoint's target: no headers of the owner's, no other base URL", async () => {
+    const context = await setup();
+    await copilotSignInFlow(context);
+    const base = { id: "copilot", label: "Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot", models: ["gpt-6.1-sol"] };
+    expect((await context.post({ op: "save", endpoint: { ...base, headers: { "Copilot-Integration-Id": "x" } } }, "endpoints")).text).toMatch(/no headers/);
+    expect((await context.post({ op: "save", endpoint: { ...base, baseUrl: "https://api.business.githubcopilot.com" } }, "endpoints")).text).toMatch(/openai-responses at https:\/\/api\.individual\.githubcopilot\.com/);
+    expect((await context.post({ op: "save", endpoint: { ...base, label: "Copilot Pro" } }, "endpoints")).status).toBe(200);
   });
 });

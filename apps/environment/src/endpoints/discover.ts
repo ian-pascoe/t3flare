@@ -5,7 +5,8 @@
 // fills in what the list does not say (store.ts). A failure is reported as its HTTP status, never its body (which may
 // echo the key).
 import { parseList, realIdOf } from "@t3flare/models/catalog";
-import { type EndpointModelInput, type EndpointTarget, isRecord } from "@t3flare/models/endpoints";
+import { type EndpointApi, type EndpointModelInput, type EndpointTarget, isRecord } from "@t3flare/models/endpoints";
+import { copilotModelApi } from "@t3flare/models/known";
 import { credentialHeaderOf } from "@t3flare/models/relay";
 
 const TIMEOUT_MS = 10_000;
@@ -73,7 +74,35 @@ const openai = async (target: EndpointTarget, apiKey: string | undefined, fetche
     );
   }
   if (!isRecord(body) || !Array.isArray(body.data)) throw new ListError("the endpoint's answer is not a list of models");
+  if (body.data.some((entry) => isRecord(entry) && "model_picker_enabled" in entry)) return copilotModels(body.data, target);
   return body.data.flatMap((entry): Array<EndpointModelInput> => (isRecord(entry) && typeof entry.id === "string" && entry.id !== "" ? [{ id: entry.id }] : []));
+};
+
+/** Each API's path in Copilot's `supported_endpoints`. */
+const COPILOT_PATHS: Readonly<Partial<Record<EndpointApi, string>>> = { "openai-responses": "/responses", "openai-completions": "/chat/completions", "anthropic-messages": "/v1/messages" };
+
+/**
+ * GitHub Copilot's catalog (SPI-1166): `{ data: [{ id, name, model_picker_enabled, policy: { state }, capabilities: {
+ * type, supports: { tool_calls } }, supported_endpoints? }] }`, read by pi-ai's rules (`parseGitHubCopilotModelCatalog`):
+ * the chat models with tools that the account's picker shows and its policy does not disable; on an individual account
+ * whose picker shows none, those its policy enables. Of those, the ones served on the endpoint's API: as Copilot lists
+ * them (`supported_endpoints`), else as pi-ai's Copilot catalog sends them; a model neither says is left out.
+ */
+const copilotModels = (data: ReadonlyArray<unknown>, target: EndpointTarget): Array<EndpointModelInput> => {
+  const entries = data.filter(isRecord).flatMap((entry) => {
+    if (typeof entry.id !== "string" || entry.id === "") return [];
+    const capabilities = isRecord(entry.capabilities) ? entry.capabilities : {};
+    const supports = isRecord(capabilities.supports) ? capabilities.supports : {};
+    if (supports.tool_calls === false || (capabilities.type !== undefined && capabilities.type !== "chat")) return [];
+    const policy = isRecord(entry.policy) ? entry.policy.state : undefined;
+    return [{ id: entry.id, name: typeof entry.name === "string" && entry.name !== "" ? entry.name : undefined, picker: entry.model_picker_enabled === true, policy, endpoints: entry.supported_endpoints }];
+  });
+  const picked = entries.filter((entry) => entry.picker && entry.policy !== "disabled");
+  const fallback = picked.length === 0 && new URL(target.baseUrl).hostname === "api.individual.githubcopilot.com";
+  const path = COPILOT_PATHS[target.api];
+  return (fallback ? entries.filter((entry) => entry.policy === "enabled") : picked)
+    .filter((entry) => (Array.isArray(entry.endpoints) ? path !== undefined && entry.endpoints.includes(path) : copilotModelApi(entry.id) === target.api))
+    .map((entry) => ({ id: entry.id, ...(entry.name === undefined ? {} : { name: entry.name }) }));
 };
 
 const google = async (target: EndpointTarget, apiKey: string | undefined, fetcher: typeof fetch, signal: AbortSignal) => {

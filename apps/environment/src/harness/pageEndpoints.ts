@@ -7,7 +7,9 @@
 // the authorize link, paste what it gives back (ChatGPT's: the 127.0.0.1 address the browser lands on, a page that does not
 // load), and see the account or why it failed. A sign-in endpoint's card shows its account and token expiry, with Sign
 // out. Each says plainly what is verified of it (its kind's `note`). SPI-1165 adds Claude, whose vendor offers no
-// revocation: its Sign out says where the owner removes the grant (its kind's `revocation`).
+// revocation: its Sign out says where the owner removes the grant (its kind's `revocation`). SPI-1166 adds GitHub Copilot,
+// a device sign-in (its kind's `device`): the form shows the code to enter at GitHub's device page, and asks the
+// Environment at GitHub's interval whether it was approved, with no paste; its card shows the API host its token names.
 import { endpointSlug, type EndpointApi, type EndpointPreset, isSignIn, type ModelEndpoint, SIGN_IN_KINDS, SIGN_INS, type SignIn } from "@t3flare/models/endpoints";
 
 import type { SignInStatus } from "../credentials/broker.ts";
@@ -41,8 +43,9 @@ const when = (ms: number): string => new Date(ms).toISOString().slice(0, 16).rep
 const signInFacts = (escape: Escape, status: SignInStatus | undefined): string => {
   if (status === undefined) return "";
   const account = status.signedIn ? escape(status.email ?? "signed in") : '<span class="pill pill-warn">not signed in</span>';
+  const awaited = status.kind !== null && SIGN_IN_KINDS[status.kind].device !== null ? "approval at the vendor" : "its paste";
   return `<div><dt>Account</dt><dd>${account}</dd></div>${status.signedIn && status.expiresAt !== null ? `<div><dt>Token</dt><dd>renews before ${escape(when(status.expiresAt))}</dd></div>` : ""}${
-    status.pendingSince === null ? "" : `<div><dt>Sign-in</dt><dd>waiting for its paste since ${escape(when(status.pendingSince))}</dd></div>`
+    status.pendingSince === null ? "" : `<div><dt>Sign-in</dt><dd>waiting for ${awaited} since ${escape(when(status.pendingSince))}</dd></div>`
   }${status.problem === null ? "" : `<div><dt>Problem</dt><dd class="sign-in-problem">${escape(status.problem)}</dd></div>`}`;
 };
 
@@ -66,6 +69,13 @@ const endpointCard = (escape: Escape, endpoint: EndpointsView["endpoints"][numbe
 <details class="tools"${endpoint.models.length <= 12 ? " open" : ""}><summary>${icon("chevron")}Models</summary><ul class="endpoint-models">${models}</ul></details></article>`;
 };
 
+/** Where a sign-in endpoint's requests go: its base URL, or for one whose token names it (Copilot's), the token's. */
+const baseUrlOf = (escape: Escape, endpoint: EndpointsView["endpoints"][number], signIn: (typeof SIGN_IN_KINDS)[SignIn]): string => {
+  if (!signIn.baseUrlFromCredential) return escape(endpoint.baseUrl);
+  const named = endpoint.signIn?.baseUrl ?? null;
+  return named === null ? `set by its ${escape(signIn.title)} token` : `${escape(named)} (from its ${escape(signIn.title)} token)`;
+};
+
 /** A sign-in endpoint's card: its account and Sign out (or Sign in again), its models; no key, no Edit of its target. */
 const signInCard = (escape: Escape, endpoint: EndpointsView["endpoints"][number], kind: SignIn): string => {
   const signIn = SIGN_IN_KINDS[kind];
@@ -79,7 +89,7 @@ const signInCard = (escape: Escape, endpoint: EndpointsView["endpoints"][number]
         }>Sign out</button>`
       : `<button type="button" class="btn btn-sm btn-primary" data-sign-in-start="${escape(endpoint.id)}" data-sign-in-kind="${escape(kind)}" data-sign-in-label="${escape(endpoint.label)}">Sign in with ${escape(signIn.title)}</button>`;
   return `<article class="group server" aria-labelledby="${id}" data-endpoint-row="${escape(endpoint.id)}">
-<div class="server-head"><div><div class="server-name"><h3 id="${id}">${escape(endpoint.label)}</h3><span class="ident">${escape(endpoint.id)}</span><span class="tag">${escape(signIn.title)} sign-in</span></div><p class="server-url">${escape(endpoint.baseUrl)}</p></div>
+<div class="server-head"><div><div class="server-name"><h3 id="${id}">${escape(endpoint.label)}</h3><span class="ident">${escape(endpoint.id)}</span><span class="tag">${escape(signIn.title)} sign-in</span></div><p class="server-url">${baseUrlOf(escape, endpoint, signIn)}</p></div>
 <dl class="facts"><div><dt>Models</dt><dd>${endpoint.models.length}</dd></div>${signInFacts(escape, endpoint.signIn)}</dl></div>
 <p class="desc">${escape(signIn.note)}</p>
 <div class="server-actions">${action}<button type="button" class="btn btn-sm" data-endpoint-edit="${escape(JSON.stringify(editable))}">Edit models</button><span class="spacer"></span><button type="button" class="btn btn-sm btn-danger" data-endpoint-remove="${escape(endpoint.id)}" aria-label="Remove ${escape(endpoint.label)}">${icon("trash")}Remove</button></div>
@@ -95,15 +105,23 @@ const signInForm = (escape: Escape, view: EndpointsView, kind: SignIn): string =
     .map(([id, status]) => `<div class="field wide"><dl class="facts"><div><dt>Endpoint</dt><dd><code>${escape(id)}</code></dd></div>${signInFacts(escape, status)}</dl></div>`)
     .join("");
   const at = (name: string) => escape(`sign-in-${kind}-${name}`);
-  return `<form class="group add" id="${at("form")}" data-sign-in-form data-sign-in-kind="${escape(kind)}" data-sign-in-steps="${escape(signIn.paste.instructions)}" autocomplete="off" aria-labelledby="${at("title")}">
-<div class="row"><div><div class="row-title"><h3 id="${at("title")}">Sign in with ${escape(signIn.title)}</h3></div><p class="desc">${escape(signIn.about)} Start, open the link and approve, then paste what it gives you back here.</p>
+  const waitingHere = waiting.some(([, status]) => status.pendingSince !== null);
+  // A paste sign-in's step: the link, then the paste. A device sign-in's: the link and the code to enter there.
+  const step =
+    signIn.paste === null
+      ? `<div class="field wide" data-sign-in-step hidden><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer">Open ${escape(signIn.title)}'s device page</a></p><p class="desc">Enter this code there: <code class="ident" data-sign-in-code></code></p></div>`
+      : `<div class="field wide" data-sign-in-step${waitingHere ? "" : " hidden"}><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer" hidden>Open the ${escape(signIn.title)} sign-in</a></p><label for="${at("paste")}">What the sign-in gave you</label><textarea id="${at("paste")}" name="pasted" rows="3" spellcheck="false" placeholder="${escape(signIn.paste.placeholder)}"></textarea><p class="hint">It holds a one-time code: paste it here only.</p></div>`;
+  const steps = signIn.paste?.instructions ?? signIn.device?.instructions ?? "";
+  const how = signIn.paste === null ? "Start, open GitHub's page and enter the code shown here; this page finishes once you approve." : "Start, open the link and approve, then paste what it gives you back here.";
+  return `<form class="group add" id="${at("form")}" data-sign-in-form data-sign-in-kind="${escape(kind)}"${signIn.paste === null ? " data-sign-in-device" : ""} data-sign-in-steps="${escape(steps)}" autocomplete="off" aria-labelledby="${at("title")}">
+<div class="row"><div><div class="row-title"><h3 id="${at("title")}">Sign in with ${escape(signIn.title)}</h3></div><p class="desc">${escape(signIn.about)} ${how}</p>
 <div class="callout callout-warn" role="note">${icon("warn")}<div><strong>${escape(signIn.noteTitle)}</strong><p>${escape(signIn.note)}</p></div></div></div></div>
 <div class="form-body">${notes}
 <div class="field"><label for="${at("id")}">Id</label><input id="${at("id")}" name="id" type="text" required pattern="[a-z0-9](?:[a-z0-9\\-]{0,30}[a-z0-9])?" value="${escape(waiting[0]?.[0] ?? kind)}" autocapitalize="none" spellcheck="false"></div>
 <div class="field"><label for="${at("label")}">Label</label><input id="${at("label")}" name="label" type="text" maxlength="60" value="${escape(signIn.title)}"></div>
-<div class="field wide" data-sign-in-step${waiting.some(([, status]) => status.pendingSince !== null) ? "" : " hidden"}><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer" hidden>Open the ${escape(signIn.title)} sign-in</a></p><label for="${at("paste")}">What the sign-in gave you</label><textarea id="${at("paste")}" name="pasted" rows="3" spellcheck="false" placeholder="${escape(signIn.paste.placeholder)}"></textarea><p class="hint">It holds a one-time code: paste it here only.</p></div>
+${step}
 </div>
-<div class="form-foot"><p data-sign-in-note aria-live="polite"></p><button type="button" class="btn" data-sign-in-start>Start sign-in</button><button type="button" class="btn btn-primary" data-sign-in-finish>Finish sign-in</button></div>
+<div class="form-foot"><p data-sign-in-note aria-live="polite"></p><button type="button" class="btn" data-sign-in-start>Start sign-in</button><button type="button" class="btn btn-primary" data-sign-in-finish>${signIn.paste === null ? "Check sign-in" : "Finish sign-in"}</button></div>
 </form>`;
 };
 
@@ -236,6 +254,32 @@ for (const form of document.querySelectorAll("form[data-sign-in-form]")) {
   const field = (name) => form.querySelector("[name=" + name + "]");
   const note = form.querySelector("[data-sign-in-note]");
   const link = form.querySelector("[data-sign-in-link]");
+  const device = form.dataset.signInDevice !== undefined;
+  const finish = form.querySelector("[data-sign-in-finish]");
+  // A device sign-in: the Environment is asked at the vendor's interval whether the owner approved, until the code lapses.
+  let polling;
+  const stopPolling = () => { if (polling !== undefined) clearTimeout(polling); polling = undefined; };
+  const completed = (answer) => {
+    if (answer === undefined) { note.textContent = ""; return; }
+    if (!answer.ok && answer.waiting) { note.textContent = answer.error; return "waiting"; }
+    stopPolling();
+    if (!answer.ok) { note.textContent = "The sign-in failed: " + answer.error; notify("err", "The sign-in failed: " + answer.error); return; }
+    if (!device) field("pasted").value = "";
+    notify("ok", "Signed in as " + (answer.email || "your account") + ": " + answer.models + " models." + (answer.modelsProblem ? " The model list could not be read (" + answer.modelsProblem + "): add models with Edit models." : ""));
+    setTimeout(done, 1500);
+  };
+  const check = async (control) => {
+    const body = { op: "complete", id: field("id").value.trim(), label: field("label").value.trim() };
+    if (!device) body.pasted = field("pasted").value.trim();
+    return completed(await signInStep(body, control));
+  };
+  const poll = (intervalMs, until) => {
+    stopPolling();
+    polling = setTimeout(async () => {
+      if (Date.now() > until) { stopPolling(); note.textContent = "The code lapsed: start the sign-in again."; return; }
+      if ((await check(finish)) === "waiting") poll(intervalMs, until);
+    }, intervalMs);
+  };
   const start = async (id, label, control) => {
     note.textContent = "Starting…";
     const answer = await signInStep({ op: "start", id, signIn: kind, label }, control);
@@ -246,6 +290,10 @@ for (const form of document.querySelectorAll("form[data-sign-in-form]")) {
     link.hidden = false;
     form.querySelector("[data-sign-in-step]").hidden = false;
     note.textContent = form.dataset.signInSteps;
+    if (device && answer.device) {
+      form.querySelector("[data-sign-in-code]").textContent = answer.device.userCode;
+      poll(Math.max(1, answer.device.intervalSeconds) * 1000, answer.device.expiresAt);
+    }
     form.scrollIntoView();
   };
   signInForms.set(kind, start);
@@ -253,17 +301,10 @@ for (const form of document.querySelectorAll("form[data-sign-in-form]")) {
     if (!form.reportValidity()) return;
     void start(field("id").value.trim(), field("label").value.trim(), event.currentTarget);
   });
-  const finish = form.querySelector("[data-sign-in-finish]");
   finish.addEventListener("click", async () => {
-    const pasted = field("pasted").value.trim();
-    if (pasted === "") { note.textContent = "Paste what the sign-in gave you first."; return; }
-    note.textContent = "Finishing the sign-in…";
-    const answer = await signInStep({ op: "complete", id: field("id").value.trim(), label: field("label").value.trim(), pasted }, finish);
-    if (answer === undefined) { note.textContent = ""; return; }
-    if (!answer.ok) { note.textContent = "The sign-in failed: " + answer.error; notify("err", "The sign-in failed: " + answer.error); return; }
-    field("pasted").value = "";
-    notify("ok", "Signed in as " + (answer.email || "your account") + ": " + answer.models + " models." + (answer.modelsProblem ? " The model list could not be read (" + answer.modelsProblem + "): add models with Edit models." : ""));
-    setTimeout(done, 1500);
+    if (!device && field("pasted").value.trim() === "") { note.textContent = "Paste what the sign-in gave you first."; return; }
+    note.textContent = device ? "Asking whether it was approved…" : "Finishing the sign-in…";
+    await check(finish);
   });
 }
 for (const button of document.querySelectorAll("article button[data-sign-in-start]")) {

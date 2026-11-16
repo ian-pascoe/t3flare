@@ -14,6 +14,7 @@ const endpoints: ModelEndpoints = {
     { id: "gw", label: "Anthropic", api: "openai-responses", baseUrl: "https://gw.example.com/v1", auth: "none", headers: {}, models: [model("m1")] },
     // A sign-in endpoint is not relayed yet (SPI-1171): Codex does not list it.
     { id: "chatgpt", label: "ChatGPT", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "chatgpt", headers: {}, models: [model("gpt-6.1-sol")] },
+    { id: "copilot", label: "GitHub Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot", headers: {}, models: [model("gpt-6.1-sol")] },
   ],
 };
 const proxy = [{ slug: "gemini-3-flash", name: "Gemini 3 Flash", subProvider: "Anthropic", isCustom: false, capabilities: { optionDescriptors: [] } }];
@@ -34,6 +35,8 @@ describe("Codex's Model endpoints", () => {
     expect(route("openai/gpt-5-mini")).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
     expect(route("claude/claude-haiku-5-5")).toEqual({ provider: "t3flare-proxy", model: "claude/claude-haiku-5-5" });
     expect(route("gemini-3-flash")).toEqual({ provider: "t3flare-proxy", model: "gemini-3-flash" });
+    // A sign-in's slug is no endpoint's for Codex (SPI-1171).
+    expect(route("copilot/gpt-6.1-sol")).toEqual({ provider: "t3flare-proxy", model: "copilot/gpt-6.1-sol" });
     expect(codexRouteFor(() => undefined)("openai/gpt-5-mini")).toEqual({ provider: "t3flare-proxy", model: "openai/gpt-5-mini" });
   });
 });

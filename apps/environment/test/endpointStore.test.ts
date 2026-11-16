@@ -1,6 +1,7 @@
 // The Model endpoints' store (SPI-1162): its own entity and revision, the models' metadata from pi-ai's catalog where it
 // knows them (the owner's own fields win), and the API key sealed apart from the entity, write-only, refused when the
 // Environment has no credentials key.
+import { copilotModelApi, knownModel } from "@t3flare/models/known";
 import { describe, expect, it } from "vitest";
 
 import { sealedStore } from "../src/credentials/sealed.ts";
@@ -174,5 +175,24 @@ describe("endpointStore", () => {
     await store.save(OPENAI, { apiKey: "sk-use" });
     expect(await store.resolve("openai")).toMatchObject({ endpoint: { id: "openai" }, apiKey: "sk-use" });
     expect(await store.resolve("nope")).toBeUndefined();
+  });
+});
+
+describe("pi-ai's GitHub Copilot catalog (SPI-1166)", () => {
+  const copilot = { api: "openai-responses" as const, baseUrl: "https://api.individual.githubcopilot.com" };
+
+  it("gives a Copilot endpoint's models Copilot's metadata and compat, first", () => {
+    expect(knownModel("mai-code-1.1-flash", copilot)).toMatchObject({ reasoning: true });
+    // Copilot's compat for a model OpenAI's catalog has too, not OpenAI's (no tool search on Copilot).
+    expect(knownModel("gpt-6.1-sol", copilot)?.compat).not.toHaveProperty("supportsToolSearch");
+    expect(knownModel("gpt-6.1-sol", { api: "openai-responses", baseUrl: "https://api.openai.com/v1" })?.compat).toHaveProperty("supportsToolSearch", true);
+    expect(copilotModelApi("gpt-6.1-sol")).toBe("openai-responses");
+    expect(copilotModelApi("claude-haiku-4.5")).toBe("anthropic-messages");
+    expect(copilotModelApi("nope")).toBeUndefined();
+  });
+
+  it("is read for Copilot's own host only: its ids and prices are no other endpoint's", () => {
+    expect(knownModel("mai-code-1.1-flash", { api: "openai-responses", baseUrl: "https://gw.example.com/v1" })).toBeUndefined();
+    expect(knownModel("claude-haiku-4.5", { api: "anthropic-messages", baseUrl: "https://api.anthropic.com" })).toBeUndefined();
   });
 });

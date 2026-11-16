@@ -12,7 +12,9 @@
 //
 // A sign-in endpoint (SPI-1164) has no key: its tokens are the Credential broker's (credentials/broker.ts), and a
 // Session's request for its credential gets the broker's access token, again only for the endpoint's target now. Its API
-// and base URL are the sign-in's own, it has no headers, and its auth never changes (remove it to change it).
+// and base URL are the sign-in's own, it has no headers, and its auth never changes (remove it to change it). A Copilot
+// sign-in's (SPI-1166) stored base URL is a stand-in: the broker gives the one its token names, with the editor headers,
+// beside each token.
 import { CLAUDE_OAUTH_TOKEN_MARK } from "@t3flare/models/claudeOAuth";
 import {
   EMPTY_ENDPOINTS,
@@ -180,7 +182,10 @@ export const endpointStore = (kv: KvStorage, sealed: SealedStore, signIns?: Pick
       if (isSignIn(endpoint.auth)) {
         if (signIns === undefined) return { apiKey: null, signedOut: true, problem: "this Environment has no Credential broker" };
         const access = await signIns.access(endpointId);
-        return access.ok ? { apiKey: access.accessToken, expiresAt: access.expiresAt } : { apiKey: null, ...(access.signedOut ? { signedOut: true } : {}), problem: access.problem };
+        // Where the token goes and the headers it takes, when the token decides (Copilot's): the broker's, never stored here.
+        return access.ok
+          ? { apiKey: access.accessToken, expiresAt: access.expiresAt, ...(access.baseUrl === undefined ? {} : { baseUrl: access.baseUrl }), ...(access.headers === undefined ? {} : { headers: access.headers }) }
+          : { apiKey: null, ...(access.signedOut ? { signedOut: true } : {}), problem: access.problem };
       }
       const apiKey = await sealed.open(endpointKeyName(endpointId));
       return apiKey === undefined ? { apiKey: null, ...(keyMark(endpointId).set ? { unreadable: true } : {}) } : { apiKey };

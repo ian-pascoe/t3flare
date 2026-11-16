@@ -59,6 +59,9 @@ describe("the model relay's target", () => {
     // A Claude sign-in (SPI-1165) too, on the API Claude Code speaks.
     await store.save({ id: "claude", label: "Claude", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "claude", models: ["claude-haiku-5-5"] }, {});
     expect(await target(store, "claude")).toEqual({ ok: false, status: 501, message: expect.stringMatching(/sign-in/) });
+    // A GitHub Copilot sign-in (SPI-1166) too, until SPI-1171.
+    await store.save({ id: "copilot", label: "GitHub Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot", models: ["gpt-6.1-sol"] }, {});
+    expect(await target(store, "copilot")).toEqual({ ok: false, status: 501, message: expect.stringMatching(/sign-in/) });
   });
 
   it("refuses an endpoint that is gone (404) or whose key no longer opens (503), naming no key", async () => {

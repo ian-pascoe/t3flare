@@ -11,7 +11,10 @@
 //                                  landed on and saves the sign-in's endpoint with the models its token lists;
 //                                  { op: "sign-out", id } revokes and stops the endpoint's Sessions; where the
 //                                  vendor offers no revocation (Claude, SPI-1165), the answer's `revocation` says
-//                                  where the owner removes the grant
+//                                  where the owner removes the grant. A device sign-in (Copilot, SPI-1166):
+//                                  `start` also gives `device` (the code the owner enters at the vendor's page),
+//                                  and `complete` takes no paste: it asks the vendor once whether it was approved,
+//                                  answering `waiting` until it was
 //
 // Every change bumps the endpoints' own revision and is audited under the entity `endpoints`, with the key's mark and the
 // headers' names only.
@@ -135,7 +138,7 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
     if (deps.signIns === undefined || saved === undefined || !isSignIn(saved.auth)) return { status: 400, text: "sign in first: the list is read with the sign-in's token" };
     const access = await deps.signIns.access(saved.id);
     if (!access.ok) return { status: 200, json: { ok: false, error: access.problem } };
-    target = signInTarget(saved.auth, access.accessToken);
+    target = signInTarget(saved.auth, access);
   } else if (valid.endpoint.auth === "api-key") {
     if (typed !== undefined) apiKey = typed;
     else {
@@ -153,11 +156,14 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
   return { status: 200, json: { ok: true, models: modelsWithMetadata(valid.endpoint, found.models) } };
 };
 
-/** A sign-in's model list target: its own API and base URL, its token in the headers its vendor takes it in. */
-const signInTarget = (kind: SignIn, accessToken: string): Pick<ModelEndpoint, "api" | "baseUrl" | "headers"> => ({
+/**
+ * A sign-in's model list target: its own API and base URL (the one its token names, when it does: Copilot's), its token
+ * in the headers its vendor takes it in, with the headers the broker gives beside it.
+ */
+const signInTarget = (kind: SignIn, access: { readonly accessToken: string; readonly baseUrl?: string; readonly headers?: Readonly<Record<string, string>> }): Pick<ModelEndpoint, "api" | "baseUrl" | "headers"> => ({
   api: SIGN_IN_KINDS[kind].api,
-  baseUrl: SIGN_IN_KINDS[kind].baseUrl,
-  headers: { ...signInHeaders(kind, accessToken) },
+  baseUrl: access.baseUrl ?? SIGN_IN_KINDS[kind].baseUrl,
+  headers: { ...access.headers, ...signInHeaders(kind, access.accessToken) },
 });
 
 /** What a sign-out tells the owner beside `revoked`: where to remove a grant its vendor cannot revoke (none otherwise). */
@@ -187,9 +193,15 @@ const completeSignIn = async (
   body: Record<string, unknown>,
   audit: (entry: Omit<AuditEntry, "at" | "caller" | "entity">) => void,
 ): Promise<EndpointsAnswer> => {
-  if (typeof body.pasted !== "string" || body.pasted.length > 8192) return { status: 400, text: "pasted is the address your browser landed on" };
-  const result = await signIns.complete(id, body.pasted);
+  // A device sign-in takes no paste: its completion asks the vendor whether the owner approved.
+  const started = signIns.status(id).kind;
+  const device = started !== null && SIGN_IN_KINDS[started].device !== null;
+  const pasted = device && body.pasted === undefined ? "" : body.pasted;
+  if (typeof pasted !== "string" || pasted.length > 8192) return { status: 400, text: "pasted is the address your browser landed on" };
+  const result = await signIns.complete(id, pasted);
   const kind = signIns.status(id).kind;
+  // Not approved yet: asked again after the vendor's interval; nothing to audit until it ends.
+  if (!result.ok && result.waiting === true) return { status: 200, json: { ok: false, waiting: true, error: result.problem } };
   if (!result.ok || kind === null) {
     audit({ action: "endpoint.sign-in", target: id, after: { ok: false } });
     return { status: 200, json: { ok: false, error: result.ok ? "the sign-in's kind is not known: start it again" : result.problem } };
@@ -199,7 +211,7 @@ const completeSignIn = async (
   let modelsProblem: string | undefined;
   if (saved === undefined) {
     const access = await signIns.access(id);
-    const found = access.ok ? await deps.discover(signInTarget(kind, access.accessToken), undefined) : { ok: false as const, error: access.problem };
+    const found = access.ok ? await deps.discover(signInTarget(kind, access), undefined) : { ok: false as const, error: access.problem };
     if (found.ok) models = found.models;
     else modelsProblem = found.error;
   }
@@ -234,9 +246,9 @@ export const endpointsSignIn = async (deps: EndpointsApiDeps, body: Record<strin
     if (!isSignInKind(body.signIn)) return { status: 400, text: `signIn is one of ${SIGN_INS.join(", ")}` };
     if (saved !== undefined && saved.auth !== body.signIn) return { status: 400, text: `the endpoint ${id} is another sign-in: pick another id` };
     try {
-      const { authorizeUrl } = await signIns.start(id, body.signIn);
+      const { authorizeUrl, device } = await signIns.start(id, body.signIn);
       audit({ action: "endpoint.sign-in.start", target: id, after: { signIn: body.signIn } });
-      return { status: 200, json: { ok: true, authorizeUrl } };
+      return { status: 200, json: { ok: true, authorizeUrl, ...(device === undefined ? {} : { device }) } };
     } catch (error) {
       return { status: 400, text: error instanceof Error ? error.message : "the sign-in could not start" };
     }
