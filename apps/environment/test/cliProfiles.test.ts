@@ -221,7 +221,6 @@ describe("pi's profile", () => {
         { id: "resp", label: "Responses", api: "openai-responses", models: [endpointModel("gpt-r")] },
         { id: "gem", label: "Gemini", api: "google-generative-ai", models: [endpointModel("gemini-x", { input: ["text", "image"] })] },
         { id: "mis", label: "Mistral", api: "mistral-conversations", models: [endpointModel("mistral-x")] },
-        { id: "empty", label: "Empty", api: "openai-responses", models: [] },
       ],
       model: "oai/gpt-x",
     };
@@ -232,7 +231,7 @@ describe("pi's profile", () => {
       return JSON.parse(answer.files!.find((file) => file.path === `/var/lib/t3flare/cli/proc-1/agent/${name}`)!.text);
     };
 
-    it("writes one provider per endpoint that lists a model, at the relay's per-endpoint URL, with its API and the handle command as its key", () => {
+    it("writes one provider per endpoint, at the relay's per-endpoint URL, with its API and the handle command as its key", () => {
       const models = fileOf(onRelay(rpc), "models.json");
       expect(Object.keys(models.providers)).toEqual(["t3flare-endpoint-comm", "t3flare-endpoint-oai", "t3flare-endpoint-resp", "t3flare-endpoint-gem", "t3flare-endpoint-mis"]);
       for (const [id, api] of [["comm", "anthropic-messages"], ["oai", "openai-completions"], ["resp", "openai-responses"], ["gem", "google-generative-ai"], ["mis", "mistral-conversations"]] as const) {

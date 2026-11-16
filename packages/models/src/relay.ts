@@ -31,6 +31,12 @@ export const modelRoutedRelayUrl = modelRelayUrl(MODEL_ROUTED_ID);
  */
 export const endpointProviderId = (endpointId: string): string => `t3flare-endpoint-${endpointId}`;
 
+/** The endpoint id a CLI's provider id names (`endpointProviderId`'s inverse), or undefined for any other provider id. */
+export const endpointIdOfProvider = (providerId: string): string | undefined => {
+  const prefix = endpointProviderId("");
+  return providerId.startsWith(prefix) && providerId.length > prefix.length ? providerId.slice(prefix.length) : undefined;
+};
+
 /**
  * What a CLI profile reads of an endpoint it configures for the relay: its id (the route's and the CLI's provider's) and
  * label. A `ModelEndpoint` is one; the narrow type keeps the profiles from reading anything else.

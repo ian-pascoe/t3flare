@@ -12,33 +12,39 @@
 // never changes), so a session resumes in a new process.
 import type { ServerProviderModel } from "@t3tools/contracts";
 import type { Catalog } from "@t3flare/models/catalog";
-import { endpointSlug, type ModelEndpoint, type ModelEndpoints } from "@t3flare/models/endpoints";
-import { endpointProviderId } from "@t3flare/models/relay";
+import { type ModelEndpoint, type ModelEndpoints } from "@t3flare/models/endpoints";
+import { endpointIdOfProvider, endpointProviderId } from "@t3flare/models/relay";
 
 import type { PiRelay } from "../../agents/cliProfiles.ts";
 import { snapshotModels } from "../models.ts";
 
-/** The endpoints pi reaches through the model relay: every endpoint that lists a model (pi speaks each API). */
-export const piEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => (endpoints?.endpoints ?? []).filter((endpoint) => endpoint.models.length > 0);
+/**
+ * Whether pi reaches an endpoint through the model relay: it lists a model (pi speaks every endpoint API). The one
+ * place a further rule goes (a sign-in endpoint's, SPI-1164).
+ */
+export const piServes = (endpoint: ModelEndpoint): boolean => endpoint.models.length > 0;
 
-/** pi's relay configuration for the endpoints as stored now, or undefined for the Model proxy (no endpoint lists a model). */
+/** The endpoints pi reaches through the model relay, in the owner's order. */
+export const piEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => (endpoints?.endpoints ?? []).filter(piServes);
+
+/** The picker's rows of pi's endpoints: by slug, grouped by endpoint, pi's thinking picker on reasoning models, the first the default. */
+const pickerOf = (own: ReadonlyArray<ModelEndpoint>): ReadonlyArray<ServerProviderModel> => snapshotModels({ models: [], fetchedAt: null }, { revision: 0, endpoints: own });
+
+/**
+ * pi's relay configuration for the endpoints as stored now (each one pi serves, so each lists a model), or undefined for
+ * the Model proxy (none does). pi starts on the picker's default.
+ */
 export const piRelayOf = (endpoints: ModelEndpoints | undefined): PiRelay | undefined => {
   const own = piEndpoints(endpoints);
   if (own.length === 0) return undefined;
-  // The picker's default (`piModelsOf`'s first).
-  return { endpoints: own, model: endpointSlug(own[0]!.id, own[0]!.models[0]!.id) };
+  return { endpoints: own, model: pickerOf(own).find((row) => row.isDefault === true)?.slug };
 };
 
-/**
- * pi's model list: with an endpoint that lists a model, those endpoints' models by slug, grouped by endpoint, each with
- * pi's thinking picker on reasoning models, the first the default; else the proxy's catalog, as before.
- */
+/** pi's model list: with an endpoint pi serves, those endpoints' models (`pickerOf`); else the proxy's catalog, as before. */
 export const piModelsOf = (catalog: Catalog, endpoints: ModelEndpoints | undefined): ReadonlyArray<ServerProviderModel> => {
   const own = piEndpoints(endpoints);
-  return own.length === 0 ? snapshotModels(catalog) : snapshotModels({ models: [], fetchedAt: null }, { revision: 0, endpoints: own });
+  return own.length === 0 ? snapshotModels(catalog) : pickerOf(own);
 };
-
-const PROVIDER_PREFIX = endpointProviderId("");
 
 /**
  * A line t3's Pi adapter sends pi (one RPC command): a `set_model` naming an endpoint id as its provider names that
@@ -59,37 +65,50 @@ export const piLineToPi = (line: string, endpointIds: ReadonlySet<string>): stri
   return JSON.stringify({ ...command, provider: endpointProviderId(provider) });
 };
 
-/** Every `provider` member in `value` that names an endpoint's pi provider, named by its endpoint id instead. */
-const endpointIdsIn = (value: unknown, endpointIds: ReadonlySet<string>): unknown => {
-  if (Array.isArray(value)) return value.map((entry) => endpointIdsIn(entry, endpointIds));
-  if (typeof value !== "object" || value === null) return value;
-  return Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => {
-      if (key === "provider" && typeof entry === "string" && entry.startsWith(PROVIDER_PREFIX) && endpointIds.has(entry.slice(PROVIDER_PREFIX.length))) {
-        return [key, entry.slice(PROVIDER_PREFIX.length)];
-      }
-      return [key, endpointIdsIn(entry, endpointIds)];
-    }),
-  );
+/** Every endpoint provider id starts so: a line without it holds none (a cheap test before any parse). */
+const PROVIDER_PREFIX = endpointProviderId("");
+
+/** `provider` as t3 names it: an endpoint's pi provider as its endpoint id; any other provider as it is. */
+const asEndpointId = (provider: unknown, endpointIds: ReadonlySet<string>): unknown => {
+  const endpointId = typeof provider === "string" ? endpointIdOfProvider(provider) : undefined;
+  return endpointId !== undefined && endpointIds.has(endpointId) ? endpointId : provider;
 };
 
+/** A pi Model object (or anything else) with its `provider` as t3 names it. */
+const withEndpointId = (model: unknown, endpointIds: ReadonlySet<string>): unknown =>
+  typeof model === "object" && model !== null && !Array.isArray(model) && "provider" in model ? { ...model, provider: asEndpointId((model as { provider: unknown }).provider, endpointIds) } : model;
+
+type Line = { readonly type?: unknown; readonly command?: unknown; readonly data?: unknown; readonly message?: unknown };
+
 /**
- * A line pi sends t3's Pi adapter: in a command's response (`get_available_models`, `get_state`, `set_model`, …) and an
- * assistant message's end, the only lines where the adapter reads a provider, an endpoint's pi provider is named by its
- * endpoint id, so the adapter's `<provider>/<model>` is t3's slug. Every other line passes as it is (unparsed).
+ * A line pi sends t3's Pi adapter, with the model's provider named as t3 names it where pi puts one and t3's adapter
+ * reads it: `set_model`'s response (a Model), `get_state`'s and `cycle_model`'s (`data.model`),
+ * `get_available_models`'s (`data.models[]`), and `message_end` (`message.provider`). Nothing else in a line changes
+ * (a tool call's arguments that name a provider stay as they are). Every other line passes as it is (unparsed).
  */
 export const piLineFromPi = (line: string, endpointIds: ReadonlySet<string>): string => {
   if (!line.includes(PROVIDER_PREFIX) || !(line.includes('"type":"response"') || line.includes('"type":"message_end"'))) return line;
-  let event: unknown;
+  let event: Line;
   try {
-    event = JSON.parse(line);
+    event = JSON.parse(line) as Line;
   } catch {
     return line;
   }
   if (typeof event !== "object" || event === null) return line;
-  const type = (event as { type?: unknown }).type;
-  if (type !== "response" && type !== "message_end") return line;
-  return JSON.stringify(endpointIdsIn(event, endpointIds));
+  const data = event.data as { readonly model?: unknown; readonly models?: unknown } | null | undefined;
+  if (event.type === "message_end") return JSON.stringify({ ...event, message: withEndpointId(event.message, endpointIds) });
+  if (event.type !== "response" || typeof data !== "object" || data === null) return line;
+  switch (event.command) {
+    case "set_model":
+      return JSON.stringify({ ...event, data: withEndpointId(data, endpointIds) });
+    case "get_state":
+    case "cycle_model":
+      return JSON.stringify({ ...event, data: { ...data, model: withEndpointId(data.model, endpointIds) } });
+    case "get_available_models":
+      return Array.isArray(data.models) ? JSON.stringify({ ...event, data: { ...data, models: data.models.map((model: unknown) => withEndpointId(model, endpointIds)) } }) : line;
+    default:
+      return line;
+  }
 };
 
 /**

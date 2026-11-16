@@ -50,12 +50,14 @@ export interface LineMaps {
 
 /** The handle t3 reads and writes: the channel's process as Effect streams and a sink. */
 export const handleOf = (process: ChannelProcess, stdinEndOnDone: boolean, lines?: LineMaps): ChildProcessSpawner.ChildProcessHandle => {
-  const read = (queue: ChannelProcess["stdout"]) =>
+  /** The process's bytes on one of its outputs. */
+  const bytesOf = (queue: ChannelProcess["stdout"]) =>
     Stream.fromAsyncIterable(queue, (cause) => failedStart(process.cli, `reading the process: ${String(cause).slice(0, 200)}`));
-  const streamOf = (queue: ChannelProcess["stdout"], map?: (line: string) => string) => {
-    if (map === undefined) return read(queue);
+  /** One output as t3 reads it: its bytes, or with `map`, its lines each mapped. */
+  const outputOf = (queue: ChannelProcess["stdout"], map?: (line: string) => string) => {
+    if (map === undefined) return bytesOf(queue);
     const mapper = lineMapper(map);
-    return read(queue).pipe(
+    return bytesOf(queue).pipe(
       Stream.map(mapper.chunk),
       Stream.concat(Stream.sync(() => mapper.flush())),
       Stream.filter((bytes) => bytes.length > 0),
@@ -91,9 +93,9 @@ export const handleOf = (process: ChannelProcess, stdinEndOnDone: boolean, lines
         }),
       ),
     ),
-    stdout: streamOf(process.stdout, lines?.fromCli),
-    stderr: streamOf(process.stderr),
-    all: Stream.merge(streamOf(process.stdout, lines?.fromCli), streamOf(process.stderr)),
+    stdout: outputOf(process.stdout, lines?.fromCli),
+    stderr: outputOf(process.stderr),
+    all: Stream.merge(outputOf(process.stdout, lines?.fromCli), outputOf(process.stderr)),
     getInputFd: () => Sink.drain,
     getOutputFd: () => Stream.empty,
     unref: Effect.succeed(Effect.void),
@@ -190,8 +192,10 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     const stdin = command.options.stdin;
     const endOnDone = typeof stdin === "object" && stdin !== null && "endOnDone" in stdin ? stdin.endOnDone !== false : true;
     // SPI-1170: pi on the relay names an endpoint's model by its own provider id; t3's adapter by the endpoint's.
-    const relayed = new Set(launch.modelRelay ?? []);
-    const handle = handleOf(process, endOnDone, name === "pi" && relayed.size > 0 ? { toCli: (line) => piLineToPi(line, relayed), fromCli: (line) => piLineFromPi(line, relayed) } : undefined);
+    const relayEndpointIds = new Set(launch.modelRelay ?? []);
+    const piLineMaps: LineMaps | undefined =
+      name === "pi" && relayEndpointIds.size > 0 ? { toCli: (line) => piLineToPi(line, relayEndpointIds), fromCli: (line) => piLineFromPi(line, relayEndpointIds) } : undefined;
+    const handle = handleOf(process, endOnDone, piLineMaps);
     // A stdin given as a Stream is piped in, as Node's spawner does (t3's `codex exec` prompt, parity G7).
     const input = typeof stdin === "object" && stdin !== null && "stream" in stdin ? stdin.stream : stdin;
     if (Stream.isStream(input)) yield* Effect.forkScoped(Stream.run(input as Stream.Stream<Uint8Array, PlatformError.PlatformError>, handle.stdin).pipe(Effect.ignore));

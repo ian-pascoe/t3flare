@@ -79,8 +79,9 @@ export interface ProfileContext {
 }
 
 /**
- * pi on the Model endpoints (SPI-1170, `provider/cli/piEndpoints.ts` `piRelayOf`): the endpoints that list a model (pi
- * speaks every endpoint API, through pi-ai; its handle is for these), and the model it starts on.
+ * pi on the Model endpoints (SPI-1170, `provider/cli/piEndpoints.ts` `piRelayOf`): the endpoints pi serves, each of which
+ * lists a model (`piServes`; pi speaks every endpoint API, through pi-ai; its handle is for exactly these), and the model
+ * it starts on.
  */
 export interface PiRelay {
   readonly endpoints: ReadonlyArray<Pick<ModelEndpoint, "id" | "label" | "api" | "models">>;
@@ -310,7 +311,7 @@ const piEndpointModels = (endpoint: PiRelay["endpoints"][number]) =>
   }));
 
 /**
- * pi's `models.json` on the model relay (SPI-1170): one provider per endpoint that lists a model,
+ * pi's `models.json` on the model relay (SPI-1170): one provider per endpoint it serves,
  * `t3flare-endpoint-<id>` (prefixed, so no endpoint id changes one of pi's built-in providers), with the endpoint's API
  * and its relay URL (an endpoint's base URL follows pi-ai's convention, so pi-ai appends each API's own path), and the
  * handle command as its API key. pi reads `models.json` only from its agent directory, the process's own home.
@@ -319,9 +320,7 @@ export const piRelayModelsJson = (relay: PiRelay): string =>
   `${JSON.stringify(
     {
       providers: Object.fromEntries(
-        relay.endpoints
-          .filter((endpoint) => endpoint.models.length > 0)
-          .map((endpoint) => [
+        relay.endpoints.map((endpoint) => [
             endpointProviderId(endpoint.id),
             { name: endpoint.label, baseUrl: modelRelayUrl(endpoint.id), api: endpoint.api, apiKey: `!${PI_HANDLE_COMMAND}`, models: piEndpointModels(endpoint) },
           ]),
@@ -506,7 +505,7 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     prune: [{ dir: PI_SESSIONS, days: PI_SESSION_RETENTION_DAYS }],
     ...(thread === undefined ? {} : { thread }),
     // SPI-1170: the Workspace DO gives the process a model handle for these endpoints, in its environment only.
-    ...(piRelay === undefined ? {} : { modelRelay: piRelay.endpoints.filter((endpoint) => endpoint.models.length > 0).map((endpoint) => endpoint.id) }),
+    ...(piRelay === undefined ? {} : { modelRelay: piRelay.endpoints.map((endpoint) => endpoint.id) }),
     droppedEnv: dropped(input.env),
   };
 };

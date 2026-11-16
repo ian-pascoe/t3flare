@@ -2,6 +2,7 @@
 // starts on, and the mapping of t3's slugs to pi's provider ids on the process's RPC lines.
 import type { Catalog } from "@t3flare/models/catalog";
 import type { EndpointApi, ModelEndpoints } from "@t3flare/models/endpoints";
+import { endpointIdOfProvider, endpointProviderId } from "@t3flare/models/relay";
 import { describe, expect, it } from "vitest";
 
 import { lineMapper, piEndpoints, piLineFromPi, piLineToPi, piModelsOf, piRelayOf } from "../src/provider/cli/piEndpoints.ts";
@@ -50,6 +51,14 @@ describe("pi's model list", () => {
   });
 });
 
+describe("endpointIdOfProvider", () => {
+  it("inverts endpointProviderId, and names no endpoint for any other provider id", () => {
+    expect(endpointIdOfProvider(endpointProviderId("oai"))).toBe("oai");
+    expect(endpointIdOfProvider(endpointProviderId("t3flare-endpoint-x"))).toBe("t3flare-endpoint-x");
+    for (const id of ["anthropic", "t3flare-endpoint-", "t3flare-endpoin-oai", ""]) expect(endpointIdOfProvider(id), id).toBeUndefined();
+  });
+});
+
 describe("pi's RPC lines on the relay", () => {
   const ids = new Set(["oai", "comm", "t3flare-endpoint-x"]);
 
@@ -73,16 +82,28 @@ describe("pi's RPC lines on the relay", () => {
     }
   });
 
-  it("names an endpoint's model by the endpoint's id in pi's responses and an assistant message's end", () => {
+  it("names an endpoint's model by the endpoint's id where pi puts the model's provider: each model command's response and an assistant message's end", () => {
     const models = { type: "response", id: "c1", command: "get_available_models", success: true, data: { models: [{ provider: "t3flare-endpoint-oai", id: "gpt-x", contextWindow: 5 }, { provider: "anthropic", id: "claude" }, { provider: "t3flare-endpoint-gone", id: "m" }] } };
     expect(JSON.parse(piLineFromPi(JSON.stringify(models), ids)).data.models.map((entry: { provider: string }) => entry.provider)).toEqual(["oai", "anthropic", "t3flare-endpoint-gone"]);
-    const state = { type: "response", command: "get_state", success: true, data: { model: { provider: "t3flare-endpoint-comm", id: "c" }, sessionFile: "/x" } };
-    expect(JSON.parse(piLineFromPi(JSON.stringify(state), ids)).data.model.provider).toBe("comm");
+    for (const command of ["get_state", "cycle_model"]) {
+      const state = { type: "response", command, success: true, data: { model: { provider: "t3flare-endpoint-comm", id: "c" }, sessionFile: "/x" } };
+      expect(JSON.parse(piLineFromPi(JSON.stringify(state), ids)).data, command).toEqual({ model: { provider: "comm", id: "c" }, sessionFile: "/x" });
+    }
+    const set = { type: "response", command: "set_model", success: true, data: { provider: "t3flare-endpoint-oai", id: "gpt-x", baseUrl: "http://computer.internal/t3flare/model/oai" } };
+    expect(JSON.parse(piLineFromPi(JSON.stringify(set), ids)).data).toEqual({ ...set.data, provider: "oai" });
     const end = { type: "message_end", message: { role: "assistant", provider: "t3flare-endpoint-t3flare-endpoint-x", model: "m", content: [{ type: "text", text: 'a "provider":"t3flare-endpoint-oai" in text' }] } };
     const mapped = JSON.parse(piLineFromPi(JSON.stringify(end), ids));
     expect(mapped.message.provider).toBe("t3flare-endpoint-x");
-    // Only `provider` members: text that holds the name is not touched.
     expect(mapped.message.content[0].text).toBe('a "provider":"t3flare-endpoint-oai" in text');
+  });
+
+  it("changes no other member: a tool call's arguments, another response's data, nested providers", () => {
+    const end = { type: "message_end", message: { role: "assistant", provider: "t3flare-endpoint-oai", model: "m", content: [{ type: "toolCall", name: "bash", arguments: { provider: "t3flare-endpoint-oai", nested: { provider: "t3flare-endpoint-comm" } } }] } };
+    expect(JSON.parse(piLineFromPi(JSON.stringify(end), ids)).message.content).toEqual(end.message.content);
+    const other = { type: "response", command: "bash", success: true, data: { provider: "t3flare-endpoint-oai", output: "x" } };
+    expect(piLineFromPi(JSON.stringify(other), ids)).toBe(JSON.stringify(other));
+    const state = { type: "response", command: "get_state", success: true, data: { model: { provider: "t3flare-endpoint-comm" }, extra: { provider: "t3flare-endpoint-comm" } } };
+    expect(JSON.parse(piLineFromPi(JSON.stringify(state), ids)).data.extra).toEqual({ provider: "t3flare-endpoint-comm" });
   });
 
   it("leaves other lines unparsed and unchanged", () => {
