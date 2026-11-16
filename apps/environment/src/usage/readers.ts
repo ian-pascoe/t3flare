@@ -9,6 +9,9 @@ import * as Effect from "effect/Effect";
 
 import { environmentServices } from "../agents/bindings.ts";
 import { CommissaryError, type CommissaryManagement, type CommissaryUsageProvider, type Fetch, readUsageRecords, toUsageRecord } from "./commissary.ts";
+import { agentsOf, toUsageRecord as ownUsageRecord, type UsageStore } from "./records.ts";
+
+type ScanReader<Config> = Extract<ProviderUsageReader<Config, never>, { readonly kind: "scan" }>;
 
 /** A read is reused for this long by the other readers of one usage request, and by the next request. */
 export const USAGE_READ_TTL_MS = 60_000;
@@ -80,3 +83,42 @@ const defaultRead = sharedRead(
 /** The reader t3's usage service runs for `provider`. */
 export const commissaryUsageReader = <Config>(provider: CommissaryUsageProvider): ProviderUsageReader<Config, never> =>
   makeCommissaryUsageReader<Config>(provider, defaultRead);
+
+// ---- SPI-1173: t3flare's own records ----
+
+/**
+ * A reader of t3flare's own usage records (`records.ts`) for one of t3's providers: one source per agent counted under
+ * it (Pi's: the Durable agent, text generation and the pi CLI), so the page's sources say which agent spent what.
+ */
+export const makeOwnUsageReader = <Config>(provider: CommissaryUsageProvider, store: () => UsageStore): ScanReader<Config> => ({
+  kind: "scan",
+  provider,
+  scan: ({ windowStartMs }) =>
+    Effect.sync(() => {
+      let rows: ReturnType<UsageStore["read"]> | undefined;
+      try {
+        rows = store().read(windowStartMs);
+      } catch {
+        // An unreadable table is a failed source, never a failed page.
+      }
+      return agentsOf(provider).map((agent): ProviderUsageScan => {
+        const dir = `t3flare://usage/${agent}`;
+        if (rows === undefined) return { dir, volumeId: "t3flare", status: "failed", message: "t3flare's usage records could not be read.", files: null };
+        return { dir, volumeId: "t3flare", status: "ok", files: [{ path: `${dir}/records`, records: rows.filter((row) => row.agent === agent).map(ownUsageRecord) }] };
+      });
+    }).pipe(Effect.withSpan("ownUsageReader.scan")),
+});
+
+/**
+ * The reader t3's usage service runs for `provider`: t3flare's own records (every Model endpoint's), then Commissary's
+ * request log while the Model proxy is configured (its traffic is not in our records: only endpoints' is).
+ */
+export const usageReader = <Config>(provider: CommissaryUsageProvider): ProviderUsageReader<Config, never> => {
+  const own = makeOwnUsageReader<Config>(provider, () => environmentServices().usage);
+  const commissary = commissaryUsageReader<Config>(provider) as ScanReader<Config>;
+  return {
+    kind: "scan",
+    provider,
+    scan: (input) => Effect.zipWith(own.scan(input), commissary.scan(input), (ours, theirs) => [...ours, ...theirs], { concurrent: true }),
+  };
+};

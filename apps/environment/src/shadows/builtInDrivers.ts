@@ -12,7 +12,7 @@ import { PiCliDriver, type PiCliDriverEnv } from "../provider/cli/piDriver.ts";
 import type { AcpCliDriverEnv } from "../provider/cli/acpDriver.ts";
 import { ClaudeCliDriver } from "../provider/cli/claudeDriver.ts";
 import { OpenCodeCliDriver } from "../provider/cli/opencodeDriver.ts";
-import { commissaryUsageReader } from "../usage/readers.ts";
+import { usageReader } from "../usage/readers.ts";
 
 export type BuiltInDriversEnv = PiDurableDriverEnv | CodexCliDriverEnv | PiCliDriverEnv | AcpCliDriverEnv;
 
@@ -22,13 +22,13 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
 export type BuiltInUsageReadersEnv = ProviderUsageReaderEnv<typeof PiDurableDriver>;
 
 /**
- * Parity G8 (SPI-999): t3's Usage page reads every agent's usage from the model proxy's request log (ADR-0012), one
- * reader per t3 usage provider (`usage/readers.ts`): Pi (the Durable agent, text generation, the pi CLI), Codex,
- * Claude Code and OpenCode. Each reports no source until Commissary's management API is configured.
+ * t3's Usage page, one reader per t3 usage provider (`usage/readers.ts`): Pi (the Durable agent, text generation, the pi
+ * CLI), Codex, Claude Code and OpenCode. Each reads t3flare's own usage records of the Model endpoints (SPI-1173), then,
+ * while Commissary's management API is configured, the model proxy's request log (parity G8, SPI-999; ADR-0012).
  */
 export const BUILT_IN_USAGE_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv, BuiltInUsageReadersEnv>> = [
-  { ...PiDurableDriver, usage: commissaryUsageReader("pi") },
-  { ...CodexCliDriver, usage: commissaryUsageReader("codex") },
-  { ...ClaudeCliDriver, usage: commissaryUsageReader("claude") },
-  { ...OpenCodeCliDriver, usage: commissaryUsageReader("opencode") },
+  { ...PiDurableDriver, usage: usageReader("pi") },
+  { ...CodexCliDriver, usage: usageReader("codex") },
+  { ...ClaudeCliDriver, usage: usageReader("claude") },
+  { ...OpenCodeCliDriver, usage: usageReader("opencode") },
 ];
