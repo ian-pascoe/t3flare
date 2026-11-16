@@ -20,28 +20,34 @@ Each Environment signs in itself: a rotating credential is never copied from the
 Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
 
 1. **A sign-in is a Model endpoint's auth.** An endpoint's auth is an API key, none, or a sign-in (`chatgpt` first;
-   Claude and Copilot follow in SPI-1165 and SPI-1166). A sign-in fixes its endpoint's API and base URL and allows no
-   headers of the owner's; its auth never changes (remove the endpoint to change it).
+   Claude and Copilot follow in SPI-1165 and SPI-1166, each one entry in `SIGN_IN_KINDS` and one vendor in the broker).
+   A sign-in fixes its endpoint's API and base URL and allows no headers of the owner's; its auth never changes (remove
+   the endpoint to change it). Until the hard cut (SPI-1176), Subscriptions may also stay connected in the Model proxy.
 2. **The broker is ours, not t3's.** `credentials/broker.ts` implements pi-ai's `CredentialStore` over the sealed store
    (ADR-0034 §4: AES-256-GCM under the stage's credentials key), keyed by the endpoint's id. t3's `CodexChatGptAuth` is
    not reused: sign-ins are edited on the Harness panel, not t3's provider settings, and the Environment's bundle keeps
    no pi-ai (pi-ai's types only).
-3. **One refresher, saved before use.** `modify` is serialised per endpoint and commits its write before it resolves; a
-   token is renewed inside it when less than 5 minutes are left (never before OpenAI's `earliest_refresh_at`), so a
-   refresh runs once however many Sessions ask. The renewed credential, its rotated refresh token included, is saved
-   before any caller gets its access token; if it cannot be saved, no caller gets it.
+3. **One refresher, saved before use.** Every write of an endpoint's sign-in (a renewal, a completed sign-in, a
+   sign-out, `modify`, `delete`) runs under the endpoint's lock and is committed before it resolves; a token is renewed
+   under it when less than 5 minutes are left (never before OpenAI's `earliest_refresh_at`), so a refresh, or a refused
+   one, runs once however many Sessions ask. The renewed credential, its rotated refresh token included, is saved before
+   any caller gets its access token; if it cannot be saved, no caller gets it.
 4. **A refused renewal signs the endpoint out.** OpenAI's "unusable refresh token" codes (`invalid_grant`,
    `refresh_token_expired`, …) and `invalid_client` remove the tokens, mark the endpoint signed out with the reason, and
    the next turn fails naming the sign-in ("… is not signed in to ChatGPT (…): sign in with ChatGPT again in the Harness
-   panel."). A passing failure keeps a token that is still valid, and otherwise fails the turn as retryable.
+   panel."). A passing failure keeps a token that is still valid, and otherwise fails the turn as retryable. The Session
+   records the failure on the turn, typed (`EndpointCredentialFailure`: `signed_out`, `unavailable`, …), and the differ
+   shows that, never the error's text.
 5. **Sessions ask at use time.** `endpointCredential({ endpointId, target })` gives a sign-in's access token and its
    expiry, under the target rule keys have. The Session keeps it in memory only, for at most 5 minutes and never past 2
    minutes before its expiry, so a long turn's next request takes the renewed token; it drops it on a 401 and on the
    endpoint's sign-out (`endpointSignedOut`). No token reaches pi-durable's storage, the push, a Workspace or a Container.
-6. **Sign-out** revokes at the vendor where it can (ChatGPT: the refresh token at discovery's revocation endpoint),
-   forgets the tokens and keeps the registration (OpenAI's issued client id and the account's email, for the next
-   sign-in), then every open Session drops the endpoint's token and the Sessions on it stop their turns. Removing a
-   signed-in endpoint signs it out first.
+6. **Sign-out**, in order: after any renewal in flight, the tokens are removed here (the registration is kept: OpenAI's
+   issued client id and the account's email, for the next sign-in); then every open Session drops the endpoint's token,
+   and stops its live turns when they run on the endpoint (the Session's own storage says, so it holds after a restart);
+   then the vendor revokes the refresh token that was current (ChatGPT: at discovery's revocation endpoint, retried
+   twice). The panel says `revoked` only when the vendor confirmed it. Removing a signed-in endpoint signs it out first,
+   and a completed sign-in whose endpoint cannot be saved is signed out (revoked) at once.
 7. **Each Environment signs in on its own panel.** The vendor's redirect goes to a loopback address nothing serves; the
    owner pastes the address the browser lands on into the panel. The attempt's state, nonce and PKCE verifier are kept
    sealed in the Environment DO between the start and the paste (30 minutes), never in an isolate's memory: pi-ai's
@@ -53,8 +59,9 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
    usage is offered to Plus and Pro plans, and OpenAI documents it for "open-source and locally hosted apps" (a paid or
    remotely hosted app is asked to fill in an interest form). Whether an Environment on the owner's own Cloudflare
    account counts as locally hosted is OpenAI's call. The panel says so beside the sign-in.
-9. **The relay does not carry a sign-in yet** (SPI-1171): CLI agents' relay refuses a sign-in endpoint, and the CLI
-   profiles do not list it.
+9. **The relay does not carry a sign-in yet** (SPI-1171): the relay refuses a sign-in endpoint (501), and every CLI's
+   list of endpoints (Codex, Claude Code, OpenCode) starts from `relayedEndpoints`, which leaves sign-ins out. No
+   Workspace code asks for a sign-in's token.
 
 Considered and not taken:
 
