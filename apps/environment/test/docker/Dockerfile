@@ -24,6 +24,7 @@ RUN apt-get update \
 COPY cli/package.json cli/package-lock.json /opt/t3flare/pi/
 RUN cd /opt/t3flare/pi && npm ci --omit=dev --ignore-scripts --no-audit --no-fund && rm -rf /root/.npm
 COPY --chmod=755 t3flare-pi /opt/t3flare/bin/pi
+COPY --chmod=755 t3flare-pi-handle /opt/t3flare/bin/t3flare-pi-handle
 COPY --chmod=755 t3flare-model-key /opt/t3flare/bin/t3flare-model-key
 RUN arch=$([ "$(uname -m)" = aarch64 ] && echo arm64 || echo x64) && sha=$([ "$arch" = arm64 ] && echo "$OPENCODE_SHA256_ARM64" || echo "$OPENCODE_SHA256") \
  && curl -fsSL -o /tmp/opencode.tgz https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-${arch}.tar.gz \

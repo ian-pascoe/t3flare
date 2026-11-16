@@ -36,7 +36,7 @@ child.stdout.on("data", (chunk) => {
     note("in", msg);
     summary.events[msg.type] = (summary.events[msg.type] ?? 0) + 1;
     if (msg.type === "response") {
-      summary.responses.push({ command: msg.command, success: msg.success, error: msg.error ?? null, data: msg.command === "get_state" ? { sessionFile: msg.data?.sessionFile, sessionId: msg.data?.sessionId, model: msg.data?.model?.id } : msg.command === "get_commands" ? msg.data : undefined });
+      summary.responses.push({ command: msg.command, success: msg.success, error: msg.error ?? null, data: msg.command === "get_state" ? { sessionFile: msg.data?.sessionFile, sessionId: msg.data?.sessionId, model: msg.data?.model?.id, provider: msg.data?.model?.provider } : msg.command === "get_commands" ? msg.data : msg.command === "set_model" ? { provider: msg.data?.provider, id: msg.data?.id } : msg.command === "get_available_models" ? (msg.data?.models ?? []).map((model) => `${model.provider}/${model.id}`) : undefined });
       if (waiter?.kind === "response" && msg.id === waiter.id) waiter.resolve();
     }
     if (msg.type === "extension_ui_request") {
