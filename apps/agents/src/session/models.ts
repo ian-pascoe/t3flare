@@ -4,7 +4,7 @@
 // replace its endpoint. A model pi-ai does not know (a newer Claude, or any other model the proxy translates) is
 // a generic Anthropic Messages model with the limits the catalog gives it. Adapted from
 // cloudpid@ae5a7b73:apps/server/src/session/models.ts (`proxyModels`).
-import { type Api, type AssistantMessage, type Context, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type OpenAIResponsesCompat, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
+import { type Api, type AssistantMessage, type Context, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
 import { mistralConversationsApi } from "@earendil-works/pi-ai/api/mistral-conversations.lazy";
@@ -17,19 +17,18 @@ import {
   type EndpointApi,
   type EndpointCredential,
   type EndpointModel,
-  endpointLabel,
   type EndpointTarget,
   isSignIn,
   type ModelEndpoint,
   type ModelEndpoints,
   type SignIn,
-  signInOf,
+  signInRequestTarget,
   targetOf,
 } from "@t3flare/models/endpoints";
 import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 
-import { copilotHeaders, copilotPayload } from "./copilot.ts";
-import { PLAN_USAGE_COMPAT, planUsagePayload } from "./planUsage.ts";
+import { credentialFailure } from "./credentialFailure.ts";
+import { SIGN_IN_REQUESTS } from "./signInRequests.ts";
 
 export type { ModelProxy };
 
@@ -181,55 +180,7 @@ const answering = (provider: Provider, endpointId: string, answered: EndpointAcc
   } satisfies Provider;
 };
 
-/** Why the Environment gave no credential for an endpoint, typed, with the turn's (or the text generation's) text. */
-export const credentialFailure = (endpoint: Pick<ModelEndpoint, "id" | "auth">, { unreadable, changed, signedOut, problem }: EndpointCredential): EndpointCredentialFailure => {
-  const named = endpointLabel(endpoint.id);
-  const failure = (kind: EndpointCredentialFailure["kind"], message: string, retryable: boolean): EndpointCredentialFailure => ({ endpointId: endpoint.id, kind, message, retryable });
-  const signIn = signInOf(endpoint.auth);
-  if (changed === true) return failure("changed", `${named} changed or was removed since this Session took it: retry the turn.`, true);
-  if (signIn !== undefined) {
-    const why = problem === undefined ? "" : ` (${problem})`;
-    return signedOut === true
-      ? failure("signed_out", `${named} is not signed in to ${signIn.title}${why}: sign in with ${signIn.title} again in the Harness panel.`, false)
-      : failure("unavailable", `${named} could not get a ${signIn.title} token${why}: retry the turn.`, true);
-  }
-  return unreadable === true
-    ? failure("unreadable", `${named}'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`, false)
-    : failure("no_key", `${named} has no API key: set one in the Harness panel.`, false);
-};
-
-/** Why the Environment gave no credential for an endpoint, as the turn (or the text generation) says it. */
-export const credentialProblem = (endpoint: Pick<ModelEndpoint, "id" | "auth">, credential: EndpointCredential): string => credentialFailure(endpoint, credential).message;
-
-/**
- * What a sign-in's requests need of pi-ai (SPI-1164), by kind: its request body's rules (`onPayload`) and its models'
- * compatibility overrides. A new sign-in adds its entry here.
- * - ChatGPT plan usage: no `configuration_update` items, so the effort goes as `reasoning.effort`; no Responses
- *   `tool_search`.
- * - Claude (SPI-1165): no entry, nothing of ours. pi-ai gives a Claude subscription's token (`sk-ant-oat…`) Claude Code's request
- *   shape itself: Bearer auth, its betas, user agent and identity block, and its tool names (anthropic-messages.js
- *   `isOAuthToken`). `claudeSignInShape.test.ts` pins that shape; an API key never takes it (the store refuses such a
- *   token as a key).
- * - GitHub Copilot (SPI-1166): what pi-ai does for its own `github-copilot` provider, which a sign-in endpoint is not
- *   (copilot.ts): the dynamic headers per request, and no thinking-off `reasoning`. Its base URL and editor headers are
- *   its token's, from the Credential broker.
- */
-const SIGN_IN_REQUESTS: Readonly<
-  Partial<
-    Record<
-      SignIn,
-      {
-        readonly payload: (params: unknown) => unknown;
-        readonly compat?: OpenAIResponsesCompat;
-        /** Headers for this request's context, beside the auth's. */
-        readonly headers?: (context: Context) => Record<string, string>;
-      }
-    >
-  >
-> = {
-  chatgpt: { payload: planUsagePayload, compat: PLAN_USAGE_COMPAT },
-  copilot: { payload: copilotPayload, headers: copilotHeaders },
-};
+export { credentialFailure, credentialProblem } from "./credentialFailure.ts";
 
 const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api> => ({
   id: model.id,
@@ -299,12 +250,11 @@ const endpointProvider = (endpoint: ModelEndpoint, access: EndpointAccess): Prov
           }
           access.outcome?.(undefined, endpoint.id);
           // A sign-in whose token names where it goes (Copilot's, SPI-1166) goes there, with the headers the broker gives
-          // beside it, when its kind allows that base URL (the broker's own rule, `credentialBaseUrl`, checked again here);
-          // the endpoint's own base URL is then only a stand-in. No other endpoint takes either.
-          const allowed = signInOf(endpoint.auth)?.credentialBaseUrl ?? null;
-          const own = allowed !== null && credential.baseUrl !== undefined && allowed.test(credential.baseUrl);
+          // beside it, when its kind allows that base URL (`signInRequestTarget`, the model relay's rule too); the
+          // endpoint's own base URL is then only a stand-in. No other endpoint takes either.
+          const sent = isSignIn(endpoint.auth) ? signInRequestTarget(endpoint, credential) : { baseUrl: endpoint.baseUrl, headers };
           return {
-            auth: { apiKey: credential.apiKey, baseUrl: (own ? credential.baseUrl : undefined) ?? endpoint.baseUrl, headers: own ? { ...headers, ...credential.headers } : headers },
+            auth: { apiKey: credential.apiKey, baseUrl: sent.baseUrl, headers: { ...sent.headers } },
             source: isSignIn(endpoint.auth) ? "Model endpoint (sign-in)" : "Model endpoint",
           };
         },

@@ -13,12 +13,18 @@ import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 export const RELAY_ERROR_BODY_BYTES = 1024 * 1024;
 
 /** A short error in the API's own shape, in place of an error body over `RELAY_ERROR_BODY_BYTES`. */
-export const oversizedError = (api: EndpointApi, status: number): string => {
-  const message = `t3flare: the Model endpoint's error body (HTTP ${status}) was over ${RELAY_ERROR_BODY_BYTES} bytes and was not passed on`;
+export const oversizedError = (api: EndpointApi, status: number): string =>
+  relayErrorBody(api, status, `t3flare: the Model endpoint's error body (HTTP ${status}) was over ${RELAY_ERROR_BODY_BYTES} bytes and was not passed on`);
+
+/**
+ * The relay's own error in the API's own shape, so the CLI shows `message` as it would a vendor's (an oversized body's
+ * stand-in; a sign-in's refusal, SPI-1171). A 401 is Anthropic's `authentication_error`.
+ */
+export const relayErrorBody = (api: EndpointApi, status: number, message: string): string => {
   const server = status >= 500;
   switch (api) {
     case "anthropic-messages":
-      return JSON.stringify({ type: "error", error: { type: server ? "api_error" : "invalid_request_error", message } });
+      return JSON.stringify({ type: "error", error: { type: server ? "api_error" : status === 401 ? "authentication_error" : "invalid_request_error", message } });
     case "openai-responses":
     case "openai-completions":
       return JSON.stringify({ error: { message, type: server ? "server_error" : "invalid_request_error", param: null, code: null } });

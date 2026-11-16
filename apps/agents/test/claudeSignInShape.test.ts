@@ -7,7 +7,17 @@
 // A pi-ai bump that changes any of these fails here.
 import { createModels, type FetchFunction } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { CLAUDE_AUTHORIZE_URL, CLAUDE_CLIENT_ID, CLAUDE_OAUTH_TOKEN_MARK, CLAUDE_REDIRECT_URI, CLAUDE_SCOPES, CLAUDE_TOKEN_URL } from "@t3flare/models/claudeOAuth";
+import {
+  CLAUDE_AUTHORIZE_URL,
+  CLAUDE_CLIENT_ID,
+  CLAUDE_CODE_IDENTITY,
+  CLAUDE_OAUTH_BETAS,
+  CLAUDE_OAUTH_HEADERS,
+  CLAUDE_OAUTH_TOKEN_MARK,
+  CLAUDE_REDIRECT_URI,
+  CLAUDE_SCOPES,
+  CLAUDE_TOKEN_URL,
+} from "@t3flare/models/claudeOAuth";
 import type { EndpointCredential, ModelEndpoint } from "@t3flare/models/endpoints";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -122,6 +132,10 @@ describe("a Claude sign-in on pi-ai", () => {
     const system = sent.body.system as Array<{ readonly type: string; readonly text: string }>;
     expect(system.map((block) => block.text)).toEqual([IDENTITY, "Be brief."]);
     expect((sent.body.tools as Array<{ readonly name: string }>).map((tool) => tool.name)).toEqual(["Bash"]);
+    // The model relay restates this shape for a CLI's request on a Claude sign-in (SPI-1171) from these constants.
+    expect(CLAUDE_CODE_IDENTITY).toBe(IDENTITY);
+    expect(sent.headers["anthropic-beta"]).toBe(CLAUDE_OAUTH_BETAS.join(","));
+    expect(sent.headers).toMatchObject(CLAUDE_OAUTH_HEADERS);
   });
 
   it("gives a key that falls one character short of our mark none of it: our mark is no stricter than pi-ai's", async () => {

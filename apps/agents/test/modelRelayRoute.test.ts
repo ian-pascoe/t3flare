@@ -563,6 +563,15 @@ describe("the Workspace DO's check of a model handle", () => {
     expect(await authorizeModelRelay({ handle: HANDLE, endpointId: "openai" }, keyless.value)).toMatchObject({ kind: "granted" });
     expect([...gone.remembered, ...keyless.remembered]).toEqual([]);
   });
+
+  it("grants a sign-in its token of this request, remembered for the sync guard, and passes a sign-in's refusal on with why (SPI-1171)", async () => {
+    const signedIn = deps({ target: async () => ({ ok: true, api: "openai-responses", auth: "chatgpt", baseUrl: "https://api.openai.com/v1", headers: { authorization: "Bearer oai-access-token-1" }, key: "oai-access-token-1" }) });
+    expect(await authorizeModelRelay({ handle: HANDLE, endpointId: "openai" }, signedIn.value)).toMatchObject({ kind: "granted", target: { auth: "chatgpt" } });
+    expect(signedIn.remembered).toEqual([["openai", "oai-access-token-1"]]);
+    const signIn = { api: "openai-responses" as const, kind: "chatgpt" as const, signedOut: true, problem: "it is not signed in" };
+    const out = deps({ target: async () => ({ ok: false, status: 401, message: "not signed in", signIn }) });
+    expect(await authorizeModelRelay({ handle: HANDLE, endpointId: "openai" }, out.value)).toEqual({ kind: "refused", status: 401, message: "not signed in", handleId: "proc-1", workspace: "ws-1", signIn });
+  });
 });
 
 describe("each process's most telling relay failure this turn (SPI-1172, review 2)", () => {

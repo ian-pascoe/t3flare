@@ -16,6 +16,28 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 export const copilotHeaders = (context: Context): Record<string, string> =>
   buildCopilotDynamicHeaders({ messages: context.messages, hasImages: hasCopilotVisionInput(context.messages) });
 
+/**
+ * A Responses `input` item as pi-ai's message roles read it: the owner's message is `user`; a tool's output `toolResult`
+ * (its images count as vision input, as a tool result's do); anything else the agent's.
+ */
+const messageOf = (item: unknown): { readonly role: string; readonly content: ReadonlyArray<{ readonly type: string }> } => {
+  if (!isRecord(item)) return { role: "assistant", content: [] };
+  const parts = (value: unknown) => (Array.isArray(value) ? value.filter(isRecord).map((part) => ({ type: part.type === "input_image" ? "image" : String(part.type) })) : []);
+  if (item.role === "user") return { role: "user", content: parts(item.content) };
+  if (item.type === "function_call_output") return { role: "toolResult", content: parts(item.output) };
+  return { role: typeof item.role === "string" ? item.role : "assistant", content: [] };
+};
+
+/**
+ * The headers pi-ai adds to a Copilot request, from a CLI's Responses body on the model relay (SPI-1171): its `input`
+ * read as pi-ai's messages, then pi-ai's own rule (`buildCopilotDynamicHeaders`).
+ */
+export const copilotRelayHeaders = (body: unknown): Record<string, string> => {
+  const input = isRecord(body) ? body.input : undefined;
+  const messages = (typeof input === "string" ? [{ role: "user", content: [] }] : Array.isArray(input) ? input.map(messageOf) : []) as Context["messages"];
+  return buildCopilotDynamicHeaders({ messages, hasImages: hasCopilotVisionInput(messages) });
+};
+
 /** A Responses body as pi-ai sends it to Copilot: no thinking-off `reasoning`. Anything not an object is left as it is. */
 export const copilotPayload = (params: unknown): unknown => {
   if (!isRecord(params) || !isRecord(params.reasoning) || "summary" in params.reasoning) return params;

@@ -1,8 +1,9 @@
 // @effect-diagnostics nodeBuiltinImport:off
-// No sign-in's token can reach a Workspace or its Container (SPI-1164; ADR-0016): the only way to a Model endpoint's
-// credential from the Workspace side is the model relay's `modelRelayTarget`, which refuses a sign-in endpoint (501,
-// environment's endpointRelay.test.ts), and no Workspace code (the Workspace DO and every route its Container reaches)
-// calls `endpointCredential`, the RPC that gives a sign-in's access token. Only a Session and text generation call it.
+// No sign-in's token can reach a Container (SPI-1164; ADR-0016): from the Workspace side, the only way to a Model
+// endpoint's credential is the model relay's `modelRelayTarget`, which since SPI-1171 gives a sign-in's access token for
+// one request to the Workspace DO, which hands it to the relay's route in `WorkspaceProxy` (a Worker, outside the
+// Container) and keeps it only by hash for the sync guard. No Workspace code calls `endpointCredential`, the Session's
+// RPC; only a Session and text generation call it.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -25,7 +26,8 @@ describe("a sign-in's token and the Workspace side", () => {
   it("reaches the Environment from the Workspace for a credential only through the relay's target", () => {
     const workspace = fs.readFileSync(path.join(src, "workspace/WorkspaceDO.ts"), "utf8");
     const calls = [...workspace.matchAll(/environmentStub\([^)]*\)\.(\w+)\(/g)].map((match) => match[1]);
-    // The Environment RPCs the Workspace DO calls: none of them gives a sign-in's token (modelRelayTarget refuses one).
+    // The Environment RPCs the Workspace DO calls: only the relay's target gives a credential (a key, or a sign-in's
+    // token for one request).
     expect(calls).not.toContain("endpointCredential");
     expect(calls).toContain("modelRelayTarget");
   });

@@ -20,16 +20,17 @@
 // its model as `<endpointId>/<modelId>`, and the relay sends it to that endpoint with the model's own id in its place,
 // the rest of the body byte for byte (`routedBody.ts`). The handle is checked before the body is read, and its scope
 // then judges the endpoint as it judges one in the path.
-import { ENDPOINT_ID } from "@t3flare/models/endpoints";
+import { ENDPOINT_ID, isSignIn } from "@t3flare/models/endpoints";
 import { describeFailure, type DescribedFailure, failureHeaders, readBody } from "@t3flare/models/failures";
 import { redactSecrets } from "@t3flare/models/redact";
 import type { EndpointFailureRecord } from "@t3flare/session-protocol";
-import { credentialHeaderOf, forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget, type RelayTarget } from "@t3flare/models/relay";
+import { credentialHeaderFor, forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget, type RelaySignInRefusal, type RelayTarget } from "@t3flare/models/relay";
 import { HANDLE } from "@t3flare/workspace-client";
 
 import type { HandleCaller } from "./processHost.ts";
 import { oversizedError, RELAY_ERROR_BODY_BYTES, sseErrors } from "./relayFailures.ts";
 import { declaredLength, MAX_ROUTED_BODY_BYTES, readCapped, type RoutedBody, routeBody } from "./routedBody.ts";
+import { signInRefusal, signInRequest } from "./relaySignIns.ts";
 import { observeUsage } from "./relayUsage.ts";
 import type { UsageEntry } from "@t3flare/models/usage";
 
@@ -47,7 +48,15 @@ export type ModelRelayGrant =
     }
   /** The handle names a live process here (asked with no endpoint: a model-routed request before its body is read). */
   | { readonly kind: "known"; readonly handleId: string; readonly cli: string; readonly workspace: string | null }
-  | { readonly kind: "refused"; readonly status: number; readonly message: string; readonly handleId: string | null; readonly workspace: string | null };
+  | {
+      readonly kind: "refused";
+      readonly status: number;
+      readonly message: string;
+      readonly handleId: string | null;
+      readonly workspace: string | null;
+      /** A sign-in that gave no token now (SPI-1171): the relay answers naming it, in the API's shape. */
+      readonly signIn?: RelaySignInRefusal;
+    };
 
 /** What the relay asks the Workspace DO: a handle, and the endpoint it is for (null: only whether the handle is live). */
 export interface ModelRelayAsk {
@@ -204,6 +213,13 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
     try {
       const grant = await deps.authorize({ handle, endpointId: endpoint });
       if (grant.kind !== "refused") return grant;
+      if (grant.signIn !== undefined && grant.handleId !== null && endpoint !== null) {
+        // SPI-1171: the sign-in gave no token; the CLI and t3 are told which, and why.
+        const refused = signInRefusal(endpoint, grant.signIn, deps.now());
+        log(refused.response.status, grant, { why: grant.message, signIn: grant.signIn.kind, failure: { class: refused.failure.class, code: refused.failure.code } });
+        await (deps.outcome?.(grant.handleId, { ...refused.failure, endpointId: endpoint, at: deps.now() }) ?? Promise.resolve()).catch(() => undefined);
+        return refused.response;
+      }
       log(grant.status, grant, { why: grant.message });
       return plain(grant.status, grant.message);
     } catch (error) {
@@ -244,6 +260,23 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   const { headers, dropped } = upstreamHeaders(request.headers, grant.target);
   // A routed body changed length with its model: its own length goes instead of the Container's.
   if (routedBody !== undefined) headers.delete("content-length");
+  let body: Uint8Array | ReadableStream<Uint8Array> | null = routedBody ?? (hasBody ? request.body : null);
+  if (isSignIn(grant.target.auth)) {
+    // SPI-1171: a sign-in's request rules (`relaySignIns.ts`), on the body read whole (the routed cap), then its headers.
+    let bytes = routedBody;
+    if (bytes === undefined && hasBody) {
+      const read = await readCapped(request.body, declaredLength(request.headers));
+      if ("tooLarge" in read) {
+        log(413, grant, { why: `the body is over ${MAX_ROUTED_BODY_BYTES} bytes` });
+        return plain(413, `the body is over ${MAX_ROUTED_BODY_BYTES} bytes`);
+      }
+      bytes = read.bytes;
+    }
+    const shaped = signInRequest(grant.target.auth, bytes, request.headers);
+    for (const [name, value] of Object.entries(shaped.headers)) headers.set(name, value);
+    if (shaped.changed) headers.delete("content-length");
+    body = shaped.body ?? null;
+  }
   // SPI-1172: each answer goes to the Workspace DO before the CLI sees it (`RelayFailures` keeps the turn's most telling one).
   const report = (failure: DescribedFailure | undefined): Promise<void> =>
     (deps.outcome?.(grant.handleId, failure === undefined ? null : { ...failure, endpointId, at: deps.now() }) ?? Promise.resolve()).catch(() => undefined);
@@ -253,7 +286,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
       new Request(target, {
         method: request.method,
         headers,
-        body: routedBody ?? (hasBody ? request.body : null),
+        body,
         redirect: "manual",
         signal: request.signal,
         // Node's fetch needs this for a streamed body; workerd ignores it.
@@ -278,13 +311,15 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   const endpoint = grant.target;
   const known = credentialValues(endpoint);
   const redact = (text: string) => redactSecrets(text, known);
+  // SPI-1171: which of a sign-in's tokens went (a short hash, never the token), so a mid-thread renewal shows in the log.
+  const signedWith = isSignIn(endpoint.auth) && known.length > 0 ? { signIn: endpoint.auth, credential: await credentialId(known[known.length - 1]!) } : {};
   const classify = (status: number, body: string): DescribedFailure | undefined =>
     describeFailure({ status, headers: failureHeaders(upstream.headers), body, at: deps.now() }, { id: endpointId, api: endpoint.api, auth: endpoint.auth });
   const logged = (failure: DescribedFailure | undefined) =>
     failure === undefined ? {} : { failure: { class: failure.class, code: failure.code, ...(failure.resetAt === undefined ? {} : { resetAt: failure.resetAt }) } };
   if (upstream.status < 400) {
     // The dropped headers' names (never values) show what a CLI sends that the allowlist keeps back.
-    log(upstream.status, grant, { dropped });
+    log(upstream.status, grant, { dropped, ...signedWith });
     await report(undefined);
     const observed = observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, deps.usage);
     const streaming = (upstream.headers.get("content-type") ?? "").includes("text/event-stream");
@@ -306,7 +341,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   void upstream.body?.cancel().catch(() => undefined);
   const text = read === undefined || read.over ? oversizedError(endpoint.api, upstream.status) : read.text;
   const failure = classify(upstream.status, text);
-  log(upstream.status, grant, { dropped, ...logged(failure), ...(read?.over === true ? { oversized: true } : {}) });
+  log(upstream.status, grant, { dropped, ...signedWith, ...logged(failure), ...(read?.over === true ? { oversized: true } : {}) });
   await report(failure);
   // The body's length (and any encoding) changed with the redaction.
   answer.delete("content-length");
@@ -314,10 +349,18 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   return new Response(redact(text), { status: upstream.status, statusText: upstream.statusText, headers: answer });
 };
 
+/** A credential's short id for the log: the first 8 hex digits of its SHA-256 (of a sign-in's long random token only). */
+const credentialId = async (value: string): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+    .slice(0, 4)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+
 /** The values the endpoint's credential header carries (a bearer's token too), to redact wherever an answer echoes them. */
 const credentialValues = (target: RelayTarget): ReadonlyArray<string> => {
   if (target.auth === "none") return [];
-  const name = credentialHeaderOf(target.api, "").name;
+  // A sign-in's token is a bearer on every API (SPI-1171).
+  const name = credentialHeaderFor(target.api, target.auth, "").name;
   return Object.entries(target.headers).flatMap(([header, value]) => {
     if (header.toLowerCase() !== name) return [];
     const bearer = /^Bearer\s+(\S+)$/i.exec(value)?.[1];
@@ -353,7 +396,7 @@ export const authorizeModelRelay = async (input: ModelRelayAsk, deps: AuthorizeD
     return { kind: "refused", status: 403, message: `this process's model handle is not for the Model endpoint ${input.endpointId}`, handleId: caller.key, workspace };
   }
   const target = await deps.target(input.endpointId);
-  if (!target.ok) return { kind: "refused", status: target.status, message: target.message, handleId: caller.key, workspace };
+  if (!target.ok) return { kind: "refused", status: target.status, message: target.message, handleId: caller.key, workspace, ...(target.signIn === undefined ? {} : { signIn: target.signIn }) };
   if (target.key !== null) await deps.remember(input.endpointId, target.key);
   return { kind: "granted", handleId: caller.key, cli: caller.cli, workspace, target: { api: target.api, auth: target.auth, baseUrl: target.baseUrl, headers: target.headers } };
 };
