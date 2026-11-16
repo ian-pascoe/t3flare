@@ -157,6 +157,50 @@ const isSignInKind = (value: unknown): value is SignIn => typeof value === "stri
 const signOutOf = (deps: EndpointsApiDeps, signIns: CredentialBroker, id: string) => signIns.signOut(id, { beforeRevoke: async () => deps.signedOut?.(id) });
 
 /**
+ * A sign-in's completion: the pasted redirect exchanged, then its endpoint saved with the models its token lists (a
+ * re-sign-in keeps the owner's); a grant whose endpoint cannot be saved is revoked. Answered as JSON either way, so the
+ * panel shows why beside the paste field.
+ */
+const completeSignIn = async (
+  deps: EndpointsApiDeps,
+  signIns: CredentialBroker,
+  id: string,
+  saved: ModelEndpoint | undefined,
+  body: Record<string, unknown>,
+  audit: (entry: Omit<AuditEntry, "at" | "caller" | "entity">) => void,
+): Promise<EndpointsAnswer> => {
+  if (typeof body.pasted !== "string" || body.pasted.length > 8192) return { status: 400, text: "pasted is the address your browser landed on" };
+  const result = await signIns.complete(id, body.pasted);
+  const kind = signIns.status(id).kind;
+  if (!result.ok || kind === null) {
+    audit({ action: "endpoint.sign-in", target: id, after: { ok: false } });
+    return { status: 200, json: { ok: false, error: result.ok ? "the sign-in's kind is not known: start it again" : result.problem } };
+  }
+  const target = SIGN_IN_KINDS[kind];
+  let models: ReadonlyArray<{ readonly id: string; readonly name?: string }> = saved?.models ?? [];
+  let modelsProblem: string | undefined;
+  if (saved === undefined) {
+    const access = await signIns.access(id);
+    const found = access.ok ? await deps.discover({ api: target.api, baseUrl: target.baseUrl, headers: {} }, access.accessToken) : { ok: false as const, error: access.problem };
+    if (found.ok) models = found.models;
+    else modelsProblem = found.error;
+  }
+  const stored = await deps.store.save(
+    { id, label: saved?.label ?? signInLabel(body.label, kind), api: target.api, baseUrl: target.baseUrl, auth: kind, headers: {}, models: models.map((model) => ({ id: model.id, ...(model.name === undefined ? {} : { name: model.name }) })) },
+    {},
+  );
+  if (!stored.ok) {
+    // No endpoint holds the fresh grant: it is revoked, not left behind.
+    const { revoked } = await signOutOf(deps, signIns, id);
+    audit({ action: "endpoint.sign-in", target: id, after: { ok: false, saved: false, revoked } });
+    return { status: 200, json: { ok: false, error: `Signed in, but the endpoint could not be saved (${stored.error}), so the sign-in was ${revoked ? "revoked" : "dropped (its revocation was not confirmed)"}.` } };
+  }
+  audit({ action: "endpoint.sign-in", target: id, before: audited(stored.before), after: { ok: true, ...audited(stored.endpoint) } });
+  deps.changed?.();
+  return { status: 200, json: { ok: true, email: result.status.email, models: stored.endpoint.models.length, ...(modelsProblem === undefined ? {} : { modelsProblem }) } };
+};
+
+/**
  * A sign-in's steps (SPI-1164), for any kind of `SIGN_IN_KINDS`: start, complete with the pasted redirect, sign out.
  * Each audited, none with a token.
  */
@@ -178,39 +222,7 @@ export const endpointsSignIn = async (deps: EndpointsApiDeps, body: Record<strin
       return { status: 400, text: error instanceof Error ? error.message : "the sign-in could not start" };
     }
   }
-  if (body.op === "complete") {
-    if (typeof body.pasted !== "string" || body.pasted.length > 8192) return { status: 400, text: "pasted is the address your browser landed on" };
-    const result = await signIns.complete(id, body.pasted);
-    const kind = signIns.status(id).kind;
-    if (!result.ok || kind === null) {
-      audit({ action: "endpoint.sign-in", target: id, after: { ok: false } });
-      // Answered as JSON, not a refusal: the panel shows why, next to the paste field.
-      return { status: 200, json: { ok: false, error: result.ok ? "the sign-in's kind is not known: start it again" : result.problem } };
-    }
-    const target = SIGN_IN_KINDS[kind];
-    // The models its token lists (read with the same token); a re-sign-in keeps the owner's list.
-    let models: ReadonlyArray<{ readonly id: string; readonly name?: string }> = saved?.models ?? [];
-    let modelsProblem: string | undefined;
-    if (saved === undefined) {
-      const access = await signIns.access(id);
-      const found = access.ok ? await deps.discover({ api: target.api, baseUrl: target.baseUrl, headers: {} }, access.accessToken) : { ok: false as const, error: access.problem };
-      if (found.ok) models = found.models;
-      else modelsProblem = found.error;
-    }
-    const stored = await deps.store.save(
-      { id, label: saved?.label ?? signInLabel(body.label, kind), api: target.api, baseUrl: target.baseUrl, auth: kind, headers: {}, models: models.map((model) => ({ id: model.id, ...(model.name === undefined ? {} : { name: model.name }) })) },
-      {},
-    );
-    if (!stored.ok) {
-      // No endpoint holds the fresh grant: it is revoked, not left behind.
-      const { revoked } = await signOutOf(deps, signIns, id);
-      audit({ action: "endpoint.sign-in", target: id, after: { ok: false, saved: false, revoked } });
-      return { status: 200, json: { ok: false, error: `Signed in, but the endpoint could not be saved (${stored.error}), so the sign-in was ${revoked ? "revoked" : "dropped (its revocation was not confirmed)"}.` } };
-    }
-    audit({ action: "endpoint.sign-in", target: id, before: audited(stored.before), after: { ok: true, ...audited(stored.endpoint) } });
-    deps.changed?.();
-    return { status: 200, json: { ok: true, email: result.status.email, models: stored.endpoint.models.length, ...(modelsProblem === undefined ? {} : { modelsProblem }) } };
-  }
+  if (body.op === "complete") return completeSignIn(deps, signIns, id, saved, body, audit);
   if (body.op === "sign-out") {
     const { signedOut, revoked } = await signOutOf(deps, signIns, id);
     audit({ action: "endpoint.sign-out", target: id, after: { signedOut, revoked } });

@@ -27,4 +27,16 @@ describe("stopping a signed-out endpoint's Sessions", () => {
     expect(result).toEqual({ told: 2, stopped: 1 });
     expect(told.sort()).toEqual(["on-chatgpt chatgpt", "on-proxy chatgpt"]);
   });
+
+  it("does not wait on a Session that hangs: it is skipped after its bound", async () => {
+    const result = await stopSessionsOn("chatgpt", {
+      open: () => ["hung", "fine"],
+      timeoutMs: 20,
+      session: (name) => ({
+        endpointSignedOut: () => (name === "hung" ? new Promise<never>(() => undefined) : Promise.resolve({ dropped: true, stopped: true })),
+      }),
+    });
+    expect(result).toEqual({ told: 1, stopped: 1 });
+  });
 });
+

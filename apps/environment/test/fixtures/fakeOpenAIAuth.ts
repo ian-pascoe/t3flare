@@ -40,6 +40,11 @@ export interface FakeOpenAIOptions {
   expiresIn?: number;
   /** Held open until released: a refresh in flight. */
   refreshGate?: Promise<void> | undefined;
+  /** Held open until released: a code exchange in flight. */
+  exchangeGate?: Promise<void> | undefined;
+  /** Called when a refresh (or a code exchange) reaches the token endpoint, before its gate. */
+  onRefresh?: (() => void) | undefined;
+  onExchange?: (() => void) | undefined;
   /** A request to the token endpoint fails at the network. */
   tokenDown?: boolean;
   /** The ID token is wrong in this one way. */
@@ -148,6 +153,8 @@ export const fakeOpenAI = async (options: FakeOpenAIOptions = {}): Promise<FakeO
       if (form.get("resource") !== "https://api.openai.com/v1") return oauthError("invalid_target");
       if (form.get("grant_type") === "authorization_code") {
         counts.exchanges += 1;
+        options.onExchange?.();
+        await options.exchangeGate;
         if (options.exchangeError !== undefined) return oauthError(options.exchangeError);
         const code = codes.get(form.get("code") ?? "");
         if (code === undefined || code.used || code.clientId !== form.get("client_id") || code.redirectUri !== form.get("redirect_uri")) return oauthError("invalid_grant");
@@ -158,6 +165,7 @@ export const fakeOpenAI = async (options: FakeOpenAIOptions = {}): Promise<FakeO
       }
       if (form.get("grant_type") === "refresh_token") {
         counts.refreshes += 1;
+        options.onRefresh?.();
         await options.refreshGate;
         if (options.refreshError !== undefined) return oauthError(options.refreshError);
         const record = refreshTokens.get(form.get("refresh_token") ?? "");
@@ -204,4 +212,13 @@ export const fakeOpenAI = async (options: FakeOpenAIOptions = {}): Promise<FakeO
       return callback.toString();
     },
   };
+};
+
+/** A gate a test opens when it chooses, and a signal that something reached it: no timing involved. */
+export const gate = () => {
+  let open!: () => void;
+  let reached!: () => void;
+  const opened = new Promise<void>((resolve) => (open = resolve));
+  const arrived = new Promise<void>((resolve) => (reached = resolve));
+  return { opened, open, arrived, reached };
 };

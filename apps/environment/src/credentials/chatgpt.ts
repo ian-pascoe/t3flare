@@ -172,12 +172,15 @@ const pastedUrl = (pasted: string, redirectUri: string): URL | string => {
   return url;
 };
 
-const post = async (vendor: ChatGptVendor, url: string, form: Record<string, string>): Promise<Response> =>
+/** A request's bound: its own 15 s, and the caller's overall deadline when it has one. */
+const bounded = (deadline?: AbortSignal): AbortSignal => (deadline === undefined ? AbortSignal.timeout(TIMEOUT_MS) : AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), deadline]));
+
+const post = async (vendor: ChatGptVendor, url: string, form: Record<string, string>, deadline?: AbortSignal): Promise<Response> =>
   vendor.fetch(url, {
     method: "POST",
     headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(form).toString(),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: bounded(deadline),
     redirect: "manual",
   });
 
@@ -216,14 +219,14 @@ const tokenAnswer = (body: unknown): TokenAnswer | undefined => {
   };
 };
 
-const getJson = async (vendor: ChatGptVendor, url: string): Promise<unknown> => {
-  const response = await vendor.fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS), redirect: "manual" });
+const getJson = async (vendor: ChatGptVendor, url: string, deadline?: AbortSignal): Promise<unknown> => {
+  const response = await vendor.fetch(url, { headers: { accept: "application/json" }, signal: bounded(deadline), redirect: "manual" });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 };
 
-const discovery = async (vendor: ChatGptVendor): Promise<{ readonly issuer: string; readonly jwksUri: string; readonly revocation: string | undefined }> => {
-  const body = await getJson(vendor, (vendor.urls ?? CHATGPT_URLS).discovery);
+const discovery = async (vendor: ChatGptVendor, deadline?: AbortSignal): Promise<{ readonly issuer: string; readonly jwksUri: string; readonly revocation: string | undefined }> => {
+  const body = await getJson(vendor, (vendor.urls ?? CHATGPT_URLS).discovery, deadline);
   if (!isRecord(body) || typeof body.issuer !== "string" || typeof body.jwks_uri !== "string") throw new Error("discovery");
   return { issuer: body.issuer, jwksUri: body.jwks_uri, revocation: typeof body.revocation_endpoint === "string" ? body.revocation_endpoint : undefined };
 };
@@ -294,15 +297,16 @@ export const completeChatGptSignIn = async (vendor: ChatGptVendor, pending: Pend
   const spent = { spent: true, ...(pending.clientId === null ? { clientId } : {}) } as const;
   if (!response.ok) return { ok: false, problem: exchangeProblem(response.status, await errorCode(response)), ...spent };
   const answer = tokenAnswer(await response.json().catch(() => undefined));
-  if (answer === undefined || answer.refresh === undefined || answer.idToken === undefined) return { ok: false, problem: "OpenAI's answer to the sign-in was not a usable token set: start the sign-in again.", ...spent };
+  /** A grant this attempt will not keep: revoked (bounded, as a sign-out's) when it came with a refresh token. */
+  const dropped = async (problem: string): Promise<ChatGptSignInResult> => {
+    if (answer?.refresh !== undefined) await revokeChatGpt(vendor, { refresh: answer.refresh, clientId });
+    return { ok: false, problem, ...spent };
+  };
+  if (answer === undefined || answer.refresh === undefined || answer.idToken === undefined) return dropped("OpenAI's answer to the sign-in was not a usable token set: start the sign-in again.");
   const identity = await verifiedIdToken(vendor, answer.idToken, clientId, pending.nonce).catch(() => undefined);
-  if (identity === undefined) return { ok: false, problem: "The sign-in could not be verified (OpenAI's ID token did not check out): start it again.", ...spent };
-  if (pending.subject !== null && identity.sub !== pending.subject) {
-    return { ok: false, problem: "This sign-in returned another ChatGPT account than the one saved: sign out first to change accounts.", ...spent };
-  }
-  if (!answer.scopes.includes(PLAN_USAGE_SCOPE)) {
-    return { ok: false, problem: "Signed in, but ChatGPT did not allow ChatGPT plan usage for t3flare: start again and allow it (it needs a Plus or Pro plan).", ...spent };
-  }
+  if (identity === undefined) return dropped("The sign-in could not be verified (OpenAI's ID token did not check out): start it again.");
+  if (pending.subject !== null && identity.sub !== pending.subject) return dropped("This sign-in returned another ChatGPT account than the one saved: sign out first to change accounts.");
+  if (!answer.scopes.includes(PLAN_USAGE_SCOPE)) return dropped("Signed in, but ChatGPT did not allow ChatGPT plan usage for t3flare: start again and allow it (it needs a Plus or Pro plan).");
   return {
     ok: true,
     credential: {
@@ -356,17 +360,22 @@ export const refreshChatGpt = async (vendor: ChatGptVendor, credential: ChatGptC
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** The whole of a revocation, its retries included. */
+export const REVOKE_DEADLINE_MS = 30_000;
+
 /**
  * Ends the renewable session at OpenAI: the refresh token posted to discovery's revocation endpoint (an empty 200 is
- * success, also for a token already invalid). A network failure or 5xx is retried twice; `confirmed` false otherwise.
+ * success, also for a token already invalid). A network failure or 5xx is retried twice, all within 30 s; `confirmed`
+ * false otherwise.
  */
 export const revokeChatGpt = async (vendor: ChatGptVendor, credential: Pick<ChatGptCredential, "refresh" | "clientId">): Promise<{ readonly confirmed: boolean }> => {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const deadline = AbortSignal.timeout(REVOKE_DEADLINE_MS);
+  for (let attempt = 0; attempt < 3 && !deadline.aborted; attempt += 1) {
     let retry = true;
     try {
-      const { revocation } = await discovery(vendor);
+      const { revocation } = await discovery(vendor, deadline);
       if (revocation === undefined) return { confirmed: false };
-      const response = await post(vendor, revocation, { token: credential.refresh, token_type_hint: "refresh_token", client_id: credential.clientId });
+      const response = await post(vendor, revocation, { token: credential.refresh, token_type_hint: "refresh_token", client_id: credential.clientId }, deadline);
       if (response.status === 200) return { confirmed: true };
       retry = response.status >= 500;
     } catch {

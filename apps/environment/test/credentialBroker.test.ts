@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalTimers:off
+// @effect-diagnostics globalConsole:off
 // The Credential broker (SPI-1164; ADR-0018 revived): the Environment DO holds each sign-in's tokens sealed, is their
 // only refresher (one refresh in flight per endpoint), saves a rotated refresh token before any caller gets the new access
 // token, and signs the endpoint out when OpenAI refuses a renewal. Tested against a fake of OpenAI's authorization server;
@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type CredentialBroker, credentialBroker, signInStatusKey } from "../src/credentials/broker.ts";
 import { chatgptSignIn } from "../src/credentials/chatgpt.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
-import { type FakeOpenAI, fakeOpenAI } from "./fixtures/fakeOpenAIAuth.ts";
+import { type FakeOpenAI, fakeOpenAI, gate } from "./fixtures/fakeOpenAIAuth.ts";
 
 const KEY = "d".repeat(64);
 const HOUR = 3_600_000;
@@ -79,11 +79,13 @@ describe("the Credential broker", () => {
     const first = await broker.access("chatgpt");
     // Inside the margin: five Sessions ask at once while OpenAI is slow to answer.
     advance(HOUR - 60_000);
-    let release!: () => void;
-    vendor.options.refreshGate = new Promise((resolve) => (release = resolve));
+    const slow = gate();
+    vendor.options.refreshGate = slow.opened;
+    vendor.options.onRefresh = slow.reached;
     const asks = Promise.all(Array.from({ length: 5 }, () => broker.access("chatgpt")));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    release();
+    // The refresh holds the lock at OpenAI; whenever the others arrive, they find it renewed.
+    await slow.arrived;
+    slow.open();
     const answers = await asks;
     expect(vendor.counts.refreshes).toBe(1);
     const tokens = new Set(answers.map((answer) => (answer.ok ? answer.accessToken : "refused")));
@@ -136,11 +138,12 @@ describe("the Credential broker", () => {
     await signIn(broker, vendor);
     advance(HOUR);
     vendor.options.refreshError = "invalid_grant";
-    let release!: () => void;
-    vendor.options.refreshGate = new Promise((resolve) => (release = resolve));
+    const slow = gate();
+    vendor.options.refreshGate = slow.opened;
+    vendor.options.onRefresh = slow.reached;
     const asks = Promise.all(Array.from({ length: 5 }, () => broker.access("chatgpt")));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    release();
+    await slow.arrived;
+    slow.open();
     const answers = await asks;
     expect(vendor.counts.refreshes).toBe(1);
     expect(answers.every((answer) => !answer.ok && answer.signedOut)).toBe(true);
@@ -152,14 +155,15 @@ describe("the Credential broker", () => {
     await signIn(broker, vendor);
     advance(HOUR);
     vendor.options.refreshError = "invalid_grant";
-    let release!: () => void;
-    vendor.options.refreshGate = new Promise((resolve) => (release = resolve));
+    const slow = gate();
+    vendor.options.refreshGate = slow.opened;
+    vendor.options.onRefresh = slow.reached;
     const refused = broker.access("chatgpt");
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    // The owner signs in again meanwhile; its write waits for the refusal's.
+    // The refused renewal holds the lock; the owner signs in again meanwhile. Whether the new sign-in's write queues
+    // behind the refusal or comes after it, the refusal's removal cannot touch it: no timing decides the outcome.
+    await slow.arrived;
     const again = signIn(broker, vendor);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    release();
+    slow.open();
     expect(await refused).toMatchObject({ ok: false, signedOut: true });
     expect(await again).toMatchObject({ ok: true });
     expect(await broker.read("chatgpt")).toMatchObject({ access: vendor.accessTokens.at(-1) });
@@ -205,12 +209,14 @@ describe("the Credential broker", () => {
     const { kv, vendor, broker, advance } = await setup();
     await signIn(broker, vendor);
     advance(HOUR);
-    let release!: () => void;
-    vendor.options.refreshGate = new Promise((resolve) => (release = resolve));
+    const slow = gate();
+    vendor.options.refreshGate = slow.opened;
+    vendor.options.onRefresh = slow.reached;
     const refreshing = broker.access("chatgpt");
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // The refresh holds the lock at OpenAI: the sign-out queues behind it.
+    await slow.arrived;
     const out = broker.signOut("chatgpt");
-    release();
+    slow.open();
     await refreshing;
     expect(await out).toEqual({ signedOut: true, revoked: true });
     // The rotated refresh token (the one OpenAI honours now) is the one revoked; nothing is left here.
@@ -263,8 +269,10 @@ describe("the Credential broker", () => {
   it("serialises modify per endpoint, as pi-ai's CredentialStore asks", async () => {
     const { broker } = await setup();
     const order: Array<string> = [];
+    const held = gate();
     const slow = broker.modify("chatgpt", async () => {
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      held.reached();
+      await held.opened;
       order.push("first");
       return { type: "oauth", access: "a", refresh: "r", expires: 1 };
     });
@@ -272,7 +280,59 @@ describe("the Credential broker", () => {
       order.push(`second saw ${current?.type === "oauth" ? current.access : "nothing"}`);
       return undefined;
     });
+    // The first holds the lock until it is let go; the second, queued meanwhile, then sees what the first wrote.
+    await held.arrived;
+    held.open();
     await Promise.all([slow, fast]);
     expect(order).toEqual(["first", "second saw a"]);
   });
+
+  it("lets a sign-out during a completion's exchange win: the fresh grant is revoked, nothing shows signed in", async () => {
+    const { kv, vendor, broker } = await setup();
+    const { authorizeUrl } = await broker.start("chatgpt", "chatgpt");
+    const slow = gate();
+    vendor.options.exchangeGate = slow.opened;
+    vendor.options.onExchange = slow.reached;
+    const completing = broker.complete("chatgpt", vendor.approve(authorizeUrl));
+    await slow.arrived;
+    expect(await broker.signOut("chatgpt")).toEqual({ signedOut: false, revoked: false });
+    slow.open();
+    expect(await completing).toMatchObject({ ok: false, problem: expect.stringMatching(/signed out or started again/) });
+    expect(await broker.read("chatgpt")).toBeUndefined();
+    expect(broker.status("chatgpt")).toMatchObject({ signedIn: false, pendingSince: null });
+    expect(vendor.revoked.has(vendor.currentRefresh()!)).toBe(true);
+    scan(kv, vendor);
+  });
+
+  it("keeps a waiting attempt sealed: its state, nonce and verifier are nowhere in the storage", async () => {
+    const { kv, vendor, broker } = await setup();
+    const { authorizeUrl } = await broker.start("chatgpt", "chatgpt");
+    // OpenAI cannot be reached at the exchange: the attempt keeps waiting for another paste.
+    vendor.options.tokenDown = true;
+    expect(await broker.complete("chatgpt", vendor.approve(authorizeUrl))).toMatchObject({ ok: false });
+    expect(broker.status("chatgpt").pendingSince).not.toBeNull();
+    // The fake saw the attempt's state, nonce and challenge (the authorize URL) and its verifier and code (the exchange).
+    expect(vendor.secrets().length).toBeGreaterThanOrEqual(5);
+    scan(kv, vendor);
+  });
+
+  it("forgets the account at sign-out, so the next sign-in may be another account", async () => {
+    const { kv, vendor, broker } = await setup();
+    await signIn(broker, vendor);
+    await broker.signOut("chatgpt");
+    expect(broker.status("chatgpt").subject).toBeNull();
+    const { authorizeUrl } = await broker.start("chatgpt", "chatgpt");
+    expect(await broker.complete("chatgpt", vendor.approve(authorizeUrl, { sub: "user-8", email: "other@example.com" }))).toMatchObject({ ok: true });
+    expect(broker.status("chatgpt")).toMatchObject({ signedIn: true, email: "other@example.com" });
+    scan(kv, vendor);
+  });
+
+  it("revokes at sign-out even when stopping the Sessions failed", async () => {
+    const { kv, vendor, broker } = await setup();
+    await signIn(broker, vendor);
+    expect(await broker.signOut("chatgpt", { beforeRevoke: () => Promise.reject(new Error("a Session broke")) })).toEqual({ signedOut: true, revoked: true });
+    expect(vendor.counts.revocations).toBe(1);
+    scan(kv, vendor);
+  });
 });
+

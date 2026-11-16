@@ -98,8 +98,19 @@ describe("ChatGPT plan usage sign-in", () => {
       const { authorizeUrl, pending } = await startChatGptSignIn({ hostId: HOST });
       const result = await completeChatGptSignIn({ fetch: vendor.fetch, now: Date.now }, pending, vendor.approve(authorizeUrl));
       expect(result).toMatchObject({ ok: false, spent: true, problem: expect.stringMatching(/could not be verified/) });
+      // The grant it will not keep is revoked at OpenAI.
+      expect(vendor.revoked.has(vendor.currentRefresh()!)).toBe(true);
     });
   }
+
+  it("revokes a grant that did not allow plan usage", async () => {
+    const vendor = await fakeOpenAI({ grantedScope: "openid profile email offline_access" });
+    const { authorizeUrl, pending } = await startChatGptSignIn({ hostId: HOST });
+    const result = await completeChatGptSignIn({ fetch: vendor.fetch, now: Date.now }, pending, vendor.approve(authorizeUrl));
+    expect(result).toMatchObject({ ok: false, problem: expect.stringMatching(/did not allow ChatGPT plan usage/) });
+    expect(vendor.counts.revocations).toBe(1);
+    expect(vendor.revoked.has(vendor.currentRefresh()!)).toBe(true);
+  });
 
   it("refuses the sign-in when OpenAI's JWKS cannot be read", async () => {
     const vendor = await fakeOpenAI({ jwksDown: true });

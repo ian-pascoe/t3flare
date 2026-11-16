@@ -4,10 +4,14 @@
 //
 // - Sealed at rest: it implements pi-ai's `CredentialStore` (types only; no pi-ai in this bundle) over the sealed store
 //   (credentials/sealed.ts), keyed by the endpoint's id.
-// - One at a time: every write of an endpoint's sign-in (a refresh, a completed sign-in, a sign-out, `modify`, `delete`)
-//   runs under that endpoint's lock, after the one before it, and is committed before it resolves. So a refresh runs
-//   once however many Sessions ask, a sign-out waits for a refresh in flight and revokes the refresh token it left, and a
-//   refused renewal's removal cannot wipe a sign-in completed meanwhile.
+// - One at a time: every write of an endpoint's sign-in runs under that endpoint's lock, after the one before it, and is
+//   committed before it resolves: its credential (a refresh, a completed sign-in, a sign-out, `modify`, `delete`), its
+//   waiting attempt (a start, a completion, a sign-out) and its status as they go with them. Only the vendor's network
+//   calls of a start and a completion (the code exchange) run outside it; a completion then checks under the lock that its
+//   attempt is still the one waiting. So a refresh runs once however many Sessions ask, a sign-out waits for a refresh in
+//   flight and revokes the refresh token it left, a refused renewal's removal cannot wipe a sign-in completed meanwhile,
+//   and a sign-out during a completion's exchange wins (the fresh grant is revoked). Problem texts and the index are
+//   status-only writes outside it.
 // - Saved before use: a renewed credential, its rotated refresh token included, is saved before any caller gets its
 //   access token; if it cannot be saved, no caller gets it.
 // - A refused renewal (the vendor's codes that end a sign-in) signs the endpoint out, with the reason; a passing failure
@@ -228,8 +232,10 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     const saved = status(endpointId);
     const registration: SignInRegistration | undefined = saved.clientId === null || saved.kind !== kind ? undefined : { clientId: saved.clientId, email: saved.email, subject: saved.subject };
     const { authorizeUrl, pending } = await vendor.start({ hostId: hostId(), now, ...(registration === undefined ? {} : { registration }) });
-    await sealed.put(pendingName(endpointId), JSON.stringify({ ...pending, signIn: kind }));
-    setStatus(endpointId, { kind, pendingSince: pending.startedAt, problem: null, problemAt: null });
+    await serial(endpointId, async () => {
+      await sealed.put(pendingName(endpointId), JSON.stringify({ ...pending, signIn: kind }));
+      setStatus(endpointId, { kind, pendingSince: pending.startedAt, problem: null, problemAt: null });
+    });
     log({ endpoint: endpointId, event: "start", kind, registered: registration !== undefined });
     return { authorizeUrl };
   };
@@ -240,39 +246,52 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     const vendor = pending === undefined ? undefined : vendors[pending.signIn];
     if (pending === undefined || vendor === undefined) return { ok: false, problem: "No sign-in is waiting for a pasted address: start the sign-in again." };
     if (now() - pending.startedAt > PENDING_TTL_MS) {
-      sealed.remove(pendingName(endpointId));
-      setStatus(endpointId, { pendingSince: null });
+      await serial(endpointId, async () => {
+        if ((await sealed.open(pendingName(endpointId))) !== text) return;
+        sealed.remove(pendingName(endpointId));
+        setStatus(endpointId, { pendingSince: null });
+      });
       return { ok: false, problem: "That sign-in lapsed (30 minutes): start it again." };
     }
     const result = await vendor.complete(pending, pasted);
-    if (!result.ok) {
-      log({ endpoint: endpointId, event: "complete", ok: false, spent: result.spent === true });
-      if (result.spent === true) {
-        sealed.remove(pendingName(endpointId));
-        // The vendor's advice after a refused code: start again with the registration this attempt was issued.
-        setStatus(endpointId, { pendingSince: null, problem: result.problem, problemAt: now(), ...(result.clientId === undefined ? {} : { clientId: result.clientId }) });
+    return serial(endpointId, async (): Promise<SignInCompletion> => {
+      // Still the attempt waiting? A sign-out (or a new start) during the exchange took it away.
+      const still = (await sealed.open(pendingName(endpointId))) === text;
+      if (!result.ok) {
+        log({ endpoint: endpointId, event: "complete", ok: false, spent: result.spent === true });
+        if (result.spent === true && still) {
+          sealed.remove(pendingName(endpointId));
+          // The vendor's advice after a refused code: start again with the registration this attempt was issued.
+          setStatus(endpointId, { pendingSince: null, problem: result.problem, problemAt: now(), ...(result.clientId === undefined ? {} : { clientId: result.clientId }) });
+        }
+        return { ok: false, problem: result.problem };
       }
-      return { ok: false, problem: result.problem };
-    }
-    const { credential } = result;
-    await serial(endpointId, () => write(endpointId, { ...credential, signIn: pending.signIn }));
-    sealed.remove(pendingName(endpointId));
-    log({ endpoint: endpointId, event: "complete", ok: true, expiresAt: credential.expires });
-    return {
-      ok: true,
-      status: setStatus(endpointId, {
-        signedIn: true,
-        email: credential.email ?? null,
-        clientId: credential.clientId ?? null,
-        subject: credential.subject ?? null,
-        signedInAt: now(),
-        expiresAt: credential.expires,
-        refreshedAt: null,
-        pendingSince: null,
-        problem: null,
-        problemAt: null,
-      }),
-    };
+      const { credential } = result;
+      if (!still) {
+        // The fresh grant belongs to an attempt that is over: it is revoked, not kept.
+        const { confirmed } = await vendor.revoke(credential);
+        log({ endpoint: endpointId, event: "complete", ok: false, superseded: true, revoked: confirmed });
+        return { ok: false, problem: "This sign-in was signed out or started again while it finished, so it was not kept: start it again." };
+      }
+      await write(endpointId, { ...credential, signIn: pending.signIn });
+      sealed.remove(pendingName(endpointId));
+      log({ endpoint: endpointId, event: "complete", ok: true, expiresAt: credential.expires });
+      return {
+        ok: true,
+        status: setStatus(endpointId, {
+          signedIn: true,
+          email: credential.email ?? null,
+          clientId: credential.clientId ?? null,
+          subject: credential.subject ?? null,
+          signedInAt: now(),
+          expiresAt: credential.expires,
+          refreshedAt: null,
+          pendingSince: null,
+          problem: null,
+          problemAt: null,
+        }),
+      };
+    });
   };
 
   // --- sign-out --------------------------------------------------------------------------------------------------------
@@ -282,10 +301,16 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
       sealed.remove(pendingName(endpointId));
       const current = await read(endpointId);
       sealed.remove(credentialName(endpointId));
-      setStatus(endpointId, { signedIn: false, expiresAt: null, pendingSince: null, problem: null, problemAt: null });
+      // The account is forgotten too, so the next sign-in may be another account; the registration's client id stays.
+      setStatus(endpointId, { signedIn: false, subject: null, expiresAt: null, pendingSince: null, problem: null, problemAt: null });
       return current;
     });
-    await options.beforeRevoke?.();
+    // The Sessions are stopped before the revocation, and the revocation runs whatever happened to them.
+    try {
+      await options.beforeRevoke?.();
+    } catch (error) {
+      log({ endpoint: endpointId, event: "sign-out-sessions-failed", error: String(error).slice(0, 200) });
+    }
     const vendor = isSignedIn(taken) ? vendors[taken.signIn] : undefined;
     const revoked = isSignedIn(taken) && vendor !== undefined ? (await vendor.revoke(taken)).confirmed : false;
     log({ endpoint: endpointId, event: "sign-out", hadToken: taken !== undefined, revoked });
