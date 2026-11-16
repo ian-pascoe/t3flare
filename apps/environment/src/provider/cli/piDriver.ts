@@ -70,8 +70,8 @@ const snapshotOf = (enabled: boolean) =>
   });
 
 /**
- * pi's managed snapshot (its model list): built from the catalog or the Model endpoints (`piModelsOf`), checked once at
- * once, and again at each endpoint change (SPI-1170) while the caller's scope is open.
+ * pi's managed snapshot (its model list): built from the catalog or the Model endpoints (`piModelsOf`), checked when the
+ * driver starts, and again at each endpoint change (SPI-1170) while the caller's scope is open.
  */
 export const piSnapshot = (effective: PiSettings, stamp: (draft: Omit<ServerProvider, "instanceId" | "driver">) => ServerProvider) =>
   Effect.gen(function* () {

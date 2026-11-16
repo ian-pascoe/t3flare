@@ -31,6 +31,28 @@ describe("pi's endpoints", () => {
   });
 });
 
+describe("pi's endpoints and sign-ins", () => {
+  it("never takes a sign-in endpoint, which the relay does not carry yet (SPI-1164)", () => {
+    const chatgpt = { ...endpoint("chatgpt", "openai-responses", [model("gpt-6.1-sol")]), auth: "chatgpt" as const };
+    expect(piEndpoints({ revision: 1, endpoints: [chatgpt] })).toEqual([]);
+    expect(piRelayOf({ revision: 1, endpoints: [chatgpt] })).toBeUndefined();
+    expect(piModelsOf(catalog, { revision: 1, endpoints: [chatgpt] }).map((entry) => entry.slug)).toEqual(["anthropic/claude-sonnet-5-5"]);
+    const both = endpoints(endpoint("comm", "anthropic-messages", [model("c")]));
+    expect(piRelayOf({ revision: 1, endpoints: [chatgpt, ...both.endpoints] })?.endpoints.map((entry) => entry.id)).toEqual(["comm"]);
+  });
+});
+
+describe("pi's start model", () => {
+  it("is the picker's default row, wherever it is in the list", () => {
+    // The picker marks the default model's slug when it lists it, not its first row. No saved endpoint takes the id
+    // `anthropic` (it is reserved), so this list is built by hand to pin the rule.
+    const list = endpoints(endpoint("comm", "anthropic-messages", [model("c")]), endpoint("anthropic", "anthropic-messages", [model("claude-sonnet-5-5")]));
+    const picked = piModelsOf(catalog, list).find((row) => row.isDefault === true)?.slug;
+    expect(picked).toBe("anthropic/claude-sonnet-5-5");
+    expect(piRelayOf(list)?.model).toBe(picked);
+  });
+});
+
 describe("pi's model list", () => {
   it("is the endpoints' models by slug, grouped by endpoint, the first the default, with pi's thinking picker on reasoning models", () => {
     const list = piModelsOf(catalog, endpoints(endpoint("oai", "openai-completions", [model("gpt-x"), model("o-think", true)], "Gateway"), endpoint("comm", "anthropic-messages", [model("c")], "Gateway"), endpoint("empty", "openai-responses", [])));
