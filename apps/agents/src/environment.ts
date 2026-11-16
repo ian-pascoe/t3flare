@@ -9,6 +9,7 @@ import type { GlobalMiseReport, McpRelayAnswer, McpRelayInput, ResolvedEnvironme
 import type { SkillSet } from "@t3flare/skills";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
 import type { ModelRelayTarget } from "@t3flare/models/relay";
+import type { UsageEntry } from "@t3flare/models/usage";
 import type { McpCallAnswer, McpView } from "./extensions/mcp.ts";
 
 export interface EnvironmentRpc {
@@ -37,6 +38,8 @@ export interface EnvironmentRpc {
   endpointCredential(input: EndpointCredentialRequest): Promise<EndpointCredential>;
   /** The model relay's target for an endpoint (SPI-1167): its base URL and headers with its credential, or why not. */
   modelRelayTarget(input: { readonly endpointId: string }): Promise<ModelRelayTarget>;
+  /** Usage records (SPI-1173): a Session's, text generation's or the model relay's, kept for t3's Usage page. Never boots t3. */
+  recordUsage(input: { readonly entries: ReadonlyArray<UsageEntry> }): Promise<{ readonly kept: number }>;
   /** The Environment settings, resolved (ADR-0032): read before a Container start. Never boots t3. */
   environmentSettings(): Promise<ResolvedEnvironment>;
   /**

@@ -126,6 +126,8 @@ export const topLevelModel = (bytes: Uint8Array): { readonly start: number; read
 /** A routed body's endpoint, and the body with the model's own id in place of the slug. */
 export interface RoutedBody {
   readonly endpointId: string;
+  /** The model's own id at the endpoint (SPI-1173: what its usage is recorded under). */
+  readonly modelId: string;
   readonly body: Uint8Array;
 }
 
@@ -143,7 +145,7 @@ export const routeBody = (bytes: Uint8Array): RoutedBody | undefined => {
   if (removed <= 0) throw new Error("t3flare: a model id is not shorter than its slug");
   bytes.set(id, model.start);
   bytes.copyWithin(model.start + id.length, model.end);
-  return { endpointId: slug.endpointId, body: bytes.subarray(0, bytes.length - removed) };
+  return { endpointId: slug.endpointId, modelId: slug.modelId, body: bytes.subarray(0, bytes.length - removed) };
 };
 
 /** The declared length of a request's body, when it declares a valid one. */

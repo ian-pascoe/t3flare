@@ -13,6 +13,7 @@
 // Addressed as computer's proxy addresses its host.
 import { WorkspaceProxy as ComputerWorkspaceProxy } from "@cloudflare/computer";
 
+import { environmentStub } from "./environment.ts";
 import { handleRelayRequest, isRelayPath } from "./workspace/mcpRelay.ts";
 import { handleModelRelay, isModelRelayPath } from "./workspace/modelRelay.ts";
 import { CREDENTIAL_PATH, MODEL_KEY_PATH, type WorkspaceDO } from "./workspace/WorkspaceDO.ts";
@@ -43,6 +44,16 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
         fetch: (upstream) => fetch(upstream),
         log: (event) => console.log(JSON.stringify(event)),
         now: () => Date.now(),
+        // SPI-1173: each answer's usage, kept by the Environment for t3's Usage page; a failure loses the record only.
+        usage: (entry) => {
+          const environment = (this.env as { readonly ENVIRONMENT?: DurableObjectNamespace }).ENVIRONMENT;
+          if (environment === undefined) return;
+          this.ctx.waitUntil(
+            environmentStub(environment)
+              .recordUsage({ entries: [entry] })
+              .catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "usage-record-failed", agent: entry.agent, endpoint: entry.endpointId, error: error instanceof Error ? error.name : "error" }))),
+          );
+        },
       }).catch((error: unknown) => {
         // The route logs its own failures; this is what escaped it, with what the path names (never a value).
         const endpoint = /^\/t3flare\/model\/([a-z0-9-]{1,32})(?:\/|$)/.exec(pathname)?.[1] ?? null;

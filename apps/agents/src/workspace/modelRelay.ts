@@ -19,6 +19,8 @@ import { HANDLE } from "@t3flare/workspace-client";
 
 import type { HandleCaller } from "./processHost.ts";
 import { declaredLength, MAX_ROUTED_BODY_BYTES, readCapped, type RoutedBody, routeBody } from "./routedBody.ts";
+import { observeUsage } from "./relayUsage.ts";
+import type { UsageEntry } from "@t3flare/models/usage";
 
 export { MAX_ROUTED_BODY_BYTES } from "./routedBody.ts";
 
@@ -48,6 +50,8 @@ export interface ModelRelayDeps {
   readonly fetch: (request: Request) => Promise<Response>;
   readonly log: (event: Record<string, unknown>) => void;
   readonly now: () => number;
+  /** SPI-1173: records an answer's usage, read as it streams past (`relayUsage.ts`); absent, nothing is read. */
+  readonly usage?: (entry: UsageEntry) => void;
 }
 
 /** Response headers not passed back: hop-by-hop ones and cookies. */
@@ -177,6 +181,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
     }
   };
   let routedBody: Uint8Array | undefined;
+  let routedModel: string | null = null;
   if (endpointId === null) {
     // A model-routed request: the handle first, so an unknown one never has its body read; then the body's endpoint.
     const declared = declaredLength(request.headers);
@@ -193,6 +198,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
     }
     endpointId = routedOrRefused.endpointId;
     routedBody = routedOrRefused.body;
+    routedModel = routedOrRefused.modelId;
   }
   const granted = await ask(endpointId);
   if (granted instanceof Response) return granted;
@@ -234,7 +240,12 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   log(upstream.status, grant, { dropped });
   const answer = new Headers();
   for (const [name, value] of upstream.headers) if (!DROPPED_RESPONSE.has(name)) answer.append(name, value);
-  return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: answer });
+  const record = deps.usage;
+  const body =
+    record === undefined
+      ? upstream.body
+      : observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, record);
+  return new Response(body, { status: upstream.status, statusText: upstream.statusText, headers: answer });
 };
 
 /** What `authorizeModelRelay` needs of the Workspace DO and the Environment. */
