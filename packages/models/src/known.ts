@@ -1,10 +1,12 @@
 // What pi-ai's own catalog knows of a model (SPI-1162): its name, limits, reasoning, thinking levels and price, for a model
 // a Model endpoint serves. Only the catalogs of the vendors an endpoint is likely to be are read: pi-ai's catalog modules
 // (their JSON plus the small `model-catalog.js`), no provider code, bundled where this is imported. The catalog of the
-// endpoint's own host is tried first, then the others in order.
+// endpoint's own host is tried first, then the others in order. GitHub Copilot's (SPI-1166) is read only for its own
+// host: its ids (`claude-haiku-4.5`) and prices are Copilot's, not any other endpoint's.
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
 import { DEEPSEEK_MODELS } from "@earendil-works/pi-ai/providers/deepseek.models";
+import { GITHUB_COPILOT_MODELS } from "@earendil-works/pi-ai/providers/github-copilot.models";
 import { GOOGLE_MODELS } from "@earendil-works/pi-ai/providers/google.models";
 import { GROQ_MODELS } from "@earendil-works/pi-ai/providers/groq.models";
 import { MISTRAL_MODELS } from "@earendil-works/pi-ai/providers/mistral.models";
@@ -16,8 +18,8 @@ import type { EndpointApi, KnownModel } from "./endpoints.ts";
 
 type Catalog = Readonly<Record<string, Model<Api>>>;
 
-/** Each catalog with the host its vendor serves it at. */
-const CATALOGS: ReadonlyArray<{ readonly host: string; readonly models: Catalog }> = [
+/** Each catalog with the host its vendor serves it at; `own`: read for that host only. */
+const CATALOGS: ReadonlyArray<{ readonly host: string; readonly models: Catalog; readonly own?: true }> = [
   { host: "api.anthropic.com", models: ANTHROPIC_MODELS as unknown as Catalog },
   { host: "api.openai.com", models: OPENAI_MODELS as unknown as Catalog },
   { host: "generativelanguage.googleapis.com", models: GOOGLE_MODELS as unknown as Catalog },
@@ -26,7 +28,15 @@ const CATALOGS: ReadonlyArray<{ readonly host: string; readonly models: Catalog 
   { host: "api.deepseek.com", models: DEEPSEEK_MODELS as unknown as Catalog },
   { host: "api.groq.com", models: GROQ_MODELS as unknown as Catalog },
   { host: "openrouter.ai", models: OPENROUTER_MODELS as unknown as Catalog },
+  // The Copilot sign-in's stand-in base URL (`SIGN_IN_KINDS.copilot`): its endpoint's models take Copilot's metadata.
+  { host: "api.individual.githubcopilot.com", models: GITHUB_COPILOT_MODELS as unknown as Catalog, own: true },
 ];
+
+/** The API pi-ai's Copilot catalog sends `id` on (Copilot serves each model on one of three), or undefined. */
+export const copilotModelApi = (id: string): string | undefined => {
+  const model = (GITHUB_COPILOT_MODELS as unknown as Catalog)[id];
+  return model === undefined || (model.type !== undefined && model.type !== "chat") ? undefined : model.api;
+};
 
 const hostOf = (baseUrl: string): string | undefined => {
   try {
@@ -42,7 +52,7 @@ const hostOf = (baseUrl: string): string | undefined => {
  */
 export const knownModel = (id: string, endpoint: { readonly api: EndpointApi; readonly baseUrl: string }): KnownModel | undefined => {
   const host = hostOf(endpoint.baseUrl);
-  const ordered = [...CATALOGS.filter((catalog) => catalog.host === host), ...CATALOGS.filter((catalog) => catalog.host !== host)];
+  const ordered = [...CATALOGS.filter((catalog) => catalog.host === host), ...CATALOGS.filter((catalog) => catalog.host !== host && catalog.own !== true)];
   for (const catalog of ordered) {
     const model = catalog.models[id];
     if (model === undefined || (model.type !== undefined && model.type !== "chat")) continue;
