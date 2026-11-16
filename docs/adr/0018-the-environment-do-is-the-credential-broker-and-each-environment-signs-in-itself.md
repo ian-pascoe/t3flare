@@ -65,9 +65,8 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
    usage is offered to Plus and Pro plans, and OpenAI documents it for "open-source and locally hosted apps" (a paid or
    remotely hosted app is asked to fill in an interest form). Whether an Environment on the owner's own Cloudflare
    account counts as locally hosted is OpenAI's call. The panel says so beside the sign-in.
-9. **The relay does not carry a sign-in yet** (SPI-1171): the relay refuses a sign-in endpoint (501), and every CLI's
-   list of endpoints (Codex, Claude Code, OpenCode) starts from `relayedEndpoints`, which leaves sign-ins out. No
-   Workspace code asks for a sign-in's token.
+9. **The relay carries sign-ins since SPI-1171** (it refused them with 501 until then): see the SPI-1171 refinement
+   below. No Workspace code asks for a sign-in's token through `endpointCredential`.
 
 10. **Claude is a Claude Pro or Max plan through Claude Code's OAuth sign-in** (SPI-1165; report
     [`docs/steps/spi-1165.md`](../steps/spi-1165.md)). It is pi-ai's copy-code flow: the owner approves at claude.ai,
@@ -142,6 +141,24 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
     **Unverified against a Copilot plan**: on p1166 GitHub's device flow ran from a Worker and the owner approved, but
     the owner's Copilot subscription had ended, so GitHub refused the Copilot token (403 `subscription_ended`) and no
     turn ran on it (SPI-1226).
+
+## Refinement (SPI-1171, 2026-11-16): the model relay is a caller too
+
+Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md); the relay's side is ADR-0016's SPI-1171 refinement.
+
+1. **The model relay asks at use time, per request.** `modelRelayTarget` gives a sign-in's access token for one relayed
+   request (the broker's `access`, renewed first under item 3's lock when near its expiry). The Workspace DO hands it
+   to the relay's route in the agents Worker and keeps only its hash; it never reaches the Container. A mid-thread
+   renewal is the next request's, without restarting the CLI.
+2. **A passing failure says when to try again.** `BrokerAccess` carries `retryAt` while a vendor's back-off holds
+   (`earliestRefreshAt`, item 11): no caller reaches the vendor before then, and the relay passes it to the CLI as
+   `retry-after`.
+3. **Two broker reads for checks only.** `secrets` gives the stored access and refresh tokens to the admin leak check,
+   renewing nothing; `expire` marks the stored token expired so its next use renews it, through an admin route that
+   answers only where the Environment's faults are on (`T3FLARE_FAULTS=1`, bound on every stage but prod;
+   `expireHook.test.ts` checks both).
+4. **Unverified live** (owner decision, 2026-11-16): no subscription was signed in on the stage, so no CLI turn on a
+   subscription, no live mid-thread renewal and no live sign-out ran through the relay. Each is unit-tested.
 
 Considered and not taken:
 

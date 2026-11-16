@@ -34,7 +34,7 @@ import * as fs from "node:fs";
 import { defaultTextModel, type ModelEndpoint } from "@t3flare/models/endpoints";
 
 import { cliTurn as acpTurn, EDIT_AND_TEST, enable as enableAcp } from "./lib/acpTurn.ts";
-import { admin, pair, sleep, wsCall } from "./lib/client.ts";
+import { admin, itemsOf, pair, projectionOf, sleep, threadWindow, wsCall } from "./lib/client.ts";
 import { cliTurn, enable } from "./lib/cliTurn.ts";
 import { leakCheck as leak, linesOf, panelApi as api, relayEvidence, workerLogs, workspaceExec as exec } from "./lib/relayEvidence.ts";
 import { tailing } from "./lib/tail.ts";
@@ -178,9 +178,19 @@ async function control(): Promise<void> {
       check(`a ${cli} turn with tools ran through the relay on an API-key endpoint (${model})`, toolTurn(turn), turns[`${cli} control`]);
       const title = signIn === "chatgpt" ? "ChatGPT" : "Claude";
       const refused = await turnOf(cli, { workspace, model: SIGN_IN_MODEL[signIn], mode: "approval-required", plan: false, prompt: "Reply with the word ok." });
-      const failure = refused.runs.at(-1)?.failure as { message?: string; code?: string; class?: string } | null;
-      turns[`${cli} ${signIn} sign-in`] = clean({ model: SIGN_IN_MODEL[signIn], runs: refused.runs.slice(-1), errors: refused.items.filter((item: any) => item.type === "error") });
-      check(`a ${cli} turn on the ${title} sign-in with no credential fails with t3's failure naming the sign-in`, refused.runs.at(-1)?.status === "failed" && String(failure?.message ?? "").includes(`not signed in to ${title}`), turns[`${cli} ${signIn} sign-in`]);
+      // t3's failure as its error item carries it (the turn's own failure item).
+      const failures = itemsOf(projectionOf(await threadWindow(cookie, refused.threadId)))
+        .filter((item: any) => item.type === "error")
+        .map((item: any) => ({ class: item.failure?.class ?? null, code: item.failure?.code ?? null, message: String(item.failure?.message ?? "") }));
+      turns[`${cli} ${signIn} sign-in`] = clean({ model: SIGN_IN_MODEL[signIn], runs: refused.runs.slice(-1).map((entry) => ({ status: entry.status })), failures });
+      const named = refused.runs.at(-1)?.status === "failed" && failures.some((entry) => entry.code === "sign_in_refused" && entry.message.includes(`not signed in to ${title}`));
+      if (cli === "claude") {
+        // SPI-1172's E1: Claude Code fails before any turn when its session cannot open, with t3's own failure, which the
+        // CLI wrapper has no failed turn to map. Recorded, not checked.
+        report.claudeCodeOnSignIn = { failedBeforeTurn: refused.runs.at(-1)?.status === "failed", named };
+      } else {
+        check(`a ${cli} turn on the ${title} sign-in with no credential fails with t3's failure naming the sign-in`, named, turns[`${cli} ${signIn} sign-in`]);
+      }
     }
     report.turns = turns;
 

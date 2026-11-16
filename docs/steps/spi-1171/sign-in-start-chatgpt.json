@@ -1,0 +1,23 @@
+{
+  "at": "2026-11-16T20:26:32.369Z",
+  "step": "start",
+  "kind": "chatgpt",
+  "status": 200,
+  "ok": true,
+  "authorize": {
+    "endpoint": "https://auth.openai.com/api/accounts/authorize",
+    "params": {
+      "client_id": "dynamic_agent_client",
+      "agent_name_hint": "t3flare",
+      "ext_agent_host_id": "<45 chars>",
+      "response_type": "code",
+      "redirect_uri": "http://127.0.0.1:1455/auth/callback",
+      "scope": "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct",
+      "resource": "https://api.openai.com/v1",
+      "state": "<43 chars>",
+      "nonce": "<43 chars>",
+      "code_challenge_method": "S256",
+      "code_challenge": "<43 chars>"
+    }
+  }
+}

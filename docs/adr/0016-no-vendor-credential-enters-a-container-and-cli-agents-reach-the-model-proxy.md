@@ -277,3 +277,37 @@ Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/
    others by name, under that PATH, with the handle in its environment, for pi as for Claude Code and OpenCode; a
    project's shim named so would get the handle (or, as `setsid`, become its holder). Not fixed here: filed as a
    follow-up by the orchestrator.
+
+## Refinement (SPI-1171, 2026-11-16): subscription sign-ins through the model relay
+
+Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md). A sign-in endpoint (ADR-0018) is carried by the relay like an
+API-key one: the handle is swapped for the credential in the agents Worker, never in the Container.
+
+1. **Which CLI takes which sign-in** (the ticket's matrix, `RELAYED_SIGN_INS` in `@t3flare/models/relay`): Codex the
+   ChatGPT sign-in (a Responses provider), Claude Code the Claude sign-in, OpenCode and pi every sign-in. Every CLI's
+   endpoint list starts from `relayedEndpoints(endpoints, cli)`.
+2. **The token is asked for at every request.** `modelRelayTarget` asks the Credential broker (`access`) for each
+   relayed request, so a token renewed mid-thread is the next request's, and nothing caches it past one request. It
+   goes as a bearer on every API (`credentialHeaderFor`), at the base URL the sign-in's kind allows
+   (`signInRequestTarget`, the Session's own rule: Copilot's token's host, else the endpoint's). The Workspace DO keeps
+   only its hash for the sync guard.
+3. **The sign-in's request rules are the Session's.** The relay applies `SIGN_IN_REQUESTS` (agents' `session/
+   signInRequests.ts`) to the CLI's JSON body: ChatGPT plan usage's body rules, Copilot's (no thinking-off
+   `reasoning`). Where pi-ai does something for a Session from the token or its own provider id, which a CLI's
+   API-key-shaped request lacks, the table's `relay` part restates it: Claude's betas (`claude-code-20250219`,
+   `oauth-2025-04-20` before the CLI's own), pi-ai's Claude Code headers and the identity as the system's first block
+   unless a block already opens with it; Copilot's `X-Initiator`, `Openai-Intent` and vision headers, from the body's
+   `input`. A body that is no JSON, or that the rules leave as it was, goes on byte for byte. The body is read whole
+   for a sign-in (the model-routed URL's 16 MiB cap). This is the second exception to "the body passes unchanged",
+   after SPI-1168's model routing; it is the vendor's own request shape, not protocol translation. Tool names are left
+   as the CLI sends them (pi-ai gives Claude Code's casing to a Session's tools; the relay would have to map them back
+   in the answer's stream).
+4. **A sign-in that gives no token** (signed out, a refused renewal, a passing failure): the relay answers 401 (503 for
+   a passing failure, with `retry-after` while the vendor's back-off, `earliestRefreshAt`, holds) in the API's own error
+   shape, with the Session's text naming the sign-in ("… is not signed in to Claude (…): sign in with Claude again in
+   the Harness panel."), and reports it as the process's last answer (`sign_in_refused` or `unavailable`), so t3 shows
+   it (SPI-1172). The vendor is not asked again before its back-off.
+5. **The log** of a sign-in's request names the sign-in and a short id of the token used (the first 8 hex digits of its
+   SHA-256), so a renewal shows; never the token.
+6. **The leak check** also looks for each sign-in's access and refresh tokens as the broker holds them (a Copilot
+   sign-in's refresh token is its GitHub token), read without renewing.

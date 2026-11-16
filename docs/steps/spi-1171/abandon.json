@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-16T21:27:18.857Z",
+  "step": "abandon",
+  "waiting": {
+    "chatgpt": null,
+    "claude": null
+  },
+  "endpoints": [
+    "commissary"
+  ]
+}
