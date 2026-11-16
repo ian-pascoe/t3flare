@@ -51,7 +51,7 @@ optional headers, and the models it serves.
    setting names that default and follows it as the endpoints change.
 6. **Expand, then cut.** Until SPI-1176 the Model proxy's models and settings keep working beside the endpoints. A
    turn on a model whose endpoint was removed, or no longer lists it, fails with a message that says so.
-   **Except Claude Code** (SPI-1168; pending the owner's confirmation): once an Anthropic Messages endpoint lists a
+   **Except Claude Code** (SPI-1168; the owner accepted it): once an Anthropic Messages endpoint lists a
    model, every Claude Code process runs on the endpoints, and the Model proxy's models are refused in Claude Code
    threads. Its managed settings are the Container's, shared by every Claude process, so the choice is the
    Environment's, not the session's. **And OpenCode** (SPI-1169; the same choice, which the owner accepted for Claude

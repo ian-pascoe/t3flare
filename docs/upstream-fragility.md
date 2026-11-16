@@ -1050,54 +1050,82 @@ environment or file holds it beyond that.
 
 ### U76. OpenCode on Model endpoints through the model relay (SPI-1169)
 
-Ranked after U75, which it parallels: a break fails OpenCode turns on endpoints, or puts the model handle in the
-environment of OpenCode's shells or MCP servers. The Model proxy path keeps its plugin branch. As for Codex and
-Claude Code, the handle is never out of reach of the Container's commands (ADR-0016's SPI-1169 refinement): a shell
-can read OpenCode's `/proc/<pid>/environ`. What this entry guards is that no other environment or file holds it.
+Ranked after U75, which it parallels: a break fails OpenCode turns on endpoints, sends the model handle somewhere
+other than the relay, or puts it in the environment of OpenCode's shells, MCP servers or plugins. The Model proxy path
+keeps its plugin branch. As for Codex and Claude Code, the handle is never out of reach of the Container's commands
+(ADR-0016's SPI-1169 refinement): a shell can read setsid's `/proc/<pid>/environ`. What this entry guards is that no
+other environment or file holds it, and that it goes into no request but the relay's.
 
 - **Where**: `apps/environment/src/agents/acpProfiles.ts` (`opencodeConfig` with an `OpenCodeRelay`,
-  `OPENCODE_PACKAGES`), `provider/cli/opencodeEndpoints.ts`, `provider/cli/relayModels.ts`, `provider/cli/acpDriver.ts`
-  (`resolveModelId`, the model list), the image's `opencode-key-plugin` and `t3flare-opencode`. It leans on OpenCode
-  2.2.7 in these ways:
+  `OPENCODE_PACKAGES`, `opencodeServes`, `OPENCODE_HANDLE_HOLDERS`), `provider/cli/opencodeEndpoints.ts`,
+  `provider/cli/relayModels.ts`, `provider/cli/acpDriver.ts` (`resolveModelId`, the model list), the image's
+  `opencode-key-plugin` (`index.js`, and `relay.js`, its pure guard) and `t3flare-opencode`. It leans on OpenCode 2.2.7
+  in these ways:
   - **A base URL per provider, by package**: `@opencode/ai/providers/anthropic-compatible` appends `/messages` to a
     base URL holding `/v1`; `openai-compatible` appends `/chat/completions`, `openai-compatible-responses` `/responses`
     (measured in `test:docker` and on p1169).
   - **A configured provider's model is sent by its own id**: `t3flare-endpoint-<id>/<model>` reaches the wire as
     `<model>`; a model id holding `/` is the provider's model whole (split at the first `/`).
-  - **The plugin API**: `ctx.provider.transform`, whose `editor.update(id, …)` patches a provider by id. The
-    configured providers are added after a plugin's transform runs (they are not in `editor.list()` then), so the
-    plugin takes their ids from the process's own configuration file and the patch applies when they are added. The
-    handle goes in as `settings.apiKey`, which each package sends in its API's header (`x-api-key`, or
-    `authorization: Bearer`); `openai-compatible-responses` refuses to send without it ("provider authentication
-    required"), a header alone is not enough there.
-  - **A plugin module runs once per process, in `opencode serve`**: `opencode acp` starts `opencode serve --stdio`
-    as its child with its own environment, and the plugin is imported there; its top-level `delete` keeps the handle
-    out of everything that server starts (its shells, a repository's MCP servers). `opencode acp` itself keeps it in
-    its `process.env` and starts only the server.
-  - **The session offers only the allowed providers' models**: t3's adapter refuses any other model (a stale
-    `t3flare/<id>` proxy model, an endpoint's that is gone) before any request, as for Claude Code (U75).
+  - **Configuration precedence**: the system file (`/etc/opencode`) outranks a repository's for each key it sets, and
+    a model's own `package` and `settings.baseURL` win over its provider's. So the profile pins both on every endpoint
+    model; a repository's model-level ones for those models do nothing (`test:docker`). A model or variant the
+    repository adds to an endpoint's provider is not pinned (the system file cannot remove it, and the configuration
+    is applied after every plugin transform, so a plugin cannot either).
+  - **The plugin API**: `ctx.provider.transform`'s `editor.update(id, …)` patches a provider by id, and applies when
+    the configuration adds it (the configured providers are not in `editor.list()` when a plugin's transform runs);
+    the plugin sets each endpoint provider's API key to a placeholder, without which `openai-compatible-responses`
+    refuses to send ("provider authentication required"). `ctx.session.hook("http.request", …, { providerID })`
+    gets each request as sent, after every setting (a variant's included) applies: the plugin puts the handle in the
+    key header (`x-api-key` or `authorization`) only when the URL is the relay's for that provider's endpoint
+    (`relay.js` `putHandle`). If the hook stops running, requests carry the placeholder and the relay answers 401
+    (fails closed); if it starts running before a variant's settings apply, the URL check still holds.
+  - **`opencode acp` runs its server as a child** (`opencode serve --stdio`), where plugins run. The launcher starts
+    `opencode acp` without the handle, and the plugin reads it from the launch chain's setsid (by its command line
+    and the process's marker, `relay.js` `handleFrom`, walking up from the server's parent). A repository's
+    `{env:T3FLARE_MODEL_HANDLE}` (OpenCode substitutes from `process.env`) finds nothing.
+  - **The plugin trusts the profile's copy of the configuration** (`/var/lib/t3flare/cli/<marker>/opencode.json`) for
+    which providers are the relay's: a provider is one only with an endpoint provider id, one of the three packages,
+    and the relay's base URL for that endpoint (`relayProviders`, tested in `opencodeKeyPlugin.test.ts`). The process
+    command (`@t3flare/sandbox-image/process`) makes the home fresh (`rm -rf`, `mkdir -m 700`) and writes the file
+    `0600`, root's; the launcher installs the same file as `/etc/opencode/opencode.json` (`0644`). Every process in
+    the Container is root, so a command can rewrite either. That gains it nothing it lacks: the handle still goes only
+    to the relay's URL for an endpoint of the process's handle, and a root command can read setsid's environment anyway.
+  - **OpenCode watches `/etc/opencode` and reloads it live** (its config watcher; read in the source, not measured
+    here). The file is the Container's: a newer OpenCode spawn's configuration reaches running processes. A provider
+    the running process's plugin did not see at its start gets no placeholder, then the hook gives it no handle
+    (fails closed); an Environment that flips between relay and proxy while OpenCode processes run can break them
+    until their next process.
+  - **The session offers only the allowed providers' models** (and models a repository adds to them): t3's adapter
+    refuses any other model (a stale `t3flare/<id>` proxy model, an endpoint's that is gone) before any request, as
+    for Claude Code (U75).
   - **t3's registry replaces a ready OpenCode snapshot's models** (`ProviderRegistry.ts`
     `shouldRetainMissingProviderModels` keeps an `opencode` snapshot's missing models only while its probe is pending
     or failed; ours is installed and ready), so the proxy's models leave OpenCode's picker when the endpoints' arrive,
     unlike Claude's (U75). If t3 starts retaining them, a picked proxy model is refused as above.
 - **Breaks when**: OpenCode renames or reshapes a provider package or its path (the relay log shows the new path, the
-  endpoint answers 404); the plugin API drops `transform`/`update` or stops applying a patch to a provider added after
-  it (no key: OpenCode reports "provider authentication required" or the relay answers 401); `opencode acp` starts
-  its server, or anything else, before the plugin is imported, or OpenCode spawns shells with an environment it saved
-  at start (the handle reaches the shells: only `test:docker` and the stage script see it); OpenCode starts writing
-  provider settings back to a file (the handle on disk; the stage script's file check sees it); or OpenCode starts
-  requiring a header the allowlist drops (the relay log's `dropped` names it; p1169's list is in
-  `docs/steps/spi-1169/p1169.json`).
-- **Detection**: `test/acpProfiles.test.ts` (the configuration, against the pinned schema), `test/opencodeEndpoints.test.ts`,
-  `test/opencodeSpawn.test.ts`; `test/docker/opencodeRelay.docker.test.ts` in `test:docker` (the real launcher and
-  plugin: each API's path and key header, a switch across three endpoints in one session, a shell's and a repository
-  MCP server's environment, the processes holding the handle); `scripts/p1169.ts` on a stage. **Silent**: the handle
-  reaching a shell's environment between `test:docker` runs; a new dropped header OpenCode needs for a feature but
-  not for a turn. Not detectable, by design: a command reading OpenCode's `/proc/<pid>/environ` (the residual).
-- **Blast radius**: OpenCode turns on endpoints fail, or the model handle in the environment of OpenCode's shells;
-  either way spending stays bounded to the process's endpoints and life.
+  endpoint answers 404); drops or renames the `http.request` hook or its `request` (no handle: the relay answers 401);
+  stops honouring the system file's model-level pins over a repository's (a repository moves an endpoint model, with
+  its prompts, elsewhere; still without the handle); runs a plugin in a process that is not a child of `opencode acp`
+  under the launch chain's setsid (no handle: 401); starts writing provider settings back to a file (the placeholder
+  on disk, not the handle); or starts requiring a header the allowlist drops (the relay log's `dropped` names it;
+  p1169's list is in `docs/steps/spi-1169/p1169.json`).
+- **Detection**: `test/acpProfiles.test.ts` (the configuration and its pins, against the pinned schema),
+  `test/opencodeEndpoints.test.ts`, `test/opencodeSpawn.test.ts`, `test/opencodeKeyPlugin.test.ts` (the plugin's
+  provider guard, its request guard, where it reads the handle, and its constants against their TypeScript sources);
+  `test/docker/opencodeRelay.docker.test.ts` in `test:docker` (the real launcher and plugin: each API's path and key
+  header, a switch across three endpoints in one session, a hostile repository configuration (model-level `baseURL`
+  and `package`, an added model with `{env:T3FLARE_MODEL_HANDLE}`, an added variant with its own `baseURL`) sending
+  no handle anywhere but the relay, a shell's, a repository MCP server's and a repository plugin's environment, the
+  processes holding the handle); `scripts/p1169.ts` on a stage. **Silent**: the handle reaching a shell's environment
+  between `test:docker` runs; a new dropped header OpenCode needs for a feature but not for a turn; the profile's copy
+  or `/etc/opencode` rewritten by a command in the Container (by design: such a command can read the handle already).
+  Not detectable, by design: a command reading setsid's `/proc/<pid>/environ` (the residual).
+- **Blast radius**: OpenCode turns on endpoints fail; or the model handle in the environment of OpenCode's shells, or
+  in a request to a URL a repository chose. Either way spending stays bounded to the process's endpoints and life,
+  and from inside the Container only (the relay is the Container's egress host).
 - **Fix**: on an OpenCode bump, refresh the schema fixture, re-run `opencodeRelay.docker.test.ts` and `p1169.ts`, and
-  diff the provider packages' paths and the plugin API (`transform`, `editor.update`).
+  diff the provider packages' paths, the plugin API (`provider.transform`, `editor.update`, `session.hook`'s
+  `http.request`) and the configuration's precedence for model-level settings.
 
 ## Gaps in detection
 

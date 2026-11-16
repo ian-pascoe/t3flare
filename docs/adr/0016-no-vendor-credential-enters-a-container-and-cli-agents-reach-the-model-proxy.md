@@ -192,26 +192,35 @@ Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/
    OpenCode's catalog providers), at the relay's per-endpoint URL. The package is the API's: Anthropic Messages
    `@opencode/ai/providers/anthropic-compatible` (base URL `…/<id>/v1`), OpenAI Responses `openai-compatible-responses`
    and OpenAI-compatible Completions `openai-compatible` (base URL `…/<id>`). Other APIs' endpoints are not offered to
-   OpenCode. The model-routed URL is not used: the relay reads no OpenCode body. Policies allow exactly those providers.
+   OpenCode. The model-routed URL is not used: the relay reads no OpenCode body. Policies allow exactly those providers,
+   and each endpoint's model is pinned to its provider's package and base URL in the system configuration, which
+   outranks a repository's for the keys it sets.
 2. **The choice is the Environment's**, as Claude Code's (item 2 of SPI-1168's refinement): with such an endpoint that
    lists a model, every OpenCode process runs on the endpoints; its model ids are the endpoints' slugs, mapped to
    `t3flare-endpoint-<id>/<model>`; its small model is the text-generation model when that is one of their models. A
    model OpenCode's session does not offer (a stale `t3flare/<id>` proxy model) is refused by t3's adapter before any
    request. Without such an endpoint, the Model proxy as before.
-3. **Where the handle is.** The Workspace DO puts it in the process's environment. The launcher (`t3flare-opencode`)
-   execs `opencode acp`, which starts its server (`opencode serve --stdio`) as a child with that environment. The
-   image's plugin, imported once in that server, reads the handle and deletes it from the server's `process.env` before
-   OpenCode starts anything from it (shells, a repository's MCP servers), then sets it as the API key of each endpoint
-   provider of the process's own configuration whose base URL is the relay's URL for that endpoint (each package sends
-   it in its API's key header). The launcher's watcher and snapshot loop are started without it (`env -u`). No file
-   holds it. **As for Codex and Claude Code, this keeps the handle out of environments and files, not out of reach**:
-   the start environments of `setsid`, `opencode acp` and `opencode serve` (`/proc/<pid>/environ`) hold it, and every
-   process in the Container is root, so a shell OpenCode runs can read them and spend through the handle for that
-   process's endpoints until it exits. The same class, not wider; no command can take an endpoint's key out of the
-   Container. Measured in `test:docker` and on p1169: the holders are exactly those three; a shell's `env`, a
-   repository MCP server's environment and the launcher's loops have no handle; no file in the process homes,
-   `/etc/opencode`, `/root`, `/tmp` or the repo holds it.
-4. **SPI-1045.** On the relay the plugin asks no key helper: the handle is fixed for the process's life, so the
+3. **The handle goes only into a request at the relay.** The providers' configured API key is a placeholder the relay
+   refuses. The image's plugin puts the handle in the request's key header in OpenCode's `http.request` hook, after
+   every setting (provider, model, variant, a repository's included) has been applied, and only when the request's URL
+   is the relay's for that provider's endpoint. A model or variant a repository adds to an endpoint's provider, with its
+   own `baseURL` or `package`, reaches its own URL with the placeholder, never the handle (`test:docker`). It still
+   sends that request, and its prompt, where the repository says: as a repository's own MCP server or plugin can, which
+   stock t3 honours.
+4. **Where the handle is.** The Workspace DO puts it in the process's environment. The launcher (`t3flare-opencode`)
+   starts OpenCode without it (`env -u`), so no OpenCode process (`opencode acp`, its `opencode serve` child) holds it
+   in its environment, and nothing OpenCode starts (shells, a repository's MCP servers and plugins) inherits it; a
+   repository's `{env:T3FLARE_MODEL_HANDLE}` substitution finds nothing. The plugin reads it from the start environment
+   of the launch chain's `setsid` (`/proc/<pid>/environ`), after checking that process's command line and that its
+   marker (`T3FLARE_EXEC`) is this process's; it fails closed otherwise. The launcher's watcher and snapshot loop start
+   without it. No file holds it. **As for Codex and Claude Code, this keeps the handle out of environments and files,
+   not out of reach**: setsid's start environment holds it, readable by any process of the same uid, and every process
+   in the Container is root, so a shell OpenCode runs can read it and spend through the handle for that process's
+   endpoints until it exits. The same class, not wider; no command can take an endpoint's key out of the Container.
+   Measured in `test:docker` and on p1169: setsid is the only holder; a shell's `env`, a repository MCP server's and
+   plugin's environment and the launcher's loops have no handle; no file in the process homes, `/etc/opencode`,
+   `/root`, `/tmp` or the repo holds it.
+5. **SPI-1045.** On the relay the plugin asks no key helper: the handle is fixed for the process's life, so the
    proxy key's re-ask after a rotation does not arise.
-5. **Headers.** OpenCode's own (`x-opencode-*`, `x-session-*`, `b3`, `traceparent`, `user-agent`) are dropped; its turns
+6. **Headers.** OpenCode's own (`x-opencode-*`, `x-session-*`, `b3`, `traceparent`, `user-agent`) are dropped; its turns
    need none of them. The allowlist is unchanged.
