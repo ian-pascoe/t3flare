@@ -41,7 +41,8 @@ import * as TestProviderHost from "../../../t3code/packages/provider-testing/src
 import { makeTurnInput } from "t3/src/orchestration-v2/Adapters/AcpAdapterV2.testkit.ts";
 import { acpAdapterOptions, acpFlavor } from "../src/provider/cli/acpDriver.ts";
 import { KEY_NAME } from "../src/provider/cli/acpFlavor.ts";
-import { CLI_MIN_RESET_MS, cliRelayFailure, endpointOfModel } from "../src/provider/cli/relayFailure.ts";
+import { MIN_RESET_MS } from "@t3flare/models/failures";
+import { cliRelayFailure, endpointOfModel } from "../src/provider/cli/relayFailure.ts";
 import { wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 
 const AGENT = path.join(import.meta.dirname, "fixtures/fake-acp-agent.mjs");
@@ -94,7 +95,7 @@ describe("cliRelayFailure", () => {
       retryable: true,
       resetAt: "2026-11-16T12:00:00.000Z",
     });
-    expect(cliRelayFailure(own, { ...USAGE_LIMIT, resetAt: NOW + 1000 }, "commissary", NOW).resetAt).toBe(new Date(NOW + CLI_MIN_RESET_MS).toISOString());
+    expect(cliRelayFailure(own, { ...USAGE_LIMIT, resetAt: NOW + 1000 }, "commissary", NOW).resetAt).toBe(new Date(NOW + MIN_RESET_MS).toISOString());
   });
 
   it("with no relay failure on an endpoint, the proxy's classification gives way to a plain error naming the endpoint", () => {

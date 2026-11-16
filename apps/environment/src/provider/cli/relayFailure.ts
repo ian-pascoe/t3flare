@@ -11,14 +11,14 @@
 // - on the Model proxy's model: the adapter's failure stands.
 import type { OrchestrationV2ProviderFailure } from "@t3tools/contracts";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
+import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import { endpointLabel, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { heldReset } from "@t3flare/models/failures";
 import type { EndpointFailureRecord } from "@t3flare/session-protocol";
-import * as DateTime from "effect/DateTime";
 
 import { KEY_NAME } from "./acpFlavor.ts";
 
-/** The least time after now a CLI turn's usage-limit reset is held to: t3 arms no resume for one not after the turn. */
-export const CLI_MIN_RESET_MS = 30_000;
+type Event = ProviderAdapter.ProviderAdapterV2Event;
 
 /** The Model endpoint a session's model slug names, or undefined for the Model proxy's (`anthropic/<id>`) or a gone one. */
 export const endpointOfModel = (model: string | undefined, endpoints: ModelEndpoints | undefined): string | undefined => {
@@ -32,9 +32,19 @@ const proxyClassified = (failure: OrchestrationV2ProviderFailure): boolean => fa
 
 export const cliRelayFailure = (failure: OrchestrationV2ProviderFailure, relayed: EndpointFailureRecord | null, endpointId: string | undefined, now: number): OrchestrationV2ProviderFailure => {
   if (relayed !== null) {
-    const resetAt = relayed.class === "usage_limit" && relayed.resetAt !== undefined ? DateTime.formatIso(DateTime.makeUnsafe(Math.max(relayed.resetAt, now + CLI_MIN_RESET_MS))) : null;
-    return makeProviderFailure({ class: relayed.class, message: relayed.message, code: relayed.code, retryable: relayed.retryable, resetAt });
+    return makeProviderFailure({ class: relayed.class, message: relayed.message, code: relayed.code, retryable: relayed.retryable, resetAt: heldReset(relayed, now) });
   }
   if (endpointId === undefined || !proxyClassified(failure)) return failure;
   return makeProviderFailure({ class: "provider_error", message: `${endpointLabel(endpointId)} failed while the agent was answering.`, code: null, retryable: null });
+};
+
+/** The failure a failed turn's terminal or an error item carries; undefined for any other event. */
+export const failureOf = (event: Event): OrchestrationV2ProviderFailure | undefined =>
+  event.type === "turn.terminal" && event.status === "failed" ? event.failure : event.type === "turn_item.updated" && event.turnItem.type === "error" ? event.turnItem.failure : undefined;
+
+/** The event with its failure as t3 shows it for the session (`cliRelayFailure`). */
+export const withRelayFailure = (event: Event, relayed: EndpointFailureRecord | null, endpointId: string | undefined, now: number): Event => {
+  if (event.type === "turn.terminal" && event.status === "failed") return { ...event, failure: cliRelayFailure(event.failure, relayed, endpointId, now) };
+  if (event.type === "turn_item.updated" && event.turnItem.type === "error") return { ...event, turnItem: { ...event.turnItem, failure: cliRelayFailure(event.turnItem.failure, relayed, endpointId, now) } };
+  return event;
 };

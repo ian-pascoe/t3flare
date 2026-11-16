@@ -22,7 +22,6 @@ import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import { newHandle, toWorkspace } from "@t3flare/workspace-client";
 import {
   type NodeId,
-  type OrchestrationV2ProviderFailure,
   type OrchestrationV2ExecutionNode,
   type OrchestrationV2ProviderCapabilities,
   type OrchestrationV2RuntimeRequest,
@@ -47,7 +46,7 @@ import { environmentServices } from "../../agents/bindings.ts";
 import type { ChannelProcess } from "../../agents/processChannel.ts";
 import { type CliAnswer, type CliAsk, registerCliAsker } from "./cliAsk.ts";
 import { takeEnvironmentSkillsAt } from "./environmentSkillsTake.ts";
-import { cliRelayFailure, endpointOfModel } from "./relayFailure.ts";
+import { endpointOfModel, failureOf, withRelayFailure } from "./relayFailure.ts";
 
 /** ADR-0015: a CLI turn longer than this ends its process. */
 export const TURN_CAP_MS = 2 * 60 * 60_000;
@@ -172,17 +171,11 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
     });
   const now = options.now ?? Date.now;
   const relayFailure = options.relayFailure ?? (async (session: CliSession) => (await session.process?.modelFailure()) ?? null);
-  /** SPI-1172: a failure as t3 shows it for the session: the relay's classification of the process's last answer. */
-  const relayed = (session: CliSession, failure: OrchestrationV2ProviderFailure) =>
-    Effect.promise(async () => cliRelayFailure(failure, await relayFailure(session), endpointOfModel(session.model, modelEndpoints()), now()));
-  const relayedEvent = (session: CliSession, event: ProviderAdapter.ProviderAdapterV2Event): Effect.Effect<ProviderAdapter.ProviderAdapterV2Event> => {
-    if (event.type === "turn.terminal" && event.status === "failed") return relayed(session, event.failure).pipe(Effect.map((failure) => ({ ...event, failure })));
-    if (event.type === "turn_item.updated" && event.turnItem.type === "error") {
-      const item = event.turnItem;
-      return relayed(session, item.failure).pipe(Effect.map((failure) => ({ ...event, turnItem: { ...item, failure } })));
-    }
-    return Effect.succeed(event);
-  };
+  /** SPI-1172: a failed turn's terminal or error item, with the relay's classification of the process's last answer. */
+  const relayedEvent = (session: CliSession, event: ProviderAdapter.ProviderAdapterV2Event): Effect.Effect<ProviderAdapter.ProviderAdapterV2Event> =>
+    failureOf(event) === undefined
+      ? Effect.succeed(event)
+      : Effect.promise(async () => withRelayFailure(event, await relayFailure(session), endpointOfModel(session.model, modelEndpoints()), now()));
   const turnEnded = (session: CliSession) =>
     Effect.gen(function* () {
       if (!session.turnActive) return;

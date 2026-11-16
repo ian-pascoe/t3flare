@@ -83,6 +83,18 @@ describe("ProcessChannel", () => {
     expect(ws.starts).toHaveLength(1);
   });
 
+  it("asks its Workspace for its last model relay failure by its key; none on an error or an older Workspace (SPI-1172)", async () => {
+    const ws = fakeWorkspace();
+    const record = { endpointId: "e", class: "usage_limit" as const, code: "usage_limit", message: "m", retryable: true, stop: true, at: 1 };
+    const asked: Array<string> = [];
+    const process = await channel({ ...ws, remote: { ...ws.remote, processModelFailure: async (key) => (asked.push(key), record) } }).start(start);
+    expect(await process.modelFailure()).toEqual(record);
+    expect(asked).toEqual(["proc-1"]);
+    const failing = await channel({ ...ws, remote: { ...ws.remote, processModelFailure: async () => Promise.reject(new Error("rpc")) } }).start(start);
+    expect(await failing.modelFailure()).toBeNull();
+    expect(await (await channel(ws).start(start)).modelFailure()).toBeNull();
+  });
+
   it("fails the start with the Workspace's reason (the budget's)", async () => {
     const ws = fakeWorkspace({ start: { ok: false, epoch: 5, reason: "the Container cannot start: 3 Containers are running" } });
     await expect(channel(ws).start(start)).rejects.toThrow(ProcessRefused);
