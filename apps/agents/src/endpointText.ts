@@ -3,9 +3,12 @@
 // with no tools. The Environment DO calls it over the `EndpointTextGeneration` entrypoint (`worker.ts`) with ids only,
 // so the Environment's bundle never holds pi-ai and no caller-supplied endpoint exists here: the endpoint is read from the
 // Environment (`modelEndpoints`) and its provider is a Session's own (`endpointProviders`), whose key is asked of the
-// Environment at use time for the endpoint's target and kept nowhere. A failure names the endpoint and says what happened
-// by the answer's status alone: a vendor's body (which can echo request details) and the key never reach the message.
+// Environment at use time for the endpoint's target and kept nowhere. A failure names the endpoint and says what happened,
+// classified by the endpoint's API and auth from the answer's status, headers and error body (SPI-1172,
+// `@t3flare/models/failures`), else by its status: a vendor's body (which can echo request details) and the key never
+// reach the message.
 import { createModels, type FetchFunction } from "@earendil-works/pi-ai";
+import { classifyModelFailure, errorBodyOf, failureHeaders, modelFailureMessage } from "@t3flare/models/failures";
 import {
   type EndpointCredential,
   type EndpointTarget,
@@ -51,10 +54,13 @@ export const endpointTextRequestOf = (value: unknown): EndpointTextRequest | und
     ? { endpointId: value.endpointId, modelId: value.modelId, prompt: value.prompt }
     : undefined;
 
-/** What the request saw: a refused key, the answer's status, or no answer at all. */
+/** What the request saw: a refused key, the answer's status (with its headers and error body), or no answer at all. */
 interface Observed {
   refused?: EndpointCredential;
   status?: number;
+  headers?: Record<string, string>;
+  body?: string;
+  at?: number;
   unreachable: boolean;
 }
 
@@ -85,7 +91,13 @@ const failureOf = (endpoint: ModelEndpoint, modelId: string, observed: Observed)
       error: observed.refused.changed === true ? `${named} changed or was removed while the text was being generated: try again.` : credentialProblem(endpoint, observed.refused),
     };
   }
-  if (observed.status !== undefined) return { ok: false, error: statusProblem(endpoint, modelId, observed.status) };
+  if (observed.status !== undefined) {
+    // Classified by the endpoint's API and auth when the answer is a failure the table knows; else by its status.
+    const failure = classifyModelFailure({ status: observed.status, headers: observed.headers ?? {}, body: observed.body ?? "", at: observed.at ?? Date.now() }, endpoint);
+    if (failure === undefined) return { ok: false, error: statusProblem(endpoint, modelId, observed.status) };
+    const resets = failure.class === "usage_limit" && failure.resetAt !== undefined ? ` It resets at ${new Date(failure.resetAt).toISOString()}.` : "";
+    return { ok: false, error: `${modelFailureMessage(failure, endpoint, observed.status)}${resets}` };
+  }
   if (observed.unreachable) return { ok: false, error: `${named} could not be reached.` };
   // An error with no status this code can read (Google's adapter reports none): the endpoint failed, how is not known.
   return { ok: false, error: `${named} failed (its API reports no status here).` };
@@ -115,6 +127,9 @@ export const generateEndpointText = async (input: unknown, access: EndpointTextA
       throw error;
     }
     observed.status = response.status;
+    observed.at = Date.now();
+    observed.headers = failureHeaders(response.headers);
+    if (response.status >= 400) observed.body = (await errorBodyOf(response)) ?? "";
     return response;
   };
   const credential = async (id: string, target: EndpointTarget): Promise<EndpointCredential> => {
@@ -143,6 +158,8 @@ export const generateEndpointText = async (input: unknown, access: EndpointTextA
         // Mistral's adapter reports its status here (it takes no fetch from a Session); the others through `fetch`.
         onResponse: (response) => {
           observed.status = response.status;
+          observed.at = Date.now();
+          observed.headers = failureHeaders(new Headers(response.headers));
         },
       },
     );

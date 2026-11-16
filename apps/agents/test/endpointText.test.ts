@@ -4,6 +4,7 @@
 import type { EndpointCredential, EndpointTarget, ModelEndpoint } from "@t3flare/models/endpoints";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import fixtures from "../../../packages/models/test/fixtures/vendors.json" with { type: "json" };
 import { type EndpointTextAccess, generateEndpointText } from "../src/endpointText.ts";
 
 const COST = { input: 1, output: 5, cacheRead: 0, cacheWrite: 0 };
@@ -101,9 +102,10 @@ describe("generateEndpointText", () => {
       [401, 'The Model endpoint "gw" refused its API key (HTTP 401): check it in the Harness panel.'],
       [403, 'The Model endpoint "gw" refused its API key (HTTP 403): check it in the Harness panel.'],
       [404, 'The Model endpoint "gw" does not serve the model small-mini (HTTP 404).'],
-      [429, 'The Model endpoint "gw" is rate- or usage-limited (HTTP 429): try again later.'],
+      [429, 'The Model endpoint "gw" is rate-limited (HTTP 429).'],
       [400, 'The Model endpoint "gw" refused the request (HTTP 400).'],
-      [503, 'The Model endpoint "gw" failed (HTTP 503).'],
+      [503, 'The Model endpoint "gw" is overloaded (HTTP 503).'],
+      [500, 'The Model endpoint "gw" failed (HTTP 500).'],
     ] as const) {
       it(`names the endpoint and never echoes the body or the key on HTTP ${status} (${api})`, async () => {
         const wire = recorder(() => Response.json({ error: { message: VENDOR_BODY, type: "error" } }, { status }));
@@ -113,6 +115,25 @@ describe("generateEndpointText", () => {
         expect(error).not.toContain(KEY);
       });
     }
+  }
+
+  // SPI-1172: classified by the endpoint's API and auth from the recorded vendor answers.
+  for (const [name, api, auth, says] of [
+    ["anthropicSubscriptionLimit", "anthropic-messages", "api-key", 'The Model endpoint "gw" reached its usage limit. It resets at 2026-11-16T12:00:00.000Z.'],
+    ["anthropicSpendCap", "anthropic-messages", "api-key", `The Model endpoint "gw"'s account is out of quota, credit or its spend limit: raise it with the vendor.`],
+    ["anthropicOverloaded", "anthropic-messages", "api-key", 'The Model endpoint "gw" is overloaded (HTTP 529).'],
+    ["openaiInsufficientQuota", "openai-responses", "api-key", `The Model endpoint "gw"'s account is out of quota, credit or its spend limit: raise it with the vendor.`],
+    ["openaiRateLimit", "openai-completions", "api-key", 'The Model endpoint "gw" is rate-limited (HTTP 429). It resets at '],
+    ["openaiKeyRefused", "openai-responses", "api-key", 'The Model endpoint "gw" refused its API key (HTTP 401): check it in the Harness panel.'],
+    ["chatgptUsageLimitReached", "openai-responses", "api-key", 'The Model endpoint "gw" reached its usage limit. It resets at 2026-11-16T13:00:00.000Z.'],
+  ] as const) {
+    it(`classifies ${name} by the endpoint's API (${api}), never echoing the body`, async () => {
+      const answer = fixtures.answers[name];
+      const wire = recorder(() => new Response(answer.body, { status: answer.status, headers: { ...answer.headers, "content-type": "application/json" } }));
+      const error = errorOf(await generate(endpoint(api, auth), { credential: keyFor().credential, fetch: wire.fetch }));
+      expect(error.startsWith(says), error).toBe(true);
+      expect(error).not.toContain("sk-proj");
+    });
   }
 
   it("says an endpoint with no auth refused the request, not a key", async () => {
@@ -197,7 +218,8 @@ describe("generateEndpointText", () => {
     const chatgpt: ModelEndpoint = { ...endpoint("openai-responses", "chatgpt"), baseUrl: "https://api.openai.com/v1", headers: {} };
     const refused = recorder(() => Response.json({ error: { message: VENDOR_BODY, code: "subscription_sharing_user_not_eligible" } }, { status: 403 }));
     const error = errorOf(await generate(chatgpt, { credential: keyFor({ apiKey: "at-chatgpt", expiresAt: 4_000_000_000_000 }).credential, fetch: refused.fetch }));
-    expect(error).toBe('The Model endpoint "gw" refused its ChatGPT sign-in (HTTP 403): ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.');
+    // SPI-1172: plan usage's code says why: the plan, not the sign-in.
+    expect(error).toBe('The Model endpoint "gw"\'s ChatGPT account cannot use its plan for this request (HTTP 403): ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.');
     expect(refused.sent[0]!.headers.authorization).toBe("Bearer at-chatgpt");
     const body = JSON.parse(refused.sent[0]!.body) as Record<string, unknown>;
     expect(body).toMatchObject({ store: false, stream: true });
