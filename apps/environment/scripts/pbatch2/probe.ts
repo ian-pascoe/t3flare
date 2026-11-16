@@ -13,6 +13,9 @@
 //   bearer (the key the endpoint is saved with). It logs each request's path, whether the key came, and every other
 //   header (so the harness can look for a model handle that should never arrive). `/relay/v1/drip?gaps=30,60,…` answers
 //   a server-sent event stream with an event at the start and after each gap (seconds): the long, idle stream check.
+//   `/relay/v1/chat/completions` (SPI-1173) answers any Chat Completions request with "ready" as a stream (or a body
+//   when `stream` is false), its usage in the last chunk, under the model the request named: a Model endpoint keyed
+//   with a key of its own, for the usage records.
 //
 // `GET /log` (with the probe key as bearer) answers everything logged.
 import { DurableObject } from "cloudflare:workers";
@@ -237,6 +240,22 @@ export default {
       });
       if (!sawKey) return json({ error: { message: "the stand-in endpoint wants its key" } }, 401);
       if (url.pathname === "/relay/v1/models") return json({ object: "list", data: [{ id: "drip", object: "model" }] });
+      if (url.pathname === "/relay/v1/chat/completions" && request.method === "POST") {
+        const asked = (await request.json().catch(() => ({}))) as { model?: unknown; stream?: unknown };
+        const model = typeof asked.model === "string" ? asked.model : "standin";
+        const usage = { prompt_tokens: 1200, completion_tokens: 3, total_tokens: 1203, prompt_tokens_details: { cached_tokens: 200 } };
+        const base = { id: "chatcmpl-standin", created: Math.floor(Date.now() / 1000), model };
+        if (asked.stream === false) {
+          return json({ ...base, object: "chat.completion", choices: [{ index: 0, message: { role: "assistant", content: "ready" }, finish_reason: "stop" }], usage });
+        }
+        const chunks = [
+          { ...base, object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant", content: "ready" }, finish_reason: null }] },
+          { ...base, object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
+          { ...base, object: "chat.completion.chunk", choices: [], usage },
+        ];
+        const body = `${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("")}data: [DONE]\n\n`;
+        return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+      }
       if (url.pathname === "/relay/v1/drip") {
         const gaps = (url.searchParams.get("gaps") ?? "1")
           .split(",")
