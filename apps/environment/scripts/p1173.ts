@@ -65,7 +65,7 @@ await admin("POST", "/_t3flare/disarm-bootstrap");
 // 1. The endpoints, and text generation on comm's model.
 const MODEL = "claude-haiku-5-5";
 /** A model Commissary serves that pi-ai's catalog does not know (so the endpoint has no price for it), and LiteLLM does. */
-const UNPRICED = "claude-sonnet-4-20250514";
+const UNPRICED = "claude-fable-5-2";
 const ENDPOINTS = {
   comm: { label: "Commissary (Anthropic)", api: "anthropic-messages", baseUrl: proxyUrl },
   oai: { label: "Commissary (Chat Completions)", api: "openai-completions", baseUrl: `${proxyUrl}/v1` },

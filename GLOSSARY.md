@@ -362,6 +362,12 @@ _Avoid_: model proxy (that is the Model proxy), gateway, intercept
 The Model relay's one base URL for every Model endpoint a process may use: the endpoint is chosen per request, from the model the request names. For a CLI agent that takes one base URL per process.
 _Avoid_: router, catch-all endpoint, wildcard endpoint
 
+**Usage record**:
+t3flare's own count of one model answer's tokens on a Model endpoint, with its agent, endpoint, model, time and cost
+when known: made by a Session, text generation or the Model relay, kept by the Environment DO for t3's Usage page.
+Never a key, a Handle, a prompt or an answer's text.
+_Avoid_: usage log, telemetry, request log (that is Commissary's)
+
 **Subscription**:
 The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key: a Model endpoint's sign-in, its tokens held by the Credential broker.
 _Avoid_: Subscription login, OAuth, account
