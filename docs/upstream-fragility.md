@@ -1433,9 +1433,9 @@ terms-of-service risk (ADR-0018 item 11).
   the editor headers, the model list's API version, `copilotBaseUrl`), `apps/environment/src/credentials/copilot.ts`
   (the start, the poll and its interval, the Copilot token, what ends a sign-in at renewal, no revocation, `use`),
   `credentials/broker.ts` (`SignInVendor.use`: the base URL and headers given with each token), `endpoints/discover.ts`
-  (`copilotModels`), `known.ts` (Copilot's catalog, for its own host only), `apps/agents/src/session/copilot.ts` and
-  `session/models.ts` (`SIGN_IN_REQUESTS.copilot`; the credential's base URL and headers taken only for a kind whose
-  `baseUrlFromCredential` is set), `SIGN_IN_KINDS.copilot`. It leans on pi-ai 1.5.0 and GitHub in these ways:
+  (`copilotModels`, for a Copilot sign-in only), `known.ts` (Copilot's catalog, for its own host only), `apps/agents/src/session/copilot.ts` and
+  `session/models.ts` (`SIGN_IN_REQUESTS.copilot`; the credential's base URL and headers taken only when its kind's
+  `credentialBaseUrl`, `COPILOT_BASE_URL`, matches it), `SIGN_IN_KINDS.copilot`. It leans on pi-ai 1.5.0 and GitHub in these ways:
   - **pi-ai's flow** (`dist/auth/oauth/github-copilot.js`): `CLIENT_ID` (:9), `COPILOT_HEADERS` (:10-15),
     `COPILOT_API_VERSION` (:16), `getUrls` (:29-35), `getBaseUrlFromToken` (:41-49) and `getGitHubCopilotBaseUrl`
     (:50-61), the model list's rules (`parseGitHubCopilotModelCatalog`, :65-100), the device code request (:155-196),
@@ -1452,7 +1452,8 @@ terms-of-service risk (ADR-0018 item 11).
     200 with `authorization_pending`, `slow_down` (with `interval`), `expired_token`, `access_denied`; the Copilot token
     (`token` holding `proxy-ep=`, `expires_at` in epoch seconds); its refusals as GitHub API errors (`{ message }`,
     `error_details.notification_id`, e.g. `subscription_ended`, SPI-1161); rate limits as 403 or 429 with `retry-after`
-    or `x-ratelimit-remaining: 0`; `/models`' `model_picker_enabled`, `policy.state`, `capabilities`,
+    or `x-ratelimit-remaining: 0`, or a message naming a rate limit or too many login attempts (a secondary limit;
+    another wording would read as a refusal and sign out); `/models`' `model_picker_enabled`, `policy.state`, `capabilities`,
     `supported_endpoints`. No revocation for a public client.
 - **Breaks when**: pi-ai changes the client, URLs, scope, editor headers or their versions, the API version, the base
   URL's derivation, the dynamic headers, or its Copilot reasoning rule; pi-ai keys the Copilot shape on something a
@@ -1470,7 +1471,7 @@ terms-of-service risk (ADR-0018 item 11).
   code, a poll, the owner's approval, the GitHub token), but the owner's Copilot subscription had ended and GitHub
   refused the Copilot token (403 `subscription_ended`), so no Copilot token, model list or turn was seen. Whether
   Copilot's API accepts these requests from a Worker's egress, and what GitHub answers for a revoked grant, are not
-  known.
+  known (SPI-1226).
 - **Blast radius**: turns on the Copilot endpoint fail (shown as model errors, or `sign_in_refused` for a 401 or 403), or
   the sign-in fails; a refused renewal signs the endpoint out (sign in again). No token leaves the Session or the broker
   either way, and the GitHub token never leaves the broker.
