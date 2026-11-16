@@ -1,0 +1,30 @@
+#!/bin/sh
+# pi's API key on the model relay (SPI-1170): the `!command` of each endpoint provider in pi's models.json, which pi runs
+# at each request (pi 1.5.2: `resolveConfigValueUncached`, not cached). Prints this pi process's model handle, which only
+# the launch chain's setsid holds, in the environment it started with (the launcher starts pi without it). Found by
+# walking up from this command's parent (pi's shell, then pi) to the first process whose command line is that setsid's,
+# and taken only when that process's marker (T3FLARE_EXEC) is this process's. Writes no file and logs nothing; fails
+# closed otherwise (pi then has no key and its request is not sent).
+set -eu
+fail() {
+  echo "t3flare: $1" >&2
+  exit 1
+}
+marker=${T3FLARE_EXEC:?}
+pid=$PPID
+while [ "$pid" -gt 0 ] 2> /dev/null; do
+  # The first three words of the command line, NUL-separated: `setsid --wait /opt/t3flare/bin/pi`.
+  words=$(tr '\0' '\n' < "/proc/$pid/cmdline" 2> /dev/null | head -n 3 | tr '\n' ' ') || words=""
+  if [ "$words" = "setsid --wait /opt/t3flare/bin/pi " ]; then
+    tr '\0' '\n' < "/proc/$pid/environ" | grep -qxF "T3FLARE_EXEC=$marker" || fail "the launch chain above this command is another process's"
+    handle=$(tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^T3FLARE_MODEL_HANDLE=//p' | head -n 1)
+    case "$handle" in '' | *[!0-9a-f]*) fail "this pi process has no model handle" ;; esac
+    [ "${#handle}" -eq 64 ] || fail "this pi process has no model handle"
+    printf '%s\n' "$handle"
+    exit 0
+  fi
+  # The parent's pid: /proc/<pid>/stat's 4th field (the command name, field 2, may hold spaces and parentheses).
+  pid=$(sed 's/.*) //' "/proc/$pid/stat" 2> /dev/null | cut -d' ' -f2) || pid=0
+  case "$pid" in '' | *[!0-9]*) pid=0 ;; esac
+done
+fail "this command does not run under a pi process's launch chain"

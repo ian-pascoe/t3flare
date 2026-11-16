@@ -117,13 +117,14 @@ RUN set -e; found=0; \
 
 # The CLI agents (step 4a, plan §6), at fixed paths the CLI profiles name absolutely, after the mise layer so a CLI bump
 # rebuilds only this: Codex's checked binary, pi from a committed lock with the image's Node (`npm ci`, no scripts), the
-# key helper. Not mise: a project's toolchains must never shadow them.
+# key helper, and pi's handle command on the model relay (SPI-1170). Not mise: a project's toolchains must never shadow them.
 COPY --from=codex --chown=0:0 /codex /opt/t3flare/bin/codex
 COPY cli/package.json cli/package-lock.json /opt/t3flare/pi/
 RUN cd /opt/t3flare/pi \
  && PATH=/usr/local/share/mise/installs/node/26.13.0/bin:$PATH npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
  && rm -rf /root/.npm
 COPY --chmod=755 t3flare-pi /opt/t3flare/bin/pi
+COPY --chmod=755 t3flare-pi-handle /opt/t3flare/bin/t3flare-pi-handle
 COPY --chmod=755 t3flare-model-key /opt/t3flare/bin/t3flare-model-key
 
 # Step 4b, plan §6: Claude Code over ACP (claude-agent-acp and the Claude Agent SDK, whose platform package holds the

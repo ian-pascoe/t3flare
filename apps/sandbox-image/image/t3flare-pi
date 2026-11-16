@@ -1,4 +1,8 @@
 #!/bin/sh
 # The pi CLI (step 4a): the image's locked install, run by the image's own Node (absolute paths: a project's mise
 # shims never come first).
-exec /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js "$@"
+# SPI-1170: a process on the model relay has its model handle in T3FLARE_MODEL_HANDLE. pi starts without it (`env -u`),
+# so no pi process holds it and nothing pi starts (its bash tool's commands, MCP servers) inherits it. pi's API key for
+# an endpoint's provider is the command `t3flare-pi-handle`, which reads the handle from the start environment of the
+# launch chain's setsid, the process that started this script. No file holds it.
+exec env -u T3FLARE_MODEL_HANDLE /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js "$@"
