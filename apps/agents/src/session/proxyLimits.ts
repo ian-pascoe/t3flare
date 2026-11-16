@@ -22,7 +22,7 @@ import type { EndpointApi, EndpointAuth } from "@t3flare/models/endpoints";
 import { describeFailure, errorBodyOf, type FailedAnswer, failureHeaders, modelFailureDetail } from "@t3flare/models/failures";
 import { classifyProxyFailure, proxyFailureDetail } from "@t3flare/models/proxyFailure";
 import { redactSecrets } from "@t3flare/models/redact";
-import type { EndpointFailureRecord, ProxyFailureRecord } from "@t3flare/session-protocol";
+import type { EndpointFailureRecord, ProxyFailureRecord, ProxyRecord } from "@t3flare/session-protocol";
 import type { AssistantMessage, MutableModels } from "@earendil-works/pi-ai";
 
 /** The last answer the proxy, an endpoint (or a fault) gave: its status, `retry-after` and when it came. */
@@ -207,6 +207,29 @@ export interface ProxyLimitsOptions {
   /** SPI-1172: the credentials the Session holds for a provider (its key or token), redacted from its error text whatever their shape. */
   readonly secrets?: (provider: string) => ReadonlyArray<string>;
 }
+
+/** What `sessionLimits` takes of the Session: the recording fetch, its record of the running turn, its endpoints, the proxy's key. */
+export interface SessionLimitsDeps {
+  readonly last: () => RecordedAnswer | undefined;
+  /** Changes the running turn's record (`SessionDO.#noteProxy`). */
+  readonly note: (update: (record: ProxyRecord) => ProxyRecord) => void;
+  readonly endpoints: { endpoint(id: string): ClassifiedEndpoint | undefined; secrets(id: string): ReadonlyArray<string> };
+  readonly proxyKey: string;
+}
+
+/**
+ * The Session's `ProxyLimitsOptions` (SPI-1172): every failed answer replaces the turn's record, the proxy's and an
+ * endpoint's alike (undefined clears it, and either clears the other), so the last answer is always the turn's; a
+ * provider's credential is the proxy's key for `anthropic`, else what the Session holds for the endpoint.
+ */
+export const sessionLimits = (deps: SessionLimitsDeps): ProxyLimitsOptions => ({
+  last: deps.last,
+  record: (failure) => deps.note(({ endpointFailure: _endpoint, failure: _before, ...record }) => (failure === undefined ? record : { ...record, failure })),
+  endpoint: (provider) => deps.endpoints.endpoint(provider),
+  recordEndpoint: (endpointFailure) =>
+    deps.note(({ failure: _proxy, endpointFailure: _before, ...record }) => (endpointFailure === undefined ? record : { ...record, endpointFailure })),
+  secrets: (provider) => (provider === "anthropic" ? [deps.proxyKey] : deps.endpoints.secrets(provider)),
+});
 
 /**
  * An endpoint's failed response (SPI-1172), classified by its API and auth from the recorded answer when the request

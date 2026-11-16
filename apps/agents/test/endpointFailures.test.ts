@@ -10,13 +10,13 @@ import { createModels, isRetryableAssistantError } from "@earendil-works/pi-ai";
 import { createRegistry, Harness, MemoryStorage } from "@earendil-works/pi-durable";
 import type { ModelEndpoint } from "@t3flare/models/endpoints";
 import { ERROR_BODY_BYTES, type ModelFailureCode, modelFailureDetail } from "@t3flare/models/failures";
-import type { EndpointFailureRecord, ProxyFailureRecord } from "@t3flare/session-protocol";
+import type { EndpointFailureRecord, ProxyFailureRecord, ProxyRecord } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
 import fixtures from "../../../packages/models/test/fixtures/vendors.json" with { type: "json" };
 import { SessionEndpoints } from "../src/session/endpoints.ts";
 import { liveOf, pushedEntry, turnDetail } from "../src/session/state.ts";
-import { armFault, compactionLimits, type Fault, FAULT_ECHOED_SECRETS, FAULT_FIXTURES, faultAnswer, proxyLimits, recordingFetch } from "../src/session/proxyLimits.ts";
+import { armFault, compactionLimits, sessionLimits, type Fault, FAULT_ECHOED_SECRETS, FAULT_FIXTURES, faultAnswer, proxyLimits, recordingFetch } from "../src/session/proxyLimits.ts";
 
 const context = BACKGROUND_CONTEXT;
 const T0 = Date.parse(fixtures.now);
@@ -144,7 +144,7 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
   it("Anthropic's unified usage limit: one request, recorded with its reset and the endpoint's text, no fallback", async () => {
     const run = await submit(() => answerOf("anthropicSubscriptionLimit"), { endpoints: [CLAUDE, OTHER] });
     expect(run.requests).toBe(1);
-    expect(run.status).toMatchObject({ status: "unanswered", detail: "t3flare model endpoint: usage_limit" });
+    expect(run.status).toMatchObject({ status: "unanswered", detail: "t3flare model endpoint: usage_limit, not retried" });
     expect(run.records).toEqual([
       { endpointId: "claude", class: "usage_limit", code: "usage_limit", message: 'The Model endpoint "claude" reached its usage limit.', retryable: true, resetAt: T0 + 2 * 3_600_000, stop: true, at: T0 },
     ]);
@@ -179,8 +179,8 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
     const run = await submit(() => (calls++ === 0 ? answerOf("anthropicRateLimitBare") : answerOf("anthropicRateLimitLong")));
     expect(run.requests).toBe(2);
     expect(run.records.map((record) => [record?.code, record?.stop])).toEqual([
-      ["throttled", false],
-      ["throttled", true],
+      ["rate_limited", false],
+      ["rate_limited", true],
     ]);
   });
 
@@ -191,7 +191,7 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
     compacting = true;
     const compaction = await session.compact();
     expect(compaction.requests).toBe(1);
-    expect(compaction.outcome).toMatchObject({ status: "failed", error: { message: "Summarization failed: t3flare model endpoint: usage_limit" } });
+    expect(compaction.outcome).toMatchObject({ status: "failed", error: { message: "Summarization failed: t3flare model endpoint: usage_limit, not retried" } });
     expect(session.counts().records.at(-1)).toMatchObject({ code: "usage_limit", stop: true });
   });
 
@@ -223,10 +223,13 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
     expect(notImplemented.records.at(-1)).toMatchObject({ code: "unsupported_request", stop: true });
   });
 
-  it("a 429 with a short retry-after is retried in the run; a long one stops it after one request", async () => {
+  it("a 429 resetting within pi-durable's retries (14 s) is retried; one past them, even at 20 s, stops after one request", async () => {
     const short = await submit(() => new Response(answerOf("anthropicRateLimitBare").body, { status: 429, headers: { "retry-after": "2" } }));
     expect(short.requests).toBe(4);
-    expect(short.records.at(-1)).toMatchObject({ code: "throttled", stop: false });
+    expect(short.records.at(-1)).toMatchObject({ code: "rate_limited", stop: false });
+    const beyond = await submit(() => new Response(answerOf("anthropicRateLimitBare").body, { status: 429, headers: { "retry-after": "20" } }));
+    expect(beyond.requests).toBe(1);
+    expect(beyond.records.at(-1)).toMatchObject({ code: "rate_limited", stop: true, class: "usage_limit" });
     const long = await submit(() => answerOf("anthropicRateLimitLong"));
     expect(long.requests).toBe(1);
   });
@@ -242,7 +245,7 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
     expect(own.records.at(-1)).toMatchObject({ code: "usage_limit", stop: true });
     // Another base URL: the recorded answer is not this endpoint's, so only pi-ai's text is read (a rate limit, no reset).
     const other = await submit(() => answerOf("anthropicSubscriptionLimit"), { baseUrl: "https://elsewhere.example" });
-    expect(other.records.at(-1)).toMatchObject({ code: "throttled", stop: false });
+    expect(other.records.at(-1)).toMatchObject({ code: "rate_limited", stop: false });
   });
 
   it("every code the Session stops on leaves a text no retry pattern of pi-ai's matches; every one it retries, one that does", () => {
@@ -250,7 +253,7 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
       "usage_limit",
       "workspace_limit",
       "spend_limit",
-      "throttled",
+      "rate_limited",
       "key_refused",
       "sign_in_refused",
       "credential_needed",
@@ -261,7 +264,7 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
       const errorMessage = modelFailureDetail({ class: "usage_limit", code, retryable: false, stop: true });
       expect(isRetryableAssistantError({ stopReason: "error", errorMessage } as never), code).toBe(false);
     }
-    for (const code of ["throttled", "overloaded", "server_error", "unavailable"] as const) {
+    for (const code of ["rate_limited", "overloaded", "server_error", "unavailable"] as const) {
       const errorMessage = modelFailureDetail({ class: "provider_error", code, retryable: true, stop: false });
       expect(isRetryableAssistantError({ stopReason: "error", errorMessage } as never), code).toBe(true);
     }
@@ -324,7 +327,7 @@ describe("the fault route's vendor shapes (SPI-1172)", () => {
   it("each vendor fault is a failure the classifier knows for its API", async () => {
     const shapes: ReadonlyArray<readonly [Fault["fixture"], ModelEndpoint, ModelFailureCode]> = [
       ["anthropicUsageLimit", CLAUDE, "usage_limit"],
-      ["anthropicRateLimit", CLAUDE, "throttled"],
+      ["anthropicRateLimit", CLAUDE, "rate_limited"],
       ["anthropicKeyRefused", CLAUDE, "key_refused"],
       ["openaiUsageLimit", OPENAI, "usage_limit"],
       ["openaiQuota", OPENAI, "spend_limit"],
@@ -355,5 +358,44 @@ describe("what the Session pushes is redacted (SPI-1172)", () => {
     expect(detail).not.toContain(FAULT_ECHOED_SECRETS[2]);
     expect(detail?.length).toBe(2048);
     expect(turnDetail(undefined)).toBeUndefined();
+  });
+});
+
+describe("the Session's record of a turn's failures (sessionLimits, SPI-1172 review 2)", () => {
+  const proxyFailure = { class: "provider_error" as const, code: "proxy_overloaded", row: 9, stop: false, at: 1 };
+  const endpointFailure = { endpointId: "claude", class: "provider_error" as const, code: "overloaded", message: "m", retryable: true, stop: false, at: 2 };
+  const session = () => {
+    let record: ProxyRecord = { requests: 3 };
+    const options = sessionLimits({
+      last: () => undefined,
+      note: (update) => void (record = update(record)),
+      endpoints: { endpoint: (id) => (id === "claude" ? CLAUDE : undefined), secrets: (id) => (id === "claude" ? ["claude-key-held-now"] : []) },
+      proxyKey: "proxy-key-of-the-stage",
+    });
+    return { options, record: () => record };
+  };
+
+  it("each failed answer replaces the record: an endpoint's clears the proxy's, and undefined clears both", () => {
+    const s = session();
+    s.options.record(proxyFailure);
+    expect(s.record()).toEqual({ requests: 3, failure: proxyFailure });
+    s.options.recordEndpoint?.(endpointFailure);
+    expect(s.record()).toEqual({ requests: 3, endpointFailure });
+    s.options.recordEndpoint?.(undefined);
+    expect(s.record()).toEqual({ requests: 3 });
+    s.options.recordEndpoint?.(endpointFailure);
+    s.options.record(undefined);
+    expect(s.record()).toEqual({ requests: 3 });
+    s.options.record(proxyFailure);
+    s.options.record(undefined);
+    expect(s.record()).toEqual({ requests: 3 });
+  });
+
+  it("names a provider's endpoint and credentials: the proxy's key for anthropic, the held one for an endpoint", () => {
+    const s = session();
+    expect(s.options.endpoint?.("claude")).toBe(CLAUDE);
+    expect(s.options.endpoint?.("anthropic")).toBeUndefined();
+    expect(s.options.secrets?.("anthropic")).toEqual(["proxy-key-of-the-stage"]);
+    expect(s.options.secrets?.("claude")).toEqual(["claude-key-held-now"]);
   });
 });

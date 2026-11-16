@@ -86,7 +86,7 @@ import { proxyModels } from "./models.ts";
 import { SessionEndpoints } from "./endpoints.ts";
 import { noteTurnProvider, runsOn } from "./signOut.ts";
 import { SUGGESTION_MODEL, suggestPrompt } from "./promptSuggestion.ts";
-import { armFault, compactionLimits, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
+import { armFault, compactionLimits, type Fault, sessionLimits, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
 import { FORK_PAGE_BYTES, forkPage, forkPoint, freshConversation, rewind, rollbackPlan, seed } from "./branches.ts";
 import { liveOf, pushedEntry, turnDetail, turnOfEntry, usageOf } from "./state.ts";
@@ -218,17 +218,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.#execs = new RunningExecs(ctx.storage.kv, (ids) => this.#killExecs(ids));
     const registry = createRegistry();
     // The turn's last failed answer wins: a proxy failure clears an endpoint's, and an endpoint's clears the proxy's.
-    this.#limits = {
-      last: recorder.last,
-      // Each failed answer replaces the record (undefined clears it), so the last answer is always the turn's.
-      record: (failure) => this.#noteProxy(({ endpointFailure: _endpoint, failure: _before, ...record }) => (failure === undefined ? record : { ...record, failure })),
-      // SPI-1172: a Model endpoint's failed answer, classified by its API and auth.
-      endpoint: (provider) => this.#endpoints.endpoint(provider),
-      recordEndpoint: (endpointFailure) =>
-        this.#noteProxy(({ failure: _proxy, endpointFailure: _before, ...record }) => (endpointFailure === undefined ? record : { ...record, endpointFailure })),
-      // The key or token the Session holds for the provider, redacted from its error text whatever its shape.
-      secrets: (provider) => (provider === "anthropic" ? [env.MODEL_PROXY_API_KEY] : this.#endpoints.secrets(provider)),
-    };
+    // SPI-1172: each failed answer replaces the turn's record; a Model endpoint's is classified by its API and auth.
+    this.#limits = sessionLimits({ last: recorder.last, note: (update) => this.#noteProxy(update), endpoints: { endpoint: (id) => this.#endpoints.endpoint(id), secrets: (id) => this.#endpoints.secrets(id) }, proxyKey: env.MODEL_PROXY_API_KEY });
     registry.install(proxyLimits(this.#limits));
     registry.install(codingTools());
     registry.install(fileTools(() => this.#files()));
