@@ -1,6 +1,6 @@
 {
-  "at": "2026-11-16T15:21:17.177Z",
-  "head": "ec40608822ba52816b85d468aa8414532b90a386",
+  "at": "2026-11-16T15:24:23.354Z",
+  "head": "6a43e971afd4991433554463348173902de3cec8",
   "endpoints": {
     "saved": {
       "comm": 200,
@@ -101,10 +101,6 @@
       "ok": true
     },
     {
-      "name": "our records: the hung-up stream, recorded with the input its first event gave (the Workers' cancel and waitUntil)",
-      "ok": false
-    },
-    {
       "name": "the stand-in's models, with no endpoint price, are priced by t3's rate table",
       "ok": true
     },
@@ -123,7 +119,7 @@
   ],
   "turns": {
     "durable": {
-      "threadId": "98ecd17b-eeda-4d90-81ed-8f0991a81e87",
+      "threadId": "12ed446c-0fe7-40f9-b229-0fcaf4248749",
       "runs": [
         "completed",
         "completed"
@@ -131,14 +127,14 @@
       "title": {
         "status": "failed",
         "message": "The Model endpoint \"standin\" (model claude-fable-5-2) returned invalid structured output.",
-        "requestId": "805f87d6-7da5-4fda-8b09-5dea607d6644",
-        "completedAt": "2026-11-16T15:21:32.050Z"
+        "requestId": "b21f5683-ff5b-4625-a7a5-1c9f8d990b22",
+        "completedAt": "2026-11-16T15:24:37.878Z"
       }
     },
     "codex": {
       "runs": [
         {
-          "id": "run:thread:6d4f2190-61c4-4a72-b87e-ae2057178eef:ordinal:1",
+          "id": "run:thread:03ee9d6a-e543-4227-8fff-b3b52123b94f:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -148,7 +144,7 @@
     "codexStandin": {
       "runs": [
         {
-          "id": "run:thread:046c6107-9f59-44e2-b656-a9b1e7a82dcd:ordinal:1",
+          "id": "run:thread:7fc223f2-9e06-4348-92cd-db74f43677a5:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -158,7 +154,7 @@
     "pi": {
       "runs": [
         {
-          "id": "run:thread:f753ea68-6995-4d87-88b6-3ace4db2c14f:ordinal:1",
+          "id": "run:thread:53d068cd-582e-46ed-bb1c-d4f2de55014c:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -168,7 +164,7 @@
     "piStandin": {
       "runs": [
         {
-          "id": "run:thread:1e9f81b0-e80a-4a8a-a308-69c7c8aae3d6:ordinal:1",
+          "id": "run:thread:a63d36d1-9dcd-4dbd-b9ce-976b06a16c12:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -178,7 +174,7 @@
     "claude": {
       "runs": [
         {
-          "id": "run:thread:2d7273d3-7fa0-414f-914b-1765c3fa4e6d:ordinal:1",
+          "id": "run:thread:bae4220f-dd49-41dd-af04-a09f0e0a4d75:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -188,7 +184,7 @@
     "claudeStandin": {
       "runs": [
         {
-          "id": "run:thread:b6415e26-891d-4f36-93e5-b3dd9b98c8fd:ordinal:1",
+          "id": "run:thread:359ccd61-0f28-4d03-ba29-60fee15d9837:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -201,7 +197,7 @@
     "opencode": {
       "runs": [
         {
-          "id": "run:thread:af1150e3-169a-4fe3-9487-902d184309a6:ordinal:1",
+          "id": "run:thread:20e835d7-6913-4e16-bf29-6904128a4b18:ordinal:1",
           "status": "completed",
           "failure": null
         }
@@ -215,65 +211,75 @@
         "provider": "claude",
         "source": "t3flare://usage/claude",
         "model": "standin-anth/claude-fable-5-2",
-        "tokens": 2606,
-        "records": 1,
-        "costUsd": 0.01636,
+        "tokens": 5212,
+        "records": 2,
+        "costUsd": 0.03272,
         "costSource": "modelPriced",
+        "sessions": 2
+      },
+      {
+        "provider": "claude",
+        "source": "t3flare://usage/claude",
+        "model": "standin-anth/slow-cancel",
+        "tokens": 1303,
+        "records": 1,
+        "costUsd": 0,
+        "costSource": "unpriced",
         "sessions": 1
       },
       {
         "provider": "codex",
         "source": "t3flare://usage/codex",
         "model": "standin-resp/gpt-5.1-codex",
-        "tokens": 1504,
-        "records": 1,
-        "costUsd": 0.0013525000000000002,
+        "tokens": 3008,
+        "records": 2,
+        "costUsd": 0.0027050000000000004,
         "costSource": "modelPriced",
-        "sessions": 1
+        "sessions": 2
       },
       {
         "provider": "opencode",
         "source": "t3flare://usage/opencode",
         "model": "standin/claude-fable-5-2",
-        "tokens": 1203,
-        "records": 1,
-        "costUsd": 0.00816,
+        "tokens": 2406,
+        "records": 2,
+        "costUsd": 0.01632,
         "costSource": "modelPriced",
-        "sessions": 1
+        "sessions": 2
       },
       {
         "provider": "pi",
         "source": "t3flare://usage/durable",
         "model": "standin/claude-fable-5-2",
-        "tokens": 1203,
-        "records": 1,
-        "costUsd": 0.00816,
+        "tokens": 2406,
+        "records": 2,
+        "costUsd": 0.01632,
         "costSource": "modelPriced",
-        "sessions": 1
+        "sessions": 2
       },
       {
         "provider": "pi",
         "source": "t3flare://usage/pi",
         "model": "standin/claude-fable-5-2",
-        "tokens": 1203,
-        "records": 1,
-        "costUsd": 0.00816,
+        "tokens": 2406,
+        "records": 2,
+        "costUsd": 0.01632,
         "costSource": "modelPriced",
-        "sessions": 1
+        "sessions": 2
       },
       {
         "provider": "pi",
         "source": "t3flare://usage/text-generation",
         "model": "standin/claude-fable-5-2",
-        "tokens": 1203,
+        "tokens": 2406,
         "records": 1,
-        "costUsd": 0.00816,
+        "costUsd": 0.01632,
         "costSource": "modelPriced",
         "sessions": 0
       }
     ],
     "commissaryLog": {
-      "since": "2026-11-16T15:21:20.840Z",
+      "since": "2026-11-16T15:24:26.503Z",
       "model": "claude-haiku-5-5",
       "requests": 8,
       "byProvider": {
@@ -287,7 +293,7 @@
         "source": "t3flare://usage/durable",
         "status": "ok",
         "scannedFiles": 1,
-        "distinctSessions": 1,
+        "distinctSessions": 2,
         "message": null
       },
       {
@@ -303,7 +309,7 @@
         "source": "t3flare://usage/pi",
         "status": "ok",
         "scannedFiles": 1,
-        "distinctSessions": 1,
+        "distinctSessions": 2,
         "message": null
       },
       {
@@ -319,7 +325,7 @@
         "source": "t3flare://usage/codex",
         "status": "ok",
         "scannedFiles": 1,
-        "distinctSessions": 1,
+        "distinctSessions": 2,
         "message": null
       },
       {
@@ -335,7 +341,7 @@
         "source": "t3flare://usage/claude",
         "status": "ok",
         "scannedFiles": 1,
-        "distinctSessions": 1,
+        "distinctSessions": 2,
         "message": null
       },
       {
@@ -351,7 +357,7 @@
         "source": "t3flare://usage/opencode",
         "status": "ok",
         "scannedFiles": 1,
-        "distinctSessions": 1,
+        "distinctSessions": 2,
         "message": null
       },
       {
@@ -364,14 +370,13 @@
       }
     ],
     "pricing": {
-      "status": "fresh",
+      "status": "cached",
       "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
       "fetchedAt": "2026-11-16T15:23:45.949Z",
       "knownModels": 5361
     }
   },
-  "failures": [
-    "our records: the hung-up stream, recorded with the input its first event gave (the Workers' cancel and waitUntil): [{\"provider\":\"claude\",\"source\":\"t3flare://usage/claude\",\"model\":\"standin-anth/claude-fable-5-2\",\"tokens\":2606,\"records\":1,\"costUsd\":0.01636,\"costSource\":\"modelPriced\",\"sessions\":1},{\"provider\":\"codex\",\"source\":\"t3flare://usage/codex\",\"model\":\"standin-resp/gpt-5.1-codex\",\"tokens\":1504,\"records\":1,\"costUsd\":0.0013525000000000002,\"costSource\":\"modelPriced\",\"sessions\":1},{\"provider\":\"opencode\",\"source\":\"t3flare://usage/opencode\",\"model\":\"standin/claude-fable-5-2\",\"tokens\":1203,\"records\":1,\"costUsd\":0.00816,\"costSource\":\"modelPriced\",\"sessions\":1},{\"provider\":\"pi\",\"source\":\"t3flare://usage/durable\",\"model\":\"standin/claude-fable-5-2\",\"tokens\":1203,\"records\":1,\"costUsd\":0.00816,\"costSource\":\"modelPriced\",\"sessions\":1},{\"provider\":\"pi\",\"source\":\"t3flare://usage/pi\",\"model\":\"standin/claude-fable-5-"
-  ],
-  "ok": false
+  "hangUpRecorded": true,
+  "failures": [],
+  "ok": true
 }
