@@ -38,6 +38,7 @@ export const MIN_SEARCHED_VALUE_LENGTH = 8;
  */
 export const leakTargets = async (
   credentials: ReadonlyArray<{ readonly name: string; readonly value: string }>,
+  hashed: ReadonlyArray<CredentialPattern> = [],
 ): Promise<{
   readonly values: ReadonlyArray<readonly [string, string]>;
   readonly patterns: ReadonlyArray<CredentialPattern>;
@@ -48,5 +49,14 @@ export const leakTargets = async (
   const skipped = credentials
     .filter((credential) => credential.value.length < MIN_SCANNED_KEY_LENGTH)
     .map((credential) => ({ name: credential.name, where: credential.value.length < MIN_SEARCHED_VALUE_LENGTH ? ("everywhere" as const) : ("container" as const) }));
-  return { values, patterns, skipped };
+  // SPI-1171: a sign-in's tokens come as their patterns only (the Environment hashes them): never a value here, so they
+  // are scanned for in the Container and not in the DO's files, whose content came from the Container through the sync
+  // guard, which refuses a file holding a token the relay used. One that is malformed or too short is named, not scanned.
+  const scannable = (pattern: CredentialPattern) =>
+    pattern.length >= MIN_SCANNED_KEY_LENGTH && pattern.prefix.length <= 4 && pattern.prefix.length < pattern.length && /^[0-9a-f]{64}$/.test(pattern.sha256);
+  return {
+    values,
+    patterns: [...patterns, ...hashed.filter(scannable)],
+    skipped: [...skipped, ...hashed.filter((pattern) => !scannable(pattern)).map((pattern) => ({ name: pattern.name, where: "everywhere" as const }))],
+  };
 };

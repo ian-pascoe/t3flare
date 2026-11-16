@@ -33,6 +33,7 @@ import {
   validateEndpoint,
 } from "@t3flare/models/endpoints";
 import { knownModel } from "@t3flare/models/known";
+import { NO_CREDENTIAL_BROKER } from "@t3flare/models/relay";
 
 import type { BrokerAccess, CredentialBroker } from "../credentials/broker.ts";
 import { CredentialsKeyMissing, type SealedMark, type SealedStore } from "../credentials/sealed.ts";
@@ -91,7 +92,7 @@ export const modelsWithMetadata = (endpoint: { readonly api: EndpointApi; readon
 const withMetadata = (input: EndpointInput): ModelEndpoint => ({ ...input, models: modelsWithMetadata(input, input.models) });
 
 /** A sign-in's answer in an Environment with no Credential broker. */
-const NO_BROKER = { ok: false, signedOut: true, problem: "this Environment has no Credential broker" } as const satisfies BrokerAccess;
+const NO_BROKER: BrokerAccess = { ok: false, ...NO_CREDENTIAL_BROKER };
 
 /** The save in flight, per storage. */
 const saving = new WeakMap<object, Promise<unknown>>();
@@ -189,7 +190,7 @@ export const endpointStore = (kv: KvStorage, sealed: SealedStore, signIns?: Pick
       if (endpoint === undefined || !sameTarget(endpoint, target)) return { apiKey: null, changed: true };
       if (endpoint.auth === "none") return { apiKey: null };
       if (isSignIn(endpoint.auth)) {
-        if (signIns === undefined) return { apiKey: null, signedOut: true, problem: NO_BROKER.problem };
+        if (signIns === undefined) return { apiKey: null, signedOut: true, problem: NO_CREDENTIAL_BROKER.problem };
         const access = await signIns.access(endpointId);
         // Where the token goes and the headers it takes, when the token decides (Copilot's): the broker's, never stored here.
         return access.ok

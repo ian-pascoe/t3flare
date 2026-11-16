@@ -28,6 +28,7 @@
 // record with no secret: signed in or not, the account's email, the token's expiry, the attempt's start, the last
 // problem. Each sign-in kind's vendor (signIn.ts) does the talking; nothing here logs a token.
 import { type Credential, type CredentialStore, SIGN_IN_KINDS, type SignIn } from "@t3flare/models/endpoints";
+import type { SignInRefusal } from "@t3flare/models/relay";
 
 import type { KvStorage } from "../harness/keys.ts";
 import { CredentialsKeyMissing, type SealedStore } from "./sealed.ts";
@@ -96,7 +97,7 @@ export type BrokerAccess =
    * asked to wait before the next renewal (`earliestRefreshAt`): nothing asks it again before then, so a caller that
    * retries sooner gets this same answer (the model relay passes it on as `retry-after`, SPI-1171).
    */
-  | { readonly ok: false; readonly signedOut: boolean; readonly problem: string; readonly retryAt?: number };
+  | ({ readonly ok: false } & SignInRefusal);
 
 /** `waiting`: a device sign-in the owner has not approved yet; ask again after its interval. */
 export type SignInCompletion = { readonly ok: true; readonly status: SignInStatus } | { readonly ok: false; readonly problem: string; readonly waiting?: boolean };

@@ -153,8 +153,9 @@ Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md); the relay's side is AD
 2. **A passing failure says when to try again.** `BrokerAccess` carries `retryAt` while a vendor's back-off holds
    (`earliestRefreshAt`, item 11): no caller reaches the vendor before then, and the relay passes it to the CLI as
    `retry-after`.
-3. **Two broker reads for checks only.** `secrets` gives the stored access and refresh tokens to the admin leak check,
-   renewing nothing; `expire` marks the stored token expired so its next use renews it, through an admin route that
+3. **Two broker reads for checks only.** `secrets` gives the stored access and refresh tokens to the admin leak check
+   in the Environment, renewing nothing, which hashes them there: only their hashes go to the Workspace DO (ADR-0016's
+   SPI-1171 item 6). `expire` marks the stored token expired so its next use renews it, through an admin route that
    answers only where the Environment's faults are on (`T3FLARE_FAULTS=1`, bound on every stage but prod;
    `expireHook.test.ts` checks both).
 4. **Unverified live** (owner decision, 2026-11-16): no subscription was signed in on the stage, so no CLI turn on a

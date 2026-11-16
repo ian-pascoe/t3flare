@@ -48,4 +48,24 @@ describe("the leak check's endpoint keys", () => {
     ]);
     expect(JSON.stringify(targets.skipped)).not.toContain("short-key-123");
   });
+
+  it("takes a sign-in's tokens as hashes only (SPI-1171): scanned in the Container, never a value, a malformed or short one refused", async () => {
+    const token = await patternOf("sign-in:claude:access", LONG);
+    const targets = await leakTargets(
+      [],
+      [
+        token,
+        { name: "sign-in:claude:refresh", prefix: "sk-a", length: MIN_SCANNED_KEY_LENGTH - 1, sha256: "a".repeat(64) },
+        { name: "sign-in:x:access", prefix: "toolongprefix", length: 40, sha256: "a".repeat(64) },
+        { name: "sign-in:y:access", prefix: "abcd", length: 40, sha256: "not-a-hash" },
+      ],
+    );
+    expect(targets.values).toEqual([]);
+    expect(targets.patterns).toEqual([token]);
+    expect(targets.skipped).toEqual([
+      { name: "sign-in:claude:refresh", where: "everywhere" },
+      { name: "sign-in:x:access", where: "everywhere" },
+      { name: "sign-in:y:access", where: "everywhere" },
+    ]);
+  });
 });

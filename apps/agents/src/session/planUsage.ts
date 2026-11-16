@@ -6,7 +6,7 @@
 // (`isChatGPTSignIn`); a Model endpoint's provider is its own id, so a sign-in endpoint's requests pass through this
 // instead (`onPayload`), and its models carry `PLAN_USAGE_COMPAT`. docs/upstream-fragility.md U77.
 import type { OpenAIResponsesCompat } from "@earendil-works/pi-ai";
-import { SIGN_IN_COMPAT } from "@t3flare/models/endpoints";
+import { isRecord, SIGN_IN_COMPAT } from "@t3flare/models/endpoints";
 
 /** The request fields plan usage refuses (OpenAI's list), plus `prompt_cache_options`, which pi-ai drops for it too. */
 export const PLAN_USAGE_REFUSED_FIELDS: ReadonlyArray<string> = [
@@ -36,8 +36,6 @@ export const PLAN_USAGE_REFUSED_FIELDS: ReadonlyArray<string> = [
  * too (SPI-1171).
  */
 export const PLAN_USAGE_COMPAT: OpenAIResponsesCompat = { ...SIGN_IN_COMPAT.chatgpt };
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** A Responses request body as plan usage takes it; anything that is not an object is left as it is. */
 export const planUsagePayload = (params: unknown): unknown => {

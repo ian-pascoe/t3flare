@@ -4,6 +4,7 @@
 import { createModels, type FetchFunction } from "@earendil-works/pi-ai";
 import type { EndpointCredential, ModelEndpoint, SignIn } from "@t3flare/models/endpoints";
 import type { RelaySignInRefusal, RelayTarget } from "@t3flare/models/relay";
+import type { UsageEntry } from "@t3flare/models/usage";
 import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
@@ -35,6 +36,7 @@ const harness = (grants: ReadonlyArray<ModelRelayGrant>, upstream?: (request: Re
   const sent: Array<Sent> = [];
   const logs: Array<Record<string, unknown>> = [];
   const outcomes: Array<EndpointFailureRecord | null> = [];
+  const usage: Array<UsageEntry> = [];
   let asked = 0;
   let now = 1_000_000;
   const deps: ModelRelayDeps = {
@@ -45,10 +47,10 @@ const harness = (grants: ReadonlyArray<ModelRelayGrant>, upstream?: (request: Re
     },
     log: (event) => void logs.push(event),
     now: () => (now += 5),
-    usage: () => undefined,
+    usage: (entry) => void usage.push(entry),
     outcome: async (_handle, failure) => void outcomes.push(failure),
   };
-  return { deps, sent, logs, outcomes };
+  return { deps, sent, logs, outcomes, usage };
 };
 
 const post = (path: string, body: string, headers: Record<string, string> = {}) =>
@@ -60,6 +62,7 @@ describe("a ChatGPT sign-in on the model relay", () => {
     const body = {
       model: "gpt-6.1-sol",
       store: true,
+      stream: true,
       max_output_tokens: 4096,
       metadata: { a: "b" },
       previous_response_id: "resp_1",
@@ -94,6 +97,29 @@ describe("a ChatGPT sign-in on the model relay", () => {
     const body = '{ "model":"gpt-6.1-sol", "input":"hi", "store":false, "stream":true, "n": 9007199254740993 }';
     await handleModelRelay(post("chatgpt/responses", body), h.deps);
     expect(h.sent[0]!.text).toBe(body);
+  });
+
+  it("does not make a CLI's non-streaming call a streamed one (plan usage's rule forces `stream: true`)", async () => {
+    const h = harness([granted(target("chatgpt", "oai-access-1"))]);
+    await handleModelRelay(post("chatgpt/responses", JSON.stringify({ model: "gpt-6.1-sol", input: "hi", temperature: 0 })), h.deps);
+    await handleModelRelay(post("chatgpt/responses", JSON.stringify({ model: "gpt-6.1-sol", input: "hi", stream: false, temperature: 0 })), h.deps);
+    const [absent, off] = h.sent.map((sent) => JSON.parse(sent.text) as Record<string, unknown>);
+    expect(absent).not.toHaveProperty("stream");
+    expect(off).toMatchObject({ stream: false, store: false });
+    // The rest of plan usage's rules still apply.
+    expect(absent).not.toHaveProperty("temperature");
+  });
+
+  it("records the usage of a relayed sign-in request, as SPI-1173 records any", async () => {
+    const events = [
+      { type: "response.created", response: { id: "r1", model: "gpt-6.1-sol", usage: null } },
+      { type: "response.completed", response: { id: "r1", model: "gpt-6.1-sol", output: [], usage: { input_tokens: 100, input_tokens_details: { cached_tokens: 0 }, output_tokens: 7, output_tokens_details: { reasoning_tokens: 0 }, total_tokens: 107 } } },
+    ];
+    const sse = events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join("");
+    const h = harness([granted(target("chatgpt", "oai-access-1"))], () => new Response(sse, { headers: { "content-type": "text/event-stream" } }));
+    const response = await handleModelRelay(post("chatgpt/responses", '{"model":"gpt-6.1-sol","input":"hi","stream":true}'), h.deps);
+    await response.text();
+    expect(h.usage).toMatchObject([{ endpointId: "chatgpt", modelId: "gpt-6.1-sol", input: 100, output: 7 }]);
   });
 
   it("refuses a body over the cap before sending anything", async () => {
@@ -167,12 +193,45 @@ describe("a Claude sign-in on the model relay", () => {
     expect(h.sent[0]!.headers.authorization).toBe(`Bearer ${OAT}`);
   });
 
-  it("redacts the token from an error answer that echoes it", async () => {
-    const h = harness([granted(target("claude", OAT))], () => Response.json({ type: "error", error: { type: "authentication_error", message: `bad token ${OAT}` } }, { status: 401 }));
+  it("redacts the token from an error answer that echoes it, whatever its shape", async () => {
+    // A token no generic shape catches (not `sk-…`, no `Bearer ` before it in the echo): only the target's own bearer does.
+    const plainToken = "Zq7xYw3Rk9Lm2Np5Tv8Bc4Df6Gh1Jk0";
+    const h = harness([granted(target("claude", plainToken))], () => Response.json({ type: "error", error: { type: "authentication_error", message: `bad token ${plainToken}` } }, { status: 401 }));
     const response = await handleModelRelay(post("claude/v1/messages", '{"model":"m","messages":[]}'), h.deps);
     expect(response.status).toBe(401);
-    expect(await response.text()).not.toContain(OAT);
+    expect(await response.text()).not.toContain(plainToken);
     expect(h.outcomes.at(-1)).toMatchObject({ code: "sign_in_refused", message: expect.stringContaining("Claude sign-in") });
+  });
+});
+
+describe("a sign-in's paths on the model relay", () => {
+  it("refuses every path but the sign-in's inference calls, sending nothing anywhere (no account or key-minting call)", async () => {
+    const h = harness([granted(target("claude", OAT))]);
+    for (const path of ["claude/api/oauth/claude_cli/create_api_key", "claude/api/oauth/profile", "claude/v1/models", "claude/v1/messages/batches", "claude/v1/messages/"]) {
+      const response = await handleModelRelay(post(path, "{}"), h.deps);
+      expect(response.status, path).toBe(404);
+      expect(await response.text()).not.toContain(OAT);
+    }
+    const get = await handleModelRelay(new Request("http://computer.internal/t3flare/model/claude/v1/messages", { headers: { authorization: `Bearer ${HANDLE}` } }), h.deps);
+    expect(get.status).toBe(404);
+    const chatgpt = harness([granted(target("chatgpt", "oai-access-1"))]);
+    for (const path of ["chatgpt/models", "chatgpt/files", "chatgpt/chat/completions", "chatgpt/responses/compact"]) expect((await handleModelRelay(post(path, "{}"), chatgpt.deps)).status, path).toBe(404);
+    expect([...h.sent, ...chatgpt.sent]).toEqual([]);
+    expect(h.logs.at(-1)).toMatchObject({ status: 404 });
+  });
+
+  it("carries each sign-in's inference calls", async () => {
+    const cases: ReadonlyArray<readonly [SignIn, string, string]> = [
+      ["claude", "claude/v1/messages?beta=true", "https://api.anthropic.com/v1/messages?beta=true"],
+      ["claude", "claude/v1/messages/count_tokens", "https://api.anthropic.com/v1/messages/count_tokens"],
+      ["chatgpt", "chatgpt/responses", "https://api.openai.com/v1/responses"],
+      ["copilot", "copilot/responses", "https://api.business.githubcopilot.com/responses"],
+    ];
+    for (const [kind, path, url] of cases) {
+      const h = harness([granted(target(kind, "tok-1"))]);
+      expect((await handleModelRelay(post(path, '{"model":"m","messages":[],"input":"hi"}'), h.deps)).status, path).toBe(200);
+      expect(h.sent[0]!.url).toBe(url);
+    }
   });
 });
 

@@ -3,13 +3,12 @@
 // relay adds what pi-ai would (`@t3flare/models/claudeOAuth`, pinned to pi-ai's wire by claudeSignInShape.test.ts):
 // - Claude Code's betas first, then the CLI's own (`anthropic-beta`), and pi-ai's Claude Code identity headers;
 // - the identity as the system's first block, unless a block already opens with it (Claude Code's own requests carry
-//   it among their blocks, and pass as they are: SPI-1161 Q4). Anthropic refuses an OAuth token's request without it
+//   it among their blocks, and pass as they are: SPI-1161 Q4). Anthropic refuses a subscription token's request without it
 //   (a disguised 429, SPI-1161 Q4).
 // The bearer is the Environment's (`credentialHeaderFor`). Tool names stay the CLI's: pi-ai's Claude Code casing would
 // have to be mapped back in the answer's stream, which the relay passes through unchanged.
 import { CLAUDE_CODE_IDENTITY, CLAUDE_OAUTH_BETAS, CLAUDE_OAUTH_HEADERS } from "@t3flare/models/claudeOAuth";
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+import { isRecord } from "@t3flare/models/endpoints";
 
 /** The headers a Claude sign-in's request takes on the relay: Claude Code's betas before the CLI's, and pi-ai's headers. */
 export const claudeRelayHeaders = (_body: unknown, incoming: Headers): Record<string, string> => {

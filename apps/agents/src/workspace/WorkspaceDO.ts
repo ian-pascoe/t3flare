@@ -592,7 +592,13 @@ export class WorkspaceDO extends ContainerHost {
    * only, never a value. `credentials`: more to look for, by name (the Model endpoints' keys, SPI-1167: the admin route
    * gives them from the Environment); used for this check only, never kept.
    */
-  async leakCheck(input: { readonly credentials?: ReadonlyArray<{ readonly name: string; readonly value: string }> } = {}): Promise<{
+  async leakCheck(
+    input: {
+      readonly credentials?: ReadonlyArray<{ readonly name: string; readonly value: string }>;
+      /** Credentials given as their hashes only (a sign-in's tokens, SPI-1171): scanned for in the Container. */
+      readonly patterns?: ReadonlyArray<CredentialPattern>;
+    } = {},
+  ): Promise<{
     readonly do: ReadonlyArray<{ readonly name: string; readonly path: string }>;
     readonly container: LeakScanAnswer | null;
     readonly flagged: unknown;
@@ -604,7 +610,7 @@ export class WorkspaceDO extends ContainerHost {
     const values: Array<readonly [string, string]> = [];
     const key = this.env.COMMISSARY_CONTAINER_API_KEY;
     if (key !== undefined && key !== "") values.push(["model-key", key]);
-    const { values: endpointValues, patterns: extra, skipped } = await leakTargets(input.credentials ?? []);
+    const { values: endpointValues, patterns: extra, skipped } = await leakTargets(input.credentials ?? [], input.patterns ?? []);
     values.push(...endpointValues);
     const found: Array<{ name: string; path: string }> = [];
     for (const [credential, value] of values) {

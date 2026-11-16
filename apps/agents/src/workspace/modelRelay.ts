@@ -30,7 +30,7 @@ import { HANDLE } from "@t3flare/workspace-client";
 import type { HandleCaller } from "./processHost.ts";
 import { oversizedError, RELAY_ERROR_BODY_BYTES, sseErrors } from "./relayFailures.ts";
 import { declaredLength, MAX_ROUTED_BODY_BYTES, readCapped, type RoutedBody, routeBody } from "./routedBody.ts";
-import { signInRefusal, signInRequest } from "./relaySignIns.ts";
+import { signInBody, signInPathRefusal, signInRefusal, signInRequest, tokenLogHashPrefix } from "./relaySignIns.ts";
 import { observeUsage } from "./relayUsage.ts";
 import type { UsageEntry } from "@t3flare/models/usage";
 
@@ -262,17 +262,18 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   if (routedBody !== undefined) headers.delete("content-length");
   let body: Uint8Array | ReadableStream<Uint8Array> | null = routedBody ?? (hasBody ? request.body : null);
   if (isSignIn(grant.target.auth)) {
-    // SPI-1171: a sign-in's request rules (`relaySignIns.ts`), on the body read whole (the routed cap), then its headers.
-    let bytes = routedBody;
-    if (bytes === undefined && hasBody) {
-      const read = await readCapped(request.body, declaredLength(request.headers));
-      if ("tooLarge" in read) {
-        log(413, grant, { why: `the body is over ${MAX_ROUTED_BODY_BYTES} bytes` });
-        return plain(413, `the body is over ${MAX_ROUTED_BODY_BYTES} bytes`);
-      }
-      bytes = read.bytes;
+    // SPI-1171: only the sign-in's inference paths, before anything is sent; then its request rules (`relaySignIns.ts`).
+    const offPath = signInPathRefusal(grant.target.auth, request.method, rest);
+    if (offPath !== undefined) {
+      log(offPath.status, grant, { why: offPath.why });
+      return plain(offPath.status, offPath.why);
     }
-    const shaped = signInRequest(grant.target.auth, bytes, request.headers);
+    const read = await signInBody(request, routedBody);
+    if ("why" in read) {
+      log(read.status, grant, { why: read.why });
+      return plain(read.status, read.why);
+    }
+    const shaped = signInRequest(grant.target.auth, read.bytes, request.headers);
     for (const [name, value] of Object.entries(shaped.headers)) headers.set(name, value);
     if (shaped.changed) headers.delete("content-length");
     body = shaped.body ?? null;
@@ -312,7 +313,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   const known = credentialValues(endpoint);
   const redact = (text: string) => redactSecrets(text, known);
   // SPI-1171: which of a sign-in's tokens went (a short hash, never the token), so a mid-thread renewal shows in the log.
-  const signedWith = isSignIn(endpoint.auth) && known.length > 0 ? { signIn: endpoint.auth, credential: await credentialId(known[known.length - 1]!) } : {};
+  const signedWith = isSignIn(endpoint.auth) && known.length > 0 ? { signIn: endpoint.auth, credential: await tokenLogHashPrefix(known[known.length - 1]!) } : {};
   const classify = (status: number, body: string): DescribedFailure | undefined =>
     describeFailure({ status, headers: failureHeaders(upstream.headers), body, at: deps.now() }, { id: endpointId, api: endpoint.api, auth: endpoint.auth });
   const logged = (failure: DescribedFailure | undefined) =>
@@ -348,13 +349,6 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   answer.delete("content-encoding");
   return new Response(redact(text), { status: upstream.status, statusText: upstream.statusText, headers: answer });
 };
-
-/** A credential's short id for the log: the first 8 hex digits of its SHA-256 (of a sign-in's long random token only). */
-const credentialId = async (value: string): Promise<string> =>
-  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
-    .slice(0, 4)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
 
 /** The values the endpoint's credential header carries (a bearer's token too), to redact wherever an answer echoes them. */
 const credentialValues = (target: RelayTarget): ReadonlyArray<string> => {

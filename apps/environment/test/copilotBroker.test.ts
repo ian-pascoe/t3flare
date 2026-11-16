@@ -8,7 +8,10 @@
 import { COPILOT_HEADERS } from "@t3flare/models/copilotOAuth";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { relayTargetOf } from "@t3flare/models/relay";
+
 import { credentialBroker } from "../src/credentials/broker.ts";
+import { endpointStore } from "../src/endpoints/store.ts";
 import { copilotSignIn } from "../src/credentials/copilot.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
 import { fakeGitHubCopilot } from "./fixtures/fakeGitHubCopilot.ts";
@@ -295,6 +298,25 @@ describe("the Credential broker with a GitHub Copilot sign-in", () => {
     expect(context.github.counts.copilotTokens).toBe(asked + 1);
     const stored = await context.broker.read("copilot");
     expect(stored?.type === "oauth" ? stored.earliestRefreshAt : "none").toBeNull();
+    scan(context);
+  });
+
+  // SPI-1171: the relay's target, through this broker, tells a CLI when to retry, so its retries wait for the back-off.
+  it("answers the model relay a rate-limited renewal's wait (503 with retryAt), asking GitHub nothing until then", async () => {
+    const context = setup();
+    await signIn(context);
+    const store = endpointStore(context.kv, sealedStore(context.kv, "d".repeat(64), context.now), context.broker);
+    await store.save({ id: "copilot", label: "GitHub Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot", models: ["gpt-6.1-sol"] }, {});
+    context.advance(LIFE);
+    context.github.options.copilotStatus = 403;
+    context.github.options.copilotBody = { message: "You have exceeded a secondary rate limit" };
+    context.github.options.copilotHeaders = { "retry-after": "90" };
+    const at = context.now();
+    expect(relayTargetOf(await store.resolve("copilot"), "copilot")).toMatchObject({ ok: false, status: 503, signIn: { kind: "copilot", signedOut: false, retryAt: at + 90_000 } });
+    const asked = context.github.counts.copilotTokens;
+    context.advance(10_000);
+    expect(relayTargetOf(await store.resolve("copilot"), "copilot")).toMatchObject({ ok: false, status: 503, signIn: { retryAt: at + 90_000 } });
+    expect(context.github.counts.copilotTokens).toBe(asked);
     scan(context);
   });
 });

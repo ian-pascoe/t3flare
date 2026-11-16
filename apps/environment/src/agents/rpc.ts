@@ -128,7 +128,11 @@ export interface WorkspaceRpc {
   processState(): Promise<{ readonly epoch: number; readonly processes: ReadonlyArray<unknown>; readonly pushes: number }>;
   releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }>;
   /** Step 4a (plan §4.7): credentials in the DO's files (by value) and the Container (by hash); names and paths only. */
-  leakCheck(input?: { readonly credentials?: ReadonlyArray<{ readonly name: string; readonly value: string }> }): Promise<{ readonly do: ReadonlyArray<{ readonly name: string; readonly path: string }>; readonly container: unknown; readonly flagged: unknown; readonly notScanned?: ReadonlyArray<{ readonly name: string; readonly where: string }> }>;
+  leakCheck(input?: {
+    readonly credentials?: ReadonlyArray<{ readonly name: string; readonly value: string }>;
+    /** Credentials as their hashes only (a sign-in's tokens, SPI-1171): scanned for in the Container. */
+    readonly patterns?: ReadonlyArray<{ readonly name: string; readonly prefix: string; readonly length: number; readonly sha256: string }>;
+  }): Promise<{ readonly do: ReadonlyArray<{ readonly name: string; readonly path: string }>; readonly container: unknown; readonly flagged: unknown; readonly notScanned?: ReadonlyArray<{ readonly name: string; readonly where: string }> }>;
   /** Step 4a M0 P1, test stages only. */
   probeProcess(op: unknown): Promise<unknown>;
   /** Why a reclaim would leave the running Container alone now, or null (SPI-1150's stage check). */

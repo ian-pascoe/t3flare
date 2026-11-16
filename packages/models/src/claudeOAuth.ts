@@ -29,9 +29,9 @@ export const CLAUDE_OAUTH_TOKEN_MARK = "sk-ant-oat";
  * shape with its handle, and the relay adds these. `apps/agents/test/claudeSignInShape.test.ts` pins them to pi-ai's wire.
  */
 export const CLAUDE_CODE_IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude.";
-/** The betas an OAuth token's requests open with, before the request's own. */
+/** The betas a subscription token's requests open with, before the request's own. */
 export const CLAUDE_OAUTH_BETAS: ReadonlyArray<string> = ["claude-code-20250219", "oauth-2025-04-20"];
-/** The headers an OAuth token's requests carry beside the bearer (pi-ai's Claude Code identity headers). */
+/** The headers a subscription token's requests carry beside the bearer (pi-ai's Claude Code identity headers). */
 export const CLAUDE_OAUTH_HEADERS: Readonly<Record<string, string>> = {
   "anthropic-dangerous-direct-browser-access": "true",
   "user-agent": "claude-cli/2.1.280",

@@ -3,6 +3,7 @@
 // stored, read without renewing it.
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import type { ModelRelayTarget } from "@t3flare/models/relay";
+import { patternOf } from "@t3flare/sandbox-image/leakscan";
 import { describe, expect, it } from "vitest";
 
 import { endpointLeakCredentials } from "../src/endpoints/leak.ts";
@@ -33,11 +34,10 @@ describe("the leak check's endpoint keys", () => {
         ];
       },
     });
-    expect(credentials).toEqual([
-      { name: "endpoint:openai", value: "sk-openai-key-1" },
-      { name: "sign-in:copilot:access", value: "tid=copilot-token-1" },
-      { name: "sign-in:copilot:refresh", value: "gho_github-token-1" },
-    ]);
+    // A key by value; a sign-in's tokens only as their hashes (never a value leaves the Environment).
+    expect(credentials.credentials).toEqual([{ name: "endpoint:openai", value: "sk-openai-key-1" }]);
+    expect(credentials.patterns).toEqual([await patternOf("sign-in:copilot:access", "tid=copilot-token-1"), await patternOf("sign-in:copilot:refresh", "gho_github-token-1")]);
+    expect(JSON.stringify(credentials)).not.toMatch(/copilot-token-1|github-token-1/);
     // A sign-in's tokens are read as stored, never through the relay's target, which would renew one near its expiry.
     expect(asked).toEqual(["openai", "local", "broken"]);
     expect(signIns).toEqual(["copilot"]);

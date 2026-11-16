@@ -343,6 +343,15 @@ const KINDS: Readonly<Record<ModelFailureCode, { readonly class: ModelFailure["c
   unavailable: { class: "provider_error", retryable: true, stop: "never" },
 };
 
+/**
+ * A code's failure as the table's rows give it, for a failure known without an answer to read (the model relay's own
+ * refusal of a sign-in that gave no token, SPI-1171): its class, retryability and whether retries stop. No reset.
+ */
+export const modelFailureOf = (code: ModelFailureCode): ModelFailure => {
+  const kind = KINDS[code];
+  return { class: kind.class, code, retryable: kind.retryable, stop: kind.stop === "always" };
+};
+
 /** The endpoint's failure, or undefined for an answer that is none of the known ones (a 400 the request caused, a 404). */
 export const classifyModelFailure = (answer: FailedAnswer, endpoint: FailedEndpoint): ModelFailure | undefined => {
   const r = read(answer);

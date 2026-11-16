@@ -9,8 +9,7 @@
 // `copilotSignInShape.test.ts` pins the wire. docs/upstream-fragility.md U82.
 import type { Context } from "@earendil-works/pi-ai";
 import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "@earendil-works/pi-ai/api/github-copilot-headers";
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+import { isRecord } from "@t3flare/models/endpoints";
 
 /** The headers pi-ai adds to a Copilot request for this context. */
 export const copilotHeaders = (context: Context): Record<string, string> =>

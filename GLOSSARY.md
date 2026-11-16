@@ -371,7 +371,7 @@ The owner's own signed-in plan with a model vendor (ChatGPT, Claude, GitHub Copi
 _Avoid_: Subscription login, OAuth, account
 
 **Credential broker**:
-The Environment DO in its role as the one holder and refresher of every Subscription's tokens. A Session asks it for an access token when it needs one.
+The Environment DO in its role as the one holder and refresher of every Subscription's tokens. A Session asks it for an access token when it needs one, and the Model relay at every request it carries for a CLI agent.
 _Avoid_: token service, auth server
 
 **Container token**:

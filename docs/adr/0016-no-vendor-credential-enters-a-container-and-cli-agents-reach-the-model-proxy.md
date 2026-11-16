@@ -291,13 +291,18 @@ API-key one: the handle is swapped for the credential in the agents Worker, neve
    goes as a bearer on every API (`credentialHeaderFor`), at the base URL the sign-in's kind allows
    (`signInRequestTarget`, the Session's own rule: Copilot's token's host, else the endpoint's). The Workspace DO keeps
    only its hash for the sync guard.
+   **Only the sign-in's inference calls are carried** (`SIGN_IN_RELAY_PATHS`, review round 1): a POST to `/v1/messages`
+   or `/v1/messages/count_tokens` on a Claude sign-in, to `/responses` on a ChatGPT or Copilot one. Any other path below
+   the vendor's base URL (an account's `/api/oauth/…`, a key-minting call) is refused (404) before the vendor is asked,
+   so the subscription's token never goes there and no such answer comes back to the Container.
 3. **The sign-in's request rules are the Session's.** The relay applies `SIGN_IN_REQUESTS` (agents' `session/
    signInRequests.ts`) to the CLI's JSON body: ChatGPT plan usage's body rules, Copilot's (no thinking-off
    `reasoning`). Where pi-ai does something for a Session from the token or its own provider id, which a CLI's
    API-key-shaped request lacks, the table's `relay` part restates it: Claude's betas (`claude-code-20250219`,
    `oauth-2025-04-20` before the CLI's own), pi-ai's Claude Code headers and the identity as the system's first block
    unless a block already opens with it; Copilot's `X-Initiator`, `Openai-Intent` and vision headers, from the body's
-   `input`. A body that is no JSON, or that the rules leave as it was, goes on byte for byte. The body is read whole
+   `input`. A body that is no JSON, or that the rules leave as it was, goes on byte for byte, and a call the CLI did not
+   stream is not made a streamed one (plan usage's `stream: true` is not forced on it). The body is read whole
    for a sign-in (the model-routed URL's 16 MiB cap). This is the second exception to "the body passes unchanged",
    after SPI-1168's model routing; it is the vendor's own request shape, not protocol translation. Tool names are left
    as the CLI sends them (pi-ai gives Claude Code's casing to a Session's tools; the relay would have to map them back
@@ -305,9 +310,12 @@ API-key one: the handle is swapped for the credential in the agents Worker, neve
 4. **A sign-in that gives no token** (signed out, a refused renewal, a passing failure): the relay answers 401 (503 for
    a passing failure, with `retry-after` while the vendor's back-off, `earliestRefreshAt`, holds) in the API's own error
    shape, with the Session's text naming the sign-in ("… is not signed in to Claude (…): sign in with Claude again in
-   the Harness panel."), and reports it as the process's last answer (`sign_in_refused` or `unavailable`), so t3 shows
-   it (SPI-1172). The vendor is not asked again before its back-off.
+   the Harness panel."), and reports it as the process's last answer (`sign_in_refused` or `unavailable`, as SPI-1172's
+   table classes them), so t3 shows it. The vendor is not asked again before its back-off.
 5. **The log** of a sign-in's request names the sign-in and a short id of the token used (the first 8 hex digits of its
    SHA-256), so a renewal shows; never the token.
 6. **The leak check** also looks for each sign-in's access and refresh tokens as the broker holds them (a Copilot
-   sign-in's refresh token is its GitHub token), read without renewing.
+   sign-in's refresh token is its GitHub token), read without renewing, **by hash only**: the Environment hashes them
+   and the Workspace DO gets the patterns, which the Container's scan looks for. No sign-in token leaves the Environment
+   by value for the check. The DO's own files are not searched for them: their content comes from the Container through
+   the sync guard, which refuses a file holding a token the relay used.

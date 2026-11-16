@@ -180,8 +180,6 @@ const answering = (provider: Provider, endpointId: string, answered: EndpointAcc
   } satisfies Provider;
 };
 
-export { credentialFailure, credentialProblem } from "./credentialFailure.ts";
-
 const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api> => ({
   id: model.id,
   name: model.name,

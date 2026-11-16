@@ -5,7 +5,7 @@
 // Environment answers for an endpoint (its target with the credential in its header). A CLI adds only its own config.
 // SPI-1171: a sign-in's credential is the Credential broker's access token, asked for at each request, as a bearer; which
 // CLI takes which sign-in is `RELAYED_SIGN_INS`.
-import { ENDPOINT_APIS, type EndpointApi, type EndpointAuth, isSignIn, type ModelEndpoint, type ModelEndpoints, type SignIn, SIGN_IN_KINDS, SIGN_INS, signInRequestTarget } from "./endpoints.ts";
+import { ENDPOINT_APIS, type EndpointApi, type EndpointAuth, isSignIn, type ModelEndpoint, type ModelEndpoints, type SignIn, SIGN_INS, signInRequestTarget } from "./endpoints.ts";
 
 /** The relay's path prefix in the Container's egress host. */
 export const MODEL_RELAY_PREFIX = "/t3flare/model/";
@@ -129,22 +129,32 @@ export interface RelayTarget {
 }
 
 /**
- * Why a sign-in gave the relay no token now (SPI-1171), as the Credential broker said it: signed out (sign in again), or
- * a passing failure, with when its vendor allows the next renewal. Never a token.
+ * Why a sign-in gives no token now, as the Credential broker says it (SPI-1164, SPI-1171): signed out (sign in again), or
+ * a passing failure, with when its vendor allows the next renewal (`retryAt`) while a back-off holds. Never a token.
  */
-export interface RelaySignInRefusal {
-  readonly api: EndpointApi;
-  readonly kind: SignIn;
+export interface SignInRefusal {
   readonly signedOut: boolean;
   readonly problem: string;
   readonly retryAt?: number;
 }
 
+/** A sign-in's answer in an Environment with no Credential broker. */
+export const NO_CREDENTIAL_BROKER: SignInRefusal = { signedOut: true, problem: "this Environment has no Credential broker" };
+
+/** The relay's status for a sign-in's refusal: 401 signed out (sign in again), 503 a passing failure (retry). */
+export const signInRefusalStatus = (refusal: SignInRefusal): 401 | 503 => (refusal.signedOut ? 401 : 503);
+
+/** A sign-in's refusal at the relay, with the endpoint's API (the error's shape) and kind (the text's name). */
+export interface RelaySignInRefusal extends SignInRefusal {
+  readonly api: EndpointApi;
+  readonly kind: SignIn;
+}
+
 /**
  * What the Environment answers the relay for an endpoint: where to send the request (its base URL) and the headers to
  * add (the endpoint's own, then its credential's), or why not, as an HTTP status. `key` is the credential the headers
- * carry, for the Workspace DO's sync guard and leak check to look for (by hash), never to send anywhere else. A
- * sign-in's refusal says why (`signIn`), so the relay can answer the CLI naming the sign-in.
+ * carry, for the Workspace DO's sync guard to look for (by hash), never to send anywhere else. A sign-in's refusal says
+ * why (`signIn`), and the relay words it for the CLI (the Session's text, naming the sign-in).
  */
 export type ModelRelayTarget =
   | (RelayTarget & { readonly ok: true; readonly key: string | null })
@@ -153,7 +163,7 @@ export type ModelRelayTarget =
 /** The Credential broker's answer for a sign-in, as the relay reads it (the Environment's `BrokerAccess`). */
 export type RelaySignInAccess =
   | { readonly ok: true; readonly accessToken: string; readonly baseUrl?: string; readonly headers?: Readonly<Record<string, string>> }
-  | { readonly ok: false; readonly signedOut: boolean; readonly problem: string; readonly retryAt?: number };
+  | ({ readonly ok: false } & SignInRefusal);
 
 /** What the store's `resolve` gives the relay: the endpoint with its key, or its sign-in's answer at this request. */
 export interface RelayResolved {
@@ -163,14 +173,25 @@ export interface RelayResolved {
   readonly signIn?: RelaySignInAccess;
 }
 
+/**
+ * The paths below a sign-in's base URL the relay carries, by kind: its inference calls only, as the CLIs make them
+ * (Anthropic Messages, with Claude Code's token count; OpenAI Responses), each a POST. Any other path (an account's
+ * `/api/oauth/…`, a key-minting call) is refused before the vendor is asked, so a subscription's token never goes there.
+ */
+export const SIGN_IN_RELAY_PATHS: Readonly<Record<SignIn, ReadonlyArray<string>>> = {
+  chatgpt: ["/responses"],
+  claude: ["/v1/messages", "/v1/messages/count_tokens"],
+  copilot: ["/responses"],
+};
+
+/** Whether the relay carries a `method` request to `path` (below the base URL, no query) on a `kind` sign-in. */
+export const signInRelayAllows = (kind: SignIn, method: string, path: string): boolean => method === "POST" && SIGN_IN_RELAY_PATHS[kind].includes(path);
+
 /** A sign-in endpoint's target with the broker's token (`signInRequestTarget`, the Session's rule), or why not. */
 const signInRelayTarget = (endpoint: ModelEndpoint, kind: SignIn, access: RelaySignInAccess): ModelRelayTarget => {
   if (!access.ok) {
-    const title = SIGN_IN_KINDS[kind].title;
     const signIn: RelaySignInRefusal = { api: endpoint.api, kind, signedOut: access.signedOut, problem: access.problem, ...(access.retryAt === undefined ? {} : { retryAt: access.retryAt }) };
-    return access.signedOut
-      ? { ok: false, status: 401, message: `the Model endpoint ${endpoint.id} is not signed in to ${title} (${access.problem}): sign in with ${title} again in the Harness panel`, signIn }
-      : { ok: false, status: 503, message: `the Model endpoint ${endpoint.id} could not get a ${title} token (${access.problem}): retry`, signIn };
+    return { ok: false, status: signInRefusalStatus(signIn), message: `the Model endpoint ${endpoint.id}'s sign-in gave no token (${access.problem})`, signIn };
   }
   const sent = signInRequestTarget(endpoint, access);
   const credential = credentialHeaderFor(endpoint.api, kind, access.accessToken);
@@ -182,9 +203,7 @@ const signInRelayTarget = (endpoint: ModelEndpoint, kind: SignIn, access: RelayS
 export const relayTargetOf = (resolved: RelayResolved | undefined, endpointId: string): ModelRelayTarget => {
   if (resolved === undefined) return { ok: false, status: 404, message: `no Model endpoint ${endpointId}: it was removed, or never saved` };
   const { endpoint, apiKey } = resolved;
-  if (isSignIn(endpoint.auth)) {
-    return signInRelayTarget(endpoint, endpoint.auth, resolved.signIn ?? { ok: false, signedOut: true, problem: "this Environment has no Credential broker" });
-  }
+  if (isSignIn(endpoint.auth)) return signInRelayTarget(endpoint, endpoint.auth, resolved.signIn ?? { ok: false, ...NO_CREDENTIAL_BROKER });
   if (endpoint.auth === "none") return { ok: true, api: endpoint.api, auth: "none", baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers }, key: null };
   if (apiKey === undefined) {
     return {

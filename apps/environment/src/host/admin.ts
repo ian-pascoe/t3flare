@@ -44,7 +44,9 @@
 //   POST /_t3flare/agents/acp-check               step 4b (stages only): Claude Code or OpenCode over ACP through the channel
 //   GET  /_t3flare/agents/process-state?id=<id>   step 4a: a Workspace's CLI processes and this instance's channel
 //   POST /_t3flare/check/leak?id=<id>             step 4a: credentials in a Workspace's files (DO and Container), names and paths only;
-//                                                the Model endpoints' keys too (SPI-1167)
+//                                                the Model endpoints' keys too (SPI-1167), the sign-ins' tokens by hash (SPI-1171)
+//   POST /_t3flare/check/sign-in-expire?id=<id>  SPI-1171 (stages only): a sign-in's access token marked expired, so its
+//                                                next use renews it
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -421,20 +423,19 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         // SPI-1167: every Model endpoint's key is looked for too (by value in the DO's files, by hash in the Container);
         // SPI-1171: every sign-in's access and refresh tokens, as stored.
         const { endpointLeakCredentials } = await import("../endpoints/leak.ts");
-        const credentials = await endpointLeakCredentials({
+        const { credentials, patterns } = await endpointLeakCredentials({
           endpoints: () => environment.modelEndpoints(),
           target: (endpointId) => environment.modelRelayTarget({ endpointId }),
           signIn: (endpointId) => environment.signInSecrets(endpointId),
         });
         // The names looked for (never a value), so a scan's coverage shows.
-        return json({ ...(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck({ credentials })), lookedFor: credentials.map((credential) => credential.name) });
+        const lookedFor = [...credentials, ...patterns].map((credential) => credential.name);
+        return json({ ...(await workspaceRpc(url.searchParams.get("id") ?? "").leakCheck({ credentials, patterns })), lookedFor });
       }
       case "POST /_t3flare/check/sign-in-expire": {
-        // SPI-1171 (stages only): a sign-in's access token marked expired, so the next use renews it: a mid-thread
-        // refresh shown without waiting for the token's real expiry. Answers whether it was signed in, never a token.
-        const [{ environmentServices }, { expireHook }] = await Promise.all([import("../agents/bindings.ts"), import("../endpoints/expireHook.ts")]);
-        const answer = await expireHook({ faults: environmentServices().faults, expire: (endpointId) => environment.expireSignIn(endpointId) }, url.searchParams.get("endpoint") ?? "");
-        return json(answer.json, answer.status);
+        // SPI-1171 (stages only): a sign-in's access token marked expired, so the next use renews it (expireHook.ts).
+        const [{ environmentServices }, { expireRoute }] = await Promise.all([import("../agents/bindings.ts"), import("../endpoints/expireHook.ts")]);
+        return expireRoute(url, { faults: () => environmentServices().faults, expire: (endpointId) => environment.expireSignIn(endpointId) });
       }
       case "GET /_t3flare/agents/process-state": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");

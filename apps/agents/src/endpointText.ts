@@ -24,7 +24,8 @@ import {
 
 import { type UsageEntry, usageOfPiAnswer } from "@t3flare/models/usage";
 
-import { credentialProblem, endpointProviders } from "./session/models.ts";
+import { credentialProblem } from "./session/credentialFailure.ts";
+import { endpointProviders } from "./session/models.ts";
 
 /** How long the one request may take, inside the Environment's own bound (120 s). */
 const TIMEOUT_MS = 110_000;
