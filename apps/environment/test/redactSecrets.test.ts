@@ -56,6 +56,19 @@ describe("redactSecrets", () => {
     for (const value of ["plainvalue123456", "other-value-987", "third-value-555", "fourth-value-222"]) expect(out).not.toContain(value);
   });
 
+  it("a key header or parameter whose value starts with a digit (hex keys)", () => {
+    const out = redactSecrets("x-api-key: 9f86d081884c7d659a2feaa0c55ad015 and api_key=0123456789abcdef and access_token: 42aa77bb88");
+    for (const value of ["9f86d081884c7d659a2feaa0c55ad015", "0123456789abcdef", "42aa77bb88"]) expect(out).not.toContain(value);
+    // Inside JSON, as a string's text: still JSON.
+    const json = JSON.stringify({ message: "header x-api-key: 9f86d081884c7d659a2f was refused" });
+    expect(JSON.parse(redactSecrets(json))).toEqual({ message: `header x-api-key: ${REDACTED} was refused` });
+  });
+
+  it("leaves prose after Bearer alone", () => {
+    expect(redactSecrets("Bearer authentication failed for this request")).toBe("Bearer authentication failed for this request");
+    expect(redactSecrets("Authorization: Bearer abcdefgh12345678")).toBe(`Authorization: Bearer ${REDACTED}`);
+  });
+
   it("a value the caller knows, whatever its shape (an endpoint's own key)", () => {
     const own = "my-gateway-key.4f7d";
     expect(redactSecrets(`gateway says ${own} is over its budget`, [own])).not.toContain(own);

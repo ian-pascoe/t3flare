@@ -25,11 +25,13 @@ const SHAPES: ReadonlyArray<{ readonly pattern: RegExp; readonly keep?: true }> 
   { pattern: new RegExp(String.raw`("${KEY_NAMES}"\s*:\s*")${FRESH}(?:[^"\\]|\\.)+(?=")`, "gi"), keep: true },
   { pattern: new RegExp(String.raw`(\\"${KEY_NAMES}\\"\s*:\s*\\")${FRESH}[^"\\]+(?=\\")`, "gi"), keep: true },
   // A header or parameter in plain text (`x-api-key: …`, `api_key=…`): never a JSON literal, never past a quote or a backslash.
-  { pattern: new RegExp(String.raw`(\b${KEY_NAMES}\s*[:=]\s*)${FRESH}(?!(?:null|true|false)\b|-?\d)[^\s"'\\,;&)}\]]+`, "gi"), keep: true },
+  // (A JSON key is quoted, so this never meets a JSON value: `"api_key": 12` is the first shape's or none.)
+  { pattern: new RegExp(String.raw`(\b${KEY_NAMES}\s*[:=]\s*)${FRESH}[^\s"'\\,;&)}\]]+`, "gi"), keep: true },
   // A URL's credential parameter (`?key=…`, `#token=…`, `&credential=…`).
   { pattern: new RegExp(String.raw`([?#&](?:key|token|credential|sig|signature)=)${FRESH}[^\s"'\\&#)]+`, "gi"), keep: true },
-  // A bearer or basic credential of any shape.
-  { pattern: /((?:Bearer|Basic)\s+)[A-Za-z0-9._~+/=-]{8,}/gi, keep: true },
+  // A bearer or basic credential of any shape: one with a character a word has not (a digit, `.`, `-`, `=`, …), or 16
+  // letters or more, so prose ("Bearer authentication failed") is left alone.
+  { pattern: /((?:Bearer|Basic)\s+)(?:(?=[A-Za-z]*[0-9._~+/=-])[A-Za-z0-9._~+/=-]{8,}|[A-Za-z]{16,})/gi, keep: true },
   // Vendor keys: Anthropic's (`sk-ant-…`, its OAuth `sk-ant-oat…`), OpenAI's (`sk-proj-…`, `sk-…`), masked echoes (`sk-proj-****…`), OpenRouter's.
   { pattern: /\bsk-[A-Za-z0-9_*-]{12,}/g },
   // xAI's and Groq's keys.
@@ -52,6 +54,3 @@ export const redactSecrets = (text: string, known: ReadonlyArray<string> = []): 
   for (const { pattern, keep } of SHAPES) out = out.replace(pattern, (...match) => (keep === true ? `${String(match[1])}${REDACTED}` : REDACTED));
   return out;
 };
-
-/** Whether `text` holds anything `redactSecrets` would take out. */
-export const holdsSecrets = (text: string, known: ReadonlyArray<string> = []): boolean => redactSecrets(text, known) !== text;
