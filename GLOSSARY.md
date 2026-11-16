@@ -367,7 +367,7 @@ t3flare's own count of one model answer's tokens on a Model endpoint, with its a
 _Avoid_: usage log, telemetry, request log (that is Commissary's)
 
 **Limit reading**:
-The usage windows (ChatGPT's primary and secondary, Claude's five-hour and weekly) one Model endpoint answer reported in its vendor's rate-limit headers, with the share used, the reset and when the answer came, read by a Session, text generation or the Model relay and kept by the Environment, the latest answer's per window, for t3's limit meters (one limit source per endpoint); never a token or an account.
+The usage windows one Model endpoint answer reported in its vendor's rate-limit headers (ChatGPT's primary and secondary, Claude's five-hour and weekly): for each, the share used and when it resets, with when the answer came. Never a token or an account.
 _Avoid_: quota report (that is Commissary's), usage record (that counts tokens)
 
 **Subscription**:

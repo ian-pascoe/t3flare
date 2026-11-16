@@ -1532,11 +1532,13 @@ answer). It leans on two vendors' undocumented-or-client-only header shapes and 
 its web client's meter logic, which nothing of ours restates.
 
 - **Where**:
-  - Our side: `packages/models/src/limits.ts` (`@t3flare/models/limits`: `limitWindowsOf`, `limitReadingOf`,
-    `acceptedLimitReading`); the readers in agents' `session/models.ts` (`limitWatch`, on each endpoint's fetch, beside
-    SPI-1173's `answering`), `workspace/modelRelay.ts` (`noteLimits`) and `endpointText.ts`; the sender `limitsSender`
-    (`environment.ts`); the Environment's `usage/limits.ts` (`limitStore`, table `t3flare_limit_windows`;
-    `limitSnapshots`) and `usage/limitSources.ts` (`endpointMeterSources`, `withSources`), wired in `t3/composition.ts`.
+  - Our side: `packages/models/src/limits.ts` (`@t3flare/models/limits`: `LIMIT_WINDOWS`, `limitWindowsOf`,
+    `noteLimitReading`, `acceptedLimitReading`); the readers in agents' `session/models.ts` (`limitWatch`, on each
+    endpoint's fetch, beside SPI-1173's `answering`), `workspace/modelRelay.ts` and `endpointText.ts`; the sender
+    `limitsSender` (`environment.ts`); the Environment's `usage/limits.ts` (`limitStore`, table
+    `t3flare_limit_windows`; `forget` on an endpoint's removal, `endpoints/api.ts`'s `removed`), `usage/limitMeters.ts`
+    (`limitSnapshots`) and `usage/limitSources.ts` (`endpointMeterSources`, `withSources`), wired in
+    `t3/composition.ts`.
   - **ChatGPT's Codex headers**: `x-codex-{primary,secondary}-used-percent` (a percentage), `-window-minutes`,
     `-reset-at` (epoch seconds), as openai/codex reads them (`codex-rs/codex-api/src/rate_limits.rs` at `662a634e`:
     `parse_rate_limit_for_limit` :57, the names :68-80, `parse_rate_limit_window` :195). Only the default `codex` family.
@@ -1553,7 +1555,11 @@ its web client's meter logic, which nothing of ours restates.
     kind `cliproxy` only); the web client's `collectLimitAccounts`, `collectLimitPools`, `collectLimitNotices` and
     `collectProviderUsageLimits` (`packages/shared/src/usageLimits.ts`): an account with no email is named by its id, a
     source's `error` becomes a notice beside the meters (our staleness text: "Last read 3 hours ago …"), Codex windows
-    pool by kind.
+    pool by kind. The composer's `/usage-limits` report labels every source account "CLI Proxy" (`sourceLabel`, fixed
+    for t3's only source kind `cliproxy`), ours included: it reads "<endpoint label> · <endpoint id>" beside that.
+  - **A gateway double count until SPI-1176** (P3): an endpoint whose gateway passes a subscription's headers through
+    (Commissary in front of a Claude account) gets our meter, while Commissary's own source (U58) lists the same account
+    from its quota report: the page shows that account twice, once per source, until the Commissary source goes.
 - **Breaks when**: a vendor renames a header, changes a unit (a percentage for Claude's fraction, milliseconds for a
   reset) or stops sending a window; OpenAI adds the Codex headers to plan usage under other names; pi-ai stops taking a
   request's `fetch` on Anthropic Messages or OpenAI Responses (the Session's reader sits on it); t3 adds a source kind,
