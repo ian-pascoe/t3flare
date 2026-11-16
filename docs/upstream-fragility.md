@@ -1076,8 +1076,10 @@ can read OpenCode's `/proc/<pid>/environ`. What this entry guards is that no oth
     its `process.env` and starts only the server.
   - **The session offers only the allowed providers' models**: t3's adapter refuses any other model (a stale
     `t3flare/<id>` proxy model, an endpoint's that is gone) before any request, as for Claude Code (U75).
-  - **t3's registry keeps an OpenCode snapshot's earlier models** (as Claude's, U75): the proxy's models listed
-    before the first endpoint stay in the picker after the endpoints' until the Environment restarts its registry.
+  - **t3's registry replaces a ready OpenCode snapshot's models** (`ProviderRegistry.ts`
+    `shouldRetainMissingProviderModels` keeps an `opencode` snapshot's missing models only while its probe is pending
+    or failed; ours is installed and ready), so the proxy's models leave OpenCode's picker when the endpoints' arrive,
+    unlike Claude's (U75). If t3 starts retaining them, a picked proxy model is refused as above.
 - **Breaks when**: OpenCode renames or reshapes a provider package or its path (the relay log shows the new path, the
   endpoint answers 404); the plugin API drops `transform`/`update` or stops applying a patch to a provider added after
   it (no key: OpenCode reports "provider authentication required" or the relay answers 401); `opencode acp` starts
