@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-16T19:13:12.451Z",
+  "step": "sign-out",
+  "status": 200,
+  "answer": {
+    "ok": true,
+    "signedOut": false,
+    "revoked": false,
+    "revocation": "GitHub offers this client no revocation: the grant stays on your GitHub account until you revoke it at github.com, under Settings, Applications (Authorized GitHub Apps: GitHub Copilot)."
+  }
+}

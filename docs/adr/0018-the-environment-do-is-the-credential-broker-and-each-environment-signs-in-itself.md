@@ -128,10 +128,15 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
     GitHub account until the owner revokes it at github.com, under Settings, Applications, which the panel says beside
     the sign-in, in Sign out's confirmation and in its answer.
 
-    **The terms-of-service risk is the owner's, chosen knowingly** (owner decision, 2026-11-16, SPI-1166's E2). The client is the Copilot editor extension's; GitHub's terms may not
-    allow a Copilot plan's usage outside its own editors, and its requests present themselves as that editor (its
-    headers), as pi-ai's do. The owner chose to offer the sign-in regardless, for the owner's own Environment; the panel names the risk as the
-    owner's beside the sign-in ("Your risk").
+    **The terms-of-service risk is the owner's, chosen knowingly** (owner decision, 2026-11-16, SPI-1166's E2). The
+    client is the Copilot editor extension's; GitHub's terms may not allow a Copilot plan's usage outside its own
+    editors, and its requests present themselves as that editor (its headers), as pi-ai's do. The owner chose to offer
+    the sign-in regardless, for the owner's own Environment; the panel names the risk as the owner's beside the sign-in
+    ("Your risk").
+
+    **Unverified against a Copilot plan**: on p1166 GitHub's device flow ran from a Worker and the owner approved, but
+    the owner's Copilot subscription had ended, so GitHub refused the Copilot token (403 `subscription_ended`) and no
+    turn ran on it.
 
 Considered and not taken:
 

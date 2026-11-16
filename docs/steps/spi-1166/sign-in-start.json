@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-16T19:11:13.362Z",
+  "step": "start",
+  "status": 200,
+  "ok": true,
+  "authorizeUrl": "https://github.com/login/device",
+  "device": {
+    "userCode": "<4-4>",
+    "expiresAt": "2026-11-16T19:26:12.278Z",
+    "intervalSeconds": 5
+  }
+}

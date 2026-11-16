@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-16T19:13:11.557Z",
+  "step": "scan",
+  "scanned": [
+    "page",
+    "listed",
+    "audit"
+  ],
+  "pattern": "/gh[opusr]_[A-Za-z0-9]{8}|tid=[^;\\s\"]+;|Bearer /",
+  "found": []
+}

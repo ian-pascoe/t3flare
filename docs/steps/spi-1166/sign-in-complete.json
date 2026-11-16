@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-16T19:13:01.014Z",
+  "step": "complete",
+  "status": 200,
+  "ms": 1600,
+  "asks": 1,
+  "answer": {
+    "ok": false,
+    "error": "Signed in at GitHub, but GitHub refused a Copilot token (subscription_ended): this GitHub account needs a Copilot plan. It could not be revoked here: revoke it at github.com, under Settings, Applications."
+  }
+}

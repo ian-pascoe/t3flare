@@ -1,0 +1,83 @@
+{
+  "at": "2026-11-16T19:15:37.470Z",
+  "step": "turn",
+  "model": "commissary/claude-haiku-5-5",
+  "ok": true,
+  "failures": [],
+  "fixture": "ian-pascoe/t3flare-fixture",
+  "clone": {
+    "destination": "/w/acceptance-mwjn5ymd",
+    "ms": 87936,
+    "cwd": "/w/acceptance-mwjn5ymd",
+    "error": null
+  },
+  "turn": {
+    "threadId": "1ff1372e-8ee4-4ce4-ab6f-1df23b012494",
+    "runs": [
+      "completed"
+    ],
+    "approvals": [
+      {
+        "kind": "file-change",
+        "status": "resolved",
+        "decision": "accept"
+      },
+      {
+        "kind": "command",
+        "status": "resolved",
+        "decision": "accept"
+      }
+    ],
+    "edit": {
+      "fileName": "/w/acceptance-mwjn5ymd/src/greeting.txt",
+      "status": "completed"
+    },
+    "bash": {
+      "input": "cd /w/acceptance-mwjn5ymd && bash test.sh",
+      "status": "completed",
+      "exitCode": 0
+    },
+    "checkpointFiles": [
+      {
+        "path": "src/greeting.txt",
+        "kind": "modified",
+        "additions": 1,
+        "deletions": 0
+      }
+    ],
+    "ms": 116311
+  },
+  "checkpointOps": [
+    "has:do",
+    "capture:do",
+    "has:do",
+    "capture:do",
+    "has:do",
+    "diff:container",
+    "authored:do"
+  ],
+  "commit": {
+    "events": [
+      "action_started",
+      "phase_started",
+      "hook_output",
+      "hook_output",
+      "action_finished"
+    ],
+    "failure": null,
+    "result": {
+      "status": "created",
+      "commitSha": "711fad3dd1d7c928e5ed3646cbfe9d47e45f7ca6",
+      "subject": "acceptance: t3's commit action"
+    },
+    "head": {
+      "sha": "711fad3dd1d7c928e5ed3646cbfe9d47e45f7ca6",
+      "subject": "acceptance: t3's commit action",
+      "files": [
+        "src/greeting.txt"
+      ]
+    },
+    "ms": 8287
+  },
+  "ms": 125945
+}

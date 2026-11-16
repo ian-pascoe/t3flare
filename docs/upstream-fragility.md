@@ -1466,9 +1466,11 @@ terms-of-service risk (ADR-0018 item 11).
   `endpointsSignIn.test.ts` run ours against a fake of GitHub (`fixtures/fakeGitHubCopilot.ts`);
   `endpointDiscover.test.ts` reads Copilot's catalog. **Silent**: anything on GitHub's side, which only a real sign-in
   and turn see (the fake is ours); a model Copilot moves to another API (a turn on it fails with a 400 or 404).
-- **Unverified until a real sign-in runs**: the owner's Copilot subscription had ended at the spike (403
-  `subscription_ended`); see SPI-1166's report for what the stage showed. Whether GitHub accepts these requests from
-  a Worker's egress, and what it answers for a revoked grant, are not known.
+- **Unverified until a sign-in with a Copilot plan runs**: on p1166 the device flow ran from the Worker (the device
+  code, a poll, the owner's approval, the GitHub token), but the owner's Copilot subscription had ended and GitHub
+  refused the Copilot token (403 `subscription_ended`), so no Copilot token, model list or turn was seen. Whether
+  Copilot's API accepts these requests from a Worker's egress, and what GitHub answers for a revoked grant, are not
+  known.
 - **Blast radius**: turns on the Copilot endpoint fail (shown as model errors, or `sign_in_refused` for a 401 or 403), or
   the sign-in fails; a refused renewal signs the endpoint out (sign in again). No token leaves the Session or the broker
   either way, and the GitHub token never leaves the broker.
