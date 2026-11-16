@@ -31,6 +31,7 @@ describe("the model relay's target", () => {
     expect(await target(store, "openai")).toEqual({
       ok: true,
       api: "openai-responses",
+      auth: "api-key",
       baseUrl: "https://api.openai.com/v1",
       headers: { "X-Org": "acme", authorization: "Bearer sk-relay-1" },
       key: "sk-relay-1",
@@ -48,7 +49,7 @@ describe("the model relay's target", () => {
   it("adds no credential for an endpoint with no auth", async () => {
     const { store } = setup();
     await store.save(endpoint({ id: "local", auth: "none", baseUrl: "https://models.example.com/v1" }), {});
-    expect(await target(store, "local")).toEqual({ ok: true, api: "openai-responses", baseUrl: "https://models.example.com/v1", headers: {}, key: null });
+    expect(await target(store, "local")).toEqual({ ok: true, api: "openai-responses", auth: "none", baseUrl: "https://models.example.com/v1", headers: {}, key: null });
   });
 
   it("refuses a sign-in endpoint (SPI-1164): the relay carries no sign-in's token yet", async () => {

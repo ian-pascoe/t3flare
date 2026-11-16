@@ -9,8 +9,8 @@ import { endpointLeakCredentials } from "../src/endpoints/leak.ts";
 const endpoint = (id: string) => ({ id, label: id, api: "openai-responses" as const, baseUrl: `https://${id}.example.com/v1`, auth: "api-key" as const, headers: {}, models: [] });
 const endpoints: ModelEndpoints = { revision: 1, endpoints: [endpoint("openai"), endpoint("local"), endpoint("broken")] };
 const targets: Record<string, ModelRelayTarget> = {
-  openai: { ok: true, api: "openai-responses", baseUrl: "https://openai.example.com/v1", headers: { authorization: "Bearer sk-1" }, key: "sk-openai-key-1" },
-  local: { ok: true, api: "openai-responses", baseUrl: "https://local.example.com/v1", headers: {}, key: null },
+  openai: { ok: true, api: "openai-responses", auth: "api-key", baseUrl: "https://openai.example.com/v1", headers: { authorization: "Bearer sk-1" }, key: "sk-openai-key-1" },
+  local: { ok: true, api: "openai-responses", auth: "none", baseUrl: "https://local.example.com/v1", headers: {}, key: null },
   broken: { ok: false, status: 503, message: "can no longer be read" },
 };
 

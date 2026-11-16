@@ -7,20 +7,28 @@
 // content negotiation and the API's own version headers), then the endpoint's headers and its credential: no header from
 // the Container can route the key elsewhere at a header-routed gateway (ADR-0034 §4). Redirects are not followed. Every
 // request is logged with its endpoint, status and the handle's id (its process's key), never a value. Pure, deps
-// injected; a CLI adds only its own config. An error answer (SPI-1172) goes back in the vendor's own shape with its body
-// redacted, and its class, by the endpoint's API and auth, is logged.
+// injected; a CLI adds only its own config.
+//
+// SPI-1172: an error answer goes back in the vendor's own shape (its status, its reset headers, its JSON with its codes),
+// so the CLI reads it as it would the vendor's, with its body redacted (`relayFailures.ts`); an error event inside a
+// stream is redacted the same way. Each answer is classified by the endpoint's API and auth, logged, and handed to the
+// Workspace DO as the process's last answer (`outcome`: the failure, or null for a success), which the Environment's
+// CLI wrapper reads when the CLI's turn fails, so t3 shows the endpoint's failure with its reset, whatever the CLI made
+// of it.
 //
 // SPI-1168: a CLI with one base URL per process (Claude Code) uses the model-routed id `_`: the request's JSON body names
 // its model as `<endpointId>/<modelId>`, and the relay sends it to that endpoint with the model's own id in its place,
 // the rest of the body byte for byte (`routedBody.ts`). The handle is checked before the body is read, and its scope
 // then judges the endpoint as it judges one in the path.
 import { ENDPOINT_ID, type EndpointApi } from "@t3flare/models/endpoints";
-import { classifyModelFailure, errorBodyOf, failureHeaders } from "@t3flare/models/failures";
+import { describeFailure, type DescribedFailure, failureHeaders, readBody } from "@t3flare/models/failures";
 import { redactSecrets } from "@t3flare/models/redact";
+import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import { credentialHeaderOf, forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget } from "@t3flare/models/relay";
 import { HANDLE } from "@t3flare/workspace-client";
 
 import type { HandleCaller } from "./processHost.ts";
+import { oversizedError, RELAY_ERROR_BODY_BYTES, sseErrors } from "./relayFailures.ts";
 import { declaredLength, MAX_ROUTED_BODY_BYTES, readCapped, type RoutedBody, routeBody } from "./routedBody.ts";
 import { observeUsage } from "./relayUsage.ts";
 import type { UsageEntry } from "@t3flare/models/usage";
@@ -35,7 +43,7 @@ export type ModelRelayGrant =
       readonly handleId: string;
       readonly cli: string;
       readonly workspace: string | null;
-      readonly target: { readonly api: EndpointApi; readonly baseUrl: string; readonly headers: Readonly<Record<string, string>> };
+      readonly target: { readonly api: EndpointApi; readonly auth: "api-key" | "none"; readonly baseUrl: string; readonly headers: Readonly<Record<string, string>> };
     }
   /** The handle names a live process here (asked with no endpoint: a model-routed request before its body is read). */
   | { readonly kind: "known"; readonly handleId: string; readonly cli: string; readonly workspace: string | null }
@@ -55,6 +63,11 @@ export interface ModelRelayDeps {
   readonly now: () => number;
   /** Records an answer's usage, read as it streams past (`relayUsage.ts`, SPI-1173). */
   readonly usage: (entry: UsageEntry) => void;
+  /**
+   * SPI-1172: the process's last answer, for the Workspace DO: its classified failure, or null for a success or an error
+   * the table does not know (the last answer always wins). Never fails the request.
+   */
+  readonly outcome?: (handleId: string, failure: EndpointFailureRecord | null) => Promise<void>;
 }
 
 /** Response headers not passed back: hop-by-hop ones and cookies. */
@@ -241,35 +254,57 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   }
   const answer = new Headers();
   for (const [name, value] of upstream.headers) if (!DROPPED_RESPONSE.has(name)) answer.append(name, value);
+  const endpoint = grant.target;
+  const known = credentialValues(endpoint);
+  const redact = (text: string) => redactSecrets(text, known);
+  const classify = (status: number, body: string): DescribedFailure | undefined =>
+    describeFailure({ status, headers: failureHeaders(upstream.headers), body, at: deps.now() }, { id: endpointId, api: endpoint.api, auth: endpoint.auth });
+  const report = (failure: DescribedFailure | undefined): Promise<void> =>
+    (deps.outcome?.(grant.handleId, failure === undefined ? null : { ...failure, endpointId, at: deps.now() }) ?? Promise.resolve()).catch(() => undefined);
+  const logged = (failure: DescribedFailure | undefined) =>
+    failure === undefined ? {} : { failure: { class: failure.class, code: failure.code, ...(failure.resetAt === undefined ? {} : { resetAt: failure.resetAt }) } };
   if (upstream.status < 400) {
     // The dropped headers' names (never values) show what a CLI sends that the allowlist keeps back.
     log(upstream.status, grant, { dropped });
-    const body = observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, deps.usage);
+    void report(undefined);
+    const observed = observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, deps.usage);
+    const streaming = (upstream.headers.get("content-type") ?? "").includes("text/event-stream");
+    // An error event inside the stream: redacted, classified, logged and reported as the process's last answer.
+    const body =
+      streaming && observed !== null
+        ? observed.pipeThrough(
+          sseErrors(redact, (event) => {
+            const failure = classify(200, event);
+            log(upstream.status, grant, { stream: "error-event", ...logged(failure) });
+            void report(failure);
+          }),
+        )
+      : observed;
     return new Response(body, { status: upstream.status, statusText: upstream.statusText, headers: answer });
   }
-  // SPI-1172: an error answer goes back in the vendor's own shape (its status, its reset headers, its JSON with its codes),
-  // so the CLI reads its usage limit or refusal as it would the vendor's; its body is redacted first (the endpoint's own
-  // credential and any key, bearer or JWT shape), and its class is logged, classified by the endpoint's API and auth.
-  const text = (await errorBodyOf(upstream)) ?? "";
+  // The error body, whole and redacted, so the CLI reads it as the vendor's; one over the cap is replaced, never cut.
+  const read = await readBody(upstream, RELAY_ERROR_BODY_BYTES);
   void upstream.body?.cancel().catch(() => undefined);
-  const auth = Object.keys(grant.target.headers).some((name) => name.toLowerCase() === credentialHeaderOf(grant.target.api, "").name) ? "api-key" : "none";
-  const failure = classifyModelFailure({ status: upstream.status, headers: failureHeaders(upstream.headers), body: text, at: deps.now() }, { id: endpointId, api: grant.target.api, auth });
-  log(upstream.status, grant, {
-    dropped,
-    ...(failure === undefined ? {} : { failure: { class: failure.class, code: failure.code, ...(failure.resetAt === undefined ? {} : { resetAt: failure.resetAt }) } }),
-  });
+  const text = read === undefined || read.over ? oversizedError(endpoint.api, upstream.status) : read.text;
+  const failure = classify(upstream.status, text);
+  log(upstream.status, grant, { dropped, ...logged(failure), ...(read?.over === true ? { oversized: true } : {}) });
+  await report(failure);
   // The body's length (and any encoding) changed with the redaction.
   answer.delete("content-length");
   answer.delete("content-encoding");
-  return new Response(redactSecrets(text, credentialValues(grant.target.headers)), { status: upstream.status, statusText: upstream.statusText, headers: answer });
+  return new Response(redact(text), { status: upstream.status, statusText: upstream.statusText, headers: answer });
 };
 
 /** The values the endpoint's credential header carries (a bearer's token too), to redact wherever an answer echoes them. */
-const credentialValues = (headers: Readonly<Record<string, string>>): ReadonlyArray<string> =>
-  Object.values(headers).flatMap((value) => {
+const credentialValues = (target: { readonly api: EndpointApi; readonly auth: "api-key" | "none"; readonly headers: Readonly<Record<string, string>> }): ReadonlyArray<string> => {
+  if (target.auth === "none") return [];
+  const name = credentialHeaderOf(target.api, "").name;
+  return Object.entries(target.headers).flatMap(([header, value]) => {
+    if (header.toLowerCase() !== name) return [];
     const bearer = /^Bearer\s+(\S+)$/i.exec(value)?.[1];
     return bearer === undefined ? [value] : [value, bearer];
   });
+};
 
 /** What `authorizeModelRelay` needs of the Workspace DO and the Environment. */
 export interface AuthorizeDeps {
@@ -301,5 +336,5 @@ export const authorizeModelRelay = async (input: ModelRelayAsk, deps: AuthorizeD
   const target = await deps.target(input.endpointId);
   if (!target.ok) return { kind: "refused", status: target.status, message: target.message, handleId: caller.key, workspace };
   if (target.key !== null) await deps.remember(input.endpointId, target.key);
-  return { kind: "granted", handleId: caller.key, cli: caller.cli, workspace, target: { api: target.api, baseUrl: target.baseUrl, headers: target.headers } };
+  return { kind: "granted", handleId: caller.key, cli: caller.cli, workspace, target: { api: target.api, auth: target.auth, baseUrl: target.baseUrl, headers: target.headers } };
 };

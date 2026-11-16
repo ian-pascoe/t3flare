@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { ENDPOINT_ID } from "@t3flare/models/endpoints";
 import { MODEL_ROUTED_ID, modelRoutedRelayUrl } from "@t3flare/models/relay";
 
+import { RELAY_ERROR_BODY_BYTES, RelayFailures } from "../src/workspace/relayFailures.ts";
 import { authorizeModelRelay, handleModelRelay, isModelRelayPath, MAX_ROUTED_BODY_BYTES, type ModelRelayDeps, type ModelRelayGrant } from "../src/workspace/modelRelay.ts";
 
 const HANDLE = "a".repeat(64);
@@ -18,7 +19,7 @@ const granted: ModelRelayGrant = {
   handleId: "proc-1",
   cli: "codex",
   workspace: "ws-1",
-  target: { api: "openai-responses", baseUrl: "https://api.example.com/v1", headers: { "X-Org": "acme", authorization: `Bearer ${KEY}` } },
+  target: { api: "openai-responses", auth: "api-key", baseUrl: "https://api.example.com/v1", headers: { "X-Org": "acme", authorization: `Bearer ${KEY}` } },
 };
 
 const harness = (options: { grant?: ModelRelayGrant; upstream?: (request: Request) => Promise<Response>; authorizeFails?: boolean } = {}) => {
@@ -135,7 +136,7 @@ describe("the model relay route", () => {
     expect(sent.headers.get("authorization")).toBe(`Bearer ${KEY}`);
     expect(new URL(sent.url).host).toBe("api.example.com");
     // An Anthropic endpoint takes its version and beta headers, and an OpenAI one's beta header is not its.
-    const anthropic = harness({ grant: { ...granted, target: { api: "anthropic-messages", baseUrl: "https://api.anthropic.example", headers: { "x-api-key": KEY } } } as ModelRelayGrant });
+    const anthropic = harness({ grant: { ...granted, target: { api: "anthropic-messages", auth: "api-key", baseUrl: "https://api.anthropic.example", headers: { "x-api-key": KEY } } } as ModelRelayGrant });
     await handleModelRelay(post("{}", { "anthropic-version": "2023-06-01", "anthropic-beta": "tools", "openai-beta": "x", "x-portkey-custom-host": "https://evil.example" }), anthropic.deps);
     expect([...anthropic.sent[0]!.headers.keys()].sort()).toEqual(["anthropic-beta", "anthropic-version", "content-type", "x-api-key"]);
     // The names (never the values) of what was held back are logged.
@@ -271,6 +272,66 @@ describe("the model relay route", () => {
     expect(JSON.stringify(h.logs)).not.toContain(KEY);
   });
 
+  it("redacts the endpoint's own key whatever its shape, and only the credential: another header's value stays (SPI-1172)", async () => {
+    const own = "gateway-key-not-sk-shaped";
+    const grant = { ...granted, target: { ...granted.target, headers: { "X-Org": "acme-organisation-long-id", authorization: `Bearer ${own}` } } } as ModelRelayGrant;
+    const h = harness({ grant, upstream: async () => Response.json({ error: { message: `key ${own} refused for org acme-organisation-long-id`, code: "invalid_api_key" } }, { status: 401 }) });
+    const text = await (await handleModelRelay(post("{}"), h.deps)).text();
+    expect(text).not.toContain(own);
+    expect(text).toContain("acme-organisation-long-id");
+  });
+
+  it("passes a 20 KiB error body back whole, redacted and still JSON; one over 1 MiB is replaced by a short error in the API's shape", async () => {
+    const big = JSON.stringify({ error: { message: `${"x".repeat(20 * 1024)} ${KEY}`, type: "invalid_request_error", code: "context_length_exceeded" } });
+    const h = harness({ upstream: async () => new Response(big, { status: 400, headers: { "content-type": "application/json" } }) });
+    const text = await (await handleModelRelay(post("{}"), h.deps)).text();
+    expect(text.length).toBeGreaterThan(20 * 1024);
+    expect(JSON.parse(text)).toMatchObject({ error: { code: "context_length_exceeded" } });
+    expect(text).not.toContain(KEY);
+    const huge = new Response(`{"error":{"message":"${"y".repeat(RELAY_ERROR_BODY_BYTES + 10)}"}}`, { status: 500 });
+    const over = harness({ upstream: async () => huge });
+    const answer = await handleModelRelay(post("{}"), over.deps);
+    expect(answer.status).toBe(500);
+    expect(JSON.parse(await answer.text())).toMatchObject({ error: { type: "server_error", message: expect.stringContaining("over 1048576 bytes") } });
+    expect(over.logs.at(-1)).toMatchObject({ oversized: true });
+  });
+
+  it("an error event inside a 200 stream is redacted, classified, logged and reported; the rest streams unchanged", async () => {
+    const reported: Array<unknown> = [];
+    const frames = [
+      'event: message_start\ndata: {"type":"message_start"}\n\n',
+      `event: error\ndata: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded for ${KEY}"}}\n\n`,
+    ];
+    const h = harness({
+      grant: { ...granted, target: { api: "anthropic-messages", auth: "api-key", baseUrl: "https://api.anthropic.example", headers: { "x-api-key": KEY } } } as ModelRelayGrant,
+      upstream: async () => new Response(frames.join(""), { status: 200, headers: { "content-type": "text/event-stream" } }),
+    });
+    const deps = { ...h.deps, outcome: async (handleId: string, failure: unknown) => void reported.push([handleId, failure]) };
+    const text = await (await handleModelRelay(post("{}"), deps)).text();
+    expect(text.startsWith(frames[0]!)).toBe(true);
+    expect(text).toContain('"overloaded_error"');
+    expect(text).not.toContain(KEY);
+    expect(h.logs.at(-1)).toMatchObject({ stream: "error-event", failure: { class: "provider_error", code: "overloaded" } });
+    expect(reported).toEqual([
+      ["proc-1", null],
+      ["proc-1", expect.objectContaining({ endpointId: "openai", code: "overloaded" })],
+    ]);
+  });
+
+  it("reports each answer as the process's last: a classified failure with its reset, a success as null (SPI-1172)", async () => {
+    const reported: Array<unknown> = [];
+    const limit = JSON.stringify({ error: { type: "usage_limit_reached", message: "The usage limit has been reached", resets_at: 1_794_834_000 } });
+    let calls = 0;
+    const h = harness({ upstream: async () => (calls++ === 0 ? new Response(limit, { status: 429 }) : new Response("{}", { status: 200 })) });
+    const deps = { ...h.deps, outcome: async (handleId: string, failure: unknown) => void reported.push([handleId, failure]) };
+    await handleModelRelay(post("{}"), deps);
+    await handleModelRelay(post("{}"), deps);
+    expect(reported).toEqual([
+      ["proc-1", expect.objectContaining({ endpointId: "openai", class: "usage_limit", code: "usage_limit", resetAt: 1_794_834_000_000, message: 'The Model endpoint "openai" reached its usage limit.' })],
+      ["proc-1", null],
+    ]);
+  });
+
   it("streams a success unread: only an error answer's body is read and redacted", async () => {
     const h = harness({ upstream: async () => new Response(`data: ${KEY}\n\n`, { status: 200, headers: { "content-type": "text/event-stream" } }) });
     const response = await handleModelRelay(post("{}"), h.deps);
@@ -300,7 +361,7 @@ describe("the model-routed relay URL (SPI-1168: one base URL for every endpoint 
   const anthropic = (endpointId: string): ModelRelayGrant => ({
     ...granted,
     cli: "claude",
-    target: { api: "anthropic-messages", baseUrl: `https://${endpointId}.example/v1`, headers: { "x-api-key": KEY } },
+    target: { api: "anthropic-messages", auth: "api-key", baseUrl: `https://${endpointId}.example/v1`, headers: { "x-api-key": KEY } },
   });
   /** The Workspace DO as it answers: `known` for a live handle asked with no endpoint, the endpoint's target otherwise. */
   const routedHarness = (live = true) => {
@@ -422,7 +483,7 @@ describe("the model-routed relay URL (SPI-1168: one base URL for every endpoint 
 
 describe("the Workspace DO's check of a model handle", () => {
   const caller = { key: "proc-1", cli: "codex", thread: "thread-1", endpoints: new Set(["openai"]) };
-  const target = { ok: true as const, api: "openai-responses" as const, baseUrl: "https://api.example.com/v1", headers: { authorization: `Bearer ${KEY}` }, key: KEY };
+  const target = { ok: true as const, api: "openai-responses" as const, auth: "api-key" as const, baseUrl: "https://api.example.com/v1", headers: { authorization: `Bearer ${KEY}` }, key: KEY };
   const deps = (extra: Partial<Parameters<typeof authorizeModelRelay>[1]> = {}) => {
     const remembered: Array<[string, string]> = [];
     const asked: Array<string> = [];
@@ -450,7 +511,7 @@ describe("the Workspace DO's check of a model handle", () => {
       handleId: "proc-1",
       cli: "codex",
       workspace: "ws-1",
-      target: { api: "openai-responses", baseUrl: "https://api.example.com/v1", headers: { authorization: `Bearer ${KEY}` } },
+      target: { api: "openai-responses", auth: "api-key", baseUrl: "https://api.example.com/v1", headers: { authorization: `Bearer ${KEY}` } },
     });
     expect(d.remembered).toEqual([["openai", KEY]]);
   });
@@ -478,5 +539,22 @@ describe("the Workspace DO's check of a model handle", () => {
     const keyless = deps({ target: async () => ({ ...target, headers: {}, key: null }) });
     expect(await authorizeModelRelay({ handle: HANDLE, endpointId: "openai" }, keyless.value)).toMatchObject({ kind: "granted" });
     expect([...gone.remembered, ...keyless.remembered]).toEqual([]);
+  });
+});
+
+describe("each process's last relay failure (SPI-1172)", () => {
+  const failure = { endpointId: "openai", class: "usage_limit" as const, code: "usage_limit", message: "m", retryable: true, stop: true, at: 1 };
+
+  it("keeps a process's last failure, cleared by a success and by its next turn's start, per process", () => {
+    const failures = new RelayFailures();
+    failures.report("proc-1", failure);
+    failures.report("proc-2", { ...failure, code: "key_refused" });
+    expect(failures.last("proc-1")).toEqual(failure);
+    failures.report("proc-1", null);
+    expect(failures.last("proc-1")).toBeNull();
+    failures.report("proc-1", failure);
+    failures.turnStarted("proc-1");
+    expect(failures.last("proc-1")).toBeNull();
+    expect(failures.last("proc-2")).toMatchObject({ code: "key_refused" });
   });
 });

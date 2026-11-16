@@ -8,7 +8,8 @@
 //   tool handle, to the Workspace DO and on to the Environment DO;
 // - the CLI agents' model relay (`/t3flare/model/<endpointId>/…`, SPI-1167): the Workspace DO checks the process's model
 //   handle and gets the endpoint's target from the Environment DO; the request is streamed from here to the endpoint
-//   and its answer back, so no Durable Object holds a long stream.
+//   and its answer back, so no Durable Object holds a long stream. Each answer's class goes back to the Workspace DO as
+//   the process's last answer (SPI-1172).
 //
 // Addressed as computer's proxy addresses its host.
 import { WorkspaceProxy as ComputerWorkspaceProxy } from "@cloudflare/computer";
@@ -38,9 +39,12 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
     const workspace = namespace.get(target);
     if (modelRelay) {
       // SAFETY: the Workspace DO answers `modelRelay` (WorkspaceDO.ts).
-      const rpc = workspace as unknown as Pick<WorkspaceDO, "modelRelay">;
+      const rpc = workspace as unknown as Pick<WorkspaceDO, "modelRelay" | "modelRelayOutcome">;
       return handleModelRelay(request, {
         authorize: (input) => rpc.modelRelay(input),
+        // SPI-1172: the process's last answer, for the CLI wrapper's view of a failed turn.
+        // SAFETY: a Durable Object stub's RPC returns a promise of the method's result, though the method is synchronous.
+        outcome: (handleId, failure) => rpc.modelRelayOutcome({ handleId, failure }) as unknown as Promise<void>,
         fetch: (upstream) => fetch(upstream),
         log: (event) => console.log(JSON.stringify(event)),
         now: () => Date.now(),

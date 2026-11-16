@@ -99,7 +99,15 @@ export const forwardedHeadersOf = (api: EndpointApi): ReadonlySet<string> => new
  * carry, for the Workspace DO's sync guard and leak check to look for (by hash), never to send anywhere else.
  */
 export type ModelRelayTarget =
-  | { readonly ok: true; readonly api: EndpointApi; readonly baseUrl: string; readonly headers: Readonly<Record<string, string>>; readonly key: string | null }
+  | {
+      readonly ok: true;
+      readonly api: EndpointApi;
+      /** The endpoint's auth: the relay carries no sign-in, so a key or none (SPI-1172: its failures are classified by it). */
+      readonly auth: "api-key" | "none";
+      readonly baseUrl: string;
+      readonly headers: Readonly<Record<string, string>>;
+      readonly key: string | null;
+    }
   | { readonly ok: false; readonly status: number; readonly message: string };
 
 /** The relay's target for a resolved endpoint and its key (pure; the store's `resolve` gives both). */
@@ -107,7 +115,7 @@ export const relayTargetOf = (resolved: { readonly endpoint: ModelEndpoint; read
   if (resolved === undefined) return { ok: false, status: 404, message: `no Model endpoint ${endpointId}: it was removed, or never saved` };
   const { endpoint, apiKey } = resolved;
   if (isSignIn(endpoint.auth)) return { ok: false, status: 501, message: `the Model endpoint ${endpointId} is a sign-in, which the model relay does not carry yet` };
-  if (endpoint.auth === "none") return { ok: true, api: endpoint.api, baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers }, key: null };
+  if (endpoint.auth === "none") return { ok: true, api: endpoint.api, auth: "none", baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers }, key: null };
   if (apiKey === undefined) {
     return {
       ok: false,
@@ -120,5 +128,5 @@ export const relayTargetOf = (resolved: { readonly endpoint: ModelEndpoint; read
   const credential = credentialHeaderOf(endpoint.api, apiKey);
   // The endpoint's own headers never carry a credential (validateEndpoint), so the key's header is the only one.
   const headers = Object.fromEntries(Object.entries(endpoint.headers).filter(([name]) => name.toLowerCase() !== credential.name));
-  return { ok: true, api: endpoint.api, baseUrl: endpoint.baseUrl, headers: { ...headers, [credential.name]: credential.value }, key: apiKey };
+  return { ok: true, api: endpoint.api, auth: "api-key", baseUrl: endpoint.baseUrl, headers: { ...headers, [credential.name]: credential.value }, key: apiKey };
 };

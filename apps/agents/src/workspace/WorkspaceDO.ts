@@ -6,6 +6,7 @@
 //
 // It is a plain DurableObject: computer reaches it through `__getWorkspaceStub()` with raw Workers RPC, and its Worker
 // Shell calls back into it through `WorkspaceServiceProxy` (exported by the Worker's entry).
+import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import { Workspace as ComputerWorkspace, type WorkspaceBackend, type WorkspaceStub } from "@cloudflare/computer";
 import {
   ContainerBackend,
@@ -80,6 +81,7 @@ import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
 import { ModelKeyGate } from "./modelKey.ts";
 import { authorizeModelRelay, type ModelRelayAsk, type ModelRelayGrant } from "./modelRelay.ts";
+import { RelayFailures } from "./relayFailures.ts";
 import { EndpointKeyPatterns, leakTargets } from "./endpointKeys.ts";
 import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
@@ -259,6 +261,8 @@ export class WorkspaceDO extends ContainerHost {
   #expireTimer: ReturnType<typeof setInterval> | undefined;
   /** The CLI processes (step 4a). */
   readonly #processes: ProcessHost;
+  /** SPI-1172: each CLI process's last model relay failure this turn, by process key (`modelRelayOutcome`). */
+  readonly #relayFailures = new RelayFailures();
   /** This object's boot counter (review F6): the process channel's epoch, durable, never a UUID. */
   readonly #boot: number;
   /** The key route's nonces: one per live CLI process, with its CLI and the grants it took. */
@@ -1693,7 +1697,23 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   processTurn(key: string, active: boolean): ProcessAnswer {
+    // SPI-1172: a turn's start forgets the process's last relay answer, so a failed turn never reads an earlier turn's.
+    if (active) this.#relayFailures.turnStarted(key);
     return this.#processes.turn(key, active);
+  }
+
+  /**
+   * SPI-1172: the model relay's report of a process's last answer (`WorkspaceProxy`): its failure classified by the
+   * endpoint's API and auth, or null for a success. In memory only: a Workspace DO that restarted has none, and the CLI's
+   * own failure stands.
+   */
+  modelRelayOutcome(input: { readonly handleId: string; readonly failure: EndpointFailureRecord | null }): void {
+    this.#relayFailures.report(input.handleId, input.failure);
+  }
+
+  /** SPI-1172: the process's last model relay answer this turn, for the Environment's CLI wrapper when the turn fails. */
+  processModelFailure(key: string): EndpointFailureRecord | null {
+    return this.#relayFailures.last(key);
   }
 
   processSignal(key: string): Promise<ProcessAnswer> {
