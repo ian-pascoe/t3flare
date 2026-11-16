@@ -245,6 +245,39 @@ describe("the model relay route", () => {
     expect(await response.json()).toEqual({ error: { message: "bad model" } });
   });
 
+  it("passes a usage limit back in the vendor's own shape, so the CLI pauses at its reset, and logs its class (SPI-1172)", async () => {
+    const body = JSON.stringify({ error: { type: "usage_limit_reached", message: "The usage limit has been reached", plan_type: "plus", resets_at: 1_794_834_000 } });
+    const h = harness({ upstream: async () => new Response(body, { status: 429, headers: { "content-type": "application/json", "retry-after": "3600", "x-codex-primary-used-percent": "100" } }) });
+    const response = await handleModelRelay(post("{}"), h.deps);
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("3600");
+    expect(response.headers.get("x-codex-primary-used-percent")).toBe("100");
+    expect(await response.text()).toBe(body);
+    expect(h.logs.at(-1)).toMatchObject({ status: 429, failure: { class: "usage_limit", code: "usage_limit", resetAt: 1_794_834_000_000 } });
+  });
+
+  it("redacts an error body before it reaches the CLI: the endpoint's own key, and any key, bearer or JWT shape (SPI-1172)", async () => {
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJlLXZhbHVl";
+    const echo = JSON.stringify({ error: { message: `Incorrect API key provided: ${KEY}; also sk-proj-AbCdEfGhIjKlMnOpQrSt and Bearer ${jwt}`, type: "invalid_request_error", code: "invalid_api_key" } });
+    const h = harness({ upstream: async () => new Response(echo, { status: 401, headers: { "content-type": "application/json", "content-length": String(echo.length) } }) });
+    const response = await handleModelRelay(post("{}"), h.deps);
+    expect(response.status).toBe(401);
+    const text = await response.text();
+    for (const secret of [KEY, "sk-proj-AbCdEfGhIjKlMnOpQrSt", jwt]) expect(text).not.toContain(secret);
+    // Still the vendor's JSON, its code intact, so the CLI reads it as it would the vendor's.
+    expect(JSON.parse(text)).toMatchObject({ error: { code: "invalid_api_key", type: "invalid_request_error" } });
+    expect(response.headers.get("content-length")).toBeNull();
+    expect(h.logs.at(-1)).toMatchObject({ status: 401, failure: { class: "permission_error", code: "key_refused" } });
+    expect(JSON.stringify(h.logs)).not.toContain(KEY);
+  });
+
+  it("streams a success unread: only an error answer's body is read and redacted", async () => {
+    const h = harness({ upstream: async () => new Response(`data: ${KEY}\n\n`, { status: 200, headers: { "content-type": "text/event-stream" } }) });
+    const response = await handleModelRelay(post("{}"), h.deps);
+    expect(await response.text()).toBe(`data: ${KEY}\n\n`);
+    expect(h.logs.at(-1)).not.toHaveProperty("failure");
+  });
+
   it("logs every request with its endpoint, status and handle id, never a handle or a key", async () => {
     const h = harness();
     await handleModelRelay(post("{}"), h.deps);

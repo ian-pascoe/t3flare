@@ -7,14 +7,17 @@
 // content negotiation and the API's own version headers), then the endpoint's headers and its credential: no header from
 // the Container can route the key elsewhere at a header-routed gateway (ADR-0034 §4). Redirects are not followed. Every
 // request is logged with its endpoint, status and the handle's id (its process's key), never a value. Pure, deps
-// injected; a CLI adds only its own config.
+// injected; a CLI adds only its own config. An error answer (SPI-1172) goes back in the vendor's own shape with its body
+// redacted, and its class, by the endpoint's API and auth, is logged.
 //
 // SPI-1168: a CLI with one base URL per process (Claude Code) uses the model-routed id `_`: the request's JSON body names
 // its model as `<endpointId>/<modelId>`, and the relay sends it to that endpoint with the model's own id in its place,
 // the rest of the body byte for byte (`routedBody.ts`). The handle is checked before the body is read, and its scope
 // then judges the endpoint as it judges one in the path.
 import { ENDPOINT_ID, type EndpointApi } from "@t3flare/models/endpoints";
-import { forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget } from "@t3flare/models/relay";
+import { classifyModelFailure, errorBodyOf, failureHeaders } from "@t3flare/models/failures";
+import { redactSecrets } from "@t3flare/models/redact";
+import { credentialHeaderOf, forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget } from "@t3flare/models/relay";
 import { HANDLE } from "@t3flare/workspace-client";
 
 import type { HandleCaller } from "./processHost.ts";
@@ -236,13 +239,37 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
     log(502, grant, { why: `redirected (HTTP ${upstream.status})`, dropped });
     return plain(502, `the Model endpoint ${endpointId} redirected (HTTP ${upstream.status}); the relay follows no redirect: fix its base URL`);
   }
-  // The dropped headers' names (never values) show what a CLI sends that the allowlist keeps back.
-  log(upstream.status, grant, { dropped });
   const answer = new Headers();
   for (const [name, value] of upstream.headers) if (!DROPPED_RESPONSE.has(name)) answer.append(name, value);
-  const body = observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, deps.usage);
-  return new Response(body, { status: upstream.status, statusText: upstream.statusText, headers: answer });
+  if (upstream.status < 400) {
+    // The dropped headers' names (never values) show what a CLI sends that the allowlist keeps back.
+    log(upstream.status, grant, { dropped });
+    const body = observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, deps.usage);
+    return new Response(body, { status: upstream.status, statusText: upstream.statusText, headers: answer });
+  }
+  // SPI-1172: an error answer goes back in the vendor's own shape (its status, its reset headers, its JSON with its codes),
+  // so the CLI reads its usage limit or refusal as it would the vendor's; its body is redacted first (the endpoint's own
+  // credential and any key, bearer or JWT shape), and its class is logged, classified by the endpoint's API and auth.
+  const text = (await errorBodyOf(upstream)) ?? "";
+  void upstream.body?.cancel().catch(() => undefined);
+  const auth = Object.keys(grant.target.headers).some((name) => name.toLowerCase() === credentialHeaderOf(grant.target.api, "").name) ? "api-key" : "none";
+  const failure = classifyModelFailure({ status: upstream.status, headers: failureHeaders(upstream.headers), body: text, at: deps.now() }, { id: endpointId, api: grant.target.api, auth });
+  log(upstream.status, grant, {
+    dropped,
+    ...(failure === undefined ? {} : { failure: { class: failure.class, code: failure.code, ...(failure.resetAt === undefined ? {} : { resetAt: failure.resetAt }) } }),
+  });
+  // The body's length (and any encoding) changed with the redaction.
+  answer.delete("content-length");
+  answer.delete("content-encoding");
+  return new Response(redactSecrets(text, credentialValues(grant.target.headers)), { status: upstream.status, statusText: upstream.statusText, headers: answer });
 };
+
+/** The values the endpoint's credential header carries (a bearer's token too), to redact wherever an answer echoes them. */
+const credentialValues = (headers: Readonly<Record<string, string>>): ReadonlyArray<string> =>
+  Object.values(headers).flatMap((value) => {
+    const bearer = /^Bearer\s+(\S+)$/i.exec(value)?.[1];
+    return bearer === undefined ? [value] : [value, bearer];
+  });
 
 /** What `authorizeModelRelay` needs of the Workspace DO and the Environment. */
 export interface AuthorizeDeps {
