@@ -29,11 +29,13 @@ const endpoints: ModelEndpoints = {
 const proxy = [{ slug: "anthropic/claude-haiku-5-5", name: "Claude Haiku 5.5", subProvider: "Anthropic", isCustom: false, capabilities: { optionDescriptors: [] } }];
 
 describe("OpenCode's Model endpoints", () => {
-  it("never takes a sign-in endpoint, which the relay does not carry yet (SPI-1164)", () => {
+  it("takes every sign-in through the relay (SPI-1171): ChatGPT, Claude and GitHub Copilot", () => {
     const chatgpt = { id: "chatgpt", label: "ChatGPT", api: "openai-responses" as const, baseUrl: "https://api.openai.com/v1", auth: "chatgpt" as const, headers: {}, models: [model("gpt-6.1-sol")] };
-    expect(opencodeEndpoints({ revision: 1, endpoints: [chatgpt] })).toEqual([]);
-    expect(opencodeRelayOf({ revision: 1, endpoints: [chatgpt] }, undefined)).toBeUndefined();
-    expect(opencodeEndpoints({ revision: 1, endpoints: [...endpoints.endpoints, chatgpt] }).map((endpoint) => endpoint.id)).toEqual(["comm", "openai", "or"]);
+    const claude = { ...chatgpt, id: "claude", label: "Claude", api: "anthropic-messages" as const, baseUrl: "https://api.anthropic.com", auth: "claude" as const, models: [model("claude-haiku-5-5")] };
+    const copilot = { ...chatgpt, id: "copilot", label: "GitHub Copilot", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot" as const };
+    expect(opencodeEndpoints({ revision: 1, endpoints: [chatgpt] }).map((endpoint) => endpoint.id)).toEqual(["chatgpt"]);
+    expect(opencodeRelayOf({ revision: 1, endpoints: [chatgpt] }, undefined)?.endpoints.map((endpoint) => endpoint.id)).toEqual(["chatgpt"]);
+    expect(opencodeEndpoints({ revision: 1, endpoints: [...endpoints.endpoints, chatgpt, claude, copilot] }).map((endpoint) => endpoint.id)).toEqual(["comm", "openai", "or", "chatgpt", "claude", "copilot"]);
   });
 
   it("takes the endpoints of the three APIs OpenCode speaks that list a model, in the owner's order", () => {

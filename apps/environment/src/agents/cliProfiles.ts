@@ -3,7 +3,7 @@
 // its only model provider with the key helper, and a home built fresh on the Container's own disk with only its session
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
-import { type ModelEndpoint, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { isSignIn, type ModelEndpoint, parseEndpointSlug, SIGN_IN_COMPAT } from "@t3flare/models/endpoints";
 import { endpointProviderId, MODEL_HANDLE_ENV, modelRelayUrl, type RelayedEndpoint } from "@t3flare/models/relay";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, RELAY_SERVERS_ENV, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
@@ -84,7 +84,8 @@ export interface ProfileContext {
  * it starts on.
  */
 export interface PiRelay {
-  readonly endpoints: ReadonlyArray<Pick<ModelEndpoint, "id" | "label" | "api" | "models">>;
+  /** Its auth, when a sign-in: its models take the sign-in's compatibility overrides (`SIGN_IN_COMPAT`, SPI-1171). */
+  readonly endpoints: ReadonlyArray<Pick<ModelEndpoint, "id" | "label" | "api" | "models"> & Partial<Pick<ModelEndpoint, "auth">>>;
   readonly model: string | undefined;
 }
 
@@ -307,8 +308,14 @@ const piEndpointModels = (endpoint: PiRelay["endpoints"][number]) =>
     maxTokens: model.maxTokens,
     // pi-ai's own entry's, as the Session's pi-ai models have them (`apps/agents/src/session/models.ts`).
     ...(model.thinkingLevelMap === undefined ? {} : { thinkingLevelMap: { ...model.thinkingLevelMap } }),
-    ...(model.compat === undefined ? {} : { compat: { ...model.compat } }),
+    ...compatOf(endpoint, model),
   }));
+
+/** A model's compat in pi's `models.json`: its catalog entry's, with its sign-in's overrides, as the Session's pi-ai has it. */
+const compatOf = (endpoint: PiRelay["endpoints"][number], model: PiRelay["endpoints"][number]["models"][number]) => {
+  const overrides = endpoint.auth !== undefined && isSignIn(endpoint.auth) ? SIGN_IN_COMPAT[endpoint.auth] : undefined;
+  return model.compat === undefined && overrides === undefined ? {} : { compat: { ...model.compat, ...overrides } };
+};
 
 /**
  * pi's `models.json` on the model relay (SPI-1170): one provider per endpoint it serves,

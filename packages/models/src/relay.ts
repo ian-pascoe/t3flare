@@ -3,7 +3,9 @@
 // their key. The Workers check the handle, swap in the endpoint's own credential and stream the request to the
 // endpoint's base URL unchanged. These are the pieces both Workers share: the route, the handle's variable, and what the
 // Environment answers for an endpoint (its target with the credential in its header). A CLI adds only its own config.
-import { ENDPOINT_APIS, type EndpointApi, isSignIn, type ModelEndpoint, type ModelEndpoints } from "./endpoints.ts";
+// SPI-1171: a sign-in's credential is the Credential broker's access token, asked for at each request, as a bearer; which
+// CLI takes which sign-in is `RELAYED_SIGN_INS`.
+import { ENDPOINT_APIS, type EndpointApi, type EndpointAuth, isSignIn, type ModelEndpoint, type ModelEndpoints, type SignIn, SIGN_IN_KINDS, SIGN_INS, signInRequestTarget } from "./endpoints.ts";
 
 /** The relay's path prefix in the Container's egress host. */
 export const MODEL_RELAY_PREFIX = "/t3flare/model/";
@@ -46,15 +48,31 @@ export interface RelayedEndpoint {
   readonly label: string;
 }
 
-/**
- * The endpoints the model relay carries: every one but a sign-in's (SPI-1164), whose token the relay does not carry yet
- * (SPI-1171). Every CLI's list of endpoints starts here (Codex, Claude Code, OpenCode), so none lists one it cannot reach.
- */
-export const relayedEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => (endpoints?.endpoints ?? []).filter((endpoint) => !isSignIn(endpoint.auth));
+/** The CLI agents on the model relay. */
+export type RelayCli = "codex" | "claude" | "opencode" | "pi";
 
-/** The relayed endpoints that speak `api`, in the owner's order: those a CLI that speaks it reaches through the relay. */
-export const endpointsOfApi = (endpoints: ModelEndpoints | undefined, api: EndpointApi): ReadonlyArray<ModelEndpoint> =>
-  relayedEndpoints(endpoints).filter((endpoint) => endpoint.api === api);
+/**
+ * The sign-ins each CLI takes through the relay (SPI-1171), as the ticket's matrix gives them: Codex the ChatGPT sign-in
+ * (a Responses provider), Claude Code the Claude sign-in, OpenCode and pi every one. An endpoint with a key or none is
+ * every CLI's whose API it speaks.
+ */
+export const RELAYED_SIGN_INS: Readonly<Record<RelayCli, ReadonlyArray<SignIn>>> = {
+  codex: ["chatgpt"],
+  claude: ["claude"],
+  opencode: SIGN_INS,
+  pi: SIGN_INS,
+};
+
+/**
+ * The endpoints the model relay carries for `cli`: every one with a key or none, and the sign-ins `cli` takes
+ * (`RELAYED_SIGN_INS`). Every CLI's list of endpoints starts here, so none lists one it cannot reach.
+ */
+export const relayedEndpoints = (endpoints: ModelEndpoints | undefined, cli: RelayCli): ReadonlyArray<ModelEndpoint> =>
+  (endpoints?.endpoints ?? []).filter((endpoint) => !isSignIn(endpoint.auth) || RELAYED_SIGN_INS[cli].includes(endpoint.auth));
+
+/** The endpoints relayed for `cli` that speak `api`, in the owner's order: those it reaches through the relay. */
+export const endpointsOfApi = (endpoints: ModelEndpoints | undefined, api: EndpointApi, cli: RelayCli): ReadonlyArray<ModelEndpoint> =>
+  relayedEndpoints(endpoints, cli).filter((endpoint) => endpoint.api === api);
 
 // What each API knows of keys and headers, in one place: the header its key goes in, and the request headers a CLI's
 // client sends that the endpoint needs. The relay takes a handle from the key headers and forwards only the allowed
@@ -94,28 +112,79 @@ const API_HEADERS: Readonly<Record<EndpointApi, ReadonlyArray<string>>> = {
 export const forwardedHeadersOf = (api: EndpointApi): ReadonlySet<string> => new Set([...FORWARDED_HEADERS, ...API_HEADERS[api]]);
 
 /**
- * What the Environment answers the relay for an endpoint: where to send the request (its base URL) and the headers to
- * add (the endpoint's own, then its credential's), or why not, as an HTTP status. `key` is the credential the headers
- * carry, for the Workspace DO's sync guard and leak check to look for (by hash), never to send anywhere else.
+ * The header a credential goes in at the relay: an API key in its API's (`credentialHeaderOf`); a sign-in's access token
+ * always as a bearer (`authorization`), on every sign-in's API (an Anthropic subscription token is refused as
+ * `x-api-key`: SPI-1161 Q4).
  */
+export const credentialHeaderFor = (api: EndpointApi, auth: EndpointAuth, credential: string): { readonly name: string; readonly value: string } =>
+  isSignIn(auth) ? { name: "authorization", value: `Bearer ${credential}` } : credentialHeaderOf(api, credential);
+
 /** Where the relay sends an endpoint's request: its API, auth, base URL and the headers to add (its credential's among them). */
 export interface RelayTarget {
   readonly api: EndpointApi;
-  /** The endpoint's auth: the relay carries no sign-in, so a key or none (SPI-1172: its failures are classified by it). */
-  readonly auth: "api-key" | "none";
+  /** The endpoint's auth: a key, none, or a sign-in (SPI-1171), by which its failures are classified (SPI-1172). */
+  readonly auth: EndpointAuth;
   readonly baseUrl: string;
   readonly headers: Readonly<Record<string, string>>;
 }
 
+/**
+ * Why a sign-in gave the relay no token now (SPI-1171), as the Credential broker said it: signed out (sign in again), or
+ * a passing failure, with when its vendor allows the next renewal. Never a token.
+ */
+export interface RelaySignInRefusal {
+  readonly api: EndpointApi;
+  readonly kind: SignIn;
+  readonly signedOut: boolean;
+  readonly problem: string;
+  readonly retryAt?: number;
+}
+
+/**
+ * What the Environment answers the relay for an endpoint: where to send the request (its base URL) and the headers to
+ * add (the endpoint's own, then its credential's), or why not, as an HTTP status. `key` is the credential the headers
+ * carry, for the Workspace DO's sync guard and leak check to look for (by hash), never to send anywhere else. A
+ * sign-in's refusal says why (`signIn`), so the relay can answer the CLI naming the sign-in.
+ */
 export type ModelRelayTarget =
   | (RelayTarget & { readonly ok: true; readonly key: string | null })
-  | { readonly ok: false; readonly status: number; readonly message: string };
+  | { readonly ok: false; readonly status: number; readonly message: string; readonly signIn?: RelaySignInRefusal };
 
-/** The relay's target for a resolved endpoint and its key (pure; the store's `resolve` gives both). */
-export const relayTargetOf = (resolved: { readonly endpoint: ModelEndpoint; readonly apiKey: string | undefined; readonly unreadable: boolean } | undefined, endpointId: string): ModelRelayTarget => {
+/** The Credential broker's answer for a sign-in, as the relay reads it (the Environment's `BrokerAccess`). */
+export type RelaySignInAccess =
+  | { readonly ok: true; readonly accessToken: string; readonly baseUrl?: string; readonly headers?: Readonly<Record<string, string>> }
+  | { readonly ok: false; readonly signedOut: boolean; readonly problem: string; readonly retryAt?: number };
+
+/** What the store's `resolve` gives the relay: the endpoint with its key, or its sign-in's answer at this request. */
+export interface RelayResolved {
+  readonly endpoint: ModelEndpoint;
+  readonly apiKey: string | undefined;
+  readonly unreadable: boolean;
+  readonly signIn?: RelaySignInAccess;
+}
+
+/** A sign-in endpoint's target with the broker's token (`signInRequestTarget`, the Session's rule), or why not. */
+const signInRelayTarget = (endpoint: ModelEndpoint, kind: SignIn, access: RelaySignInAccess): ModelRelayTarget => {
+  if (!access.ok) {
+    const title = SIGN_IN_KINDS[kind].title;
+    const signIn: RelaySignInRefusal = { api: endpoint.api, kind, signedOut: access.signedOut, problem: access.problem, ...(access.retryAt === undefined ? {} : { retryAt: access.retryAt }) };
+    return access.signedOut
+      ? { ok: false, status: 401, message: `the Model endpoint ${endpoint.id} is not signed in to ${title} (${access.problem}): sign in with ${title} again in the Harness panel`, signIn }
+      : { ok: false, status: 503, message: `the Model endpoint ${endpoint.id} could not get a ${title} token (${access.problem}): retry`, signIn };
+  }
+  const sent = signInRequestTarget(endpoint, access);
+  const credential = credentialHeaderFor(endpoint.api, kind, access.accessToken);
+  const headers = Object.fromEntries(Object.entries(sent.headers).filter(([name]) => name.toLowerCase() !== credential.name));
+  return { ok: true, api: endpoint.api, auth: kind, baseUrl: sent.baseUrl, headers: { ...headers, [credential.name]: credential.value }, key: access.accessToken };
+};
+
+/** The relay's target for a resolved endpoint and its key or sign-in (pure; the store's `resolve` gives them). */
+export const relayTargetOf = (resolved: RelayResolved | undefined, endpointId: string): ModelRelayTarget => {
   if (resolved === undefined) return { ok: false, status: 404, message: `no Model endpoint ${endpointId}: it was removed, or never saved` };
   const { endpoint, apiKey } = resolved;
-  if (isSignIn(endpoint.auth)) return { ok: false, status: 501, message: `the Model endpoint ${endpointId} is a sign-in, which the model relay does not carry yet` };
+  if (isSignIn(endpoint.auth)) {
+    return signInRelayTarget(endpoint, endpoint.auth, resolved.signIn ?? { ok: false, signedOut: true, problem: "this Environment has no Credential broker" });
+  }
   if (endpoint.auth === "none") return { ok: true, api: endpoint.api, auth: "none", baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers }, key: null };
   if (apiKey === undefined) {
     return {

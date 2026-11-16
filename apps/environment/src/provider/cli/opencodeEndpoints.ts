@@ -14,7 +14,7 @@ import { cliModelId } from "./acpFlavor.ts";
 import { relayPickerModels, relayTextModel } from "./relayModels.ts";
 
 /** The endpoints OpenCode reaches through the model relay: relayed, an API it has a provider package for, and a model. */
-export const opencodeEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => relayedEndpoints(endpoints).filter(opencodeServes);
+export const opencodeEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => relayedEndpoints(endpoints, "opencode").filter(opencodeServes);
 
 /** OpenCode's relay configuration for the endpoints as stored now, or undefined for the Model proxy (no such endpoint). */
 export const opencodeRelayOf = (endpoints: ModelEndpoints | undefined, textModel: string | undefined): OpenCodeRelay | undefined => {

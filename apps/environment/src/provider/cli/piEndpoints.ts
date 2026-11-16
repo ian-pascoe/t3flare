@@ -1,5 +1,6 @@
 // pi's Model endpoints (SPI-1170): pi speaks every endpoint API (it is pi-ai's coding agent, and an endpoint's API is
-// one pi-ai speaks), so every endpoint the relay carries (no sign-in yet, SPI-1164) that lists a model is pi's. With one, pi runs on them through the model relay,
+// one pi-ai speaks), so every endpoint the relay carries for pi (every sign-in too, SPI-1171) that lists a model is pi's.
+// With one, pi runs on them through the model relay,
 // not the Model proxy: one pi provider per endpoint (`t3flare-endpoint-<id>`, prefixed so no endpoint id changes one of
 // pi's built-in providers) at the relay's per-endpoint URL, so a model switch between two endpoints, across APIs, stays
 // in the thread's process. The choice is the Environment's, as Claude Code's and OpenCode's (SPI-1168, SPI-1169): with
@@ -20,12 +21,12 @@ import { snapshotModels } from "../models.ts";
 
 /**
  * Whether pi reaches one of the relay's endpoints: it lists a model (pi speaks every endpoint API). pi's own rule, on
- * top of the relay's (`relayedEndpoints`: no sign-in endpoint until SPI-1171).
+ * top of the relay's (`relayedEndpoints`, which carries every sign-in for pi since SPI-1171).
  */
 export const piServes = (endpoint: ModelEndpoint): boolean => endpoint.models.length > 0;
 
-/** The endpoints pi reaches through the model relay, in the owner's order: the relay's (no sign-in), each listing a model. */
-export const piEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => relayedEndpoints(endpoints).filter(piServes);
+/** The endpoints pi reaches through the model relay, in the owner's order: the relay's for pi, each listing a model. */
+export const piEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => relayedEndpoints(endpoints, "pi").filter(piServes);
 
 /** The picker's rows of pi's endpoints: by slug, grouped by endpoint, pi's thinking picker on reasoning models, the first the default. */
 const pickerOf = (own: ReadonlyArray<ModelEndpoint>): ReadonlyArray<ServerProviderModel> => snapshotModels({ models: [], fetchedAt: null }, { revision: 0, endpoints: own });

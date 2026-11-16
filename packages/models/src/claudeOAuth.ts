@@ -21,3 +21,19 @@ export const CLAUDE_INFERENCE_SCOPE = "user:inference";
  * hold it, and an API key must not.
  */
 export const CLAUDE_OAUTH_TOKEN_MARK = "sk-ant-oat";
+
+/**
+ * The request shape pi-ai gives a Claude subscription's token (anthropic-messages.js: `createClient` :786-801 for the
+ * headers, `getBetaFeatures` :858-859 for the betas, `buildParams` :911-926 for the identity block, `claudeCodeVersion`
+ * :45), which the model relay restates for a CLI's request on a Claude sign-in (SPI-1171): the CLI sends an API key's
+ * shape with its handle, and the relay adds these. `apps/agents/test/claudeSignInShape.test.ts` pins them to pi-ai's wire.
+ */
+export const CLAUDE_CODE_IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude.";
+/** The betas an OAuth token's requests open with, before the request's own. */
+export const CLAUDE_OAUTH_BETAS: ReadonlyArray<string> = ["claude-code-20250219", "oauth-2025-04-20"];
+/** The headers an OAuth token's requests carry beside the bearer (pi-ai's Claude Code identity headers). */
+export const CLAUDE_OAUTH_HEADERS: Readonly<Record<string, string>> = {
+  "anthropic-dangerous-direct-browser-access": "true",
+  "user-agent": "claude-cli/2.1.280",
+  "x-app": "cli",
+};

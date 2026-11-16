@@ -32,13 +32,15 @@ describe("pi's endpoints", () => {
 });
 
 describe("pi's endpoints and sign-ins", () => {
-  it("never takes a sign-in endpoint, which the relay does not carry yet (SPI-1164)", () => {
+  it("takes every sign-in through the relay (SPI-1171): ChatGPT, Claude and GitHub Copilot", () => {
     const chatgpt = { ...endpoint("chatgpt", "openai-responses", [model("gpt-6.1-sol")]), auth: "chatgpt" as const };
-    expect(piEndpoints({ revision: 1, endpoints: [chatgpt] })).toEqual([]);
-    expect(piRelayOf({ revision: 1, endpoints: [chatgpt] })).toBeUndefined();
-    expect(piModelsOf(catalog, { revision: 1, endpoints: [chatgpt] }).map((entry) => entry.slug)).toEqual(["anthropic/claude-sonnet-5-5"]);
+    const claude = { ...endpoint("claude", "anthropic-messages", [model("claude-haiku-5-5")]), auth: "claude" as const };
+    const copilot = { ...endpoint("copilot", "openai-responses", [model("gpt-6.1-sol")]), auth: "copilot" as const };
+    expect(piEndpoints({ revision: 1, endpoints: [chatgpt] }).map((entry) => entry.id)).toEqual(["chatgpt"]);
+    expect(piRelayOf({ revision: 1, endpoints: [chatgpt] })?.model).toBe("chatgpt/gpt-6.1-sol");
+    expect(piModelsOf(catalog, { revision: 1, endpoints: [chatgpt] }).map((entry) => entry.slug)).toEqual(["chatgpt/gpt-6.1-sol"]);
     const both = endpoints(endpoint("comm", "anthropic-messages", [model("c")]));
-    expect(piRelayOf({ revision: 1, endpoints: [chatgpt, ...both.endpoints] })?.endpoints.map((entry) => entry.id)).toEqual(["comm"]);
+    expect(piRelayOf({ revision: 1, endpoints: [chatgpt, claude, copilot, ...both.endpoints] })?.endpoints.map((entry) => entry.id)).toEqual(["chatgpt", "claude", "copilot", "comm"]);
   });
 });
 

@@ -9,7 +9,7 @@ import { CODEX_PROVIDER_ID } from "../../agents/cliProfiles.ts";
 import { codexModelRoute, type CodexModelRoute } from "./codexGuard.ts";
 
 /** The endpoints Codex reaches through the model relay: those that speak OpenAI Responses. */
-export const codexEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => endpointsOfApi(endpoints, "openai-responses");
+export const codexEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> => endpointsOfApi(endpoints, "openai-responses", "codex");
 
 /** Codex's models: the proxy's (`proxy`, as listed), then each Responses endpoint's by slug, labelled with the endpoint. */
 export const codexModelsOf = (proxy: ReadonlyArray<ServerProviderModel>, endpoints: ModelEndpoints = EMPTY_ENDPOINTS): ReadonlyArray<ServerProviderModel> => {

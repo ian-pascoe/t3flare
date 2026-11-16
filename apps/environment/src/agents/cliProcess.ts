@@ -121,7 +121,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     // The opening session (the wrapper's), when t3's adapter spawns inside `openSession`.
     const session = yield* CliSpawn;
     // SPI-1167: the Model endpoints Codex reaches through the model relay (OpenAI Responses), as stored now.
-    const responsesEndpoints = endpointsOfApi(services.modelEndpoints?.(), "openai-responses");
+    const responsesEndpoints = endpointsOfApi(services.modelEndpoints?.(), "openai-responses", "codex");
     // SPI-1168: Claude Code on the Anthropic Messages endpoints through the relay, when there is one (else the proxy).
     const claudeRelay = name === "claude-agent-acp" ? claudeRelayOf(services.modelEndpoints?.(), currentTextGenerationModel()) : undefined;
     // SPI-1169: OpenCode on the endpoints whose API it speaks, when there is one (else the proxy).

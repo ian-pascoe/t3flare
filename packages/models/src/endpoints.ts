@@ -160,6 +160,31 @@ export const signInHeaders = (kind: SignIn, accessToken: string): Readonly<Recor
 /** An endpoint's sign-in facts, or undefined for a key or no auth. */
 export const signInOf = (auth: EndpointAuth): SignInKind | undefined => (isSignIn(auth) ? SIGN_IN_KINDS[auth] : undefined);
 
+/**
+ * pi-ai's compatibility overrides for a sign-in's models (`Model.compat`), by kind: ChatGPT plan usage takes no
+ * mid-conversation effort (`configuration_update` items: pi-ai sends the level as `reasoning.effort` instead) and no
+ * Responses `tool_search` (SPI-1164, U77). Every pi-ai that sends a sign-in's requests applies them: the Session's and pi's
+ * on the model relay (SPI-1171).
+ */
+export const SIGN_IN_COMPAT: Readonly<Partial<Record<SignIn, Readonly<Record<string, unknown>>>>> = {
+  chatgpt: { supportsMidConvoEffort: false, supportsToolSearch: false },
+};
+
+/**
+ * Where a sign-in endpoint's request goes with the token the Credential broker gave, and the headers it takes beside the
+ * token: the credential's base URL when its kind allows that one (`credentialBaseUrl`, the broker's own rule, checked
+ * again), with the credential's headers (Copilot's, SPI-1166); otherwise the endpoint's own base URL and headers. The one
+ * rule for the Session's requests and the model relay's (SPI-1171).
+ */
+export const signInRequestTarget = (
+  endpoint: Pick<ModelEndpoint, "auth" | "baseUrl" | "headers">,
+  credential: Pick<EndpointCredential, "baseUrl" | "headers">,
+): { readonly baseUrl: string; readonly headers: Readonly<Record<string, string>> } => {
+  const allowed = signInOf(endpoint.auth)?.credentialBaseUrl ?? null;
+  const own = allowed !== null && credential.baseUrl !== undefined && allowed.test(credential.baseUrl) ? credential.baseUrl : undefined;
+  return own === undefined ? { baseUrl: endpoint.baseUrl, headers: { ...endpoint.headers } } : { baseUrl: own, headers: { ...endpoint.headers, ...credential.headers } };
+};
+
 // pi-ai's credential types, which the Credential broker implements (type-only: no pi-ai in the Environment's bundle).
 export type { Credential, CredentialStore, OAuthCredential } from "@earendil-works/pi-ai";
 

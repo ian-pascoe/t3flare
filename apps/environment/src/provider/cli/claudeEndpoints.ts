@@ -18,7 +18,7 @@ import { relayPickerModels, relayTextModel } from "./relayModels.ts";
  * `availableModels` come from them; an endpoint with none adds nothing, and none with a model leaves the proxy).
  */
 export const claudeEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> =>
-  endpointsOfApi(endpoints, "anthropic-messages").filter((endpoint) => endpoint.models.length > 0);
+  endpointsOfApi(endpoints, "anthropic-messages", "claude").filter((endpoint) => endpoint.models.length > 0);
 
 /** A model family's word (`opus`, `sonnet`) in a model id. */
 const familyOf = (family: string) => new RegExp(`(?:^|[-_./:])${family}(?:$|[-_.:])`, "i");

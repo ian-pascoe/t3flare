@@ -12,7 +12,7 @@ const endpoints: ModelEndpoints = {
     { id: "openai", label: "OpenAI", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api-key", headers: {}, models: [model("gpt-5-mini")] },
     { id: "claude", label: "Anthropic", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "api-key", headers: {}, models: [model("claude-haiku-5-5")] },
     { id: "gw", label: "Anthropic", api: "openai-responses", baseUrl: "https://gw.example.com/v1", auth: "none", headers: {}, models: [model("m1")] },
-    // A sign-in endpoint is not relayed yet (SPI-1171): Codex does not list it.
+    // SPI-1171: Codex takes a ChatGPT sign-in through the relay as a Responses provider, and not a Copilot one.
     { id: "chatgpt", label: "ChatGPT", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "chatgpt", headers: {}, models: [model("gpt-6.1-sol")] },
     { id: "copilot", label: "GitHub Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot", headers: {}, models: [model("gpt-6.1-sol")] },
   ],
@@ -26,6 +26,7 @@ describe("Codex's Model endpoints", () => {
       ["openai/gpt-5-mini", "OpenAI", "GPT-5-MINI"],
       // A label a proxy vendor has is told apart by the endpoint's id.
       ["gw/m1", "Anthropic · gw", "M1"],
+      ["chatgpt/gpt-6.1-sol", "ChatGPT", "GPT-6.1-SOL"],
     ]);
     expect(codexModelsOf(proxy)).toEqual(proxy);
   });
@@ -35,7 +36,8 @@ describe("Codex's Model endpoints", () => {
     expect(route("openai/gpt-5-mini")).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
     expect(route("claude/claude-haiku-5-5")).toEqual({ provider: "t3flare-proxy", model: "claude/claude-haiku-5-5" });
     expect(route("gemini-3-flash")).toEqual({ provider: "t3flare-proxy", model: "gemini-3-flash" });
-    // A sign-in's slug is no endpoint's for Codex (SPI-1171).
+    // A ChatGPT sign-in's slug is its provider's; a Copilot sign-in's is no endpoint's for Codex (SPI-1171).
+    expect(route("chatgpt/gpt-6.1-sol")).toEqual({ provider: "t3flare-endpoint-chatgpt", model: "gpt-6.1-sol" });
     expect(route("copilot/gpt-6.1-sol")).toEqual({ provider: "t3flare-proxy", model: "copilot/gpt-6.1-sol" });
     expect(codexRouteFor(() => undefined)("openai/gpt-5-mini")).toEqual({ provider: "t3flare-proxy", model: "openai/gpt-5-mini" });
   });

@@ -261,6 +261,22 @@ describe("pi's profile", () => {
       expect(JSON.stringify(models)).not.toContain("t3flare-model-key");
     });
 
+    it("gives a ChatGPT sign-in's models plan usage's compatibility overrides, as the Session's pi-ai has them (SPI-1171)", () => {
+      const signedIn: PiRelay = {
+        endpoints: [
+          { id: "chatgpt", label: "ChatGPT", api: "openai-responses", auth: "chatgpt", models: [endpointModel("gpt-6.1-sol", { compat: { supportsMidConvoEffort: true, supportsStrictTools: true } })] },
+          { id: "claude", label: "Claude", api: "anthropic-messages", auth: "claude", models: [endpointModel("claude-haiku-5-5")] },
+        ],
+        model: "chatgpt/gpt-6.1-sol",
+      };
+      const answer = profileLaunch({ cli: "pi", args: rpc, key: "proc-1", cwd: "/w/demo", env: { T3_PI_RUNTIME_MODE: "approval-required" }, allowProbe: false }, { ...context, piRelay: signedIn });
+      const models = fileOf(answer, "models.json");
+      expect(models.providers["t3flare-endpoint-chatgpt"].models[0].compat).toEqual({ supportsMidConvoEffort: false, supportsStrictTools: true, supportsToolSearch: false });
+      expect(models.providers["t3flare-endpoint-claude"].models[0].compat).toBeUndefined();
+      if ("refused" in answer) throw new Error(answer.refused);
+      expect(answer.modelRelay).toEqual(["chatgpt", "claude"]);
+    });
+
     it("starts pi on the relay's model, as pi names it, with no project trust", () => {
       expect(fileOf(onRelay(rpc), "settings.json")).toEqual({ defaultProjectTrust: "never", retry: { maxRetries: 1 }, defaultProvider: "t3flare-endpoint-oai", defaultModel: "gpt-x" });
     });
