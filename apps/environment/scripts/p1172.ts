@@ -13,6 +13,9 @@
 //                                                   thread, the Session's state nor (with --tail) either Worker's logs
 //                                                   hold one
 //   node scripts/stage.ts run p1172 p1172 overload  an overload (529) is retried and ends as a provider error, no pause
+//   node scripts/stage.ts run p1172 p1172 cli       Claude Code through the model relay on an endpoint whose key is
+//                                                   refused (Commissary's own 401): t3's failure is the relay's, naming
+//                                                   the endpoint, not the Model proxy key's text; the key is in no answer
 //   … [--model <endpointId>/<modelId>] [--out file.json]
 //
 // The fixture project is kept in `.alchemy/stages/<host>.p1172.json` (gitignored) between runs.
@@ -21,6 +24,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { cliTurn, enable } from "./lib/acpTurn.ts";
 import { admin, base, dispatch, itemsOf, mutateProject, pair, runsOf, sendMessage, SETTLED, sleep, updateSettings, uuid, waitFor, wsCall } from "./lib/client.ts";
 
 /** The made-up credentials the `anthropicKeyRefused` fault echoes (apps/agents/src/session/proxyLimits.ts). */
@@ -207,6 +211,37 @@ switch (step) {
     // pi-durable retries an overload (3 retries): four answers, then a provider error.
     check("four model requests (retried)", turn.proxy?.requests === 4, turn.proxy);
     check("a provider error, not a usage limit", failure.class === "provider_error" && failure.code === "overloaded", failure);
+    finish();
+  }
+  // eslint-disable-next-line no-fallthrough
+  case "cli": {
+    const proxyUrl = (process.env.MODEL_PROXY_URL ?? "").replace(/\/+$/, "");
+    if (!check("the stage's script has MODEL_PROXY_URL (dev.env)", proxyUrl !== "")) finish();
+    // A made-up key of no vendor's shape: only the relay's known-value redaction would catch an echo of it.
+    const refusedKey = `p1172-refused-${stamp}-not-a-real-key`;
+    const api = (method: string, pathname: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${pathname}`, body);
+    const saved = await api("POST", "endpoints", {
+      op: "save",
+      endpoint: { id: "badkey", label: "Refused key", api: "anthropic-messages", baseUrl: proxyUrl, auth: "api-key", headers: {}, models: ["claude-haiku-5-5"] },
+      apiKey: refusedKey,
+    });
+    check("the endpoint with a refused key saved", saved.status === 200, saved.status);
+    await enable(cookie, "claude");
+    await sleep(3000);
+    const turn = await cliTurn(cookie, { cli: "claude", workspace: `p1172-cli-${stamp}`, model: "badkey/claude-haiku-5-5", mode: "full-access", plan: false, prompt: "Reply with the single word: pong" });
+    const projection = await waitFor(cookie, turn.threadId, () => true, 10_000);
+    const errors = itemsOf(projection.projection).filter((item: any) => item.type === "error").map((item: any) => item.failure);
+    const failure = (turn.runs.at(-1)?.failure ?? errors.at(-1) ?? {}) as Record<string, any>;
+    report.cli = { runs: turn.runs.map((run: any) => ({ status: run.status })), failure, errorItems: errors };
+    check("the Claude Code turn failed", turn.runs.at(-1)?.status === "failed", turn.runs);
+    check(
+      "t3's failure is the relay's: a refused key naming the endpoint",
+      failure.class === "permission_error" && failure.code === "key_refused" && String(failure.message).startsWith('The Model endpoint "badkey" refused its API key (HTTP 401)'),
+      failure,
+    );
+    check("not the Model proxy key's text", !JSON.stringify(report.cli).includes("COMMISSARY_CONTAINER_API_KEY"), report.cli);
+    check("the refused key is in no answer", !JSON.stringify(projection.projection).includes(refusedKey));
+    await api("POST", "endpoints", { op: "remove", id: "badkey" });
     finish();
   }
   // eslint-disable-next-line no-fallthrough
