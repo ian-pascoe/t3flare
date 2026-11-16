@@ -4,11 +4,9 @@
 // endpoint cross that call: the endpoint is read from the Environment (`modelEndpoints`) and its key asked for its target
 // (`endpointCredential`), as a Session does (ADR-0018). The Worker has no public URL, so only that binding reaches it.
 //
-// Subscription endpoints (OAuth sign-ins, SPI-1164/1165) come through the same provider code a Session uses
-// (`endpointProviders` in session/models.ts). What SPI-1164 still touches for them here: `endpointProviders`' resolver and
-// `ENDPOINT_STREAMS` (a sign-in's credential from the broker, and its APIs, such as Codex's backend), and the texts that
-// say "API key" (`credentialProblem`, and `statusProblem` in endpointText.ts) for an endpoint whose credential is a
-// sign-in.
+// Sign-in endpoints (SPI-1164) come through the same provider code a Session uses (`endpointProviders` in
+// session/models.ts): the access token is the Credential broker's, asked for the same way, and their failures name the
+// sign-in (`credentialProblem`, `statusProblem` in endpointText.ts).
 import type { EndpointTextAnswer } from "@t3flare/models/endpoints";
 import { WorkerEntrypoint } from "cloudflare:workers";
 

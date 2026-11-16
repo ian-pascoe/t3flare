@@ -1,9 +1,11 @@
 // @effect-diagnostics globalConsole:off globalTimers:off globalDate:off
 // A Session's Model endpoints (SPI-1162): the endpoints it last took, kept secret-free in its storage so a restart has the
 // same providers; their providers installed in the Session's models in place; and their keys, asked of the Environment at
-// use time (ADR-0018) and kept in memory only, never in storage. Each request for a key names the target the Session
-// will send it to (API, base URL, headers), and the Environment gives it only for the endpoint's target now: a Session
-// still holding an endpoint the owner moved gets no key for the old target.
+// use time (ADR-0018) and kept in memory only, never in storage. A sign-in endpoint's access token (SPI-1164) comes the
+// same way, from the Credential broker, and is kept no later than shortly before its expiry, and dropped on a 401 or the
+// endpoint's sign-out. Each request for a key names the target the Session will send it to (API, base URL, headers), and
+// the Environment gives it only for the endpoint's target now: a Session still holding an endpoint the owner moved gets no
+// key for the old target.
 import type { MutableModels, FetchFunction } from "@earendil-works/pi-ai";
 import { EMPTY_ENDPOINTS, type EndpointCredential, type EndpointCredentialRequest, type EndpointTarget, type ModelEndpoints, targetKey } from "@t3flare/models/endpoints";
 
@@ -13,6 +15,11 @@ import { endpointProviders } from "./models.ts";
 export const ENDPOINTS_KEY = "t3flare:model-endpoints";
 /** How long an endpoint's key is kept in memory before it is asked for again. */
 export const ENDPOINT_KEY_TTL_MS = 5 * 60 * 1000;
+/**
+ * A sign-in's access token is kept no later than this before its expiry (SPI-1164): the broker renews one with less than
+ * five minutes left, so the next ask after this gets the renewed token.
+ */
+export const TOKEN_EXPIRY_MARGIN_MS = 2 * 60 * 1000;
 
 /** The Environment's answers (`EnvironmentRpc`). */
 export interface EndpointSource {
@@ -39,7 +46,7 @@ export class SessionEndpoints {
    * Keys in memory only, by endpoint and target: an answer for an old target (one that lands after a newer install) is
    * never used for another.
    */
-  readonly #keys = new Map<string, { readonly credential: EndpointCredential; readonly at: number }>();
+  readonly #keys = new Map<string, { readonly credential: EndpointCredential; readonly until: number; readonly endpointId: string }>();
 
   constructor(options: SessionEndpointsOptions) {
     this.#options = options;
@@ -48,7 +55,11 @@ export class SessionEndpoints {
 
   /** One provider per endpoint, in place: a removed endpoint's goes, so its models fail as unavailable. */
   #install(endpoints: ModelEndpoints): void {
-    const providers = endpointProviders(endpoints, { credential: (id, target) => this.#credential(id, target), ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }) });
+    const providers = endpointProviders(endpoints, {
+      credential: (id, target) => this.#credential(id, target),
+      refused: (id) => void this.drop(id),
+      ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }),
+    });
     const next = new Set(providers.map((provider) => provider.id));
     for (const id of this.#ids) if (!next.has(id)) this.#options.models.deleteProvider(id);
     for (const provider of providers) this.#options.models.setProvider(provider);
@@ -61,10 +72,28 @@ export class SessionEndpoints {
     const now = this.#options.now ?? Date.now;
     const cacheKey = JSON.stringify([endpointId, targetKey(target)]);
     const kept = this.#keys.get(cacheKey);
-    if (kept !== undefined && now() - kept.at < ENDPOINT_KEY_TTL_MS) return kept.credential;
+    if (kept !== undefined && now() < kept.until) return kept.credential;
     const credential = await this.#options.source().endpointCredential({ endpointId, target });
-    if (credential.apiKey !== null) this.#keys.set(cacheKey, { credential, at: now() });
+    if (credential.apiKey !== null) {
+      // A sign-in's token is kept no later than shortly before it expires; a key, for the TTL.
+      const until = Math.min(now() + ENDPOINT_KEY_TTL_MS, credential.expiresAt === undefined ? Number.POSITIVE_INFINITY : credential.expiresAt - TOKEN_EXPIRY_MARGIN_MS);
+      this.#keys.set(cacheKey, { credential, until, endpointId });
+    }
     return credential;
+  }
+
+  /**
+   * Drops what is kept for `endpointId` (its sign-out, or a 401 on its token, SPI-1164): its next request asks the
+   * Environment again. Whether anything was kept.
+   */
+  drop(endpointId: string): boolean {
+    let dropped = false;
+    for (const [key, kept] of this.#keys) {
+      if (kept.endpointId !== endpointId) continue;
+      this.#keys.delete(key);
+      dropped = true;
+    }
+    return dropped;
   }
 
   /**

@@ -13,7 +13,20 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import type { CatalogModel } from "@t3flare/models";
 import type { Catalog, ModelProxy } from "@t3flare/models/catalog";
-import { type EndpointApi, type EndpointCredential, type EndpointModel, endpointLabel, type EndpointTarget, type ModelEndpoint, type ModelEndpoints, targetOf } from "@t3flare/models/endpoints";
+import {
+  type EndpointApi,
+  type EndpointCredential,
+  type EndpointModel,
+  endpointLabel,
+  type EndpointTarget,
+  isSignIn,
+  type ModelEndpoint,
+  type ModelEndpoints,
+  SIGN_IN_TARGETS,
+  targetOf,
+} from "@t3flare/models/endpoints";
+
+import { planUsagePayload } from "./planUsage.ts";
 
 export type { ModelProxy };
 
@@ -128,13 +141,19 @@ export interface EndpointAccess {
   readonly credential: (endpointId: string, target: EndpointTarget) => Promise<EndpointCredential>;
   /** Every model request's fetch, where the API takes one. */
   readonly fetch?: FetchFunction;
+  /** A sign-in endpoint's request was refused (401): its token is dropped from memory, and asked for again (SPI-1164). */
+  readonly refused?: (endpointId: string) => void;
 }
 
 /** Why the Environment gave no key for an endpoint, as the turn (or the text generation) says it. */
-export const credentialProblem = (endpointId: string, { unreadable, changed }: EndpointCredential): string =>
+export const credentialProblem = (endpointId: string, { unreadable, changed, signedOut, problem }: EndpointCredential): string =>
   changed === true
     ? `${endpointLabel(endpointId)} changed or was removed since this Session took it: retry the turn.`
-    : unreadable === true
+    : signedOut === true
+      ? `${endpointLabel(endpointId)} is not signed in to ChatGPT${problem === undefined ? "" : ` (${problem})`}: sign in with ChatGPT again in the Harness panel.`
+      : problem !== undefined
+        ? `${endpointLabel(endpointId)} could not get a ChatGPT token (${problem}).`
+        : unreadable === true
       ? `${endpointLabel(endpointId)}'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`
       : `${endpointLabel(endpointId)} has no API key: set one in the Harness panel.`;
 
@@ -155,6 +174,14 @@ const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api
   ...(model.compat === undefined ? {} : { compat: model.compat as never }),
 });
 
+/** A sign-in endpoint's fetch: a 401 tells the Session to drop the token it holds (it may have been revoked). */
+const refusalWatch = (fetch: FetchFunction, onRefused: () => void): FetchFunction =>
+  (async (input: Parameters<FetchFunction>[0], init?: Parameters<FetchFunction>[1]) => {
+    const response = await fetch(input, init);
+    if (response.status === 401) onRefused();
+    return response;
+  }) as FetchFunction;
+
 /**
  * One pi-ai provider per endpoint, under the endpoint's id: a model's ref is `{ provider: <endpointId>, modelId }`, its t3
  * slug `<endpointId>/<modelId>`. Each resolves its key from `access.credential` at each request; an API-key endpoint
@@ -168,7 +195,7 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
       baseUrl: endpoint.baseUrl,
       auth: {
         apiKey: {
-          name: `${endpoint.label} API key`,
+          name: isSignIn(endpoint.auth) ? `${endpoint.label} sign-in` : `${endpoint.label} API key`,
           resolve: async () => {
             // The endpoint's headers go with every request as the resolved auth's headers: pi-ai sends those (it reads no
             // provider-level headers).
@@ -176,15 +203,17 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
             // pi-ai's APIs refuse a request without a key, so an endpoint with no auth sends a placeholder, never a secret.
             if (endpoint.auth === "none") return { auth: { apiKey: NO_KEY, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint (no key)" };
             // The key is asked for the target this provider sends it to; the Environment gives none for an old one.
+            // A sign-in's access token comes the same way (the Credential broker's, SPI-1164), for the same target rule.
             const credential = await access.credential(endpoint.id, targetOf(endpoint));
             if (credential.apiKey === null) throw new Error(credentialProblem(endpoint.id, credential));
-            return { auth: { apiKey: credential.apiKey, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint" };
+            return { auth: { apiKey: credential.apiKey, baseUrl: endpoint.baseUrl, headers }, source: isSignIn(endpoint.auth) ? "Model endpoint (sign-in)" : "Model endpoint" };
           },
         },
       },
       models: endpoint.models.map((model) => endpointModel(endpoint, model)),
       api: ENDPOINT_STREAMS[endpoint.api](),
     });
+    if (isSignIn(endpoint.auth)) return signInProvider(base, endpoint, access);
     const fetch = access.fetch;
     if (fetch === undefined || !TAKES_FETCH.has(endpoint.api)) return base;
     return {
@@ -195,3 +224,31 @@ export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAcc
       streamSimple: (model, context, options) => base.streamSimple(model, context, { ...options, fetch }),
     } satisfies Provider;
   });
+
+/**
+ * A sign-in endpoint's provider (SPI-1164): every request's body follows ChatGPT plan usage's rules (`planUsagePayload`,
+ * after any `onPayload` of the caller's), and a 401 drops the Session's token. Its API is the sign-in's own
+ * (`SIGN_IN_TARGETS`), which takes a request's `fetch`.
+ */
+const signInProvider = (base: Provider, endpoint: ModelEndpoint, access: EndpointAccess): Provider => {
+  const target = SIGN_IN_TARGETS[endpoint.auth as keyof typeof SIGN_IN_TARGETS];
+  if (target === undefined || !TAKES_FETCH.has(target.api)) return base;
+  const outer = access.fetch ?? (globalThis.fetch as FetchFunction);
+  const fetch = access.refused === undefined ? outer : refusalWatch(outer, () => access.refused?.(endpoint.id));
+  type Options = NonNullable<Parameters<Provider["streamSimple"]>[2]>;
+  const withRules = (options: Options | undefined): Options => {
+    const earlier = options?.onPayload;
+    return {
+      ...options,
+      fetch,
+      onPayload: async (params, model) => planUsagePayload((earlier === undefined ? undefined : await earlier(params, model)) ?? params),
+    };
+  };
+  return {
+    ...base,
+    // SAFETY: as above, only `fetch` and `onPayload` are added, both fields of every API's stream options; the cast
+    // restores the generic `ApiStreamOptions<T>` the spread widens.
+    stream: (model, context, options) => base.stream(model, context, withRules(options as Options | undefined) as typeof options),
+    streamSimple: (model, context, options) => base.streamSimple(model, context, withRules(options)),
+  } satisfies Provider;
+};

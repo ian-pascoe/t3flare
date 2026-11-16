@@ -835,6 +835,16 @@ export class SessionDO extends DurableObject<SessionEnv> {
     return { aborted: targets.length > 0 };
   }
 
+  /**
+   * SPI-1164: a sign-in endpoint was signed out (the Environment's panel): any access token this Session holds for it is
+   * dropped, so nothing more is sent with it. The Environment stops the turns of a Session on the endpoint (`abort`).
+   */
+  endpointSignedOut(input: { readonly endpointId: string }): Promise<{ readonly dropped: boolean }> {
+    const dropped = this.#endpoints.drop(String(input.endpointId));
+    console.log(JSON.stringify({ t3flare: "endpoint-signed-out", endpoint: String(input.endpointId), dropped }));
+    return Promise.resolve({ dropped });
+  }
+
   async #abortTurn(providerTurnId: string, reason: string): Promise<void> {
     const harness = await this.#opening;
     const turn = this.#turns()[providerTurnId];

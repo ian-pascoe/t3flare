@@ -191,4 +191,20 @@ describe("generateEndpointText", () => {
     const wire = recorder(() => anthropicOk(""));
     expect(await generate(endpoint("anthropic-messages"), { credential: keyFor().credential, fetch: wire.fetch })).toEqual({ ok: false, error: 'The Model endpoint "gw"\'s model small-mini returned no text.' });
   });
+
+  it("generates on a ChatGPT sign-in endpoint with the broker's token and plan usage's body, and names the sign-in when refused", async () => {
+    const chatgpt: ModelEndpoint = { ...endpoint("openai-responses", "chatgpt"), baseUrl: "https://api.openai.com/v1", headers: {} };
+    const refused = recorder(() => Response.json({ error: { message: VENDOR_BODY, code: "subscription_sharing_user_not_eligible" } }, { status: 403 }));
+    const error = errorOf(await generate(chatgpt, { credential: keyFor({ apiKey: "at-chatgpt", expiresAt: 4_000_000_000_000 }).credential, fetch: refused.fetch }));
+    expect(error).toBe('The Model endpoint "gw" refused its ChatGPT sign-in (HTTP 403): ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.');
+    expect(refused.sent[0]!.headers.authorization).toBe("Bearer at-chatgpt");
+    const body = JSON.parse(refused.sent[0]!.body) as Record<string, unknown>;
+    expect(body).toMatchObject({ store: false, stream: true });
+    expect(body).not.toHaveProperty("max_output_tokens");
+    const signedOut = recorder(() => anthropicOk("never"));
+    expect(errorOf(await generate(chatgpt, { credential: keyFor({ apiKey: null, signedOut: true }).credential, fetch: signedOut.fetch }))).toBe(
+      'The Model endpoint "gw" is not signed in to ChatGPT: sign in with ChatGPT again in the Harness panel.',
+    );
+    expect(signedOut.sent).toEqual([]);
+  });
 });

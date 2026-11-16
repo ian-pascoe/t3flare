@@ -13,6 +13,7 @@ import {
   type EndpointTextRequest,
   endpointLabel,
   isRecord,
+  isSignIn,
   jsonOnlyPrompt,
   type ModelEndpoint,
   type ModelEndpoints,
@@ -59,7 +60,9 @@ const statusProblem = (endpoint: ModelEndpoint, modelId: string, status: number)
   if (status === 401 || status === 403) {
     return endpoint.auth === "none"
       ? `${named} refused the request without a credential (HTTP ${status}): check its auth in the Harness panel.`
-      : `${named} refused its API key (HTTP ${status}): check it in the Harness panel.`;
+      : isSignIn(endpoint.auth)
+        ? `${named} refused its ChatGPT sign-in (HTTP ${status}): ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.`
+        : `${named} refused its API key (HTTP ${status}): check it in the Harness panel.`;
   }
   if (status === 404) return `${named} does not serve the model ${modelId} (HTTP 404).`;
   if (status === 429) return `${named} is rate- or usage-limited (HTTP 429): try again later.`;

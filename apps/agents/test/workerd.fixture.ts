@@ -119,7 +119,8 @@ export class SkillSetProbe extends DurableObject {
  * value the object stored, so a test can check the key was used and never kept.
  */
 export class EndpointsProbe extends DurableObject {
-  async run(input: { readonly key: string }): Promise<{ readonly sentKey: string | null; readonly reply: string; readonly stored: string }> {
+  /** `signIn` (SPI-1164): a ChatGPT sign-in endpoint, its access token as the broker gives it, on OpenAI's Responses API. */
+  async run(input: { readonly key: string; readonly signIn?: boolean }): Promise<{ readonly sentKey: string | null; readonly reply: string; readonly stored: string }> {
     const { createModels } = await import("@earendil-works/pi-ai");
     const { SessionEndpoints } = await import("../src/session/endpoints.ts");
     let sentKey: string | null = null;
@@ -133,9 +134,21 @@ export class EndpointsProbe extends DurableObject {
     ]
       .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
       .join("");
-    const fetcher = (async (_url: unknown, init?: RequestInit) => {
-      sentKey = new Headers(init?.headers).get("x-api-key");
-      return new Response(sse, { headers: { "content-type": "text/event-stream" } });
+    const item = { id: "msg_1", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "ready", annotations: [] }] };
+    const usage = { input_tokens: 1, output_tokens: 1, total_tokens: 2, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } };
+    const responses = [
+      { type: "response.created", response: { id: "resp_1", object: "response", status: "in_progress", model: "gpt-6.1-sol", output: [], usage } },
+      { type: "response.output_item.added", output_index: 0, item: { ...item, status: "in_progress", content: [] } },
+      { type: "response.output_text.delta", output_index: 0, content_index: 0, item_id: "msg_1", delta: "ready" },
+      { type: "response.output_item.done", output_index: 0, item },
+      { type: "response.completed", response: { id: "resp_1", object: "response", status: "completed", model: "gpt-6.1-sol", output: [item], usage } },
+    ]
+      .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+      .join("");
+    const fetcher = (async (url: unknown, init?: RequestInit) => {
+      const request = url instanceof Request ? url : new Request(String(url), init);
+      sentKey = input.signIn === true ? (request.headers.get("authorization")?.replace(/^Bearer /, "") ?? null) : request.headers.get("x-api-key");
+      return new Response(input.signIn === true ? responses : sse, { headers: { "content-type": "text/event-stream" } });
     }) as typeof fetch;
     const models = createModels();
     const endpoints = new SessionEndpoints({
@@ -145,18 +158,28 @@ export class EndpointsProbe extends DurableObject {
         modelEndpoints: async () => ({
           revision: 1,
           endpoints: [
-            {
-              id: "probe",
-              label: "Probe",
-              api: "anthropic-messages",
-              baseUrl: "https://endpoint.example",
-              auth: "api-key",
-              headers: {},
-              models: [{ id: "claude-haiku-5-5", name: "Claude Haiku 5.5", reasoning: false, input: ["text"], contextWindow: 200_000, maxTokens: 1_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: true }],
-            },
+            input.signIn === true
+              ? {
+                  id: "probe",
+                  label: "Probe",
+                  api: "openai-responses",
+                  baseUrl: "https://api.openai.com/v1",
+                  auth: "chatgpt",
+                  headers: {},
+                  models: [{ id: "claude-haiku-5-5", name: "GPT-6.1 Sol", reasoning: false, input: ["text"], contextWindow: 200_000, maxTokens: 1_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false }],
+                }
+              : {
+                  id: "probe",
+                  label: "Probe",
+                  api: "anthropic-messages",
+                  baseUrl: "https://endpoint.example",
+                  auth: "api-key",
+                  headers: {},
+                  models: [{ id: "claude-haiku-5-5", name: "Claude Haiku 5.5", reasoning: false, input: ["text"], contextWindow: 200_000, maxTokens: 1_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: true }],
+                },
           ],
         }),
-        endpointCredential: async () => ({ apiKey: input.key }),
+        endpointCredential: async () => ({ apiKey: input.key, ...(input.signIn === true ? { expiresAt: 4_000_000_000_000 } : {}) }),
       }),
       fetch: fetcher,
       readMs: 5_000,

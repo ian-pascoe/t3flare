@@ -21,4 +21,14 @@ describe("a Session's Model endpoint keys", () => {
     expect(stored).toContain("t3flare:model-endpoints");
     expect(stored).not.toContain(key);
   });
+
+  it("sends a sign-in's access token as a bearer and stores it nowhere (SPI-1164)", async () => {
+    const key = "at-probe-sign-in-never-stored-91c2";
+    const probe = bindings.ENDPOINTS_PROBE.get(bindings.ENDPOINTS_PROBE.newUniqueId());
+    const { sentKey, reply, stored } = await probe.run({ key, signIn: true });
+    expect(sentKey).toBe(key);
+    expect(reply).toBe("ready");
+    expect(stored).toContain("t3flare:model-endpoints");
+    expect(stored).not.toContain(key);
+  });
 });
