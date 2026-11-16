@@ -17,7 +17,8 @@
 //   when `stream` is false), its usage in the last chunk, under the model the request named: a Model endpoint keyed
 //   with a key of its own, for the usage records. `/relay/v1/messages` (Anthropic Messages) and `/relay/v1/responses`
 //   (OpenAI Responses) do the same in their APIs' stream shapes; a Messages model named `slow-…` sends its first event
-//   and then waits a minute, so a client that hangs up mid-stream can be seen.
+//   and then waits a minute, so a client that hangs up mid-stream can be seen. Both send subscription windows in their
+//   vendor's limit headers (SPI-1174), for the limit meters.
 //
 // `GET /log` (with the probe key as bearer) answers everything logged.
 import { DurableObject } from "cloudflare:workers";
@@ -232,7 +233,7 @@ export default {
     if (url.pathname.startsWith("/relay/v1/")) {
       // A bearer (OpenAI's APIs), or Anthropic's `x-api-key` (SPI-1173's Messages stand-in).
       const sawKey = authorization === `Bearer ${env.PROBE_KEY}` || request.headers.get("x-api-key") === env.PROBE_KEY;
-      await log.append({
+      const requestNumber = await log.append({
         at: new Date().toISOString(),
         kind: "relay",
         method: request.method,
@@ -243,13 +244,26 @@ export default {
       });
       if (!sawKey) return json({ error: { message: "the stand-in endpoint wants its key" } }, 401);
       if (url.pathname === "/relay/v1/models") return json({ object: "list", data: [{ id: "drip", object: "model" }] });
+      // SPI-1174: each answer reports subscription windows in its vendor's limit headers (Claude's unified ones on
+      // Messages, ChatGPT's Codex ones on Responses), the share used growing with each request, the resets fixed ahead.
+      const nowS = Math.floor(Date.now() / 1000);
+      const used = 5 + (requestNumber % 90);
       if (url.pathname === "/relay/v1/messages" && request.method === "POST") {
+        const limits = {
+          "anthropic-ratelimit-unified-status": "allowed",
+          "anthropic-ratelimit-unified-5h-status": "allowed",
+          "anthropic-ratelimit-unified-5h-utilization": String(used / 100),
+          "anthropic-ratelimit-unified-5h-reset": String(nowS + 2 * 3600),
+          "anthropic-ratelimit-unified-7d-status": "allowed",
+          "anthropic-ratelimit-unified-7d-utilization": "0.3",
+          "anthropic-ratelimit-unified-7d-reset": String(nowS + 3 * 86400),
+        };
         const asked = (await request.json().catch(() => ({}))) as { model?: unknown; stream?: unknown };
         const model = typeof asked.model === "string" ? asked.model : "standin";
         const usage = { input_tokens: 1000, cache_read_input_tokens: 300, cache_creation_input_tokens: 0 };
         const message = { id: "msg_standin", type: "message", role: "assistant", model, content: [] as Array<unknown>, stop_reason: null, stop_sequence: null, usage: { ...usage, output_tokens: 1 } };
         if (asked.stream !== true) {
-          return json({ ...message, content: [{ type: "text", text: "ready" }], stop_reason: "end_turn", usage: { ...usage, output_tokens: 3 } });
+          return Response.json({ ...message, content: [{ type: "text", text: "ready" }], stop_reason: "end_turn", usage: { ...usage, output_tokens: 3 } }, { headers: { "cache-control": "no-store", ...limits } });
         }
         const event = (data: { readonly type: string }) => `event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`;
         const encoder = new TextEncoder();
@@ -269,9 +283,17 @@ export default {
             controller.close();
           },
         });
-        return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+        return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store", ...limits } });
       }
       if (url.pathname === "/relay/v1/responses" && request.method === "POST") {
+        const limits = {
+          "x-codex-primary-used-percent": String(used),
+          "x-codex-primary-window-minutes": "300",
+          "x-codex-primary-reset-at": String(nowS + 2 * 3600),
+          "x-codex-secondary-used-percent": "30",
+          "x-codex-secondary-window-minutes": "10080",
+          "x-codex-secondary-reset-at": String(nowS + 3 * 86400),
+        };
         const asked = (await request.json().catch(() => ({}))) as { model?: unknown };
         const model = typeof asked.model === "string" ? asked.model : "standin";
         const item = { id: "msg_standin", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "ready", annotations: [] }] };
@@ -284,7 +306,7 @@ export default {
           { type: "response.output_item.done", sequence_number: 3, output_index: 0, item },
           { type: "response.completed", sequence_number: 4, response: { ...response, status: "completed", output: [item], usage } },
         ];
-        return new Response(events.map((data) => `event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`).join(""), { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+        return new Response(events.map((data) => `event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`).join(""), { headers: { "content-type": "text/event-stream", "cache-control": "no-store", ...limits } });
       }
       if (url.pathname === "/relay/v1/chat/completions" && request.method === "POST") {
         const asked = (await request.json().catch(() => ({}))) as { model?: unknown; stream?: unknown };
