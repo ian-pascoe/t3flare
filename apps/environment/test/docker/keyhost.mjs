@@ -145,7 +145,7 @@ http
       relay(req, res, url);
       return;
     }
-    log({ event: "http", method: req.method, path: url.pathname });
+    log({ event: "http", method: req.method, path: url.pathname, apiKeyIsHandle: HANDLE !== "" && req.headers["x-api-key"] === HANDLE, bearerIsHandle: HANDLE !== "" && req.headers.authorization === `Bearer ${HANDLE}` });
     res.writeHead(404).end();
   })
   .listen(80);

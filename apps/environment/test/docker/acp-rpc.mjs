@@ -3,7 +3,8 @@
 // without one (after the first), optionally sends one prompt, answers the agent's requests with an error (no client
 // file system, no terminal), logs every line to $LOG and prints a summary JSON.
 //   node acp-rpc.mjs '<json {cwd, settleMs?, waitMs?, model?, prompt?, turns?, lingerMs?, timeoutMs?}>' -- <command…>
-// `turns` (SPI-1169): prompts in the same session after the first, each on its own model (`{model, prompt}`); their stop
+// `turns` (SPI-1169): prompts in the same session after the first, each on its own model (`{model, prompt, config?}`,
+// `config` other config options to set first); their stop
 // reasons and errors in `summary.turns`.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -80,6 +81,7 @@ try {
   summary.sessionId = session?.sessionId ?? null;
   // The models the session offers: ACP v1's model state, or v2's `model` config option.
   const modelOption = (session?.configOptions ?? []).find((option) => option.id === "model" || option.category === "model");
+  summary.configOptions = (session?.configOptions ?? []).map((option) => ({ id: option.id, values: (option.options ?? []).flatMap((entry) => ("value" in entry ? [entry.value] : (entry.options ?? []).map((choice) => choice.value))).slice(0, 12) }));
   summary.models = session?.models?.availableModels?.map((entry) => entry.modelId) ?? (modelOption?.options ?? []).flatMap((entry) => ("value" in entry ? [entry.value] : (entry.options ?? []).map((choice) => choice.value)));
   // The session's model, as t3's adapter writes it before a turn (its `model` config option).
   if (scenario.model !== undefined && summary.sessionId !== null) {
@@ -102,6 +104,7 @@ try {
       const entry = { model: turn.model, stopReason: null, error: null };
       try {
         await request("session/set_config_option", { sessionId: summary.sessionId, configId: "model", value: turn.model });
+        for (const [configId, value] of Object.entries(turn.config ?? {})) await request("session/set_config_option", { sessionId: summary.sessionId, configId, value });
         const answer = await Promise.race([
           request("session/prompt", { sessionId: summary.sessionId, prompt: [{ type: "text", text: turn.prompt }] }),
           sleep(Math.max(deadline - Date.now(), 0)).then(() => ({ stopReason: "probe timeout" })),

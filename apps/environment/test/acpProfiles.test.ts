@@ -288,7 +288,16 @@ describe("OpenCode on the Model endpoints through the model relay (SPI-1169)", (
       name: "Commissary",
       package: "@opencode/ai/providers/anthropic-compatible",
       settings: { baseURL: "http://computer.internal/t3flare/model/comm/v1" },
-      models: { "claude-haiku-5-5": { name: "CLAUDE-HAIKU-5-5", capabilities: { input: ["text", "image"] }, limit: { context: 100_000, output: 8_000 } } },
+      // Each model pinned to the provider's package and base URL: a repository's model-level ones cannot move it.
+      models: {
+        "claude-haiku-5-5": {
+          name: "CLAUDE-HAIKU-5-5",
+          capabilities: { input: ["text", "image"] },
+          limit: { context: 100_000, output: 8_000 },
+          package: "@opencode/ai/providers/anthropic-compatible",
+          settings: { baseURL: "http://computer.internal/t3flare/model/comm/v1" },
+        },
+      },
     });
     expect(providers["t3flare-endpoint-oai"]).toMatchObject({ package: "@opencode/ai/providers/openai-compatible-responses", settings: { baseURL: "http://computer.internal/t3flare/model/oai" } });
     expect(providers["t3flare-endpoint-or"]).toMatchObject({ package: "@opencode/ai/providers/openai-compatible", settings: { baseURL: "http://computer.internal/t3flare/model/or" } });
