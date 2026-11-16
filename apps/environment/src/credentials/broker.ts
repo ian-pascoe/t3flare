@@ -23,7 +23,7 @@
 // survives an isolate's restart (the spike: pi-ai's in-memory `login()` does not). What the panel shows is a status
 // record with no secret: signed in or not, the account's email, the token's expiry, the attempt's start, the last
 // problem. Each sign-in kind's vendor (signIn.ts) does the talking; nothing here logs a token.
-import type { Credential, CredentialStore, SignIn } from "@t3flare/models/endpoints";
+import { type Credential, type CredentialStore, SIGN_IN_KINDS, type SignIn } from "@t3flare/models/endpoints";
 
 import type { KvStorage } from "../harness/keys.ts";
 import { CredentialsKeyMissing, type SealedStore } from "./sealed.ts";
@@ -152,10 +152,13 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     return next;
   };
   /**
-   * The account's fields as a sign-out leaves them: its subject always forgotten, its email kept only with a registration
-   * the vendor issued (OpenAI's client id, whose next sign-in is hinted with it); a vendor with none (Claude) keeps neither.
+   * The account's fields as a sign-out leaves them: its subject always forgotten, its email kept only where its kind's
+   * next sign-in is hinted with it (`SignInKind.keepsEmail`: ChatGPT's); otherwise (Claude) neither is kept.
    */
-  const forgotten = (endpointId: string): Pick<SignInStatus, "subject" | "email"> => ({ subject: null, email: status(endpointId).clientId === null ? null : status(endpointId).email });
+  const forgotten = (endpointId: string): Pick<SignInStatus, "subject" | "email"> => {
+    const { kind, email } = status(endpointId);
+    return { subject: null, email: kind !== null && SIGN_IN_KINDS[kind].keepsEmail ? email : null };
+  };
   const notSignedIn = (endpointId: string): BrokerAccess => ({ ok: false, signedOut: true, problem: status(endpointId).problem ?? "it is not signed in" });
 
   // --- The sealed credential (callers hold the lock to write) ---------------------------------------------------------

@@ -48,6 +48,11 @@ export interface SignInKind {
   readonly revocation: string | null;
   /** Headers the vendor needs beside the bearer token to list the sign-in's models. */
   readonly listHeaders: Readonly<Record<string, string>>;
+  /**
+   * Whether a sign-out keeps the account's email (its subject is always forgotten): true where the next sign-in is
+   * hinted with it (OpenAI's `login_hint`, with the client id OpenAI issued); otherwise the account is forgotten whole.
+   */
+  readonly keepsEmail: boolean;
 }
 
 /**
@@ -69,6 +74,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     },
     revocation: null,
     listHeaders: {},
+    keepsEmail: true,
   },
   claude: {
     api: "anthropic-messages",
@@ -85,6 +91,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     revocation: "Anthropic offers no revocation to apps: the grant stays on your Claude account until you remove it at claude.ai, under Settings, Claude Code (Authorization tokens).",
     // Anthropic takes a Claude sign-in's token as a bearer only with its OAuth beta (SPI-1161 Q4).
     listHeaders: { "anthropic-beta": "oauth-2025-04-20" },
+    keepsEmail: false,
   },
 };
 

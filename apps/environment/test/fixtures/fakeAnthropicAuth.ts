@@ -137,7 +137,9 @@ export const fakeAnthropic = (options: FakeAnthropicOptions = {}): FakeAnthropic
       await options.refreshGate;
       if (options.refreshError !== undefined) return oauthError(options.refreshError);
       if (options.refreshStatus !== undefined) {
-        return options.refreshBody === undefined ? new Response("upstream trouble", { status: options.refreshStatus }) : Response.json(options.refreshBody, { status: options.refreshStatus });
+        if (options.refreshBody === undefined) return new Response("<html>upstream trouble</html>", { status: options.refreshStatus, headers: { "content-type": "text/html" } });
+        if (options.refreshBody === "") return new Response(null, { status: options.refreshStatus });
+        return Response.json(options.refreshBody, { status: options.refreshStatus });
       }
       const record = refreshTokens.get(String(form.refresh_token));
       if (record === undefined || !record.alive) return oauthError("invalid_grant");

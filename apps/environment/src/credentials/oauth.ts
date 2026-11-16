@@ -16,12 +16,28 @@ export const pkceChallenge = async (verifier: string): Promise<string> =>
 
 export const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** An OAuth error's code from an answer's body (`{ error: "invalid_grant", … }`), or undefined; never the rest of it. */
-export const oauthErrorCode = async (response: Response): Promise<string | undefined> => {
-  try {
-    const body: unknown = await response.json();
-    return isRecord(body) && typeof body.error === "string" && /^[a-z_]{1,64}$/.test(body.error) ? body.error : undefined;
-  } catch {
-    return undefined;
-  }
+/**
+ * The options every request to a vendor's OAuth endpoints shares: bounded by `timeoutMs` (and the caller's overall
+ * `deadline`, when it has one), and never following a redirect, which would carry a code or a token wherever it points.
+ */
+export const oauthRequestOptions = (options: { readonly deadline?: AbortSignal | undefined; readonly timeoutMs?: number | undefined } = {}): Pick<RequestInit, "signal" | "redirect"> => {
+  const own = AbortSignal.timeout(options.timeoutMs ?? OAUTH_TIMEOUT_MS);
+  return { signal: options.deadline === undefined ? own : AbortSignal.any([own, options.deadline]), redirect: "manual" };
 };
+
+/**
+ * What an error answer's body says, without the rest of it: whether it was JSON at all (an OAuth or API error, as
+ * opposed to an edge's HTML page or nothing), and its OAuth error code (`{ error: "invalid_grant", … }`) when it has one.
+ */
+export const oauthErrorOf = async (response: Response): Promise<{ readonly json: boolean; readonly code: string | undefined }> => {
+  let body: unknown;
+  try {
+    body = JSON.parse(await response.text());
+  } catch {
+    return { json: false, code: undefined };
+  }
+  return { json: true, code: isRecord(body) && typeof body.error === "string" && /^[a-z_]{1,64}$/.test(body.error) ? body.error : undefined };
+};
+
+/** An OAuth error's code from an answer's body, or undefined; never the rest of it. */
+export const oauthErrorCode = async (response: Response): Promise<string | undefined> => (await oauthErrorOf(response)).code;

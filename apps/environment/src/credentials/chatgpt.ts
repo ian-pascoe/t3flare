@@ -15,7 +15,7 @@
 // discovery, and the redirect port is 1455 from the first registration onward.
 //
 // Every failure is one of our fixed texts: never a token, a code, a verifier, or the vendor's body.
-import { isRecord, OAUTH_TIMEOUT_MS, oauthErrorCode, pkceChallenge, random } from "./oauth.ts";
+import { isRecord, oauthErrorCode, oauthRequestOptions, pkceChallenge, random } from "./oauth.ts";
 import type { SignInVendor } from "./signIn.ts";
 
 /** OpenAI's endpoints for this flow (the authorize and token URLs as the docs give them; the rest from discovery). */
@@ -169,18 +169,13 @@ const pastedUrl = (pasted: string, redirectUri: string): URL | string => {
   return url;
 };
 
-/** A request's bound: its own 15 s, and the caller's overall deadline when it has one. */
-const bounded = (deadline?: AbortSignal): AbortSignal => (deadline === undefined ? AbortSignal.timeout(OAUTH_TIMEOUT_MS) : AbortSignal.any([AbortSignal.timeout(OAUTH_TIMEOUT_MS), deadline]));
-
 const post = async (vendor: ChatGptVendor, url: string, form: Record<string, string>, deadline?: AbortSignal): Promise<Response> =>
   vendor.fetch(url, {
     method: "POST",
     headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(form).toString(),
-    signal: bounded(deadline),
-    redirect: "manual",
+    ...oauthRequestOptions({ deadline }),
   });
-
 
 interface TokenAnswer {
   readonly access: string;
@@ -208,7 +203,7 @@ const tokenAnswer = (body: unknown): TokenAnswer | undefined => {
 };
 
 const getJson = async (vendor: ChatGptVendor, url: string, deadline?: AbortSignal): Promise<unknown> => {
-  const response = await vendor.fetch(url, { headers: { accept: "application/json" }, signal: bounded(deadline), redirect: "manual" });
+  const response = await vendor.fetch(url, { headers: { accept: "application/json" }, ...oauthRequestOptions({ deadline }) });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 };

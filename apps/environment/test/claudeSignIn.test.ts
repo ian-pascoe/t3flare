@@ -3,7 +3,7 @@
 // the state checked; the exchange; refresh with rotation; and no revocation, since Anthropic offers none. Each failure is
 // a fixed text that never holds a token, a code or the verifier.
 import { CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI, CLAUDE_SCOPES, CLAUDE_TOKEN_URL } from "@t3flare/models/claudeOAuth";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { claudeSignIn, completeClaudeSignIn, refreshClaude, startClaudeSignIn } from "../src/credentials/claude.ts";
 import { fakeAnthropic } from "./fixtures/fakeAnthropicAuth.ts";
@@ -75,6 +75,32 @@ describe("the Claude subscription sign-in", () => {
     expect(fake.counts.exchanges).toBe(0);
   });
 
+  it("bounds each request at 15 s by default", async () => {
+    const timeouts = vi.spyOn(AbortSignal, "timeout");
+    const fake = fakeAnthropic();
+    const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
+    await completeClaudeSignIn(vendorOf(fake), pending, fake.approve(authorizeUrl));
+    expect(timeouts).toHaveBeenCalledWith(15_000);
+    timeouts.mockRestore();
+  });
+
+  it("takes a code pasted in quotes, and asks again for one holding an address's characters, never exchanging it", async () => {
+    for (const quote of [['"', '"'], ["'", "'"], ["\u201C", "\u201D"], ["`", "`"]] as const) {
+      const fake = fakeAnthropic();
+      const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
+      const shown = fake.approve(authorizeUrl);
+      expect(await completeClaudeSignIn(vendorOf(fake), pending, ` ${quote[0]}${shown}${quote[1]} `), quote[0]).toMatchObject({ ok: true });
+    }
+    const fake = fakeAnthropic();
+    const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
+    const shown = fake.approve(authorizeUrl);
+    // Each holds the right state, followed by an address's characters: not what Anthropic's page shows.
+    for (const pasted of [`${shown}?x`, `${shown}&x=1`, `${shown}#more`, `x=${shown}`]) {
+      expect(await completeClaudeSignIn(vendorOf(fake), pending, pasted), pasted).toMatchObject({ ok: false, problem: expect.stringMatching(/^Copy all of the code/) });
+    }
+    expect(fake.counts.exchanges).toBe(0);
+  });
+
   it("gives up on a token endpoint that does not answer, within its bound, and the attempt keeps waiting", async () => {
     const fake = fakeAnthropic({ hang: true });
     const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
@@ -127,15 +153,21 @@ describe("the Claude subscription sign-in", () => {
     expect(await refreshClaude(vendorOf(fake), renewed.credential)).toMatchObject({ ok: false, refused: false, problem: expect.stringMatching(/HTTP 503/) });
   });
 
-  it("ends the sign-in on any refusal of the refresh (a grant removed at claude.ai), but not on Anthropic's passing trouble", async () => {
+  it("ends the sign-in on a JSON refusal of the refresh (a grant removed at claude.ai), but not on passing trouble or a body that is not JSON", async () => {
     const credential = { type: "oauth" as const, access: "sk-ant-oat01-a", refresh: "sk-ant-ort01-r", expires: NOW };
     const cases: Array<{ readonly status: number; readonly body?: unknown; readonly refused: boolean; readonly code?: string }> = [
       { status: 401, body: { error: "invalid_client" }, refused: true, code: "invalid_client" },
       { status: 400, body: { error: "unauthorized_client" }, refused: true, code: "unauthorized_client" },
       // No OAuth code at all (Anthropic's API error shape, or none): still the end of the sign-in, not "retry" forever.
       { status: 401, body: { type: "error", error: { type: "authentication_error", message: "OAuth token has been revoked" } }, refused: true, code: "http_401" },
-      { status: 403, refused: true, code: "http_403" },
+      { status: 403, body: { type: "error", error: { type: "permission_error", message: "x" } }, refused: true, code: "http_403" },
+      // Not JSON (an edge's HTML page, or nothing): passing trouble, retried; the sign-in is kept.
+      { status: 403, refused: false },
+      { status: 401, body: "", refused: false },
+      // Anthropic's passing codes, each.
       { status: 400, body: { error: "temporarily_unavailable" }, refused: false },
+      { status: 400, body: { error: "server_error" }, refused: false },
+      { status: 400, body: { error: "slow_down" }, refused: false },
       { status: 429, body: { error: "rate_limit_error" }, refused: false },
     ];
     for (const entry of cases) {
