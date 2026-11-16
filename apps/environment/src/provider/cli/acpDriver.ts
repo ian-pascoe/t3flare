@@ -42,7 +42,6 @@ import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import {
   type AcpCli,
   acpModelCapabilities,
-  cliModelId,
   cliPermissionDisposition,
   cliPromptFailure,
   cliRuntimeModeForSessionMode,
@@ -53,6 +52,7 @@ import {
 } from "./acpFlavor.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { claudeModelId, claudeModelsOf } from "./claudeEndpoints.ts";
+import { opencodeModelId, opencodeModelsOf } from "./opencodeEndpoints.ts";
 import { refreshOnEndpointsChanged } from "../../endpoints/changes.ts";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { CliSpawn, CliTurn, type CliSessions, wrapCliAdapter } from "./wrapper.ts";
@@ -156,7 +156,8 @@ export interface AcpCliDriverSpec {
 /** The snapshot's note on what of t3's settings form is ignored here (plan §3.1). */
 const IGNORED_SETTINGS: Readonly<Record<AcpCli, string>> = {
   claude: "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints (else the model proxy); the binary, home, launch arguments and custom models settings are not used.",
-  opencode: "Runs OpenCode in the Workspace's Container on the model proxy; the binary, server URL, password and custom models settings are not used.",
+  opencode:
+    "Runs OpenCode in the Workspace's Container on the Anthropic Messages, OpenAI Responses and OpenAI-compatible Model endpoints (else the model proxy); the binary, server URL, password and custom models settings are not used.",
 };
 
 const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
@@ -168,8 +169,8 @@ const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
       presentation: spec.presentation,
       enabled,
       checkedAt,
-      // SPI-1168: Claude Code's are the Anthropic Messages endpoints' when there is one.
-      models: spec.cli === "claude" ? claudeModelsOf(proxy, services.modelEndpoints?.()) : proxy,
+      // SPI-1168, SPI-1169: each CLI's are its endpoints' when there is one.
+      models: spec.cli === "claude" ? claudeModelsOf(proxy, services.modelEndpoints?.()) : opencodeModelsOf(proxy, services.modelEndpoints?.()),
       // SPI-1151: the built-ins that run here (none: t3's ACP adapter refuses `/compact` without a compacting flavor).
       slashCommands: CLI_BUILT_IN_COMMANDS[spec.cli],
       probe: { installed: true, version: spec.version, status: "ready", auth: { status: "authenticated" }, message: IGNORED_SETTINGS[spec.cli] },
@@ -180,7 +181,7 @@ export interface AcpFlavorOptions {
   readonly buildPrompt?: AcpAdapterV2Flavor["buildPrompt"];
   /** The unguarded runtime (tests replay a recorded agent); by default the CLI through the process channel. */
   readonly spawn?: AcpAdapterV2Flavor["makeRuntime"];
-  /** SPI-1168: the Model endpoints as stored now, for Claude Code's model ids (an endpoint's by its slug). Absent: none. */
+  /** SPI-1168, SPI-1169: the Model endpoints as stored now, for the CLI's model ids (an endpoint's by its slug). Absent: none. */
   readonly modelEndpoints?: () => ModelEndpoints | undefined;
 }
 
@@ -198,7 +199,7 @@ export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpF
   permissionDisposition: cliPermissionDisposition,
   promptFailure: (cause) => cliPromptFailure(cause),
   requiresSignIn: () => false,
-  resolveModelId: (selection) => (cli === "claude" ? claudeModelId(selection.model, options.modelEndpoints?.()) : cliModelId(cli, selection.model)),
+  resolveModelId: (selection) => (cli === "claude" ? claudeModelId : opencodeModelId)(selection.model, options.modelEndpoints?.()),
   ...(options.buildPrompt === undefined ? {} : { buildPrompt: options.buildPrompt }),
   // Review F1: the plan is captured when Claude asks to leave plan mode (guardedRuntime), not after the turn settles.
   registerExtensions: ({ runtime, captureProposedPlan }) =>
@@ -285,8 +286,8 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
     ),
   }).pipe(Effect.orDie);
   yield* Effect.forkScoped(snapshot.refresh);
-  // SPI-1168: Claude Code's model list follows the Model endpoints at once, as Codex's does.
-  if (spec.cli === "claude") yield* refreshOnEndpointsChanged(snapshot.refresh);
+  // SPI-1168, SPI-1169: the model list follows the Model endpoints at once, as Codex's does.
+  yield* refreshOnEndpointsChanged(snapshot.refresh);
   const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
   const sessions: CliSessions = new Map();
   // t3's own tools with t3's per-thread bearer, as stock t3 hands them, at t3's public `/mcp` (owner, 2026-11-12, back

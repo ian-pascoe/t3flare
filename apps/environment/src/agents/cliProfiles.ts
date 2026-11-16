@@ -4,12 +4,12 @@
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
 import { parseEndpointSlug } from "@t3flare/models/endpoints";
-import { MODEL_HANDLE_ENV, modelRelayUrl, type RelayedEndpoint } from "@t3flare/models/relay";
+import { endpointProviderId, MODEL_HANDLE_ENV, modelRelayUrl, type RelayedEndpoint } from "@t3flare/models/relay";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, RELAY_SERVERS_ENV, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
 
-import { acpProfileLaunch, type ClaudeRelay, environmentSkillsLink } from "./acpProfiles.ts";
+import { acpProfileLaunch, type ClaudeRelay, environmentSkillsLink, type OpenCodeRelay } from "./acpProfiles.ts";
 
 /**
  * The CLIs the channel runs; `probe` is M1's test program (stages only). Step 4b: Claude Code and OpenCode over ACP. A
@@ -32,7 +32,7 @@ export const CODEX_PROVIDER_ID = "t3flare-proxy";
  * The Codex provider of a Model endpoint (SPI-1167): derived from the endpoint's id, which never changes, so a rollout
  * that names it resumes. Prefixed, so no endpoint id can take one of Codex's built-in ids (`openai`, `ollama`, …).
  */
-export const codexEndpointProvider = (endpointId: string): string => `t3flare-endpoint-${endpointId}`;
+export const codexEndpointProvider = endpointProviderId;
 /** The variable the key helper sends as its nonce; Codex's shells never see it (review F4). */
 export const NONCE_ENV = "T3FLARE_MODEL_KEY_NONCE";
 
@@ -72,6 +72,11 @@ export interface ProfileContext {
    * Model proxy. Absent: the proxy.
    */
   readonly claudeRelay?: ClaudeRelay;
+  /**
+   * SPI-1169: OpenCode on the endpoints whose API it speaks through the model relay (`opencodeRelayOf`), instead of the
+   * Model proxy. Absent: the proxy.
+   */
+  readonly opencodeRelay?: OpenCodeRelay;
 }
 
 /** The relay's URL for `server` as the Container reaches it. */

@@ -25,6 +25,13 @@ export const MODEL_ROUTED_ID = "_";
 export const modelRoutedRelayUrl = modelRelayUrl(MODEL_ROUTED_ID);
 
 /**
+ * A CLI's provider id for a Model endpoint (Codex's, SPI-1167; OpenCode's, SPI-1169): derived from the endpoint's id,
+ * which never changes, so a session that names it resumes. Prefixed, so no endpoint id can take one of the CLI's
+ * built-in provider ids (`openai`, `ollama`, `openrouter`, …) and inherit its catalog entry.
+ */
+export const endpointProviderId = (endpointId: string): string => `t3flare-endpoint-${endpointId}`;
+
+/**
  * What a CLI profile reads of an endpoint it configures for the relay: its id (the route's and the CLI's provider's) and
  * label. A `ModelEndpoint` is one; the narrow type keeps the profiles from reading anything else.
  */

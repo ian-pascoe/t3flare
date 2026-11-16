@@ -224,6 +224,9 @@ describe("OpenCode's profile", () => {
     const last = (action: string, resource: string) => policies.filter((entry) => entry.action === action && matches(entry.resource, resource)).at(-1)?.effect;
     expect(last("provider.use", "openai")).toBe("deny");
     expect(last("provider.use", "t3flare")).toBe("allow");
+    // On the proxy, no model handle is asked for.
+    const answer = launch("opencode", ["acp"]);
+    expect("refused" in answer ? undefined : answer.modelRelay).toBeUndefined();
     // The project's own plugins, MCP servers, skills and agents (owner, 2026-11-12, back to stock); no vendor account.
     for (const [action, resource] of [["plugin.use", "/w/demo/.opencode/plugins/x.ts"], ["mcp.use", "repo-server"], ["skill.use", "anything"], ["tool.use", "subagent:repo-agent"]]) {
       expect(last(action!, resource!), action).toBeUndefined();
@@ -245,5 +248,66 @@ describe("OpenCode's profile", () => {
     expect(violations(schema, schema, json)).toEqual([]);
     // The checker itself: a malformed statement is caught.
     expect(violations(schema, schema, { ...json, policies: [{ action: "tool.use", resource: "*", effect: "maybe" }] })).not.toEqual([]);
+    // SPI-1169: the relay's configuration too.
+    expect(violations(schema, schema, fileOf(relayedOpenCode(), "/opencode.json").json)).toEqual([]);
+  });
+});
+
+const endpointModel = (id: string, input: ReadonlyArray<"text" | "image"> = ["text"]) => ({ id, name: id.toUpperCase(), reasoning: false, input, contextWindow: 100_000, maxTokens: 8_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false });
+const opencodeRelayed: ProfileContext = {
+  ...context,
+  opencodeRelay: {
+    endpoints: [
+      { id: "comm", label: "Commissary", api: "anthropic-messages", models: [endpointModel("claude-haiku-5-5", ["text", "image"])] },
+      { id: "oai", label: "OpenAI", api: "openai-responses", models: [endpointModel("gpt-5-mini")] },
+      { id: "or", label: "OpenRouter", api: "openai-completions", models: [endpointModel("anthropic/claude-opus-5-5")] },
+      // Not offered: an API OpenCode has no package for here, and an endpoint with no model.
+      { id: "gem", label: "Gemini", api: "google-generative-ai", models: [endpointModel("gemini-x")] },
+      { id: "empty", label: "Empty", api: "anthropic-messages", models: [] },
+    ],
+    model: "comm/claude-haiku-5-5",
+    smallModel: "oai/gpt-5-mini",
+  },
+};
+const relayedOpenCode = (env: Record<string, string> = {}) => profileLaunch({ cli: "opencode", args: ["acp"], key: "proc-7", cwd: "/w/demo", env, allowProbe: false }, opencodeRelayed);
+
+describe("OpenCode on the Model endpoints through the model relay (SPI-1169)", () => {
+  it("asks for a model handle for the endpoints it gets a provider for, and never takes one from t3's environment", () => {
+    const answer = relayedOpenCode({ T3FLARE_MODEL_HANDLE: "a".repeat(64) });
+    if ("refused" in answer) throw new Error(answer.refused);
+    expect(answer.modelRelay).toEqual(["comm", "oai", "or"]);
+    expect(JSON.stringify(answer)).not.toContain("a".repeat(64));
+    expect(answer.droppedEnv).toEqual(["T3FLARE_MODEL_HANDLE"]);
+  });
+
+  it("gives each endpoint its own provider at the relay's per-endpoint URL, its package by API, and nothing of the proxy's", () => {
+    const { json } = fileOf(relayedOpenCode(), "/opencode.json");
+    const providers = json.providers as Record<string, { name: string; package: string; settings: Record<string, unknown>; models: Record<string, unknown> }>;
+    expect(Object.keys(providers)).toEqual(["t3flare-endpoint-comm", "t3flare-endpoint-oai", "t3flare-endpoint-or"]);
+    expect(providers["t3flare-endpoint-comm"]).toEqual({
+      name: "Commissary",
+      package: "@opencode/ai/providers/anthropic-compatible",
+      settings: { baseURL: "http://computer.internal/t3flare/model/comm/v1" },
+      models: { "claude-haiku-5-5": { name: "CLAUDE-HAIKU-5-5", capabilities: { input: ["text", "image"] }, limit: { context: 100_000, output: 8_000 } } },
+    });
+    expect(providers["t3flare-endpoint-oai"]).toMatchObject({ package: "@opencode/ai/providers/openai-compatible-responses", settings: { baseURL: "http://computer.internal/t3flare/model/oai" } });
+    expect(providers["t3flare-endpoint-or"]).toMatchObject({ package: "@opencode/ai/providers/openai-compatible", settings: { baseURL: "http://computer.internal/t3flare/model/or" } });
+    // A model id holding `/` is its provider's model as is.
+    expect(Object.keys(providers["t3flare-endpoint-or"]!.models)).toEqual(["anthropic/claude-opus-5-5"]);
+    expect(json).toMatchObject({ model: "t3flare-endpoint-comm/claude-haiku-5-5", small_model: "t3flare-endpoint-oai/gpt-5-mini" });
+    // No key in the file: the plugin gives the handle; nothing of the Model proxy's.
+    expect(JSON.stringify(json)).not.toMatch(/apiKey|x-api-key|proxy\.example|"t3flare"/i);
+    expect(json.plugins).toEqual(["/opt/t3flare/share/opencode-key-plugin"]);
+  });
+
+  it("admits only the endpoints' providers", () => {
+    const { json } = fileOf(relayedOpenCode(), "/opencode.json");
+    const policies = json.policies as Array<{ action: string; resource: string; effect: string }>;
+    expect(policies.filter((entry) => entry.action === "provider.use")).toEqual([
+      { action: "provider.use", resource: "*", effect: "deny" },
+      { action: "provider.use", resource: "t3flare-endpoint-comm", effect: "allow" },
+      { action: "provider.use", resource: "t3flare-endpoint-oai", effect: "allow" },
+      { action: "provider.use", resource: "t3flare-endpoint-or", effect: "allow" },
+    ]);
   });
 });

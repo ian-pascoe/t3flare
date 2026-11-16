@@ -15,9 +15,15 @@
 // sends each request to its model's endpoint), and its key is the process's model handle, which `apiKeyHelper` reads
 // from the launcher's environment (`CLAUDE_HANDLE_HELPER`). The managed settings are the Container's, shared by every
 // Claude process in it, so nothing in them is one process's.
+//
+// SPI-1169: with an endpoint whose API OpenCode speaks (Anthropic Messages, OpenAI Responses, OpenAI-compatible
+// Completions), OpenCode runs on the endpoints through the model relay instead (`OpenCodeRelay`): one OpenCode provider
+// per endpoint (`t3flare-endpoint-<id>`, its package by API), each at the relay's per-endpoint URL, and the image's
+// plugin gives each the process's model handle as its key, from OpenCode's own start environment.
 import type { CatalogModel } from "@t3flare/models";
 import { SMALL_MODEL_SLUG, DEFAULT_MODEL_SLUG } from "@t3flare/models";
-import { modelRoutedRelayUrl } from "@t3flare/models/relay";
+import { type EndpointApi, type ModelEndpoint, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { endpointProviderId, modelRelayUrl, modelRoutedRelayUrl } from "@t3flare/models/relay";
 import { CLI_HOMES } from "@t3flare/sandbox-image/process";
 import { SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT } from "@t3flare/workspace-client";
@@ -41,7 +47,10 @@ export const environmentSkillsLink = (path: string) => ({ path, target: SKILLS_M
 export const CLAUDE_PROJECTS = `${HARNESS_ROOT}/claude/projects`;
 /** Where OpenCode's database snapshot lives, synced (plan §7, M4). */
 export const OPENCODE_SNAPSHOT_DIR = `${HARNESS_ROOT}/opencode`;
-/** The image's OpenCode key plugin (apps/sandbox-image/image/opencode-key-plugin). */
+/**
+ * The image's OpenCode key plugin (apps/sandbox-image/image/opencode-key-plugin): the Model proxy's key from the key
+ * helper, or (SPI-1169) the process's model handle on each endpoint's provider.
+ */
 export const OPENCODE_KEY_PLUGIN = "/opt/t3flare/share/opencode-key-plugin";
 /** The helper Claude Code runs for its key: the image's, reading this process's nonce from its home. */
 export const CLAUDE_KEY_HELPER = `${CLI_BIN}/t3flare-claude-key`;
@@ -66,6 +75,36 @@ export interface ClaudeRelay {
   readonly opusModel: string | undefined;
   readonly sonnetModel: string | undefined;
 }
+/**
+ * OpenCode on the Model endpoints (SPI-1169, `provider/cli/opencodeEndpoints.ts` `opencodeRelayOf`): the endpoints whose
+ * API it speaks that list a model (its handle is for these), the default model's and the small model's slugs.
+ */
+export interface OpenCodeRelay {
+  readonly endpoints: ReadonlyArray<Pick<ModelEndpoint, "id" | "label" | "api" | "models">>;
+  readonly model: string | undefined;
+  readonly smallModel: string | undefined;
+}
+
+/**
+ * OpenCode's provider package for each API it speaks, and the path its base URL takes beyond the endpoint's: Anthropic's
+ * SDK appends `/messages` to a base URL that holds `/v1` (an endpoint's base URL does not, as pi-ai's), the OpenAI
+ * packages `/responses` and `/chat/completions` to one that does. Other APIs' endpoints are not offered to OpenCode.
+ */
+export const OPENCODE_PACKAGES: Readonly<Partial<Record<EndpointApi, { readonly package: string; readonly path: string }>>> = {
+  "anthropic-messages": { package: "@opencode/ai/providers/anthropic-compatible", path: "/v1" },
+  "openai-responses": { package: "@opencode/ai/providers/openai-compatible-responses", path: "" },
+  "openai-completions": { package: "@opencode/ai/providers/openai-compatible", path: "" },
+};
+
+/** The relay's endpoints OpenCode gets a provider for: an API it speaks, and a model. */
+const opencodeRelayEndpoints = (relay: OpenCodeRelay) => relay.endpoints.filter((endpoint) => OPENCODE_PACKAGES[endpoint.api] !== undefined && endpoint.models.length > 0);
+
+/** The model as OpenCode names it on the relay: its endpoint's provider and the model's own id. */
+export const opencodeEndpointModel = (slug: string): string | undefined => {
+  const parsed = parseEndpointSlug(slug);
+  return parsed === undefined ? undefined : `${endpointProviderId(parsed.endpointId)}/${parsed.modelId}`;
+};
+
 /** The `claude` binary the image installs (the SDK's linux-x64 platform package). */
 export const CLAUDE_EXECUTABLE = "/opt/t3flare/claude/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude";
 
@@ -234,34 +273,78 @@ const deny = (action: string, resource = "*") => ({ action, resource, effect: "d
 const allow = (action: string, resource: string) => ({ action, resource, effect: "allow" as const });
 
 /**
- * OpenCode's system configuration (`/etc/opencode/opencode.json`). `relayServers`: the MCP relay's servers (ADR-0028),
- * admitted by policy and their tools allowed without OpenCode's prompt (the relay decides and asks).
+ * Where OpenCode gets its models (SPI-1169): the Model proxy (its one `t3flare` provider, the key plugin asking the key
+ * helper), or the model relay (one provider per endpoint, the key plugin giving each the process's model handle).
  */
-export const opencodeConfig = (proxyUrl: string, models: ReadonlyArray<CatalogModel>, relayServers: ReadonlyArray<string> = []) => {
-  const ids = new Set(models.map((model) => model.id));
-  const pick = (slug: string) => (ids.has(idOf(slug)) ? idOf(slug) : models[0]?.id);
+export type OpenCodeMode = { readonly kind: "proxy"; readonly proxyUrl: string; readonly models: ReadonlyArray<CatalogModel> } | { readonly kind: "relay"; readonly relay: OpenCodeRelay };
+
+/** OpenCode's mode for a profile's context: the relay's when it has an `opencodeRelay`, else the proxy's. */
+export const opencodeModeOf = (context: Pick<ProfileContext, "proxyUrl" | "models" | "opencodeRelay">): OpenCodeMode =>
+  context.opencodeRelay === undefined ? { kind: "proxy", proxyUrl: context.proxyUrl, models: context.models } : { kind: "relay", relay: context.opencodeRelay };
+
+/** A model's entry in an OpenCode provider: its name, inputs and limits. */
+const opencodeModelEntry = (model: { readonly name: string; readonly input: ReadonlyArray<string>; readonly contextWindow: number; readonly maxTokens: number }) => ({
+  name: model.name,
+  capabilities: { input: [...model.input] },
+  limit: { context: model.contextWindow, output: model.maxTokens },
+});
+
+/** The providers, default and small models of a mode, as OpenCode names them (`<provider>/<model>`). */
+const opencodeProviders = (mode: OpenCodeMode) => {
+  if (mode.kind === "proxy") {
+    const { proxyUrl, models } = mode;
+    const ids = new Set(models.map((model) => model.id));
+    const pick = (slug: string) => (ids.has(idOf(slug)) ? `t3flare/${idOf(slug)}` : models[0] === undefined ? undefined : `t3flare/${models[0].id}`);
+    return {
+      providers: {
+        t3flare: {
+          name: "Model proxy",
+          package: "@opencode/ai/providers/anthropic-compatible",
+          settings: { baseURL: `${proxyUrl}/v1` },
+          models: Object.fromEntries(models.map((model) => [model.id, opencodeModelEntry(model)])),
+        },
+      },
+      model: pick(DEFAULT_MODEL_SLUG),
+      small: pick(SMALL_MODEL_SLUG),
+    };
+  }
+  const { relay } = mode;
+  const providers: Record<string, unknown> = {};
+  for (const endpoint of opencodeRelayEndpoints(relay)) {
+    const wiring = OPENCODE_PACKAGES[endpoint.api]!;
+    providers[endpointProviderId(endpoint.id)] = {
+      name: endpoint.label,
+      package: wiring.package,
+      // The relay's per-endpoint URL: the key plugin gives the handle only to a provider whose base URL is this.
+      settings: { baseURL: `${modelRelayUrl(endpoint.id)}${wiring.path}` },
+      models: Object.fromEntries(endpoint.models.map((model) => [model.id, opencodeModelEntry(model)])),
+    };
+  }
+  return {
+    providers,
+    model: relay.model === undefined ? undefined : opencodeEndpointModel(relay.model),
+    small: relay.smallModel === undefined ? undefined : opencodeEndpointModel(relay.smallModel),
+  };
+};
+
+/**
+ * OpenCode's system configuration (`/etc/opencode/opencode.json`). `relayServers`: the MCP relay's servers (ADR-0028),
+ * admitted by policy and their tools allowed without OpenCode's prompt (the relay decides and asks). `mode`: the
+ * proxy's or the model relay's (SPI-1169, `opencodeModeOf`); only its providers are usable.
+ */
+export const opencodeConfig = (mode: OpenCodeMode, relayServers: ReadonlyArray<string> = []) => {
   // The relay's tools are not asked about by OpenCode: the relay decides and asks on the thread (one card per write).
   const asking = [...ASKING, ...relayServers.map((server) => allow(`${server}_*`, "*"))];
-  const main = pick(DEFAULT_MODEL_SLUG);
-  const small = pick(SMALL_MODEL_SLUG);
+  const { providers, model, small } = opencodeProviders(mode);
   return {
     $schema: "https://opencode.ai/config.json",
-    providers: {
-      t3flare: {
-        name: "Model proxy",
-        package: "@opencode/ai/providers/anthropic-compatible",
-        settings: { baseURL: `${proxyUrl}/v1` },
-        models: Object.fromEntries(
-          models.map((model) => [model.id, { name: model.name, capabilities: { input: [...model.input] }, limit: { context: model.contextWindow, output: model.maxTokens } }]),
-        ),
-      },
-    },
-    ...(main === undefined ? {} : { model: `t3flare/${main}` }),
-    ...(small === undefined ? {} : { small_model: `t3flare/${small}` }),
+    providers,
+    ...(model === undefined ? {} : { model }),
+    ...(small === undefined ? {} : { small_model: small }),
     plugins: [OPENCODE_KEY_PLUGIN],
     policies: [
       deny("provider.use"),
-      allow("provider.use", "t3flare"),
+      ...Object.keys(providers).map((provider) => allow("provider.use", provider)),
       // No vendor account (K3): OpenCode's sign-in and its hosted web search.
       deny("integration.connect"),
       deny("websearch.use"),
@@ -286,6 +369,7 @@ const opencodeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnsw
   if (input.args.length !== 1 || input.args[0] !== "acp") return { refused: `OpenCode runs here only as \`opencode acp\` (not \`opencode ${input.args.join(" ")}\`)` };
   const home = homeOf(input.key);
   const thread = input.env.T3CODE_THREAD_ID;
+  const mode = opencodeModeOf(context);
   return {
     argv: [`${CLI_BIN}/opencode`, "acp"],
     env: {
@@ -301,10 +385,12 @@ const opencodeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnsw
       OPENCODE_DISABLE_CLAUDE_CODE: "1",
       OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
     },
-    files: [{ path: `${home}/opencode.json`, text: `${JSON.stringify(opencodeConfig(context.proxyUrl, context.models, relayNames(context)), null, 1)}\n` }],
+    files: [{ path: `${home}/opencode.json`, text: `${JSON.stringify(opencodeConfig(mode, relayNames(context)), null, 1)}\n` }],
     // SPI-1153: the Environment skill set as OpenCode's user-level root (`$XDG_CONFIG_HOME/opencode/skills`).
     links: [environmentSkillsLink(`${home}/config/opencode/skills`)],
     ...(thread === undefined ? {} : { thread }),
+    // SPI-1169: the Workspace DO gives the process a model handle for these endpoints, in its environment only.
+    ...(mode.kind === "relay" ? { modelRelay: opencodeRelayEndpoints(mode.relay).map((endpoint) => endpoint.id) } : {}),
     droppedEnv: dropped(input.env),
   } satisfies Launch;
 };
