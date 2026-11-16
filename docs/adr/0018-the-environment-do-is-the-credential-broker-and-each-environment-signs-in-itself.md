@@ -77,9 +77,9 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
     and identity as the system's first block, its tool names), pinned in a test; the shape follows from the token, so an
     API-key endpoint refuses such a token as its key, and the shape reaches no other endpoint. Its tokens last 8 hours
     and its refresh token rotates on every refresh, a replaced one refused (SPI-1161 Q5), so item 3's one refresher
-    matters most here. Any refusal of a refresh (400, 401 or 403, whatever its body, but Anthropic's passing codes)
+    matters most here. A refusal of a refresh (a 400, 401 or 403 with a JSON body, but Anthropic's passing codes)
     signs the endpoint out, so a grant removed at claude.ai ends the sign-in rather than failing every turn as
-    retryable. Sign-out forgets the account whole (Claude has no registration to keep, so its email goes too).
+    retryable; a body that is not JSON (an edge's page) is retried. The accepted cost: a JSON 400, 401 or 403 during an incident at Anthropic would sign the owner out (sign in again; the old grant stays at claude.ai), weighed against retrying a removed grant's refresh forever; what Anthropic answers for a removed grant is unverified. Sign-out forgets the account whole (Claude has no registration to keep, so its email goes too).
     **Anthropic offers no revocation to apps** (SPI-1161: `platform.claude.com/v1/oauth/revoke`
     answers 404): sign-out deletes the tokens here and stops the Sessions; the grant stays on the owner's account until the
     owner removes it at claude.ai (Settings, Claude Code), which the panel says beside the sign-in, in Sign out's confirmation

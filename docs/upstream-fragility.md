@@ -1397,8 +1397,8 @@ undocumented OAuth for Claude Code, whose use outside Claude Code is the owner's
     token lacks the mark.
   - **Anthropic** (the spike, SPI-1161): the token answer's fields (`access_token`, `refresh_token`, `expires_in` 28800,
     `scope`, `account.uuid`, `account.email_address`), a refresh token that rotates on every refresh and refuses a
-    replaced one with `invalid_grant` (any 400, 401 or 403 but Anthropic's passing codes is taken as the end of the
-    sign-in), no revocation endpoint, and `GET /v1/models` with the bearer and the OAuth beta
+    replaced one with `invalid_grant` (a 400, 401 or 403 with a JSON body, but Anthropic's passing codes, is taken as
+    the end of the sign-in; the accepted cost: a JSON 400, 401 or 403 during an incident at Anthropic would sign the owner out (sign in again; the old grant stays at claude.ai), weighed against retrying a removed grant's refresh forever; what Anthropic answers for a removed grant is unverified), no revocation endpoint, and `GET /v1/models` with the bearer and the OAuth beta
     for the model list.
 - **Breaks when**: pi-ai changes Claude Code's client, URLs or scopes, the exchange or refresh body, the token mark,
   the headers, betas, user agent's version, identity text or tool names; Anthropic changes what it requires of an OAuth
