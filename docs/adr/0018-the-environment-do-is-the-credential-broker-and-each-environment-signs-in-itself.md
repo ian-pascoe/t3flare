@@ -20,9 +20,9 @@ Each Environment signs in itself: a rotating credential is never copied from the
 Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
 
 1. **A sign-in is a Model endpoint's auth.** An endpoint's auth is an API key, none, or a sign-in (`chatgpt` first,
-   `claude` second (item 10); Copilot follows in SPI-1166, each one entry in `SIGN_IN_KINDS` and one vendor in the broker).
-   A sign-in fixes its endpoint's API and base URL and allows no headers of the owner's; its auth never changes (remove
-   the endpoint to change it). Until the hard cut (SPI-1176), Subscriptions may also stay connected in the Model proxy.
+   `claude` second (item 10), `copilot` third (item 11), each one entry in `SIGN_IN_KINDS` and one vendor in the broker).
+   A sign-in fixes its endpoint's API and base URL and allows no headers of the owner's (Copilot's base URL is its
+   token's, item 11); its auth never changes (remove the endpoint to change it). Until the hard cut (SPI-1176), Subscriptions may also stay connected in the Model proxy.
 2. **The broker is ours, not t3's.** `credentials/broker.ts` implements pi-ai's `CredentialStore` over the sealed store
    (ADR-0034 §4: AES-256-GCM under the stage's credentials key), keyed by the endpoint's id. t3's `CodexChatGptAuth` is
    not reused: sign-ins are edited on the Harness panel, not t3's provider settings, and the Environment's bundle keeps
@@ -46,7 +46,7 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
    issued client id and the account's email, for the next sign-in); then every open Session drops the endpoint's token,
    and stops its live turns when they run on the endpoint (the Session's own storage says, so it holds after a restart);
    then the vendor revokes the refresh token that was current (ChatGPT: at discovery's revocation endpoint, retried
-   twice, 30 s in all; Claude: Anthropic offers no revocation, item 10), whatever happened to the Sessions (each is given 5 s). The panel says `revoked` only when the
+   twice, 30 s in all; Claude and Copilot: the vendor offers no revocation, items 10 and 11), whatever happened to the Sessions (each is given 5 s). The panel says `revoked` only when the
    vendor confirmed it. Removing a signed-in endpoint signs it out first; a completed sign-in whose endpoint cannot be
    saved, or which a sign-out overtook during its code exchange, is revoked at once, as is a grant the sign-in does not
    keep (no plan-usage scope, an ID token that does not check out). Sign-out forgets the account (its subject), so the
@@ -101,6 +101,37 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
     identity), as pi-ai's do, since Anthropic refuses an OAuth token's requests without the identity (SPI-1161 Q4). The
     panel names the risk as the owner's beside the sign-in.
 
+11. **GitHub Copilot is a Copilot plan through GitHub's device flow** (SPI-1166; report
+    [`docs/steps/spi-1166.md`](../steps/spi-1166.md)), with the Copilot editor's public GitHub client, as pi-ai signs in
+    to Copilot: the panel shows GitHub's device page and a code, the owner enters it there and approves, and the
+    Environment asks GitHub whether it was approved once per panel ask, no sooner than GitHub's interval (slowed as
+    `slow_down` says). The device code is sealed with the attempt, as item 7's state and verifier are; no paste.
+
+    **Two tokens.** The long-lived GitHub token is the sign-in's grant, sealed, and sent only to GitHub's Copilot token
+    endpoint. The short-lived Copilot token (about 30 minutes) is derived from it under item 3's lock, once however many
+    Sessions ask, and given to a Session with the base URL the token names (`proxy-ep`, as pi-ai derives it, only on
+    `githubcopilot.com`) and the editor headers Copilot requires. Neither the base URL nor the headers are the endpoint's
+    stored config: the endpoint keeps a fixed stand-in base URL for the target rule, and its requests go where the token
+    says. The Session adds what pi-ai adds for its own `github-copilot` provider (the `X-Initiator` and `Openai-Intent`
+    headers; no thinking-off `reasoning`), pinned on the wire against pi-ai's own provider. The endpoint speaks
+    Copilot's Responses API only (one API per endpoint): Copilot's Claude and Gemini models, on its Messages and Chat
+    Completions APIs, are not listed on it.
+
+    **A refused renewal signs the endpoint out**, by item 10's rule: a 400, 401 or 403 whose body is an error object
+    (GitHub's `{ message }` or an OAuth error), unless it is a rate limit (`retry-after`, or `x-ratelimit-remaining: 0`,
+    as GitHub answers its rate limits with 403 or 429). That is a revoked GitHub token, or an account whose Copilot plan
+    ended; anything else is passing trouble, retried and shown on the panel. The accepted cost is item 10's: an error
+    object at 401 or 403 during an incident at GitHub signs the owner out.
+
+    **GitHub offers this client no revocation**: it revokes an app's token only with the app's client secret, which a
+    public client has none of. Sign-out deletes the tokens here and stops the Sessions; the grant stays on the owner's
+    GitHub account until the owner revokes it at github.com, under Settings, Applications, which the panel says beside
+    the sign-in, in Sign out's confirmation and in its answer.
+
+    **The terms-of-service risk is the owner's.** The client is the Copilot editor extension's; GitHub's terms may not
+    allow a Copilot plan's usage outside its own editors, and its requests present themselves as that editor (its
+    headers), as pi-ai's do. The panel names the risk as the owner's beside the sign-in (provisional, SPI-1166's E2).
+
 Considered and not taken:
 
 - **ChatGPT's device code on the Codex backend** (the spike's go): its sign-in runs in a Worker, but every request from
@@ -110,5 +141,10 @@ Considered and not taken:
   bring Subscriptions into t3flare, and the hard cut (SPI-1176) removes the proxy.
 - **pi-ai's state as the verifier** for Claude: it puts the PKCE verifier in the browser's address and on Anthropic's
   page beside the code; a state of our own costs nothing, and Anthropic accepted it (the first real sign-in, on p1165).
+- **pi-ai's Copilot `login()`**: it polls GitHub in a loop held in memory, which an isolate's restart loses; and it
+  switches on the account's "unconfigured" model policies, which t3flare leaves to the owner.
+- **One Copilot endpoint over all three of Copilot's APIs** (a per-model API): every endpoint has one API, which the
+  target rule, the relay and the CLIs' lists build on; a second Copilot sign-in endpoint per API is the follow-up if
+  the owner wants its Claude models.
 - **t3's `CodexChatGptAuth`** (step-2a2's plan): it is the same OAuth flow, but tied to t3's provider settings and secret
   store, which the panel's sign-ins do not use.
