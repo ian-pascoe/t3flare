@@ -293,7 +293,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
       streaming && observed !== null
         ? observed.pipeThrough(
           sseErrors(redact, async (event) => {
-            const failure = classify(200, event);
+            const failure = classify(event.status ?? 200, event.body);
             log(upstream.status, grant, { stream: "error-event", ...logged(failure) });
             await report(failure);
           }),

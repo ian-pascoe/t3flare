@@ -646,34 +646,132 @@ describe("the over-cap replacement in each API's own error shape (SPI-1172, revi
   });
 });
 
-describe("a stream's error events, held only while a line may be one (SPI-1172, rebased on SPI-1173)", () => {
-  const run = async (pieces: ReadonlyArray<string>) => {
-    const reported: Array<string> = [];
+describe("a stream's error events, held only while a line may be one (SPI-1172, rebased on SPI-1173; review 3)", () => {
+  /** The watcher over `pieces`: what it passed on per piece, and what it reported. `gate` holds each report until opened. */
+  const run = async (pieces: ReadonlyArray<string>, gate?: Promise<void>) => {
+    const reported: Array<{ readonly body: string; readonly status?: number }> = [];
     const emitted: Array<string> = [];
-    const writer = sseErrors(
-      (text) => text.replace(KEY, "[redacted]"),
-      (body) => void reported.push(body),
+    const watcher = sseErrors(
+      (text) => text.replaceAll(KEY, "[redacted]"),
+      async (error) => {
+        reported.push(error);
+        await gate;
+      },
     );
     const reading = (async () => {
-      const reader = writer.readable.getReader();
+      const reader = watcher.readable.getReader();
       for (;;) {
         const { done, value } = await reader.read();
         if (done) return;
         emitted.push(new TextDecoder().decode(value));
       }
     })();
-    const w = writer.writable.getWriter();
-    for (const piece of pieces) await w.write(new TextEncoder().encode(piece));
-    await w.close();
+    const writer = watcher.writable.getWriter();
+    for (const piece of pieces) await writer.write(new TextEncoder().encode(piece));
+    await writer.close();
     await reading;
-    return { reported, emitted };
+    return { reported, emitted, text: emitted.join("") };
   };
+  const anthropicError = `{"type":"error","error":{"type":"overloaded_error","message":"${KEY}"}}`;
 
   it("an error event cut across pieces is held to its end, redacted and reported; other lines go on piece by piece", async () => {
-    const { reported, emitted } = await run(['data: {"type":"message_st', 'art"}\n\ndata: {"type":"err', `or","error":{"type":"overloaded_error","message":"${KEY}"}}\n\n`]);
+    const { reported, emitted, text } = await run(['data: {"type":"message_st', 'art"}\n\ndata: {"type":"err', `or","error":{"type":"overloaded_error","message":"${KEY}"}}\n\n`]);
     expect(emitted[0]).toBe('data: {"type":"message_st');
-    expect(emitted.join("")).not.toContain(KEY);
-    expect(emitted.join("")).toContain('"overloaded_error"');
+    expect(text).not.toContain(KEY);
+    expect(text).toContain('"overloaded_error"');
     expect(reported).toHaveLength(1);
+  });
+
+  it("spaced JSON and no space after data: are error events too", async () => {
+    for (const line of [`data:${anthropicError}`, `data:  { "type": "error", "error": { "type": "overloaded_error", "message": "${KEY}" } }`, `data: { "error": { "message": "${KEY}", "code": "insufficient_quota" } }`]) {
+      const { reported, text } = await run([`${line}\n\n`]);
+      expect(text, line).not.toContain(KEY);
+      expect(reported, line).toHaveLength(1);
+    }
+  });
+
+  it("a line decided as passing stays passing across pieces, even when its continuation looks like an opening", async () => {
+    const pieces = ['data: {"type":"content_block_delta","delta":{"text":"', `data: {"type":"error" ${KEY}`, '"}}\n\n'];
+    const { reported, emitted, text } = await run(pieces);
+    expect(text).toBe(pieces.join(""));
+    expect(emitted[1]).toBe(pieces[1]);
+    expect(reported).toEqual([]);
+  });
+
+  it("CRLF line ends, event: lines, and a held line with no final newline flushed at the end", async () => {
+    const crlf = await run([`event: error\r\ndata: ${anthropicError}\r\n\r\n`]);
+    expect(crlf.text).toBe(`event: error\r\ndata: ${anthropicError.replace(KEY, "[redacted]")}\r\n\r\n`);
+    expect(crlf.reported).toHaveLength(1);
+    const unterminated = await run([`data: ${anthropicError}`]);
+    expect(unterminated.text).toBe(`data: ${anthropicError.replace(KEY, "[redacted]")}`);
+    expect(unterminated.reported).toHaveLength(1);
+  });
+
+  it("OpenAI Responses' response.failed and Mistral's conversation.response.error, the latter's code its status", async () => {
+    const failed = await run([`data: {"type":"response.failed","response":{"error":{"code":"insufficient_quota","message":"${KEY}"}}}\n\n`]);
+    expect(failed.text).not.toContain(KEY);
+    // The report is for the classifier only (never passed on), so it is the event as it came.
+    expect(JSON.parse(failed.reported[0]!.body)).toEqual({ error: { code: "insufficient_quota", message: KEY } });
+    const mistral = await run([`data: {"type":"conversation.response.error","message":"rate limited ${KEY}","code":429}\n\n`]);
+    expect(mistral.text).not.toContain(KEY);
+    expect(mistral.reported).toEqual([{ body: expect.stringContaining("conversation.response.error"), status: 429 }]);
+  });
+
+  it("an error event's line goes on only after its report", async () => {
+    let open!: () => void;
+    const gate = new Promise<void>((resolve) => (open = resolve));
+    const watcher = run([`data: ${anthropicError}\n\n`], gate);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    let settled = false;
+    void watcher.then(() => (settled = true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(settled).toBe(false);
+    open();
+    expect((await watcher).reported).toHaveLength(1);
+  });
+});
+
+describe("the relay waits for each report before the CLI has the answer (SPI-1172, review 3)", () => {
+  const gated = () => {
+    const reported: Array<unknown> = [];
+    let open!: () => void;
+    const gate = new Promise<void>((resolve) => (open = resolve));
+    return { reported, open, outcome: async (handleId: string, failure: unknown) => { reported.push([handleId, failure]); await gate; } };
+  };
+
+  it("a success's report", async () => {
+    const g = gated();
+    const h = harness();
+    let answered = false;
+    const answer = handleModelRelay(post("{}"), { ...h.deps, outcome: g.outcome }).then((response) => ((answered = true), response));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(g.reported).toEqual([["proc-1", null]]);
+    expect(answered).toBe(false);
+    g.open();
+    expect((await answer).status).toBe(200);
+  });
+
+  it("a stream error event's report, before its line reaches the CLI; a response.failed event is classified", async () => {
+    const g = gated();
+    const frames = ['data: {"type":"response.created"}\n\n', `data: {"type":"response.failed","response":{"error":{"code":"insufficient_quota","message":"${KEY}"}}}\n\n`];
+    const h = harness({ upstream: async () => new Response(frames.join(""), { status: 200, headers: { "content-type": "text/event-stream" } }) });
+    g.open();
+    const gate2 = gated();
+    let reports = 0;
+    const response = await handleModelRelay(post("{}"), {
+      ...h.deps,
+      outcome: async (handleId, failure) => {
+        reports++;
+        if (reports > 1) await gate2.outcome(handleId, failure);
+      },
+    });
+    let done = false;
+    const text = response.text().then((body) => ((done = true), body));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(done).toBe(false);
+    expect(gate2.reported).toEqual([["proc-1", expect.objectContaining({ code: "spend_limit" })]]);
+    gate2.open();
+    expect(await text).not.toContain(KEY);
+    expect(h.logs.at(-1)).toMatchObject({ stream: "error-event", failure: { code: "spend_limit" } });
   });
 });

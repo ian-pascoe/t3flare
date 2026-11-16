@@ -3,8 +3,9 @@
 // - An error answer's body goes back whole, redacted (`@t3flare/models/redact`, which keeps JSON valid), up to
 //   `RELAY_ERROR_BODY_BYTES`. A larger one is not cut (a cut JSON body is no JSON a CLI can read): a short error in the
 //   API's own shape takes its place, with the same status.
-// - A stream that began with 200 may carry an error event (Anthropic's `error`, OpenAI's `error` or `response.failed`):
-//   `sseErrors` passes the stream through as it comes, line by line, and redacts and reports each such event's line.
+// - A stream that began with 200 may carry an error event (Anthropic's `error`, OpenAI's `error` or `response.failed`, a
+//   Completions error chunk, Mistral's `conversation.response.error`): `sseErrors` passes the stream through as it
+//   comes, piece by piece, holding only a line that opens as such an event, which it redacts and reports at its end.
 import type { EndpointApi } from "@t3flare/models/endpoints";
 import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 
@@ -32,13 +33,20 @@ export const oversizedError = (api: EndpointApi, status: number): string => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** A stream event that is an error: as an error body the classifier reads, and the status it carries, if any. */
+export interface StreamError {
+  readonly body: string;
+  readonly status?: number;
+}
+
 /**
- * A stream event's error as an error body the classifier reads (`{"error": {…}}`, or Anthropic's own shape), or
- * undefined for an event that is no error: Anthropic's `{"type":"error","error":{…}}`, OpenAI Responses'
- * `{"type":"error","code","message"}` and `{"type":"response.failed","response":{"error":{…}}}`, and an OpenAI-compatible
- * Completions chunk that is only an error (`{"error":{…}}`, no `type`).
+ * A stream event's error, or undefined for an event that is no error: Anthropic's `{"type":"error","error":{…}}`,
+ * OpenAI Responses' `{"type":"error","code","message"}` and `{"type":"response.failed","response":{"error":{…}}}`, an
+ * OpenAI-compatible Completions chunk that is only an error (`{"error":{…}}`, no `type`), and Mistral Conversations'
+ * `{"type":"conversation.response.error","message","code"}` (mistralai/client-python `ResponseErrorEvent`, read
+ * 2026-11-16), whose numeric `code` is taken as its status.
  */
-export const streamErrorBody = (data: string): string | undefined => {
+export const streamErrorBody = (data: string): StreamError | undefined => {
   if (!data.includes("error") && !data.includes("failed")) return undefined;
   let event: unknown;
   try {
@@ -47,38 +55,47 @@ export const streamErrorBody = (data: string): string | undefined => {
     return undefined;
   }
   if (!isRecord(event)) return undefined;
-  if (event.type === "error" && isRecord(event.error)) return data;
-  if (event.type === undefined && isRecord(event.error)) return data;
-  if (event.type === "error") return JSON.stringify({ error: { code: event.code ?? null, message: event.message ?? null, type: event.type } });
-  if (event.type === "response.failed" && isRecord(event.response) && isRecord(event.response.error)) return JSON.stringify({ error: event.response.error });
+  if (event.type === "error" && isRecord(event.error)) return { body: data };
+  if (event.type === undefined && isRecord(event.error)) return { body: data };
+  if (event.type === "error") return { body: JSON.stringify({ error: { code: event.code ?? null, message: event.message ?? null, type: event.type } }) };
+  if (event.type === "response.failed" && isRecord(event.response) && isRecord(event.response.error)) return { body: JSON.stringify({ error: event.response.error }) };
+  if (event.type === "conversation.response.error") {
+    const code = typeof event.code === "number" && event.code >= 400 && event.code < 600 ? event.code : undefined;
+    return { body: JSON.stringify({ error: { message: event.message ?? null, type: event.type } }), ...(code === undefined ? {} : { status: code }) };
+  }
   return undefined;
 };
 
 /**
- * The openings of a `data:` line whose event may be an error: Anthropic's and OpenAI Responses' `{"type":"error"`,
- * Responses' `{"type":"response.failed"`, a Completions chunk's `{"error"`. Vendors send compact JSON; a line that opens
- * otherwise is no error event and goes on as it comes.
+ * The openings of a `data:` line whose event may be an error, compared with the line's whitespace taken out (so
+ * `data:  { "type": "error"` is one): Anthropic's and OpenAI Responses' `error`, Responses' `response.failed`, a
+ * Completions chunk's `{"error"`, Mistral's `conversation.response.error`. Each names its `type` (or `error`) as the
+ * object's first key, as every vendor sends it; a line that opens otherwise is no error event and goes on as it comes.
  */
-const ERROR_OPENINGS = ['data: {"type":"error"', 'data:{"type":"error"', 'data: {"type":"response.failed"', 'data:{"type":"response.failed"', 'data: {"error"', 'data:{"error"'];
+const ERROR_OPENINGS = ['data:{"type":"error"', 'data:{"type":"response.failed"', 'data:{"error"', 'data:{"type":"conversation.response.error"'];
 
 /**
  * A stream passed through as it comes (SPI-1173's usage reader and the CLI never wait for a line's end), but for a line
  * that opens as an error event (`ERROR_OPENINGS`): that line is held to its end, redacted (`redact`) and reported
- * (`onError`, with the event as an error body). A line is held only while its opening could still be one of them.
+ * (`onError`, awaited before the line goes on). A line is held only while its opening could still be one of them; once
+ * a line is passing, the rest of it passes, whatever it holds. A line ends at `\n` (a `\r` before it stays in it).
  */
-export const sseErrors = (redact: (text: string) => string, onError: (body: string) => Promise<void> | void): TransformStream<Uint8Array, Uint8Array> => {
+export const sseErrors = (redact: (text: string) => string, onError: (error: StreamError) => Promise<void> | void): TransformStream<Uint8Array, Uint8Array> => {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   /** The current line's text not yet passed on, and whether it is passing (decided not to be an error event). */
   let held = "";
   let passing = false;
-  /** Whether `text`, the start of a line, could still open an error event, or does. */
-  const mayBeError = (text: string) => ERROR_OPENINGS.some((opening) => opening.startsWith(text) || text.startsWith(opening));
+  /** Whether `text`, the start of a line, could still open an error event, or does (its whitespace out). */
+  const mayBeError = (text: string) => {
+    const squeezed = text.replace(/\s+/g, "");
+    return ERROR_OPENINGS.some((opening) => opening.startsWith(squeezed) || squeezed.startsWith(opening));
+  };
   /** A complete held line as it goes on: an error event's redacted, after its report. */
   const finished = async (text: string): Promise<string> => {
-    const body = text.startsWith("data:") ? streamErrorBody(text.slice(5).trim()) : undefined;
-    if (body === undefined) return text;
-    await onError(body);
+    const error = text.startsWith("data:") ? streamErrorBody(text.slice(5).trim()) : undefined;
+    if (error === undefined) return text;
+    await onError(error);
     return redact(text);
   };
   const take = async (text: string): Promise<string> => {
