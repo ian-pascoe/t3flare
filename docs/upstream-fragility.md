@@ -14,8 +14,8 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
    | find the newest nightly tag (`:98`) | t3 changed its tag format: `NIGHTLY` at `bump.ts:80` |
    | regenerate the workspace and install (`:157`) | t3 added a workspace setting ("classify it") or changed its lock's layout: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); a patch no longer applies or matches nothing, or t3's lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
    | lock matches t3's, one effect (`:161`) | a t3 importer installs other versions than in t3's lock, a second `effect`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030), [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
-   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `provider/textGeneration.ts` and `endpointTextGeneration.test.ts` [U68](#u68-text-generation-names-the-endpoint-on-t3s-own-failures-spi-1163); `provider/cli/codexGuard.ts`, `codexEndpoints.ts`, `codexDriver.ts`, `cliProfiles.test.ts`'s Codex cases [U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167); `provider/cli/claudeEndpoints.ts`, `acpProfiles.test.ts`'s relay cases [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168) |
-   | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)) |
+   | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `provider/textGeneration.ts` and `endpointTextGeneration.test.ts` [U68](#u68-text-generation-names-the-endpoint-on-t3s-own-failures-spi-1163); `provider/cli/codexGuard.ts`, `codexEndpoints.ts`, `codexDriver.ts`, `cliProfiles.test.ts`'s Codex cases [U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167); `provider/cli/claudeEndpoints.ts`, `acpProfiles.test.ts`'s relay cases [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168); `provider/cli/opencodeEndpoints.ts`, `relayModels.ts`, `acpProfiles.test.ts`'s OpenCode relay cases [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169) |
+   | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)); `claudeRelay.docker.test.ts` and `opencodeRelay.docker.test.ts`: a CLI's path, key header or handle holders on the model relay ([U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168), [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169)) |
    | deploy the bump stage (`:176`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
    | acceptance test (`:180`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `text generation names the Model endpoints' default` and the report's `modelEndpoint`/`textGeneration` (SPI-1175) [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
    | stock t3 nightly links and forwards (step 3) | the laptop half of [U7](#u7-client-version-skew-desktop-mobile-laptop) |
@@ -811,7 +811,7 @@ for the shell exclusion, puts the model handle in an agent's commands. The Model
 - **Fix**: diff `CodexAdapterV2.ts` (`codexThreadRuntimeParams`, `buildCodexTurnStartParams`, `planSelectionTransition`)
   and the app-server schema (`ThreadStartParams`, `ThreadStartResponse`, `TurnStartParams`) between tags; update the
   guard, `codexProcessProvider` and the exclusion; re-run `p1167.ts`.
-- Claude Code's leans on the relay, and the model-routed URL, are [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168).
+- Claude Code's leans on the relay, and the model-routed URL, are [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168); OpenCode's are [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169).
 
 ### U70. The Settings server's caller: `threadLinkIn` reads the thread projection (SPI-1198)
 
@@ -1047,6 +1047,55 @@ environment or file holds it beyond that.
   bounded to the process's endpoints and life.
 - **Fix**: on a Claude Code bump, re-run `p1168.ts`; diff claude-agent-acp's spawn of `claude` (its `env` option) and
   Claude Code's settings schema (`availableModels`, `apiKeyHelper`, `modelOverrides`).
+
+### U76. OpenCode on Model endpoints through the model relay (SPI-1169)
+
+Ranked after U75, which it parallels: a break fails OpenCode turns on endpoints, or puts the model handle in the
+environment of OpenCode's shells or MCP servers. The Model proxy path keeps its plugin branch. As for Codex and
+Claude Code, the handle is never out of reach of the Container's commands (ADR-0016's SPI-1169 refinement): a shell
+can read OpenCode's `/proc/<pid>/environ`. What this entry guards is that no other environment or file holds it.
+
+- **Where**: `apps/environment/src/agents/acpProfiles.ts` (`opencodeConfig` with an `OpenCodeRelay`,
+  `OPENCODE_PACKAGES`), `provider/cli/opencodeEndpoints.ts`, `provider/cli/relayModels.ts`, `provider/cli/acpDriver.ts`
+  (`resolveModelId`, the model list), the image's `opencode-key-plugin` and `t3flare-opencode`. It leans on OpenCode
+  2.2.7 in these ways:
+  - **A base URL per provider, by package**: `@opencode/ai/providers/anthropic-compatible` appends `/messages` to a
+    base URL holding `/v1`; `openai-compatible` appends `/chat/completions`, `openai-compatible-responses` `/responses`
+    (measured in `test:docker` and on p1169).
+  - **A configured provider's model is sent by its own id**: `t3flare-endpoint-<id>/<model>` reaches the wire as
+    `<model>`; a model id holding `/` is the provider's model whole (split at the first `/`).
+  - **The plugin API**: `ctx.provider.transform`, whose `editor.update(id, …)` patches a provider by id. The
+    configured providers are added after a plugin's transform runs (they are not in `editor.list()` then), so the
+    plugin takes their ids from the process's own configuration file and the patch applies when they are added. The
+    handle goes in as `settings.apiKey`, which each package sends in its API's header (`x-api-key`, or
+    `authorization: Bearer`); `openai-compatible-responses` refuses to send without it ("provider authentication
+    required"), a header alone is not enough there.
+  - **A plugin module runs once per process, in `opencode serve`**: `opencode acp` starts `opencode serve --stdio`
+    as its child with its own environment, and the plugin is imported there; its top-level `delete` keeps the handle
+    out of everything that server starts (its shells, a repository's MCP servers). `opencode acp` itself keeps it in
+    its `process.env` and starts only the server.
+  - **The session offers only the allowed providers' models**: t3's adapter refuses any other model (a stale
+    `t3flare/<id>` proxy model, an endpoint's that is gone) before any request, as for Claude Code (U75).
+  - **t3's registry keeps an OpenCode snapshot's earlier models** (as Claude's, U75): the proxy's models listed
+    before the first endpoint stay in the picker after the endpoints' until the Environment restarts its registry.
+- **Breaks when**: OpenCode renames or reshapes a provider package or its path (the relay log shows the new path, the
+  endpoint answers 404); the plugin API drops `transform`/`update` or stops applying a patch to a provider added after
+  it (no key: OpenCode reports "provider authentication required" or the relay answers 401); `opencode acp` starts
+  its server, or anything else, before the plugin is imported, or OpenCode spawns shells with an environment it saved
+  at start (the handle reaches the shells: only `test:docker` and the stage script see it); OpenCode starts writing
+  provider settings back to a file (the handle on disk; the stage script's file check sees it); or OpenCode starts
+  requiring a header the allowlist drops (the relay log's `dropped` names it; p1169's list is in
+  `docs/steps/spi-1169/p1169.json`).
+- **Detection**: `test/acpProfiles.test.ts` (the configuration, against the pinned schema), `test/opencodeEndpoints.test.ts`,
+  `test/opencodeSpawn.test.ts`; `test/docker/opencodeRelay.docker.test.ts` in `test:docker` (the real launcher and
+  plugin: each API's path and key header, a switch across three endpoints in one session, a shell's and a repository
+  MCP server's environment, the processes holding the handle); `scripts/p1169.ts` on a stage. **Silent**: the handle
+  reaching a shell's environment between `test:docker` runs; a new dropped header OpenCode needs for a feature but
+  not for a turn. Not detectable, by design: a command reading OpenCode's `/proc/<pid>/environ` (the residual).
+- **Blast radius**: OpenCode turns on endpoints fail, or the model handle in the environment of OpenCode's shells;
+  either way spending stays bounded to the process's endpoints and life.
+- **Fix**: on an OpenCode bump, refresh the schema fixture, re-run `opencodeRelay.docker.test.ts` and `p1169.ts`, and
+  diff the provider packages' paths and the plugin API (`transform`, `editor.update`).
 
 ## Gaps in detection
 

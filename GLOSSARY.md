@@ -162,7 +162,7 @@ What t3flare passes to t3's generic ACP adapter (`makeAcpAdapterV2`) to run Clau
 _Avoid_: ACP driver, registry agent (t3's ACP Registry driver is another thing, refused)
 
 **Managed settings**:
-Claude Code's highest settings source, shared by every Claude process in a Container: where its requests go and how it gets its key, and the permissions a repository's `.claude/` cannot override. Its requests go to the Model relay's Model-routed URL with the process's Handle as its key when an Anthropic Messages Model endpoint lists a model; otherwise to the Model proxy. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`.
+Claude Code's highest settings source, shared by every Claude process in a Container: where its requests go and how it gets its key, and the permissions a repository's `.claude/` cannot override. Its requests go to the Model relay's Model-routed URL with the process's Handle as its key when an Anthropic Messages Model endpoint lists a model; otherwise to the Model proxy. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`: one provider per Model endpoint whose API OpenCode speaks, each at the Model relay with the process's Handle as its key, when such an endpoint lists a model; otherwise the Model proxy.
 
 ## Tools
 

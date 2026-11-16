@@ -54,7 +54,7 @@ Revised on 2026-11-11 by the text above. The original:
 ## Refinement (step 4b, 2026-11-12): the key path for Claude Code and OpenCode
 
 - **Claude Code** takes the key from `apiKeyHelper` in its managed settings: `t3flare-claude-key`, which runs 4a's `t3flare-model-key claude` with this process's nonce, read from the process's Container-local home (the launcher moves it there from the environment, so Claude's Bash, hooks and helpers never inherit it). Claude Code's own env scrub was tried and rejected: in 2.1.322 it isolates every command with bubblewrap and leaves empty decoy files (`package.json`, `.gitmodules`, `.env*`) in the repository (M0 P1). `CLAUDE_CODE_API_KEY_HELPER_TTL_MS` is 24 h: one grant per process (M0 P1); the gate allows 2.
-- **OpenCode** takes it from a server plugin of ours in the image (`/opt/t3flare/share/opencode-key-plugin`), allowed by absolute path while every other plugin is denied: at load it asks the helper once with the nonce, deletes the nonce from its process environment, and sets `x-api-key` on the `t3flare` provider through `ctx.provider.transform`. No loopback relay was needed (M0 P2). One grant per process; the gate allows 2; a re-ask after a 401 is SPI-1045.
+- **OpenCode** takes it from a server plugin of ours in the image (`/opt/t3flare/share/opencode-key-plugin`), allowed by absolute path while every other plugin is denied: at load it asks the helper once with the nonce, deletes the nonce from its process environment, and sets `x-api-key` on the `t3flare` provider through `ctx.provider.transform`. No loopback relay was needed (M0 P2). One grant per process; the gate allows 2; a re-ask after a 401 is SPI-1045. (SPI-1169: on the model relay the plugin asks no helper; a handle does not rotate while its process lives, so SPI-1045 is moot there, and the key helper itself goes at the hard cut.)
 - Neither CLI is offered a login: Claude's `initialize` lists no auth method under the managed helper; OpenCode lists `opencode-login`, which t3flare never invokes (`authenticateOnAuthRequired: false`), and `integration.connect` is denied. An `auth_required` or a 401 is reported as the deploy's `COMMISSARY_CONTAINER_API_KEY` refused.
 - The sentence "OpenCode and pi have no such hook that is known yet" is closed for OpenCode by the plugin.
 - Residual risk, unchanged from 4a: the agent runs as root, so `/proc/<pid>/environ` of the launcher (which still holds the nonce) and the managed files are readable and writable by the agent's own commands; the grant count bounds the nonce, and those files defend against a repository's configuration, not against an agent already running commands. A canary planted in the Environment DO's `process.env` reached no CLI process on stage (M5).
@@ -183,3 +183,35 @@ Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/
    are its client's own (`x-stainless-*`, `x-app`, `x-claude-code-session-id`, `user-agent`,
    `anthropic-dangerous-direct-browser-access`), and its turns work without them. The allowlist is unchanged.
 
+## Refinement (SPI-1169, 2026-11-16): OpenCode through the model relay
+
+Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/spi-1169/p1169.json`.
+
+1. **A provider per endpoint, at its own path.** OpenCode takes a base URL per provider, so each endpoint whose API it
+   speaks is its own provider, `t3flare-endpoint-<endpointId>` (prefixed as Codex's, so no endpoint id takes one of
+   OpenCode's catalog providers), at the relay's per-endpoint URL. The package is the API's: Anthropic Messages
+   `@opencode/ai/providers/anthropic-compatible` (base URL `…/<id>/v1`), OpenAI Responses `openai-compatible-responses`
+   and OpenAI-compatible Completions `openai-compatible` (base URL `…/<id>`). Other APIs' endpoints are not offered to
+   OpenCode. The model-routed URL is not used: the relay reads no OpenCode body. Policies allow exactly those providers.
+2. **The choice is the Environment's**, as Claude Code's (item 2 of SPI-1168's refinement): with such an endpoint that
+   lists a model, every OpenCode process runs on the endpoints; its model ids are the endpoints' slugs, mapped to
+   `t3flare-endpoint-<id>/<model>`; its small model is the text-generation model when that is one of their models. A
+   model OpenCode's session does not offer (a stale `t3flare/<id>` proxy model) is refused by t3's adapter before any
+   request. Without such an endpoint, the Model proxy as before.
+3. **Where the handle is.** The Workspace DO puts it in the process's environment. The launcher (`t3flare-opencode`)
+   execs `opencode acp`, which starts its server (`opencode serve --stdio`) as a child with that environment. The
+   image's plugin, imported once in that server, reads the handle and deletes it from the server's `process.env` before
+   OpenCode starts anything from it (shells, a repository's MCP servers), then sets it as the API key of each endpoint
+   provider of the process's own configuration whose base URL is the relay's URL for that endpoint (each package sends
+   it in its API's key header). The launcher's watcher and snapshot loop are started without it (`env -u`). No file
+   holds it. **As for Codex and Claude Code, this keeps the handle out of environments and files, not out of reach**:
+   the start environments of `setsid`, `opencode acp` and `opencode serve` (`/proc/<pid>/environ`) hold it, and every
+   process in the Container is root, so a shell OpenCode runs can read them and spend through the handle for that
+   process's endpoints until it exits. The same class, not wider; no command can take an endpoint's key out of the
+   Container. Measured in `test:docker` and on p1169: the holders are exactly those three; a shell's `env`, a
+   repository MCP server's environment and the launcher's loops have no handle; no file in the process homes,
+   `/etc/opencode`, `/root`, `/tmp` or the repo holds it.
+4. **SPI-1045.** On the relay the plugin asks no key helper: the handle is fixed for the process's life, so the
+   proxy key's re-ask after a rotation does not arise.
+5. **Headers.** OpenCode's own (`x-opencode-*`, `x-session-*`, `b3`, `traceparent`, `user-agent`) are dropped; its turns
+   need none of them. The allowlist is unchanged.
