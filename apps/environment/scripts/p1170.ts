@@ -11,7 +11,7 @@
 //    one provider per endpoint at the relay's per-endpoint URL with the handle command as its key, and no key.
 // 3. A pi turn with tools on `comm/<model>` (approval-required, every request accepted): an edit and a test run.
 // 4. In the same thread, a turn with tools on `oai/<model>` (an OpenAI endpoint), then one on `resp/<model>`: each
-//    completes in the same native pi session, and the last knows the code word.
+//    completes in the same native pi session, and the last (with tools too) knows the code word.
 // 5. Where the handle is: only in the start environment of the launch chain's setsid (not pi's, not a shell's, not in
 //    any file); a full-access turn's `env` holds no handle. The handle reaches the relay for each endpoint in its API's
 //    key header (200); a forged handle and none get 401; an endpoint saved after the process started gets 403. The
@@ -94,7 +94,8 @@ const { text: raw } = await tailing([`t3flare-agents-${stage}`], async () => {
   report.turn = clean(first);
   const toolTurn = (turn: typeof first) => turn.runs.at(-1)?.status === "completed" && turn.items.some((item: any) => item.type === "file_change") && turn.items.some((item: any) => item.type === "command_execution");
   check("a pi turn with tools ran on the Anthropic Messages endpoint's model through the relay", toolTurn(first), first.items);
-  check("its tool requests were asked and accepted", first.requests.length > 0 && first.requests.every((request: any) => request.decision === "accept"), first.requests);
+  // Each request was answered `accept` by `cliTurn`; t3's projection keeps no decision for pi's, only that it resolved.
+  check("its tool requests were asked, and resolved by the accept sent", first.requests.length > 0 && first.requests.every((request: any) => request.status === "resolved"), first.requests);
 
   // pi's models.json and settings in the Container: one provider per endpoint at the relay, the handle command, no key.
   const files = await exec(A, "for d in /var/lib/t3flare/cli/proc-*; do [ -f $d/agent/models.json ] && { cat $d/agent/models.json; echo; echo '#settings'; cat $d/agent/settings.json; break; }; done");
@@ -119,9 +120,9 @@ const { text: raw } = await tailing([`t3flare-agents-${stage}`], async () => {
   const openai = await cliTurn(cookie, { cli: "pi", workspace: A, model: SLUGS.oai, mode: "approval-required", plan: false, prompt: "In src/greeting.txt add another last line `Hello again.` with your file edit tool (not the shell), then run `bash test.sh` and tell me in one sentence whether it passed.", threadId: first.threadId });
   report.openaiTurn = clean(openai);
   check("a pi turn with tools ran on the OpenAI (Chat Completions) endpoint's model, in the same thread", toolTurn(openai), openai.items);
-  const responses = await cliTurn(cookie, { cli: "pi", workspace: A, model: SLUGS.resp, mode: "approval-required", plan: false, prompt: "What was the code word? Reply with it only.", threadId: first.threadId });
-  report.switch = clean({ toResponses: { runs: responses.runs.slice(-1), text: responses.text, native: native(responses) }, openai: native(openai), first: native(first) });
-  check("a model switch to the Responses endpoint's model: the turn completes and knows the code word", responses.runs.at(-1)?.status === "completed" && responses.text.includes("KESTREL-41"), report.switch);
+  const responses = await cliTurn(cookie, { cli: "pi", workspace: A, model: SLUGS.resp, mode: "approval-required", plan: false, prompt: "In src/greeting.txt add another last line `Hello once more.` with your file edit tool (not the shell), then run `bash test.sh`, and reply with the code word only.", threadId: first.threadId });
+  report.switch = clean({ toResponses: { runs: responses.runs.slice(-1), items: responses.items, text: responses.text, native: native(responses) }, openai: native(openai), first: native(first) });
+  check("a model switch to the Responses endpoint's model: a turn with tools that knows the code word", toolTurn(responses) && responses.text.includes("KESTREL-41"), report.switch);
   check("the same native pi session throughout (no handoff)", native(first).length === 1 && JSON.stringify(native(first)) === JSON.stringify(native(openai)) && JSON.stringify(native(first)) === JSON.stringify(native(responses)), report.switch);
 
   // 5. Where the handle is, with the thread's process alive. Only counts and names leave the Container.
