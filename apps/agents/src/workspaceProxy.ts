@@ -16,7 +16,7 @@ import { WorkspaceProxy as ComputerWorkspaceProxy } from "@cloudflare/computer";
 
 import { environmentStub, usageSender } from "./environment.ts";
 import { handleRelayRequest, isRelayPath } from "./workspace/mcpRelay.ts";
-import { handleModelRelay, isModelRelayPath } from "./workspace/modelRelay.ts";
+import { handleModelRelay, isModelRelayPath, workspaceRelayDeps } from "./workspace/modelRelay.ts";
 import { CREDENTIAL_PATH, MODEL_KEY_PATH, type WorkspaceDO } from "./workspace/WorkspaceDO.ts";
 
 interface ProxyProps {
@@ -40,17 +40,17 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
     if (modelRelay) {
       // SAFETY: the Workspace DO answers `modelRelay` (WorkspaceDO.ts).
       const rpc = workspace as unknown as Pick<WorkspaceDO, "modelRelay" | "modelRelayOutcome">;
-      return handleModelRelay(request, {
-        authorize: (input) => rpc.modelRelay(input),
-        // SPI-1172: the process's last answer, for the CLI wrapper's view of a failed turn.
-        // SAFETY: a Durable Object stub's RPC returns a promise of the method's result, though the method is synchronous.
-        outcome: (handleId, failure) => rpc.modelRelayOutcome({ handleId, failure }) as unknown as Promise<void>,
-        fetch: (upstream) => fetch(upstream),
-        log: (event) => console.log(JSON.stringify(event)),
-        now: () => Date.now(),
-        // Each answer's usage, kept by the Environment for t3's Usage page (SPI-1173).
-        usage: usageSender(this.ctx, () => environmentStub((this.env as { readonly ENVIRONMENT: DurableObjectNamespace }).ENVIRONMENT)),
-      }).catch((error: unknown) => {
+      // SPI-1172: each answer reported to the Workspace DO, for the CLI wrapper's view of a failed turn.
+      return handleModelRelay(
+        request,
+        workspaceRelayDeps(rpc, {
+          fetch: (upstream) => fetch(upstream),
+          log: (event) => console.log(JSON.stringify(event)),
+          now: () => Date.now(),
+          // Each answer's usage, kept by the Environment for t3's Usage page (SPI-1173).
+          usage: usageSender(this.ctx, () => environmentStub((this.env as { readonly ENVIRONMENT: DurableObjectNamespace }).ENVIRONMENT)),
+        }),
+      ).catch((error: unknown) => {
         // The route logs its own failures; this is what escaped it, with what the path names (never a value).
         const endpoint = /^\/t3flare\/model\/([a-z0-9-]{1,32})(?:\/|$)/.exec(pathname)?.[1] ?? null;
         console.warn(JSON.stringify({ t3flare: "model-relay-failed", endpoint, handle: null, error: error instanceof Error ? error.name : "error" }));

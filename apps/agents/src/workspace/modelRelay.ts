@@ -20,11 +20,11 @@
 // its model as `<endpointId>/<modelId>`, and the relay sends it to that endpoint with the model's own id in its place,
 // the rest of the body byte for byte (`routedBody.ts`). The handle is checked before the body is read, and its scope
 // then judges the endpoint as it judges one in the path.
-import { ENDPOINT_ID, type EndpointApi } from "@t3flare/models/endpoints";
+import { ENDPOINT_ID } from "@t3flare/models/endpoints";
 import { describeFailure, type DescribedFailure, failureHeaders, readBody } from "@t3flare/models/failures";
 import { redactSecrets } from "@t3flare/models/redact";
 import type { EndpointFailureRecord } from "@t3flare/session-protocol";
-import { credentialHeaderOf, forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget } from "@t3flare/models/relay";
+import { credentialHeaderOf, forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget, type RelayTarget } from "@t3flare/models/relay";
 import { HANDLE } from "@t3flare/workspace-client";
 
 import type { HandleCaller } from "./processHost.ts";
@@ -43,7 +43,7 @@ export type ModelRelayGrant =
       readonly handleId: string;
       readonly cli: string;
       readonly workspace: string | null;
-      readonly target: { readonly api: EndpointApi; readonly auth: "api-key" | "none"; readonly baseUrl: string; readonly headers: Readonly<Record<string, string>> };
+      readonly target: RelayTarget;
     }
   /** The handle names a live process here (asked with no endpoint: a model-routed request before its body is read). */
   | { readonly kind: "known"; readonly handleId: string; readonly cli: string; readonly workspace: string | null }
@@ -69,6 +69,21 @@ export interface ModelRelayDeps {
    */
   readonly outcome?: (handleId: string, failure: EndpointFailureRecord | null) => Promise<void>;
 }
+
+/** What `WorkspaceProxy` reaches of the Workspace DO for the relay (its RPC stub's methods answer promises). */
+export interface WorkspaceRelayRpc {
+  modelRelay(input: ModelRelayAsk): Promise<ModelRelayGrant>;
+  modelRelayOutcome(input: { readonly handleId: string; readonly failure: EndpointFailureRecord | null }): Promise<void> | void;
+}
+
+/** The relay's deps in `WorkspaceProxy`: the Workspace DO's check, and each answer reported to it before the CLI has it. */
+export const workspaceRelayDeps = (rpc: WorkspaceRelayRpc, io: Pick<ModelRelayDeps, "fetch" | "log" | "now" | "usage">): ModelRelayDeps => ({
+  ...io,
+  authorize: (input) => rpc.modelRelay(input),
+  outcome: async (handleId, failure) => {
+    await rpc.modelRelayOutcome({ handleId, failure });
+  },
+});
 
 /** Response headers not passed back: hop-by-hop ones and cookies. */
 const DROPPED_RESPONSE = new Set(["connection", "keep-alive", "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade", "set-cookie"]);
@@ -129,7 +144,7 @@ const leavesBase = (rest: string): boolean =>
     });
 
 /** Only the allowed headers of the Container's request, then the endpoint's own and its credential. */
-const upstreamHeaders = (incoming: Headers, target: { readonly api: EndpointApi; readonly headers: Readonly<Record<string, string>> }): { readonly headers: Headers; readonly dropped: ReadonlyArray<string> } => {
+const upstreamHeaders = (incoming: Headers, target: Pick<RelayTarget, "api" | "headers">): { readonly headers: Headers; readonly dropped: ReadonlyArray<string> } => {
   const allowed = forwardedHeadersOf(target.api);
   const headers = new Headers();
   const dropped: Array<string> = [];
@@ -229,6 +244,9 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   const { headers, dropped } = upstreamHeaders(request.headers, grant.target);
   // A routed body changed length with its model: its own length goes instead of the Container's.
   if (routedBody !== undefined) headers.delete("content-length");
+  // SPI-1172: each answer goes to the Workspace DO before the CLI sees it (`RelayFailures` keeps the turn's most telling one).
+  const report = (failure: DescribedFailure | undefined): Promise<void> =>
+    (deps.outcome?.(grant.handleId, failure === undefined ? null : { ...failure, endpointId, at: deps.now() }) ?? Promise.resolve()).catch(() => undefined);
   let upstream: Response;
   try {
     upstream = await deps.fetch(
@@ -245,11 +263,14 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   } catch (error) {
     // The error may echo the request: only its name is logged.
     log(502, grant, { why: `unreachable (${error instanceof Error ? error.name : "error"})`, dropped });
+    // The relay's own failure, no endpoint's answer: a passing failure recorded before it is no longer the latest.
+    await report(undefined);
     return plain(502, `the Model endpoint ${endpointId} could not be reached`);
   }
   if (upstream.status >= 300 && upstream.status < 400) {
     void upstream.body?.cancel().catch(() => undefined);
     log(502, grant, { why: `redirected (HTTP ${upstream.status})`, dropped });
+    await report(undefined);
     return plain(502, `the Model endpoint ${endpointId} redirected (HTTP ${upstream.status}); the relay follows no redirect: fix its base URL`);
   }
   const answer = new Headers();
@@ -259,24 +280,22 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   const redact = (text: string) => redactSecrets(text, known);
   const classify = (status: number, body: string): DescribedFailure | undefined =>
     describeFailure({ status, headers: failureHeaders(upstream.headers), body, at: deps.now() }, { id: endpointId, api: endpoint.api, auth: endpoint.auth });
-  const report = (failure: DescribedFailure | undefined): Promise<void> =>
-    (deps.outcome?.(grant.handleId, failure === undefined ? null : { ...failure, endpointId, at: deps.now() }) ?? Promise.resolve()).catch(() => undefined);
   const logged = (failure: DescribedFailure | undefined) =>
     failure === undefined ? {} : { failure: { class: failure.class, code: failure.code, ...(failure.resetAt === undefined ? {} : { resetAt: failure.resetAt }) } };
   if (upstream.status < 400) {
     // The dropped headers' names (never values) show what a CLI sends that the allowlist keeps back.
     log(upstream.status, grant, { dropped });
-    void report(undefined);
+    await report(undefined);
     const observed = observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, deps.usage);
     const streaming = (upstream.headers.get("content-type") ?? "").includes("text/event-stream");
     // An error event inside the stream: redacted, classified, logged and reported as the process's last answer.
     const body =
       streaming && observed !== null
         ? observed.pipeThrough(
-          sseErrors(redact, (event) => {
+          sseErrors(redact, async (event) => {
             const failure = classify(200, event);
             log(upstream.status, grant, { stream: "error-event", ...logged(failure) });
-            void report(failure);
+            await report(failure);
           }),
         )
       : observed;
@@ -296,7 +315,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
 };
 
 /** The values the endpoint's credential header carries (a bearer's token too), to redact wherever an answer echoes them. */
-const credentialValues = (target: { readonly api: EndpointApi; readonly auth: "api-key" | "none"; readonly headers: Readonly<Record<string, string>> }): ReadonlyArray<string> => {
+const credentialValues = (target: RelayTarget): ReadonlyArray<string> => {
   if (target.auth === "none") return [];
   const name = credentialHeaderOf(target.api, "").name;
   return Object.entries(target.headers).flatMap(([header, value]) => {

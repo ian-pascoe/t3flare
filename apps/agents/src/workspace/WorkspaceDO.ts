@@ -6,7 +6,6 @@
 //
 // It is a plain DurableObject: computer reaches it through `__getWorkspaceStub()` with raw Workers RPC, and its Worker
 // Shell calls back into it through `WorkspaceServiceProxy` (exported by the Worker's entry).
-import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import { Workspace as ComputerWorkspace, type WorkspaceBackend, type WorkspaceStub } from "@cloudflare/computer";
 import {
   ContainerBackend,
@@ -84,6 +83,7 @@ import { authorizeModelRelay, type ModelRelayAsk, type ModelRelayGrant } from ".
 import { RelayFailures } from "./relayFailures.ts";
 import { EndpointKeyPatterns, leakTargets } from "./endpointKeys.ts";
 import { type CredentialPattern, type LeakScanAnswer, type LeakScanInput, leakScanArgv, patternOf } from "@t3flare/sandbox-image/leakscan";
+import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import { ProcessHost, type ProcessMarker } from "./processHost.ts";
 import { AgentTerminals } from "./agentTerminals.ts";
 import { workspacePrompts, workspaceSkills } from "./skills.ts";
@@ -1698,7 +1698,7 @@ export class WorkspaceDO extends ContainerHost {
 
   processTurn(key: string, active: boolean): ProcessAnswer {
     // SPI-1172: a turn's start forgets the process's last relay answer, so a failed turn never reads an earlier turn's.
-    if (active) this.#relayFailures.turnStarted(key);
+    this.#relayFailures.turn(key, active);
     return this.#processes.turn(key, active);
   }
 

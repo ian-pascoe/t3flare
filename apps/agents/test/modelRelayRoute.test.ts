@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import { ENDPOINT_ID } from "@t3flare/models/endpoints";
 import { MODEL_ROUTED_ID, modelRoutedRelayUrl } from "@t3flare/models/relay";
 
-import { RELAY_ERROR_BODY_BYTES, RelayFailures } from "../src/workspace/relayFailures.ts";
+import { oversizedError, RELAY_ERROR_BODY_BYTES, RelayFailures } from "../src/workspace/relayFailures.ts";
+import { workspaceRelayDeps } from "../src/workspace/modelRelay.ts";
 import { authorizeModelRelay, handleModelRelay, isModelRelayPath, MAX_ROUTED_BODY_BYTES, type ModelRelayDeps, type ModelRelayGrant } from "../src/workspace/modelRelay.ts";
 
 const HANDLE = "a".repeat(64);
@@ -281,6 +282,15 @@ describe("the model relay route", () => {
     expect(text).toContain("acme-organisation-long-id");
   });
 
+  it("drops content-length and content-encoding from a redacted error answer: its body was read decoded and changed length", async () => {
+    const body = JSON.stringify({ error: { message: `bad key ${KEY}`, code: "invalid_api_key" } });
+    const h = harness({ upstream: async () => new Response(body, { status: 401, headers: { "content-type": "application/json", "content-encoding": "gzip", "content-length": String(body.length) } }) });
+    const response = await handleModelRelay(post("{}"), h.deps);
+    expect(response.headers.get("content-encoding")).toBeNull();
+    expect(response.headers.get("content-length")).toBeNull();
+    expect(response.headers.get("content-type")).toBe("application/json");
+  });
+
   it("passes a 20 KiB error body back whole, redacted and still JSON; one over 1 MiB is replaced by a short error in the API's shape", async () => {
     const big = JSON.stringify({ error: { message: `${"x".repeat(20 * 1024)} ${KEY}`, type: "invalid_request_error", code: "context_length_exceeded" } });
     const h = harness({ upstream: async () => new Response(big, { status: 400, headers: { "content-type": "application/json" } }) });
@@ -316,6 +326,19 @@ describe("the model relay route", () => {
       ["proc-1", null],
       ["proc-1", expect.objectContaining({ endpointId: "openai", code: "overloaded" })],
     ]);
+  });
+
+  it("an OpenAI-compatible Completions error chunk (`{\"error\":…}`, no type) inside a 200 stream is redacted, classified and reported", async () => {
+    const reported: Array<unknown> = [];
+    const frames = ['data: {"id":"c1","object":"chat.completion.chunk","choices":[]}\n\n', `data: {"error":{"message":"Incorrect API key provided: ${KEY}","type":"invalid_request_error","code":"insufficient_quota"}}\n\n`, "data: [DONE]\n\n"];
+    const h = harness({ upstream: async () => new Response(frames.join(""), { status: 200, headers: { "content-type": "text/event-stream" } }) });
+    const deps = { ...h.deps, outcome: async (handleId: string, failure: unknown) => void reported.push([handleId, failure]) };
+    const text = await (await handleModelRelay(post("{}"), deps)).text();
+    expect(text).not.toContain(KEY);
+    expect(text.startsWith(frames[0]!)).toBe(true);
+    expect(text.endsWith(frames[2]!)).toBe(true);
+    expect(h.logs.at(-1)).toMatchObject({ stream: "error-event", failure: { code: "spend_limit" } });
+    expect(reported.at(-1)).toEqual(["proc-1", expect.objectContaining({ code: "spend_limit" })]);
   });
 
   it("reports each answer as the process's last: a classified failure with its reset, a success as null (SPI-1172)", async () => {
@@ -542,19 +565,83 @@ describe("the Workspace DO's check of a model handle", () => {
   });
 });
 
-describe("each process's last relay failure (SPI-1172)", () => {
-  const failure = { endpointId: "openai", class: "usage_limit" as const, code: "usage_limit", message: "m", retryable: true, stop: true, at: 1 };
+describe("each process's most telling relay failure this turn (SPI-1172, review 2)", () => {
+  const limit = { endpointId: "openai", class: "usage_limit" as const, code: "usage_limit", message: "m", retryable: true, stop: true, at: 1 };
+  const overload = { endpointId: "openai", class: "provider_error" as const, code: "overloaded", message: "o", retryable: true, stop: false, at: 2 };
 
-  it("keeps a process's last failure, cleared by a success and by its next turn's start, per process", () => {
+  it("a background request's success never clears the turn's usage limit; a retried overload that then succeeded is forgotten", () => {
     const failures = new RelayFailures();
-    failures.report("proc-1", failure);
-    failures.report("proc-2", { ...failure, code: "key_refused" });
-    expect(failures.last("proc-1")).toEqual(failure);
+    failures.report("proc-1", limit);
     failures.report("proc-1", null);
+    expect(failures.last("proc-1")).toEqual(limit);
+    failures.report("proc-2", overload);
+    failures.report("proc-2", null);
+    expect(failures.last("proc-2")).toBeNull();
+  });
+
+  it("a passing failure never hides a stop; a later stop replaces an earlier one; a stop replaces a passing one", () => {
+    const failures = new RelayFailures();
+    failures.report("proc-1", limit);
+    failures.report("proc-1", overload);
+    expect(failures.last("proc-1")).toEqual(limit);
+    const refused = { ...limit, class: "permission_error" as const, code: "key_refused", at: 3 };
+    failures.report("proc-1", refused);
+    expect(failures.last("proc-1")).toEqual(refused);
+    failures.report("proc-2", overload);
+    failures.report("proc-2", limit);
+    expect(failures.last("proc-2")).toEqual(limit);
+  });
+
+  it("a turn's start forgets it, per process; a turn's end does not", () => {
+    const failures = new RelayFailures();
+    failures.report("proc-1", limit);
+    failures.report("proc-2", limit);
+    failures.turn("proc-1", false);
+    expect(failures.last("proc-1")).toEqual(limit);
+    failures.turn("proc-1", true);
     expect(failures.last("proc-1")).toBeNull();
-    failures.report("proc-1", failure);
-    failures.turnStarted("proc-1");
-    expect(failures.last("proc-1")).toBeNull();
-    expect(failures.last("proc-2")).toMatchObject({ code: "key_refused" });
+    expect(failures.last("proc-2")).toEqual(limit);
+  });
+});
+
+describe("the relay's own failure clears a passing record (SPI-1172, review 2)", () => {
+  it("an unreachable endpoint and a redirect each report null, before the CLI has the answer", async () => {
+    for (const upstream of [async () => Promise.reject(new TypeError("fetch failed")), async () => new Response("", { status: 302, headers: { location: "https://x" } })]) {
+      const reported: Array<unknown> = [];
+      const h = harness({ upstream });
+      await handleModelRelay(post("{}"), { ...h.deps, outcome: async (handleId: string, failure: unknown) => void reported.push([handleId, failure]) });
+      expect(reported).toEqual([["proc-1", null]]);
+    }
+  });
+});
+
+describe("WorkspaceProxy's relay deps (SPI-1172, review 2)", () => {
+  it("report each answer to the Workspace DO, and the CLI's answer waits for the report", async () => {
+    const order: Array<string> = [];
+    let release!: () => void;
+    const rpc = {
+      modelRelay: async () => granted,
+      modelRelayOutcome: (input: { readonly handleId: string; readonly failure: unknown }) =>
+        new Promise<void>((resolve) => {
+          order.push(`reported ${input.handleId} ${input.failure === null ? "null" : "failure"}`);
+          release = resolve;
+        }),
+    };
+    const deps = workspaceRelayDeps(rpc, { fetch: async () => new Response('{"error":{"code":"insufficient_quota"}}', { status: 429 }), log: () => undefined, now: () => 1 });
+    const answered = handleModelRelay(post("{}"), deps).then(() => order.push("answered"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(order).toEqual(["reported proc-1 failure"]);
+    release();
+    await answered;
+    expect(order).toEqual(["reported proc-1 failure", "answered"]);
+  });
+});
+
+describe("the over-cap replacement in each API's own error shape (SPI-1172, review 2)", () => {
+  it("Anthropic's, OpenAI's, Google's google.rpc.Status and Mistral's error object", () => {
+    expect(JSON.parse(oversizedError("anthropic-messages", 500))).toMatchObject({ type: "error", error: { type: "api_error" } });
+    expect(JSON.parse(oversizedError("openai-completions", 400))).toMatchObject({ error: { type: "invalid_request_error", code: null } });
+    expect(JSON.parse(oversizedError("google-generative-ai", 503))).toMatchObject({ error: { code: 503, status: "INTERNAL" } });
+    expect(JSON.parse(oversizedError("mistral-conversations", 400))).toMatchObject({ object: "error", type: "invalid_request_error", code: "400" });
   });
 });
