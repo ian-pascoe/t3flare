@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off effectFnOpportunity:off
 // The pi CLI in the Cloud Environment (step 4a, plan §3, §5.2, §5.3): t3's own Pi adapter (`makePiAdapterV2`) with
-// t3flare's readiness (the image's version and the proxy's catalog, never a spawning probe), t3's MCP credential
-// withheld (OD-3), the spawn's profile from `agents/cliProfiles.ts` (t3's permission extension required, its mode
+// t3flare's readiness (the image's version and the proxy's catalog, or the Model endpoints since SPI-1170, never a
+// spawning probe), t3's MCP credential withheld (OD-3), the spawn's profile from `agents/cliProfiles.ts` (t3's permission extension required, its mode
 // always set), plan turns refused, text generation through the proxy, and the wrapper. Shown as "Pi", beside "Pi Durable".
 import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
 import { CLIS } from "@t3flare/sandbox-image/clis";
@@ -23,10 +23,11 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { makePiAdapterV2 } from "../../../../../t3code/packages/provider-pi/src/server/adapter.ts";
 import { PiSettings } from "../../../../../t3code/packages/provider-pi/src/settings.ts";
 import { environmentServices } from "../../agents/bindings.ts";
-import { snapshotModels } from "../models.ts";
+import { refreshOnEndpointsChanged } from "../../endpoints/changes.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import { cliSnapshotForCwdOf } from "../skills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
+import { piModelsOf } from "./piEndpoints.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSessions, wrapCliAdapter } from "./wrapper.ts";
 
@@ -60,7 +61,8 @@ const snapshotOf = (enabled: boolean) =>
       presentation: PRESENTATION,
       enabled,
       checkedAt,
-      models: snapshotModels(environmentServices().catalog.current()),
+      // SPI-1170: the endpoints' models when one lists a model (pi runs on them through the model relay), else the proxy's.
+      models: piModelsOf(environmentServices().catalog.current(), environmentServices().modelEndpoints?.()),
       // SPI-1151: stock's `/compact` (t3's Pi adapter runs it as pi's RPC compaction).
       slashCommands: CLI_BUILT_IN_COMMANDS.pi,
       probe: { installed: true, version: CLIS.pi.version, status: "ready", auth: { status: "authenticated" } },
@@ -98,6 +100,8 @@ export const PiCliDriver: ProviderDriver<PiSettings, PiCliDriverEnv> = {
       ),
     }).pipe(Effect.orDie);
     yield* Effect.forkScoped(snapshot.refresh);
+    // SPI-1170: the list follows the endpoints at once, as the other drivers' do.
+    yield* refreshOnEndpointsChanged(snapshot.refresh);
     const realMcpSessions = yield* McpProviderSessions.McpProviderSessions;
     const sessions: CliSessions = new Map();
     // t3's own tools with t3's per-thread bearer, as stock t3 hands them, at t3's public `/mcp` (owner, 2026-11-12, back

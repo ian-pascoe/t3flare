@@ -3,7 +3,7 @@
 import type { CatalogModel } from "@t3flare/models";
 import { describe, expect, it } from "vitest";
 
-import { CODEX_SESSIONS, PI_SESSIONS, piRepoResourceArgs, type ProfileContext, profileLaunch, repoRootOf } from "../src/agents/cliProfiles.ts";
+import { CODEX_SESSIONS, PI_SESSIONS, type PiRelay, piRepoResourceArgs, type ProfileContext, profileLaunch, repoRootOf } from "../src/agents/cliProfiles.ts";
 
 const model = (id: string, extra: Partial<CatalogModel> = {}): CatalogModel => ({
   id,
@@ -208,6 +208,89 @@ describe("pi's profile", () => {
     if ("refused" in answer) throw new Error(answer.refused);
     expect(answer.argv).toContain("--fork");
     expect(answer.env.T3_PI_MCP_EXTENSION_PATH).toBeUndefined();
+  });
+
+  // SPI-1170: pi on the Model endpoints through the model relay.
+  describe("on the model relay", () => {
+    const cost = { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 1.25 };
+    const endpointModel = (id: string, extra: Record<string, unknown> = {}) => ({ id, name: `${id} name`, reasoning: false, input: ["text" as const], contextWindow: 100_000, maxTokens: 8000, cost, known: false, ...extra });
+    const piRelay: PiRelay = {
+      endpoints: [
+        { id: "comm", label: "Commissary", api: "anthropic-messages", models: [endpointModel("claude-haiku-5-5", { reasoning: true, thinkingLevelMap: { xhigh: null }, compat: { supportsStrictTools: true } })] },
+        { id: "oai", label: "OpenAI", api: "openai-completions", models: [endpointModel("gpt-x"), endpointModel("org/model:free")] },
+        { id: "resp", label: "Responses", api: "openai-responses", models: [endpointModel("gpt-r")] },
+        { id: "gem", label: "Gemini", api: "google-generative-ai", models: [endpointModel("gemini-x", { input: ["text", "image"] })] },
+        { id: "mis", label: "Mistral", api: "mistral-conversations", models: [endpointModel("mistral-x")] },
+        { id: "empty", label: "Empty", api: "openai-responses", models: [] },
+      ],
+      model: "oai/gpt-x",
+    };
+    const onRelay = (args: ReadonlyArray<string>, env: Record<string, string> = { T3_PI_RUNTIME_MODE: "approval-required" }) =>
+      profileLaunch({ cli: "pi", args, key: "proc-1", cwd: "/w/demo", env, allowProbe: false }, { ...context, piRelay });
+    const fileOf = (answer: ReturnType<typeof onRelay>, name: string) => {
+      if ("refused" in answer) throw new Error(answer.refused);
+      return JSON.parse(answer.files!.find((file) => file.path === `/var/lib/t3flare/cli/proc-1/agent/${name}`)!.text);
+    };
+
+    it("writes one provider per endpoint that lists a model, at the relay's per-endpoint URL, with its API and the handle command as its key", () => {
+      const models = fileOf(onRelay(rpc), "models.json");
+      expect(Object.keys(models.providers)).toEqual(["t3flare-endpoint-comm", "t3flare-endpoint-oai", "t3flare-endpoint-resp", "t3flare-endpoint-gem", "t3flare-endpoint-mis"]);
+      for (const [id, api] of [["comm", "anthropic-messages"], ["oai", "openai-completions"], ["resp", "openai-responses"], ["gem", "google-generative-ai"], ["mis", "mistral-conversations"]] as const) {
+        const provider = models.providers[`t3flare-endpoint-${id}`];
+        expect(provider).toMatchObject({ baseUrl: `http://computer.internal/t3flare/model/${id}`, api, apiKey: "!/opt/t3flare/bin/t3flare-pi-handle" });
+        // Each model pinned to the endpoint's API and relay URL.
+        for (const entry of provider.models) expect(entry).toMatchObject({ api, baseUrl: `http://computer.internal/t3flare/model/${id}` });
+      }
+      expect(models.providers["t3flare-endpoint-oai"].models.map((entry: { id: string }) => entry.id)).toEqual(["gpt-x", "org/model:free"]);
+      // pi-ai's own metadata of the model, as the Session has it; nothing of the endpoint's own URL or key.
+      expect(models.providers["t3flare-endpoint-comm"].models[0]).toEqual({
+        id: "claude-haiku-5-5",
+        name: "claude-haiku-5-5 name",
+        api: "anthropic-messages",
+        baseUrl: "http://computer.internal/t3flare/model/comm",
+        reasoning: true,
+        input: ["text"],
+        cost,
+        contextWindow: 100_000,
+        maxTokens: 8000,
+        thinkingLevelMap: { xhigh: null },
+        compat: { supportsStrictTools: true },
+      });
+      // Nothing of the Model proxy's.
+      expect(models.providers.anthropic).toBeUndefined();
+      expect(JSON.stringify(models)).not.toContain("proxy.example");
+      expect(JSON.stringify(models)).not.toContain("t3flare-model-key");
+    });
+
+    it("starts pi on the relay's model, as pi names it, with no project trust", () => {
+      expect(fileOf(onRelay(rpc), "settings.json")).toEqual({ defaultProjectTrust: "never", retry: { maxRetries: 1 }, defaultProvider: "t3flare-endpoint-oai", defaultModel: "gpt-x" });
+    });
+
+    it("asks a model handle for exactly those endpoints, and never puts a handle in pi's environment or files", () => {
+      const answer = onRelay(rpc);
+      if ("refused" in answer) throw new Error(answer.refused);
+      expect(answer.modelRelay).toEqual(["comm", "oai", "resp", "gem", "mis"]);
+      expect(Object.keys(answer.env)).not.toContain("T3FLARE_MODEL_HANDLE");
+      // The handle is not taken from t3's environment either.
+      const fromT3 = onRelay(rpc, { T3_PI_RUNTIME_MODE: "approval-required", T3FLARE_MODEL_HANDLE: "f".repeat(64) });
+      if ("refused" in fromT3) throw new Error(fromT3.refused);
+      expect(JSON.stringify(fromT3.env)).not.toContain("f".repeat(64));
+      expect(JSON.stringify(fromT3.files)).not.toContain("f".repeat(64));
+      expect(fromT3.droppedEnv).toContain("T3FLARE_MODEL_HANDLE");
+    });
+
+    it("gives t3's fork the same models.json and a handle (it makes no request, but resolves its models)", () => {
+      const answer = onRelay(["--mode", "rpc", "--offline", "--no-extensions", "--no-tools", "--fork", `${PI_SESSIONS}/s1.jsonl`]);
+      expect(Object.keys(fileOf(answer, "models.json").providers)).toHaveLength(5);
+      if ("refused" in answer) throw new Error(answer.refused);
+      expect(answer.modelRelay).toEqual(["comm", "oai", "resp", "gem", "mis"]);
+    });
+
+    it("stays on the Model proxy without a relay (no handle asked)", () => {
+      const answer = launch("pi", rpc, { T3_PI_RUNTIME_MODE: "approval-required" });
+      if ("refused" in answer) throw new Error(answer.refused);
+      expect(answer.modelRelay).toBeUndefined();
+    });
   });
 
   // T-pi-1 (settings-mcp plan §5, D4; SPI-1076): the relay's servers through pi's built-in MCP.

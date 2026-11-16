@@ -3,7 +3,7 @@
 // its only model provider with the key helper, and a home built fresh on the Container's own disk with only its session
 // directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
 import { type CatalogModel } from "@t3flare/models";
-import { parseEndpointSlug } from "@t3flare/models/endpoints";
+import { type ModelEndpoint, parseEndpointSlug } from "@t3flare/models/endpoints";
 import { endpointProviderId, MODEL_HANDLE_ENV, modelRelayUrl, type RelayedEndpoint } from "@t3flare/models/relay";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, RELAY_SERVERS_ENV, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
@@ -72,6 +72,19 @@ export interface ProfileContext {
    * Model proxy. Absent: the proxy.
    */
   readonly opencodeRelay?: OpenCodeRelay;
+  /**
+   * SPI-1170: pi on the endpoints through the model relay (`piRelayOf`), instead of the Model proxy. Absent: the proxy.
+   */
+  readonly piRelay?: PiRelay;
+}
+
+/**
+ * pi on the Model endpoints (SPI-1170, `provider/cli/piEndpoints.ts` `piRelayOf`): the endpoints that list a model (pi
+ * speaks every endpoint API, through pi-ai; its handle is for these), and the model it starts on.
+ */
+export interface PiRelay {
+  readonly endpoints: ReadonlyArray<Pick<ModelEndpoint, "id" | "label" | "api" | "models">>;
+  readonly model: string | undefined;
 }
 
 /** The relay's URL for `server` as the Container reaches it. */
@@ -267,6 +280,57 @@ const PI_FLAGS: ReadonlyMap<string, boolean> = new Map([
 
 const RUNTIME_MODES = new Set(["approval-required", "auto-accept-edits", "full-access"]);
 
+/**
+ * The command pi runs for an endpoint provider's API key on the model relay (SPI-1170): the image's, printing this pi
+ * process's model handle from the start environment of the launch chain's setsid. No file and no pi environment holds it.
+ */
+export const PI_HANDLE_COMMAND = `${CLI_BIN}/t3flare-pi-handle`;
+
+/**
+ * The processes whose start environment holds a pi process's model handle (SPI-1170), by the start of their command
+ * line: only the launch chain's setsid. The launcher starts pi without it; `PI_HANDLE_COMMAND` reads it from there.
+ */
+export const PI_HANDLE_HOLDERS: ReadonlyArray<string> = ["setsid --wait /opt/t3flare/bin/pi --mode rpc"];
+
+/** pi's models of an endpoint, at its relay URL, each pinned to the endpoint's API and base URL. */
+const piEndpointModels = (endpoint: PiRelay["endpoints"][number]) =>
+  endpoint.models.map((model) => ({
+    id: model.id,
+    name: model.name,
+    api: endpoint.api,
+    baseUrl: modelRelayUrl(endpoint.id),
+    reasoning: model.reasoning,
+    input: [...model.input],
+    cost: { ...model.cost },
+    contextWindow: model.contextWindow,
+    maxTokens: model.maxTokens,
+    // pi-ai's own entry's, as the Session's pi-ai models have them (`apps/agents/src/session/models.ts`).
+    ...(model.thinkingLevelMap === undefined ? {} : { thinkingLevelMap: { ...model.thinkingLevelMap } }),
+    ...(model.compat === undefined ? {} : { compat: { ...model.compat } }),
+  }));
+
+/**
+ * pi's `models.json` on the model relay (SPI-1170): one provider per endpoint that lists a model,
+ * `t3flare-endpoint-<id>` (prefixed, so no endpoint id changes one of pi's built-in providers), with the endpoint's API
+ * and its relay URL (an endpoint's base URL follows pi-ai's convention, so pi-ai appends each API's own path), and the
+ * handle command as its API key. pi reads `models.json` only from its agent directory, the process's own home.
+ */
+export const piRelayModelsJson = (relay: PiRelay): string =>
+  `${JSON.stringify(
+    {
+      providers: Object.fromEntries(
+        relay.endpoints
+          .filter((endpoint) => endpoint.models.length > 0)
+          .map((endpoint) => [
+            endpointProviderId(endpoint.id),
+            { name: endpoint.label, baseUrl: modelRelayUrl(endpoint.id), api: endpoint.api, apiKey: `!${PI_HANDLE_COMMAND}`, models: piEndpointModels(endpoint) },
+          ]),
+      ),
+    },
+    null,
+    1,
+  )}\n`;
+
 /** pi's `models.json` (plan §4.4): the proxy as the anthropic provider, every catalog model, a command for the key. */
 export const piModelsJson = (proxyUrl: string, models: ReadonlyArray<CatalogModel>): string =>
   `${JSON.stringify(
@@ -316,6 +380,16 @@ export const piMcpJson = (servers: ReadonlyArray<string>): string =>
 
 /** pi's agent settings: no project is trusted (review F2), few retries (ADR-0012: nothing retries into spend). */
 export const PI_SETTINGS = `${JSON.stringify({ defaultProjectTrust: "never", retry: { maxRetries: 1 } }, null, 1)}\n`;
+
+/**
+ * pi's agent settings on the model relay (SPI-1170): `PI_SETTINGS`, and the model pi starts on (its default, which t3's
+ * `default` model keeps), as pi names it: its endpoint's provider and the model's own id.
+ */
+export const piRelaySettings = (relay: PiRelay): string => {
+  const start = relay.model === undefined ? undefined : parseEndpointSlug(relay.model);
+  const defaults = start === undefined ? {} : { defaultProvider: endpointProviderId(start.endpointId), defaultModel: start.modelId };
+  return `${JSON.stringify({ defaultProjectTrust: "never", retry: { maxRetries: 1 }, ...defaults }, null, 1)}\n`;
+};
 
 /**
  * The t3 path of the repo root that normalized t3 path `path` is in: its Workspace's `/w/<id>` (a project) or
@@ -377,9 +451,11 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     rest.push(arg, value);
   }
   const forking = rest.includes("--no-extensions");
+  // SPI-1170: the endpoints through the model relay when the context has them, else the Model proxy.
+  const piRelay = context.piRelay;
   const files: Array<{ path: string; text: string; mode?: number }> = [
-    { path: `${home}/agent/models.json`, text: piModelsJson(context.proxyUrl, context.models) },
-    { path: `${home}/agent/settings.json`, text: PI_SETTINGS },
+    { path: `${home}/agent/models.json`, text: piRelay === undefined ? piModelsJson(context.proxyUrl, context.models) : piRelayModelsJson(piRelay) },
+    { path: `${home}/agent/settings.json`, text: piRelay === undefined ? PI_SETTINGS : piRelaySettings(piRelay) },
   ];
   const env: Record<string, string> = {
     HOME: "/root",
@@ -429,6 +505,8 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     files,
     prune: [{ dir: PI_SESSIONS, days: PI_SESSION_RETENTION_DAYS }],
     ...(thread === undefined ? {} : { thread }),
+    // SPI-1170: the Workspace DO gives the process a model handle for these endpoints, in its environment only.
+    ...(piRelay === undefined ? {} : { modelRelay: piRelay.endpoints.filter((endpoint) => endpoint.models.length > 0).map((endpoint) => endpoint.id) }),
     droppedEnv: dropped(input.env),
   };
 };
