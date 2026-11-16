@@ -432,9 +432,9 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
       case "POST /_t3flare/check/sign-in-expire": {
         // SPI-1171 (stages only): a sign-in's access token marked expired, so the next use renews it: a mid-thread
         // refresh shown without waiting for the token's real expiry. Answers whether it was signed in, never a token.
-        const { environmentServices } = await import("../agents/bindings.ts");
-        if (!environmentServices().faults) return json({ error: "stages only" }, 403);
-        return json({ expired: await environment.expireSignIn(url.searchParams.get("endpoint") ?? "") });
+        const [{ environmentServices }, { expireHook }] = await Promise.all([import("../agents/bindings.ts"), import("../endpoints/expireHook.ts")]);
+        const answer = await expireHook({ faults: environmentServices().faults, expire: (endpointId) => environment.expireSignIn(endpointId) }, url.searchParams.get("endpoint") ?? "");
+        return json(answer.json, answer.status);
       }
       case "GET /_t3flare/agents/process-state": {
         const { workspaceRpc } = await import("../agents/workspaceClient.ts");

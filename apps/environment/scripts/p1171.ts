@@ -90,11 +90,152 @@ if (step === "start") {
     endpoints: (endpoints.endpoints ?? []).map((endpoint) => ({ id: endpoint.id, auth: endpoint.auth, api: endpoint.api, models: endpoint.models.map((model) => model.id), signIn: endpoint.signIn ?? null })),
     signIns: endpoints.signIns ?? null,
   });
+} else if (step === "abandon") {
+  // Owner decision (2026-11-16): no live sign-in for SPI-1171. A waiting attempt is dropped by a sign-out, never completed.
+  for (const kind of KINDS) await api("POST", "endpoints/sign-in", { op: "sign-out", id: kind });
+  const after = await listed();
+  print({ waiting: Object.fromEntries(KINDS.map((kind) => [kind, after.signIns?.[kind]?.pendingSince ?? null])), endpoints: (after.endpoints ?? []).map((endpoint) => endpoint.id) });
 } else if (step === "run") {
   await run();
+} else if (step === "control") {
+  await control();
 } else {
-  console.error("usage: p1171 start <kind> <file> | complete <kind> <file> | status | run [--out file]");
+  console.error("usage: p1171 start <kind> <file> | complete <kind> <file> | status | abandon | run [--out file] | control [--out file]");
   process.exit(2);
+}
+
+/**
+ * `control`: what the stage shows with no subscription signed in (owner decision, 2026-11-16).
+ * 1. Every CLI lists exactly the sign-ins the ticket's matrix gives it: two sign-in endpoints saved with no credential
+ *    (`sub-chatgpt`, `sub-claude`) beside the stage's API-key endpoints (`commissary`, Anthropic Messages; `resp`, OpenAI
+ *    Responses, both Commissary's with the proxy key).
+ * 2. A regression control: a turn with tools per CLI through the relay on an API-key endpoint.
+ * 3. A sign-in that gives no token: each CLI's turn on its sign-in fails with t3's failure naming the sign-in, and a
+ *    request at the relay with the process's handle gets 401 in its API's shape, naming it.
+ * 4. The Container leak scan in each CLI's Workspace, its processes alive; a planted canary key is found.
+ * 5. Both Workers' logs hold no key, token form or handle.
+ */
+async function control(): Promise<void> {
+  const proxyUrl = (process.env.MODEL_PROXY_URL ?? "").replace(/\/+$/, "");
+  const proxyKey = process.env.MODEL_PROXY_API_KEY ?? "";
+  const canaryKey = `sk-canary-${randomBytes(24).toString("hex")}`;
+  const { stage, report, handles, clean, check, leaks, fail, finish } = relayEvidence([proxyKey, canaryKey]);
+  if (proxyUrl === "" || proxyKey === "") {
+    fail("the stage needs MODEL_PROXY_URL and MODEL_PROXY_API_KEY (dev.env)");
+    finish();
+  }
+  const MODEL = "claude-haiku-5-5";
+  const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${stage}`], async () => {
+    const cookie = await pair();
+    await admin("POST", "/_t3flare/disarm-bootstrap");
+
+    // 1. The endpoints, saved before any CLI process starts (a handle's scope is its process's start).
+    const saves = {
+      resp: (await api("POST", "endpoints", { op: "save", endpoint: { id: "resp", label: "Commissary (Responses)", api: "openai-responses", baseUrl: `${proxyUrl}/v1`, auth: "api-key", headers: {}, models: [MODEL] }, apiKey: proxyKey })).status,
+      "sub-chatgpt": await api("POST", "endpoints", { op: "save", endpoint: { id: "sub-chatgpt", label: "ChatGPT", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "chatgpt", headers: {}, models: ["gpt-6.1-sol"] } }),
+      "sub-claude": await api("POST", "endpoints", { op: "save", endpoint: { id: "sub-claude", label: "Claude", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "claude", headers: {}, models: [MODEL] } }),
+    };
+    report.saves = clean({ resp: saves.resp, "sub-chatgpt": saves["sub-chatgpt"].status, "sub-claude": saves["sub-claude"].status });
+    check("the API-key Responses endpoint and two sign-in endpoints with no credential saved", saves.resp === 200 && saves["sub-chatgpt"].status === 200 && saves["sub-claude"].status === 200, { ...(report.saves as object), errors: [saves["sub-chatgpt"].json, saves["sub-claude"].json] });
+    const endpoints = (await listed()).endpoints ?? [];
+    report.endpoints = endpoints.map((endpoint) => ({ id: endpoint.id, auth: endpoint.auth, api: endpoint.api, signedIn: endpoint.signIn?.signedIn ?? null }));
+    const SIGN_IN_MODEL = { chatgpt: "sub-chatgpt/gpt-6.1-sol", claude: `sub-claude/${MODEL}` } as const;
+
+    // The lists: the ticket's matrix.
+    await enable(cookie, "codex", "codex");
+    await enable(cookie, "pi", "pi");
+    await enableAcp(cookie, "claude");
+    await enableAcp(cookie, "opencode");
+    await sleep(3000);
+    const config = (await wsCall(cookie, "server.getConfig", {})) as any;
+    const lists = Object.fromEntries(
+      ["codex", "claudeAgent", "opencode", "pi"].map((driver) => [driver, ((config?.providers ?? []) as Array<any>).find((provider) => provider.driver === driver)?.models?.map((model: any) => String(model.slug)) ?? []]),
+    ) as Record<string, Array<string>>;
+    report.lists = Object.fromEntries(Object.entries(lists).map(([driver, slugs]) => [driver, slugs.filter((slug) => !slug.startsWith("commissary/"))]));
+    const has = (driver: string, slug: string) => lists[driver]!.includes(slug);
+    check("Codex lists the ChatGPT sign-in, not the Claude one", has("codex", SIGN_IN_MODEL.chatgpt) && !has("codex", SIGN_IN_MODEL.claude), report.lists);
+    check("Claude Code lists the Claude sign-in, not the ChatGPT one", has("claudeAgent", SIGN_IN_MODEL.claude) && !has("claudeAgent", SIGN_IN_MODEL.chatgpt), report.lists);
+    check("OpenCode lists both sign-ins", has("opencode", SIGN_IN_MODEL.claude) && has("opencode", SIGN_IN_MODEL.chatgpt), report.lists);
+    check("pi lists both sign-ins", has("pi", SIGN_IN_MODEL.claude) && has("pi", SIGN_IN_MODEL.chatgpt), report.lists);
+
+    // 2 and 3: per CLI, a tool turn on an API-key endpoint, then a new thread on its sign-in.
+    const run = Date.now().toString(36);
+    const toolTurn = (turn: { runs: Array<any>; items: Array<any> }) => turn.runs.at(-1)?.status === "completed" && turn.items.some((item: any) => item.type === "file_change") && turn.items.some((item: any) => item.type === "command_execution");
+    const CLIS = [
+      { cli: "codex", control: `resp/${MODEL}`, signIn: "chatgpt" },
+      { cli: "claude", control: `commissary/${MODEL}`, signIn: "claude" },
+      { cli: "opencode", control: `commissary/${MODEL}`, signIn: "claude" },
+      { cli: "pi", control: `commissary/${MODEL}`, signIn: "claude" },
+    ] as const;
+    const turns: Record<string, unknown> = {};
+    const workspaces: Record<string, string> = {};
+    const turnOf = (cli: string, options: { workspace: string; model: string; mode: string; plan: boolean; prompt: string }) => (cli === "codex" || cli === "pi" ? cliTurn(cookie, { cli, ...options }) : acpTurn(cookie, { cli, ...options }));
+    for (const { cli, control: model, signIn } of CLIS) {
+      const workspace = `ctl-${cli}-${run}`;
+      workspaces[cli] = workspace;
+      const turn = await turnOf(cli, { workspace, model, mode: "approval-required", plan: false, prompt: EDIT_AND_TEST });
+      turns[`${cli} control`] = clean({ model, runs: turn.runs.slice(-1), items: turn.items, text: turn.text });
+      check(`a ${cli} turn with tools ran through the relay on an API-key endpoint (${model})`, toolTurn(turn), turns[`${cli} control`]);
+      const title = signIn === "chatgpt" ? "ChatGPT" : "Claude";
+      const refused = await turnOf(cli, { workspace, model: SIGN_IN_MODEL[signIn], mode: "approval-required", plan: false, prompt: "Reply with the word ok." });
+      const failure = refused.runs.at(-1)?.failure as { message?: string; code?: string; class?: string } | null;
+      turns[`${cli} ${signIn} sign-in`] = clean({ model: SIGN_IN_MODEL[signIn], runs: refused.runs.slice(-1), errors: refused.items.filter((item: any) => item.type === "error") });
+      check(`a ${cli} turn on the ${title} sign-in with no credential fails with t3's failure naming the sign-in`, refused.runs.at(-1)?.status === "failed" && String(failure?.message ?? "").includes(`not signed in to ${title}`), turns[`${cli} ${signIn} sign-in`]);
+    }
+    report.turns = turns;
+
+    // A request at the relay with pi's handle, on each sign-in, as a CLI makes it.
+    const HANDLE_OF = `grep -ahz '^T3FLARE_MODEL_HANDLE=' /proc/[0-9]*/environ 2>/dev/null | tr '\\0' '\\n' | head -1 | cut -d= -f2`;
+    const relay = await exec(
+      workspaces.pi!,
+      [
+        `H=$(${HANDLE_OF})`,
+        `echo "handle=$H"`,
+        `code=$(curl -s -o /tmp/p1171-a.json -w '%{http_code}' -X POST -H "x-api-key: $H" -H 'anthropic-version: 2023-06-01' -H 'content-type: application/json' --data '{"model":"${MODEL}","max_tokens":5,"messages":[{"role":"user","content":"hi"}]}' http://computer.internal/t3flare/model/sub-claude/v1/messages); echo "claude=$code"`,
+        `echo "claudeType=$(grep -o '"type":"authentication_error"' /tmp/p1171-a.json | head -1)"`,
+        `echo "claudeNames=$(grep -c 'not signed in to Claude' /tmp/p1171-a.json)"`,
+        `code=$(curl -s -o /tmp/p1171-b.json -w '%{http_code}' -X POST -H "authorization: Bearer $H" -H 'content-type: application/json' --data '{"model":"gpt-6.1-sol","input":"hi"}' http://computer.internal/t3flare/model/sub-chatgpt/responses); echo "chatgpt=$code"`,
+        `echo "chatgptNames=$(grep -c 'not signed in to ChatGPT' /tmp/p1171-b.json)"`,
+        "rm -f /tmp/p1171-a.json /tmp/p1171-b.json",
+      ].join("\n"),
+    );
+    const lines = linesOf(relay.stdout);
+    if (/^[0-9a-f]{64}$/.test(lines.handle ?? "")) handles.push(lines.handle!);
+    delete lines.handle;
+    report.relayRefusal = clean(lines);
+    check("a request at the relay on the Claude sign-in gets 401, Anthropic's authentication_error naming the sign-in", lines.claude === "401" && lines.claudeType !== "" && lines.claudeNames === "1", lines);
+    check("a request at the relay on the ChatGPT sign-in gets 401 naming the sign-in", lines.chatgpt === "401" && lines.chatgptNames === "1", lines);
+
+    // 4. The leak scans, then the positive control.
+    const scans: Record<string, unknown> = {};
+    for (const workspace of Object.values(workspaces)) {
+      const scan = await leak(workspace);
+      scans[workspace] = clean({ do: scan?.do ?? null, hits: scan?.container?.hits ?? null, files: scan?.container?.files ?? null, notScanned: scan?.notScanned ?? null, lookedFor: scan?.lookedFor ?? null });
+      check(`the leak scan in ${workspace} finds no key and scanned every one`, (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0 && (scan?.container?.files ?? 0) > 0 && Array.isArray(scan?.notScanned) && scan.notScanned.length === 0 && (scan?.lookedFor ?? []).includes("endpoint:resp"), scan);
+    }
+    report.leak = scans;
+    const CANARY = { id: "canary", label: "Canary", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "api-key", headers: {}, models: [MODEL] };
+    check("the canary endpoint saved", (await api("POST", "endpoints", { op: "save", endpoint: CANARY, apiKey: canaryKey })).status === 200);
+    await exec(workspaces.pi!, `printf %s '${canaryKey}' > /tmp/p1171-canary.txt`);
+    const planted = await leak(workspaces.pi!);
+    await exec(workspaces.pi!, "rm -f /tmp/p1171-canary.txt");
+    const hits = (planted?.container?.hits ?? []) as Array<{ name: string; path: string }>;
+    report.leakControl = clean({ hits });
+    check("the leak scan finds a key planted in the Container (the positive control)", hits.some((hit) => hit.name === "endpoint:canary" && hit.path === "/tmp/p1171-canary.txt"), report.leakControl);
+    for (const id of ["canary", "sub-chatgpt", "sub-claude", "resp"]) await api("POST", "endpoints", { op: "remove", id });
+  });
+
+  // 5. The logs.
+  const relayLogs = workerLogs(all.text, "model-relay");
+  const refusals = relayLogs.filter((entry) => typeof entry.signIn === "string");
+  report.relayLog = {
+    entries: relayLogs.length,
+    byCli: Object.fromEntries(["codex", "claude", "opencode", "pi"].map((cli) => [cli, [...new Set(relayLogs.filter((entry) => entry.cli === cli).map((entry) => `${entry.endpoint} ${entry.status}`))].sort((a, b) => a.localeCompare(b))])),
+    signInRefusals: refusals.map((entry) => ({ cli: entry.cli, endpoint: entry.endpoint, status: entry.status, signIn: entry.signIn, failure: entry.failure ?? null })),
+  };
+  check("the relay logged each sign-in's refusal as sign_in_refused", refusals.length > 0 && refusals.every((entry) => entry.status === 401 && entry.failure?.code === "sign_in_refused"), report.relayLog);
+  check("no key, token form or handle in either Worker's log", !TOKEN_FORMS.test(all.text) && !leaks(all.text), { bytes: all.workers });
+  finish();
 }
 
 async function run(): Promise<void> {
