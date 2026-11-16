@@ -367,7 +367,7 @@ t3flare's own count of one model answer's tokens on a Model endpoint, with its a
 _Avoid_: usage log, telemetry, request log (that is Commissary's)
 
 **Subscription**:
-The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key: a Model endpoint's sign-in, its tokens held by the Credential broker.
+The owner's own signed-in plan with a model vendor (ChatGPT plan usage; a Claude Pro or Max plan, signed in as Claude Code), as opposed to an API key: a Model endpoint's sign-in, its tokens held by the Credential broker.
 _Avoid_: Subscription login, OAuth, account
 
 **Credential broker**:

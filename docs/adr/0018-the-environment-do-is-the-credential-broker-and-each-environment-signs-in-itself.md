@@ -19,8 +19,8 @@ Each Environment signs in itself: a rotating credential is never copied from the
 
 Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
 
-1. **A sign-in is a Model endpoint's auth.** An endpoint's auth is an API key, none, or a sign-in (`chatgpt` first;
-   Claude and Copilot follow in SPI-1165 and SPI-1166, each one entry in `SIGN_IN_KINDS` and one vendor in the broker).
+1. **A sign-in is a Model endpoint's auth.** An endpoint's auth is an API key, none, or a sign-in (`chatgpt` first,
+   `claude` second (item 10); Copilot follows in SPI-1166, each one entry in `SIGN_IN_KINDS` and one vendor in the broker).
    A sign-in fixes its endpoint's API and base URL and allows no headers of the owner's; its auth never changes (remove
    the endpoint to change it). Until the hard cut (SPI-1176), Subscriptions may also stay connected in the Model proxy.
 2. **The broker is ours, not t3's.** `credentials/broker.ts` implements pi-ai's `CredentialStore` over the sealed store
@@ -46,7 +46,7 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
    issued client id and the account's email, for the next sign-in); then every open Session drops the endpoint's token,
    and stops its live turns when they run on the endpoint (the Session's own storage says, so it holds after a restart);
    then the vendor revokes the refresh token that was current (ChatGPT: at discovery's revocation endpoint, retried
-   twice, 30 s in all), whatever happened to the Sessions (each is given 5 s). The panel says `revoked` only when the
+   twice, 30 s in all; Claude: Anthropic offers no revocation, item 10), whatever happened to the Sessions (each is given 5 s). The panel says `revoked` only when the
    vendor confirmed it. Removing a signed-in endpoint signs it out first; a completed sign-in whose endpoint cannot be
    saved, or which a sign-out overtook during its code exchange, is revoked at once, as is a grant the sign-in does not
    keep (no plan-usage scope, an ID token that does not check out). Sign-out forgets the account (its subject), so the
@@ -68,10 +68,35 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
    list of endpoints (Codex, Claude Code, OpenCode) starts from `relayedEndpoints`, which leaves sign-ins out. No
    Workspace code asks for a sign-in's token.
 
+10. **Claude is a Claude Pro or Max plan through Claude Code's OAuth sign-in** (SPI-1165; report
+    [`docs/steps/spi-1165.md`](../steps/spi-1165.md)). It is pi-ai's copy-code flow: the owner approves at claude.ai,
+    Anthropic's page shows a code (`code#state`), and the owner pastes it into the panel. Its client, URLs and scopes are
+    pi-ai's (Claude Code's public client), pinned against pi-ai's own flow; its state is a random value of its own, not
+    the PKCE verifier pi-ai sends as the state. Its endpoint is `anthropic-messages` at `https://api.anthropic.com`, and
+    its requests take the shape pi-ai gives a Claude subscription's token (Bearer auth, Claude Code's betas, user agent
+    and identity as the system's first block, its tool names), pinned in a test; the shape follows from the token, so an
+    API-key endpoint refuses such a token as its key, and the shape reaches no other endpoint. Its tokens last 8 hours
+    and its refresh token rotates on every refresh, a replaced one refused (SPI-1161 Q5), so item 3's one refresher
+    matters most here. **Anthropic offers no revocation to apps** (SPI-1161: `platform.claude.com/v1/oauth/revoke`
+    answers 404): sign-out deletes the tokens here and stops the Sessions; the grant stays on the owner's account until he
+    removes it at claude.ai (Settings, Claude Code), which the panel says beside the sign-in, in Sign out's confirmation
+    and in its answer.
+
+    **The terms-of-service risk is the owner's, chosen knowingly** (owner decision, 2026-11-13). Claude Code's OAuth
+    client is Anthropic's own, made for Claude Code; Anthropic's terms may not allow a Claude plan's usage through
+    another app, and Anthropic may refuse such requests, or act on the account. The owner chose to offer the sign-in
+    regardless, for his own Environment. Its requests present themselves as Claude Code (its user agent and identity),
+    as pi-ai's do, since Anthropic refuses an OAuth token's requests without the identity (SPI-1161 Q4). The panel names
+    the risk as his beside the sign-in.
+
 Considered and not taken:
 
 - **ChatGPT's device code on the Codex backend** (the spike's go): its sign-in runs in a Worker, but every request from
   our Workers to `chatgpt.com` is blocked at its edge.
 - **pi-ai's `login()` in the Durable Object**: its attempt lives in memory and is lost before the paste.
+- **Claude through the Model proxy only** (Commissary holds a Claude credential): the owner's Model endpoints decisions
+  bring Subscriptions into t3flare, and the hard cut (SPI-1176) removes the proxy.
+- **pi-ai's state as the verifier** for Claude: it puts the PKCE verifier in the browser's address and on Anthropic's
+  page beside the code; a state of our own costs nothing (to be confirmed by the first real sign-in, SPI-1165).
 - **t3's `CodexChatGptAuth`** (step-2a2's plan): it is the same OAuth flow, but tied to t3's provider settings and secret
   store, which the panel's sign-ins do not use.

@@ -8,7 +8,8 @@ the endpoints stand side by side) and [ADR-0032](0032-environment-settings-and-h
 
 t3flare stops depending on the Model proxy. The owner configures **Model endpoints**: each is an API pi-ai speaks
 (Anthropic Messages, OpenAI Responses, OpenAI-compatible Completions, Google Generative AI, Mistral), at a base URL,
-with an API key, a sign-in (SPI-1164: ChatGPT plan usage first; [ADR-0018](0018-the-environment-do-is-the-credential-broker-and-each-environment-signs-in-itself.md)'s
+with an API key, a sign-in (SPI-1164: ChatGPT plan usage first; SPI-1165: a Claude plan, its terms-of-service risk the
+owner's; [ADR-0018](0018-the-environment-do-is-the-credential-broker-and-each-environment-signs-in-itself.md)'s
 refinement) or none, optional headers, and the models it serves.
 
 1. **Their own entity.** Stored in the Environment DO under `t3flare:endpoints:settings` with their own revision,
