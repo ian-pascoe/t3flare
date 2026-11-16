@@ -227,3 +227,41 @@ Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/
    proxy key's re-ask after a rotation does not arise.
 6. **Headers.** OpenCode's own (`x-opencode-*`, `x-session-*`, `b3`, `traceparent`, `user-agent`) are dropped; its turns
    need none of them. The allowlist is unchanged.
+
+## Refinement (SPI-1170, 2026-11-16): the pi CLI through the model relay
+
+Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/spi-1170/p1170.json`.
+
+1. **A provider per endpoint, every API.** pi takes a base URL per provider (`models.json`), so each endpoint that lists
+   a model is its own provider, `t3flare-endpoint-<endpointId>` (prefixed, so no endpoint id changes one of pi's
+   built-in providers), with the endpoint's API and the relay's per-endpoint URL, every model pinned to both. pi is
+   pi-ai's coding agent and an endpoint's base URL follows pi-ai's convention, so every endpoint API is pi's (Anthropic
+   Messages, OpenAI Responses and Completions, Google Generative AI, Mistral) and pi-ai appends each API's own path. The
+   model-routed URL is not used.
+2. **The choice is the Environment's**, as Claude Code's and OpenCode's: with an endpoint that lists a model, every pi
+   process runs on the endpoints; otherwise the Model proxy as before. t3's slugs stay `<endpointId>/<modelId>`: the
+   process's RPC lines are mapped at the channel (an endpoint id in a `set_model` to its provider; a provider in pi's
+   responses and `message_end` events back to the endpoint id), so t3 sees its own slugs and pi's session files keep
+   pi's provider ids, which follow from the immutable endpoint id, and resume in a new process.
+3. **The key is a command pi runs per request.** The providers' `apiKey` is `!/opt/t3flare/bin/t3flare-pi-handle`. pi
+   1.5.2 runs an API key's command at each request, uncached (`resolveConfigValueUncached`), and only when it sends
+   one. A `$NAME` key was not used: pi resolves it from its own environment, which its bash tool's commands inherit.
+4. **Where the handle is.** The Workspace DO puts it in the process's environment. The launcher (`t3flare-pi`) starts
+   pi without it (`env -u`), so pi's process holds none and nothing pi starts (bash tool commands, MCP servers, key
+   commands) inherits it. The handle command walks up from its parent to the launch chain's `setsid` (by its command
+   line) and prints that process's start environment's handle only when its marker (`T3FLARE_EXEC`) is the command's
+   own; it fails closed otherwise. No file holds it. **As for the other CLIs, this keeps the handle out of environments
+   and files, not out of reach**: setsid's start environment is readable by any process of the same uid, everything in
+   the Container is root, and a command pi's bash tool runs is in pi's launch chain, so it can run the handle command
+   (as Claude Code's Bash can run its helper) and spend through the handle for that process's endpoints until it
+   exits. The same class, not wider. Measured in `test:docker` and on p1170: setsid is the only holder; pi's process,
+   a shell's `env` and the files under `/var/lib/t3flare`, `/root`, `/tmp` and `/workspace` have none.
+5. **Where the handle can go.** Only to a model's `baseUrl`, which only the process's own `models.json` (pi reads it
+   from its agent directory alone) or an extension (only t3's is passed; a repository's `.pi/extensions`, settings and
+   packages load only under project trust, which stays off) can set; `modelOverrides` cannot set one. A hostile
+   repository `.pi/` (an extension moving an endpoint's provider, settings naming it and a package, a `models.json`)
+   loaded nothing and sent nothing elsewhere (`test:docker`). So no placeholder or request-time hook is needed, unlike
+   OpenCode's. A root command can rewrite the home's `models.json`; it can read the handle already.
+6. **Headers.** pi's own (`x-stainless-*`, `user-agent`, `accept-language`, `anthropic-dangerous-direct-browser-access`,
+   Google's `x-goog-api-client`, and the prompt-cache affinity hints `session-id`, `x-client-request-id` and Mistral's
+   `x-affinity`) are dropped; its turns need none of them. The allowlist is unchanged.

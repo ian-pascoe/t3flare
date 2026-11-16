@@ -58,7 +58,9 @@ refinement) or none, optional headers, and the models it serves.
    Environment's, not the session's. **And OpenCode** (SPI-1169; the same choice, which the owner accepted for Claude
    Code): once an endpoint whose API OpenCode speaks (Anthropic Messages, OpenAI Responses, OpenAI-compatible
    Completions) lists a model, every OpenCode process runs on the endpoints, and the Model proxy's models are refused
-   in OpenCode threads. Its system configuration (`/etc/opencode`) is the Container's too.
+   in OpenCode threads. Its system configuration (`/etc/opencode`) is the Container's too. **And pi** (SPI-1170; the
+   same choice): once any endpoint lists a model (pi speaks every endpoint API), every pi process runs on the
+   endpoints, and the Model proxy's models are refused in pi threads.
 7. **CLI agents through the model relay** (SPI-1167): a CLI agent reaches an endpoint whose API it speaks at
    `computer.internal/t3flare/model/<endpointId>` with a per-process Handle; the Workers swap it for the key from
    `resolve` and stream the request to the endpoint unchanged ([ADR-0016](0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)'s
@@ -66,7 +68,9 @@ refinement) or none, optional headers, and the models it serves.
    (SPI-1168) reaches every Anthropic Messages endpoint through one model-routed URL (`…/t3flare/model/_`), the
    endpoint chosen by the request's model slug, so a thread can switch between endpoints' models. OpenCode (SPI-1169)
    takes a base URL per provider: one provider per endpoint whose API it speaks (`t3flare-endpoint-<id>`, at the
-   per-endpoint path), so a thread switches between them, across APIs, without the routed URL.
+   per-endpoint path), so a thread switches between them, across APIs, without the routed URL. pi (SPI-1170) does the
+   same for every endpoint: one provider per endpoint (`t3flare-endpoint-<id>`) in its `models.json`, whose key is a
+   command that prints the process's handle.
 
 Consequences: Commissary is one endpoint among others (an Anthropic Messages endpoint at its URL with its key). Losing
 a stage's alchemy state loses its credentials key, and the owner enters the endpoints' keys again.

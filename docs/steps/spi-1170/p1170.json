@@ -1,0 +1,728 @@
+{
+  "at": "2026-11-16T12:28:07.313Z",
+  "stage": "p1170",
+  "head": "7f1b163556bfdffa1bcfa2bfc4860fef1a9f0796",
+  "clean": true,
+  "removedEndpoints": [
+    "comm",
+    "oai",
+    "resp"
+  ],
+  "models": {
+    "model": "claude-haiku-5-5",
+    "anthropicLists": true,
+    "openaiLists": true
+  },
+  "endpoints": {
+    "saved": {
+      "comm": 200,
+      "oai": 200,
+      "resp": 200
+    },
+    "baseUrls": {
+      "comm": "<MODEL_PROXY_URL>",
+      "oai": "<MODEL_PROXY_URL>/v1",
+      "resp": "<MODEL_PROXY_URL>/v1"
+    }
+  },
+  "piModels": {
+    "first": [
+      {
+        "slug": "comm/claude-haiku-5-5",
+        "group": "Commissary (Anthropic)",
+        "isDefault": true
+      },
+      {
+        "slug": "oai/claude-haiku-5-5",
+        "group": "Commissary (Chat Completions)",
+        "isDefault": false
+      },
+      {
+        "slug": "resp/claude-haiku-5-5",
+        "group": "Commissary (Responses)",
+        "isDefault": false
+      }
+    ],
+    "total": 3,
+    "proxyRetained": 0
+  },
+  "turn": {
+    "threadId": "ed0937ad-2886-447f-88fa-7e873c6269fc",
+    "root": "/w/relay-pi-mwj8oxny",
+    "model": "comm/claude-haiku-5-5",
+    "runs": [
+      {
+        "id": "run:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:ordinal:1",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "items": [
+      {
+        "type": "user_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "reasoning",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "dynamic_tool",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "reasoning",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "file_change",
+        "status": "completed",
+        "fileName": "src/greeting.txt",
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "command_execution",
+        "status": "completed",
+        "fileName": null,
+        "input": "bash test.sh",
+        "exitCode": 0
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "reasoning",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "assistant_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "checkpoint",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      }
+    ],
+    "text": "The test passed: `bash test.sh` printed \"all checks passed\" after I added `Hello from the CLI.` as the last line of `src/greeting.txt`.\n\nI'll remember the code word KESTREL-41.",
+    "requests": [
+      {
+        "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253A1:native-request:139b8a29-a84c-44e5-bb19-8aec4b228351:9a3f9d37-5a88-4efc-b6ae-6d23789f658b",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": null
+      },
+      {
+        "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253A1:native-request:f6d48093-fb03-402f-b237-dd0d343fd01b:e1bbeccc-e3fb-4222-997d-c4d91fea0e4a",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": null
+      }
+    ],
+    "providerThreads": [
+      {
+        "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Aed0937ad-2886-447f-88fa-7e873c6269fc%3Aordinal%3A1",
+        "nativeThreadRef": {
+          "driver": "pi",
+          "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-16T12-28-32-097Z_01a1e454-99df-77a4-bcf0-53578be81c56.jsonl",
+          "strength": "strong"
+        },
+        "providerSessionId": "provider-session:provider-instance:pi:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:92eaf5e2-f264-421e-b0ba-0af6f6a63451",
+        "providerInstanceId": "pi"
+      }
+    ],
+    "providerSessions": [
+      {
+        "id": "provider-session:provider-instance:pi:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:92eaf5e2-f264-421e-b0ba-0af6f6a63451",
+        "status": "ready",
+        "cwd": "/w/relay-pi-mwj8oxny"
+      }
+    ],
+    "ms": 26664
+  },
+  "modelsJson": {
+    "providers": {
+      "t3flare-endpoint-comm": {
+        "api": "anthropic-messages",
+        "baseUrl": "http://computer.internal/t3flare/model/comm",
+        "apiKey": "!/opt/t3flare/bin/t3flare-pi-handle",
+        "models": [
+          "claude-haiku-5-5@http://computer.internal/t3flare/model/comm"
+        ]
+      },
+      "t3flare-endpoint-oai": {
+        "api": "openai-completions",
+        "baseUrl": "http://computer.internal/t3flare/model/oai",
+        "apiKey": "!/opt/t3flare/bin/t3flare-pi-handle",
+        "models": [
+          "claude-haiku-5-5@http://computer.internal/t3flare/model/oai"
+        ]
+      },
+      "t3flare-endpoint-resp": {
+        "api": "openai-responses",
+        "baseUrl": "http://computer.internal/t3flare/model/resp",
+        "apiKey": "!/opt/t3flare/bin/t3flare-pi-handle",
+        "models": [
+          "claude-haiku-5-5@http://computer.internal/t3flare/model/resp"
+        ]
+      }
+    },
+    "settings": {
+      "defaultProjectTrust": "never",
+      "retry": {
+        "maxRetries": 1
+      },
+      "defaultProvider": "t3flare-endpoint-comm",
+      "defaultModel": "claude-haiku-5-5"
+    }
+  },
+  "openaiTurn": {
+    "threadId": "ed0937ad-2886-447f-88fa-7e873c6269fc",
+    "root": "/w/relay-pi-mwj8oxny",
+    "model": "oai/claude-haiku-5-5",
+    "runs": [
+      {
+        "id": "run:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:ordinal:1",
+        "status": "completed",
+        "failure": null
+      },
+      {
+        "id": "run:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:ordinal:2",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "items": [
+      {
+        "type": "user_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "file_change",
+        "status": "completed",
+        "fileName": "src/greeting.txt",
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "command_execution",
+        "status": "completed",
+        "fileName": null,
+        "input": "bash test.sh",
+        "exitCode": 0
+      },
+      {
+        "type": "approval_request",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "assistant_message",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      },
+      {
+        "type": "checkpoint",
+        "status": "completed",
+        "fileName": null,
+        "input": null,
+        "exitCode": null
+      }
+    ],
+    "text": "The test passed: `bash test.sh` printed \"all checks passed\" after I added `Hello again.` as the last line of `src/greeting.txt`.",
+    "requests": [
+      {
+        "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253A1:native-request:139b8a29-a84c-44e5-bb19-8aec4b228351:9a3f9d37-5a88-4efc-b6ae-6d23789f658b",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": null
+      },
+      {
+        "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253A1:native-request:f6d48093-fb03-402f-b237-dd0d343fd01b:e1bbeccc-e3fb-4222-997d-c4d91fea0e4a",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": null
+      },
+      {
+        "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A2%253Aattempt%253A1:native-request:d80ab592-4f1c-4c42-bb7f-529e529c3485:af3bb8b7-ff1d-4592-8dad-ad3927622d73",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": null
+      },
+      {
+        "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253Aed0937ad-2886-447f-88fa-7e873c6269fc%25253Aordinal%25253A2%253Aattempt%253A1:native-request:42b00361-26b0-4412-8f1a-5ae57229cfef:355a66a9-6795-4c36-8a6f-698d67b730d0",
+        "kind": "command",
+        "requestKind": null,
+        "status": "resolved",
+        "decision": null
+      }
+    ],
+    "providerThreads": [
+      {
+        "id": "provider-thread:provider:pi:native-thread:pending%3Arun%3Athread%3Aed0937ad-2886-447f-88fa-7e873c6269fc%3Aordinal%3A1",
+        "nativeThreadRef": {
+          "driver": "pi",
+          "nativeId": "/workspace/.t3flare/pi/sessions/2026-11-16T12-28-32-097Z_01a1e454-99df-77a4-bcf0-53578be81c56.jsonl",
+          "strength": "strong"
+        },
+        "providerSessionId": "provider-session:provider-instance:pi:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:92eaf5e2-f264-421e-b0ba-0af6f6a63451",
+        "providerInstanceId": "pi"
+      }
+    ],
+    "providerSessions": [
+      {
+        "id": "provider-session:provider-instance:pi:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:92eaf5e2-f264-421e-b0ba-0af6f6a63451",
+        "status": "ready",
+        "cwd": "/w/relay-pi-mwj8oxny"
+      }
+    ],
+    "ms": 12164
+  },
+  "switch": {
+    "toResponses": {
+      "runs": [
+        {
+          "id": "run:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:ordinal:3",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "reasoning",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "file_change",
+          "status": "completed",
+          "fileName": "src/greeting.txt",
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "bash test.sh",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "KESTREL-41",
+      "native": [
+        "/workspace/.t3flare/pi/sessions/2026-11-16T12-28-32-097Z_01a1e454-99df-77a4-bcf0-53578be81c56.jsonl"
+      ]
+    },
+    "openai": [
+      "/workspace/.t3flare/pi/sessions/2026-11-16T12-28-32-097Z_01a1e454-99df-77a4-bcf0-53578be81c56.jsonl"
+    ],
+    "first": [
+      "/workspace/.t3flare/pi/sessions/2026-11-16T12-28-32-097Z_01a1e454-99df-77a4-bcf0-53578be81c56.jsonl"
+    ]
+  },
+  "handle": {
+    "found": true,
+    "holders": " setsid --wait /opt/t3flare/bin/pi --mode rpc|",
+    "piProcesses": "1",
+    "piTitle": "pi                  ",
+    "piWithHandle": "0",
+    "files": "0",
+    "outside": "0",
+    "anthropic": "200",
+    "openai": "200",
+    "forged": "401",
+    "none": "401",
+    "unconfigured": "403",
+    "stderr": ""
+  },
+  "shellEnv": {
+    "runs": [
+      {
+        "id": "run:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:ordinal:4",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "counts": "handle=0\nexec=1"
+  },
+  "leak": {
+    "do": [],
+    "container": {
+      "hits": [],
+      "files": 615,
+      "bytes": 7038341,
+      "ms": 114
+    },
+    "flagged": null,
+    "notScanned": []
+  },
+  "leakControl": {
+    "hits": [
+      {
+        "name": "endpoint:canary",
+        "path": "/tmp/p1170-canary.txt"
+      }
+    ]
+  },
+  "resume": {
+    "runs": [
+      {
+        "id": "run:thread:ed0937ad-2886-447f-88fa-7e873c6269fc:ordinal:5",
+        "status": "completed",
+        "failure": null
+      }
+    ],
+    "text": "KESTREL-41",
+    "native": [
+      "/workspace/.t3flare/pi/sessions/2026-11-16T12-28-32-097Z_01a1e454-99df-77a4-bcf0-53578be81c56.jsonl"
+    ]
+  },
+  "resumeTrace": [
+    {
+      "at": 1794832176055,
+      "command": "pi",
+      "argv": [
+        "switch_session"
+      ],
+      "cwd": null,
+      "route": "protocol",
+      "exitCode": null,
+      "ms": 0,
+      "detail": "/workspace/.t3flare/pi/sessions/2026-11-16T12-28-32-097Z_01a1e454-99df-77a4-bcf0-53578be81c56.jsonl"
+    }
+  ],
+  "revoked": {
+    "output": "revoked=401\nfresh=200\nchanged=1"
+  },
+  "relayLog": {
+    "entries": 20,
+    "byStatus": {
+      "200": 16,
+      "401": 3,
+      "403": 1
+    },
+    "pi": {
+      "entries": 16,
+      "byEndpoint": {
+        "comm": 9,
+        "oai": 4,
+        "resp": 3
+      },
+      "routed": false,
+      "statuses": [
+        200
+      ]
+    },
+    "piDropped": [
+      "accept-encoding",
+      "accept-language",
+      "anthropic-dangerous-direct-browser-access",
+      "authorization",
+      "connection",
+      "host",
+      "session-id",
+      "user-agent",
+      "x-api-key",
+      "x-client-request-id",
+      "x-stainless-arch",
+      "x-stainless-lang",
+      "x-stainless-os",
+      "x-stainless-package-version",
+      "x-stainless-retry-count",
+      "x-stainless-runtime",
+      "x-stainless-runtime-version",
+      "x-stainless-timeout"
+    ],
+    "sample": [
+      {
+        "t3flare": "model-relay",
+        "endpoint": "comm",
+        "status": 200,
+        "handle": "proc-74c3fbb6-5562-4ace-bf94-e42c70c1652d",
+        "cli": "pi",
+        "workspace": "relay-pi-mwj8oxny",
+        "method": "POST",
+        "ms": 1833,
+        "dropped": [
+          "accept-encoding",
+          "accept-language",
+          "anthropic-dangerous-direct-browser-access",
+          "connection",
+          "host",
+          "user-agent",
+          "x-api-key",
+          "x-stainless-arch",
+          "x-stainless-lang",
+          "x-stainless-os",
+          "x-stainless-package-version",
+          "x-stainless-retry-count",
+          "x-stainless-runtime",
+          "x-stainless-runtime-version",
+          "x-stainless-timeout"
+        ]
+      },
+      {
+        "t3flare": "model-relay",
+        "endpoint": "comm",
+        "status": 200,
+        "handle": "proc-74c3fbb6-5562-4ace-bf94-e42c70c1652d",
+        "cli": "pi",
+        "workspace": "relay-pi-mwj8oxny",
+        "method": "POST",
+        "ms": 1222,
+        "dropped": [
+          "accept-encoding",
+          "accept-language",
+          "anthropic-dangerous-direct-browser-access",
+          "connection",
+          "host",
+          "user-agent",
+          "x-api-key",
+          "x-stainless-arch",
+          "x-stainless-lang",
+          "x-stainless-os",
+          "x-stainless-package-version",
+          "x-stainless-retry-count",
+          "x-stainless-runtime",
+          "x-stainless-runtime-version",
+          "x-stainless-timeout"
+        ]
+      },
+      {
+        "t3flare": "model-relay",
+        "endpoint": "comm",
+        "status": 200,
+        "handle": "proc-74c3fbb6-5562-4ace-bf94-e42c70c1652d",
+        "cli": "pi",
+        "workspace": "relay-pi-mwj8oxny",
+        "method": "POST",
+        "ms": 1156,
+        "dropped": [
+          "accept-encoding",
+          "accept-language",
+          "anthropic-dangerous-direct-browser-access",
+          "connection",
+          "host",
+          "user-agent",
+          "x-api-key",
+          "x-stainless-arch",
+          "x-stainless-lang",
+          "x-stainless-os",
+          "x-stainless-package-version",
+          "x-stainless-retry-count",
+          "x-stainless-runtime",
+          "x-stainless-runtime-version",
+          "x-stainless-timeout"
+        ]
+      }
+    ]
+  },
+  "keyHelper": {
+    "entries": 0,
+    "pi": 0
+  },
+  "checks": [
+    {
+      "name": "Commissary's Anthropic API lists the model",
+      "ok": true
+    },
+    {
+      "name": "the three endpoints saved",
+      "ok": true
+    },
+    {
+      "name": "pi lists exactly the endpoints' models by slug, the first the default (t3's registry keeps none of the proxy's)",
+      "ok": true
+    },
+    {
+      "name": "a pi turn with tools ran on the Anthropic Messages endpoint's model through the relay",
+      "ok": true
+    },
+    {
+      "name": "its tool requests were asked, and resolved by the accept sent",
+      "ok": true
+    },
+    {
+      "name": "pi's providers: one per endpoint, its API, at the relay's per-endpoint URL, the handle command as its key",
+      "ok": true
+    },
+    {
+      "name": "a pi turn with tools ran on the OpenAI (Chat Completions) endpoint's model, in the same thread",
+      "ok": true
+    },
+    {
+      "name": "a model switch to the Responses endpoint's model: a turn with tools that knows the code word",
+      "ok": true
+    },
+    {
+      "name": "the same native pi session throughout (no handoff)",
+      "ok": true
+    },
+    {
+      "name": "the canary endpoint saved (after the process started)",
+      "ok": true
+    },
+    {
+      "name": "only the launch chain's setsid holds the handle (not pi, not a shell)",
+      "ok": true
+    },
+    {
+      "name": "no file holds the handle",
+      "ok": true
+    },
+    {
+      "name": "the handle command prints nothing outside a pi process's launch chain",
+      "ok": true
+    },
+    {
+      "name": "the handle reaches the Anthropic endpoint in x-api-key and the OpenAI endpoint as a Bearer (200)",
+      "ok": true
+    },
+    {
+      "name": "a forged handle and no handle are refused (401)",
+      "ok": true
+    },
+    {
+      "name": "an endpoint saved after the process started is refused (403)",
+      "ok": true
+    },
+    {
+      "name": "a pi shell's environment has no model handle (its marker shows it was the process's)",
+      "ok": true
+    },
+    {
+      "name": "the leak scan finds no endpoint key and scanned every key (DO files, Container files, process environments and command lines)",
+      "ok": true
+    },
+    {
+      "name": "the leak scan finds an endpoint key planted in the Container",
+      "ok": true
+    },
+    {
+      "name": "the canary endpoint removed",
+      "ok": true
+    },
+    {
+      "name": "the Container stopped",
+      "ok": true
+    },
+    {
+      "name": "the next turn completed after the restart and knew the code word",
+      "ok": true
+    },
+    {
+      "name": "the same native pi session (resumed, not a handoff)",
+      "ok": true
+    },
+    {
+      "name": "the protocol log shows pi switched to that session file",
+      "ok": true
+    },
+    {
+      "name": "the new process has a new handle; the first process's is refused (401), the new one passes (200)",
+      "ok": true
+    },
+    {
+      "name": "pi's requests went to each endpoint's own path (comm, oai, resp), none model-routed, every one 200",
+      "ok": true
+    },
+    {
+      "name": "pi on the relay never asked the key helper",
+      "ok": true
+    },
+    {
+      "name": "no handle or key in the agents Worker's log",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "ok": true
+}
