@@ -77,6 +77,18 @@ describe("redacting Console", () => {
     expect(String(lines[1]![0])).not.toContain("abcdefghijklmnop");
     expect(redact("see #token=abc and &credential=def")).toBe("see #token=<redacted> and &credential=<redacted>");
   });
+
+  it("redacts a model error's echoed key and JWT in a log record (SPI-1172)", () => {
+    const lines: Array<Array<unknown>> = [];
+    const console = redactingConsole({ warn: (...args: Array<unknown>) => lines.push(args) } as unknown as Console);
+    const key = "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl";
+    console.warn({ t3flare: "turn-failed", error: `401 invalid x-api-key ${key}; id ${jwt}` });
+    console.warn(`model said ${key}`);
+    const printed = JSON.stringify(lines);
+    expect(printed).not.toContain(key);
+    expect(printed).not.toContain(jwt);
+  });
 });
 
 describe("idle queries", () => {

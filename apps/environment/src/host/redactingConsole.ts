@@ -4,9 +4,10 @@
 // t3 prints a fresh one-time pairing URL, token included, on every boot (`announceStartupPairingUrl` in
 // serverRuntimeStartup.ts, through `Console.log`), and Effect's loggers write through the same Console
 // reference. This Console drops t3's pairing-URL line and redacts any `token=` value or bearer credential
-// in what remains, before it reaches workerd's console.
+// in what remains, before it reaches workerd's console, with every credential shape `@t3flare/models/redact` knows.
 import * as Console from "effect/Console";
 import * as Layer from "effect/Layer";
+import { redactSecrets } from "@t3flare/models/redact";
 
 /** t3's pairing-URL line: `  pairingUrl: http://…/pair#token=…`. */
 const PAIRING_LINE = /pairingUrl:/i;
@@ -15,7 +16,11 @@ const BEARER = /(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/g;
 
 const SENSITIVE = /pairingUrl:|[#?&](?:token|credential)=|Bearer\s+[A-Za-z0-9._~+/=-]{8,}/i;
 
-export const redact = (text: string): string => text.replace(TOKEN_PARAM, "$1<redacted>").replace(BEARER, "$1<redacted>");
+/**
+ * The token and bearer forms first, then every credential shape a model's error text may echo (SPI-1172: vendor keys,
+ * JWT-shaped values, key headers; `@t3flare/models/redact`, the one list the Session and the relay use too).
+ */
+export const redact = (text: string): string => redactSecrets(text.replace(TOKEN_PARAM, "$1<redacted>").replace(BEARER, "$1<redacted>"));
 
 /** Counts what was dropped or redacted, for the admin health route. */
 export const redactions = { droppedPairingLines: 0, redactedArguments: 0 };
@@ -34,9 +39,11 @@ const redactArgument = (value: unknown): unknown => {
     } catch {
       return value;
     }
-    if (text === undefined || !SENSITIVE.test(text)) return value;
+    if (text === undefined) return value;
+    const redacted = redact(text);
+    if (redacted === text && !SENSITIVE.test(text)) return value;
     redactions.redactedArguments++;
-    return redact(text);
+    return redacted;
   }
   return value;
 };
