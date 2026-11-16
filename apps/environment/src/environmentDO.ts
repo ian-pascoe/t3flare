@@ -57,6 +57,7 @@ import type { ContainerPreviewProps } from "./preview/containerPreviews.ts";
 import { closeLeftoverSessions } from "./preview/sessions.ts";
 import { previewStore } from "./preview/store.ts";
 import { usageRecorder } from "./usage/commissaryCount.ts";
+import { limitStore } from "./usage/limits.ts";
 import { usageStore } from "./usage/records.ts";
 
 /** SPI-1163: the model the text-generation setting was last pointed at as its default. */
@@ -261,6 +262,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       publicOrigin: () => (this.env.T3FLARE_HOST === undefined ? null : `https://${this.env.T3FLARE_HOST}`),
       commissary: commissaryManagementOf(env),
       usage: usageStore(ctx.storage.sql),
+      limits: limitStore(ctx.storage.sql),
       browserRun: env.BROWSER,
       // SAFETY: the Worker's entry (`worker.ts`) exports `ContainerPreviews`; `ctx.exports` is untyped here.
       containerPreviews: (workspace) => (ctx.exports as unknown as EnvironmentExports).ContainerPreviews({ props: { workspace } }),
@@ -529,6 +531,17 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       now: () => Date.now(),
     });
     return this.#usageRecorder(input);
+  }
+
+  /**
+   * Limit readings, RPC from the agents Worker (SPI-1174): a Session's, text generation's or the model relay's, each the
+   * windows an answer on a Model endpoint reported in its headers, kept for t3's limit meters (`usage/limits.ts`): each
+   * window's reading of the latest answer, on an endpoint that exists now. Invalid ones are dropped. Never boots t3; a
+   * running t3 shows a kept reading at once.
+   */
+  async recordLimits(input: unknown): Promise<{ readonly kept: number }> {
+    const { environmentServices } = await import("./agents/bindings.ts");
+    return { kept: environmentServices().limits.record(input, this.#endpointStore().load(), Date.now()) };
   }
 
 

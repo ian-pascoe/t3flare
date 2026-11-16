@@ -105,6 +105,7 @@ import * as ProviderInstanceRegistry from "t3/src/provider/ProviderInstanceRegis
 import * as ProviderAdapterRegistry from "t3/src/orchestration-v2/ProviderAdapterRegistry.ts";
 import * as ProviderRegistry from "t3/src/provider/ProviderRegistry.ts";
 import * as ProviderUsageLimitsIngestion from "t3/src/provider/ProviderUsageLimitsIngestion.ts";
+import { EMPTY_ENDPOINTS } from "@t3flare/models/endpoints";
 import * as CommissaryLimitSources from "../usage/limitSources.ts";
 import { layerAcpRegistry } from "../provider/acpRegistry.ts";
 import * as DurableObjectDatabaseStorage from "./databaseStorage.ts";
@@ -331,8 +332,12 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(layerServerSettings),
   );
 
-  // t3flare: t3's usage-limit sources plus Commissary's accounts when its management API is set (parity G8).
-  const layerUsageLimitSources = CommissaryLimitSources.layer(() => environmentServices().commissary);
+  // t3flare: t3's usage-limit sources plus Commissary's accounts when its management API is set (parity G8), plus one
+  // source per subscription endpoint from the limit readings of its answers (SPI-1174).
+  const layerUsageLimitSources = CommissaryLimitSources.layer(
+    () => environmentServices().commissary,
+    () => ({ store: environmentServices().limits, endpoints: () => environmentServices().modelEndpoints?.() ?? EMPTY_ENDPOINTS }),
+  );
 
   const layerUsage = UsageService.layer.pipe(
     Layer.provide(

@@ -12,6 +12,7 @@ import type { SkillStore } from "../skills/store.ts";
 import type { WorkspaceRegistry } from "./workspaces.ts";
 import type { ProcessChannel } from "./processChannel.ts";
 import type { CommissaryManagement } from "../usage/commissary.ts";
+import type { LimitStore } from "../usage/limits.ts";
 import type { UsageStore } from "../usage/records.ts";
 import type { BrowserRunBinding, BrowserRunFetcher } from "../preview/browserRun.ts";
 import type { PreviewStore } from "../preview/store.ts";
@@ -50,6 +51,8 @@ export interface EnvironmentServices {
   readonly commissary: CommissaryManagement | undefined;
   /** t3flare's own usage records, for t3's Usage page (SPI-1173). */
   readonly usage: UsageStore;
+  /** The subscription endpoints' limit windows, read from their answers' headers, for t3's limit meters (SPI-1174). */
+  readonly limits: LimitStore;
   /** G11 (ADR-0031): the Browser Run binding, or undefined where none is bound (local workerd, tests). */
   readonly browserRun: BrowserRunBinding | undefined;
   /** G11: the `ContainerPreviews` entrypoint made for one Workspace, as a preview browser's `outboundByHost` target. */
