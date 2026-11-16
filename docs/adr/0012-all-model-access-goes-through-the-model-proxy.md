@@ -6,7 +6,7 @@ Every model call t3flare makes, for every kind of agent, goes to one model proxy
 
 ## Consequences
 
-- Nothing in t3flare refreshes a token, so there is no Credential broker and no per-Environment sign-in: [ADR-0018](0018-the-environment-do-is-the-credential-broker-and-each-environment-signs-in-itself.md) is superseded.
+- Nothing in t3flare refreshes a token, so there is no Credential broker and no per-Environment sign-in: [ADR-0018](0018-the-environment-do-is-the-credential-broker-and-each-environment-signs-in-itself.md) is superseded. (Accepted again on 2026-11-16 for the Model endpoints' sign-ins, SPI-1164.)
 - A CLI agent is pointed at the proxy with its base URL and a key. How that key reaches the Container is open ([ADR-0016](0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)).
 - A usage limit is the proxy's. When every account behind a model is exhausted it answers 429 with a reset hint; t3 shows the limit, pauses the thread and can resume it at the reset. Nothing retries into spend, and nothing falls back to another key or model. A refused key (401/403) is a failure that names the key, not a pause.
 - Plan windows and usage meters belong to the proxy's accounts, so t3's usage readers stay empty.

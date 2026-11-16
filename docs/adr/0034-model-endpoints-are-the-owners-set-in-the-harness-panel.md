@@ -7,9 +7,9 @@ the endpoints stand side by side) and [ADR-0032](0032-environment-settings-and-h
 (a third entity on the same page).
 
 t3flare stops depending on the Model proxy. The owner configures **Model endpoints**: each is an API pi-ai speaks
-(Anthropic Messages, OpenAI Responses, OpenAI-compatible Completions, Google Generative AI, Mistral; ChatGPT's Codex
-backend and the other sign-ins come with SPI-1164), at a base URL, with an API key or none (OAuth sign-ins next),
-optional headers, and the models it serves.
+(Anthropic Messages, OpenAI Responses, OpenAI-compatible Completions, Google Generative AI, Mistral), at a base URL,
+with an API key, a sign-in (SPI-1164: ChatGPT plan usage first; [ADR-0018](0018-the-environment-do-is-the-credential-broker-and-each-environment-signs-in-itself.md)'s
+refinement) or none, optional headers, and the models it serves.
 
 1. **Their own entity.** Stored in the Environment DO under `t3flare:endpoints:settings` with their own revision,
    apart from the Harness settings and the Environment settings; edited in the Harness panel's Model endpoints section
@@ -38,7 +38,8 @@ optional headers, and the models it serves.
    `endpointCredential({ endpointId, target })`. The Environment gives the key only when that is the endpoint's target
    now. Otherwise the turn fails saying the endpoint changed and to retry. The Session keeps keys in memory only, by
    endpoint and target. The endpoint's headers go with every request; an endpoint with no auth sends a placeholder
-   key, never a secret.
+   key, never a secret. A sign-in endpoint has no key: `endpointCredential` gives its access token from the Credential
+   broker, under the same target rule (ADR-0018's refinement).
 5. **Text generation** (SPI-1163). Thread titles, commit messages and PR text on an endpoint's model are one pi-ai
    request on the agents Worker (`EndpointTextGeneration`, the Environment's `TEXT_GENERATION` service binding), so the
    Environment's bundle never holds pi-ai. The call carries ids only; the agents Worker reads the endpoint with

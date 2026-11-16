@@ -363,8 +363,12 @@ The Model relay's one base URL for every Model endpoint a process may use: the e
 _Avoid_: router, catch-all endpoint, wildcard endpoint
 
 **Subscription**:
-The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key. Connected in the Model proxy, never held by t3flare.
-_Avoid_: Subscription login (t3flare holds none), OAuth, account
+The owner's own signed-in plan with a model vendor (Claude, ChatGPT), as opposed to an API key. Signed in from the Harness panel as a Model endpoint's sign-in, its tokens held by the Credential broker; still connected in the Model proxy until the hard cut. The first is ChatGPT plan usage (Sign in with ChatGPT), which needs a Plus or Pro plan.
+_Avoid_: Subscription login, OAuth, account
+
+**Credential broker**:
+The Environment DO in its role as the one holder and refresher of every Subscription's tokens: sealed at rest, renewed one at a time, a renewed token saved before anyone uses it. A Session asks it for an access token at use time and keeps it in memory only.
+_Avoid_: token service, auth server, credential store (that is pi-ai's interface it implements)
 
 **Container token**:
 A GitHub installation token for one Workspace's one repo (code and pull requests write; `workflows` only when the Workspace is opted in), handed to git in its Container on the credential helper's request; never stored there. The agent's own git pushes with it (owner, 2026-11-12, back to stock).
