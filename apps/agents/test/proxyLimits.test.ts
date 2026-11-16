@@ -68,7 +68,8 @@ const openSession = async (answer: () => Response, fault?: Fault) => {
       requests++;
     },
   });
-  const limits = { last: recorder.last, record: (failure: ProxyFailureRecord) => void records.push(failure) };
+  const cleared: Array<number> = [];
+  const limits = { last: recorder.last, record: (failure: ProxyFailureRecord | undefined) => void (failure === undefined ? cleared.push(records.length) : records.push(failure)) };
   const models = compactionLimits(proxyModels({ url: "https://proxy.example", apiKey: "k" }, () => STATIC_CATALOG, recorder.fetch), limits);
   const registry = createRegistry();
   registry.install(proxyLimits(limits));
@@ -81,7 +82,7 @@ const openSession = async (answer: () => Response, fault?: Fault) => {
   const root = await harness.root(context, { agent: { model: { provider: "anthropic", modelId: "claude-haiku-5-5" } } });
   harness.resume();
   return {
-    counts: () => ({ requests, proxied, records }),
+    counts: () => ({ requests, proxied, records, cleared }),
     submit: async () => {
       const submission = await root.submit({ type: "input", content: "hi" }, context);
       for (;;) {
@@ -125,6 +126,14 @@ describe("the Session's model proxy failures", () => {
     const run = await submit(() => (calls++ === 0 ? answerOf("upstreamLimit") : answerOf("cooldown")));
     expect(run.requests).toBe(2);
     expect(run.records.map((record) => record.code)).toEqual(["proxy_upstream_limit", "proxy_cooldown"]);
+  });
+
+  it("an answer the classifier does not know clears the record: an overload, then a 400, leaves no overload (SPI-1172)", async () => {
+    let calls = 0;
+    const run = await submit(() => (calls++ === 0 ? answerOf("overloaded") : new Response('{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long"}}', { status: 400 })));
+    expect(run.records.map((record) => record.code)).toEqual(["proxy_overloaded"]);
+    // The 400 came after the overload's record, and cleared it.
+    expect(run.cleared).toEqual([1]);
   });
 
   it("compaction on a usage limit or a refused key: one request, recorded, failed with the text no retry matches", async () => {

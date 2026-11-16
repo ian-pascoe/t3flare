@@ -19,7 +19,7 @@
 // @effect-diagnostics globalDate:off
 import { GenerationTask, defineExtension, type Extension, hook } from "@earendil-works/pi-durable";
 import type { EndpointApi, EndpointAuth } from "@t3flare/models/endpoints";
-import { classifyModelFailure, errorBodyOf, type FailedAnswer, failureHeaders, modelFailureDetail, modelFailureMessage } from "@t3flare/models/failures";
+import { describeFailure, errorBodyOf, type FailedAnswer, failureHeaders, modelFailureDetail } from "@t3flare/models/failures";
 import { classifyProxyFailure, proxyFailureDetail } from "@t3flare/models/proxyFailure";
 import { redactSecrets } from "@t3flare/models/redact";
 import type { EndpointFailureRecord, ProxyFailureRecord } from "@t3flare/session-protocol";
@@ -37,9 +37,6 @@ export interface RecordedAnswer {
   /** An error answer's body (status 400 and up), at most `ERROR_BODY_BYTES`. */
   readonly body?: string;
 }
-
-/** The headers a failure's class reads. */
-
 
 /** A test's fault: every model request is answered with `fixture` until `resetAt` (epoch ms). */
 export interface Fault {
@@ -71,6 +68,14 @@ const goDuration = (seconds: number) => {
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
   return h > 0 ? `${h}h${m}m${s}s` : m > 0 ? `${m}m${s}s` : `${s}s`;
+};
+
+/** A fault to arm, or why not: only where the deployment has `T3FLARE_FAULTS=1` (every stage but prod), a known fixture and a finite reset. */
+export const armFault = (faults: string | undefined, input: { readonly fixture: string; readonly resetAt: number }): Fault | Error => {
+  if (faults !== "1") return new Error("t3flare: faults are off in this deployment");
+  const fixture = FAULT_FIXTURES.find((name) => name === input.fixture);
+  if (fixture === undefined || !Number.isFinite(input.resetAt)) return new Error(`t3flare: no fixture ${input.fixture}`);
+  return { fixture, resetAt: input.resetAt };
 };
 
 const anthropicError = (type: string, message: string) => JSON.stringify({ type: "error", error: { type, message } });
@@ -190,17 +195,24 @@ export interface ClassifiedEndpoint {
 export interface ProxyLimitsOptions {
   /** The answer of the request that ended in this response. */
   readonly last: () => RecordedAnswer | undefined;
-  /** The classified failure, for the running turn. */
-  readonly record: (failure: ProxyFailureRecord) => void;
+  /**
+   * The running turn's last failed answer from the proxy, classified, or undefined for one the classifier does not
+   * know: every failed answer replaces the record (and clears an endpoint's), so the last answer is always the turn's.
+   */
+  readonly record: (failure: ProxyFailureRecord | undefined) => void;
   /** SPI-1172: the Model endpoint a message's provider names; undefined for the proxy's `anthropic`. */
   readonly endpoint?: (provider: string) => ClassifiedEndpoint | undefined;
-  /** SPI-1172: an endpoint's classified failure, for the running turn. */
-  readonly recordEndpoint?: (failure: EndpointFailureRecord) => void;
+  /** SPI-1172: the same for an endpoint's failed answer (and it clears the proxy's). */
+  readonly recordEndpoint?: (failure: EndpointFailureRecord | undefined) => void;
+  /** SPI-1172: the credentials the Session holds for a provider (its key or token), redacted from its error text whatever their shape. */
+  readonly secrets?: (provider: string) => ReadonlyArray<string>;
 }
 
 /**
  * An endpoint's failed response (SPI-1172), classified by its API and auth from the recorded answer when the request
- * was the endpoint's (an API whose pi-ai client takes no fetch leaves none: its text alone is read, as a stream's is).
+ * was the endpoint's: the message's provider is the endpoint and the answer's URL is under its base URL (an API whose
+ * pi-ai client takes no fetch leaves none: its text alone is read, as a stream's is). The record is replaced either way;
+ * a classified failure's text becomes its code, worded so pi-durable stops or retries it as the table says.
  */
 const classifyEndpoint = (message: AssistantMessage, errorMessage: string, endpoint: ClassifiedEndpoint, options: ProxyLimitsOptions): void => {
   const recorded = options.last();
@@ -209,33 +221,22 @@ const classifyEndpoint = (message: AssistantMessage, errorMessage: string, endpo
     answer !== undefined && answer.status >= 400
       ? { status: answer.status, headers: answer.headers, body: answer.body ?? errorMessage, at: answer.at }
       : { status: 200, headers: answer?.headers ?? {}, body: errorMessage, at: answer?.at ?? Date.now() };
-  const failure = classifyModelFailure(failed, endpoint);
-  if (failure === undefined) return;
-  options.recordEndpoint?.({
-    endpointId: endpoint.id,
-    class: failure.class,
-    code: failure.code,
-    message: modelFailureMessage(failure, endpoint, answer?.status),
-    retryable: failure.retryable,
-    ...(failure.resetAt === undefined ? {} : { resetAt: failure.resetAt }),
-    stop: failure.stop,
-    at: failed.at,
-  });
-  if (failure.stop) message.errorMessage = modelFailureDetail(failure);
+  const failure = describeFailure(failed, endpoint);
+  options.recordEndpoint?.(failure === undefined ? undefined : { ...failure, endpointId: endpoint.id, at: failed.at });
+  if (failure !== undefined) message.errorMessage = modelFailureDetail(failure);
 };
 
-/** Classify a failed response once, record it, and when no retry can succeed leave a text no retry pattern matches. */
+/** Classify a failed response once, record it (or clear the record), and leave pi-durable a text it stops or retries on. */
 const classifyOnce = (message: AssistantMessage, options: ProxyLimitsOptions): void => {
   if (message.stopReason !== "error" || message.errorMessage === undefined) return;
   // No echoed credential reaches pi-durable's record of the answer, the turn's detail, the push or t3 (SPI-1172).
-  message.errorMessage = redactSecrets(message.errorMessage);
+  message.errorMessage = redactSecrets(message.errorMessage, options.secrets?.(message.provider) ?? []);
   const endpoint = options.endpoint?.(message.provider);
   if (endpoint !== undefined) return classifyEndpoint(message, message.errorMessage, endpoint, options);
   const answer = options.last() ?? { status: 200, retryAfter: null, at: Date.now() };
   const failure = classifyProxyFailure({ ...answer, text: message.errorMessage });
-  if (failure === undefined) return;
-  options.record({ ...failure, at: answer.at });
-  if (failure.stop) message.errorMessage = proxyFailureDetail(failure);
+  options.record(failure === undefined ? undefined : { ...failure, at: answer.at });
+  if (failure?.stop === true) message.errorMessage = proxyFailureDetail(failure);
 };
 
 /** The `afterResponse` hook: `classifyOnce` on each generation's response, before pi-durable decides to retry it. */

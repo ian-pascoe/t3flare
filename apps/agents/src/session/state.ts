@@ -187,6 +187,9 @@ export const liveOf = (doc: Json, turnOfTask: (taskId: string) => string | null)
   };
 };
 
+/** A turn's failure detail as the Session keeps and pushes it: redacted (SPI-1172), at most 2 KiB; undefined for none. */
+export const turnDetail = (detail: unknown): string | undefined => (typeof detail === "string" ? redactSecrets(detail).slice(0, 2048) : undefined);
+
 /** The turn an entry belongs to: the latest turn whose input was placed at or before it. */
 export const turnOfEntry = (entryId: number, turns: Readonly<Record<string, TurnState>>): string | null => {
   let best: { readonly turn: string; readonly at: number } | null = null;

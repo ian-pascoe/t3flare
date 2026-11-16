@@ -9,14 +9,14 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, isRetryableAssistantError } from "@earendil-works/pi-ai";
 import { createRegistry, Harness, MemoryStorage } from "@earendil-works/pi-durable";
 import type { ModelEndpoint } from "@t3flare/models/endpoints";
-import { type ModelFailureCode, modelFailureDetail } from "@t3flare/models/failures";
+import { ERROR_BODY_BYTES, type ModelFailureCode, modelFailureDetail } from "@t3flare/models/failures";
 import type { EndpointFailureRecord, ProxyFailureRecord } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
 import fixtures from "../../../packages/models/test/fixtures/vendors.json" with { type: "json" };
 import { SessionEndpoints } from "../src/session/endpoints.ts";
-import { liveOf, pushedEntry } from "../src/session/state.ts";
-import { compactionLimits, type Fault, FAULT_ECHOED_SECRETS, FAULT_FIXTURES, faultAnswer, proxyLimits, recordingFetch } from "../src/session/proxyLimits.ts";
+import { liveOf, pushedEntry, turnDetail } from "../src/session/state.ts";
+import { armFault, compactionLimits, type Fault, FAULT_ECHOED_SECRETS, FAULT_FIXTURES, faultAnswer, proxyLimits, recordingFetch } from "../src/session/proxyLimits.ts";
 
 const context = BACKGROUND_CONTEXT;
 const T0 = Date.parse(fixtures.now);
@@ -58,14 +58,18 @@ const okAnswer = () => {
 };
 
 /** The Session's model path over fake endpoints: their providers, the recording fetch, the hook and compaction's limits. */
-const openSession = async (answer: (url: string) => Response, options: { readonly on?: ModelEndpoint; readonly fault?: Fault; readonly endpoints?: ReadonlyArray<ModelEndpoint> } = {}) => {
+const openSession = async (
+  answer: (url: string) => Response,
+  options: { readonly on?: ModelEndpoint; readonly fault?: Fault; readonly endpoints?: ReadonlyArray<ModelEndpoint>; readonly baseUrl?: string } = {},
+) => {
   const on = options.on ?? CLAUDE;
   const endpoints = options.endpoints ?? [on];
   let now = T0;
   const sentTo = new Map<string, number>();
   let requests = 0;
-  const records: Array<EndpointFailureRecord> = [];
-  const proxyRecords: Array<ProxyFailureRecord> = [];
+  // Every failed answer's record, `undefined` where it cleared the record (an answer the table does not know).
+  const records: Array<EndpointFailureRecord | undefined> = [];
+  const proxyRecords: Array<ProxyFailureRecord | undefined> = [];
   let stored = options.fault;
   const recorder = recordingFetch({
     fetch: (async (input: RequestInfo | URL) => {
@@ -95,9 +99,14 @@ const openSession = async (answer: (url: string) => Response, options: { readonl
   });
   const limits = {
     last: recorder.last,
-    record: (failure: ProxyFailureRecord) => void proxyRecords.push(failure),
-    endpoint: (id: string) => session.endpoint(id),
-    recordEndpoint: (failure: EndpointFailureRecord) => void records.push(failure),
+    record: (failure: ProxyFailureRecord | undefined) => void proxyRecords.push(failure),
+    // A test may move the endpoint's base URL away from where its requests go (the answers are then not its).
+    endpoint: (id: string) => {
+      const endpoint = session.endpoint(id);
+      return endpoint === undefined || options.baseUrl === undefined ? endpoint : { ...endpoint, baseUrl: options.baseUrl };
+    },
+    recordEndpoint: (failure: EndpointFailureRecord | undefined) => void records.push(failure),
+    secrets: (id: string) => session.secrets(id),
   };
   compactionLimits(models, limits);
   const registry = createRegistry();
@@ -165,11 +174,11 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
     expect(limited.records.at(-1)).toMatchObject({ code: "usage_limit", resetAt: T0 + 3 * 3_600_000 });
   });
 
-  it("a rate limit with no reset is retried, and the next answer's reset ends it", async () => {
+  it("a rate limit with no reset is retried, and the next answer's long reset ends it", async () => {
     let calls = 0;
-    const run = await submit(() => (calls++ === 0 ? answerOf("anthropicRateLimitBare") : answerOf("anthropicRateLimit")));
+    const run = await submit(() => (calls++ === 0 ? answerOf("anthropicRateLimitBare") : answerOf("anthropicRateLimitLong")));
     expect(run.requests).toBe(2);
-    expect(run.records.map((record) => [record.code, record.stop])).toEqual([
+    expect(run.records.map((record) => [record?.code, record?.stop])).toEqual([
       ["throttled", false],
       ["throttled", true],
     ]);
@@ -189,13 +198,54 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
   it("an error the table does not know keeps pi-ai's text, redacted: an echoed key never reaches pi-durable", async () => {
     const echo = `{"type":"error","error":{"type":"invalid_request_error","message":"bad header x-api-key: ${FAULT_ECHOED_SECRETS[0]}"}}`;
     const run = await submit(() => new Response(echo, { status: 400, headers: { "content-type": "application/json" } }));
-    expect(run.records).toEqual([]);
+    expect(run.records).toEqual([undefined]);
     const detail = String(run.status.detail);
     expect(detail).toContain("[redacted]");
     for (const secret of FAULT_ECHOED_SECRETS) expect(detail).not.toContain(secret);
   });
 
-  it("every code the Session stops on leaves a text no retry pattern of pi-ai's matches", () => {
+  it("the last failed answer wins: a retried 529, then a 400 the table does not know, clears the overload", async () => {
+    let calls = 0;
+    const tooLong = '{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long"}}';
+    const run = await submit(() => (calls++ < 2 ? answerOf("anthropicOverloaded") : new Response(tooLong, { status: 400, headers: { "content-type": "application/json" } })));
+    expect(run.requests).toBe(3);
+    expect(run.records.map((record) => record?.code)).toEqual(["overloaded", "overloaded", undefined]);
+  });
+
+  it("a bare 529, 521 or 507 (no body pi-ai's patterns know) is retried; 501 is not", async () => {
+    for (const status of [529, 521, 507]) {
+      const run = await submit(() => new Response("", { status }));
+      expect(run.requests, String(status)).toBe(4);
+      expect(run.records.at(-1), String(status)).toMatchObject({ class: "provider_error", stop: false });
+    }
+    const notImplemented = await submit(() => new Response("", { status: 501 }));
+    expect(notImplemented.requests).toBe(1);
+    expect(notImplemented.records.at(-1)).toMatchObject({ code: "unsupported_request", stop: true });
+  });
+
+  it("a 429 with a short retry-after is retried in the run; a long one stops it after one request", async () => {
+    const short = await submit(() => new Response(answerOf("anthropicRateLimitBare").body, { status: 429, headers: { "retry-after": "2" } }));
+    expect(short.requests).toBe(4);
+    expect(short.records.at(-1)).toMatchObject({ code: "throttled", stop: false });
+    const long = await submit(() => answerOf("anthropicRateLimitLong"));
+    expect(long.requests).toBe(1);
+  });
+
+  it("the endpoint's own key is redacted from its error text whatever its shape", async () => {
+    const echo = '{"type":"error","error":{"type":"invalid_request_error","message":"bad request for key key-for-tests-only"}}';
+    const run = await submit(() => new Response(echo, { status: 400, headers: { "content-type": "application/json" } }));
+    expect(String(run.status.detail)).not.toContain("key-for-tests-only");
+  });
+
+  it("an answer is the endpoint's only when it came from under its base URL: the unified headers are read only then", async () => {
+    const own = await submit(() => answerOf("anthropicSubscriptionLimit"));
+    expect(own.records.at(-1)).toMatchObject({ code: "usage_limit", stop: true });
+    // Another base URL: the recorded answer is not this endpoint's, so only pi-ai's text is read (a rate limit, no reset).
+    const other = await submit(() => answerOf("anthropicSubscriptionLimit"), { baseUrl: "https://elsewhere.example" });
+    expect(other.records.at(-1)).toMatchObject({ code: "throttled", stop: false });
+  });
+
+  it("every code the Session stops on leaves a text no retry pattern of pi-ai's matches; every one it retries, one that does", () => {
     const stopped: ReadonlyArray<ModelFailureCode> = [
       "usage_limit",
       "workspace_limit",
@@ -211,6 +261,49 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
       const errorMessage = modelFailureDetail({ class: "usage_limit", code, retryable: false, stop: true });
       expect(isRetryableAssistantError({ stopReason: "error", errorMessage } as never), code).toBe(false);
     }
+    for (const code of ["throttled", "overloaded", "server_error", "unavailable"] as const) {
+      const errorMessage = modelFailureDetail({ class: "provider_error", code, retryable: true, stop: false });
+      expect(isRetryableAssistantError({ stopReason: "error", errorMessage } as never), code).toBe(true);
+    }
+  });
+});
+
+describe("the recording fetch (SPI-1172)", () => {
+  const recorder = (answer: () => Response) =>
+    recordingFetch({ fetch: (async () => answer()) as typeof globalThis.fetch, fault: () => undefined, clearFault: () => undefined, now: () => T0, onRequest: () => undefined });
+
+  it("never reads or buffers a success's body: it streams to pi-ai untouched", async () => {
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+        pull: (controller) => {
+          pulls++;
+          controller.enqueue(new TextEncoder().encode("data: x\n\n"));
+          controller.close();
+        },
+      }, { highWaterMark: 0 });
+    const r = recorder(() => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }));
+    const response = await r.fetch("https://claude.example/v1/messages");
+    expect(pulls).toBe(0);
+    expect(r.last()?.body).toBeUndefined();
+    expect(await response.text()).toBe("data: x\n\n");
+  });
+
+  it("keeps at most ERROR_BODY_BYTES of an error's body, and pi-ai still reads it whole", async () => {
+    const big = `{"error":{"message":"${"x".repeat(20 * 1024)}"}}`;
+    const r = recorder(() => new Response(big, { status: 400 }));
+    const response = await r.fetch("https://claude.example/v1/messages");
+    expect(r.last()?.body?.length).toBe(ERROR_BODY_BYTES);
+    expect(await response.text()).toBe(big);
+  });
+});
+
+describe("the fault gate (SPI-1172)", () => {
+  it("arms only where the deployment has T3FLARE_FAULTS=1, a known fixture and a finite reset", () => {
+    expect(armFault("1", { fixture: "anthropicUsageLimit", resetAt: T0 })).toEqual({ fixture: "anthropicUsageLimit", resetAt: T0 });
+    expect(armFault(undefined, { fixture: "anthropicUsageLimit", resetAt: T0 })).toBeInstanceOf(Error);
+    expect(armFault("0", { fixture: "anthropicUsageLimit", resetAt: T0 })).toBeInstanceOf(Error);
+    expect(armFault("1", { fixture: "nope", resetAt: T0 })).toBeInstanceOf(Error);
+    expect(armFault("1", { fixture: "cooldown", resetAt: Number.NaN })).toBeInstanceOf(Error);
   });
 });
 
@@ -255,5 +348,12 @@ describe("what the Session pushes is redacted (SPI-1172)", () => {
     const pushed = JSON.stringify([entry, live]);
     for (const secret of FAULT_ECHOED_SECRETS) expect(pushed).not.toContain(secret);
     expect(pushed).toContain("[redacted]");
+  });
+
+  it("a turn's failure detail as the Session keeps it is redacted and bounded", () => {
+    const detail = turnDetail(`run failed: ${FAULT_ECHOED_SECRETS[2]} ${"y".repeat(3000)}`);
+    expect(detail).not.toContain(FAULT_ECHOED_SECRETS[2]);
+    expect(detail?.length).toBe(2048);
+    expect(turnDetail(undefined)).toBeUndefined();
   });
 });

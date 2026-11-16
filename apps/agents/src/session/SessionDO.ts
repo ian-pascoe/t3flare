@@ -82,15 +82,14 @@ import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
-import { redactSecrets } from "@t3flare/models/redact";
 import { proxyModels } from "./models.ts";
 import { SessionEndpoints } from "./endpoints.ts";
 import { noteTurnProvider, runsOn } from "./signOut.ts";
 import { SUGGESTION_MODEL, suggestPrompt } from "./promptSuggestion.ts";
-import { compactionLimits, FAULT_FIXTURES, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
+import { armFault, compactionLimits, type Fault, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
 import { FORK_PAGE_BYTES, forkPage, forkPoint, freshConversation, rewind, rollbackPlan, seed } from "./branches.ts";
-import { liveOf, pushedEntry, turnOfEntry, usageOf } from "./state.ts";
+import { liveOf, pushedEntry, turnDetail, turnOfEntry, usageOf } from "./state.ts";
 
 export interface SessionEnv {
   readonly ENVIRONMENT: DurableObjectNamespace;
@@ -221,11 +220,14 @@ export class SessionDO extends DurableObject<SessionEnv> {
     // The turn's last failed answer wins: a proxy failure clears an endpoint's, and an endpoint's clears the proxy's.
     this.#limits = {
       last: recorder.last,
-      record: (failure) =>
-        this.#noteProxy(({ endpointFailure: _endpoint, ...record }) => ({ ...record, failure })),
+      // Each failed answer replaces the record (undefined clears it), so the last answer is always the turn's.
+      record: (failure) => this.#noteProxy(({ endpointFailure: _endpoint, failure: _before, ...record }) => (failure === undefined ? record : { ...record, failure })),
       // SPI-1172: a Model endpoint's failed answer, classified by its API and auth.
       endpoint: (provider) => this.#endpoints.endpoint(provider),
-      recordEndpoint: (endpointFailure) => this.#noteProxy(({ failure: _proxy, ...record }) => ({ ...record, endpointFailure })),
+      recordEndpoint: (endpointFailure) =>
+        this.#noteProxy(({ failure: _proxy, endpointFailure: _before, ...record }) => (endpointFailure === undefined ? record : { ...record, endpointFailure })),
+      // The key or token the Session holds for the provider, redacted from its error text whatever its shape.
+      secrets: (provider) => (provider === "anthropic" ? [env.MODEL_PROXY_API_KEY] : this.#endpoints.secrets(provider)),
     };
     registry.install(proxyLimits(this.#limits));
     registry.install(codingTools());
@@ -1059,10 +1061,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
    * in the proxy's place (`proxyLimits.ts`). Refused on prod.
    */
   proxyFault(input: { readonly fixture: string; readonly resetAt: number }): Promise<{ readonly armed: Fault }> {
-    if (this.env.T3FLARE_FAULTS !== "1") return Promise.reject(new Error("t3flare: faults are off in this deployment"));
-    const fixture = FAULT_FIXTURES.find((name) => name === input.fixture);
-    if (fixture === undefined || !Number.isFinite(input.resetAt)) return Promise.reject(new Error(`t3flare: no fixture ${input.fixture}`));
-    const armed: Fault = { fixture, resetAt: input.resetAt };
+    const armed = armFault(this.env.T3FLARE_FAULTS, input);
+    if (armed instanceof Error) return Promise.reject(armed);
     this.ctx.storage.kv.put(FAULT_KEY, armed);
     return Promise.resolve({ armed });
   }
@@ -1126,7 +1126,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       } else if (status.status === "unanswered") {
         const reason = String(status.reason);
         // Redacted again here (SPI-1172): a failure the hook did not see (a tool's, the run's) never carries a credential to t3.
-        const detail = typeof status.detail === "string" ? redactSecrets(status.detail).slice(0, 2048) : undefined;
+        const detail = turnDetail(status.detail);
         next = {
           ...turn,
           status: reason === "aborted" ? "aborted" : "failed",

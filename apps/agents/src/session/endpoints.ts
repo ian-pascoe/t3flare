@@ -105,6 +105,11 @@ export class SessionEndpoints {
     return this.#endpoints.get(id);
   }
 
+  /** The credentials held for `endpointId` now (keys or tokens, in memory only), for redacting its error text (SPI-1172). */
+  secrets(endpointId: string): ReadonlyArray<string> {
+    return [...this.#keys.values()].flatMap((kept) => (kept.endpointId === endpointId && kept.credential.apiKey !== null ? [kept.credential.apiKey] : []));
+  }
+
   /** An endpoint's key for `target`, from memory while fresh, else from the Environment (a refusal is never kept). */
   async #credential(endpointId: string, target: EndpointTarget): Promise<EndpointCredential> {
     const now = this.#options.now ?? Date.now;

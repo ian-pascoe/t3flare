@@ -338,19 +338,24 @@ export interface ProxyRecord {
 }
 
 /**
- * `@t3flare/models/failures`' `ModelFailure` for a Model endpoint (SPI-1172), with the endpoint, the Session's fixed text
- * naming it (never the vendor's body), and the time of the answer (epoch ms).
+ * `@t3flare/models/failures`' `ModelFailure`, restated here because this package depends on none (its `code` is that
+ * module's `ModelFailureCode`; the Session's record assigns one to the other, so typecheck holds them together).
  */
-export interface EndpointFailureRecord {
-  readonly endpointId: string;
+export interface ModelFailureFields {
   readonly class: "usage_limit" | "permission_error" | "provider_error";
   readonly code: string;
-  readonly message: string;
-  readonly retryable: boolean;
   readonly resetAt?: number;
+  readonly retryable: boolean;
   readonly stop: boolean;
-  readonly at: number;
 }
+
+/** A Model endpoint's classified failure (SPI-1172), with the endpoint, the Session's text naming it, and the answer's time. */
+export type EndpointFailureRecord = ModelFailureFields & {
+  readonly endpointId: string;
+  /** The Session's fixed text, never the vendor's body. */
+  readonly message: string;
+  readonly at: number;
+};
 
 /**
  * Why a Session got no credential for a Model endpoint (SPI-1164), as it records it on the turn: `signed_out` (sign in
@@ -363,6 +368,7 @@ export interface EndpointCredentialFailure {
   readonly message: string;
   readonly retryable: boolean;
 }
+
 
 /** `@t3flare/models/proxyFailure`'s `ProxyFailure`, with the time of the answer (epoch ms). */
 export interface ProxyFailureRecord {
