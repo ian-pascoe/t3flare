@@ -46,8 +46,13 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
    issued client id and the account's email, for the next sign-in); then every open Session drops the endpoint's token,
    and stops its live turns when they run on the endpoint (the Session's own storage says, so it holds after a restart);
    then the vendor revokes the refresh token that was current (ChatGPT: at discovery's revocation endpoint, retried
-   twice). The panel says `revoked` only when the vendor confirmed it. Removing a signed-in endpoint signs it out first,
-   and a completed sign-in whose endpoint cannot be saved is signed out (revoked) at once.
+   twice, 30 s in all), whatever happened to the Sessions (each is given 5 s). The panel says `revoked` only when the
+   vendor confirmed it. Removing a signed-in endpoint signs it out first; a completed sign-in whose endpoint cannot be
+   saved, or which a sign-out overtook during its code exchange, is revoked at once, as is a grant the sign-in does not
+   keep (no plan-usage scope, an ID token that does not check out). Sign-out forgets the account (its subject), so the
+   next sign-in may be another account. Which Sessions are open is in the Environment's memory: after an Environment
+   restart it knows only those t3 has opened again; one it misses had its turns ended by the restart (ADR-0004), holds
+   a token at most 5 minutes, and gets no other.
 7. **Each Environment signs in on its own panel.** The vendor's redirect goes to a loopback address nothing serves; the
    owner pastes the address the browser lands on into the panel. The attempt's state, nonce and PKCE verifier are kept
    sealed in the Environment DO between the start and the paste (30 minutes), never in an isolate's memory: pi-ai's
