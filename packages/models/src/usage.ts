@@ -1,6 +1,6 @@
 // Usage records (SPI-1173): t3flare's own count of the tokens its agents spend on Model endpoints, which feeds t3's Usage
-// page in place of any vendor's management API. Three places make them, and the Environment DO keeps them
-// (`recordUsage`):
+// page beside Commissary's request log until the hard cut (SPI-1176). Three places make them, and the Environment DO keeps
+// them (`recordUsage`), but for an endpoint whose requests Commissary's log already counts:
 //
 // - a Session, for each assistant message a Durable agent's model call answers on an endpoint (turns, compaction, the
 //   extensions' own calls): pi-ai's usage and cost;
@@ -55,7 +55,17 @@ export const MAX_USAGE_ENTRIES = 64;
 /** The longest model id or session id kept. */
 export const MAX_USAGE_NAME = 200;
 
-const count = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.min(Math.trunc(value), Number.MAX_SAFE_INTEGER) : 0);
+/** A token count: a positive finite number, whole; anything else counts 0. */
+export const tokenCount = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.min(Math.trunc(value), Number.MAX_SAFE_INTEGER) : 0);
+
+/** The counts of anything shaped like `UsageTokens` (pi-ai's `Usage` is), each through `tokenCount`; reasoning at most the output. */
+export const tokensOf = (source: { readonly [K in keyof UsageTokens]?: unknown }): UsageTokens => {
+  const output = tokenCount(source.output);
+  return { input: tokenCount(source.input), cacheRead: tokenCount(source.cacheRead), cacheWrite: tokenCount(source.cacheWrite), output, reasoning: Math.min(tokenCount(source.reasoning), output) };
+};
+
+/** A cost in dollars when it is a positive finite number; null otherwise (unknown, or a model with no price). */
+export const positiveCost = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null);
 
 /** Whether an entry counts any token: one with none is not kept. */
 export const hasTokens = (tokens: UsageTokens): boolean => tokens.input + tokens.cacheRead + tokens.cacheWrite + tokens.output > 0;
@@ -74,16 +84,9 @@ export const usageEntryOf = (value: unknown): UsageEntry | undefined => {
   const name = (text: unknown): text is string => typeof text === "string" && text.length <= MAX_USAGE_NAME && !/[\u0000-\u001f\u007f]/.test(text);
   if (!name(modelId) || modelId.trim() === "" || !name(session)) return undefined;
   if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) return undefined;
-  const tokens: UsageTokens = {
-    input: count(entry.input),
-    cacheRead: count(entry.cacheRead),
-    cacheWrite: count(entry.cacheWrite),
-    output: count(entry.output),
-    reasoning: count(entry.reasoning),
-  };
+  const tokens = tokensOf(entry);
   if (!hasTokens(tokens)) return undefined;
-  const cost = typeof costUsd === "number" && Number.isFinite(costUsd) && costUsd > 0 ? costUsd : null;
-  return { agent, endpointId, modelId: modelId.trim(), at: Math.trunc(at), session, ...tokens, reasoning: Math.min(tokens.reasoning, tokens.output), costUsd: cost };
+  return { agent, endpointId, modelId: modelId.trim(), at: Math.trunc(at), session, ...tokens, costUsd: positiveCost(costUsd) };
 };
 
 /** What a pi-ai assistant message carries that a record reads (pi-ai's `AssistantMessage`, structurally). */
@@ -107,15 +110,8 @@ export interface PiAnswer {
 export const usageOfPiAnswer = (answer: PiAnswer, call: { readonly agent: UsageAgent; readonly endpointId: string; readonly session: string; readonly now: number }): UsageEntry | undefined => {
   const usage = answer.usage;
   if (usage === undefined) return undefined;
-  const tokens: UsageTokens = {
-    input: count(usage.input),
-    cacheRead: count(usage.cacheRead),
-    cacheWrite: count(usage.cacheWrite),
-    output: count(usage.output),
-    reasoning: count(usage.reasoning),
-  };
+  const tokens = tokensOf(usage);
   if (!hasTokens(tokens)) return undefined;
-  const total = usage.cost?.total;
   return {
     agent: call.agent,
     endpointId: call.endpointId,
@@ -123,6 +119,6 @@ export const usageOfPiAnswer = (answer: PiAnswer, call: { readonly agent: UsageA
     at: typeof answer.timestamp === "number" && answer.timestamp > 0 ? answer.timestamp : call.now,
     session: call.session,
     ...tokens,
-    costUsd: typeof total === "number" && Number.isFinite(total) && total > 0 ? total : null,
+    costUsd: positiveCost(usage.cost?.total),
   };
 };

@@ -57,6 +57,7 @@ const sessionWith = (answer: (asked: number) => EndpointCredential, reply: (sent
   const map = new Map<string, unknown>();
   const recorded: Array<EndpointCredentialFailure | undefined> = [];
   const endpoints = new SessionEndpoints({
+    usage: { session: () => "s", record: () => undefined },
     onCredential: (failure) => void recorded.push(failure),
     kv: { get: <T>(key: string) => map.get(key) as T | undefined, put: (key, value) => void map.set(key, value) },
     models,

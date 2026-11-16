@@ -41,8 +41,8 @@ export interface EndpointTextAccess {
   readonly fetch?: FetchFunction;
   /** The request's bound, shorter in tests. */
   readonly timeoutMs?: number;
-  /** SPI-1173: the answer's usage, as a record of text generation (a failed answer's too, when it counted tokens). */
-  readonly usage?: (entry: UsageEntry) => void;
+  /** The answer's usage, as a record of text generation (a failed answer's too, when it counted tokens) (SPI-1173). */
+  readonly usage: (entry: UsageEntry) => void;
 }
 
 /** The request as the binding hands it: three strings, else undefined. */
@@ -123,15 +123,11 @@ export const generateEndpointText = async (input: unknown, access: EndpointTextA
     return answer;
   };
   const models = createModels();
-  const record = access.usage;
-  const answered =
-    record === undefined
-      ? undefined
-      : (answer: Parameters<typeof usageOfPiAnswer>[0], id: string) => {
-          const entry = usageOfPiAnswer(answer, { agent: "text-generation", endpointId: id, session: "", now: Date.now() });
-          if (entry !== undefined) record(entry);
-        };
-  for (const provider of endpointProviders({ revision: endpoints.revision, endpoints: [endpoint] }, { credential, fetch, ...(answered === undefined ? {} : { answered }) })) models.setProvider(provider);
+  const answered = (answer: Parameters<typeof usageOfPiAnswer>[0], id: string) => {
+    const entry = usageOfPiAnswer(answer, { agent: "text-generation", endpointId: id, session: "", now: Date.now() });
+    if (entry !== undefined) access.usage(entry);
+  };
+  for (const provider of endpointProviders({ revision: endpoints.revision, endpoints: [endpoint] }, { credential, fetch, answered })) models.setProvider(provider);
   const model = models.getModel(endpoint.id, modelId);
   if (model === undefined) return { ok: false, error: `${named} does not list the model ${modelId}.` };
   const signal = AbortSignal.timeout(access.timeoutMs ?? TIMEOUT_MS);

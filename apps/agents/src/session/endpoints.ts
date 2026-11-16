@@ -50,17 +50,9 @@ export interface SessionEndpointsOptions {
    * records it on the running turn for the differ (SPI-1164). Called on a change only.
    */
   readonly onCredential?: (failure: EndpointCredentialFailure | undefined) => void;
-  /** SPI-1173: each answer on an endpoint, as a usage record of the Durable agent in this Session. */
-  readonly usage?: { readonly session: () => string; readonly record: (entry: UsageEntry) => void };
+  /** Each answer on an endpoint, as a usage record of the Durable agent in this Session (SPI-1173). */
+  readonly usage: { readonly session: () => string; readonly record: (entry: UsageEntry) => void };
 }
-
-/** What a Session records of an answer on `endpointId` (an endpoint's, or the Model proxy's `anthropic`): the Durable agent's usage. */
-export const durableUsage =
-  (usage: NonNullable<SessionEndpointsOptions["usage"]>, now: () => number) =>
-  (message: Parameters<typeof usageOfPiAnswer>[0], endpointId: string): void => {
-    const entry = usageOfPiAnswer(message, { agent: "durable", endpointId, session: usage.session(), now: now() });
-    if (entry !== undefined) usage.record(entry);
-  };
 
 export class SessionEndpoints {
   readonly #options: SessionEndpointsOptions;
@@ -91,7 +83,11 @@ export class SessionEndpoints {
         } else if (this.#failing.delete(id)) this.#options.onCredential?.(undefined);
       },
       ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }),
-      ...(this.#options.usage === undefined ? {} : { answered: durableUsage(this.#options.usage, this.#options.now ?? Date.now) }),
+      answered: (message, endpointId) => {
+        const { usage, now = Date.now } = this.#options;
+        const entry = usageOfPiAnswer(message, { agent: "durable", endpointId, session: usage.session(), now: now() });
+        if (entry !== undefined) usage.record(entry);
+      },
     });
     const next = new Set(providers.map((provider) => provider.id));
     for (const id of this.#ids) if (!next.has(id)) this.#options.models.deleteProvider(id);

@@ -152,6 +152,7 @@ export class EndpointsProbe extends DurableObject {
     }) as typeof fetch;
     const models = createModels();
     const endpoints = new SessionEndpoints({
+      usage: { session: () => "s", record: () => undefined },
       kv: this.ctx.storage.kv,
       models,
       source: () => ({

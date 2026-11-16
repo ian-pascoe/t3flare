@@ -38,6 +38,7 @@ const harness = (options: { grant?: ModelRelayGrant; upstream?: (request: Reques
     },
     log: (event) => void logs.push(event),
     now: () => (now += 5),
+    usage: () => undefined,
   };
   return { deps, asked, sent, logs };
 };

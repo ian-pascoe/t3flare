@@ -126,7 +126,7 @@ export const topLevelModel = (bytes: Uint8Array): { readonly start: number; read
 /** A routed body's endpoint, and the body with the model's own id in place of the slug. */
 export interface RoutedBody {
   readonly endpointId: string;
-  /** The model's own id at the endpoint (SPI-1173: what its usage is recorded under). */
+  /** The model's own id at the endpoint (what its usage is recorded under, SPI-1173). */
   readonly modelId: string;
   readonly body: Uint8Array;
 }

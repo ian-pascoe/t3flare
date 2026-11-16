@@ -56,8 +56,8 @@ const keyFor = (answer: EndpointCredential = { apiKey: KEY }) => {
 };
 
 /** One request for `gw`'s `modelId`, the Environment holding `held`. */
-const generate = (held: ModelEndpoint, access: Partial<EndpointTextAccess> & Pick<EndpointTextAccess, "credential">, modelId = "small-mini") =>
-  generateEndpointText({ endpointId: "gw", modelId, prompt: "Name this thread." }, { endpoints: async () => ({ revision: 2, endpoints: [held] }), ...access });
+const generate = (held: ModelEndpoint, access: Partial<Omit<EndpointTextAccess, "usage">> & Pick<EndpointTextAccess, "credential">, modelId = "small-mini") =>
+  generateEndpointText({ endpointId: "gw", modelId, prompt: "Name this thread." }, { endpoints: async () => ({ revision: 2, endpoints: [held] }), usage: () => undefined, ...access });
 
 const errorOf = (answer: Awaited<ReturnType<typeof generateEndpointText>>) => (answer.ok ? "" : answer.error);
 
@@ -167,10 +167,10 @@ describe("generateEndpointText", () => {
     const wire = recorder(() => anthropicOk("never"));
     expect(await generate(endpoint("anthropic-messages"), { credential: keyFor().credential, fetch: wire.fetch }, "gone")).toEqual({ ok: false, error: 'The Model endpoint "gw" does not list the model gone.' });
     expect(
-      await generateEndpointText({ endpointId: "gw", modelId: "small-mini", prompt: "p" }, { endpoints: async () => ({ revision: 3, endpoints: [] }), credential: keyFor().credential, fetch: wire.fetch }),
+      await generateEndpointText({ endpointId: "gw", modelId: "small-mini", prompt: "p" }, { endpoints: async () => ({ revision: 3, endpoints: [] }), credential: keyFor().credential, fetch: wire.fetch, usage: () => undefined }),
     ).toEqual({ ok: false, error: 'The Model endpoint "gw" was removed: pick another model for text generation.' });
     expect(
-      await generateEndpointText({ endpointId: "gw", modelId: "small-mini", prompt: "p" }, { endpoints: () => Promise.reject(new Error("rpc")), credential: keyFor().credential, fetch: wire.fetch }),
+      await generateEndpointText({ endpointId: "gw", modelId: "small-mini", prompt: "p" }, { endpoints: () => Promise.reject(new Error("rpc")), credential: keyFor().credential, fetch: wire.fetch, usage: () => undefined }),
     ).toEqual({ ok: false, error: 'The Model endpoint "gw" could not be read from the Environment: try again.' });
     expect(wire.sent).toEqual([]);
   });
@@ -181,6 +181,7 @@ describe("generateEndpointText", () => {
       const answer = await generateEndpointText(input, {
         endpoints: async () => ((read = true), { revision: 1, endpoints: [] }),
         credential: keyFor().credential,
+        usage: () => undefined,
       });
       expect(answer).toEqual({ ok: false, error: "The text generation request was malformed: it names no Model endpoint, model and prompt." });
     }

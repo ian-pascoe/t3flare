@@ -5,12 +5,23 @@
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import type { UsageEntry } from "@t3flare/models/usage";
 import * as Effect from "effect/Effect";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UsageAggregator } from "../../../t3code/apps/server/src/usage/usageAggregation.ts";
 import { parseRateTable } from "../../../t3code/apps/server/src/usage/usagePricing.ts";
-import { makeOwnUsageReader } from "../src/usage/readers.ts";
-import { MAX_USAGE_ROWS, USAGE_RETENTION_MS, USAGE_SLOT_MS, usageStore } from "../src/usage/records.ts";
+import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
+import { commissaryManagementOf } from "../src/usage/commissary.ts";
+import { makeOwnUsageReader, usageReader } from "../src/usage/readers.ts";
+import {
+  acceptUsage,
+  commissaryCountedCache,
+  countedByCommissary,
+  listedModelOf,
+  MAX_USAGE_ROWS,
+  USAGE_RETENTION_MS,
+  USAGE_SLOT_MS,
+  usageStore,
+} from "../src/usage/records.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -144,3 +155,132 @@ describe("the Environment's usage records", () => {
     expect(store.record([{ ...entry(), agent: "probe" } as never, entry({ input: 0, cacheRead: 0, output: 0 }), entry({ modelId: "a\nb" }), "junk" as never], endpoints, NOW)).toBe(0);
   });
 });
+
+describe("the records' times and bounds", () => {
+  const slotOf = (at: number) => Math.floor(at / USAGE_SLOT_MS) * USAGE_SLOT_MS;
+  const rows = async (store: ReturnType<typeof usageStore>) => (await scanOf(store, "pi", 0))[0]!.files![0]!.records;
+
+  it("rolls up by quarter hour: the slot's first and last moment share a row, the next moment starts one", async () => {
+    const store = usageStore(nodeSqlStorage());
+    const slot = slotOf(NOW - DAY);
+    store.record([entry({ at: slot }), entry({ at: slot + USAGE_SLOT_MS - 1 }), entry({ at: slot + USAGE_SLOT_MS })], endpoints, NOW);
+    expect((await rows(store)).map((record) => [record.timestampMs, record.totals.outputTokens])).toEqual([
+      [slot, 100],
+      [slot + USAGE_SLOT_MS, 50],
+    ]);
+  });
+
+  it("prunes at most once an hour", async () => {
+    const store = usageStore(nodeSqlStorage(), { maxRows: 1 });
+    store.record([entry({ at: NOW - 3 * USAGE_SLOT_MS }), entry({ at: NOW - 2 * USAGE_SLOT_MS })], endpoints, NOW);
+    expect(await rows(store)).toHaveLength(1);
+    // Within the hour: kept past the cap.
+    store.record([entry({ at: NOW })], endpoints, NOW + 30 * 60_000);
+    expect(await rows(store)).toHaveLength(2);
+    // An hour after the last prune: pruned again.
+    store.record([entry({ at: NOW + 60 * 60_000 })], endpoints, NOW + 60 * 60_000);
+    expect((await rows(store)).map((record) => record.timestampMs)).toEqual([slotOf(NOW + 60 * 60_000)]);
+  });
+
+  it("reports a table it cannot read as a failed source, never a failed page", async () => {
+    const broken = { record: () => 0, read: () => { throw new Error("SQLITE_CORRUPT"); } };
+    const scans = await Effect.runPromise(
+      makeOwnUsageReader("pi", () => broken).scan({ instances: [], settings: {} as never, windowStartMs: 0, retentionCutoffMs: 0, awaitRefresh: false }),
+    );
+    expect(scans.map((scan) => [scan.dir, scan.status, scan.files])).toEqual([
+      ["t3flare://usage/durable", "failed", null],
+      ["t3flare://usage/text-generation", "failed", null],
+      ["t3flare://usage/pi", "failed", null],
+    ]);
+  });
+});
+
+describe("a dated model's listed one", () => {
+  const listed = (...ids: Array<string>) => ids.map((id) => ({ ...endpoints.endpoints[0]!.models[0]!, id }));
+  it("is the listed id a date follows, and never another model's prefix", () => {
+    expect(listedModelOf(listed("claude-sonnet-4-5"), "claude-sonnet-4-5-20250929")?.id).toBe("claude-sonnet-4-5");
+    expect(listedModelOf(listed("gpt-5"), "gpt-5-2025-08-07")?.id).toBe("gpt-5");
+    expect(listedModelOf(listed("gpt-5"), "gpt-5-mini")).toBeUndefined();
+    expect(listedModelOf(listed("gpt-5"), "gpt-5-mini-2025-08-07")).toBeUndefined();
+    expect(listedModelOf(listed("gpt-5"), "gpt-5-2025")).toBeUndefined();
+    expect(listedModelOf(listed("gpt-5", "gpt-5-mini"), "gpt-5-mini")?.id).toBe("gpt-5-mini");
+  });
+});
+
+// Until the hard cut (SPI-1176), the page reads Commissary's request log as well: a request on an endpoint keyed with a
+// key the log is read for is the log's to count, never ours too.
+describe("no request counted twice beside Commissary's log", () => {
+  const PROXY_KEY = "cms_global_0a1b2c3d4e5f6a7b8c9d_c2VjcmV0";
+  const OTHER_KEY = "cms_global_ffffffffffffffffffff_b3RoZXI";
+  const keys: Readonly<Record<string, string>> = { comm: PROXY_KEY, mine: "sk-ant-own-key", other: OTHER_KEY };
+  const two: ModelEndpoints = {
+    revision: 7,
+    endpoints: [
+      { ...endpoints.endpoints[0]!, id: "comm" },
+      { ...endpoints.endpoints[0]!, id: "mine" },
+      { ...endpoints.endpoints[0]!, id: "other" },
+      { ...endpoints.endpoints[0]!, id: "open", auth: "none" },
+    ],
+  };
+  const config = commissaryManagementOf({ COMMISSARY_MANAGEMENT_URL: "https://c.example", COMMISSARY_MANAGEMENT_KEY: "cmsm_global_k_s", MODEL_PROXY_API_KEY: PROXY_KEY })!;
+  const counted = (endpointsNow: ModelEndpoints) => countedByCommissary(endpointsNow, async (id) => keys[id], config.principals);
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("finds the endpoints whose key is a principal the log is read for (the proxy's key), and only those", async () => {
+    expect([...(await counted(two))]).toEqual(["comm"]);
+    expect([...(await countedByCommissary(two, async (id) => keys[id], []))]).toEqual([]);
+    expect([...(await countedByCommissary(two, async (id) => keys[id], ["key:ffffffffffffffffffff", "key:0a1b2c3d4e5f6a7b8c9d"]))].sort()).toEqual(["comm", "other"]);
+  });
+
+  it("keeps every other endpoint's records, and stores what it keeps", async () => {
+    const store = usageStore(nodeSqlStorage());
+    const answer = await acceptUsage(
+      { entries: [entry({ endpointId: "comm" }), entry({ endpointId: "mine" }), entry({ endpointId: "open" }), entry({ endpointId: "other" })] },
+      { store, endpoints: two, countedByCommissary: counted, now: () => NOW },
+    );
+    expect(answer).toEqual({ kept: 3 });
+    expect((await scanOf(store, "pi"))[0]!.files![0]!.records.map((record) => record.model).sort()).toEqual(["mine/claude-sonnet-4-5", "open/claude-sonnet-4-5", "other/claude-sonnet-4-5"]);
+  });
+
+  it("drops the entries when it cannot tell, and reads at most MAX_USAGE_ENTRIES of one call", async () => {
+    const store = usageStore(nodeSqlStorage());
+    expect(await acceptUsage({ entries: [entry()] }, { store, endpoints: two, countedByCommissary: () => Promise.reject(new Error("sealed store")), now: () => NOW })).toEqual({ kept: 0 });
+    expect(await acceptUsage({ entries: Array.from({ length: 100 }, () => entry({ endpointId: "mine" })) }, { store, endpoints: two, countedByCommissary: counted, now: () => NOW })).toEqual({ kept: 64 });
+    expect(await acceptUsage("junk", { store, endpoints: two, countedByCommissary: counted, now: () => NOW })).toEqual({ kept: 0 });
+  });
+
+  it("opens the keys once per revision of the endpoints, and asks again after a failure", async () => {
+    let opened = 0;
+    let fail = true;
+    const cache = commissaryCountedCache(async (endpointsNow) => {
+      opened += 1;
+      if (fail) throw new Error("busy");
+      return counted(endpointsNow);
+    });
+    await expect(cache(two)).rejects.toThrow("busy");
+    fail = false;
+    expect([...(await cache(two))]).toEqual(["comm"]);
+    await cache(two);
+    expect(opened).toBe(2);
+    await cache({ ...two, revision: 8 });
+    expect(opened).toBe(3);
+  });
+
+  it("counts a turn on the proxy-key endpoint once on the page (the log's) and another endpoint's once (ours)", async () => {
+    const store = usageStore(nodeSqlStorage());
+    bindEnvironmentServices({ usage: store, commissary: config } as unknown as EnvironmentServices);
+    // The agents Worker sends both; the Environment keeps only `mine`'s.
+    await acceptUsage({ entries: [entry({ agent: "claude", endpointId: "comm", modelId: "claude-sonnet-4-5" }), entry({ agent: "claude", endpointId: "mine" })] }, { store, endpoints: two, countedByCommissary: counted, now: () => NOW });
+    // Commissary's log has the `comm` request, under the proxy key's principal.
+    vi.stubGlobal("fetch", async (url: string) => {
+      const query = new URL(url).searchParams;
+      const records = query.get("principal") === "key:0a1b2c3d4e5f6a7b8c9d" ? [{ timestamp: new Date(NOW - 60_000).toISOString(), provider: "claude", model: "claude-sonnet-4-5", endpoint: "/v1/messages", api_key: "x", request_id: "r1", failed: false, session_id: "claude:abc", token_breakdown: { input: { uncached_tokens: 100, cache_read_tokens: 1_000, cache_write_tokens: 0 }, output: { total_tokens: 50, reasoning_tokens: 0 } } }] : [];
+      return Response.json({ records });
+    });
+    const scans = await Effect.runPromise(usageReader("claude").scan({ instances: [], settings: {} as never, windowStartMs: NOW - DAY, retentionCutoffMs: 0, awaitRefresh: true }));
+    const records = scans.flatMap((scan) => (scan.files ?? []).flatMap((file) => file.records.map((record) => `${scan.dir} ${record.model}`)));
+    expect(records).toEqual(["t3flare://usage/claude mine/claude-sonnet-4-5", "commissary://c.example/claude claude-sonnet-4-5"]);
+  });
+});
+

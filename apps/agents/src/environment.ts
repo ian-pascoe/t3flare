@@ -38,7 +38,7 @@ export interface EnvironmentRpc {
   endpointCredential(input: EndpointCredentialRequest): Promise<EndpointCredential>;
   /** The model relay's target for an endpoint (SPI-1167): its base URL and headers with its credential, or why not. */
   modelRelayTarget(input: { readonly endpointId: string }): Promise<ModelRelayTarget>;
-  /** Usage records (SPI-1173): a Session's, text generation's or the model relay's, kept for t3's Usage page. Never boots t3. */
+  /** A Session's, text generation's or the model relay's usage records, kept for t3's Usage page (SPI-1173). Never boots t3. */
   recordUsage(input: { readonly entries: ReadonlyArray<UsageEntry> }): Promise<{ readonly kept: number }>;
   /** The Environment settings, resolved (ADR-0032): read before a Container start. Never boots t3. */
   environmentSettings(): Promise<ResolvedEnvironment>;
@@ -68,6 +68,27 @@ export interface EnvironmentRpc {
   /** A CLI process's MCP message through the relay (ADR-0028), its caller resolved by the Workspace DO. */
   mcpRelay(input: McpRelayInput): Promise<McpRelayAnswer>;
 }
+
+/**
+ * What every recorder of usage sends a record with (SPI-1173): the Environment's `recordUsage`, after the answer, kept
+ * alive by `waitUntil`. A failed send loses that record only, and is logged by the record's names, never a value.
+ */
+export const usageSender =
+  (ctx: { waitUntil(promise: Promise<unknown>): void }, environment: () => Pick<EnvironmentRpc, "recordUsage">, warn: (line: string) => void = console.warn) =>
+  (entry: UsageEntry): void => {
+    let sent: Promise<unknown>;
+    try {
+      sent = environment().recordUsage({ entries: [entry] });
+    } catch (error) {
+      sent = Promise.reject(error);
+    }
+    ctx.waitUntil(
+      sent.then(
+        () => undefined,
+        (error: unknown) => warn(JSON.stringify({ t3flare: "usage-record-failed", agent: entry.agent, endpoint: entry.endpointId, error: error instanceof Error ? error.name : "error" })),
+      ),
+    );
+  };
 
 export const environmentStub = (namespace: DurableObjectNamespace): EnvironmentRpc =>
   namespace.get(namespace.idFromName(ENVIRONMENT_NAME)) as unknown as EnvironmentRpc;

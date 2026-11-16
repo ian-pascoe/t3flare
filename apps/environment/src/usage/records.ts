@@ -1,6 +1,6 @@
 // t3flare's own usage records (SPI-1173), kept in the Environment DO's SQLite: what the Sessions, text generation and the
 // model relay record of each model answer on a Model endpoint (`@t3flare/models/usage`, through `recordUsage`), served
-// to t3's Usage page by our scan readers (`readers.ts`) in place of any vendor's management API.
+// to t3's Usage page by our scan readers (`readers.ts`), beside Commissary's request log until the hard cut (SPI-1176).
 //
 // Rolled up as they are written: one row per quarter hour, agent, endpoint, model, session and whether the cost is
 // known, its counts the sum of the answers'. The Usage page buckets by hour at the finest, so a quarter hour loses
@@ -11,11 +11,16 @@
 // the longest the page keeps a transcript's usage, and more than its widest range) are deleted, and at most
 // `MAX_USAGE_ROWS` rows are kept, the oldest dropped first (a guard against a runaway writer: a heavy owner makes a few
 // hundred rows a day). Both are pruned on a write, at most once an hour.
+//
+// A row's `requests` is the answers it adds up; t3's page counts records, so its record counts are rows (a quarter hour
+// of one session on one model), not requests. Tokens, costs and sessions (distinct session ids) are exact.
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import type { UsageProviderKind } from "@t3tools/contracts";
 import type { UsageRecord } from "@t3tools/provider-core/server/usage";
 import type { EndpointModel, EndpointModelCost, ModelEndpoints } from "@t3flare/models/endpoints";
-import { type UsageAgent, type UsageEntry, usageEntryOf } from "@t3flare/models/usage";
+import { MAX_USAGE_ENTRIES, type UsageAgent, type UsageEntry, usageEntryOf } from "@t3flare/models/usage";
+
+import { principalOfApiKey } from "./commissary.ts";
 
 export const USAGE_SLOT_MS = 15 * 60 * 1000;
 export const USAGE_RETENTION_DAYS = 92;
@@ -62,19 +67,16 @@ export interface UsageStore {
   read(sinceMs: number): ReadonlyArray<StoredUsage>;
 }
 
+/** A dated version's suffix: `-20250929` or `-2025-09-29`. */
+const DATED = /^-(?:\d{8}|\d{4}-\d{2}-\d{2})$/;
+
 /**
- * The endpoint's listed model an answer names: the same id, or the longest listed id it is a dated version of
- * (`claude-sonnet-4-5-20250929` of `claude-sonnet-4-5`). Undefined when the endpoint lists neither.
+ * The endpoint's listed model an answer names: the same id, or a listed id the answer's is a dated version of
+ * (`claude-sonnet-4-5-20250929` of `claude-sonnet-4-5`). Any other suffix is another model (`gpt-5-mini` is not
+ * `gpt-5`). Undefined when the endpoint lists neither.
  */
-export const listedModelOf = (models: ReadonlyArray<EndpointModel>, modelId: string): EndpointModel | undefined => {
-  const exact = models.find((model) => model.id === modelId);
-  if (exact !== undefined) return exact;
-  let best: EndpointModel | undefined;
-  for (const model of models) {
-    if (modelId.startsWith(`${model.id}-`) && (best === undefined || model.id.length > best.id.length)) best = model;
-  }
-  return best;
-};
+export const listedModelOf = (models: ReadonlyArray<EndpointModel>, modelId: string): EndpointModel | undefined =>
+  models.find((model) => model.id === modelId) ?? models.find((model) => modelId.startsWith(model.id) && DATED.test(modelId.slice(model.id.length)));
 
 /** What the tokens cost at the model's prices (dollars per million tokens), or null when it has none. */
 export const costAt = (cost: EndpointModelCost | undefined, entry: Pick<UsageEntry, "input" | "cacheRead" | "cacheWrite" | "output">): number | null => {
@@ -209,3 +211,76 @@ export const toUsageRecord = (row: StoredUsage): UsageRecord => ({
   speed: "standard",
   dedupeKey: null,
 });
+
+// ---- Commissary's own count, until the hard cut (SPI-1176) ----
+//
+// While Commissary's request log is read for the page (`readers.ts`), a request it logs under a principal it is read
+// for must not be counted again here. That is every request on an endpoint whose API key is such a principal's
+// (`key:<id>` of a `cms_` key: the Model proxy's own, or one listed in COMMISSARY_USAGE_PRINCIPALS), wherever its base
+// URL points (a `cms_` key opens nothing but Commissary). Its records are dropped as they arrive: the Session and the
+// relay send them as for any endpoint, and only the Environment, which holds the keys, decides. No key leaves it, and
+// the decision follows the key the endpoint has now. SPI-1176 removes this with the Commissary readers.
+
+/** The ids of the endpoints whose requests Commissary's log counts, from their keys (`apiKeyOf`). */
+export const countedByCommissary = async (
+  endpoints: ModelEndpoints,
+  apiKeyOf: (endpointId: string) => Promise<string | undefined>,
+  principals: ReadonlyArray<string>,
+): Promise<ReadonlySet<string>> => {
+  const counted = new Set<string>();
+  if (principals.length === 0) return counted;
+  for (const endpoint of endpoints.endpoints) {
+    if (endpoint.auth !== "api-key") continue;
+    const principal = principalOfApiKey(await apiKeyOf(endpoint.id).catch(() => undefined));
+    if (principal !== undefined && principals.includes(principal)) counted.add(endpoint.id);
+  }
+  return counted;
+};
+
+/**
+ * `countedByCommissary`, worked out once per revision of the endpoints (every save, a key's included, makes a new one):
+ * each key is opened once per revision, not once per record.
+ */
+export const commissaryCountedCache = (work: (endpoints: ModelEndpoints) => Promise<ReadonlySet<string>>) => {
+  let held: { readonly revision: number; readonly counted: Promise<ReadonlySet<string>> } | undefined;
+  return (endpoints: ModelEndpoints): Promise<ReadonlySet<string>> => {
+    if (held?.revision !== endpoints.revision) {
+      const counted = work(endpoints);
+      held = { revision: endpoints.revision, counted };
+      // A failed read is not kept: the next record asks again.
+      counted.catch(() => {
+        if (held?.counted === counted) held = undefined;
+      });
+    }
+    return held.counted;
+  };
+};
+
+/**
+ * The `recordUsage` RPC (SPI-1173): at most `MAX_USAGE_ENTRIES` entries kept, but none on an endpoint Commissary's log
+ * counts. When that cannot be worked out, the entries are dropped too: a missing record is safer than a doubled one.
+ */
+export const acceptUsage = async (
+  input: unknown,
+  deps: {
+    readonly store: UsageStore;
+    readonly endpoints: ModelEndpoints;
+    readonly countedByCommissary: (endpoints: ModelEndpoints) => Promise<ReadonlySet<string>>;
+    readonly now: () => number;
+  },
+): Promise<{ readonly kept: number }> => {
+  const raw = typeof input === "object" && input !== null ? (input as { readonly entries?: unknown }).entries : undefined;
+  const entries = Array.isArray(raw) ? raw.slice(0, MAX_USAGE_ENTRIES) : [];
+  if (entries.length === 0) return { kept: 0 };
+  let counted: ReadonlySet<string>;
+  try {
+    counted = await deps.countedByCommissary(deps.endpoints);
+  } catch {
+    return { kept: 0 };
+  }
+  const ours = entries.filter((entry) => {
+    const endpointId = (entry as { readonly endpointId?: unknown } | null)?.endpointId;
+    return !(typeof endpointId === "string" && counted.has(endpointId));
+  });
+  return { kept: deps.store.record(ours, deps.endpoints, deps.now()) };
+};

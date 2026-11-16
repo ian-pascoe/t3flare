@@ -48,7 +48,7 @@ export interface EnvironmentServices {
   readonly publicOrigin: () => string | null;
   /** Commissary's management API for t3's Usage page and limit meters (parity G8), or undefined when not set. */
   readonly commissary: CommissaryManagement | undefined;
-  /** SPI-1173: t3flare's own usage records, for t3's Usage page. */
+  /** t3flare's own usage records, for t3's Usage page (SPI-1173). */
   readonly usage: UsageStore;
   /** G11 (ADR-0031): the Browser Run binding, or undefined where none is bound (local workerd, tests). */
   readonly browserRun: BrowserRunBinding | undefined;

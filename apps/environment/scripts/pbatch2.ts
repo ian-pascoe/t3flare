@@ -74,7 +74,8 @@ switch (part) {
     const commissary = sources.find((source: any) => source.id === "commissary");
     const summary = (await wsCall(cookie, "server.getUsageSummary", { sinceDay: day(-2), untilDay: day(0), timeZone: "UTC", awaitRefresh: true })) as any;
     const byProvider: Record<string, { tokens: number; records: number; costUsd: number }> = {};
-    for (const bucket of summary?.buckets ?? []) {
+    // Commissary's half of the page only: t3flare's own records (`t3flare://usage/…`, SPI-1173) are p1173's to check.
+    for (const bucket of (summary?.buckets ?? []).filter((entry: any) => String(entry.sourcePath ?? "").startsWith("commissary://"))) {
       const entry = (byProvider[bucket.provider] ??= { tokens: 0, records: 0, costUsd: 0 });
       entry.records += bucket.records ?? 0;
       entry.tokens += (bucket.totals?.uncachedInputTokens ?? 0) + (bucket.totals?.cachedInputTokens ?? 0) + (bucket.totals?.cacheCreationTokens ?? 0) + (bucket.totals?.outputTokens ?? 0);

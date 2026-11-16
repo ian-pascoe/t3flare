@@ -9,6 +9,7 @@ import { modelRoutedRelayUrl } from "@t3flare/models/relay";
 import type { UsageEntry } from "@t3flare/models/usage";
 
 import { handleModelRelay, type ModelRelayDeps, type ModelRelayGrant } from "../src/workspace/modelRelay.ts";
+import { MAX_USAGE_COPY_CHARS } from "../src/workspace/relayUsage.ts";
 
 const HANDLE = "a".repeat(64);
 const KEY = "sk-endpoint-secret-1";
@@ -143,9 +144,62 @@ describe("the model relay's usage records", () => {
     expect(a.recorded).toEqual([]);
     const none = sse([{ type: "message_stop" }]);
     expect((await relay({ api: "anthropic-messages", cli: "claude", body: none })).recorded).toEqual([]);
-    const refused = await relay({ api: "openai-responses", body: '{"error":{"message":"bad key","usage":{"input_tokens":5}}}', contentType: "application/json", status: 401 });
-    expect(refused.response.status).toBe(401);
+    // A failed answer is not read even when it holds a usage it could read (a vendor's partial billing on a 4xx or 5xx).
+    const refused = await relay({ api: "openai-responses", body: JSON.stringify({ object: "response", model: "m", usage: { input_tokens: 5, output_tokens: 1 } }), contentType: "application/json", status: 429 });
+    expect(refused.response.status).toBe(429);
     expect(refused.recorded).toEqual([]);
+    // The same body answered 200 is read: the status is what kept it out.
+    expect((await relay({ api: "openai-responses", body: JSON.stringify({ object: "response", model: "m", usage: { input_tokens: 5, output_tokens: 1 } }), contentType: "application/json" })).recorded).toHaveLength(1);
+  });
+
+  it("stops reading past MAX_USAGE_COPY_CHARS in one line, and still relays the answer whole", async () => {
+    const huge = "x".repeat(MAX_USAGE_COPY_CHARS + 10);
+    const over = sse([{ type: "response.completed", response: { model: "m", output: [{ text: huge }], usage: { input_tokens: 3, output_tokens: 1 } } }]);
+    const cut = await relay({ api: "openai-responses", body: over, size: 512 * 1024 });
+    expect(cut.text.length).toBe(over.length);
+    expect(cut.recorded).toEqual([]);
+    const under = sse([{ type: "response.completed", response: { model: "m", output: [{ text: "x".repeat(MAX_USAGE_COPY_CHARS - 1000) }], usage: { input_tokens: 3, output_tokens: 1 } } }]);
+    expect((await relay({ api: "openai-responses", body: under, size: 512 * 1024 })).recorded).toMatchObject([{ input: 3, output: 1 }]);
+  });
+
+  it("records what a stream the CLI cancels had read (Anthropic's input), once", async () => {
+    let push!: ReadableStreamDefaultController<Uint8Array>;
+    const upstream = new ReadableStream<Uint8Array>({ start: (controller) => void (push = controller) });
+    const recorded: Array<UsageEntry> = [];
+    const deps: ModelRelayDeps = {
+      authorize: async () => grantOf("anthropic-messages", "claude"),
+      fetch: async () => new Response(upstream, { status: 200, headers: { "content-type": "text/event-stream" } }),
+      log: () => undefined,
+      now: () => 1,
+      usage: (entry) => void recorded.push(entry),
+    };
+    const response = await handleModelRelay(new Request("http://computer.internal/t3flare/model/ep1/messages", { method: "POST", headers: { authorization: `Bearer ${HANDLE}` }, body: "{}" }), deps);
+    const reader = response.body!.getReader();
+    push.enqueue(new TextEncoder().encode(sse([{ type: "message_start", message: { model: "claude-x", usage: { input_tokens: 900, cache_read_input_tokens: 50, output_tokens: 1 } } }])));
+    await reader.read();
+    await reader.cancel("interrupted");
+    await reader.cancel("again").catch(() => undefined);
+    expect(recorded).toEqual([{ ...call, at: 1, agent: "claude", modelId: "claude-x", input: 900, cacheRead: 50, cacheWrite: 0, output: 1, reasoning: 0 }]);
+  });
+
+  it("records what a stream that fails upstream had read, and passes the failure on", async () => {
+    let push!: ReadableStreamDefaultController<Uint8Array>;
+    const upstream = new ReadableStream<Uint8Array>({ start: (controller) => void (push = controller) });
+    const recorded: Array<UsageEntry> = [];
+    const deps: ModelRelayDeps = {
+      authorize: async () => grantOf("openai-completions", "pi"),
+      fetch: async () => new Response(upstream, { status: 200, headers: { "content-type": "text/event-stream" } }),
+      log: () => undefined,
+      now: () => 1,
+      usage: (entry) => void recorded.push(entry),
+    };
+    const response = await handleModelRelay(new Request("http://computer.internal/t3flare/model/ep1/chat/completions", { method: "POST", headers: { authorization: `Bearer ${HANDLE}` }, body: "{}" }), deps);
+    const reader = response.body!.getReader();
+    push.enqueue(new TextEncoder().encode(sse([{ object: "chat.completion.chunk", model: "q", choices: [], usage: { prompt_tokens: 40, completion_tokens: 2 } }])));
+    await reader.read();
+    push.error(new TypeError("reset"));
+    await expect(reader.read()).rejects.toThrow("reset");
+    expect(recorded).toMatchObject([{ agent: "pi", modelId: "q", input: 40, output: 2 }]);
   });
 
   it("records nothing for a process that is not a CLI agent's (the stage's probe)", async () => {

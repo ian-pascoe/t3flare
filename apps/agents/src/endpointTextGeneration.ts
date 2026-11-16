@@ -11,7 +11,7 @@ import type { EndpointTextAnswer } from "@t3flare/models/endpoints";
 import { WorkerEntrypoint } from "cloudflare:workers";
 
 import { generateEndpointText } from "./endpointText.ts";
-import { environmentStub } from "./environment.ts";
+import { environmentStub, usageSender } from "./environment.ts";
 
 export interface TextGenerationEnv {
   readonly ENVIRONMENT: DurableObjectNamespace;
@@ -23,16 +23,8 @@ export class EndpointTextGeneration extends WorkerEntrypoint<TextGenerationEnv> 
     return generateEndpointText(input, {
       endpoints: () => environment().modelEndpoints(),
       credential: (endpointId, target) => environment().endpointCredential({ endpointId, target }),
-      // SPI-1173: the answer's usage, kept by the Environment for t3's Usage page; a failed send loses the record only.
-      usage: (entry) =>
-        this.ctx.waitUntil(
-          environment()
-            .recordUsage({ entries: [entry] })
-            .then(
-              () => undefined,
-              () => undefined,
-            ),
-        ),
+      // The answer's usage, kept by the Environment for t3's Usage page (SPI-1173).
+      usage: usageSender(this.ctx, environment),
     });
   }
 }

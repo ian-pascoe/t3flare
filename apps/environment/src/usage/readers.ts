@@ -1,15 +1,18 @@
 // @effect-diagnostics globalFetch:off globalDate:off
 // t3's usage readers for t3flare's agents (`shadows/builtInDrivers.ts`). t3's own readers scan each CLI's transcripts on
-// the host; here the agents run in Durable Objects and Containers, so the readers read t3flare's own usage records
-// (SPI-1173, `records.ts`), one source per agent. Parity G8 (SPI-999) read Commissary's request log instead
-// (`commissary.ts`, one read serving the four readers): those readers are kept, unused by the page, until the hard cut
-// removes them (SPI-1176).
+// the host; here the agents run in Durable Objects and Containers, so each reader reads two sources:
+//
+// - t3flare's own usage records (`records.ts`, SPI-1173), one source per agent: every Model endpoint's requests but
+//   those Commissary's log counts;
+// - Commissary's request log (`commissary.ts`, parity G8, SPI-999), one read serving the four readers: the Model proxy's
+//   traffic (and an endpoint's on a key it is read for). Unconfigured, it reports no source. Removed at the hard cut
+//   (SPI-1176), with `records.ts`' exclusion of its endpoints.
 import type { UsageProviderKind } from "@t3tools/contracts";
 import type { ProviderUsageReader, ProviderUsageScan, UsageRecord } from "@t3tools/provider-core/server/usage";
 import * as Effect from "effect/Effect";
 
 import { environmentServices } from "../agents/bindings.ts";
-import { CommissaryError, type CommissaryManagement, type CommissaryUsageProvider, type Fetch, readUsageRecords, toUsageRecord } from "./commissary.ts";
+import { CommissaryError, type CommissaryManagement, type CommissaryUsageProvider, type Fetch, readUsageRecords, toUsageRecord, USAGE_PROVIDERS } from "./commissary.ts";
 import { agentsOf, toUsageRecord as ownUsageRecord, type UsageStore } from "./records.ts";
 
 type ScanReader<Config> = Extract<ProviderUsageReader<Config, never>, { readonly kind: "scan" }>;
@@ -85,13 +88,13 @@ const defaultRead = sharedRead(
 export const commissaryUsageReader = <Config>(provider: CommissaryUsageProvider): ProviderUsageReader<Config, never> =>
   makeCommissaryUsageReader<Config>(provider, defaultRead);
 
-// ---- SPI-1173: t3flare's own records ----
+// ---- t3flare's own records (SPI-1173) ----
 
 /**
  * A reader of t3flare's own usage records (`records.ts`) for one of t3's providers: one source per agent counted under
  * it (Pi's: the Durable agent, text generation and the pi CLI), so the page's sources say which agent spent what.
  */
-export const makeOwnUsageReader = <Config>(provider: CommissaryUsageProvider, store: () => UsageStore): ScanReader<Config> => ({
+export const makeOwnUsageReader = <Config>(provider: UsageProviderKind, store: () => UsageStore): ScanReader<Config> => ({
   kind: "scan",
   provider,
   scan: ({ windowStartMs }) =>
@@ -110,9 +113,19 @@ export const makeOwnUsageReader = <Config>(provider: CommissaryUsageProvider, st
     }).pipe(Effect.withSpan("ownUsageReader.scan")),
 });
 
+const isCommissaryProvider = (provider: UsageProviderKind): provider is CommissaryUsageProvider => (USAGE_PROVIDERS as ReadonlyArray<string>).includes(provider);
+
 /**
- * The reader t3's usage service runs for `provider` (SPI-1173): t3flare's own records alone. Commissary's request log is
- * no longer read for the page: a Model endpoint at Commissary with the proxy's key (SPI-1175's stage endpoint, the
- * owner's own) would be counted twice, once in our records and once in its log.
+ * The reader t3's usage service runs for `provider`: t3flare's own records, then Commissary's request log for the
+ * providers it attributes (`USAGE_PROVIDERS`). The two never count one request twice (`records.ts`' exclusion).
  */
-export const usageReader = <Config>(provider: CommissaryUsageProvider): ProviderUsageReader<Config, never> => makeOwnUsageReader<Config>(provider, () => environmentServices().usage);
+export const usageReader = <Config>(provider: UsageProviderKind, store: () => UsageStore = () => environmentServices().usage): ScanReader<Config> => {
+  const own = makeOwnUsageReader<Config>(provider, store);
+  if (!isCommissaryProvider(provider)) return own;
+  const commissary = commissaryUsageReader<Config>(provider) as ScanReader<Config>;
+  return {
+    kind: "scan",
+    provider,
+    scan: (input) => Effect.zipWith(own.scan(input), commissary.scan(input), (ours, theirs) => [...ours, ...theirs], { concurrent: true }),
+  };
+};

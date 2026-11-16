@@ -14,7 +14,7 @@
 //   without `alt=sse` is one JSON array.
 // - Mistral: the `conversation.response.done` event's usage (Conversations), or Chat Completions' shape.
 import type { EndpointApi } from "@t3flare/models/endpoints";
-import { isUsageAgent, type UsageAgent, type UsageEntry, usageEntryOf } from "@t3flare/models/usage";
+import { isUsageAgent, tokenCount, type UsageAgent, type UsageEntry, usageEntryOf, type UsageTokens } from "@t3flare/models/usage";
 
 /** The longest stream line, or JSON body, the reader copies: past it, it stops reading (the answer still goes through). */
 export const MAX_USAGE_COPY_CHARS = 4 * 1024 * 1024;
@@ -32,23 +32,18 @@ export interface RelayCall {
   readonly at: number;
 }
 
-interface Counts {
-  model: string | null;
-  input: number;
-  cacheRead: number;
-  cacheWrite: number;
-  output: number;
-  reasoning: number;
-}
+/** The answer's counts so far, and the model it names. */
+type Counts = { -readonly [K in keyof UsageTokens]: UsageTokens[K] } & { model: string | null };
 
 type Json = Record<string, unknown>;
 
 const object = (value: unknown): Json | undefined => (typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Json) : undefined);
-const num = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined);
+/** A vendor's count, or undefined when it gives none (so the count it gave earlier stands). */
+const num = (value: unknown): number | undefined => (typeof value === "number" ? tokenCount(value) : undefined);
 const text = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined);
 
 /** A stream's counts are cumulative: a later event's count replaces the earlier, and an event without one leaves it. */
-const put = (counts: Counts, field: Exclude<keyof Counts, "model">, value: number | undefined) => {
+const put = (counts: Counts, field: keyof UsageTokens, value: number | undefined) => {
   if (value !== undefined) counts[field] = value;
 };
 
@@ -187,6 +182,7 @@ class Reader {
     let start = 0;
     for (let newline = chunk.indexOf("\n"); newline !== -1; newline = chunk.indexOf("\n", start)) {
       const piece = chunk.slice(start, newline);
+      if (this.#pendingChars + piece.length > MAX_USAGE_COPY_CHARS) return this.stop();
       const line = this.#pending.length === 0 ? piece : [...this.#pending, piece].join("");
       this.#pending.length = 0;
       this.#pendingChars = 0;
@@ -222,7 +218,8 @@ class Reader {
 
 /**
  * The answer's body with its usage read as it passes, recorded once it ends; the body itself when the answer is not one
- * whose usage can be read (a failure, a body neither a stream nor JSON, a process that is not a CLI agent's).
+ * whose usage can be read (a failure, a body neither a stream nor JSON, a process that is not a CLI agent's). A stream
+ * the CLI cancels, or that fails, is recorded with the counts read so far (Anthropic's input is in its first event), once.
  */
 export const observeUsage = (response: Response, call: RelayCall, record: (entry: UsageEntry) => void): ReadableStream<Uint8Array> | null => {
   const body = response.body;
@@ -240,24 +237,45 @@ export const observeUsage = (response: Response, call: RelayCall, record: (entry
       reader.stop();
     }
   };
-  return body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        // The CLI's bytes first; the copy is read after.
-        controller.enqueue(chunk);
-        guarded(() => reader.push(chunk));
-      },
-      flush() {
-        guarded(() => {
-          reader.end();
-          const { model: named, ...tokens } = reader.counts;
-          // The id the request named wins over the answer's (which may be a dated version of it).
-          const model = call.modelId ?? named;
-          if (model === null) return;
-          const entry = usageEntryOf({ agent, endpointId: call.endpointId, modelId: model, at: call.at, session: call.session, ...tokens, costUsd: null });
-          if (entry !== undefined) record(entry);
-        });
-      },
-    }),
-  );
+  let recorded = false;
+  /** Records what was read, once: at the end, or what a cut stream had (never a cut JSON body: it does not parse). */
+  const finish = (whole: boolean) => {
+    if (recorded) return;
+    recorded = true;
+    guarded(() => {
+      if (whole) reader.end();
+      else if (!stream) return;
+      const { model: named, ...tokens } = reader.counts;
+      // The id the request named wins over the answer's (which may be a dated version of it).
+      const model = call.modelId ?? named;
+      if (model === null) return;
+      const entry = usageEntryOf({ agent, endpointId: call.endpointId, modelId: model, at: call.at, session: call.session, ...tokens, costUsd: null });
+      if (entry !== undefined) record(entry);
+    });
+  };
+  const upstream = body.getReader();
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      let next: ReadableStreamReadResult<Uint8Array>;
+      try {
+        next = await upstream.read();
+      } catch (error) {
+        finish(false);
+        controller.error(error);
+        return;
+      }
+      if (next.done) {
+        controller.close();
+        finish(true);
+        return;
+      }
+      // The CLI's bytes first; the copy is read after.
+      controller.enqueue(next.value);
+      guarded(() => reader.push(next.value));
+    },
+    cancel(reason) {
+      finish(false);
+      return upstream.cancel(reason);
+    },
+  });
 };

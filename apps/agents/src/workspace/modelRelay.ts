@@ -50,8 +50,8 @@ export interface ModelRelayDeps {
   readonly fetch: (request: Request) => Promise<Response>;
   readonly log: (event: Record<string, unknown>) => void;
   readonly now: () => number;
-  /** SPI-1173: records an answer's usage, read as it streams past (`relayUsage.ts`); absent, nothing is read. */
-  readonly usage?: (entry: UsageEntry) => void;
+  /** Records an answer's usage, read as it streams past (`relayUsage.ts`, SPI-1173). */
+  readonly usage: (entry: UsageEntry) => void;
 }
 
 /** Response headers not passed back: hop-by-hop ones and cookies. */
@@ -240,11 +240,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   log(upstream.status, grant, { dropped });
   const answer = new Headers();
   for (const [name, value] of upstream.headers) if (!DROPPED_RESPONSE.has(name)) answer.append(name, value);
-  const record = deps.usage;
-  const body =
-    record === undefined
-      ? upstream.body
-      : observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, record);
+  const body = observeUsage(upstream, { cli: grant.cli, endpointId, api: grant.target.api, modelId: routedModel, session: grant.handleId, at: started }, deps.usage);
   return new Response(body, { status: upstream.status, statusText: upstream.statusText, headers: answer });
 };
 

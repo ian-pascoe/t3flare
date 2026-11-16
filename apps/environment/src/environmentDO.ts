@@ -37,7 +37,6 @@ import { sealedStore } from "./credentials/sealed.ts";
 import { endpointStore, type EndpointStore } from "./endpoints/store.ts";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
 import { type ModelRelayTarget, relayTargetOf } from "@t3flare/models/relay";
-import { MAX_USAGE_ENTRIES } from "@t3flare/models/usage";
 import type { SkillsApiDeps } from "./skills/api.ts";
 import type { OwnerClients } from "./settings/clients.ts";
 import type { SettingsServerDeps } from "./settings/server.ts";
@@ -53,7 +52,7 @@ import type { BrowserRunBinding, BrowserRunFetcher } from "./preview/browserRun.
 import type { ContainerPreviewProps } from "./preview/containerPreviews.ts";
 import { closeLeftoverSessions } from "./preview/sessions.ts";
 import { previewStore } from "./preview/store.ts";
-import { usageStore } from "./usage/records.ts";
+import { acceptUsage, commissaryCountedCache, countedByCommissary, usageStore } from "./usage/records.ts";
 
 /** SPI-1163: the model the text-generation setting was last pointed at as its default. */
 const SEEDED_TEXT_MODEL_KEY = "t3flare:text-generation-default";
@@ -179,6 +178,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   readonly #processes: ProcessChannel;
   /** The Owner clients' table (settings/clients.ts), one per instance so its DDL runs once, not per request. */
   #ownerClients: OwnerClients | undefined;
+  /** The endpoints whose usage Commissary's log counts, by the endpoints' revision (SPI-1173, until SPI-1176). */
+  #commissaryCounted: ((endpoints: ModelEndpoints) => Promise<ReadonlySet<string>>) | undefined;
 
   constructor(ctx: DurableObjectState, env: EnvironmentEnv) {
     super(ctx, env);
@@ -488,14 +489,17 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /**
-   * Usage records (SPI-1173), RPC from the agents Worker: a Session's, text generation's or the model relay's, each a
-   * model answer's counts on a Model endpoint, kept for t3's Usage page (`usage/records.ts`). Entries that are not valid
-   * are dropped. Never boots t3.
+   * Usage records, RPC from the agents Worker (SPI-1173): a Session's, text generation's or the model relay's, each a
+   * model answer's counts on a Model endpoint, kept for t3's Usage page (`usage/records.ts` `acceptUsage`). Entries
+   * that are not valid are dropped, and so are those on an endpoint Commissary's log already counts. Never boots t3.
    */
-  async recordUsage(input: { readonly entries?: unknown }): Promise<{ readonly kept: number }> {
-    const entries = Array.isArray(input?.entries) ? input.entries.slice(0, MAX_USAGE_ENTRIES) : [];
+  async recordUsage(input: unknown): Promise<{ readonly kept: number }> {
     const { environmentServices } = await import("./agents/bindings.ts");
-    return { kept: environmentServices().usage.record(entries, this.#endpointStore().load(), Date.now()) };
+    const services = environmentServices();
+    this.#commissaryCounted ??= commissaryCountedCache((endpoints) =>
+      countedByCommissary(endpoints, async (id) => (await this.#endpointStore().resolve(id))?.apiKey, services.commissary?.principals ?? []),
+    );
+    return acceptUsage(input, { store: services.usage, endpoints: this.#endpointStore().load(), countedByCommissary: this.#commissaryCounted, now: () => Date.now() });
   }
 
   /**

@@ -8,9 +8,8 @@ import type { UsageEntry } from "@t3flare/models/usage";
 import { describe, expect, it } from "vitest";
 
 import { generateEndpointText } from "../src/endpointText.ts";
-import { durableUsage, SessionEndpoints } from "../src/session/endpoints.ts";
-import { proxyModels } from "../src/session/models.ts";
-import { mergeLists } from "@t3flare/models/catalog";
+import { usageSender } from "../src/environment.ts";
+import { SessionEndpoints } from "../src/session/endpoints.ts";
 
 const model = (id: string, cost: { input: number; output: number; cacheRead: number; cacheWrite: number }) => ({
   id,
@@ -106,20 +105,6 @@ describe("a Session's usage records", () => {
     expect(recorded).toHaveLength(1);
   });
 
-  it("records an answer on the Model proxy too, under its own id (`anthropic`), until the hard cut", async () => {
-    const recorded: Array<UsageEntry> = [];
-    const catalog = { models: mergeLists([{ id: "claude-haiku-5-5" }], undefined), fetchedAt: 1 };
-    const models = proxyModels(
-      { url: "https://proxy.example", apiKey: "cms_key" },
-      () => catalog,
-      (async () => answer("claude-haiku-5-5", { input_tokens: 20, output_tokens: 4 })) as unknown as typeof fetch,
-      durableUsage({ session: () => "session-9", record: (entry) => void recorded.push(entry) }, () => 1),
-    );
-    await models.completeSimple(models.getModel("anthropic", "claude-haiku-5-5")!, { messages: [{ role: "user", content: "hi", timestamp: 0 }] });
-    await settle();
-    expect(recorded).toMatchObject([{ agent: "durable", endpointId: "anthropic", modelId: "claude-haiku-5-5", session: "session-9", input: 20, output: 4 }]);
-  });
-
   it("text generation records its own answer, under text generation", async () => {
     const recorded: Array<UsageEntry> = [];
     const result = await generateEndpointText(
@@ -133,5 +118,34 @@ describe("a Session's usage records", () => {
     );
     expect(result).toEqual({ ok: true, text: "ok" });
     expect(recorded).toMatchObject([{ agent: "text-generation", endpointId: "gw", modelId: "claude-haiku-5-5", session: "", input: 50, output: 6 }]);
+  });
+});
+
+describe("the usage sender every recorder uses (the Session, text generation, the relay's WorkspaceProxy)", () => {
+  const entry: UsageEntry = { agent: "codex", endpointId: "gw", modelId: "m", at: 1, session: "proc-1", input: 1, cacheRead: 0, cacheWrite: 0, output: 1, reasoning: 0, costUsd: null };
+
+  it("sends the record to the Environment's recordUsage, kept alive by waitUntil", async () => {
+    const sent: Array<unknown> = [];
+    const kept: Array<Promise<unknown>> = [];
+    usageSender({ waitUntil: (promise) => void kept.push(promise) }, () => ({ recordUsage: async (input) => (sent.push(input), { kept: 1 }) }))(entry);
+    await Promise.all(kept);
+    expect(sent).toEqual([{ entries: [entry] }]);
+    expect(kept).toHaveLength(1);
+  });
+
+  it("loses only the record when the send fails, and logs its names, never a value", async () => {
+    const lines: Array<string> = [];
+    const kept: Array<Promise<unknown>> = [];
+    const ctx = { waitUntil: (promise: Promise<unknown>) => void kept.push(promise) };
+    usageSender(ctx, () => ({ recordUsage: () => Promise.reject(new TypeError("sk-secret in a message")) }), (line) => void lines.push(line))(entry);
+    usageSender(ctx, () => {
+      throw new Error("no binding");
+    }, (line) => void lines.push(line))(entry);
+    await Promise.all(kept);
+    expect(lines.map((line) => JSON.parse(line))).toEqual([
+      { t3flare: "usage-record-failed", agent: "codex", endpoint: "gw", error: "TypeError" },
+      { t3flare: "usage-record-failed", agent: "codex", endpoint: "gw", error: "Error" },
+    ]);
+    expect(lines.join("")).not.toContain("sk-secret");
   });
 });
