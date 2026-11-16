@@ -69,7 +69,7 @@ export const claudeModelsOf = (proxy: ReadonlyArray<ServerProviderModel>, endpoi
     const group = (labels.get(endpoint.label) ?? 0) > 1 ? `${endpoint.label} · ${endpoint.id}` : endpoint.label;
     return endpoint.models.map((model) => ({ slug: endpointSlug(endpoint.id, model.id), name: model.name, subProvider: group, isCustom: false, capabilities: acpModelCapabilities(model.reasoning) }));
   });
-  // The picker's default for a new thread: the first, so it is never a proxy model t3 keeps listed (U70).
+  // The picker's default for a new thread: the first, so it is never a proxy model t3 keeps listed (U75).
   return listed.map((model, at) => (at === 0 ? { ...model, isDefault: true } : model));
 };
 
