@@ -25,7 +25,7 @@ import {
   signInRequestTarget,
   targetOf,
 } from "@t3flare/models/endpoints";
-import { type LimitReading, limitReadingOf } from "@t3flare/models/limits";
+import { type LimitReading, noteLimitReading } from "@t3flare/models/limits";
 import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 
 import { credentialFailure } from "./credentialFailure.ts";
@@ -228,12 +228,7 @@ const refusalWatch = (fetch: FetchFunction, onRefused: () => void): FetchFunctio
 export const limitWatch = (fetch: FetchFunction, endpointId: string, limits: (reading: LimitReading) => void, now: () => number = Date.now): FetchFunction =>
   (async (input: Parameters<FetchFunction>[0], init?: Parameters<FetchFunction>[1]) => {
     const response = await fetch(input, init);
-    try {
-      const reading = limitReadingOf(endpointId, response.headers, now());
-      if (reading !== undefined) limits(reading);
-    } catch {
-      // A reading that fails is lost; the answer is not.
-    }
+    noteLimitReading(endpointId, response.headers, now(), limits);
     return response;
   }) as FetchFunction;
 

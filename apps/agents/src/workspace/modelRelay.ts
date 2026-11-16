@@ -22,7 +22,9 @@
 // then judges the endpoint as it judges one in the path.
 import { ENDPOINT_ID, isSignIn } from "@t3flare/models/endpoints";
 import { describeFailure, type DescribedFailure, failureHeaders, readBody } from "@t3flare/models/failures";
+import { type LimitReading, noteLimitReading } from "@t3flare/models/limits";
 import { redactSecrets } from "@t3flare/models/redact";
+import type { UsageEntry } from "@t3flare/models/usage";
 import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import { credentialHeaderFor, forwardedHeadersOf, KEY_HEADERS, MODEL_RELAY_PREFIX, MODEL_ROUTED_ID, type ModelRelayTarget, type RelaySignInRefusal, type RelayTarget } from "@t3flare/models/relay";
 import { HANDLE } from "@t3flare/workspace-client";
@@ -32,8 +34,6 @@ import { oversizedError, RELAY_ERROR_BODY_BYTES, sseErrors } from "./relayFailur
 import { declaredLength, MAX_ROUTED_BODY_BYTES, readCapped, type RoutedBody, routeBody } from "./routedBody.ts";
 import { signInBody, signInPathRefusal, signInRefusal, signInRequest, tokenLogHashPrefix } from "./relaySignIns.ts";
 import { observeUsage } from "./relayUsage.ts";
-import type { UsageEntry } from "@t3flare/models/usage";
-import { type LimitReading, limitReadingOf } from "@t3flare/models/limits";
 
 export { MAX_ROUTED_BODY_BYTES } from "./routedBody.ts";
 
@@ -77,7 +77,7 @@ export interface ModelRelayDeps {
    * SPI-1174: the limit windows each endpoint answer's headers report (a failed answer's too), for t3's limit meters.
    * Read as the answer's headers arrive, before the CLI has it; never in its way.
    */
-  readonly limits?: (reading: LimitReading) => void;
+  readonly limits: (reading: LimitReading) => void;
   /**
    * SPI-1172: the process's last answer, for the Workspace DO: its classified failure, or null for a success or an error
    * the table does not know (the last answer always wins). Never fails the request.
@@ -92,7 +92,7 @@ export interface WorkspaceRelayRpc {
 }
 
 /** The relay's deps in `WorkspaceProxy`: the Workspace DO's check, and each answer reported to it before the CLI has it. */
-export const workspaceRelayDeps = (rpc: WorkspaceRelayRpc, io: Pick<ModelRelayDeps, "fetch" | "log" | "now" | "usage"> & Required<Pick<ModelRelayDeps, "limits">>): ModelRelayDeps => ({
+export const workspaceRelayDeps = (rpc: WorkspaceRelayRpc, io: Pick<ModelRelayDeps, "fetch" | "log" | "now" | "usage" | "limits">): ModelRelayDeps => ({
   ...io,
   authorize: (input) => rpc.modelRelay(input),
   outcome: async (handleId, failure) => {
@@ -314,7 +314,7 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
     return plain(502, `the Model endpoint ${endpointId} redirected (HTTP ${upstream.status}); the relay follows no redirect: fix its base URL`);
   }
   // SPI-1174: the endpoint's limit windows, as this answer's headers report them (a refused limit's too).
-  noteLimits(endpointId, upstream.headers, deps);
+  noteLimitReading(endpointId, upstream.headers, deps.now(), deps.limits);
   const answer = new Headers();
   for (const [name, value] of upstream.headers) if (!DROPPED_RESPONSE.has(name)) answer.append(name, value);
   const endpoint = grant.target;
@@ -358,17 +358,6 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   answer.delete("content-length");
   answer.delete("content-encoding");
   return new Response(redact(text), { status: upstream.status, statusText: upstream.statusText, headers: answer });
-};
-
-/** The reading of an answer's limit headers to `deps.limits`; a reading that fails is lost, never the answer. */
-const noteLimits = (endpointId: string, headers: Headers, deps: Pick<ModelRelayDeps, "limits" | "now">): void => {
-  if (deps.limits === undefined) return;
-  try {
-    const reading = limitReadingOf(endpointId, headers, deps.now());
-    if (reading !== undefined) deps.limits(reading);
-  } catch {
-    // Lost; the answer goes on.
-  }
 };
 
 /** The values the endpoint's credential header carries (a bearer's token too), to redact wherever an answer echoes them. */

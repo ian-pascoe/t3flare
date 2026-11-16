@@ -29,6 +29,7 @@ const harness = (options: { grant?: ModelRelayGrant; upstream?: (request: Reques
   const logs: Array<Record<string, unknown>> = [];
   let now = 1_000;
   const deps: ModelRelayDeps = {
+    limits: () => undefined,
     authorize: async (input) => {
       asked.push(input);
       if (options.authorizeFails === true) throw new Error("rpc broke");

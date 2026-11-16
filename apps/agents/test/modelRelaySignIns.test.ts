@@ -40,6 +40,7 @@ const harness = (grants: ReadonlyArray<ModelRelayGrant>, upstream?: (request: Re
   let asked = 0;
   let now = 1_000_000;
   const deps: ModelRelayDeps = {
+    limits: () => undefined,
     authorize: async (input) => (input.endpointId === null ? { kind: "known", handleId: "proc-7", cli: "claude", workspace: "ws-1" } : grants[Math.min(asked++, grants.length - 1)]!),
     fetch: async (request) => {
       sent.push({ url: request.url, headers: Object.fromEntries(request.headers.entries()), text: await request.text() });

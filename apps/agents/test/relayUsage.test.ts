@@ -51,6 +51,7 @@ const relay = async (options: {
   const recorded: Array<UsageEntry> = [];
   const grant = grantOf(options.api, options.cli);
   const deps: ModelRelayDeps = {
+    limits: () => undefined,
     authorize: async (input) => (input.endpointId === null ? { kind: "known", handleId: "proc-1", cli: grant.kind === "granted" ? grant.cli : "codex", workspace: "ws-1" } : grant),
     fetch: async () => new Response(pieces(options.body, options.size ?? 7), { status: options.status ?? 200, headers: { "content-type": options.contentType ?? "text/event-stream" } }),
     log: () => undefined,
@@ -183,6 +184,7 @@ describe("the model relay's usage records", () => {
     const upstream = new ReadableStream<Uint8Array>({ start: (controller) => void (push = controller) });
     const recorded: Array<UsageEntry> = [];
     const deps: ModelRelayDeps = {
+      limits: () => undefined,
       authorize: async () => grantOf("anthropic-messages", "claude"),
       fetch: async () => new Response(upstream, { status: 200, headers: { "content-type": "text/event-stream" } }),
       log: () => undefined,
@@ -205,6 +207,7 @@ describe("the model relay's usage records", () => {
       cancel: (reason) => void cancelled.push(reason),
     });
     const deps: ModelRelayDeps = {
+      limits: () => undefined,
       authorize: async () => grantOf("anthropic-messages", "claude"),
       fetch: async () => new Response(upstream, { status: 200, headers: { "content-type": "text/event-stream" } }),
       log: () => undefined,
@@ -223,6 +226,7 @@ describe("the model relay's usage records", () => {
     const upstream = new ReadableStream<Uint8Array>({ start: (controller) => void (push = controller) });
     const recorded: Array<UsageEntry> = [];
     const deps: ModelRelayDeps = {
+      limits: () => undefined,
       authorize: async () => grantOf("openai-completions", "pi"),
       fetch: async () => new Response(upstream, { status: 200, headers: { "content-type": "text/event-stream" } }),
       log: () => undefined,
@@ -246,6 +250,7 @@ describe("the model relay's usage records", () => {
   it("never lets a failing record break the answer", async () => {
     const body = sse([{ type: "response.completed", response: { model: "m", usage: { input_tokens: 3, output_tokens: 1 } } }]);
     const deps: ModelRelayDeps = {
+      limits: () => undefined,
       authorize: async () => grantOf("openai-responses"),
       fetch: async () => new Response(pieces(body, 5), { status: 200, headers: { "content-type": "text/event-stream" } }),
       log: () => undefined,
@@ -263,6 +268,7 @@ describe("the model relay's usage records", () => {
     const upstream = new ReadableStream<Uint8Array>({ start: (controller) => void (push = controller) });
     const recorded: Array<UsageEntry> = [];
     const deps: ModelRelayDeps = {
+      limits: () => undefined,
       authorize: async () => grantOf("anthropic-messages", "claude"),
       fetch: async () => new Response(upstream, { status: 200, headers: { "content-type": "text/event-stream" } }),
       log: () => undefined,

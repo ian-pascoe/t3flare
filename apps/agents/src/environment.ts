@@ -8,8 +8,8 @@ import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client
 import type { GlobalMiseReport, McpRelayAnswer, McpRelayInput, ResolvedEnvironment, ResolvedHarness } from "@t3flare/harness-registry";
 import type { SkillSet } from "@t3flare/skills";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
-import type { ModelRelayTarget } from "@t3flare/models/relay";
 import type { LimitReading } from "@t3flare/models/limits";
+import type { ModelRelayTarget } from "@t3flare/models/relay";
 import type { UsageEntry } from "@t3flare/models/usage";
 import type { McpCallAnswer, McpView } from "./extensions/mcp.ts";
 
@@ -76,38 +76,41 @@ export interface EnvironmentRpc {
  * What every recorder of usage sends a record with (SPI-1173): the Environment's `recordUsage`, after the answer, kept
  * alive by `waitUntil`. A failed send loses that record only, and is logged by the record's names, never a value.
  */
-export const usageSender = (ctx: { waitUntil(promise: Promise<unknown>): void }, environment: () => Pick<EnvironmentRpc, "recordUsage">, warn: (line: string) => void = console.warn) =>
-  sender(ctx, warn, (entry: UsageEntry) => ({
-    send: () => environment().recordUsage({ entries: [entry] }),
-    failed: { t3flare: "usage-record-failed", agent: entry.agent, endpoint: entry.endpointId },
-  }));
-
-/**
- * What every reader of limit headers sends a reading with (SPI-1174), as `usageSender` sends a usage record: the
- * Environment's `recordLimits`, after the answer's headers, kept alive by `waitUntil`; a failed send loses that reading
- * only, logged by its endpoint.
- */
-export const limitsSender = (ctx: { waitUntil(promise: Promise<unknown>): void }, environment: () => Pick<EnvironmentRpc, "recordLimits">, warn: (line: string) => void = console.warn) =>
-  sender(ctx, warn, (reading: LimitReading) => ({
-    send: () => environment().recordLimits({ readings: [reading] }),
-    failed: { t3flare: "limit-reading-failed", endpoint: reading.endpointId },
-  }));
-
-/** One record sent to the Environment under `waitUntil`; a failure is logged by the names `failed` holds, never a value. */
-const sender =
-  <T>(ctx: { waitUntil(promise: Promise<unknown>): void }, warn: (line: string) => void, of: (value: T) => { readonly send: () => Promise<unknown>; readonly failed: Record<string, string> }) =>
-  (value: T): void => {
-    const { send, failed } = of(value);
+export const usageSender =
+  (ctx: { waitUntil(promise: Promise<unknown>): void }, environment: () => Pick<EnvironmentRpc, "recordUsage">, warn: (line: string) => void = console.warn) =>
+  (entry: UsageEntry): void => {
     let sent: Promise<unknown>;
     try {
-      sent = send();
+      sent = environment().recordUsage({ entries: [entry] });
     } catch (error) {
       sent = Promise.reject(error);
     }
     ctx.waitUntil(
       sent.then(
         () => undefined,
-        (error: unknown) => warn(JSON.stringify({ ...failed, error: error instanceof Error ? error.name : "error" })),
+        (error: unknown) => warn(JSON.stringify({ t3flare: "usage-record-failed", agent: entry.agent, endpoint: entry.endpointId, error: error instanceof Error ? error.name : "error" })),
+      ),
+    );
+  };
+
+/**
+ * What every reader of limit headers sends a reading with (SPI-1174), as `usageSender` sends a usage record: the
+ * Environment's `recordLimits`, after the answer's headers, kept alive by `waitUntil`. A failed send loses that reading
+ * only, and is logged by its endpoint, never a value.
+ */
+export const limitsSender =
+  (ctx: { waitUntil(promise: Promise<unknown>): void }, environment: () => Pick<EnvironmentRpc, "recordLimits">, warn: (line: string) => void = console.warn) =>
+  (reading: LimitReading): void => {
+    let sent: Promise<unknown>;
+    try {
+      sent = environment().recordLimits({ readings: [reading] });
+    } catch (error) {
+      sent = Promise.reject(error);
+    }
+    ctx.waitUntil(
+      sent.then(
+        () => undefined,
+        (error: unknown) => warn(JSON.stringify({ t3flare: "limit-reading-failed", endpoint: reading.endpointId, error: error instanceof Error ? error.name : "error" })),
       ),
     );
   };
