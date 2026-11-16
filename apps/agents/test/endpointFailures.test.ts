@@ -93,6 +93,7 @@ const openSession = async (
     kv: { get: <T>(key: string) => map.get(key) as T | undefined, put: (key, value) => void map.set(key, value) },
     models,
     fetch: recorder.fetch,
+    usage: { session: () => "s", record: () => undefined },
     readMs: 50,
     now: () => now,
     source: () => ({ modelEndpoints: async () => ({ revision: 1, endpoints }), endpointCredential: async () => ({ apiKey: "key-for-tests-only" }) }),

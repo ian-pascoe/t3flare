@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { ENDPOINT_ID } from "@t3flare/models/endpoints";
 import { MODEL_ROUTED_ID, modelRoutedRelayUrl } from "@t3flare/models/relay";
 
-import { oversizedError, RELAY_ERROR_BODY_BYTES, RelayFailures } from "../src/workspace/relayFailures.ts";
+import { oversizedError, RELAY_ERROR_BODY_BYTES, RelayFailures, sseErrors } from "../src/workspace/relayFailures.ts";
 import { workspaceRelayDeps } from "../src/workspace/modelRelay.ts";
 import { authorizeModelRelay, handleModelRelay, isModelRelayPath, MAX_ROUTED_BODY_BYTES, type ModelRelayDeps, type ModelRelayGrant } from "../src/workspace/modelRelay.ts";
 
@@ -627,7 +627,7 @@ describe("WorkspaceProxy's relay deps (SPI-1172, review 2)", () => {
           release = resolve;
         }),
     };
-    const deps = workspaceRelayDeps(rpc, { fetch: async () => new Response('{"error":{"code":"insufficient_quota"}}', { status: 429 }), log: () => undefined, now: () => 1 });
+    const deps = workspaceRelayDeps(rpc, { fetch: async () => new Response('{"error":{"code":"insufficient_quota"}}', { status: 429 }), log: () => undefined, now: () => 1, usage: () => undefined });
     const answered = handleModelRelay(post("{}"), deps).then(() => order.push("answered"));
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(order).toEqual(["reported proc-1 failure"]);
@@ -643,5 +643,37 @@ describe("the over-cap replacement in each API's own error shape (SPI-1172, revi
     expect(JSON.parse(oversizedError("openai-completions", 400))).toMatchObject({ error: { type: "invalid_request_error", code: null } });
     expect(JSON.parse(oversizedError("google-generative-ai", 503))).toMatchObject({ error: { code: 503, status: "INTERNAL" } });
     expect(JSON.parse(oversizedError("mistral-conversations", 400))).toMatchObject({ object: "error", type: "invalid_request_error", code: "400" });
+  });
+});
+
+describe("a stream's error events, held only while a line may be one (SPI-1172, rebased on SPI-1173)", () => {
+  const run = async (pieces: ReadonlyArray<string>) => {
+    const reported: Array<string> = [];
+    const emitted: Array<string> = [];
+    const writer = sseErrors(
+      (text) => text.replace(KEY, "[redacted]"),
+      (body) => void reported.push(body),
+    );
+    const reading = (async () => {
+      const reader = writer.readable.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        emitted.push(new TextDecoder().decode(value));
+      }
+    })();
+    const w = writer.writable.getWriter();
+    for (const piece of pieces) await w.write(new TextEncoder().encode(piece));
+    await w.close();
+    await reading;
+    return { reported, emitted };
+  };
+
+  it("an error event cut across pieces is held to its end, redacted and reported; other lines go on piece by piece", async () => {
+    const { reported, emitted } = await run(['data: {"type":"message_st', 'art"}\n\ndata: {"type":"err', `or","error":{"type":"overloaded_error","message":"${KEY}"}}\n\n`]);
+    expect(emitted[0]).toBe('data: {"type":"message_st');
+    expect(emitted.join("")).not.toContain(KEY);
+    expect(emitted.join("")).toContain('"overloaded_error"');
+    expect(reported).toHaveLength(1);
   });
 });

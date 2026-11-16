@@ -19,7 +19,7 @@ const grantOf = (api: EndpointApi, cli = "codex"): ModelRelayGrant => ({
   handleId: "proc-1",
   cli,
   workspace: "ws-1",
-  target: { api, baseUrl: "https://api.example.com/v1", headers: { authorization: `Bearer ${KEY}` } },
+  target: { api, auth: "api-key", baseUrl: "https://api.example.com/v1", headers: { authorization: `Bearer ${KEY}` } },
 });
 
 const sse = (events: ReadonlyArray<unknown>, named = false): string =>

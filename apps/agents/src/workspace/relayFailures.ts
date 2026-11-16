@@ -55,39 +55,65 @@ export const streamErrorBody = (data: string): string | undefined => {
 };
 
 /**
- * A stream's bytes passed through as they come, a line at a time: a `data:` line holding an error event is redacted
- * (`redact`) and reported (`onError`, with the event as an error body). Every other byte goes on unchanged; a line's end
- * is awaited before it goes on, and what is left at the stream's end is flushed.
+ * The openings of a `data:` line whose event may be an error: Anthropic's and OpenAI Responses' `{"type":"error"`,
+ * Responses' `{"type":"response.failed"`, a Completions chunk's `{"error"`. Vendors send compact JSON; a line that opens
+ * otherwise is no error event and goes on as it comes.
+ */
+const ERROR_OPENINGS = ['data: {"type":"error"', 'data:{"type":"error"', 'data: {"type":"response.failed"', 'data:{"type":"response.failed"', 'data: {"error"', 'data:{"error"'];
+
+/**
+ * A stream passed through as it comes (SPI-1173's usage reader and the CLI never wait for a line's end), but for a line
+ * that opens as an error event (`ERROR_OPENINGS`): that line is held to its end, redacted (`redact`) and reported
+ * (`onError`, with the event as an error body). A line is held only while its opening could still be one of them.
  */
 export const sseErrors = (redact: (text: string) => string, onError: (body: string) => Promise<void> | void): TransformStream<Uint8Array, Uint8Array> => {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  let pending = "";
-  /** A line as it goes on: an error event's redacted, after its report. */
-  const line = async (text: string): Promise<string> => {
-    if (!text.startsWith("data:")) return text;
-    const body = streamErrorBody(text.slice(5).trim());
+  /** The current line's text not yet passed on, and whether it is passing (decided not to be an error event). */
+  let held = "";
+  let passing = false;
+  /** Whether `text`, the start of a line, could still open an error event, or does. */
+  const mayBeError = (text: string) => ERROR_OPENINGS.some((opening) => opening.startsWith(text) || text.startsWith(opening));
+  /** A complete held line as it goes on: an error event's redacted, after its report. */
+  const finished = async (text: string): Promise<string> => {
+    const body = text.startsWith("data:") ? streamErrorBody(text.slice(5).trim()) : undefined;
     if (body === undefined) return text;
     await onError(body);
     return redact(text);
   };
-  const lines = async (text: string): Promise<string> => {
-    const out: Array<string> = [];
-    for (const each of text.split("\n")) out.push(await line(each));
-    return out.join("\n");
+  const take = async (text: string): Promise<string> => {
+    let out = "";
+    let rest = text;
+    while (rest !== "") {
+      const end = rest.indexOf("\n");
+      const piece = end === -1 ? rest : rest.slice(0, end);
+      rest = end === -1 ? "" : rest.slice(end + 1);
+      if (passing) out += piece;
+      else {
+        held += piece;
+        if (!mayBeError(held)) {
+          passing = true;
+          out += held;
+          held = "";
+        }
+      }
+      if (end === -1) break;
+      // The line ends: a held one is finished, and the next line starts undecided.
+      if (!passing) out += await finished(held);
+      out += "\n";
+      held = "";
+      passing = false;
+    }
+    return out;
   };
   return new TransformStream({
     transform: async (chunk, controller) => {
-      pending += decoder.decode(chunk, { stream: true });
-      const end = pending.lastIndexOf("\n");
-      if (end === -1) return;
-      const complete = pending.slice(0, end + 1);
-      pending = pending.slice(end + 1);
-      controller.enqueue(encoder.encode(await lines(complete)));
+      const out = await take(decoder.decode(chunk, { stream: true }));
+      if (out !== "") controller.enqueue(encoder.encode(out));
     },
     flush: async (controller) => {
-      pending += decoder.decode();
-      if (pending !== "") controller.enqueue(encoder.encode(await line(pending)));
+      const out = (await take(decoder.decode())) + (passing || held === "" ? "" : await finished(held));
+      if (out !== "") controller.enqueue(encoder.encode(out));
     },
   });
 };
@@ -110,7 +136,7 @@ const weight = (failure: EndpointFailureRecord): number => (failure.stop ? 2 : 1
  *   succeeded is forgotten;
  * - a turn's start forgets it, so a turn never reads an earlier turn's.
  *
- * What it cannot tell apart (U79): a background request's stop during the turn becomes the record, and a stop the CLI
+ * What it cannot tell apart (U80): a background request's stop during the turn becomes the record, and a stop the CLI
  * later got past (its own retry after a reset) stays until the turn ends.
  */
 export class RelayFailures {
