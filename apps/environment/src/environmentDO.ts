@@ -420,7 +420,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       skills: this.#skillsApi(),
       endpoints: {
         store: this.#endpointStore(),
-        discover: async (target, apiKey) => (await import("./endpoints/discover.ts")).discoverModels(target, apiKey),
+        discover: async (target, apiKey, signIn) => (await import("./endpoints/discover.ts")).discoverModels(target, apiKey, (input, init) => fetch(input, init), signIn),
         changed: () => void import("./endpoints/changes.ts").then(({ endpointsChanged }) => endpointsChanged()),
         signIns: this.#credentialBroker(),
         signedOut: (endpointId) => this.#stopSessionsOn(endpointId),

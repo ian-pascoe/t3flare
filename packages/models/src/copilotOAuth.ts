@@ -35,8 +35,11 @@ export const COPILOT_LIST_HEADERS: Readonly<Record<string, string>> = { "X-GitHu
 /** Where a Copilot token without a proxy endpoint is sent (pi-ai's fallback for github.com). */
 export const COPILOT_DEFAULT_BASE_URL = "https://api.individual.githubcopilot.com";
 
-/** A Copilot API host: GitHub Copilot's own domain only, so a token never goes elsewhere whatever it names. */
-const COPILOT_HOST = /^(?:[a-z0-9-]+\.)+githubcopilot\.com$/;
+/**
+ * A Copilot API base URL: https on GitHub Copilot's own domain only, so a token never goes elsewhere whatever it names.
+ * The one rule both the Credential broker (`copilotBaseUrl`) and the Session (`SignInKind.credentialBaseUrl`) apply.
+ */
+export const COPILOT_BASE_URL = /^https:\/\/(?:[a-z0-9-]+\.)+githubcopilot\.com$/;
 
 /**
  * A Copilot token's API base URL, pi-ai's way: its `proxy-ep=proxy.<x>` field read as `https://api.<x>`, else the
@@ -46,5 +49,6 @@ export const copilotBaseUrl = (token: string): string | undefined => {
   const match = /proxy-ep=([^;]+)/.exec(token);
   if (match === null) return COPILOT_DEFAULT_BASE_URL;
   const host = match[1]!.trim().toLowerCase().replace(/^proxy\./, "api.");
-  return COPILOT_HOST.test(host) ? `https://${host}` : undefined;
+  const url = `https://${host}`;
+  return COPILOT_BASE_URL.test(url) ? url : undefined;
 };

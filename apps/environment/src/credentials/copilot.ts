@@ -22,9 +22,10 @@
 //   so `revoke` sends nothing and never confirms. Sign-out deletes the tokens here; the grant stays on the owner's
 //   GitHub account until the owner revokes it at github.com, under Settings, Applications.
 // - What ends the sign-in at a renewal: a 400, 401 or 403 whose body is an error object (GitHub's `{ message }` or an
-//   OAuth error) and which is not a rate limit (`retry-after`, or `x-ratelimit-remaining: 0`): the GitHub token was
-//   revoked, or the account has no Copilot plan any more. Anything else (an edge's page, a 5xx, a rate limit, no
-//   answer) is passing trouble, retried at the next use (ADR-0018 item 11, after SPI-1165's rule, item 10).
+//   OAuth error) and which is not a rate limit (`retry-after`, `x-ratelimit-remaining: 0`, or a message naming a rate
+//   limit or too many sign-in attempts, GitHub's secondary limits): the GitHub token was revoked, or the account has no
+//   Copilot plan any more. Anything else (an edge's page, a 5xx, a rate limit, no answer) is passing trouble, retried
+//   at the next use (ADR-0018 item 11, after SPI-1165's rule, item 10).
 //
 // Every failure is one of our fixed texts: never a token, the device code, or GitHub's body.
 import {
@@ -78,6 +79,13 @@ const FORM = { accept: "application/json", "content-type": "application/x-www-fo
 
 const positive = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
 
+/** GitHub's poll interval (seconds) as ms, never below a second; `fallback` when it names none. */
+const intervalOf = (seconds: unknown, fallback: number): number => (positive(seconds) ? Math.max(MIN_INTERVAL_MS, Math.floor(seconds * 1000)) : fallback);
+
+/** The shape of a code from GitHub that a text may name (`invalid_grant`, `subscription_ended`): never anything else of a body. */
+const CODE = /^[a-z_]{1,64}$/;
+const codeOf = (value: unknown): string | undefined => (typeof value === "string" && CODE.test(value) ? value : undefined);
+
 /** A new attempt: GitHub's device page and code for the owner, and what the polls need, kept sealed. */
 export const startCopilotSignIn = async (vendor: CopilotVendor): Promise<{ readonly authorizeUrl: string; readonly pending: PendingCopilotSignIn; readonly device: DeviceCode }> => {
   let response: Response;
@@ -115,7 +123,7 @@ export const startCopilotSignIn = async (vendor: CopilotVendor): Promise<{ reado
     throw new Error("GitHub's answer to the device sign-in was not usable: start it again.");
   }
   const now = vendor.now();
-  const intervalMs = positive(interval) ? Math.max(MIN_INTERVAL_MS, Math.floor(interval * 1000)) : DEFAULT_INTERVAL_MS;
+  const intervalMs = intervalOf(interval, DEFAULT_INTERVAL_MS);
   const pending: PendingCopilotSignIn = {
     deviceCode: device_code,
     userCode: user_code,
@@ -129,25 +137,38 @@ export const startCopilotSignIn = async (vendor: CopilotVendor): Promise<{ reado
   return { authorizeUrl: pending.verificationUri, pending, device: { userCode: user_code, expiresAt: pending.expiresAt, intervalSeconds: intervalMs / 1000 } };
 };
 
-/** GitHub's error object (its API's `{ message }`, or an OAuth error) and a code from it, never the rest of the body. */
-const githubErrorOf = async (response: Response): Promise<{ readonly errorObject: boolean; readonly code: string | undefined }> => {
+/**
+ * A GitHub rate limit's message: its secondary limits ("You have exceeded a secondary rate limit"), its primary ("API
+ * rate limit exceeded") and its sign-in throttle ("Maximum number of login attempts exceeded", "too many requests").
+ */
+const RATE_LIMIT_MESSAGE = /rate limit|too many|login attempts/i;
+
+/**
+ * GitHub's error object (its API's `{ message }`, or an OAuth error), a code from it, and whether its message names a
+ * rate limit; never the rest of the body.
+ */
+const githubErrorOf = async (response: Response): Promise<{ readonly errorObject: boolean; readonly code: string | undefined; readonly rateLimit: boolean }> => {
   let body: unknown;
   try {
     body = JSON.parse(await response.text());
   } catch {
-    return { errorObject: false, code: undefined };
+    return { errorObject: false, code: undefined, rateLimit: false };
   }
-  if (!isRecord(body)) return { errorObject: false, code: undefined };
-  const named = (value: unknown): string | undefined => (typeof value === "string" && /^[a-z_]{1,64}$/.test(value) ? value : undefined);
+  if (!isRecord(body)) return { errorObject: false, code: undefined, rateLimit: false };
   const details = isRecord(body.error_details) ? body.error_details : undefined;
   return {
     errorObject: typeof body.message === "string" || typeof body.error === "string",
-    code: named(body.error) ?? named(details?.notification_id),
+    code: codeOf(body.error) ?? codeOf(details?.notification_id),
+    rateLimit: typeof body.message === "string" && RATE_LIMIT_MESSAGE.test(body.message),
   };
 };
 
-/** GitHub's rate limits answer 403 or 429 with `retry-after` or no requests left: passing, never a refusal. */
-const rateLimited = (response: Response): boolean => response.headers.get("retry-after") !== null || response.headers.get("x-ratelimit-remaining") === "0";
+/**
+ * GitHub's rate limits answer 403 or 429 with `retry-after`, no requests left, or (a secondary limit) only a message
+ * naming it: passing, never a refusal.
+ */
+const rateLimited = (response: Response, rateLimitMessage: boolean): boolean =>
+  rateLimitMessage || response.headers.get("retry-after") !== null || response.headers.get("x-ratelimit-remaining") === "0";
 
 type CopilotToken =
   | { readonly ok: true; readonly token: string; readonly expires: number }
@@ -166,8 +187,8 @@ const copilotToken = async (vendor: CopilotVendor, githubToken: string): Promise
     return { ok: false, refused: false, problem: "GitHub's Copilot token endpoint could not be reached" };
   }
   if (!response.ok) {
-    const { errorObject, code } = await githubErrorOf(response);
-    const refused = [400, 401, 403].includes(response.status) && errorObject && !rateLimited(response);
+    const { errorObject, code, rateLimit } = await githubErrorOf(response);
+    const refused = [400, 401, 403].includes(response.status) && errorObject && !rateLimited(response, rateLimit);
     return {
       ok: false,
       refused,
@@ -186,7 +207,8 @@ const copilotToken = async (vendor: CopilotVendor, githubToken: string): Promise
   return { ok: true, token: body.token, expires: body.expires_at * 1000 };
 };
 
-const LEFT = " It could not be revoked here: revoke it at github.com, under Settings, Applications.";
+/** After GitHub issued its token but the sign-in did not keep it: nothing is stored, and only the owner can revoke it. */
+const LEFT = " Nothing was kept here; GitHub offers this app no revocation, so the approval stays on your GitHub account until you revoke it at github.com, under Settings, Applications.";
 const LAPSED = "GitHub's code lapsed before it was approved: start the sign-in again.";
 
 /**
@@ -221,15 +243,17 @@ export const pollCopilotSignIn = async (vendor: CopilotVendor, pending: PendingC
       case "authorization_pending":
         return wait(waiting);
       case "slow_down":
-        return wait(waiting, positive(body.interval) ? Math.max(MIN_INTERVAL_MS, Math.floor(body.interval * 1000)) : pending.intervalMs + SLOW_DOWN_MS);
+        return wait(waiting, intervalOf(body.interval, pending.intervalMs + SLOW_DOWN_MS));
       case "expired_token":
         return { ok: false, problem: LAPSED, spent: true };
       case "access_denied":
         return { ok: false, problem: "The sign-in was declined at GitHub: start it again to retry.", spent: true };
-      default:
-        return typeof body.error === "string" && /^[a-z_]{1,64}$/.test(body.error)
-          ? { ok: false, problem: `GitHub refused the device sign-in (${body.error}): start it again.`, spent: true }
+      default: {
+        const code = codeOf(body.error);
+        return code !== undefined
+          ? { ok: false, problem: `GitHub refused the device sign-in (${code}): start it again.`, spent: true }
           : wait("GitHub's answer to the sign-in's poll was not usable: still waiting.");
+      }
     }
   }
   const githubToken = body.access_token;

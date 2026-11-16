@@ -22,6 +22,7 @@ import {
   ENDPOINT_APIS,
   ENDPOINT_ID,
   ENDPOINT_PRESETS,
+  isDeviceSignIn,
   isRecord,
   isSignIn,
   type ModelEndpoint,
@@ -43,7 +44,7 @@ import { type EndpointStore, modelsWithMetadata } from "./store.ts";
 export interface EndpointsApiDeps {
   readonly store: EndpointStore;
   /** Reads an endpoint's model list (discover.ts). */
-  readonly discover: (target: Pick<ModelEndpoint, "api" | "baseUrl" | "headers">, apiKey: string | undefined) => Promise<Discovery>;
+  readonly discover: (target: Pick<ModelEndpoint, "api" | "baseUrl" | "headers">, apiKey: string | undefined, signIn?: SignIn) => Promise<Discovery>;
   /** The endpoints changed: the Pi Durable picker reads them again. */
   readonly changed?: () => void;
   /** The Credential broker (SPI-1164): the sign-ins' tokens. Without it no sign-in is offered. */
@@ -151,7 +152,7 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
       apiKey = saved.apiKey;
     }
   }
-  const found = await deps.discover(target, apiKey);
+  const found = await deps.discover(target, apiKey, isSignIn(valid.endpoint.auth) ? valid.endpoint.auth : undefined);
   if (!found.ok) return { status: 200, json: found };
   return { status: 200, json: { ok: true, models: modelsWithMetadata(valid.endpoint, found.models) } };
 };
@@ -195,7 +196,7 @@ const completeSignIn = async (
 ): Promise<EndpointsAnswer> => {
   // A device sign-in takes no paste: its completion asks the vendor whether the owner approved.
   const started = signIns.status(id).kind;
-  const device = started !== null && SIGN_IN_KINDS[started].device !== null;
+  const device = started !== null && isDeviceSignIn(started);
   const pasted = device && body.pasted === undefined ? "" : body.pasted;
   if (typeof pasted !== "string" || pasted.length > 8192) return { status: 400, text: "pasted is the address your browser landed on" };
   const result = await signIns.complete(id, pasted);
@@ -211,7 +212,7 @@ const completeSignIn = async (
   let modelsProblem: string | undefined;
   if (saved === undefined) {
     const access = await signIns.access(id);
-    const found = access.ok ? await deps.discover(signInTarget(kind, access), undefined) : { ok: false as const, error: access.problem };
+    const found = access.ok ? await deps.discover(signInTarget(kind, access), undefined, kind) : { ok: false as const, error: access.problem };
     if (found.ok) models = found.models;
     else modelsProblem = found.error;
   }

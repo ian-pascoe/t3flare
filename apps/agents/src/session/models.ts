@@ -299,8 +299,10 @@ const endpointProvider = (endpoint: ModelEndpoint, access: EndpointAccess): Prov
           }
           access.outcome?.(undefined, endpoint.id);
           // A sign-in whose token names where it goes (Copilot's, SPI-1166) goes there, with the headers the broker gives
-          // beside it; the endpoint's own base URL is then only a stand-in. No other endpoint takes either.
-          const own = signInOf(endpoint.auth)?.baseUrlFromCredential === true;
+          // beside it, when its kind allows that base URL (the broker's own rule, `credentialBaseUrl`, checked again here);
+          // the endpoint's own base URL is then only a stand-in. No other endpoint takes either.
+          const allowed = signInOf(endpoint.auth)?.credentialBaseUrl ?? null;
+          const own = allowed !== null && credential.baseUrl !== undefined && allowed.test(credential.baseUrl);
           return {
             auth: { apiKey: credential.apiKey, baseUrl: (own ? credential.baseUrl : undefined) ?? endpoint.baseUrl, headers: own ? { ...headers, ...credential.headers } : headers },
             source: isSignIn(endpoint.auth) ? "Model endpoint (sign-in)" : "Model endpoint",

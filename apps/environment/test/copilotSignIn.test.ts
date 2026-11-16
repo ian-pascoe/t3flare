@@ -2,7 +2,7 @@
 // the device code, one poll per ask no sooner than GitHub's interval (slowed as `slow_down` says), the GitHub token
 // exchanged for a Copilot token, its renewal and what ends it, where its requests go, and no revocation. No answer holds
 // a token or the device code.
-import { COPILOT_CLIENT_ID, COPILOT_HEADERS, COPILOT_TOKEN_URL, GITHUB_ACCESS_TOKEN_URL, GITHUB_DEVICE_CODE_URL } from "@t3flare/models/copilotOAuth";
+import { COPILOT_CLIENT_ID, COPILOT_HEADERS, COPILOT_TOKEN_URL, copilotBaseUrl, GITHUB_ACCESS_TOKEN_URL, GITHUB_DEVICE_CODE_URL } from "@t3flare/models/copilotOAuth";
 import { describe, expect, it } from "vitest";
 
 import { copilotSignIn, type PendingCopilotSignIn, pollCopilotSignIn, refreshCopilot, startCopilotSignIn } from "../src/credentials/copilot.ts";
@@ -49,10 +49,16 @@ describe("the GitHub Copilot sign-in", () => {
     clean(github, { authorizeUrl, device });
   });
 
-  it("refuses a device answer whose page is not GitHub's", async () => {
-    const { vendor } = setup();
-    const fetch = (async () => Response.json({ device_code: "dc", user_code: "ABCD-1234", verification_uri: "https://github.example/login/device", expires_in: 900, interval: 5 })) as typeof globalThis.fetch;
-    await expect(startCopilotSignIn({ ...vendor, fetch })).rejects.toThrow(/not usable/);
+  it("refuses a device answer whose page is not GitHub's over https, or whose user code is not GitHub's shape", async () => {
+    for (const deviceAnswer of [
+      { verification_uri: "https://github.example/login/device" },
+      { verification_uri: "http://github.com/login/device" },
+      { user_code: "<b>AB</b>" },
+      { user_code: "abcd-1234" },
+    ]) {
+      const { vendor } = setup({ deviceAnswer });
+      await expect(startCopilotSignIn(vendor), JSON.stringify(deviceAnswer)).rejects.toThrow(/not usable/);
+    }
   });
 
   it("says why GitHub would not start, with a fixed text", async () => {
@@ -76,14 +82,15 @@ describe("the GitHub Copilot sign-in", () => {
   });
 
   it("slows down as GitHub says: to the interval it names, else 5 s more", async () => {
-    const { github, vendor, now, advance } = setup({ slowDown: { interval: 10 } });
+    // 12 s, not the 10 s that 5 s more would make.
+    const { github, vendor, now, advance } = setup({ slowDown: { interval: 12 } });
     const { pending } = await startCopilotSignIn(vendor);
     advance(5_000);
     const slowed = waitingOf(await pollCopilotSignIn(vendor, pending));
-    expect(slowed).toMatchObject({ intervalMs: 10_000, nextPollAt: now() + 10_000 });
+    expect(slowed).toMatchObject({ intervalMs: 12_000, nextPollAt: now() + 12_000 });
     github.options.slowDown = {};
-    advance(10_000);
-    expect(waitingOf(await pollCopilotSignIn(vendor, slowed))).toMatchObject({ intervalMs: 15_000 });
+    advance(12_000);
+    expect(waitingOf(await pollCopilotSignIn(vendor, slowed))).toMatchObject({ intervalMs: 17_000 });
   });
 
   it("on approval, exchanges the GitHub token for a Copilot token: the Copilot token is the access token, the GitHub token the refresh", async () => {
@@ -131,7 +138,8 @@ describe("the GitHub Copilot sign-in", () => {
     expect(result).toEqual({
       ok: false,
       spent: true,
-      problem: "Signed in at GitHub, but GitHub refused a Copilot token (subscription_ended): this GitHub account needs a Copilot plan. It could not be revoked here: revoke it at github.com, under Settings, Applications.",
+      problem:
+        "Signed in at GitHub, but GitHub refused a Copilot token (subscription_ended): this GitHub account needs a Copilot plan. Nothing was kept here; GitHub offers this app no revocation, so the approval stays on your GitHub account until you revoke it at github.com, under Settings, Applications.",
     });
     clean(context.github, result);
     expect(JSON.stringify(result)).not.toContain("secret-ish");
@@ -140,6 +148,16 @@ describe("the GitHub Copilot sign-in", () => {
   it("does not use a Copilot token that names a host outside githubcopilot.com", async () => {
     const context = setup({ proxyHost: "proxy.githubcopilot.com.evil.example" });
     expect(await signedIn(context)).toMatchObject({ ok: false, spent: true, problem: expect.stringMatching(/outside githubcopilot\.com/) });
+    // Only https on a githubcopilot.com host, from its start: not a look-alike, not a path that ends in one.
+    for (const host of ["proxy.evilgithubcopilot.com", "evil.example/https://api.githubcopilot.com", "evil.example/x.githubcopilot.com", "api.githubcopilot.com:8443", "githubcopilot.com"]) {
+      expect(copilotBaseUrl(`tid=1;proxy-ep=${host};`), host).toBeUndefined();
+    }
+    expect(copilotBaseUrl("tid=1;proxy-ep=proxy.business.githubcopilot.com;")).toBe("https://api.business.githubcopilot.com");
+  });
+
+  it("does not use a Copilot token GitHub gives already expired", async () => {
+    const context = setup({ copilotLife: -60 });
+    expect(await signedIn(context)).toMatchObject({ ok: false, spent: true, problem: expect.stringMatching(/Copilot token was not usable/) });
   });
 
   it("sends the Copilot token where it says, with the editor headers; a token without proxy-ep goes to pi-ai's default", async () => {
@@ -172,7 +190,14 @@ describe("the GitHub Copilot sign-in", () => {
       [{ copilotStatus: 401, copilotBody: { message: "Bad credentials", documentation_url: "https://docs.github.com/rest" } }, { refused: true, code: "http_401" }],
       [{ copilotStatus: 403, copilotBody: { message: "Forbidden", error_details: { notification_id: "subscription_ended" } } }, { refused: true, code: "subscription_ended" }],
       [{ copilotStatus: 400, copilotBody: { error: "invalid_request" } }, { refused: true, code: "invalid_request" }],
-      // GitHub's rate limits answer 403 or 429 with retry-after, or no requests left: passing.
+      // GitHub's rate limits answer 403 or 429 with retry-after, or no requests left, or (secondary limits) only a message
+      // naming them: passing.
+      [{ copilotStatus: 403, copilotBody: { message: "You have exceeded a secondary rate limit. Please wait a few minutes before you try again." } }, { refused: false }],
+      [{ copilotStatus: 403, copilotBody: { message: "Maximum number of login attempts exceeded. Please try again later." } }, { refused: false }],
+      // A JSON object that is not GitHub's error object: passing.
+      [{ copilotStatus: 401, copilotBody: { detail: "Unauthorized" } }, { refused: false }],
+      // A code is named only in its shape: anything else of the body is not, and the status names it instead.
+      [{ copilotStatus: 403, copilotBody: { message: "Forbidden", error_details: { notification_id: "Leak This Secret" } } }, { refused: true, code: "http_403" }],
       [{ copilotStatus: 403, copilotBody: { message: "You have exceeded a secondary rate limit" }, copilotHeaders: { "retry-after": "60" } }, { refused: false }],
       [{ copilotStatus: 403, copilotBody: { message: "API rate limit exceeded" }, copilotHeaders: { "x-ratelimit-remaining": "0" } }, { refused: false }],
       // An edge's page, a bare JSON value, another status: passing.
@@ -186,6 +211,7 @@ describe("the GitHub Copilot sign-in", () => {
       Object.assign(context.github.options, options);
       const answer = await refreshCopilot(context.vendor, held);
       expect(answer, JSON.stringify(options)).toMatchObject({ ok: false, ...expected });
+      expect(JSON.stringify(answer)).not.toMatch(/Leak/);
       clean(context.github, answer);
     }
     const { context, credential: held } = await credential();

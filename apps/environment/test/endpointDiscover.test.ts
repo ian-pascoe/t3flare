@@ -110,7 +110,7 @@ describe("discoverModels", () => {
       ],
     }));
     const target = { api: "openai-responses" as const, baseUrl: "https://api.individual.githubcopilot.com", headers: { authorization: "Bearer tid=1", "Copilot-Integration-Id": "vscode-chat" } };
-    expect(await discoverModels(target, undefined, fetcher)).toEqual({
+    expect(await discoverModels(target, undefined, fetcher, "copilot")).toEqual({
       ok: true,
       models: [
         { id: "gpt-6.1-sol", name: "GPT-6.1-SOL" },
@@ -125,7 +125,12 @@ describe("discoverModels", () => {
     const entry = (id: string, state: string) => ({ id, model_picker_enabled: false, policy: { state }, capabilities: { type: "chat", supports: { tool_calls: true } } });
     const { fetcher } = fake(() => ({ data: [entry("gpt-6.1-sol", "enabled"), entry("gpt-6-sol", "unconfigured")] }));
     const individual = { api: "openai-responses" as const, baseUrl: "https://api.individual.githubcopilot.com", headers: {} };
-    expect(await discoverModels(individual, undefined, fetcher)).toEqual({ ok: true, models: [{ id: "gpt-6.1-sol" }] });
-    expect(await discoverModels({ ...individual, baseUrl: "https://api.business.githubcopilot.com" }, undefined, fetcher)).toEqual({ ok: true, models: [] });
+    expect(await discoverModels(individual, undefined, fetcher, "copilot")).toEqual({ ok: true, models: [{ id: "gpt-6.1-sol" }] });
+    expect(await discoverModels({ ...individual, baseUrl: "https://api.business.githubcopilot.com" }, undefined, fetcher, "copilot")).toEqual({ ok: true, models: [] });
+  });
+
+  it("reads a generic endpoint's list generically, whatever Copilot-like fields it carries: only a Copilot sign-in's is Copilot's catalog", async () => {
+    const { fetcher } = fake(() => ({ data: [{ id: "m1", model_picker_enabled: false, policy: { state: "disabled" } }, { id: "m2", model_picker_enabled: true }] }));
+    expect(await discoverModels({ api: "openai-responses", baseUrl: "https://gw.example.com/v1", headers: {} }, "sk-1", fetcher)).toEqual({ ok: true, models: [{ id: "m1" }, { id: "m2" }] });
   });
 });

@@ -420,6 +420,8 @@ describe("GitHub Copilot on the Harness panel (SPI-1166)", () => {
     const context = await setup();
     context.github.options.proxyHost = "proxy.business.githubcopilot.com";
     await copilotSignInFlow(context);
+    // The list was read at the token's base URL, not the endpoint's stand-in.
+    expect(context.discovered[0]).toMatchObject({ baseUrl: "https://api.business.githubcopilot.com" });
     const credential = await context.endpoints.credential({ endpointId: "copilot", target: COPILOT_TARGET });
     expect(credential).toEqual({ apiKey: context.github.copilotTokens[0], expiresAt: Math.floor(NOW / 1000) * 1000 + 10_000 + 1_800_000, baseUrl: "https://api.business.githubcopilot.com", headers: EDITOR_HEADERS });
     expect(await context.endpoints.credential({ endpointId: "copilot", target: { ...COPILOT_TARGET, baseUrl: "https://api.business.githubcopilot.com" } })).toEqual({ apiKey: null, changed: true });
@@ -442,7 +444,7 @@ describe("GitHub Copilot on the Harness panel (SPI-1166)", () => {
     context.github.options.copilotStatus = 403;
     context.github.options.copilotBody = { message: "Forbidden", error_details: { notification_id: "subscription_ended" } };
     const { done } = await copilotSignInFlow(context);
-    expect(JSON.parse(done.text)).toMatchObject({ ok: false, error: expect.stringMatching(/subscription_ended\): this GitHub account needs a Copilot plan\. It could not be revoked here: revoke it at github\.com/) });
+    expect(JSON.parse(done.text)).toMatchObject({ ok: false, error: expect.stringMatching(/subscription_ended\): this GitHub account needs a Copilot plan\. Nothing was kept here; .* revoke it at github\.com/) });
     expect(context.endpoints.load().endpoints).toEqual([]);
     expect(context.leaks()).toEqual([]);
   });

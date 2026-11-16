@@ -6,7 +6,7 @@
 // its provider), and for the model relay and the credential broker that build on this (SPI-1164, SPI-1167). An endpoint's
 // id never changes, so a slug stays valid as long as the endpoint keeps the model. A model id may itself hold a `/`
 // (OpenRouter's `anthropic/claude-…`): the slug splits at its first one.
-import { COPILOT_LIST_HEADERS } from "./copilotOAuth.ts";
+import { COPILOT_BASE_URL, COPILOT_LIST_HEADERS } from "./copilotOAuth.ts";
 
 /** The pi-ai APIs an endpoint may speak. A sign-in fixes its endpoint's API (`SIGN_IN_KINDS`). */
 export const ENDPOINT_APIS = ["anthropic-messages", "openai-responses", "openai-completions", "google-generative-ai", "mistral-conversations"] as const;
@@ -51,12 +51,21 @@ export interface SignInKind {
    * A device sign-in (RFC 8628): the owner enters the code the panel shows at the vendor's page, and the Environment polls
    * the vendor until it is approved. What the panel says to do; null for a paste sign-in.
    */
-  readonly device: { readonly instructions: string } | null;
+  readonly device: {
+    readonly instructions: string;
+    /** How the form says the sign-in goes, after the kind's `about`. */
+    readonly how: string;
+    /** The vendor's device page link's text. */
+    readonly link: string;
+    /** The button that asks whether it was approved. */
+    readonly check: string;
+  } | null;
   /**
-   * Whether the base URL is the credential's own (Copilot's token names it): the Credential broker gives it with each
-   * token, and `baseUrl` is only the endpoint's fixed stand-in for the target rule, never where a request goes.
+   * The base URLs a credential may name (Copilot's token names its API host): the Credential broker gives the token's
+   * with each token, the Session sends there only one this matches, and `baseUrl` is then only the endpoint's fixed
+   * stand-in for the target rule. Null: the requests go to `baseUrl`.
    */
-  readonly baseUrlFromCredential: boolean;
+  readonly credentialBaseUrl: RegExp | null;
   /**
    * Null when sign-out revokes the grant at the vendor; otherwise the vendor offers no revocation, and this says where the
    * owner removes the grant, which stays on the account until then.
@@ -89,7 +98,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
       placeholder: "http://127.0.0.1:1455/auth/callback?code=…",
     },
     device: null,
-    baseUrlFromCredential: false,
+    credentialBaseUrl: null,
     revocation: null,
     listHeaders: {},
     keepsEmail: true,
@@ -107,7 +116,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
       placeholder: "code#state",
     },
     device: null,
-    baseUrlFromCredential: false,
+    credentialBaseUrl: null,
     revocation: "Anthropic offers no revocation to apps: the grant stays on your Claude account until you remove it at claude.ai, under Settings, Claude Code (Authorization tokens).",
     // Anthropic takes a Claude sign-in's token as a bearer only with its OAuth beta (SPI-1161 Q4).
     listHeaders: { "anthropic-beta": "oauth-2025-04-20" },
@@ -117,7 +126,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     // One API per endpoint: Copilot's Responses models (GPT, Grok). Its Claude models (Messages) and others (Chat
     // Completions) are not listed on it.
     api: "openai-responses",
-    // A stand-in: each request goes to the base URL its Copilot token names (`baseUrlFromCredential`).
+    // A stand-in: each request goes to the base URL its Copilot token names (`credentialBaseUrl`).
     baseUrl: "https://api.individual.githubcopilot.com",
     title: "GitHub Copilot",
     noteTitle: "Your risk",
@@ -125,14 +134,22 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     refused: "the GitHub account needs a Copilot plan with this model enabled; otherwise sign in with GitHub Copilot again in the Harness panel.",
     about: "Use your GitHub Copilot plan's models for Pi Durable, on Copilot's Responses API.",
     paste: null,
-    device: { instructions: "Open GitHub's device page, enter the code shown here, and approve. This page finishes the sign-in by itself once GitHub says so." },
-    baseUrlFromCredential: true,
+    device: {
+      instructions: "Open GitHub's device page, enter the code shown here, and approve. This page finishes the sign-in by itself once GitHub says so.",
+      how: "Start, open GitHub's page and enter the code shown here; this page finishes once you approve.",
+      link: "Open GitHub's device page",
+      check: "Check sign-in",
+    },
+    credentialBaseUrl: COPILOT_BASE_URL,
     revocation: "GitHub offers this client no revocation: the grant stays on your GitHub account until you revoke it at github.com, under Settings, Applications (Authorized GitHub Apps: GitHub Copilot).",
     // The editor headers come from the Credential broker with each token (copilotOAuth.ts), never from here.
     listHeaders: COPILOT_LIST_HEADERS,
     keepsEmail: false,
   },
 };
+
+/** Whether a `kind` sign-in is a device sign-in (no paste: the Environment asks the vendor whether it was approved). */
+export const isDeviceSignIn = (kind: SignIn): boolean => SIGN_IN_KINDS[kind].device !== null;
 
 /** The headers that carry a `kind` sign-in's access token to its vendor, for its model list. */
 export const signInHeaders = (kind: SignIn, accessToken: string): Readonly<Record<string, string>> => ({

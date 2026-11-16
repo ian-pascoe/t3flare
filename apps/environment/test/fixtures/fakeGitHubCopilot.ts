@@ -28,6 +28,11 @@ export interface FakeCopilotOptions {
   /** Held open until released, and signalled on arrival. */
   copilotGate?: Promise<void> | undefined;
   onCopilot?: (() => void) | undefined;
+  /** Polls are held open until released, and signalled on arrival. */
+  pollGate?: Promise<void> | undefined;
+  onPoll?: (() => void) | undefined;
+  /** The device code answer's fields, replaced (a test of what the Environment refuses). */
+  deviceAnswer?: Record<string, unknown>;
   /** Every request fails at the network. */
   down?: boolean;
 }
@@ -87,10 +92,12 @@ export const fakeGitHubCopilot = (options: FakeCopilotOptions = {}, now: () => n
         const deviceCode = next("dc_");
         const userCode = `${String(serial).padStart(4, "0").slice(-4)}-${crypto.randomUUID().slice(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, "Q")}`;
         devices.set(deviceCode, { userCode, approved: false, used: false });
-        return Response.json({ device_code: deviceCode, user_code: userCode, verification_uri: "https://github.com/login/device", expires_in: 900, interval: 5 });
+        return Response.json({ device_code: deviceCode, user_code: userCode, verification_uri: "https://github.com/login/device", expires_in: 900, interval: 5, ...options.deviceAnswer });
       }
       if (url === GITHUB_ACCESS_TOKEN_URL && method === "POST") {
         counts.polls += 1;
+        options.onPoll?.();
+        await options.pollGate;
         if (form.get("client_id") !== COPILOT_CLIENT_ID || form.get("grant_type") !== DEVICE_GRANT_TYPE) return Response.json({ error: "unsupported_grant_type" });
         const device = devices.get(form.get("device_code") ?? "");
         if (device === undefined || device.used) return Response.json({ error: "incorrect_device_code" });

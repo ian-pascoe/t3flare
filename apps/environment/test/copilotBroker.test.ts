@@ -222,4 +222,51 @@ describe("the Credential broker with a GitHub Copilot sign-in", () => {
     expect(context.broker.status("copilot")).toMatchObject({ pendingSince: null, problem: "The sign-in was declined at GitHub: start it again to retry." });
     scan(context);
   });
+
+  it("does not seal an overtaken poll's attempt again: a sign-out, or a newer start, during the poll wins", async () => {
+    for (const overtake of ["sign-out", "start"] as const) {
+      const context = setup();
+      const first = await context.broker.start("copilot", "copilot");
+      context.userCodes.push(first.device!.userCode);
+      context.advance(5_000);
+      const slow = gate();
+      context.github.options.pollGate = slow.opened;
+      context.github.options.onPoll = slow.reached;
+      const asking = context.broker.complete("copilot", "");
+      await slow.arrived;
+      const second = overtake === "start" ? await context.broker.start("copilot", "copilot") : (await context.broker.signOut("copilot"), undefined);
+      if (second !== undefined) context.userCodes.push(second.device!.userCode);
+      slow.open();
+      expect(await asking).toMatchObject({ ok: false, waiting: true });
+      context.github.options.pollGate = undefined;
+      context.github.options.onPoll = undefined;
+      if (second === undefined) {
+        // Signed out: nothing waits any more, and GitHub is not asked again.
+        expect(await context.broker.complete("copilot", "")).toEqual({ ok: false, problem: "No sign-in is waiting for a pasted address: start the sign-in again." });
+        expect(context.broker.status("copilot").pendingSince).toBeNull();
+      } else {
+        // The newer attempt is the one waiting: its approval completes it, the older one's code is never asked again.
+        context.github.approve(second.device!.userCode);
+        context.advance(5_000);
+        const polls = context.github.counts.polls;
+        expect(await context.broker.complete("copilot", "")).toMatchObject({ ok: true });
+        expect(context.github.counts.polls).toBe(polls + 1);
+        expect(new URLSearchParams(context.github.requests.filter((request) => request.url.endsWith("/login/oauth/access_token")).at(-1)!.body).get("device_code")).not.toBe(
+          new URLSearchParams(context.github.requests.filter((request) => request.url.endsWith("/login/oauth/access_token"))[0]!.body).get("device_code"),
+        );
+      }
+      scan(context);
+    }
+  });
+
+  it("shows the base URL a renewed Copilot token names", async () => {
+    const context = setup();
+    await signIn(context);
+    expect(context.broker.status("copilot").baseUrl).toBe("https://api.individual.githubcopilot.com");
+    context.advance(LIFE - 60_000);
+    context.github.options.proxyHost = "proxy.business.githubcopilot.com";
+    expect(await context.broker.access("copilot")).toMatchObject({ ok: true, baseUrl: "https://api.business.githubcopilot.com" });
+    expect(context.broker.status("copilot").baseUrl).toBe("https://api.business.githubcopilot.com");
+    scan(context);
+  });
 });

@@ -209,6 +209,18 @@ describe("a GitHub Copilot sign-in on pi-ai", () => {
     expect(JSON.parse((await ours(FROM_OWNER, "high")).body)).toMatchObject({ reasoning: { effort: "high" } });
   });
 
+  it("sends a Copilot token only to a base URL its kind allows: one outside githubcopilot.com goes to the stand-in, without the headers", async () => {
+    for (const baseUrl of ["https://evil.example", "https://api.evilgithubcopilot.com", "http://api.business.githubcopilot.com"]) {
+      const seen: Array<Seen> = [];
+      const models = createModels();
+      const credential = { apiKey: TOKEN, expiresAt: 4_000_000_000_000, baseUrl, headers: { ...COPILOT_HEADERS, "X-Extra": "1" } };
+      for (const provider of endpointProviders({ revision: 1, endpoints: [COPILOT] }, { credential: async () => credential, fetch: record(seen, responsesOk) })) models.setProvider(provider);
+      await models.completeSimple(models.getModel("copilot", MODEL_ID)!, FROM_OWNER, { maxTokens: 500 });
+      expect(seen[0]!.url, baseUrl).toBe(`${kind.baseUrl}/responses`);
+      expect(seen[0]!.headers).not.toHaveProperty("x-extra");
+    }
+  });
+
   it("takes no base URL or headers from a credential for an endpoint whose token does not name them", async () => {
     const seen: Array<Seen> = [];
     const models = createModels();

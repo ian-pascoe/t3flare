@@ -10,7 +10,7 @@
 // revocation: its Sign out says where the owner removes the grant (its kind's `revocation`). SPI-1166 adds GitHub Copilot,
 // a device sign-in (its kind's `device`): the form shows the code to enter at GitHub's device page, and asks the
 // Environment at GitHub's interval whether it was approved, with no paste; its card shows the API host its token names.
-import { endpointSlug, type EndpointApi, type EndpointPreset, isSignIn, type ModelEndpoint, SIGN_IN_KINDS, SIGN_INS, type SignIn } from "@t3flare/models/endpoints";
+import { endpointSlug, type EndpointApi, type EndpointPreset, isDeviceSignIn, isSignIn, type ModelEndpoint, SIGN_IN_KINDS, SIGN_INS, type SignIn } from "@t3flare/models/endpoints";
 
 import type { SignInStatus } from "../credentials/broker.ts";
 import type { SealedMark } from "../credentials/sealed.ts";
@@ -43,7 +43,7 @@ const when = (ms: number): string => new Date(ms).toISOString().slice(0, 16).rep
 const signInFacts = (escape: Escape, status: SignInStatus | undefined): string => {
   if (status === undefined) return "";
   const account = status.signedIn ? escape(status.email ?? "signed in") : '<span class="pill pill-warn">not signed in</span>';
-  const awaited = status.kind !== null && SIGN_IN_KINDS[status.kind].device !== null ? "approval at the vendor" : "its paste";
+  const awaited = status.kind !== null && isDeviceSignIn(status.kind) ? "approval at the vendor" : "its paste";
   return `<div><dt>Account</dt><dd>${account}</dd></div>${status.signedIn && status.expiresAt !== null ? `<div><dt>Token</dt><dd>renews before ${escape(when(status.expiresAt))}</dd></div>` : ""}${
     status.pendingSince === null ? "" : `<div><dt>Sign-in</dt><dd>waiting for ${awaited} since ${escape(when(status.pendingSince))}</dd></div>`
   }${status.problem === null ? "" : `<div><dt>Problem</dt><dd class="sign-in-problem">${escape(status.problem)}</dd></div>`}`;
@@ -71,7 +71,7 @@ const endpointCard = (escape: Escape, endpoint: EndpointsView["endpoints"][numbe
 
 /** Where a sign-in endpoint's requests go: its base URL, or for one whose token names it (Copilot's), the token's. */
 const baseUrlOf = (escape: Escape, endpoint: EndpointsView["endpoints"][number], signIn: (typeof SIGN_IN_KINDS)[SignIn]): string => {
-  if (!signIn.baseUrlFromCredential) return escape(endpoint.baseUrl);
+  if (signIn.credentialBaseUrl === null) return escape(endpoint.baseUrl);
   const named = endpoint.signIn?.baseUrl ?? null;
   return named === null ? `set by its ${escape(signIn.title)} token` : `${escape(named)} (from its ${escape(signIn.title)} token)`;
 };
@@ -106,14 +106,16 @@ const signInForm = (escape: Escape, view: EndpointsView, kind: SignIn): string =
     .join("");
   const at = (name: string) => escape(`sign-in-${kind}-${name}`);
   const waitingHere = waiting.some(([, status]) => status.pendingSince !== null);
-  // A paste sign-in's step: the link, then the paste. A device sign-in's: the link and the code to enter there.
+  // A device sign-in's step: the vendor's page and the code to enter there (its kind's words). A paste sign-in's: the
+  // link, then the paste.
+  const device = signIn.device;
   const step =
-    signIn.paste === null
-      ? `<div class="field wide" data-sign-in-step hidden><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer">Open ${escape(signIn.title)}'s device page</a></p><p class="desc">Enter this code there: <code class="ident" data-sign-in-code></code></p></div>`
-      : `<div class="field wide" data-sign-in-step${waitingHere ? "" : " hidden"}><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer" hidden>Open the ${escape(signIn.title)} sign-in</a></p><label for="${at("paste")}">What the sign-in gave you</label><textarea id="${at("paste")}" name="pasted" rows="3" spellcheck="false" placeholder="${escape(signIn.paste.placeholder)}"></textarea><p class="hint">It holds a one-time code: paste it here only.</p></div>`;
-  const steps = signIn.paste?.instructions ?? signIn.device?.instructions ?? "";
-  const how = signIn.paste === null ? "Start, open GitHub's page and enter the code shown here; this page finishes once you approve." : "Start, open the link and approve, then paste what it gives you back here.";
-  return `<form class="group add" id="${at("form")}" data-sign-in-form data-sign-in-kind="${escape(kind)}"${signIn.paste === null ? " data-sign-in-device" : ""} data-sign-in-steps="${escape(steps)}" autocomplete="off" aria-labelledby="${at("title")}">
+    device !== null
+      ? `<div class="field wide" data-sign-in-step hidden><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer">${escape(device.link)}</a></p><p class="desc">Enter this code there: <code class="ident" data-sign-in-code></code></p></div>`
+      : `<div class="field wide" data-sign-in-step${waitingHere ? "" : " hidden"}><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer" hidden>Open the ${escape(signIn.title)} sign-in</a></p><label for="${at("paste")}">What the sign-in gave you</label><textarea id="${at("paste")}" name="pasted" rows="3" spellcheck="false" placeholder="${escape(signIn.paste?.placeholder ?? "")}"></textarea><p class="hint">It holds a one-time code: paste it here only.</p></div>`;
+  const steps = device?.instructions ?? signIn.paste?.instructions ?? "";
+  const how = device?.how ?? "Start, open the link and approve, then paste what it gives you back here.";
+  return `<form class="group add" id="${at("form")}" data-sign-in-form data-sign-in-kind="${escape(kind)}"${device !== null ? " data-sign-in-device" : ""} data-sign-in-steps="${escape(steps)}" autocomplete="off" aria-labelledby="${at("title")}">
 <div class="row"><div><div class="row-title"><h3 id="${at("title")}">Sign in with ${escape(signIn.title)}</h3></div><p class="desc">${escape(signIn.about)} ${how}</p>
 <div class="callout callout-warn" role="note">${icon("warn")}<div><strong>${escape(signIn.noteTitle)}</strong><p>${escape(signIn.note)}</p></div></div></div></div>
 <div class="form-body">${notes}
@@ -121,7 +123,7 @@ const signInForm = (escape: Escape, view: EndpointsView, kind: SignIn): string =
 <div class="field"><label for="${at("label")}">Label</label><input id="${at("label")}" name="label" type="text" maxlength="60" value="${escape(signIn.title)}"></div>
 ${step}
 </div>
-<div class="form-foot"><p data-sign-in-note aria-live="polite"></p><button type="button" class="btn" data-sign-in-start>Start sign-in</button><button type="button" class="btn btn-primary" data-sign-in-finish>${signIn.paste === null ? "Check sign-in" : "Finish sign-in"}</button></div>
+<div class="form-foot"><p data-sign-in-note aria-live="polite"></p><button type="button" class="btn" data-sign-in-start>Start sign-in</button><button type="button" class="btn btn-primary" data-sign-in-finish>${escape(device?.check ?? "Finish sign-in")}</button></div>
 </form>`;
 };
 
