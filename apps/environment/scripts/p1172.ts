@@ -13,9 +13,11 @@
 //                                                   thread, the Session's state nor (with --tail) either Worker's logs
 //                                                   hold one
 //   node scripts/stage.ts run p1172 p1172 overload  an overload (529) is retried and ends as a provider error, no pause
-//   node scripts/stage.ts run p1172 p1172 cli       Claude Code through the model relay on an endpoint whose key is
+//   node scripts/stage.ts run p1172 p1172 cli [--cli pi|codex|claude] [--control]
+//                                                   a CLI agent through the model relay on an endpoint whose key is
 //                                                   refused (Commissary's own 401): t3's failure is the relay's, naming
-//                                                   the endpoint, not the Model proxy key's text; the key is in no answer
+//                                                   the endpoint, not what the CLI made of it; the key is in no answer.
+//                                                   --control: the same turn on a working key completes
 //   … [--model <endpointId>/<modelId>] [--out file.json]
 //
 // The fixture project is kept in `.alchemy/stages/<host>.p1172.json` (gitignored) between runs.
@@ -24,7 +26,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { cliTurn, enable } from "./lib/acpTurn.ts";
+import { cliTurn as acpCliTurn, enable as acpEnable } from "./lib/acpTurn.ts";
+import { cliTurn as cli4aTurn, enable as cli4aEnable } from "./lib/cliTurn.ts";
 import { admin, base, dispatch, itemsOf, mutateProject, pair, runsOf, sendMessage, SETTLED, sleep, updateSettings, uuid, waitFor, wsCall } from "./lib/client.ts";
 
 /** The made-up credentials the `anthropicKeyRefused` fault echoes (apps/agents/src/session/proxyLimits.ts). */
@@ -220,22 +223,32 @@ switch (step) {
     // A made-up key of no vendor's shape: only the relay's known-value redaction would catch an echo of it.
     const refusedKey = `p1172-refused-${stamp}-not-a-real-key`;
     const api = (method: string, pathname: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${pathname}`, body);
-    const saved = await api("POST", "endpoints", {
-      op: "save",
-      endpoint: { id: "badkey", label: "Refused key", api: "anthropic-messages", baseUrl: proxyUrl, auth: "api-key", headers: {}, models: ["claude-haiku-5-5"] },
-      apiKey: refusedKey,
-    });
-    check("the endpoint with a refused key saved", saved.status === 200, saved.status);
-    await enable(cookie, "claude");
+    const cli = option("cli", "pi");
+    // Codex speaks OpenAI Responses (Commissary's at `/v1`); pi and Claude Code, Anthropic Messages.
+    const responses = cli === "codex";
+    const modelId = responses ? "gemini-3-flash" : "claude-haiku-5-5";
+    const endpoint = { api: responses ? "openai-responses" : "anthropic-messages", baseUrl: responses ? `${proxyUrl}/v1` : proxyUrl, auth: "api-key", headers: {}, models: [modelId] };
+    const control = flag("control");
+    const saved = await api("POST", "endpoints", { op: "save", endpoint: { id: "badkey", label: "Refused key", ...endpoint }, apiKey: control ? process.env.MODEL_PROXY_API_KEY : refusedKey });
+    check(control ? "the endpoint saved with the stage's working key" : "the endpoint with a refused key saved", saved.status === 200, saved.status);
+    if (cli === "claude") await acpEnable(cookie, "claude");
+    else await cli4aEnable(cookie, cli, cli);
     await sleep(3000);
-    const turn = await cliTurn(cookie, { cli: "claude", workspace: `p1172-cli-${stamp}`, model: "badkey/claude-haiku-5-5", mode: "full-access", plan: false, prompt: "Reply with the single word: pong" });
+    const turnOptions = { cli, workspace: `p1172-cli-${stamp}`, model: `badkey/${modelId}`, mode: "full-access", plan: false, prompt: "Reply with the single word: pong" };
+    const turn = cli === "claude" ? await acpCliTurn(cookie, turnOptions) : await cli4aTurn(cookie, turnOptions);
+    report.cliAgent = cli;
+    if (control) {
+      report.control = { runs: turn.runs, text: turn.text };
+      check("the control turn completed", turn.runs.at(-1)?.status === "completed", turn.runs);
+      finish();
+    }
     const projection = await waitFor(cookie, turn.threadId, () => true, 10_000);
     const errors = itemsOf(projection.projection).filter((item: any) => item.type === "error").map((item: any) => item.failure);
     const failure = (turn.runs.at(-1)?.failure ?? errors.at(-1) ?? {}) as Record<string, any>;
     report.cli = { runs: turn.runs.map((run: any) => ({ status: run.status })), failure, errorItems: errors };
-    check("the Claude Code turn failed", turn.runs.at(-1)?.status === "failed", turn.runs);
+    check(`the ${cli} turn failed`, turn.runs.at(-1)?.status === "failed", turn.runs);
     check(
-      "t3's failure is the relay's: a refused key naming the endpoint",
+      `t3's failure on ${cli} is the relay's: a refused key naming the endpoint`,
       failure.class === "permission_error" && failure.code === "key_refused" && String(failure.message).startsWith('The Model endpoint "badkey" refused its API key (HTTP 401)'),
       failure,
     );
