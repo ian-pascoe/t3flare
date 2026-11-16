@@ -17,12 +17,18 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as UsageLimitSources from "t3/src/usage/UsageLimitSources.ts";
 
 import { COMMISSARY_SOURCE_ID, CommissaryError, type CommissaryManagement, type Fetch, limitSnapshot, readCredentials } from "./commissary.ts";
-import { LIMIT_SOURCE_PREFIX, type LimitStore, limitSnapshots } from "./limits.ts";
+import { LIMIT_SOURCE_PREFIX, limitSnapshots } from "./limitMeters.ts";
+import type { LimitStore } from "./limits.ts";
 
 /** How often Commissary's accounts are read while t3 runs (Commissary's own quota sweep is slower). */
 export const COMMISSARY_LIMITS_EVERY = Duration.minutes(5);
 /** How often the endpoints' meters are looked at again (staleness and passed resets) while t3 runs. */
 export const ENDPOINT_METERS_EVERY = Duration.minutes(1);
+/**
+ * The most often kept readings are pushed to t3's clients: a CLI turn's many requests each send one, so the readings of a
+ * burst are pushed once, this long after its first (the trailing edge, with the latest of them).
+ */
+export const ENDPOINT_METERS_PUSH_EVERY = Duration.seconds(3);
 
 type Service = UsageLimitSources.UsageLimitSources["Service"];
 
@@ -86,7 +92,7 @@ export const commissarySources = Effect.fn("commissarySources")(function* (confi
   } satisfies ExtraSources;
 });
 
-/** t3's service with Commissary's accounts added as a source. */
+/** t3's service with Commissary's accounts added as a source: the seam `commissaryLimits.test.ts` tests it through. */
 export const withCommissary = Effect.fn("withCommissary")(function* (stock: Service, config: CommissaryManagement, fetcher: Fetch) {
   return withSources(stock, [yield* commissarySources(config, fetcher)]);
 });
@@ -96,11 +102,15 @@ export interface EndpointMetersDeps {
   readonly store: Pick<LimitStore, "read" | "subscribe">;
   readonly endpoints: () => ModelEndpoints;
   readonly now: () => number;
+  /** `ENDPOINT_METERS_EVERY` and `ENDPOINT_METERS_PUSH_EVERY` unless given (tests). */
+  readonly every?: Duration.Input;
+  readonly pushEvery?: Duration.Input;
 }
 
 /**
- * One source per subscription endpoint with limit readings (SPI-1174): built now, again whenever the store keeps a
- * reading, every `ENDPOINT_METERS_EVERY`, and on t3's refresh. Only a changed list is published.
+ * One source per subscription endpoint with limit readings (SPI-1174): built now, again after the store keeps readings
+ * (at most once per `ENDPOINT_METERS_PUSH_EVERY`), every `ENDPOINT_METERS_EVERY`, and on t3's refresh. Only a changed
+ * list is published.
  */
 export const endpointMeterSources = Effect.fn("endpointMeterSources")(function* (deps: EndpointMetersDeps) {
   let shown = "";
@@ -124,12 +134,24 @@ export const endpointMeterSources = Effect.fn("endpointMeterSources")(function* 
     return next.changed ? SubscriptionRef.set(ref, next.sources) : Effect.void;
   });
   const runFork = Effect.runForkWith(yield* Effect.context<never>());
-  // A kept reading shows at once: the store calls back synchronously inside `recordLimits`.
+  // The store calls back synchronously inside `recordLimits`; a burst of readings is pushed once, after its first by
+  // `pushEvery`, with what is kept then. A reading kept while that push builds schedules the next.
+  let pushing = false;
+  const push = Effect.sleep(deps.pushEvery ?? ENDPOINT_METERS_PUSH_EVERY).pipe(
+    Effect.andThen(Effect.sync(() => (pushing = false))),
+    Effect.andThen(update),
+  );
   yield* Effect.acquireRelease(
-    Effect.sync(() => deps.store.subscribe(() => void runFork(update))),
+    Effect.sync(() =>
+      deps.store.subscribe(() => {
+        if (pushing) return;
+        pushing = true;
+        runFork(push);
+      }),
+    ),
     (unsubscribe) => Effect.sync(unsubscribe),
   );
-  yield* Effect.sleep(ENDPOINT_METERS_EVERY).pipe(Effect.andThen(update), Effect.forever, Effect.forkScoped);
+  yield* Effect.sleep(deps.every ?? ENDPOINT_METERS_EVERY).pipe(Effect.andThen(update), Effect.forever, Effect.forkScoped);
   return {
     ref,
     refresh: update,

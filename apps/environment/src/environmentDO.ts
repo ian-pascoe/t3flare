@@ -13,7 +13,7 @@ import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client
 import type { SkillSet } from "@t3flare/skills";
 import { extensionOf, type McpRelayAnswer, type McpRelayInput, resolveEnvironment, type ResolvedEnvironment, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
-import { bindEnvironmentServices } from "./agents/bindings.ts";
+import { bindEnvironmentServices, environmentServices } from "./agents/bindings.ts";
 import { GitHubTokens } from "./agents/github.ts";
 import { deliverPush } from "./agents/sessionSink.ts";
 import { GRACE_MS } from "./agents/deletionConstants.ts";
@@ -428,6 +428,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         changed: () => void import("./endpoints/changes.ts").then(({ endpointsChanged }) => endpointsChanged()),
         signIns: this.#credentialBroker(),
         signedOut: (endpointId) => this.#stopSessionsOn(endpointId),
+        // A removed endpoint's limit readings go with it: one added again under its id starts with none (SPI-1174).
+        removed: (endpointId) => environmentServices().limits.forget(endpointId),
       },
       // The Open changes (plan D10): the Change page answers them through the Settings server's own apply.
       changes: changesApiOf(await this.#settingsDeps()),

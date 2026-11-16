@@ -51,6 +51,8 @@ export interface EndpointsApiDeps {
   readonly signIns?: CredentialBroker;
   /** A sign-in endpoint was signed out or removed: its Sessions drop its token and stop its turns. */
   readonly signedOut?: (endpointId: string) => Promise<void>;
+  /** An endpoint was removed: what is kept of it elsewhere goes too (its limit readings, SPI-1174). */
+  readonly removed?: (endpointId: string) => void;
 }
 
 export type EndpointsAnswer = { readonly status: number; readonly json: unknown } | { readonly status: number; readonly text: string };
@@ -111,6 +113,7 @@ export const endpointsChange = async (deps: EndpointsApiDeps, body: Record<strin
     // A removed sign-in endpoint is signed out first (revoked where the vendor allows), and its Sessions stopped.
     const signedOut = isSignIn(removed.removed.auth) && deps.signIns !== undefined ? await deps.signIns.forget(id, { beforeRevoke: async () => deps.signedOut?.(id) }) : undefined;
     audit({ action: "endpoint.remove", target: id, before: audited(removed.removed), ...(signedOut === undefined ? {} : { after: { revoked: signedOut.revoked } }) });
+    deps.removed?.(id);
     deps.changed?.();
     const kept = signedOut !== undefined && !signedOut.revoked && isSignIn(removed.removed.auth) ? revocationNote(removed.removed.auth) : {};
     return { status: 200, json: { ok: true, revision: removed.endpoints.revision, ...kept } };

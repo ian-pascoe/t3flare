@@ -30,6 +30,7 @@ const setup = (caller: HarnessCaller = owner) => {
   const endpoints = endpointStore(kv, sealedStore(kv, "d".repeat(64), () => NOW));
   const discovered: Array<{ baseUrl: string; apiKey: string | undefined }> = [];
   let changes = 0;
+  const removed: Array<string> = [];
   const deps: HarnessDeps = {
     caller,
     host: HOST,
@@ -42,9 +43,10 @@ const setup = (caller: HarnessCaller = owner) => {
         return { ok: true, models: [{ id: "gpt-5-mini" }] };
       },
       changed: () => void changes++,
+      removed: (id) => void removed.push(id),
     },
   };
-  return { store, endpoints, deps, discovered, changes: () => changes };
+  return { store, endpoints, deps, discovered, changes: () => changes, removed };
 };
 
 const headersOf = async (store: ReturnType<typeof setup>["store"]) => ({
@@ -109,14 +111,15 @@ describe("Model endpoints on the Harness panel", () => {
     expect(html).toContain("cannot be read: enter it again");
   });
 
-  it("removes an endpoint and its key, audited", async () => {
-    const { store, endpoints, deps } = setup();
+  it("removes an endpoint and its key, audited, and says so to what else keeps of it (its limit readings, SPI-1174)", async () => {
+    const { store, endpoints, deps, removed } = setup();
     await post(deps, "endpoints", { op: "save", endpoint: ENDPOINT, apiKey: SECRET }, await headersOf(store));
     const response = await post(deps, "endpoints", { op: "remove", id: "openai" }, await headersOf(store));
     expect(response.status).toBe(200);
     expect(endpoints.load()).toMatchObject({ revision: 2, endpoints: [] });
     expect((await endpoints.resolve("openai"))?.apiKey).toBeUndefined();
     expect(store.auditLog(1)).toMatchObject([{ entity: "endpoints", action: "endpoint.remove", target: "openai" }]);
+    expect(removed).toEqual(["openai"]);
   });
 
   it("reads a model list with the key given, or else the saved endpoint's own", async () => {
