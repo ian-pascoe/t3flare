@@ -8,7 +8,7 @@
 // `@t3flare/models/failures`), else by its status: a vendor's body (which can echo request details) and the key never
 // reach the message.
 import { createModels, type FetchFunction } from "@earendil-works/pi-ai";
-import { classifyModelFailure, errorBodyOf, failureHeaders, modelFailureMessage } from "@t3flare/models/failures";
+import { describeFailure, errorBodyOf, failureHeaders, resetSentence } from "@t3flare/models/failures";
 import {
   type EndpointCredential,
   type EndpointTarget,
@@ -93,10 +93,8 @@ const failureOf = (endpoint: ModelEndpoint, modelId: string, observed: Observed)
   }
   if (observed.status !== undefined) {
     // Classified by the endpoint's API and auth when the answer is a failure the table knows; else by its status.
-    const failure = classifyModelFailure({ status: observed.status, headers: observed.headers ?? {}, body: observed.body ?? "", at: observed.at ?? Date.now() }, endpoint);
-    if (failure === undefined) return { ok: false, error: statusProblem(endpoint, modelId, observed.status) };
-    const resets = failure.class === "usage_limit" && failure.resetAt !== undefined ? ` It resets at ${new Date(failure.resetAt).toISOString()}.` : "";
-    return { ok: false, error: `${modelFailureMessage(failure, endpoint, observed.status)}${resets}` };
+    const failure = describeFailure({ status: observed.status, headers: observed.headers ?? {}, body: observed.body ?? "", at: observed.at ?? Date.now() }, endpoint);
+    return { ok: false, error: failure === undefined ? statusProblem(endpoint, modelId, observed.status) : `${failure.message}${resetSentence(failure)}` };
   }
   if (observed.unreachable) return { ok: false, error: `${named} could not be reached.` };
   // An error with no status this code can read (Google's adapter reports none): the endpoint failed, how is not known.
