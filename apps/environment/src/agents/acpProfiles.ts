@@ -96,8 +96,14 @@ export const OPENCODE_PACKAGES: Readonly<Partial<Record<EndpointApi, { readonly 
   "openai-completions": { package: "@opencode/ai/providers/openai-compatible", path: "" },
 };
 
-/** The relay's endpoints OpenCode gets a provider for: an API it speaks, and a model. */
-const opencodeRelayEndpoints = (relay: OpenCodeRelay) => relay.endpoints.filter((endpoint) => OPENCODE_PACKAGES[endpoint.api] !== undefined && endpoint.models.length > 0);
+/**
+ * The processes whose start environment holds an OpenCode process's model handle (SPI-1169), by command line: only the
+ * launch chain's setsid. The launcher starts OpenCode without it; the key plugin reads it from there.
+ */
+export const OPENCODE_HANDLE_HOLDERS: ReadonlyArray<string> = ["setsid --wait /opt/t3flare/bin/opencode acp"];
+
+/** Whether OpenCode gets a provider for an endpoint: an API it speaks, and a model (`opencodeEndpoints`, the profile). */
+export const opencodeServes = (endpoint: Pick<ModelEndpoint, "api" | "models">): boolean => OPENCODE_PACKAGES[endpoint.api] !== undefined && endpoint.models.length > 0;
 
 /** The model as OpenCode names it on the relay: its endpoint's provider and the model's own id. */
 export const opencodeEndpointModel = (slug: string): string | undefined => {
@@ -310,14 +316,17 @@ const opencodeProviders = (mode: OpenCodeMode) => {
   }
   const { relay } = mode;
   const providers: Record<string, unknown> = {};
-  for (const endpoint of opencodeRelayEndpoints(relay)) {
+  for (const endpoint of relay.endpoints.filter(opencodeServes)) {
     const wiring = OPENCODE_PACKAGES[endpoint.api]!;
+    // The relay's per-endpoint URL. The key plugin treats a provider as the relay's only with this base URL, and puts the
+    // handle only into a request sent to it (`relay.js`).
+    const pinned = { package: wiring.package, settings: { baseURL: `${modelRelayUrl(endpoint.id)}${wiring.path}` } };
     providers[endpointProviderId(endpoint.id)] = {
       name: endpoint.label,
-      package: wiring.package,
-      // The relay's per-endpoint URL: the key plugin gives the handle only to a provider whose base URL is this.
-      settings: { baseURL: `${modelRelayUrl(endpoint.id)}${wiring.path}` },
-      models: Object.fromEntries(endpoint.models.map((model) => [model.id, opencodeModelEntry(model)])),
+      ...pinned,
+      // Pinned on each model too: OpenCode lets a model's own `package` and `settings.baseURL` win over its provider's,
+      // and this system configuration outranks a repository's for the keys it sets, so the endpoint's models stay here.
+      models: Object.fromEntries(endpoint.models.map((model) => [model.id, { ...opencodeModelEntry(model), ...pinned }])),
     };
   }
   return {
@@ -390,7 +399,7 @@ const opencodeLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnsw
     links: [environmentSkillsLink(`${home}/config/opencode/skills`)],
     ...(thread === undefined ? {} : { thread }),
     // SPI-1169: the Workspace DO gives the process a model handle for these endpoints, in its environment only.
-    ...(mode.kind === "relay" ? { modelRelay: opencodeRelayEndpoints(mode.relay).map((endpoint) => endpoint.id) } : {}),
+    ...(mode.kind === "relay" ? { modelRelay: mode.relay.endpoints.filter(opencodeServes).map((endpoint) => endpoint.id) } : {}),
     droppedEnv: dropped(input.env),
   } satisfies Launch;
 };

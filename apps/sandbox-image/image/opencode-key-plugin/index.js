@@ -1,63 +1,71 @@
-// OpenCode V2 server plugin (plan §4.2 (a), changelog F6): sets the key OpenCode's providers send, from what the
-// process was started with, after removing it from the process environment so OpenCode's shells, MCP servers and other
-// children do not inherit it. Two modes, by what the Workspace DO gave the process:
-// - SPI-1169, the model relay: the process's model handle (T3FLARE_MODEL_HANDLE) is the API key of each Model endpoint
-//   provider (`t3flare-endpoint-<id>`) of this process's system configuration (the profile's copy in its home) whose
-//   base URL is the relay's URL for that endpoint; each provider package sends it in its own API's key header. No helper
-//   is asked: a handle does not rotate while the process lives (SPI-1045's re-ask is not needed).
+// OpenCode V2 server plugin (plan §4.2 (a), changelog F6): the key OpenCode's providers send. Two modes:
+// - SPI-1169, the model relay: each Model endpoint provider of the process's own configuration (`relay.js`
+//   `relayProviders`) gets a placeholder API key, which the relay refuses; the process's model handle replaces it in a
+//   request (OpenCode's `http.request` hook, after every setting was applied) only when the request's URL is at the
+//   relay for that provider's endpoint (`putHandle`). So a repository's model-level `baseURL` or `package`, a model or
+//   variant it adds, never sends the handle anywhere else. The handle is read from the start environment of the launch
+//   chain's `setsid` (`handleFrom`): the launcher starts OpenCode without it, so OpenCode's own environment never holds
+//   it and a repository's `{env:T3FLARE_MODEL_HANDLE}` finds nothing. No helper is asked: a handle does not rotate
+//   while the process lives (SPI-1045's re-ask is not needed). No handle found: no key, failing closed.
 // - Otherwise the Model proxy: asks the key helper once with the nonce and sets the key on the `t3flare` provider only.
-// The providers are patched by id: OpenCode adds the configured ones after a plugin's transform runs, so the patch
-// names them (from the configuration file), and it applies when they are added.
+// The nonce leaves this process's environment at import, before OpenCode starts anything from it. Providers are patched
+// by id: OpenCode adds the configured ones after a plugin's transform runs, so the ids come from the configuration file.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+import { handleFrom, PLACEHOLDER, putHandle, relayProviders } from "./relay.js";
+
 const HELPER = "/opt/t3flare/bin/t3flare-model-key";
-const RELAY = "http://computer.internal/t3flare/model/";
-const ENDPOINT_PROVIDER = "t3flare-endpoint-";
-const ENDPOINT_ID = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
-/** The path each provider package's base URL takes beyond the relay's per-endpoint URL (`acpProfiles.ts` `OPENCODE_PACKAGES`). */
-const PACKAGE_PATHS = {
-  "@opencode/ai/providers/anthropic-compatible": "/v1",
-  "@opencode/ai/providers/openai-compatible-responses": "",
-  "@opencode/ai/providers/openai-compatible": "",
+
+const read = (path) => {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return "";
+  }
 };
 
-// Read once, when OpenCode imports the plugin (a module runs once per process; `setup` may run for each location), and
-// deleted from the environment at once.
+/** The handle from the nearest ancestor that is the launch chain's `setsid` (`opencode serve` ← `opencode acp` ← setsid). */
+const ancestorHandle = () => {
+  let pid = process.ppid;
+  for (let depth = 0; depth < 4 && pid > 0; depth++) {
+    const handle = handleFrom(read(`/proc/${pid}/cmdline`), read(`/proc/${pid}/environ`), process.env.T3FLARE_EXEC);
+    if (handle !== "") return handle;
+    const stat = read(`/proc/${pid}/stat`);
+    pid = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]);
+  }
+  return "";
+};
+
+// Once per process, at import.
 const NONCE = process.env.T3FLARE_MODEL_KEY_NONCE ?? "";
-const HANDLE = process.env.T3FLARE_MODEL_HANDLE ?? "";
 delete process.env.T3FLARE_MODEL_KEY_NONCE;
 delete process.env.T3FLARE_MODEL_HANDLE;
-let proxyKey;
-
-/** The endpoint providers of this process's configuration that are at the relay: the only ones given the handle. */
-const relayProviders = () => {
-  let providers = {};
+const PROVIDERS = (() => {
   try {
-    providers = JSON.parse(readFileSync(`/var/lib/t3flare/cli/${process.env.T3FLARE_EXEC}/opencode.json`, "utf8")).providers ?? {};
+    return relayProviders(JSON.parse(read(`/var/lib/t3flare/cli/${process.env.T3FLARE_EXEC}/opencode.json`)));
   } catch {
     return [];
   }
-  return Object.entries(providers).flatMap(([id, provider]) => {
-    if (!id.startsWith(ENDPOINT_PROVIDER)) return [];
-    const endpoint = id.slice(ENDPOINT_PROVIDER.length);
-    const path = PACKAGE_PATHS[provider?.package];
-    return ENDPOINT_ID.test(endpoint) && path !== undefined && provider?.settings?.baseURL === `${RELAY}${endpoint}${path}` ? [id] : [];
-  });
-};
+})();
+const HANDLE = PROVIDERS.length === 0 ? "" : ancestorHandle();
+let proxyKey;
 
 export default {
   id: "t3flare.key",
   async setup(ctx) {
-    if (HANDLE !== "") {
-      const ids = relayProviders();
+    if (PROVIDERS.length > 0) {
+      if (HANDLE === "") return;
       await ctx.provider.transform((editor) => {
-        for (const id of ids) {
-          editor.update(id, (provider) => {
-            provider.settings = { ...provider.settings, apiKey: HANDLE };
+        for (const { providerID } of PROVIDERS) {
+          editor.update(providerID, (provider) => {
+            provider.settings = { ...provider.settings, apiKey: PLACEHOLDER };
           });
         }
       });
+      for (const { providerID, endpoint } of PROVIDERS) {
+        await ctx.session.hook("http.request", (input) => void putHandle(input.request.headers, input.request.url, endpoint, HANDLE), { providerID });
+      }
       return;
     }
     proxyKey ??= execFileSync(HELPER, ["opencode"], {
