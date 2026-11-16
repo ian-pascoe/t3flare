@@ -1,0 +1,20 @@
+{
+ "at": "2026-11-16T11:27:18.225Z",
+ "destroyedAt": "2026-11-16T10:37Z (local 05:37, after the 2026-11-16 redeploy of p1161 with global_fetch_strictly_public)",
+ "command": "node scripts/stage.ts destroy p1161 (T3FLARE_DOMAIN unset; env | grep -c T3FLARE_DOMAIN printed 0)",
+ "alchemyOutput": [
+  "[CodemodeSandbox] deleted (749ms)",
+  "[McpFixture] deleted (827ms)",
+  "[Environment] deleted (1.3s)",
+  "[McpWorker] deleted (976ms)",
+  "[Agents] deleted (1.0s)",
+  "[WorkspaceContainer] deleted (163ms)",
+  "[AdminAccess] deleted (1.5s)",
+  "[AdminServiceToken] deleted (534ms)",
+  "Done: 9 succeeded (4.0s)"
+ ],
+ "checks": {
+  "localStageFiles": "apps/environment/.alchemy/stages/ holds no p1161 file (ls | grep -c p1161 printed 0)",
+  "workerScriptsNamedP1161": "0, from a read-only Cloudflare listing (Executor, workerScriptSearchWorkers name=p1161) on 2026-11-16"
+ }
+}

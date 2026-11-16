@@ -1,0 +1,25 @@
+{
+ "at": "2026-11-16T11:26:42.428Z",
+ "setup": "Commissary (the Model proxy) as a control: MODEL_PROXY_URL (host api.ai.ianpascoe.dev) and MODEL_PROXY_API_KEY exported alone from dev.env (two lines; nothing else sourced; nothing printed); the same Codex request body as the probe; run from the laptop against Commissary, which forwards from its own Worker.",
+ "requests": [
+  {
+   "path": "/backend-api/codex/responses",
+   "status": 200,
+   "contentType": "text/event-stream",
+   "seconds": 0.880719,
+   "responseCompleted": true
+  },
+  {
+   "path": "/v1/responses",
+   "status": 200,
+   "contentType": "text/event-stream",
+   "seconds": 1.485246,
+   "responseCompleted": true
+  }
+ ],
+ "models": {
+  "modelsListed": 124,
+  "gpt6Luna": true
+ },
+ "reading": "Commissary served gpt-6-luna, a model only the Codex backend (chatgpt.com/backend-api/codex) has in pi-ai 1.5.0's catalog. Its response headers do not name the credential or the upstream URL it used."
+}

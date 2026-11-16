@@ -2,7 +2,7 @@
  "at": "2026-11-15T11:00:33.704Z",
  "op": "paste-durable",
  "provider": "anthropic",
- "arg": "/Users/ianpascoe/.t3/userdata/secrets/files/b93272ee994ec507b4292264ae3792f8",
+ "arg": "<secret-file>",
  "result": {
   "status": 200,
   "ok": true,

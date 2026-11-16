@@ -2,7 +2,7 @@
  "at": "2026-11-15T11:02:50.214Z",
  "op": "paste-durable",
  "provider": "openai",
- "arg": "/Users/ianpascoe/.t3/userdata/secrets/files/3b816c0c315a9afba1af4d23dd761be5",
+ "arg": "<secret-file>",
  "result": {
   "status": 200,
   "ok": false,

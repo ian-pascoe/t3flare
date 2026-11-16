@@ -1,0 +1,951 @@
+{
+ "at": "2026-11-16T11:26:42.428Z",
+ "setup": "Standalone throwaway Worker `codex-probe` (scratch /tmp/cxp/worker.js + wrangler.toml, deployed by the owner with wrangler; Executor uploads failed, see the report). One script, two hosts: the Workers Custom Domain codex-probe.ianpascoe.dev (zone ianpascoe.dev, the zone of Commissary's ai.ianpascoe.dev) and codex-probe.ian-g-pascoe.workers.dev (control). Same code, same token, same Durable Object (`Probe`, one named object). Every endpoint gated by a bearer (only its SHA-256 in the code). /matrix runs in the stateless fetch handler, /matrix-do inside the Durable Object. /echo and each matrix first fetch httpbin.org/headers and postman-echo.com/headers to observe the cf-worker header of the subrequest.",
+ "signIn": {
+  "flow": "ChatGPT device code (auth.openai.com/api/accounts/deviceauth, client app_EMoamEEZ73f0CkXaXp7hrann), polled by the Durable Object's alarm every 5 s",
+  "state": "complete",
+  "events": [
+   {
+    "at": 0,
+    "type": "device_code"
+   },
+   {
+    "at": 30339,
+    "type": "approved+exchanged",
+    "tokenFields": [
+     "access_token",
+     "earliest_refresh_at",
+     "expires_in",
+     "id_token",
+     "refresh_token",
+     "scope",
+     "token_type"
+    ],
+    "expiresIn": 864000,
+    "planType": "free"
+   }
+  ],
+  "polls": 6,
+  "tokenHeld": true
+ },
+ "runs": {
+  "codex-probe.ianpascoe.dev": {
+   "echo": {
+    "host": "codex-probe.ianpascoe.dev",
+    "echo": {
+     "https://postman-echo.com/headers": {
+      "status": 200,
+      "cfWorker": null,
+      "cfHeaderNames": [],
+      "userAgent": null
+     },
+     "https://httpbin.org/headers": {
+      "status": 200,
+      "cfWorker": "ianpascoe.dev",
+      "cfHeaderNames": [
+       "cf-ew-via",
+       "cf-ray",
+       "cf-visitor",
+       "cf-worker"
+      ],
+      "userAgent": null
+     }
+    }
+   },
+   "matrixFetchHandler": {
+    "host": "codex-probe.ianpascoe.dev",
+    "where": "worker fetch handler",
+    "model": "gpt-6-luna",
+    "echo": {
+     "https://postman-echo.com/headers": {
+      "status": 200,
+      "cfWorker": null,
+      "cfHeaderNames": [],
+      "userAgent": null
+     },
+     "https://httpbin.org/headers": {
+      "status": 200,
+      "cfWorker": "ianpascoe.dev",
+      "cfHeaderNames": [
+       "cf-ew-via",
+       "cf-ray",
+       "cf-visitor",
+       "cf-worker"
+      ],
+      "userAgent": null
+     }
+    },
+    "cases": [
+     {
+      "transport": "sse",
+      "name": "commissary exact",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 3,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "minimal: authorization, content-type, accept, codex-tui UA",
+      "sentHeaderNames": [
+       "accept",
+       "content-type",
+       "user-agent"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "no user-agent (commissary minus user-agent)",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "bare: authorization, content-type, accept",
+      "sentHeaderNames": [
+       "accept",
+       "content-type"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus originator",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus chatgpt-account-id",
+      "sentHeaderNames": [
+       "accept",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus session-id, routing hint, connection",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "content-type",
+       "originator",
+       "user-agent"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "pi-ai's SSE set (originator pi, no user-agent)",
+      "sentHeaderNames": [
+       "OpenAI-Beta",
+       "accept",
+       "chatgpt-account-id",
+       "content-type",
+       "originator"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "commissary exact",
+      "sentHeaderNames": [
+       "chatgpt-account-id",
+       "conversation_id",
+       "openai-beta",
+       "originator",
+       "session_id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 1,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "minimal: authorization, openai-beta, codex-tui UA",
+      "sentHeaderNames": [
+       "openai-beta",
+       "user-agent"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "no user-agent (commissary minus user-agent)",
+      "sentHeaderNames": [
+       "chatgpt-account-id",
+       "conversation_id",
+       "openai-beta",
+       "originator",
+       "session_id",
+       "x-codex-routing-hint"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     }
+    ]
+   },
+   "matrixDurableObject": {
+    "host": "codex-probe.ianpascoe.dev",
+    "where": "durable-object",
+    "model": "gpt-6-luna",
+    "echo": {
+     "https://postman-echo.com/headers": {
+      "status": 200,
+      "cfWorker": null,
+      "cfHeaderNames": [],
+      "userAgent": null
+     },
+     "https://httpbin.org/headers": {
+      "status": 200,
+      "cfWorker": "ian-g-pascoe.workers.dev",
+      "cfHeaderNames": [
+       "cf-ew-via",
+       "cf-ray",
+       "cf-visitor",
+       "cf-worker"
+      ],
+      "userAgent": null
+     }
+    },
+    "cases": [
+     {
+      "transport": "sse",
+      "name": "commissary exact",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "minimal: authorization, content-type, accept, codex-tui UA",
+      "sentHeaderNames": [
+       "accept",
+       "content-type",
+       "user-agent"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "no user-agent (commissary minus user-agent)",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 3,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "bare: authorization, content-type, accept",
+      "sentHeaderNames": [
+       "accept",
+       "content-type"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 1,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus originator",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 3,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus chatgpt-account-id",
+      "sentHeaderNames": [
+       "accept",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus session-id, routing hint, connection",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "content-type",
+       "originator",
+       "user-agent"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "pi-ai's SSE set (originator pi, no user-agent)",
+      "sentHeaderNames": [
+       "OpenAI-Beta",
+       "accept",
+       "chatgpt-account-id",
+       "content-type",
+       "originator"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 1,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "commissary exact",
+      "sentHeaderNames": [
+       "chatgpt-account-id",
+       "conversation_id",
+       "openai-beta",
+       "originator",
+       "session_id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "minimal: authorization, openai-beta, codex-tui UA",
+      "sentHeaderNames": [
+       "openai-beta",
+       "user-agent"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "no user-agent (commissary minus user-agent)",
+      "sentHeaderNames": [
+       "chatgpt-account-id",
+       "conversation_id",
+       "openai-beta",
+       "originator",
+       "session_id",
+       "x-codex-routing-hint"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     }
+    ]
+   }
+  },
+  "codex-probe.ian-g-pascoe.workers.dev": {
+   "echo": {
+    "host": "codex-probe.ian-g-pascoe.workers.dev",
+    "echo": {
+     "https://postman-echo.com/headers": {
+      "status": 200,
+      "cfWorker": null,
+      "cfHeaderNames": [],
+      "userAgent": null
+     },
+     "https://httpbin.org/headers": {
+      "status": 200,
+      "cfWorker": "ian-g-pascoe.workers.dev",
+      "cfHeaderNames": [
+       "cf-ew-via",
+       "cf-ray",
+       "cf-visitor",
+       "cf-worker"
+      ],
+      "userAgent": null
+     }
+    }
+   },
+   "matrixFetchHandler": {
+    "host": "codex-probe.ian-g-pascoe.workers.dev",
+    "where": "worker fetch handler",
+    "model": "gpt-6-luna",
+    "echo": {
+     "https://postman-echo.com/headers": {
+      "status": 200,
+      "cfWorker": null,
+      "cfHeaderNames": [],
+      "userAgent": null
+     },
+     "https://httpbin.org/headers": {
+      "status": 200,
+      "cfWorker": "ian-g-pascoe.workers.dev",
+      "cfHeaderNames": [
+       "cf-ew-via",
+       "cf-ray",
+       "cf-visitor",
+       "cf-worker"
+      ],
+      "userAgent": null
+     }
+    },
+    "cases": [
+     {
+      "transport": "sse",
+      "name": "commissary exact",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 3,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "minimal: authorization, content-type, accept, codex-tui UA",
+      "sentHeaderNames": [
+       "accept",
+       "content-type",
+       "user-agent"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 3,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "no user-agent (commissary minus user-agent)",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "bare: authorization, content-type, accept",
+      "sentHeaderNames": [
+       "accept",
+       "content-type"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus originator",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 3,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus chatgpt-account-id",
+      "sentHeaderNames": [
+       "accept",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus session-id, routing hint, connection",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "content-type",
+       "originator",
+       "user-agent"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "pi-ai's SSE set (originator pi, no user-agent)",
+      "sentHeaderNames": [
+       "OpenAI-Beta",
+       "accept",
+       "chatgpt-account-id",
+       "content-type",
+       "originator"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "commissary exact",
+      "sentHeaderNames": [
+       "chatgpt-account-id",
+       "conversation_id",
+       "openai-beta",
+       "originator",
+       "session_id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "minimal: authorization, openai-beta, codex-tui UA",
+      "sentHeaderNames": [
+       "openai-beta",
+       "user-agent"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "no user-agent (commissary minus user-agent)",
+      "sentHeaderNames": [
+       "chatgpt-account-id",
+       "conversation_id",
+       "openai-beta",
+       "originator",
+       "session_id",
+       "x-codex-routing-hint"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     }
+    ]
+   },
+   "matrixDurableObject": {
+    "host": "codex-probe.ian-g-pascoe.workers.dev",
+    "where": "durable-object",
+    "model": "gpt-6-luna",
+    "echo": {
+     "https://postman-echo.com/headers": {
+      "status": 200,
+      "cfWorker": null,
+      "cfHeaderNames": [],
+      "userAgent": null
+     },
+     "https://httpbin.org/headers": {
+      "status": 200,
+      "cfWorker": "ian-g-pascoe.workers.dev",
+      "cfHeaderNames": [
+       "cf-ew-via",
+       "cf-ray",
+       "cf-visitor",
+       "cf-worker"
+      ],
+      "userAgent": null
+     }
+    },
+    "cases": [
+     {
+      "transport": "sse",
+      "name": "commissary exact",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 3,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "minimal: authorization, content-type, accept, codex-tui UA",
+      "sentHeaderNames": [
+       "accept",
+       "content-type",
+       "user-agent"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "no user-agent (commissary minus user-agent)",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "bare: authorization, content-type, accept",
+      "sentHeaderNames": [
+       "accept",
+       "content-type"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus originator",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "connection",
+       "content-type",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus chatgpt-account-id",
+      "sentHeaderNames": [
+       "accept",
+       "connection",
+       "content-type",
+       "originator",
+       "session-id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "commissary minus session-id, routing hint, connection",
+      "sentHeaderNames": [
+       "accept",
+       "chatgpt-account-id",
+       "content-type",
+       "originator",
+       "user-agent"
+      ],
+      "userAgent": "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)",
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "sse",
+      "name": "pi-ai's SSE set (originator pi, no user-agent)",
+      "sentHeaderNames": [
+       "OpenAI-Beta",
+       "accept",
+       "chatgpt-account-id",
+       "content-type",
+       "originator"
+      ],
+      "userAgent": null,
+      "status": 403,
+      "ms": 2,
+      "contentType": "text/html; charset=UTF-8",
+      "server": "cloudflare",
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "commissary exact",
+      "sentHeaderNames": [
+       "chatgpt-account-id",
+       "conversation_id",
+       "openai-beta",
+       "originator",
+       "session_id",
+       "user-agent",
+       "x-codex-routing-hint"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "minimal: authorization, openai-beta, codex-tui UA",
+      "sentHeaderNames": [
+       "openai-beta",
+       "user-agent"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 1,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     },
+     {
+      "transport": "websocket",
+      "name": "no user-agent (commissary minus user-agent)",
+      "sentHeaderNames": [
+       "chatgpt-account-id",
+       "conversation_id",
+       "openai-beta",
+       "originator",
+       "session_id",
+       "x-codex-routing-hint"
+      ],
+      "handshake": 403,
+      "server": "cloudflare",
+      "contentType": "text/html; charset=UTF-8",
+      "ms": 2,
+      "head": "<html> <head> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> </head> <body> <div class=\"container\"> <div class=\"logo\"> <svg width=\"41\" h"
+     }
+    ]
+   }
+  }
+ },
+ "revoke": [
+  {
+   "hint": "refresh_token",
+   "status": 200
+  },
+  {
+   "hint": "access_token",
+   "status": 200
+  },
+  {
+   "refreshAfterRevoke": 401,
+   "body": "{\n  \"error\": {\n    \"message\": \"Your session has ended. Please log in again.\",\n    \"type\": \"invalid_request_error\",\n    \"param\": null,\n    \"code\": \"[redacted]\"\n  }\n}"
+  }
+ ]
+}
