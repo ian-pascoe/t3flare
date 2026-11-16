@@ -102,7 +102,12 @@ if (proxyUrl === "" || proxyKey === "") {
 const cookie = await pair();
 await admin("POST", "/_t3flare/disarm-bootstrap");
 
-// 1. The endpoints: Commissary's three APIs OpenCode speaks, each with the same model (the list read with the key).
+// 1. The endpoints: Commissary's three APIs OpenCode speaks, each with the same model (the list read with the key). The
+//    stage's own endpoint (`stage.ts deploy`'s, SPI-1175) is removed first, so OpenCode's are exactly these.
+const existing = ((await api("GET", "endpoints")).json ?? {}) as { endpoints?: { endpoints?: Array<{ id: string }> } | Array<{ id: string }> };
+const existingIds = (Array.isArray(existing.endpoints) ? existing.endpoints : (existing.endpoints?.endpoints ?? [])).map((entry) => entry.id);
+for (const id of existingIds) await api("POST", "endpoints", { op: "remove", id });
+report.removedEndpoints = existingIds;
 const ANTHROPIC = { api: "anthropic-messages", baseUrl: proxyUrl, auth: "api-key", headers: {} };
 const COMPLETIONS = { api: "openai-completions", baseUrl: `${proxyUrl}/v1`, auth: "api-key", headers: {} };
 const RESPONSES = { api: "openai-responses", baseUrl: `${proxyUrl}/v1`, auth: "api-key", headers: {} };
