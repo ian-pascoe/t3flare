@@ -7,7 +7,7 @@
 // A pi-ai bump that changes any of these fails here.
 import { createModels, type FetchFunction } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { CLAUDE_AUTHORIZE_URL, CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI, CLAUDE_SCOPES, CLAUDE_TOKEN_URL } from "@t3flare/models/claudeOAuth";
+import { CLAUDE_AUTHORIZE_URL, CLAUDE_CLIENT_ID, CLAUDE_OAUTH_TOKEN_MARK, CLAUDE_REDIRECT_URI, CLAUDE_SCOPES, CLAUDE_TOKEN_URL } from "@t3flare/models/claudeOAuth";
 import type { EndpointCredential, ModelEndpoint } from "@t3flare/models/endpoints";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -107,10 +107,12 @@ describe("a Claude sign-in on pi-ai", () => {
   });
 
   it("sends an OAuth token with Claude Code's headers, betas, identity and tool names", async () => {
-    const sent = await requestOn(CLAUDE, { apiKey: "sk-ant-oat01-token", expiresAt: 4_000_000_000_000 });
+    // A token built from our mark gets pi-ai's OAuth shape: our mark is no looser than pi-ai's `isOAuthToken`.
+    const token = `${CLAUDE_OAUTH_TOKEN_MARK}01-token`;
+    const sent = await requestOn(CLAUDE, { apiKey: token, expiresAt: 4_000_000_000_000 });
     expect(sent.url).toBe("https://api.anthropic.com/v1/messages?beta=true");
     expect(sent.headers).toMatchObject({
-      authorization: "Bearer sk-ant-oat01-token",
+      authorization: `Bearer ${token}`,
       "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
       "user-agent": "claude-cli/2.1.280",
       "x-app": "cli",
@@ -120,6 +122,12 @@ describe("a Claude sign-in on pi-ai", () => {
     const system = sent.body.system as Array<{ readonly type: string; readonly text: string }>;
     expect(system.map((block) => block.text)).toEqual([IDENTITY, "Be brief."]);
     expect((sent.body.tools as Array<{ readonly name: string }>).map((tool) => tool.name)).toEqual(["Bash"]);
+  });
+
+  it("gives a key that falls one character short of our mark none of it: our mark is no stricter than pi-ai's", async () => {
+    const sent = await requestOn({ ...CLAUDE, id: "anthropic-api", auth: "api-key" }, { apiKey: `${CLAUDE_OAUTH_TOKEN_MARK.slice(0, -1)}_-key` });
+    expect(sent.headers).not.toHaveProperty("authorization");
+    expect(sent.headers).not.toHaveProperty("x-app");
   });
 
   it("sends an API key on the same API with none of it", async () => {

@@ -97,7 +97,7 @@ const signInForm = (escape: Escape, view: EndpointsView, kind: SignIn): string =
   const at = (name: string) => escape(`sign-in-${kind}-${name}`);
   return `<form class="group add" id="${at("form")}" data-sign-in-form data-sign-in-kind="${escape(kind)}" data-sign-in-steps="${escape(signIn.paste.instructions)}" autocomplete="off" aria-labelledby="${at("title")}">
 <div class="row"><div><div class="row-title"><h3 id="${at("title")}">Sign in with ${escape(signIn.title)}</h3></div><p class="desc">${escape(signIn.about)} Start, open the link and approve, then paste what it gives you back here.</p>
-<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>${escape(signIn.caution)}</strong><p>${escape(signIn.note)}</p></div></div></div></div>
+<div class="callout callout-warn" role="note">${icon("warn")}<div><strong>${escape(signIn.noteTitle)}</strong><p>${escape(signIn.note)}</p></div></div></div></div>
 <div class="form-body">${notes}
 <div class="field"><label for="${at("id")}">Id</label><input id="${at("id")}" name="id" type="text" required pattern="[a-z0-9](?:[a-z0-9\\-]{0,30}[a-z0-9])?" value="${escape(waiting[0]?.[0] ?? kind)}" autocapitalize="none" spellcheck="false"></div>
 <div class="field"><label for="${at("label")}">Label</label><input id="${at("label")}" name="label" type="text" maxlength="60" value="${escape(signIn.title)}"></div>

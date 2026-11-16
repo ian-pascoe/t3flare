@@ -27,12 +27,13 @@ describe("the Claude subscription sign-in", () => {
   });
 
   it("completes from the code Anthropic shows, pasted whole, with spaces, or as the page's address", async () => {
-    for (const shape of ["code#state", "spaced", "address"] as const) {
+    for (const shape of ["code#state", "spaced", "address", "address without scheme"] as const) {
       const fake = fakeAnthropic();
       const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
       const shown = fake.approve(authorizeUrl, { uuid: "acct-42", email: "owner@example.com" });
       const [code, state] = shown.split("#");
-      const pasted = shape === "code#state" ? shown : shape === "spaced" ? `  ${shown}\n` : `${CLAUDE_REDIRECT_URI}?code=${code}&state=${state}`;
+      const address = `${CLAUDE_REDIRECT_URI}?code=${code}&state=${state}`;
+      const pasted = shape === "code#state" ? shown : shape === "spaced" ? `  ${shown}\n` : shape === "address" ? address : address.replace(/^https:\/\//, "");
       const result = await completeClaudeSignIn(vendorOf(fake), pending, pasted);
       expect(result, shape).toMatchObject({ ok: true });
       if (!result.ok) continue;
@@ -42,6 +43,8 @@ describe("the Claude subscription sign-in", () => {
       const sent = fake.requests[0]!;
       expect(sent.url).toBe(CLAUDE_TOKEN_URL);
       expect(JSON.parse(sent.body)).toEqual({ grant_type: "authorization_code", client_id: CLAUDE_CLIENT_ID, code, state, redirect_uri: CLAUDE_REDIRECT_URI, code_verifier: pending.verifier });
+      // Never following a redirect (the body holds the code), and bounded.
+      expect(sent).toMatchObject({ redirect: "manual", signal: true });
     }
   });
 
@@ -54,6 +57,34 @@ describe("the Claude subscription sign-in", () => {
     expect(result).toMatchObject({ ok: false, problem: expect.stringMatching(/does not belong to the sign-in in progress/) });
     expect(result).not.toHaveProperty("spent");
     expect(fake.counts.exchanges).toBe(0);
+    for (const part of [shown, ...shown.split("#")]) expect(JSON.stringify(result)).not.toContain(part);
+  });
+
+  it("refuses any address but the page Anthropic shows the code on, before any exchange: the authorize link itself spends nothing", async () => {
+    const fake = fakeAnthropic();
+    const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
+    const [code] = fake.approve(authorizeUrl).split("#");
+    // The authorize link carries `code=true` and this attempt's state: pasted by mistake, it must not be exchanged.
+    const pastes = [authorizeUrl, `https://evil.example/oauth/code/callback?code=${code}&state=${pending.state}`, `https://platform.claude.com/other?code=${code}&state=${pending.state}`, `code=${code}&state=${pending.state}`];
+    for (const pasted of pastes) {
+      const result = await completeClaudeSignIn(vendorOf(fake), pending, pasted);
+      expect(result, pasted).toMatchObject({ ok: false });
+      expect(result, pasted).not.toHaveProperty("spent");
+      for (const secret of [code!, pending.state, pending.verifier]) expect(JSON.stringify(result), pasted).not.toContain(secret);
+    }
+    expect(fake.counts.exchanges).toBe(0);
+  });
+
+  it("gives up on a token endpoint that does not answer, within its bound, and the attempt keeps waiting", async () => {
+    const fake = fakeAnthropic({ hang: true });
+    const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
+    const shown = fake.approve(authorizeUrl);
+    const started = performance.now();
+    const result = await completeClaudeSignIn({ ...vendorOf(fake), timeoutMs: 50 }, pending, shown);
+    expect(result).toMatchObject({ ok: false, problem: expect.stringMatching(/could not be reached/) });
+    expect(result).not.toHaveProperty("spent");
+    expect(await refreshClaude({ ...vendorOf(fake), timeoutMs: 50 }, { type: "oauth", access: "sk-ant-oat01-a", refresh: "sk-ant-ort01-r", expires: NOW })).toMatchObject({ ok: false, refused: false });
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 
   it("says plainly why a sign-in failed, never echoing a code, the verifier or a token", async () => {
@@ -94,6 +125,34 @@ describe("the Claude subscription sign-in", () => {
     // A passing failure is not a refusal.
     fake.options.refreshStatus = 503;
     expect(await refreshClaude(vendorOf(fake), renewed.credential)).toMatchObject({ ok: false, refused: false, problem: expect.stringMatching(/HTTP 503/) });
+  });
+
+  it("ends the sign-in on any refusal of the refresh (a grant removed at claude.ai), but not on Anthropic's passing trouble", async () => {
+    const credential = { type: "oauth" as const, access: "sk-ant-oat01-a", refresh: "sk-ant-ort01-r", expires: NOW };
+    const cases: Array<{ readonly status: number; readonly body?: unknown; readonly refused: boolean; readonly code?: string }> = [
+      { status: 401, body: { error: "invalid_client" }, refused: true, code: "invalid_client" },
+      { status: 400, body: { error: "unauthorized_client" }, refused: true, code: "unauthorized_client" },
+      // No OAuth code at all (Anthropic's API error shape, or none): still the end of the sign-in, not "retry" forever.
+      { status: 401, body: { type: "error", error: { type: "authentication_error", message: "OAuth token has been revoked" } }, refused: true, code: "http_401" },
+      { status: 403, refused: true, code: "http_403" },
+      { status: 400, body: { error: "temporarily_unavailable" }, refused: false },
+      { status: 429, body: { error: "rate_limit_error" }, refused: false },
+    ];
+    for (const entry of cases) {
+      const fake = fakeAnthropic({ refreshStatus: entry.status, refreshBody: entry.body });
+      const result = await refreshClaude(vendorOf(fake), credential);
+      expect(result, JSON.stringify(entry)).toMatchObject({ ok: false, refused: entry.refused, ...(entry.code === undefined ? {} : { code: entry.code }) });
+      expect(JSON.stringify(result)).not.toContain("revoked");
+    }
+  });
+
+  it("does not take a renewal whose access token is not a Claude subscription's", async () => {
+    const fake = fakeAnthropic();
+    const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
+    const signedIn = await completeClaudeSignIn(vendorOf(fake), pending, fake.approve(authorizeUrl));
+    if (!signedIn.ok) throw new Error(signedIn.problem);
+    fake.options.plainTokens = true;
+    expect(await refreshClaude(vendorOf(fake), signedIn.credential)).toEqual({ ok: false, refused: false, problem: "Anthropic's renewal was not a usable token set" });
   });
 
   it("revokes nothing: Anthropic offers no revocation, so nothing is sent and it is not confirmed", async () => {

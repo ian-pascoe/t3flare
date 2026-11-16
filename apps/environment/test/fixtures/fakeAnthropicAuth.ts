@@ -26,8 +26,11 @@ export interface FakeAnthropicOptions {
   exchangeError?: string | undefined;
   /** A refresh answers this OAuth error. */
   refreshError?: string | undefined;
-  /** A refresh answers this HTTP status with no OAuth error (a passing failure). */
+  /** A refresh answers this HTTP status, with this body (none: a text body). */
   refreshStatus?: number | undefined;
+  refreshBody?: unknown;
+  /** A request to the token endpoint never answers: it waits for its caller's signal to abort it. */
+  hang?: boolean;
   /** The scope granted (drop `user:inference` to decline model use). */
   grantedScope?: string;
   /** Each token response's `expires_in` (Anthropic's: 8 h). */
@@ -48,7 +51,8 @@ export interface FakeAnthropic {
   readonly options: FakeAnthropicOptions;
   /** The owner's approval at claude.ai: the text Anthropic's page shows to copy, `code#state`. */
   approve(authorizeUrl: string, account?: { readonly uuid?: string; readonly email?: string }): string;
-  readonly requests: Array<{ readonly url: string; readonly method: string; readonly body: string }>;
+  /** Every request, with whether it would follow a redirect (`redirect`) and was bounded (`signal`). */
+  readonly requests: Array<{ readonly url: string; readonly method: string; readonly body: string; readonly redirect: RequestRedirect | undefined; readonly signal: boolean }>;
   /** Every token it issued (access and refresh), for leak scans. */
   readonly issued: Array<string>;
   readonly accessTokens: Array<string>;
@@ -94,7 +98,7 @@ export const fakeAnthropic = (options: FakeAnthropicOptions = {}): FakeAnthropic
     const url = String(input instanceof Request ? input.url : input);
     const method = init?.method ?? "GET";
     const body = typeof init?.body === "string" ? init.body : "";
-    requests.push({ url, method, body });
+    requests.push({ url, method, body, redirect: init?.redirect, signal: init?.signal instanceof AbortSignal });
     if (url !== CLAUDE_TOKEN_URL || method !== "POST") {
       counts.other += 1;
       return new Response("not found", { status: 404 });
@@ -107,6 +111,10 @@ export const fakeAnthropic = (options: FakeAnthropicOptions = {}): FakeAnthropic
     }
     for (const name of ["code", "code_verifier", "state", "refresh_token"]) if (typeof form[name] === "string") seen.push(form[name]);
     if (options.tokenDown === true) throw new TypeError("fetch failed");
+    if (options.hang === true) {
+      const signal = init?.signal;
+      await new Promise<never>((_, reject) => signal?.addEventListener("abort", () => reject(signal.reason), { once: true }));
+    }
     if (new Headers(init?.headers).get("content-type") !== "application/json") return oauthError("invalid_request");
     if (form.client_id !== CLAUDE_CLIENT_ID) return oauthError("invalid_client", 401);
     if (form.grant_type === "authorization_code") {
@@ -128,7 +136,9 @@ export const fakeAnthropic = (options: FakeAnthropicOptions = {}): FakeAnthropic
       options.onRefresh?.();
       await options.refreshGate;
       if (options.refreshError !== undefined) return oauthError(options.refreshError);
-      if (options.refreshStatus !== undefined) return new Response("upstream trouble", { status: options.refreshStatus });
+      if (options.refreshStatus !== undefined) {
+        return options.refreshBody === undefined ? new Response("upstream trouble", { status: options.refreshStatus }) : Response.json(options.refreshBody, { status: options.refreshStatus });
+      }
       const record = refreshTokens.get(String(form.refresh_token));
       if (record === undefined || !record.alive) return oauthError("invalid_grant");
       // Every refresh rotates it; the replaced one is refused from now on (SPI-1161 Q5).

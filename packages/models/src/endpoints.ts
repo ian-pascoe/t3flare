@@ -32,7 +32,7 @@ export interface SignInKind {
   /** The vendor's name as messages use it: "is not signed in to <title>", "Sign in with <title>". */
   readonly title: string;
   /** The title of the panel's note: what the owner should weigh before signing in. */
-  readonly caution: string;
+  readonly noteTitle: string;
   /** The panel's plain note beside the sign-in (what is verified of it, and what it needs). */
   readonly note: string;
   /** What a refused request on it most likely means, after "refused its <title> sign-in (HTTP n): ". */
@@ -59,7 +59,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     api: "openai-responses",
     baseUrl: "https://api.openai.com/v1",
     title: "ChatGPT",
-    caution: "Unverified",
+    noteTitle: "Unverified",
     note: "ChatGPT plan usage is unverified in t3flare: no working sign-in has been seen yet. OpenAI offers it to ChatGPT Plus or Pro plans, for open-source and locally hosted apps. If it fails, please report it with the message shown.",
     refused: "ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.",
     about: "Use your ChatGPT plan's usage for Pi Durable, on OpenAI's Responses API.",
@@ -74,7 +74,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     api: "anthropic-messages",
     baseUrl: "https://api.anthropic.com",
     title: "Claude",
-    caution: "Your risk",
+    noteTitle: "Your risk",
     note: "This signs in as Claude Code, with its OAuth client, as pi-ai does. Anthropic's terms may not allow a Claude plan's usage outside its own apps: that risk is yours, chosen knowingly. It needs a Claude Pro or Max plan. Anthropic offers no revocation to apps, so signing out here does not end the grant: remove it at claude.ai, under Settings, Claude Code.",
     refused: "a Claude Pro or Max plan is needed; otherwise sign in with Claude again in the Harness panel.",
     about: "Use your Claude Pro or Max plan's usage for Pi Durable, on Anthropic's Messages API.",

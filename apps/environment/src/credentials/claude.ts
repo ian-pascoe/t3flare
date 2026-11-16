@@ -21,11 +21,14 @@
 // Every failure is one of our fixed texts: never a token, a code, the verifier, or Anthropic's body.
 import { CLAUDE_AUTHORIZE_URL, CLAUDE_CLIENT_ID, CLAUDE_INFERENCE_SCOPE, CLAUDE_OAUTH_TOKEN_MARK, CLAUDE_REDIRECT_URI, CLAUDE_SCOPES, CLAUDE_TOKEN_URL } from "@t3flare/models/claudeOAuth";
 
+import { isRecord, OAUTH_TIMEOUT_MS, oauthErrorCode, pkceChallenge, random } from "./oauth.ts";
 import type { RefreshResult, SignInCredential, SignInResult, SignInVendor } from "./signIn.ts";
 
 export interface ClaudeVendor {
   readonly fetch: typeof fetch;
   readonly now: () => number;
+  /** Each request's bound (`OAUTH_TIMEOUT_MS`; shorter in tests). */
+  readonly timeoutMs?: number;
 }
 
 /** A sign-in started and not yet completed: kept sealed until the owner pastes the code. */
@@ -35,28 +38,19 @@ export interface PendingClaudeSignIn {
   readonly startedAt: number;
 }
 
-/** A signed-in credential, in pi-ai's `OAuthCredential` shape; `expires` is the access token's real expiry (ms). */
-export interface ClaudeCredential extends SignInCredential {
-  readonly scopes: ReadonlyArray<string>;
-  /** Anthropic's account id. */
-  readonly subject: string | null;
-  readonly email: string | null;
-}
-
-const TIMEOUT_MS = 15_000;
-
-/** A refresh answer that ends the sign-in: the refresh token is gone (rotated away, expired, or the grant removed). */
-const REFUSED_CODES: ReadonlySet<string> = new Set(["invalid_grant", "invalid_client", "unauthorized_client"]);
-
-const base64url = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-const random = (bytes: number): string => base64url(crypto.getRandomValues(new Uint8Array(bytes)));
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+/**
+ * A refresh answer that does not end the sign-in though its status is 400, 401 or 403: the vendor's passing trouble.
+ * Every other refusal at those statuses ends it (the refresh token is gone: rotated away, expired, or the grant removed
+ * at claude.ai), whatever its body says, so a removed grant signs the endpoint out instead of failing every turn as
+ * "retry".
+ */
+const PASSING_CODES: ReadonlySet<string> = new Set(["temporarily_unavailable", "server_error", "slow_down"]);
 
 /** A new attempt: its authorize URL for the owner's browser, and what the paste is checked against. */
 export const startClaudeSignIn = async (input: { readonly now?: () => number } = {}): Promise<{ readonly authorizeUrl: string; readonly pending: PendingClaudeSignIn }> => {
   // pi-ai's verifier is 32 random bytes; the state is as long, and its own.
   const pending: PendingClaudeSignIn = { state: random(32), verifier: random(32), startedAt: (input.now ?? Date.now)() };
-  const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pending.verifier))));
+  const challenge = await pkceChallenge(pending.verifier);
   const url = new URL(CLAUDE_AUTHORIZE_URL);
   url.search = new URLSearchParams({
     code: "true",
@@ -72,52 +66,47 @@ export const startClaudeSignIn = async (input: { readonly now?: () => number } =
 };
 
 const WHOLE = "Copy all of the code Anthropic shows after you approve: it is two parts joined by #. Paste it here whole.";
+const CALLBACK = new URL(CLAUDE_REDIRECT_URI);
 
-/** The pasted code and state: `code#state` as Anthropic's page shows it, or its page's address, or `code=…&state=…`. */
+/**
+ * The pasted code and state: `code#state` as Anthropic's page shows it, or that page's own address (its `code` and
+ * `state` in the query). Any other address is refused before anything is sent: the authorize link itself carries this
+ * attempt's state and a `code` parameter, and must not spend the attempt.
+ */
 const pastedCode = (pasted: string): { readonly code: string; readonly state: string } | string => {
   const text = pasted.trim();
   let code: string | null = null;
   let state: string | null = null;
-  if (/^https?:\/\//i.test(text)) {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text) || text.startsWith(`${CALLBACK.host}/`)) {
+    let url: URL;
     try {
-      const url = new URL(text);
-      code = url.searchParams.get("code");
-      state = url.searchParams.get("state");
+      url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`);
     } catch {
       return WHOLE;
     }
+    if (url.protocol !== CALLBACK.protocol || url.host !== CALLBACK.host || url.pathname !== CALLBACK.pathname) {
+      return `That is not the page Anthropic shows the code on (${CLAUDE_REDIRECT_URI}): ${WHOLE}`;
+    }
+    code = url.searchParams.get("code");
+    state = url.searchParams.get("state");
   } else if (text.includes("#")) {
     const at = text.indexOf("#");
     code = text.slice(0, at);
     state = text.slice(at + 1);
-  } else if (text.includes("code=")) {
-    const params = new URLSearchParams(text.replace(/^\?/, ""));
-    code = params.get("code");
-    state = params.get("state");
   }
-  if (code === null || state === null || code === "" || state === "" || /\s/.test(code) || /\s/.test(state)) return WHOLE;
+  if (code === null || state === null || code === "" || state === "" || /[\s#?&=]/.test(code) || /[\s#?&=]/.test(state)) return WHOLE;
   return { code, state };
 };
 
-/** A request's bound: its own 15 s. */
+/** A JSON POST to Anthropic's token endpoint, bounded, never following a redirect (the body holds a code or a token). */
 const postJson = (vendor: ClaudeVendor, body: Record<string, string>): Promise<Response> =>
   vendor.fetch(CLAUDE_TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(vendor.timeoutMs ?? OAUTH_TIMEOUT_MS),
     redirect: "manual",
   });
-
-/** An OAuth error's code from an answer's body, or undefined. */
-const errorCode = async (response: Response): Promise<string | undefined> => {
-  try {
-    const body: unknown = await response.json();
-    return isRecord(body) && typeof body.error === "string" && /^[a-z_]{1,64}$/.test(body.error) ? body.error : undefined;
-  } catch {
-    return undefined;
-  }
-};
 
 interface TokenAnswer {
   readonly access: string;
@@ -174,7 +163,7 @@ export const completeClaudeSignIn = async (vendor: ClaudeVendor, pending: Pendin
   } catch {
     return { ok: false, problem: "Anthropic's token endpoint could not be reached: paste the code again, or start again." };
   }
-  if (!response.ok) return { ok: false, problem: exchangeProblem(response.status, await errorCode(response)), spent: true };
+  if (!response.ok) return { ok: false, problem: exchangeProblem(response.status, await oauthErrorCode(response)), spent: true };
   const answer = tokenAnswer(await response.json().catch(() => undefined));
   const left = " It could not be revoked here: remove it at claude.ai, under Settings, Claude Code.";
   if (answer === undefined || answer.refresh === undefined) return { ok: false, problem: `Anthropic's answer to the sign-in was not a usable token set: start the sign-in again.${left}`, spent: true };
@@ -194,7 +183,7 @@ export const completeClaudeSignIn = async (vendor: ClaudeVendor, pending: Pendin
       scopes: answer.scopes ?? [],
       subject: answer.subject,
       email: answer.email,
-    } satisfies ClaudeCredential,
+    },
   };
 };
 
@@ -207,8 +196,11 @@ export const refreshClaude = async (vendor: ClaudeVendor, credential: SignInCred
     return { ok: false, refused: false, problem: "Anthropic's token endpoint could not be reached to renew the Claude sign-in" };
   }
   if (!response.ok) {
-    const code = await errorCode(response);
-    if (code !== undefined && REFUSED_CODES.has(code)) return { ok: false, refused: true, code, problem: `Claude refused to renew the sign-in (${code})` };
+    const code = await oauthErrorCode(response);
+    if ([400, 401, 403].includes(response.status) && (code === undefined || !PASSING_CODES.has(code))) {
+      const named = code ?? `HTTP ${response.status}`;
+      return { ok: false, refused: true, code: code ?? `http_${response.status}`, problem: `Claude refused to renew the sign-in (${named})` };
+    }
     return { ok: false, refused: false, ...(code === undefined ? {} : { code }), problem: `Anthropic did not renew the Claude sign-in (HTTP ${response.status})` };
   }
   const answer = tokenAnswer(await response.json().catch(() => undefined));

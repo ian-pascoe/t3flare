@@ -15,6 +15,7 @@
 // discovery, and the redirect port is 1455 from the first registration onward.
 //
 // Every failure is one of our fixed texts: never a token, a code, a verifier, or the vendor's body.
+import { isRecord, OAUTH_TIMEOUT_MS, oauthErrorCode, pkceChallenge, random } from "./oauth.ts";
 import type { SignInVendor } from "./signIn.ts";
 
 /** OpenAI's endpoints for this flow (the authorize and token URLs as the docs give them; the rest from discovery). */
@@ -38,7 +39,6 @@ export const PLAN_USAGE_SCOPE = "chatgpt.tokens.use.direct";
 const SCOPE = `openid profile email offline_access resource.invoke ${PLAN_USAGE_SCOPE}`;
 /** The app's name on OpenAI's consent page, the same on every installation (first registration only). */
 const AGENT_NAME = "t3flare";
-const TIMEOUT_MS = 15_000;
 /** Clock skew allowed on the ID token's expiry. */
 const SKEW_MS = 5 * 60_000;
 
@@ -110,10 +110,7 @@ export type ChatGptRefreshResult =
   /** `refused`: OpenAI ended the sign-in (sign in again); otherwise a passing failure (retry). */
   | { readonly ok: false; readonly refused: boolean; readonly code?: string; readonly problem: string };
 
-const base64url = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const unbase64url = (text: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), (char) => char.charCodeAt(0));
-const random = (bytes: number): string => base64url(crypto.getRandomValues(new Uint8Array(bytes)));
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** A new attempt: its authorize URL for the owner's browser, and what the paste is checked against. */
 export const startChatGptSignIn = async (input: {
@@ -131,7 +128,7 @@ export const startChatGptSignIn = async (input: {
     subject: input.registration?.subject ?? null,
     startedAt: (input.now ?? Date.now)(),
   };
-  const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pending.verifier))));
+  const challenge = await pkceChallenge(pending.verifier);
   const url = new URL((input.urls ?? CHATGPT_URLS).authorize);
   url.search = new URLSearchParams({
     client_id: pending.clientId ?? "dynamic_agent_client",
@@ -173,7 +170,7 @@ const pastedUrl = (pasted: string, redirectUri: string): URL | string => {
 };
 
 /** A request's bound: its own 15 s, and the caller's overall deadline when it has one. */
-const bounded = (deadline?: AbortSignal): AbortSignal => (deadline === undefined ? AbortSignal.timeout(TIMEOUT_MS) : AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), deadline]));
+const bounded = (deadline?: AbortSignal): AbortSignal => (deadline === undefined ? AbortSignal.timeout(OAUTH_TIMEOUT_MS) : AbortSignal.any([AbortSignal.timeout(OAUTH_TIMEOUT_MS), deadline]));
 
 const post = async (vendor: ChatGptVendor, url: string, form: Record<string, string>, deadline?: AbortSignal): Promise<Response> =>
   vendor.fetch(url, {
@@ -184,15 +181,6 @@ const post = async (vendor: ChatGptVendor, url: string, form: Record<string, str
     redirect: "manual",
   });
 
-/** An OAuth error's code from an answer's body, or undefined. */
-const errorCode = async (response: Response): Promise<string | undefined> => {
-  try {
-    const body: unknown = await response.json();
-    return isRecord(body) && typeof body.error === "string" && /^[a-z_]{1,64}$/.test(body.error) ? body.error : undefined;
-  } catch {
-    return undefined;
-  }
-};
 
 interface TokenAnswer {
   readonly access: string;
@@ -295,7 +283,7 @@ export const completeChatGptSignIn = async (vendor: ChatGptVendor, pending: Pend
     return { ok: false, problem: "OpenAI's token endpoint could not be reached: paste the address again, or start again." };
   }
   const spent = { spent: true, ...(pending.clientId === null ? { clientId } : {}) } as const;
-  if (!response.ok) return { ok: false, problem: exchangeProblem(response.status, await errorCode(response)), ...spent };
+  if (!response.ok) return { ok: false, problem: exchangeProblem(response.status, await oauthErrorCode(response)), ...spent };
   const answer = tokenAnswer(await response.json().catch(() => undefined));
   /** A grant this attempt will not keep: revoked (bounded, as a sign-out's) when it came with a refresh token. */
   const dropped = async (problem: string): Promise<ChatGptSignInResult> => {
@@ -337,7 +325,7 @@ export const refreshChatGpt = async (vendor: ChatGptVendor, credential: ChatGptC
     return { ok: false, refused: false, problem: "OpenAI's token endpoint could not be reached to renew the ChatGPT sign-in" };
   }
   if (!response.ok) {
-    const code = await errorCode(response);
+    const code = await oauthErrorCode(response);
     if (code !== undefined && REFUSED_CODES.has(code)) return { ok: false, refused: true, code, problem: `ChatGPT refused to renew the sign-in (${code})` };
     return { ok: false, refused: false, ...(code === undefined ? {} : { code }), problem: `OpenAI did not renew the ChatGPT sign-in (HTTP ${response.status})` };
   }

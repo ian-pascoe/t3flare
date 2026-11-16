@@ -151,6 +151,11 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     if (!index.has(endpointId)) kv.put(INDEX_KEY, [...index, endpointId]);
     return next;
   };
+  /**
+   * The account's fields as a sign-out leaves them: its subject always forgotten, its email kept only with a registration
+   * the vendor issued (OpenAI's client id, whose next sign-in is hinted with it); a vendor with none (Claude) keeps neither.
+   */
+  const forgotten = (endpointId: string): Pick<SignInStatus, "subject" | "email"> => ({ subject: null, email: status(endpointId).clientId === null ? null : status(endpointId).email });
   const notSignedIn = (endpointId: string): BrokerAccess => ({ ok: false, signedOut: true, problem: status(endpointId).problem ?? "it is not signed in" });
 
   // --- The sealed credential (callers hold the lock to write) ---------------------------------------------------------
@@ -190,7 +195,7 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     sealed.remove(credentialName(endpointId));
     const problem = `${refusal.problem}: it is signed out`;
     // The account is forgotten as at a sign-out: the next sign-in may be another account.
-    setStatus(endpointId, { signedIn: false, subject: null, expiresAt: null, problem, problemAt: now() });
+    setStatus(endpointId, { ...forgotten(endpointId), signedIn: false, expiresAt: null, problem, problemAt: now() });
     log({ endpoint: endpointId, event: "refresh", ok: false, refused: true, code: refusal.code ?? null });
     return { ok: false, signedOut: true, problem };
   };
@@ -335,8 +340,9 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
           (kv.get<ReadonlyArray<string>>(INDEX_KEY) ?? []).filter((id) => id !== endpointId),
         );
       } else {
-        // The account is forgotten too, so the next sign-in may be another account; the registration's client id stays.
-        setStatus(endpointId, { signedIn: false, subject: null, expiresAt: null, pendingSince: null, problem: null, problemAt: null });
+        // The account is forgotten too, so the next sign-in may be another account; a registration (its client id, and the
+        // email it is hinted with) stays.
+        setStatus(endpointId, { ...forgotten(endpointId), signedIn: false, expiresAt: null, pendingSince: null, problem: null, problemAt: null });
       }
       return current;
     });

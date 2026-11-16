@@ -205,14 +205,13 @@ export const credentialProblem = (endpoint: Pick<ModelEndpoint, "id" | "auth">, 
  * compatibility overrides. A new sign-in adds its entry here.
  * - ChatGPT plan usage: no `configuration_update` items, so the effort goes as `reasoning.effort`; no Responses
  *   `tool_search`.
- * - Claude (SPI-1165): nothing of ours. pi-ai gives a Claude subscription's token (`sk-ant-oat…`) Claude Code's request
+ * - Claude (SPI-1165): no entry, nothing of ours. pi-ai gives a Claude subscription's token (`sk-ant-oat…`) Claude Code's request
  *   shape itself: Bearer auth, its betas, user agent and identity block, and its tool names (anthropic-messages.js
  *   `isOAuthToken`). `claudeSignInShape.test.ts` pins that shape; an API key never takes it (the store refuses such a
  *   token as a key).
  */
-const SIGN_IN_REQUESTS: Readonly<Record<SignIn, { readonly payload?: (params: unknown) => unknown; readonly compat?: OpenAIResponsesCompat }>> = {
+const SIGN_IN_REQUESTS: Readonly<Partial<Record<SignIn, { readonly payload: (params: unknown) => unknown; readonly compat: OpenAIResponsesCompat }>>> = {
   chatgpt: { payload: planUsagePayload, compat: PLAN_USAGE_COMPAT },
-  claude: {},
 };
 
 const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api> => ({
@@ -238,7 +237,7 @@ const endpointModel = (endpoint: ModelEndpoint, model: EndpointModel): Model<Api
  * so TypeScript resolves it to `never`; the value is that API's compat (the catalog's same-API entry, the override's type).
  */
 const compatOf = (endpoint: ModelEndpoint, model: EndpointModel): { readonly compat?: never } => {
-  const overrides = isSignIn(endpoint.auth) ? SIGN_IN_REQUESTS[endpoint.auth].compat : undefined;
+  const overrides = isSignIn(endpoint.auth) ? SIGN_IN_REQUESTS[endpoint.auth]?.compat : undefined;
   if (model.compat === undefined && overrides === undefined) return {};
   return { compat: { ...model.compat, ...overrides } as never };
 };
@@ -308,11 +307,12 @@ const endpointProvider = (endpoint: ModelEndpoint, access: EndpointAccess): Prov
  */
 const signInProvider = (base: Provider, kind: SignIn, endpoint: ModelEndpoint, access: EndpointAccess): Provider => {
   if (!TAKES_FETCH.has(endpoint.api)) return base;
-  const payload = SIGN_IN_REQUESTS[kind].payload ?? ((params: unknown) => params);
+  const payload = SIGN_IN_REQUESTS[kind]?.payload;
   const outer = access.fetch ?? (globalThis.fetch as FetchFunction);
   const fetch = access.refused === undefined ? outer : refusalWatch(outer, () => access.refused?.(endpoint.id));
   type Options = NonNullable<Parameters<Provider["streamSimple"]>[2]>;
   const withRules = (options: Options | undefined): Options => {
+    if (payload === undefined) return { ...options, fetch };
     const earlier = options?.onPayload;
     return {
       ...options,

@@ -265,6 +265,30 @@ describe("Claude on the Harness panel (SPI-1165)", () => {
     for (const token of context.anthropic.issued) expect(started.text).not.toContain(token);
   });
 
+  it("reads a signed-in Claude endpoint's model list again with its token as a bearer, with the OAuth beta", async () => {
+    const context = await setup();
+    await claudeSignInFlow(context);
+    const read = await context.post({ endpoint: { id: "claude", label: "Claude", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "claude" } }, "endpoints/discover");
+    expect(read.status).toBe(200);
+    expect(context.discovered.at(-1)).toEqual({
+      baseUrl: "https://api.anthropic.com",
+      apiKey: undefined,
+      headers: { authorization: `Bearer ${context.anthropic.accessTokens[0]}`, "anthropic-beta": "oauth-2025-04-20" },
+    });
+    for (const token of context.anthropic.issued) expect(read.text).not.toContain(token);
+  });
+
+  it("drops a fresh grant whose endpoint cannot be saved (32 endpoints already), and says where to remove it", async () => {
+    const context = await setup();
+    for (let index = 0; index < 32; index += 1) {
+      await context.post({ op: "save", endpoint: { id: `e${index}`, label: `E${index}`, api: "openai-completions", baseUrl: "https://llm.example/v1", auth: "none", models: [] } }, "endpoints");
+    }
+    const { done } = await claudeSignInFlow(context);
+    expect(JSON.parse(done.text)).toMatchObject({ ok: false, error: expect.stringMatching(/could not be saved \(at most 32 endpoints\), so the sign-in was dropped here\. Anthropic offers no revocation to apps: .*claude\.ai/) });
+    expect(await context.signIns.read("claude")).toBeUndefined();
+    expect(context.leaks()).toEqual([]);
+  });
+
   it("gives a Session the token for the endpoint's target only", async () => {
     const context = await setup();
     await claudeSignInFlow(context);

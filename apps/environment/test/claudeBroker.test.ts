@@ -122,8 +122,20 @@ describe("the Credential broker with a Claude sign-in", () => {
     vendor.options.refreshError = "invalid_grant";
     const answer = await broker.access("claude");
     expect(answer).toMatchObject({ ok: false, signedOut: true, problem: "Claude refused to renew the sign-in (invalid_grant): it is signed out" });
-    expect(broker.status("claude")).toMatchObject({ signedIn: false, subject: null, problem: expect.stringMatching(/invalid_grant/) });
+    expect(broker.status("claude")).toMatchObject({ signedIn: false, subject: null, email: null, problem: expect.stringMatching(/invalid_grant/) });
     expect(await broker.read("claude")).toBeUndefined();
+    expect(await broker.access("claude")).toMatchObject({ ok: false, signedOut: true });
+    expect(vendor.counts.refreshes).toBe(1);
+    scan(kv, vendor);
+  });
+
+  it("signs the endpoint out when the grant was removed at claude.ai (a 401 with no OAuth code), instead of failing every turn as retryable", async () => {
+    const { kv, vendor, broker, advance } = setup();
+    await signIn(broker, vendor);
+    advance(HOURS_8);
+    vendor.options.refreshStatus = 401;
+    vendor.options.refreshBody = { type: "error", error: { type: "authentication_error", message: "invalid" } };
+    expect(await broker.access("claude")).toMatchObject({ ok: false, signedOut: true, problem: "Claude refused to renew the sign-in (HTTP 401): it is signed out" });
     expect(await broker.access("claude")).toMatchObject({ ok: false, signedOut: true });
     expect(vendor.counts.refreshes).toBe(1);
     scan(kv, vendor);
@@ -140,7 +152,8 @@ describe("the Credential broker with a Claude sign-in", () => {
     expect(out).toEqual({ signedOut: true, revoked: false });
     expect(order).toEqual(["removed: true"]);
     expect(vendor.requests).toHaveLength(before);
-    expect(broker.status("claude")).toMatchObject({ signedIn: false, subject: null, expiresAt: null });
+    // No registration to keep for Claude: the account is forgotten whole, its email included.
+    expect(broker.status("claude")).toMatchObject({ signedIn: false, subject: null, email: null, expiresAt: null });
     expect(await broker.access("claude")).toMatchObject({ ok: false, signedOut: true });
     // Another account may sign in next.
     expect(await signIn(broker, vendor, { uuid: "acct-9", email: "other@example.com" })).toMatchObject({ ok: true });

@@ -14,6 +14,9 @@ export interface SignInCredential {
   readonly expires: number;
   /** The vendor's registration of this app for the account, when it has one (OpenAI's issued client id). */
   readonly clientId?: string;
+  /** What the account granted, as the vendor listed it. */
+  readonly scopes?: ReadonlyArray<string>;
+  /** The vendor's id of the account, and its email: what the panel shows, and what a sign-out forgets. */
   readonly subject?: string | null;
   readonly email?: string | null;
   /** No refresh before this (ms), when the vendor says. */
