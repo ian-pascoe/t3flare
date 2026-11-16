@@ -1,6 +1,7 @@
 // SPI-1172: a Model endpoint's failed answer, classified by its endpoint's API and auth (the step-2a2 plan's §3 table
-// as the starting point). Each recorded answer is in the shape its vendor's docs give, cited with its read date in
-// packages/models/test/fixtures/vendors.json (made by docs/steps/spi-1172/gen-vendor-fixtures.mjs); no vendor was called.
+// as the starting point). The answers are doc-shaped, not recorded: each is written in the shape its source documents,
+// cited with its read date in packages/models/test/fixtures/vendors.json (made by docs/steps/spi-1172/gen-vendor-fixtures.mjs),
+// because no vendor was called with real credentials.
 import type { EndpointApi, EndpointAuth } from "@t3flare/models/endpoints";
 import { classifyModelFailure, type FailedAnswer, modelFailureMessage } from "@t3flare/models/failures";
 import { describe, expect, it } from "vitest";
@@ -35,8 +36,29 @@ describe("classifyModelFailure: Anthropic Messages", () => {
     });
   });
 
-  it("a rate limit with retry-after: a usage limit reset after it, counted from the answer's time", () => {
-    expect(classify("anthropicRateLimit")).toEqual({ class: "usage_limit", code: "throttled", resetAt: AT + 17_000, retryable: true, stop: true });
+  it("a rate limit with a short retry-after (≤ 60 s) is retried in the run; a longer one pauses until it", () => {
+    expect(classify("anthropicRateLimit")).toEqual({ class: "usage_limit", code: "throttled", resetAt: AT + 17_000, retryable: true, stop: false });
+    expect(classify("anthropicRateLimitLong")).toEqual({ class: "usage_limit", code: "throttled", resetAt: AT + 600_000, retryable: true, stop: true });
+  });
+
+  it("the short-reset boundary is 60 s: at 60 s retried, at 61 s paused", () => {
+    const at = (seconds: number) => classifyModelFailure({ status: 429, headers: { "retry-after": String(seconds) }, body: "", at: AT }, { id: "x", api: "anthropic-messages", auth: "api-key" })?.stop;
+    expect(at(60)).toBe(false);
+    expect(at(61)).toBe(true);
+  });
+
+  it("retry-after-ms is read before retry-after", () => {
+    const failure = classifyModelFailure({ status: 429, headers: { "retry-after-ms": "90000", "retry-after": "5" }, body: "", at: AT }, { id: "x", api: "anthropic-messages", auth: "api-key" });
+    expect(failure).toMatchObject({ resetAt: AT + 90_000, stop: true });
+  });
+
+  it("a unified rejection without its reset header pauses until retry-after", () => {
+    expect(classify("anthropicSubscriptionLimitNoReset")).toMatchObject({ code: "usage_limit", resetAt: AT + 7_200_000, stop: true });
+  });
+
+  it("an owner-set spend limit (400 invalid_request_error, its documented opening): a spend limit; another 400 is not", () => {
+    expect(classify("anthropicOwnerSpendLimit")).toMatchObject({ class: "usage_limit", code: "spend_limit", stop: true });
+    expect(classify("anthropicOwnerSpendLimit")?.resetAt).toBeUndefined();
   });
 
   it("a rate limit with no reset: retried by pi-durable, a usage limit with no reset if it never clears", () => {
@@ -80,12 +102,23 @@ describe("classifyModelFailure: OpenAI Responses and Completions", () => {
     }
   });
 
-  it("a rate limit: retry-after first", () => {
-    expect(classify("openaiRateLimit")).toMatchObject({ code: "throttled", resetAt: AT + 20_000, stop: true });
+  it("a rate limit: retry-after first (20 s: retried in the run)", () => {
+    expect(classify("openaiRateLimit")).toMatchObject({ code: "throttled", resetAt: AT + 20_000, stop: false });
   });
 
   it("a rate limit with only x-ratelimit-reset-* (Go durations): the later of the exhausted ones", () => {
     expect(classify("openaiRateLimitResetHeaders")).toMatchObject({ code: "throttled", resetAt: AT + 360_000, stop: true });
+    // Only the exhausted window counts: the requests window (1 s) alone at 0 is a short limit, retried.
+    const requestsOnly = { status: 429, headers: { "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": "1s", "x-ratelimit-remaining-tokens": "900", "x-ratelimit-reset-tokens": "6m0s" }, body: "", at: AT };
+    expect(classifyModelFailure(requestsOnly, { id: "x", api: "openai-responses", auth: "api-key" })).toMatchObject({ resetAt: AT + 1000, stop: false });
+  });
+
+  it("with no window at 0 there is no reset to wait for: a short rate limit, retried", () => {
+    expect(classify("openaiRateLimitNoneExhausted")).toEqual({ class: "usage_limit", code: "throttled", retryable: true, stop: false });
+  });
+
+  it("an OpenAI-family 402: a spend limit", () => {
+    expect(classify("openaiPaymentRequired")).toMatchObject({ class: "usage_limit", code: "spend_limit", stop: true });
   });
 
   it("a refused key and a refused region: permission errors", () => {
@@ -112,8 +145,8 @@ describe("classifyModelFailure: ChatGPT's usage_limit_reached and plan usage's s
     expect(classify("chatgptUsageLimitReached")).toEqual({ class: "usage_limit", code: "usage_limit", resetAt: AT + 3 * 3_600_000, retryable: true, stop: true });
   });
 
-  it("usage_limit_reached with only resets_in_seconds: counted from the answer's time", () => {
-    expect(classify("chatgptUsageLimitInSeconds")).toMatchObject({ code: "usage_limit", resetAt: AT + 5_400_000 });
+  it("usage_limit_reached without resets_at: its retry-after", () => {
+    expect(classify("chatgptUsageLimitRetryAfter")).toMatchObject({ code: "usage_limit", resetAt: AT + 5_400_000 });
   });
 
   it("usage_not_included: the plan does not cover it", () => {
@@ -157,6 +190,12 @@ describe("classifyModelFailure: by auth, and what it leaves alone", () => {
     expect(classifyModelFailure({ status: 429, headers: { "retry-after": "30" }, body: '{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}', at: AT }, google)).toMatchObject({ code: "throttled", resetAt: AT + 30_000 });
     expect(classifyModelFailure({ status: 403, headers: {}, body: '{"error":{"code":403,"status":"PERMISSION_DENIED"}}', at: AT }, google)).toMatchObject({ code: "key_refused" });
     expect(classifyModelFailure({ status: 503, headers: {}, body: "", at: AT }, google)).toMatchObject({ code: "overloaded" });
+  });
+
+  it("every transient 5xx is retried; 501 Not Implemented is not", () => {
+    const endpoint = { id: "x", api: "anthropic-messages" as const, auth: "api-key" as const };
+    for (const status of [500, 502, 504, 507, 520, 521, 524, 529]) expect(classifyModelFailure({ status, headers: {}, body: "", at: AT }, endpoint), String(status)).toMatchObject({ class: "provider_error", retryable: true, stop: false });
+    expect(classifyModelFailure({ status: 501, headers: {}, body: "", at: AT }, endpoint)).toMatchObject({ code: "unsupported_request", retryable: false, stop: true });
   });
 
   it("a retry-after as an HTTP date", () => {

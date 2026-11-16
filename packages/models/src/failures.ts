@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off
 // A Model endpoint's failed answer, classified by the endpoint's API and auth (SPI-1172; the step-2a2 plan's §3 table as
 // the starting point). Pure: the Session classifies each failed response once, when it is recorded (Durable turns and
 // compaction), text generation classifies its one request, and the relay logs the class of what it passes back. The
@@ -67,15 +68,13 @@ export interface ModelFailure {
   readonly stop: boolean;
 }
 
-/** An API's family: the shapes its vendor answers in. */
-type Family = "anthropic" | "openai" | "other";
+/** An API's family: the shapes its vendor answers in. The other APIs get only the rows for every API. */
+type Family = "anthropic" | "openai";
 
-const FAMILY: Readonly<Record<EndpointApi, Family>> = {
+const FAMILY: Readonly<Partial<Record<EndpointApi, Family>>> = {
   "anthropic-messages": "anthropic",
   "openai-responses": "openai",
   "openai-completions": "openai",
-  "google-generative-ai": "other",
-  "mistral-conversations": "other",
 };
 
 /** What the rows read of an answer. */
@@ -86,6 +85,8 @@ interface Read {
   readonly type: string | undefined;
   readonly code: string | undefined;
   readonly detailCode: string | undefined;
+  /** The error's message: read by one row only, Anthropic's owner-set spend limit, whose docs name its opening words. */
+  readonly message: string;
   /** The error object's fields (ChatGPT's `resets_at`, `resets_in_seconds`). */
   readonly error: Readonly<Record<string, unknown>>;
   readonly header: (name: string) => string | undefined;
@@ -140,6 +141,7 @@ const read = (answer: FailedAnswer): Read => {
     type,
     code,
     detailCode: str(details.error_code),
+    message: str(error.message) ?? "",
     error,
     header: (name) => headers.get(name),
     at: answer.at,
@@ -161,19 +163,24 @@ export const failureHeaders = (headers: Headers): Record<string, string> => {
   return kept;
 };
 
+/** An error answer's body, at most `limit` bytes (`readBody`), for classifying it. Undefined when it cannot be read. */
+export const errorBodyOf = async (response: Response, limit = ERROR_BODY_BYTES): Promise<string | undefined> => {
+  return (await readBody(response, limit))?.text;
+};
+
 /**
- * An error answer's body, at most `ERROR_BODY_BYTES`, read from a copy so its reader still gets the answer whole; the
- * rest is cancelled, never read. Undefined when it cannot be read.
+ * Up to `limit` bytes of an answer's body, read from a copy so its reader still gets the answer whole, and whether there
+ * was more (the rest is cancelled, never read). Undefined when it cannot be read.
  */
-export const errorBodyOf = async (response: Response): Promise<string | undefined> => {
+export const readBody = async (response: Response, limit: number): Promise<{ readonly text: string; readonly over: boolean } | undefined> => {
   try {
     const body = response.clone().body;
-    if (body === null) return "";
+    if (body === null) return { text: "", over: false };
     const reader = body.getReader();
     const chunks: Array<Uint8Array> = [];
     let size = 0;
     try {
-      while (size < ERROR_BODY_BYTES) {
+      while (size <= limit) {
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value);
@@ -182,14 +189,14 @@ export const errorBodyOf = async (response: Response): Promise<string | undefine
     } finally {
       void reader.cancel().catch(() => undefined);
     }
-    const bytes = new Uint8Array(Math.min(size, ERROR_BODY_BYTES));
+    const bytes = new Uint8Array(Math.min(size, limit));
     let offset = 0;
     for (const chunk of chunks) {
       const part = chunk.subarray(0, bytes.byteLength - offset);
       bytes.set(part, offset);
       offset += part.byteLength;
     }
-    return new TextDecoder().decode(bytes);
+    return { text: new TextDecoder().decode(bytes), over: size > limit };
   } catch {
     return undefined;
   }
@@ -227,26 +234,28 @@ const goDuration = (text: string): number | undefined => {
 /** Anthropic's unified limit: the reset of the claim that refused (`anthropic-ratelimit-unified-reset`, epoch seconds). */
 const unifiedReset = (r: Read): number | undefined => epochSeconds(r.header("anthropic-ratelimit-unified-reset"));
 
-/** ChatGPT's `resets_at` (epoch seconds), else `resets_in_seconds` from the answer's time, else `retry-after`. */
-const chatgptReset = (r: Read): number | undefined => {
-  const at = epochSeconds(r.error.resets_at);
-  if (at !== undefined) return at;
-  const seconds = r.error.resets_in_seconds;
-  if (typeof seconds === "number" && seconds > 0) return r.at + seconds * 1000;
-  return retryAfter(r);
-};
+/** Anthropic's unified limit's reset, else the answer's `retry-after`. */
+const unifiedOrRetryAfter = (r: Read): number | undefined => unifiedReset(r) ?? retryAfter(r);
 
-/** OpenAI's: `retry-after` first, else the later of the `x-ratelimit-reset-*` whose remaining count is 0 (all, when none says). */
+/** ChatGPT's `resets_at` (epoch seconds; codex-rs `UsageErrorBody`), else `retry-after`. */
+const chatgptReset = (r: Read): number | undefined => epochSeconds(r.error.resets_at) ?? retryAfter(r);
+
+/**
+ * OpenAI's: `retry-after` first, else the later reset of the windows whose remaining count is 0. OpenAI's rate-limit
+ * guide (platform.openai.com/docs/guides/rate-limits, "Rate limits in headers", read 2026-11-16): `x-ratelimit-reset-*`
+ * is the time until that window "resets to its initial state", and `x-ratelimit-remaining-*` what it still permits; only
+ * an exhausted window refuses. With none at 0 there is no reset to wait for: a short rate limit, retried.
+ */
 const openaiReset = (r: Read): number | undefined => {
   const after = retryAfter(r);
   if (after !== undefined) return after;
-  const windows = ["requests", "tokens", "project-tokens"].flatMap((name) => {
+  const exhausted = ["requests", "tokens", "project-tokens"].flatMap((name) => {
+    if (r.header(`x-ratelimit-remaining-${name}`)?.trim() !== "0") return [];
     const reset = r.header(`x-ratelimit-reset-${name}`);
     const ms = reset === undefined ? undefined : goDuration(reset.trim());
-    return ms === undefined ? [] : [{ ms, exhausted: r.header(`x-ratelimit-remaining-${name}`)?.trim() === "0" }];
+    return ms === undefined ? [] : [ms];
   });
-  const used = windows.some((window) => window.exhausted) ? windows.filter((window) => window.exhausted) : windows;
-  return used.length === 0 ? undefined : r.at + Math.max(...used.map((window) => window.ms));
+  return exhausted.length === 0 ? undefined : r.at + Math.max(...exhausted);
 };
 
 // The table ---------------------------------------------------------------------------------------------------------
@@ -269,8 +278,11 @@ const OPENAI_SPEND = ["insufficient_quota", "credit_balance_exhausted", "organiz
 
 const ROWS: ReadonlyArray<Row> = [
   // Anthropic Messages (platform.claude.com/docs/en/api/errors, /rate-limits; Claude Code's unified headers).
-  { families: ["anthropic"], when: (r) => status(r, 429) && r.header("anthropic-ratelimit-unified-status") === "rejected", code: "usage_limit", reset: unifiedReset },
+  { families: ["anthropic"], when: (r) => status(r, 429) && r.header("anthropic-ratelimit-unified-status") === "rejected", code: "usage_limit", reset: unifiedOrRetryAfter },
   { families: ["anthropic"], when: (r) => r.detailCode === "enforced_spend_limit_reached" || named(r, "billing_error") || status(r, 402), code: "spend_limit" },
+  // An owner-set spend limit: 400 `invalid_request_error`, which the rate-limits page tells apart only by the message's
+  // documented opening ("You have reached your specified API usage limits", or "… workspace API usage limits").
+  { families: ["anthropic"], when: (r) => status(r, 400) && named(r, "invalid_request_error") && /^You have reached your specified (?:workspace )?API usage limits/.test(r.message), code: "spend_limit" },
   { families: ["anthropic"], when: (r) => named(r, "overloaded_error") || status(r, 529), code: "overloaded" },
   // ChatGPT's Codex backend (codex-rs api_bridge.rs) and plan usage (developers.openai.com/siwc/…/errors-and-recovery).
   { families: ["openai"], when: (r) => named(r, "usage_limit_reached"), code: "usage_limit", reset: chatgptReset },
@@ -286,7 +298,7 @@ const ROWS: ReadonlyArray<Row> = [
   { families: ["openai"], when: (r) => named(r, "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable"), code: "unavailable" },
   { families: ["openai"], when: (r) => named(r, "subscription_sharing_unsupported_capability"), code: "unsupported_request" },
   // OpenAI's API (platform.openai.com/docs/guides/error-codes, /rate-limits).
-  { families: ["openai"], when: (r) => named(r, ...OPENAI_SPEND), code: "spend_limit" },
+  { families: ["openai"], when: (r) => named(r, ...OPENAI_SPEND) || status(r, 402), code: "spend_limit" },
   { families: ["openai"], when: (r) => status(r, 429), code: "throttled", reset: openaiReset },
   { families: ["openai"], when: (r) => named(r, "server_is_overloaded"), code: "overloaded" },
   // Every API: a 429's retry-after; a refused credential by the endpoint's auth; overload and server errors.
@@ -294,16 +306,25 @@ const ROWS: ReadonlyArray<Row> = [
   { families: "any", auths: ["api-key"], when: (r) => status(r, 401, 403), code: "key_refused" },
   { families: "any", auths: SIGN_INS, when: (r) => status(r, 401, 403), code: "sign_in_refused" },
   { families: "any", auths: ["none"], when: (r) => status(r, 401, 403), code: "credential_needed" },
+  // 501 Not Implemented: the endpoint does not do what was asked; no retry changes that.
+  { families: "any", when: (r) => status(r, 501), code: "unsupported_request" },
   { families: "any", when: (r) => status(r, 503, 529), code: "overloaded" },
   { families: "any", when: (r) => r.status !== undefined && r.status >= 500, code: "server_error" },
 ];
 
+/**
+ * The longest reset a rate limit is retried through within the run: a 429 that resets in at most this is retried by
+ * pi-durable, as the SDKs and pi-ai do (step-2a2 §3; pi-ai's `DEFAULT_MAX_RETRY_DELAY_MS`); a later reset pauses the
+ * thread until it.
+ */
+export const SHORT_RESET_MS = 60_000;
+
 /** Each code's class, whether a retry can help, and whether one is worth making before the reset (or at all). */
-const KINDS: Readonly<Record<ModelFailureCode, { readonly class: ModelFailure["class"]; readonly retryable: boolean; readonly stop: "always" | "with-reset" | "never" }>> = {
+const KINDS: Readonly<Record<ModelFailureCode, { readonly class: ModelFailure["class"]; readonly retryable: boolean; readonly stop: "always" | "long-reset" | "never" }>> = {
   usage_limit: { class: "usage_limit", retryable: true, stop: "always" },
   workspace_limit: { class: "usage_limit", retryable: false, stop: "always" },
   spend_limit: { class: "usage_limit", retryable: false, stop: "always" },
-  throttled: { class: "usage_limit", retryable: true, stop: "with-reset" },
+  throttled: { class: "usage_limit", retryable: true, stop: "long-reset" },
   key_refused: { class: "permission_error", retryable: false, stop: "always" },
   sign_in_refused: { class: "permission_error", retryable: false, stop: "always" },
   credential_needed: { class: "permission_error", retryable: false, stop: "always" },
@@ -318,11 +339,11 @@ const KINDS: Readonly<Record<ModelFailureCode, { readonly class: ModelFailure["c
 export const classifyModelFailure = (answer: FailedAnswer, endpoint: FailedEndpoint): ModelFailure | undefined => {
   const r = read(answer);
   const family = FAMILY[endpoint.api];
-  const row = ROWS.find((entry) => (entry.families === "any" || entry.families.includes(family)) && (entry.auths === undefined || entry.auths.includes(endpoint.auth)) && entry.when(r));
+  const row = ROWS.find((entry) => (entry.families === "any" || (family !== undefined && entry.families.includes(family))) && (entry.auths === undefined || entry.auths.includes(endpoint.auth)) && entry.when(r));
   if (row === undefined) return undefined;
   const kind = KINDS[row.code];
   const resetAt = row.reset?.(r);
-  const stop = kind.stop === "always" || (kind.stop === "with-reset" && resetAt !== undefined);
+  const stop = kind.stop === "always" || (kind.stop === "long-reset" && resetAt !== undefined && resetAt - answer.at > SHORT_RESET_MS);
   return { class: kind.class, code: row.code, ...(resetAt === undefined ? {} : { resetAt }), retryable: kind.retryable, stop };
 };
 
@@ -361,9 +382,32 @@ export const modelFailureMessage = (failure: ModelFailure, endpoint: Pick<Failed
   }
 };
 
+/** A classified failure with the text t3 shows for it. */
+export interface DescribedFailure extends ModelFailure {
+  readonly message: string;
+}
+
+/** The answer classified by the endpoint's API and auth, with its text (`modelFailureMessage`); undefined when unknown. */
+export const describeFailure = (answer: FailedAnswer, endpoint: FailedEndpoint): DescribedFailure | undefined => {
+  const failure = classifyModelFailure(answer, endpoint);
+  return failure === undefined ? undefined : { ...failure, message: modelFailureMessage(failure, endpoint, answer.status) };
+};
+
+/** A usage limit's reset as one sentence ("It resets at <ISO>."), or "" for another class or no reset. */
+export const resetSentence = (failure: Pick<ModelFailure, "class" | "resetAt">): string =>
+  failure.class === "usage_limit" && failure.resetAt !== undefined ? ` It resets at ${new Date(failure.resetAt).toISOString()}.` : "";
+
 /**
- * The error text the Session leaves in pi-durable for a failure it stops the retries of: no retry pattern of pi-ai's
- * matches it (the codes avoid them), so the run ends after this one request.
+ * The error text the Session leaves in pi-durable for a classified failure. One it stops the retries of matches no retry
+ * pattern of pi-ai's (the codes avoid them), so the run ends after this one request; one that is retried carries words
+ * that one of pi-ai's patterns matches, so pi-durable retries it whatever the vendor's text said (a bare 529 or 521).
  */
 export const MODEL_FAILURE_PREFIX = "t3flare model endpoint: ";
-export const modelFailureDetail = (failure: ModelFailure): string => `${MODEL_FAILURE_PREFIX}${failure.code}`;
+const RETRIED: Readonly<Partial<Record<ModelFailureCode, string>>> = {
+  throttled: "rate limit",
+  overloaded: "overloaded",
+  server_error: "server error",
+  unavailable: "service unavailable",
+};
+export const modelFailureDetail = (failure: ModelFailure): string =>
+  failure.stop ? `${MODEL_FAILURE_PREFIX}${failure.code}` : `${MODEL_FAILURE_PREFIX}${failure.code} (${RETRIED[failure.code] ?? "service unavailable"}, retried)`;
