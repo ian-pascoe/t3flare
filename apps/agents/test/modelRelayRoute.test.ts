@@ -636,7 +636,7 @@ describe("WorkspaceProxy's relay deps (SPI-1172, review 2)", () => {
           release = resolve;
         }),
     };
-    const deps = workspaceRelayDeps(rpc, { fetch: async () => new Response('{"error":{"code":"insufficient_quota"}}', { status: 429 }), log: () => undefined, now: () => 1, usage: () => undefined });
+    const deps = workspaceRelayDeps(rpc, { fetch: async () => new Response('{"error":{"code":"insufficient_quota"}}', { status: 429 }), log: () => undefined, now: () => 1, usage: () => undefined, limits: () => undefined });
     const answered = handleModelRelay(post("{}"), deps).then(() => order.push("answered"));
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(order).toEqual(["reported proc-1 failure"]);

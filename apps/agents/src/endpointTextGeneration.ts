@@ -11,7 +11,7 @@ import type { EndpointTextAnswer } from "@t3flare/models/endpoints";
 import { WorkerEntrypoint } from "cloudflare:workers";
 
 import { generateEndpointText } from "./endpointText.ts";
-import { environmentStub, usageSender } from "./environment.ts";
+import { environmentStub, limitsSender, usageSender } from "./environment.ts";
 
 export interface TextGenerationEnv {
   readonly ENVIRONMENT: DurableObjectNamespace;
@@ -25,6 +25,8 @@ export class EndpointTextGeneration extends WorkerEntrypoint<TextGenerationEnv> 
       credential: (endpointId, target) => environment().endpointCredential({ endpointId, target }),
       // The answer's usage, kept by the Environment for t3's Usage page (SPI-1173).
       usage: usageSender(this.ctx, environment),
+      // Its limit windows, for t3's limit meters (SPI-1174).
+      limits: limitsSender(this.ctx, environment),
     });
   }
 }

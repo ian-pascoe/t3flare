@@ -94,6 +94,7 @@ const openSession = async (
     models,
     fetch: recorder.fetch,
     usage: { session: () => "s", record: () => undefined },
+    limits: () => undefined,
     readMs: 50,
     now: () => now,
     source: () => ({ modelEndpoints: async () => ({ revision: 1, endpoints }), endpointCredential: async () => ({ apiKey: "key-for-tests-only" }) }),

@@ -25,6 +25,7 @@ import {
   signInRequestTarget,
   targetOf,
 } from "@t3flare/models/endpoints";
+import { type LimitReading, limitReadingOf } from "@t3flare/models/limits";
 import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 
 import { credentialFailure } from "./credentialFailure.ts";
@@ -155,6 +156,13 @@ export interface EndpointAccess {
    * usage records (SPI-1173). Called after the answer, never in its way.
    */
   readonly answered?: (message: AssistantMessage, endpointId: string) => void;
+  /**
+   * The limit windows each answer's headers report (SPI-1174), read as the answer arrives (a failed one too: a refused
+   * limit is the reading that matters most), for t3's limit meters. Never in the answer's way. Only on the APIs whose
+   * pi-ai client takes a request's `fetch` (Anthropic Messages, OpenAI Responses and Completions): Google's and
+   * Mistral's send no window headers.
+   */
+  readonly limits?: (reading: LimitReading) => void;
 }
 
 /** A provider whose every answer is also handed to `answered` once it is final; the answer's stream is untouched. */
@@ -216,6 +224,25 @@ const refusalWatch = (fetch: FetchFunction, onRefused: () => void): FetchFunctio
     return response;
   }) as FetchFunction;
 
+/** An endpoint's fetch whose every answer's limit windows go to `limits`; the answer itself is untouched. */
+export const limitWatch = (fetch: FetchFunction, endpointId: string, limits: (reading: LimitReading) => void, now: () => number = Date.now): FetchFunction =>
+  (async (input: Parameters<FetchFunction>[0], init?: Parameters<FetchFunction>[1]) => {
+    const response = await fetch(input, init);
+    try {
+      const reading = limitReadingOf(endpointId, response.headers, now());
+      if (reading !== undefined) limits(reading);
+    } catch {
+      // A reading that fails is lost; the answer is not.
+    }
+    return response;
+  }) as FetchFunction;
+
+/** The fetch an endpoint's requests go through: the Session's, watched for limit headers when it reads them. */
+const endpointFetch = (endpointId: string, access: EndpointAccess): FetchFunction | undefined => {
+  if (access.limits === undefined) return access.fetch;
+  return limitWatch(access.fetch ?? (globalThis.fetch as FetchFunction), endpointId, access.limits);
+};
+
 /**
  * One pi-ai provider per endpoint, under the endpoint's id: a model's ref is `{ provider: <endpointId>, modelId }`, its t3
  * slug `<endpointId>/<modelId>`. Each resolves its key from `access.credential` at each request; an API-key endpoint
@@ -262,7 +289,7 @@ const endpointProvider = (endpoint: ModelEndpoint, access: EndpointAccess): Prov
     api: ENDPOINT_STREAMS[endpoint.api](),
   });
   if (isSignIn(endpoint.auth)) return signInProvider(base, endpoint.auth, endpoint, access);
-  const fetch = access.fetch;
+  const fetch = endpointFetch(endpoint.id, access);
   if (fetch === undefined || !TAKES_FETCH.has(endpoint.api)) return base;
   return {
     ...base,
@@ -282,7 +309,7 @@ const signInProvider = (base: Provider, kind: SignIn, endpoint: ModelEndpoint, a
   if (!TAKES_FETCH.has(endpoint.api)) return base;
   const rules = SIGN_IN_REQUESTS[kind];
   const payload = rules?.payload;
-  const outer = access.fetch ?? (globalThis.fetch as FetchFunction);
+  const outer = endpointFetch(endpoint.id, access) ?? (globalThis.fetch as FetchFunction);
   const fetch = access.refused === undefined ? outer : refusalWatch(outer, () => access.refused?.(endpoint.id));
   type Options = NonNullable<Parameters<Provider["streamSimple"]>[2]>;
   const withRules = (context: Context, options: Options | undefined): Options => {

@@ -61,7 +61,7 @@ import { DurableObject } from "cloudflare:workers";
 
 import { EMPTY_HARNESS, extensionOf, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
-import { environmentStub, usageSender } from "../environment.ts";
+import { environmentStub, limitsSender, usageSender } from "../environment.ts";
 import { type CodemodeSandboxNamespace, codemodeExtension, remoteSandbox, toolSearchExtension } from "../extensions/codemode.ts";
 import { mcpExtension, mcpNamespaces, type McpView } from "../extensions/mcp.ts";
 import { codingTools } from "../extensions/coding-tools.ts";
@@ -268,6 +268,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
       // Each answer on an endpoint (a turn's, compaction's, an extension's), kept by the Environment for t3's Usage page
       // (SPI-1173). Sent after the answer; a failed send loses the record only.
       usage: { session: () => ctx.id.name ?? ctx.id.toString(), record: usageSender(ctx, () => environmentStub(env.ENVIRONMENT)) },
+      // Each answer's limit windows (its rate-limit headers), kept by the Environment for t3's limit meters (SPI-1174).
+      limits: limitsSender(ctx, () => environmentStub(env.ENVIRONMENT)),
     });
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {

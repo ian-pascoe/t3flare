@@ -14,7 +14,7 @@
 // Addressed as computer's proxy addresses its host.
 import { WorkspaceProxy as ComputerWorkspaceProxy } from "@cloudflare/computer";
 
-import { environmentStub, usageSender } from "./environment.ts";
+import { environmentStub, limitsSender, usageSender } from "./environment.ts";
 import { handleRelayRequest, isRelayPath } from "./workspace/mcpRelay.ts";
 import { handleModelRelay, isModelRelayPath, workspaceRelayDeps } from "./workspace/modelRelay.ts";
 import { CREDENTIAL_PATH, MODEL_KEY_PATH, type WorkspaceDO } from "./workspace/WorkspaceDO.ts";
@@ -49,6 +49,8 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
           now: () => Date.now(),
           // Each answer's usage, kept by the Environment for t3's Usage page (SPI-1173).
           usage: usageSender(this.ctx, () => environmentStub((this.env as { readonly ENVIRONMENT: DurableObjectNamespace }).ENVIRONMENT)),
+          // Each answer's limit windows (its rate-limit headers), kept by the Environment for t3's limit meters (SPI-1174).
+          limits: limitsSender(this.ctx, () => environmentStub((this.env as { readonly ENVIRONMENT: DurableObjectNamespace }).ENVIRONMENT)),
         }),
       ).catch((error: unknown) => {
         // The route logs its own failures; this is what escaped it, with what the path names (never a value).

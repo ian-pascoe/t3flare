@@ -242,6 +242,7 @@ describe("a GitHub Copilot sign-in on pi-ai", () => {
     const map = new Map<string, unknown>();
     const endpoints = new SessionEndpoints({
       usage: { session: () => "s", record: () => undefined },
+      limits: () => undefined,
       kv: { get: <T>(key: string) => map.get(key) as T | undefined, put: (key, value) => void map.set(key, value) },
       models,
       fetch: record(seen, () => (status === 200 ? responsesOk() : Response.json({ error: { message: "unauthorized" } }, { status }))),

@@ -60,6 +60,7 @@ const sessionWith = (fetcher: typeof fetch) => {
     now: () => 5_000,
     source: () => ({ modelEndpoints: async () => ({ revision: 1, endpoints: [endpoint] }), endpointCredential: async () => ({ apiKey: "sk-gw" }) }),
     usage: { session: () => "session-1", record: (entry) => void recorded.push(entry) },
+    limits: () => undefined,
   });
   return { recorded, models, endpoints };
 };

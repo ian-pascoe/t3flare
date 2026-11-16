@@ -22,6 +22,7 @@ import {
   signInOf,
 } from "@t3flare/models/endpoints";
 
+import type { LimitReading } from "@t3flare/models/limits";
 import { type UsageEntry, usageOfPiAnswer } from "@t3flare/models/usage";
 
 import { credentialProblem } from "./session/credentialFailure.ts";
@@ -47,6 +48,8 @@ export interface EndpointTextAccess {
   readonly timeoutMs?: number;
   /** The answer's usage, as a record of text generation (a failed answer's too, when it counted tokens) (SPI-1173). */
   readonly usage: (entry: UsageEntry) => void;
+  /** The answer's limit windows (its rate-limit headers), for t3's limit meters (SPI-1174). */
+  readonly limits?: (reading: LimitReading) => void;
 }
 
 /** The request as the binding hands it: three strings, else undefined. */
@@ -141,7 +144,7 @@ export const generateEndpointText = async (input: unknown, access: EndpointTextA
     const entry = usageOfPiAnswer(answer, { agent: "text-generation", endpointId: id, session: "", now: Date.now() });
     if (entry !== undefined) access.usage(entry);
   };
-  for (const provider of endpointProviders({ revision: endpoints.revision, endpoints: [endpoint] }, { credential, fetch, answered })) models.setProvider(provider);
+  for (const provider of endpointProviders({ revision: endpoints.revision, endpoints: [endpoint] }, { credential, fetch, answered, ...(access.limits === undefined ? {} : { limits: access.limits }) })) models.setProvider(provider);
   const model = models.getModel(endpoint.id, modelId);
   if (model === undefined) return { ok: false, error: `${named} does not list the model ${modelId}.` };
   const signal = AbortSignal.timeout(access.timeoutMs ?? TIMEOUT_MS);

@@ -16,6 +16,7 @@ import {
   type ModelEndpoints,
   targetKey,
 } from "@t3flare/models/endpoints";
+import type { LimitReading } from "@t3flare/models/limits";
 import { type UsageEntry, usageOfPiAnswer } from "@t3flare/models/usage";
 import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 
@@ -53,6 +54,8 @@ export interface SessionEndpointsOptions {
   readonly onCredential?: (failure: EndpointCredentialFailure | undefined) => void;
   /** Each answer on an endpoint, as a usage record of the Durable agent in this Session (SPI-1173). */
   readonly usage: { readonly session: () => string; readonly record: (entry: UsageEntry) => void };
+  /** Each answer's limit windows on an endpoint, for t3's limit meters (SPI-1174). */
+  readonly limits: (reading: LimitReading) => void;
 }
 
 export class SessionEndpoints {
@@ -89,6 +92,7 @@ export class SessionEndpoints {
         const entry = usageOfPiAnswer(message, { agent: "durable", endpointId, session: usage.session(), now: now() });
         if (entry !== undefined) usage.record(entry);
       },
+      limits: this.#options.limits,
     });
     const next = new Map(endpoints.endpoints.map((endpoint) => [endpoint.id, endpoint]));
     for (const id of this.#endpoints.keys()) if (!next.has(id)) this.#options.models.deleteProvider(id);

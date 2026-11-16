@@ -33,6 +33,7 @@ import { declaredLength, MAX_ROUTED_BODY_BYTES, readCapped, type RoutedBody, rou
 import { signInBody, signInPathRefusal, signInRefusal, signInRequest, tokenLogHashPrefix } from "./relaySignIns.ts";
 import { observeUsage } from "./relayUsage.ts";
 import type { UsageEntry } from "@t3flare/models/usage";
+import { type LimitReading, limitReadingOf } from "@t3flare/models/limits";
 
 export { MAX_ROUTED_BODY_BYTES } from "./routedBody.ts";
 
@@ -73,6 +74,11 @@ export interface ModelRelayDeps {
   /** Records an answer's usage, read as it streams past (`relayUsage.ts`, SPI-1173). */
   readonly usage: (entry: UsageEntry) => void;
   /**
+   * SPI-1174: the limit windows each endpoint answer's headers report (a failed answer's too), for t3's limit meters.
+   * Read as the answer's headers arrive, before the CLI has it; never in its way.
+   */
+  readonly limits?: (reading: LimitReading) => void;
+  /**
    * SPI-1172: the process's last answer, for the Workspace DO: its classified failure, or null for a success or an error
    * the table does not know (the last answer always wins). Never fails the request.
    */
@@ -86,7 +92,7 @@ export interface WorkspaceRelayRpc {
 }
 
 /** The relay's deps in `WorkspaceProxy`: the Workspace DO's check, and each answer reported to it before the CLI has it. */
-export const workspaceRelayDeps = (rpc: WorkspaceRelayRpc, io: Pick<ModelRelayDeps, "fetch" | "log" | "now" | "usage">): ModelRelayDeps => ({
+export const workspaceRelayDeps = (rpc: WorkspaceRelayRpc, io: Pick<ModelRelayDeps, "fetch" | "log" | "now" | "usage"> & Required<Pick<ModelRelayDeps, "limits">>): ModelRelayDeps => ({
   ...io,
   authorize: (input) => rpc.modelRelay(input),
   outcome: async (handleId, failure) => {
@@ -307,6 +313,8 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
     await report(undefined);
     return plain(502, `the Model endpoint ${endpointId} redirected (HTTP ${upstream.status}); the relay follows no redirect: fix its base URL`);
   }
+  // SPI-1174: the endpoint's limit windows, as this answer's headers report them (a refused limit's too).
+  noteLimits(endpointId, upstream.headers, deps);
   const answer = new Headers();
   for (const [name, value] of upstream.headers) if (!DROPPED_RESPONSE.has(name)) answer.append(name, value);
   const endpoint = grant.target;
@@ -350,6 +358,17 @@ export const handleModelRelay = async (request: Request, deps: ModelRelayDeps): 
   answer.delete("content-length");
   answer.delete("content-encoding");
   return new Response(redact(text), { status: upstream.status, statusText: upstream.statusText, headers: answer });
+};
+
+/** The reading of an answer's limit headers to `deps.limits`; a reading that fails is lost, never the answer. */
+const noteLimits = (endpointId: string, headers: Headers, deps: Pick<ModelRelayDeps, "limits" | "now">): void => {
+  if (deps.limits === undefined) return;
+  try {
+    const reading = limitReadingOf(endpointId, headers, deps.now());
+    if (reading !== undefined) deps.limits(reading);
+  } catch {
+    // Lost; the answer goes on.
+  }
 };
 
 /** The values the endpoint's credential header carries (a bearer's token too), to redact wherever an answer echoes them. */
