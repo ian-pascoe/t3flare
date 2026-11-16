@@ -141,6 +141,19 @@ describe("the Credential broker with a Claude sign-in", () => {
     scan(kv, vendor);
   });
 
+  it("shows a passing renewal failure on the panel's status until a renewal succeeds", async () => {
+    const { kv, vendor, broker, advance } = setup();
+    await signIn(broker, vendor);
+    advance(HOURS_8 - 60_000);
+    vendor.options.refreshStatus = 503;
+    expect(await broker.access("claude")).toMatchObject({ ok: true });
+    expect(broker.status("claude")).toMatchObject({ signedIn: true, problem: "Anthropic did not renew the Claude sign-in (HTTP 503): it is tried again at the next use", problemAt: expect.any(Number) });
+    vendor.options.refreshStatus = undefined;
+    expect(await broker.access("claude")).toMatchObject({ ok: true, accessToken: vendor.accessTokens[1] });
+    expect(broker.status("claude")).toMatchObject({ signedIn: true, problem: null, problemAt: null });
+    scan(kv, vendor);
+  });
+
   it("signs out by removing the tokens and stopping the Sessions, sending nothing to Anthropic, which offers no revocation", async () => {
     const { kv, vendor, broker } = setup();
     await signIn(broker, vendor);

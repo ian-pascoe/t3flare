@@ -26,17 +26,21 @@ export const oauthRequestOptions = (options: { readonly deadline?: AbortSignal |
 };
 
 /**
- * What an error answer's body says, without the rest of it: whether it was JSON at all (an OAuth or API error, as
- * opposed to an edge's HTML page or nothing), and its OAuth error code (`{ error: "invalid_grant", … }`) when it has one.
+ * What an error answer's body says, without the rest of it: whether it is an error object at all, an OAuth error
+ * (`{ error: "invalid_grant", … }`) or Anthropic's API error (`{ type: "error", error: { type } }`), as opposed to an
+ * edge's page, nothing, a bare JSON value or another object's shape; and its OAuth error code when it has one.
  */
-export const oauthErrorOf = async (response: Response): Promise<{ readonly json: boolean; readonly code: string | undefined }> => {
+export const oauthErrorOf = async (response: Response): Promise<{ readonly errorObject: boolean; readonly code: string | undefined }> => {
   let body: unknown;
   try {
     body = JSON.parse(await response.text());
   } catch {
-    return { json: false, code: undefined };
+    return { errorObject: false, code: undefined };
   }
-  return { json: true, code: isRecord(body) && typeof body.error === "string" && /^[a-z_]{1,64}$/.test(body.error) ? body.error : undefined };
+  if (!isRecord(body)) return { errorObject: false, code: undefined };
+  const oauth = typeof body.error === "string";
+  const api = body.type === "error" && isRecord(body.error) && typeof body.error.type === "string";
+  return { errorObject: oauth || api, code: oauth && /^[a-z_]{1,64}$/.test(body.error as string) ? (body.error as string) : undefined };
 };
 
 /** An OAuth error's code from an answer's body, or undefined; never the rest of it. */

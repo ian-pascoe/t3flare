@@ -26,7 +26,7 @@ export interface FakeAnthropicOptions {
   exchangeError?: string | undefined;
   /** A refresh answers this OAuth error. */
   refreshError?: string | undefined;
-  /** A refresh answers this HTTP status, with this body (none: a text body). */
+  /** A refresh answers this HTTP status, with this body as JSON (none: an HTML page; `""`: no body). */
   refreshStatus?: number | undefined;
   refreshBody?: unknown;
   /** A request to the token endpoint never answers: it waits for its caller's signal to abort it. */
@@ -139,6 +139,8 @@ export const fakeAnthropic = (options: FakeAnthropicOptions = {}): FakeAnthropic
       if (options.refreshStatus !== undefined) {
         if (options.refreshBody === undefined) return new Response("<html>upstream trouble</html>", { status: options.refreshStatus, headers: { "content-type": "text/html" } });
         if (options.refreshBody === "") return new Response(null, { status: options.refreshStatus });
+        // A bare JSON value (`null` included) as the body.
+        if (!(typeof options.refreshBody === "object" && options.refreshBody !== null)) return new Response(JSON.stringify(options.refreshBody), { status: options.refreshStatus, headers: { "content-type": "application/json" } });
         return Response.json(options.refreshBody, { status: options.refreshStatus });
       }
       const record = refreshTokens.get(String(form.refresh_token));

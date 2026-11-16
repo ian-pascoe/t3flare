@@ -40,11 +40,10 @@ export interface PendingClaudeSignIn {
 
 /**
  * A refresh answer that does not end the sign-in though its status is 400, 401 or 403: the vendor's passing trouble.
- * Every other such refusal with a JSON body (an OAuth error, or Anthropic's API error) ends it: the refresh token is
- * gone (rotated away, expired, or the grant removed at claude.ai), so a removed grant signs the endpoint out instead of
- * failing every turn as "retry". A body that is not JSON (an edge's HTML page, nothing) is passing trouble, retried.
- * The accepted cost: a JSON 400, 401 or 403 during an incident at Anthropic signs the owner out (sign in again; the old
- * grant stays at claude.ai). What Anthropic answers for a removed grant is unverified.
+ * Every other such refusal whose body is an error object (an OAuth error, or Anthropic's API error: `oauthErrorOf`)
+ * ends it: the refresh token is gone (rotated away, expired, or the grant removed at claude.ai), so a removed grant
+ * signs the endpoint out instead of failing every turn as "retry". Any other body (an edge's page, nothing, a bare JSON
+ * value, another object's shape) is passing trouble, retried. The accepted cost is ADR-0018 item 10's.
  */
 const PASSING_CODES: ReadonlySet<string> = new Set(["temporarily_unavailable", "server_error", "slow_down"]);
 
@@ -71,13 +70,15 @@ const WHOLE = "Copy all of the code Anthropic shows after you approve: it is two
 const CALLBACK = new URL(CLAUDE_REDIRECT_URI);
 /** Whether a paste starts with a URL scheme (`https://`, …). */
 const hasScheme = (text: string): boolean => /^[a-z][a-z0-9+.-]*:\/\//i.test(text);
-/** Quotes a paste may come wrapped in (from a chat or a note): straight, curly or backticks. */
-const QUOTED = /^(["'`\u2018\u201C])(.*)(["'`\u2019\u201D])$/s;
+/** A quote a paste may begin or end with (from a chat or a note), each stripped on its own: straight, curly, backticks. */
+const LEADING_QUOTE = /^["'`\u2018\u201C]/;
+const TRAILING_QUOTE = /["'`\u2019\u201D]$/;
 /**
- * What neither half of a code may hold: space, or the characters that join them (`#`) or an address's query
- * (`? & =`). A paste holding them is not what Anthropic's page shows, so it is asked for again, never exchanged.
+ * Each half's alphabet: Anthropic's code page shows base64url-like characters, and the state is ours (base64url). A
+ * paste with anything else in either half (`,`, `:`, `&`, a space, a second `#`) is not what the page shows, so it is
+ * asked for again, never exchanged.
  */
-const NOT_IN_CODE = /[\s#?&=]/;
+const CODE_PART = /^[A-Za-z0-9_-]+$/;
 
 /**
  * The pasted code and state: `code#state` as Anthropic's page shows it, or that page's own address (its `code` and
@@ -85,8 +86,7 @@ const NOT_IN_CODE = /[\s#?&=]/;
  * attempt's state and a `code` parameter, and must not spend the attempt.
  */
 const pastedCode = (pasted: string): { readonly code: string; readonly state: string } | string => {
-  const trimmed = pasted.trim();
-  const text = (QUOTED.exec(trimmed)?.[2] ?? trimmed).trim();
+  const text = pasted.trim().replace(LEADING_QUOTE, "").replace(TRAILING_QUOTE, "").trim();
   let code: string | null = null;
   let state: string | null = null;
   if (hasScheme(text) || text.startsWith(`${CALLBACK.host}/`)) {
@@ -106,7 +106,7 @@ const pastedCode = (pasted: string): { readonly code: string; readonly state: st
     code = text.slice(0, at);
     state = text.slice(at + 1);
   }
-  if (code === null || state === null || code === "" || state === "" || NOT_IN_CODE.test(code) || NOT_IN_CODE.test(state)) return WHOLE;
+  if (code === null || state === null || !CODE_PART.test(code) || !CODE_PART.test(state)) return WHOLE;
   return { code, state };
 };
 
@@ -207,8 +207,8 @@ export const refreshClaude = async (vendor: ClaudeVendor, credential: SignInCred
     return { ok: false, refused: false, problem: "Anthropic's token endpoint could not be reached to renew the Claude sign-in" };
   }
   if (!response.ok) {
-    const { json, code } = await oauthErrorOf(response);
-    if ([400, 401, 403].includes(response.status) && json && (code === undefined || !PASSING_CODES.has(code))) {
+    const { errorObject, code } = await oauthErrorOf(response);
+    if ([400, 401, 403].includes(response.status) && errorObject && (code === undefined || !PASSING_CODES.has(code))) {
       const named = code ?? `HTTP ${response.status}`;
       return { ok: false, refused: true, code: code ?? `http_${response.status}`, problem: `Claude refused to renew the sign-in (${named})` };
     }

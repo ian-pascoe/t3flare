@@ -84,8 +84,8 @@ describe("the Claude subscription sign-in", () => {
     timeouts.mockRestore();
   });
 
-  it("takes a code pasted in quotes, and asks again for one holding an address's characters, never exchanging it", async () => {
-    for (const quote of [['"', '"'], ["'", "'"], ["\u201C", "\u201D"], ["`", "`"]] as const) {
+  it("takes a code pasted in quotes, or with a stray quote at either end, and asks again for one holding other characters, never exchanging it", async () => {
+    for (const quote of [['"', '"'], ["'", "'"], ["\u201C", "\u201D"], ["`", "`"], ['"', ""], ["", "\u201D"]] as const) {
       const fake = fakeAnthropic();
       const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
       const shown = fake.approve(authorizeUrl);
@@ -95,7 +95,7 @@ describe("the Claude subscription sign-in", () => {
     const { authorizeUrl, pending } = await startClaudeSignIn({ now: () => NOW });
     const shown = fake.approve(authorizeUrl);
     // Each holds the right state, followed by an address's characters: not what Anthropic's page shows.
-    for (const pasted of [`${shown}?x`, `${shown}&x=1`, `${shown}#more`, `x=${shown}`]) {
+    for (const pasted of [`${shown}?x`, `${shown}&x=1`, `${shown}&x`, `${shown}#more`, `x=${shown}`, `,${shown}`, `code:${shown}`, `${shown},`]) {
       expect(await completeClaudeSignIn(vendorOf(fake), pending, pasted), pasted).toMatchObject({ ok: false, problem: expect.stringMatching(/^Copy all of the code/) });
     }
     expect(fake.counts.exchanges).toBe(0);
@@ -164,6 +164,12 @@ describe("the Claude subscription sign-in", () => {
       // Not JSON (an edge's HTML page, or nothing): passing trouble, retried; the sign-in is kept.
       { status: 403, refused: false },
       { status: 401, body: "", refused: false },
+      // JSON that is not an error object: a bare value, a list, another shape (an edge's problem details). Passing.
+      { status: 403, body: "Forbidden", refused: false },
+      { status: 403, body: null, refused: false },
+      { status: 403, body: 403, refused: false },
+      { status: 401, body: [{ error: "invalid_grant" }], refused: false },
+      { status: 403, body: { type: "about:blank", title: "Forbidden", status: 403 }, refused: false },
       // Anthropic's passing codes, each.
       { status: 400, body: { error: "temporarily_unavailable" }, refused: false },
       { status: 400, body: { error: "server_error" }, refused: false },
