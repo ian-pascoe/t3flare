@@ -74,11 +74,16 @@ if (scanDir !== undefined) {
     bootstrapToken: process.env.T3_BOOTSTRAP_TOKEN ?? "",
     accessSecret: process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "",
   }).filter(([, value]) => value.length >= 8);
-  const shapes = /sk-ant-[a-z0-9]|sk-proj-|eyJhbGci|Bearer [A-Za-z0-9._-]{20,}/;
+  const shapes: ReadonlyArray<readonly [string, RegExp]> = [
+    ["a token shape", /sk-ant-[a-z0-9]|sk-proj-|eyJhbGci|Bearer [A-Za-z0-9._-]{20,}/],
+    // A Cloudflare account id (32 hex digits, as alchemy logs it in `registry.cloudflare.com/<id>/…`).
+    ["an account id shape", /(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/],
+    ["a home directory path", /\/Users\/|\/home\/[a-z]/],
+  ];
   const files = fs.readdirSync(scanDir).filter((name) => !name.endsWith(".png"));
   const hits = files.flatMap((name) => {
     const text = fs.readFileSync(`${scanDir}/${name}`, "utf8");
-    return [...named.filter(([, value]) => text.includes(value)).map(([key]) => `${name}: ${key}`), ...(shapes.test(text) ? [`${name}: a token shape`] : [])];
+    return [...named.filter(([, value]) => text.includes(value)).map(([key]) => `${name}: ${key}`), ...shapes.filter(([, shape]) => shape.test(text)).map(([what]) => `${name}: ${what}`)];
   });
   console.log(JSON.stringify({ scanned: files, secrets: named.map(([key]) => key), hits }, null, 2));
   process.exit(hits.length === 0 ? 0 : 1);
