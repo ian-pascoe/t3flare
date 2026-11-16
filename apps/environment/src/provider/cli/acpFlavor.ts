@@ -107,6 +107,8 @@ export const KEY_NAME = "COMMISSARY_CONTAINER_API_KEY";
 /**
  * A prompt's failure (review F9): the proxy's own answers classified as the Durable agents' are (a 429 is t3's usage
  * limit, with its reset), a refused key named as the deploy's key, never as a sign-in. Anything else is the provider's.
+ * For a process on the Model proxy only: on a Model endpoint, the CLI wrapper puts the model relay's classification of
+ * the process's last answer in its place (SPI-1172, `relayFailure.ts`).
  */
 export const cliPromptFailure = (cause: unknown, now = Date.now()): OrchestrationV2ProviderFailure => {
   const text = errorText(cause);

@@ -7,6 +7,7 @@ import type { CliAgent, PromptTemplate, SkillDiscovery } from "@t3flare/skills";
 import type {
   AbortInput,
   AnswerInput,
+  EndpointFailureRecord,
   ForkAnswer,
   ForkInput,
   OpenAnswer,
@@ -122,6 +123,8 @@ export interface WorkspaceRpc {
   processSignal(key: string): Promise<ProcessAnswer>;
   processHeartbeat(keys: ReadonlyArray<string>): Promise<ProcessAnswer>;
   processRead(input: ProcessReadInput): Promise<ProcessReadAnswer>;
+  /** SPI-1172: the process's last model relay answer this turn, classified (null: a success, or none). */
+  processModelFailure(key: string): Promise<EndpointFailureRecord | null>;
   processState(): Promise<{ readonly epoch: number; readonly processes: ReadonlyArray<unknown>; readonly pushes: number }>;
   releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }>;
   /** Step 4a (plan §4.7): credentials in the DO's files (by value) and the Container (by hash); names and paths only. */

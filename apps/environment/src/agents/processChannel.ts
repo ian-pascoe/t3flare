@@ -13,6 +13,7 @@
 // - The Workspace DO's epoch (its boot counter) is the one its start answered; another in any answer, or the key
 //   unknown, ends the process with 129: the Workspace restarted and its processes went with it.
 // - pids are synthetic and unique per instance (> 1: t3's `signalProcessGroup` refuses `pid <= 1`).
+import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import type {
   ProcessAnswer,
   ProcessCli,
@@ -43,6 +44,8 @@ export interface ProcessRemote {
   processSignal(key: string): Promise<ProcessAnswer>;
   processHeartbeat(keys: ReadonlyArray<string>): Promise<ProcessAnswer>;
   processRead(input: ProcessReadInput): Promise<ProcessReadAnswer>;
+  /** SPI-1172: the process's last model relay answer this turn, classified (null: a success, or none). */
+  processModelFailure?(key: string): Promise<EndpointFailureRecord | null>;
 }
 
 export interface ProcessPlace {
@@ -239,6 +242,18 @@ export class ChannelProcess {
       .processTurn(this.key, active)
       .then((answer) => this.checkAnswer(answer))
       .catch(() => undefined);
+  }
+
+  /**
+   * SPI-1172: this process's last model relay answer this turn, as the relay classified it by its endpoint's API and auth;
+   * null for a success, none, or a Workspace that does not answer.
+   */
+  async modelFailure(): Promise<EndpointFailureRecord | null> {
+    try {
+      return (await this.place.remote.processModelFailure?.(this.key)) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /** A frame of this process's, in the Workspace's order; awaits room in stdout's queue. */

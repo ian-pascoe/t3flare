@@ -217,6 +217,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
             processSignal: (key) => rpc().processSignal(key),
             processHeartbeat: (keys) => rpc().processHeartbeat(keys),
             processRead: (input) => rpc().processRead(input),
+            processModelFailure: (key) => rpc().processModelFailure(key),
           },
         };
       },

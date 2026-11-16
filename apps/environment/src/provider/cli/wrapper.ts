@@ -15,9 +15,14 @@
 // - The thread's Workspace takes the Environment skill set before each turn (SPI-1153).
 // - A tool call the MCP relay asks about (ADR-0028) is raised as t3's approval card on the thread's live turn: the
 //   wrapper injects the request's events and answers it itself (`respondToRuntimeRequest`), never the CLI.
+// - A failed turn on a Model endpoint shows the model relay's classification of the process's last answer, by the
+//   endpoint's API and auth (SPI-1172, `relayFailure.ts`), in its terminal and its error items.
+import type { ModelEndpoints } from "@t3flare/models/endpoints";
+import type { EndpointFailureRecord } from "@t3flare/session-protocol";
 import { newHandle, toWorkspace } from "@t3flare/workspace-client";
 import {
   type NodeId,
+  type OrchestrationV2ProviderFailure,
   type OrchestrationV2ExecutionNode,
   type OrchestrationV2ProviderCapabilities,
   type OrchestrationV2RuntimeRequest,
@@ -38,9 +43,11 @@ import * as Fiber from "effect/Fiber";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 
+import { environmentServices } from "../../agents/bindings.ts";
 import type { ChannelProcess } from "../../agents/processChannel.ts";
 import { type CliAnswer, type CliAsk, registerCliAsker } from "./cliAsk.ts";
 import { takeEnvironmentSkillsAt } from "./environmentSkillsTake.ts";
+import { cliRelayFailure, endpointOfModel } from "./relayFailure.ts";
 
 /** ADR-0015: a CLI turn longer than this ends its process. */
 export const TURN_CAP_MS = 2 * 60 * 60_000;
@@ -104,6 +111,12 @@ export interface WrapOptions {
    * (`takeEnvironmentSkillsAt`) unless a test replaces it: every CLI driver gets it without asking.
    */
   readonly takeEnvironmentSkills?: (cwd: string | null) => Effect.Effect<void>;
+  /** SPI-1172: the Model endpoints as stored now (the session's model names one of theirs, or the proxy's). Default: the Environment's. */
+  readonly modelEndpoints?: () => ModelEndpoints | undefined;
+  /** SPI-1172: the clock a usage limit's reset is held against (tests). */
+  readonly now?: () => number;
+  /** SPI-1172: the session's process's last model relay failure this turn. Default: asked of its Workspace DO. */
+  readonly relayFailure?: (session: CliSession) => Promise<EndpointFailureRecord | null>;
 }
 
 /**
@@ -147,6 +160,29 @@ const answerOf = (decision: ProviderApprovalDecision): CliAnswer =>
 export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Service"], options: WrapOptions): ProviderAdapter.ProviderAdapterV2["Service"] => {
   const { sessions } = options;
   const takeEnvironmentSkills = options.takeEnvironmentSkills ?? ((cwd: string | null) => takeEnvironmentSkillsAt(cwd));
+  const modelEndpoints =
+    options.modelEndpoints ??
+    (() => {
+      // Unbound (a test's adapter): no endpoint is known, so every failure stands.
+      try {
+        return environmentServices().modelEndpoints?.();
+      } catch {
+        return undefined;
+      }
+    });
+  const now = options.now ?? Date.now;
+  const relayFailure = options.relayFailure ?? (async (session: CliSession) => (await session.process?.modelFailure()) ?? null);
+  /** SPI-1172: a failure as t3 shows it for the session: the relay's classification of the process's last answer. */
+  const relayed = (session: CliSession, failure: OrchestrationV2ProviderFailure) =>
+    Effect.promise(async () => cliRelayFailure(failure, await relayFailure(session), endpointOfModel(session.model, modelEndpoints()), now()));
+  const relayedEvent = (session: CliSession, event: ProviderAdapter.ProviderAdapterV2Event): Effect.Effect<ProviderAdapter.ProviderAdapterV2Event> => {
+    if (event.type === "turn.terminal" && event.status === "failed") return relayed(session, event.failure).pipe(Effect.map((failure) => ({ ...event, failure })));
+    if (event.type === "turn_item.updated" && event.turnItem.type === "error") {
+      const item = event.turnItem;
+      return relayed(session, item.failure).pipe(Effect.map((failure) => ({ ...event, turnItem: { ...item, failure } })));
+    }
+    return Effect.succeed(event);
+  };
   const turnEnded = (session: CliSession) =>
     Effect.gen(function* () {
       if (!session.turnActive) return;
@@ -292,6 +328,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
         };
         const events = runtime.events.pipe(
           Stream.flatMap((event) => Stream.fromIterable(track(event))),
+          Stream.mapEffect((event) => relayedEvent(session, event)),
           Stream.tap((event) => (event.type === "turn.terminal" ? turnEnded(session) : Effect.void)),
           Stream.filter((event) => options.dropEvent?.(event) !== true),
           Stream.merge(Stream.fromQueue(injected), { haltStrategy: "left" }),
