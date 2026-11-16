@@ -216,7 +216,10 @@ Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/
    without it. No file holds it. **As for Codex and Claude Code, this keeps the handle out of environments and files,
    not out of reach**: setsid's start environment holds it, readable by any process of the same uid, and every process
    in the Container is root, so a shell OpenCode runs can read it and spend through the handle for that process's
-   endpoints until it exits. The same class, not wider; no command can take an endpoint's key out of the Container.
+   endpoints until it exits. A repository can reach it the same way without a shell: OpenCode's `{file:<path>}`
+   substitution reads any absolute path, so a repository `opencode.json` can name `/proc/<pid>/environ`; and a
+   repository plugin's own `http.request` or `http.response` hook sees the relay request carrying the handle. The
+   same class, not wider; no command can take an endpoint's key out of the Container.
    Measured in `test:docker` and on p1169: setsid is the only holder; a shell's `env`, a repository MCP server's and
    plugin's environment and the launcher's loops have no handle; no file in the process homes, `/etc/opencode`,
    `/root`, `/tmp` or the repo holds it.

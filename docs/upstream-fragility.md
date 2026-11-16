@@ -1077,12 +1077,19 @@ other environment or file holds it, and that it goes into no request but the rel
     refuses to send ("provider authentication required"). `ctx.session.hook("http.request", …, { providerID })`
     gets each request as sent, after every setting (a variant's included) applies: the plugin puts the handle in the
     key header (`x-api-key` or `authorization`) only when the URL is the relay's for that provider's endpoint
-    (`relay.js` `putHandle`). If the hook stops running, requests carry the placeholder and the relay answers 401
+    (`relay.js` `putHandle`). The relay never redirects (it answers 502, `modelRelay.ts`), which matters because a
+    cross-origin redirect would carry `x-api-key` (fetch strips only `authorization`). If the hook stops running, requests carry the placeholder and the relay answers 401
     (fails closed); if it starts running before a variant's settings apply, the URL check still holds.
   - **`opencode acp` runs its server as a child** (`opencode serve --stdio`), where plugins run. The launcher starts
     `opencode acp` without the handle, and the plugin reads it from the launch chain's setsid (by its command line
     and the process's marker, `relay.js` `handleFrom`, walking up from the server's parent). A repository's
-    `{env:T3FLARE_MODEL_HANDLE}` (OpenCode substitutes from `process.env`) finds nothing.
+    `{env:T3FLARE_MODEL_HANDLE}` (OpenCode substitutes from `process.env`) finds nothing. This needs setsid to fork:
+    `setsid --wait` forks only when its caller is a process-group leader and otherwise execs in place
+    (`packages/computer-env/src/shell.ts`, `sandbox-image/src/process.ts`), leaving no process with the handle and
+    every turn a 401 (fails closed). It forks today; `test:docker` cannot catch a platform change here (its bash is
+    PID 1, always a leader), only `p1169.ts` on a stage can. `HOLDER_CMDLINE` (`relay.js`) and
+    `OPENCODE_HANDLE_HOLDERS` are literals tied to neither `processCommand`'s `setsid --wait` nor the profile's argv;
+    a change there also fails closed, caught only by `test:docker` and p1169.
   - **The plugin trusts the profile's copy of the configuration** (`/var/lib/t3flare/cli/<marker>/opencode.json`) for
     which providers are the relay's: a provider is one only with an endpoint provider id, one of the three packages,
     and the relay's base URL for that endpoint (`relayProviders`, tested in `opencodeKeyPlugin.test.ts`). The process
@@ -1094,7 +1101,8 @@ other environment or file holds it, and that it goes into no request but the rel
     here). The file is the Container's: a newer OpenCode spawn's configuration reaches running processes. A provider
     the running process's plugin did not see at its start gets no placeholder, then the hook gives it no handle
     (fails closed); an Environment that flips between relay and proxy while OpenCode processes run can break them
-    until their next process.
+    until their next process. **Silent**: nothing tests the live reload; **Detection**: a 401 or proxy-key failure on
+    a running OpenCode process right after another OpenCode spawn in the same Container.
   - **The session offers only the allowed providers' models** (and models a repository adds to them): t3's adapter
     refuses any other model (a stale `t3flare/<id>` proxy model, an endpoint's that is gone) before any request, as
     for Claude Code (U75).
