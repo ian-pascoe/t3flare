@@ -263,6 +263,20 @@ export class SessionDO extends DurableObject<SessionEnv> {
           const { credential: _cleared, ...rest } = record;
           return rest;
         }),
+      // SPI-1173: each answer on an endpoint (a turn's, compaction's, an extension's), kept by the Environment for t3's
+      // Usage page. Sent after the answer; a failed send loses the record only.
+      usage: {
+        session: () => ctx.id.name ?? ctx.id.toString(),
+        record: (entry) =>
+          ctx.waitUntil(
+            environmentStub(env.ENVIRONMENT)
+              .recordUsage({ entries: [entry] })
+              .then(
+                () => undefined,
+                (error: unknown) => console.warn(JSON.stringify({ t3flare: "usage-record-failed", agent: entry.agent, endpoint: entry.endpointId, error: error instanceof Error ? error.name : "error" })),
+              ),
+          ),
+      },
     });
     this.#opening = new Promise((resolve, reject) => {
       void ctx.blockConcurrencyWhile(async () => {

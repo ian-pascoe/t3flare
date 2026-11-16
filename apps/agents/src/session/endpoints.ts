@@ -15,6 +15,7 @@ import {
   type ModelEndpoints,
   targetKey,
 } from "@t3flare/models/endpoints";
+import { type UsageEntry, usageOfPiAnswer } from "@t3flare/models/usage";
 import type { EndpointCredentialFailure } from "@t3flare/session-protocol";
 
 import { endpointProviders } from "./models.ts";
@@ -49,6 +50,8 @@ export interface SessionEndpointsOptions {
    * records it on the running turn for the differ (SPI-1164). Called on a change only.
    */
   readonly onCredential?: (failure: EndpointCredentialFailure | undefined) => void;
+  /** SPI-1173: each answer on an endpoint, as a usage record of the Durable agent in this Session. */
+  readonly usage?: { readonly session: () => string; readonly record: (entry: UsageEntry) => void };
 }
 
 export class SessionEndpoints {
@@ -80,12 +83,20 @@ export class SessionEndpoints {
         } else if (this.#failing.delete(id)) this.#options.onCredential?.(undefined);
       },
       ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }),
+      ...(this.#options.usage === undefined ? {} : { answered: (message, endpointId) => this.#answered(message, endpointId) }),
     });
     const next = new Set(providers.map((provider) => provider.id));
     for (const id of this.#ids) if (!next.has(id)) this.#options.models.deleteProvider(id);
     for (const provider of providers) this.#options.models.setProvider(provider);
     this.#ids = next;
     this.#keys.clear();
+  }
+
+  #answered(message: Parameters<typeof usageOfPiAnswer>[0], endpointId: string): void {
+    const usage = this.#options.usage;
+    if (usage === undefined) return;
+    const entry = usageOfPiAnswer(message, { agent: "durable", endpointId, session: usage.session(), now: (this.#options.now ?? Date.now)() });
+    if (entry !== undefined) usage.record(entry);
   }
 
   /** An endpoint's key for `target`, from memory while fresh, else from the Environment (a refusal is never kept). */

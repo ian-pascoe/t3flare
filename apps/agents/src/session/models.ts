@@ -4,7 +4,7 @@
 // replace its endpoint. A model pi-ai does not know (a newer Claude, or any other model the proxy translates) is
 // a generic Anthropic Messages model with the limits the catalog gives it. Adapted from
 // cloudpid@ae5a7b73:apps/server/src/session/models.ts (`proxyModels`).
-import { type Api, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type OpenAIResponsesCompat, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
+import { type Api, type AssistantMessage, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type OpenAIResponsesCompat, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
 import { mistralConversationsApi } from "@earendil-works/pi-ai/api/mistral-conversations.lazy";
@@ -150,7 +150,35 @@ export interface EndpointAccess {
    * the Session can record on the turn why it failed (the differ shows it) without anything reading the error's text.
    */
   readonly outcome?: (failure: EndpointCredentialFailure | undefined, endpointId: string) => void;
+  /**
+   * SPI-1173: every answer a model of the endpoint gives (its final message: a failed one too, with what usage it got),
+   * for the usage records. Called after the answer, never in its way.
+   */
+  readonly answered?: (message: AssistantMessage, endpointId: string) => void;
 }
+
+/** A provider whose every answer is also handed to `answered` once it is final; the answer's stream is untouched. */
+const answering = (provider: Provider, endpointId: string, answered: EndpointAccess["answered"]): Provider => {
+  if (answered === undefined) return provider;
+  const watch = <S extends { result(): Promise<AssistantMessage> }>(stream: S): S => {
+    stream.result().then(
+      (message) => {
+        try {
+          answered(message, endpointId);
+        } catch {
+          // A record that fails is lost; the answer is not.
+        }
+      },
+      () => undefined,
+    );
+    return stream;
+  };
+  return {
+    ...provider,
+    stream: (model, context, options) => watch(provider.stream(model, context, options)),
+    streamSimple: (model, context, options) => watch(provider.streamSimple(model, context, options)),
+  } satisfies Provider;
+};
 
 /** Why the Environment gave no credential for an endpoint, typed, with the turn's (or the text generation's) text. */
 export const credentialFailure = (endpoint: Pick<ModelEndpoint, "id" | "auth">, { unreadable, changed, signedOut, problem }: EndpointCredential): EndpointCredentialFailure => {
@@ -223,47 +251,49 @@ const refusalWatch = (fetch: FetchFunction, onRefused: () => void): FetchFunctio
  * whose key is gone fails the request with a message that says so.
  */
 export const endpointProviders = (endpoints: ModelEndpoints, access: EndpointAccess): ReadonlyArray<Provider> =>
-  endpoints.endpoints.map((endpoint) => {
-    const base = createProvider({
-      id: endpoint.id,
-      name: endpoint.label,
-      baseUrl: endpoint.baseUrl,
-      auth: {
-        apiKey: {
-          name: isSignIn(endpoint.auth) ? `${endpoint.label} sign-in` : `${endpoint.label} API key`,
-          resolve: async () => {
-            // The endpoint's headers go with every request as the resolved auth's headers: pi-ai sends those (it reads no
-            // provider-level headers).
-            const headers = { ...endpoint.headers };
-            // pi-ai's APIs refuse a request without a key, so an endpoint with no auth sends a placeholder, never a secret.
-            if (endpoint.auth === "none") return { auth: { apiKey: NO_KEY, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint (no key)" };
-            // The key is asked for the target this provider sends it to; the Environment gives none for an old one.
-            // A sign-in's access token comes the same way (the Credential broker's, SPI-1164), for the same target rule.
-            const credential = await access.credential(endpoint.id, targetOf(endpoint));
-            if (credential.apiKey === null) {
-              const failure = credentialFailure(endpoint, credential);
-              access.outcome?.(failure, endpoint.id);
-              throw new Error(failure.message);
-            }
-            access.outcome?.(undefined, endpoint.id);
-            return { auth: { apiKey: credential.apiKey, baseUrl: endpoint.baseUrl, headers }, source: isSignIn(endpoint.auth) ? "Model endpoint (sign-in)" : "Model endpoint" };
-          },
+  endpoints.endpoints.map((endpoint) => answering(endpointProvider(endpoint, access), endpoint.id, access.answered));
+
+const endpointProvider = (endpoint: ModelEndpoint, access: EndpointAccess): Provider => {
+  const base = createProvider({
+    id: endpoint.id,
+    name: endpoint.label,
+    baseUrl: endpoint.baseUrl,
+    auth: {
+      apiKey: {
+        name: isSignIn(endpoint.auth) ? `${endpoint.label} sign-in` : `${endpoint.label} API key`,
+        resolve: async () => {
+          // The endpoint's headers go with every request as the resolved auth's headers: pi-ai sends those (it reads no
+          // provider-level headers).
+          const headers = { ...endpoint.headers };
+          // pi-ai's APIs refuse a request without a key, so an endpoint with no auth sends a placeholder, never a secret.
+          if (endpoint.auth === "none") return { auth: { apiKey: NO_KEY, baseUrl: endpoint.baseUrl, headers }, source: "Model endpoint (no key)" };
+          // The key is asked for the target this provider sends it to; the Environment gives none for an old one.
+          // A sign-in's access token comes the same way (the Credential broker's, SPI-1164), for the same target rule.
+          const credential = await access.credential(endpoint.id, targetOf(endpoint));
+          if (credential.apiKey === null) {
+            const failure = credentialFailure(endpoint, credential);
+            access.outcome?.(failure, endpoint.id);
+            throw new Error(failure.message);
+          }
+          access.outcome?.(undefined, endpoint.id);
+          return { auth: { apiKey: credential.apiKey, baseUrl: endpoint.baseUrl, headers }, source: isSignIn(endpoint.auth) ? "Model endpoint (sign-in)" : "Model endpoint" };
         },
       },
-      models: endpoint.models.map((model) => endpointModel(endpoint, model)),
-      api: ENDPOINT_STREAMS[endpoint.api](),
-    });
-    if (isSignIn(endpoint.auth)) return signInProvider(base, endpoint.auth, endpoint, access);
-    const fetch = access.fetch;
-    if (fetch === undefined || !TAKES_FETCH.has(endpoint.api)) return base;
-    return {
-      ...base,
-      // SAFETY: only `fetch` is added, a field every API's stream options declare (`ProviderRequestOptions.fetch`); the
-      // cast restores the generic `ApiStreamOptions<T>` the spread widens.
-      stream: (model, context, options) => base.stream(model, context, { ...options, fetch } as typeof options),
-      streamSimple: (model, context, options) => base.streamSimple(model, context, { ...options, fetch }),
-    } satisfies Provider;
+    },
+    models: endpoint.models.map((model) => endpointModel(endpoint, model)),
+    api: ENDPOINT_STREAMS[endpoint.api](),
   });
+  if (isSignIn(endpoint.auth)) return signInProvider(base, endpoint.auth, endpoint, access);
+  const fetch = access.fetch;
+  if (fetch === undefined || !TAKES_FETCH.has(endpoint.api)) return base;
+  return {
+    ...base,
+    // SAFETY: only `fetch` is added, a field every API's stream options declare (`ProviderRequestOptions.fetch`); the
+    // cast restores the generic `ApiStreamOptions<T>` the spread widens.
+    stream: (model, context, options) => base.stream(model, context, { ...options, fetch } as typeof options),
+    streamSimple: (model, context, options) => base.streamSimple(model, context, { ...options, fetch }),
+  } satisfies Provider;
+};
 
 /**
  * A sign-in endpoint's provider (SPI-1164): every request's body follows its sign-in's rules (`SIGN_IN_REQUESTS`, after

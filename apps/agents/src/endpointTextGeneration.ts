@@ -23,6 +23,16 @@ export class EndpointTextGeneration extends WorkerEntrypoint<TextGenerationEnv> 
     return generateEndpointText(input, {
       endpoints: () => environment().modelEndpoints(),
       credential: (endpointId, target) => environment().endpointCredential({ endpointId, target }),
+      // SPI-1173: the answer's usage, kept by the Environment for t3's Usage page; a failed send loses the record only.
+      usage: (entry) =>
+        this.ctx.waitUntil(
+          environment()
+            .recordUsage({ entries: [entry] })
+            .then(
+              () => undefined,
+              () => undefined,
+            ),
+        ),
     });
   }
 }
