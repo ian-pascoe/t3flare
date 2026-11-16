@@ -168,12 +168,15 @@ async function control(): Promise<void> {
       { cli: "pi", control: `commissary/${MODEL}`, signIn: "claude" },
     ] as const;
     const turns: Record<string, unknown> = {};
+    const scans: Record<string, unknown> = {};
     const workspaces: Record<string, string> = {};
     const turnOf = (cli: string, options: { workspace: string; model: string; mode: string; plan: boolean; prompt: string }) => (cli === "codex" || cli === "pi" ? cliTurn(cookie, { cli, ...options }) : acpTurn(cookie, { cli, ...options }));
     for (const { cli, control: model, signIn } of CLIS) {
       const workspace = `ctl-${cli}-${run}`;
       workspaces[cli] = workspace;
-      const turn = await turnOf(cli, { workspace, model, mode: "approval-required", plan: false, prompt: EDIT_AND_TEST });
+      // Codex has no edit tool of its own name (it patches): SPI-1167's wording for it.
+      const prompt = cli === "codex" ? "In src/greeting.txt add a new last line `Hello through the relay.` (edit the file), then run `bash test.sh` and tell me in one sentence whether it passed." : EDIT_AND_TEST;
+      const turn = await turnOf(cli, { workspace, model, mode: "approval-required", plan: false, prompt });
       turns[`${cli} control`] = clean({ model, runs: turn.runs.slice(-1), items: turn.items, text: turn.text });
       check(`a ${cli} turn with tools ran through the relay on an API-key endpoint (${model})`, toolTurn(turn), turns[`${cli} control`]);
       const title = signIn === "chatgpt" ? "ChatGPT" : "Claude";
@@ -191,6 +194,10 @@ async function control(): Promise<void> {
       } else {
         check(`a ${cli} turn on the ${title} sign-in with no credential fails with t3's failure naming the sign-in`, named, turns[`${cli} ${signIn} sign-in`]);
       }
+      // The leak scan in this CLI's Container, its processes alive (the Container sleeps once idle).
+      const scan = await leak(workspace);
+      scans[workspace] = clean({ do: scan?.do ?? null, hits: scan?.container?.hits ?? null, files: scan?.container?.files ?? null, notScanned: scan?.notScanned ?? null, lookedFor: scan?.lookedFor ?? null });
+      check(`the leak scan in ${cli}'s Container finds no key and scanned every one`, (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0 && (scan?.container?.files ?? 0) > 0 && Array.isArray(scan?.notScanned) && scan.notScanned.length === 0 && (scan?.lookedFor ?? []).includes("endpoint:resp"), scan);
     }
     report.turns = turns;
 
@@ -216,13 +223,7 @@ async function control(): Promise<void> {
     check("a request at the relay on the Claude sign-in gets 401, Anthropic's authentication_error naming the sign-in", lines.claude === "401" && lines.claudeType !== "" && lines.claudeNames === "1", lines);
     check("a request at the relay on the ChatGPT sign-in gets 401 naming the sign-in", lines.chatgpt === "401" && lines.chatgptNames === "1", lines);
 
-    // 4. The leak scans, then the positive control.
-    const scans: Record<string, unknown> = {};
-    for (const workspace of Object.values(workspaces)) {
-      const scan = await leak(workspace);
-      scans[workspace] = clean({ do: scan?.do ?? null, hits: scan?.container?.hits ?? null, files: scan?.container?.files ?? null, notScanned: scan?.notScanned ?? null, lookedFor: scan?.lookedFor ?? null });
-      check(`the leak scan in ${workspace} finds no key and scanned every one`, (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0 && (scan?.container?.files ?? 0) > 0 && Array.isArray(scan?.notScanned) && scan.notScanned.length === 0 && (scan?.lookedFor ?? []).includes("endpoint:resp"), scan);
-    }
+    // 4. The leak scans (above, per CLI), then the positive control.
     report.leak = scans;
     const CANARY = { id: "canary", label: "Canary", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "api-key", headers: {}, models: [MODEL] };
     check("the canary endpoint saved", (await api("POST", "endpoints", { op: "save", endpoint: CANARY, apiKey: canaryKey })).status === 200);
