@@ -22,10 +22,11 @@
 //   so `revoke` sends nothing and never confirms. Sign-out deletes the tokens here; the grant stays on the owner's
 //   GitHub account until the owner revokes it at github.com, under Settings, Applications.
 // - What ends the sign-in at a renewal: a 400, 401 or 403 whose body is an error object (GitHub's `{ message }` or an
-//   OAuth error) and which is not a rate limit (`retry-after`, `x-ratelimit-remaining: 0`, or a message naming a rate
-//   limit or too many sign-in attempts, GitHub's secondary limits): the GitHub token was revoked, or the account has no
-//   Copilot plan any more. Anything else (an edge's page, a 5xx, a rate limit, no answer) is passing trouble, retried
-//   at the next use (ADR-0018 item 11, after SPI-1165's rule, item 10).
+//   OAuth error) and which is not a rate limit (`retry-after`, `x-ratelimit-remaining: 0`, or a 403 whose message names a
+//   rate limit, too many requests or too many login attempts, GitHub's secondary limits): the GitHub token was revoked,
+//   or the account has no Copilot plan any more. Anything else (an edge's page, a 5xx, a rate limit, no answer) is
+//   passing trouble, retried at the next use (ADR-0018 item 11, after SPI-1165's rule, item 10); a rate limit only after
+//   the time GitHub names (at least a minute, at most 15), so Sessions asking meanwhile do not each reach GitHub.
 //
 // Every failure is one of our fixed texts: never a token, the device code, or GitHub's body.
 import {
@@ -138,10 +139,14 @@ export const startCopilotSignIn = async (vendor: CopilotVendor): Promise<{ reado
 };
 
 /**
- * A GitHub rate limit's message: its secondary limits ("You have exceeded a secondary rate limit"), its primary ("API
- * rate limit exceeded") and its sign-in throttle ("Maximum number of login attempts exceeded", "too many requests").
+ * A GitHub rate limit's message, on a 403: its secondary limits ("You have exceeded a secondary rate limit"), its
+ * primary ("API rate limit exceeded"), "Too many requests", and its sign-in throttle ("Maximum number of login attempts
+ * exceeded").
  */
-const RATE_LIMIT_MESSAGE = /rate limit|too many|login attempts/i;
+const RATE_LIMIT_MESSAGE = /rate limit|too many requests|login attempts/i;
+/** A rate-limited renewal waits at least this, and this when GitHub names no time; at most the cap. */
+const RATE_LIMIT_FLOOR_MS = 60_000;
+const RATE_LIMIT_CAP_MS = 15 * 60_000;
 
 /**
  * GitHub's error object (its API's `{ message }`, or an OAuth error), a code from it, and whether its message names a
@@ -164,15 +169,33 @@ const githubErrorOf = async (response: Response): Promise<{ readonly errorObject
 };
 
 /**
- * GitHub's rate limits answer 403 or 429 with `retry-after`, no requests left, or (a secondary limit) only a message
- * naming it: passing, never a refusal.
+ * GitHub's rate limits answer 403 or 429 with `retry-after`, no requests left, or (a secondary limit, on a 403) only a
+ * message naming it: passing, never a refusal.
  */
 const rateLimited = (response: Response, rateLimitMessage: boolean): boolean =>
-  rateLimitMessage || response.headers.get("retry-after") !== null || response.headers.get("x-ratelimit-remaining") === "0";
+  (response.status === 403 && rateLimitMessage) || response.status === 429 || response.headers.get("retry-after") !== null || response.headers.get("x-ratelimit-remaining") === "0";
+
+/**
+ * When a rate-limited renewal may be tried again: `retry-after` (seconds or a date), else the reset of an exhausted
+ * limit (`x-ratelimit-reset`, epoch seconds), else a minute; between a minute and 15 minutes from now.
+ */
+const retryAtOf = (response: Response, now: number): number => {
+  const after = response.headers.get("retry-after")?.trim();
+  const reset = Number(response.headers.get("x-ratelimit-reset"));
+  const named =
+    after !== undefined && /^\d+$/.test(after)
+      ? now + Number(after) * 1000
+      : after !== undefined && !Number.isNaN(Date.parse(after))
+        ? Date.parse(after)
+        : response.headers.get("x-ratelimit-remaining") === "0" && positive(reset)
+          ? reset * 1000
+          : now;
+  return Math.min(Math.max(named, now + RATE_LIMIT_FLOOR_MS), now + RATE_LIMIT_CAP_MS);
+};
 
 type CopilotToken =
   | { readonly ok: true; readonly token: string; readonly expires: number }
-  | { readonly ok: false; readonly refused: boolean; readonly status?: number; readonly code?: string; readonly problem: string };
+  | { readonly ok: false; readonly refused: boolean; readonly status?: number; readonly code?: string; readonly problem: string; readonly retryAt?: number };
 
 /** A Copilot token for `githubToken` (pi-ai's request: the bearer and the editor headers), or why not. */
 const copilotToken = async (vendor: CopilotVendor, githubToken: string): Promise<CopilotToken> => {
@@ -188,12 +211,14 @@ const copilotToken = async (vendor: CopilotVendor, githubToken: string): Promise
   }
   if (!response.ok) {
     const { errorObject, code, rateLimit } = await githubErrorOf(response);
-    const refused = [400, 401, 403].includes(response.status) && errorObject && !rateLimited(response, rateLimit);
+    const limited = rateLimited(response, rateLimit);
+    const refused = [400, 401, 403].includes(response.status) && errorObject && !limited;
     return {
       ok: false,
       refused,
       status: response.status,
       ...(code === undefined ? {} : { code }),
+      ...(limited ? { retryAt: retryAtOf(response, vendor.now()) } : {}),
       problem: refused ? `GitHub refused a Copilot token (${code ?? `HTTP ${response.status}`})` : `GitHub gave no Copilot token (HTTP ${response.status})`,
     };
   }
@@ -282,9 +307,15 @@ export const refreshCopilot = async (vendor: CopilotVendor, credential: SignInCr
   if (!copilot.ok) {
     return copilot.refused
       ? { ok: false, refused: true, code: copilot.code ?? `http_${copilot.status ?? 0}`, problem: copilot.problem }
-      : { ok: false, refused: false, ...(copilot.code === undefined ? {} : { code: copilot.code }), problem: copilot.problem };
+      : {
+          ok: false,
+          refused: false,
+          ...(copilot.code === undefined ? {} : { code: copilot.code }),
+          ...(copilot.retryAt === undefined ? {} : { retryAt: copilot.retryAt }),
+          problem: copilot.problem,
+        };
   }
-  return { ok: true, credential: { ...credential, access: copilot.token, expires: copilot.expires } };
+  return { ok: true, credential: { ...credential, access: copilot.token, expires: copilot.expires, earliestRefreshAt: null } };
 };
 
 /** Where a Copilot token's requests go (the host it names) and the editor headers they take. */

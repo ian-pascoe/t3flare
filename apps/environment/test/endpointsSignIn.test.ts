@@ -56,7 +56,7 @@ const setup = async () => {
     now,
   });
   const endpoints = endpointStore(kv, sealed, signIns);
-  const discovered: Array<{ baseUrl: string; apiKey: string | undefined; headers: Readonly<Record<string, string>> }> = [];
+  const discovered: Array<{ baseUrl: string; apiKey: string | undefined; headers: Readonly<Record<string, string>>; signIn: string | undefined }> = [];
   const stopped: Array<string> = [];
   let listed: Discovery = { ok: true, models: [{ id: "gpt-6.1-sol", name: "GPT-6.1 Sol" }, { id: "gpt-5-mini" }] };
   let changes = 0;
@@ -68,8 +68,9 @@ const setup = async () => {
     endpoints: {
       store: endpoints,
       signIns,
-      discover: async (target, apiKey) => {
-        discovered.push({ baseUrl: target.baseUrl, apiKey, headers: target.headers });
+      discover: async (target, apiKey, signIn) => {
+        // Which sign-in's list it is: Copilot's is read as its own catalog (discover.ts).
+        discovered.push({ baseUrl: target.baseUrl, apiKey, headers: target.headers, signIn });
         return listed;
       },
       changed: () => void changes++,
@@ -123,7 +124,7 @@ describe("ChatGPT plan usage on the Harness panel", () => {
     expect(endpoint).toMatchObject({ id: "chatgpt", label: "ChatGPT", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "chatgpt", headers: {} });
     expect(endpoint!.models.map((model) => model.id)).toEqual(["gpt-6.1-sol", "gpt-5-mini"]);
     // The list was read at OpenAI with the sign-in's access token.
-    expect(context.discovered).toEqual([{ baseUrl: "https://api.openai.com/v1", apiKey: undefined, headers: { authorization: `Bearer ${context.vendor.issued[0]}` } }]);
+    expect(context.discovered).toEqual([{ baseUrl: "https://api.openai.com/v1", apiKey: undefined, headers: { authorization: `Bearer ${context.vendor.issued[0]}` }, signIn: "chatgpt" }]);
     expect(context.changes()).toBe(1);
     const html = await context.page();
     expect(html).toContain("owner@example.com");
@@ -261,7 +262,7 @@ describe("Claude on the Harness panel (SPI-1165)", () => {
     expect(endpoint).toMatchObject({ id: "claude", label: "Claude", api: "anthropic-messages", baseUrl: "https://api.anthropic.com", auth: "claude", headers: {} });
     // The list was read at Anthropic with the sign-in's token as a bearer, with its OAuth beta.
     expect(context.discovered).toEqual([
-      { baseUrl: "https://api.anthropic.com", apiKey: undefined, headers: { authorization: `Bearer ${context.anthropic.accessTokens[0]}`, "anthropic-beta": "oauth-2025-04-20" } },
+      { baseUrl: "https://api.anthropic.com", apiKey: undefined, headers: { authorization: `Bearer ${context.anthropic.accessTokens[0]}`, "anthropic-beta": "oauth-2025-04-20" }, signIn: "claude" },
     ]);
     const html = await context.page();
     expect(html).toContain("owner@example.com");
@@ -283,6 +284,7 @@ describe("Claude on the Harness panel (SPI-1165)", () => {
       baseUrl: "https://api.anthropic.com",
       apiKey: undefined,
       headers: { authorization: `Bearer ${context.anthropic.accessTokens[0]}`, "anthropic-beta": "oauth-2025-04-20" },
+      signIn: "claude",
     });
     for (const token of context.anthropic.issued) expect(read.text).not.toContain(token);
   });
@@ -405,6 +407,8 @@ describe("GitHub Copilot on the Harness panel (SPI-1166)", () => {
         baseUrl: "https://api.individual.githubcopilot.com",
         apiKey: undefined,
         headers: { ...EDITOR_HEADERS, "X-GitHub-Api-Version": "2026-06-01", authorization: `Bearer ${context.github.copilotTokens[0]}` },
+        // Read as Copilot's catalog.
+        signIn: "copilot",
       },
     ]);
     const html = await context.page();
@@ -435,7 +439,7 @@ describe("GitHub Copilot on the Harness panel (SPI-1166)", () => {
     await copilotSignInFlow(context);
     const read = await context.post({ endpoint: { id: "copilot", label: "Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot" } }, "endpoints/discover");
     expect(read.status).toBe(200);
-    expect(context.discovered.at(-1)).toMatchObject({ baseUrl: "https://api.individual.githubcopilot.com", headers: { authorization: `Bearer ${context.github.copilotTokens[0]}`, "Copilot-Integration-Id": "vscode-chat" } });
+    expect(context.discovered.at(-1)).toMatchObject({ baseUrl: "https://api.individual.githubcopilot.com", headers: { authorization: `Bearer ${context.github.copilotTokens[0]}`, "Copilot-Integration-Id": "vscode-chat" }, signIn: "copilot" });
     for (const token of context.github.issued) expect(read.text).not.toContain(token);
   });
 

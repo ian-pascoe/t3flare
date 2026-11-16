@@ -81,6 +81,16 @@ describe("the GitHub Copilot sign-in", () => {
     expect(github.requests.at(-1)).toMatchObject({ url: GITHUB_ACCESS_TOKEN_URL, redirect: "manual", signal: true });
   });
 
+  it("asks no more often than once a second, whatever interval GitHub names", async () => {
+    const { github, vendor, now, advance } = setup({ deviceAnswer: { interval: 0.2 }, slowDown: { interval: 0.5 } });
+    const { pending, device } = await startCopilotSignIn(vendor);
+    expect(pending).toMatchObject({ intervalMs: 1_000, nextPollAt: now() + 1_000 });
+    expect(device.intervalSeconds).toBe(1);
+    advance(1_000);
+    expect(waitingOf(await pollCopilotSignIn(vendor, pending))).toMatchObject({ intervalMs: 1_000 });
+    expect(github.counts.polls).toBe(1);
+  });
+
   it("slows down as GitHub says: to the interval it names, else 5 s more", async () => {
     // 12 s, not the 10 s that 5 s more would make.
     const { github, vendor, now, advance } = setup({ slowDown: { interval: 12 } });
@@ -194,6 +204,11 @@ describe("the GitHub Copilot sign-in", () => {
       // naming them: passing.
       [{ copilotStatus: 403, copilotBody: { message: "You have exceeded a secondary rate limit. Please wait a few minutes before you try again." } }, { refused: false }],
       [{ copilotStatus: 403, copilotBody: { message: "Maximum number of login attempts exceeded. Please try again later." } }, { refused: false }],
+      [{ copilotStatus: 403, copilotBody: { message: "Too Many Requests" } }, { refused: false }],
+      // Each wording in any case, on a 403 only; "too many" alone is not a rate limit.
+      [{ copilotStatus: 403, copilotBody: { message: "API RATE LIMIT EXCEEDED" } }, { refused: false }],
+      [{ copilotStatus: 403, copilotBody: { message: "Too many seats in use for your organization" } }, { refused: true, code: "http_403" }],
+      [{ copilotStatus: 401, copilotBody: { message: "API rate limit exceeded" } }, { refused: true, code: "http_401" }],
       // A JSON object that is not GitHub's error object: passing.
       [{ copilotStatus: 401, copilotBody: { detail: "Unauthorized" } }, { refused: false }],
       // A code is named only in its shape: anything else of the body is not, and the status names it instead.
@@ -226,5 +241,32 @@ describe("the GitHub Copilot sign-in", () => {
     const before = context.github.requests.length;
     expect(await copilotSignIn(context.vendor).revoke(result.credential)).toEqual({ confirmed: false });
     expect(context.github.requests).toHaveLength(before);
+  });
+
+  it("names when a rate-limited renewal may be tried again: retry-after, else the limit's reset, else a minute; at most 15", async () => {
+    const credential = async (options: Parameters<typeof fakeGitHubCopilot>[0]) => {
+      const context = setup();
+      const result = await signedIn(context);
+      if (!result.ok) throw new Error("not signed in");
+      Object.assign(context.github.options, options);
+      return { context, answer: await refreshCopilot(context.vendor, result.credential) };
+    };
+    const limited = { copilotStatus: 403, copilotBody: { message: "You have exceeded a secondary rate limit" } };
+    for (const [headers, after] of [
+      [{ "retry-after": "120" }, 120_000],
+      [{ "retry-after": "5" }, 60_000],
+      [{ "retry-after": "86400" }, 900_000],
+      [{}, 60_000],
+    ] as const) {
+      const { context, answer } = await credential({ ...limited, copilotHeaders: headers });
+      expect(answer, JSON.stringify(headers)).toMatchObject({ ok: false, refused: false, retryAt: context.now() + after });
+    }
+    const { context, answer } = await credential({ copilotStatus: 403, copilotBody: { message: "API rate limit exceeded" }, copilotHeaders: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "" } });
+    expect(answer).toMatchObject({ retryAt: context.now() + 60_000 });
+    const reset = await credential({ copilotStatus: 403, copilotBody: { message: "API rate limit exceeded" }, copilotHeaders: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.floor(Date.UTC(2026, 10, 16, 12, 0) / 1000) + 300) } });
+    expect(reset.answer).toMatchObject({ retryAt: Date.UTC(2026, 10, 16, 12, 0) + 300_000 });
+    // A 503 is passing trouble with no time named: the next ask tries again.
+    const down = await credential({ copilotStatus: 503, copilotBody: { message: "Service unavailable" } });
+    expect(down.answer).not.toHaveProperty("retryAt");
   });
 });

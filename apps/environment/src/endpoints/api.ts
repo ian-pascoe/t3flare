@@ -133,6 +133,8 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
   const typed = typeof body.apiKey === "string" && body.apiKey !== "" ? body.apiKey : undefined;
   let apiKey: string | undefined;
   let target: Pick<ModelEndpoint, "api" | "baseUrl" | "headers"> = valid.endpoint;
+  // The saved sign-in whose list it is (its vendor's list may have its own shape: Copilot's).
+  let signIn: SignIn | undefined;
   if (isSignIn(valid.endpoint.auth)) {
     // A sign-in's list is read with its own token, at its own target only.
     const saved = deps.store.load().endpoints.find((endpoint) => endpoint.id === valid.endpoint.id);
@@ -140,6 +142,7 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
     const access = await deps.signIns.access(saved.id);
     if (!access.ok) return { status: 200, json: { ok: false, error: access.problem } };
     target = signInTarget(saved.auth, access);
+    signIn = saved.auth;
   } else if (valid.endpoint.auth === "api-key") {
     if (typed !== undefined) apiKey = typed;
     else {
@@ -152,7 +155,7 @@ export const endpointsDiscover = async (deps: EndpointsApiDeps, body: Record<str
       apiKey = saved.apiKey;
     }
   }
-  const found = await deps.discover(target, apiKey, isSignIn(valid.endpoint.auth) ? valid.endpoint.auth : undefined);
+  const found = await deps.discover(target, apiKey, signIn);
   if (!found.ok) return { status: 200, json: found };
   return { status: 200, json: { ok: true, models: modelsWithMetadata(valid.endpoint, found.models) } };
 };

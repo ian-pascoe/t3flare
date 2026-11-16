@@ -108,7 +108,7 @@ const signInForm = (escape: Escape, view: EndpointsView, kind: SignIn): string =
   const waitingHere = waiting.some(([, status]) => status.pendingSince !== null);
   // A device sign-in's step: the vendor's page and the code to enter there (its kind's words). A paste sign-in's: the
   // link, then the paste.
-  const device = signIn.device;
+  const device = isDeviceSignIn(kind) ? signIn.device : null;
   const step =
     device !== null
       ? `<div class="field wide" data-sign-in-step hidden><p class="desc"><a data-sign-in-link target="_blank" rel="noopener noreferrer">${escape(device.link)}</a></p><p class="desc">Enter this code there: <code class="ident" data-sign-in-code></code></p></div>`

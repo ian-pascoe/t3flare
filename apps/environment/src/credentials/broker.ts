@@ -236,6 +236,14 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     if (!renewed.ok) {
       if (renewed.refused) return refusedRenewal(endpointId, renewed);
       log({ endpoint: endpointId, event: "refresh", ok: false, refused: false, code: renewed.code ?? null, kept: current.expires > now() });
+      if (renewed.retryAt !== undefined) {
+        // The vendor asked to wait (a rate limit): no renewal before then, whoever asks (`earliestRefreshAt` above).
+        try {
+          await write(endpointId, { ...current, earliestRefreshAt: renewed.retryAt });
+        } catch {
+          // Unsaved, the next ask tries again: no worse than before.
+        }
+      }
       // Shown on the panel until a renewal succeeds, so it does not read "signed in, renews before" a time gone by.
       setStatus(endpointId, { problem: `${renewed.problem}: it is tried again at the next use`, problemAt: now() });
       return keep(renewed.problem);

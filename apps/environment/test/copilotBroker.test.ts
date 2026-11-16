@@ -164,6 +164,9 @@ describe("the Credential broker with a GitHub Copilot sign-in", () => {
     expect(await context.broker.access("copilot")).toMatchObject({ ok: true, accessToken: context.github.copilotTokens[0] });
     expect(context.broker.status("copilot")).toMatchObject({ signedIn: true, problem: "GitHub gave no Copilot token (HTTP 403): it is tried again at the next use" });
     context.github.options.copilotStatus = undefined;
+    // Renewed once the rate limit's wait (a minute at least) is over.
+    expect(await context.broker.access("copilot")).toMatchObject({ ok: true, accessToken: context.github.copilotTokens[0] });
+    context.advance(60_000);
     expect(await context.broker.access("copilot")).toMatchObject({ ok: true, accessToken: context.github.copilotTokens[1] });
     expect(context.broker.status("copilot")).toMatchObject({ problem: null });
     // Expired, with the edge's page: a passing failure, retryable.
@@ -269,4 +272,30 @@ describe("the Credential broker with a GitHub Copilot sign-in", () => {
     expect(context.broker.status("copilot").baseUrl).toBe("https://api.business.githubcopilot.com");
     scan(context);
   });
+
+  it("waits out a rate-limited renewal: callers meanwhile do not reach GitHub, and it renews after the time GitHub named", async () => {
+    const context = setup();
+    await signIn(context);
+    context.advance(LIFE);
+    context.github.options.copilotStatus = 403;
+    context.github.options.copilotBody = { message: "You have exceeded a secondary rate limit" };
+    context.github.options.copilotHeaders = { "retry-after": "90" };
+    expect(await context.broker.access("copilot")).toMatchObject({ ok: false, signedOut: false });
+    const asked = context.github.counts.copilotTokens;
+    context.github.options.copilotStatus = undefined;
+    // Within the 90 s: every caller is answered here, retryable, and GitHub is not asked.
+    for (const answer of await Promise.all(Array.from({ length: 3 }, () => context.broker.access("copilot")))) expect(answer).toMatchObject({ ok: false, signedOut: false });
+    context.advance(60_000);
+    expect(await context.broker.access("copilot")).toMatchObject({ ok: false, signedOut: false });
+    expect(context.github.counts.copilotTokens).toBe(asked);
+    expect(context.broker.status("copilot")).toMatchObject({ signedIn: true, problem: expect.stringMatching(/HTTP 403\): it is tried again/) });
+    // After it: renewed, and the wait is cleared.
+    context.advance(31_000);
+    expect(await context.broker.access("copilot")).toMatchObject({ ok: true, accessToken: context.github.copilotTokens.at(-1) });
+    expect(context.github.counts.copilotTokens).toBe(asked + 1);
+    const stored = await context.broker.read("copilot");
+    expect(stored?.type === "oauth" ? stored.earliestRefreshAt : "none").toBeNull();
+    scan(context);
+  });
 });
+

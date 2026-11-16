@@ -59,7 +59,14 @@ export type SignInResult =
 export type RefreshResult =
   | { readonly ok: true; readonly credential: SignInCredential }
   /** `refused`: the vendor ended the sign-in (sign in again); otherwise a passing failure. `problem` is a fixed text. */
-  | { readonly ok: false; readonly refused: boolean; readonly code?: string; readonly problem: string };
+  | {
+      readonly ok: false;
+      readonly refused: boolean;
+      readonly code?: string;
+      readonly problem: string;
+      /** A passing failure the vendor asked to wait out (a rate limit): no renewal is tried before this (ms). */
+      readonly retryAt?: number;
+    };
 
 /** A device sign-in's code for the owner to enter at the vendor's page (`authorizeUrl`). Not a secret: the page shows it. */
 export interface DeviceCode {
