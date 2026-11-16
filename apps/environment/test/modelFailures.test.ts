@@ -3,7 +3,7 @@
 // cited with its read date in packages/models/test/fixtures/vendors.json (made by docs/steps/spi-1172/gen-vendor-fixtures.mjs),
 // because no vendor was called with real credentials.
 import type { EndpointApi, EndpointAuth } from "@t3flare/models/endpoints";
-import { classifyModelFailure, type FailedAnswer, modelFailureMessage } from "@t3flare/models/failures";
+import { classifyModelFailure, type FailedAnswer, modelFailureMessage, SHORT_RESET_MS } from "@t3flare/models/failures";
 import { describe, expect, it } from "vitest";
 
 import fixtures from "../../../packages/models/test/fixtures/vendors.json" with { type: "json" };
@@ -36,15 +36,16 @@ describe("classifyModelFailure: Anthropic Messages", () => {
     });
   });
 
-  it("a rate limit with a short retry-after (≤ 60 s) is retried in the run; a longer one pauses until it", () => {
-    expect(classify("anthropicRateLimit")).toEqual({ class: "usage_limit", code: "throttled", resetAt: AT + 17_000, retryable: true, stop: false });
-    expect(classify("anthropicRateLimitLong")).toEqual({ class: "usage_limit", code: "throttled", resetAt: AT + 600_000, retryable: true, stop: true });
+  it("a rate limit resetting within pi-durable's retries (≤ 14 s) is retried in the run; a later one (17 s) pauses until it", () => {
+    expect(classify("anthropicRateLimit")).toEqual({ class: "usage_limit", code: "rate_limited", resetAt: AT + 17_000, retryable: true, stop: true });
+    expect(classify("anthropicRateLimitLong")).toEqual({ class: "usage_limit", code: "rate_limited", resetAt: AT + 600_000, retryable: true, stop: true });
   });
 
-  it("the short-reset boundary is 60 s: at 60 s retried, at 61 s paused", () => {
+  it("the short-reset boundary is SHORT_RESET_MS (14 s, pi-durable's retries' span): at 14 s retried, at 15 s paused", () => {
     const at = (seconds: number) => classifyModelFailure({ status: 429, headers: { "retry-after": String(seconds) }, body: "", at: AT }, { id: "x", api: "anthropic-messages", auth: "api-key" })?.stop;
-    expect(at(60)).toBe(false);
-    expect(at(61)).toBe(true);
+    expect(SHORT_RESET_MS).toBe(14_000);
+    expect(at(14)).toBe(false);
+    expect(at(15)).toBe(true);
   });
 
   it("retry-after-ms is read before retry-after", () => {
@@ -62,7 +63,7 @@ describe("classifyModelFailure: Anthropic Messages", () => {
   });
 
   it("a rate limit with no reset: retried by pi-durable, a usage limit with no reset if it never clears", () => {
-    expect(classify("anthropicRateLimitBare")).toEqual({ class: "usage_limit", code: "throttled", retryable: true, stop: false });
+    expect(classify("anthropicRateLimitBare")).toEqual({ class: "usage_limit", code: "rate_limited", retryable: true, stop: false });
   });
 
   it("the tier's spend cap (enforced_spend_limit_reached, no retry-after): a usage limit no retry clears, no reset read from its prose", () => {
@@ -102,19 +103,19 @@ describe("classifyModelFailure: OpenAI Responses and Completions", () => {
     }
   });
 
-  it("a rate limit: retry-after first (20 s: retried in the run)", () => {
-    expect(classify("openaiRateLimit")).toMatchObject({ code: "throttled", resetAt: AT + 20_000, stop: false });
+  it("a rate limit: retry-after first (20 s: past pi-durable's retries, so it pauses)", () => {
+    expect(classify("openaiRateLimit")).toMatchObject({ code: "rate_limited", resetAt: AT + 20_000, stop: true });
   });
 
   it("a rate limit with only x-ratelimit-reset-* (Go durations): the later of the exhausted ones", () => {
-    expect(classify("openaiRateLimitResetHeaders")).toMatchObject({ code: "throttled", resetAt: AT + 360_000, stop: true });
+    expect(classify("openaiRateLimitResetHeaders")).toMatchObject({ code: "rate_limited", resetAt: AT + 360_000, stop: true });
     // Only the exhausted window counts: the requests window (1 s) alone at 0 is a short limit, retried.
     const requestsOnly = { status: 429, headers: { "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": "1s", "x-ratelimit-remaining-tokens": "900", "x-ratelimit-reset-tokens": "6m0s" }, body: "", at: AT };
     expect(classifyModelFailure(requestsOnly, { id: "x", api: "openai-responses", auth: "api-key" })).toMatchObject({ resetAt: AT + 1000, stop: false });
   });
 
   it("with no window at 0 there is no reset to wait for: a short rate limit, retried", () => {
-    expect(classify("openaiRateLimitNoneExhausted")).toEqual({ class: "usage_limit", code: "throttled", retryable: true, stop: false });
+    expect(classify("openaiRateLimitNoneExhausted")).toEqual({ class: "usage_limit", code: "rate_limited", retryable: true, stop: false });
   });
 
   it("an OpenAI-family 402: a spend limit", () => {
@@ -187,7 +188,7 @@ describe("classifyModelFailure: by auth, and what it leaves alone", () => {
 
   it("other APIs get the shared rows: a 429 with retry-after, a refused key, a 503", () => {
     const google = { id: "g", api: "google-generative-ai" as const, auth: "api-key" as const };
-    expect(classifyModelFailure({ status: 429, headers: { "retry-after": "30" }, body: '{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}', at: AT }, google)).toMatchObject({ code: "throttled", resetAt: AT + 30_000 });
+    expect(classifyModelFailure({ status: 429, headers: { "retry-after": "30" }, body: '{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}', at: AT }, google)).toMatchObject({ code: "rate_limited", resetAt: AT + 30_000 });
     expect(classifyModelFailure({ status: 403, headers: {}, body: '{"error":{"code":403,"status":"PERMISSION_DENIED"}}', at: AT }, google)).toMatchObject({ code: "key_refused" });
     expect(classifyModelFailure({ status: 503, headers: {}, body: "", at: AT }, google)).toMatchObject({ code: "overloaded" });
   });

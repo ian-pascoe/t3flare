@@ -137,7 +137,7 @@ describe("differ", () => {
         attemptId: "a",
         status: "failed",
         reason: "model_error",
-        detail: "t3flare model endpoint: usage_limit",
+        detail: "t3flare model endpoint: usage_limit, not retried",
         startedAt: 0,
         settledAt: nowMs,
         proxy: { requests: 1, endpointFailure, ...extra },
@@ -156,7 +156,7 @@ describe("differ", () => {
     });
 
     it("a reset held to at least 30 s after now; none when the vendor gave none", () => {
-      const soon = failureOf(failed({ endpointId: "e", class: "usage_limit", code: "throttled", message: "m", retryable: true, resetAt: nowMs + 1000, stop: true, at: nowMs }), now);
+      const soon = failureOf(failed({ endpointId: "e", class: "usage_limit", code: "rate_limited", message: "m", retryable: true, resetAt: nowMs + 1000, stop: true, at: nowMs }), now);
       expect(soon.resetAt).toBe("2026-11-10T21:20:30.000Z");
       const none = failureOf(failed({ endpointId: "e", class: "usage_limit", code: "usage_limit", message: "m", retryable: true, stop: true, at: nowMs }), now);
       expect(none.resetAt ?? null).toBeNull();

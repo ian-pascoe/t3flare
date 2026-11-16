@@ -98,16 +98,17 @@ export const forwardedHeadersOf = (api: EndpointApi): ReadonlySet<string> => new
  * add (the endpoint's own, then its credential's), or why not, as an HTTP status. `key` is the credential the headers
  * carry, for the Workspace DO's sync guard and leak check to look for (by hash), never to send anywhere else.
  */
+/** Where the relay sends an endpoint's request: its API, auth, base URL and the headers to add (its credential's among them). */
+export interface RelayTarget {
+  readonly api: EndpointApi;
+  /** The endpoint's auth: the relay carries no sign-in, so a key or none (SPI-1172: its failures are classified by it). */
+  readonly auth: "api-key" | "none";
+  readonly baseUrl: string;
+  readonly headers: Readonly<Record<string, string>>;
+}
+
 export type ModelRelayTarget =
-  | {
-      readonly ok: true;
-      readonly api: EndpointApi;
-      /** The endpoint's auth: the relay carries no sign-in, so a key or none (SPI-1172: its failures are classified by it). */
-      readonly auth: "api-key" | "none";
-      readonly baseUrl: string;
-      readonly headers: Readonly<Record<string, string>>;
-      readonly key: string | null;
-    }
+  | (RelayTarget & { readonly ok: true; readonly key: string | null })
   | { readonly ok: false; readonly status: number; readonly message: string };
 
 /** The relay's target for a resolved endpoint and its key (pure; the store's `resolve` gives both). */

@@ -33,20 +33,21 @@ export interface FailedEndpoint {
  * - `usage_limit`: a subscription's or plan's usage window (Anthropic's unified limit, ChatGPT's `usage_limit_reached`,
  *   plan usage's `subscription_sharing_usage_limit_exceeded`); `workspace_limit`: one a workspace admin set.
  * - `spend_limit`: quota, credits, a spend cap or billing: no retry clears it.
- * - `throttled`: a 429 rate limit.
+ * - `rate_limited`: a 429 rate limit.
  * - `key_refused`, `sign_in_refused`, `credential_needed` (no auth, refused): a 401 or 403, by the endpoint's auth.
  * - `plan_not_eligible`: the plan or user cannot use this route.
  * - `unsupported_request`: plan usage refused a capability of the request.
  * - `overloaded`, `server_error`, `unavailable`: passing, retried.
  *
- * No code the Session stops on matches pi-ai's retry patterns (`rate.?limit`, `overloaded`, `server.?error`, a status,
- * …), so it can leave the code in the error text to stop pi-durable's retries (hence `throttled`, not `rate_limited`).
+ * The Session leaves pi-durable a text by the failure (`modelFailureDetail`): for one it stops on, a text no retry
+ * pattern of pi-ai's matches (it names the class, never the code: `rate_limited` would match `rate.?limit`); for one it
+ * retries, a text one of them matches.
  */
 export type ModelFailureCode =
   | "usage_limit"
   | "workspace_limit"
   | "spend_limit"
-  | "throttled"
+  | "rate_limited"
   | "key_refused"
   | "sign_in_refused"
   | "credential_needed"
@@ -87,7 +88,7 @@ interface Read {
   readonly detailCode: string | undefined;
   /** The error's message: read by one row only, Anthropic's owner-set spend limit, whose docs name its opening words. */
   readonly message: string;
-  /** The error object's fields (ChatGPT's `resets_at`, `resets_in_seconds`). */
+  /** The error object's fields (ChatGPT's `resets_at`). */
   readonly error: Readonly<Record<string, unknown>>;
   readonly header: (name: string) => string | undefined;
   readonly at: number;
@@ -299,10 +300,10 @@ const ROWS: ReadonlyArray<Row> = [
   { families: ["openai"], when: (r) => named(r, "subscription_sharing_unsupported_capability"), code: "unsupported_request" },
   // OpenAI's API (platform.openai.com/docs/guides/error-codes, /rate-limits).
   { families: ["openai"], when: (r) => named(r, ...OPENAI_SPEND) || status(r, 402), code: "spend_limit" },
-  { families: ["openai"], when: (r) => status(r, 429), code: "throttled", reset: openaiReset },
+  { families: ["openai"], when: (r) => status(r, 429), code: "rate_limited", reset: openaiReset },
   { families: ["openai"], when: (r) => named(r, "server_is_overloaded"), code: "overloaded" },
   // Every API: a 429's retry-after; a refused credential by the endpoint's auth; overload and server errors.
-  { families: "any", when: (r) => status(r, 429), code: "throttled", reset: retryAfter },
+  { families: "any", when: (r) => status(r, 429), code: "rate_limited", reset: retryAfter },
   { families: "any", auths: ["api-key"], when: (r) => status(r, 401, 403), code: "key_refused" },
   { families: "any", auths: SIGN_INS, when: (r) => status(r, 401, 403), code: "sign_in_refused" },
   { families: "any", auths: ["none"], when: (r) => status(r, 401, 403), code: "credential_needed" },
@@ -313,18 +314,25 @@ const ROWS: ReadonlyArray<Row> = [
 ];
 
 /**
- * The longest reset a rate limit is retried through within the run: a 429 that resets in at most this is retried by
- * pi-durable, as the SDKs and pi-ai do (step-2a2 §3; pi-ai's `DEFAULT_MAX_RETRY_DELAY_MS`); a later reset pauses the
- * thread until it.
+ * The longest reset a rate limit is retried through within the run: pi-durable's default retries (3, 2 s doubling:
+ * `DEFAULT_RETRY_POLICY` and pi-ai's `retryDelayMs`) span 2 + 4 + 8 = 14 s, so a 429 that resets within that is met by
+ * one of them; a later reset is out of their reach and pauses the thread until it at once, with one request.
  */
-export const SHORT_RESET_MS = 60_000;
+export const SHORT_RESET_MS = 14_000;
+
+/** The least time after now a usage limit's reset is held to: t3 arms no resume for one not after the turn's end. */
+export const MIN_RESET_MS = 30_000;
+
+/** A usage limit's reset as t3 takes it (ISO, at least `MIN_RESET_MS` after `now`), or null for another class or none. */
+export const heldReset = (failure: { readonly class: string; readonly resetAt?: number }, now: number): string | null =>
+  failure.class === "usage_limit" && failure.resetAt !== undefined ? new Date(Math.max(failure.resetAt, now + MIN_RESET_MS)).toISOString() : null;
 
 /** Each code's class, whether a retry can help, and whether one is worth making before the reset (or at all). */
 const KINDS: Readonly<Record<ModelFailureCode, { readonly class: ModelFailure["class"]; readonly retryable: boolean; readonly stop: "always" | "long-reset" | "never" }>> = {
   usage_limit: { class: "usage_limit", retryable: true, stop: "always" },
   workspace_limit: { class: "usage_limit", retryable: false, stop: "always" },
   spend_limit: { class: "usage_limit", retryable: false, stop: "always" },
-  throttled: { class: "usage_limit", retryable: true, stop: "long-reset" },
+  rate_limited: { class: "usage_limit", retryable: true, stop: "long-reset" },
   key_refused: { class: "permission_error", retryable: false, stop: "always" },
   sign_in_refused: { class: "permission_error", retryable: false, stop: "always" },
   credential_needed: { class: "permission_error", retryable: false, stop: "always" },
@@ -359,7 +367,7 @@ export const modelFailureMessage = (failure: ModelFailure, endpoint: Pick<Failed
       return `${name} reached the usage limit its workspace's admin set${signIn === undefined ? "" : ` for ${signIn.title}`}; only the admin can raise it.`;
     case "spend_limit":
       return `${name}'s account is out of quota, credit or its spend limit: raise it with the vendor.`;
-    case "throttled":
+    case "rate_limited":
       return `${name} is rate-limited${http}.`;
     case "key_refused":
       return `${name} refused its API key${http}: check it in the Harness panel.`;
@@ -403,11 +411,31 @@ export const resetSentence = (failure: Pick<ModelFailure, "class" | "resetAt">):
  * that one of pi-ai's patterns matches, so pi-durable retries it whatever the vendor's text said (a bare 529 or 521).
  */
 export const MODEL_FAILURE_PREFIX = "t3flare model endpoint: ";
-const RETRIED: Readonly<Partial<Record<ModelFailureCode, string>>> = {
-  throttled: "rate limit",
-  overloaded: "overloaded",
-  server_error: "server error",
-  unavailable: "service unavailable",
+
+/** The words of a retried failure's text: each matches one of pi-ai's retry patterns. */
+const retriedWords = (code: ModelFailureCode): string | undefined => {
+  switch (code) {
+    case "rate_limited":
+      return "rate limit";
+    case "overloaded":
+      return "overloaded";
+    case "server_error":
+      return "server error";
+    case "unavailable":
+      return "service unavailable";
+    case "usage_limit":
+    case "workspace_limit":
+    case "spend_limit":
+    case "key_refused":
+    case "sign_in_refused":
+    case "credential_needed":
+    case "plan_not_eligible":
+    case "unsupported_request":
+      return undefined;
+  }
 };
-export const modelFailureDetail = (failure: ModelFailure): string =>
-  failure.stop ? `${MODEL_FAILURE_PREFIX}${failure.code}` : `${MODEL_FAILURE_PREFIX}${failure.code} (${RETRIED[failure.code] ?? "service unavailable"}, retried)`;
+
+export const modelFailureDetail = (failure: ModelFailure): string => {
+  const words = failure.stop ? undefined : retriedWords(failure.code);
+  return words === undefined ? `${MODEL_FAILURE_PREFIX}${failure.class}, not retried` : `${MODEL_FAILURE_PREFIX}${failure.code} (${words}, retried)`;
+};

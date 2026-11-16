@@ -23,6 +23,7 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import type { ProviderAdapterV2Event } from "@t3tools/provider-core/server/ProviderAdapter";
 import { type ApprovalDecision, type ContentBlock, type EndpointFailureRecord, type PendingApproval, type PendingQuestion, PROPOSE_PLAN_TOOL, type PushedEntry, type SessionState, type TurnState } from "@t3flare/session-protocol";
+import { heldReset } from "@t3flare/models/failures";
 import { classifyProxyFailure, type ProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
 import * as DateTime from "effect/DateTime";
 
@@ -784,14 +785,8 @@ const emitRequests = (state: DifferState, out: Array<ProviderAdapterV2Event>, pe
   }
 };
 
-/** The least time after the turn's end a usage limit's reset is held to: t3 arms no resume for one not after it. */
-export const MIN_RESET_MS = 30_000;
-
-/** A usage limit's reset as t3 takes it: ISO, at least 30 s after `now`; null for another class or no reset. */
-const resetOf = (failure: { readonly class: string; readonly resetAt?: number }, now: DateTime.Utc): string | null =>
-  failure.class === "usage_limit" && failure.resetAt !== undefined
-    ? DateTime.formatIso(DateTime.makeUnsafe(Math.max(failure.resetAt, DateTime.toEpochMillis(now) + MIN_RESET_MS)))
-    : null;
+/** A usage limit's reset as t3 takes it (`heldReset`: ISO, at least `MIN_RESET_MS` after `now`). */
+const resetOf = (failure: { readonly class: string; readonly resetAt?: number }, now: DateTime.Utc): string | null => heldReset(failure, DateTime.toEpochMillis(now));
 
 /** A model proxy failure as t3's: fixed text by its code, the reset held to at least 30 s after `now`. */
 const proxyFailureOf = (failure: ProxyFailure, now: DateTime.Utc): OrchestrationV2ProviderFailure =>
