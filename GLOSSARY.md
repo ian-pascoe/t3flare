@@ -366,6 +366,10 @@ _Avoid_: router, catch-all endpoint, wildcard endpoint
 t3flare's own count of one model answer's tokens on a Model endpoint, with its agent, endpoint, model, time and cost when known, made by a Session, text generation or the Model relay for t3's Usage page; never a key, a Handle, a prompt or an answer's text. On the page, Pi Durable's turns, text generation and Pi's all count in one Pi row, told apart by their source.
 _Avoid_: usage log, telemetry, request log (that is Commissary's)
 
+**Limit reading**:
+The usage windows (ChatGPT's primary and secondary, Claude's five-hour and weekly) one Model endpoint answer reported in its vendor's rate-limit headers, with the share used, the reset and when the answer came, read by a Session, text generation or the Model relay and kept by the Environment, the latest answer's per window, for t3's limit meters (one limit source per endpoint); never a token or an account.
+_Avoid_: quota report (that is Commissary's), usage record (that counts tokens)
+
 **Subscription**:
 The owner's own signed-in plan with a model vendor (ChatGPT, Claude, GitHub Copilot), as opposed to an API key: a Model endpoint's sign-in, its tokens held by the Credential broker.
 _Avoid_: Subscription login, OAuth, account
