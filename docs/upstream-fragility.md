@@ -1327,8 +1327,9 @@ succeed; nothing in t3 is touched. The leans are on the vendors' error shapes, o
 
 - **Where**: `packages/models/src/failures.ts` (`ROWS`, `KINDS`, `read`), `packages/models/src/redact.ts` (`SHAPES`),
   `apps/agents/src/session/proxyLimits.ts` (`recordingFetch`'s `failureHeaders`/`errorBodyOf`, `classifyEndpoint`, the
-  vendor-shaped `faultAnswer` cases), `endpointText.ts`, `workspace/modelRelay.ts` (an error answer's redacted body), the
-  differ's `endpointFailureOf`. It leans on:
+  vendor-shaped `faultAnswer` cases), `endpointText.ts`, `workspace/modelRelay.ts` and `relayFailures.ts` (an error
+  answer's redacted body, a stream's error events, the process's last answer), the differ's `endpointFailureOf`, and
+  the CLI wrapper's `relayedEvent` with `provider/cli/relayFailure.ts`. It leans on:
   - **The vendors' error shapes** (packages/models/test/fixtures/vendors.json, each with its source, read 2026-11-16):
     Anthropic's `error.type`, `error.details.error_code` (`enforced_spend_limit_reached`) and `retry-after`; OpenAI's
     `error.type`/`error.code` (`insufficient_quota`, `credit_balance_exhausted`, the spend-limit codes,
@@ -1339,15 +1340,22 @@ succeed; nothing in t3 is touched. The leans are on the vendors' error shapes, o
   - **pi-ai's error text** for an error inside a stream: the Responses `response.failed` event as `<code>: <message>`
     and an `error` event as `Error Code <code>: …` (`openai-responses-shared.js`); Anthropic's as the JSON body.
   - **pi-ai's retry patterns** (`utils/retry.js`): the codes the Session stops on are chosen to match none (hence
-    `throttled`, never `rate_limited`); pi-durable's `afterResponse` hook and `AssistantMessage.provider` (the endpoint's
-    id), as U24 and step 2a part 2 already lean on.
+    `throttled`, never `rate_limited`), and a retried code's text is worded to match one (`overloaded`, `server error`,
+    `rate limit`, `service unavailable`); pi-durable's `afterResponse` hook and `AssistantMessage.provider` (the
+    endpoint's id), as U24 and step 2a part 2 already lean on.
+  - **t3's adapter events** (U3): a failed `turn.terminal` and an `error` turn item carry `failure`, which the CLI
+    wrapper replaces; a failure t3 raises outside the adapter's events (a session that fails to open) is not seen.
+  - **The vendors' stream error events**: Anthropic's `{"type":"error","error":{…}}`, OpenAI's `error` and
+    `response.failed`, read line by line from a `text/event-stream`.
 - **Breaks when**: a vendor renames a code or moves a reset (Anthropic documents its unified headers, or changes them);
   pi-ai changes its stream error text or adds a retry pattern a code matches; pi-ai stops passing a request's `fetch`.
-- **Detection**: `apps/environment/test/modelFailures.test.ts` (each row on recorded answers),
+- **Detection**: `apps/environment/test/modelFailures.test.ts` (each row on doc-shaped answers), `cliRelayFailure.test.ts`
+  (t3's ACP adapter for Claude Code and OpenCode, stand-ins for Codex and pi),
   `apps/agents/test/endpointFailures.test.ts` (a real Harness: one request for a limit, four for an overload, every
   stopping code not retryable to pi-ai), `endpointText.test.ts`, `modelRelayRoute.test.ts`, `redactSecrets.test.ts`.
   **Silent**: a vendor-side change (the fixtures are the docs' shapes, not live answers); an unknown 429 then shows as
-  `throttled` with no reset, retried by pi-durable, then a usage limit without auto-resume.
+  `throttled` with no reset, retried by pi-durable, then a usage limit without auto-resume. A t3 change to which
+  failures reach the adapter's events: `p1172.ts cli` on a stage shows it.
 - **Blast radius**: a usage-limited thread fails without pausing or resuming, or a refused key is retried a few times
   before it fails; never a fallback to another endpoint, and no credential reaches t3 (the redaction is by shape).
 - **Fix**: the vendor's error docs (sources in the fixture file), then a row in `ROWS`; on a pi-ai bump, diff

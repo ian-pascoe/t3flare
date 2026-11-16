@@ -1,0 +1,30 @@
+{
+  "step": "cli",
+  "at": "2026-11-16T14:59:52.839Z",
+  "model": "commissary/claude-haiku-5-5",
+  "cli": {
+    "runs": [
+      {
+        "status": "failed"
+      }
+    ],
+    "failure": {
+      "class": "provider_error",
+      "message": "Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:23681a05-6f1d-4460-9a3e-33c8748e7e15:3a8fa3f6-b0ca-4e92-b484-3212730c3db1.",
+      "code": null,
+      "retryable": null
+    },
+    "errorItems": [
+      {
+        "class": "provider_error",
+        "message": "Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:23681a05-6f1d-4460-9a3e-33c8748e7e15:3a8fa3f6-b0ca-4e92-b484-3212730c3db1.",
+        "code": null,
+        "retryable": null
+      }
+    ]
+  },
+  "failures": [
+    "t3's failure is the relay's: a refused key naming the endpoint: {\"class\":\"provider_error\",\"message\":\"Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:23681a05-6f1d-4460-9a3e-33c8748e7e15:3a8fa3f6-b0ca-4e92-b484-3212730c3db1.\",\"code\":null,\"retryable\":null}"
+  ],
+  "ok": false
+}

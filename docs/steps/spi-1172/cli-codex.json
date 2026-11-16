@@ -1,0 +1,29 @@
+{
+  "step": "cli",
+  "at": "2026-11-16T15:03:51.414Z",
+  "model": "commissary/claude-haiku-5-5",
+  "cliAgent": "codex",
+  "cli": {
+    "runs": [
+      {
+        "status": "failed"
+      }
+    ],
+    "failure": {
+      "class": "permission_error",
+      "message": "The Model endpoint \"badkey\" refused its API key (HTTP 401): check it in the Harness panel.",
+      "code": "key_refused",
+      "retryable": false
+    },
+    "errorItems": [
+      {
+        "class": "permission_error",
+        "message": "The Model endpoint \"badkey\" refused its API key (HTTP 401): check it in the Harness panel.",
+        "code": "key_refused",
+        "retryable": false
+      }
+    ]
+  },
+  "failures": [],
+  "ok": true
+}

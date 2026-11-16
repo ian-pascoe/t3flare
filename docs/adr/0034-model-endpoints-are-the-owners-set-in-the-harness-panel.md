@@ -79,10 +79,13 @@ refinement) or none, optional headers, and the models it serves.
    `retry-after`, a 401 or 403 by the endpoint's auth, overload and 5xx), never its prose. The Session classifies a
    Durable turn's or a compaction's answer once, records it on the turn with its own text naming the endpoint, and stops
    pi-durable's retries when none can help; t3 shows it, and a usage limit pauses the thread until its reset (auto-resume
-   when the owner has it on). Overload and 5xx are retried and are never a usage limit. **No fallback**: a turn's model
-   is its endpoint's, so a limited endpoint's thread waits for that endpoint. Text generation names the classified
-   failure and its reset. The relay passes an error back in the vendor's own shape (the CLI pauses as it would on the
-   vendor), its body redacted, and logs the class. Error text is redacted by shape (vendor keys, bearer tokens,
+   when the owner has it on). A rate limit that resets within 60 s is retried in the run. Overload and 5xx are
+   retried and are never a usage limit (501 is not retried). **No fallback**: a turn's model is its endpoint's, so a
+   limited endpoint's thread waits for that endpoint. Every failed answer replaces the turn's record. Text generation
+   names the classified failure and its reset. The relay passes an error back in the vendor's own shape, its body
+   redacted whole (an error event in a stream too), logs the class, and reports it to the Workspace DO as the process's
+   last answer; a CLI agent's failed turn on an endpoint shows that classification (the Environment's CLI wrapper), so
+   no CLI's failure on an endpoint is read from Commissary's texts. Error text is redacted by shape (vendor keys, bearer tokens,
    JWT-shaped values, key headers and parameters) and by the endpoint's own credential before it reaches t3 or a log
    (`@t3flare/models/redact`, also in the Environment's redacting Console). The Model proxy keeps its own classifier
    (`proxyFailure.ts`) until the hard cut.

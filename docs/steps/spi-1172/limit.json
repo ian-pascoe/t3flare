@@ -1,14 +1,14 @@
 {
   "step": "limit",
-  "at": "2026-11-16T14:07:10.892Z",
+  "at": "2026-11-16T14:57:36.563Z",
   "model": "commissary/claude-haiku-5-5",
   "fault": {
     "armed": {
       "fixture": "anthropicUsageLimit",
-      "resetAt": 1794838154114
+      "resetAt": 1794841181009
     }
   },
-  "threadId": "bb3409b8-6cf8-49d5-b083-8067911cf85a",
+  "threadId": "d793adb2-feb7-4898-a080-947c82e237e0",
   "first": {
     "run": "failed",
     "failure": {
@@ -16,23 +16,23 @@
       "message": "The Model endpoint \"commissary\" reached its usage limit.",
       "code": "usage_limit",
       "retryable": true,
-      "resetAt": "2026-11-16T14:09:15.000Z"
+      "resetAt": "2026-11-16T14:59:42.000Z"
     },
     "model": {
       "requests": 1,
       "endpointFailure": {
-        "endpointId": "commissary",
         "class": "usage_limit",
         "code": "usage_limit",
-        "message": "The Model endpoint \"commissary\" reached its usage limit.",
+        "resetAt": 1794841182000,
         "retryable": true,
-        "resetAt": 1794838155000,
         "stop": true,
-        "at": 1794838037367
+        "message": "The Model endpoint \"commissary\" reached its usage limit.",
+        "endpointId": "commissary",
+        "at": 1794841063626
       }
     },
     "detail": "t3flare model endpoint: usage_limit",
-    "faultResetAt": "2026-11-16T14:09:14.114Z"
+    "faultResetAt": "2026-11-16T14:59:41.009Z"
   },
   "idle": {
     "reset": true,
@@ -44,30 +44,30 @@
       "remoteTasksUnanswered": 0
     },
     "due": {
-      "at": "2026-11-16T14:09:15.000Z",
+      "at": "2026-11-16T14:59:42.000Z",
       "sources": {
         "outbox": null,
         "scheduledTasks": null,
-        "usageLimitResets": "2026-11-16T14:09:15.000Z",
+        "usageLimitResets": "2026-11-16T14:59:42.000Z",
         "pullRequestWatch": null
       }
     },
-    "alarm": "2026-11-16T14:09:15.000Z"
+    "alarm": "2026-11-16T14:59:42.000Z"
   },
   "resumed": {
     "runs": [
       {
-        "id": "run:thread:bb3409b8-6cf8-49d5-b083-8067911cf85a:ordinal:1",
+        "id": "run:thread:d793adb2-feb7-4898-a080-947c82e237e0:ordinal:1",
         "status": "failed",
-        "startedAt": "2026-11-16T14:07:15.905Z"
+        "startedAt": "2026-11-16T14:57:42.640Z"
       },
       {
-        "id": "run:thread:bb3409b8-6cf8-49d5-b083-8067911cf85a:ordinal:2",
+        "id": "run:thread:d793adb2-feb7-4898-a080-947c82e237e0:ordinal:2",
         "status": "completed",
-        "startedAt": "2026-11-16T14:09:19.545Z"
+        "startedAt": "2026-11-16T14:59:46.234Z"
       }
     ],
-    "secondRunStartedAfterResetMs": 5431,
+    "secondRunStartedAfterResetMs": 5225,
     "answer": "pong",
     "turns": [
       {
@@ -75,14 +75,14 @@
         "proxy": {
           "requests": 1,
           "endpointFailure": {
-            "endpointId": "commissary",
             "class": "usage_limit",
             "code": "usage_limit",
-            "message": "The Model endpoint \"commissary\" reached its usage limit.",
+            "resetAt": 1794841182000,
             "retryable": true,
-            "resetAt": 1794838155000,
             "stop": true,
-            "at": 1794838037367
+            "message": "The Model endpoint \"commissary\" reached its usage limit.",
+            "endpointId": "commissary",
+            "at": 1794841063626
           }
         }
       },

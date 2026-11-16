@@ -1,14 +1,14 @@
 {
   "step": "overload",
-  "at": "2026-11-16T14:09:33.419Z",
+  "at": "2026-11-16T14:57:08.282Z",
   "model": "commissary/claude-haiku-5-5",
   "fault": {
     "armed": {
       "fixture": "overloaded",
-      "resetAt": 1794838296226
+      "resetAt": 1794841151971
     }
   },
-  "threadId": "00f09a41-0b64-4051-a1ec-64df3802a6f0",
+  "threadId": "fca21e6c-f052-4168-a29f-c311392a3acc",
   "first": {
     "run": "failed",
     "failure": {
@@ -20,17 +20,17 @@
     "model": {
       "requests": 4,
       "endpointFailure": {
-        "endpointId": "commissary",
         "class": "provider_error",
         "code": "overloaded",
-        "message": "The Model endpoint \"commissary\" is overloaded (HTTP 529).",
         "retryable": true,
         "stop": false,
-        "at": 1794838193653
+        "message": "The Model endpoint \"commissary\" is overloaded (HTTP 529).",
+        "endpointId": "commissary",
+        "at": 1794841048160
       }
     },
-    "detail": "529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
-    "faultResetAt": "2026-11-16T14:11:36.226Z"
+    "detail": "t3flare model endpoint: overloaded (overloaded, retried)",
+    "faultResetAt": "2026-11-16T14:59:11.971Z"
   },
   "failures": [],
   "ok": true
