@@ -363,9 +363,7 @@ The Model relay's one base URL for every Model endpoint a process may use: the e
 _Avoid_: router, catch-all endpoint, wildcard endpoint
 
 **Usage record**:
-t3flare's own count of one model answer's tokens on a Model endpoint, with its agent, endpoint, model, time and cost
-when known: made by a Session, text generation or the Model relay, kept by the Environment DO for t3's Usage page.
-Never a key, a Handle, a prompt or an answer's text.
+t3flare's own count of one model answer's tokens on a Model endpoint, with its agent, endpoint, model, time and cost when known, made by a Session, text generation or the Model relay for t3's Usage page; never a key, a Handle, a prompt or an answer's text. On the page, Pi Durable's turns, text generation and the Pi CLI agent all count in the page's Pi row (t3's usage provider `pi`), told apart by their source.
 _Avoid_: usage log, telemetry, request log (that is Commissary's)
 
 **Subscription**:
