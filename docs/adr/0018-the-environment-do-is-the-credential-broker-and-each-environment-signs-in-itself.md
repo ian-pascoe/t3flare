@@ -77,17 +77,20 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
     and identity as the system's first block, its tool names), pinned in a test; the shape follows from the token, so an
     API-key endpoint refuses such a token as its key, and the shape reaches no other endpoint. Its tokens last 8 hours
     and its refresh token rotates on every refresh, a replaced one refused (SPI-1161 Q5), so item 3's one refresher
-    matters most here. **Anthropic offers no revocation to apps** (SPI-1161: `platform.claude.com/v1/oauth/revoke`
-    answers 404): sign-out deletes the tokens here and stops the Sessions; the grant stays on the owner's account until he
-    removes it at claude.ai (Settings, Claude Code), which the panel says beside the sign-in, in Sign out's confirmation
+    matters most here. Any refusal of a refresh (400, 401 or 403, whatever its body, but Anthropic's passing codes)
+    signs the endpoint out, so a grant removed at claude.ai ends the sign-in rather than failing every turn as
+    retryable. Sign-out forgets the account whole (Claude has no registration to keep, so its email goes too).
+    **Anthropic offers no revocation to apps** (SPI-1161: `platform.claude.com/v1/oauth/revoke`
+    answers 404): sign-out deletes the tokens here and stops the Sessions; the grant stays on the owner's account until the
+    owner removes it at claude.ai (Settings, Claude Code), which the panel says beside the sign-in, in Sign out's confirmation
     and in its answer.
 
     **The terms-of-service risk is the owner's, chosen knowingly** (owner decision, 2026-11-13). Claude Code's OAuth
     client is Anthropic's own, made for Claude Code; Anthropic's terms may not allow a Claude plan's usage through
     another app, and Anthropic may refuse such requests, or act on the account. The owner chose to offer the sign-in
-    regardless, for his own Environment. Its requests present themselves as Claude Code (its user agent and identity),
+    regardless, for the owner's own Environment. Its requests present themselves as Claude Code (its user agent and identity),
     as pi-ai's do, since Anthropic refuses an OAuth token's requests without the identity (SPI-1161 Q4). The panel names
-    the risk as his beside the sign-in.
+    the risk as the owner's beside the sign-in.
 
 Considered and not taken:
 
@@ -97,6 +100,6 @@ Considered and not taken:
 - **Claude through the Model proxy only** (Commissary holds a Claude credential): the owner's Model endpoints decisions
   bring Subscriptions into t3flare, and the hard cut (SPI-1176) removes the proxy.
 - **pi-ai's state as the verifier** for Claude: it puts the PKCE verifier in the browser's address and on Anthropic's
-  page beside the code; a state of our own costs nothing (to be confirmed by the first real sign-in, SPI-1165).
+  page beside the code; a state of our own costs nothing, and Anthropic accepted it (the first real sign-in, on p1165).
 - **t3's `CodexChatGptAuth`** (step-2a2's plan): it is the same OAuth flow, but tied to t3's provider settings and secret
   store, which the panel's sign-ins do not use.

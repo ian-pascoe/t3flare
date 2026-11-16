@@ -1397,7 +1397,8 @@ undocumented OAuth for Claude Code, whose use outside Claude Code is the owner's
     token lacks the mark.
   - **Anthropic** (the spike, SPI-1161): the token answer's fields (`access_token`, `refresh_token`, `expires_in` 28800,
     `scope`, `account.uuid`, `account.email_address`), a refresh token that rotates on every refresh and refuses a
-    replaced one with `invalid_grant`, no revocation endpoint, and `GET /v1/models` with the bearer and the OAuth beta
+    replaced one with `invalid_grant` (any 400, 401 or 403 but Anthropic's passing codes is taken as the end of the
+    sign-in), no revocation endpoint, and `GET /v1/models` with the bearer and the OAuth beta
     for the model list.
 - **Breaks when**: pi-ai changes Claude Code's client, URLs or scopes, the exchange or refresh body, the token mark,
   the headers, betas, user agent's version, identity text or tool names; Anthropic changes what it requires of an OAuth
@@ -1406,8 +1407,13 @@ undocumented OAuth for Claude Code, whose use outside Claude Code is the owner's
   compares them with `claudeOAuth.ts`, and pins every header, the system blocks and a tool name on the wire (and their
   absence for an API key). `apps/environment/test/claudeSignIn.test.ts` and `claudeBroker.test.ts` run ours against a
   fake of Anthropic. **Silent**: anything on Anthropic's side, which only a real sign-in and turn see (the fake is ours).
+- **Unverified until a real refresh runs**: whether Anthropic ends the replaced access token at a refresh. A Session
+  keeps a token at most 5 minutes and never past 2 minutes before its expiry, and the broker renews with less than 5
+  minutes left, so a Session may send the replaced access token for at most 3 minutes after a renewal. If Anthropic
+  refuses it there, the request's 401 is SPI-1172's `sign_in_refused` (not retried) and the Session drops the token,
+  so the next turn takes the renewed one; that turn fails once. The stage run ended before the 8-hour token's renewal.
 - **Blast radius**: turns on the Claude endpoint fail (429 or 401, shown as model errors), or the sign-in fails; a lost
-  rotation signs the endpoint out (sign in again). No token leaves the Session or the broker either way.
+  rotation, or any refusal of a refresh, signs the endpoint out (sign in again). No token leaves the Session or the broker either way.
 - **Fix**: on a pi-ai bump, diff `auth/oauth/anthropic.js` against `claudeOAuth.ts` and `credentials/claude.ts`, and
   `api/anthropic-messages.js` (`isOAuthToken`, `createClient`, `getBetaFeatures`, `buildParams`) against the pins; update
   the pins only once a turn on a real Claude sign-in passes with the new shape.
