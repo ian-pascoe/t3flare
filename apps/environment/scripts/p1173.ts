@@ -8,10 +8,13 @@
 //    (SPI-1162's approach; Commissary's log counts their requests, so our records of them are dropped): `comm`
 //    (Anthropic Messages), `oai` (Chat Completions), `resp` (OpenAI Responses); and `standin`, the stage's probe Worker's
 //    Chat Completions stand-in keyed with the probe key (ours to count), serving `STANDIN_MODEL`, a model pi-ai does not
-//    price and LiteLLM does. Text generation is pointed at `standin`.
+//    price and LiteLLM does; `standin-anth` and `standin-resp`, the stand-in's Anthropic Messages and OpenAI Responses,
+//    on the same key. Text generation is pointed at `standin`.
 // 2. A turn on each agent: the Durable agent on `comm`, its thread's title regenerated (text generation on `standin`),
-//    the Durable agent on `standin`; Codex on `resp`; Claude Code on `comm` (model-routed); pi on `oai` and on
-//    `standin`; OpenCode on `oai`.
+//    the Durable agent on `standin`; Codex on `resp` and on `standin-resp`; Claude Code on `comm` and on `standin-anth`
+//    (model-routed); then, in Claude Code's Container, a request through the relay with its process's handle that hangs
+//    up mid-stream (the stand-in's `slow-…` model), recorded by the Workers' cancel; pi on `oai` and on `standin`;
+//    OpenCode on `oai`.
 // 3. t3's usage summary (`server.getUsageSummary`, what the Usage page reads): our sources (`t3flare://usage/<agent>`)
 //    have the `standin` turns, priced by t3's rate table, and nothing of the Commissary endpoints; Commissary's half is
 //    on the page too (on a probe stage, the probe's stand-in log). Commissary's own log (dev.env's
@@ -26,6 +29,7 @@ import * as fs from "node:fs";
 import { cliTurn as acpTurn, enable as enableAcp } from "./lib/acpTurn.ts";
 import { admin, base, createProjectAndThread, dispatch, pair, projectionOf, runsOf, sendMessage, SETTLED, sleep, threadWindow, updateSettings, uuid, wsCall } from "./lib/client.ts";
 import { cliTurn, enable } from "./lib/cliTurn.ts";
+import { workspaceExec as exec } from "./lib/relayEvidence.ts";
 import { commissaryManagementOf, readUsageRecords, toUsageRecord } from "../src/usage/commissary.ts";
 
 const option = (name: string) => {
@@ -80,6 +84,8 @@ const runStart = Date.now();
 const MODEL = "claude-haiku-5-5";
 /** The stand-in's model: one pi-ai's catalog does not know (so the endpoint has no price for it), and LiteLLM does. */
 const STANDIN_MODEL = "claude-fable-5-2";
+/** The stand-in's Responses model, for Codex: one pi-ai does not price and LiteLLM does. */
+const STANDIN_RESP_MODEL = "gpt-5.1-codex";
 const COMMISSARY = {
   comm: { label: "Commissary (Anthropic)", api: "anthropic-messages", baseUrl: proxyUrl },
   oai: { label: "Commissary (Chat Completions)", api: "openai-completions", baseUrl: `${proxyUrl}/v1` },
@@ -90,12 +96,14 @@ for (const [id, spec] of Object.entries(COMMISSARY)) {
   saved[id] = (await api("POST", "endpoints", { op: "save", endpoint: { id, ...spec, auth: "api-key", headers: {}, models: [MODEL] }, apiKey: proxyKey })).status;
 }
 saved.standin = (await api("POST", "endpoints", { op: "save", endpoint: { id: "standin", label: "Stand-in", api: "openai-completions", baseUrl: `${PROBE}/relay/v1`, auth: "api-key", headers: {}, models: [STANDIN_MODEL] }, apiKey: probeKey })).status;
+saved["standin-anth"] = (await api("POST", "endpoints", { op: "save", endpoint: { id: "standin-anth", label: "Stand-in (Anthropic)", api: "anthropic-messages", baseUrl: `${PROBE}/relay`, auth: "api-key", headers: {}, models: [STANDIN_MODEL] }, apiKey: probeKey })).status;
+saved["standin-resp"] = (await api("POST", "endpoints", { op: "save", endpoint: { id: "standin-resp", label: "Stand-in (Responses)", api: "openai-responses", baseUrl: `${PROBE}/relay/v1`, auth: "api-key", headers: {}, models: [STANDIN_RESP_MODEL] }, apiKey: probeKey })).status;
 const listed = ((await api("GET", "endpoints")).json?.endpoints ?? []) as Array<any>;
 const standinCost = listed.find((endpoint) => endpoint.id === "standin")?.models?.find((model: any) => model.id === STANDIN_MODEL)?.cost ?? null;
 report.endpoints = { saved, model: MODEL, standin: { model: STANDIN_MODEL, endpointCost: standinCost, baseUrl: "<probe>/relay/v1" }, baseUrls: { comm: "<MODEL_PROXY_URL>", oai: "<MODEL_PROXY_URL>/v1", resp: "<MODEL_PROXY_URL>/v1" } };
-check("the four endpoints saved", Object.values(saved).every((status) => status === 200), saved);
+check("the six endpoints saved", Object.values(saved).every((status) => status === 200), saved);
 check("the stand-in's endpoint has no price for its model", standinCost === null || Object.values(standinCost).every((value) => value === 0), standinCost);
-const SLUG = { comm: `comm/${MODEL}`, oai: `oai/${MODEL}`, resp: `resp/${MODEL}`, standin: `standin/${STANDIN_MODEL}` };
+const SLUG = { comm: `comm/${MODEL}`, oai: `oai/${MODEL}`, resp: `resp/${MODEL}`, standin: `standin/${STANDIN_MODEL}`, anth: `standin-anth/${STANDIN_MODEL}`, standinResp: `standin-resp/${STANDIN_RESP_MODEL}` };
 await wsCall(cookie, "server.updateSettings", { patch: {}, providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } } });
 await updateSettings(cookie, { textGenerationModelSelection: { instanceId: "piDurable", model: SLUG.standin } });
 
@@ -143,6 +151,7 @@ const cli = async (name: string, turn: () => Promise<{ runs: Array<any>; text: s
   check(what, settled(answer.runs.at(-1)?.status), turns[name]);
 };
 await cli("codex", () => cliTurn(cookie, { cli: "codex", workspace: `usage-cli-${run}`, model: SLUG.resp, mode: "full-access", plan: false, prompt: ask }), "a Codex turn on Commissary's Responses endpoint, through the relay");
+await cli("codexStandin", () => cliTurn(cookie, { cli: "codex", workspace: `usage-cli2-${run}`, model: SLUG.standinResp, mode: "full-access", plan: false, prompt: ask }), "a Codex turn on the stand-in's Responses, through the relay");
 await enable(cookie, "pi", "pi");
 await sleep(2000);
 await cli("pi", () => cliTurn(cookie, { cli: "pi", workspace: `usage-cli-${run}`, model: SLUG.oai, mode: "full-access", plan: false, prompt: ask }), "a pi turn on Commissary's Chat Completions endpoint, through the relay");
@@ -150,6 +159,24 @@ await cli("piStandin", () => cliTurn(cookie, { cli: "pi", workspace: `usage-cli-
 await enableAcp(cookie, "claude");
 await sleep(2000);
 await cli("claude", () => acpTurn(cookie, { cli: "claude", workspace: `usage-acp-${run}`, model: SLUG.comm, mode: "full-access", plan: false, prompt: ask }), "a Claude Code turn on Commissary's Anthropic Messages endpoint, model-routed through the relay");
+await cli("claudeStandin", () => acpTurn(cookie, { cli: "claude", workspace: `usage-acp2-${run}`, model: SLUG.anth, mode: "full-access", plan: false, prompt: ask }), "a Claude Code turn on the stand-in's Anthropic Messages, model-routed through the relay");
+// A client hanging up mid-stream, in Claude Code's Container with its live process's handle (never leaving the
+// Container): the stand-in's `slow-…` model sends its first event, then waits a minute; curl gives up after 5 s.
+{
+  const RELAY = "http://computer.internal/t3flare/model/standin-anth/v1/messages";
+  const body = `{"model":"slow-cancel","max_tokens":5,"stream":true,"messages":[{"role":"user","content":"hi"}]}`;
+  const hung = await exec(
+    `usage-acp2-${run}`,
+    [
+      `H=$(grep -ahz '^T3FLARE_MODEL_HANDLE=' /proc/[0-9]*/environ 2>/dev/null | tr '\\0' '\\n' | head -1 | cut -d= -f2)`,
+      `echo "handle=$([ -n "$H" ] && echo 1 || echo 0)"`,
+      `echo "curl=$(curl -s -N -o /dev/null -w '%{http_code}' --max-time 5 -X POST -H "x-api-key: $H" -H 'content-type: application/json' -H 'anthropic-version: 2023-06-01' --data '${body}' ${RELAY}; echo " exit $?")"`,
+    ].join("\n"),
+    60_000,
+  );
+  turns.hangUp = clean({ output: String(hung.stdout ?? "").trim() });
+  check("a relayed stream hung up on mid-way (curl's timeout, exit 28)", /handle=1/.test(String(hung.stdout)) && /exit 28/.test(String(hung.stdout)), turns.hangUp);
+}
 await enableAcp(cookie, "opencode");
 await sleep(2000);
 await cli("opencode", () => acpTurn(cookie, { cli: "opencode", workspace: `usage-acp-${run}`, model: SLUG.oai, mode: "full-access", plan: false, prompt: ask }), "an OpenCode turn on Commissary's Chat Completions endpoint, through the relay");
@@ -183,8 +210,11 @@ report.usage = clean({
 const has = (provider: string, source: string, model: string) => table.some((row) => row.provider === provider && row.source === `t3flare://usage/${source}` && row.model === model && row.tokens > 0);
 check("our records: the Durable agent's turn on the stand-in, under Pi, by its endpoint's model", has("pi", "durable", SLUG.standin), table);
 check("our records: text generation's title on the stand-in, under Pi", has("pi", "text-generation", SLUG.standin), table);
-check("our records: pi's relayed turn on the stand-in, under Pi (the pi CLI's source)", has("pi", "pi", SLUG.standin), table);
-check("the stand-in's model, with no endpoint price, is priced by t3's rate table", table.filter((row) => row.model === SLUG.standin).every((row) => row.costSource === "modelPriced" && row.costUsd > 0), table);
+check("our records: Pi's relayed turn on the stand-in, under Pi (its own source)", has("pi", "pi", SLUG.standin), table);
+check("our records: Codex's relayed turn on the stand-in's Responses, under Codex", has("codex", "codex", SLUG.standinResp), table);
+check("our records: Claude Code's model-routed turn on the stand-in's Anthropic Messages, under Claude", has("claude", "claude", SLUG.anth), table);
+check("our records: the hung-up stream, recorded with the input its first event gave (the Workers' cancel and waitUntil)", table.some((row) => row.model === "standin-anth/slow-cancel" && row.tokens >= 1300), table);
+check("the stand-in's models, with no endpoint price, are priced by t3's rate table", [SLUG.standin, SLUG.anth, SLUG.standinResp].every((model) => table.some((row) => row.model === model) && table.filter((row) => row.model === model).every((row) => row.costSource === "modelPriced" && row.costUsd > 0)), table);
 check("no record of ours for an endpoint on the proxy's key (Commissary's log counts those)", !table.some((row) => /^(comm|oai|resp)\//.test(row.model)), table);
 check("Commissary's own log has this run's requests on the proxy's key (at least one per turn on its endpoints): counted once, there", ofRun.length >= 5, commissaryLog);
 check("both halves are on the page: our sources and Commissary's", (summary?.sources ?? []).some((source: any) => String(source.fingerprint?.resolvedHomePath).startsWith("t3flare://")) && (summary?.sources ?? []).some((source: any) => String(source.fingerprint?.resolvedHomePath).startsWith("commissary://")), report.usage);

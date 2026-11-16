@@ -15,7 +15,9 @@
 //   a server-sent event stream with an event at the start and after each gap (seconds): the long, idle stream check.
 //   `/relay/v1/chat/completions` (SPI-1173) answers any Chat Completions request with "ready" as a stream (or a body
 //   when `stream` is false), its usage in the last chunk, under the model the request named: a Model endpoint keyed
-//   with a key of its own, for the usage records.
+//   with a key of its own, for the usage records. `/relay/v1/messages` (Anthropic Messages) and `/relay/v1/responses`
+//   (OpenAI Responses) do the same in their APIs' stream shapes; a Messages model named `slow-…` sends its first event
+//   and then waits a minute, so a client that hangs up mid-stream can be seen.
 //
 // `GET /log` (with the probe key as bearer) answers everything logged.
 import { DurableObject } from "cloudflare:workers";
@@ -228,7 +230,8 @@ export default {
     }
 
     if (url.pathname.startsWith("/relay/v1/")) {
-      const sawKey = authorization === `Bearer ${env.PROBE_KEY}`;
+      // A bearer (OpenAI's APIs), or Anthropic's `x-api-key` (SPI-1173's Messages stand-in).
+      const sawKey = authorization === `Bearer ${env.PROBE_KEY}` || request.headers.get("x-api-key") === env.PROBE_KEY;
       await log.append({
         at: new Date().toISOString(),
         kind: "relay",
@@ -240,6 +243,49 @@ export default {
       });
       if (!sawKey) return json({ error: { message: "the stand-in endpoint wants its key" } }, 401);
       if (url.pathname === "/relay/v1/models") return json({ object: "list", data: [{ id: "drip", object: "model" }] });
+      if (url.pathname === "/relay/v1/messages" && request.method === "POST") {
+        const asked = (await request.json().catch(() => ({}))) as { model?: unknown; stream?: unknown };
+        const model = typeof asked.model === "string" ? asked.model : "standin";
+        const usage = { input_tokens: 1000, cache_read_input_tokens: 300, cache_creation_input_tokens: 0 };
+        const message = { id: "msg_standin", type: "message", role: "assistant", model, content: [] as Array<unknown>, stop_reason: null, stop_sequence: null, usage: { ...usage, output_tokens: 1 } };
+        if (asked.stream !== true) {
+          return json({ ...message, content: [{ type: "text", text: "ready" }], stop_reason: "end_turn", usage: { ...usage, output_tokens: 3 } });
+        }
+        const event = (data: { readonly type: string }) => `event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`;
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            controller.enqueue(encoder.encode(event({ type: "message_start", message } as { type: string })));
+            if (model.startsWith("slow-")) await new Promise((resolve) => setTimeout(resolve, 60_000));
+            for (const data of [
+              { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+              { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "ready" } },
+              { type: "content_block_stop", index: 0 },
+              { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 3 } },
+              { type: "message_stop" },
+            ]) {
+              controller.enqueue(encoder.encode(event(data)));
+            }
+            controller.close();
+          },
+        });
+        return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+      }
+      if (url.pathname === "/relay/v1/responses" && request.method === "POST") {
+        const asked = (await request.json().catch(() => ({}))) as { model?: unknown };
+        const model = typeof asked.model === "string" ? asked.model : "standin";
+        const item = { id: "msg_standin", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "ready", annotations: [] }] };
+        const response = { id: "resp_standin", object: "response", created_at: Math.floor(Date.now() / 1000), model, status: "in_progress", output: [] as Array<unknown> };
+        const usage = { input_tokens: 1500, input_tokens_details: { cached_tokens: 500 }, output_tokens: 4, output_tokens_details: { reasoning_tokens: 0 }, total_tokens: 1504 };
+        const events = [
+          { type: "response.created", sequence_number: 0, response },
+          { type: "response.output_item.added", sequence_number: 1, output_index: 0, item: { ...item, status: "in_progress", content: [] } },
+          { type: "response.output_text.delta", sequence_number: 2, item_id: item.id, output_index: 0, content_index: 0, delta: "ready" },
+          { type: "response.output_item.done", sequence_number: 3, output_index: 0, item },
+          { type: "response.completed", sequence_number: 4, response: { ...response, status: "completed", output: [item], usage } },
+        ];
+        return new Response(events.map((data) => `event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`).join(""), { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+      }
       if (url.pathname === "/relay/v1/chat/completions" && request.method === "POST") {
         const asked = (await request.json().catch(() => ({}))) as { model?: unknown; stream?: unknown };
         const model = typeof asked.model === "string" ? asked.model : "standin";
