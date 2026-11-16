@@ -1,0 +1,116 @@
+{
+  "at": "2026-11-16T12:31:11.933Z",
+  "step": "status",
+  "endpoints": [
+    {
+      "id": "commissary",
+      "auth": "api-key",
+      "api": "anthropic-messages",
+      "baseUrl": "https://api.ai.ianpascoe.dev",
+      "models": [
+        "claude-3-5-haiku-20241022",
+        "claude-3-7-sonnet-20250219",
+        "claude-fable-5",
+        "claude-fable-5-1",
+        "claude-fable-5-2",
+        "claude-haiku-4-5",
+        "claude-haiku-4-5-20251001",
+        "claude-haiku-5-5",
+        "claude-opus-4-1-20250805",
+        "claude-opus-4-20250514",
+        "claude-opus-4-5",
+        "claude-opus-4-5-20251101",
+        "claude-opus-4-6",
+        "claude-opus-4-6-thinking",
+        "claude-opus-4-7",
+        "claude-opus-4-8",
+        "claude-opus-5",
+        "claude-opus-5-5",
+        "claude-sonnet-4-20250514",
+        "claude-sonnet-4-5",
+        "claude-sonnet-4-6",
+        "claude-sonnet-5",
+        "claude-sonnet-5-5"
+      ],
+      "signIn": null
+    }
+  ],
+  "signIns": {
+    "chatgpt": {
+      "signedIn": false,
+      "email": null,
+      "clientId": "oaiapp_<issued>",
+      "subject": null,
+      "signedInAt": null,
+      "expiresAt": null,
+      "refreshedAt": null,
+      "pendingSince": null,
+      "problem": "OpenAI refused the sign-in code (invalid_grant). ChatGPT plan usage needs a ChatGPT Plus or Pro plan: on another plan this is the expected answer. Otherwise the code expired or was already used: start the sign-in again.",
+      "problemAt": 1794832261129
+    }
+  },
+  "audit": [
+    {
+      "action": "endpoint.sign-in",
+      "target": "chatgpt",
+      "after": {
+        "ok": false
+      },
+      "entity": "endpoints",
+      "at": 1794832261129,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.sign-in.start",
+      "target": "chatgpt",
+      "entity": "endpoints",
+      "at": 1794831806088,
+      "caller": "service-token"
+    },
+    {
+      "action": "endpoint.add",
+      "target": "commissary",
+      "before": null,
+      "after": {
+        "label": "Commissary",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.ai.ianpascoe.dev",
+        "auth": "api-key",
+        "headers": [],
+        "models": [
+          "claude-3-5-haiku-20241022",
+          "claude-3-7-sonnet-20250219",
+          "claude-fable-5",
+          "claude-fable-5-1",
+          "claude-fable-5-2",
+          "claude-haiku-4-5",
+          "claude-haiku-4-5-20251001",
+          "claude-haiku-5-5",
+          "claude-opus-4-1-20250805",
+          "claude-opus-4-20250514",
+          "claude-opus-4-5",
+          "claude-opus-4-5-20251101",
+          "claude-opus-4-6",
+          "claude-opus-4-6-thinking",
+          "claude-opus-4-7",
+          "claude-opus-4-8",
+          "claude-opus-5",
+          "claude-opus-5-5",
+          "claude-sonnet-4-20250514",
+          "claude-sonnet-4-5",
+          "claude-sonnet-4-6",
+          "claude-sonnet-5",
+          "claude-sonnet-5-5"
+        ],
+        "key": {
+          "set": true,
+          "setAt": 1794831662065,
+          "fingerprint": "5c220aed"
+        }
+      },
+      "entity": "endpoints",
+      "at": 1794831662065,
+      "caller": "service-token"
+    }
+  ]
+}

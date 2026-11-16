@@ -1,0 +1,9 @@
+{
+  "at": "2026-11-16T12:31:22.886Z",
+  "step": "sign-out",
+  "status": 200,
+  "answer": {
+    "ok": true,
+    "revoked": false
+  }
+}
