@@ -1,0 +1,13 @@
+{
+  "scanned": [
+    "p1174.json",
+    "stage-deploy.txt"
+  ],
+  "secrets": [
+    "probeKey",
+    "adminToken",
+    "bootstrapToken",
+    "accessSecret"
+  ],
+  "hits": []
+}

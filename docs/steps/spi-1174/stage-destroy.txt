@@ -1,0 +1,97 @@
+env | grep -c T3FLARE_DOMAIN: 0
+[18:26:24.163] WARN: alchemy 2.0.0-beta.87 is available (you're on 2.0.0-beta.85). Run `pnpm add alchemy@2.0.0-beta.87` to upgrade.
+[18:26:24.193] INFO: Destroy · p1174
+[18:26:24.193] INFO: Importing stack module
+[18:26:25.155] INFO: Resolving stack services
+[18:26:25.167] INFO: Loading stack state
+[18:26:28.272] INFO: Computing plan
+[18:26:29.722] INFO: Plan ready (5.5s)
+[18:26:29.735] INFO: Plan: 12 to delete, 43 binding changes
+[18:26:29.735] INFO: [AdminAccess] delete
+[18:26:29.736] INFO: [AdminServiceToken] delete
+[18:26:29.736] INFO: [Agents] delete
+[18:26:29.736] INFO: [Agents/CODEMODE_SANDBOX] unbind
+[18:26:29.736] INFO: [Agents/COMMISSARY_CONTAINER_API_KEY] unbind
+[18:26:29.737] INFO: [Agents/CONTAINER_BUDGET] unbind
+[18:26:29.737] INFO: [Agents/ENVIRONMENT] unbind
+[18:26:29.737] INFO: [Agents/LOADER] unbind
+[18:26:29.737] INFO: [Agents/SESSIONS] unbind
+[18:26:29.737] INFO: [Agents/T3FLARE_FAULTS] unbind
+[18:26:29.738] INFO: [Agents/WORKSPACES] unbind
+[18:26:29.738] INFO: [CodemodeSandbox] delete
+[18:26:29.738] INFO: [CodemodeSandbox/CODEMODE_SANDBOX] unbind
+[18:26:29.738] INFO: [CredentialsKey] delete
+[18:26:29.738] INFO: [Environment] delete
+[18:26:29.738] INFO: [Environment/BROWSER] unbind
+[18:26:29.738] INFO: [Environment/COMMISSARY_ACCESS_CLIENT_ID] unbind
+[18:26:29.739] INFO: [Environment/COMMISSARY_ACCESS_CLIENT_SECRET] unbind
+[18:26:29.739] INFO: [Environment/COMMISSARY_MANAGEMENT_KEY] unbind
+[18:26:29.739] INFO: [Environment/COMMISSARY_MANAGEMENT_URL] unbind
+[18:26:29.739] INFO: [Environment/COMMISSARY_USAGE_PRINCIPALS] unbind
+[18:26:29.739] INFO: [Environment/CONTAINER_BUDGET] unbind
+[18:26:29.739] INFO: [Environment/ENVIRONMENT] unbind
+[18:26:29.739] INFO: [Environment/MCP_ENGINE] unbind
+[18:26:29.739] INFO: [Environment/MCP_OAUTH] unbind
+[18:26:29.740] INFO: [Environment/SESSIONS] unbind
+[18:26:29.740] INFO: [Environment/T3_BOOTSTRAP_TOKEN] unbind
+[18:26:29.740] INFO: [Environment/T3FLARE_ACCESS_AUD] unbind
+[18:26:29.740] INFO: [Environment/T3FLARE_ACCESS_SERVICE_CLIENT_ID] unbind
+[18:26:29.740] INFO: [Environment/T3FLARE_ACCESS_SETTINGS_AUD] unbind
+[18:26:29.740] INFO: [Environment/T3FLARE_ACCESS_TEAM_DOMAIN] unbind
+[18:26:29.740] INFO: [Environment/T3FLARE_ADMIN_TOKEN] unbind
+[18:26:29.740] INFO: [Environment/T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN] unbind
+[18:26:29.741] INFO: [Environment/T3FLARE_CONNECT_SERVICE_TOKEN] unbind
+[18:26:29.741] INFO: [Environment/T3FLARE_CREDENTIALS_KEY] unbind
+[18:26:29.741] INFO: [Environment/T3FLARE_FAULTS] unbind
+[18:26:29.741] INFO: [Environment/T3FLARE_GITHUB_APP_ID] unbind
+[18:26:29.741] INFO: [Environment/T3FLARE_GITHUB_APP_PRIVATE_KEY] unbind
+[18:26:29.741] INFO: [Environment/T3FLARE_HOST] unbind
+[18:26:29.741] INFO: [Environment/T3FLARE_OWNER_EMAIL] unbind
+[18:26:29.741] INFO: [Environment/T3FLARE_SWEEP_PURGE] unbind
+[18:26:29.742] INFO: [Environment/TEXT_GENERATION] unbind
+[18:26:29.742] INFO: [Environment/WORKSPACE_PREVIEWS] unbind
+[18:26:29.742] INFO: [Environment/WORKSPACES] unbind
+[18:26:29.742] INFO: [McpFixture] delete
+[18:26:29.742] INFO: [McpFixture/FIXTURE_BEARER] unbind
+[18:26:29.742] INFO: [McpFixture/LOG] unbind
+[18:26:29.742] INFO: [McpWorker] delete
+[18:26:29.743] INFO: [Probe] delete
+[18:26:29.743] INFO: [Probe/LOG] unbind
+[18:26:29.743] INFO: [Probe/PROBE_KEY] unbind
+[18:26:29.743] INFO: [SettingsAccess] delete
+[18:26:29.744] INFO: [WorkspaceContainer] delete
+[18:26:29.744] INFO: [Agents/WorkspaceDO-Containers] delete
+[18:26:29.744] INFO: [Agents/WorkspaceDO-Containers/WorkspaceContainer] unbind
+[18:26:29.744] INFO: 
+[18:26:31.071] INFO: [Environment] deleting
+[18:26:31.072] INFO: [Agents/WorkspaceDO-Containers] deleting
+[18:26:31.072] INFO: [CodemodeSandbox] deleting
+[18:26:31.072] INFO: [McpFixture] deleting
+[18:26:31.073] INFO: [Probe] deleting
+[18:26:31.253] INFO: [CodemodeSandbox] Cloudflare Worker delete: deleting t3flare-codemode-p1174
+[18:26:31.268] INFO: [Probe] Cloudflare Worker delete: deleting t3flare-probe-p1174
+[18:26:31.281] INFO: [McpFixture] Cloudflare Worker delete: deleting t3flare-mcpfixture-p1174
+[18:26:31.325] INFO: [Environment] Cloudflare Worker delete: deleting t3flare-environment-p1174
+[18:26:32.347] INFO: [CodemodeSandbox] deleted (1.3s)
+[18:26:32.398] INFO: [Environment] deleted (1.3s)
+[18:26:32.399] INFO: [AdminAccess] deleting
+[18:26:32.399] INFO: [SettingsAccess] deleting
+[18:26:32.399] INFO: [Agents] deleting
+[18:26:32.400] INFO: [CredentialsKey] deleting
+[18:26:32.400] INFO: [McpWorker] deleting
+[18:26:32.496] INFO: [McpFixture] deleted (1.4s)
+[18:26:32.662] INFO: [CredentialsKey] deleted (262ms)
+[18:26:32.670] INFO: [Probe] deleted (1.6s)
+[18:26:32.742] INFO: [Agents] Cloudflare Worker delete: deleting t3flare-agents-p1174
+[18:26:32.926] INFO: [Agents/WorkspaceDO-Containers] deleted (1.9s)
+[18:26:33.011] INFO: [McpWorker] Cloudflare Worker delete: deleting t3flare-mcp-p1174
+[18:26:33.706] INFO: [SettingsAccess] deleted (1.3s)
+[18:26:33.865] INFO: [McpWorker] deleted (1.5s)
+[18:26:33.952] INFO: [AdminAccess] deleted (1.6s)
+[18:26:33.952] INFO: [AdminServiceToken] deleting
+[18:26:34.033] INFO: [Agents] deleted (1.6s)
+[18:26:34.033] INFO: [WorkspaceContainer] deleting
+[18:26:34.286] INFO: [WorkspaceContainer] deleted (253ms)
+[18:26:34.562] INFO: [AdminServiceToken] deleted (610ms)
+[18:26:34.855] INFO: 
+[18:26:34.855] INFO: Done: 12 succeeded (5.1s)

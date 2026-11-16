@@ -1,0 +1,10 @@
+# node scripts/stage.ts deploy p1174 --no-model-proxy with T3FLARE_PROBE=1, at 881bc65 (env | grep -c T3FLARE_DOMAIN: 0). stage.ts's own lines and alchemy's plans:
+t3flare: deploying without the Model proxy (--no-model-proxy)
+t3flare: built 12.92 MiB for t3 v0.1.10-nightly.20261112.4606; 7 patches, 4 shadows, 47 node:fs imports aliased in 41 t3 modules, module-state probe in 113 modules (204 bindings)
+t3flare: built the agents Worker, 5.58 MiB in 20 files
+INFO: Plan: 12 to create, 43 binding changes
+t3flare: Durable Object class not found; retrying in two passes (the first without cross-Worker bindings)
+INFO: Plan: 2 to create, 1 to update, 15 binding changes
+INFO: Plan: 2 to update, 7 binding changes
+t3flare: Model endpoint "commissary" created (from MODEL_PROXY_URL, 19 models; its small model commissary/claude-haiku-5-5)
+# AuthRateLimit, custom domain or adopt in the log: 0
