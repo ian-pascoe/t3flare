@@ -150,24 +150,119 @@ describe("the Credential broker", () => {
     scan(kv, vendor);
   });
 
-  it("keeps a sign-in completed while a refused renewal was in flight", async () => {
+  it("keeps a sign-in completed while a refused renewal was in flight: the completion waits for the lock", async () => {
     const { kv, vendor, broker, advance } = await setup();
     await signIn(broker, vendor);
     advance(HOUR);
+    // The owner's new attempt is started first; then a renewal is refused while OpenAI holds it.
+    const { authorizeUrl } = await broker.start("chatgpt", "chatgpt");
     vendor.options.refreshError = "invalid_grant";
     const slow = gate();
     vendor.options.refreshGate = slow.opened;
     vendor.options.onRefresh = slow.reached;
     const refused = broker.access("chatgpt");
-    // The refused renewal holds the lock; the owner signs in again meanwhile. Whether the new sign-in's write queues
-    // behind the refusal or comes after it, the refusal's removal cannot touch it: no timing decides the outcome.
     await slow.arrived;
-    const again = signIn(broker, vendor);
+    let settled = false;
+    const again = broker.complete("chatgpt", vendor.approve(authorizeUrl, { sub: "user-7" })).finally(() => (settled = true));
+    // However long it is given, the completion cannot finish while the refusal holds the lock (only the negative
+    // direction rests on this wait).
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(settled).toBe(false);
     slow.open();
     expect(await refused).toMatchObject({ ok: false, signedOut: true });
     expect(await again).toMatchObject({ ok: true });
     expect(await broker.read("chatgpt")).toMatchObject({ access: vendor.accessTokens.at(-1) });
     expect(broker.status("chatgpt").signedIn).toBe(true);
+    scan(kv, vendor);
+  });
+
+  it("forgets the account when a renewal is refused, so another account can sign in", async () => {
+    const { kv, vendor, broker, advance } = await setup();
+    await signIn(broker, vendor);
+    advance(HOUR);
+    vendor.options.refreshError = "invalid_grant";
+    await broker.access("chatgpt");
+    expect(broker.status("chatgpt").subject).toBeNull();
+    vendor.options.refreshError = undefined;
+    const { authorizeUrl } = await broker.start("chatgpt", "chatgpt");
+    expect(await broker.complete("chatgpt", vendor.approve(authorizeUrl, { sub: "user-9", email: "other@example.com" }))).toMatchObject({ ok: true });
+    scan(kv, vendor);
+  });
+
+  it("starts under the lock: a start queued behind a sign-out keeps its attempt", async () => {
+    const { kv, vendor, broker, advance } = await setup();
+    await signIn(broker, vendor);
+    advance(HOUR);
+    const slow = gate();
+    vendor.options.refreshGate = slow.opened;
+    vendor.options.onRefresh = slow.reached;
+    const refreshing = broker.access("chatgpt");
+    await slow.arrived;
+    // Queued in this order behind the refresh: the sign-out, then the start's write.
+    const out = broker.signOut("chatgpt");
+    const started = broker.start("chatgpt", "chatgpt");
+    // Without the start's lock its attempt would be written now, then removed by the queued sign-out.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    slow.open();
+    await Promise.all([refreshing, out]);
+    const { authorizeUrl } = await started;
+    expect(broker.status("chatgpt").pendingSince).not.toBeNull();
+    expect(await broker.complete("chatgpt", vendor.approve(authorizeUrl, { sub: "user-7" }))).toMatchObject({ ok: true });
+    scan(kv, vendor);
+  });
+
+  it("leaves a newer attempt waiting when an older one's code is refused", async () => {
+    const { kv, vendor, broker } = await setup();
+    const first = await broker.start("chatgpt", "chatgpt");
+    const slow = gate();
+    vendor.options.exchangeGate = slow.opened;
+    vendor.options.onExchange = slow.reached;
+    vendor.options.exchangeError = "invalid_grant";
+    const older = broker.complete("chatgpt", vendor.approve(first.authorizeUrl));
+    await slow.arrived;
+    // The owner starts again while the older attempt's exchange is at OpenAI; then that exchange is refused.
+    const second = await broker.start("chatgpt", "chatgpt");
+    slow.open();
+    expect(await older).toMatchObject({ ok: false });
+    expect(broker.status("chatgpt").pendingSince).not.toBeNull();
+    vendor.options.exchangeError = undefined;
+    vendor.options.exchangeGate = undefined;
+    expect(await broker.complete("chatgpt", vendor.approve(second.authorizeUrl))).toMatchObject({ ok: true });
+    scan(kv, vendor);
+  });
+
+  it("shares one completion for a paste submitted twice", async () => {
+    const { kv, vendor, broker } = await setup();
+    const { authorizeUrl } = await broker.start("chatgpt", "chatgpt");
+    const pasted = vendor.approve(authorizeUrl);
+    const slow = gate();
+    vendor.options.exchangeGate = slow.opened;
+    vendor.options.onExchange = slow.reached;
+    const first = broker.complete("chatgpt", pasted);
+    await slow.arrived;
+    const second = broker.complete("chatgpt", pasted);
+    slow.open();
+    const answers = await Promise.all([first, second]);
+    expect(answers.every((answer) => answer.ok)).toBe(true);
+    expect(vendor.counts.exchanges).toBe(1);
+    expect(vendor.counts.revocations).toBe(0);
+    expect(broker.status("chatgpt").signedIn).toBe(true);
+    scan(kv, vendor);
+  });
+
+  it("forgets an endpoint's status in its sign-out's step: a start during the revocation keeps its own", async () => {
+    const { kv, vendor, broker } = await setup();
+    await signIn(broker, vendor);
+    let authorizeUrl = "";
+    await broker.forget("chatgpt", {
+      beforeRevoke: async () => {
+        authorizeUrl = (await broker.start("chatgpt", "chatgpt")).authorizeUrl;
+      },
+    });
+    expect(broker.status("chatgpt")).toMatchObject({ kind: "chatgpt" });
+    expect(broker.known()).toContain("chatgpt");
+    expect(await broker.complete("chatgpt", vendor.approve(authorizeUrl))).toMatchObject({ ok: true });
+    expect(broker.status("chatgpt")).toMatchObject({ kind: "chatgpt", signedIn: true });
     scan(kv, vendor);
   });
 

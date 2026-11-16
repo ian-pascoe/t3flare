@@ -10,8 +10,9 @@
 //   calls of a start and a completion (the code exchange) run outside it; a completion then checks under the lock that its
 //   attempt is still the one waiting. So a refresh runs once however many Sessions ask, a sign-out waits for a refresh in
 //   flight and revokes the refresh token it left, a refused renewal's removal cannot wipe a sign-in completed meanwhile,
-//   and a sign-out during a completion's exchange wins (the fresh grant is revoked). Problem texts and the index are
-//   status-only writes outside it.
+//   and a sign-out during a completion's exchange wins (the fresh grant is revoked, after the lock is let go). Every
+//   status write is under it too, and a forgotten endpoint's status and index entry go in its sign-out's locked step.
+//   A paste submitted twice shares the one completion in flight for its attempt.
 // - Saved before use: a renewed credential, its rotated refresh token included, is saved before any caller gets its
 //   access token; if it cannot be saved, no caller gets it.
 // - A refused renewal (the vendor's codes that end a sign-in) signs the endpoint out, with the reason; a passing failure
@@ -115,6 +116,8 @@ export interface BrokerDeps {
 
 /** The write in flight per endpoint, per storage: every write of a sign-in queues behind it. */
 const locks = new WeakMap<object, Map<string, Promise<unknown>>>();
+/** The completion in flight per endpoint and attempt, per storage: a paste submitted twice shares it. */
+const completing = new WeakMap<object, Map<string, Promise<SignInCompletion>>>();
 
 const log = (event: Record<string, unknown>) => console.log(JSON.stringify({ t3flare: "sign-in", ...event }));
 
@@ -186,7 +189,8 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
   const refusedRenewal = (endpointId: string, refusal: { readonly code?: string; readonly problem: string }): BrokerAccess => {
     sealed.remove(credentialName(endpointId));
     const problem = `${refusal.problem}: it is signed out`;
-    setStatus(endpointId, { signedIn: false, expiresAt: null, problem, problemAt: now() });
+    // The account is forgotten as at a sign-out: the next sign-in may be another account.
+    setStatus(endpointId, { signedIn: false, subject: null, expiresAt: null, problem, problemAt: now() });
     log({ endpoint: endpointId, event: "refresh", ok: false, refused: true, code: refusal.code ?? null });
     return { ok: false, signedOut: true, problem };
   };
@@ -240,11 +244,30 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     return { authorizeUrl };
   };
 
+  const inFlight = (() => {
+    let map = completing.get(kv);
+    if (map === undefined) completing.set(kv, (map = new Map()));
+    return map;
+  })();
+
+  /** The completion's locked step: keep the grant, or say why not (a grant whose attempt is over is revoked after it). */
+  type Settled = { readonly answer: SignInCompletion; readonly superseded?: SignInCredential };
+
   const complete = async (endpointId: string, pasted: string): Promise<SignInCompletion> => {
     const text = await sealed.open(pendingName(endpointId));
-    const pending = text === undefined ? undefined : (JSON.parse(text) as PendingSignIn & { readonly signIn: SignIn });
-    const vendor = pending === undefined ? undefined : vendors[pending.signIn];
-    if (pending === undefined || vendor === undefined) return { ok: false, problem: "No sign-in is waiting for a pasted address: start the sign-in again." };
+    if (text === undefined) return { ok: false, problem: "No sign-in is waiting for a pasted address: start the sign-in again." };
+    const key = JSON.stringify([endpointId, text]);
+    const running = inFlight.get(key);
+    if (running !== undefined) return running;
+    const next = completeAttempt(endpointId, text, pasted).finally(() => inFlight.delete(key));
+    inFlight.set(key, next);
+    return next;
+  };
+
+  const completeAttempt = async (endpointId: string, text: string, pasted: string): Promise<SignInCompletion> => {
+    const pending = JSON.parse(text) as PendingSignIn & { readonly signIn: SignIn };
+    const vendor = vendors[pending.signIn];
+    if (vendor === undefined) return { ok: false, problem: "No sign-in is waiting for a pasted address: start the sign-in again." };
     if (now() - pending.startedAt > PENDING_TTL_MS) {
       await serial(endpointId, async () => {
         if ((await sealed.open(pendingName(endpointId))) !== text) return;
@@ -254,7 +277,7 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
       return { ok: false, problem: "That sign-in lapsed (30 minutes): start it again." };
     }
     const result = await vendor.complete(pending, pasted);
-    return serial(endpointId, async (): Promise<SignInCompletion> => {
+    const settled = await serial(endpointId, async (): Promise<Settled> => {
       // Still the attempt waiting? A sign-out (or a new start) during the exchange took it away.
       const still = (await sealed.open(pendingName(endpointId))) === text;
       if (!result.ok) {
@@ -264,45 +287,57 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
           // The vendor's advice after a refused code: start again with the registration this attempt was issued.
           setStatus(endpointId, { pendingSince: null, problem: result.problem, problemAt: now(), ...(result.clientId === undefined ? {} : { clientId: result.clientId }) });
         }
-        return { ok: false, problem: result.problem };
+        return { answer: { ok: false, problem: result.problem } };
       }
       const { credential } = result;
-      if (!still) {
-        // The fresh grant belongs to an attempt that is over: it is revoked, not kept.
-        const { confirmed } = await vendor.revoke(credential);
-        log({ endpoint: endpointId, event: "complete", ok: false, superseded: true, revoked: confirmed });
-        return { ok: false, problem: "This sign-in was signed out or started again while it finished, so it was not kept: start it again." };
-      }
+      if (!still) return { answer: { ok: false, problem: "This sign-in was signed out or started again while it finished, so it was not kept: start it again." }, superseded: credential };
       await write(endpointId, { ...credential, signIn: pending.signIn });
       sealed.remove(pendingName(endpointId));
       log({ endpoint: endpointId, event: "complete", ok: true, expiresAt: credential.expires });
       return {
-        ok: true,
-        status: setStatus(endpointId, {
-          signedIn: true,
-          email: credential.email ?? null,
-          clientId: credential.clientId ?? null,
-          subject: credential.subject ?? null,
-          signedInAt: now(),
-          expiresAt: credential.expires,
-          refreshedAt: null,
-          pendingSince: null,
-          problem: null,
-          problemAt: null,
-        }),
+        answer: {
+          ok: true,
+          status: setStatus(endpointId, {
+            signedIn: true,
+            email: credential.email ?? null,
+            clientId: credential.clientId ?? null,
+            subject: credential.subject ?? null,
+            signedInAt: now(),
+            expiresAt: credential.expires,
+            refreshedAt: null,
+            pendingSince: null,
+            problem: null,
+            problemAt: null,
+          }),
+        },
       };
     });
+    if (settled.superseded !== undefined) {
+      // Outside the lock: a revocation may take its 30 s.
+      const { confirmed } = await vendor.revoke(settled.superseded);
+      log({ endpoint: endpointId, event: "complete", ok: false, superseded: true, revoked: confirmed });
+    }
+    return settled.answer;
   };
 
   // --- sign-out --------------------------------------------------------------------------------------------------------
-  const signOut = async (endpointId: string, options: SignOutOptions = {}) => {
+  const signOut = async (endpointId: string, options: SignOutOptions & { readonly forget?: boolean } = {}) => {
     // Under the lock: after a refresh in flight, so the refresh token taken here is the current one.
     const taken = await serial(endpointId, async () => {
       sealed.remove(pendingName(endpointId));
       const current = await read(endpointId);
       sealed.remove(credentialName(endpointId));
-      // The account is forgotten too, so the next sign-in may be another account; the registration's client id stays.
-      setStatus(endpointId, { signedIn: false, subject: null, expiresAt: null, pendingSince: null, problem: null, problemAt: null });
+      if (options.forget === true) {
+        // The endpoint is gone: its status and index entry go in this same step, so a start that comes after makes its own.
+        kv.delete(signInStatusKey(endpointId));
+        kv.put(
+          INDEX_KEY,
+          (kv.get<ReadonlyArray<string>>(INDEX_KEY) ?? []).filter((id) => id !== endpointId),
+        );
+      } else {
+        // The account is forgotten too, so the next sign-in may be another account; the registration's client id stays.
+        setStatus(endpointId, { signedIn: false, subject: null, expiresAt: null, pendingSince: null, problem: null, problemAt: null });
+      }
       return current;
     });
     // The Sessions are stopped before the revocation, and the revocation runs whatever happened to them.
@@ -329,15 +364,7 @@ export const credentialBroker = (deps: BrokerDeps): CredentialBroker => {
     start,
     complete,
     signOut,
-    forget: async (endpointId, options) => {
-      const { revoked } = await signOut(endpointId, options);
-      kv.delete(signInStatusKey(endpointId));
-      kv.put(
-        INDEX_KEY,
-        (kv.get<ReadonlyArray<string>>(INDEX_KEY) ?? []).filter((id) => id !== endpointId),
-      );
-      return { revoked };
-    },
+    forget: async (endpointId, options) => ({ revoked: (await signOut(endpointId, { ...options, forget: true })).revoked }),
     status,
     known: () => kv.get<ReadonlyArray<string>>(INDEX_KEY) ?? [],
   };

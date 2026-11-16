@@ -157,4 +157,18 @@ describe("ChatGPT plan usage sign-in", () => {
     expect(Object.fromEntries(new URLSearchParams(revocation.body))).toEqual({ token: signedIn.credential.refresh, token_type_hint: "refresh_token", client_id: signedIn.credential.clientId });
     expect(await refreshChatGpt({ fetch: vendor.fetch, now: Date.now }, signedIn.credential)).toMatchObject({ ok: false, refused: true });
   });
+
+  it("gives a failing revocation up at its deadline, its retry wait cut short", async () => {
+    const vendor = await fakeOpenAI();
+    const { authorizeUrl, pending } = await startChatGptSignIn({ hostId: HOST });
+    const signedIn = await completeChatGptSignIn({ fetch: vendor.fetch, now: Date.now }, pending, vendor.approve(authorizeUrl));
+    if (!signedIn.ok) throw new Error(signedIn.problem);
+    vendor.options.revokeStatus = 503;
+    const started = performance.now();
+    // A 400 ms deadline: the first try, a 250 ms wait, the second try, then the 1 s wait is cut at the deadline.
+    expect(await revokeChatGpt({ fetch: vendor.fetch, now: Date.now }, signedIn.credential, 400)).toEqual({ confirmed: false });
+    expect(vendor.counts.revocations).toBe(2);
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
 });
+

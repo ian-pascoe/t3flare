@@ -358,7 +358,20 @@ export const refreshChatGpt = async (vendor: ChatGptVendor, credential: ChatGptC
   };
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Waits `ms`, or less when `deadline` passes first. */
+const sleep = (ms: number, deadline: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    if (deadline.aborted) return resolve();
+    const timer = setTimeout(resolve, ms);
+    deadline.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
 
 /** The whole of a revocation, its retries included. */
 export const REVOKE_DEADLINE_MS = 30_000;
@@ -368,8 +381,12 @@ export const REVOKE_DEADLINE_MS = 30_000;
  * success, also for a token already invalid). A network failure or 5xx is retried twice, all within 30 s; `confirmed`
  * false otherwise.
  */
-export const revokeChatGpt = async (vendor: ChatGptVendor, credential: Pick<ChatGptCredential, "refresh" | "clientId">): Promise<{ readonly confirmed: boolean }> => {
-  const deadline = AbortSignal.timeout(REVOKE_DEADLINE_MS);
+export const revokeChatGpt = async (
+  vendor: ChatGptVendor,
+  credential: Pick<ChatGptCredential, "refresh" | "clientId">,
+  deadlineMs: number = REVOKE_DEADLINE_MS,
+): Promise<{ readonly confirmed: boolean }> => {
+  const deadline = AbortSignal.timeout(deadlineMs);
   for (let attempt = 0; attempt < 3 && !deadline.aborted; attempt += 1) {
     let retry = true;
     try {
@@ -382,7 +399,7 @@ export const revokeChatGpt = async (vendor: ChatGptVendor, credential: Pick<Chat
       retry = true;
     }
     if (!retry || attempt === 2) break;
-    await sleep(attempt === 0 ? 250 : 1_000);
+    await sleep(attempt === 0 ? 250 : 1_000, deadline);
   }
   return { confirmed: false };
 };
