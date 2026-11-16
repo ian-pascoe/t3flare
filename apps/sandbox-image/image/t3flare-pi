@@ -1,8 +1,15 @@
 #!/bin/sh
-# The pi CLI (step 4a): the image's locked install, run by the image's own Node (absolute paths: a project's mise
-# shims never come first).
+# The pi CLI (step 4a): the image's locked install, run by the image's own Node. Every program is named by its absolute
+# path: the image puts mise's shims first on PATH and trusts /workspace's mise configuration, so a project could put an
+# `env` or a `node` there.
 # SPI-1170: a process on the model relay has its model handle in T3FLARE_MODEL_HANDLE. pi starts without it (`env -u`),
 # so no pi process holds it and nothing pi starts (its bash tool's commands, MCP servers) inherits it. pi's API key for
 # an endpoint's provider is the command `t3flare-pi-handle`, which reads the handle from the start environment of the
 # launch chain's setsid, the process that started this script. No file holds it.
-exec env -u T3FLARE_MODEL_HANDLE /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js "$@"
+# The relay's host is never proxied: pi's HTTP client (undici's EnvHttpProxyAgent) honours HTTP_PROXY, which an owner's
+# Variable may set for the agent's commands, and would send the relay's cleartext request, handle and all, through it.
+# The host is added to no_proxy and NO_PROXY (undici reads the lowercase one first), keeping the owner's own entries.
+relay_host=computer.internal
+no_proxy_list=${no_proxy:-${NO_PROXY:-}}
+no_proxy_list=${no_proxy_list:+$no_proxy_list,}$relay_host
+exec /usr/bin/env -u T3FLARE_MODEL_HANDLE no_proxy="$no_proxy_list" NO_PROXY="$no_proxy_list" /usr/local/share/mise/installs/node/26.13.0/bin/node /opt/t3flare/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js "$@"
