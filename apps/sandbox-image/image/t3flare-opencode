@@ -3,7 +3,38 @@
 # into this process's home (/etc/opencode outranks user and project files), copies in the synced session snapshot, and
 # becomes `opencode acp`. OpenCode drops a configuration statement it cannot read with only a warning in its log, which
 # would fail open: a watcher ends the process on any diagnostic about t3flare's file. Nothing goes to stdout.
+# SPI-1169: a process on the model relay has its model handle in T3FLARE_MODEL_HANDLE (and every process the key
+# helper's nonce). Both stay only in the environment OpenCode starts with: its key plugin reads them and deletes them
+# from OpenCode's own environment, and the watcher and the snapshot loop are this script run again without them
+# (`env -u`), so only OpenCode (and setsid, which started this script) holds them, and no file does.
 set -eu
+self=${2:-}
+if [ "${1:-}" = --t3flare-watch ]; then
+  log=$3
+  while kill -0 "$self" 2>/dev/null; do
+    if grep -q 'configuration normalization diagnostic.*source=/etc/opencode' "$log" 2>/dev/null; then
+      echo "t3flare: OpenCode could not read part of t3flare's configuration; the process was ended" >&2
+      grep 'configuration normalization diagnostic.*source=/etc/opencode' "$log" | head -3 >&2
+      kill -TERM "$self"; exit 0
+    fi
+    sleep 1
+  done
+  exit 0
+fi
+if [ "${1:-}" = --t3flare-snapshot ]; then
+  # The snapshot: a consistent copy (VACUUM INTO reads in one transaction) whenever the database changed, every 15 s.
+  snapshot_dir=$3 db=$4 snapshot=$5
+  mkdir -p "$snapshot_dir"; last=""
+  while kill -0 "$self" 2>/dev/null; do
+    sleep 15
+    [ -f "$db" ] || continue
+    now=$(stat -c %Y "$db" "$db-wal" 2>/dev/null | sort -n | tail -1)
+    [ "$now" = "$last" ] && continue
+    rm -f "$snapshot_dir/.opencode.db.tmp"
+    if sqlite3 "$db" "VACUUM INTO '$snapshot_dir/.opencode.db.tmp'" 2>/dev/null; then mv -f "$snapshot_dir/.opencode.db.tmp" "$snapshot"; last=$now; fi
+  done
+  exit 0
+fi
 home=/var/lib/t3flare/cli/${T3FLARE_EXEC:?}
 mkdir -p /etc/opencode "$XDG_DATA_HOME/opencode/log"
 install -m 644 "$home/opencode.json" "/etc/opencode/.opencode.$$.json"
@@ -18,23 +49,6 @@ if [ -f "$snapshot" ]; then
   for table in permission account account_state control_account; do sqlite3 "$db" "DELETE FROM $table" 2>/dev/null || true; done
 fi
 log=$XDG_DATA_HOME/opencode/log/opencode.log
-self=$$
-( while kill -0 "$self" 2>/dev/null; do
-    if grep -q 'configuration normalization diagnostic.*source=/etc/opencode' "$log" 2>/dev/null; then
-      echo "t3flare: OpenCode could not read part of t3flare's configuration; the process was ended" >&2
-      grep 'configuration normalization diagnostic.*source=/etc/opencode' "$log" | head -3 >&2
-      kill -TERM "$self"; exit 0
-    fi
-    sleep 1
-  done ) </dev/null >/dev/null &
-# The snapshot: a consistent copy (VACUUM INTO reads in one transaction) whenever the database changed, every 15 s.
-( mkdir -p "$snapshot_dir"; last=""
-  while kill -0 "$self" 2>/dev/null; do
-    sleep 15
-    [ -f "$db" ] || continue
-    now=$(stat -c %Y "$db" "$db-wal" 2>/dev/null | sort -n | tail -1)
-    [ "$now" = "$last" ] && continue
-    rm -f "$snapshot_dir/.opencode.db.tmp"
-    if sqlite3 "$db" "VACUUM INTO '$snapshot_dir/.opencode.db.tmp'" 2>/dev/null; then mv -f "$snapshot_dir/.opencode.db.tmp" "$snapshot"; last=$now; fi
-  done ) </dev/null >/dev/null 2>&1 &
+env -u T3FLARE_MODEL_HANDLE -u T3FLARE_MODEL_KEY_NONCE "$0" --t3flare-watch "$$" "$log" </dev/null >/dev/null &
+env -u T3FLARE_MODEL_HANDLE -u T3FLARE_MODEL_KEY_NONCE "$0" --t3flare-snapshot "$$" "$snapshot_dir" "$db" "$snapshot" </dev/null >/dev/null 2>&1 &
 exec /opt/t3flare/opencode/opencode acp
