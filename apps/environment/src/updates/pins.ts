@@ -52,7 +52,7 @@ export const pinVersionOf = (
 export type Pin = { readonly kind: "t3"; readonly tag: string } | { readonly kind: "cli"; readonly cli: UpdatableCli; readonly version: string };
 
 /** `pin`, validated: a nightly tag, or an updatable CLI at an exact version; else why not. */
-export const pinOf = (input: { readonly kind?: string; readonly tag?: string; readonly cli?: string; readonly version?: string }): Pin | string => {
+export const pinOf = (input: { readonly kind?: string | undefined; readonly tag?: string | undefined; readonly cli?: string | undefined; readonly version?: string | undefined }): Pin | string => {
   if (input.kind === "t3") return input.tag !== undefined && NIGHTLY_TAG.test(input.tag) ? { kind: "t3", tag: input.tag } : `not a nightly tag: ${JSON.stringify(input.tag)}`;
   if (input.kind === "cli") {
     if (!isUpdatableCli(input.cli)) return `not an updatable CLI: ${JSON.stringify(input.cli)}`;
@@ -101,12 +101,51 @@ export const PROVEN_CONTEXT = "t3flare/proven";
 export type Gate = "update" | "full";
 export const provenDescription = (gate: Gate): string => `gate=${gate}`;
 
-/** The gate a commit's statuses prove it passed: the newest `t3flare/proven` success set by GitHub Actions, if any. */
-export const provenGate = (
-  statuses: ReadonlyArray<{ readonly context?: string; readonly state?: string; readonly description?: string | null; readonly creator?: { readonly login?: string } | null }>,
-): Gate | undefined => {
-  // GitHub lists a commit's statuses newest first.
+/** The `t3flare/proven` status a commit carries, as the API lists statuses (newest first). */
+export interface ProofStatus {
+  readonly context?: string;
+  readonly state?: string;
+  readonly description?: string | null;
+  readonly target_url?: string | null;
+  readonly creator?: { readonly login?: string } | null;
+}
+
+/** The newest `t3flare/proven` status's gate and the run it names, when GitHub Actions set it as a success. */
+export const provenStatus = (statuses: ReadonlyArray<ProofStatus>): { readonly gate: Gate; readonly runId: number; readonly repository: string } | undefined => {
   const status = statuses.find((candidate) => candidate.context === PROVEN_CONTEXT);
   if (status === undefined || status.state !== "success" || status.creator?.login !== "github-actions[bot]") return undefined;
-  return status.description === "gate=full" ? "full" : status.description === "gate=update" ? "update" : undefined;
+  const gate = status.description === "gate=full" ? "full" : status.description === "gate=update" ? "update" : undefined;
+  const run = RUN_URL.exec(status.target_url ?? "");
+  return gate === undefined || run === null ? undefined : { gate, runId: Number(run[2]), repository: run[1]! };
+};
+
+/** A pin as one string, as the workflows carry it (review A12): `t3:<tag>`, `cli:<cli>:<version>`. */
+export const pinText = (pin: Pin): string => (pin.kind === "t3" ? `t3:${pin.tag}` : `cli:${pin.cli}:${pin.version}`);
+export const parsePin = (text: string | undefined): Pin | string => {
+  const [kind, first, second, ...rest] = (text ?? "").split(":");
+  if (rest.length > 0) return `not a pin: ${JSON.stringify(text)}`;
+  return kind === "t3" && second === undefined ? pinOf({ kind, tag: first }) : kind === "cli" ? pinOf({ kind, cli: first, version: second }) : `not a pin: ${JSON.stringify(text)}`;
+};
+
+/** A workflow run's page: `https://github.com/<owner>/<repo>/actions/runs/<id>`. */
+export const RUN_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/actions\/runs\/(\d+)$/;
+
+/** The workflows whose trusted publish job may prove a pin. */
+export const PROVING_WORKFLOWS = [".github/workflows/bump.yml", ".github/workflows/cli-bump.yml"] as const;
+
+/**
+ * Why the run a `t3flare/proven` status names cannot have proven anything, or undefined (review B1): it must be one of
+ * this repository's proving workflows, run from `main`, on a schedule or a dispatch. A workflow pushed on another branch
+ * can set a status as GitHub Actions, but its own run fails this; what this cannot see is which run set the status
+ * (ADR-0037 §6 has the residual).
+ */
+export const proofRunRefusal = (
+  run: { readonly path?: unknown; readonly head_branch?: unknown; readonly event?: unknown; readonly repository?: { readonly full_name?: unknown } | null; readonly head_repository?: { readonly full_name?: unknown } | null },
+  repository: string,
+): string | undefined => {
+  if (run.repository?.full_name !== repository || run.head_repository?.full_name !== repository) return "its run is not this repository's";
+  if (!(PROVING_WORKFLOWS as ReadonlyArray<unknown>).includes(run.path)) return `its run is ${String(run.path)}, not a proving workflow`;
+  if (run.head_branch !== "main") return `its run is on ${String(run.head_branch)}, not main`;
+  if (run.event !== "schedule" && run.event !== "workflow_dispatch") return `its run was started by ${String(run.event)}`;
+  return undefined;
 };

@@ -8,12 +8,13 @@ name: CLI bump
 # acceptance test's core plus that CLI's sub-test; the full test:docker and every CLI's sub-test run in the verify run
 # after the land (bump.yml, D18). Shares the `bump` concurrency group with bump.yml (`queue: max`, nothing cancelled).
 #
-# Trust (review F1), as bump.yml: only the `bump` job runs upstream and dependency code, with a token that reads contents
-# and nothing else; it hands the proven commit to the trusted `publish` job as an artifact (a git bundle and its report).
-# `publish` checks the commit with main's own `scripts/land-check.ts` (the pin made again from main's files and compared
-# byte for byte), then pushes `bump/cli-<cli>-<version>`, marks it proven, and calls land.yml. `running` is the version
-# prod runs (the Environment DO sends it): when main already holds the newest pin and prod does not run it, the run only
-# deploys (review F2).
+# Trust (review F1, B1, B4), as bump.yml: only the `bump` job runs upstream and dependency code, with a token that reads
+# contents and nothing else and no dependency cache; it hands the proven commit to the trusted `publish` job as an
+# artifact (a git bundle and its report). `publish` checks the commit with main's own `scripts/land-check.ts` (the pin
+# made again from main's files and compared byte for byte) in a step with no token, then pushes
+# `bump/cli-<cli>-<version>`, marks it proven, and calls land.yml with that exact commit. `running` is the version prod
+# runs (the Environment DO sends it): when main already holds the newest pin and prod does not run it, the run only
+# deploys main (review F2). `dry_run` runs the path through the check and pushes, marks and lands nothing (review B3).
 #
 # Needs the `bump` environment's secrets, as bump.yml (see there), in the bump job only; prod's never reach it.
 
@@ -68,7 +69,10 @@ jobs:
 
       - run: git submodule update --init t3code
 
+      # No cache: a store this job saved would be restored by deploy-prod (review B4).
       - uses: ./.github/actions/setup
+        with:
+          cache: "false"
 
       - name: Mask the Model endpoint
         run: node apps/environment/scripts/mask-endpoint.ts
@@ -77,14 +81,13 @@ jobs:
 
       - name: CLI bump
         run: |
-          args=(--cli "$CLI" --report cli-bump-report.json)
-          if [ "$DRY_RUN" != "true" ]; then args+=(--commit); fi
+          # Committed here (locally) even on a dry run, so the trusted job can check it; nothing pushes it.
+          args=(--cli "$CLI" --report cli-bump-report.json --commit)
           git config user.name "t3flare-bump"
           git config user.email "t3flare-bump@users.noreply.github.com"
           pnpm run cli-bump "${args[@]}"
         env:
           CLI: ${{ inputs.cli }}
-          DRY_RUN: ${{ inputs.dry_run }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
@@ -104,7 +107,7 @@ jobs:
           fi
 
       - name: Bundle the pin
-        if: success() && inputs.dry_run != true
+        if: success()
         run: |
           if [ "$(git rev-parse HEAD)" != "$BASE" ]; then git bundle create pin.bundle HEAD "^$BASE"; fi
         env:
@@ -119,18 +122,19 @@ jobs:
             pin.bundle
           if-no-files-found: ignore
 
-  # Trusted: checks the proven commit and publishes it; main's scripts, plain Node, never the bump's code.
+  # Trusted: checks the proven commit (no token), then publishes it; main's scripts, plain Node, never the bump's code.
   publish:
     needs: bump
-    if: needs.bump.result == 'success' && inputs.dry_run != true
+    if: needs.bump.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
       statuses: write
     outputs:
-      land: ${{ steps.report.outputs.land }}
-      to: ${{ steps.report.outputs.to }}
+      call_land: ${{ steps.check.outputs.call_land }}
+      pin: ${{ steps.check.outputs.pin }}
+      sha: ${{ steps.check.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -144,36 +148,31 @@ jobs:
         with:
           name: cli-bump
           path: ${{ runner.temp }}/cli-bump
-      - name: Read the report
-        id: report
-        run: node scripts/updates-ci.ts read-report --kind cli --cli "$CLI" --running "$RUNNING" --file "$RUNNER_TEMP/cli-bump/cli-bump-report.json"
+      # No token here (review A9): the land check runs npm to make the pin again.
+      - name: Check the proposal
+        id: check
+        run: node scripts/updates-ci.ts check-proposal --kind cli --dir "$RUNNER_TEMP/cli-bump" --cli "$CLI" --running "$RUNNING"
         env:
           CLI: ${{ inputs.cli }}
           RUNNING: ${{ inputs.running }}
-      - name: Check, push and mark it proven
-        if: steps.report.outputs.changed == 'true'
-        run: |
-          git bundle verify "$RUNNER_TEMP/cli-bump/pin.bundle"
-          git fetch --quiet "$RUNNER_TEMP/cli-bump/pin.bundle" "HEAD:refs/remotes/candidate"
-          node scripts/land-check.ts --ref refs/remotes/candidate --kind cli --cli "$CLI" --version "$TO"
-          sha=$(git rev-parse refs/remotes/candidate)
-          branch=$(node scripts/updates-ci.ts land-plan --kind cli --cli "$CLI" --version "$TO" | sed -n 's/^branch=//p')
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$sha:refs/heads/$branch"
-          node scripts/updates-ci.ts set-proven --sha "$sha" --gate update --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Push it and mark it proven
+        if: steps.check.outputs.changed == 'true' && inputs.dry_run != true
+        run: node scripts/updates-ci.ts publish-proposal --pin "$PIN" --sha "$SHA" --gate update
         env:
           GH_TOKEN: ${{ github.token }}
-          GITHUB_TOKEN: ${{ github.token }}
-          CLI: ${{ inputs.cli }}
-          TO: ${{ steps.report.outputs.to }}
+          PIN: ${{ steps.check.outputs.pin }}
+          SHA: ${{ steps.check.outputs.sha }}
 
+  # Lands exactly the commit `publish` proved, or only deploys main when it already holds the pin (review F2, B1).
   land:
     needs: publish
-    if: needs.publish.outputs.land == 'true'
+    if: needs.publish.outputs.call_land == 'true' && inputs.dry_run != true
     permissions:
       contents: write
       actions: write
+      statuses: read
     uses: ./.github/workflows/land.yml
     with:
-      kind: cli
-      cli: ${{ inputs.cli }}
-      version: ${{ needs.publish.outputs.to }}
+      pin: ${{ needs.publish.outputs.pin }}
+      sha: ${{ needs.publish.outputs.sha }}
+      dry_run: ${{ inputs.dry_run == true }}

@@ -7,7 +7,7 @@ import * as path from "node:path";
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
 
-import { branchOf, landedBranches, newestNightly, pinOf, pinOfBranch, provenGate, UPDATABLE_CLIS } from "../src/updates/pins.ts";
+import { branchOf, landedBranches, newestNightly, parsePin, pinOf, pinOfBranch, pinText, proofRunRefusal, provenStatus, UPDATABLE_CLIS } from "../src/updates/pins.ts";
 
 describe("nightly tags", () => {
   it("orders by date, then run", () => {
@@ -45,20 +45,42 @@ describe("bump branches", () => {
   });
 });
 
-describe("the proven status (A1)", () => {
-  const status = (patch: Record<string, unknown>) => ({ context: "t3flare/proven", state: "success", description: "gate=full", creator: { login: "github-actions[bot]" }, ...patch });
+describe("the proven status (A1, B1)", () => {
+  const url = "https://github.com/ian-pascoe/t3flare/actions/runs/42";
+  const status = (patch: Record<string, unknown>) => ({ context: "t3flare/proven", state: "success", description: "gate=full", target_url: url, creator: { login: "github-actions[bot]" }, ...patch });
 
-  it("reads the newest t3flare/proven success set by GitHub Actions", () => {
-    expect(provenGate([status({})])).toBe("full");
-    expect(provenGate([status({ description: "gate=update" }), status({})])).toBe("update");
-    expect(provenGate([{ context: "ci", state: "success" }, status({})])).toBe("full");
+  it("reads the newest t3flare/proven success set by GitHub Actions, with the run it names", () => {
+    expect(provenStatus([status({})])).toEqual({ gate: "full", runId: 42, repository: "ian-pascoe/t3flare" });
+    expect(provenStatus([status({ description: "gate=update" }), status({})])?.gate).toBe("update");
+    expect(provenStatus([{ context: "ci", state: "success" }, status({})])?.gate).toBe("full");
   });
 
-  it("ignores a status anyone else set, a failure, or a strange gate", () => {
-    expect(provenGate([status({ creator: { login: "t3flare[bot]" } })])).toBeUndefined();
-    expect(provenGate([status({ state: "failure" })])).toBeUndefined();
-    expect(provenGate([status({ description: "gate=anything" })])).toBeUndefined();
-    expect(provenGate([])).toBeUndefined();
+  it("ignores a status anyone else set, a failure, a strange gate, or one naming no run", () => {
+    expect(provenStatus([status({ creator: { login: "t3flare[bot]" } })])).toBeUndefined();
+    expect(provenStatus([status({ state: "failure" })])).toBeUndefined();
+    expect(provenStatus([status({ description: "gate=anything" })])).toBeUndefined();
+    expect(provenStatus([status({ target_url: "https://evil.example/actions/runs/42" })])).toBeUndefined();
+    expect(provenStatus([])).toBeUndefined();
+  });
+
+  it("counts only a run of a proving workflow, on main, from a schedule or a dispatch, in this repository", () => {
+    const run = (patch: Record<string, unknown>) => ({ path: ".github/workflows/bump.yml", head_branch: "main", event: "workflow_dispatch", repository: { full_name: "o/r" }, head_repository: { full_name: "o/r" }, ...patch });
+    expect(proofRunRefusal(run({}), "o/r")).toBeUndefined();
+    expect(proofRunRefusal(run({ path: ".github/workflows/cli-bump.yml", event: "schedule" }), "o/r")).toBeUndefined();
+    expect(proofRunRefusal(run({ path: ".github/workflows/forge.yml" }), "o/r")).toMatch(/not a proving workflow/);
+    expect(proofRunRefusal(run({ head_branch: "agent/branch" }), "o/r")).toMatch(/not main/);
+    expect(proofRunRefusal(run({ event: "push" }), "o/r")).toMatch(/started by push/);
+    expect(proofRunRefusal(run({ head_repository: { full_name: "fork/r" } }), "o/r")).toMatch(/not this repository/);
+  });
+});
+
+describe("a pin as one string (A12)", () => {
+  it("round-trips, and refuses anything else", () => {
+    for (const pin of [{ kind: "t3", tag: "v0.1.11-nightly.20261117.4851" }, { kind: "cli", cli: "claude", version: "0.108.0" }] as const) expect(parsePin(pinText(pin))).toEqual(pin);
+    expect(parsePin("cli:codex:0.169.0:x")).toMatch(/not a pin/);
+    expect(parsePin("cli:codex:main")).toMatch(/not an exact version/);
+    expect(parsePin("t3:main")).toMatch(/not a nightly tag/);
+    expect(parsePin(undefined)).toMatch(/not a pin/);
   });
 });
 

@@ -2,7 +2,16 @@
 // Plain Node: no dependency.
 import { spawnSync } from "node:child_process";
 
-import { COMMIT, NIGHTLY_TAG, type Gate, PROVEN_CONTEXT, provenDescription, provenGate } from "../../apps/environment/src/updates/pins.ts";
+import { COMMIT, NIGHTLY_TAG, type Gate, PROVEN_CONTEXT, proofRunRefusal, provenDescription, provenStatus } from "../../apps/environment/src/updates/pins.ts";
+
+/** `--name value` from `args` (every update script's one parser). */
+export const optionOf =
+  (args: ReadonlyArray<string>) =>
+  (name: string): string | undefined =>
+    args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : undefined;
+
+/** This run's page. */
+export const thisRunUrl = (): string => `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${process.env.GITHUB_REPOSITORY ?? ""}/actions/runs/${process.env.GITHUB_RUN_ID ?? ""}`;
 
 export const git = (args: ReadonlyArray<string>, cwd?: string) => {
   const result = spawnSync("git", args, { ...(cwd === undefined ? {} : { cwd }), encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
@@ -52,11 +61,21 @@ const api = async (method: string, pathname: string, body?: unknown): Promise<un
   return response.json();
 };
 
-/** The gate `sha`'s `t3flare/proven` status proves, if a trusted job set one (review A1). */
-export const provenGateOf = async (sha: string): Promise<Gate | undefined> =>
-  provenGate((await api("GET", `/commits/${sha}/statuses?per_page=100`)) as Parameters<typeof provenGate>[0]);
+/**
+ * The gate `sha` is proven through (review A1, B1): its newest `t3flare/proven` status, set by GitHub Actions, naming a
+ * run of one of this repository's proving workflows on `main` (`proofRunRefusal`). Undefined with the reason otherwise.
+ */
+export const provenGateOf = async (sha: string): Promise<{ readonly gate: Gate } | { readonly gate: undefined; readonly reason: string }> => {
+  const status = provenStatus((await api("GET", `/commits/${sha}/statuses?per_page=100`)) as Parameters<typeof provenStatus>[0]);
+  if (status === undefined) return { gate: undefined, reason: `${sha} has no t3flare/proven status set by GitHub Actions` };
+  const repository = process.env.GITHUB_REPOSITORY ?? "";
+  if (status.repository !== repository) return { gate: undefined, reason: `its proof names a run of ${status.repository}` };
+  const refusal = proofRunRefusal((await api("GET", `/actions/runs/${status.runId}`)) as Parameters<typeof proofRunRefusal>[0], repository);
+  return refusal === undefined ? { gate: status.gate } : { gate: undefined, reason: `its proof does not count: ${refusal}` };
+};
 
 /** Records that `sha` passed `gate` (the trusted publish job only). */
-export const setProven = async (sha: string, gate: Gate, targetUrl: string): Promise<void> => {
-  await api("POST", `/statuses/${sha}`, { state: "success", context: PROVEN_CONTEXT, description: provenDescription(gate), target_url: targetUrl });
+export const setProven = async (sha: string, gate: Gate): Promise<void> => {
+  if (!COMMIT.test(sha)) throw new Error(`not a commit: ${sha}`);
+  await api("POST", `/statuses/${sha}`, { state: "success", context: PROVEN_CONTEXT, description: provenDescription(gate), target_url: thisRunUrl() });
 };

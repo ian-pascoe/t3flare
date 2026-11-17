@@ -14,11 +14,15 @@ name: Nightly bump
 #                     Full gate. A failure of any kind opens an issue naming what landed and the failed step (D18).
 #   (by hand)         `tag`, `force`, `dry_run` as before.
 #
-# Trust (review F1): only the `bump` job runs upstream and dependency code, and its token reads contents and nothing else.
-# It hands the proven commit to the others as an artifact (a git bundle and its report). `plan`, `publish`,
-# `verify-issue` and land.yml run on fresh runners with plain Node and main's own scripts (`scripts/updates-ci.ts`,
-# `scripts/land-check.ts`), treat the report as untrusted input, and check the commit's content before they push it, mark
-# it proven (`t3flare/proven`, which Container tokens cannot set) or land it.
+# Trust (review F1, B1, B4): only the `bump` job runs upstream and dependency code; its token reads contents and nothing
+# else, and it saves no dependency cache. It hands the proven commit to the others as an artifact (a git bundle and its
+# report). `plan`, `publish`, `verify-issue` and land.yml run on fresh runners with plain Node and main's own scripts
+# (`scripts/updates-ci.ts`, `scripts/land-check.ts`), treat the report as untrusted input, and check the commit's content
+# (with no token in that step) before they push it, mark it proven (`t3flare/proven`) or land it. Land is bound to the
+# proven commit: land.yml lands only the exact commit `plan` or `publish` names, while its branch still points at it and
+# its proof names a run of this workflow on main.
+# `dry_run` runs the whole path to the check (plan, bump, the publish job's land check) and pushes, marks, proposes and
+# lands nothing.
 #
 # Every run checks out the tip of main when it starts. This workflow and cli-bump.yml share the `bump` concurrency group
 # with `queue: max`: runs wait their turn in order, none is cancelled for a newer one.
@@ -74,16 +78,19 @@ concurrency:
   queue: max
 
 jobs:
-  # Trusted: decides before any upstream code runs. Reads tags, branches and the `t3flare/proven` statuses.
+  # Trusted: decides before any upstream code runs. Reads tags, branches, the `t3flare/proven` statuses and their runs.
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
       statuses: read
+      actions: read
     outputs:
       mode: ${{ steps.plan.outputs.mode }}
       tag: ${{ steps.plan.outputs.tag }}
+      pin: ${{ steps.plan.outputs.pin }}
+      sha: ${{ steps.plan.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,7 +110,7 @@ jobs:
           LAND: ${{ inputs.land }}
           VERIFY: ${{ inputs.verify }}
 
-  # Untrusted: runs upstream and dependency code. Its token reads contents only; it publishes nothing itself.
+  # Untrusted: runs upstream and dependency code. Its token reads contents only; it publishes and caches nothing itself.
   bump:
     needs: plan
     if: needs.plan.outputs.mode == 'bump'
@@ -129,8 +136,11 @@ jobs:
 
       - run: git submodule update --init t3code
 
-      # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030).
+      # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030). No cache: a store this job
+      # saved would be restored by deploy-prod (review B4).
       - uses: ./.github/actions/setup
+        with:
+          cache: "false"
 
       # SPI-1175: GitHub masks only the whole secret, so its key and header values are masked each on its own.
       - name: Mask the Model endpoint
@@ -138,10 +148,10 @@ jobs:
         env:
           T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
 
+      # The pin is committed here (locally) even on a dry run, so the trusted job can check it; nothing pushes it.
       - name: Bump
         run: |
-          args=(--report bump-report.json --gate "${GATE:-full}")
-          if [ "$DRY_RUN" != "true" ]; then args+=(--commit); fi
+          args=(--report bump-report.json --gate "${GATE:-full}" --commit)
           # A verify run re-proves main's own pin.
           if [ -n "$VERIFY" ]; then TAG=$(git -C t3code describe --tags --exact-match HEAD); fi
           if [ -n "$TAG" ]; then args+=(--tag "$TAG"); fi
@@ -152,7 +162,6 @@ jobs:
         env:
           TAG: ${{ needs.plan.outputs.tag }}
           FORCE: ${{ inputs.force }}
-          DRY_RUN: ${{ inputs.dry_run }}
           GATE: ${{ inputs.gate }}
           VERIFY: ${{ inputs.verify }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -175,7 +184,7 @@ jobs:
 
       # The proven commit, for the trusted publish job: a bundle of the one commit on top of the base.
       - name: Bundle the pin
-        if: success() && inputs.dry_run != true
+        if: success()
         run: |
           if [ "$(git rev-parse HEAD)" != "$BASE" ]; then git bundle create pin.bundle HEAD "^$BASE"; fi
         env:
@@ -190,10 +199,10 @@ jobs:
             pin.bundle
           if-no-files-found: ignore
 
-  # Trusted: checks the proven commit and publishes it. Runs main's scripts with plain Node; never the bump's code.
+  # Trusted: checks the proven commit (no token), then publishes it. main's scripts, plain Node, never the bump's code.
   publish:
     needs: [plan, bump]
-    if: needs.bump.result == 'success' && inputs.dry_run != true && !inputs.verify
+    if: needs.bump.result == 'success' && !inputs.verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -201,7 +210,8 @@ jobs:
       pull-requests: write
       statuses: write
     outputs:
-      changed: ${{ steps.report.outputs.changed }}
+      changed: ${{ steps.check.outputs.changed }}
+      sha: ${{ steps.check.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -215,47 +225,37 @@ jobs:
         with:
           name: bump
           path: ${{ runner.temp }}/bump
-      - name: Read the report
-        id: report
-        run: node scripts/updates-ci.ts read-report --kind t3 --file "$RUNNER_TEMP/bump/bump-report.json" --tag "$TAG"
-        env:
-          TAG: ${{ needs.plan.outputs.tag }}
-      - name: Check the proven commit
+      # No token here (review A9): the land check runs git and npm on what the bump job made.
+      - name: Check the proposal
         id: check
-        if: steps.report.outputs.changed == 'true'
         run: |
-          git bundle verify "$RUNNER_TEMP/bump/pin.bundle"
-          git fetch --quiet "$RUNNER_TEMP/bump/pin.bundle" "HEAD:refs/remotes/candidate"
           node scripts/updates-ci.ts install-yaml
-          node scripts/land-check.ts --kind t3 --tag "$TO" --ref refs/remotes/candidate
-          echo "sha=$(git rev-parse refs/remotes/candidate)" >> "$GITHUB_OUTPUT"
+          node scripts/updates-ci.ts check-proposal --kind t3 --dir "$RUNNER_TEMP/bump" --gate "${GATE:-full}" --tag "$TAG"
         env:
-          TO: ${{ steps.report.outputs.to }}
-      - name: Push and mark it proven
-        if: steps.report.outputs.changed == 'true'
-        run: |
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$SHA:refs/heads/bump/$TO"
-          node scripts/updates-ci.ts set-proven --sha "$SHA" --gate "$GATE" --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          GATE: ${{ inputs.gate }}
+          TAG: ${{ needs.plan.outputs.tag }}
+      - name: Push it and mark it proven
+        id: push
+        if: steps.check.outputs.changed == 'true' && inputs.dry_run != true
+        run: node scripts/updates-ci.ts publish-proposal --pin "$PIN" --sha "$SHA" --gate "$GATE"
         env:
           GH_TOKEN: ${{ github.token }}
-          GITHUB_TOKEN: ${{ github.token }}
+          PIN: ${{ steps.check.outputs.pin }}
           SHA: ${{ steps.check.outputs.sha }}
-          TO: ${{ steps.report.outputs.to }}
-          GATE: ${{ steps.report.outputs.gate }}
+          GATE: ${{ steps.check.outputs.gate }}
       # Not an Update: a pull request for the owner, which closes the older bump pull requests it supersedes.
       - name: Propose it
-        if: steps.report.outputs.changed == 'true' && inputs.land != true
+        if: steps.check.outputs.changed == 'true' && inputs.dry_run != true && inputs.land != true
         run: |
-          branch="bump/$TO"
-          gh pr create --head "$branch" --base main --title "chore: bump t3code to $TO" \
+          gh pr create --head "$BRANCH" --base main --title "chore: bump t3code to ${BRANCH#bump/}" \
             --body "Pinned by the nightly bump job; the $GATE gate passed on the \`bump\` stage. See the run's report: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            || echo "A pull request for $branch already exists."
-          gh pr list --state open --json number,headRefName --jq '.[] | select(.headRefName | test("^bump/v[0-9]")) | select(.headRefName != "'"$branch"'") | .number' \
-            | while read -r number; do gh pr close "$number" --comment "Superseded by $branch." || true; done
+            || echo "A pull request for $BRANCH already exists."
+          gh pr list --state open --json number,headRefName --jq '.[] | select(.headRefName | test("^bump/v[0-9]")) | select(.headRefName != "'"$BRANCH"'") | .number' \
+            | while read -r number; do gh pr close "$number" --comment "Superseded by $BRANCH." || true; done
         env:
           GH_TOKEN: ${{ github.token }}
-          TO: ${{ steps.report.outputs.to }}
-          GATE: ${{ steps.report.outputs.gate }}
+          BRANCH: ${{ steps.push.outputs.branch }}
+          GATE: ${{ steps.check.outputs.gate }}
 
   # D18, review A3: a verify run that does not pass, for any reason (a failure, a timeout, a cancellation), opens an
   # issue (GitHub Issues sync to Linear). No automatic revert: migrations only go forward.
@@ -282,22 +282,23 @@ jobs:
           path: ${{ runner.temp }}/bump
       - name: Open an issue
         run: |
-          node scripts/updates-ci.ts issue-body --verify "$VERIFY" --file "$RUNNER_TEMP/bump/bump-report.json" \
-            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/issue.md"
+          node scripts/updates-ci.ts issue-body --verify "$VERIFY" --file "$RUNNER_TEMP/bump/bump-report.json" > "$RUNNER_TEMP/issue.md"
           gh issue create --title "Verify did not pass after an in-app Update landed" --body-file "$RUNNER_TEMP/issue.md"
         env:
           GH_TOKEN: ${{ github.token }}
           VERIFY: ${{ inputs.verify }}
 
-  # ADR-0037: an Update lands its proven pin, or only deploys a pin main already holds (review F2).
+  # ADR-0037: an Update lands exactly the commit `plan` (its fast path) or `publish` proved, or only deploys a pin main
+  # already holds (review F2, B1). Never on a dry run (review B3).
   land:
     needs: [plan, publish]
-    if: always() && inputs.land && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'land' || (needs.publish.result == 'success' && needs.publish.outputs.changed == 'true'))
+    if: always() && inputs.land && inputs.dry_run != true && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'land' || (needs.publish.result == 'success' && needs.publish.outputs.changed == 'true'))
     permissions:
       contents: write
       actions: write
       statuses: read
     uses: ./.github/workflows/land.yml
     with:
-      kind: t3
-      tag: ${{ needs.plan.outputs.tag }}
+      pin: ${{ needs.plan.outputs.pin }}
+      sha: ${{ needs.publish.outputs.sha || needs.plan.outputs.sha }}
+      dry_run: ${{ inputs.dry_run == true }}

@@ -1,16 +1,18 @@
-// `node scripts/updates-ci.ts <command> …`: the steps of the update workflows that decide or publish (ADR-0037; review
-// F1, F2, A1, A3, A5). They run in trusted jobs, on runners where no upstream or dependency code ran, with plain Node and
-// nothing installed. Every value from a bump job's report or a workflow input is validated here with the patterns in
-// `apps/environment/src/updates/pins.ts` before it is used; outputs go to $GITHUB_OUTPUT as `name=value` lines.
+// `node scripts/updates-ci.ts <command> …`: the steps of the update workflows that decide, check or publish (ADR-0037;
+// review F1, F2, A1, A3, A5, A12, B1). They run in trusted jobs, on runners where no upstream or dependency code ran,
+// with plain Node and nothing installed but main's locked `yaml` (`install-yaml`). Every value from a bump job's report
+// or a workflow input is validated against `apps/environment/src/updates/pins.ts`'s patterns before it is used. Outputs
+// go to $GITHUB_OUTPUT as `name=value` lines. A pin travels as one string (`t3:<tag>`, `cli:<cli>:<version>`).
 //
-//   plan-t3 --event <e> [--tag <t>] [--land true] [--verify <what>]   bump.yml: skip, bump or land (outputs mode, tag)
-//   read-report --kind t3|cli --file <f> [--tag <t>] [--cli <c>] [--running <v>]
-//                                                                      a bump job's report, validated (changed, to, land)
-//   land-plan (--kind t3 --tag <t> | --kind cli --cli <c> --version <v>)   land.yml: land or deploy-only (mode, branch)
-//   landed-branches (pin as land-plan)                                the `bump/*` branches a land deletes, one a line
-//   set-proven --sha <sha> --gate update|full --url <run url>          the `t3flare/proven` status (A1)
-//   issue-body --verify <what> [--file <report>] [--url <run url>]    a failed verify run's issue body (A3)
-//   install-yaml                                                       `yaml` at main's locked version, for land-check
+//   plan-t3 --event <e> [--tag <t>] [--land true] [--verify <what>]   bump.yml: skip, bump or land (mode, tag, pin, sha)
+//   check-proposal --kind t3|cli --dir <artifact dir> (--gate <g> [--tag <t>] | --cli <c> [--running <v>])
+//                       no token: the report read and the bundled commit checked (changed, pin, sha, gate, call_land)
+//   publish-proposal --pin <pin> --sha <sha> --gate <g>      token: push `bump/*`, mark the commit proven
+//   land-plan --pin <pin> [--sha <sha>]   land.yml: land (the branch's tip is `sha`, proven) or deploy-only
+//                                         (mode, branch, sha, verify)
+//   landed-branches --pin <pin>           the `bump/*` branches a land deletes, one a line
+//   issue-body --verify <what> [--file <report>]                       a failed verify run's issue body (A3)
+//   install-yaml                          `yaml` at main's locked version, checked against the lock's integrity
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -18,12 +20,12 @@ import * as path from "node:path";
 
 import { clisField } from "../apps/environment/scripts/lib/cliPins.ts";
 import { landMode, planT3, readBumpReport } from "../apps/environment/scripts/lib/land.ts";
-import { branchOf, COMMIT, landedBranches, newestNightly, NIGHTLY_TAG, pinOf, type Pin } from "../apps/environment/src/updates/pins.ts";
-import { branchTipOf, bumpBranches, git, nightlyTagsOf, provenGateOf, setProven } from "./lib/updatesGit.ts";
+import { branchOf, COMMIT, landedBranches, newestNightly, NIGHTLY_TAG, parsePin, type Pin, pinOf, pinText } from "../apps/environment/src/updates/pins.ts";
+import { branchTipOf, bumpBranches, git, nightlyTagsOf, optionOf, provenGateOf, setProven, thisRunUrl } from "./lib/updatesGit.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const [command, ...args] = process.argv.slice(2);
-const option = (name: string) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : undefined);
+const option = optionOf(args);
 
 const fail = (reason: string): never => {
   console.error(`updates-ci ${command}: ${reason}`);
@@ -40,9 +42,14 @@ const output = (values: Readonly<Record<string, string>>) => {
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
 };
 
-const pinFromArgs = (): Pin => {
-  const pin = pinOf({ kind: option("kind"), tag: option("tag"), cli: option("cli"), version: option("version") });
+const pinArg = (): Pin => {
+  const pin = parsePin(option("pin"));
   return typeof pin === "string" ? fail(pin) : pin;
+};
+
+const gateArg = (): "update" | "full" => {
+  const gate = option("gate") || "full";
+  return gate === "update" || gate === "full" ? gate : fail(`not a gate: ${gate}`);
 };
 
 const submoduleUrl = () => git(["config", "-f", ".gitmodules", "submodule.t3code.url"], root).out;
@@ -67,8 +74,10 @@ switch (command) {
     const tip = target === undefined ? undefined : branchTipOf(`bump/${target}`);
     if (target !== undefined && tip !== undefined && COMMIT.test(tip)) {
       git(["fetch", "--quiet", "origin", `+refs/heads/bump/${target}:refs/remotes/origin/bump/${target}`], root);
+      const proof = await provenGateOf(tip);
+      if (proof.gate === undefined) console.error(`plan: bump/${target}: ${proof.reason}`);
       branch = {
-        gate: await provenGateOf(tip),
+        gate: proof.gate,
         mainIsAncestor: git(["merge-base", "--is-ancestor", "HEAD", tip], root).ok,
         commits: Number(git(["rev-list", "--count", `HEAD..${tip}`], root).out || "0"),
       };
@@ -77,22 +86,48 @@ switch (command) {
     if (typeof plan === "string") fail(plan);
     const decided = plan as Exclude<typeof plan, string>;
     console.error(`plan: ${decided.mode}: ${decided.reason}`);
-    output({ mode: decided.mode, tag: decided.tag });
+    // The proven tip the fast path lands: land.yml lands exactly it (review B1).
+    output({ mode: decided.mode, tag: decided.tag, pin: decided.tag === "" ? "" : pinText({ kind: "t3", tag: decided.tag }), sha: decided.proven === true ? tip! : "" });
     break;
   }
-  case "read-report": {
+  case "check-proposal": {
+    // No token in this step's environment (review A9): it runs npm (a CLI pin made again) and git on the bundle.
+    if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) fail("runs without a token");
     const kind = option("kind");
-    const file = option("file") ?? fail("--file is required");
+    const dir = option("dir") ?? fail("--dir is required");
     if (kind !== "t3" && kind !== "cli") fail(`not a kind of bump: ${String(kind)}`);
-    const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : fail(`${file} is missing`);
-    const read = readBumpReport(text, kind === "t3" ? { kind, tag: option("tag") || undefined } : { kind: "cli", cli: option("cli") ?? "", running: option("running") || undefined });
+    const reportFile = path.join(dir, kind === "t3" ? "bump-report.json" : "cli-bump-report.json");
+    const text = fs.existsSync(reportFile) ? fs.readFileSync(reportFile, "utf8") : fail(`${reportFile} is missing`);
+    const read = readBumpReport(text, kind === "t3" ? { kind, gate: gateArg(), tag: option("tag") || undefined } : { kind: "cli", cli: option("cli") ?? "", running: option("running") || undefined });
     if (typeof read === "string") fail(read);
     const report = read as Exclude<typeof read, string>;
-    output({ changed: String(report.changed), to: report.to, gate: report.gate, land: String(report.land) });
+    const pin = pinOf(kind === "t3" ? { kind, tag: report.to } : { kind, cli: option("cli"), version: report.to });
+    if (typeof pin === "string") fail(pin);
+    let sha = "";
+    if (report.changed) {
+      const bundle = path.join(dir, "pin.bundle");
+      if (!git(["bundle", "verify", bundle], root).ok) fail("the pin's bundle does not verify");
+      if (!git(["fetch", "--quiet", bundle, "HEAD:refs/remotes/candidate"], root).ok) fail("could not fetch the pin's bundle");
+      sha = git(["rev-parse", "refs/remotes/candidate"], root).out;
+      const checked = spawnSync(process.execPath, ["scripts/land-check.ts", "--ref", "refs/remotes/candidate", "--pin", pinText(pin as Pin)], { cwd: root, stdio: "inherit" });
+      if (checked.status !== 0) fail("the land check refused the proposed pin");
+    }
+    output({ changed: String(report.changed), pin: pinText(pin as Pin), sha, gate: report.gate, call_land: String(report.callLand) });
+    break;
+  }
+  case "publish-proposal": {
+    const pin = pinArg();
+    const sha = option("sha") ?? "";
+    if (!COMMIT.test(sha) || git(["rev-parse", "refs/remotes/candidate"], root).out !== sha) fail(`not the checked candidate: ${sha}`);
+    const token = process.env.GH_TOKEN ?? fail("GH_TOKEN is required");
+    const pushed = git(["push", "--force", `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`, `${sha}:refs/heads/${branchOf(pin)}`], root);
+    if (!pushed.ok) fail(`push: ${pushed.err.replaceAll(token, "***")}`);
+    await setProven(sha, gateArg());
+    output({ branch: branchOf(pin) });
     break;
   }
   case "land-plan": {
-    const pin = pinFromArgs();
+    const pin = pinArg();
     let mode;
     if (pin.kind === "t3") {
       mode = landMode(pin, { tag: tagOfGitlink("origin/main", nightlyTagsOf(submoduleUrl())) });
@@ -101,27 +136,30 @@ switch (command) {
       if (!clis.ok) fail("main has no clis.ts");
       mode = landMode(pin, { cliVersion: clisField(clis.raw, pin.cli, pin.cli === "claude" ? "packageVersion" : "version") });
     }
-    output({ mode, branch: branchOf(pin) });
+    const branch = branchOf(pin);
+    // What the verify run is named after (D18).
+    const verify = pin.kind === "t3" ? `t3code ${pin.tag}` : `${pin.cli} ${pin.version}`;
+    if (mode === "deploy-only") {
+      output({ mode, branch, sha: git(["rev-parse", "origin/main"], root).out, verify });
+      break;
+    }
+    // Review B1: land exactly the commit a trusted job proved, and only while the branch still points at it.
+    const sha = option("sha") ?? "";
+    if (!COMMIT.test(sha)) fail(`landing ${branch} needs the proven commit, not ${JSON.stringify(sha)}`);
+    const tip = branchTipOf(branch);
+    if (tip !== sha) fail(`${branch} is at ${String(tip)}, not the proven ${sha}`);
+    if (!git(["fetch", "--quiet", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`], root).ok) fail(`could not fetch ${branch}`);
+    const proof = await provenGateOf(sha);
+    if (proof.gate === undefined) fail(proof.reason);
+    output({ mode, branch, sha, verify });
     break;
   }
   case "landed-branches": {
-    for (const branch of landedBranches(pinFromArgs(), bumpBranches())) console.log(branch);
-    break;
-  }
-  case "set-proven": {
-    const sha = option("sha") ?? "";
-    const gate = option("gate");
-    const url = option("url") ?? "";
-    if (!COMMIT.test(sha)) fail(`not a commit: ${sha}`);
-    if (gate !== "update" && gate !== "full") fail(`not a gate: ${String(gate)}`);
-    if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/actions\/runs\/\d+$/.test(url)) fail(`not a run URL: ${url}`);
-    await setProven(sha, gate as "update" | "full", url);
-    console.log(`${sha}: ${gate} gate`);
+    for (const branch of landedBranches(pinArg(), bumpBranches())) console.log(branch);
     break;
   }
   case "issue-body": {
     const verify = (option("verify") ?? "").replace(/[^\w .:@/+-]/g, "").slice(0, 120) || "an Update";
-    const url = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/actions\/runs\/\d+$/.test(option("url") ?? "") ? option("url")! : "(no run URL)";
     let step = "setup, before the report";
     const file = option("file");
     if (file !== undefined && fs.existsSync(file)) {
@@ -139,7 +177,7 @@ switch (command) {
         `The Full gate did not pass on main after **${verify}** landed through an in-app Update (ADR-0037).`,
         "",
         `- Failed step: \`${step}\``,
-        `- Run: ${url}`,
+        `- Run: ${thisRunUrl()}`,
         "",
         "Prod runs it. Recovery: Safe mode, then a revert by the owner (in-app updates plan D15).",
       ].join("\n"),
@@ -149,9 +187,8 @@ switch (command) {
   case "install-yaml": {
     // main's own locked `yaml`, checked against the lock's integrity, installed with no scripts.
     const lock = fs.readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8");
-    const match = /\n {2}yaml@(\d+\.\d+\.\d+):\n {4}resolution: \{integrity: (sha512-[A-Za-z0-9+/=]+)\}/.exec(lock);
-    if (match === null) fail("main's lock holds no yaml");
-    const [, version, integrity] = match!;
+    const match = /\n {2}yaml@(\d+\.\d+\.\d+):\n {4}resolution: \{integrity: (sha512-[A-Za-z0-9+/=]+)\}/.exec(lock) ?? fail("main's lock holds no yaml");
+    const [, version, integrity] = match;
     const prefix = fs.mkdtempSync(path.join(os.tmpdir(), "yaml-"));
     const installed = spawnSync("npm", ["install", "--prefix", prefix, "--ignore-scripts", "--no-audit", "--no-fund", `yaml@${version}`], { encoding: "utf8", cwd: prefix });
     if (installed.status !== 0) fail(`npm install yaml@${version}: ${installed.stderr}`);

@@ -1,4 +1,4 @@
-// `node scripts/land-check.ts --ref <candidate> (--kind t3 --tag <tag> | --kind cli --cli <cli> --version <v>)`
+// `node scripts/land-check.ts --ref <candidate> --pin <t3:<tag> | cli:<cli>:<version>> [--base <ref>]`
 //
 // May this proposed pin be published as proven, or land (ADR-0037; review F3)? Run by the trusted jobs (`bump.yml`'s
 // publish, `cli-bump.yml`'s publish, `land.yml`) on a runner that ran no upstream code, with plain Node: no install but
@@ -26,24 +26,20 @@ import * as path from "node:path";
 
 import { applyCliPin, CLI_PIN_FILES, cliPinRefusal, type PinFiles } from "../apps/environment/scripts/lib/cliPins.ts";
 import { landRefusal, lockProvenance, t3LockRefusal, t3ManifestRefusal } from "../apps/environment/scripts/lib/land.ts";
-import { COMMIT, pinOf, type Pin } from "../apps/environment/src/updates/pins.ts";
-import { tagCommitOf } from "./lib/updatesGit.ts";
+import { COMMIT, parsePin, type Pin } from "../apps/environment/src/updates/pins.ts";
+import { git as gitIn, optionOf, tagCommitOf } from "./lib/updatesGit.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
-const option = (name: string) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : undefined);
-
-const git = (gitArgs: ReadonlyArray<string>, cwd = root) => {
-  const result = spawnSync("git", gitArgs, { cwd, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
-  return { ok: result.status === 0, out: (result.stdout ?? "").trim(), err: (result.stderr ?? "").trim(), raw: result.stdout ?? "" };
-};
+const option = optionOf(args);
+const git = (gitArgs: ReadonlyArray<string>, cwd = root) => gitIn(gitArgs, cwd);
 
 const refuse = (reason: string): never => {
   console.error(`land-check: refused: ${reason}`);
   process.exit(1);
 };
 
-const pinned = pinOf({ kind: option("kind"), tag: option("tag"), cli: option("cli"), version: option("version") });
+const pinned = parsePin(option("pin"));
 if (typeof pinned === "string") refuse(pinned);
 const pin = pinned as Pin;
 const ref = option("ref") ?? refuse("--ref is required");
