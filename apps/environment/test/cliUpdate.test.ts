@@ -6,7 +6,7 @@ import { CLIS } from "@t3flare/sandbox-image/clis";
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 
-import { CLI_UPDATE_COMMAND, cliMaintenance, lookupLatestCliVersion, runCliUpdate } from "../src/updates/cliUpdate.ts";
+import { CLI_UPDATE_COMMAND, CLI_UPDATE_TOKEN_ENV, cliMaintenance, isCliUpdateSpawn, lookupLatestCliVersion, runCliUpdate } from "../src/updates/cliUpdate.ts";
 import { updates, type UpdateStore } from "../src/updates/records.ts";
 import type { ActionsClient, WorkflowRun } from "../src/updates/actions.ts";
 
@@ -43,6 +43,22 @@ describe("the CLI drivers' maintenance capabilities", () => {
     expect(capabilities.update).toMatchObject({ executable: CLI_UPDATE_COMMAND, args: ["codex"], lockKey: "t3flare-cli:codex", command: `${CLI_UPDATE_COMMAND} codex` });
     expect(capabilities.latestVersion).toBeNull();
     expect(await Effect.runPromise(capabilities.lookupLatestVersion!)).toBe("0.169.0");
+  });
+
+  it("answers only t3's runner: the exact argv with this isolate's token, which no client sees (review A4)", () => {
+    const update = cliMaintenance(codex, "codex", { configured: true }).update!;
+    const token = update.env?.[CLI_UPDATE_TOKEN_ENV];
+    expect(token).toMatch(/^[0-9a-f-]{36}$/);
+    // What a client sees: the advisory's command and the runner's message, neither with the token.
+    expect(update.command).toBe(`${CLI_UPDATE_COMMAND} codex`);
+    expect([update.executable, ...update.args].join(" ")).not.toContain(token);
+    expect(isCliUpdateSpawn(CLI_UPDATE_COMMAND, ["codex"], update.env)).toBe(true);
+    // A client-settable command (a custom text generator, a setup script) knows no token.
+    expect(isCliUpdateSpawn(CLI_UPDATE_COMMAND, ["codex"], {})).toBe(false);
+    expect(isCliUpdateSpawn(CLI_UPDATE_COMMAND, ["codex"], { [CLI_UPDATE_TOKEN_ENV]: "guess" })).toBe(false);
+    expect(isCliUpdateSpawn(`/usr/bin/${CLI_UPDATE_COMMAND}`, ["codex"], update.env)).toBe(false);
+    expect(isCliUpdateSpawn(CLI_UPDATE_COMMAND, ["codex", "--extra"], update.env)).toBe(false);
+    expect(isCliUpdateSpawn(CLI_UPDATE_COMMAND, ["opencode"], update.env)).toBe(false);
   });
 
   it("stays manual-only elsewhere (ADR-0024)", () => {
