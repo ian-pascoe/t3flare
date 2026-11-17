@@ -8,6 +8,8 @@ import * as Stream from "effect/Stream";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 import * as Socket from "effect/socket/Socket";
 
+import { CLI_APIS } from "./modelEndpointSpec.ts";
+
 export const base = new URL(process.env.T3_URL ?? "http://localhost:8791");
 const bootstrapToken = process.env.T3_BOOTSTRAP_TOKEN ?? "local-bootstrap-token-0123456789";
 const adminToken = process.env.T3FLARE_ADMIN_TOKEN ?? "local-admin-token";
@@ -200,6 +202,18 @@ export interface RunView {
   readonly status: string;
   readonly restartContinuationOfRunId?: string;
 }
+
+/**
+ * The model a CLI turn names when its caller gives none: the first model of the first Model endpoint the CLI runs on
+ * (`CLI_APIS`), read through the panel's API, so the turn runs on a real endpoint model, not an old selection's
+ * fallback. Undefined without one (a stage in the setup state).
+ */
+export const endpointModelFor = async (cli: "codex" | "pi" | "claude" | "opencode"): Promise<string | undefined> => {
+  const listed = ((await admin("GET", "/_t3flare/harness/api/endpoints")).json?.endpoints ?? []) as Array<{ id: string; api: string; models?: Array<{ id: string }> }>;
+  const apis = CLI_APIS[cli] as ReadonlyArray<string>;
+  const endpoint = listed.find((entry) => apis.includes(entry.api) && (entry.models?.length ?? 0) > 0);
+  return endpoint === undefined ? undefined : `${endpoint.id}/${endpoint.models![0]!.id}`;
+};
 
 export const runsOf = (projection: any): Array<RunView> => projection?.runs ?? [];
 export const itemsOf = (projection: any): Array<any> => projection?.turnItems ?? [];

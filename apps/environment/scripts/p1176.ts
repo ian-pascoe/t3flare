@@ -183,8 +183,9 @@ const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${sta
   const old: Record<string, unknown> = {};
   const scanned: Record<string, any> = {};
   for (const cli of ["codex", "pi", "claude", "opencode"]) {
-    // No model given: each helper's own proxy-era default (`gpt-6-luna`, `anthropic/claude-haiku-5-5`, `anthropic/claude-sonnet-5-5`).
-    const turn = await turnOf(cli, { workspace: workspaces[cli]!, prompt: "Run `cat src/greeting.txt` with your shell tool, then reply with the single word done." });
+    // Each CLI's proxy-era model, named explicitly (the helpers name an endpoint model when given none).
+    const proxyEra: Record<string, string> = { codex: "gpt-6-luna", pi: "anthropic/claude-haiku-5-5", claude: "anthropic/claude-sonnet-5-5", opencode: "anthropic/claude-sonnet-5-5" };
+    const turn = await turnOf(cli, { workspace: workspaces[cli]!, model: proxyEra[cli]!, prompt: "Run `cat src/greeting.txt` with your shell tool, then reply with the single word done." });
     old[cli] = clean({ model: turn.model, runs: turn.runs.slice(-1), items: turn.items, text: turn.text });
     check(`a ${cli} thread on its proxy-era model (${turn.model}) runs on the default model`, turn.runs.at(-1)?.status === "completed" && /done/i.test(turn.text), old[cli]);
     // 5. The leak scan, right after the CLI's last turn, its processes alive (a Container idle for minutes may sleep:

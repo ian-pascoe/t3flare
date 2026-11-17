@@ -1,7 +1,7 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
 // Step 4b: Claude Code and OpenCode turns from t3's own client protocol, shared by `scripts/cli4b.ts` (the milestones'
 // evidence) and `scripts/acceptance.ts --claude --opencode`.
-import { admin, dispatch, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./client.ts";
+import { admin, dispatch, endpointModelFor, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./client.ts";
 
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 
@@ -44,7 +44,9 @@ export interface TurnOptions {
 export const cliTurn = async (cookie: string, options: TurnOptions) => {
   const started = Date.now();
   const { projectId, root } = await ensureProject(cookie, options.workspace);
-  const model = { instanceId: INSTANCE[options.cli]!.instanceId, model: options.model ?? INSTANCE[options.cli]!.model, options: [] };
+  // No model given: the first endpoint model this CLI runs on (`endpointModelFor`), else the old default.
+  const given = options.model ?? (await endpointModelFor(options.cli as "claude" | "opencode"));
+  const model = { instanceId: INSTANCE[options.cli]!.instanceId, model: given ?? INSTANCE[options.cli]!.model, options: [] };
   let threadId = options.threadId;
   if (threadId === undefined) {
     threadId = uuid();

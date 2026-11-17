@@ -25,7 +25,8 @@ const option = (name: string) => {
 const out = option("out");
 const spec = modelEndpointSpec(process.env);
 if (!spec.ok) throw new Error(spec.reason);
-const secrets = secretsOf(spec.spec).filter((value) => value.length >= MIN_SECRET_LENGTH);
+// Every endpoint's key and header values, not only the first's (the setting may hold a list).
+const secrets = spec.specs.flatMap(secretsOf).filter((value) => value.length >= MIN_SECRET_LENGTH);
 const failures: Array<string> = [];
 const report: Record<string, unknown> = { at: new Date().toISOString(), endpointFrom: spec.source };
 const check = (name: string, ok: boolean, detail?: unknown) => {

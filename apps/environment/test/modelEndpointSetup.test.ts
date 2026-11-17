@@ -27,6 +27,7 @@ import { handleHarness, type HarnessDeps } from "../src/harness/panel.ts";
 import { harnessStore } from "../src/harness/store.ts";
 
 const KEY = "sk-spi1175-secret-key-0123456789";
+const SECOND_KEY = "rk-other-endpoint-abcdefghijkl";
 const HOST = "t3.example.dev";
 const NOW = Date.UTC(2026, 10, 14, 10, 0);
 
@@ -106,14 +107,17 @@ describe("modelEndpointSpec", () => {
 
   it("reads a list, one endpoint per API, the first being the stage's own; ids unique", () => {
     const anth = { id: "anth", baseUrl: "https://llm.example.com", apiKey: KEY };
-    const resp = { id: "resp", api: "openai-responses", baseUrl: "https://llm.example.com/v1", apiKey: `${KEY}-2` };
+    const resp = { id: "resp", api: "openai-responses", baseUrl: "https://llm.example.com/v1", apiKey: SECOND_KEY };
     const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, resp]) });
     if (!found.ok) throw new Error(found.reason);
     expect(found.specs.map((spec) => [spec.id, spec.api])).toEqual([["anth", "anthropic-messages"], ["resp", "openai-responses"]]);
     expect(found.spec).toEqual(found.specs[0]);
     // Both keys are masked and scrubbed, not only the first's.
-    expect(maskCommands({ T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, resp]) })).toEqual([`::add-mask::${KEY}`, `::add-mask::${KEY}-2`]);
-    expect(keptReportJson({ a: `${KEY}-2` }, { T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, resp]) })).not.toContain(KEY);
+    expect(maskCommands({ T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, resp]) })).toEqual([`::add-mask::${KEY}`, `::add-mask::${SECOND_KEY}`]);
+    // The second key shares nothing with the first: scrubbing the first alone leaves it.
+    const kept = keptReportJson({ a: KEY, b: `second ${SECOND_KEY}` }, { T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, resp]) });
+    expect(kept).not.toContain(KEY);
+    expect(kept).not.toContain(SECOND_KEY);
     // ci:setup writes it back as a list.
     expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: modelEndpointSecret(found.specs) })).toEqual(found);
     expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, anth]) })).toMatchObject({ ok: false, invalid: true, reason: 'T3FLARE_MODEL_ENDPOINT has the id "anth" twice' });

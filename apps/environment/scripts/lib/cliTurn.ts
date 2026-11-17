@@ -1,7 +1,7 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off
 // Step 4a: one CLI agent turn from t3's own client protocol (a Codex or Pi thread in a Workspace of the fixture), every
 // request answered, and the projection's evidence. Used by `scripts/cli4a.ts` and `acceptance.ts --codex/--pi`.
-import { dispatch, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./client.ts";
+import { dispatch, endpointModelFor, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./client.ts";
 import { cloudProjects } from "./fixtureProject.ts";
 
 const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
@@ -41,7 +41,8 @@ export interface TurnOptions {
 export const cliTurn = async (cookie: string, options: TurnOptions) => {
   const started = Date.now();
   const { projectId, root } = await ensureProject(cookie, options.workspace);
-  const model = modelOf(options.cli, options.model);
+  // No model given: the first endpoint model this CLI runs on (`endpointModelFor`), else the old default.
+  const model = modelOf(options.cli, options.model ?? (await endpointModelFor(options.cli as "codex" | "pi")));
   let threadId = options.threadId;
   if (threadId === undefined) {
     threadId = uuid();
