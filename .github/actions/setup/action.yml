@@ -2,15 +2,24 @@ name: Set up the workspace
 description: >-
   Node, pnpm and Vite+ at the versions package.json pins (gen-workspace.ts copies them from t3code), the pnpm store
   from cache, then a frozen install. After t3's own setup-ci-deps, without its maintainer task cache (ADR-0030).
+inputs:
+  cache:
+    description: >-
+      Restore the pnpm store from the cache and save it after a successful job. False in every job that runs upstream
+      code (the bump jobs): setup-vp saves the store under the lock's key, which deploy-prod restores with prod's secrets
+      (ADR-0037, review B4).
+    required: false
+    default: "true"
 runs:
   using: composite
   steps:
-    # vp installs the Node of engines.node and the pnpm of packageManager. Its dependency cache (the pnpm store)
-    # is keyed on the lock.
+    # vp installs the Node of engines.node and the pnpm of packageManager. Its dependency cache (the pnpm store) is keyed
+    # on the lock (`vite-plus-<os>-<arch>-pnpm-<hash>`, restore keys down to `vite-plus-<os>-<arch>-`) and saved in its
+    # post step when the job passed and the key was missed (setup-vp@250f29ce, dist/index.mjs `saveCache`).
     - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1
       with:
         node-version-file: package.json
-        cache: true
+        cache: ${{ inputs.cache }}
         run-install: false
 
     - shell: bash
