@@ -1,9 +1,14 @@
 name: Land
 
-# ADR-0037: land a proposed pin. Fast-forward `main` to the exact commit a trusted job proved, deploy prod by dispatching
-# deploy-prod.yml (a push made with GITHUB_TOKEN starts no workflow, so the push alone would deploy nothing), and follow
-# that run: its conclusion is the Update's outcome. Then delete the landed `bump/*` branches at or below the landed
-# version and dispatch the verify run (bump.yml through the Full gate, D18).
+# ADR-0037: land a proposed pin. Fast-forward `main` to the exact commit a trusted job proved, and follow the prod deploy
+# that push starts (deploy-prod.yml's push run): its conclusion is the Update's outcome. Then delete the landed `bump/*`
+# branches at or below the landed version and dispatch the verify run (bump.yml through the Full gate, D18).
+#
+# The push uses the deploy key T3FLARE_LAND_DEPLOY_KEY, a secret of the `prod` environment (deployable from `main`
+# only), because ruleset `main` requires pull requests and only deploy keys and admins may skip it: GitHub Actions can't
+# be a bypass actor on a personal account's repo, and the t3flare App also mints agents' Container tokens, so it must not
+# skip it. A deploy-key push, unlike a GITHUB_TOKEN one, starts deploy-prod.yml. The key reaches only the push step, after
+# the proof binding and the land check, and is a plain fast-forward (no force). ADR-0037 §7.
 #
 # Bound to the proof (review B1): it lands `sha` only while the pin's branch still points at it, and only when `sha`
 # carries a `t3flare/proven` status set by GitHub Actions that names a run of bump.yml or cli-bump.yml on main
@@ -48,6 +53,8 @@ jobs:
     # Long enough to wait out deploy-prod's own 45 minutes and a queue in its group; with the bump job's 20 and publish's
     # 15 and plan's 5 this stays within an Update's 110 minutes from its start (ADR-0037, U92).
     timeout-minutes: 60
+    # For T3FLARE_LAND_DEPLOY_KEY only; its branch policy admits `main` alone.
+    environment: prod
     permissions:
       contents: write
       actions: write
@@ -81,32 +88,53 @@ jobs:
           PIN: ${{ inputs.pin }}
           SHA: ${{ steps.plan.outputs.sha }}
 
-      # A fast-forward only: a push that is not one is refused, and nothing is forced.
+      # A fast-forward only: a push that is not one is refused, and nothing is forced. The deploy key (see the header)
+      # lives in a 0600 file under the runner's temp directory for this step alone; GitHub's host keys come from its API.
       - name: Fast-forward main
         if: steps.plan.outputs.mode == 'land' && inputs.dry_run != true
-        run: git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$SHA:refs/heads/main"
+        run: |
+          dir=$(mktemp -d "$RUNNER_TEMP/land-key.XXXXXX")
+          trap 'rm -rf "$dir"' EXIT
+          (umask 077 && printf '%s\n' "$LAND_DEPLOY_KEY" > "$dir/key")
+          gh api meta --jq '.ssh_keys[] | "github.com " + .' > "$dir/known_hosts"
+          GIT_SSH_COMMAND="ssh -i $dir/key -o IdentitiesOnly=yes -o IdentityAgent=none -o UserKnownHostsFile=$dir/known_hosts -o StrictHostKeyChecking=yes" \
+            git push "git@github.com:${GITHUB_REPOSITORY}.git" "$SHA:refs/heads/main"
         env:
           GH_TOKEN: ${{ github.token }}
+          LAND_DEPLOY_KEY: ${{ secrets.T3FLARE_LAND_DEPLOY_KEY }}
           SHA: ${{ steps.plan.outputs.sha }}
 
+      # A landed commit: follow the push run the deploy key's push started. Deploy-only (main already held the pin), or
+      # no push run listed in time: dispatch one for main's tip and follow that.
       - name: Deploy
         if: inputs.dry_run != true
         run: |
-          stage=prod
-          since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          gh workflow run deploy-prod.yml --ref main -f stage="$stage" -f checked_sha="$SHA"
-          name="Deploy $stage $SHA"
-          for _ in $(seq 1 30); do
-            run=$(gh run list --workflow deploy-prod.yml --event workflow_dispatch --created ">=$since" --json databaseId,displayTitle \
-              --jq "[.[] | select(.displayTitle == \"$name\")][0].databaseId // empty")
-            if [ -n "$run" ]; then break; fi
-            sleep 5
-          done
+          run=""
+          if [ "$MODE" = land ]; then
+            for _ in $(seq 1 36); do
+              run=$(gh run list --workflow deploy-prod.yml --event push --commit "$SHA" --json databaseId --jq '.[0].databaseId // empty')
+              if [ -n "$run" ]; then break; fi
+              sleep 5
+            done
+          fi
+          if [ -z "$run" ]; then
+            stage=prod
+            since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            gh workflow run deploy-prod.yml --ref main -f stage="$stage" -f checked_sha="$SHA"
+            name="Deploy $stage $SHA"
+            for _ in $(seq 1 30); do
+              run=$(gh run list --workflow deploy-prod.yml --event workflow_dispatch --created ">=$since" --json databaseId,displayTitle \
+                --jq "[.[] | select(.displayTitle == \"$name\")][0].databaseId // empty")
+              if [ -n "$run" ]; then break; fi
+              sleep 5
+            done
+          fi
           if [ -z "$run" ]; then echo "The deploy run never appeared."; exit 1; fi
           echo "Following $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run"
           gh run watch "$run" --interval 15 --exit-status
         env:
           GH_TOKEN: ${{ github.token }}
+          MODE: ${{ steps.plan.outputs.mode }}
           SHA: ${{ steps.plan.outputs.sha }}
 
       # Names from `pins.ts`'s parser only: this kind (and CLI), at or below the landed version.

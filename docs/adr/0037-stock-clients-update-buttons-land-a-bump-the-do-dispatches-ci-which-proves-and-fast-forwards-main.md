@@ -88,9 +88,15 @@ CI, never by updating the Environment in place:
    Cloudflare token, the GitHub App's key), so opting a Workspace in to changing CI is trusting it with them.
 7. **Land** (`land.yml`, reusable by both kinds) lands exactly the commit `plan` (an Update's fast path) or `publish`
    proved: it refuses unless the pin's branch still points at that commit and the commit's proof counts (review B1),
-   then runs the land check, fast-forwards `main` with `GITHUB_TOKEN`, dispatches `deploy-prod.yml` with
-   `checked_sha` (a `GITHUB_TOKEN` push starts no workflow), and follows that run: its conclusion is the Update's. It is
-   idempotent: when main already holds the pin (or a newer one), it pushes nothing and deploys main's tip, so a press
+   then runs the land check, fast-forwards `main` with the deploy key `T3FLARE_LAND_DEPLOY_KEY`, and follows the
+   `deploy-prod.yml` push run that push starts: its conclusion is the Update's. The key is a secret of the `prod`
+   environment (deployable from `main` only) and reaches only the push step. Ruleset `main` requires pull requests and
+   lets deploy keys and admins skip it: GitHub Actions can't be a bypass actor on a personal account's repo, and the
+   t3flare App also mints agents' Container tokens, so letting it skip would let a Workspace on this repo push `main`.
+   The ruleset's skip also covers its other rules (no force push), so the push itself is a plain fast-forward; the repo
+   holds no other deploy key, and adding one is trusting it with `main`. It is
+   idempotent: when main already holds the pin (or a newer one), it pushes nothing and dispatches `deploy-prod.yml`
+   with `checked_sha` for main's tip (as it does when no push run is listed within 3 minutes), so a press
    after a land whose deploy failed recovers, with or without its branch. The server Update's plan lands (deploy-only) a
    tag main already pins, and refuses one older than main's pin with the reason ("prod is moving to Y, newer than X",
    D6, review A11); a CLI update sends the version prod runs, and a run that finds main's pin newest but prod older
@@ -138,6 +144,9 @@ CI, never by updating the Environment in place:
   turns are not warned or refused: the restart costs a re-prompt (ADR-0004). A running Container keeps its old CLI until
   it restarts.
 - A t3 bump that raises a CLI's minimum fails `check` with "bump the CLI in clis.ts": press that CLI's update first.
+- The deploy key `land.yml: fast-forward main (ADR-0037)` (write access), its private half as the `prod` secret
+  `T3FLARE_LAND_DEPLOY_KEY`, and the `DeployKey` bypass on ruleset `main` were set by hand (2026-11-17). Rotate by
+  replacing both halves.
 - The owner accepts the App's new `actions: write` on its installation, which must include `ian-pascoe/t3flare`, and
   deletes the Actions caches the bump jobs saved before this (`gh cache delete --all`): until now they saved the pnpm
   store under the key deploy-prod restores.
@@ -146,7 +155,8 @@ CI, never by updating the Environment in place:
   - `queue: max` on `concurrency` (documented; actionlint does not know the key yet);
   - `run-name` from inputs, read back as a run's `display_title` by the DO (`updates/actions.ts`) and by `land.yml`
     (`gh run list … displayTitle`), and `run_started_at` for a record's window;
-  - a `GITHUB_TOKEN` push starts no workflow, so `land.yml` dispatches `deploy-prod.yml`;
+  - a deploy-key push starts `deploy-prod.yml`'s push run, which `land.yml` finds by commit (`gh run list --commit`);
+    deploy keys may skip a ruleset, GitHub Actions may not on a personal account's repo;
   - commit statuses and their `creator`, for the proof;
   - the hourly plan reads t3's tags with `git ls-remote` against `pins.ts`'s tag pattern.
   A change in any of these shows in the trial runs (plan D16) and in an Update that fails to start or report: one whose
