@@ -42,6 +42,15 @@ await wsCall(cookie, "server.updateSettings", {
 });
 const cloudProject = await ensureCloudFixtureProject(cookie);
 out.cloudProject = cloudProject;
+// The forwarded launch's model: one the stage's Durable agent advertises. Since v0.1.11-nightly.20261117.4825 t3's
+// `t3_thread_launch` refuses a model its provider does not list (`model_unavailable`), and the stage's models are its
+// Model endpoints' (e.g. `commissary/claude-haiku-5-5`), so a fixed id is refused. A small one, when listed.
+const advertised: Array<string> = await wsCall(cookie, "server.refreshProviders", { instanceId: "piDurable" })
+  .then((reply: any) => (reply?.providers ?? []).find((provider: any) => provider.instanceId === "piDurable")?.models ?? [])
+  .then((models: Array<any>) => models.map((model) => String(model.slug)))
+  .catch(() => []);
+const launchModel = advertised.find((slug) => /haiku/.test(slug)) ?? advertised[0] ?? "anthropic/claude-haiku-5-5";
+out.launchModel = { model: launchModel, advertised: advertised.slice(0, 20) };
 
 // The laptop.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3flare-laptop-"));
@@ -106,7 +115,7 @@ try {
       projectId: cloudProject.projectId,
       title: `step3 forwarded ${version}`,
       message: "Reply with exactly the word PONG and nothing else. Use no tools.",
-      modelSelection: { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5" },
+      modelSelection: { instanceId: "piDurable", model: launchModel },
       clientRequestId: `forwarded-${Date.now()}`,
     });
     out.launch = { isError: launched.isError, sample: launched.text.slice(0, 800) };
