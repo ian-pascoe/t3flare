@@ -53,3 +53,14 @@ Shadows 4 (unchanged), Patches 6.
 
 Shadows 4 (unchanged), Patches 7.
 - Patch `0007-pi-relay-tools-are-judged-by-the-relay.patch` (SPI-1076): t3's pi extension does not ask "Allow …?" for a `builtin:mcp` tool (`getAllTools()` source) whose server is one the relay serves this process (`T3FLARE_RELAY_SERVERS`), matched as pi names its tools; t3flare's MCP relay judges and asks for it; see U71 in `docs/upstream-fragility.md`. A Layer cannot reach it: `mcpExtensionSource.ts` is the text of a program pi runs in the Container (`FS_ALIAS_SKIP`), and the CLI profile requires the extension's content to be t3's own. A Shadow would freeze the whole extension for one early return.
+
+## Counts after in-app updates (ADR-0037)
+
+Shadows 4 (unchanged), Patches 7 (unchanged). One new Build shim: the **Server version stamp** (`serverVersionStamp` in
+`apps/environment/build.ts`), which serves t3's `apps/server/package.json` with the pin's version
+(`apps/environment/serverVersion.ts`), as t3's release CI writes it into the manifest before it builds. It replaces no
+module and changes no code, only the manifest's `version`, so every reader of `packageJson.version` (15 importing
+modules at `v0.1.11-nightly.20261117.4825`) reports the pin. Counted in `dist/build-report.json` as
+`buildShims.manifestStamps` (the files and their importers). Everything else is a Layer: t3flare's `ServerSelfUpdate`
+and `ServiceLauncherClient` in place of t3's (`apps/environment/src/updates/selfUpdate.ts`), and the CLI drivers'
+maintenance capabilities.

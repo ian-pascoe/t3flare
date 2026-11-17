@@ -104,6 +104,8 @@ export interface BuildReport {
     readonly builtinStubs: ReadonlyArray<string>;
     readonly dependencyStubs: ReadonlyArray<string>;
     readonly defines: ReadonlyArray<string>;
+    /** The Server version stamp: the manifests served with the pin's version, and how many modules import them. */
+    readonly manifestStamps: { readonly files: ReadonlyArray<string>; readonly importers: number };
   };
   readonly moduleStateProbe: { readonly modules: number; readonly bindings: number };
   readonly bytes: number;
@@ -229,19 +231,29 @@ const STUB_PREFIX = "\0t3flare-stub:";
 const T3_SERVER_PACKAGE = path.join(T3_ROOT, "apps/server/package.json");
 
 /**
- * The Server version stamp (in-app updates plan D1): t3's server manifest, served with the pin's version, so every
- * reader of `packageJson.version` (the descriptor's `serverVersion`, the runtime state, the update target's check) sees
- * the tag, as a t3 release build's manifest does.
+ * A Build shim (ADR-0001), the Server version stamp (in-app updates plan D1): t3's server manifest, served with the
+ * pin's version, so every reader of `packageJson.version` (the descriptor's `serverVersion`, the runtime state, the
+ * update target's check) sees the tag, as a t3 release build's manifest does. Counted in the build report: the stamped
+ * files and how many modules import them.
  */
-const serverVersionStamp = (version: string): Plugin => {
+const serverVersionStamp = (version: string, report: { importers: number }): Plugin => {
   const manifest = fs.realpathSync(T3_SERVER_PACKAGE);
   return {
     name: "t3flare:server-version",
+    buildStart() {
+      report.importers = 0;
+    },
     load(id) {
       return id === manifest ? stampedManifest(fs.readFileSync(manifest, "utf8"), version) : null;
     },
+    buildEnd() {
+      report.importers = this.getModuleInfo(manifest)?.importers.length ?? 0;
+    },
   };
 };
+
+/** The manifests the Server version stamp serves, from the submodule's root. */
+const STAMPED_MANIFESTS = ["apps/server/package.json"];
 
 const dependencyStubs = (): Plugin => ({
   name: "t3flare:dependency-stubs",
@@ -339,6 +351,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
   const { default: cloudflare } = await import("@alchemy.run/cloudflare-runtime/rolldown");
   const fsAlias = { rewritten: 0, importers: new Set<string>(), skippedDependencyImports: 0 };
   const probe = { modules: 0, bindings: 0 };
+  const stamp = { importers: 0 };
   const applied: Array<string> = [];
   const shadowed = new Set<string>();
   const serverVersion = t3ServerVersion();
@@ -349,7 +362,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
     external: ["lightningcss", "fsevents", "cloudflare:workers"],
     plugins: [
       patchedT3Modules(applied),
-      serverVersionStamp(serverVersion.version),
+      serverVersionStamp(serverVersion.version, stamp),
       shadows(shadowed),
       t3NodeFsAlias(fsAlias),
       dependencyStubs(),
@@ -387,6 +400,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
       builtinStubs: Object.keys(BUILTIN_STUBS),
       dependencyStubs: Object.keys(DEPENDENCY_STUBS),
       defines: Object.keys(DEFINES),
+      manifestStamps: { files: STAMPED_MANIFESTS, importers: stamp.importers },
     },
     moduleStateProbe: probe,
     bytes,
@@ -396,7 +410,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
     console.log(
       `t3flare: built ${(bytes / 1024 / 1024).toFixed(2)} MiB for t3 ${report.t3} (Server version ${serverVersion.version}${serverVersion.exact ? "" : ", not an exact tag"}); ${applied.length} patches, ${shadowed.size} shadows, ` +
         `${fsAlias.rewritten} node:fs imports aliased in ${fsAlias.importers.size} t3 modules, ` +
-        `module-state probe in ${probe.modules} modules (${probe.bindings} bindings)`,
+        `manifest stamped for ${stamp.importers} importers, module-state probe in ${probe.modules} modules (${probe.bindings} bindings)`,
     );
   }
   return report;
