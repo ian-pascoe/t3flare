@@ -4,14 +4,15 @@
 // accounts are one more source, read when t3 refreshes its sources and every few minutes while t3 runs.
 //
 // SPI-1174: each subscription endpoint whose answers report limit windows is one more source (`limits.ts`), from the
-// readings the Environment DO keeps: shown at once when a reading is kept, and looked at again every minute, so a stale
-// meter says when it was last read and a window past its reset shows reset.
+// readings the Environment DO keeps: pushed a few seconds after readings are kept (a burst once), and looked at again
+// every minute, so a stale meter says when it was last read and a window past its reset shows reset.
 import { UsageLimitSourceError, type UsageLimitSourceSnapshot } from "@t3tools/contracts";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as UsageLimitSources from "t3/src/usage/UsageLimitSources.ts";
@@ -133,22 +134,13 @@ export const endpointMeterSources = Effect.fn("endpointMeterSources")(function* 
     const next = build();
     return next.changed ? SubscriptionRef.set(ref, next.sources) : Effect.void;
   });
-  const runFork = Effect.runForkWith(yield* Effect.context<never>());
-  // The store calls back synchronously inside `recordLimits`; a burst of readings is pushed once, after its first by
-  // `pushEvery`, with what is kept then. A reading kept while that push builds schedules the next.
-  let pushing = false;
-  const push = Effect.sleep(deps.pushEvery ?? ENDPOINT_METERS_PUSH_EVERY).pipe(
-    Effect.andThen(Effect.sync(() => (pushing = false))),
-    Effect.andThen(update),
-  );
+  // The store calls back synchronously inside `recordLimits`, marking the meters due (a one-place queue: marks while
+  // one waits are dropped). A scoped fiber pushes a burst once, `pushEvery` after its first mark, with what is kept then;
+  // a mark made while that push builds makes the next. The fiber and the subscription end with the scope.
+  const due = yield* Queue.dropping<void>(1);
+  yield* Queue.take(due).pipe(Effect.andThen(Effect.sleep(deps.pushEvery ?? ENDPOINT_METERS_PUSH_EVERY)), Effect.andThen(update), Effect.forever, Effect.forkScoped);
   yield* Effect.acquireRelease(
-    Effect.sync(() =>
-      deps.store.subscribe(() => {
-        if (pushing) return;
-        pushing = true;
-        runFork(push);
-      }),
-    ),
+    Effect.sync(() => deps.store.subscribe(() => void Queue.offerUnsafe(due, undefined))),
     (unsubscribe) => Effect.sync(unsubscribe),
   );
   yield* Effect.sleep(deps.every ?? ENDPOINT_METERS_EVERY).pipe(Effect.andThen(update), Effect.forever, Effect.forkScoped);

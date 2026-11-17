@@ -110,10 +110,11 @@ export const endpointsChange = async (deps: EndpointsApiDeps, body: Record<strin
     const id = typeof body.id === "string" ? body.id : "";
     const removed = deps.store.remove(id);
     if (!removed.ok) return { status: 404, text: removed.error };
+    // What else is kept of it (its limit readings) goes at once, before a sign-out that may fail.
+    deps.removed?.(id);
     // A removed sign-in endpoint is signed out first (revoked where the vendor allows), and its Sessions stopped.
     const signedOut = isSignIn(removed.removed.auth) && deps.signIns !== undefined ? await deps.signIns.forget(id, { beforeRevoke: async () => deps.signedOut?.(id) }) : undefined;
     audit({ action: "endpoint.remove", target: id, before: audited(removed.removed), ...(signedOut === undefined ? {} : { after: { revoked: signedOut.revoked } }) });
-    deps.removed?.(id);
     deps.changed?.();
     const kept = signedOut !== undefined && !signedOut.revoked && isSignIn(removed.removed.auth) ? revocationNote(removed.removed.auth) : {};
     return { status: 200, json: { ok: true, revision: removed.endpoints.revision, ...kept } };

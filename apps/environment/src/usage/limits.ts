@@ -131,3 +131,12 @@ export const limitStore = (sql: SqlStorage): LimitStore => {
     },
   };
 };
+
+/**
+ * What the Environment DO wires to the store (`EnvironmentDO.recordLimits` and the Harness panel's endpoint removal): a
+ * reading checked against the endpoints stored now, and a removed endpoint forgotten.
+ */
+export const limitWiring = (deps: { readonly store: () => LimitStore; readonly endpoints: () => ModelEndpoints; readonly now: () => number }) => ({
+  record: (input: unknown): { readonly kept: number } => ({ kept: deps.store().record(input, deps.endpoints(), deps.now()) }),
+  removed: (endpointId: string): void => deps.store().forget(endpointId),
+});

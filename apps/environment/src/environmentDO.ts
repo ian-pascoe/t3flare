@@ -57,7 +57,7 @@ import type { ContainerPreviewProps } from "./preview/containerPreviews.ts";
 import { closeLeftoverSessions } from "./preview/sessions.ts";
 import { previewStore } from "./preview/store.ts";
 import { usageRecorder } from "./usage/commissaryCount.ts";
-import { limitStore } from "./usage/limits.ts";
+import { limitStore, limitWiring } from "./usage/limits.ts";
 import { usageStore } from "./usage/records.ts";
 
 /** SPI-1163: the model the text-generation setting was last pointed at as its default. */
@@ -429,7 +429,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
         signIns: this.#credentialBroker(),
         signedOut: (endpointId) => this.#stopSessionsOn(endpointId),
         // A removed endpoint's limit readings go with it: one added again under its id starts with none (SPI-1174).
-        removed: (endpointId) => environmentServices().limits.forget(endpointId),
+        removed: this.#limits().removed,
       },
       // The Open changes (plan D10): the Change page answers them through the Settings server's own apply.
       changes: changesApiOf(await this.#settingsDeps()),
@@ -539,11 +539,15 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
    * Limit readings, RPC from the agents Worker (SPI-1174): a Session's, text generation's or the model relay's, each the
    * windows an answer on a Model endpoint reported in its headers, kept for t3's limit meters (`usage/limits.ts`): each
    * window's reading of the latest answer, on an endpoint that exists now. Invalid ones are dropped. Never boots t3; a
-   * running t3 shows a kept reading at once.
+   * running t3 pushes kept readings to its clients within a few seconds (a burst once).
    */
   async recordLimits(input: unknown): Promise<{ readonly kept: number }> {
-    const { environmentServices } = await import("./agents/bindings.ts");
-    return { kept: environmentServices().limits.record(input, this.#endpointStore().load(), Date.now()) };
+    return this.#limits().record(input);
+  }
+
+  /** The limit readings' wiring (SPI-1174): the store, against the endpoints stored now. */
+  #limits() {
+    return limitWiring({ store: () => environmentServices().limits, endpoints: () => this.#endpointStore().load(), now: () => Date.now() });
   }
 
 

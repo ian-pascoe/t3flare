@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import { sealedStore } from "../src/credentials/sealed.ts";
+import { endpointsChange, type EndpointsApiDeps } from "../src/endpoints/api.ts";
 import type { Discovery } from "../src/endpoints/discover.ts";
 import { endpointStore } from "../src/endpoints/store.ts";
 import { csrfToken } from "../src/harness/csrf.ts";
@@ -120,6 +121,24 @@ describe("Model endpoints on the Harness panel", () => {
     expect((await endpoints.resolve("openai"))?.apiKey).toBeUndefined();
     expect(store.auditLog(1)).toMatchObject([{ entity: "endpoints", action: "endpoint.remove", target: "openai" }]);
     expect(removed).toEqual(["openai"]);
+  });
+
+  it("forgets a removed endpoint's limit readings before signing it out, so a failed sign-out leaves none (SPI-1174)", async () => {
+    const order: Array<string> = [];
+    const signInEndpoint = { ...ENDPOINT, id: "chatgpt", auth: "chatgpt" };
+    const deps = {
+      store: { remove: () => ({ ok: true, removed: signInEndpoint, endpoints: { revision: 2, endpoints: [] } }) },
+      discover: async () => ({ ok: true, models: [] }),
+      signIns: {
+        forget: async () => {
+          order.push("sign-out");
+          throw new Error("the vendor did not answer");
+        },
+      },
+      removed: (id: string) => void order.push(`removed ${id}`),
+    } as unknown as EndpointsApiDeps;
+    await expect(endpointsChange(deps, { op: "remove", id: "chatgpt" }, () => undefined)).rejects.toThrow(/did not answer/);
+    expect(order).toEqual(["removed chatgpt", "sign-out"]);
   });
 
   it("reads a model list with the key given, or else the saved endpoint's own", async () => {

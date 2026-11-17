@@ -7,7 +7,7 @@
 // - **A passed reset shows reset** (0 % used, no reset time), as the vendor's window is, until an answer reads it again.
 import type { UsageLimitSourceSnapshot } from "@t3tools/contracts";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
-import { familyOfWindow, type LimitFamily, LIMIT_WINDOWS, type LimitWindowId, type LimitWindowKind } from "@t3flare/models/limits";
+import { familyOfWindow, type LimitFamily, windowKind, windowLabel } from "@t3flare/models/limits";
 
 import type { StoredWindow } from "./limits.ts";
 
@@ -18,26 +18,6 @@ export const LIMIT_SOURCE_PREFIX = "t3flare-endpoint-";
 
 /** t3's driver whose meter a family's windows show as (its icon, color and pooling). */
 const DRIVER: Readonly<Record<LimitFamily, string>> = { codex: "codex", claude: "claudeAgent" };
-
-const DAY_MINUTES = 24 * 60;
-
-/** A window's kind by its length (Codex's slots are five hours and a week); by its own when the length is unknown. */
-const kindOf = (id: LimitWindowId, minutes: number | null): LimitWindowKind => {
-  if (minutes === null) return LIMIT_WINDOWS[id].kind;
-  if (minutes <= DAY_MINUTES) return "session";
-  if (minutes <= 8 * DAY_MINUTES) return "weekly";
-  if (minutes >= 28 * DAY_MINUTES) return "monthly";
-  return "other";
-};
-
-/** A window's label by its length, as Codex and Claude name theirs ("5-hour", "Weekly"); by its own when unknown. */
-const labelOf = (id: LimitWindowId, minutes: number | null): string => {
-  if (minutes === null) return LIMIT_WINDOWS[id].label;
-  if (minutes === 7 * DAY_MINUTES) return "Weekly";
-  if (minutes % DAY_MINUTES === 0) return `${minutes / DAY_MINUTES}-day`;
-  if (minutes % 60 === 0) return `${minutes / 60}-hour`;
-  return `${minutes}-minute`;
-};
 
 const plural = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"}`;
 
@@ -62,7 +42,7 @@ const staleNotice = (windows: ReadonlyArray<StoredWindow>, now: number): string 
   const why = "limits are read from this endpoint's answers";
   const agos = new Set(stale.map((window) => agoText(now - window.at)));
   if (stale.length === windows.length && agos.size === 1) return `Last read ${[...agos][0]} (${why}).`;
-  return `${stale.map((window) => `${labelOf(window.id, window.windowMinutes)} last read ${agoText(now - window.at)}`).join("; ")} (${why}).`;
+  return `${stale.map((window) => `${windowLabel(window.id, window.windowMinutes)} last read ${agoText(now - window.at)}`).join("; ")} (${why}).`;
 };
 
 /**
@@ -91,8 +71,8 @@ export const limitSnapshots = (windows: ReadonlyArray<StoredWindow>, endpoints: 
             const pending = window.resetsAt !== null && window.resetsAt > now;
             return {
               id: window.id,
-              kind: kindOf(window.id, window.windowMinutes),
-              label: labelOf(window.id, window.windowMinutes),
+              kind: windowKind(window.id, window.windowMinutes),
+              label: windowLabel(window.id, window.windowMinutes),
               // A window past its reset has reset at the vendor; the next answer reads its new use.
               usedPercent: window.resetsAt === null || pending ? window.usedPercent : 0,
               ...(pending ? { resetsAt: iso(window.resetsAt!) } : {}),

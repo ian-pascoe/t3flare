@@ -8,7 +8,9 @@ import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { acceptedLimitReading, limitReadingOf, limitWindowsOf, type LimitReading, noteLimitReading } from "@t3flare/models/limits";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as TestClock from "effect/testing/TestClock";
@@ -16,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import { endpointMeterSources, withSources } from "../src/usage/limitSources.ts";
 import { agoText, LIMIT_SOURCE_PREFIX, limitSnapshots, STALE_AFTER_MS } from "../src/usage/limitMeters.ts";
-import { limitStore } from "../src/usage/limits.ts";
+import { limitStore, limitWiring } from "../src/usage/limits.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
 const NOW = Date.parse("2026-11-16T12:00:00Z");
@@ -119,8 +121,10 @@ describe("each vendor's limit headers, as its own client reads them", () => {
     expect(claude("0.5", { "anthropic-ratelimit-unified-5h-reset": `${S(NOW + HOUR)}.0` })).toEqual([{ id: "five_hour", usedPercent: 50, resetsAt: NOW + HOUR, windowMinutes: 300 }]);
     expect(codex("10", { "x-codex-primary-reset-at": `${S(NOW + HOUR)}.4`, "x-codex-primary-window-minutes": "300.0" })).toEqual([{ id: "primary", usedPercent: 10, resetsAt: NOW + HOUR, windowMinutes: 300 }]);
     for (const bad of ["lots", "-1", "-0.5", "NaN", "Infinity", "1e400", "12.5%", "0x10", " ", "1.2.3", "+5"]) expect(codex(bad), bad).toEqual([]);
-    // Overspent is spent: clamped to 100.
-    expect(codex("150")).toEqual([{ id: "primary", usedPercent: 100 }]);
+    // Overspent by a little (float noise, a just-spent window) is spent: clamped to 100. More is not a share: dropped.
+    expect(codex("100.5")).toEqual([{ id: "primary", usedPercent: 100 }]);
+    expect(codex("100.0000001")).toEqual([{ id: "primary", usedPercent: 100 }]);
+    for (const bad of ["100.6", "150", "1e9"]) expect(codex(bad), bad).toEqual([]);
     // Codex drops a window that says nothing.
     expect(codex("0")).toEqual([]);
     expect(codex("0", { "x-codex-primary-window-minutes": "300" })).toEqual([{ id: "primary", usedPercent: 0, windowMinutes: 300 }]);
@@ -130,8 +134,10 @@ describe("each vendor's limit headers, as its own client reads them", () => {
     }
     // A length of zero, over a month or negative is dropped.
     for (const minutes of ["0", "50000", "-300", "0.2"]) expect(codex("10", { "x-codex-primary-window-minutes": minutes }), minutes).toEqual([{ id: "primary", usedPercent: 10 }]);
-    // Claude's utilization is a fraction: 1.5 is 150 %, clamped; a negative or garbage one is dropped.
-    expect(claude("1.5")).toEqual([{ id: "five_hour", usedPercent: 100, windowMinutes: 300 }]);
+    // Claude's utilization is a fraction: 1.004 is just spent (100 %); 1.5 or 42 (4200 %) is not a share, dropped.
+    expect(claude("1.004")).toEqual([{ id: "five_hour", usedPercent: 100, windowMinutes: 300 }]);
+    expect(claude("1.5")).toEqual([]);
+    expect(claude("42")).toEqual([]);
     expect(claude("-0.1")).toEqual([]);
     expect(claude("42%")).toEqual([]);
   });
@@ -231,6 +237,17 @@ describe("the Environment's kept windows", () => {
     // Re-added under the same id: no meter until an answer reads one.
     expect(limitSnapshots(store.read(), endpoints, NOW).map((source) => source.id)).toEqual([`${LIMIT_SOURCE_PREFIX}claude`]);
     expect(told).toEqual([2, 1]);
+  });
+
+  it("the Environment's wiring: recordLimits checks a reading against the endpoints stored now, and a removal forgets", () => {
+    const store = limitStore(nodeSqlStorage());
+    let stored: ModelEndpoints = endpoints;
+    const wiring = limitWiring({ store: () => store, endpoints: () => stored, now: () => NOW });
+    expect(wiring.record({ readings: [reading("claude", NOW, [{ id: "five_hour", usedPercent: 5 }])] })).toEqual({ kept: 1 });
+    stored = { revision: 2, endpoints: endpoints.endpoints.filter((endpoint) => endpoint.id !== "claude") };
+    expect(wiring.record({ readings: [reading("claude", NOW + 1, [{ id: "five_hour", usedPercent: 6 }])] })).toEqual({ kept: 0 });
+    wiring.removed("claude");
+    expect(store.read()).toEqual([]);
   });
 
   it("outlives the object: a new store on the same database reads what an earlier one kept (eviction)", () => {
@@ -400,6 +417,36 @@ describe("the endpoints' meters in t3's UsageLimitSources", () => {
       ).pipe(Effect.provide(TestClock.layer())),
     );
     expect(errors).toEqual([undefined, "Last read 1 hour ago (limits are read from this endpoint's answers)."]);
+  });
+
+  it("stop listening and pushing when their scope closes", async () => {
+    const store = limitStore(nodeSqlStorage());
+    const seen: Array<ReadonlyArray<number>> = [];
+    const listeners = { count: 0 };
+    const counted = { ...store, subscribe: (listener: () => void) => {
+      listeners.count += 1;
+      const off = store.subscribe(listener);
+      return () => {
+        listeners.count -= 1;
+        off();
+      };
+    } };
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const scope = yield* Scope.make();
+        const meters = yield* endpointMeterSources({ store: counted, endpoints: () => endpoints, now: () => NOW + 1000, pushEvery: "100 millis" }).pipe(Scope.provide(scope));
+        yield* SubscriptionRef.changes(meters.ref).pipe(Stream.runForEach((sources) => Effect.sync(() => void seen.push(shares(sources)))), Effect.forkDetach);
+        yield* pass("5 millis");
+        // A reading marks a push due; the scope closes before it runs.
+        store.record({ readings: [claudeAt(10)] }, endpoints, NOW);
+        yield* pass("10 millis");
+        expect(listeners.count).toBe(1);
+        yield* Scope.close(scope, Exit.void);
+        expect(listeners.count).toBe(0);
+        yield* pass("300 millis");
+      }).pipe(Effect.provide(TestClock.layer())),
+    );
+    expect(seen).toEqual([[]]);
   });
 
   it("push a burst of readings once, on its trailing edge, with the latest of them", async () => {

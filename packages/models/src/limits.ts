@@ -24,7 +24,7 @@
 // Defensive, as lenient as the vendors' own clients: a number is read as Claude Code's `Number()` and Codex's
 // `parse::<f64>` read it (a decimal with any fraction or an exponent: `0.30000000000000004`, `1e-05`), but only a finite
 // one of at least 0 and with no sign, unit or hex prefix (where the two clients disagree, neither reads it). A used share
-// is clamped to 100 % (an overspent window is spent); a reset is rounded to the second, as Claude Code does, and kept only
+// up to 100.5 % is clamped to 100 % (an overspent window is spent), and one above it drops the window (not a share); a reset is rounded to the second, as Claude Code does, and kept only
 // when it is after the answer and within a year of it; a length is rounded to the minute and kept from 1 minute to 31
 // days. Anything else drops that value (a window with no used share is not read at all). Nothing here can fail an
 // answer. A reading names its endpoint and its windows: never a token, an account or an organization (Anthropic's
@@ -41,20 +41,46 @@ export type LimitFamily = "codex" | "claude";
 /** t3's kinds of window (`ServerProviderUsageWindow.kind`). */
 export type LimitWindowKind = "session" | "weekly" | "monthly" | "other";
 
+export const HOUR_MINUTES = 60;
+export const DAY_MINUTES = 24 * HOUR_MINUTES;
+export const WEEK_MINUTES = 7 * DAY_MINUTES;
+
 /**
- * Each window's facts: its vendor, how it is named and of what kind when its length is not known (Codex names slots, so
- * its primary is its short window), and, for Claude's, the claim its headers name and its fixed length.
+ * Each window's facts: its vendor, and how it is named and of what kind when its length is not known (Codex names slots,
+ * so its primary is its short window).
  */
-export const LIMIT_WINDOWS: Readonly<
-  Record<LimitWindowId, { readonly family: LimitFamily; readonly label: string; readonly kind: LimitWindowKind; readonly claude?: { readonly claim: "5h" | "7d"; readonly minutes: number } }>
-> = {
+export const LIMIT_WINDOWS: Readonly<Record<LimitWindowId, { readonly family: LimitFamily; readonly label: string; readonly kind: LimitWindowKind }>> = {
   primary: { family: "codex", label: "Primary", kind: "session" },
   secondary: { family: "codex", label: "Secondary", kind: "weekly" },
-  five_hour: { family: "claude", label: "5-hour", kind: "session", claude: { claim: "5h", minutes: 5 * 60 } },
-  seven_day: { family: "claude", label: "Weekly", kind: "weekly", claude: { claim: "7d", minutes: 7 * 24 * 60 } },
+  five_hour: { family: "claude", label: "5-hour", kind: "session" },
+  seven_day: { family: "claude", label: "Weekly", kind: "weekly" },
 };
 
+/** Claude's windows: the claim its headers name, and its fixed length (the headers name the claim, not its length). */
+const CLAUDE_CLAIMS = [
+  { id: "five_hour", claim: "5h", minutes: 5 * HOUR_MINUTES },
+  { id: "seven_day", claim: "7d", minutes: WEEK_MINUTES },
+] as const;
+
 export const familyOfWindow = (id: LimitWindowId): LimitFamily => LIMIT_WINDOWS[id].family;
+
+/** A window's kind (t3's): by its length when known (Codex's slots are five hours and a week), else by the window. */
+export const windowKind = (id: LimitWindowId, minutes: number | null): LimitWindowKind => {
+  if (minutes === null) return LIMIT_WINDOWS[id].kind;
+  if (minutes <= DAY_MINUTES) return "session";
+  if (minutes <= WEEK_MINUTES + DAY_MINUTES) return "weekly";
+  if (minutes >= 4 * WEEK_MINUTES) return "monthly";
+  return "other";
+};
+
+/** A window's label: by its length when known, as Codex and Claude name theirs ("5-hour", "Weekly"), else the window's. */
+export const windowLabel = (id: LimitWindowId, minutes: number | null): string => {
+  if (minutes === null) return LIMIT_WINDOWS[id].label;
+  if (minutes === WEEK_MINUTES) return "Weekly";
+  if (minutes % DAY_MINUTES === 0) return `${minutes / DAY_MINUTES}-day`;
+  if (minutes % HOUR_MINUTES === 0) return `${minutes / HOUR_MINUTES}-hour`;
+  return `${minutes}-minute`;
+};
 
 export interface LimitWindowReading {
   readonly id: LimitWindowId;
@@ -74,7 +100,7 @@ export interface LimitReading {
 }
 
 /** The longest window kept: a month and a day (ChatGPT's and Claude's are five hours and a week). */
-export const MAX_WINDOW_MINUTES = 31 * 24 * 60;
+export const MAX_WINDOW_MINUTES = 31 * DAY_MINUTES;
 /** How far after the answer a reset may be: past this it is not a window's reset. */
 export const MAX_RESET_AHEAD_MS = 366 * 24 * 60 * 60 * 1000;
 /** The most readings one `recordLimits` call carries. */
@@ -116,13 +142,24 @@ const resetOf = (text: string | undefined, at: number): number | undefined => {
   return seconds === undefined ? undefined : plausibleReset(Math.round(seconds) * 1000, at);
 };
 
-/** One window: its share clamped to 100 %, and only the reset and length given. */
-const window = (read: { readonly id: LimitWindowId; readonly usedPercent: number; readonly resetsAt?: number | undefined; readonly windowMinutes?: number | undefined }): LimitWindowReading => ({
-  id: read.id,
-  usedPercent: Math.min(100, Math.max(0, read.usedPercent)),
-  ...(read.resetsAt === undefined ? {} : { resetsAt: read.resetsAt }),
-  ...(read.windowMinutes === undefined ? {} : { windowMinutes: read.windowMinutes }),
-});
+/**
+ * A used share above 100 % by at most this is float noise or a just-overspent window, read as 100 %; more is not a share
+ * (Claude's utilization `42` would be 4200 %) and drops the window.
+ */
+export const MAX_SHARE_OVERSHOOT = 0.5;
+
+/** One window, or none when its share is not plausible: its share clamped to 100 %, and only the reset and length given. */
+const window = (read: { readonly id: LimitWindowId; readonly usedPercent: number; readonly resetsAt?: number | undefined; readonly windowMinutes?: number | undefined }): ReadonlyArray<LimitWindowReading> =>
+  read.usedPercent > 100 + MAX_SHARE_OVERSHOOT
+    ? []
+    : [
+        {
+          id: read.id,
+          usedPercent: Math.min(100, Math.max(0, read.usedPercent)),
+          ...(read.resetsAt === undefined ? {} : { resetsAt: read.resetsAt }),
+          ...(read.windowMinutes === undefined ? {} : { windowMinutes: read.windowMinutes }),
+        },
+      ];
 
 /** ChatGPT's Codex windows, as Codex reads them (`rate_limits.rs` `parse_rate_limit_window`). */
 const codexWindows = (headers: HeaderSource, at: number): ReadonlyArray<LimitWindowReading> =>
@@ -133,7 +170,7 @@ const codexWindows = (headers: HeaderSource, at: number): ReadonlyArray<LimitWin
     const rawReset = header(headers, `x-codex-${id}-reset-at`);
     // Codex drops a window that says nothing: no use, no length, no reset.
     if (used === 0 && (rawMinutes === undefined || rawMinutes === 0) && rawReset === undefined) return [];
-    return [window({ id, usedPercent: used, resetsAt: resetOf(rawReset, at), windowMinutes: plausibleMinutes(rawMinutes) })];
+    return window({ id, usedPercent: used, resetsAt: resetOf(rawReset, at), windowMinutes: plausibleMinutes(rawMinutes) });
   });
 
 /**
@@ -143,15 +180,14 @@ const codexWindows = (headers: HeaderSource, at: number): ReadonlyArray<LimitWin
 const claudeWindows = (headers: HeaderSource, at: number): ReadonlyArray<LimitWindowReading> => {
   const overall = header(headers, "anthropic-ratelimit-unified-status");
   const representative = header(headers, "anthropic-ratelimit-unified-representative-claim");
-  return (["five_hour", "seven_day"] as const).flatMap((id) => {
-    const { claim, minutes } = LIMIT_WINDOWS[id].claude!;
+  return CLAUDE_CLAIMS.flatMap(({ id, claim, minutes }) => {
     const prefix = `anthropic-ratelimit-unified-${claim}`;
     const utilization = numberOf(header(headers, `${prefix}-utilization`));
     const resetsAt = resetOf(header(headers, `${prefix}-reset`), at);
-    if (utilization !== undefined) return [window({ id, usedPercent: utilization * 100, resetsAt, windowMinutes: minutes })];
-    if (header(headers, `${prefix}-status`) === "rejected") return [window({ id, usedPercent: 100, resetsAt, windowMinutes: minutes })];
+    if (utilization !== undefined) return window({ id, usedPercent: utilization * 100, resetsAt, windowMinutes: minutes });
+    if (header(headers, `${prefix}-status`) === "rejected") return window({ id, usedPercent: 100, resetsAt, windowMinutes: minutes });
     if (overall === "rejected" && representative === id) {
-      return [window({ id, usedPercent: 100, resetsAt: resetsAt ?? resetOf(header(headers, "anthropic-ratelimit-unified-reset"), at), windowMinutes: minutes })];
+      return window({ id, usedPercent: 100, resetsAt: resetsAt ?? resetOf(header(headers, "anthropic-ratelimit-unified-reset"), at), windowMinutes: minutes });
     }
     return [];
   });
@@ -207,14 +243,12 @@ export const acceptedLimitReading = (value: unknown): LimitReading | undefined =
     if (!isWindowId(id) || seen.has(id)) return [];
     if (typeof usedPercent !== "number" || !Number.isFinite(usedPercent) || usedPercent < 0 || usedPercent > 100) return [];
     seen.add(id);
-    return [
-      window({
-        id,
-        usedPercent,
-        resetsAt: plausibleReset(typeof resetsAt === "number" ? Math.trunc(resetsAt) : undefined, at),
-        windowMinutes: typeof windowMinutes === "number" && Number.isInteger(windowMinutes) ? plausibleMinutes(windowMinutes) : undefined,
-      }),
-    ];
+    return window({
+      id,
+      usedPercent,
+      resetsAt: plausibleReset(typeof resetsAt === "number" ? Math.trunc(resetsAt) : undefined, at),
+      windowMinutes: typeof windowMinutes === "number" && Number.isInteger(windowMinutes) ? plausibleMinutes(windowMinutes) : undefined,
+    });
   });
   return kept.length === 0 ? undefined : { endpointId, at: Math.trunc(at), windows: kept };
 };
