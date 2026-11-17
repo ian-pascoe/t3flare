@@ -12,7 +12,6 @@ import * as CodexErrors from "effect-codex-app-server/errors";
 import { defaultProviderContinuationIdentity, type ProviderDriver, type ProviderInstance } from "@t3tools/provider-core/server/driver";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
-import { makeManualOnlyProviderMaintenanceCapabilities } from "@t3tools/provider-core/server/maintenanceResolver";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
@@ -33,6 +32,7 @@ import { environmentServices } from "../../agents/bindings.ts";
 import { traceProtocol } from "../../agents/processRouter.ts";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import { runText } from "../textGeneration.ts";
+import { cliMaintenance, cliVersionAdvisory } from "../../updates/cliUpdate.ts";
 import { readinessOf } from "../readiness.ts";
 import { noEndpointFor } from "../../agents/cliProfiles.ts";
 import { withCodexInvestigation } from "./codexInvestigation.ts";
@@ -179,9 +179,12 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
     });
     const effective = { ...config, enabled };
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
-    const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: CODEX_DRIVER, packageName: null });
+    // In-app updates (ADR-0037, plan D21): on prod, t3's provider-update button lands a CLI bump.
+    const maintenance = cliMaintenance(CODEX_DRIVER, "codex");
+    const enrichSnapshot = yield* cliVersionAdvisory(maintenance);
     const snapshot = yield* makeManagedServerProvider({
       resolveMaintenance: () => Effect.succeed(maintenance),
+      ...(enrichSnapshot === undefined ? {} : { enrichSnapshot }),
       getSettings: settingsSource.getSettings,
       streamSettings: settingsSource.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,

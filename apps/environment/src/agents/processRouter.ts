@@ -36,11 +36,12 @@ import { bindScratchCheckout, isScratchDir, scratchProjectOf } from "./scratch.t
 import { workspaceRpc } from "./workspaceClient.ts";
 import { CLI_NAMES, spawnCli } from "./cliProcess.ts";
 import { HTML_BROWSER_EXECUTABLE, spawnHtmlBrowser } from "../preview/htmlBrowser.ts";
+import { CLI_UPDATE_COMMAND, runCliUpdate } from "../updates/cliUpdate.ts";
 
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
 
-export type Route = "protocol" | "process" | "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "scratch" | "gh-token" | "emulated" | "no-workspace" | "not-found" | "error";
+export type Route = "protocol" | "process" | "container" | "cache" | "stale-patched" | "stale-last-answer" | "container-stopped" | "clone" | "worktree" | "scratch" | "gh-token" | "update" | "emulated" | "no-workspace" | "not-found" | "error";
 
 export interface TraceEntry {
   readonly at: number;
@@ -449,6 +450,8 @@ const routeOf = (
   spawnCwd: string | undefined,
 ): ((env: Readonly<Record<string, unknown>> | undefined, stdin: string | undefined) => Promise<Answer>) | null => {
   if (name === "gh") return ghRouteOf(argv);
+  // In-app updates (ADR-0037, plan D21): t3's provider-update command dispatches a CLI bump and follows its run.
+  if (name === CLI_UPDATE_COMMAND) return async () => ({ ...(await runCliUpdate(argv)), route: "update" });
   if (name !== "git") return null;
   if (argv.length === 1 && argv[0] === "--version") return async () => ({ exitCode: 0, stdout: `${GIT_VERSION}\n`, stderr: "", route: "emulated" });
   // `git -C <dir> …`: the directory is the command's cwd.

@@ -11,6 +11,7 @@ import { defaultProviderContinuationIdentity, type ProviderInstance } from "@t3t
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "@t3tools/provider-core/server/maintenanceResolver";
+import { cliMaintenance, cliVersionAdvisory } from "../../updates/cliUpdate.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
@@ -284,9 +285,13 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   });
   const effective = { ...config, enabled };
   const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
-  const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: spec.driver, packageName: null });
+  // In-app updates (ADR-0037, plan D21): on prod, t3's provider-update button lands a CLI bump of Claude Code. OpenCode
+  // stays manual: its 2.x line is not on npm.
+  const maintenance = spec.cli === "claude" ? cliMaintenance(spec.driver, "claude") : makeManualOnlyProviderMaintenanceCapabilities({ provider: spec.driver, packageName: null });
+  const enrichSnapshot = yield* cliVersionAdvisory(maintenance);
   const snapshot = yield* makeManagedServerProvider({
     resolveMaintenance: () => Effect.succeed(maintenance),
+    ...(enrichSnapshot === undefined ? {} : { enrichSnapshot }),
     getSettings: settingsSource.getSettings,
     streamSettings: settingsSource.streamSettings,
     haveSettingsChanged: haveProviderSnapshotSettingsChanged,

@@ -9,7 +9,6 @@ import { CLIS } from "@t3flare/sandbox-image/clis";
 import { defaultProviderContinuationIdentity, type ProviderDriver, type ProviderInstance } from "@t3tools/provider-core/server/driver";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
-import { makeManualOnlyProviderMaintenanceCapabilities } from "@t3tools/provider-core/server/maintenanceResolver";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
@@ -24,6 +23,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { makePiAdapterV2 } from "../../../../../t3code/packages/provider-pi/src/server/adapter.ts";
 import { PiSettings } from "../../../../../t3code/packages/provider-pi/src/settings.ts";
 import { environmentServices } from "../../agents/bindings.ts";
+import { cliMaintenance, cliVersionAdvisory } from "../../updates/cliUpdate.ts";
 import { refreshOnEndpointsChanged } from "../../endpoints/changes.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
 import { readinessOf } from "../readiness.ts";
@@ -80,9 +80,12 @@ const snapshotOf = (enabled: boolean) =>
 export const piSnapshot = (effective: PiSettings, stamp: (draft: Omit<ServerProvider, "instanceId" | "driver">) => ServerProvider) =>
   Effect.gen(function* () {
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
-    const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: PI_CLI_DRIVER, packageName: null });
+    // In-app updates (ADR-0037, plan D21): on prod, t3's provider-update button lands a CLI bump.
+    const maintenance = cliMaintenance(PI_CLI_DRIVER, "pi");
+    const enrichSnapshot = yield* cliVersionAdvisory(maintenance);
     const snapshot = yield* makeManagedServerProvider({
       resolveMaintenance: () => Effect.succeed(maintenance),
+      ...(enrichSnapshot === undefined ? {} : { enrichSnapshot }),
       getSettings: settingsSource.getSettings,
       streamSettings: settingsSource.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,
