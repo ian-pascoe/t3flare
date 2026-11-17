@@ -47,7 +47,7 @@ Port discovery, `PreviewBrowser` and agent browser access are Layers, or the rem
 ## Counts after SPI-1162 (Model endpoints)
 
 Shadows 4 (unchanged), Patches 6.
-- Patch `0006-pi-durable-models-are-not-retained.patch`: one line at the top of `ProviderRegistry.ts`'s `shouldRetainMissingProviderModels`, so `piDurable` retains no model it stopped listing and a removed Model endpoint's models leave the picker. No Layer reaches the registry's merge, and a Shadow would copy the 1,194-line file. Evidence: `docs/steps/spi-1162.md`.
+- Patch `0006-endpoint-models-are-not-retained.patch`: one line at the top of `ProviderRegistry.ts`'s `shouldRetainMissingProviderModels`, so `piDurable` and the CLI drivers (`codex`, `claudeAgent`, `opencode`, `pi`, since SPI-1176) retain no model they stopped listing: a removed Model endpoint's models leave the picker, and a provider in the setup state lists none. No Layer reaches the registry's merge, and a Shadow would copy the 1,194-line file. Evidence: `docs/steps/spi-1162.md`.
 
 ## Counts after the Settings server (SPI-1195)
 

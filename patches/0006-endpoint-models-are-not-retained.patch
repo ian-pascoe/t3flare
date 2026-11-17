@@ -6,9 +6,9 @@ index 18456b2397..f181ed5d87 100644
  }
  
  const shouldRetainMissingProviderModels = (provider: ServerProvider): boolean => {
-+  // t3flare: Pi Durable lists exactly its Model endpoints' and the Model proxy's models; one removed from either leaves the
-+  // picker (SPI-1162).
-+  if (provider.driver === ProviderDriverKind.make("piDurable")) return false;
++  // t3flare: Pi Durable and the CLI agents list exactly their Model endpoints' models; one removed leaves the picker, and
++  // with none (the setup state) the picker is empty (SPI-1162, SPI-1176).
++  if (["piDurable", "codex", "claudeAgent", "opencode", "pi"].includes(provider.driver)) return false;
 +
    if (provider.driver === ProviderDriverKind.make("pi")) {
      // Pi auth becomes known only after inventory discovery: empty means unauthenticated; failed/interactive discovery preserves unknown auth and cached models.

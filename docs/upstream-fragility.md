@@ -684,14 +684,14 @@ CLI behaviour over ACP is the silent part.
   `m0-roots.json`; diff `ClaudeSkillDispatch.ts`, the ACP adapter's `resolvePromptParts`, `mcpExtensionSource.ts` and
   `CodexProvider.ts`'s slash commands between tags.
 
-### U66. Patch 0006: Pi Durable's removed models leave the picker (SPI-1162)
+### U66. Patch 0006: a removed endpoint's models leave the picker (SPI-1162, SPI-1176)
 
 Ranked last with U64 and U65: a break leaves turns running. The patch failing to apply is loud; a new retention path is
 the silent part, and costs only stale entries in the picker.
 
-- **Where**: `patches/0006-pi-durable-models-are-not-retained.patch`, the first line of `shouldRetainMissingProviderModels` in `ProviderRegistry.ts`: `piDurable` retains no missing model. Stock t3 keeps every model a non-Codex, non-OpenCode driver stops listing (`mergeProviderModels`), and persists it, so a removed Model endpoint's models (or a model the proxy dropped) would stay in the picker for good.
+- **Where**: `patches/0006-endpoint-models-are-not-retained.patch`, the first line of `shouldRetainMissingProviderModels` in `ProviderRegistry.ts`: `piDurable`, `codex`, `claudeAgent`, `opencode` and `pi` retain no missing model (the CLI drivers since SPI-1176). Stock t3 keeps every model a non-Codex, non-OpenCode driver stops listing (`mergeProviderModels`), Codex's on a `warning` probe and pi's while its auth is `unknown`, and persists them, so a removed Model endpoint's models, and the Model proxy's from before the hard cut, would stay in the picker for good, and a provider in the setup state would still list models.
 - **Breaks when**: the function is renamed or moved, or t3 adds another retention path.
-- **Detection**: the patch fails to apply at bump (loud). **Silent**: a new retention path keeps a removed endpoint's models in the picker; `scripts/p1162.ts` checks they leave it.
+- **Detection**: the patch fails to apply at bump (loud). **Silent**: a new retention path keeps a removed endpoint's models in the picker; `scripts/p1162.ts` checks they leave Pi Durable's, `scripts/p1176.ts` that every provider lists none in the setup state.
 - **Blast radius**: stale models in the picker; a turn on one fails with the removed-model message.
 - **Fix**: re-cut the patch.
 
@@ -1017,10 +1017,10 @@ environment or file holds it beyond that.
     first, which `claudeModelsOf` marks, ahead of any proxy model t3 kept listed from before the hard cut.
   - **The managed settings file is the Container's** (`/etc/claude-code/managed-settings.json`): every Claude process
     in a Container shares it, so it holds nothing of one process's.
-  - **t3's provider registry keeps a Claude snapshot's earlier models** (`ProviderRegistry.ts`
-    `shouldRetainMissingProviderModels` is true for `claudeAgent`): the proxy's models listed before the first
-    Anthropic endpoint stay in the picker after the endpoints' (123 rows on p1168, 121 of them the proxy's) until the
-    Environment restarts its registry. Picking one now runs on the default model (`claudeModelId`, SPI-1176).
+  - **t3's provider registry would keep a Claude snapshot's earlier models** (`ProviderRegistry.ts`
+    `shouldRetainMissingProviderModels` is true for `claudeAgent` in stock t3: 123 rows on p1168, 121 of them the
+    proxy's). Patch 0006 makes it false since SPI-1176 (U66), so the picker lists exactly the endpoints' models. A
+    stale selection runs on the default model (`claudeModelId`, SPI-1176).
 - **Breaks when**: Claude Code adds an alias or a model id it resolves without these variables (the routed URL
   refuses it, 400: the relay log names `routed` with a null endpoint); t3's adapter stops validating the model against
   the session's list (a stale non-slug then reaches the relay and gets its 400 instead of t3's message); Claude Code
@@ -1108,9 +1108,8 @@ other environment or file holds it, and that it goes into no request but the rel
     refuses any other model (an endpoint's that is gone) before any request, as for Claude Code (U75). A proxy-era
     model (`anthropic/<id>`) is named as the default model (`opencodeModelId`, SPI-1176).
   - **t3's registry replaces a ready OpenCode snapshot's models** (`ProviderRegistry.ts`
-    `shouldRetainMissingProviderModels` keeps an `opencode` snapshot's missing models only while its probe is pending
-    or failed; ours is installed and ready), so a model that left the endpoints leaves OpenCode's picker,
-    unlike Claude's (U75).
+    `shouldRetainMissingProviderModels`, which patch 0006 makes false for `opencode` since SPI-1176, U66), so a model
+    that left the endpoints leaves OpenCode's picker.
 - **Breaks when**: OpenCode renames or reshapes a provider package or its path (the relay log shows the new path, the
   endpoint answers 404); drops or renames the `http.request` hook or its `request` (no handle: the relay answers 401);
   stops honouring the system file's model-level pins over a repository's (a repository moves an endpoint model, with
@@ -1225,9 +1224,9 @@ holds it, and that it goes into no request but the relay's.
     marker's shape (`isProcessMarker`), so a marker holding a newline cannot match another line of the holder's
     environment. **Not covered**: the process command that starts every CLI process (`processCommand`) runs `setsid`,
     `mkdir`, `grep` and others by name, with the handle in its environment (a follow-up, ADR-0016's SPI-1170 item 7).
-  - **t3's registry replaces a ready pi snapshot's models** (`ProviderRegistry.ts` `shouldRetainMissingProviderModels`
-    keeps a `pi` snapshot's missing models only while it is not installed, ready and authenticated), so a model that left
-    the endpoints leaves the picker.
+  - **t3's registry replaces a pi snapshot's models** (`ProviderRegistry.ts` `shouldRetainMissingProviderModels`, which
+    patch 0006 makes false for `pi` since SPI-1176, U66; stock t3 keeps them while pi's auth is `unknown`, as in the
+    setup state), so a model that left the endpoints leaves the picker.
   - **A stale proxy model** (`anthropic/<id>`) would name pi's built-in `anthropic` provider, which has no key here:
     since SPI-1176 the channel's `piLineToPi` names the default model's provider and id in a `set_model` of
     `anthropic` instead (t3's Pi adapter sends a slug as `{ provider, modelId }`, `resolvePiModelSlug`).
