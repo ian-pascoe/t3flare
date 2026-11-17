@@ -159,6 +159,9 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       console.warn(JSON.stringify({ t3flare: "cli-spawn-refused", cli: name, reason: launch.refused, argv: args.slice(0, 6) }));
       return yield* refused(name, launch.refused);
     }
+    // The resume proof (M5), at spawn: since v0.1.11-nightly.20261117.4825 t3 resumes a persisted pi session with
+    // `--session <file>` on the new process instead of a `switch_session` message (the stdin hook below keeps that one).
+    if (name === "pi" && args.includes("--session")) traceProtocol("pi", "--session", args[args.indexOf("--session") + 1] ?? "?");
     // The relay's wiring for this process (never the handle): whether t3's tools reach it, and through which session.
     console.log(JSON.stringify({ t3flare: "cli-relay", cli: name, session: session !== undefined, t3Tools: launch.env.T3_MCP_URL !== undefined }));
     if (launch.droppedEnv.length > 0) console.log(JSON.stringify({ t3flare: "cli-env-dropped", cli: name, keys: launch.droppedEnv }));

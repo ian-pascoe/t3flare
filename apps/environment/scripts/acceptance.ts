@@ -370,7 +370,8 @@ for (const cli of ["codex", "pi"] as const) {
 const peer = process.argv.includes("--peer");
 if (peer) {
   const { bootstrapAtDecision, peerAcceptance } = await import("./lib/peerAcceptance.ts");
-  const result = await peerAcceptance(cookie);
+  // On the Model endpoint's small model, as the real turn: t3 refuses a launch on a model no endpoint lists.
+  const result = await peerAcceptance(cookie, { ...(endpointModel === undefined ? {} : { model: endpointModel }) });
   report.peer = result;
   for (const failure of result.failures) failures.push(`peer: ${failure}`);
   const f11 = await bootstrapAtDecision(bootstrapToken, true);

@@ -20,7 +20,13 @@ import { base, dispatch, mutateProject, projectionOf, runsOf, SETTLED, sleep, th
 import { ensureCloudFixtureProject } from "./fixtureProject.ts";
 import { decide, McpClient, mintPairingCode, registerPeerClient, signIn, type ToolAnswer, WAIT_CHUNK_MS } from "./peer.ts";
 
-const MODEL = { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5" };
+/**
+ * The launches' model: the stage's Model endpoint's, when the caller names it. Since v0.1.11-nightly.20261117.4825 t3's
+ * `t3_thread_launch` refuses a model its provider does not advertise (`model_unavailable`) before our fallback to the
+ * default model could take it, so an id no endpoint lists is refused.
+ */
+const DEFAULT_MODEL = "anthropic/claude-haiku-5-5";
+let MODEL = { instanceId: "piDurable", model: DEFAULT_MODEL };
 
 export interface PeerReport {
   readonly ok: boolean;
@@ -31,7 +37,8 @@ export interface PeerReport {
 /** A refusal t3's link fence answers: `capability_denied`, naming the link. */
 const denied = (answer: ToolAnswer) => answer.isError && /capability_denied|linked environment|link/i.test(answer.text);
 
-export const peerAcceptance = async (cookie: string, options: { readonly only?: ReadonlySet<string> } = {}): Promise<PeerReport> => {
+export const peerAcceptance = async (cookie: string, options: { readonly only?: ReadonlySet<string>; readonly model?: string } = {}): Promise<PeerReport> => {
+  MODEL = { instanceId: "piDurable", model: options.model ?? DEFAULT_MODEL };
   const failures: Array<string> = [];
   const report: Record<string, unknown> = {};
   const check = (name: string, ok: boolean, detail?: unknown) => {
