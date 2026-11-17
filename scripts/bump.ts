@@ -50,7 +50,7 @@ interface Step {
 }
 
 const steps: Array<Step> = [];
-/** test:docker's failures each carry a long probe record; 4000 characters held barely one. */
+/** test:docker's and the acceptance test's failures each carry a long record; 4000 characters held barely one. */
 const DOCKER_DETAIL_CHARS = 24_000;
 
 const sh = (command: string, commandArgs: Array<string>, cwd: string, options: { quiet?: boolean; env?: Record<string, string> } = {}) => {
@@ -76,7 +76,7 @@ const step = (name: string, run: () => { ok: boolean; detail?: string }): boolea
   }
   if (failAt !== undefined && name.startsWith(failAt)) result = { ok: false, detail: `forced to fail by --fail-at ${failAt}` };
   const seconds = Math.round((performance.now() - started) / 100) / 10;
-  steps.push({ name, ok: result.ok, seconds, ...(result.detail === undefined ? {} : { detail: result.detail.slice(name.startsWith("the CLI agents in Docker") ? -DOCKER_DETAIL_CHARS : -4000) }) });
+  steps.push({ name, ok: result.ok, seconds, ...(result.detail === undefined ? {} : { detail: result.detail.slice(name.startsWith("the CLI agents in Docker") || name.startsWith("acceptance test") ? -DOCKER_DETAIL_CHARS : -4000) }) });
   console.log(`== ${name}: ${result.ok ? "ok" : "FAILED"} (${seconds} s)`);
   return result.ok;
 };
