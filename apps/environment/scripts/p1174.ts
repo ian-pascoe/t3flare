@@ -76,16 +76,26 @@ if (scanDir !== undefined) {
   }).filter(([, value]) => value.length >= 8);
   const shapes: ReadonlyArray<readonly [string, RegExp]> = [
     ["a token shape", /sk-ant-[a-z0-9]|sk-proj-|eyJhbGci|Bearer [A-Za-z0-9._-]{20,}/],
-    // A Cloudflare account id (32 hex digits, as alchemy logs it in `registry.cloudflare.com/<id>/…`).
-    ["an account id shape", /(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/],
+    // A Cloudflare account id (32 hex digits, as alchemy logs it in `registry.cloudflare.com/<id>/…`), either case.
+    ["an account id shape", /(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/i],
     ["a home directory path", /\/Users\/|\/home\/[a-z]/],
+    ["an email address", /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/],
   ];
-  const files = fs.readdirSync(scanDir).filter((name) => !name.endsWith(".png"));
+  /** Every file under `dir`, its subdirectories included, by its path below `dir`. */
+  const walk = (dir: string, below = ""): ReadonlyArray<string> =>
+    fs.readdirSync(`${dir}/${below}`, { withFileTypes: true }).flatMap((entry) => {
+      const path = below === "" ? entry.name : `${below}/${entry.name}`;
+      return entry.isDirectory() ? walk(dir, path) : entry.isFile() ? [path] : [];
+    });
+  // Images (the page's screenshots) are not text: they are skipped, and were looked at by eye.
+  const BINARY = /\.(?:png|jpe?g|gif|webp)$/i;
+  const all = [...walk(scanDir)].sort();
+  const files = all.filter((name) => !BINARY.test(name));
   const hits = files.flatMap((name) => {
     const text = fs.readFileSync(`${scanDir}/${name}`, "utf8");
     return [...named.filter(([, value]) => text.includes(value)).map(([key]) => `${name}: ${key}`), ...shapes.filter(([, shape]) => shape.test(text)).map(([what]) => `${name}: ${what}`)];
   });
-  console.log(JSON.stringify({ scanned: files, secrets: named.map(([key]) => key), hits }, null, 2));
+  console.log(JSON.stringify({ scanned: files, skipped: { binary: all.filter((name) => BINARY.test(name)), note: "images, checked by eye" }, secrets: named.map(([key]) => key), hits }, null, 2));
   process.exit(hits.length === 0 ? 0 : 1);
 }
 
