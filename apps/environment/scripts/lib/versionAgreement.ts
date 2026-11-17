@@ -26,7 +26,9 @@ export const versionAgreement = (input: {
   const expected = input.tag === null ? (typeof input.serverVersion === "string" ? input.serverVersion : null) : input.tag.replace(/^v/, "");
   const failures: Array<string> = [];
   if (input.tag !== null && input.serverVersion !== expected) failures.push(`t3's descriptor reports serverVersion ${String(input.serverVersion)}, the pin is ${input.tag}`);
-  const webAppVersion = expected !== null && input.scripts.some((text) => text.includes(JSON.stringify(expected)));
+  // A string literal in any of the minifier's quotes (it prefers backticks).
+  const literals = expected === null ? [] : ['"', "'", "`"].map((quote) => `${quote}${expected}${quote}`);
+  const webAppVersion = input.scripts.some((text) => literals.some((literal) => text.includes(literal)));
   if (!webAppVersion) failures.push(`no web client script carries APP_VERSION ${String(expected)}`);
   return { ok: failures.length === 0, tag: input.tag, expected, serverVersion: input.serverVersion, webAppVersion, failures };
 };

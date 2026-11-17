@@ -32,6 +32,8 @@ describe("the version agreement acceptance check", () => {
 
   it("passes when the tag, the descriptor and the web client agree", () => {
     expect(versionAgreement({ tag: `v${version}`, serverVersion: version, scripts: [`const a=${JSON.stringify(version)};`] }).ok).toBe(true);
+    // As the minifier writes it.
+    expect(versionAgreement({ tag: `v${version}`, serverVersion: version, scripts: [`let t=\`${version}\`;`] }).ok).toBe(true);
   });
 
   it("names each disagreement", () => {
