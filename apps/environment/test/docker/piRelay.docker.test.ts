@@ -28,7 +28,7 @@ import { expect, it } from "vitest";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import { PI_HANDLE_HOLDERS, profileLaunch } from "../../src/agents/cliProfiles.ts";
 import { piLineFromPi, piRelayOf } from "../../src/provider/cli/piEndpoints.ts";
-import { docker, drive, EXTENSION, IMAGE, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { docker, drive, EXTENSION, IMAGE, readMounted, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 
 const here = import.meta.dirname;
 
@@ -126,7 +126,7 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     );
     delete process.env.PI_RPC_RAW;
     // The first process's shell environment (the resumed process's turn writes the file again).
-    const firstShellEnv = fs.existsSync(path.join(workspace, "shell-env.txt")) ? fs.readFileSync(path.join(workspace, "shell-env.txt"), "utf8") : "";
+    const firstShellEnv = readMounted(path.join(workspace, "shell-env.txt"));
     const states = (result.responses ?? []).filter((entry: { command: string }) => entry.command === "get_state");
     const sessionFile = states[0]?.data?.sessionFile as string | undefined;
     // The resume: a new process with its own handle switches to the session file, as t3's adapter does, and runs a turn.
@@ -136,7 +136,7 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
       { commands: [{ type: "switch_session", sessionPath: sessionFile ?? "/missing" }, ...turn("anth", "And after the restart."), { type: "get_state" }], confirm: true, timeoutMs: 180_000 },
       runCommand({ harness, name: "t3flare-pi-relay-2", launch: { ...second, env: { ...second.env, T3FLARE_MODEL_HANDLE: handles[1]! } }, marker: markers[1]!, workspace }),
     );
-    const read = (name: string) => (fs.existsSync(path.join(workspace, name)) ? fs.readFileSync(path.join(workspace, name), "utf8") : "");
+    const read = (name: string) => readMounted(path.join(workspace, name));
     const logs = docker(["logs", "t3flare-pi-relay-keyhost"]).stdout.split("\n");
     type Relayed = { path: string; query: string; api: string; model: string; messages: number; headers: ReadonlyArray<string>; apiKeyIsHandle: boolean; bearerIsHandle: boolean; googKeyIsHandle: boolean; handle: number; bash: boolean };
     const relayed = logs.filter((line) => line.includes('"model-relay"')).map((line) => JSON.parse(line) as Relayed);

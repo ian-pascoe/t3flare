@@ -42,6 +42,21 @@ export const removeMounted = (dir: string, image: string = IMAGE) => {
   }
 };
 
+/**
+ * A file a container wrote into a bind-mounted directory, or "" when there is none. A CLI's shell may write it
+ * owner-only, which a Linux host's user cannot read (Docker Desktop maps it to the host user): then it is read from a
+ * container.
+ */
+export const readMounted = (file: string, image: string = IMAGE) => {
+  if (!fs.existsSync(file)) return "";
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch {
+    const dir = path.dirname(file);
+    return docker(["run", "--rm", "--user", "0", "--entrypoint", "cat", "-v", `${dir}:/mounted:ro`, image, `/mounted/${path.basename(file)}`]).stdout;
+  }
+};
+
 /** The probe endpoint's one model (no model is called). */
 const PROBE_MODEL: EndpointModel = { id: "claude-haiku-5-5", name: "Probe", reasoning: false, input: ["text"], contextWindow: 200_000, maxTokens: 32_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false };
 /** Every CLI's relay on one probe Anthropic Messages endpoint (Codex's a Responses one of the same id). */

@@ -25,7 +25,7 @@ import { expect, it } from "vitest";
 import { OPENCODE_HANDLE_HOLDERS } from "../../src/agents/acpProfiles.ts";
 import { profileLaunch } from "../../src/agents/cliProfiles.ts";
 import { opencodeRelayOf } from "../../src/provider/cli/opencodeEndpoints.ts";
-import { docker, drive, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { docker, drive, readMounted, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 
 const here = import.meta.dirname;
 
@@ -112,7 +112,7 @@ it("OpenCode reaches each endpoint's provider at the model relay with its handle
       },
       command,
     );
-    const read = (name: string) => (fs.existsSync(path.join(workspace, name)) ? fs.readFileSync(path.join(workspace, name), "utf8") : "");
+    const read = (name: string) => readMounted(path.join(workspace, name));
     const logs = docker(["logs", "t3flare-opencode-relay-keyhost"]).stdout.split("\n");
     const relayed = logs
       .filter((line) => line.includes('"model-relay"'))

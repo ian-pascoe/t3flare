@@ -16,7 +16,7 @@ import * as path from "node:path";
 import { expect, it } from "vitest";
 
 import { profileLaunch } from "../../src/agents/cliProfiles.ts";
-import { docker, drive, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { docker, drive, readMounted, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 
 const here = import.meta.dirname;
 
@@ -64,7 +64,7 @@ it("Claude Code reaches the model relay with its handle, which no Claude process
       setup: "(env -u T3FLARE_MODEL_HANDLE bash /workspace/watch.sh > /workspace/watch.log 2>&1 &)",
     });
     const result = drive("acp-rpc.mjs", { cwd: T3_PATH, waitMs: 30_000, settleMs: 3000, timeoutMs: 180_000, prompt: "Write your environment to a file.", lingerMs: 10_000 }, command);
-    const read = (name: string) => (fs.existsSync(path.join(workspace, name)) ? fs.readFileSync(path.join(workspace, name), "utf8") : "");
+    const read = (name: string) => readMounted(path.join(workspace, name));
     const relayed = docker(["logs", "t3flare-claude-relay-keyhost"]).stdout
       .split("\n")
       .filter((line) => line.includes('"model-relay"'))

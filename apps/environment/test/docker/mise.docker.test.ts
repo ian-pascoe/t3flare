@@ -24,6 +24,8 @@ import { COMMAND_ENV, GLOBAL_MISE_CONFIG } from "@t3flare/sandbox-image/env";
 import { GLOBAL_MISE_SCRIPT } from "@t3flare/sandbox-image/globalMise";
 import { expect, it } from "vitest";
 
+import { removeMounted } from "./cliHarness.ts";
+
 const here = import.meta.dirname;
 const imageContext = path.resolve(here, "../../../sandbox-image/image");
 const IMAGE = "t3flare-mise-test";
@@ -109,8 +111,12 @@ it("M0: the owner's mise config over the image's base, git and gh kept, no GitHu
       `import json
 def request(flow):
     h = flow.request.headers
-    with open("/home/mitmproxy/.mitmproxy/requests.jsonl", "a") as f:
+    # A failed log line must never fail the request: the probe would then measure the log, not mise.
+    try:
+      with open("/home/mitmproxy/.mitmproxy/requests.jsonl", "a") as f:
         f.write(json.dumps({"method": flow.request.method, "host": flow.request.pretty_host, "path": flow.request.path.split("?")[0], "authorization": h.get("authorization", "")[:13]}) + "\\n")
+    except Exception as e:
+      print("m0 log failed:", e)
 `,
     );
     docker(["run", "-d", "--name", PROXY, "--network", NET, "-v", `${work}:/home/mitmproxy/.mitmproxy`, MITMPROXY, "mitmdump", "-q", "-s", "/home/mitmproxy/.mitmproxy/log.py"]);
@@ -145,10 +151,11 @@ def request(flow):
       return { stdout: redact(result.stdout ?? ""), stderr: redact(result.stderr ?? ""), status: result.status };
     };
     const proxiedRun = (env: Readonly<Record<string, string>>, script: string, options: { hostsYml?: boolean; gitHelper?: boolean; plainGit?: boolean } = {}) => {
-      fs.writeFileSync(requestsFile, "");
+      // Emptied by removing it: the proxy creates it as its own user, which on a Linux host is not the host's user
+      // and could not append to a file the host made (Docker Desktop hides this).
+      fs.rmSync(requestsFile, { force: true });
       const result = run(env, script, { ...options, proxied: true });
-      const requests = fs
-        .readFileSync(requestsFile, "utf8")
+      const requests = (fs.existsSync(requestsFile) ? fs.readFileSync(requestsFile, "utf8") : "")
         .split("\n")
         .filter((line) => line !== "")
         .map((line) => JSON.parse(line) as { method: string; host: string; path: string; authorization: string });
@@ -230,7 +237,7 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
     const installAnswer = lastJson(install.stdout.split("\n").filter((line) => line.startsWith("{")).at(0) ?? "");
     const byHost = (requests: ReadonlyArray<{ host: string }>) => requests.reduce<Record<string, number>>((counts, request) => Object.assign(counts, { [request.host]: (counts[request.host] ?? 0) + 1 }), {});
     const api = (requests: ReadonlyArray<{ host: string }>) => requests.filter((request) => request.host === "api.github.com").length;
-    check("requests: the install laid the file down and installed", installAnswer.laid === true && installAnswer.install === 0 && install.stdout.includes("v24.11.1") && install.stdout.includes("0.56.3"), { installAnswer, stdout: install.stdout.slice(-400) });
+    check("requests: the install laid the file down and installed", installAnswer.laid === true && installAnswer.install === 0 && install.stdout.includes("v24.11.1") && install.stdout.includes("0.56.3"), { installAnswer, stdout: install.stdout.slice(-400), stderr: install.stderr.slice(-400) });
     check("requests: no api.github.com request", api(install.requests) === 0, byHost(install.requests));
     check("requests: no request carries a token", install.requests.every((request) => request.authorization === ""), install.requests);
     const direct = proxiedRun({ ...DESIGN_ENV, MISE_USE_VERSIONS_HOST: "false" }, `${layDown(INSTALL)}`);
@@ -318,7 +325,7 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
     console.log(JSON.stringify({ failures, ...files }, null, 1).slice(0, 20_000));
   } finally {
     cleanup();
-    fs.rmSync(work, { recursive: true, force: true });
+    removeMounted(work, IMAGE);
   }
   expect(failures).toEqual([]);
 }, 60 * 60_000);
