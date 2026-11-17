@@ -412,7 +412,7 @@ The nightly tag the `t3code` submodule is at.
 _Avoid_: t3 version, upstream version
 
 **Server version**:
-The t3 pin without its `v`, stamped into the build: what the descriptor's `serverVersion` and the web client's `APP_VERSION` report.
+The t3 pin without its `v`: the version the Cloud Environment and its web client report to the stock clients.
 _Avoid_: app version, t3 version
 
 **t3 bump**:
@@ -420,7 +420,7 @@ Moving the t3 pin to another nightly tag and proving it on the `bump` stage.
 _Avoid_: upgrade, sync
 
 **CLI pin**:
-A CLI agent's version in the Workspace image, as `apps/sandbox-image/src/clis.ts` names it.
+A CLI agent's version in the Workspace image.
 _Avoid_: CLI version
 
 **CLI bump**:
@@ -428,15 +428,15 @@ The job that moves one CLI pin to its newest version, proves it and lands it.
 _Avoid_: CLI upgrade
 
 **Proposed pin**:
-A pin that passed a gate but is not on `main`: a `bump/*` branch, which records the gate it passed.
+A pin that passed a gate but is not on `main`, recorded with the gate it passed.
 _Avoid_: candidate, pending bump
 
 **Update gate**:
-The short proof an Update waits on: the check, the `bump` stage deploy and the acceptance test's core with one agent turn (a CLI bump: that CLI's sub-test).
+The short proof an Update waits on: the checks, a deploy to the `bump` Stage, and the core acceptance test with one agent turn (for a CLI bump, that CLI's turn).
 _Avoid_: fast gate, smoke
 
 **Full gate**:
-The nightly bump's whole proof, test:docker and every acceptance sub-test included; a landed Update's verify run.
+The nightly bump's whole proof, every CLI agent's turn included; a landed Update gets it afterwards.
 _Avoid_: full test, slow gate
 
 **Land**:
@@ -453,4 +453,4 @@ _Avoid_: environment (that is t3's), instance
 
 **Workspace image**:
 The Container image every Workspace runs: git, the CLI agents at their CLI pins, and the tools.
-_Avoid_: sandbox image (the code's name for it)
+_Avoid_: sandbox image

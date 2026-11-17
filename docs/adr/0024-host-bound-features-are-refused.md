@@ -11,9 +11,8 @@ Stock t3 runs on the owner's own machine, and some of its features are about tha
 | Triage (`server.prepareTriage`) | clones t3's source and writes diagnostics on the host for a bug report | `triage` stripped |
 | jj and other VCS CLIs | not in the Workspace image | source-control discovery reports them "not found"; git and `gh` are emulated (ADR-0009, ADR-0013) |
 | Import of agent sessions | reads CLI session homes (`~/.codex`, `~/.claude`, …) on the host | there are none in the State directory |
-| Server self-update | the Environment is updated by the nightly bump and a deploy (ADR-0017); on prod a stock client's server Update lands one (ADR-0037) | `serverSelfUpdate` advertised as `respawn` on prod only; `npmReleaseLookup`, the progress and staging flags and the desktop-updater flags stripped |
-| Provider install | CLIs are pinned in the Workspace image (ADR-0015) and change only with it | install refused; a version changes only with a new image and deploy |
-| Provider update (amended, ADR-0037) | a CLI's version is its pin in the Workspace image | on prod, the update button of the pi CLI, Codex and Claude Code lands a CLI bump through CI (a new image and deploy), never an install in place; elsewhere, and for OpenCode, refused |
+| Server self-update | the Environment is updated by the nightly bump and a deploy (ADR-0017) | `serverSelfUpdate`, `npmReleaseLookup` and the desktop-updater flags stripped |
+| Provider install and update | CLIs are pinned in the Workspace image (ADR-0015) and change only with it | a version changes only with a new image and deploy, never from a client |
 
 ## Not refused: previews and the server browser (owner decision D4)
 
@@ -33,3 +32,14 @@ Dev-server previews and t3's server browser are part of parity and are **built l
 ## Refinement (G11, 2026-11-13): previews are built
 
 Previews, the server browser and agent browser access are built (ADR-0031): t3's browser is Cloudflare Browser Run, `localhost` is the thread's Workspace Container, and ports are listed from each running Container. The device hub stays refused.
+
+## Refinement (in-app updates, ADR-0037, 2026-11-17): the server Update and CLI updates on prod
+
+Two rows of the table above change on a stage with an update target, which today is prod alone:
+
+- **Server self-update**: `serverSelfUpdate` is advertised as `respawn` (ADR-0023's third classification). A stock
+  client's server Update lands a t3 bump through CI; the Environment never updates itself in place. Still stripped:
+  `npmReleaseLookup`, the progress and staging flags, and the desktop updater's flags.
+- **Provider update**: the update button of the pi CLI, Codex and Claude Code lands a CLI bump through CI (a new
+  Workspace image and a deploy), never an install in place. Install stays refused; OpenCode's update stays refused, and
+  every update is refused on any other stage.
