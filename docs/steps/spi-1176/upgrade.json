@@ -1,5 +1,9 @@
 {
- "what": "SPI-1176 review item 11: an upgrade on stage p1176. origin/main (c2299eb, with the Model proxy) deployed fresh; a thread per agent kind; this branch deployed over it; an OpenAI Responses endpoint added (the owner's step for Codex); each thread resumed with one more turn. Keys scrubbed.",
+ "what": "SPI-1176 review round 2, item 8: an upgrade on a fresh stage p1176. origin/main deployed (the Model proxy bound); one thread per agent kind (and the proxy-model threads main already refuses for pi, Claude Code and OpenCode); this branch's head deployed over it; the endpoints set up as docs/steps/spi-1176-owner-setup.md step 1 says (commissary edited: model list read, narrowed to two, the default first; commissary-oai added for Codex); each thread resumed on its own model; one new thread per agent kind on its picker's default. Keys scrubbed. Stage destroyed after.",
+ "deploys": {
+  "origin/main": "c2299eb920de8c2631c3ea2c11f96eeed8d8aecc",
+  "branch head": "ca7ed2ee3714abedf2e8df54e66d4417984dcfea"
+ },
  "bindings": {
   "origin/main deploy": [
    "Agents/COMMISSARY_CONTAINER_API_KEY create",
@@ -23,7 +27,7 @@
    "Environment/MODEL_PROXY_URL create",
    "Environment/MODEL_PROXY_URL noop"
   ],
-  "branch deploy over it": [
+  "branch head deploy over it": [
    "Agents/COMMISSARY_CONTAINER_API_KEY unbind",
    "Agents/MODEL_PROXY_API_KEY unbind",
    "Agents/MODEL_PROXY_URL unbind",
@@ -37,51 +41,54 @@
   ]
  },
  "beforeTheCut": {
+  "endpoints": [
+   {
+    "id": "commissary",
+    "api": "anthropic-messages",
+    "models": 21,
+    "first": "claude-3-7-sonnet-20250219"
+   }
+  ],
   "providers": {
    "codex": {
     "status": "ready",
-    "message": null,
-    "models": 119,
+    "models": 116,
     "first": [
      "beam-free",
      "big-pickle",
-     "claude-3-5-haiku-20241022"
+     "claude-3-7-sonnet-20250219"
     ]
    },
    "claudeAgent": {
     "status": "ready",
-    "message": "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints (else the model proxy); the binary, home, launch arguments and custom models settings are not used.",
-    "models": 23,
+    "models": 21,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
      "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-fable-5",
+     "commissary/claude-fable-5-1"
     ]
    },
    "opencode": {
     "status": "ready",
-    "message": "Runs OpenCode in the Workspace's Container on the Anthropic Messages, OpenAI Responses and OpenAI-compatible Model endpoints (else the model proxy); the binary, server URL, password and custom models settings are not used.",
-    "models": 23,
+    "models": 21,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
      "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-fable-5",
+     "commissary/claude-fable-5-1"
     ]
    },
    "pi": {
     "status": "ready",
-    "message": null,
-    "models": 23,
+    "models": 21,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
      "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-fable-5",
+     "commissary/claude-fable-5-1"
     ]
    },
    "piDurable": {
     "status": "ready",
-    "message": null,
-    "models": 142,
+    "models": 137,
     "first": [
      "anthropic/qwen3.5-plus",
      "anthropic/qwen3.6-plus",
@@ -89,211 +96,291 @@
     ]
    }
   },
-  "endpoints": [
-   {
-    "id": "commissary",
-    "api": "anthropic-messages",
-    "models": 23
-   }
-  ],
   "threads": {
    "durable": {
+    "threadId": "639c1661-a809-4aa4-bf98-adbb4d4452d2",
     "model": "anthropic/claude-haiku-5-5",
     "runs": [
-     {
-      "status": "completed"
-     }
+     "completed"
     ],
     "text": "ready",
+    "nativeThreads": [
+     "thread:639c1661-a809-4aa4-bf98-adbb4d4452d2"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:piDurable:thread:639c1661-a809-4aa4-bf98-adbb4d4452d2:2b733609-35f5-497c-a923-283b3c5c0fc7"
+    ],
     "errors": []
    },
    "codex": {
+    "threadId": "5b419a87-82d2-4a49-bbf5-3e2c149a5607",
+    "workspace": "upg-codex-mwk5nihm",
+    "cli": "codex",
     "model": "gpt-6-luna",
     "runs": [
      "completed"
     ],
     "text": "ready",
+    "nativeThreads": [
+     "01a1e7a1-eea3-7ee0-a7c6-e29b036cc11c"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:codex:thread:5b419a87-82d2-4a49-bbf5-3e2c149a5607:9b21739f-a096-46ff-9aa9-5bf6c0ec55fa"
+    ],
     "errors": []
    },
    "pi": {
+    "threadId": "7fcfcf26-0699-4951-9100-463cf7124829",
+    "workspace": "upg-pi-mwk5nihm",
+    "cli": "pi",
+    "model": "commissary/claude-haiku-5-5",
+    "runs": [
+     "completed"
+    ],
+    "text": "ready",
+    "nativeThreads": [
+     "/workspace/.t3flare/pi/sessions/2026-11-17T03-52-15-570Z_01a1e7a2-4bcd-73a7-83d9-7f73a8cd0898.jsonl"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:pi:thread:7fcfcf26-0699-4951-9100-463cf7124829:db2bf8ad-1605-467f-b7dd-416500b30b3d"
+    ],
+    "errors": []
+   },
+   "claude": {
+    "threadId": "bd1ece1d-a696-4d75-a01a-da3e0c9f849e",
+    "workspace": "upg-claude-mwk5nihm",
+    "cli": "claude",
+    "model": "commissary/claude-haiku-5-5",
+    "runs": [
+     "completed"
+    ],
+    "text": "ready",
+    "nativeThreads": [
+     "f088a4bf-938f-4eb6-8494-d9044b1e28b4"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:claudeAgent:thread:bd1ece1d-a696-4d75-a01a-da3e0c9f849e:fdeefdce-b9b2-4934-b3a2-cea2b69c6a1b"
+    ],
+    "errors": []
+   },
+   "opencode": {
+    "threadId": "7c2ee6dd-3c1f-4c05-85b4-4e68f1329fdb",
+    "workspace": "upg-opencode-mwk5nihm",
+    "cli": "opencode",
+    "model": "commissary/claude-haiku-5-5",
+    "runs": [
+     "completed"
+    ],
+    "text": "ready",
+    "nativeThreads": [
+     "ses_e185c4988ffe95UwrH02G5O8Fd"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:opencode:thread:7c2ee6dd-3c1f-4c05-85b4-4e68f1329fdb:0bd1af5d-4deb-4313-9404-9e8d2949ca8c"
+    ],
+    "errors": []
+   },
+   "pi (proxy model)": {
+    "threadId": "6c4c008a-df89-4e3d-97d3-83d9181d1f4f",
+    "workspace": "upg-pip-mwk5nihm",
+    "cli": "pi",
     "model": "anthropic/claude-haiku-5-5",
     "runs": [
      "failed"
     ],
     "text": "",
+    "nativeThreads": [
+     "/workspace/.t3flare/pi/sessions/2026-11-17T03-54-22-762Z_01a1e7a4-3ca6-70d2-be6b-be589cc35c7e.jsonl"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:pi:thread:6c4c008a-df89-4e3d-97d3-83d9181d1f4f:f45e4ea8-5d3f-47e5-864d-bd0f97e7f0aa"
+    ],
     "errors": [
      "The provider could not start this turn. Retry the turn; if it keeps failing, check the provider setup and server logs."
     ]
    },
-   "claude": {
+   "claude (proxy model)": {
+    "threadId": "0e75a4af-f80f-4e98-a8a8-4c2132f82ce2",
+    "workspace": "upg-claudep-mwk5nihm",
+    "cli": "claude",
     "model": "anthropic/claude-sonnet-5-5",
     "runs": [
      "failed"
     ],
     "text": "",
+    "nativeThreads": [
+     null
+    ],
+    "providerSessions": [],
     "errors": [
      "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
     ]
    },
-   "opencode": {
+   "opencode (proxy model)": {
+    "threadId": "dacdaf26-e933-4c03-875a-02d055492164",
+    "workspace": "upg-opencodep-mwk5nihm",
+    "cli": "opencode",
     "model": "anthropic/claude-sonnet-5-5",
     "runs": [
      "failed"
     ],
     "text": "",
+    "nativeThreads": [
+     null
+    ],
+    "providerSessions": [],
     "errors": [
      "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
     ]
-   },
-   "pi@endpoint": {
-    "model": "commissary/claude-haiku-5-5",
-    "runs": [
-     "completed"
-    ],
-    "text": "ready",
-    "errors": []
-   },
-   "claude@endpoint": {
-    "model": "commissary/claude-haiku-5-5",
-    "runs": [
-     "completed"
-    ],
-    "text": "ready",
-    "errors": []
-   },
-   "opencode@endpoint": {
-    "model": "commissary/claude-haiku-5-5",
-    "runs": [
-     "completed"
-    ],
-    "text": "ready",
-    "errors": []
    }
   }
  },
- "afterTheCut": {
-  "endpointsBefore": [
+ "setup": {
+  "commissaryListRead": {
+   "listed": 116,
+   "listedFirst": [
+    "beam-free",
+    "big-pickle",
+    "claude-3-7-sonnet-20250219"
+   ],
+   "kept": [
+    "claude-sonnet-5-5",
+    "claude-haiku-5-5"
+   ]
+  },
+  "saveCommissary": 200,
+  "saveCommissaryOai": 200,
+  "endpoints": [
    {
     "id": "commissary",
     "api": "anthropic-messages",
-    "models": 23
+    "models": [
+     "claude-sonnet-5-5",
+     "claude-haiku-5-5"
+    ]
+   },
+   {
+    "id": "commissary-oai",
+    "api": "openai-responses",
+    "models": [
+     "claude-sonnet-5-5"
+    ]
    }
   ],
   "providersBeforeSetup": {
    "codex": {
     "status": "warning",
-    "message": "Codex has no Model endpoint to run on: it needs one that speaks OpenAI Responses and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
     "models": 0,
     "first": []
    },
    "claudeAgent": {
     "status": "ready",
-    "message": "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints; the binary, home, launch arguments and custom models settings are not used.",
-    "models": 23,
+    "models": 21,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
      "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-fable-5",
+     "commissary/claude-fable-5-1"
     ]
    },
    "opencode": {
     "status": "ready",
-    "message": "Runs OpenCode in the Workspace's Container on the Anthropic Messages, OpenAI Responses and OpenAI-compatible Model endpoints; the binary, server URL, password and custom models settings are not used.",
-    "models": 23,
+    "models": 21,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
      "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-fable-5",
+     "commissary/claude-fable-5-1"
     ]
    },
    "pi": {
     "status": "ready",
-    "message": null,
-    "models": 23,
+    "models": 21,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
      "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-fable-5",
+     "commissary/claude-fable-5-1"
     ]
    },
    "piDurable": {
     "status": "ready",
-    "message": null,
-    "models": 23,
+    "models": 21,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
      "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-fable-5",
+     "commissary/claude-fable-5-1"
     ]
    }
   },
-  "savedResponsesEndpoint": 200,
-  "providers": {
+  "providersAfterSetup": {
    "codex": {
     "status": "ready",
-    "message": null,
     "models": 1,
     "first": [
-     "commissary-oai/claude-haiku-5-5"
+     "commissary-oai/claude-sonnet-5-5"
     ]
    },
    "claudeAgent": {
     "status": "ready",
-    "message": "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints; the binary, home, launch arguments and custom models settings are not used.",
-    "models": 23,
+    "models": 2,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
-     "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-sonnet-5-5",
+     "commissary/claude-haiku-5-5"
     ]
    },
    "opencode": {
     "status": "ready",
-    "message": "Runs OpenCode in the Workspace's Container on the Anthropic Messages, OpenAI Responses and OpenAI-compatible Model endpoints; the binary, server URL, password and custom models settings are not used.",
-    "models": 24,
+    "models": 3,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
-     "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-sonnet-5-5",
+     "commissary/claude-haiku-5-5",
+     "commissary-oai/claude-sonnet-5-5"
     ]
    },
    "pi": {
     "status": "ready",
-    "message": null,
-    "models": 24,
+    "models": 3,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
-     "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-sonnet-5-5",
+     "commissary/claude-haiku-5-5",
+     "commissary-oai/claude-sonnet-5-5"
     ]
    },
    "piDurable": {
     "status": "ready",
-    "message": null,
-    "models": 24,
+    "models": 3,
     "first": [
-     "commissary/claude-3-5-haiku-20241022",
-     "commissary/claude-3-7-sonnet-20250219",
-     "commissary/claude-fable-5"
+     "commissary/claude-sonnet-5-5",
+     "commissary/claude-haiku-5-5",
+     "commissary-oai/claude-sonnet-5-5"
     ]
    }
   }
  },
- "resume1_at_8a15fd5_plus_round1_wip": {
+ "resumed": {
   "durable": {
    "model": "anthropic/claude-haiku-5-5",
    "runs": [
-    {
-     "status": "completed"
-    },
-    {
-     "status": "failed"
-    }
+    "completed",
+    "completed"
    ],
-   "text": "",
-   "errors": [
-    "The model provider returned HTTP 400."
-   ]
+   "lastAnswer": "ready",
+   "nativeBefore": {
+    "nativeThreads": [
+     "thread:639c1661-a809-4aa4-bf98-adbb4d4452d2"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:piDurable:thread:639c1661-a809-4aa4-bf98-adbb4d4452d2:2b733609-35f5-497c-a923-283b3c5c0fc7"
+    ]
+   },
+   "nativeAfter": {
+    "nativeThreads": [
+     "thread:639c1661-a809-4aa4-bf98-adbb4d4452d2"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:piDurable:thread:639c1661-a809-4aa4-bf98-adbb4d4452d2:2b733609-35f5-497c-a923-283b3c5c0fc7"
+    ]
+   },
+   "sameNativeThread": true,
+   "errorsFromEarlierTurns": []
   },
   "codex": {
    "model": "gpt-6-luna",
@@ -301,214 +388,237 @@
     "completed",
     "completed"
    ],
-   "text": "ready",
-   "errors": []
+   "lastAnswer": "ready",
+   "nativeBefore": {
+    "nativeThreads": [
+     "01a1e7a1-eea3-7ee0-a7c6-e29b036cc11c"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:codex:thread:5b419a87-82d2-4a49-bbf5-3e2c149a5607:9b21739f-a096-46ff-9aa9-5bf6c0ec55fa"
+    ]
+   },
+   "nativeAfter": {
+    "nativeThreads": [
+     "01a1e7a7-eed0-7e70-8926-00a63157f787"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:codex:thread:5b419a87-82d2-4a49-bbf5-3e2c149a5607:9b21739f-a096-46ff-9aa9-5bf6c0ec55fa"
+    ]
+   },
+   "sameNativeThread": false,
+   "errorsFromEarlierTurns": []
   },
   "pi": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "completed"
+   ],
+   "lastAnswer": "ready",
+   "nativeBefore": {
+    "nativeThreads": [
+     "/workspace/.t3flare/pi/sessions/2026-11-17T03-52-15-570Z_01a1e7a2-4bcd-73a7-83d9-7f73a8cd0898.jsonl"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:pi:thread:7fcfcf26-0699-4951-9100-463cf7124829:db2bf8ad-1605-467f-b7dd-416500b30b3d"
+    ]
+   },
+   "nativeAfter": {
+    "nativeThreads": [
+     "/workspace/.t3flare/pi/sessions/2026-11-17T03-52-15-570Z_01a1e7a2-4bcd-73a7-83d9-7f73a8cd0898.jsonl"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:pi:thread:7fcfcf26-0699-4951-9100-463cf7124829:db2bf8ad-1605-467f-b7dd-416500b30b3d"
+    ]
+   },
+   "sameNativeThread": true,
+   "errorsFromEarlierTurns": []
+  },
+  "claude": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "completed"
+   ],
+   "lastAnswer": "ready",
+   "nativeBefore": {
+    "nativeThreads": [
+     "f088a4bf-938f-4eb6-8494-d9044b1e28b4"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:claudeAgent:thread:bd1ece1d-a696-4d75-a01a-da3e0c9f849e:fdeefdce-b9b2-4934-b3a2-cea2b69c6a1b"
+    ]
+   },
+   "nativeAfter": {
+    "nativeThreads": [
+     "f088a4bf-938f-4eb6-8494-d9044b1e28b4"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:claudeAgent:thread:bd1ece1d-a696-4d75-a01a-da3e0c9f849e:fdeefdce-b9b2-4934-b3a2-cea2b69c6a1b"
+    ]
+   },
+   "sameNativeThread": true,
+   "errorsFromEarlierTurns": []
+  },
+  "opencode": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "completed"
+   ],
+   "lastAnswer": "ready",
+   "nativeBefore": {
+    "nativeThreads": [
+     "ses_e185c4988ffe95UwrH02G5O8Fd"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:opencode:thread:7c2ee6dd-3c1f-4c05-85b4-4e68f1329fdb:0bd1af5d-4deb-4313-9404-9e8d2949ca8c"
+    ]
+   },
+   "nativeAfter": {
+    "nativeThreads": [
+     "ses_e1856247effeQ7TMSavyE3WGaT"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:opencode:thread:7c2ee6dd-3c1f-4c05-85b4-4e68f1329fdb:0bd1af5d-4deb-4313-9404-9e8d2949ca8c"
+    ]
+   },
+   "sameNativeThread": false,
+   "errorsFromEarlierTurns": []
+  },
+  "pi (proxy model)": {
    "model": "anthropic/claude-haiku-5-5",
    "runs": [
     "failed",
-    "failed"
+    "completed"
    ],
-   "text": "",
-   "errors": [
-    "The provider could not start this turn. Retry the turn; if it keeps failing, check the provider setup and server logs.",
-    "The Model endpoint \"commissary\" is overloaded (HTTP 503)."
+   "lastAnswer": "ready",
+   "nativeBefore": {
+    "nativeThreads": [
+     "/workspace/.t3flare/pi/sessions/2026-11-17T03-54-22-762Z_01a1e7a4-3ca6-70d2-be6b-be589cc35c7e.jsonl"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:pi:thread:6c4c008a-df89-4e3d-97d3-83d9181d1f4f:f45e4ea8-5d3f-47e5-864d-bd0f97e7f0aa"
+    ]
+   },
+   "nativeAfter": {
+    "nativeThreads": [
+     "/workspace/.t3flare/pi/sessions/2026-11-17T03-54-22-762Z_01a1e7a4-3ca6-70d2-be6b-be589cc35c7e.jsonl"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:pi:thread:6c4c008a-df89-4e3d-97d3-83d9181d1f4f:f45e4ea8-5d3f-47e5-864d-bd0f97e7f0aa"
+    ]
+   },
+   "sameNativeThread": true,
+   "errorsFromEarlierTurns": [
+    "The provider could not start this turn. Retry the turn; if it keeps failing, check the provider setup and server logs."
    ]
   },
-  "claude": {
+  "claude (proxy model)": {
    "model": "anthropic/claude-sonnet-5-5",
    "runs": [
     "failed",
-    "failed"
+    "completed"
    ],
-   "text": "",
-   "errors": [
-    "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry.",
-    "Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:07e08a8b-6906-471b-acd5-bc4b7c63e2f6:4d20081b-d03c-4234-bd0e-fb482c566884."
-   ]
-  },
-  "opencode": {
-   "model": "anthropic/claude-sonnet-5-5",
-   "runs": [
-    "failed",
-    "running"
-   ],
-   "text": "",
-   "errors": [
+   "lastAnswer": "ready",
+   "nativeBefore": {
+    "nativeThreads": [
+     null
+    ],
+    "providerSessions": []
+   },
+   "nativeAfter": {
+    "nativeThreads": [
+     "c9d54a74-44f5-4a96-ad81-d36f1e1efa23"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:claudeAgent:thread:0e75a4af-f80f-4e98-a8a8-4c2132f82ce2:2072c289-c867-4c29-94a3-2e5094b865a1"
+    ]
+   },
+   "sameNativeThread": null,
+   "errorsFromEarlierTurns": [
     "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
    ]
   },
-  "pi@endpoint": {
-   "model": "commissary/claude-haiku-5-5",
+  "opencode (proxy model)": {
+   "model": "anthropic/claude-sonnet-5-5",
    "runs": [
-    "completed",
+    "failed",
     "completed"
    ],
-   "text": "ready",
-   "errors": []
-  },
-  "claude@endpoint": {
-   "model": "commissary/claude-haiku-5-5",
-   "runs": [
-    "completed",
-    "failed"
-   ],
-   "text": "",
-   "errors": [
-    "Provider turn failed."
+   "lastAnswer": "I didn't give one. The earlier request failed with a model error, so no word was ever sent.",
+   "nativeBefore": {
+    "nativeThreads": [
+     null
+    ],
+    "providerSessions": []
+   },
+   "nativeAfter": {
+    "nativeThreads": [
+     "ses_e1854c9f3ffeXImPb3OS0a2gOQ"
+    ],
+    "providerSessions": [
+     "provider-session:provider-instance:opencode:thread:dacdaf26-e933-4c03-875a-02d055492164:f23e341a-0f00-4f60-a48c-8112ee9b3228"
+    ]
+   },
+   "sameNativeThread": null,
+   "errorsFromEarlierTurns": [
+    "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
    ]
-  },
-  "opencode@endpoint": {
-   "model": "commissary/claude-haiku-5-5",
-   "runs": [
-    "completed",
-    "completed"
-   ],
-   "text": "ready",
-   "errors": []
   }
  },
- "resume2_with_retiredSelectionSlug": {
+ "newThreadsOnTheDefault": {
   "durable": {
-   "model": "anthropic/claude-haiku-5-5",
+   "threadId": "86621bae-8a6d-4fc1-be6f-e744420926da",
+   "model": "commissary/claude-sonnet-5-5",
    "runs": [
-    {
-     "status": "completed"
-    },
-    {
-     "status": "failed"
-    },
-    {
-     "status": "completed"
-    }
+    "completed"
    ],
-   "text": "ready",
-   "errors": []
+   "text": "ready"
   },
   "codex": {
-   "model": "gpt-6-luna",
+   "threadId": "851affe5-54f8-4ccc-b71e-21fdc74605f3",
+   "workspace": "upg-new-codex-mwk61r6m",
+   "cli": "codex",
+   "model": "commissary-oai/claude-sonnet-5-5",
    "runs": [
-    "completed",
-    "completed",
     "completed"
    ],
    "text": "ready",
    "errors": []
   },
   "pi": {
-   "model": "anthropic/claude-haiku-5-5",
+   "threadId": "134e4af9-21a8-4d48-913d-e3a8600390ac",
+   "workspace": "upg-new-pi-mwk61r6m",
+   "cli": "pi",
+   "model": "commissary/claude-sonnet-5-5",
    "runs": [
-    "failed",
-    "failed",
     "completed"
    ],
-   "text": "The word I replied with was:\n\n**ready**",
-   "errors": [
-    "The provider could not start this turn. Retry the turn; if it keeps failing, check the provider setup and server logs.",
-    "The Model endpoint \"commissary\" is overloaded (HTTP 503)."
-   ]
+   "text": "ready",
+   "errors": []
   },
   "claude": {
-   "model": "anthropic/claude-sonnet-5-5",
+   "threadId": "8b8de897-3cc2-4709-a3b0-a7cb54d535f5",
+   "workspace": "upg-new-claude-mwk61r6m",
+   "cli": "claude",
+   "model": "commissary/claude-sonnet-5-5",
    "runs": [
-    "failed",
-    "failed",
-    "failed"
+    "completed"
    ],
-   "text": "",
-   "errors": [
-    "Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:07e08a8b-6906-471b-acd5-bc4b7c63e2f6:4d20081b-d03c-4234-bd0e-fb482c566884.",
-    "the Container cannot start: Container budget (3) reached: raise it at /_t3flare/harness#environment."
-   ]
+   "text": "ready",
+   "errors": []
   },
   "opencode": {
-   "model": "anthropic/claude-sonnet-5-5",
-   "runs": [
-    "failed",
-    "cancelled",
-    "cancelled",
-    "cancelled",
-    "completed",
-    "completed"
-   ],
-   "text": "None",
-   "errors": [
-    "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
-   ]
-  },
-  "pi@endpoint": {
-   "model": "commissary/claude-haiku-5-5",
-   "runs": [
-    "completed",
-    "completed",
-    "completed"
-   ],
-   "text": "ready",
-   "errors": []
-  },
-  "claude@endpoint": {
-   "model": "commissary/claude-haiku-5-5",
-   "runs": [
-    "completed",
-    "failed",
-    "failed",
-    "failed"
-   ],
-   "text": "",
-   "errors": [
-    "The Model endpoint \"commissary\" is overloaded (HTTP 503).",
-    "The Model endpoint \"commissary\" is overloaded (HTTP 503)."
-   ]
-  },
-  "opencode@endpoint": {
-   "model": "commissary/claude-haiku-5-5",
-   "runs": [
-    "completed",
-    "completed",
-    "completed"
-   ],
-   "text": "ready",
-   "errors": []
-  },
-  "claude (new thread)": {
-   "model": "commissary/claude-haiku-5-5",
+   "threadId": "5450980d-258a-4b87-a148-6d241c5c25e8",
+   "workspace": "upg-new-opencode-mwk61r6m",
+   "cli": "opencode",
+   "model": "commissary/claude-sonnet-5-5",
    "runs": [
     "completed"
    ],
    "text": "ready",
    "errors": []
-  }
- },
- "resume3_claude_with_known_family_alias": {
-  "claude": {
-   "model": "anthropic/claude-sonnet-5-5",
-   "runs": [
-    "failed",
-    "failed",
-    "failed",
-    "completed"
-   ],
-   "text": "I haven't replied with any word. Each earlier run failed with a provider error (rejected model name, session open failure, container budget reached), so none produced an answer. The first request asked for \"ready\", but that reply was never sent.",
-   "errors": [
-    "Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:07e08a8b-6906-471b-acd5-bc4b7c63e2f6:4d20081b-d03c-4234-bd0e-fb482c566884.",
-    "the Container cannot start: Container budget (3) reached: raise it at /_t3flare/harness#environment."
-   ]
-  },
-  "claude@endpoint": {
-   "model": "commissary/claude-haiku-5-5",
-   "runs": [
-    "completed",
-    "failed",
-    "failed",
-    "failed",
-    "completed"
-   ],
-   "text": "again",
-   "errors": [
-    "The Model endpoint \"commissary\" is overloaded (HTTP 503).",
-    "The Model endpoint \"commissary\" is overloaded (HTTP 503)."
-   ]
   }
  }
 }

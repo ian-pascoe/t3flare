@@ -108,7 +108,9 @@ one thread per agent kind ([`spi-1176/upgrade.json`](spi-1176/upgrade.json)):
 - **Threads from before the cut keep working.** A model selection from before the cut (`anthropic/<id>`, Codex's and
   Claude Code's bare ids) runs on the default model, the first endpoint's first model (each CLI: of its endpoints),
   even where an endpoint lists a model of the same id. Pick another in the thread to change it. Pi Durable, Codex,
-  Claude Code, OpenCode and pi threads each answered their next turn; Codex's on the same native thread.
+  Claude Code, OpenCode and pi threads each answered their next turn. Pi Durable, Claude Code and pi kept their native
+  session; Codex and OpenCode continued on a new native thread with the conversation carried over. A new thread per
+  agent kind on its default answered too.
 - **Bindings**: the deploy unbinds `MODEL_PROXY_URL`, `MODEL_PROXY_API_KEY` and `COMMISSARY_CONTAINER_API_KEY` from
   both Workers and every `COMMISSARY_*` from the Environment's (the stage's deploy log: `unbind` for each of the ten).
 - The Harness settings: a Guardian, Advisor or web-search model setting from before the cut (`claude-haiku-5-5`) reads
