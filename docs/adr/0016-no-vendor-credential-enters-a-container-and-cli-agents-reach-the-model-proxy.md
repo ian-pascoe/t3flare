@@ -1,10 +1,27 @@
-# No vendor credential enters a Container, and CLI agents reach the model proxy
+# No vendor credential enters a Container, and CLI agents reach their models through the model relay
 
-Revised 2026-11-11, after [ADR-0012](0012-all-model-access-goes-through-the-model-proxy.md) (all model access goes through the model proxy); the original is kept under [History](#history).
+Revised 2026-11-17 at the hard cut (SPI-1176), after [ADR-0034](0034-model-endpoints-are-the-owners-set-in-the-harness-panel.md)
+(Model endpoints) superseded [ADR-0012](0012-all-model-access-goes-through-the-model-proxy.md). The file keeps its first
+name, "CLI agents reach the model proxy", so links hold. The decisions of 2026-11-11 and 2026-11-12 (the proxy key, the
+key helper A′) are kept below for their history, each marked superseded.
 
-A CLI agent (Codex, Claude Code, OpenCode, pi) is configured with the model proxy's base URL and a proxy key, through the CLI's own base-URL setting. It is never given a vendor credential or a Subscription login: t3flare holds none. No credential is written to the Workspace file system. The CLI's session-state directories sit beside the repo, outside any t3 path, and are synced; they hold no secrets. GitHub access is unchanged ([ADR-0013](0013-github-access-through-a-github-app-with-per-repo-tokens.md)): Container tokens per command or on the credential helper's request, never stored.
+A CLI agent (Codex, Claude Code, OpenCode, pi) runs on the owner's Model endpoints whose API it speaks, through the
+**model relay**: its process gets a per-process **Handle**, which the Workers swap for the endpoint's key or a
+sign-in's token outside the Container (the SPI-1167 to SPI-1171 refinements below). It is never given a vendor
+credential, a Subscription login or any key: no credential is in its environment, its files or the synced Workspace. A
+CLI with no endpoint of an API it speaks is refused at its spawn, saying so (the SPI-1176 refinement). The CLI's
+session-state directories sit beside the repo, outside any t3 path, and are synced; they hold no secrets. GitHub access
+is unchanged ([ADR-0013](0013-github-access-through-a-github-app-with-per-repo-tokens.md)).
 
-Of the original Handles and HTTPS intercepts, the only possible use left is the proxy key's way into the Container, and whether it needs them is open.
+### The decision of 2026-11-11 (superseded at the hard cut)
+
+> A CLI agent (Codex, Claude Code, OpenCode, pi) is configured with the model proxy's base URL and a proxy key, through
+> the CLI's own base-URL setting. It is never given a vendor credential or a Subscription login: t3flare holds none.
+> No credential is written to the Workspace file system. The CLI's session-state directories sit beside the repo,
+> outside any t3 path, and are synced; they hold no secrets.
+>
+> Of the original Handles and HTTPS intercepts, the only possible use left is the proxy key's way into the Container,
+> and whether it needs them is open.
 
 ## Open question for step 4a: the proxy key in the Container, or injected by an intercept?
 
@@ -26,7 +43,10 @@ Closed by step 4a: A′ (the decision above). The options as they were weighed:
 
 Either way: an intercept checks the URL's host (the Host header is container-controlled), and each CLI is spawned with an explicit environment.
 
-## Decision (step 4a, 2026-11-12): A′, a key helper, built
+## Decision (step 4a, 2026-11-12): A′, a key helper, built (superseded at the hard cut, SPI-1176)
+
+**Superseded:** the key helper, its route (`/t3flare/model-key`), its nonces and the sync guard's entry for
+`COMMISSARY_CONTAINER_API_KEY` are gone with the Model proxy; the model relay's Handle took their place (below).
 
 The owner chose A′. The CLI agents' key is `COMMISSARY_CONTAINER_API_KEY`, never the Workers' `MODEL_PROXY_API_KEY`, bound to the agents Worker alone.
 
@@ -51,7 +71,10 @@ Revised on 2026-11-11 by the text above. The original:
 >
 > If streaming through the intercept handler fails, Containers instead get real access tokens that expire within hours, never refresh tokens or year-long tokens. Credentialed CLIs then run under a second user ID so a Durable agent's shell cannot read their environment. Not offered: ACP's terminal `/login`, which would write a rotating credential into the synced Workspace.
 
-## Refinement (step 4b, 2026-11-12): the key path for Claude Code and OpenCode
+## Refinement (step 4b, 2026-11-12): the key path for Claude Code and OpenCode (superseded at the hard cut, SPI-1176)
+
+**Superseded:** `t3flare-claude-key` and the OpenCode plugin's helper path are gone; Claude Code's `apiKeyHelper` is
+`t3flare-claude-handle` and the plugin gives each endpoint's provider the Handle (SPI-1168, SPI-1169).
 
 - **Claude Code** takes the key from `apiKeyHelper` in its managed settings: `t3flare-claude-key`, which runs 4a's `t3flare-model-key claude` with this process's nonce, read from the process's Container-local home (the launcher moves it there from the environment, so Claude's Bash, hooks and helpers never inherit it). Claude Code's own env scrub was tried and rejected: in 2.1.322 it isolates every command with bubblewrap and leaves empty decoy files (`package.json`, `.gitmodules`, `.env*`) in the repository (M0 P1). `CLAUDE_CODE_API_KEY_HELPER_TTL_MS` is 24 h: one grant per process (M0 P1); the gate allows 2.
 - **OpenCode** takes it from a server plugin of ours in the image (`/opt/t3flare/share/opencode-key-plugin`), allowed by absolute path while every other plugin is denied: at load it asks the helper once with the nonce, deletes the nonce from its process environment, and sets `x-api-key` on the `t3flare` provider through `ctx.provider.transform`. No loopback relay was needed (M0 P2). One grant per process; the gate allows 2; a re-ask after a 401 is SPI-1045. (SPI-1169: on the model relay the plugin asks no helper; a handle does not rotate while its process lives, so SPI-1045 is moot there, and the key helper itself goes at the hard cut.)
@@ -324,3 +347,26 @@ API-key one: the handle is swapped for the credential in the agents Worker, neve
    **The DO's own files are not searched for them**, and the answer names them in `containerOnly` so the gap shows.
    What reaches those files passes the sync guard, which looks only for the newest access token the relay used per
    endpoint, kept in memory: never a refresh token, nor an access token the relay has not used in this DO's life.
+
+## Refinement (SPI-1176, 2026-11-17): the hard cut
+
+Report: [`docs/steps/spi-1176.md`](../steps/spi-1176.md).
+
+1. **The relay is the only way.** Every CLI's profile names only Model endpoints (`agents/cliProfiles.ts`,
+   `acpProfiles.ts`); the Model proxy's provider (Codex's `t3flare-proxy`, pi's `anthropic` `models.json`, Claude Code's
+   proxy `ANTHROPIC_BASE_URL`, OpenCode's `t3flare` provider) is gone, and so are the key helper
+   (`t3flare-model-key`, `t3flare-claude-key`, the Workspace DO's `/t3flare/model-key` route and its nonce gate) and
+   `COMMISSARY_CONTAINER_API_KEY`. The sync guard and the leak check look for the git tokens, the endpoint keys the relay
+   used and the sign-ins' tokens, as before; the Container key entry went with the key.
+2. **No endpoint, no spawn.** A CLI with no endpoint of an API it speaks (Codex: OpenAI Responses; Claude Code: Anthropic
+   Messages; OpenCode: those two and OpenAI-compatible Completions; pi: any) is refused before anything starts, with
+   "<CLI> has no Model endpoint to run on: it needs one that speaks <API> and that lists a model; add one in the
+   Harness panel (/_t3flare/harness), under Model endpoints". t3 shows it as the session's failure, and the provider's
+   status needs setup (ADR-0034's SPI-1176 refinement). Codex's investigating `codex exec` runs on the relay too.
+3. **Old threads.** A thread's model from before the cut runs on the default model (ADR-0034's SPI-1176 refinement):
+   Claude Code and OpenCode through the flavor's model id, pi through its `set_model` line (`anthropic` mapped to the
+   default's provider), Codex through the request guard's route. A Codex thread whose rollout names the proxy's provider
+   cannot move to an endpoint's (Codex refuses a thread on another provider): it needs a new thread.
+4. **The ACP registry's rule** (the G13 refinement) now reads: an agent is admitted when it takes the relay's base URL
+   through its own setting and t3flare has a profile that keeps its Handle out of its commands. The four built-in CLIs
+   do; the rest stay refused, as before.

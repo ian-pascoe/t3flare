@@ -150,19 +150,15 @@ How a CLI agent's process, spawned by t3 in the Environment, runs in its Workspa
 _Avoid_: process bridge, remote spawn
 
 **CLI profile**:
-What a CLI agent's process gets whatever t3 asked: the image's binary, an allowlisted environment, the model proxy as its only provider, and a home built fresh on the Container's disk with only its session directory synced.
+What a CLI agent's process gets whatever t3 asked: the image's binary, an allowlisted environment, the Model endpoints whose API it speaks as its only providers (through the Model relay, with its Handle), and a home built fresh on the Container's disk with only its session directory synced. Without such an endpoint it is refused.
 _Avoid_: CLI config
 
-**Key helper**:
-The command a CLI agent runs for its model proxy key (`t3flare-model-key`), which asks the Workspace DO only while a CLI process lives there; the key is never in an environment or on disk.
-_Avoid_: token helper (Codex's managed mode), credential helper (that is git's)
-
 **ACP flavor**:
-What t3flare passes to t3's generic ACP adapter (`makeAcpAdapterV2`) to run Claude Code or OpenCode under t3's kinds: the agent's spawn through the process channel, the pinned asking mode, t3flare's answer to each permission request, the approval card, the model ids and the proxy's failures (`provider/cli/acpDriver.ts`, `acpFlavor.ts`).
+What t3flare passes to t3's generic ACP adapter (`makeAcpAdapterV2`) to run Claude Code or OpenCode under t3's kinds: the agent's spawn through the process channel, the pinned asking mode, t3flare's answer to each permission request, the approval card, the model ids and a failed prompt's failure (`provider/cli/acpDriver.ts`, `acpFlavor.ts`).
 _Avoid_: ACP driver, registry agent (t3's ACP Registry driver is another thing, refused)
 
 **Managed settings**:
-Claude Code's highest settings source, shared by every Claude process in a Container: where its requests go and how it gets its key, and the permissions a repository's `.claude/` cannot override. Its requests go to the Model relay's Model-routed URL with the process's Handle as its key when an Anthropic Messages Model endpoint lists a model; otherwise to the Model proxy. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`: where its requests go, also the Model relay's or the Model proxy's.
+Claude Code's highest settings source, shared by every Claude process in a Container: where its requests go and how it gets its key, and the permissions a repository's `.claude/` cannot override. Its requests go to the Model relay's Model-routed URL with the process's Handle as its key. OpenCode's counterpart is its **system configuration**, `/etc/opencode/opencode.json`: where its requests go, the Model relay's per-endpoint URLs.
 
 ## Tools
 
@@ -346,17 +342,13 @@ _Avoid_: prompt, snippet, MCP prompt
 **Provider instance**:
 One configured way to reach an agent or model provider, with its own credentials. Used in t3's sense.
 
-**Model proxy**:
-The HTTP endpoint model calls go to by default until the hard cut (Durable agents' and CLI agents' turns, and generated titles and commit text on its models; a Model endpoint's models go to that endpoint instead), set by `MODEL_PROXY_URL` and `MODEL_PROXY_API_KEY`. It holds the owner's Subscriptions and provider keys; t3flare holds only its URL and keys. It speaks the Anthropic Messages API, lists its models at `GET /v1/models` and translates to other providers; t3flare is built against Commissary. See `docs/model-proxy.md`.
-_Avoid_: gateway, LLM router
-
 **Model endpoint**:
-One of the owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Replaces the Model proxy at the hard cut.
+One of the owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one (since the hard cut, SPI-1176, which retired the Model proxy). Set up in the Harness panel; see `docs/model-endpoints.md`.
 _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 
 **Model relay**:
 How a CLI agent reaches a Model endpoint without holding its credential: the agent presents a Handle, and the endpoint's own credential is used in its place.
-_Avoid_: model proxy (that is the Model proxy), gateway, intercept
+_Avoid_: model proxy (the retired Model proxy was another thing), gateway, intercept
 
 **Model-routed URL**:
 The Model relay's one base URL for every Model endpoint a process may use: the endpoint is chosen per request, from the model the request names. For a CLI agent that takes one base URL per process.
@@ -371,7 +363,7 @@ The usage windows one Model endpoint answer reported in its vendor's rate-limit 
 _Avoid_: quota report (that is Commissary's), usage record (that counts tokens)
 
 **Subscription**:
-The owner's own signed-in plan with a model vendor (ChatGPT, Claude, GitHub Copilot), as opposed to an API key: a Model endpoint's sign-in, its tokens held by the Credential broker.
+The owner's own signed-in plan with a model vendor (ChatGPT plan usage, a Claude Pro or Max plan, GitHub Copilot), as opposed to an API key: a Model endpoint's sign-in, made in the Harness panel, its tokens held and refreshed by the Credential broker and never in a Container. (Before the hard cut, SPI-1176, subscriptions sat in the Model proxy instead.)
 _Avoid_: Subscription login, OAuth, account
 
 **Credential broker**:

@@ -1,9 +1,11 @@
 # Model endpoints are the owner's, set in the Harness panel
 
-Status: draft (SPI-1162, 2026-11-14), to be accepted at the hard cut (SPI-1176). Part of **Model endpoints**
-(SPI-1160 to SPI-1176; the owner's decisions of 2026-11-13). Report: [`docs/steps/spi-1162.md`](../steps/spi-1162.md).
-Refines [ADR-0012](0012-all-model-access-goes-through-the-model-proxy.md) (until the hard cut, the Model proxy and
-the endpoints stand side by side) and [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md)
+Status: **accepted** at the hard cut (SPI-1176, 2026-11-17); drafted with SPI-1162 (2026-11-14). Part of **Model
+endpoints** (SPI-1160 to SPI-1176; the owner's decisions of 2026-11-13). Reports: [`docs/steps/spi-1162.md`](../steps/spi-1162.md),
+[`docs/steps/spi-1176.md`](../steps/spi-1176.md); the owner's guide: [`docs/model-endpoints.md`](../model-endpoints.md).
+**Supersedes** [ADR-0012](0012-all-model-access-goes-through-the-model-proxy.md) (until the hard cut, the Model proxy
+and the endpoints stood side by side; items 2, 5, 6 and 8 below say what they did then, and the SPI-1176 refinement at
+the end what holds now) and refines [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md)
 (a third entity on the same page).
 
 t3flare stops depending on the Model proxy. The owner configures **Model endpoints**: each is an API pi-ai speaks
@@ -93,3 +95,30 @@ refinement) or none, optional headers, and the models it serves.
 
 Consequences: Commissary is one endpoint among others (an Anthropic Messages endpoint at its URL with its key). Losing
 a stage's alchemy state loses its credentials key, and the owner enters the endpoints' keys again.
+
+## Refinement (SPI-1176, 2026-11-17): the hard cut
+
+Report: [`docs/steps/spi-1176.md`](../steps/spi-1176.md). t3flare no longer knows a Model proxy. Where items 2, 5, 6 and 8
+speak of "until the hard cut", this holds instead:
+
+1. **No proxy, no compatibility path.** `MODEL_PROXY_URL`, `MODEL_PROXY_API_KEY`, `COMMISSARY_CONTAINER_API_KEY` and every
+   `COMMISSARY_*` setting are gone from the code, the deploy and CI, with the key helper (its route, nonces and the sync
+   guard's entry for its key), the proxy's catalog and static model list, its failure classifier (`proxyFailure.ts`), and
+   Commissary's usage and limit readers. Commissary is one endpoint among others (Anthropic Messages at its host, OpenAI
+   Responses at its `/v1` for Codex), and its MCP tools a direct server the owner adds (ADR-0028's SPI-1160 refinement).
+2. **The setup state.** With no endpoint that lists a model, Pi Durable's provider is t3's `warning` status with no model
+   and a message pointing to the Harness panel; so is each CLI's with no endpoint of an API it speaks, and its spawn is
+   refused saying which API it needs (ADR-0016's SPI-1176 refinement). Nothing runs until the owner adds an endpoint.
+3. **Old selections fall back** (item 6's "until SPI-1176's fallback"): a model selection from before the cut (the
+   proxy's `anthropic/<id>`, a bare id, `default`) runs on the default model, the first model of the first endpoint that
+   lists one (each CLI's: of its endpoints), for Pi Durable and every CLI; text generation's falls back to text
+   generation's default. A slug of an endpoint that is gone still fails, saying so. `anthropic` stays a reserved
+   endpoint id, so no endpoint answers for an old selection by accident.
+4. **Text generation's default** (item 5): a small model of the first endpoint that has one, else the default model; with
+   no endpoint, it says to set one up. The Guardian, prompt suggestions and `web_search` (on an Anthropic Messages
+   endpoint with an API key or no auth) use the same small model unless the owner names another endpoint's model; the
+   Advisor follows the thread's.
+5. **Failures** (item 8): every failed answer is an endpoint's, classified by its API and auth; no other classifier is
+   left.
+6. **Usage and limits**: the Usage page and the limit meters read t3flare's own records alone, every endpoint's
+   (Commissary's included) counted once.

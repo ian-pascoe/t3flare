@@ -23,7 +23,8 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
    `claude` second (item 10), `copilot` third (item 11), each one entry in `SIGN_IN_KINDS` and one vendor in the
    broker). A sign-in fixes its endpoint's API and base URL and allows no headers of the owner's (Copilot's base URL is
    its token's, item 11); its auth never changes (remove the endpoint to change it). Until the hard cut (SPI-1176),
-   Subscriptions may also stay connected in the Model proxy.
+   Subscriptions could also stay connected in the Model proxy; since it, a Model endpoint's sign-in is the only place
+   one lives in t3flare.
 2. **The broker is ours, not t3's.** `credentials/broker.ts` implements pi-ai's `CredentialStore` over the sealed store
    (ADR-0034 §4: AES-256-GCM under the stage's credentials key), keyed by the endpoint's id. t3's `CodexChatGptAuth` is
    not reused: sign-ins are edited on the Harness panel, not t3's provider settings, and the Environment's bundle keeps

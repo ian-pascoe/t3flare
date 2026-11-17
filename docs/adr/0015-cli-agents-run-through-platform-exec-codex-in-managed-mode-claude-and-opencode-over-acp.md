@@ -11,6 +11,13 @@ CLI agents cannot run in a Durable Object (workerd's `child_process` is a stub, 
 
 All are pre-installed in one image shared with Durable agents. At most 3 Containers run at once, and a turn may run at most 2 hours.
 
+## Refinement (SPI-1176, 2026-11-17): every CLI on the Model endpoints
+
+Since the hard cut no CLI reaches a Model proxy: each runs on the Model endpoints whose API it speaks, through the model
+relay with a per-process handle ([ADR-0016](0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md)'s
+SPI-1167 to SPI-1171 refinements), and is refused at its spawn without one. The refinement below is kept for its
+history.
+
 ## Refinement (2026-11-11): every CLI on the model proxy, and the pi CLI added
 
 After [ADR-0012](0012-all-model-access-goes-through-the-model-proxy.md), no CLI uses a vendor sign-in:
