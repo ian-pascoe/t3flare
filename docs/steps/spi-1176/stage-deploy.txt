@@ -1,0 +1,35 @@
+# p1176 deploy at f21d63fb175c0f0c716e8e00b720569ef74e1175: each Worker's bindings as alchemy's last pass reported them (names only)
+env | grep -c T3FLARE_DOMAIN: 0
+Agents/CODEMODE_SANDBOX
+Agents/CONTAINER_BUDGET
+Agents/ENVIRONMENT
+Agents/LOADER
+Agents/SESSIONS
+Agents/T3FLARE_FAULTS
+Agents/WORKSPACES
+Environment/BROWSER
+Environment/CONTAINER_BUDGET
+Environment/ENVIRONMENT
+Environment/MCP_ENGINE
+Environment/MCP_OAUTH
+Environment/SESSIONS
+Environment/T3FLARE_ACCESS_AUD
+Environment/T3FLARE_ACCESS_SERVICE_CLIENT_ID
+Environment/T3FLARE_ACCESS_SETTINGS_AUD
+Environment/T3FLARE_ACCESS_TEAM_DOMAIN
+Environment/T3FLARE_ADMIN_TOKEN
+Environment/T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN
+Environment/T3FLARE_CONNECT_SERVICE_TOKEN
+Environment/T3FLARE_CREDENTIALS_KEY
+Environment/T3FLARE_FAULTS
+Environment/T3FLARE_GITHUB_APP_ID
+Environment/T3FLARE_GITHUB_APP_PRIVATE_KEY
+Environment/T3FLARE_HOST
+Environment/T3FLARE_OWNER_EMAIL
+Environment/T3FLARE_SWEEP_PURGE
+Environment/T3_BOOTSTRAP_TOKEN
+Environment/TEXT_GENERATION
+Environment/WORKSPACES
+Environment/WORKSPACE_PREVIEWS
+MODEL_PROXY_*/COMMISSARY_* mentions in the whole deploy log: 0
+t3flare: no Model endpoint set up: T3FLARE_MODEL_ENDPOINT is not set
