@@ -188,8 +188,15 @@ const ok =
   // A new build on CI's own stage starts fresh: boots the last build failed (safe mode after three, which only the owner
   // or this turns off, ADR-0010) say nothing about this one.
   step(`the ${stage} stage starts its new build fresh (safe mode off)`, () => {
-    const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "admin", "POST", "/_t3flare/safe-mode?on=0"], environment);
-    return { ok: result.ok && /^200 /m.test(result.output), detail: result.output };
+    // Just after a deploy the admin routes can refuse for a moment (a 404, as the panel's endpoint save also met): retried.
+    let output = "";
+    for (let attempt = 0; attempt < 12; attempt++) {
+      if (attempt > 0) spawnSync("sleep", ["5"]);
+      const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "admin", "POST", "/_t3flare/safe-mode?on=0"], environment);
+      output = result.output;
+      if (result.ok && /^200 /m.test(output)) return { ok: true, detail: `attempt ${attempt + 1}: ${output}` };
+    }
+    return { ok: false, detail: output };
   }) &&
   step(`acceptance test against the ${stage} stage`, () => {
     const out = path.join(environment, "dist/bump-acceptance.json");
