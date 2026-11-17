@@ -15,6 +15,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as url from "node:url";
 
 import { credentialsFile, secretsFile as secretsFileOf, standinFile } from "../stage-files.ts";
 import { buildWorker } from "../build.ts";
@@ -199,7 +200,9 @@ switch (command) {
       process.exit(2);
     }
     const access = JSON.parse(fs.readFileSync(credentialsFile(stage), "utf8")) as { url: string; adminUrl?: string; settingsMcpUrl?: string; clientId: string; clientSecret: string };
-    const result = spawnSync(process.execPath, [path.join(here, "scripts", `${script}.ts`), ...args], {
+    // Each script's fetch retries a connection Cloudflare's edge reset (lib/resetRetry.ts).
+    const installResetRetry = url.pathToFileURL(path.join(here, "scripts/lib/installResetRetry.ts")).href;
+    const result = spawnSync(process.execPath, ["--import", installResetRetry, path.join(here, "scripts", `${script}.ts`), ...args], {
       cwd: here,
       stdio: "inherit",
       env: {

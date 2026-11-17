@@ -9,8 +9,6 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 import * as Socket from "effect/socket/Socket";
 
 import { CLI_APIS } from "./modelEndpointSpec.ts";
-// Every stage script's fetch survives a reset HTTP/2 stream at Cloudflare's edge.
-import "./resetRetry.ts";
 
 export const base = new URL(process.env.T3_URL ?? "http://localhost:8791");
 const bootstrapToken = process.env.T3_BOOTSTRAP_TOKEN ?? "local-bootstrap-token-0123456789";

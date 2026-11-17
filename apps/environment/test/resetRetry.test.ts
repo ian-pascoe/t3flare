@@ -41,5 +41,11 @@ describe("withResetRetry", () => {
     const streamed = vi.fn<typeof fetch>().mockRejectedValue(reset());
     await expect(withResetRetry(streamed)("https://stage.example/api", { method: "POST", body: new Uint8Array([1]) })).rejects.toThrow("fetch failed");
     expect(streamed).toHaveBeenCalledTimes(1);
+
+    const controller = new AbortController();
+    controller.abort();
+    const aborted = vi.fn<typeof fetch>().mockRejectedValue(reset());
+    await expect(withResetRetry(aborted)("https://stage.example/api", { signal: controller.signal })).rejects.toThrow("fetch failed");
+    expect(aborted).toHaveBeenCalledTimes(1);
   });
 });
