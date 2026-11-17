@@ -113,13 +113,17 @@ def request(flow):
     h = flow.request.headers
     # A failed log line must never fail the request: the probe would then measure the log, not mise.
     try:
-      with open("/home/mitmproxy/.mitmproxy/requests.jsonl", "a") as f:
+      with open("/m0proxy/requests.jsonl", "a") as f:
         f.write(json.dumps({"method": flow.request.method, "host": flow.request.pretty_host, "path": flow.request.path.split("?")[0], "authorization": h.get("authorization", "")[:13]}) + "\\n")
     except Exception as e:
       print("m0 log failed:", e)
 `,
     );
-    docker(["run", "-d", "--name", PROXY, "--network", NET, "-v", `${work}:/home/mitmproxy/.mitmproxy`, MITMPROXY, "mitmdump", "-q", "-s", "/home/mitmproxy/.mitmproxy/log.py"]);
+    // As the host's user, past the image's entrypoint: that one runs `usermod` to the mounted directory's owner, which
+    // fails (and ends the container) on a Linux host whose group the image does not have; Docker Desktop hides it. The
+    // proxy's files are then the host user's, which it can read and remove.
+    const owner = `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`;
+    docker(["run", "-d", "--name", PROXY, "--network", NET, "--user", owner, "-e", "HOME=/tmp", "--entrypoint", "mitmdump", "-v", `${work}:/m0proxy`, MITMPROXY, "-q", "--set", "confdir=/m0proxy", "-s", "/m0proxy/log.py"]);
     for (let tries = 0; !fs.existsSync(path.join(work, "mitmproxy-ca-cert.pem")) && tries < 60; tries++) spawnSync("sleep", ["1"]);
     const requestsFile = path.join(work, "requests.jsonl");
     const proxyState = docker(["inspect", "-f", "{{.State.Status}} {{.State.ExitCode}}", PROXY], { quiet: true }).stdout.trim();
