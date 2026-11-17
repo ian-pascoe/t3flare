@@ -43,3 +43,17 @@ Under Bun, every nightly bump re-translated t3code's pnpm settings into Bun's. C
 - **`tsx` to run scripts**: we have no syntax that Node's stripping rejects.
 
 Evidence: `docs/steps/pnpm-plan.md` (with its review changelog), `docs/steps/pnpm.md` and `docs/steps/pnpm/`.
+
+## Refinement (in-app updates, ADR-0037, 2026-11-17): a bump keeps t3flare's own resolutions
+
+`seed-lock.ts` now carries t3flare's own importers over from the current lock, with what they install that t3's graph
+does not name, and `relock.ts` installs with `--fix-lockfile`, so pnpm keeps those resolutions and mends their references
+into t3's graph. Before, every bump re-resolved t3flare's own packages against the registry, so a bump's lock drifted
+wherever a registry release had landed since the last one (the first trial: `@smithy/core` 3.40.0 to 3.41.0, through
+alchemy's dependencies), and nothing tied that drift to t3. Now a bump's lock moves only where t3 moved (its own graph,
+its catalog, overrides and patches), which is what the land check holds it to (ADR-0037 §5). t3flare's own packages move
+when their manifests do, or by a deliberate `pnpm update`. Names t3 installs are still resolved against t3's graph, never
+carried over (step 4 above, measured in M0), and `verify-lock.ts` still fails on any move of t3's graph. Measured on
+`v0.1.11-nightly.20261117.4851`: verify-lock passed, and the lock's diff was t3's (`@legendapp/list` 3.7.3, its patch
+dropped, the peer variants that follow).
+
