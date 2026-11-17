@@ -5,15 +5,14 @@
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import type { UsageEntry } from "@t3flare/models/usage";
 import * as Effect from "effect/Effect";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { UsageAggregator } from "../../../t3code/apps/server/src/usage/usageAggregation.ts";
 import { parseRateTable } from "../../../t3code/apps/server/src/usage/usagePricing.ts";
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
-import { commissaryManagementOf } from "../src/usage/commissary.ts";
 import { usageReader } from "../src/usage/readers.ts";
-import { acceptUsage, commissaryCountedCache, countedByCommissary, usageRecorder } from "../src/usage/commissaryCount.ts";
 import {
+  acceptUsage,
   listedModelOf,
   MAX_USAGE_ROWS,
   USAGE_RETENTION_MS,
@@ -59,9 +58,9 @@ const entry = (over: Partial<UsageEntry> = {}): UsageEntry => ({
   ...over,
 });
 
-/** t3's reader for `provider`, as the Shadow builds it, on `store` (no Commissary configured). */
+/** t3's reader for `provider`, as the Shadow builds it, on `store`. */
 const readerOn = (store: UsageStore, provider: "pi" | "codex" | "claude" | "opencode") => {
-  bindEnvironmentServices({ usage: store, commissary: undefined } as unknown as EnvironmentServices);
+  bindEnvironmentServices({ usage: store } as unknown as EnvironmentServices);
   return usageReader(provider);
 };
 
@@ -237,115 +236,37 @@ describe("a dated model's listed one", () => {
   });
 });
 
-// Until the hard cut (SPI-1176), the page reads Commissary's request log as well: a request on an endpoint keyed with a
-// key the log is read for is the log's to count, never ours too.
-describe("no request counted twice beside Commissary's log", () => {
-  const PROXY_KEY = "cms_global_0a1b2c3d4e5f6a7b8c9d_c2VjcmV0";
-  const OTHER_KEY = "cms_global_ffffffffffffffffffff_b3RoZXI";
-  const keys: Readonly<Record<string, string>> = { comm: PROXY_KEY, mine: "sk-ant-own-key", other: OTHER_KEY };
+// Since the hard cut (SPI-1176) the page reads t3flare's own records alone: every endpoint's records are kept, Commissary's
+// included (its request log was read beside them before, and the records of the endpoints it counted were dropped).
+describe("every endpoint's records, counted once, ours", () => {
   const two: ModelEndpoints = {
     revision: 7,
     endpoints: [
       { ...endpoints.endpoints[0]!, id: "comm" },
       { ...endpoints.endpoints[0]!, id: "mine" },
-      { ...endpoints.endpoints[0]!, id: "other" },
       { ...endpoints.endpoints[0]!, id: "open", auth: "none" },
     ],
   };
-  const config = commissaryManagementOf({ COMMISSARY_MANAGEMENT_URL: "https://c.example", COMMISSARY_MANAGEMENT_KEY: "cmsm_global_k_s", MODEL_PROXY_API_KEY: PROXY_KEY })!;
-  const counted = (endpointsNow: ModelEndpoints) => countedByCommissary(endpointsNow, async (id) => keys[id], config.principals);
 
-  afterEach(() => vi.unstubAllGlobals());
-
-  it("finds the endpoints whose key is a principal the log is read for (the proxy's key), and only those", async () => {
-    expect([...(await counted(two))]).toEqual(["comm"]);
-    expect([...(await countedByCommissary(two, async (id) => keys[id], []))]).toEqual([]);
-    expect([...(await countedByCommissary(two, async (id) => keys[id], ["key:ffffffffffffffffffff", "key:0a1b2c3d4e5f6a7b8c9d"]))].sort()).toEqual(["comm", "other"]);
-  });
-
-  it("keeps every other endpoint's records, and stores what it keeps", async () => {
+  it("keeps every endpoint's records, and stores what it keeps", async () => {
     const store = usageStore(nodeSqlStorage());
-    const answer = await acceptUsage(
-      { entries: [entry({ endpointId: "comm" }), entry({ endpointId: "mine" }), entry({ endpointId: "open" }), entry({ endpointId: "other" })] },
-      { store, endpoints: two, countedByCommissary: counted, now: () => NOW },
-    );
+    const answer = acceptUsage({ entries: [entry({ endpointId: "comm" }), entry({ endpointId: "mine" }), entry({ endpointId: "open" })] }, { store, endpoints: two, now: () => NOW });
     expect(answer).toEqual({ kept: 3 });
-    expect((await scanOf(store, "pi"))[0]!.files![0]!.records.map((record) => record.model).sort()).toEqual(["mine/claude-sonnet-4-5", "open/claude-sonnet-4-5", "other/claude-sonnet-4-5"]);
+    expect((await scanOf(store, "pi"))[0]!.files![0]!.records.map((record) => record.model).sort()).toEqual(["comm/claude-sonnet-4-5", "mine/claude-sonnet-4-5", "open/claude-sonnet-4-5"]);
   });
 
-  it("drops the entries when it cannot tell, and reads at most MAX_USAGE_ENTRIES of one call", async () => {
+  it("reads at most MAX_USAGE_ENTRIES of one call, and nothing of junk", () => {
     const store = usageStore(nodeSqlStorage());
-    expect(await acceptUsage({ entries: [entry()] }, { store, endpoints: two, countedByCommissary: () => Promise.reject(new Error("sealed store")), now: () => NOW })).toEqual({ kept: 0 });
-    expect(await acceptUsage({ entries: Array.from({ length: 100 }, () => entry({ endpointId: "mine" })) }, { store, endpoints: two, countedByCommissary: counted, now: () => NOW })).toEqual({ kept: 64 });
-    expect(await acceptUsage("junk", { store, endpoints: two, countedByCommissary: counted, now: () => NOW })).toEqual({ kept: 0 });
+    expect(acceptUsage({ entries: Array.from({ length: 100 }, () => entry({ endpointId: "mine" })) }, { store, endpoints: two, now: () => NOW })).toEqual({ kept: 64 });
+    expect(acceptUsage("junk", { store, endpoints: two, now: () => NOW })).toEqual({ kept: 0 });
   });
 
-  it("is what EnvironmentDO.recordUsage runs: the configured principals, the store's keys, the store's endpoints", async () => {
+  it("shows a turn on any endpoint once on the page, from our records alone", async () => {
     const store = usageStore(nodeSqlStorage());
-    let opened = 0;
-    const record = usageRecorder({
-      usage: () => store,
-      principals: () => config.principals,
-      endpoints: { load: () => two, resolve: async (id) => (opened++, { endpoint: two.endpoints.find((endpoint) => endpoint.id === id)!, apiKey: keys[id], unreadable: false }) },
-      now: () => NOW,
-    });
-    expect(await record({ entries: [entry({ endpointId: "comm" }), entry({ endpointId: "mine" })] })).toEqual({ kept: 1 });
-    expect(await record({ entries: [entry({ endpointId: "comm" })] })).toEqual({ kept: 0 });
-    expect((await scanOf(store, "pi"))[0]!.files![0]!.records.map((record) => record.model)).toEqual(["mine/claude-sonnet-4-5"]);
-    // Three API-key endpoints, opened once for the revision.
-    expect(opened).toBe(3);
-  });
-
-  it("keeps the records of an endpoint whose key cannot be read, or whose read fails (it serves no request)", async () => {
-    const store = usageStore(nodeSqlStorage());
-    const record = usageRecorder({
-      usage: () => store,
-      principals: () => config.principals,
-      endpoints: {
-        load: () => two,
-        resolve: async (id) => {
-          if (id === "other") throw new Error("sealed store busy");
-          const endpoint = two.endpoints.find((entry) => entry.id === id)!;
-          // `comm`'s key, the proxy's, no longer opens (the credentials key changed).
-          return id === "comm" ? { endpoint, apiKey: undefined, unreadable: true } : { endpoint, apiKey: keys[id], unreadable: false };
-        },
-      },
-      now: () => NOW,
-    });
-    expect(await record({ entries: [entry({ endpointId: "comm" }), entry({ endpointId: "other" }), entry({ endpointId: "mine" })] })).toEqual({ kept: 3 });
-  });
-
-  it("opens the keys once per revision of the endpoints, and asks again after a failure", async () => {
-    let opened = 0;
-    let fail = true;
-    const cache = commissaryCountedCache(async (endpointsNow) => {
-      opened += 1;
-      if (fail) throw new Error("busy");
-      return counted(endpointsNow);
-    });
-    await expect(cache(two)).rejects.toThrow("busy");
-    fail = false;
-    expect([...(await cache(two))]).toEqual(["comm"]);
-    await cache(two);
-    expect(opened).toBe(2);
-    await cache({ ...two, revision: 8 });
-    expect(opened).toBe(3);
-  });
-
-  it("counts a turn on the proxy-key endpoint once on the page (the log's) and another endpoint's once (ours)", async () => {
-    const store = usageStore(nodeSqlStorage());
-    bindEnvironmentServices({ usage: store, commissary: config } as unknown as EnvironmentServices);
-    // The agents Worker sends both; the Environment keeps only `mine`'s.
-    await acceptUsage({ entries: [entry({ agent: "claude", endpointId: "comm", modelId: "claude-sonnet-4-5" }), entry({ agent: "claude", endpointId: "mine" })] }, { store, endpoints: two, countedByCommissary: counted, now: () => NOW });
-    // Commissary's log has the `comm` request, under the proxy key's principal.
-    vi.stubGlobal("fetch", async (url: string) => {
-      const query = new URL(url).searchParams;
-      const records = query.get("principal") === "key:0a1b2c3d4e5f6a7b8c9d" ? [{ timestamp: new Date(NOW - 60_000).toISOString(), provider: "claude", model: "claude-sonnet-4-5", endpoint: "/v1/messages", api_key: "x", request_id: "r1", failed: false, session_id: "claude:abc", token_breakdown: { input: { uncached_tokens: 100, cache_read_tokens: 1_000, cache_write_tokens: 0 }, output: { total_tokens: 50, reasoning_tokens: 0 } } }] : [];
-      return Response.json({ records });
-    });
+    bindEnvironmentServices({ usage: store } as unknown as EnvironmentServices);
+    acceptUsage({ entries: [entry({ agent: "claude", endpointId: "comm" }), entry({ agent: "claude", endpointId: "mine" })] }, { store, endpoints: two, now: () => NOW });
     const scans = await Effect.runPromise(usageReader("claude").scan({ instances: [], settings: {} as never, windowStartMs: NOW - DAY, retentionCutoffMs: 0, awaitRefresh: true }));
     const records = scans.flatMap((scan) => (scan.files ?? []).flatMap((file) => file.records.map((record) => `${scan.dir} ${record.model}`)));
-    expect(records).toEqual(["t3flare://usage/claude mine/claude-sonnet-4-5", "commissary://c.example/claude claude-sonnet-4-5"]);
+    expect(records.sort()).toEqual(["t3flare://usage/claude comm/claude-sonnet-4-5", "t3flare://usage/claude mine/claude-sonnet-4-5"]);
   });
 });
-

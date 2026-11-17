@@ -1,6 +1,6 @@
 // SPI-1168: the spawner's Claude Code wiring (`spawnCli` for `claude-agent-acp`). With an Anthropic Messages endpoint
-// that lists a model, the process runs on the model relay (its handle asked for those endpoints, no Model proxy
-// needed); with none, on the Model proxy as before; with neither, it is refused.
+// that lists a model, the process runs on the model relay (its handle asked for those endpoints); with none, it is
+// refused, saying so (SPI-1176: until the hard cut, the Model proxy ran it then).
 import * as Effect from "effect/Effect";
 import * as ChildProcess from "effect/process/ChildProcess";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
@@ -14,14 +14,12 @@ const model = (id: string) => ({ id, name: id, reasoning: false, input: ["text" 
 const anthropic = (id: string, models: ReadonlyArray<string>) => ({ id, label: id, api: "anthropic-messages" as const, baseUrl: `https://${id}.example`, auth: "api-key" as const, headers: {}, models: models.map(model) });
 
 const started: Array<ChannelStart> = [];
-const bind = (options: { readonly proxy: boolean; readonly endpoints: ModelEndpoints }) =>
+const bind = (options: { readonly endpoints: ModelEndpoints }) =>
   bindEnvironmentServices({
     workspaces: { list: () => [], resolve: (id: string) => (id === "demo" ? { id } : undefined), get: () => undefined, worktreesOf: () => [] },
     agents: { WORKSPACES: { idFromName: (name: string) => name, get: () => ({ takeEnvironmentSkills: async (hash: string) => ({ taken: false, hash }) }) } },
     environmentSkills: () => ({ hash: () => undefined }),
-    modelProxy: options.proxy ? { url: "https://proxy.example", apiKey: "k" } : undefined,
     modelEndpoints: () => options.endpoints,
-    catalog: { current: () => ({ models: [{ id: "claude-sonnet-5-5", slug: "anthropic/claude-sonnet-5-5" }] }) },
     faults: false,
     relayServers: () => [],
     processes: {
@@ -42,9 +40,9 @@ afterEach(() => {
 });
 
 describe("spawnCli for Claude Code", () => {
-  it("runs it on the Anthropic Messages endpoints through the relay, without a Model proxy", async () => {
+  it("runs it on the Anthropic Messages endpoints through the relay", async () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
-    bind({ proxy: false, endpoints: { revision: 1, endpoints: [anthropic("comm", ["claude-haiku-5-5"]), anthropic("empty", [])] } });
+    bind({ endpoints: { revision: 1, endpoints: [anthropic("comm", ["claude-haiku-5-5"]), anthropic("empty", [])] } });
     expect((await spawnClaude())._tag).toBe("Success");
     const start = started[0]!;
     expect(start.modelRelay).toEqual(["comm"]);
@@ -52,20 +50,13 @@ describe("spawnCli for Claude Code", () => {
     expect(settingsOf(start)).toMatchObject({ apiKeyHelper: "/opt/t3flare/bin/t3flare-claude-handle", availableModels: ["comm/claude-haiku-5-5"] });
   });
 
-  it("runs it on the Model proxy when no Anthropic Messages endpoint lists a model", async () => {
+  it("refuses it without an endpoint for its API, saying so and where to add one (SPI-1176)", async () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
-    bind({ proxy: true, endpoints: { revision: 1, endpoints: [anthropic("empty", [])] } });
-    expect((await spawnClaude())._tag).toBe("Success");
-    const start = started[0]!;
-    expect(start.modelRelay).toBeUndefined();
-    expect(start.env.ANTHROPIC_BASE_URL).toBe("https://proxy.example");
-    expect(settingsOf(start)).toMatchObject({ apiKeyHelper: "/opt/t3flare/bin/t3flare-claude-key", availableModels: ["claude-sonnet-5-5"] });
-  });
-
-  it("refuses it with neither", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => undefined);
-    bind({ proxy: false, endpoints: { revision: 1, endpoints: [anthropic("empty", [])] } });
-    expect((await spawnClaude())._tag).toBe("Failure");
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    bind({ endpoints: { revision: 1, endpoints: [anthropic("empty", [])] } });
+    const exit = await spawnClaude();
+    expect(exit._tag).toBe("Failure");
+    expect(String(exit._tag === "Failure" ? exit.cause : "")).toContain("Claude Code has no Model endpoint to run on: it needs one that speaks Anthropic Messages and that lists a model");
     expect(started).toEqual([]);
   });
 });

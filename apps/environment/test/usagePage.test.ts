@@ -19,8 +19,7 @@ import * as ServerConfig from "../../../t3code/apps/server/src/config.ts";
 import * as ServerSettings from "../../../t3code/apps/server/src/serverSettings.ts";
 import * as UsageService from "../../../t3code/apps/server/src/usage/UsageService.ts";
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
-import { acceptUsage } from "../src/usage/commissaryCount.ts";
-import { usageStore } from "../src/usage/records.ts";
+import { acceptUsage, usageStore } from "../src/usage/records.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
 vi.mock("../../../t3code/apps/server/src/provider/builtInDrivers.ts", () => import("../src/shadows/builtInDrivers.ts"));
@@ -29,7 +28,7 @@ describe("t3's Usage page, through the Shadow's readers", () => {
   it("shows each agent's records by its endpoint's model, the unpriced one priced by t3's rate table", async () => {
     const now = Date.now();
     const store = usageStore(nodeSqlStorage());
-    bindEnvironmentServices({ usage: store, commissary: undefined } as unknown as EnvironmentServices);
+    bindEnvironmentServices({ usage: store } as unknown as EnvironmentServices);
     const endpoints = {
       revision: 1,
       endpoints: [
@@ -45,14 +44,14 @@ describe("t3's Usage page, through the Shadow's readers", () => {
       ],
     };
     const tokens = { input: 1_000_000, cacheRead: 0, cacheWrite: 0, output: 0, reasoning: 0 };
-    const kept = await acceptUsage(
+    const kept = acceptUsage(
       {
         entries: [
           { agent: "durable", endpointId: "gw", modelId: "house-model", at: now - 60_000, session: "s1", ...tokens, costUsd: 0.25 },
           { agent: "codex", endpointId: "gw", modelId: "house-model", at: now - 60_000, session: "proc-1", ...tokens, costUsd: null },
         ],
       },
-      { store, endpoints, countedByCommissary: async () => new Set(), now: () => now },
+      { store, endpoints, now: () => now },
     );
     expect(kept).toEqual({ kept: 2 });
 

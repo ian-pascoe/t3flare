@@ -50,8 +50,7 @@ const winnerOf = (loaded: Loaded): "environment" | "repo" | "both" | "none" => {
 
 it("each CLI reads the Environment skill set through its link, keeps its own winner per Repo root, and cannot write it (SPI-1153 M0)", async () => {
   const environmentSet = fs.mkdtempSync(path.join(here, ".env-set-"));
-  const nonce = `nonce-${randomUUID()}`;
-  const harness = startHarness(NAME, [nonce]);
+  const harness = startHarness(NAME);
   const write = (file: string, text: string) => {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, text);
@@ -73,7 +72,7 @@ it("each CLI reads the Environment skill set through its link, keeps its own win
   const dockerArgs = ["-v", `${environmentSet}:${SKILLS_MOUNT}:ro`];
   const marker = () => `proc-${randomUUID()}`;
   const run = (workspace: string, launch: Launch, key: string, argv?: ReadonlyArray<string>) =>
-    runCommand({ harness, name: argv === undefined ? NAME : `${NAME}-sh`, launch, marker: key, nonce, workspace, dockerArgs, ...(argv === undefined ? {} : { argv }) });
+    runCommand({ harness, name: argv === undefined ? NAME : `${NAME}-sh`, launch, marker: key, workspace, dockerArgs, ...(argv === undefined ? {} : { argv }) });
 
   /** A write through where the CLI reads the set (and a read of `e-env`), as a shell in the CLI's launch would make it. */
   const writeProbe = (workspace: string, cli: CliAgent, launch: Launch, key: string): string => {
@@ -129,7 +128,7 @@ it("each CLI reads the Environment skill set through its link, keeps its own win
       };
     }
     const launch = launchOf({ cli, args: ["acp"], key, env: {} });
-    const served = openCodeServedSkills({ harness, name: NAME, launch, marker: key, nonce, workspace, dockerArgs });
+    const served = openCodeServedSkills({ harness, name: NAME, launch, marker: key, workspace, dockerArgs });
     return { loaded: { skills: served.skills.map((skill) => ({ name: skill.name, description: skill.description ?? null, path: skill.path ?? null })), commands: [] }, raw: served.raw, launch, key };
   };
 

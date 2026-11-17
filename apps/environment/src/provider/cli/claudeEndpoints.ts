@@ -1,21 +1,21 @@
-// Claude Code's Model endpoints (SPI-1168): the endpoints that speak Anthropic Messages. With one, Claude Code runs on
-// them through the model relay, not the Model proxy: its one base URL is the relay's model-routed URL, so it reaches
+// Claude Code's Model endpoints (SPI-1168): the endpoints that speak Anthropic Messages. Claude Code runs on them through
+// the model relay (without one it is refused, SPI-1176): its one base URL is the relay's model-routed URL, so it reaches
 // every such endpoint in one process (a model switch between two endpoints stays in the thread's process), and its
 // models are the endpoints' slugs, which the relay reads from each request to pick its endpoint. The choice is the
 // Environment's, not the session's: Claude Code's managed settings are the Container's, shared by every Claude process
 // in it. Its background model (`ANTHROPIC_DEFAULT_HAIKU_MODEL`) is the text-generation model when that is one of these
 // endpoints' models. Pure.
 import type { ServerProviderModel } from "@t3tools/contracts";
-import { endpointSlug, type ModelEndpoint, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { endpointSlug, isRetiredSlug, type ModelEndpoint, type ModelEndpoints } from "@t3flare/models/endpoints";
 import { endpointsOfApi } from "@t3flare/models/relay";
 
 import type { ClaudeRelay } from "../../agents/acpProfiles.ts";
-import { cliModelId } from "./acpFlavor.ts";
 import { relayPickerModels, relayTextModel } from "./relayModels.ts";
 
 /**
  * The endpoints Claude Code reaches through the model relay: those that speak Anthropic Messages and list a model (its
- * `availableModels` come from them; an endpoint with none adds nothing, and none with a model leaves the proxy).
+ * `availableModels` come from them; an endpoint with none adds nothing, and none with a model leaves Claude Code with no
+ * endpoint, refused at its spawn).
  */
 export const claudeEndpoints = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ModelEndpoint> =>
   endpointsOfApi(endpoints, "anthropic-messages", "claude").filter((endpoint) => endpoint.models.length > 0);
@@ -32,7 +32,7 @@ const familyModelOf = (own: ReadonlyArray<ModelEndpoint>, family: "opus" | "sonn
   return (slugs.find((entry) => familyOf(family).test(entry.id)) ?? slugs[0])?.slug;
 };
 
-/** Claude Code's relay configuration for the endpoints as stored now, or undefined for the Model proxy (no such endpoint). */
+/** Claude Code's relay configuration for the endpoints as stored now, or undefined when there is no such endpoint. */
 export const claudeRelayOf = (endpoints: ModelEndpoints | undefined, textModel: string | undefined): ClaudeRelay | undefined => {
   const own = claudeEndpoints(endpoints);
   if (own.length === 0) return undefined;
@@ -46,17 +46,17 @@ export const claudeRelayOf = (endpoints: ModelEndpoints | undefined, textModel: 
 };
 
 /**
- * Claude Code's model list: with an Anthropic Messages endpoint, those endpoints' models by slug, grouped by endpoint
- * (the endpoint's id beside a label two endpoints share), with the effort picker on reasoning models; else the proxy's
- * (`proxy`, as listed).
+ * Claude Code's model list: the Anthropic Messages endpoints' models by slug, grouped by endpoint (the endpoint's id
+ * beside a label two endpoints share), with the effort picker on reasoning models, the first the default. Empty without
+ * one: the provider then needs setup.
  */
-export const claudeModelsOf = (proxy: ReadonlyArray<ServerProviderModel>, endpoints: ModelEndpoints | undefined): ReadonlyArray<ServerProviderModel> => {
-  const own = claudeEndpoints(endpoints);
-  return own.length === 0 ? proxy : relayPickerModels(own);
-};
+export const claudeModelsOf = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ServerProviderModel> => relayPickerModels(claudeEndpoints(endpoints));
 
-/** The model as Claude Code names it: an Anthropic Messages endpoint's by its slug (the relay routes by it), the proxy's by its id. */
-export const claudeModelId = (slug: string, endpoints: ModelEndpoints | undefined): string => {
-  const endpointId = parseEndpointSlug(slug)?.endpointId;
-  return endpointId !== undefined && claudeEndpoints(endpoints).some((endpoint) => endpoint.id === endpointId) ? slug : cliModelId("claude", slug);
-};
+/**
+ * The model as Claude Code names it: an Anthropic Messages endpoint's by its slug (the relay routes by it). A model from
+ * before the hard cut (SPI-1176, `isRetiredSlug`: the Model proxy's ids, t3's stock Claude default) is the default model,
+ * the list's first. Any other slug (an endpoint that is gone) stays as it is: Claude Code's session does not offer it,
+ * and t3's adapter refuses it before any request.
+ */
+export const claudeModelId = (slug: string, endpoints: ModelEndpoints | undefined): string =>
+  isRetiredSlug(slug) ? (relayPickerModels(claudeEndpoints(endpoints))[0]?.slug ?? slug) : slug;

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { generateEndpointText } from "../src/endpointText.ts";
 import { limitsSender } from "../src/environment.ts";
 import { SessionEndpoints } from "../src/session/endpoints.ts";
-import { faultAnswer, recordingFetch } from "../src/session/proxyLimits.ts";
+import { faultAnswer, recordingFetch } from "../src/session/modelLimits.ts";
 import { handleModelRelay, type ModelRelayDeps, type ModelRelayGrant } from "../src/workspace/modelRelay.ts";
 
 const NOW = Date.parse("2026-11-16T12:00:00Z");
@@ -154,7 +154,7 @@ describe("a Session's limit readings", () => {
       faulted = false;
       await ask(models, "claude", "claude-haiku-5-5");
       expect(readings).toEqual([{ endpointId: "claude", at: NOW, windows: [{ id: "five_hour", usedPercent: 100, resetsAt: IN_2H * 1000, windowMinutes: 300 }] }]);
-      expect(faultAnswer({ fixture: "anthropicUsageLimit", resetAt: IN_2H * 1000 }, NOW, "m").headers.get("anthropic-ratelimit-unified-representative-claim")).toBe("five_hour");
+      expect(faultAnswer({ fixture: "anthropicUsageLimit", resetAt: IN_2H * 1000 }, NOW).headers.get("anthropic-ratelimit-unified-representative-claim")).toBe("five_hour");
     } finally {
       Date.now = realNow;
     }

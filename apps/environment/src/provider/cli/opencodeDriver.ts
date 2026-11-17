@@ -1,5 +1,6 @@
 // OpenCode in the Cloud Environment (step 4b, plan §3): t3's `opencode` kind ("OpenCode") over t3's ACP adapter,
-// running `opencode acp` in the Workspace's Container on the model proxy (acpDriver.ts, acpFlavor.ts). Never t3's
+// running `opencode acp` in the Workspace's Container on the Model endpoints it speaks, through the model relay
+// (acpDriver.ts, acpFlavor.ts). Never t3's
 // native OpenCode runtime: a `serverUrl` must never make t3 connect anywhere.
 import { ProviderDriverKind } from "@t3tools/contracts";
 import { CLIS } from "@t3flare/sandbox-image/clis";

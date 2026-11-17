@@ -164,7 +164,7 @@ describe("the CLIs' relay entries (H2, M11)", () => {
     const handle = "a".repeat(64);
     const launch = profileLaunch(
       { cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false },
-      { proxyUrl: "https://proxy.example", models: [], readStateFile: () => undefined, piExtensionSource: "", relay: { handle, servers: ["commissary"] } },
+      { readStateFile: () => undefined, piExtensionSource: "", relay: { handle, servers: ["commissary"] }, endpoints: [{ id: "openai", label: "OpenAI", models: [{ id: "gpt-5-mini" }] }] },
     );
     if ("refused" in launch) throw new Error(launch.refused);
     expect(launch.env.T3FLARE_TOOL_HANDLE).toBe(handle);
@@ -178,7 +178,12 @@ describe("pi's t3 entry (SPI-1039, as stock t3 hands it)", () => {
   const pi = (env: Record<string, string>) =>
     profileLaunch(
       { cli: "pi", args: ["--mode", "rpc", "--extension", "/s/ext.ts"], key: "k", cwd: "/w/x", env: { T3_PI_RUNTIME_MODE: "approval-required", ...env }, allowProbe: false },
-      { proxyUrl: "https://proxy.example", models: [], readStateFile: () => "SRC", piExtensionSource: "SRC", relay: { handle, servers: [] } },
+      {
+        readStateFile: () => "SRC",
+        piExtensionSource: "SRC",
+        relay: { handle, servers: [] },
+        piRelay: { endpoints: [{ id: "e", label: "E", api: "anthropic-messages", models: [{ id: "m", name: "M", reasoning: false, input: ["text"], contextWindow: 1, maxTokens: 1, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false }] }], model: "e/m" },
+      },
     );
   it("passes t3's MCP variables when the URL is an https `/mcp`; anything else, none", () => {
     const real = pi({ T3_MCP_URL: "https://t3.example/mcp", T3_MCP_BEARER_TOKEN: "t3-real" });

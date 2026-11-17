@@ -40,9 +40,8 @@ import { describe, expect, it } from "vitest";
 import * as TestProviderHost from "../../../t3code/packages/provider-testing/src/TestProviderHost.ts";
 import { makeTurnInput } from "t3/src/orchestration-v2/Adapters/AcpAdapterV2.testkit.ts";
 import { acpAdapterOptions, acpFlavor } from "../src/provider/cli/acpDriver.ts";
-import { KEY_NAME } from "../src/provider/cli/acpFlavor.ts";
 import { MIN_RESET_MS } from "@t3flare/models/failures";
-import { cliRelayFailure, endpointOfModel } from "../src/provider/cli/relayFailure.ts";
+import { cliRelayFailure } from "../src/provider/cli/relayFailure.ts";
 import { wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 
 const AGENT = path.join(import.meta.dirname, "fixtures/fake-acp-agent.mjs");
@@ -84,36 +83,23 @@ const USAGE_LIMIT: EndpointFailureRecord = {
 };
 
 describe("cliRelayFailure", () => {
-  const proxyKey = makeProviderFailure({ class: "permission_error", message: `The model proxy refused the agent's key. Check the deploy's ${KEY_NAME}.`, code: null, retryable: false });
+  const refused = makeProviderFailure({ class: "permission_error", message: "The Model endpoint refused the agent's credential.", code: null, retryable: false });
   const own = makeProviderFailure({ class: "provider_error", message: "The agent crashed.", code: "-32603", retryable: null });
 
   it("the relay's failure is t3's: its class, text naming the endpoint, code and reset (held to 30 s after now)", () => {
-    expect(cliRelayFailure(proxyKey, USAGE_LIMIT, "commissary", NOW)).toEqual({
+    expect(cliRelayFailure(refused, USAGE_LIMIT, NOW)).toEqual({
       class: "usage_limit",
       message: USAGE_LIMIT.message,
       code: "usage_limit",
       retryable: true,
       resetAt: "2026-11-16T12:00:00.000Z",
     });
-    expect(cliRelayFailure(own, { ...USAGE_LIMIT, resetAt: NOW + 1000 }, "commissary", NOW).resetAt).toBe(new Date(NOW + MIN_RESET_MS).toISOString());
+    expect(cliRelayFailure(own, { ...USAGE_LIMIT, resetAt: NOW + 1000 }, NOW).resetAt).toBe(new Date(NOW + MIN_RESET_MS).toISOString());
   });
 
-  it("with no relay failure on an endpoint, the proxy's classification gives way to a plain error naming the endpoint", () => {
-    expect(cliRelayFailure(proxyKey, null, "commissary", NOW)).toMatchObject({ class: "provider_error", message: 'The Model endpoint "commissary" failed while the agent was answering.' });
-    expect(cliRelayFailure(makeProviderFailure({ class: "usage_limit", message: "m", code: "proxy_cooldown", retryable: true }), null, "commissary", NOW).class).toBe("provider_error");
-    // The adapter's own failure (not the proxy's) stands.
-    expect(cliRelayFailure(own, null, "commissary", NOW)).toBe(own);
-  });
-
-  it("on the Model proxy's model, the adapter's failure stands", () => {
-    expect(cliRelayFailure(proxyKey, null, undefined, NOW)).toBe(proxyKey);
-  });
-
-  it("names the endpoint of a session's model slug; none for the proxy's or a removed one", () => {
-    expect(endpointOfModel("commissary/claude-haiku-5-5", ENDPOINTS)).toBe("commissary");
-    expect(endpointOfModel("anthropic/claude-haiku-5-5", ENDPOINTS)).toBeUndefined();
-    expect(endpointOfModel("gone/x", ENDPOINTS)).toBeUndefined();
-    expect(endpointOfModel(undefined, ENDPOINTS)).toBeUndefined();
+  it("with no relay failure, the adapter's own failure stands", () => {
+    expect(cliRelayFailure(refused, null, NOW)).toBe(refused);
+    expect(cliRelayFailure(own, null, NOW)).toBe(own);
   });
 });
 
@@ -165,7 +151,6 @@ const acpTurn = (cli: "claude" | "opencode", relayed: EndpointFailureRecord | nu
     const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
     const adapter = wrapCliAdapter(yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(cli, driver, { spawn, modelEndpoints: () => ENDPOINTS }), undefined)), {
       sessions: new Map(),
-      modelEndpoints: () => ENDPOINTS,
       now: () => NOW,
       relayFailure: async () => relayed,
       takeEnvironmentSkills: () => Effect.void,
@@ -190,12 +175,11 @@ const run = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> 
 
 for (const cli of ["claude", "opencode"] as const) {
   describe(`${cli} on a Model endpoint, through the relay`, () => {
-    it("a relayed refused key: the relay's failure naming the endpoint, not the proxy key's text", async () => {
+    it("a relayed refused key: the relay's failure naming the endpoint", async () => {
       const { terminal, errors } = await run(acpTurn(cli, KEY_REFUSED, "commissary/claude-haiku-5-5"));
       expect(terminal.type === "turn.terminal" && terminal.status).toBe("failed");
       const failure = terminal.type === "turn.terminal" && terminal.status === "failed" ? terminal.failure : undefined;
       expect(failure).toMatchObject({ class: "permission_error", code: "key_refused", message: KEY_REFUSED.message });
-      expect(failure?.message).not.toContain(KEY_NAME);
       for (const error of errors) expect(error).toMatchObject({ code: "key_refused" });
     });
 
@@ -204,13 +188,10 @@ for (const cli of ["claude", "opencode"] as const) {
       expect(terminal.type === "turn.terminal" && terminal.status === "failed" ? terminal.failure : undefined).toMatchObject({ class: "usage_limit", resetAt: "2026-11-16T12:00:00.000Z" });
     });
 
-    it("no relay failure on the endpoint: the proxy classifier's text gives way; on the proxy's model it stands", async () => {
+    it("no relay failure: the adapter's own failure, never a text naming the retired Model proxy's key (SPI-1176)", async () => {
       const onEndpoint = await run(acpTurn(cli, null, "commissary/claude-haiku-5-5"));
       const endpointFailure = onEndpoint.terminal.type === "turn.terminal" && onEndpoint.terminal.status === "failed" ? onEndpoint.terminal.failure : undefined;
-      expect(endpointFailure?.message).not.toContain(KEY_NAME);
-      const onProxy = await run(acpTurn(cli, null, "anthropic/claude-haiku-5-5"));
-      const proxyFailure = onProxy.terminal.type === "turn.terminal" && onProxy.terminal.status === "failed" ? onProxy.terminal.failure : undefined;
-      expect(proxyFailure?.message).toContain(KEY_NAME);
+      expect(endpointFailure?.message).not.toMatch(/model proxy|COMMISSARY/i);
     });
   });
 }
@@ -250,7 +231,7 @@ const standIn = (driver: ProviderDriverKind, failure: OrchestrationV2ProviderFai
 
 const standInTurn = (driver: string, failure: OrchestrationV2ProviderFailure, relayed: EndpointFailureRecord | null, model: string) =>
   Effect.gen(function* () {
-    const adapter = wrapCliAdapter(standIn(ProviderDriverKind.make(driver), failure), { sessions: new Map(), modelEndpoints: () => ENDPOINTS, now: () => NOW, relayFailure: async () => relayed });
+    const adapter = wrapCliAdapter(standIn(ProviderDriverKind.make(driver), failure), { sessions: new Map(), now: () => NOW, relayFailure: async () => relayed });
     const runtime = yield* adapter.openSession({
       threadId: ThreadId.make(`thread-${driver}-${++threads}`),
       providerSessionId: ProviderSessionId.make(`session-${driver}-${threads}`),

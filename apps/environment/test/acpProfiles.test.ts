@@ -1,34 +1,27 @@
 // @effect-diagnostics nodeBuiltinImport:off
 // Claude Code's and OpenCode's profiles (step 4b, plan §4 with review F3, F5, F6 and M0's findings): what each process
-// gets, whatever t3 asked. Expected values are M0's (docs/steps/step-4b/m0-local.json), not recomputed here.
+// gets, whatever t3 asked. Expected values are M0's (docs/steps/step-4b/m0-local.json), not recomputed here. Since the
+// hard cut (SPI-1176) both run on their Model endpoints through the model relay, and are refused without one.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import type { CatalogModel } from "@t3flare/models";
 import { describe, expect, it } from "vitest";
 
 import { CLAUDE_PROJECTS, OPENCODE_SNAPSHOT_DIR } from "../src/agents/acpProfiles.ts";
 import { type ProfileContext, profileLaunch } from "../src/agents/cliProfiles.ts";
 
-const model = (id: string, extra: Partial<CatalogModel> = {}): CatalogModel => ({
-  id,
-  name: id,
-  provider: "anthropic",
-  vendor: "X",
-  api: "anthropic-messages",
-  slug: `anthropic/${id}`,
-  reasoning: false,
-  input: ["text"],
-  contextWindow: 200_000,
-  maxTokens: 32_000,
-  ...extra,
-});
+const endpointModel = (id: string, input: ReadonlyArray<"text" | "image"> = ["text"]) => ({ id, name: id.toUpperCase(), reasoning: false, input, contextWindow: 100_000, maxTokens: 8_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false });
 
+/** One Anthropic Messages endpoint, `comm`, for both CLIs. */
 const context: ProfileContext = {
-  proxyUrl: "https://proxy.example",
-  models: [model("claude-sonnet-5-5", { reasoning: true, input: ["text", "image"] }), model("claude-haiku-5-5"), model("gpt-6-luna"), model("kimi-k3")],
   readStateFile: () => undefined,
   piExtensionSource: "",
+  claudeRelay: { endpoints: ["comm"], models: ["comm/claude-sonnet-5-5", "comm/claude-haiku-5-5"], backgroundModel: "comm/claude-haiku-5-5", opusModel: "comm/claude-sonnet-5-5", sonnetModel: "comm/claude-sonnet-5-5" },
+  opencodeRelay: {
+    endpoints: [{ id: "comm", label: "Commissary", api: "anthropic-messages", models: [endpointModel("claude-sonnet-5-5"), endpointModel("claude-haiku-5-5")] }],
+    model: "comm/claude-sonnet-5-5",
+    smallModel: "comm/claude-haiku-5-5",
+  },
 };
 
 const launch = (cli: "claude" | "opencode", args: ReadonlyArray<string>, env: Record<string, string> = {}) =>
@@ -59,7 +52,7 @@ describe("Claude Code's profile", () => {
       CLAUDE_CONFIG_DIR: "/var/lib/t3flare/cli/proc-7/claude",
       CLAUDE_AGENT_ACP_EXPERIMENTAL_V2: "1",
       CLAUDE_CODE_API_KEY_HELPER_TTL_MS: "86400000",
-      ANTHROPIC_BASE_URL: "https://proxy.example",
+      ANTHROPIC_BASE_URL: "http://computer.internal/t3flare/model/_",
       CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "0",
     });
     expect(Object.keys(answer.env).filter((name) => /API_KEY$|AUTH_TOKEN|OAUTH|NONCE|PROXY/.test(name))).toEqual([]);
@@ -75,9 +68,9 @@ describe("Claude Code's profile", () => {
     const { json, mode } = fileOf(launch("claude", []), "/managed-settings.json");
     expect(mode ?? 0o600).toBe(0o600);
     expect(json).toMatchObject({
-      apiKeyHelper: "/opt/t3flare/bin/t3flare-claude-key",
+      apiKeyHelper: "/opt/t3flare/bin/t3flare-claude-handle",
       allowedProviders: ["customEndpoint"],
-      availableModels: ["claude-sonnet-5-5", "claude-haiku-5-5", "gpt-6-luna", "kimi-k3"],
+      availableModels: ["comm/claude-sonnet-5-5", "comm/claude-haiku-5-5"],
       skipWebFetchPreflight: true,
       disableClaudeAiConnectors: true,
       permissions: { defaultMode: "default", disableBypassPermissionsMode: "disable", allow: [], ask: [], deny: [] },
@@ -89,17 +82,23 @@ describe("Claude Code's profile", () => {
       expect(json, key).not.toHaveProperty(key);
     }
     const env = json.env as Record<string, string>;
-    expect(env.ANTHROPIC_BASE_URL).toBe("https://proxy.example");
-    expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("claude-haiku-5-5");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://computer.internal/t3flare/model/_");
+    expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("comm/claude-haiku-5-5");
     // Pinned empty: every variable a repository's settings could use to send the request (and the key) elsewhere.
     for (const name of ["HTTPS_PROXY", "HTTP_PROXY", "NODE_EXTRA_CA_CERTS", "NODE_TLS_REJECT_UNAUTHORIZED", "CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BEDROCK_BASE_URL", "CLAUDE_CODE_SKIP_BEDROCK_AUTH", "CLAUDE_CODE_USE_VERTEX", "ANTHROPIC_CUSTOM_HEADERS", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"]) {
       expect(env[name], name).toBe("");
     }
     for (const name of ["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_UPDATES"]) expect(env[name], name).toBe("1");
     expect(env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe("0");
-    // On the proxy, no model handle is asked for.
     const answer = launch("claude", []);
-    expect("refused" in answer ? undefined : answer.modelRelay).toBeUndefined();
+    expect("refused" in answer ? undefined : answer.modelRelay).toEqual(["comm"]);
+  });
+
+  it("is refused without an Anthropic Messages endpoint, saying so and where to add one (SPI-1176)", () => {
+    const { claudeRelay: _none, ...without } = context;
+    expect(profileLaunch({ cli: "claude", args: [], key: "proc-7", cwd: "/w/demo", env: {}, allowProbe: false }, without)).toEqual({
+      refused: "Claude Code has no Model endpoint to run on: it needs one that speaks Anthropic Messages and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints",
+    });
   });
 });
 
@@ -208,25 +207,25 @@ describe("OpenCode's profile", () => {
     expect(answer.links).toEqual([{ path: "/var/lib/t3flare/cli/proc-7/config/opencode/skills", target: "/workspace/.agents/skills" }]);
   });
 
-  it("writes system configuration with one provider, the catalog, the project's own config honoured, and asking agents (M0 P2)", () => {
+  it("writes system configuration with its endpoint's provider, the project's own config honoured, and asking agents (M0 P2)", () => {
     const { json } = fileOf(launch("opencode", ["acp"]), "/opencode.json");
-    const provider = (json.providers as Record<string, Record<string, unknown>>).t3flare!;
-    expect(Object.keys(json.providers as object)).toEqual(["t3flare"]);
+    const provider = (json.providers as Record<string, Record<string, unknown>>)["t3flare-endpoint-comm"]!;
+    expect(Object.keys(json.providers as object)).toEqual(["t3flare-endpoint-comm"]);
     expect(provider.package).toBe("@opencode/ai/providers/anthropic-compatible");
-    expect(provider.settings).toEqual({ baseURL: "https://proxy.example/v1" });
-    expect(Object.keys(provider.models as object)).toEqual(["claude-sonnet-5-5", "claude-haiku-5-5", "gpt-6-luna", "kimi-k3"]);
+    expect(provider.settings).toEqual({ baseURL: "http://computer.internal/t3flare/model/comm/v1" });
+    expect(Object.keys(provider.models as object)).toEqual(["claude-sonnet-5-5", "claude-haiku-5-5"]);
     expect(JSON.stringify(json)).not.toMatch(/apiKey|x-api-key/i);
-    expect(json).toMatchObject({ model: "t3flare/claude-sonnet-5-5", small_model: "t3flare/claude-haiku-5-5", update: "disable", share: "disabled", snapshots: false, lsp: false, formatter: false });
+    expect(json).toMatchObject({ model: "t3flare-endpoint-comm/claude-sonnet-5-5", small_model: "t3flare-endpoint-comm/claude-haiku-5-5", update: "disable", share: "disabled", snapshots: false, lsp: false, formatter: false });
     expect(json.plugins).toEqual(["/opt/t3flare/share/opencode-key-plugin"]);
     const policies = json.policies as Array<{ action: string; resource: string; effect: string }>;
     // OpenCode's matching: whole-value wildcards, the last match wins (M0 P4, its policies guide).
     const matches = (pattern: string, value: string) => new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*").replaceAll("?", ".")}$`).test(value);
     const last = (action: string, resource: string) => policies.filter((entry) => entry.action === action && matches(entry.resource, resource)).at(-1)?.effect;
     expect(last("provider.use", "openai")).toBe("deny");
-    expect(last("provider.use", "t3flare")).toBe("allow");
-    // On the proxy, no model handle is asked for.
+    expect(last("provider.use", "t3flare")).toBe("deny");
+    expect(last("provider.use", "t3flare-endpoint-comm")).toBe("allow");
     const answer = launch("opencode", ["acp"]);
-    expect("refused" in answer ? undefined : answer.modelRelay).toBeUndefined();
+    expect("refused" in answer ? undefined : answer.modelRelay).toEqual(["comm"]);
     // The project's own plugins, MCP servers, skills and agents (owner, 2026-11-12, back to stock); no vendor account.
     for (const [action, resource] of [["plugin.use", "/w/demo/.opencode/plugins/x.ts"], ["mcp.use", "repo-server"], ["skill.use", "anything"], ["tool.use", "subagent:repo-agent"]]) {
       expect(last(action!, resource!), action).toBeUndefined();
@@ -251,9 +250,16 @@ describe("OpenCode's profile", () => {
     // SPI-1169: the relay's configuration too.
     expect(violations(schema, schema, fileOf(relayedOpenCode(), "/opencode.json").json)).toEqual([]);
   });
+
+  it("is refused without an endpoint whose API it speaks, saying so and where to add one (SPI-1176)", () => {
+    const { opencodeRelay: _none, ...without } = context;
+    expect(profileLaunch({ cli: "opencode", args: ["acp"], key: "proc-7", cwd: "/w/demo", env: {}, allowProbe: false }, without)).toEqual({
+      refused:
+        "OpenCode has no Model endpoint to run on: it needs one that speaks Anthropic Messages, OpenAI Responses or OpenAI-compatible Completions and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints",
+    });
+  });
 });
 
-const endpointModel = (id: string, input: ReadonlyArray<"text" | "image"> = ["text"]) => ({ id, name: id.toUpperCase(), reasoning: false, input, contextWindow: 100_000, maxTokens: 8_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false });
 const opencodeRelayed: ProfileContext = {
   ...context,
   opencodeRelay: {

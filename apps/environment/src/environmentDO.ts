@@ -7,7 +7,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { DurableObjectState } from "@cloudflare/workers-types/index.ts";
 
-import { modelCatalog } from "@t3flare/models/catalog";
 import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
 import type { SkillSet } from "@t3flare/skills";
@@ -51,14 +50,12 @@ import { type McpCallAnswer, McpHost, type McpEngineBinding, type McpHostDeps, t
 import { DURABLE_AGENT } from "./provider/threadCaller.ts";
 import { currentTerminals, resetTerminals } from "./terminal/current.ts";
 import type { Runtime } from "./runtime.ts";
-import { commissaryManagementOf } from "./usage/commissary.ts";
 import type { BrowserRunBinding, BrowserRunFetcher } from "./preview/browserRun.ts";
 import type { ContainerPreviewProps } from "./preview/containerPreviews.ts";
 import { closeLeftoverSessions } from "./preview/sessions.ts";
 import { previewStore } from "./preview/store.ts";
-import { usageRecorder } from "./usage/commissaryCount.ts";
 import { limitStore, limitWiring } from "./usage/limits.ts";
-import { usageStore } from "./usage/records.ts";
+import { acceptUsage, usageStore } from "./usage/records.ts";
 
 /** SPI-1163: the model the text-generation setting was last pointed at as its default. */
 const SEEDED_TEXT_MODEL_KEY = "t3flare:text-generation-default";
@@ -75,20 +72,6 @@ export interface EnvironmentEnv extends AgentsBindings {
   /** The GitHub App (ADR-0013): only this Worker holds its key; the Environment DO mints every token. */
   readonly T3FLARE_GITHUB_APP_ID?: string;
   readonly T3FLARE_GITHUB_APP_PRIVATE_KEY?: string;
-  /** The model proxy (ADR-0012), for text generation. */
-  readonly MODEL_PROXY_URL?: string;
-  readonly MODEL_PROXY_API_KEY?: string;
-  /**
-   * Parity G8: Commissary's management API, for t3's Usage page and limit meters (`usage/commissary.ts`). Optional, and
-   * this Worker's alone: the app host's URL, an org admin's management key, the org's slug, the Access service token of a
-   * self-hosted Commissary, and the principals (`key:<id>`) of t3flare's other API keys (the Containers').
-   */
-  readonly COMMISSARY_MANAGEMENT_URL?: string;
-  readonly COMMISSARY_MANAGEMENT_ORG?: string;
-  readonly COMMISSARY_MANAGEMENT_KEY?: string;
-  readonly COMMISSARY_ACCESS_CLIENT_ID?: string;
-  readonly COMMISSARY_ACCESS_CLIENT_SECRET?: string;
-  readonly COMMISSARY_USAGE_PRINCIPALS?: string;
   /** Overrides IDLE_AFTER_MS (tests and the acceptance stage). */
   readonly T3FLARE_IDLE_AFTER_MS?: string;
   /** Step 2b: the sweep purges only when this is "1" (stages); prod's sweep reports what it would do (review F3). */
@@ -165,9 +148,6 @@ const SWEPT_SESSIONS_KEY = "t3flare:swept-sessions";
 /** Step 4a (review F6): this object's boot counter, the process channel's Environment epoch. */
 const BOOT_COUNT_KEY = "t3flare:boot-count";
 
-/** The proxy's model list, as the last read of it left it (ADR-0012). */
-const CATALOG_KEY = "t3flare:model-catalog";
-
 export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   #runtime: Promise<Runtime> | undefined;
   #host: string | undefined;
@@ -184,8 +164,6 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   readonly #processes: ProcessChannel;
   /** The Owner clients' table (settings/clients.ts), one per instance so its DDL runs once, not per request. */
   #ownerClients: OwnerClients | undefined;
-  /** `recordUsage`'s recorder, one per instance so the Commissary exclusion's keys are opened once per revision (SPI-1173). */
-  #usageRecorder: ((input: unknown) => Promise<{ readonly kept: number }>) | undefined;
 
   constructor(ctx: DurableObjectState, env: EnvironmentEnv) {
     super(ctx, env);
@@ -228,16 +206,9 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       },
       newKey: () => `proc-${crypto.randomUUID()}`,
     });
-    const modelProxy =
-      env.MODEL_PROXY_URL && env.MODEL_PROXY_API_KEY ? { url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY } : undefined;
     bindEnvironmentServices({
       agents: env,
-      modelProxy,
       modelEndpoints: () => this.#endpointStore().load(),
-      catalog: modelCatalog({
-        proxy: modelProxy,
-        store: { read: () => ctx.storage.kv.get(CATALOG_KEY), write: (catalog) => ctx.storage.kv.put(CATALOG_KEY, catalog) },
-      }),
       github: () => this.github,
       workspaces: workspaceRegistry(ctx.storage.sql),
       sql: ctx.storage.sql,
@@ -260,7 +231,6 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       // t3's in-isolate address (owner, 2026-11-12, back to stock: t3's bearer goes to the CLI as stock t3 hands it).
       t3McpUrl: () => `https://${this.#configuredHost()}/mcp`,
       publicOrigin: () => (this.env.T3FLARE_HOST === undefined ? null : `https://${this.env.T3FLARE_HOST}`),
-      commissary: commissaryManagementOf(env),
       usage: usageStore(ctx.storage.sql),
       limits: limitStore(ctx.storage.sql),
       browserRun: env.BROWSER,
@@ -521,18 +491,12 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   /**
    * Usage records, RPC from the agents Worker (SPI-1173): a Session's, text generation's or the model relay's, each a
-   * model answer's counts on a Model endpoint, kept for t3's Usage page (`usage/commissaryCount.ts` `usageRecorder`). Entries
-   * that are not valid are dropped, and so are those on an endpoint Commissary's log already counts. Never boots t3.
+   * model answer's counts on a Model endpoint, kept for t3's Usage page (`usage/records.ts` `acceptUsage`). Entries that
+   * are not valid are dropped. Every endpoint is counted, Commissary's included (SPI-1176). Never boots t3.
    */
   async recordUsage(input: unknown): Promise<{ readonly kept: number }> {
     const { environmentServices } = await import("./agents/bindings.ts");
-    this.#usageRecorder ??= usageRecorder({
-      usage: () => environmentServices().usage,
-      principals: () => environmentServices().commissary?.principals ?? [],
-      endpoints: this.#endpointStore(),
-      now: () => Date.now(),
-    });
-    return this.#usageRecorder(input);
+    return acceptUsage(input, { store: environmentServices().usage, endpoints: this.#endpointStore().load(), now: () => Date.now() });
   }
 
   /**

@@ -1,8 +1,8 @@
 // @effect-diagnostics globalConsole:off globalConsoleInEffect:off globalJsonInEffect:off globalDate:off effectFnOpportunity:off anyUnknownInErrorContext:off
 // What the Cloud Environment's ACP flavors share (step 4b, plan §3.2 and §5 with the review's F1, F7, F9; back to stock,
 // owner 2026-11-12): the agent is pinned to its asking mode and t3 decides each request it asks, as stock t3's adapters
-// decide (plan §5.1); this module is that decision, the model ids, the proxy's failures, and the plan capture around the
-// runtime both CLIs run under.
+// decide (plan §5.1); this module is that decision, the effort picker, a failed prompt's failure, and the plan capture
+// around the runtime both CLIs run under.
 //
 // - `cliPermissionDisposition`: t3's own rules for its modes. Reads never ask; `auto-accept-edits` allows every edit
 //   (t3's `acpPermissionDisposition` without a sandbox policy); `full-access` allows; `approval-required`, `auto` and an
@@ -14,13 +14,11 @@
 // The approval card is t3's own ("for the session" included); an agent changing its own mode is its business, as in
 // stock t3.
 import type { OrchestrationV2ProviderFailure, RuntimeMode } from "@t3tools/contracts";
-import { classifyProxyFailure, proxyFailureMessage, type ProxyFailure } from "@t3flare/models/proxyFailure";
 import type { AcpPermissionDisposition } from "@t3tools/provider-acp/server/clientPolicy";
 import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import { createModelCapabilities } from "@t3tools/shared/model";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import type * as EffectAcpSchema from "effect-acp/compat";
 import type * as EffectAcpErrors from "effect-acp/errors";
@@ -81,18 +79,6 @@ export const acpModelCapabilities = (reasoning: boolean) =>
     optionDescriptors: reasoning ? [{ id: "effort", label: "Effort", type: "select", options: EFFORTS.map((effort) => ({ ...effort })) }] : [],
   });
 
-/** The catalog id of a model slug (`anthropic/<id>`), as each CLI names it. */
-export const cliModelId = (cli: AcpCli, slug: string): string => {
-  const id = slug.includes("/") ? slug.slice(slug.indexOf("/") + 1) : slug;
-  return cli === "opencode" ? `t3flare/${id}` : id;
-};
-
-/** The model proxy's status and body inside an ACP error's text (`… API Error: 429 {…}`), as pi-ai writes them. */
-const proxyAnswerText = (text: string): string | undefined => {
-  const match = /API Error:\s*([45]\d\d)\b\s*([\s\S]*)$/i.exec(text) ?? /\bstatus(?: code)?:?\s*([45]\d\d)\b\s*([\s\S]*)$/i.exec(text);
-  return match === null ? undefined : `${match[1]} ${match[2] ?? ""}`.trim();
-};
-
 const isAcpRequestError = (cause: unknown): cause is EffectAcpErrors.AcpRequestError =>
   typeof cause === "object" && cause !== null && (cause as { _tag?: unknown })._tag === "AcpRequestError";
 
@@ -101,37 +87,20 @@ const errorText = (cause: unknown): string => {
   return cause instanceof Error ? cause.message : String(cause);
 };
 
-/** The key the CLIs use: named when the proxy refuses it, never a vendor sign-in (ADR-0016). */
-export const KEY_NAME = "COMMISSARY_CONTAINER_API_KEY";
-
 /**
- * A prompt's failure (review F9): the proxy's own answers classified as the Durable agents' are (a 429 is t3's usage
- * limit, with its reset), a refused key named as the deploy's key, never as a sign-in. Anything else is the provider's.
- * For a process on the Model proxy only: on a Model endpoint, the CLI wrapper puts the model relay's classification of
- * the process's last answer in its place (SPI-1172, `relayFailure.ts`).
+ * A prompt's failure (review F9): a refused credential is a permission error, never a sign-in the agent could start
+ * (ADR-0016). Anything else is the provider's. On a Model endpoint the CLI wrapper puts the model relay's classification
+ * of the process's last answer in its place when there is one (SPI-1172, `relayFailure.ts`). (Until the hard cut,
+ * SPI-1176, the Model proxy's answers were classified here by Commissary's texts.)
  */
-export const cliPromptFailure = (cause: unknown, now = Date.now()): OrchestrationV2ProviderFailure => {
+export const cliPromptFailure = (cause: unknown): OrchestrationV2ProviderFailure => {
   const text = errorText(cause);
-  const answer = proxyAnswerText(text);
-  const classified: ProxyFailure | undefined = answer === undefined ? undefined : classifyProxyFailure({ status: 0, retryAfter: null, text: answer, at: now });
   const code = isAcpRequestError(cause) ? String(cause.code) : null;
-  if (classified !== undefined) {
-    const resetAt =
-      classified.class === "usage_limit" && classified.resetAt !== undefined ? DateTime.formatIso(DateTime.makeUnsafe(Math.max(classified.resetAt, now + 60_000))) : null;
-    return makeProviderFailure({
-      cause,
-      class: classified.class,
-      message: classified.class === "permission_error" ? `${proxyFailureMessage(classified)} Check the deploy's ${KEY_NAME}.` : proxyFailureMessage(classified),
-      code: classified.code,
-      retryable: classified.class !== "permission_error",
-      resetAt,
-    });
-  }
   if (/auth(entication)?[_ ]required|not (logged|signed) in|\/login|invalid api key|\b401\b/i.test(text)) {
     return makeProviderFailure({
       cause,
       class: "permission_error",
-      message: `The model proxy refused the agent's key. Check the deploy's ${KEY_NAME}; this agent never signs in to a vendor.`,
+      message: "The Model endpoint refused the agent's credential. Check the endpoint's key or sign-in in the Harness panel; this agent never signs in to a vendor itself.",
       code,
       retryable: false,
     });

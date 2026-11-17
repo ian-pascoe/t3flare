@@ -1,6 +1,7 @@
 // OpenCode's Model endpoints (SPI-1169): with an endpoint whose API OpenCode speaks (Anthropic Messages, OpenAI
 // Responses, OpenAI-compatible Completions) and that lists a model, OpenCode runs on those endpoints through the model
-// relay, one provider each; its list is their models by slug, its model ids their providers'; with none, the proxy.
+// relay, one provider each; its list is their models by slug, its model ids their providers'; with none, no model (it
+// needs setup and a spawn is refused, SPI-1176). A selection from before the hard cut falls back to the default model.
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
@@ -26,7 +27,6 @@ const endpoints: ModelEndpoints = {
     { id: "empty", label: "Empty", api: "anthropic-messages", baseUrl: "https://e.example", auth: "none", headers: {}, models: [] },
   ],
 };
-const proxy = [{ slug: "anthropic/claude-haiku-5-5", name: "Claude Haiku 5.5", subProvider: "Anthropic", isCustom: false, capabilities: { optionDescriptors: [] } }];
 
 describe("OpenCode's Model endpoints", () => {
   it("takes every sign-in through the relay (SPI-1171): ChatGPT, Claude and GitHub Copilot", () => {
@@ -51,13 +51,13 @@ describe("OpenCode's Model endpoints", () => {
     // The text-generation model when it is one of theirs; another API's (Google's) or a stale one is not.
     expect(opencodeRelayOf(endpoints, "openai/gpt-5-mini")?.smallModel).toBe("openai/gpt-5-mini");
     for (const text of ["gem/gemini-x", "comm/gone", "anthropic/claude-haiku-5-5"]) expect(opencodeRelayOf(endpoints, text)?.smallModel, text).toBe("comm/claude-haiku-5-5");
-    // Only another API's endpoint, or one with no model: the Model proxy.
+    // Only another API's endpoint, or one with no model: none.
     expect(opencodeRelayOf({ revision: 1, endpoints: [endpoints.endpoints[0]!, endpoints.endpoints[4]!] }, undefined)).toBeUndefined();
     expect(opencodeRelayOf(undefined, undefined)).toBeUndefined();
   });
 
-  it("lists their models by slug, grouped by endpoint, the first the default; the proxy's when there is none", () => {
-    const listed = opencodeModelsOf(proxy, endpoints);
+  it("lists their models by slug, grouped by endpoint, the first the default; none when there is none", () => {
+    const listed = opencodeModelsOf(endpoints);
     expect(listed.map((entry) => [entry.slug, entry.subProvider, entry.isDefault === true])).toEqual([
       ["comm/claude-sonnet-5-5", "Commissary", true],
       ["comm/claude-haiku-5-5", "Commissary", false],
@@ -67,16 +67,17 @@ describe("OpenCode's Model endpoints", () => {
     // The effort picker on a reasoning model only.
     expect(listed[0]!.capabilities?.optionDescriptors?.map((option) => option.id)).toEqual(["effort"]);
     expect(listed[1]!.capabilities?.optionDescriptors).toEqual([]);
-    expect(opencodeModelsOf(proxy, { revision: 1, endpoints: [endpoints.endpoints[0]!] })).toEqual(proxy);
+    expect(opencodeModelsOf({ revision: 1, endpoints: [endpoints.endpoints[0]!] })).toEqual([]);
   });
 
-  it("names an endpoint's model by its provider, a model id holding `/` kept whole, and anything else as the proxy's", () => {
+  it("names an endpoint's model by its provider, a model id holding `/` kept whole; a selection from before the hard cut is the default model (SPI-1176)", () => {
     expect(opencodeModelId("comm/claude-haiku-5-5", endpoints)).toBe("t3flare-endpoint-comm/claude-haiku-5-5");
     expect(opencodeModelId("or/anthropic/claude-opus-5-5", endpoints)).toBe("t3flare-endpoint-or/anthropic/claude-opus-5-5");
-    // The proxy's model, another API's endpoint, an endpoint that is gone: the proxy's id, which the relay's session does
-    // not offer (t3's adapter refuses it before any request).
-    expect(opencodeModelId("anthropic/claude-haiku-5-5", endpoints)).toBe("t3flare/claude-haiku-5-5");
-    expect(opencodeModelId("gem/gemini-x", endpoints)).toBe("t3flare/gemini-x");
-    expect(opencodeModelId("gone/m", undefined)).toBe("t3flare/m");
+    // The Model proxy's (`anthropic/…`, a bare id) and `default`: the first model, the picker's default.
+    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5", "default"]) expect(opencodeModelId(old, endpoints), old).toBe("t3flare-endpoint-comm/claude-sonnet-5-5");
+    // Another API's endpoint, an endpoint that is gone: its provider's model, which the session does not offer (t3's
+    // adapter refuses it before any request).
+    expect(opencodeModelId("gem/gemini-x", endpoints)).toBe("t3flare-endpoint-gem/gemini-x");
+    expect(opencodeModelId("gone/m", undefined)).toBe("t3flare-endpoint-gone/m");
   });
 });

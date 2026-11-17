@@ -6,8 +6,7 @@
 # SPI-1169: a process on the model relay has its model handle in T3FLARE_MODEL_HANDLE. OpenCode starts without it
 # (`env -u` below), so no OpenCode process holds it and a repository's `{env:T3FLARE_MODEL_HANDLE}` finds nothing: the
 # key plugin reads it from the start environment of setsid, which started this script (`relay.js` `handleFrom`). The
-# watcher and the snapshot loop are this script run again without it (or the key helper's nonce, which OpenCode keeps
-# for the proxy's key plugin and deletes at its import). No file holds either.
+# watcher and the snapshot loop are this script run again without it. No file holds it.
 set -eu
 self=${2:-}
 if [ "${1:-}" = --t3flare-watch ]; then
@@ -50,6 +49,6 @@ if [ -f "$snapshot" ]; then
   for table in permission account account_state control_account; do sqlite3 "$db" "DELETE FROM $table" 2>/dev/null || true; done
 fi
 log=$XDG_DATA_HOME/opencode/log/opencode.log
-env -u T3FLARE_MODEL_HANDLE -u T3FLARE_MODEL_KEY_NONCE "$0" --t3flare-watch "$$" "$log" </dev/null >/dev/null &
-env -u T3FLARE_MODEL_HANDLE -u T3FLARE_MODEL_KEY_NONCE "$0" --t3flare-snapshot "$$" "$snapshot_dir" "$db" "$snapshot" </dev/null >/dev/null 2>&1 &
+env -u T3FLARE_MODEL_HANDLE "$0" --t3flare-watch "$$" "$log" </dev/null >/dev/null &
+env -u T3FLARE_MODEL_HANDLE "$0" --t3flare-snapshot "$$" "$snapshot_dir" "$db" "$snapshot" </dev/null >/dev/null 2>&1 &
 exec env -u T3FLARE_MODEL_HANDLE /opt/t3flare/opencode/opencode acp

@@ -1,6 +1,7 @@
 // The text-generation setting's default (SPI-1163): while the owner has set no model, the setting names text generation's
-// default model, a small model of the first Model endpoint that has one (else the Model proxy's), and follows it as the
-// endpoints change. A model the owner picked is never replaced.
+// default model, a small model of the first Model endpoint that has one (else the endpoints' default model; before the
+// hard cut, SPI-1176, the Model proxy's small model), and follows it as the endpoints change. A model the owner picked is
+// never replaced; a Pi Durable model from before the cut is not one the owner can still use, and is replaced.
 import { ProviderInstanceId } from "@t3tools/contracts";
 import type { EndpointModel, ModelEndpoints } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
@@ -22,11 +23,10 @@ const withModels = (...ids: ReadonlyArray<string>): ModelEndpoints => ({
   endpoints: ids.length === 0 ? [] : [{ id: "openai", label: "OpenAI", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api-key", headers: {}, models: ids.map(model) }],
 });
 
-/** The Environment as the sync sees it: its endpoints now, the proxy, and the model it last wrote. */
-const environment = (initial: ModelEndpoints, proxy = true) => {
+/** The Environment as the sync sees it: its endpoints now, and the model it last wrote. */
+const environment = (initial: ModelEndpoints) => {
   const state = { endpoints: initial, seeded: undefined as string | undefined };
   bindEnvironmentServices({
-    modelProxy: proxy ? { url: "https://proxy.example", apiKey: "k" } : undefined,
     modelEndpoints: () => state.endpoints,
     seededTextModel: { get: () => state.seeded, set: (slug: string) => void (state.seeded = slug) },
   } as unknown as EnvironmentServices);
@@ -82,20 +82,22 @@ describe("the text-generation setting's default", () => {
     }
   });
 
-  it("names the Model proxy's small model while no endpoint has one", async () => {
+  it("names the endpoints' default model while no endpoint has a small model (SPI-1176)", async () => {
     environment(withModels("gpt-5.4"));
     const { selection } = await settingsAfter({}, [nothing]);
-    expect(selection).toMatchObject({ instanceId: PI, model: "anthropic/claude-haiku-5-5" });
+    expect(selection).toMatchObject({ instanceId: PI, model: "openai/gpt-5.4" });
   });
 
-  it("follows the endpoints while the owner has picked nothing, including the old seed of the proxy's model", async () => {
-    const state = environment(withModels());
-    const { seen } = await settingsAfter({ textGenerationModelSelection: { instanceId: PI, model: "anthropic/claude-haiku-5-5" } }, [
-      nothing,
-      () => void (state.endpoints = withModels("gpt-5-mini")),
-      () => void (state.endpoints = withModels("gpt-5-nano")),
-    ]);
-    expect(seen).toEqual(["anthropic/claude-haiku-5-5", "openai/gpt-5-mini", "openai/gpt-5-nano"]);
+  it("follows the endpoints while the owner has picked nothing, replacing a Pi Durable model from before the hard cut", async () => {
+    for (const old of ["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5", "claude-opus-5-5"]) {
+      const state = environment(withModels());
+      const { seen } = await settingsAfter({ textGenerationModelSelection: { instanceId: PI, model: old } }, [
+        nothing,
+        () => void (state.endpoints = withModels("gpt-5-mini")),
+        () => void (state.endpoints = withModels("gpt-5-nano")),
+      ]);
+      expect(seen, old).toEqual(["default", "openai/gpt-5-mini", "openai/gpt-5-nano"]);
+    }
   });
 
   it("never replaces a model the owner picked", async () => {
@@ -108,8 +110,8 @@ describe("the text-generation setting's default", () => {
     expect(seen).toEqual(["openai/gpt-5-mini", "openai/gpt-5.4", "openai/gpt-5.4"]);
   });
 
-  it("says `default` when there is neither an endpoint with a small model nor a Model proxy", async () => {
-    environment(withModels("gpt-5.4"), false);
+  it("says `default` when no endpoint lists a model", async () => {
+    environment(withModels());
     const { selection } = await settingsAfter({}, [nothing]);
     expect(selection).toMatchObject({ instanceId: PI, model: "default" });
   });

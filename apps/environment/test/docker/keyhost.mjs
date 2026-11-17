@@ -1,17 +1,15 @@
 // test:docker's stand-in for `computer.internal` (the egress host), in a sidecar container, from step 4a M0's probe:
-// - the key route: the model key for the expected nonce only (as the Workspace DO's gate), 403 otherwise;
 // - a CONNECT proxy on :3128, the CLI network's only way out, logging every host it tunnels to;
 // - a resolver on :53 that logs every name asked and answers NXDOMAIN (the CLI network has no route out).
 // - with KEYHOST_MODEL_HANDLE (SPI-1168), a stand-in model relay and endpoint under /t3flare/model/: Anthropic Messages,
 //   and OpenAI Chat Completions and Responses (SPI-1169), Google Generative AI and Mistral's chat (SPI-1170, pi's
 //   APIs). KEYHOST_MODEL_HANDLE may name several handles (comma-separated): a process each (SPI-1170's resume).
-// The key is in this process's environment only; every event is one JSON line on stdout, never the key.
+// Every event is one JSON line on stdout, never a handle. (The Model proxy's key route went at the hard cut, SPI-1176:
+// a request to it is logged as any other path, `http`, and answered 404, as computer's proxy answers it.)
 import dgram from "node:dgram";
 import http from "node:http";
 import net from "node:net";
 
-const KEY = process.env.KEYHOST_MODEL_KEY ?? "";
-const NONCES = new Set((process.env.KEYHOST_NONCES ?? "").split(",").filter((nonce) => nonce !== ""));
 const log = (entry) => console.log(JSON.stringify({ at: Date.now(), ...entry }));
 /**
  * SPI-1168: the model handles the stand-in model relay expects (claudeRelay, opencodeRelay and piRelay docker tests), in
@@ -166,14 +164,6 @@ const relay = (req, res, url) => {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://computer.internal");
-    if (url.pathname === "/t3flare/model-key") {
-      const nonce = req.headers["x-t3flare-nonce"] ?? "";
-      const granted = KEY !== "" && NONCES.has(nonce);
-      log({ event: "model-key", cli: url.searchParams.get("cli"), granted });
-      res.writeHead(granted ? 200 : 403, { "content-type": "text/plain", "cache-control": "no-store" });
-      res.end(granted ? KEY : "");
-      return;
-    }
     if (url.pathname.startsWith("/t3flare/model/") && HANDLES.length > 0) {
       relay(req, res, url);
       return;

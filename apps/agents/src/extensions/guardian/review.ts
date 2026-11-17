@@ -1,7 +1,7 @@
 // Adapted from ian-pascoe/pi-extensions@a5e15d1:packages/pi-guardian/src/guardian-review.ts (SPI-1058): one Guardian
 // Review, a stateless completion without tools bounded by the review timeout, with one corrective retry for a malformed
 // or uncategorized reply, and the Escalation Pass for a would-be Rejection. Changed: the model is reached through the
-// Session's own models (the proxy, `api.models`) with `completeSimple`; there is no classifier First Pass, no cache
+// Session's own models (its Model endpoints', `api.models`) with `completeSimple`; there is no classifier First Pass, no cache
 // breakpoint helper and no token calibration (evidence is bounded in characters, `evidence.ts`).
 // @effect-diagnostics asyncFunction:off globalDate:off globalTimers:off newPromise:off
 import { type Api, type AssistantMessage, clampThinkingLevel, type Context, type Model, type Models } from "@earendil-works/pi-ai";

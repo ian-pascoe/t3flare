@@ -5,7 +5,8 @@
 // checkout's Container (a scratch checkout, `agents/scratch.ts`), through the process channel and the CLI profile
 // (`cliProfiles.ts` `codexExecLaunch`): the output schema goes there from the State directory, and the answer is the
 // last agent message of `--json`'s event stream, since `--output-last-message` would write it in the Container.
-// Every other operation keeps the proxy's text generation (`textGeneration.ts`).
+// The model is the selection's, through the model relay (`cliProfiles.ts`). Every other operation is Pi Durable's text
+// generation (`textGeneration.ts`).
 import { TextGenerationError } from "@t3tools/contracts";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import { toJsonSchemaObject } from "@t3tools/provider-core/server/textGenerationUtils";

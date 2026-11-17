@@ -161,7 +161,7 @@ export const endpointsSection = (escape: Escape, view: EndpointsView | undefined
       : view.endpoints.map((endpoint) => endpointCard(escape, endpoint)).join("\n");
   return `<section id="endpoints" aria-labelledby="endpoints-title">
 <div class="section-head"><h2 id="endpoints-title">${icon("key")}Model endpoints</h2><a class="btn btn-sm" href="#endpoint-form">${icon("plus")}Add endpoint</a></div>
-<p class="section-desc">Your own ways to reach models: an API pi-ai speaks, at a base URL, with an API key. Pi Durable's picker lists each endpoint's models, grouped by endpoint, beside the Model proxy's. Revision ${view.revision}.</p>
+<p class="section-desc">Your own ways to reach models: an API pi-ai speaks, at a base URL, with an API key. Every agent's picker lists each endpoint's models whose API it speaks, grouped by endpoint. Revision ${view.revision}.</p>
 ${missingKey}<div class="stack">${list}
 ${SIGN_INS.map((kind) => signInForm(escape, view, kind)).join("\n")}
 ${form(escape, view)}</div>

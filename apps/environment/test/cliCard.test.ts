@@ -40,7 +40,7 @@ const INITIALIZE = {
 const SESSION_NEW = {
   sessionId: "claude-session",
   modes: { currentModeId: "default", availableModes: ["default", "acceptEdits", "plan"].map((id) => ({ id, name: id })) },
-  configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "default", options: ["default", "claude-sonnet-5-5"].map((value) => ({ value, name: value })) }],
+  configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "default", options: ["default", "comm/claude-sonnet-5-5"].map((value) => ({ value, name: value })) }],
 };
 const OPTIONS = [
   { optionId: "allow-once", name: "Yes", kind: "allow_once" },
@@ -90,7 +90,7 @@ const session = () =>
       sessions: new Map(),
     });
     const threadId = ThreadId.make(`thread-card-${++threads}`);
-    const modelSelection = { instanceId, model: "anthropic/claude-sonnet-5-5" } as const;
+    const modelSelection = { instanceId, model: "comm/claude-sonnet-5-5" } as const;
     const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "approval-required", interactionMode: "default", cwd });
     const runtime = yield* adapter.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-card-${threads}`), modelSelection, runtimePolicy });
     const queue = yield* Queue.unbounded<Event>();

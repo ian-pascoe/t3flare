@@ -44,7 +44,7 @@ describe("the ACP registry here", () => {
     expect(agents.map((a) => a.id)).toEqual(["claude-acp", "cursor", "gemini"]);
     expect(agents[0]?.description).toMatch(/^Built in here: add the Claude provider.*An agent\.$/);
     expect(agents[1]?.description).toMatch(/signs in with its vendor's account.*D3/);
-    expect(agents[2]?.description).toMatch(/key helper \(ADR-0016\)/);
+    expect(agents[2]?.description).toMatch(/keeps its model handle out of its commands \(ADR-0016\)/);
   });
 
   it("keeps a description within t3's 1,024 characters", () => {

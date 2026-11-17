@@ -34,8 +34,7 @@ const endpoint = (id: string, api: EndpointApi, modelId: string): ModelEndpoint 
 
 it("OpenCode reaches each endpoint's provider at the model relay with its handle, which no shell or MCP server inherits", () => {
   const handle = randomBytes(32).toString("hex");
-  const nonce = `nonce-${randomUUID()}`;
-  const harness = startHarness("t3flare-opencode-relay", [nonce], { modelHandle: handle });
+  const harness = startHarness("t3flare-opencode-relay", { modelHandle: handle });
   const workspace = fs.mkdtempSync(path.join(here, ".opencode-relay-"));
   fs.mkdirSync(path.join(workspace, ".t3flare"), { recursive: true });
   const repo = path.join(workspace, "repo");
@@ -73,7 +72,7 @@ it("OpenCode reaches each endpoint's provider at the model relay with its handle
     );
     const answer = profileLaunch(
       { cli: "opencode", args: ["acp"], key: marker, cwd: T3_PATH, env: {}, allowProbe: false },
-      { proxyUrl: "", models: [], readStateFile: () => undefined, piExtensionSource: "", ...(relay === undefined ? {} : { opencodeRelay: relay }) },
+      { readStateFile: () => undefined, piExtensionSource: "", ...(relay === undefined ? {} : { opencodeRelay: relay }) },
     );
     if ("refused" in answer) throw new Error(answer.refused);
     expect(answer.modelRelay).toEqual(["anth", "oai", "resp"]);
@@ -91,7 +90,6 @@ it("OpenCode reaches each endpoint's provider at the model relay with its handle
       name: "t3flare-opencode-relay",
       launch: { ...answer, env: { ...answer.env, T3FLARE_MODEL_HANDLE: handle } },
       marker,
-      nonce,
       workspace,
       setup: "(env -u T3FLARE_MODEL_HANDLE bash /workspace/watch.sh > /workspace/watch.log 2>&1 &)",
     });
@@ -121,7 +119,6 @@ it("OpenCode reaches each endpoint's provider at the model relay with its handle
       .map((line) => JSON.parse(line) as { path: string; api: string; model: string; headers: ReadonlyArray<string>; apiKeyIsHandle: boolean; bearerIsHandle: boolean; bash: boolean });
     // Requests anywhere but the relay (the repository's own URLs), and whether any carried the handle.
     const elsewhere = logs.filter((line) => line.includes('"event":"http"')).map((line) => JSON.parse(line) as { path: string; apiKeyIsHandle: boolean; bearerIsHandle: boolean });
-    const keyAsked = logs.filter((line) => line.includes('"model-key"')).length;
     const shellEnv = read("shell-env.txt");
     const mcpEnv = read("mcp-env.txt");
     const pluginEnv = read("plugin-env.txt");
@@ -151,7 +148,6 @@ it("OpenCode reaches each endpoint's provider at the model relay with its handle
     expect(elsewhere.map((entry) => entry.path).sort((a, b) => a.localeCompare(b)), text).toEqual(["/evil/new/v1/messages", "/evil/variant/responses"]);
     expect(elsewhere.every((entry) => !entry.apiKeyIsHandle && !entry.bearerIsHandle), text).toBe(true);
     // The handle needs no key helper.
-    expect(keyAsked, text).toBe(0);
     // The shell, the repository's MCP server and its plugin: the marker, no handle, no nonce.
     for (const [name, env] of [["shell", shellEnv], ["MCP server", mcpEnv], ["plugin", pluginEnv]] as const) {
       expect(env.includes("T3FLARE_EXEC"), `${name}: ${text}`).toBe(true);

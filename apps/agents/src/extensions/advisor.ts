@@ -25,6 +25,7 @@
 import type { Context as ChordContext } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type Conversation, defineExtension, type EntryId, type Extension, GenerationTask, type Harness, hook, type HookApi, type JsonObject } from "@earendil-works/pi-durable";
+import { isRetiredSlug, parseEndpointSlug } from "@t3flare/models/endpoints";
 
 import { type EvidenceMessage, evidenceRefs, projectEntry, selectContextSeed } from "./advisor/evidence.ts";
 
@@ -66,7 +67,7 @@ const RANK: Readonly<Record<Severity, number>> = { nit: 1, concern: 2, blocker: 
 export type AdvisorFinding = { readonly severity: Severity; readonly message: string; readonly evidence: { readonly refs?: ReadonlyArray<string>; readonly quote?: string } };
 
 export interface AdvisorSettings {
-  /** A model id among the Session's models, or `inherit` (the agent's). */
+  /** A Model endpoint's slug among the Session's models, or `inherit` (the agent's). */
   readonly model: string;
   readonly reviewEvery: "turn" | "request" | number;
   readonly thinkingLevel: "off" | "low" | "medium" | "high";
@@ -248,7 +249,9 @@ export class AdvisorObserver {
   /** The Advisor Session for these settings: the stored one, or a new one with the agent's read-only tools. */
   async #session(harness: Harness, observed: Conversation, context: ChordContext): Promise<{ readonly conversation: Conversation; readonly stored: Stored; readonly fresh: boolean }> {
     const agent = await observed.agent(context);
-    const model = this.#settings.model === "inherit" ? agent.model : { provider: "anthropic", modelId: this.#settings.model };
+    // `inherit`, or a value that names no Model endpoint (one from before the hard cut, SPI-1176): the agent's own model.
+    const own = isRetiredSlug(this.#settings.model) ? undefined : parseEndpointSlug(this.#settings.model);
+    const model = this.#settings.model === "inherit" || own === undefined ? agent.model : { provider: own.endpointId, modelId: own.modelId };
     if (model === undefined) throw new Error("no Advisor model: the agent has none to inherit");
     const key = JSON.stringify([model, this.#settings.thinkingLevel]);
     const stored = this.#storage.get<Stored>(STATE_KEY);

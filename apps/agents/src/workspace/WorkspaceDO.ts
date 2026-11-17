@@ -78,7 +78,6 @@ import { CREDENTIAL_HELPER_VERSION } from "./credentialHelper.ts";
 import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, withoutOwnGitDir } from "./gitDirReads.ts";
 import { type StaleOutcome, staleRead } from "./staleReads.ts";
 import { readCache, readKey } from "./readCache.ts";
-import { ModelKeyGate } from "./modelKey.ts";
 import { authorizeModelRelay, type ModelRelayAsk, type ModelRelayGrant } from "./modelRelay.ts";
 import { RelayFailures } from "./relayFailures.ts";
 import { EndpointKeyPatterns, leakTargets } from "./endpointKeys.ts";
@@ -120,8 +119,6 @@ export interface WorkspaceEnv {
   readonly T3FLARE_TERMINAL_IDLE_MS?: string;
   /** Test stages only: the stage-only probes and faults answer. */
   readonly T3FLARE_FAULTS?: string;
-  /** Step 4a (ADR-0016 A′): the CLI agents' own model proxy key, answered by the key route only. */
-  readonly COMMISSARY_CONTAINER_API_KEY?: string;
 }
 
 export interface ExecInput {
@@ -190,8 +187,6 @@ const PROJECT_ROOT_MAX_FILES = 1000;
 const PROJECT_ROOT_MAX_BYTES = 20 * 1024 * 1024;
 const LEASED_KEY = "t3flare:container-leased";
 export { CREDENTIAL_HELPER, CREDENTIAL_PATH };
-/** Where the Container's key helper asks this object for the CLI agents' model key (step 4a). */
-export const MODEL_KEY_PATH = "/t3flare/model-key";
 const WORKSPACE_ID_KEY = "t3flare:workspace-id";
 /** A cached token is renewed this long before it expires. */
 const TOKEN_RENEW_MS = 5 * 60_000;
@@ -265,8 +260,6 @@ export class WorkspaceDO extends ContainerHost {
   readonly #relayFailures = new RelayFailures();
   /** This object's boot counter (review F6): the process channel's epoch, durable, never a UUID. */
   readonly #boot: number;
-  /** The key route's nonces: one per live CLI process, with its CLI and the grants it took. */
-  readonly #keyGate = new ModelKeyGate(() => crypto.randomUUID());
   /** When the sync guard last scanned (its files changed after this are scanned next). */
   #lastScan = 0;
   /** A CLI process ran since the last scan: the next pull is scanned even if none runs now. */
@@ -504,17 +497,19 @@ export class WorkspaceDO extends ContainerHost {
       filesMayHaveChanged: (why) => this.#terminalSync.changed(why),
       maxProcesses: MAX_CLI_PROCESSES,
       allowProbe: env.T3FLARE_FAULTS === "1",
-      beforeStart: async (input) => {
+      beforeStart: async () => {
         await this.#ensureGlobalMise();
-        return { env: { T3FLARE_MODEL_KEY_NONCE: this.#keyGate.issue(input.key, input.cli) }, sandbox: await this.#sandboxWorks() };
+        return { sandbox: await this.#sandboxWorks() };
       },
     });
   }
 
-  /** The credentials the sync guard looks for: the CLI agents' key and the git tokens handed out lately. */
-  async #patterns(): Promise<ReadonlyArray<CredentialPattern>> {
-    const key = this.env.COMMISSARY_CONTAINER_API_KEY;
-    return [...(key === undefined || key === "" ? [] : [await patternOf("model-key", key)]), ...this.#tokenPatterns, ...this.#endpointKeys.values()];
+  /**
+   * The credentials the sync guard looks for: the git tokens handed out lately and the Model endpoints' credentials the
+   * model relay used (SPI-1167). (The Model proxy's Container key went with the key helper at the hard cut, SPI-1176.)
+   */
+  #patterns(): ReadonlyArray<CredentialPattern> {
+    return [...this.#tokenPatterns, ...this.#endpointKeys.values()];
   }
 
   async #rememberToken(token: string): Promise<void> {
@@ -526,7 +521,7 @@ export class WorkspaceDO extends ContainerHost {
   async #scan(input: Omit<LeakScanInput, "patterns">, extra: ReadonlyArray<CredentialPattern> = []): Promise<LeakScanAnswer | undefined> {
     const container = this.ctx.container;
     if (container === undefined || !container.running) return undefined;
-    const patterns = [...(await this.#patterns()), ...extra];
+    const patterns = [...this.#patterns(), ...extra];
     if (patterns.length === 0) return undefined;
     const process = await container.exec([...leakScanArgv({ ...input, patterns })], { stdout: "pipe", stderr: "pipe" });
     const output = await process.output();
@@ -557,7 +552,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /** The scanner as a script suffix, its answer left in a file on the Container's disk (`#readScanResult`). */
   async #scanSuffix(): Promise<string | undefined> {
-    const patterns = await this.#patterns();
+    const patterns = this.#patterns();
     if (patterns.length === 0) return undefined;
     const started = Date.now();
     const argv = leakScanArgv({ patterns, roots: ["/workspace"], since: this.#lastScan === 0 ? 0 : this.#lastScan - 2000, quarantine: QUARANTINE, skip: SCAN_SKIP });
@@ -610,8 +605,6 @@ export class WorkspaceDO extends ContainerHost {
     this.#alive();
     await this.#ready();
     const values: Array<readonly [string, string]> = [];
-    const key = this.env.COMMISSARY_CONTAINER_API_KEY;
-    if (key !== undefined && key !== "") values.push(["model-key", key]);
     const { values: endpointValues, patterns: extra, skipped, containerOnly } = await leakTargets(input.credentials ?? [], input.patterns ?? []);
     values.push(...endpointValues);
     const found: Array<{ name: string; path: string }> = [];
@@ -1955,7 +1948,6 @@ export class WorkspaceDO extends ContainerHost {
   override async fetch(request: Request): Promise<Response> {
     if (this.#isDestroyed()) return new Response("t3flare: this Workspace was deleted", { status: 410 });
     if (new URL(request.url).pathname === CREDENTIAL_PATH) return this.#credential(new URL(request.url));
-    if (new URL(request.url).pathname === MODEL_KEY_PATH) return this.#modelKey(request);
     return this.#container.handleFetch(request);
   }
 
@@ -2046,23 +2038,6 @@ export class WorkspaceDO extends ContainerHost {
     if (op.op !== "abort") throw new Error("t3flare: the only probe is abort");
     setTimeout(() => this.ctx.abort("t3flare: probe abort"), 0);
     return { aborting: true, epoch: this.#boot };
-  }
-
-  /**
-   * The key helper's request (step 4a, ADR-0016 A′): the CLI agents' model key, only for the nonce of a CLI process that
-   * lives here, Codex's at most `CODEX_KEY_GRANTS` times. Each grant is logged without the value.
-   */
-  #modelKey(request: Request): Response {
-    const refuse = (why: string) => {
-      console.warn(JSON.stringify({ t3flare: "model-key-refused", workspace: this.#workspaceId() ?? null, why }));
-      return new Response("", { status: 403, headers: { "cache-control": "no-store" } });
-    };
-    const value = this.env.COMMISSARY_CONTAINER_API_KEY;
-    if (value === undefined || value === "") return refuse("no key bound");
-    const decision = this.#keyGate.decide(request.headers.get("x-t3flare-nonce"), new Set(this.#processes.keys()));
-    if (!decision.grant) return refuse(decision.why);
-    console.log(JSON.stringify({ t3flare: "model-key", workspace: this.#workspaceId() ?? null, cli: decision.cli, key: decision.key, grants: decision.grants }));
-    return new Response(value, { status: 200, headers: { "cache-control": "no-store", "content-type": "text/plain" } });
   }
 
   /** Points the repo's git credentials at `CREDENTIAL_HELPER` (repos cloned before it existed). */

@@ -1,8 +1,9 @@
 // @effect-diagnostics globalConsole:off globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off
 // The Codex CLI in the Cloud Environment (step 4a, plan §3, §3.1): t3's own Codex adapter (`makeCodexAdapterV2`) with
-// t3flare's readiness (the image's version and the proxy's catalog, never a spawning probe), its own app-server client
-// factory (a spawn in the thread's Workspace, the request guard), t3's MCP credential withheld (OD-3), text generation
-// through the proxy, and the wrapper (one Workspace per session, review F1). Registered by the `builtInDrivers.ts` Shadow.
+// t3flare's readiness (the image's version and the OpenAI Responses Model endpoints; it needs setup without one,
+// SPI-1176; never a spawning probe), its own app-server client factory (a spawn in the thread's Workspace, the request
+// guard), t3's MCP credential withheld (OD-3), text generation on the Model endpoints (Pi Durable's), and the wrapper
+// (one Workspace per session, review F1). Registered by the `builtInDrivers.ts` Shadow.
 import { CodexSettings, ProviderDriverKind, type ServerProvider, type ServerProviderModel } from "@t3tools/contracts";
 import { CLIS } from "@t3flare/sandbox-image/clis";
 import { toWorkspace } from "@t3flare/workspace-client";
@@ -32,6 +33,8 @@ import { environmentServices } from "../../agents/bindings.ts";
 import { traceProtocol } from "../../agents/processRouter.ts";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import { runText } from "../textGeneration.ts";
+import { readinessOf } from "../readiness.ts";
+import { noEndpointFor } from "../../agents/cliProfiles.ts";
 import { withCodexInvestigation } from "./codexInvestigation.ts";
 import { declinesInPlan, guardRequest } from "./codexGuard.ts";
 import { codexModelsOf, codexRouteFor } from "./codexEndpoints.ts";
@@ -62,17 +65,8 @@ export type CodexCliDriverEnv =
   | ProviderContinuationRequests.ProviderContinuationRequests
   | ServerConfig;
 
-/**
- * The catalog's models as Codex lists them: the real id is the slug Codex sends (M0 P3: every family drives tools).
- * Then the OpenAI Responses endpoints' models as `<endpointId>/<modelId>` (SPI-1167), reached through the model relay.
- */
-export const codexModels = (): ReadonlyArray<ServerProviderModel> => {
-  const services = environmentServices();
-  const proxy = services.catalog
-    .current()
-    .models.map((model) => ({ slug: model.id, name: model.name, subProvider: model.vendor, isCustom: false, capabilities: { optionDescriptors: [] } }));
-  return codexModelsOf(proxy, services.modelEndpoints?.());
-};
+/** The OpenAI Responses endpoints' models as `<endpointId>/<modelId>` (SPI-1167), reached through the model relay. */
+export const codexModels = (): ReadonlyArray<ServerProviderModel> => codexModelsOf(environmentServices().modelEndpoints?.());
 
 /** The thread request methods whose answer names the thread's provider. */
 const THREAD_OPENERS = new Set(["thread/start", "thread/resume", "thread/fork"]);
@@ -147,16 +141,23 @@ const snapshotOf = (enabled: boolean, setupMode: string | undefined) =>
   Effect.gen(function* () {
     const checkedAt = DateTime.formatIso(yield* DateTime.now);
     const managed = setupMode === "managed";
+    const models = codexModels();
     return buildServerProvider({
       presentation: PRESENTATION,
       enabled,
       checkedAt,
-      models: codexModels(),
+      models,
       // SPI-1151: stock's static commands, without `/feedback`.
       slashCommands: CLI_BUILT_IN_COMMANDS.codex,
       probe: managed
-        ? { installed: true, version: CLIS.codex.version, status: "error", auth: { status: "unauthenticated" }, message: "ChatGPT sign-in is not offered; t3flare uses the model proxy (set Codex's setup mode back)." }
-        : { installed: true, version: CLIS.codex.version, status: "ready", auth: { status: "authenticated" } },
+        ? {
+            installed: true,
+            version: CLIS.codex.version,
+            status: "error",
+            auth: { status: "unauthenticated" },
+            message: "Codex's own ChatGPT sign-in is not offered here; sign in to ChatGPT as a Model endpoint in the Harness panel instead (and set Codex's setup mode back).",
+          }
+        : readinessOf(models, CLIS.codex.version, `${noEndpointFor("Codex", "OpenAI Responses")}.`),
     });
   });
 
@@ -176,7 +177,6 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       continuation: { groupKey: continuationIdentity.continuationKey },
     });
     const effective = { ...config, enabled };
-    const { catalog } = environmentServices();
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
     const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: CODEX_DRIVER, packageName: null });
     const snapshot = yield* makeManagedServerProvider({
@@ -185,10 +185,7 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       streamSettings: settingsSource.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,
       initialSnapshot: (settings) => snapshotOf(settings.provider.enabled, config.setupMode).pipe(Effect.map(stamp)),
-      checkProvider: Effect.promise(() => catalog.refresh()).pipe(
-        Effect.flatMap(() => snapshotOf(effective.enabled, config.setupMode)),
-        Effect.map(stamp),
-      ),
+      checkProvider: Effect.suspend(() => snapshotOf(effective.enabled, config.setupMode)).pipe(Effect.map(stamp)),
     }).pipe(Effect.orDie);
     yield* Effect.forkScoped(snapshot.refresh);
     // SPI-1167: a change to the Model endpoints reaches Codex's model list at once, as it does Pi Durable's picker.
@@ -225,7 +222,8 @@ export const CodexCliDriver: ProviderDriver<CodexSettings, CodexCliDriverEnv> = 
       // SPI-1151: the Workspace's Repo skills at Codex's roots, from the Workspace DO (never a spawn in the project).
       snapshotForCwd: cliSnapshotForCwdOf({ machine: snapshot.getSnapshot, driver: CODEX_DRIVER, instanceId, agent: "codex" }),
       orchestrationAdapter: wrapCliAdapter(adapter, { sessions }),
-      // The proxy's text generation; a review guide's investigation runs `codex exec` read-only in the checkout (G7).
+      // Pi Durable's text generation on the Model endpoints; a review guide's investigation runs `codex exec` read-only in
+      // the checkout (G7).
       textGeneration: TextGenerationOperations.fromRunner("CodexTextGeneration", withCodexInvestigation(spawner, fileSystem, runText)),
     } satisfies ProviderInstance;
   }),

@@ -129,7 +129,7 @@ const INITIALIZE = {
 };
 const SESSION_NEW = {
   sessionId: "session",
-  configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "claude-sonnet-5-5", options: ["claude-sonnet-5-5", "t3flare/claude-sonnet-5-5"].map((value) => ({ value, name: value })) }],
+  configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "comm/claude-sonnet-5-5", options: ["comm/claude-sonnet-5-5", "t3flare-endpoint-comm/claude-sonnet-5-5"].map((value) => ({ value, name: value })) }],
 };
 
 /** The prompt the scripted agent received for one turn of `text`, through the wrapper and t3's adapter. */
@@ -189,7 +189,7 @@ const promptFor = (cli: "claude" | "opencode", text: string, files: Record<strin
       ...(order === undefined ? {} : { takeEnvironmentSkills: (at: string | null) => Effect.sync(() => void order.push(`take ${at}`)) }),
     });
     const threadId = ThreadId.make(`thread-${cli}`);
-    const modelSelection = { instanceId, model: "anthropic/claude-sonnet-5-5" } as const;
+    const modelSelection = { instanceId, model: "comm/claude-sonnet-5-5" } as const;
     const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd });
     const runtime = yield* wrapped.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-${cli}`), modelSelection, runtimePolicy });
     const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();

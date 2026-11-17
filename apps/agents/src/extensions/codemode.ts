@@ -44,7 +44,7 @@ export const codemodeExtension = (sandbox: CodemodeSandboxBase, options: { reado
     namespaces: [T3_NAMESPACE, ...(options.namespaces ?? [])],
     inlineBudget: options.inlineBudget,
     // No `models.*` in scripts: a classifier or image call would be a model request outside a turn's usage-limit
-    // handling (ADR-0012), and the proxy serves chat models only.
+    // handling (ADR-0034 §8).
     models: false,
   });
   return { ...base, sections: [...(base.sections ?? []), section("codemode_rules", () => CODEMODE_RULES)] };

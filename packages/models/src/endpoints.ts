@@ -236,8 +236,9 @@ export const EMPTY_ENDPOINTS: ModelEndpoints = { revision: 0, endpoints: [] };
 /** 1–32 of a–z, 0–9 and `-`, starting and ending with a letter or digit. */
 export const ENDPOINT_ID = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
 /**
- * Ids an endpoint may not take: `anthropic` names the Model proxy's models (`anthropic/<id>`) until the hard cut
- * (SPI-1176), and `default` is t3's word for the default model.
+ * Ids an endpoint may not take: `anthropic` named the retired Model proxy's models (`anthropic/<id>`), which still sit in
+ * old threads and settings and fall back to the default model (SPI-1176, `isRetiredSlug`), so no endpoint may answer
+ * for them; `default` is t3's word for the default model.
  */
 export const RESERVED_ENDPOINT_IDS: ReadonlyArray<string> = ["anthropic", "default"];
 export const MAX_ENDPOINTS = 32;
@@ -266,6 +267,25 @@ export const findEndpointModel = (endpoints: ModelEndpoints, slug: string): { re
   return endpoint === undefined || model === undefined ? undefined : { endpoint, model };
 };
 
+/**
+ * Whether a model selection is from before the hard cut (SPI-1176): t3's `default`, a bare id (the Model proxy's ids as
+ * Codex and Claude Code named them, or t3's own stock defaults), or the proxy's `anthropic/<id>`. None names a Model
+ * endpoint, so each falls back to the default model. A slug of an endpoint that is gone is not one: it fails, saying so.
+ */
+export const isRetiredSlug = (slug: string): boolean => slug === "default" || parseEndpointSlug(slug) === undefined || slug.startsWith("anthropic/");
+
+/** The default model (SPI-1176): the first model of the first endpoint, in the owner's order, that lists one. */
+export const defaultModelSlug = (endpoints: ModelEndpoints): string | undefined => {
+  const first = endpoints.endpoints.find((endpoint) => endpoint.models.length > 0);
+  return first === undefined ? undefined : endpointSlug(first.id, first.models[0]!.id);
+};
+
+/** Where the owner sets up Model endpoints: what a provider needing setup, or a refused spawn, points to. */
+export const SETUP_HINT = "add one in the Harness panel (/_t3flare/harness), under Model endpoints";
+
+/** Pi Durable's text while no Model endpoint lists a model: its provider needs setup (SPI-1176). */
+export const NO_ENDPOINT_MESSAGE = `No Model endpoint is set up: ${SETUP_HINT}.`;
+
 /** The small models' families: `haiku`, `mini`, `nano`, `flash`, `lite`, `small`, `tiny`, as a word of the model id. */
 const SMALL_MODEL = /(?:^|[-_./:])(?:haiku|mini|nano|flash|lite|small|tiny)(?:$|[-_.:])/i;
 
@@ -284,6 +304,18 @@ export const defaultTextModel = (endpoints: ModelEndpoints): string | undefined 
   }
   return undefined;
 };
+
+/**
+ * The small model for the Session's own requests when the owner names none (`default`): the Guardian, prompt
+ * suggestions, web search (SPI-1176). Text generation's default rule, else the default model.
+ */
+export const defaultSmallModel = (endpoints: ModelEndpoints): string | undefined => defaultTextModel(endpoints) ?? defaultModelSlug(endpoints);
+
+/**
+ * The slug a model setting names (the Guardian's, `web_search`'s): its own when it is an endpoint's slug; `default`, or a
+ * value from before the hard cut (`isRetiredSlug`), the endpoints' small model. Undefined: no endpoint lists a model.
+ */
+export const modelSettingSlug = (setting: string, endpoints: ModelEndpoints): string | undefined => (isRetiredSlug(setting) ? defaultSmallModel(endpoints) : setting);
 
 /**
  * One text-generation request on an endpoint's model (SPI-1163): the Environment DO's call of the agents Worker's

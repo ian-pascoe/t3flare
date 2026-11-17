@@ -1,5 +1,6 @@
-// Codex's Model endpoints (SPI-1167): its model list is the Model proxy's, then the OpenAI Responses endpoints' models by
-// slug, grouped by endpoint; other APIs are not Codex's. Each slug routes to its endpoint's provider.
+// Codex's Model endpoints (SPI-1167): its model list is the OpenAI Responses endpoints' models by slug, grouped by
+// endpoint; other APIs are not Codex's. Each slug routes to its endpoint's provider (the Model proxy's went at the hard
+// cut, SPI-1176, and its models fall back to the default model).
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
@@ -17,28 +18,30 @@ const endpoints: ModelEndpoints = {
     { id: "copilot", label: "GitHub Copilot", api: "openai-responses", baseUrl: "https://api.individual.githubcopilot.com", auth: "copilot", headers: {}, models: [model("gpt-6.1-sol")] },
   ],
 };
-const proxy = [{ slug: "gemini-3-flash", name: "Gemini 3 Flash", subProvider: "Anthropic", isCustom: false, capabilities: { optionDescriptors: [] } }];
-
 describe("Codex's Model endpoints", () => {
-  it("lists the proxy's models, then each Responses endpoint's by slug, grouped by endpoint", () => {
-    expect(codexModelsOf(proxy, endpoints).map((row) => [row.slug, row.subProvider, row.name])).toEqual([
-      ["gemini-3-flash", "Anthropic", "Gemini 3 Flash"],
-      ["openai/gpt-5-mini", "OpenAI", "GPT-5-MINI"],
-      // A label a proxy vendor has is told apart by the endpoint's id.
-      ["gw/m1", "Anthropic · gw", "M1"],
-      ["chatgpt/gpt-6.1-sol", "ChatGPT", "GPT-6.1-SOL"],
+  it("lists each Responses endpoint's models by slug, grouped by endpoint, the first the default; none without one", () => {
+    const listed = codexModelsOf(endpoints);
+    expect(listed.map((row) => [row.slug, row.subProvider, row.name, row.isDefault === true])).toEqual([
+      ["openai/gpt-5-mini", "OpenAI", "GPT-5-MINI", true],
+      ["gw/m1", "Anthropic", "M1", false],
+      ["chatgpt/gpt-6.1-sol", "ChatGPT", "GPT-6.1-SOL", false],
     ]);
-    expect(codexModelsOf(proxy)).toEqual(proxy);
+    // The Model proxy's models went at the hard cut (SPI-1176): without a Responses endpoint, Codex lists none.
+    expect(codexModelsOf()).toEqual([]);
+    expect(codexModelsOf({ revision: 1, endpoints: [endpoints.endpoints[1]!] })).toEqual([]);
   });
 
-  it("routes a Responses endpoint's slug to its provider, and every other model to the proxy", () => {
+  it("routes a Responses endpoint's slug to its provider; a selection from before the hard cut to the default model (SPI-1176)", () => {
     const route = codexRouteFor(() => endpoints);
     expect(route("openai/gpt-5-mini")).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
-    expect(route("claude/claude-haiku-5-5")).toEqual({ provider: "t3flare-proxy", model: "claude/claude-haiku-5-5" });
-    expect(route("gemini-3-flash")).toEqual({ provider: "t3flare-proxy", model: "gemini-3-flash" });
-    // A ChatGPT sign-in's slug is its provider's; a Copilot sign-in's is no endpoint's for Codex (SPI-1171).
+    // A ChatGPT sign-in's slug is its provider's (SPI-1171).
     expect(route("chatgpt/gpt-6.1-sol")).toEqual({ provider: "t3flare-endpoint-chatgpt", model: "gpt-6.1-sol" });
-    expect(route("copilot/gpt-6.1-sol")).toEqual({ provider: "t3flare-proxy", model: "copilot/gpt-6.1-sol" });
-    expect(codexRouteFor(() => undefined)("openai/gpt-5-mini")).toEqual({ provider: "t3flare-proxy", model: "openai/gpt-5-mini" });
+    // The Model proxy's bare ids, its `anthropic/…` and `default`: the first endpoint's first model.
+    for (const old of ["gemini-3-flash", "gpt-6-luna", "anthropic/claude-haiku-5-5", "default"]) expect(route(old), old).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
+    // Another API's endpoint, or a Copilot sign-in (no endpoint of Codex's): its own provider, which Codex does not have.
+    expect(route("claude/claude-haiku-5-5")).toEqual({ provider: "t3flare-endpoint-claude", model: "claude-haiku-5-5" });
+    expect(route("copilot/gpt-6.1-sol")).toEqual({ provider: "t3flare-endpoint-copilot", model: "gpt-6.1-sol" });
+    // No endpoint at all: nothing to fall back to.
+    expect(codexRouteFor(() => undefined)("gpt-6-luna")).toEqual({ provider: "", model: "gpt-6-luna" });
   });
 });

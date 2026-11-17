@@ -116,8 +116,8 @@ RUN set -e; found=0; \
  cp /usr/local/share/t3flare/gitconfig /etc/gitconfig
 
 # The CLI agents (step 4a, plan §6), at fixed paths the CLI profiles name absolutely, after the mise layer so a CLI bump
-# rebuilds only this: Codex's checked binary, pi from a committed lock with the image's Node (`npm ci`, no scripts), the
-# key helper, and pi's handle command on the model relay (SPI-1170). Not mise: a project's toolchains must never shadow them.
+# rebuilds only this: Codex's checked binary, pi from a committed lock with the image's Node (`npm ci`, no scripts), and
+# pi's handle command on the model relay (SPI-1170; the Model proxy's key helper went at the hard cut, SPI-1176). Not mise: a project's toolchains must never shadow them.
 COPY --from=codex --chown=0:0 /codex /opt/t3flare/bin/codex
 COPY cli/package.json cli/package-lock.json /opt/t3flare/pi/
 RUN cd /opt/t3flare/pi \
@@ -125,7 +125,6 @@ RUN cd /opt/t3flare/pi \
  && rm -rf /root/.npm
 COPY --chmod=755 t3flare-pi /opt/t3flare/bin/pi
 COPY --chmod=755 t3flare-pi-handle /opt/t3flare/bin/t3flare-pi-handle
-COPY --chmod=755 t3flare-model-key /opt/t3flare/bin/t3flare-model-key
 
 # Step 4b, plan §6: Claude Code over ACP (claude-agent-acp and the Claude Agent SDK, whose platform package holds the
 # claude binary) from its own committed lock, and OpenCode's checked binary, each in its own layers so a bump rebuilds
@@ -137,7 +136,6 @@ RUN cd /opt/t3flare/claude \
  && test -x node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude
 COPY --from=opencode --chown=0:0 /opencode /opt/t3flare/opencode/opencode
 COPY --chmod=755 t3flare-claude-agent-acp /opt/t3flare/bin/claude-agent-acp
-COPY --chmod=755 t3flare-claude-key /opt/t3flare/bin/t3flare-claude-key
 COPY --chmod=755 t3flare-claude-handle /opt/t3flare/bin/t3flare-claude-handle
 COPY claude-handle-unset.cjs /opt/t3flare/share/claude-handle-unset.cjs
 COPY --chmod=755 t3flare-opencode /opt/t3flare/bin/opencode

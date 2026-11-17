@@ -1,5 +1,6 @@
 // The Durable agent provider (step 2a): a t3 ProviderDriver whose agents run on pi-durable in Session DOs of the agents
-// Worker, with models through the deployment's model proxy (ADR-0012). Registered through the `builtInDrivers.ts` Shadow.
+// Worker, with models through the owner's Model endpoints (ADR-0034). Registered through the `builtInDrivers.ts` Shadow.
+// With no endpoint that lists a model it needs setup (SPI-1176): its status says so and points to the Harness panel.
 import type { ServerProvider, ServerProviderModel } from "@t3tools/contracts";
 import {
   defaultProviderContinuationIdentity,
@@ -21,12 +22,15 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
 
+import { NO_ENDPOINT_MESSAGE } from "@t3flare/models/endpoints";
+
 import { environmentServices } from "../agents/bindings.ts";
 import { refreshOnEndpointsChanged } from "../endpoints/changes.ts";
 import { makePiDurableAdapter } from "./adapter.ts";
 import { attachmentReader } from "./attachments.ts";
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
 import { snapshotModels } from "./models.ts";
+import { readinessOf } from "./readiness.ts";
 import { PiDurableSettings } from "./settings.ts";
 import { environmentSkillsAccess, piDurableSnapshotForCwd } from "./skills.ts";
 import { makePiDurableTextGeneration } from "./textGeneration.ts";
@@ -53,7 +57,7 @@ const snapshotOf = Effect.fn("PiDurableDriver.snapshot")(function* (input: {
     enabled: input.enabled,
     checkedAt,
     models: input.models,
-    probe: { installed: true, version: null, status: "ready", auth: { status: "authenticated" } },
+    probe: readinessOf(input.models, null, NO_ENDPOINT_MESSAGE),
   });
 });
 
@@ -73,11 +77,9 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       continuation: { groupKey: continuationIdentity.continuationKey },
     });
     const effective = { ...config, enabled };
-    const { catalog } = environmentServices();
-    // The snapshot's models are the catalog's (the copy kept from the last read, now; the proxy's list again at each
-    // check) and the Model endpoints' as stored now (SPI-1162), read through the services bound last: an Environment DO
-    // that reset in a warm isolate binds them again.
-    const models = () => snapshotModels(catalog.current(), environmentServices().modelEndpoints?.());
+    // The snapshot's models are the Model endpoints' as stored now (SPI-1162), read through the services bound last: an
+    // Environment DO that reset in a warm isolate binds them again.
+    const models = () => snapshotModels(environmentServices().modelEndpoints?.());
     const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: PI_DURABLE_DRIVER, packageName: null });
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
     const snapshot = yield* makeManagedServerProvider({
@@ -86,12 +88,8 @@ export const PiDurableDriver: ProviderDriver<PiDurableSettings, PiDurableDriverE
       streamSettings: settingsSource.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,
       initialSnapshot: (settings) => snapshotOf({ enabled: settings.provider.enabled, models: models() }).pipe(Effect.map(stamp)),
-      checkProvider: Effect.promise(() => catalog.refresh()).pipe(
-        Effect.flatMap(() => snapshotOf({ enabled: effective.enabled, models: models() })),
-        Effect.map(stamp),
-      ),
+      checkProvider: Effect.suspend(() => snapshotOf({ enabled: effective.enabled, models: models() })).pipe(Effect.map(stamp)),
     }).pipe(Effect.orDie);
-    // Read the proxy's list now rather than at the first interval: a fresh Environment starts with the kept copy.
     yield* Effect.forkScoped(snapshot.refresh);
     // A change to the Model endpoints reaches the picker at once, not at the next check.
     yield* refreshOnEndpointsChanged(snapshot.refresh);

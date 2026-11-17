@@ -54,10 +54,17 @@ export type OfferedPreset = keyof typeof OFFERED_PRESETS;
 
 const CORE_LOCK = "a core extension: always on";
 
-/** The proxy's Claude models (models.json): what `web_search`, the guardian and the advisor may ask. */
-export const PROXY_CLAUDE_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"] as const;
-/** The models `web_search` may ask. */
-export const SEARCH_MODELS = PROXY_CLAUDE_MODELS;
+/**
+ * A model setting (the Guardian's, the Advisor's, `web_search`'s): a Model endpoint's slug, `<endpointId>/<modelId>`, or
+ * `default` (the endpoints' small model, text generation's default rule). Free text, since the endpoints are the owner's
+ * (SPI-1176: until the hard cut it was one of the Model proxy's three Claude models). A value that names no endpoint (one
+ * from before the cut) is read as `default`.
+ */
+const modelSetting = (title: string, description: string, fallback: string): SettingEntry => ({
+  title,
+  description,
+  schema: { type: "text", maxLength: 300, default: fallback },
+});
 const THINKING_LEVELS = ["off", "low", "medium", "high"] as const;
 
 export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
@@ -102,20 +109,20 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     id: "web",
     title: "Web tools",
     description:
-      "web_fetch: one public page as Markdown, text or HTML, through an SSRF guard. web_search, when switched on below: a search-capable model behind the model proxy searches and cites its sources (no new key). Both are reads, allowed in every mode (SPI-1054).",
+      "web_fetch: one public page as Markdown, text or HTML, through an SSRF guard. web_search, when switched on below: a model on an Anthropic Messages Model endpoint searches with Anthropic's server-side web search tool and cites its sources (no new key). Both are reads, allowed in every mode (SPI-1054).",
     default: "on",
     settings: {
       search: {
         title: "Web search",
-        description: "Offer web_search. Off by default: each search is a model request on the proxy's spend.",
+        description: "Offer web_search. Off by default: each search is a model request on the endpoint's spend.",
         schema: { type: "boolean", default: false },
         tier: "down-free",
       },
-      searchModel: {
-        title: "Search model",
-        description: "The model that runs web_search's searches through the proxy (Commissary passes its web search tool to Claude, or to Codex as its own).",
-        schema: { type: "enum", values: SEARCH_MODELS, default: "claude-haiku-5-5" },
-      },
+      searchModel: modelSetting(
+        "Search model",
+        "The model that runs web_search's searches: an Anthropic Messages Model endpoint's model with an API key or no auth whose server takes Anthropic's web search tool, as <endpointId>/<modelId>, or default (the endpoints' small model).",
+        "default",
+      ),
     },
   },
   {
@@ -167,7 +174,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     default: "off",
     guard: true,
     settings: {
-      model: { title: "Model", description: "The Guardian model, through the proxy. A small, fast one: every reviewed call waits for it.", schema: { type: "enum", values: PROXY_CLAUDE_MODELS, default: "claude-haiku-5-5" } },
+      model: modelSetting("Model", "The Guardian model, as <endpointId>/<modelId>, or default (the endpoints' small model). A small, fast one: every reviewed call waits for it.", "default"),
       thinkingLevel: { title: "Thinking", description: "The first pass's thinking; a would-be rejection is checked again at low or above.", schema: { type: "enum", values: THINKING_LEVELS, default: "off" } },
       tools: {
         title: "Tool Policies",
@@ -194,7 +201,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
       "A reviewer model reads the thread's completed work in the background and gives attributed advice (nit, concern, blocker), shown in t3 as Advisor notices. It never starts a turn t3 did not start. Off by default: each review is a model request (SPI-1059).",
     default: "off",
     settings: {
-      model: { title: "Model", description: "The Advisor model, through the proxy; inherit follows the thread's model.", schema: { type: "enum", values: ["inherit", ...PROXY_CLAUDE_MODELS], default: "inherit" } },
+      model: modelSetting("Model", "The Advisor model, as <endpointId>/<modelId>; inherit follows the thread's model.", "inherit"),
       reviewEvery: {
         title: "Review cadence",
         description: "turn: after every tool round that is not read-only; a number: every that many rounds and at the end; request: once, when the agent answers.",

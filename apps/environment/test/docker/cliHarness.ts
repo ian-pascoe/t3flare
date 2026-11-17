@@ -1,11 +1,12 @@
 // @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off globalTimers:off
 // test:docker's harness for the skills probes (SPI-1151's `skills.docker.test.ts`, SPI-1153's `envSkills.docker.test.ts`):
-// the image, a stand-in `computer.internal` that answers the key helper on an internal network (no model is called),
-// a CLI launched as the Workspace DO launches it (`profileLaunch` → `processCommand`), and the JSON-RPC drivers.
+// the image, a stand-in `computer.internal` on an internal network (no model is called), a CLI launched as the Workspace
+// DO launches it (`profileLaunch` → `processCommand`) on a probe Model endpoint through the relay, and the JSON-RPC
+// drivers.
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
-import type { CatalogModel } from "@t3flare/models";
+import type { EndpointModel } from "@t3flare/models/endpoints";
 import { CLIS } from "@t3flare/sandbox-image/clis";
 import { processCommand } from "@t3flare/sandbox-image/process";
 
@@ -26,13 +27,24 @@ export const docker = (args: ReadonlyArray<string>, options: { quiet?: boolean }
   return result;
 };
 
-const model = (id: string): CatalogModel => ({ id, name: id, provider: "anthropic", vendor: "Anthropic", api: "anthropic-messages", slug: `anthropic/${id}`, reasoning: false, input: ["text"], contextWindow: 200_000, maxTokens: 32_000 });
+/** The probe endpoint's one model (no model is called). */
+const PROBE_MODEL: EndpointModel = { id: "claude-haiku-5-5", name: "Probe", reasoning: false, input: ["text"], contextWindow: 200_000, maxTokens: 32_000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false };
+/** Every CLI's relay on one probe Anthropic Messages endpoint (Codex's a Responses one of the same id). */
+const PROBE = { id: "probe", label: "Probe", api: "anthropic-messages" as const, models: [PROBE_MODEL] };
+const PROBE_SLUG = `${PROBE.id}/${PROBE_MODEL.id}`;
 
 /** The profile's launch at the fixture's path; a refusal throws. */
 export const launchOf = (input: Omit<LaunchInput, "allowProbe" | "cwd">): Launch => {
   const answer = profileLaunch(
     { ...input, cwd: T3_PATH, allowProbe: false },
-    { proxyUrl: "http://computer.internal/no-model", models: [model("claude-haiku-5-5")], readStateFile: (file) => (file === EXTENSION ? PI_T3_MCP_EXTENSION_SOURCE : undefined), piExtensionSource: PI_T3_MCP_EXTENSION_SOURCE },
+    {
+      readStateFile: (file) => (file === EXTENSION ? PI_T3_MCP_EXTENSION_SOURCE : undefined),
+      piExtensionSource: PI_T3_MCP_EXTENSION_SOURCE,
+      endpoints: [PROBE],
+      claudeRelay: { endpoints: [PROBE.id], models: [PROBE_SLUG], backgroundModel: PROBE_SLUG, opusModel: PROBE_SLUG, sonnetModel: PROBE_SLUG },
+      opencodeRelay: { endpoints: [PROBE], model: PROBE_SLUG, smallModel: PROBE_SLUG },
+      piRelay: { endpoints: [PROBE], model: PROBE_SLUG },
+    },
   );
   if ("refused" in answer) throw new Error(`the profile refused: ${answer.refused}`);
   return answer;
@@ -40,10 +52,10 @@ export const launchOf = (input: Omit<LaunchInput, "allowProbe" | "cwd">): Launch
 
 /** pi's launch as t3 asks for it. */
 export const piLaunchOf = (key: string): Launch =>
-  launchOf({ cli: "pi", args: ["--mode", "rpc", "--extension", EXTENSION, "--provider", "anthropic", "--model", "claude-haiku-5-5"], key, env: { T3_PI_RUNTIME_MODE: "approval-required" } });
+  launchOf({ cli: "pi", args: ["--mode", "rpc", "--extension", EXTENSION, "--provider", "t3flare-endpoint-probe", "--model", "claude-haiku-5-5"], key, env: { T3_PI_RUNTIME_MODE: "approval-required" } });
 
 /** The image built, and the stand-in key host up on its internal network; `stop` removes both containers' network. */
-export const startHarness = (name: string, nonces: ReadonlyArray<string>, options: { readonly modelHandle?: string } = {}) => {
+export const startHarness = (name: string, options: { readonly modelHandle?: string } = {}) => {
   const keyhost = `${name}-keyhost`;
   const network = `${name}-int`;
   const stop = () => {
@@ -58,9 +70,8 @@ export const startHarness = (name: string, nonces: ReadonlyArray<string>, option
     imageContext,
   ]);
   docker(["network", "create", "--internal", network]);
-  // The stand-in `computer.internal`: a key for any of the probe's nonces (no model is called), NXDOMAIN for every name;
-  // with `modelHandle`, a stand-in model relay too (SPI-1168).
-  docker(["run", "-d", "--name", keyhost, "--network", network, "--network-alias", "computer.internal", "-e", "KEYHOST_MODEL_KEY=probe-key", "-e", `KEYHOST_NONCES=${nonces.join(",")}`, ...(options.modelHandle === undefined ? [] : ["-e", `KEYHOST_MODEL_HANDLE=${options.modelHandle}`]), "-v", `${here}:/k:ro`, "node:26.13.0-bookworm-slim", "node", "/k/keyhost.mjs"]);
+  // The stand-in `computer.internal`: NXDOMAIN for every name; with `modelHandle`, a stand-in model relay (SPI-1168).
+  docker(["run", "-d", "--name", keyhost, "--network", network, "--network-alias", "computer.internal", ...(options.modelHandle === undefined ? [] : ["-e", `KEYHOST_MODEL_HANDLE=${options.modelHandle}`]), "-v", `${here}:/k:ro`, "node:26.13.0-bookworm-slim", "node", "/k/keyhost.mjs"]);
   const keyhostIp = docker(["inspect", "-f", `{{(index .NetworkSettings.Networks "${network}").IPAddress}}`, keyhost]).stdout.trim();
   return { network, keyhostIp, stop };
 };
@@ -70,7 +81,6 @@ export interface RunInput {
   readonly name: string;
   readonly launch: Launch;
   readonly marker: string;
-  readonly nonce: string;
   /** The host directory mounted at /workspace. */
   readonly workspace: string;
   /** The argv in place of the launch's. */
@@ -89,7 +99,6 @@ export const runCommand = (input: RunInput): Array<string> => {
     ...input.launch.env,
     PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     T3FLARE_EXEC: input.marker,
-    T3FLARE_MODEL_KEY_NONCE: input.nonce,
   };
   const command = processCommand({
     marker: input.marker,

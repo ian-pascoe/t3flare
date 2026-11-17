@@ -8,7 +8,17 @@ import { describe, expect, it } from "vitest";
 
 import { CLI_PROFILE_NAMES, type CliName, type LaunchInput, profileLaunch, type ProfileContext } from "../src/agents/cliProfiles.ts";
 
-const context: ProfileContext = { proxyUrl: "https://proxy.example", models: [], readStateFile: () => undefined, piExtensionSource: "// t3's extension", relay: { handle: "handle", servers: [] } };
+const MODEL = { id: "m", name: "M", reasoning: false, input: ["text" as const], contextWindow: 1, maxTokens: 1, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false };
+const ENDPOINT = { id: "e", label: "E", api: "anthropic-messages" as const, models: [MODEL] };
+const context: ProfileContext = {
+  readStateFile: () => undefined,
+  piExtensionSource: "// t3's extension",
+  relay: { handle: "handle", servers: [] },
+  endpoints: [ENDPOINT],
+  piRelay: { endpoints: [ENDPOINT], model: "e/m" },
+  claudeRelay: { endpoints: ["e"], models: ["e/m"], backgroundModel: "e/m", opusModel: "e/m", sonnetModel: "e/m" },
+  opencodeRelay: { endpoints: [ENDPOINT], model: "e/m", smallModel: "e/m" },
+};
 const ARGS: Record<CliName, ReadonlyArray<string>> = { codex: ["app-server"], pi: ["--mode", "rpc", "--no-extensions"], claude: [], opencode: ["acp"], probe: [] };
 
 /** Where mise puts its data, cache, state and config for `env`, as mise resolves them (its `dirs.rs`). */

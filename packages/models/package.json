@@ -2,7 +2,7 @@
   "name": "@t3flare/models",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./catalog": "./src/catalog.ts", "./proxyFailure": "./src/proxyFailure.ts", "./endpoints": "./src/endpoints.ts", "./known": "./src/known.ts", "./relay": "./src/relay.ts", "./usage": "./src/usage.ts", "./limits": "./src/limits.ts", "./redact": "./src/redact.ts", "./failures": "./src/failures.ts", "./claudeOAuth": "./src/claudeOAuth.ts", "./copilotOAuth": "./src/copilotOAuth.ts" },
+  "exports": { ".": "./src/index.ts", "./lists": "./src/lists.ts", "./endpoints": "./src/endpoints.ts", "./known": "./src/known.ts", "./relay": "./src/relay.ts", "./usage": "./src/usage.ts", "./limits": "./src/limits.ts", "./redact": "./src/redact.ts", "./failures": "./src/failures.ts", "./claudeOAuth": "./src/claudeOAuth.ts", "./copilotOAuth": "./src/copilotOAuth.ts" },
   "scripts": { "typecheck": "effect-tsgo tsrs --noEmit" },
   "dependencies": { "@earendil-works/pi-ai": "1.5.0" },
   "devDependencies": { "@types/node": "catalog:" }

@@ -1,14 +1,16 @@
 // CLI profiles (step 4a, plan §4 with the review's F2, F4, F5 and M0's findings): what a CLI agent process gets, fixed
-// here whatever t3 asked: its binary in the image, an allowlisted environment (never `process.env`), the model proxy as
-// its only model provider with the key helper, and a home built fresh on the Container's own disk with only its session
-// directory synced. The pure part: no I/O beyond reading the State directory for pi's extension.
-import { type CatalogModel } from "@t3flare/models";
-import { isSignIn, type ModelEndpoint, parseEndpointSlug, SIGN_IN_COMPAT } from "@t3flare/models/endpoints";
+// here whatever t3 asked: its binary in the image, an allowlisted environment (never `process.env`), the Model endpoints
+// whose API it speaks as its only model providers, through the model relay with a per-process handle (SPI-1167–1170),
+// and a home built fresh on the Container's own disk with only its session directory synced. A CLI with no endpoint for
+// its API is refused, saying so (SPI-1176: until the hard cut the Model proxy was its provider then, with the key
+// helper). The pure part: no I/O beyond reading the State directory for pi's extension.
+import { isSignIn, type ModelEndpoint, parseEndpointSlug, SETUP_HINT, SIGN_IN_COMPAT } from "@t3flare/models/endpoints";
 import { endpointProviderId, MODEL_HANDLE_ENV, modelRelayUrl, type RelayedEndpoint } from "@t3flare/models/relay";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, RELAY_SERVERS_ENV, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
 import { CLI_ROOTS, directoriesUp, SKILLS_MOUNT } from "@t3flare/skills";
 import { HARNESS_ROOT, normalize, REPO_ROOT, toWorkspace } from "@t3flare/workspace-client";
 
+import { codexModelRoute, type CodexRouteEndpoint } from "../provider/cli/codexGuard.ts";
 import { acpProfileLaunch, type ClaudeRelay, environmentSkillsLink, type OpenCodeRelay } from "./acpProfiles.ts";
 
 /**
@@ -26,10 +28,11 @@ export const CODEX_SESSIONS = `${HARNESS_ROOT}/codex/sessions`;
 export const PI_SESSIONS = `${HARNESS_ROOT}/pi/sessions`;
 /** pi sessions untouched this long are removed at a pi start (review F2's retention). */
 export const PI_SESSION_RETENTION_DAYS = 60;
-/** Codex keeps this provider id in its rollouts and needs it unchanged to resume. */
-export const CODEX_PROVIDER_ID = "t3flare-proxy";
-/** The variable the key helper sends as its nonce; Codex's shells never see it (review F4). */
-export const NONCE_ENV = "T3FLARE_MODEL_KEY_NONCE";
+/**
+ * A CLI's refusal when no Model endpoint it can use lists a model (SPI-1176): which API it needs, and where to add one.
+ */
+export const noEndpointFor = (cli: string, apis?: string): string =>
+  `${cli} has no Model endpoint to run on: it needs one ${apis === undefined ? "" : `that speaks ${apis} and `}that lists a model; ${SETUP_HINT}`;
 
 export interface LaunchInput {
   readonly cli: CliName;
@@ -43,9 +46,6 @@ export interface LaunchInput {
 }
 
 export interface ProfileContext {
-  /** The model proxy's base URL (no trailing slash). */
-  readonly proxyUrl: string;
-  readonly models: ReadonlyArray<CatalogModel>;
   /** pi's extension as t3 wrote it, by its State-directory path; undefined when there is no such file. */
   readonly readStateFile: (path: string) => string | undefined;
   /** t3's own extension source: a copy is accepted only when it is exactly this (plan §5.2). */
@@ -57,24 +57,16 @@ export interface ProfileContext {
   readonly relay?: { readonly handle: string; readonly servers: ReadonlyArray<string> };
   /**
    * The Model endpoints that speak OpenAI Responses (SPI-1167), as stored at the spawn: Codex gets one provider each,
-   * through the model relay. Absent: none.
+   * through the model relay. Absent or empty: none, and Codex is refused.
    */
-  readonly endpoints?: ReadonlyArray<RelayedEndpoint>;
+  readonly endpoints?: ReadonlyArray<RelayedEndpoint & CodexRouteEndpoint>;
   /** The model the CLI's session was opened with, when known (SPI-1167: Codex's process provider is its model's). */
   readonly model?: string;
-  /**
-   * SPI-1168: Claude Code on the Anthropic Messages endpoints through the model relay (`claudeRelayOf`), instead of the
-   * Model proxy. Absent: the proxy.
-   */
+  /** SPI-1168: Claude Code on the Anthropic Messages endpoints through the model relay (`claudeRelayOf`). Absent: refused. */
   readonly claudeRelay?: ClaudeRelay;
-  /**
-   * SPI-1169: OpenCode on the endpoints whose API it speaks through the model relay (`opencodeRelayOf`), instead of the
-   * Model proxy. Absent: the proxy.
-   */
+  /** SPI-1169: OpenCode on the endpoints whose API it speaks through the model relay (`opencodeRelayOf`). Absent: refused. */
   readonly opencodeRelay?: OpenCodeRelay;
-  /**
-   * SPI-1170: pi on the endpoints through the model relay (`piRelayOf`), instead of the Model proxy. Absent: the proxy.
-   */
+  /** SPI-1170: pi on the endpoints through the model relay (`piRelayOf`). Absent: refused. */
   readonly piRelay?: PiRelay;
 }
 
@@ -158,30 +150,18 @@ export const codexEndpointOverrides = (endpoints: ReadonlyArray<RelayedEndpoint>
 
 /**
  * The process's provider (SPI-1167): Codex runs a thread's turns only on its process's provider ("This chat uses <a>, but
- * your current provider is <b>"), so it is the session's model's: its endpoint's for an endpoint's slug, else the Model
- * proxy's when there is one (until the hard cut), else the first endpoint's.
+ * your current provider is <b>"), so it is the session's model's (`codexModelRoute`): its endpoint's for an endpoint's
+ * slug, the first endpoint's for none or one from before the hard cut.
  */
-export const codexProcessProvider = (proxyUrl: string, endpoints: ReadonlyArray<{ readonly id: string }>, model: string | undefined): string => {
-  const endpointId = model === undefined ? undefined : parseEndpointSlug(model)?.endpointId;
-  if (endpointId !== undefined && endpoints.some((endpoint) => endpoint.id === endpointId)) return endpointProviderId(endpointId);
-  return proxyUrl === "" && endpoints[0] !== undefined ? endpointProviderId(endpoints[0].id) : CODEX_PROVIDER_ID;
+export const codexProcessProvider = (endpoints: ReadonlyArray<CodexRouteEndpoint>, model: string | undefined): string => {
+  const routed = codexModelRoute(model ?? "default", endpoints, endpointProviderId).provider;
+  return routed !== "" ? routed : endpoints[0] === undefined ? "" : endpointProviderId(endpoints[0].id);
 };
 
 /** Codex's `-c` overrides (plan §4.3; M0: P3, P10, P11). Each value is TOML. */
-export const codexOverrides = (proxyUrl: string, key: string, endpoints: ReadonlyArray<RelayedEndpoint> = [], model?: string): ReadonlyArray<string> => {
-  const proxy = [
-    `name=${tomlString("Model proxy")}`,
-    `base_url=${tomlString(`${proxyUrl}/v1`)}`,
-    `wire_api="responses"`,
-    "requires_openai_auth=false",
-    "supports_websockets=false",
-    "request_max_retries=1",
-    "stream_max_retries=1",
-    `auth={command=${tomlString(`${CLI_BIN}/t3flare-model-key`)},args=["codex"],timeout_ms=30000,refresh_interval_ms=0}`,
-  ].join(",");
+export const codexOverrides = (key: string, endpoints: ReadonlyArray<RelayedEndpoint & CodexRouteEndpoint>, model?: string): ReadonlyArray<string> => {
   return [
-    `model_provider=${tomlString(codexProcessProvider(proxyUrl, endpoints, model))}`,
-    ...(proxyUrl === "" ? [] : [`model_providers.${CODEX_PROVIDER_ID}={${proxy}}`]),
+    `model_provider=${tomlString(codexProcessProvider(endpoints, model))}`,
     ...codexEndpointOverrides(endpoints),
     // The process's own defaults (review F5; 0.167.2 refuses "untrusted" here, so every turn/start carries the guard's).
     `approval_policy="on-request"`,
@@ -200,8 +180,8 @@ export const codexOverrides = (proxyUrl: string, key: string, endpoints: Readonl
     // `features.multi_agent` is left at Codex's default, as stock t3 leaves it (owner, 2026-11-12, back to stock): it
     // was turned off with M0 P10's batch, not for a vendor call of its own; its subagents use the thread's provider.
     "analytics.enabled=false",
-    // Review F4: the nonce stays out of Codex's shells; the marker stays in them (part 2's kill script).
-    `shell_environment_policy.exclude=[${tomlString(NONCE_ENV)},${tomlString(TOOL_HANDLE_ENV)},${tomlString(MODEL_HANDLE_ENV)}]`,
+    // Review F4: the handles stay out of Codex's shells; the marker stays in them (part 2's kill script).
+    `shell_environment_policy.exclude=[${tomlString(TOOL_HANDLE_ENV)},${tomlString(MODEL_HANDLE_ENV)}]`,
     `shell_environment_policy.set.T3FLARE_EXEC=${tomlString(key)}`,
   ];
 };
@@ -221,10 +201,14 @@ export const codexExecArgs = (model: string, schemaPath: string): ReadonlyArray<
   "-",
 ];
 
+/** Codex's refusal without an OpenAI Responses endpoint (SPI-1176). */
+const NO_CODEX_ENDPOINT = noEndpointFor("Codex", "OpenAI Responses");
+
 /**
  * `codex exec` for an investigation (parity G7: t3's review guide, `CodexTextGeneration`'s `-s read-only` run): only the
  * driver's own argv, read-only, never asking, no MCP servers, the output schema copied from the State directory into
- * the process's home.
+ * the process's home. Its model goes as Codex names it (`codexModelRoute`: an endpoint's own id, on its provider, the
+ * default model for one from before the hard cut), through the model relay as the app-server's do (SPI-1176).
  */
 const codexExecLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => {
   const model = input.args[7] ?? "";
@@ -234,19 +218,23 @@ const codexExecLaunch = (input: LaunchInput, context: ProfileContext): LaunchAns
   if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,100}$/.test(model)) return { refused: `Codex's model ${model} is not a model name` };
   const schema = schemaPath.startsWith("/") ? context.readStateFile(schemaPath) : undefined;
   if (schema === undefined) return { refused: `Codex's output schema ${schemaPath} is not in the State directory` };
+  const endpoints = context.endpoints ?? [];
+  if (endpoints.length === 0) return { refused: NO_CODEX_ENDPOINT };
   const home = homeOf(input.key);
   const overrides = [
-    ...codexOverrides(context.proxyUrl, input.key).filter((value) => !value.startsWith("approval_policy=") && !value.startsWith("sandbox_mode=")),
+    ...codexOverrides(input.key, endpoints, model).filter((value) => !value.startsWith("approval_policy=") && !value.startsWith("sandbox_mode=")),
     // `codex exec` cannot ask anyone: a command the read-only sandbox refuses fails back to the model.
     `approval_policy="never"`,
   ];
+  const asCodexNames = codexModelRoute(model, endpoints, endpointProviderId).model;
   return {
-    argv: [`${CLI_BIN}/codex`, ...overrides.flatMap((value) => ["-c", value]), ...expected.slice(0, 9), `${home}/output-schema.json`, "-"],
+    argv: [`${CLI_BIN}/codex`, ...overrides.flatMap((value) => ["-c", value]), ...expected.slice(0, 7), asCodexNames, expected[8]!, `${home}/output-schema.json`, "-"],
     env: { HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: `${home}/codex`, CODEX_SQLITE_HOME: `${home}/sqlite` },
     files: [
       { path: `${home}/codex/config.toml`, text: "# t3flare: every setting comes from the command line (-c)\n" },
       { path: `${home}/output-schema.json`, text: schema },
     ],
+    modelRelay: endpoints.map((endpoint) => endpoint.id),
     droppedEnv: dropped(input.env),
   };
 };
@@ -254,16 +242,18 @@ const codexExecLaunch = (input: LaunchInput, context: ProfileContext): LaunchAns
 const codexLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => {
   if (input.args[0] === "exec") return codexExecLaunch(input, context);
   if (input.args.length !== 1 || input.args[0] !== "app-server") return { refused: `Codex runs here only as \`codex app-server\` (not \`codex ${input.args.join(" ")}\`)` };
+  const endpoints = context.endpoints ?? [];
+  if (endpoints.length === 0) return { refused: NO_CODEX_ENDPOINT };
   const home = homeOf(input.key);
   const thread = input.env.T3CODE_THREAD_ID;
   const relay = context.relay;
   return {
-    argv: [`${CLI_BIN}/codex`, "app-server", ...[...codexOverrides(context.proxyUrl, input.key, context.endpoints ?? [], context.model), ...codexRelayOverrides(relay?.servers ?? [])].flatMap((value) => ["-c", value])],
+    argv: [`${CLI_BIN}/codex`, "app-server", ...[...codexOverrides(input.key, endpoints, context.model), ...codexRelayOverrides(relay?.servers ?? [])].flatMap((value) => ["-c", value])],
     env: { HOME: "/root", LANG: "C.UTF-8", CODEX_HOME: `${home}/codex`, CODEX_SQLITE_HOME: `${home}/sqlite`, ...(relay === undefined ? {} : { [TOOL_HANDLE_ENV]: relay.handle }) },
     files: [{ path: `${home}/codex/config.toml`, text: "# t3flare: every setting comes from the command line (-c)\n" }],
     links: [{ path: `${home}/codex/sessions`, target: CODEX_SESSIONS }, environmentSkillsLink(`${home}/${CODEX_ENVIRONMENT_SKILLS}`)],
     ...(thread === undefined ? {} : { thread }),
-    ...((context.endpoints ?? []).length === 0 ? {} : { modelRelay: (context.endpoints ?? []).map((endpoint) => endpoint.id) }),
+    modelRelay: endpoints.map((endpoint) => endpoint.id),
     droppedEnv: dropped(input.env),
   };
 };
@@ -339,32 +329,6 @@ export const piRelayModelsJson = (relay: PiRelay): string =>
     1,
   )}\n`;
 
-/** pi's `models.json` (plan §4.4): the proxy as the anthropic provider, every catalog model, a command for the key. */
-export const piModelsJson = (proxyUrl: string, models: ReadonlyArray<CatalogModel>): string =>
-  `${JSON.stringify(
-    {
-      providers: {
-        anthropic: {
-          baseUrl: proxyUrl,
-          apiKey: `!${CLI_BIN}/t3flare-model-key pi`,
-          models: models
-            .filter((model) => model.provider === "anthropic")
-            .map((model) => ({
-              id: model.id,
-              name: model.name,
-              api: "anthropic-messages",
-              reasoning: model.reasoning,
-              input: [...model.input],
-              contextWindow: model.contextWindow,
-              maxTokens: model.maxTokens,
-            })),
-        },
-      },
-    },
-    null,
-    1,
-  )}\n`;
-
 /**
  * pi's MCP relay entries (ADR-0028, SPI-1076, settings-mcp plan D4): its user-level `mcp.json` in the agent directory
  * (`PI_CODING_AGENT_DIR`), one streamable-HTTP server per relayed source. The handle is named, never written: pi expands
@@ -386,12 +350,10 @@ export const piMcpJson = (servers: ReadonlyArray<string>): string =>
     1,
   )}\n`;
 
-/** pi's agent settings: no project is trusted (review F2), few retries (ADR-0012: nothing retries into spend). */
-export const PI_SETTINGS = `${JSON.stringify({ defaultProjectTrust: "never", retry: { maxRetries: 1 } }, null, 1)}\n`;
-
 /**
- * pi's agent settings on the model relay (SPI-1170): `PI_SETTINGS`, and the model pi starts on (its default, which t3's
- * `default` model keeps), as pi names it: its endpoint's provider and the model's own id.
+ * pi's agent settings on the model relay (SPI-1170): no project is trusted (review F2), few retries (nothing retries into
+ * spend, ADR-0034 §8), and the model pi starts on (its default, which t3's `default` model keeps), as pi names it: its
+ * endpoint's provider and the model's own id.
  */
 export const piRelaySettings = (relay: PiRelay): string => {
   const start = relay.model === undefined ? undefined : parseEndpointSlug(relay.model);
@@ -459,11 +421,12 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     rest.push(arg, value);
   }
   const forking = rest.includes("--no-extensions");
-  // SPI-1170: the endpoints through the model relay when the context has them, else the Model proxy.
+  // SPI-1170: the endpoints through the model relay; none that lists a model, and pi is refused (SPI-1176).
   const piRelay = context.piRelay;
+  if (piRelay === undefined) return { refused: noEndpointFor("Pi") };
   const files: Array<{ path: string; text: string; mode?: number }> = [
-    { path: `${home}/agent/models.json`, text: piRelay === undefined ? piModelsJson(context.proxyUrl, context.models) : piRelayModelsJson(piRelay) },
-    { path: `${home}/agent/settings.json`, text: piRelay === undefined ? PI_SETTINGS : piRelaySettings(piRelay) },
+    { path: `${home}/agent/models.json`, text: piRelayModelsJson(piRelay) },
+    { path: `${home}/agent/settings.json`, text: piRelaySettings(piRelay) },
   ];
   const env: Record<string, string> = {
     HOME: "/root",
@@ -514,7 +477,7 @@ const piLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => 
     prune: [{ dir: PI_SESSIONS, days: PI_SESSION_RETENTION_DAYS }],
     ...(thread === undefined ? {} : { thread }),
     // SPI-1170: the Workspace DO gives the process a model handle for these endpoints, in its environment only.
-    ...(piRelay === undefined ? {} : { modelRelay: piRelay.endpoints.map((endpoint) => endpoint.id) }),
+    modelRelay: piRelay.endpoints.map((endpoint) => endpoint.id),
     droppedEnv: dropped(input.env),
   };
 };

@@ -8,7 +8,6 @@ import { type AdminCall, ensureModelEndpoint } from "../scripts/lib/modelEndpoin
 import { ENDPOINT_APIS, type EndpointApi } from "@t3flare/models/endpoints";
 
 import {
-  commissaryEndpoint,
   keptReportJson,
   maskCommands,
   modelEndpointSecret,
@@ -84,7 +83,7 @@ const noWait = { waitMs: 60_000, sleep: async () => {} };
 describe("modelEndpointSpec", () => {
   it("reads T3FLARE_MODEL_ENDPOINT, with defaults for what it leaves out", () => {
     const value = JSON.stringify({ id: "openai", api: "openai-responses", baseUrl: "https://api.openai.com/v1", apiKey: KEY, models: ["gpt-5-mini"] });
-    const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value }, { derive: false });
+    const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value });
     expect(found).toEqual({
       ok: true,
       source: "T3FLARE_MODEL_ENDPOINT",
@@ -92,32 +91,16 @@ describe("modelEndpointSpec", () => {
     });
   });
 
-  it("wins over the Model proxy's settings", () => {
-    const value = JSON.stringify({ id: "mine", label: "Mine", baseUrl: "https://llm.example.com", apiKey: KEY });
-    const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value, MODEL_PROXY_URL: "https://proxy.example.com", MODEL_PROXY_API_KEY: "cms_other" }, { derive: true });
-    expect(found.ok && found.spec).toMatchObject({ id: "mine", label: "Mine", api: "anthropic-messages", baseUrl: "https://llm.example.com" });
+  it("reads back the secret ci:setup writes", () => {
+    const given = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: JSON.stringify({ id: "commissary", baseUrl: "https://llm.example.com", apiKey: KEY, match: "^claude-" }) });
+    if (!given.ok) throw new Error(given.reason);
+    expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: modelEndpointSecret(given.spec) })).toEqual({ ok: true, source: "T3FLARE_MODEL_ENDPOINT", spec: given.spec });
   });
 
-  it("derives a Commissary endpoint from the Model proxy's settings when allowed: its Claude models, read from its list", () => {
-    const found = modelEndpointSpec({ MODEL_PROXY_URL: "https://llm.example.com/", MODEL_PROXY_API_KEY: KEY }, { derive: true });
-    expect(found).toEqual({
-      ok: true,
-      source: "MODEL_PROXY_URL",
-      spec: { id: "commissary", label: "Commissary", api: "anthropic-messages", baseUrl: "https://llm.example.com", apiKey: KEY, headers: {}, match: "^claude-" },
-    });
-  });
-
-  it("reads back in CI the secret ci:setup derives on the laptop", () => {
-    const laptop = modelEndpointSpec({ MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: KEY }, { derive: true });
-    if (!laptop.ok) throw new Error(laptop.reason);
-    const ci = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: modelEndpointSecret(laptop.spec) }, { derive: false });
-    expect(ci).toEqual({ ok: true, source: "T3FLARE_MODEL_ENDPOINT", spec: laptop.spec });
-  });
-
-  it("derives nothing in CI: a missing T3FLARE_MODEL_ENDPOINT is a skip, not an error", () => {
-    const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: "", MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: KEY }, { derive: false });
-    expect(found).toEqual({ ok: false, invalid: false, reason: "T3FLARE_MODEL_ENDPOINT is not set" });
-    expect(modelEndpointSpec({}, { derive: true })).toEqual({ ok: false, invalid: false, reason: "neither T3FLARE_MODEL_ENDPOINT nor MODEL_PROXY_URL and MODEL_PROXY_API_KEY are set" });
+  it("derives nothing from the retired Model proxy's settings (SPI-1176): a missing T3FLARE_MODEL_ENDPOINT is a skip, not an error", () => {
+    const retired = { MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: KEY };
+    expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: "", ...retired })).toEqual({ ok: false, invalid: false, reason: "T3FLARE_MODEL_ENDPOINT is not set" });
+    expect(modelEndpointSpec({})).toEqual({ ok: false, invalid: false, reason: "T3FLARE_MODEL_ENDPOINT is not set" });
   });
 
   it("refuses a malformed value without repeating it", () => {
@@ -133,7 +116,7 @@ describe("modelEndpointSpec", () => {
       JSON.stringify({ id: "x", baseUrl: "https://a.example", apiKey: KEY, api: "bedrock" }),
     ];
     for (const value of cases) {
-      const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value }, { derive: true });
+      const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: value });
       expect(found.ok, value).toBe(false);
       if (!found.ok) {
         expect(found.invalid).toBe(true);
@@ -153,12 +136,11 @@ describe("the APIs a spec may name", () => {
 });
 
 describe("stageEndpointSpec (stage.ts and acceptance.ts)", () => {
-  const proxy = { MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: KEY };
-  it("derives Commissary's endpoint on a laptop", () => {
-    expect(stageEndpointSpec(proxy)).toMatchObject({ ok: true, source: "MODEL_PROXY_URL" });
-  });
-  it("derives nothing in CI, even with the proxy's settings", () => {
-    expect(stageEndpointSpec({ ...proxy, GITHUB_ACTIONS: "true" })).toEqual({ ok: false, invalid: false, reason: "T3FLARE_MODEL_ENDPOINT is not set" });
+  const retired = { MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: KEY };
+  it("is the setting alone, on a laptop as in CI: nothing from the retired proxy's settings", () => {
+    expect(stageEndpointSpec(retired)).toEqual({ ok: false, invalid: false, reason: "T3FLARE_MODEL_ENDPOINT is not set" });
+    expect(stageEndpointSpec({ ...retired, GITHUB_ACTIONS: "true" })).toEqual({ ok: false, invalid: false, reason: "T3FLARE_MODEL_ENDPOINT is not set" });
+    expect(stageEndpointSpec({ T3FLARE_MODEL_ENDPOINT: WITH_HEADERS })).toMatchObject({ ok: true, spec: { id: "gw" } });
   });
 });
 
@@ -174,7 +156,7 @@ describe("masking and scrubbing the endpoint's secrets", () => {
     expect(maskCommands({ T3FLARE_MODEL_ENDPOINT: "{not json" })).toEqual([]);
   });
   it("scrubs the key and header values from any text", () => {
-    const parsed = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: WITH_HEADERS }, { derive: false });
+    const parsed = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: WITH_HEADERS });
     if (!parsed.ok) throw new Error(parsed.reason);
     const text = scrubSecrets(`{"error":"bad ${KEY} and ${HEADER_SECRET}","n":1}`, secretsOf(parsed.spec));
     expect(text).toBe('{"error":"bad [redacted] and [redacted]","n":1}');
@@ -209,7 +191,8 @@ describe("keptReportJson (the acceptance report and bump-report.json)", () => {
   });
 });
 
-const COMMISSARY = commissaryEndpoint("https://llm.example.com", KEY);
+/** Commissary as an ordinary Anthropic Messages endpoint, its Claude models read from its list. */
+const COMMISSARY: ModelEndpointSpec = { id: "commissary", label: "Commissary", api: "anthropic-messages", baseUrl: "https://llm.example.com", apiKey: KEY, headers: {}, match: "^claude-" };
 
 describe("ensureModelEndpoint", () => {
   it("on a fresh stage, saves the endpoint with its key and the listed models `match` keeps; the turn model is its small model", async () => {

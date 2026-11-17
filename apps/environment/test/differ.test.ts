@@ -99,9 +99,10 @@ describe("differ", () => {
     expect(diff(makeDifferState("thread:test"), state, now)).toEqual([]);
   });
 
-  it("classifies a 429 as a usage limit and keeps the raw text out", () => {
+  it("without the Session's record, names the error's HTTP status and keeps the raw text out", () => {
+    // The Model proxy's text classifier went at the hard cut (SPI-1176): a 429 with no record is the provider's error.
     const limited = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail: "429 {\"error\":\"rate_limit_error\",\"key\":\"sk-secret\"}", startedAt: 0 }, now);
-    expect(limited.class).toBe("usage_limit");
+    expect(limited).toMatchObject({ class: "provider_error", message: "The model provider returned HTTP 429.", code: "429" });
     expect(limited.message).not.toContain("sk-secret");
     const other = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail: "400 bad request", startedAt: 0 }, now);
     expect(other.class).toBe("provider_error");
@@ -113,9 +114,17 @@ describe("differ", () => {
     expect(failure).toMatchObject({ class: "provider_error", code: "no_model" });
     expect(failure.message).toBe("The model openai/gpt-5-mini is not available: its Model endpoint was removed or no longer lists it. Pick another model.");
     const bare = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", startedAt: 0 }, now);
-    expect(bare.message).toBe("The selected model is not available: its Model endpoint was removed or no longer lists it, or the Model proxy no longer lists it. Pick another model.");
-    const proxy = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", detail: "Model anthropic/claude-x is not available", startedAt: 0 }, now);
-    expect(proxy.message).toBe("The model anthropic/claude-x is not available: the Model proxy no longer lists it. Pick another model.");
+    expect(bare.message).toBe("The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model.");
+  });
+
+  it("points to the setup when a selection from before the hard cut found no endpoint to fall back to (SPI-1176)", () => {
+    for (const detail of ["Model anthropic/claude-x is not available", "Model /claude-x is not available"]) {
+      expect(failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", detail, startedAt: 0 }, now), detail).toMatchObject({
+        class: "provider_error",
+        code: "no_model",
+        message: "No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+      });
+    }
   });
 
   it("shows a Model endpoint's credential failure as the Session recorded it, typed, never the error's text (SPI-1164)", () => {
@@ -188,52 +197,11 @@ describe("differ", () => {
     });
   });
 
-  describe("a model proxy failure the Session classified", () => {
+  it("shows a record of the retired Model proxy's classifier (a push from before the hard cut) as the provider's error (SPI-1176)", () => {
     const nowMs = DateTime.toEpochMillis(now);
-    const failed = (failure: NonNullable<TurnState["proxy"]>["failure"], detail = "t3flare model proxy: x") =>
-      ({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail, startedAt: 0, settledAt: nowMs, proxy: { requests: 1, failure } }) as TurnState;
-
-    it("is t3's usage limit with the recorded reset, as an ISO time", () => {
-      const resetAt = Date.parse("2026-11-10T21:22:00.000Z");
-      expect(failureOf(failed({ class: "usage_limit", code: "proxy_cooldown", row: 1, resetAt, stop: true, at: nowMs - 5000 }), now)).toEqual({
-        class: "usage_limit",
-        message: "Every account the model proxy has for this model is at its usage limit.",
-        code: "proxy_cooldown",
-        retryable: true,
-        resetAt: "2026-11-10T21:22:00.000Z",
-      });
-    });
-
-    it("holds a reset at least 30 s after now, so t3 arms a resume and it is not instant", () => {
-      const failure = failureOf(failed({ class: "usage_limit", code: "proxy_request_rate", row: 4, resetAt: nowMs + 1000, stop: true, at: nowMs }), now);
-      expect(failure.resetAt).toBe("2026-11-10T21:20:30.000Z");
-      // No ceiling: a monthly spend limit resets weeks away.
-      const far = Date.parse("2026-12-01T00:00:00.000Z");
-      expect(failureOf(failed({ class: "usage_limit", code: "proxy_spend_limit", row: 3, resetAt: far, stop: true, at: nowMs }), now).resetAt).toBe("2026-12-01T00:00:00.000Z");
-    });
-
-    it("a limit with no reset has none, and t3 does not arm a resume", () => {
-      const failure = failureOf(failed({ class: "usage_limit", code: "proxy_upstream_limit", row: 2, stop: false, at: nowMs }), now);
-      expect(failure).toMatchObject({ class: "usage_limit", code: "proxy_upstream_limit" });
-      expect(failure.resetAt ?? null).toBeNull();
-    });
-
-    it("a refused key is a permission error that names the key, not retryable, no reset", () => {
-      expect(failureOf(failed({ class: "permission_error", code: "proxy_key_rejected", row: 5, stop: true, at: nowMs }), now)).toEqual({
-        class: "permission_error",
-        message: "The model proxy refused this Environment's key. Check `MODEL_PROXY_API_KEY`.",
-        code: "proxy_key_rejected",
-        retryable: false,
-      });
-    });
-
-    it("without the record (an older push), classifies the detail, the reset counted from the settle time", () => {
-      const detail = `429 {"type":"error","error":{"type":"rate_limit_error","message":"All credentials for model m are cooling down via provider claude (reset after 2m0s)"}}`;
-      const turn = { ...failed(undefined, detail), proxy: undefined, settledAt: nowMs - 60_000 } as TurnState;
-      expect(failureOf(turn, now)).toMatchObject({ class: "usage_limit", code: "proxy_cooldown", resetAt: "2026-11-10T21:21:00.000Z" });
-      const overloaded = { ...turn, detail: `529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}` };
-      expect(failureOf(overloaded, now)).toMatchObject({ class: "provider_error", code: "proxy_overloaded", retryable: true });
-    });
+    const old = { class: "usage_limit", code: "proxy_cooldown", row: 1, resetAt: nowMs + 60_000, stop: true, at: nowMs };
+    const turn = { submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail: "t3flare model proxy: proxy_cooldown", startedAt: 0, settledAt: nowMs, proxy: { requests: 1, failure: old } } as unknown as TurnState;
+    expect(failureOf(turn, now)).toEqual({ class: "provider_error", message: "The model provider reported an error.", code: null, retryable: null });
   });
 
   it("opens a pending approval as a runtime request, and closes it as resolved or cancelled", () => {

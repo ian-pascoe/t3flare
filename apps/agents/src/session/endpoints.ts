@@ -6,7 +6,7 @@
 // endpoint's sign-out. Each request for a key names the target the Session will send it to (API, base URL, headers), and
 // the Environment gives it only for the endpoint's target now: a Session still holding an endpoint the owner moved gets no
 // key for the old target.
-import type { MutableModels, FetchFunction } from "@earendil-works/pi-ai";
+import { type AssistantMessage, createModels, type FetchFunction, type MutableModels } from "@earendil-works/pi-ai";
 import {
   EMPTY_ENDPOINTS,
   type EndpointCredential,
@@ -15,6 +15,7 @@ import {
   type ModelEndpoint,
   type ModelEndpoints,
   targetKey,
+  targetOf,
 } from "@t3flare/models/endpoints";
 import type { LimitReading } from "@t3flare/models/limits";
 import { type UsageEntry, usageOfPiAnswer } from "@t3flare/models/usage";
@@ -75,6 +76,13 @@ export class SessionEndpoints {
     this.#install(options.kv.get<ModelEndpoints>(ENDPOINTS_KEY) ?? EMPTY_ENDPOINTS);
   }
 
+  /** Every answer on an endpoint, as a usage record of the Durable agent in this Session (SPI-1173). */
+  #answered(message: AssistantMessage, endpointId: string): void {
+    const { usage, now = Date.now } = this.#options;
+    const entry = usageOfPiAnswer(message, { agent: "durable", endpointId, session: usage.session(), now: now() });
+    if (entry !== undefined) usage.record(entry);
+  }
+
   /** One provider per endpoint, in place: a removed endpoint's goes, so its models fail as unavailable. */
   #install(endpoints: ModelEndpoints): void {
     const providers = endpointProviders(endpoints, {
@@ -87,11 +95,7 @@ export class SessionEndpoints {
         } else if (this.#failing.delete(id)) this.#options.onCredential?.(undefined);
       },
       ...(this.#options.fetch === undefined ? {} : { fetch: this.#options.fetch }),
-      answered: (message, endpointId) => {
-        const { usage, now = Date.now } = this.#options;
-        const entry = usageOfPiAnswer(message, { agent: "durable", endpointId, session: usage.session(), now: now() });
-        if (entry !== undefined) usage.record(entry);
-      },
+      answered: (message, endpointId) => this.#answered(message, endpointId),
       limits: this.#options.limits,
     });
     const next = new Map(endpoints.endpoints.map((endpoint) => [endpoint.id, endpoint]));
@@ -101,9 +105,36 @@ export class SessionEndpoints {
     this.#keys.clear();
   }
 
+  /** The endpoints the Session last took (secret-free): the default model and the model settings resolve over them. */
+  current(): ModelEndpoints {
+    return this.#options.kv.get<ModelEndpoints>(ENDPOINTS_KEY) ?? EMPTY_ENDPOINTS;
+  }
+
+  /**
+   * Models apart from the turns' (SPI-1176: prompt suggestions, which ran on the Model proxy before the hard cut): a
+   * provider per endpoint the Session holds, its key from the same memory, each answer a usage record, but no recording
+   * fetch, so a failed answer never lands in a turn's record.
+   */
+  sideModels(): MutableModels {
+    const models = createModels();
+    for (const provider of endpointProviders(this.current(), {
+      credential: (id, target) => this.#credential(id, target),
+      refused: (id) => void this.drop(id),
+      answered: (message, endpointId) => this.#answered(message, endpointId),
+    })) {
+      models.setProvider(provider);
+    }
+    return models;
+  }
+
+  /** An installed endpoint's credential for its target now (`web_search`'s, SPI-1176), as a model request asks for it. */
+  credential(endpoint: ModelEndpoint): Promise<EndpointCredential> {
+    return this.#credential(endpoint.id, targetOf(endpoint));
+  }
+
   /**
    * The installed endpoint a model's provider names (secret-free), for classifying its failed answers by its API and
-   * auth (SPI-1172); undefined for the Model proxy's `anthropic` and for an endpoint no longer installed.
+   * auth (SPI-1172); undefined for an endpoint no longer installed.
    */
   endpoint(id: string): ModelEndpoint | undefined {
     return this.#endpoints.get(id);

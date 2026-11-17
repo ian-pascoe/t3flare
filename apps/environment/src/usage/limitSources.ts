@@ -1,14 +1,13 @@
-// @effect-diagnostics globalFetch:off globalDate:off
-// Parity G8 (SPI-999): a Layer over t3's `UsageLimitSources` (ADR-0001: Layer first). t3's own sources, from the
-// owner's settings, stay as they are; with Commissary's management API configured (`commissary.ts`), Commissary's
-// accounts are one more source, read when t3 refreshes its sources and every few minutes while t3 runs.
+// @effect-diagnostics globalDate:off
+// A Layer over t3's `UsageLimitSources` (ADR-0001: Layer first; parity G8, U58). t3's own sources, from the owner's
+// settings, stay as they are. (Until the hard cut, SPI-1176, Commissary's accounts were one more source, read from its
+// management API: they went with the Model proxy, so a Commissary endpoint's windows are counted once, below.)
 //
 // SPI-1174: each subscription endpoint whose answers report limit windows is one more source (`limits.ts`), from the
 // readings the Environment DO keeps: pushed a few seconds after readings are kept (a burst once), and looked at again
 // every minute, so a stale meter says when it was last read and a window past its reset shows reset.
 import { UsageLimitSourceError, type UsageLimitSourceSnapshot } from "@t3tools/contracts";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
-import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -17,12 +16,9 @@ import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as UsageLimitSources from "t3/src/usage/UsageLimitSources.ts";
 
-import { COMMISSARY_SOURCE_ID, CommissaryError, type CommissaryManagement, type Fetch, limitSnapshot, readCredentials } from "./commissary.ts";
 import { LIMIT_SOURCE_PREFIX, limitSnapshots } from "./limitMeters.ts";
 import type { LimitStore } from "./limits.ts";
 
-/** How often Commissary's accounts are read while t3 runs (Commissary's own quota sweep is slower). */
-export const COMMISSARY_LIMITS_EVERY = Duration.minutes(5);
 /** How often the endpoints' meters are looked at again (staleness and passed resets) while t3 runs. */
 export const ENDPOINT_METERS_EVERY = Duration.minutes(1);
 /**
@@ -68,35 +64,6 @@ export const withSources = (stock: Service, extras: ReadonlyArray<ExtraSources>)
     },
   } satisfies Service;
 };
-
-/** Commissary's accounts as one source, read now, every `COMMISSARY_LIMITS_EVERY` and on t3's refresh. */
-export const commissarySources = Effect.fn("commissarySources")(function* (config: CommissaryManagement, fetcher: Fetch) {
-  const ref = yield* SubscriptionRef.make<ReadonlyArray<UsageLimitSourceSnapshot>>([]);
-  const readOurs = Effect.gen(function* () {
-    const read = yield* Effect.tryPromise({
-      try: () => readCredentials(fetcher, config),
-      catch: (cause) => (cause instanceof CommissaryError ? cause.message : "Commissary's management API could not be read."),
-    }).pipe(
-      Effect.map((list) => ({ list })),
-      Effect.catch((error) => Effect.succeed({ error })),
-    );
-    const checkedAt = DateTime.formatIso(yield* DateTime.now);
-    yield* SubscriptionRef.set(ref, [limitSnapshot(checkedAt, read)]);
-  });
-  yield* readOurs.pipe(Effect.forkScoped);
-  yield* Effect.sleep(COMMISSARY_LIMITS_EVERY).pipe(Effect.andThen(readOurs), Effect.forever, Effect.forkScoped);
-  return {
-    ref,
-    refresh: readOurs,
-    owns: (sourceId) => sourceId === COMMISSARY_SOURCE_ID,
-    noReset: "Claim this account's reset in Commissary's panel (Accounts).",
-  } satisfies ExtraSources;
-});
-
-/** t3's service with Commissary's accounts added as a source: the seam `commissaryLimits.test.ts` tests it through. */
-export const withCommissary = Effect.fn("withCommissary")(function* (stock: Service, config: CommissaryManagement, fetcher: Fetch) {
-  return withSources(stock, [yield* commissarySources(config, fetcher)]);
-});
 
 /** What the endpoints' meters read: the kept windows (and word of each new one), and the endpoints now. */
 export interface EndpointMetersDeps {
@@ -152,23 +119,14 @@ export const endpointMeterSources = Effect.fn("endpointMeterSources")(function* 
   } satisfies ExtraSources;
 });
 
-/**
- * t3's `UsageLimitSources.layer`, plus Commissary's accounts when `config()` answers (read once, at t3's boot, from the
- * Environment DO's bindings), plus the endpoints' meters when `meters()` answers.
- */
-export const layer = (
-  config: () => CommissaryManagement | undefined,
-  meters: () => Omit<EndpointMetersDeps, "now"> | undefined = () => undefined,
-  fetcher: Fetch = (input, init) => fetch(input, init),
-) =>
+/** t3's `UsageLimitSources.layer`, plus the endpoints' meters when `meters()` answers (read once, at t3's boot). */
+export const layer = (meters: () => Omit<EndpointMetersDeps, "now"> | undefined = () => undefined) =>
   Layer.effect(
     UsageLimitSources.UsageLimitSources,
     Effect.gen(function* () {
       const stock = yield* UsageLimitSources.UsageLimitSources;
-      const configured = config();
       const endpointMeters = meters();
       const extras: Array<ExtraSources> = [];
-      if (configured !== undefined) extras.push(yield* commissarySources(configured, fetcher));
       if (endpointMeters !== undefined) extras.push(yield* endpointMeterSources({ ...endpointMeters, now: () => Date.now() }));
       return withSources(stock, extras);
     }),

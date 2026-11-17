@@ -1,18 +1,24 @@
 // Prompt suggestions (SPI-996, parity G5): t3's labs flag `promptSuggestionsEnabled` asks a provider for the owner's
 // likely next message after a completed turn (`prompt_suggestion.updated`). t3's Codex adapter samples its own thread
 // with `CODEX_PROMPT_SUGGESTION_PROMPT` at low effort (t3code `CodexAdapterV2.ts`, `samplePromptSuggestion`); Claude
-// Code makes its own. A Durable agent has neither, so the Session asks a small model through the proxy, with the turn's
-// request and answer only (bounded), never the whole thread: one cheap request per completed turn, only while the owner
-// has the labs flag on.
+// Code makes its own. A Durable agent has neither, so the Session asks a small model of its Model endpoints (SPI-1176:
+// the endpoints' small model, text generation's default rule; before the hard cut, the Model proxy's Claude Haiku), with
+// the turn's request and answer only (bounded), never the whole thread: one cheap request per completed turn, only while
+// the owner has the labs flag on.
 // @effect-diagnostics asyncFunction:off globalTimers:off
 import type { Api, Context, Model, Models } from "@earendil-works/pi-ai";
+import { defaultSmallModel, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
 
 /** t3's prompt (`CODEX_PROMPT_SUGGESTION_PROMPT`, t3code `apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts`). */
 export const PROMPT_SUGGESTION_PROMPT =
   "Predict the next message the user will send in this conversation. Reply with only that message, written as the user would type it, in under 20 words. Do not use tools. If there is no clear next step, reply with nothing.";
 
-/** The model that predicts: small and fast, as the Guardian's default. */
-export const SUGGESTION_MODEL = "claude-haiku-5-5";
+/** The model that predicts: small and fast, the Guardian's default (`defaultSmallModel`), as `{ provider, modelId }`; none without an endpoint. */
+export const suggestionModelOf = (endpoints: ModelEndpoints): { readonly provider: string; readonly modelId: string } | undefined => {
+  const slug = defaultSmallModel(endpoints);
+  const parsed = slug === undefined ? undefined : parseEndpointSlug(slug);
+  return parsed === undefined ? undefined : { provider: parsed.endpointId, modelId: parsed.modelId };
+};
 /** Most characters of the request and of the answer the model reads. */
 export const SUGGESTION_EXCERPT = 4_000;
 export const SUGGESTION_TIMEOUT_MS = 20_000;

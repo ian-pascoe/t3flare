@@ -19,6 +19,7 @@
 import type { Context as ChordContext } from "@earendil-works/chord";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { defineExtension, type Extension, type Harness, hook, type HookApi, type JsonObject, type ToolHookCall, ToolTask } from "@earendil-works/pi-durable";
+import { parseEndpointSlug } from "@t3flare/models/endpoints";
 
 import { type Assessment, rejectionReason, riskLabel, statedRationale, validRiskCategories } from "./guardian/assessment.ts";
 import { renderReviewedCall, selectEvidence, toolCallsOf } from "./guardian/evidence.ts";
@@ -33,7 +34,7 @@ export const GUARDIAN_ENTRY = "t3flare.guardian";
 export const REVIEW_TIMEOUT_MS = 60_000;
 
 export interface GuardianSettings {
-  /** The Guardian model's id among the Session's proxy models (`anthropic` provider). */
+  /** The Guardian model's setting: a Model endpoint's slug, or `default` (`GuardianHost.model` resolves it). */
   readonly model: string;
   readonly thinkingLevel: GuardianThinkingLevel;
   /** The panel's texts: `name=allow|review|deny, …`. */
@@ -51,6 +52,8 @@ export interface GuardianHost {
   /** Whether a tool only reads and reaches nothing outside: an MCP read tool, a read-only t3 tool; undefined: unknown. */
   readonly readOnly: (toolName: string) => boolean | undefined;
   readonly sessionId: () => string;
+  /** The slug the model setting names now (`modelSettingSlug` over the Session's endpoints), or undefined for none. */
+  readonly model: (setting: string) => string | undefined;
 }
 
 const translated = (input: Readonly<Record<string, unknown>>, toToolPath: (text: string) => string): Readonly<Record<string, unknown>> =>
@@ -100,14 +103,21 @@ const callContext = async (api: Pick<HookApi, "entries">, call: ToolHookCall, co
   return { skip: new Set<string>(), batch: [], parent: undefined };
 };
 
-/** The Guardian model among the Session's models: the proxy's (`anthropic`), or any provider's model of that id. */
-const guardianModel = (api: HookApi, id: string): Model<Api> | undefined => api.models.getModel("anthropic", id) ?? api.models.getModels().find((model) => model.id === id);
+/** The Guardian model among the Session's models, by its slug: its Model endpoint's provider and its own id. */
+const guardianModel = (api: HookApi, slug: string | undefined): Model<Api> | undefined => {
+  const parsed = slug === undefined ? undefined : parseEndpointSlug(slug);
+  return parsed === undefined ? undefined : api.models.getModel(parsed.endpointId, parsed.modelId);
+};
 
 /** One Guardian Review of `call` and its Escalation Pass (guardian-gate.ts `review`). */
 const review = async (api: HookApi, call: ToolHookCall, settings: GuardianSettings, host: GuardianHost, reason: string | undefined, securityPolicy: boolean, context: ChordContext): Promise<Decision> => {
-  const model = guardianModel(api, settings.model);
+  const slug = host.model(settings.model);
+  const model = guardianModel(api, slug);
   const categories = validRiskCategories(securityPolicy);
-  if (model === undefined) return decisionOf({ kind: "failed", failure: `Guardian model ${settings.model} was not found`, model: settings.model, durationMs: 0, tokens: 0, cost: null });
+  if (model === undefined) {
+    const failure = slug === undefined ? "no Model endpoint lists a model for it" : `Guardian model ${slug} was not found among the Model endpoints' models`;
+    return decisionOf({ kind: "failed", failure, model: slug ?? settings.model, durationMs: 0, tokens: 0, cost: null });
+  }
   const where = await callContext(api, call, context);
   const evidence = await selectEvidence(api, context, { trustUser: host.trustUser(), skipCalls: where.skip });
   const reviewed = await renderReviewedCall({ toolName: call.name, input: call.arguments, cwd: REPO, reason, parent: where.parent, batch: where.batch });

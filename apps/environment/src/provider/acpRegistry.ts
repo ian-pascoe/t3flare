@@ -2,12 +2,12 @@
 // the registry is listed as stock lists it, and each agent says what t3flare does with it; preparing (installing) one
 // is refused with that reason, so no `acpRegistry` provider instance is made that could not run.
 //
-// What an agent needs here (ADR-0012, ADR-0016 with its A′ decision): a base-URL setting for the model proxy, and a way
-// to take the Container's proxy key from t3flare's key helper on demand, never from its environment or a file. Of the
+// What an agent needs here (ADR-0016's G13 refinement, the model relay since SPI-1167): a base-URL setting for the model
+// relay, and a profile of t3flare's that keeps its model handle out of its commands' environment and files. Of the
 // registry's agents only four have both, and each is already a built-in provider of t3's own kind, running the same
 // agent in the Workspace's Container (steps 4a, 4b): Claude Agent, Codex, OpenCode and pi. The rest either sign in with
-// their vendor (refused, parity D3) or read their key only from the environment or a settings file (not offered while
-// ADR-0016's A′ holds; the owner's call: docs/steps/parity-batch-2.md). So no registry agent is installed, at runtime or
+// their vendor (refused, parity D3) or read their key only from the environment or a settings file (not offered; the
+// owner's call: docs/steps/parity-batch-2.md). So no registry agent is installed, at runtime or
 // in the image (ADR-0024's pin is unchanged).
 import type { AcpRegistrySearchAgent } from "@t3tools/contracts";
 import * as AcpRegistryRuntimeCoordinator from "@t3tools/provider-acp-registry/server/AcpRegistryRuntimeCoordinator";
@@ -25,7 +25,8 @@ export const BUILT_IN_EQUIVALENT: Readonly<Record<string, string>> = {
 };
 
 /**
- * Registry agents that sign in with their vendor's account (parity D3, ADR-0015's refinement): no model proxy base URL.
+ * Registry agents that sign in with their vendor's account (parity D3, ADR-0015's refinement): no base URL to point at
+ * the model relay.
  * The six of D3 plus the agents whose only documented access is the vendor's own sign-in.
  */
 export const VENDOR_SIGN_IN: ReadonlySet<string> = new Set([
@@ -62,11 +63,11 @@ export const standingOf = (agentId: string): RegistryStanding => {
 export const standingText = (standing: RegistryStanding): string => {
   switch (standing.kind) {
     case "built-in":
-      return `Built in here: add the ${standing.provider} provider, which runs this agent in your Workspace on the model proxy.`;
+      return `Built in here: add the ${standing.provider} provider, which runs this agent in your Workspace on your Model endpoints.`;
     case "vendor-sign-in":
-      return "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through the model proxy (decision D3).";
+      return "Not available in t3flare: it signs in with its vendor's account, and t3flare's agents reach models only through your Model endpoints (decision D3).";
     case "key-from-environment":
-      return "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare gives a Container's agent its proxy key only through a key helper (ADR-0016).";
+      return "Not available in t3flare yet: it takes its model key only from its environment or a settings file, and t3flare has no profile for it that keeps its model handle out of its commands (ADR-0016).";
   }
 };
 

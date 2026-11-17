@@ -22,8 +22,7 @@ const here = import.meta.dirname;
 
 it("Claude Code reaches the model relay with its handle, which no Claude process or shell inherits", () => {
   const handle = randomBytes(32).toString("hex");
-  const nonce = `nonce-${randomUUID()}`;
-  const harness = startHarness("t3flare-claude-relay", [nonce], { modelHandle: handle });
+  const harness = startHarness("t3flare-claude-relay", { modelHandle: handle });
   const workspace = fs.mkdtempSync(path.join(here, ".claude-relay-"));
   fs.mkdirSync(path.join(workspace, ".t3flare"), { recursive: true });
   // The fixture's repo, where the process's cwd (T3_PATH) lands.
@@ -34,7 +33,7 @@ it("Claude Code reaches the model relay with its handle, which no Claude process
     const marker = `proc-${randomUUID()}`;
     const answer = profileLaunch(
       { cli: "claude", args: [], key: marker, cwd: T3_PATH, env: {}, allowProbe: false },
-      { proxyUrl: "", models: [], readStateFile: () => undefined, piExtensionSource: "", claudeRelay: { endpoints: ["comm"], models: ["comm/claude-haiku-5-5"], backgroundModel: "comm/claude-haiku-5-5", opusModel: "comm/claude-haiku-5-5", sonnetModel: "comm/claude-haiku-5-5" } },
+      { readStateFile: () => undefined, piExtensionSource: "", claudeRelay: { endpoints: ["comm"], models: ["comm/claude-haiku-5-5"], backgroundModel: "comm/claude-haiku-5-5", opusModel: "comm/claude-haiku-5-5", sonnetModel: "comm/claude-haiku-5-5" } },
     );
     if ("refused" in answer) throw new Error(answer.refused);
     // The watcher runs without the handle: once Claude's Bash has written its environment, it records which processes
@@ -61,7 +60,6 @@ it("Claude Code reaches the model relay with its handle, which no Claude process
       name: "t3flare-claude-relay",
       launch: { ...answer, env: { ...answer.env, T3FLARE_MODEL_HANDLE: handle } },
       marker,
-      nonce,
       workspace,
       setup: "(env -u T3FLARE_MODEL_HANDLE bash /workspace/watch.sh > /workspace/watch.log 2>&1 &)",
     });

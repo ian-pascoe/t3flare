@@ -56,8 +56,7 @@ const withoutEnvironmentSkills = (launch: Launch): Launch => {
 
 it("each CLI's skill and command roots (SPI-1151 M0) are CLI_ROOTS' table", async () => {
   const workspace = fs.mkdtempSync(path.join(here, ".skills-"));
-  const nonces = { codex: `nonce-${randomUUID()}`, pi: `nonce-${randomUUID()}`, claude: `nonce-${randomUUID()}`, opencode: `nonce-${randomUUID()}` };
-  const harness = startHarness("t3flare-skills-probe", Object.values(nonces));
+  const harness = startHarness("t3flare-skills-probe");
   const repo = path.join(workspace, "repo");
   const write = (file: string, text: string) => {
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -81,7 +80,6 @@ it("each CLI's skill and command roots (SPI-1151 M0) are CLI_ROOTS' table", asyn
       name: "t3flare-skills-probe",
       launch,
       marker,
-      nonce: nonces[cli],
       workspace,
       ...(argv === undefined ? {} : { argv }),
       files: Object.entries(PROCESS_SKILL_CANDIDATES[cli]).flatMap(([key, name]) => markerFiles(home, key, name)),
@@ -138,7 +136,6 @@ it("each CLI's skill and command roots (SPI-1151 M0) are CLI_ROOTS' table", asyn
       name: "t3flare-skills-probe",
       launch: serveLaunch,
       marker: serveKey,
-      nonce: nonces.opencode,
       workspace,
       files: Object.entries(PROCESS_SKILL_CANDIDATES.opencode).flatMap(([key, name]) => markerFiles(serveHome, key, name)),
       setup: userSetup,

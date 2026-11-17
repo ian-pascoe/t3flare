@@ -1,8 +1,9 @@
 // @effect-diagnostics globalConsole:off effectFnOpportunity:off
 // The pi CLI in the Cloud Environment (step 4a, plan §3, §5.2, §5.3): t3's own Pi adapter (`makePiAdapterV2`) with
-// t3flare's readiness (the image's version and the proxy's catalog, or the Model endpoints since SPI-1170, never a
-// spawning probe), t3's MCP credential withheld (OD-3), the spawn's profile from `agents/cliProfiles.ts` (t3's permission extension required, its mode
-// always set), plan turns refused, text generation through the proxy, and the wrapper. Shown as "Pi", beside "Pi Durable".
+// t3flare's readiness (the image's version and the Model endpoints, SPI-1170; it needs setup without one, SPI-1176; never
+// a spawning probe), t3's MCP credential withheld (OD-3), the spawn's profile from `agents/cliProfiles.ts` (t3's
+// permission extension required, its mode always set), plan turns refused, text generation on the Model endpoints (Pi
+// Durable's), and the wrapper. Shown as "Pi", beside "Pi Durable".
 import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
 import { CLIS } from "@t3flare/sandbox-image/clis";
 import { defaultProviderContinuationIdentity, type ProviderDriver, type ProviderInstance } from "@t3tools/provider-core/server/driver";
@@ -25,6 +26,8 @@ import { PiSettings } from "../../../../../t3code/packages/provider-pi/src/setti
 import { environmentServices } from "../../agents/bindings.ts";
 import { refreshOnEndpointsChanged } from "../../endpoints/changes.ts";
 import { makePiDurableTextGeneration } from "../textGeneration.ts";
+import { readinessOf } from "../readiness.ts";
+import { noEndpointFor } from "../../agents/cliProfiles.ts";
 import { cliSnapshotForCwdOf } from "../skills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { piModelsOf } from "./piEndpoints.ts";
@@ -57,25 +60,25 @@ export type PiCliDriverEnv =
 const snapshotOf = (enabled: boolean) =>
   Effect.gen(function* () {
     const checkedAt = DateTime.formatIso(yield* DateTime.now);
+    // SPI-1170: the endpoints' models (pi runs on them through the model relay); none, and pi needs setup (SPI-1176).
+    const models = piModelsOf(environmentServices().modelEndpoints?.());
     return buildServerProvider({
       presentation: PRESENTATION,
       enabled,
       checkedAt,
-      // SPI-1170: the endpoints' models when one lists a model (pi runs on them through the model relay), else the proxy's.
-      models: piModelsOf(environmentServices().catalog.current(), environmentServices().modelEndpoints?.()),
+      models,
       // SPI-1151: stock's `/compact` (t3's Pi adapter runs it as pi's RPC compaction).
       slashCommands: CLI_BUILT_IN_COMMANDS.pi,
-      probe: { installed: true, version: CLIS.pi.version, status: "ready", auth: { status: "authenticated" } },
+      probe: readinessOf(models, CLIS.pi.version, `${noEndpointFor("Pi")}.`),
     });
   });
 
 /**
- * pi's managed snapshot (its model list): built from the catalog or the Model endpoints (`piModelsOf`), checked when the
- * driver starts, and again at each endpoint change (SPI-1170) while the caller's scope is open.
+ * pi's managed snapshot (its model list): built from the Model endpoints (`piModelsOf`), checked when the driver starts,
+ * and again at each endpoint change (SPI-1170) while the caller's scope is open.
  */
 export const piSnapshot = (effective: PiSettings, stamp: (draft: Omit<ServerProvider, "instanceId" | "driver">) => ServerProvider) =>
   Effect.gen(function* () {
-    const { catalog } = environmentServices();
     const settingsSource = yield* makeProviderSnapshotSettingsSource(effective);
     const maintenance = makeManualOnlyProviderMaintenanceCapabilities({ provider: PI_CLI_DRIVER, packageName: null });
     const snapshot = yield* makeManagedServerProvider({
@@ -84,10 +87,7 @@ export const piSnapshot = (effective: PiSettings, stamp: (draft: Omit<ServerProv
       streamSettings: settingsSource.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,
       initialSnapshot: (settings) => snapshotOf(settings.provider.enabled).pipe(Effect.map(stamp)),
-      checkProvider: Effect.promise(() => catalog.refresh()).pipe(
-        Effect.flatMap(() => snapshotOf(effective.enabled)),
-        Effect.map(stamp),
-      ),
+      checkProvider: Effect.suspend(() => snapshotOf(effective.enabled)).pipe(Effect.map(stamp)),
     }).pipe(Effect.orDie);
     yield* Effect.forkScoped(snapshot.refresh);
     // SPI-1170: the list follows the endpoints at once, as the other drivers' do.

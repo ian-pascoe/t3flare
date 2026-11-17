@@ -4,7 +4,7 @@
 // and Google's `/models` (`x-goog-api-key`, the models that generate content). The owner picks from it; pi-ai's catalog
 // fills in what the list does not say (store.ts). A failure is reported as its HTTP status, never its body (which may
 // echo the key).
-import { parseList, realIdOf } from "@t3flare/models/catalog";
+import { parseList, realIdOf } from "@t3flare/models/lists";
 import { type EndpointApi, type EndpointModelInput, type EndpointTarget, isRecord, type SignIn } from "@t3flare/models/endpoints";
 import { copilotModelApi } from "@t3flare/models/known";
 import { credentialHeaderOf } from "@t3flare/models/relay";
@@ -49,7 +49,7 @@ const anthropic = async (target: EndpointTarget, apiKey: string | undefined, fet
     if (listed === undefined) throw new ListError("the endpoint's answer is not a list of models");
     for (const model of listed.models) {
       models.push({
-        // A Model proxy that lists a non-Claude model under an alias (Commissary) is read back to its real id.
+        // An endpoint at Commissary lists a non-Claude model under an alias: read back to its real id.
         id: realIdOf(model.id),
         ...(model.displayName === undefined ? {} : { name: model.displayName }),
         ...(model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow }),

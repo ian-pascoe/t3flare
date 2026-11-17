@@ -122,14 +122,13 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     const session = yield* CliSpawn;
     // SPI-1167: the Model endpoints Codex reaches through the model relay (OpenAI Responses), as stored now.
     const responsesEndpoints = endpointsOfApi(services.modelEndpoints?.(), "openai-responses", "codex");
-    // SPI-1168: Claude Code on the Anthropic Messages endpoints through the relay, when there is one (else the proxy).
+    // SPI-1168: Claude Code on the Anthropic Messages endpoints through the relay.
     const claudeRelay = name === "claude-agent-acp" ? claudeRelayOf(services.modelEndpoints?.(), currentTextGenerationModel()) : undefined;
-    // SPI-1169: OpenCode on the endpoints whose API it speaks, when there is one (else the proxy).
+    // SPI-1169: OpenCode on the endpoints whose API it speaks.
     const opencodeRelay = name === "opencode" ? opencodeRelayOf(services.modelEndpoints?.(), currentTextGenerationModel()) : undefined;
-    // SPI-1170: pi on every endpoint that lists a model, when there is one (else the proxy).
+    // SPI-1170: pi on every endpoint that lists a model.
     const piRelay = name === "pi" ? piRelayOf(services.modelEndpoints?.()) : undefined;
-    const endpointsOnly = (name === "codex" && responsesEndpoints.length > 0) || claudeRelay !== undefined || opencodeRelay !== undefined || piRelay !== undefined;
-    if (services.modelProxy === undefined && name !== "t3flare-probe" && !endpointsOnly) return yield* refused(name, "this Environment has no model proxy or Model endpoint for it");
+    // SPI-1176: a CLI with no endpoint for its API is refused by its profile, saying so (no Model proxy to fall back to).
     // ADR-0028: the process's tool handle for the relay's third-party servers (the session's; pi spawns outside the
     // session's fiber and gets one of its own).
     const toolHandle = session?.toolHandle ?? newHandle();
@@ -143,8 +142,6 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
         allowProbe: services.faults,
       },
       {
-        proxyUrl: (services.modelProxy?.url ?? "").replace(/\/+$/, ""),
-        models: services.catalog.current().models,
         readStateFile: (path) => {
           const entry = StateStore.get(path);
           return entry !== undefined && entry.kind === "file" ? new TextDecoder().decode(StateStore.readFile(path)) : undefined;
@@ -194,7 +191,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     // SPI-1170: pi on the relay names an endpoint's model by its own provider id; t3's adapter by the endpoint's.
     const relayEndpointIds = new Set(launch.modelRelay ?? []);
     const piLineMaps: LineMaps | undefined =
-      name === "pi" && relayEndpointIds.size > 0 ? { toCli: (line) => piLineToPi(line, relayEndpointIds), fromCli: (line) => piLineFromPi(line, relayEndpointIds) } : undefined;
+      name === "pi" && relayEndpointIds.size > 0 ? { toCli: (line) => piLineToPi(line, relayEndpointIds, piRelay?.model), fromCli: (line) => piLineFromPi(line, relayEndpointIds) } : undefined;
     const handle = handleOf(process, endOnDone, piLineMaps);
     // A stdin given as a Stream is piped in, as Node's spawner does (t3's `codex exec` prompt, parity G7).
     const input = typeof stdin === "object" && stdin !== null && "stream" in stdin ? stdin.stream : stdin;

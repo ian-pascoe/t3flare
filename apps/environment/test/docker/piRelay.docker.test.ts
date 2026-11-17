@@ -43,8 +43,7 @@ const SHIMMED = ["env", "tr", "head", "sed", "cut", "grep"];
 
 it("pi reaches each endpoint's provider at the model relay with its handle, which no shell inherits, and resumes in a new process", () => {
   const handles = [randomBytes(32).toString("hex"), randomBytes(32).toString("hex")];
-  const nonce = `nonce-${randomUUID()}`;
-  const harness = startHarness("t3flare-pi-relay", [nonce], { modelHandle: handles.join(",") });
+  const harness = startHarness("t3flare-pi-relay", { modelHandle: handles.join(",") });
   const workspace = fs.mkdtempSync(path.join(here, ".pi-relay-"));
   fs.mkdirSync(path.join(workspace, ".t3flare"), { recursive: true });
   const repo = path.join(workspace, "repo");
@@ -64,7 +63,7 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     const launchFor = (marker: string) => {
       const answer = profileLaunch(
         { cli: "pi", args: ["--mode", "rpc", "--extension", EXTENSION], key: marker, cwd: T3_PATH, env: { T3_PI_RUNTIME_MODE: "approval-required" }, allowProbe: false },
-        { proxyUrl: "", models: [], readStateFile: (file) => (file === EXTENSION ? PI_T3_MCP_EXTENSION_SOURCE : undefined), piExtensionSource: PI_T3_MCP_EXTENSION_SOURCE, ...(relay === undefined ? {} : { piRelay: relay }) },
+        { readStateFile: (file) => (file === EXTENSION ? PI_T3_MCP_EXTENSION_SOURCE : undefined), piExtensionSource: PI_T3_MCP_EXTENSION_SOURCE, ...(relay === undefined ? {} : { piRelay: relay }) },
       );
       if ("refused" in answer) throw new Error(answer.refused);
       return answer;
@@ -121,7 +120,6 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
         // An owner's Variables under the profile's environment: a proxy for the agent's commands, and its own no_proxy.
         launch: { ...first, env: { ...first.env, T3FLARE_MODEL_HANDLE: handles[0]!, HTTP_PROXY: "http://computer.internal:3128", HTTPS_PROXY: "http://computer.internal:3128", NO_PROXY: "example.org" } },
         marker: markers[0]!,
-        nonce,
         workspace,
         setup: [...shims, "(env -u T3FLARE_MODEL_HANDLE bash /workspace/watch.sh > /workspace/watch.log 2>&1 &)"].join("\n"),
       }),
@@ -136,14 +134,13 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     const resumed = drive(
       "pi-rpc.mjs",
       { commands: [{ type: "switch_session", sessionPath: sessionFile ?? "/missing" }, ...turn("anth", "And after the restart."), { type: "get_state" }], confirm: true, timeoutMs: 180_000 },
-      runCommand({ harness, name: "t3flare-pi-relay-2", launch: { ...second, env: { ...second.env, T3FLARE_MODEL_HANDLE: handles[1]! } }, marker: markers[1]!, nonce, workspace }),
+      runCommand({ harness, name: "t3flare-pi-relay-2", launch: { ...second, env: { ...second.env, T3FLARE_MODEL_HANDLE: handles[1]! } }, marker: markers[1]!, workspace }),
     );
     const read = (name: string) => (fs.existsSync(path.join(workspace, name)) ? fs.readFileSync(path.join(workspace, name), "utf8") : "");
     const logs = docker(["logs", "t3flare-pi-relay-keyhost"]).stdout.split("\n");
     type Relayed = { path: string; query: string; api: string; model: string; messages: number; headers: ReadonlyArray<string>; apiKeyIsHandle: boolean; bearerIsHandle: boolean; googKeyIsHandle: boolean; handle: number; bash: boolean };
     const relayed = logs.filter((line) => line.includes('"model-relay"')).map((line) => JSON.parse(line) as Relayed);
     const elsewhere = logs.filter((line) => line.includes('"event":"http"')).map((line) => JSON.parse(line) as { path: string; handle: number });
-    const keyAsked = logs.filter((line) => line.includes('"model-key"')).length;
     const shellEnv = firstShellEnv;
     const holders = read("holders.txt").split("\n").map((line) => line.trim()).filter((line) => line !== "");
     const shimRuns = read("shims.txt").split("\n").filter((line) => line !== "");
@@ -161,7 +158,6 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
       events: result.events,
       relayed,
       elsewhere,
-      keyAsked,
       holders,
       ps: read("ps.txt"),
       shellEnvWritten: shellEnv !== "",
@@ -200,7 +196,6 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     expect(report.repoExtensionLoaded, text).toBe(false);
     expect(elsewhere, text).toEqual([]);
     // The handle needs no key helper.
-    expect(keyAsked, text).toBe(0);
     // pi's bash: the marker, no handle, no nonce.
     expect(shellEnv.includes("T3FLARE_EXEC"), text).toBe(true);
     expect(shellEnv.includes("T3FLARE_MODEL_HANDLE"), text).toBe(false);
@@ -249,7 +244,7 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
 
 it("the handle command prints the handle only to its own pi launch chain: not with a forged or multi-line marker, outside one, or when setsid did not fork", () => {
   const handle = randomBytes(32).toString("hex");
-  const harness = startHarness("t3flare-pi-handle", []);
+  const harness = startHarness("t3flare-pi-handle");
   try {
     // pi's own RPC `bash` runs the handle command in pi's launch chain (only its length leaves the container).
     const probe = [

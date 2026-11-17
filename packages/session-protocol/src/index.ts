@@ -316,15 +316,17 @@ export interface TurnState {
    * next pi-durable run; it is still this turn's work, so the turn settles only when they have.
    */
   readonly steers?: ReadonlyArray<string>;
-  /** What the model proxy answered this turn (step 2a part 2); absent in pushes from before it. */
+  /**
+   * What the turn's model requests got (step 2a part 2); absent in pushes from before it. Named for the Model proxy it
+   * first recorded, kept as the wire name since the hard cut (SPI-1176).
+   */
   readonly proxy?: ProxyRecord;
 }
 
-/** A turn's model proxy requests, and its last failure as the Session classified it when the answer came. */
+/** A turn's model requests, and its last failure as the Session classified it when the answer came. */
 export interface ProxyRecord {
-  /** The Session's requests to the proxy while this turn ran (the fault route's answers included). */
+  /** The Session's model requests while this turn ran (the fault route's answers included). */
   readonly requests: number;
-  readonly failure?: ProxyFailureRecord;
   /**
    * SPI-1164: why the turn's last request got no credential from its Model endpoint (a sign-in signed out, a key gone),
    * typed, so the differ shows it without reading the error's text.
@@ -332,7 +334,8 @@ export interface ProxyRecord {
   readonly credential?: EndpointCredentialFailure;
   /**
    * SPI-1172: the turn's last failed answer from a Model endpoint, classified by the endpoint's API and auth when it came.
-   * Recording one clears `failure` (the proxy's), and the other way round: the last answer is the turn's.
+   * Every failed answer replaces it: the last answer is the turn's. (A record from before the hard cut may also hold the
+   * Model proxy's `failure`; nothing reads it now.)
    */
   readonly endpointFailure?: EndpointFailureRecord;
 }
@@ -367,17 +370,6 @@ export interface EndpointCredentialFailure {
   readonly kind: "signed_out" | "changed" | "unavailable" | "unreadable" | "no_key";
   readonly message: string;
   readonly retryable: boolean;
-}
-
-
-/** `@t3flare/models/proxyFailure`'s `ProxyFailure`, with the time of the answer (epoch ms). */
-export interface ProxyFailureRecord {
-  readonly class: "usage_limit" | "permission_error" | "provider_error";
-  readonly code: string;
-  readonly row: number;
-  readonly resetAt?: number;
-  readonly stop: boolean;
-  readonly at: number;
 }
 
 export interface PendingApproval {

@@ -1,5 +1,5 @@
-// The Durable agent provider's instance settings (ADR-0012): models come from the proxy the deployment names, so the
-// only setting is whether the instance is on. Kept browser-safe in shape, as t3's provider settings are.
+// The Durable agent provider's instance settings (ADR-0034): models come from the Model endpoints the owner sets in the
+// Harness panel, so the only setting is whether the instance is on. Kept browser-safe in shape, as t3's provider settings are.
 import { makeProviderSettingsSchema } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

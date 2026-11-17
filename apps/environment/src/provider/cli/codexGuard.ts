@@ -1,20 +1,22 @@
 // The Codex request guard (step 4a, plan §3.1; back to stock, owner 2026-11-12): every request t3's Codex adapter sends
 // to the app-server passes here first. t3's requests pass as t3 sends them, but three things: the provider pin (no
-// thread param or config key may name another provider, profile or base URL, so the proxy key goes only to the proxy,
-// K5), `feedback/*` and `account/*` (a vendor upload and a vendor sign-in, K3), and each turn's approval and sandbox
+// thread param or config key may name another provider, profile or base URL, so a model handle goes only to the model
+// relay, K5), `feedback/*` and `account/*` (a vendor upload and a vendor sign-in, K3), and each turn's approval and sandbox
 // policy, which come from t3's own mode table with a fallback when the Container has no working sandbox.
 // (Until the cut, methods and thread config keys were allowlisted, and `auto` ran as approval-required.)
 //
 // SPI-1167: a model of a Model endpoint is `<endpointId>/<modelId>` in t3; Codex gets the model's own id and the
 // endpoint's provider (`codexModelRoute`), named by the guard on every thread request. A thread stays on its provider:
 // a turn on a model of another provider is refused (Codex's `turn/start` cannot move a thread to another provider).
+// SPI-1176: a model from before the hard cut (the Model proxy's bare ids) runs on the default model, the first Responses
+// endpoint's first model.
 
-import { parseEndpointSlug } from "@t3flare/models/endpoints";
+import { isRetiredSlug, parseEndpointSlug } from "@t3flare/models/endpoints";
 
 /** Refused with their own reason (review F5): `feedback/*` uploads logs to the vendor, `account/*` is a vendor login. */
 const REFUSED_PREFIXES: ReadonlyArray<[string, string]> = [
   ["feedback/", "feedback goes to the vendor, which t3flare never contacts"],
-  ["account/", "the model proxy is the account; there is no Codex sign-in"],
+  ["account/", "Codex is signed in to nothing here: its models are the Model endpoints'"],
 ];
 
 /** Thread params that would set a policy or a provider beside the guard's: dropped (the process defaults apply). */
@@ -53,13 +55,27 @@ export interface TurnContext {
   readonly threadProvider?: (threadId: string) => string | undefined;
 }
 
+/** What a route reads of Codex's endpoints: their ids and, for the default model, their models' ids. */
+export interface CodexRouteEndpoint {
+  readonly id: string;
+  readonly models: ReadonlyArray<{ readonly id: string }>;
+}
+
 /**
- * A model's route (SPI-1167): a slug whose part before the first `/` is the id of an OpenAI Responses endpoint goes to
- * that endpoint's provider with the rest as its id; anything else is the Model proxy's model, as sent.
+ * A model's route (SPI-1167): a slug whose part before the first `/` is the id of one of Codex's (OpenAI Responses)
+ * endpoints goes to that endpoint's provider with the rest as its id. A model from before the hard cut (SPI-1176,
+ * `isRetiredSlug`: the Model proxy's bare ids, `default`) goes to the default model, the first endpoint's first model.
+ * Any other slug (an endpoint that is gone, or not Codex's) names its own endpoint's provider, which Codex does not have,
+ * so Codex refuses it; with no endpoint at all, the model goes as sent to no provider.
  */
-export const codexModelRoute = (model: string, endpointIds: ReadonlySet<string>, providerOf: (endpointId: string) => string, proxyProvider: string): CodexModelRoute => {
+export const codexModelRoute = (model: string, endpoints: ReadonlyArray<CodexRouteEndpoint>, providerOf: (endpointId: string) => string): CodexModelRoute => {
   const slug = parseEndpointSlug(model);
-  return slug !== undefined && endpointIds.has(slug.endpointId) ? { provider: providerOf(slug.endpointId), model: slug.modelId } : { provider: proxyProvider, model };
+  if (slug !== undefined && endpoints.some((endpoint) => endpoint.id === slug.endpointId)) return { provider: providerOf(slug.endpointId), model: slug.modelId };
+  if (slug === undefined || isRetiredSlug(model)) {
+    const first = endpoints.find((endpoint) => endpoint.models.length > 0);
+    return first === undefined ? { provider: "", model } : { provider: providerOf(first.id), model: first.models[0]!.id };
+  }
+  return { provider: providerOf(slug.endpointId), model: slug.modelId };
 };
 
 export interface TurnPolicy {
@@ -105,7 +121,7 @@ const turnModel = (next: Record<string, unknown>, context: TurnContext): string 
   const route = context.route(next.model);
   const threadProvider = typeof next.threadId === "string" ? context.threadProvider?.(next.threadId) : undefined;
   if (threadProvider !== undefined && threadProvider !== route.provider) {
-    return `this Codex thread runs on another Model endpoint (or the Model proxy) than ${next.model}; Codex cannot move a thread between them: start a new thread for this model`;
+    return `this Codex thread runs on another Model endpoint than ${next.model} (or on the Model proxy, before the hard cut); Codex cannot move a thread between them: start a new thread for this model`;
   }
   next.model = route.model;
   const mode = record(next.collaborationMode);

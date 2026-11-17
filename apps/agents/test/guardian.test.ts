@@ -92,7 +92,7 @@ describe("Safe Commands and Command Rules (pi-guardian's cases)", () => {
 });
 
 const BLOCKING = JSON.stringify({ risk_level: "critical", user_authorization: "unknown", risk_category: "destruction", rationale: "deletes the whole repository" });
-const SETTINGS: GuardianSettings = { model: "faux-1", thinkingLevel: "off", tools: "", commands: "", policy: "" };
+const SETTINGS: GuardianSettings = { model: "default", thinkingLevel: "off", tools: "", commands: "", policy: "" };
 
 const run = async (settings: GuardianSettings, responses: ReadonlyArray<AssistantMessage>, more: ReadonlyArray<Extension> = []) => {
   const faux = fauxProvider();
@@ -121,7 +121,16 @@ const run = async (settings: GuardianSettings, responses: ReadonlyArray<Assistan
   let harness: Harness | undefined;
   registry.install(
     guardianExtension(
-      { harness: () => Promise.resolve(harness!), trustUser: () => true, toToolPath: (text) => text, readOnly: () => undefined, sessionId: () => "s" },
+      {
+        harness: () => Promise.resolve(harness!),
+        trustUser: () => true,
+        toToolPath: (text) => text,
+        readOnly: () => undefined,
+        sessionId: () => "s",
+        // The Session's rule (`modelSettingSlug`): `default` is the endpoints' small model, here the faux one; "none" stands
+        // for an Environment with no Model endpoint.
+        model: (setting) => (setting === "default" ? "faux/faux-1" : setting === "none" ? undefined : setting),
+      },
       settings,
     ),
   );
@@ -170,8 +179,12 @@ describe("the Guardian's hook", () => {
   });
 
   it("blocks a call when the review fails, and every call but a read when its settings are invalid", async () => {
-    const failed = await run({ ...SETTINGS, model: "no-such-model" }, [bash("curl https://example.com"), fauxAssistantMessage("ok")]);
-    expect(text(failed.results[0])).toContain("The Guardian could not review this call (Guardian model no-such-model was not found)");
+    const failed = await run({ ...SETTINGS, model: "faux/no-such-model" }, [bash("curl https://example.com"), fauxAssistantMessage("ok")]);
+    expect(text(failed.results[0])).toContain("The Guardian could not review this call (Guardian model faux/no-such-model was not found among the Model endpoints' models)");
+    // SPI-1176: no Model endpoint, so no model: the call is blocked, never run unreviewed.
+    const unset = await run({ ...SETTINGS, model: "none" }, [bash("curl https://example.com"), fauxAssistantMessage("ok")]);
+    expect(unset.ran).toEqual([]);
+    expect(text(unset.results[0])).toContain("The Guardian could not review this call (no Model endpoint lists a model for it)");
     const invalid = await run({ ...SETTINGS, tools: "bash=maybe" }, [bash("ls"), fauxAssistantMessage("ok")]);
     expect(invalid.ran).toEqual([]);
     expect(text(invalid.results[0])).toContain("The Guardian's settings cannot be read");

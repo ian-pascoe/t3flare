@@ -1,6 +1,6 @@
 // The names t3flare sets itself, derived from the code (SPI-1152, ADR-0032's Variables refinement): every name
 // `COMMAND_ENV`, a CLI profile's environment or Codex's shell policy, the managed settings' `env`, a Terminal's base
-// environment or its rc file sets, and the nonce a CLI process gets. Each must be refused as a Variable's, and
+// environment or its rc file sets, and the model handle a CLI process gets. Each must be refused as a Variable's, and
 // `SET_BY_T3FLARE` must be exactly those no general rule refuses, so the list can drift neither way.
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { terminalRc } from "@t3flare/sandbox-image/terminal";
@@ -9,14 +9,20 @@ import { MODEL_HANDLE_ENV } from "@t3flare/models/relay";
 import { describe, expect, it } from "vitest";
 
 import { claudeManagedSettings, claudeModeOf } from "../src/agents/acpProfiles.ts";
-import { CLI_PROFILE_NAMES, codexExecArgs, codexOverrides, type CliName, type LaunchInput, NONCE_ENV, profileLaunch, type ProfileContext } from "../src/agents/cliProfiles.ts";
+import { CLI_PROFILE_NAMES, codexExecArgs, codexOverrides, type CliName, type LaunchInput, profileLaunch, type ProfileContext } from "../src/agents/cliProfiles.ts";
 import { TERMINAL_BASE_ENV } from "../src/terminal/layer.ts";
 
 const PI_EXTENSION = "/state/t3-pi-extension.js";
 const SCHEMA = "/state/output-schema.json";
+const MODEL = { id: "m", name: "M", reasoning: false, input: ["text" as const], contextWindow: 1, maxTokens: 1, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false };
+const ENDPOINT = { id: "e", label: "E", api: "anthropic-messages" as const, models: [MODEL] };
+const CLAUDE_RELAY = { endpoints: ["e"], models: ["e/m"], backgroundModel: "e/m", opusModel: "e/m", sonnetModel: "e/m" };
+/** Every CLI on one endpoint through the model relay (SPI-1176: there is no other way to run one). */
 const context: ProfileContext = {
-  proxyUrl: "https://proxy.example",
-  models: [],
+  endpoints: [ENDPOINT],
+  piRelay: { endpoints: [ENDPOINT], model: "e/m" },
+  claudeRelay: CLAUDE_RELAY,
+  opencodeRelay: { endpoints: [ENDPOINT], model: "e/m", smallModel: "e/m" },
   readStateFile: (path) => (path === PI_EXTENSION ? "// t3's extension" : path === SCHEMA ? "{}" : undefined),
   piExtensionSource: "// t3's extension",
   relay: { handle: "handle", servers: ["executor"] },
@@ -49,7 +55,7 @@ const launchNames = (): ReadonlyArray<string> =>
   );
 
 /** The names Codex's shell policy sets in every command it runs (`shell_environment_policy.set.NAME=…`). */
-const codexShellNames = (): ReadonlyArray<string> => codexOverrides(context.proxyUrl, "k1").flatMap((value) => /^shell_environment_policy\.set\.([A-Za-z_][A-Za-z0-9_]*)=/.exec(value)?.[1] ?? []);
+const codexShellNames = (): ReadonlyArray<string> => codexOverrides("k1", [ENDPOINT]).flatMap((value) => /^shell_environment_policy\.set\.([A-Za-z_][A-Za-z0-9_]*)=/.exec(value)?.[1] ?? []);
 
 /** The shell variables a Terminal's rc file assigns after the shell starts (`NAME=…` at a line's start). */
 const terminalRcNames = (): ReadonlyArray<string> =>
@@ -63,12 +69,10 @@ const derived = (): ReadonlyArray<string> => [
     ...Object.keys(COMMAND_ENV),
     ...launchNames(),
     ...codexShellNames(),
-    ...Object.keys(claudeManagedSettings(claudeModeOf({ proxyUrl: context.proxyUrl, models: [] })).env),
     // SPI-1168: on the model relay, every alias Claude Code resolves is pinned too.
-    ...Object.keys(claudeManagedSettings(claudeModeOf({ proxyUrl: "", models: [], claudeRelay: { endpoints: ["e"], models: ["e/m"], backgroundModel: "e/m", opusModel: "e/m", sonnetModel: "e/m" } })).env),
+    ...Object.keys(claudeManagedSettings(claudeModeOf(CLAUDE_RELAY)).env),
     ...Object.keys(TERMINAL_BASE_ENV),
     ...terminalRcNames(),
-    NONCE_ENV,
     // SPI-1167: the Workspace DO puts the model handle in a CLI process's environment.
     MODEL_HANDLE_ENV,
   ]),
@@ -87,7 +91,7 @@ describe("the names t3flare sets itself", () => {
     const names = derived();
     // Spot checks against each source, so an empty derivation cannot pass.
     expect(names).toEqual(
-      expect.arrayContaining(["ANTHROPIC_BASE_URL", "HTTPS_PROXY", "MISE_GLOBAL_CONFIG_FILE", "BASH_ENV", "CODEX_HOME", "T3FLARE_TOOL_HANDLE", "T3FLARE_MODEL_KEY_NONCE", "T3FLARE_MODEL_HANDLE", "T3FLARE_EXEC", "TERM", "HISTFILE", "PS1"]),
+      expect.arrayContaining(["ANTHROPIC_BASE_URL", "HTTPS_PROXY", "MISE_GLOBAL_CONFIG_FILE", "BASH_ENV", "CODEX_HOME", "T3FLARE_TOOL_HANDLE", "T3FLARE_MODEL_HANDLE", "T3FLARE_EXEC", "TERM", "HISTFILE", "PS1"]),
     );
     expect(names.filter((name) => variableNameProblem(name) === undefined)).toEqual([]);
   });

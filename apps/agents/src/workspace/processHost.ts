@@ -80,7 +80,7 @@ export interface ProcessHostDeps {
   readonly maxProcesses: number;
   /** Whether `cli: "probe"` may start (test stages). */
   readonly allowProbe: boolean;
-  /** Before a start: the profile's checks that need the Container (the sandbox probe, the key's nonce). */
+  /** Before a start: the profile's checks that need the Container (the sandbox probe), and env for the process. */
   readonly beforeStart?: (input: ProcessStartInput) => Promise<{ readonly env?: Readonly<Record<string, string>>; readonly sandbox?: boolean } | void>;
 }
 

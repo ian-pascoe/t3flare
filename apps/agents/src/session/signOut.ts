@@ -2,7 +2,7 @@
 // stops its live turns when they run on that endpoint. Which endpoint its turns run on is kept in the Session's own
 // storage at each turn's start, so the answer holds after either object restarts (the Environment keeps no such map).
 
-/** The provider (a Model endpoint's id, or `anthropic` for the Model proxy) of the model the Session's last turn ran on. */
+/** The provider (a Model endpoint's id) of the model the Session's last turn ran on. */
 export const TURN_PROVIDER_KEY = "t3flare:turn-provider";
 
 interface Kv {

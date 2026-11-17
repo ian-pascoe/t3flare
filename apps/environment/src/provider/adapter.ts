@@ -40,6 +40,7 @@ import * as Schedule from "effect/Schedule";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
+import { defaultModelSlug, EMPTY_ENDPOINTS, endpointSlug, findEndpointModel, isRetiredSlug, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
 import { toWorkspace } from "@t3flare/workspace-client";
 
 import { environmentServices } from "../agents/bindings.ts";
@@ -62,13 +63,29 @@ const ref = (nativeId: string, strength: "strong" | "weak" = "strong"): Orchestr
 
 const THINKING = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
-/** pi-ai's model and thinking level for a t3 model selection (`anthropic/claude-…` slugs, ADR-0012). */
-export const modelOf = (selection: ModelSelection): { readonly model: ModelRef; readonly thinking: ThinkingLevel | null } => {
-  const slug = selection.model === "default" ? "anthropic/claude-sonnet-5-5" : selection.model;
-  const slash = slug.indexOf("/");
-  const model = slash < 0 ? { provider: "anthropic", modelId: slug } : { provider: slug.slice(0, slash), modelId: slug.slice(slash + 1) };
+/**
+ * pi-ai's model and thinking level for a t3 model selection: a Model endpoint's slug, `<endpointId>/<modelId>`, as
+ * `{ provider: <endpointId>, modelId }` (ADR-0034 §2). A selection from before the hard cut (SPI-1176: t3's `default`, a
+ * bare id, the Model proxy's `anthropic/<id>`; `isRetiredSlug`) falls back to the default model (`defaultModelSlug`). With
+ * no endpoint to fall back to it is passed on as it is, and the Session refuses it as a model it does not have. A slug of
+ * an endpoint that is gone is passed on too: the turn fails saying so (SPI-1162).
+ */
+export const modelOf = (selection: ModelSelection, endpoints: ModelEndpoints): { readonly model: ModelRef; readonly thinking: ThinkingLevel | null } => {
+  const slug = isRetiredSlug(selection.model) ? (defaultModelSlug(endpoints) ?? selection.model) : selection.model;
+  const parsed = parseEndpointSlug(slug);
+  const model = parsed === undefined ? { provider: "", modelId: slug } : { provider: parsed.endpointId, modelId: parsed.modelId };
   const thinking = getModelSelectionStringOptionValue(selection, "thinking");
   return { model, thinking: thinking !== undefined && THINKING.has(thinking) ? (thinking as ThinkingLevel) : null };
+};
+
+/** The Model endpoints as stored now (none before the Environment binds them). */
+const endpointsNow = (): ModelEndpoints => environmentServices().modelEndpoints?.() ?? EMPTY_ENDPOINTS;
+
+/** A selection's endpoint model (its limits and inputs), after the fallback; undefined for one no endpoint lists. */
+const endpointModelOf = (selection: ModelSelection) => {
+  const endpoints = endpointsNow();
+  const { model } = modelOf(selection, endpoints);
+  return findEndpointModel(endpoints, endpointSlug(model.provider, model.modelId))?.model;
 };
 
 /** The Workspace id of a cwd under `/w/<id>` (ADR-0008), or null. */
@@ -313,7 +330,7 @@ export const makePiDurableAdapter = (
         readonly ownerNodeId?: OrchestrationV2ProviderThread["ownerNodeId"];
       }) {
         const at = yield* DateTime.now;
-        const { model, thinking } = modelOf(registerInput.modelSelection);
+        const { model, thinking } = modelOf(registerInput.modelSelection, endpointsNow());
         const credential = yield* t3Mcp;
         const linked = linkedWorkOf(registerInput.threadId);
         const opened = yield* call("open", () =>
@@ -372,7 +389,7 @@ export const makePiDurableAdapter = (
         canResumeAfterRestart: true,
         events: Stream.fromQueue(events),
         getModelContextWindow: (selection) =>
-          selection.instanceId !== instanceId ? undefined : environmentServices().catalog.find(modelOf(selection).model.provider + "/" + modelOf(selection).model.modelId)?.contextWindow,
+          selection.instanceId !== instanceId ? undefined : endpointModelOf(selection)?.contextWindow,
         ensureThread: (threadInput) =>
           register({
             threadId: threadInput.threadId,
@@ -418,9 +435,9 @@ export const makePiDurableAdapter = (
               startedAt,
               completedAt: null,
             };
-            const { model, thinking } = modelOf(turnInput.modelSelection);
-            const catalogModel = environmentServices().catalog.find(`${model.provider}/${model.modelId}`);
-            // A model the catalog does not list yet gets the images: pi-durable shows a text-only model a placeholder.
+            const { model, thinking } = modelOf(turnInput.modelSelection, endpointsNow());
+            const catalogModel = endpointModelOf(turnInput.modelSelection);
+            // A model no endpoint lists gets the images (its turn fails anyway): pi-durable shows a text-only model a placeholder.
             const acceptsImages = catalogModel === undefined || catalogModel.input.includes("image");
             const prompt = yield* turnPrompt(turnInput.message, { acceptsImages, reader: attachments, skills: threadSkills });
             const context: TurnContext = {

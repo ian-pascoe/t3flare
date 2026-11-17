@@ -79,14 +79,16 @@ import { backgroundJobs, TERMCTRL_EXTENSION, TERMCTRL_NAMESPACE, type TermctrlHo
 import { SKILLS_EXTENSION, skillsExtension } from "../extensions/skills.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
+import type { SearchTarget } from "../extensions/web/search.ts";
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
-import { modelCatalog, type ModelCatalog } from "@t3flare/models/catalog";
-import { proxyModels } from "./models.ts";
+import { NO_KEY, sessionModels } from "./models.ts";
+import { credentialFailure } from "./credentialFailure.ts";
+import { findEndpointModel, type ModelEndpoints, modelSettingSlug, SETUP_HINT } from "@t3flare/models/endpoints";
 import { SessionEndpoints } from "./endpoints.ts";
 import { noteTurnProvider, runsOn } from "./signOut.ts";
-import { SUGGESTION_MODEL, suggestPrompt } from "./promptSuggestion.ts";
-import { armFault, compactionLimits, type Fault, sessionLimits, type ProxyLimitsOptions, proxyLimits, recordingFetch } from "./proxyLimits.ts";
+import { suggestionModelOf, suggestPrompt } from "./promptSuggestion.ts";
+import { armFault, compactionLimits, type Fault, modelLimits, type ModelLimitsOptions, recordingFetch, sessionLimits } from "./modelLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
 import { FORK_PAGE_BYTES, forkPage, forkPoint, freshConversation, rewind, rollbackPlan, seed } from "./branches.ts";
 import { liveOf, pushedEntry, turnDetail, turnOfEntry, usageOf } from "./state.ts";
@@ -95,9 +97,7 @@ export interface SessionEnv {
   readonly ENVIRONMENT: DurableObjectNamespace;
   /** The Workspace DOs (this Worker's own): the agent's tools work on the thread's Workspace. */
   readonly WORKSPACES: DurableObjectNamespace;
-  readonly MODEL_PROXY_URL: string;
-  readonly MODEL_PROXY_API_KEY: string;
-  /** "1" on a test stage (never prod): the model proxy fault route is accepted. */
+  /** "1" on a test stage (never prod): the model fault route is accepted. */
   readonly T3FLARE_FAULTS?: string;
   /** Overrides TURN_DEADLINE_MS (tests and the stage's deadline check). */
   readonly T3FLARE_TURN_DEADLINE_MS?: string;
@@ -116,8 +116,7 @@ const PUSHED_KEY = "t3flare:pushed-entry";
 const RETRY_KEY = "t3flare:push-retry";
 const LAST_PUSH_KEY = "t3flare:last-push";
 const DIAG_KEY = "t3flare:diagnostics";
-const CATALOG_KEY = "t3flare:model-catalog";
-/** Each turn's model proxy record (requests, last failure), apart from the turns so no turn write can lose one. */
+/** Each turn's model record (requests, last failure), apart from the turns so no turn write can lose one. */
 const PROXY_KEY = "t3flare:proxy";
 /**
  * t3's MCP credential for this thread's provider session (step 3, ADR-0022): this object's storage only, never a push,
@@ -135,7 +134,7 @@ const MCP_CHUNK_CHARS = 100_000;
 const TERMCTRL_USED_KEY = "t3flare:termctrl-used";
 /** How long a turn's start waits for the Environment's harness settings before it keeps the ones it has. */
 const HARNESS_READ_MS = 5_000;
-/** A test's model proxy fault (stages only). */
+/** A test's model fault (stages only). */
 const FAULT_KEY = "t3flare:proxy-fault";
 /** The most a Stop (or the object's start) waits for an aborted command's processes to be killed. */
 const KILL_BOUND_MS = 3_000;
@@ -178,12 +177,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #questions: QuestionStore;
   /** MCP servers' questions during the Session's calls (SPI-1079): in memory, never stored. */
   readonly #mcpQuestions: McpQuestions;
-  /** The proxy's model list (ADR-0012), kept in this object's storage and read again when it is old. */
-  readonly #catalog: ModelCatalog;
-  /** Every model request's fetch: the proxy's answers recorded, a test fault answered (`proxyLimits.ts`). */
-  readonly #proxyFetch: typeof fetch;
+  /** Every model request's fetch: the answers recorded, a test fault answered (`modelLimits.ts`). */
+  readonly #modelFetch: typeof fetch;
   /** How a failed model answer is classified and recorded: by generation's hook and by compaction's models. */
-  readonly #limits: ProxyLimitsOptions;
+  readonly #limits: ModelLimitsOptions;
   /** The Container commands running, kept so an aborted one's processes are killed, even after a restart. */
   readonly #execs: RunningExecs;
   /** t3's `/mcp`, through the Environment DO (step 3). */
@@ -191,19 +188,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
   readonly #registryWriter: ReturnType<typeof createRegistry>;
   /** The Advisor (SPI-1059), while the harness settings turn it on; one per object, so a Review under way survives a settings read. */
   #advisor: AdvisorObserver | undefined;
-  /** The Session's models: the proxy's provider and one per Model endpoint (SPI-1162), changed in place as they change. */
-  readonly #models: ReturnType<typeof proxyModels>;
+  /** The Session's models: one provider per Model endpoint (SPI-1162), changed in place as they change. */
+  readonly #models: ReturnType<typeof sessionModels>;
   /** The Model endpoints' providers in `#models`, their keys in memory only (SPI-1162, `endpoints.ts`). */
   readonly #endpoints: SessionEndpoints;
-  /** Prompt suggestions' models (SPI-996): the proxy without the turns' usage-limit records; made at the first one. */
-  #suggestionModels: ReturnType<typeof proxyModels> | undefined;
 
   constructor(ctx: DurableObjectState, env: SessionEnv) {
     super(ctx, env);
-    this.#catalog = modelCatalog({
-      proxy: { url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY },
-      store: { read: () => ctx.storage.kv.get(CATALOG_KEY), write: (catalog) => ctx.storage.kv.put(CATALOG_KEY, catalog) },
-    });
     this.#approvals = new ApprovalStore(ctx.storage.kv, () => this.#schedulePush(0));
     this.#questions = new QuestionStore(ctx.storage.kv, () => this.#schedulePush(0));
     this.#mcpQuestions = new McpQuestions(() => this.#schedulePush(0));
@@ -214,13 +205,12 @@ export class SessionDO extends DurableObject<SessionEnv> {
       now: () => Date.now(),
       onRequest: () => this.#noteProxy((record) => ({ ...record, requests: record.requests + 1 })),
     });
-    this.#proxyFetch = recorder.fetch;
+    this.#modelFetch = recorder.fetch;
     this.#execs = new RunningExecs(ctx.storage.kv, (ids) => this.#killExecs(ids));
     const registry = createRegistry();
-    // The turn's last failed answer wins: a proxy failure clears an endpoint's, and an endpoint's clears the proxy's.
-    // SPI-1172: each failed answer replaces the turn's record; a Model endpoint's is classified by its API and auth.
-    this.#limits = sessionLimits({ last: recorder.last, note: (update) => this.#noteProxy(update), endpoints: { endpoint: (id) => this.#endpoints.endpoint(id), secrets: (id) => this.#endpoints.secrets(id) }, proxyKey: env.MODEL_PROXY_API_KEY });
-    registry.install(proxyLimits(this.#limits));
+    // SPI-1172: each failed answer replaces the turn's record, classified by its Model endpoint's API and auth.
+    this.#limits = sessionLimits({ last: recorder.last, note: (update) => this.#noteProxy(update), endpoints: { endpoint: (id) => this.#endpoints.endpoint(id), secrets: (id) => this.#endpoints.secrets(id) } });
+    registry.install(modelLimits(this.#limits));
     registry.install(codingTools());
     registry.install(fileTools(() => this.#files()));
     registry.install(projectContext(REPO_ROOT));
@@ -251,12 +241,12 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (mcp !== undefined) registry.install(this.#mcpExtension(mcp));
     this.#installHarness(ctx.storage.kv.get<ResolvedHarness>(HARNESS_KEY) ?? resolveHarness(EMPTY_HARNESS));
     this.#registry = registry;
-    this.#models = compactionLimits(proxyModels({ url: env.MODEL_PROXY_URL, apiKey: env.MODEL_PROXY_API_KEY }, () => this.#catalog.current(), this.#proxyFetch), this.#limits);
+    this.#models = compactionLimits(sessionModels(), this.#limits);
     this.#endpoints = new SessionEndpoints({
       kv: ctx.storage.kv,
       models: this.#models,
       source: () => environmentStub(env.ENVIRONMENT),
-      fetch: this.#proxyFetch,
+      fetch: this.#modelFetch,
       readMs: HARNESS_READ_MS,
       // SPI-1164: why the running turn's request got no credential, typed, for the differ.
       onCredential: (failure) =>
@@ -278,8 +268,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
           const fallback = Date.now() + HEARTBEAT_MS;
           const current = await ctx.storage.getAlarm();
           if (current === null || current > fallback) await ctx.storage.setAlarm(fallback);
-          // The proxy's list before the Harness opens, so a model it added is there for a resumed turn; bounded, never throws.
-          await this.#catalog.refresh();
           const storage = await openDurableObjectSqliteStorage(ctx.storage, { prefix: "pi_" });
           const harness = await Harness.open(
             storage,
@@ -364,6 +352,25 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // Harness settings (ADR-0026): code mode, tool search and the offered tools, taken at a turn's start
 
   /**
+   * Where `web_search` searches now (SPI-1176): the search model setting's slug among the Anthropic Messages endpoints
+   * with an API key or no auth (a sign-in's token is not sent outside the Session's own pi-ai requests), `default` their
+   * small model, with the endpoint's key asked for at use time as a turn's is. Or why it cannot search.
+   */
+  async #searchTarget(setting: string): Promise<SearchTarget | { readonly error: string }> {
+    const held = this.#endpoints.current();
+    const usable: ModelEndpoints = { ...held, endpoints: held.endpoints.filter((endpoint) => endpoint.api === "anthropic-messages" && (endpoint.auth === "api-key" || endpoint.auth === "none")) };
+    const slug = modelSettingSlug(setting, usable);
+    if (slug === undefined) return { error: `no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with: ${SETUP_HINT}` };
+    const found = findEndpointModel(usable, slug);
+    if (found === undefined) return { error: `the search model ${slug} is not a model of an Anthropic Messages Model endpoint with an API key or no auth (the Harness panel's Web tools)` };
+    const { endpoint, model } = found;
+    if (endpoint.auth === "none") return { baseUrl: endpoint.baseUrl, headers: endpoint.headers, apiKey: NO_KEY, slug, modelId: model.id };
+    const credential = await this.#endpoints.credential(endpoint);
+    if (credential.apiKey === null) return { error: credentialFailure(endpoint, credential).message };
+    return { baseUrl: endpoint.baseUrl, headers: endpoint.headers, apiKey: credential.apiKey, slug, modelId: model.id };
+  }
+
+  /**
    * Installs (or removes) the switchable extensions (web, SPI-1054; todo, SPI-1055; context, SPI-1056), then code mode and tool search, as `harness` says:
    * code mode's namespaces and tool search's deferral cover the tools installed before them. pi-durable applies it from
    * the next phase.
@@ -376,7 +383,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       const searchModel = String(web.settings.searchModel);
       registry.install(
         webExtension(
-          web.settings.search === true ? { search: { url: this.env.MODEL_PROXY_URL, apiKey: this.env.MODEL_PROXY_API_KEY, model: () => searchModel } } : {},
+          web.settings.search === true ? { search: { resolve: () => this.#searchTarget(searchModel) } } : {},
         ),
       );
       namespaces.push(WEB_NAMESPACE);
@@ -408,6 +415,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
             toToolPath: (text) => toToolPath(text, this.#meta()?.workspaceId ?? null),
             readOnly: (name) => this.#readOnlyTool(name),
             sessionId: () => this.ctx.id.name ?? this.ctx.id.toString(),
+            model: (setting) => modelSettingSlug(setting, this.#endpoints.current()),
           },
           {
             model: String(guardian.settings.model),
@@ -600,14 +608,14 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.ctx.storage.kv.put(TURNS_KEY, turns);
   }
 
-  /** The turns with their model proxy records. */
+  /** The turns with their model records (`ProxyRecord`, the wire name from the Model proxy's time). */
   #turnsWithProxy(): Turns {
     const turns = this.#turns();
     const proxy = this.ctx.storage.kv.get<Record<string, ProxyRecord>>(PROXY_KEY) ?? {};
     return Object.fromEntries(Object.entries(turns).map(([id, turn]) => [id, proxy[id] === undefined ? turn : { ...turn, proxy: proxy[id] }]));
   }
 
-  /** Updates the model proxy record of the turn running now: the live turn started first (a follow-up waits for it). */
+  /** Updates the model record of the turn running now: the live turn started first (a follow-up waits for it). */
   #noteProxy(update: (record: ProxyRecord) => ProxyRecord): void {
     const running = Object.entries(this.#turns())
       .filter(([, turn]) => isLive(turn))
@@ -797,8 +805,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
     // SPI-1148: the turn's Environment skill set, in the Workspace before the agent runs (bounded; never fails the turn).
     await takeSkillsForTurn(input.environmentSkillsHash, this.#skillsTaker());
     await this.#takeMcp();
-    // A model the kept list lacks may be one the proxy has added since: read its list again (once a minute at most).
-    if (input.model.provider === "anthropic" && this.#catalog.find(`${input.model.provider}/${input.model.modelId}`) === undefined) await this.#catalog.refresh({ force: true });
     const conversation = await this.#conversation(input.model, input.thinking);
     await conversation.configure({ model: input.model, thinkingLevel: input.thinking ?? null }, context);
     // SPI-1164: kept in storage, so a sign-out of this endpoint stops the turn even after a restart of either object.
@@ -931,10 +937,11 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const newest = await conversation.entries({ minEntryId: Number(turn.inputEntry) as never, order: "descending" }, 20, undefined, context);
     const answer = newest.items.map(textOf).find((entry) => entry.role === "assistant" && entry.text.trim() !== "");
     if (user === "" || user.role !== "user" || answer === undefined) return { text: "" };
-    this.#suggestionModels ??= proxyModels({ url: this.env.MODEL_PROXY_URL, apiKey: this.env.MODEL_PROXY_API_KEY }, () => this.#catalog.current());
-    const model = this.#suggestionModels.getModel("anthropic", SUGGESTION_MODEL) ?? this.#suggestionModels.getModels().find((candidate) => candidate.id === SUGGESTION_MODEL);
+    const models = this.#endpoints.sideModels();
+    const ref = suggestionModelOf(this.#endpoints.current());
+    const model = ref === undefined ? undefined : models.getModel(ref.provider, ref.modelId);
     if (model === undefined) return { text: "" };
-    const text = await suggestPrompt(this.#suggestionModels, model, user.text, answer.text);
+    const text = await suggestPrompt(models, model, user.text, answer.text);
     console.log(JSON.stringify({ t3flare: "prompt-suggestion", suggested: text !== "" }));
     return { text };
   }
@@ -953,7 +960,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
    * G6 (SPI-987): t3's checkpoint rollback. Refused while a turn is live (t3 refuses it too). The conversation goes back to
    * just before the first dropped turn the Session placed: a fork at the entry before it (its documents, code mode's
    * `store` among them, as they were there), or a fresh conversation at the thread's start. The old conversation is
-   * aborted and kept as history; the dropped turns, their proxy records and any request they left are forgotten. A
+   * aborted and kept as history; the dropped turns, their model records and any request they left are forgotten. A
    * repeated call finds nothing to drop and changes nothing.
    */
   async rollback(input: RollbackInput): Promise<RollbackAnswer> {
@@ -1051,7 +1058,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   /**
    * A test's fault, on a stage only (`T3FLARE_FAULTS`): every model request is answered with `fixture` until `resetAt`,
-   * in the proxy's place (`proxyLimits.ts`). Refused on prod.
+   * in the endpoint's place (`modelLimits.ts`). Refused on prod. (The route's name, `proxy-fault`, is the Model proxy's.)
    */
   proxyFault(input: { readonly fixture: string; readonly resetAt: number }): Promise<{ readonly armed: Fault }> {
     const armed = armFault(this.env.T3FLARE_FAULTS, input);

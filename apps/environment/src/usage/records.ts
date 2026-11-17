@@ -1,6 +1,8 @@
 // t3flare's own usage records (SPI-1173), kept in the Environment DO's SQLite: what the Sessions, text generation and the
 // model relay record of each model answer on a Model endpoint (`@t3flare/models/usage`, through `recordUsage`), served
-// to t3's Usage page by our scan readers (`readers.ts`), beside Commissary's request log until the hard cut (SPI-1176).
+// to t3's Usage page by our scan readers (`readers.ts`). Every endpoint's answers are counted here, Commissary's
+// included: Commissary's own request log was read beside these until the hard cut (SPI-1176), and the records of the
+// endpoints it counted were dropped then.
 //
 // Rolled up as they are written: one row per quarter hour, agent, endpoint, model, session and whether the cost is
 // known, its counts the sum of the answers'. The Usage page buckets by hour at the finest, so a quarter hour loses
@@ -18,7 +20,7 @@ import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import type { UsageProviderKind } from "@t3tools/contracts";
 import type { UsageRecord } from "@t3tools/provider-core/server/usage";
 import type { EndpointModel, EndpointModelCost, ModelEndpoints } from "@t3flare/models/endpoints";
-import { type UsageAgent, usageEntryOf, type UsageTokens } from "@t3flare/models/usage";
+import { MAX_USAGE_ENTRIES, type UsageAgent, usageEntryOf, type UsageTokens } from "@t3flare/models/usage";
 
 export const USAGE_SLOT_MS = 15 * 60 * 1000;
 export const USAGE_RETENTION_DAYS = 92;
@@ -186,3 +188,11 @@ export const usageRecordOfRow = (row: StoredUsage): UsageRecord => ({
   speed: "standard",
   dedupeKey: null,
 });
+
+/** What the `recordUsage` RPC keeps (`EnvironmentDO.recordUsage`): at most `MAX_USAGE_ENTRIES` valid entries, the rest dropped. */
+export const acceptUsage = (input: unknown, deps: { readonly store: UsageStore; readonly endpoints: ModelEndpoints; readonly now: () => number }): { readonly kept: number } => {
+  const raw = typeof input === "object" && input !== null ? (input as { readonly entries?: unknown }).entries : undefined;
+  const entries = (Array.isArray(raw) ? raw.slice(0, MAX_USAGE_ENTRIES) : []).flatMap((value: unknown) => usageEntryOf(value) ?? []);
+  if (entries.length === 0) return { kept: 0 };
+  return { kept: deps.store.record(entries, deps.endpoints, deps.now()) };
+};

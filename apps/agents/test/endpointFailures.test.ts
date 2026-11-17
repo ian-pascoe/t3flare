@@ -10,13 +10,13 @@ import { createModels, isRetryableAssistantError } from "@earendil-works/pi-ai";
 import { createRegistry, Harness, MemoryStorage } from "@earendil-works/pi-durable";
 import type { ModelEndpoint } from "@t3flare/models/endpoints";
 import { ERROR_BODY_BYTES, type ModelFailureCode, modelFailureDetail } from "@t3flare/models/failures";
-import type { EndpointFailureRecord, ProxyFailureRecord, ProxyRecord } from "@t3flare/session-protocol";
+import type { EndpointFailureRecord, ProxyRecord } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
 import fixtures from "../../../packages/models/test/fixtures/vendors.json" with { type: "json" };
 import { SessionEndpoints } from "../src/session/endpoints.ts";
 import { liveOf, pushedEntry, turnDetail } from "../src/session/state.ts";
-import { armFault, compactionLimits, sessionLimits, type Fault, FAULT_ECHOED_SECRETS, FAULT_FIXTURES, faultAnswer, proxyLimits, recordingFetch } from "../src/session/proxyLimits.ts";
+import { armFault, compactionLimits, sessionLimits, type Fault, FAULT_ECHOED_SECRETS, FAULT_FIXTURES, faultAnswer, modelLimits, recordingFetch } from "../src/session/modelLimits.ts";
 
 const context = BACKGROUND_CONTEXT;
 const T0 = Date.parse(fixtures.now);
@@ -69,7 +69,6 @@ const openSession = async (
   let requests = 0;
   // Every failed answer's record, `undefined` where it cleared the record (an answer the table does not know).
   const records: Array<EndpointFailureRecord | undefined> = [];
-  const proxyRecords: Array<ProxyFailureRecord | undefined> = [];
   let stored = options.fault;
   const recorder = recordingFetch({
     fetch: (async (input: RequestInfo | URL) => {
@@ -101,7 +100,6 @@ const openSession = async (
   });
   const limits = {
     last: recorder.last,
-    record: (failure: ProxyFailureRecord | undefined) => void proxyRecords.push(failure),
     // A test may move the endpoint's base URL away from where its requests go (the answers are then not its).
     endpoint: (id: string) => {
       const endpoint = session.endpoint(id);
@@ -112,12 +110,12 @@ const openSession = async (
   };
   compactionLimits(models, limits);
   const registry = createRegistry();
-  registry.install(proxyLimits(limits));
+  registry.install(modelLimits(limits));
   const harness = await Harness.open(new MemoryStorage(), { models, registry, settings: { retry: { enabled: true, maxRetries: 3, baseDelayMs: 1 }, compaction: { keepRecentTokens: 1 } } }, context);
   const root = await harness.root(context, { agent: { model: { provider: on.id, modelId: model.id } } });
   harness.resume();
   return {
-    counts: () => ({ requests, sentTo, records, proxyRecords }),
+    counts: () => ({ requests, sentTo, records }),
     tick: (ms: number) => void (now += ms),
     submit: async () => {
       const submission = await root.submit({ type: "input", content: "hi" }, context);
@@ -150,9 +148,8 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
     expect(run.records).toEqual([
       { endpointId: "claude", class: "usage_limit", code: "usage_limit", message: 'The Model endpoint "claude" reached its usage limit.', retryable: true, resetAt: T0 + 2 * 3_600_000, stop: true, at: T0 },
     ]);
-    // Never another endpoint, nor the proxy's classifier.
+    // Never another endpoint.
     expect([...run.sentTo.keys()]).toEqual(["claude.example"]);
-    expect(run.proxyRecords).toEqual([]);
   });
 
   it("a refused key: one request, a permission error naming the endpoint", async () => {
@@ -341,7 +338,7 @@ describe("the fault route's vendor shapes (SPI-1172)", () => {
       const run = await submit(() => okAnswer(), { on, fault: { fixture, resetAt: T0 + 60_000 } });
       expect(run.records.at(-1)?.code, fixture).toBe(code);
     }
-    expect(faultAnswer({ fixture: "anthropicUsageLimit", resetAt: T0 + 60_000 }, T0, "m").headers.get("anthropic-ratelimit-unified-status")).toBe("rejected");
+    expect(faultAnswer({ fixture: "anthropicUsageLimit", resetAt: T0 + 60_000 }, T0).headers.get("anthropic-ratelimit-unified-status")).toBe("rejected");
   });
 });
 
@@ -364,7 +361,6 @@ describe("what the Session pushes is redacted (SPI-1172)", () => {
 });
 
 describe("the Session's record of a turn's failures (sessionLimits, SPI-1172 review 2)", () => {
-  const proxyFailure = { class: "provider_error" as const, code: "proxy_overloaded", row: 9, stop: false, at: 1 };
   const endpointFailure = { endpointId: "claude", class: "provider_error" as const, code: "overloaded", message: "m", retryable: true, stop: false, at: 2 };
   const session = () => {
     let record: ProxyRecord = { requests: 3 };
@@ -372,32 +368,23 @@ describe("the Session's record of a turn's failures (sessionLimits, SPI-1172 rev
       last: () => undefined,
       note: (update) => void (record = update(record)),
       endpoints: { endpoint: (id) => (id === "claude" ? CLAUDE : undefined), secrets: (id) => (id === "claude" ? ["claude-key-held-now"] : []) },
-      proxyKey: "proxy-key-of-the-stage",
     });
     return { options, record: () => record };
   };
 
-  it("each failed answer replaces the record: an endpoint's clears the proxy's, and undefined clears both", () => {
+  it("each failed answer replaces the record, and undefined clears it", () => {
     const s = session();
-    s.options.record(proxyFailure);
-    expect(s.record()).toEqual({ requests: 3, failure: proxyFailure });
-    s.options.recordEndpoint?.(endpointFailure);
+    s.options.recordEndpoint(endpointFailure);
     expect(s.record()).toEqual({ requests: 3, endpointFailure });
-    s.options.recordEndpoint?.(undefined);
-    expect(s.record()).toEqual({ requests: 3 });
-    s.options.recordEndpoint?.(endpointFailure);
-    s.options.record(undefined);
-    expect(s.record()).toEqual({ requests: 3 });
-    s.options.record(proxyFailure);
-    s.options.record(undefined);
+    s.options.recordEndpoint(undefined);
     expect(s.record()).toEqual({ requests: 3 });
   });
 
-  it("names a provider's endpoint and credentials: the proxy's key for anthropic, the held one for an endpoint", () => {
+  it("names a provider's endpoint and the credentials held for it; the retired proxy's anthropic is no endpoint and holds none", () => {
     const s = session();
-    expect(s.options.endpoint?.("claude")).toBe(CLAUDE);
-    expect(s.options.endpoint?.("anthropic")).toBeUndefined();
-    expect(s.options.secrets?.("anthropic")).toEqual(["proxy-key-of-the-stage"]);
-    expect(s.options.secrets?.("claude")).toEqual(["claude-key-held-now"]);
+    expect(s.options.endpoint("claude")).toBe(CLAUDE);
+    expect(s.options.endpoint("anthropic")).toBeUndefined();
+    expect(s.options.secrets("anthropic")).toEqual([]);
+    expect(s.options.secrets("claude")).toEqual(["claude-key-held-now"]);
   });
 });

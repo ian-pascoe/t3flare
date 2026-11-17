@@ -2,8 +2,8 @@
 // computer's `WorkspaceProxy` (the Container's egress back to its Workspace DO, `ctx.exports.WorkspaceProxy`) with more
 // paths, which computer's proxy answers 404 (it forwards only `/api` and its connect callbacks):
 //
-// - the git credential helper's token request (`CREDENTIAL_PATH`, ADR-0013) and the CLI agents' key helper
-//   (`MODEL_KEY_PATH`, step 4a), passed to the Workspace DO as a bodiless GET (only the key helper's nonce header);
+// - the git credential helper's token request (`CREDENTIAL_PATH`, ADR-0013), passed to the Workspace DO as a bodiless GET
+//   (the Model proxy's key helper route, `/t3flare/model-key`, went at the hard cut, SPI-1176: it answers 404);
 // - the CLI agents' MCP relay (`/t3flare/mcp/<server>`, ADR-0028): one MCP message per request, with the process's
 //   tool handle, to the Workspace DO and on to the Environment DO;
 // - the CLI agents' model relay (`/t3flare/model/<endpointId>/…`, SPI-1167): the Workspace DO checks the process's model
@@ -17,7 +17,7 @@ import { WorkspaceProxy as ComputerWorkspaceProxy } from "@cloudflare/computer";
 import { environmentStub, limitsSender, usageSender } from "./environment.ts";
 import { handleRelayRequest, isRelayPath } from "./workspace/mcpRelay.ts";
 import { handleModelRelay, isModelRelayPath, workspaceRelayDeps } from "./workspace/modelRelay.ts";
-import { CREDENTIAL_PATH, MODEL_KEY_PATH, type WorkspaceDO } from "./workspace/WorkspaceDO.ts";
+import { CREDENTIAL_PATH, type WorkspaceDO } from "./workspace/WorkspaceDO.ts";
 
 interface ProxyProps {
   readonly binding: string;
@@ -30,7 +30,7 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
     const pathname = new URL(request.url).pathname;
     const relay = isRelayPath(pathname);
     const modelRelay = isModelRelayPath(pathname);
-    if (pathname !== CREDENTIAL_PATH && pathname !== MODEL_KEY_PATH && !relay && !modelRelay) return super.fetch(request);
+    if (pathname !== CREDENTIAL_PATH && !relay && !modelRelay) return super.fetch(request);
     const { binding, id, name } = (this.ctx as unknown as { props: ProxyProps }).props;
     const namespace = (this.env as Record<string, DurableObjectNamespace | undefined>)[binding];
     if (namespace === undefined) return new Response("", { status: 500 });
@@ -71,7 +71,6 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
         return new Response("t3flare: the MCP relay failed\n", { status: 502 });
       });
     }
-    const nonce = request.headers.get("x-t3flare-nonce");
-    return workspace.fetch(new Request(request.url, { method: "GET", ...(nonce === null ? {} : { headers: { "x-t3flare-nonce": nonce } }) }));
+    return workspace.fetch(new Request(request.url, { method: "GET" }));
   }
 }

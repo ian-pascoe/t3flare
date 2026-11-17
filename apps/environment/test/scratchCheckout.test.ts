@@ -116,17 +116,32 @@ describe("a review guide's scratch checkout", () => {
 });
 
 describe("Codex's investigation (`codex exec`)", () => {
-  const context = { proxyUrl: "https://proxy.example", models: [], readStateFile: (path: string) => (path === "/t3/state/tmp/schema" ? '{"type":"object"}' : undefined), piExtensionSource: "" };
+  const endpoints = [{ id: "openai", label: "OpenAI", models: [{ id: "gpt-5-mini" }] }];
+  const context = { endpoints, readStateFile: (path: string) => (path === "/t3/state/tmp/schema" ? '{"type":"object"}' : undefined), piExtensionSource: "" };
   const launch = (args: ReadonlyArray<string>) => profileLaunch({ cli: "codex", args, key: "proc-1", cwd: "/w/.wt/review-guide-x/checkout", env: {}, allowProbe: false }, context);
 
-  it("runs read-only, never asking, with the schema copied into its home", () => {
-    const answer = launch(codexExecArgs("gpt-6-luna", "/t3/state/tmp/schema"));
+  it("runs read-only, never asking, with the schema copied into its home, on its model's endpoint through the relay", () => {
+    const answer = launch(codexExecArgs("openai/gpt-5-mini", "/t3/state/tmp/schema"));
     if ("refused" in answer) throw new Error(answer.refused);
-    expect(answer.argv.slice(-11)).toEqual(["exec", "--json", "--ephemeral", "--skip-git-repo-check", "-s", "read-only", "--model", "gpt-6-luna", "--output-schema", "/var/lib/t3flare/cli/proc-1/output-schema.json", "-"]);
+    // Codex names the model by its own id, on its endpoint's provider (SPI-1176: the investigation runs on the relay).
+    expect(answer.argv.slice(-11)).toEqual(["exec", "--json", "--ephemeral", "--skip-git-repo-check", "-s", "read-only", "--model", "gpt-5-mini", "--output-schema", "/var/lib/t3flare/cli/proc-1/output-schema.json", "-"]);
+    expect(answer.argv).toContain('model_provider="t3flare-endpoint-openai"');
+    expect(answer.modelRelay).toEqual(["openai"]);
+    // A model from before the hard cut runs on the default model.
+    const old = launch(codexExecArgs("gpt-6-luna", "/t3/state/tmp/schema"));
+    expect("refused" in old ? old.refused : old.argv.slice(-4, -3)).toEqual(["gpt-5-mini"]);
     expect(answer.argv).toContain('approval_policy="never"');
     expect(answer.argv.filter((arg) => arg.startsWith("approval_policy=") || arg.startsWith("sandbox_mode="))).toEqual(['approval_policy="never"']);
     expect(answer.argv.some((arg) => arg.startsWith("mcp_servers."))).toBe(false);
     expect(answer.files).toContainEqual({ path: "/var/lib/t3flare/cli/proc-1/output-schema.json", text: '{"type":"object"}' });
+  });
+
+  it("is refused without an OpenAI Responses endpoint, saying so (SPI-1176)", () => {
+    const answer = profileLaunch(
+      { cli: "codex", args: codexExecArgs("gpt-6-luna", "/t3/state/tmp/schema"), key: "proc-1", cwd: "/w/.wt/review-guide-x/checkout", env: {}, allowProbe: false },
+      { readStateFile: context.readStateFile, piExtensionSource: "" },
+    );
+    expect(answer).toHaveProperty("refused", expect.stringMatching(/^Codex has no Model endpoint to run on/));
   });
 
   it("refuses any other exec", () => {

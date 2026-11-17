@@ -1,14 +1,15 @@
 // Adapted from cloudpid@93ba45a3:packages/extensions/src/web/search.ts (SPI-1054; see ./NOTICE.md): `web_search`, with
 // cloudpid's parameters, budget and sanitizing. The provider differs. cloudpid asks Exa or Parallel with keys the deploy
-// holds; t3flare holds neither and adds no owner secret (ADR-0016), so it asks a search-capable model through the model
-// proxy (Commissary) with the key the agents Worker already holds (`MODEL_PROXY_API_KEY`, never in a Container). The
-// request is an Anthropic Messages call with the server-side `web_search` tool: Commissary passes it to a Claude
-// upstream or translates it to a Codex upstream's `web_search` (commissary `translator/codex/claude/request.ts`), and
-// answers with `web_search_tool_result` blocks either way. The results are written in Exa's `Title:`/`URL:` shape so
-// cloudpid's budget applies (`shaping.ts`), followed by the model's cited summary.
+// holds; t3flare holds neither and adds no owner secret (ADR-0016), so it asks a search-capable model on one of the
+// owner's Model endpoints (SPI-1176; until the hard cut, the Model proxy) with the endpoint's own key, which the Session
+// asks the Environment for at use time and never stores (ADR-0034 §4). The request is an Anthropic Messages call with
+// the server-side `web_search` tool, so the endpoint is an Anthropic Messages one with an API key or no auth whose
+// server takes that tool (Anthropic's API; Commissary passes it to a Claude upstream or translates it to a Codex
+// upstream's `web_search`), and it answers with `web_search_tool_result` blocks. The results are written in Exa's
+// `Title:`/`URL:` shape so cloudpid's budget applies (`shaping.ts`), followed by the model's cited summary.
 //
-// A search spends a model request on the proxy, so the harness setting keeps `web_search` off until the owner turns it
-// on (the registry's `web.search`).
+// A search spends a model request on the endpoint, so the harness setting keeps `web_search` off until the owner turns
+// it on (the registry's `web.search`).
 // @effect-diagnostics asyncFunction:off
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
 import { int, obj, opt, str } from "@earendil-works/pi-schema";
@@ -28,12 +29,19 @@ const MAX_SUMMARY_TOKENS = 1_500;
 /** Total request budget, including reading the response: a model that searches takes longer than a search API. */
 export const WEB_SEARCH_TIMEOUT_MS = 90_000;
 
-/** The model proxy, as the agents Worker reaches it (ADR-0012). */
-export interface SearchProxy {
-  readonly url: string;
+/** Where one search goes: an Anthropic Messages endpoint's base URL, headers and key, and the model's slug and own id. */
+export interface SearchTarget {
+  readonly baseUrl: string;
+  readonly headers: Readonly<Record<string, string>>;
   readonly apiKey: string;
-  /** The model that searches (the harness setting `web.searchModel`). */
-  readonly model: () => string;
+  /** `<endpointId>/<modelId>`, as `structuredOutput.provider` names it. */
+  readonly slug: string;
+  readonly modelId: string;
+}
+
+/** The search model (the harness setting `web.searchModel`) resolved at each search, or why it cannot search. */
+export interface SearchEndpoint {
+  readonly resolve: () => Promise<SearchTarget | { readonly error: string }>;
 }
 
 const DESCRIPTION =
@@ -45,7 +53,7 @@ const SYSTEM =
 const OUTPUT_SCHEMA = {
   type: "object",
   properties: {
-    provider: { type: "string", description: "Who searched: the model proxy's search-capable model" },
+    provider: { type: "string", description: "Who searched: the Model endpoint's search-capable model" },
     content: { type: "string", description: "The results and summary, trimmed to numResults and cut at contextMaxCharacters (default 6,000)" },
     results: {
       type: "array",
@@ -133,8 +141,8 @@ const usageOf = (usage: Json | undefined) => {
   return { input, output, cacheRead, cacheWrite, totalTokens: input + output + cacheRead + cacheWrite, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 };
 
-/** `web_search` through `proxy`'s search-capable model, over `transport`. */
-export const webSearchTool = (transport: WebTransport, proxy: SearchProxy): ToolRegistration =>
+/** `web_search` through a Model endpoint's search-capable model (`search`), over `transport`. */
+export const webSearchTool = (transport: WebTransport, search: SearchEndpoint): ToolRegistration =>
   defineTool({
     name: "web_search",
     description: DESCRIPTION,
@@ -154,18 +162,19 @@ export const webSearchTool = (transport: WebTransport, proxy: SearchProxy): Tool
     replay: "safe",
     async execute(args, _api, context) {
       if (args.query.trim() === "") throw new Error("Unable to search the web: query is empty (provide the text to search the web for)");
-      const sanitize = providerTextSanitizer([proxy.apiKey]);
-      const model = proxy.model();
+      const target = await search.resolve();
+      if ("error" in target) throw new Error(`Unable to search the web for ${args.query}: ${target.error}`);
+      const sanitize = providerTextSanitizer([target.apiKey]);
       let read: ReturnType<typeof readAnswer>;
       try {
         read = await withDeadline(WEB_SEARCH_TIMEOUT_MS, "90 seconds", context.abortSignal, async (signal) => {
           const response = await transport(
             {
-              url: `${proxy.url.replace(/\/+$/, "")}/v1/messages`,
+              url: `${target.baseUrl.replace(/\/+$/, "")}/v1/messages`,
               method: "POST",
-              headers: { "content-type": "application/json", "x-api-key": proxy.apiKey, "anthropic-version": "2023-06-01" },
+              headers: { ...target.headers, "content-type": "application/json", "x-api-key": target.apiKey, "anthropic-version": "2023-06-01" },
               body: JSON.stringify({
-                model,
+                model: target.modelId,
                 max_tokens: MAX_SUMMARY_TOKENS,
                 system: SYSTEM,
                 messages: [{ role: "user", content: truncateCodePoints(args.query, 4_096) }],
@@ -179,7 +188,7 @@ export const webSearchTool = (transport: WebTransport, proxy: SearchProxy): Tool
           try {
             parsed = JSON.parse(body);
           } catch {
-            throw new WebToolError(response.ok ? "the model proxy returned an unrecognized response" : statusCause(response.status));
+            throw new WebToolError(response.ok ? "the Model endpoint returned an unrecognized response" : statusCause(response.status));
           }
           if (!response.ok) {
             const message = text(record(record(parsed).error).message);
@@ -197,9 +206,9 @@ export const webSearchTool = (transport: WebTransport, proxy: SearchProxy): Tool
       const usage = usageOf(read.usage);
       return {
         output: [{ type: "text" as const, text: fitted.content }],
-        structuredOutput: { provider: `model-proxy:${model}`, content, results: results.map(({ snippet: _snippet, ...page }) => page) },
+        structuredOutput: { provider: `model-endpoint:${target.slug}`, content, results: results.map(({ snippet: _snippet, ...page }) => page) },
         // What t3's web item shows (the differ): the query and each page found.
-        details: { provider: `model-proxy:${model}`, query: args.query, results: results.map((page) => ({ ...page, ...(page.snippet === undefined ? {} : { snippet: page.snippet.slice(0, 300) }) })) },
+        details: { provider: `model-endpoint:${target.slug}`, query: args.query, results: results.map((page) => ({ ...page, ...(page.snippet === undefined ? {} : { snippet: page.snippet.slice(0, 300) }) })) },
         ...(usage === undefined ? {} : { usage }),
       };
     },

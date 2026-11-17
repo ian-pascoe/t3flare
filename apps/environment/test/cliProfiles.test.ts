@@ -1,30 +1,22 @@
 // CLI profiles (step 4a, plan §4 with the review's F2, F4, F5 and M0's findings): what a Codex or pi process gets,
-// whatever t3 asked. Expected values are the M0 probes' (docs/steps/step-4a/m0-local.json), not recomputed here.
-import type { CatalogModel } from "@t3flare/models";
+// whatever t3 asked. Expected values are the M0 probes' (docs/steps/step-4a/m0-local.json), not recomputed here. Since
+// the hard cut (SPI-1176) every CLI runs on its Model endpoints through the model relay, and is refused without one.
 import { describe, expect, it } from "vitest";
 
 import { CODEX_SESSIONS, PI_SESSIONS, type PiRelay, piRepoResourceArgs, type ProfileContext, profileLaunch, repoRootOf } from "../src/agents/cliProfiles.ts";
 
-const model = (id: string, extra: Partial<CatalogModel> = {}): CatalogModel => ({
-  id,
-  name: id,
-  provider: "anthropic",
-  vendor: "X",
-  api: "anthropic-messages",
-  slug: `anthropic/${id}`,
-  reasoning: false,
-  input: ["text"],
-  contextWindow: 200_000,
-  maxTokens: 32_000,
-  ...extra,
-});
-
 const EXTENSION = "export default function (pi) {}\n";
 const STATE_EXTENSION = "/t3/state/cache/pi-t3-mcp-extension.ts";
 
+const COST = { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 1.25 };
+const anyModel = (id: string) => ({ id, name: `${id} name`, reasoning: false, input: ["text" as const], contextWindow: 100_000, maxTokens: 8000, cost: COST, known: false });
+/** Codex's OpenAI Responses endpoint, and pi's relay on an Anthropic Messages one: every CLI's endpoints. */
+const CODEX_ENDPOINTS = [{ id: "openai", label: "OpenAI", models: [anyModel("gpt-5-mini")] }];
+const PI_ON: PiRelay = { endpoints: [{ id: "comm", label: "Commissary", api: "anthropic-messages", models: [anyModel("claude-haiku-5-5")] }], model: "comm/claude-haiku-5-5" };
+
 const context: ProfileContext = {
-  proxyUrl: "https://proxy.example",
-  models: [model("claude-sonnet-5-5", { reasoning: true, input: ["text", "image"] }), model("gpt-6-luna"), model("kimi-k3")],
+  endpoints: CODEX_ENDPOINTS,
+  piRelay: PI_ON,
   readStateFile: (path) => (path === STATE_EXTENSION ? EXTENSION : path === "/t3/state/other.ts" ? "evil" : undefined),
   piExtensionSource: EXTENSION,
 };
@@ -33,15 +25,18 @@ const launch = (cli: "codex" | "pi" | "probe", args: ReadonlyArray<string>, env:
   profileLaunch({ cli, args, key: "proc-1", cwd: "/w/demo", env, allowProbe }, context);
 
 describe("Codex's profile", () => {
-  it("runs the image's codex app-server with the proxy as its only provider and M0's settings", () => {
+  it("runs the image's codex app-server with its endpoints' providers only, through the model relay, and M0's settings", () => {
     const answer = launch("codex", ["app-server"], { T3CODE_THREAD_ID: "thread-1", OPENAI_API_KEY: "sk-x", CODEX_HOME: "/elsewhere" });
     if ("refused" in answer) throw new Error(answer.refused);
     expect(answer.argv.slice(0, 2)).toEqual(["/opt/t3flare/bin/codex", "app-server"]);
     const overrides = answer.argv.filter((_, index) => answer.argv[index - 1] === "-c");
-    expect(overrides).toContain('model_provider="t3flare-proxy"');
-    expect(overrides.find((value) => value.startsWith("model_providers.t3flare-proxy="))).toBe(
-      'model_providers.t3flare-proxy={name="Model proxy",base_url="https://proxy.example/v1",wire_api="responses",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1,auth={command="/opt/t3flare/bin/t3flare-model-key",args=["codex"],timeout_ms=30000,refresh_interval_ms=0}}',
-    );
+    expect(overrides).toContain('model_provider="t3flare-endpoint-openai"');
+    // Nothing of the Model proxy's, which went at the hard cut (SPI-1176): no provider of its, no key helper.
+    expect(overrides.filter((value) => value.startsWith("model_providers."))).toEqual([
+      'model_providers.t3flare-endpoint-openai={name="t3flare-endpoint-openai",base_url="http://computer.internal/t3flare/model/openai",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
+    ]);
+    expect(answer.argv.join(" ")).not.toMatch(/t3flare-proxy|t3flare-model-key/);
+    expect(answer.modelRelay).toEqual(["openai"]);
     expect(overrides).toEqual(
       expect.arrayContaining([
         "allow_login_shell=false",
@@ -50,7 +45,7 @@ describe("Codex's profile", () => {
         "features.plugin_discovery_prefetch=false",
         "features.remote_plugin=false",
         "features.plugin_sharing=false",
-        'shell_environment_policy.exclude=["T3FLARE_MODEL_KEY_NONCE","T3FLARE_TOOL_HANDLE","T3FLARE_MODEL_HANDLE"]',
+        'shell_environment_policy.exclude=["T3FLARE_TOOL_HANDLE","T3FLARE_MODEL_HANDLE"]',
         'shell_environment_policy.set.T3FLARE_EXEC="proc-1"',
         'approval_policy="on-request"',
         'sandbox_mode="read-only"',
@@ -71,16 +66,17 @@ describe("Codex's profile", () => {
 
   it("gets one provider per OpenAI Responses endpoint through the model relay, its id from the endpoint's (SPI-1167)", () => {
     const endpoints = [
-      { id: "openai", label: "OpenAI" },
-      { id: "work-gw", label: "Work \"gateway\"" },
+      { id: "openai", label: "OpenAI", models: [] },
+      { id: "work-gw", label: "Work \"gateway\"", models: [anyModel("gpt-w")] },
       // A label Codex reads as a vendor's ("OpenAI" turns on its remote compaction, "Azure" its Azure rules) never
       // reaches Codex: the provider's name is its fixed id (SPI-1171 review 2).
-      { id: "az", label: "Azure" },
+      { id: "az", label: "Azure", models: [] },
     ];
     const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, { ...context, endpoints });
     if ("refused" in answer) throw new Error(answer.refused);
     const overrides = answer.argv.filter((_, index) => answer.argv[index - 1] === "-c");
-    expect(overrides).toContain('model_provider="t3flare-proxy"');
+    // No session model: the default model's provider, the first endpoint that lists a model.
+    expect(overrides).toContain('model_provider="t3flare-endpoint-work-gw"');
     expect(overrides).toContain(
       'model_providers.t3flare-endpoint-openai={name="t3flare-endpoint-openai",base_url="http://computer.internal/t3flare/model/openai",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
     );
@@ -95,24 +91,28 @@ describe("Codex's profile", () => {
   });
 
   it("runs on its session's model's provider: Codex runs a thread's turns only on its process's provider", () => {
-    const endpoints = [{ id: "openai", label: "OpenAI" }];
+    const endpoints = [{ id: "openai", label: "OpenAI", models: [anyModel("gpt-5-mini")] }];
     const providerFor = (model: string | undefined) => {
       const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, { ...context, endpoints, ...(model === undefined ? {} : { model }) });
       if ("refused" in answer) throw new Error(answer.refused);
       return answer.argv.find((value) => value.startsWith("model_provider="));
     };
     expect(providerFor("openai/gpt-5-mini")).toBe('model_provider="t3flare-endpoint-openai"');
-    expect(providerFor("gpt-6-luna")).toBe('model_provider="t3flare-proxy"');
-    expect(providerFor("other/x")).toBe('model_provider="t3flare-proxy"');
-    expect(providerFor(undefined)).toBe('model_provider="t3flare-proxy"');
+    // SPI-1176: a model from before the hard cut (the proxy's bare id) and none run on the default model's provider.
+    expect(providerFor("gpt-6-luna")).toBe('model_provider="t3flare-endpoint-openai"');
+    expect(providerFor(undefined)).toBe('model_provider="t3flare-endpoint-openai"');
+    // A gone endpoint's slug names its own provider, which Codex does not have: Codex refuses the thread.
+    expect(providerFor("other/x")).toBe('model_provider="t3flare-endpoint-other"');
   });
 
-  it("defaults to the first endpoint's provider when there is no Model proxy", () => {
-    const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, { ...context, proxyUrl: "", endpoints: [{ id: "openai", label: "OpenAI" }] });
-    if ("refused" in answer) throw new Error(answer.refused);
-    const overrides = answer.argv.filter((_, index) => answer.argv[index - 1] === "-c");
-    expect(overrides).toContain('model_provider="t3flare-endpoint-openai"');
-    expect(overrides.some((value) => value.startsWith("model_providers.t3flare-proxy="))).toBe(false);
+  it("is refused without an OpenAI Responses endpoint, saying so and where to add one (SPI-1176)", () => {
+    const { endpoints: _none, ...withoutEndpoints } = context;
+    for (const without of [withoutEndpoints, { ...context, endpoints: [] }]) {
+      const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, without);
+      expect(answer).toEqual({
+        refused: "Codex has no Model endpoint to run on: it needs one that speaks OpenAI Responses and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints",
+      });
+    }
   });
 
   it("refuses any other Codex argv", () => {
@@ -162,9 +162,9 @@ describe("pi's profile", () => {
     expect(answer.droppedEnv).toEqual([]);
     expect(answer.env.T3_MCP_BEARER_TOKEN).toBeUndefined();
     const models = JSON.parse(answer.files!.find((file) => file.path.endsWith("models.json"))!.text);
-    expect(models.providers.anthropic.baseUrl).toBe("https://proxy.example");
-    expect(models.providers.anthropic.apiKey).toBe("!/opt/t3flare/bin/t3flare-model-key pi");
-    expect(models.providers.anthropic.models.map((entry: { id: string }) => entry.id)).toEqual(["claude-sonnet-5-5", "gpt-6-luna", "kimi-k3"]);
+    expect(Object.keys(models.providers)).toEqual(["t3flare-endpoint-comm"]);
+    expect(models.providers["t3flare-endpoint-comm"]).toMatchObject({ baseUrl: "http://computer.internal/t3flare/model/comm", apiKey: "!/opt/t3flare/bin/t3flare-pi-handle" });
+    expect(answer.modelRelay).toEqual(["comm"]);
     expect(JSON.parse(answer.files!.find((file) => file.path.endsWith("settings.json"))!.text)).toMatchObject({ defaultProjectTrust: "never" });
   });
 
@@ -306,10 +306,10 @@ describe("pi's profile", () => {
       expect(answer.modelRelay).toEqual(["comm", "oai", "resp", "gem", "mis"]);
     });
 
-    it("stays on the Model proxy without a relay (no handle asked)", () => {
-      const answer = launch("pi", rpc, { T3_PI_RUNTIME_MODE: "approval-required" });
-      if ("refused" in answer) throw new Error(answer.refused);
-      expect(answer.modelRelay).toBeUndefined();
+    it("is refused without an endpoint that lists a model, saying so and where to add one (SPI-1176)", () => {
+      const { piRelay: _none, ...withoutRelay } = context;
+      const answer = profileLaunch({ cli: "pi", args: rpc, key: "proc-1", cwd: "/w/demo", env: { T3_PI_RUNTIME_MODE: "approval-required" }, allowProbe: false }, withoutRelay);
+      expect(answer).toEqual({ refused: "Pi has no Model endpoint to run on: it needs one that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints" });
     });
   });
 

@@ -1,18 +1,18 @@
 // Text generation's model (risk R12; SPI-1163): t3's default `textGenerationModelSelection` names the `codex` instance,
 // which the Cloud Environment does not have, and t3's fallback only applies to an instance it has. While the owner has
 // set no model, the setting names text generation's default, so the setting says which model that is: a small model of
-// the first Model endpoint that has one (`defaultTextModel`), else the Model proxy's small model until the hard cut,
-// else `default` (which fails saying to pick one). It is written at each boot and again whenever the endpoints change.
+// the first Model endpoint that has one, else the endpoints' default model (`defaultSmallModel`), else `default` (which
+// fails saying to set up an endpoint). It is written at each boot and again whenever the endpoints change.
 //
 // "No model set" is: t3's own default (Codex's model, even where the CLI agents register a `codex` instance), an
-// instance this Environment does not have, `default`, or the model this sync wrote last (kept in the Environment DO's
-// storage, recorded only once the setting holds it). A setting written by the earlier seed (the proxy's small model, with
-// no record kept) counts as unset too. Any other model is the owner's, and is never replaced; an owner who picks exactly
-// one of those values is read as unset (upstream-fragility U67). One sync runs at a time, so two endpoint changes in a row
+// instance this Environment does not have, the model this sync wrote last (kept in the Environment DO's storage,
+// recorded only once the setting holds it), or a Pi Durable model from before the hard cut (SPI-1176: `default`, a bare
+// id, the Model proxy's `anthropic/<id>`, the earlier seed's included; `isRetiredSlug`), which falls back to the default.
+// Any other model is the owner's, and is never replaced; an owner who picks exactly one of those values is read as unset
+// (upstream-fragility U67). One sync runs at a time, so two endpoint changes in a row
 // never read the setting before the other has written it.
 import { DEFAULT_SERVER_SETTINGS, defaultInstanceIdForDriver } from "@t3tools/contracts";
-import { SMALL_MODEL_SLUG } from "@t3flare/models";
-import { defaultTextModel, EMPTY_ENDPOINTS } from "@t3flare/models/endpoints";
+import { defaultSmallModel, EMPTY_ENDPOINTS, isRetiredSlug } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -42,9 +42,9 @@ export const syncTextGenerationDefault = Effect.gen(function* () {
   const unset =
     (current.instanceId === stock.instanceId && current.model === stock.model) ||
     (yield* registry.getInstance(current.instanceId)) === undefined ||
-    (current.instanceId === instanceId && (current.model === "default" || current.model === seeded || (seeded === undefined && current.model === SMALL_MODEL_SLUG)));
+    (current.instanceId === instanceId && (isRetiredSlug(current.model) || current.model === seeded));
   if (!unset) return;
-  const model = defaultTextModel(services.modelEndpoints?.() ?? EMPTY_ENDPOINTS) ?? (services.modelProxy === undefined ? "default" : SMALL_MODEL_SLUG);
+  const model = defaultSmallModel(services.modelEndpoints?.() ?? EMPTY_ENDPOINTS) ?? "default";
   const record = Effect.sync(() => services.seededTextModel.set(model));
   if (current.instanceId === instanceId && current.model === model) return yield* record;
   // Recorded only once the setting holds it: the record is the write's exit handler, and a failed or interrupted write

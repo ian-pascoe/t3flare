@@ -1,31 +1,28 @@
-// The Session's view of the model proxy's failures (step 2a part 2; ADR-0012; docs/model-proxy.md → Usage limits).
+// The Session's view of its Model endpoints' failures (step 2a part 2's design for the Model proxy, SPI-1172 per
+// endpoint API; ADR-0034 §8).
 //
 // pi-ai drops an error answer's headers, so `recordingFetch` makes each model request and keeps the last answer's status,
-// `retry-after` and time. The `proxy-limits` extension's `afterResponse` hook runs on every failed response before
-// pi-durable decides whether to retry it (pi-durable 1.5.0 `harness/generation.js`: the hook at :596, the retry
-// classification at :627): it classifies the failure once, with that answer, records it, and when no retry can succeed
-// (a limit with a reset, a refused key) leaves pi-durable a text no retry pattern of pi-ai's matches. One request, no
-// backoff; the record carries the class, the code and the reset to the differ.
+// headers, error body and time. The `proxy-limits` extension's `afterResponse` hook (its name kept from the Model proxy's
+// time: a Session installs it under that name) runs on every failed response before pi-durable decides whether to retry
+// it (pi-durable 1.5.0 `harness/generation.js`: the hook at :596, the retry classification at :627): a failed answer is
+// classified once by its endpoint's API and auth (`@t3flare/models/failures`) and recorded on the turn with the
+// endpoint's own text, and when no retry can succeed (a limit with a reset, a refused key) pi-durable is left a text no
+// retry pattern of pi-ai's matches. One request, no backoff. Every failed answer's text is redacted
+// (`@t3flare/models/redact`) before pi-durable keeps it, so no echoed key reaches the turn's detail, the push or t3.
 //
-// A test fault (`Fault`, stages only) answers in the proxy's place until its reset, so the limit path runs end to end
-// without exhausting real accounts. It counts as a request, as the proxy's answer would.
-//
-// SPI-1172: a Model endpoint's failed answer is classified by the endpoint's API and auth (`@t3flare/models/failures`),
-// from the status, the headers and the error body the recording fetch keeps (pi-ai keeps none of the headers, and only
-// some of the body), and recorded with the endpoint's own text; the proxy's `anthropic` keeps its own classifier until
-// the hard cut (SPI-1176). Every failed answer's text is redacted (`@t3flare/models/redact`) before pi-durable keeps it,
-// so no echoed key reaches the turn's detail, the push or t3. The fault route also answers in each API's vendor shapes
-// (`anthropicUsageLimit`, `openaiQuota`, …), the endpoint's own fetch never called.
+// A test fault (`Fault`, stages only) answers in the endpoint's place, in a vendor's shape (`anthropicUsageLimit`,
+// `openaiQuota`, …), until its reset, so the limit path runs end to end without exhausting a real account. It counts as
+// a request, as the endpoint's answer would. The Model proxy's classifier and its Commissary-shaped faults went at the
+// hard cut (SPI-1176).
 // @effect-diagnostics globalDate:off
 import { GenerationTask, defineExtension, type Extension, hook } from "@earendil-works/pi-durable";
 import type { EndpointApi, EndpointAuth } from "@t3flare/models/endpoints";
 import { describeFailure, errorBodyOf, type FailedAnswer, failureHeaders, modelFailureDetail } from "@t3flare/models/failures";
-import { classifyProxyFailure, proxyFailureDetail } from "@t3flare/models/proxyFailure";
 import { redactSecrets } from "@t3flare/models/redact";
-import type { EndpointFailureRecord, ProxyFailureRecord, ProxyRecord } from "@t3flare/session-protocol";
+import type { EndpointFailureRecord, ProxyRecord } from "@t3flare/session-protocol";
 import type { AssistantMessage, MutableModels } from "@earendil-works/pi-ai";
 
-/** The last answer the proxy, an endpoint (or a fault) gave: its status, `retry-after` and when it came. */
+/** The last answer an endpoint (or a fault) gave: its status, `retry-after` and when it came. */
 export interface RecordedAnswer {
   readonly status: number;
   readonly retryAfter: string | null;
@@ -44,14 +41,8 @@ export interface Fault {
   readonly resetAt: number;
 }
 
+/** The vendors' shapes a fault answers in, for a Model endpoint of the API (SPI-1172, packages/models/test/fixtures/vendors.json). */
 export const FAULT_FIXTURES = [
-  // Commissary's shapes (step 2a part 2), for the proxy.
-  "cooldown",
-  "spendLimit",
-  "invalidKey",
-  "overloaded",
-  "accountUnavailable",
-  // SPI-1172: vendors' shapes, for a Model endpoint of the API (packages/models/test/fixtures/vendors.json).
   "anthropicUsageLimit",
   "anthropicRateLimit",
   "anthropicKeyRefused",
@@ -61,14 +52,6 @@ export const FAULT_FIXTURES = [
   "planUsageLimit",
 ] as const;
 export type FaultFixture = (typeof FAULT_FIXTURES)[number];
-
-/** A Go duration of whole seconds, as Commissary's hint writes it (`2m0s`, `1h2m3s`). */
-const goDuration = (seconds: number) => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return h > 0 ? `${h}h${m}m${s}s` : m > 0 ? `${m}m${s}s` : `${s}s`;
-};
 
 /** A fault to arm, or why not: only where the deployment has `T3FLARE_FAULTS=1` (every stage but prod), a known fixture and a finite reset. */
 export const armFault = (faults: string | undefined, input: { readonly fixture: string; readonly resetAt: number }): Fault | Error => {
@@ -91,8 +74,8 @@ export const FAULT_ECHOED_SECRETS = [
   "sk-proj-t3flareFAULTechoNotARealKey000000000000000000000000",
 ] as const;
 
-/** The answer Commissary gives for `fault.fixture` (the shapes of packages/models/test/fixtures/proxy.json), reset at its time. */
-export const faultAnswer = (fault: Fault, now: number, model: string): Response => {
+/** The vendor's answer for `fault.fixture` (the shapes of packages/models/test/fixtures/vendors.json), reset at its time. */
+export const faultAnswer = (fault: Fault, now: number): Response => {
   const seconds = Math.max(1, Math.ceil((fault.resetAt - now) / 1000));
   const json = (status: number, body: string, retryAfter?: number) =>
     new Response(body, {
@@ -100,20 +83,6 @@ export const faultAnswer = (fault: Fault, now: number, model: string): Response 
       headers: { "content-type": "application/json", ...(retryAfter === undefined ? {} : { "retry-after": String(retryAfter) }) },
     });
   switch (fault.fixture) {
-    case "cooldown":
-      return json(429, anthropicError("rate_limit_error", `All credentials for model ${model} are cooling down via provider claude (reset after ${goDuration(seconds)})`), seconds);
-    case "spendLimit":
-      return json(
-        429,
-        anthropicError("rate_limit_error", `The daily Spend limit of this API key is reached; it resets at ${new Date(fault.resetAt).toISOString()}`),
-        seconds,
-      );
-    case "invalidKey":
-      return json(401, JSON.stringify({ error: "Invalid API key" }));
-    case "overloaded":
-      return json(529, anthropicError("overloaded_error", "Overloaded"));
-    case "accountUnavailable":
-      return json(503, anthropicError("api_error", "no auth available"), seconds);
     case "anthropicUsageLimit":
       // Anthropic's unified limit, as Claude Code reads it: status rejected, the claim's reset in epoch seconds.
       return new Response(anthropicError("rate_limit_error", "This request would exceed your account's rate limit. Please try again later."), {
@@ -141,17 +110,6 @@ export const faultAnswer = (fault: Fault, now: number, model: string): Response 
   }
 };
 
-/** The model a request body names, for a fault's message. */
-const modelOf = (init: RequestInit | undefined): string => {
-  if (typeof init?.body !== "string") return "requested model";
-  try {
-    const model = (JSON.parse(init.body) as { model?: unknown }).model;
-    return typeof model === "string" ? model : "requested model";
-  } catch {
-    return "requested model";
-  }
-};
-
 export interface RecordingFetchOptions {
   readonly fetch: typeof globalThis.fetch;
   readonly fault: () => Fault | undefined;
@@ -169,7 +127,7 @@ export const recordingFetch = (options: RecordingFetchOptions) => {
     options.onRequest();
     const fault = options.fault();
     let response: Response;
-    if (fault !== undefined && options.now() < fault.resetAt) response = faultAnswer(fault, options.now(), modelOf(init));
+    if (fault !== undefined && options.now() < fault.resetAt) response = faultAnswer(fault, options.now());
     else {
       if (fault !== undefined) options.clearFault();
       response = await options.fetch(input, init);
@@ -192,43 +150,37 @@ export interface ClassifiedEndpoint {
   readonly baseUrl: string;
 }
 
-export interface ProxyLimitsOptions {
+export interface ModelLimitsOptions {
   /** The answer of the request that ended in this response. */
   readonly last: () => RecordedAnswer | undefined;
+  /** The Model endpoint a message's provider names; undefined for one no longer installed. */
+  readonly endpoint: (provider: string) => ClassifiedEndpoint | undefined;
   /**
-   * The running turn's last failed answer from the proxy, classified, or undefined for one the classifier does not
-   * know: every failed answer replaces the record (and clears an endpoint's), so the last answer is always the turn's.
+   * The running turn's last failed answer, classified, or undefined for one the classifier does not know (or no
+   * endpoint's): every failed answer replaces the record, so the last answer is always the turn's.
    */
-  readonly record: (failure: ProxyFailureRecord | undefined) => void;
-  /** SPI-1172: the Model endpoint a message's provider names; undefined for the proxy's `anthropic`. */
-  readonly endpoint?: (provider: string) => ClassifiedEndpoint | undefined;
-  /** SPI-1172: the same for an endpoint's failed answer (and it clears the proxy's). */
-  readonly recordEndpoint?: (failure: EndpointFailureRecord | undefined) => void;
-  /** SPI-1172: the credentials the Session holds for a provider (its key or token), redacted from its error text whatever their shape. */
-  readonly secrets?: (provider: string) => ReadonlyArray<string>;
+  readonly recordEndpoint: (failure: EndpointFailureRecord | undefined) => void;
+  /** The credentials the Session holds for a provider (its key or token), redacted from its error text whatever their shape. */
+  readonly secrets: (provider: string) => ReadonlyArray<string>;
 }
 
-/** What `sessionLimits` takes of the Session: the recording fetch, its record of the running turn, its endpoints, the proxy's key. */
+/** What `sessionLimits` takes of the Session: the recording fetch, its record of the running turn, its endpoints. */
 export interface SessionLimitsDeps {
   readonly last: () => RecordedAnswer | undefined;
   /** Changes the running turn's record (`SessionDO.#noteProxy`). */
   readonly note: (update: (record: ProxyRecord) => ProxyRecord) => void;
   readonly endpoints: { endpoint(id: string): ClassifiedEndpoint | undefined; secrets(id: string): ReadonlyArray<string> };
-  readonly proxyKey: string;
 }
 
 /**
- * The Session's `ProxyLimitsOptions` (SPI-1172): every failed answer replaces the turn's record, the proxy's and an
- * endpoint's alike (undefined clears it, and either clears the other), so the last answer is always the turn's; a
- * provider's credential is the proxy's key for `anthropic`, else what the Session holds for the endpoint.
+ * The Session's `ModelLimitsOptions` (SPI-1172): every failed answer replaces the turn's record (undefined clears it),
+ * so the last answer is always the turn's; a provider's credential is what the Session holds for the endpoint.
  */
-export const sessionLimits = (deps: SessionLimitsDeps): ProxyLimitsOptions => ({
+export const sessionLimits = (deps: SessionLimitsDeps): ModelLimitsOptions => ({
   last: deps.last,
-  record: (failure) => deps.note(({ endpointFailure: _endpoint, failure: _before, ...record }) => (failure === undefined ? record : { ...record, failure })),
   endpoint: (provider) => deps.endpoints.endpoint(provider),
-  recordEndpoint: (endpointFailure) =>
-    deps.note(({ failure: _proxy, endpointFailure: _before, ...record }) => (endpointFailure === undefined ? record : { ...record, endpointFailure })),
-  secrets: (provider) => (provider === "anthropic" ? [deps.proxyKey] : deps.endpoints.secrets(provider)),
+  recordEndpoint: (endpointFailure) => deps.note(({ endpointFailure: _before, ...record }) => (endpointFailure === undefined ? record : { ...record, endpointFailure })),
+  secrets: (provider) => deps.endpoints.secrets(provider),
 });
 
 /**
@@ -237,7 +189,7 @@ export const sessionLimits = (deps: SessionLimitsDeps): ProxyLimitsOptions => ({
  * pi-ai client takes no fetch leaves none: its text alone is read, as a stream's is). The record is replaced either way;
  * a classified failure's text becomes its code, worded so pi-durable stops or retries it as the table says.
  */
-const classifyEndpoint = (message: AssistantMessage, errorMessage: string, endpoint: ClassifiedEndpoint, options: ProxyLimitsOptions): void => {
+const classifyEndpoint = (message: AssistantMessage, errorMessage: string, endpoint: ClassifiedEndpoint, options: ModelLimitsOptions): void => {
   const recorded = options.last();
   const answer = recorded !== undefined && recorded.url.startsWith(endpoint.baseUrl) ? recorded : undefined;
   const failed: FailedAnswer =
@@ -245,25 +197,26 @@ const classifyEndpoint = (message: AssistantMessage, errorMessage: string, endpo
       ? { status: answer.status, headers: answer.headers, body: answer.body ?? errorMessage, at: answer.at }
       : { status: 200, headers: answer?.headers ?? {}, body: errorMessage, at: answer?.at ?? Date.now() };
   const failure = describeFailure(failed, endpoint);
-  options.recordEndpoint?.(failure === undefined ? undefined : { ...failure, endpointId: endpoint.id, at: failed.at });
+  options.recordEndpoint(failure === undefined ? undefined : { ...failure, endpointId: endpoint.id, at: failed.at });
   if (failure !== undefined) message.errorMessage = modelFailureDetail(failure);
 };
 
 /** Classify a failed response once, record it (or clear the record), and leave pi-durable a text it stops or retries on. */
-const classifyOnce = (message: AssistantMessage, options: ProxyLimitsOptions): void => {
+const classifyOnce = (message: AssistantMessage, options: ModelLimitsOptions): void => {
   if (message.stopReason !== "error" || message.errorMessage === undefined) return;
   // No echoed credential reaches pi-durable's record of the answer, the turn's detail, the push or t3 (SPI-1172).
-  message.errorMessage = redactSecrets(message.errorMessage, options.secrets?.(message.provider) ?? []);
-  const endpoint = options.endpoint?.(message.provider);
-  if (endpoint !== undefined) return classifyEndpoint(message, message.errorMessage, endpoint, options);
-  const answer = options.last() ?? { status: 200, retryAfter: null, at: Date.now() };
-  const failure = classifyProxyFailure({ ...answer, text: message.errorMessage });
-  options.record(failure === undefined ? undefined : { ...failure, at: answer.at });
-  if (failure?.stop === true) message.errorMessage = proxyFailureDetail(failure);
+  message.errorMessage = redactSecrets(message.errorMessage, options.secrets(message.provider));
+  const endpoint = options.endpoint(message.provider);
+  // A provider that is no installed endpoint's (one removed mid-turn) has nothing to classify by: the record clears.
+  if (endpoint === undefined) return options.recordEndpoint(undefined);
+  classifyEndpoint(message, message.errorMessage, endpoint, options);
 };
 
-/** The `afterResponse` hook: `classifyOnce` on each generation's response, before pi-durable decides to retry it. */
-export const proxyLimits = (options: ProxyLimitsOptions): Extension =>
+/**
+ * The `afterResponse` hook: `classifyOnce` on each generation's response, before pi-durable decides to retry it. Its
+ * name is the one the Model proxy's classifier had (`proxy-limits`): the Session installs it under that name.
+ */
+export const modelLimits = (options: ModelLimitsOptions): Extension =>
   defineExtension({
     name: "proxy-limits",
     hooks: [hook(GenerationTask, { afterResponse: (message) => classifyOnce(message, options) })],
@@ -275,7 +228,7 @@ export const proxyLimits = (options: ProxyLimitsOptions): Extension =>
  * classification right after it), so this is where its answer is classified, before that retry decision. Generation
  * streams with `streamSimple` and keeps the hook, so no answer is classified twice.
  */
-export const compactionLimits = (models: MutableModels, options: ProxyLimitsOptions): MutableModels => {
+export const compactionLimits = (models: MutableModels, options: ModelLimitsOptions): MutableModels => {
   const completeSimple = models.completeSimple.bind(models);
   models.completeSimple = async (...args) => {
     const message = await completeSimple(...args);

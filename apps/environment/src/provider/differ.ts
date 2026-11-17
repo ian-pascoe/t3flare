@@ -24,7 +24,7 @@ import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import type { ProviderAdapterV2Event } from "@t3tools/provider-core/server/ProviderAdapter";
 import { type ApprovalDecision, type ContentBlock, type EndpointFailureRecord, type PendingApproval, type PendingQuestion, PROPOSE_PLAN_TOOL, type PushedEntry, type SessionState, type TurnState } from "@t3flare/session-protocol";
 import { heldReset } from "@t3flare/models/failures";
-import { classifyProxyFailure, type ProxyFailure, proxyFailureMessage } from "@t3flare/models/proxyFailure";
+import { isRetiredSlug, NO_ENDPOINT_MESSAGE, parseEndpointSlug } from "@t3flare/models/endpoints";
 import * as DateTime from "effect/DateTime";
 
 import { PI_DURABLE_DRIVER } from "./capabilities.ts";
@@ -788,27 +788,18 @@ const emitRequests = (state: DifferState, out: Array<ProviderAdapterV2Event>, pe
 /** A usage limit's reset as t3 takes it (`heldReset`: ISO, at least `MIN_RESET_MS` after `now`). */
 const resetOf = (failure: { readonly class: string; readonly resetAt?: number }, now: DateTime.Utc): string | null => heldReset(failure, DateTime.toEpochMillis(now));
 
-/** A model proxy failure as t3's: fixed text by its code, the reset held to at least 30 s after `now`. */
-const proxyFailureOf = (failure: ProxyFailure, now: DateTime.Utc): OrchestrationV2ProviderFailure =>
-  makeProviderFailure({
-    class: failure.class,
-    message: proxyFailureMessage(failure),
-    code: failure.code,
-    retryable: !(failure.class === "permission_error" || failure.code === "proxy_no_account"),
-    resetAt: resetOf(failure, now),
-  });
-
 /**
  * A Model endpoint's failure as the Session classified it by the endpoint's API and auth (SPI-1172): its fixed text
- * naming the endpoint, its code and whether a retry helps, the reset held as the proxy's is. A usage limit pauses the
+ * naming the endpoint, its code and whether a retry helps, the reset held to at least 30 s after `now`. A usage limit pauses the
  * thread until it; nothing here (or in the Session) falls back to another endpoint.
  */
 const endpointFailureOf = (failure: EndpointFailureRecord, now: DateTime.Utc): OrchestrationV2ProviderFailure =>
   makeProviderFailure({ class: failure.class, message: failure.message, code: failure.code, retryable: failure.retryable, resetAt: resetOf(failure, now) });
 
 /**
- * A model error, classified (step 2a part 2 plan, section 3): the Session's record of the proxy's answer first, else the
- * error text (a push from before the record, or a failure the Session did not see), counted from the settle time.
+ * A model error, classified (step 2a part 2 plan, section 3): the Session's record of the endpoint's answer first (its
+ * credential, then its classified failure), else the error's HTTP status. (The Model proxy's record and its text
+ * classifier went at the hard cut, SPI-1176: a turn from before it shows the plain provider error.)
  */
 export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2ProviderFailure => {
   const reason = turn.reason ?? "unknown";
@@ -820,10 +811,6 @@ export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2Pr
     if (credential !== undefined) return makeProviderFailure({ class: "provider_error", message: credential.message, code: credential.kind, retryable: credential.retryable });
     const endpointFailure = turn.proxy?.endpointFailure;
     if (endpointFailure !== undefined) return endpointFailureOf(endpointFailure, now);
-    const recorded = turn.proxy?.failure;
-    if (recorded !== undefined) return proxyFailureOf(recorded as ProxyFailure, now);
-    const classified = classifyProxyFailure({ status: 0, retryAfter: null, text: detail, at: turn.settledAt ?? DateTime.toEpochMillis(now) });
-    if (classified !== undefined) return proxyFailureOf(classified, now);
     const status = /\b([45]\d\d)\b/.exec(detail)?.[1];
     return makeProviderFailure({
       class: "provider_error",
@@ -833,17 +820,15 @@ export const failureOf = (turn: TurnState, now: DateTime.Utc): OrchestrationV2Pr
     });
   }
   if (reason === "no_model") {
-    // pi-durable's detail names the ref (`Model <provider>/<id> is not available`); a Model endpoint's is its slug, the
-    // Model proxy's `anthropic/<id>` (SPI-1162). Without one, it may be either.
+    // pi-durable's detail names the ref (`Model <provider>/<id> is not available`): a Model endpoint's slug (SPI-1162). A
+    // selection from before the hard cut reaches the Session as it was only when no endpoint lists a model to fall back
+    // to (`adapter.ts` `modelOf`, SPI-1176): the Environment needs setup.
     const slug = /^Model (\S+) is not available/.exec(detail)?.[1];
+    if (slug !== undefined && (parseEndpointSlug(slug) === undefined || isRetiredSlug(slug))) {
+      return makeProviderFailure({ class: "provider_error", message: NO_ENDPOINT_MESSAGE, code: reason });
+    }
     const which = slug === undefined ? "The selected model" : `The model ${slug}`;
-    const why =
-      slug === undefined
-        ? "its Model endpoint was removed or no longer lists it, or the Model proxy no longer lists it"
-        : slug.startsWith("anthropic/")
-          ? "the Model proxy no longer lists it"
-          : "its Model endpoint was removed or no longer lists it";
-    return makeProviderFailure({ class: "provider_error", message: `${which} is not available: ${why}. Pick another model.`, code: reason });
+    return makeProviderFailure({ class: "provider_error", message: `${which} is not available: its Model endpoint was removed or no longer lists it. Pick another model.`, code: reason });
   }
   const messages: Record<string, string> = {
     turn_deadline: "The turn ran longer than 2 hours and was stopped.",

@@ -41,7 +41,7 @@ const CLAUDE = {
     modes: { currentModeId: current, availableModes: modes.map((id) => ({ id, name: id })) },
     configOptions: [
       { id: "mode", name: "Mode", category: "mode", type: "select", currentValue: current, options: modes.map((value) => ({ value, name: value })) },
-      { id: "model", name: "Model", category: "model", type: "select", currentValue: "default", options: ["default", "claude-sonnet-5-5", "gpt-6-luna"].map((value) => ({ value, name: value })) },
+      { id: "model", name: "Model", category: "model", type: "select", currentValue: "default", options: ["default", "comm/claude-sonnet-5-5", "comm/gpt-6-luna"].map((value) => ({ value, name: value })) },
     ],
   }),
   editOptions: [
@@ -68,7 +68,7 @@ const OPENCODE = {
   sessionNew: () => ({
     sessionId: "ses_opencode",
     configOptions: [
-      { id: "model", name: "Model", category: "model", type: "select", currentValue: "t3flare/claude-sonnet-5-5", options: ["t3flare/claude-sonnet-5-5", "t3flare/gpt-6-luna"].map((value) => ({ value, name: value })) },
+      { id: "model", name: "Model", category: "model", type: "select", currentValue: "t3flare-endpoint-comm/claude-sonnet-5-5", options: ["t3flare-endpoint-comm/claude-sonnet-5-5", "t3flare-endpoint-comm/gpt-6-luna"].map((value) => ({ value, name: value })) },
       { id: "mode", name: "Mode", category: "mode", type: "select", currentValue: "build", options: ["build", "plan"].map((value) => ({ value, name: value })) },
     ],
   }),
@@ -125,7 +125,7 @@ const session = (cli: AcpCli, build: (cwd: string) => Script, policy: { readonly
     const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
     const adapter = yield* makeAcpAdapterV2({ instanceId, flavor: acpFlavor(cli, driver, { spawn }), selfInvocation: { command: "none", entrypoint: undefined } });
     const threadId = ThreadId.make(`thread-${cli}`);
-    const modelSelection = { instanceId, model: "anthropic/claude-sonnet-5-5" } as const;
+    const modelSelection = { instanceId, model: "comm/claude-sonnet-5-5" } as const;
     const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: policy.runtimeMode as never, interactionMode: policy.interactionMode ?? "default", cwd });
     const runtime = yield* adapter.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-${cli}`), modelSelection, runtimePolicy });
     const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
@@ -177,8 +177,8 @@ describe("Claude Code through t3's ACP adapter", () => {
         const log = harness.agentLog();
         // "For the session" is the agent's allow_always, as stock t3 answers it; "accept" its allow_once.
         expect(answers(log)).toEqual(["allow-with-updates", "allow-once"]);
-        // Pinned to `default`, the catalog id chosen as the model.
-        expect(log.find((entry) => entry.received === "session/set_config_option" && entry.params?.configId === "model")?.params?.value).toBe("claude-sonnet-5-5");
+        // Pinned to `default`, the endpoint's slug chosen as the model (the relay routes by it).
+        expect(log.find((entry) => entry.received === "session/set_config_option" && entry.params?.configId === "model")?.params?.value).toBe("comm/claude-sonnet-5-5");
         expect(log.some((entry) => entry.received === "session/set_mode" && entry.params?.modeId !== "default")).toBe(false);
       }),
     ));
@@ -282,8 +282,8 @@ describe("OpenCode through t3's ACP adapter", () => {
         const log = harness.agentLog();
         expect(answers(log)).toEqual(["once", "once", "once"]);
         expect(harness.seen.some(pendingRequest)).toBe(false);
-        // The catalog model is already OpenCode's current value: no other model is set.
-        expect(log.filter((entry) => entry.received === "session/set_config_option" && entry.params?.configId === "model" && entry.params.value !== "t3flare/claude-sonnet-5-5")).toEqual([]);
+        // The endpoint's model is already OpenCode's current value: no other model is set.
+        expect(log.filter((entry) => entry.received === "session/set_config_option" && entry.params?.configId === "model" && entry.params.value !== "t3flare-endpoint-comm/claude-sonnet-5-5")).toEqual([]);
       }),
     ));
 

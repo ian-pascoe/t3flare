@@ -108,20 +108,24 @@ const answer = {
 };
 
 describe("web_search", () => {
-  const proxy = { url: "https://proxy.example/", apiKey: "sk-secret-key", model: () => "claude-haiku-5-5" };
+  // SPI-1176: an Anthropic Messages Model endpoint's model, its key and headers resolved at each search.
+  const endpoint = {
+    resolve: async () => ({ baseUrl: "https://llm.example/", headers: { "x-gateway": "team" }, apiKey: "sk-secret-key", slug: "comm/claude-haiku-5-5", modelId: "claude-haiku-5-5" }),
+  };
 
-  it("asks the proxy's model with the web search server tool, and returns the pages and the cited summary", async () => {
+  it("asks the endpoint's model with the web search server tool, and returns the pages and the cited summary", async () => {
     const { transport, sent } = network(() => Response.json(answer));
-    const outcome = await run(webSearchTool(transport, proxy), { query: "pi durable" });
+    const outcome = await run(webSearchTool(transport, endpoint), { query: "pi durable" });
     const request = sent[0]!;
-    expect(request.url).toBe("https://proxy.example/v1/messages");
+    expect(request.url).toBe("https://llm.example/v1/messages");
     expect(request.headers["x-api-key"]).toBe("sk-secret-key");
+    expect(request.headers["x-gateway"]).toBe("team");
     expect(JSON.parse(request.body ?? "{}")).toMatchObject({ model: "claude-haiku-5-5", tools: [{ type: "web_search_20250305", name: "web_search" }] });
     const text = textOf(outcome);
     expect(text).toContain("Title: One\nURL: https://a.example/one\nPublished: 2 days ago\nText: agents on Durable Objects");
     expect(text).toContain("Title: Two\nURL: https://b.example/two");
     expect(text).toContain("Pi Durable runs agents on Cloudflare.");
-    expect(outcome.ok && outcome.result.details).toMatchObject({ query: "pi durable", results: [{ url: "https://a.example/one", title: "One" }, { url: "https://b.example/two" }] });
+    expect(outcome.ok && outcome.result.details).toMatchObject({ provider: "model-endpoint:comm/claude-haiku-5-5", query: "pi durable", results: [{ url: "https://a.example/one", title: "One" }, { url: "https://b.example/two" }] });
     expect(outcome.ok && outcome.result.usage).toMatchObject({ input: 1200, output: 80 });
   });
 
@@ -131,16 +135,25 @@ describe("web_search", () => {
     expect(readAnswer({ content: [] }, (text) => text)).toEqual({ results: [], summary: "" });
   });
 
-  it("reports a failed search, and a proxy error without the key", async () => {
+  it("reports a failed search, and an endpoint's error without the key", async () => {
     const failed = network(() => Response.json({ content: [{ type: "web_search_tool_result", tool_use_id: "s", content: { type: "web_search_tool_result_error", error_code: "too_many_requests" } }] }));
-    expect(textOf(await run(webSearchTool(failed.transport, proxy), { query: "q" }))).toBe("Unable to search the web for q: the search failed (too_many_requests)");
+    expect(textOf(await run(webSearchTool(failed.transport, endpoint), { query: "q" }))).toBe("Unable to search the web for q: the search failed (too_many_requests)");
     const refused = network(() => Response.json({ type: "error", error: { type: "permission_error", message: "key sk-secret-key has no models" } }, { status: 403 }));
-    const text = textOf(await run(webSearchTool(refused.transport, proxy), { query: "q" }));
+    const text = textOf(await run(webSearchTool(refused.transport, endpoint), { query: "q" }));
     expect(text).toBe("Unable to search the web for q: HTTP 403 Forbidden: key [REDACTED] has no models");
   });
 
-  it("is offered only when the setting gives it a proxy", () => {
+  it("says why when no endpoint can search, and sends nothing", async () => {
+    const { transport, sent } = network(() => Response.json(answer));
+    const none = { resolve: async () => ({ error: "no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with" }) };
+    expect(textOf(await run(webSearchTool(transport, none), { query: "q" }))).toBe(
+      "Unable to search the web for q: no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with",
+    );
+    expect(sent).toEqual([]);
+  });
+
+  it("is offered only when the setting turns it on", () => {
     expect(webExtension().tools?.map((tool) => tool.name)).toEqual(["web_fetch"]);
-    expect(webExtension({ search: proxy }).tools?.map((tool) => tool.name)).toEqual(["web_fetch", "web_search"]);
+    expect(webExtension({ search: endpoint }).tools?.map((tool) => tool.name)).toEqual(["web_fetch", "web_search"]);
   });
 });

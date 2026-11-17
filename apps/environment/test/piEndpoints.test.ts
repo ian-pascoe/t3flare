@@ -1,6 +1,5 @@
 // SPI-1170: pi's Model endpoints (`provider/cli/piEndpoints.ts`): which endpoints pi gets, its model list, the model it
 // starts on, and the mapping of t3's slugs to pi's provider ids on the process's RPC lines.
-import type { Catalog } from "@t3flare/models/catalog";
 import type { EndpointApi, ModelEndpoints } from "@t3flare/models/endpoints";
 import { endpointIdOfProvider, endpointProviderId } from "@t3flare/models/relay";
 import { describe, expect, it } from "vitest";
@@ -10,10 +9,6 @@ import { lineMapper, piEndpoints, piLineFromPi, piLineToPi, piModelsOf, piRelayO
 const model = (id: string, reasoning = false) => ({ id, name: `${id} name`, reasoning, input: ["text" as const], contextWindow: 1, maxTokens: 1, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, known: false });
 const endpoint = (id: string, api: EndpointApi, models: ReadonlyArray<ReturnType<typeof model>>, label = id) => ({ id, label, api, baseUrl: `https://${id}.example`, auth: "api-key" as const, headers: {}, models });
 const endpoints = (...list: ReadonlyArray<ReturnType<typeof endpoint>>): ModelEndpoints => ({ revision: 1, endpoints: list });
-const catalog: Catalog = {
-  models: [{ id: "claude-sonnet-5-5", slug: "anthropic/claude-sonnet-5-5", name: "Sonnet", provider: "anthropic", vendor: "Anthropic", api: "anthropic-messages", reasoning: true, input: ["text"], contextWindow: 1, maxTokens: 1 }],
-  fetchedAt: null,
-};
 
 describe("pi's endpoints", () => {
   it("are every endpoint that lists a model, of any API, in the owner's order", () => {
@@ -38,26 +33,24 @@ describe("pi's endpoints and sign-ins", () => {
     const copilot = { ...endpoint("copilot", "openai-responses", [model("gpt-6.1-sol")]), auth: "copilot" as const };
     expect(piEndpoints({ revision: 1, endpoints: [chatgpt] }).map((entry) => entry.id)).toEqual(["chatgpt"]);
     expect(piRelayOf({ revision: 1, endpoints: [chatgpt] })?.model).toBe("chatgpt/gpt-6.1-sol");
-    expect(piModelsOf(catalog, { revision: 1, endpoints: [chatgpt] }).map((entry) => entry.slug)).toEqual(["chatgpt/gpt-6.1-sol"]);
+    expect(piModelsOf({ revision: 1, endpoints: [chatgpt] }).map((entry) => entry.slug)).toEqual(["chatgpt/gpt-6.1-sol"]);
     const both = endpoints(endpoint("comm", "anthropic-messages", [model("c")]));
     expect(piRelayOf({ revision: 1, endpoints: [chatgpt, claude, copilot, ...both.endpoints] })?.endpoints.map((entry) => entry.id)).toEqual(["chatgpt", "claude", "copilot", "comm"]);
   });
 });
 
 describe("pi's start model", () => {
-  it("is the picker's default row, wherever it is in the list", () => {
-    // The picker marks the default model's slug when it lists it, not its first row. No saved endpoint takes the id
-    // `anthropic` (it is reserved), so this list is built by hand to pin the rule.
-    const list = endpoints(endpoint("comm", "anthropic-messages", [model("c")]), endpoint("anthropic", "anthropic-messages", [model("claude-sonnet-5-5")]));
-    const picked = piModelsOf(catalog, list).find((row) => row.isDefault === true)?.slug;
-    expect(picked).toBe("anthropic/claude-sonnet-5-5");
+  it("is the picker's default row: the first endpoint that lists a model's first model", () => {
+    const list = endpoints(endpoint("empty", "openai-responses", []), endpoint("comm", "anthropic-messages", [model("c"), model("d")]), endpoint("oai", "openai-completions", [model("x")]));
+    const picked = piModelsOf(list).find((row) => row.isDefault === true)?.slug;
+    expect(picked).toBe("comm/c");
     expect(piRelayOf(list)?.model).toBe(picked);
   });
 });
 
 describe("pi's model list", () => {
   it("is the endpoints' models by slug, grouped by endpoint, the first the default, with pi's thinking picker on reasoning models", () => {
-    const list = piModelsOf(catalog, endpoints(endpoint("oai", "openai-completions", [model("gpt-x"), model("o-think", true)], "Gateway"), endpoint("comm", "anthropic-messages", [model("c")], "Gateway"), endpoint("empty", "openai-responses", [])));
+    const list = piModelsOf(endpoints(endpoint("oai", "openai-completions", [model("gpt-x"), model("o-think", true)], "Gateway"), endpoint("comm", "anthropic-messages", [model("c")], "Gateway"), endpoint("empty", "openai-responses", [])));
     expect(list.map((entry) => [entry.slug, entry.subProvider, entry.isDefault === true])).toEqual([
       ["oai/gpt-x", "Gateway · oai", true],
       ["oai/o-think", "Gateway · oai", false],
@@ -69,9 +62,9 @@ describe("pi's model list", () => {
     expect(list.some((entry) => entry.slug.startsWith("anthropic/"))).toBe(false);
   });
 
-  it("is the proxy's catalog without such an endpoint", () => {
-    expect(piModelsOf(catalog, endpoints(endpoint("empty", "anthropic-messages", []))).map((entry) => entry.slug)).toEqual(["anthropic/claude-sonnet-5-5"]);
-    expect(piModelsOf(catalog, undefined).map((entry) => entry.slug)).toEqual(["anthropic/claude-sonnet-5-5"]);
+  it("is empty without such an endpoint: there is no Model proxy's catalog to fall back to (SPI-1176)", () => {
+    expect(piModelsOf(endpoints(endpoint("empty", "anthropic-messages", [])))).toEqual([]);
+    expect(piModelsOf(undefined)).toEqual([]);
   });
 });
 
@@ -90,6 +83,18 @@ describe("pi's RPC lines on the relay", () => {
     expect(JSON.parse(piLineToPi('{"id":"c3","type":"set_model","provider":"oai","modelId":"org/model:free"}', ids))).toEqual({ id: "c3", type: "set_model", provider: "t3flare-endpoint-oai", modelId: "org/model:free" });
     // An endpoint whose own id looks like a provider id is still mapped by its id.
     expect(JSON.parse(piLineToPi('{"type":"set_model","provider":"t3flare-endpoint-x","modelId":"m"}', ids)).provider).toBe("t3flare-endpoint-t3flare-endpoint-x");
+  });
+
+  it("names the default model in place of the retired Model proxy's `anthropic` (a thread from before the hard cut, SPI-1176)", () => {
+    expect(JSON.parse(piLineToPi('{"id":"c4","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}', ids, "comm/c"))).toEqual({
+      id: "c4",
+      type: "set_model",
+      provider: "t3flare-endpoint-comm",
+      modelId: "c",
+    });
+    // A default that is no endpoint of the process's names nothing in its place.
+    const line = '{"type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}';
+    expect(piLineToPi(line, ids, "gone/m")).toBe(line);
   });
 
   it("passes every other line as it is: another command, another provider, a prompt naming set_model, not JSON", () => {

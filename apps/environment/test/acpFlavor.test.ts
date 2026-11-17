@@ -5,13 +5,11 @@ import * as EffectAcpErrors from "effect-acp/errors";
 import { describe, expect, it } from "vitest";
 
 import {
-  cliModelId,
   cliPermissionDisposition,
   cliPromptFailure,
   cliRuntimeModeForSessionMode,
   cliSessionModeForPolicy,
   exitPlanMarkdown,
-  KEY_NAME,
 } from "../src/provider/cli/acpFlavor.ts";
 
 const CWD = "/w/ws-1";
@@ -85,38 +83,28 @@ describe("modes", () => {
   });
 });
 
-describe("models and failures", () => {
-  it("names a catalog model as each CLI does", () => {
-    expect(cliModelId("claude", "anthropic/claude-sonnet-5-5")).toBe("claude-sonnet-5-5");
-    expect(cliModelId("claude", "anthropic/gpt-6-luna")).toBe("gpt-6-luna");
-    expect(cliModelId("opencode", "anthropic/deepseek-v4-pro")).toBe("t3flare/deepseek-v4-pro");
-  });
-
+describe("a prompt's failure", () => {
   const acpError = (message: string, data?: unknown) => new EffectAcpErrors.AcpRequestError({ code: -32603, errorMessage: message, ...(data === undefined ? {} : { data }) });
-  const NOW = Date.parse("2026-11-12T00:00:00Z");
 
-  it("turns the proxy's 429 into t3's usage limit with its reset (review F9)", () => {
-    const failure = cliPromptFailure(
-      acpError('Internal error: API Error: 429 {"type":"error","error":{"type":"rate_limit_error","message":"Spend limit for this key is reached; it resets at 2026-11-13T00:00:00Z"}}'),
-      NOW,
-    );
-    expect(failure.class).toBe("usage_limit");
-    expect(failure.code).toBe("proxy_spend_limit");
-    expect(failure.resetAt).toBe("2026-11-13T00:00:00.000Z");
+  it("is a permission error when the credential is refused, naming the Model endpoint, never a sign-in the agent could start", () => {
+    for (const failure of [
+      cliPromptFailure(acpError('Internal error: API Error: 401 {"error":"invalid key"}')),
+      cliPromptFailure(new EffectAcpErrors.AcpRequestError({ code: -32000, errorMessage: "Authentication required" })),
+    ]) {
+      expect(failure.class).toBe("permission_error");
+      expect(failure.message).toContain("Model endpoint");
+      expect(failure.message).not.toMatch(/model proxy|COMMISSARY|sign in to/i);
+    }
   });
 
-  it("names the deploy's key when the proxy refuses it, never a sign-in", () => {
-    const flat = cliPromptFailure(acpError('Internal error: API Error: 401 {"error":"invalid key"}'), NOW);
-    expect(flat.class).toBe("permission_error");
-    expect(flat.message).toContain(KEY_NAME);
-    const auth = cliPromptFailure(new EffectAcpErrors.AcpRequestError({ code: -32000, errorMessage: "Authentication required" }), NOW);
-    expect(auth.class).toBe("permission_error");
-    expect(auth.message).toContain(KEY_NAME);
-    expect(auth.message).not.toMatch(/sign in to/i);
+  it("no longer reads Commissary's texts: the retired proxy's 429 is the provider's (the relay classifies an endpoint's, SPI-1176)", () => {
+    const failure = cliPromptFailure(acpError('Internal error: API Error: 429 {"type":"error","error":{"type":"rate_limit_error","message":"Spend limit for this key is reached; it resets at 2026-11-13T00:00:00Z"}}'));
+    expect(failure.class).toBe("provider_error");
+    expect(failure.code).toBe("-32603");
   });
 
   it("leaves other errors the provider's", () => {
-    expect(cliPromptFailure(acpError("Internal error: API Error: 410 Model gemini-3-flash has been deprecated."), NOW).class).toBe("provider_error");
-    expect(cliPromptFailure(new Error("socket hang up"), NOW).class).toBe("provider_error");
+    expect(cliPromptFailure(acpError("Internal error: API Error: 410 Model gemini-3-flash has been deprecated.")).class).toBe("provider_error");
+    expect(cliPromptFailure(new Error("socket hang up")).class).toBe("provider_error");
   });
 });

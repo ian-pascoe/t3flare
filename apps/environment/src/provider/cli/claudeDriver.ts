@@ -1,5 +1,6 @@
 // Claude Code in the Cloud Environment (step 4b, plan §3): t3's `claudeAgent` kind ("Claude") over t3's ACP adapter,
-// running `claude-agent-acp` in the Workspace's Container on the model proxy (acpDriver.ts, acpFlavor.ts).
+// running `claude-agent-acp` in the Workspace's Container on the Anthropic Messages Model endpoints, through the model
+// relay (acpDriver.ts, acpFlavor.ts).
 import { ClaudeSettings, ProviderDriverKind } from "@t3tools/contracts";
 import { CLIS } from "@t3flare/sandbox-image/clis";
 import type { ProviderDriver } from "@t3tools/provider-core/server/driver";
