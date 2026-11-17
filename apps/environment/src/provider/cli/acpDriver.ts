@@ -160,7 +160,8 @@ const NEEDS_SETUP: Readonly<Record<AcpCli, string>> = {
   opencode: `${noEndpointFor("OpenCode", "Anthropic Messages, OpenAI Responses or OpenAI-compatible Completions")}.`,
 };
 
-const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
+/** A Claude Code or OpenCode snapshot: the CLI's endpoints' models, else needing setup (SPI-1176). */
+export const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
   Effect.gen(function* () {
     const checkedAt = DateTime.formatIso(yield* DateTime.now);
     const services = environmentServices();

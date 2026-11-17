@@ -47,7 +47,8 @@ const decodeSettings = Schema.decodeSync(PiDurableSettings);
 
 export type PiDurableDriverEnv = ProviderHost.ProviderHost | McpProviderSessions.McpProviderSessions | FileSystem.FileSystem;
 
-const snapshotOf = Effect.fn("PiDurableDriver.snapshot")(function* (input: {
+/** Pi Durable's snapshot: the endpoints' models, else needing setup (SPI-1176). */
+export const snapshotOf = Effect.fn("PiDurableDriver.snapshot")(function* (input: {
   readonly enabled: boolean;
   readonly models: ReadonlyArray<ServerProviderModel>;
 }) {

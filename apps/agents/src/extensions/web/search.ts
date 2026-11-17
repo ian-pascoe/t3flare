@@ -1,7 +1,7 @@
 // Adapted from cloudpid@93ba45a3:packages/extensions/src/web/search.ts (SPI-1054; see ./NOTICE.md): `web_search`, with
 // cloudpid's parameters, budget and sanitizing. The provider differs. cloudpid asks Exa or Parallel with keys the deploy
 // holds; t3flare holds neither and adds no owner secret (ADR-0016), so it asks a search-capable model on one of the
-// owner's Model endpoints (SPI-1176; until the hard cut, the Model proxy) with the endpoint's own key, which the Session
+// owner's Model endpoints with the endpoint's own key, which the Session
 // asks the Environment for at use time and never stores (ADR-0034 §4). The request is an Anthropic Messages call with
 // the server-side `web_search` tool, so the endpoint is an Anthropic Messages one with an API key or no auth whose
 // server takes that tool (Anthropic's API; Commissary passes it to a Claude upstream or translates it to a Codex
@@ -12,6 +12,7 @@
 // it on (the registry's `web.search`).
 // @effect-diagnostics asyncFunction:off
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
+import { type EndpointModel, findEndpointModel, type ModelEndpoint, type ModelEndpoints, modelSettingSlug, SETUP_HINT } from "@t3flare/models/endpoints";
 import { int, obj, opt, str } from "@earendil-works/pi-schema";
 
 import { readBoundedBody, statusCause, type WebTransport, WebToolError, withDeadline } from "./net.ts";
@@ -28,6 +29,24 @@ const MAX_SUMMARY_TOKENS = 1_500;
 
 /** Total request budget, including reading the response: a model that searches takes longer than a search API. */
 export const WEB_SEARCH_TIMEOUT_MS = 90_000;
+
+/**
+ * The endpoint and model a search runs on: the search model setting's slug (`modelSettingSlug`: `default`, or a value
+ * no endpoint names, is the small model) among the Anthropic Messages endpoints with an API key or no auth only. A
+ * sign-in's token is never sent outside the Session's own pi-ai requests, and only Anthropic Messages takes the
+ * server-side `web_search` tool. Or why there is none.
+ */
+export const searchChoice = (
+  setting: string,
+  endpoints: ModelEndpoints,
+): { readonly endpoint: ModelEndpoint; readonly model: EndpointModel; readonly slug: string } | { readonly error: string } => {
+  const usable: ModelEndpoints = { ...endpoints, endpoints: endpoints.endpoints.filter((endpoint) => endpoint.api === "anthropic-messages" && (endpoint.auth === "api-key" || endpoint.auth === "none")) };
+  const slug = modelSettingSlug(setting, usable);
+  if (slug === undefined) return { error: `no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with: ${SETUP_HINT}` };
+  const found = findEndpointModel(usable, slug);
+  if (found === undefined) return { error: `the search model ${slug} is not a model of an Anthropic Messages Model endpoint with an API key or no auth (the Harness panel's Web tools)` };
+  return { ...found, slug };
+};
 
 /** Where one search goes: an Anthropic Messages endpoint's base URL, headers and key, and the model's slug and own id. */
 export interface SearchTarget {

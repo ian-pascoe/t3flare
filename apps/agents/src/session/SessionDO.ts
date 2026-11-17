@@ -79,12 +79,12 @@ import { backgroundJobs, TERMCTRL_EXTENSION, TERMCTRL_NAMESPACE, type TermctrlHo
 import { SKILLS_EXTENSION, skillsExtension } from "../extensions/skills.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
-import type { SearchTarget } from "../extensions/web/search.ts";
+import { type SearchTarget, searchChoice } from "../extensions/web/search.ts";
 import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { NO_KEY, sessionModels } from "./models.ts";
 import { credentialFailure } from "./credentialFailure.ts";
-import { findEndpointModel, type ModelEndpoints, modelSettingSlug, SETUP_HINT } from "@t3flare/models/endpoints";
+import { modelSettingSlug } from "@t3flare/models/endpoints";
 import { SessionEndpoints } from "./endpoints.ts";
 import { noteTurnProvider, runsOn } from "./signOut.ts";
 import { suggestionModelOf, suggestPrompt } from "./promptSuggestion.ts";
@@ -352,18 +352,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // Harness settings (ADR-0026): code mode, tool search and the offered tools, taken at a turn's start
 
   /**
-   * Where `web_search` searches now (SPI-1176): the search model setting's slug among the Anthropic Messages endpoints
-   * with an API key or no auth (a sign-in's token is not sent outside the Session's own pi-ai requests), `default` their
-   * small model, with the endpoint's key asked for at use time as a turn's is. Or why it cannot search.
+   * Where `web_search` searches now: the endpoint and model `searchChoice` picks, with the endpoint's key asked for at use
+   * time as a turn's is. Or why it cannot search.
    */
   async #searchTarget(setting: string): Promise<SearchTarget | { readonly error: string }> {
-    const held = this.#endpoints.current();
-    const usable: ModelEndpoints = { ...held, endpoints: held.endpoints.filter((endpoint) => endpoint.api === "anthropic-messages" && (endpoint.auth === "api-key" || endpoint.auth === "none")) };
-    const slug = modelSettingSlug(setting, usable);
-    if (slug === undefined) return { error: `no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with: ${SETUP_HINT}` };
-    const found = findEndpointModel(usable, slug);
-    if (found === undefined) return { error: `the search model ${slug} is not a model of an Anthropic Messages Model endpoint with an API key or no auth (the Harness panel's Web tools)` };
-    const { endpoint, model } = found;
+    const choice = searchChoice(setting, this.#endpoints.current());
+    if ("error" in choice) return choice;
+    const { endpoint, model, slug } = choice;
     if (endpoint.auth === "none") return { baseUrl: endpoint.baseUrl, headers: endpoint.headers, apiKey: NO_KEY, slug, modelId: model.id };
     const credential = await this.#endpoints.credential(endpoint);
     if (credential.apiKey === null) return { error: credentialFailure(endpoint, credential).message };
@@ -608,7 +603,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.ctx.storage.kv.put(TURNS_KEY, turns);
   }
 
-  /** The turns with their model records (`ProxyRecord`, the wire name from the Model proxy's time). */
+  /** The turns with their model records (`ProxyRecord`, a kept wire name). */
   #turnsWithProxy(): Turns {
     const turns = this.#turns();
     const proxy = this.ctx.storage.kv.get<Record<string, ProxyRecord>>(PROXY_KEY) ?? {};
@@ -1058,7 +1053,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   /**
    * A test's fault, on a stage only (`T3FLARE_FAULTS`): every model request is answered with `fixture` until `resetAt`,
-   * in the endpoint's place (`modelLimits.ts`). Refused on prod. (The route's name, `proxy-fault`, is the Model proxy's.)
+   * in the endpoint's place (`modelLimits.ts`). Refused on prod. (`proxy-fault` is a kept route name.)
    */
   proxyFault(input: { readonly fixture: string; readonly resetAt: number }): Promise<{ readonly armed: Fault }> {
     const armed = armFault(this.env.T3FLARE_FAULTS, input);

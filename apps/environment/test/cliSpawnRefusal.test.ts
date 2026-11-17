@@ -2,13 +2,14 @@
 // "Failed to open <driver> provider session <id>." The wrapper puts a `ProviderSetupError` with the refusal under t3's
 // open error, and t3's failure text reads through to it (`knownProviderFailureMessage`, as `ProviderTurnStartService`'s
 // `startFailureMessage` does).
-import { ProviderDriverKind, ProviderInstanceId, ProviderSessionId } from "@t3tools/contracts";
+import { ProviderDriverKind, ProviderInstanceId, ProviderSessionId, ThreadId } from "@t3tools/contracts";
 import { knownProviderFailureMessage } from "@t3tools/provider-core/server/failure";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as Effect from "effect/Effect";
 import * as PlatformError from "effect/PlatformError";
 import { describe, expect, it } from "vitest";
 import { noEndpointFor } from "../src/agents/cliProfiles.ts";
-import { spawnRefusalOf, withSpawnRefusal } from "../src/provider/cli/wrapper.ts";
+import { spawnRefusalOf, withSpawnRefusal, wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 
 const driver = ProviderDriverKind.make("codex");
 const providerSessionId = ProviderSessionId.make("session-1");
@@ -32,5 +33,38 @@ describe("a refused CLI spawn (SPI-1176)", () => {
     const failed = new ProviderAdapter.ProviderAdapterOpenSessionError({ driver, providerSessionId, cause: spawnError("Unknown", "t3flare: the Container did not start") });
     expect(withSpawnRefusal(instanceId, driver, providerSessionId)(failed)).toBe(failed);
     expect(spawnRefusalOf(spawnError("PermissionDenied", "EACCES"))).toBeUndefined();
+  });
+});
+
+describe("the CLI wrapper's open (SPI-1176)", () => {
+  /** A stand-in for t3's adapter whose open fails as t3's Codex adapter's does on a refused spawn. */
+  const refusing = (cause: unknown) =>
+    ({
+      instanceId,
+      driver,
+      getCapabilities: () => Effect.die("unused"),
+      planSelectionTransition: () => Effect.die("unused"),
+      openSession: () => Effect.fail(new ProviderAdapter.ProviderAdapterOpenSessionError({ driver, providerSessionId, cause })),
+    }) as unknown as ProviderAdapter.ProviderAdapterV2["Service"];
+  const open = (adapter: ProviderAdapter.ProviderAdapterV2["Service"]) =>
+    Effect.runPromise(
+      Effect.scoped(
+        wrapCliAdapter(adapter, { sessions: new Map() }).openSession({
+          threadId: ThreadId.make("thread-refused"),
+          providerSessionId,
+          modelSelection: { instanceId, model: "x" },
+          runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd: "/w/x" }),
+        } as never),
+      ).pipe(Effect.flip),
+    );
+
+  it("fails a refused spawn's open with the refusal as t3's failure text", async () => {
+    const failed = await open(refusing(spawnError("PermissionDenied", `t3flare: ${refusal}`)));
+    expect(knownProviderFailureMessage({ cause: failed })).toBe(`${refusal}.`);
+  });
+
+  it("passes any other open failure through as it was", async () => {
+    const failed = await open(refusing(spawnError("Unknown", "t3flare: the Container did not start")));
+    expect(knownProviderFailureMessage({ cause: failed })).toBeUndefined();
   });
 });

@@ -137,7 +137,8 @@ export const cliClientFactory = (spawner: ChildProcessSpawner.ChildProcessSpawne
   }),
 });
 
-const snapshotOf = (enabled: boolean, setupMode: string | undefined) =>
+/** Codex's snapshot: the OpenAI Responses endpoints' models, else needing setup (SPI-1176). */
+export const snapshotOf = (enabled: boolean, setupMode: string | undefined) =>
   Effect.gen(function* () {
     const checkedAt = DateTime.formatIso(yield* DateTime.now);
     const managed = setupMode === "managed";
